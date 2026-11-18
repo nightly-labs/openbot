@@ -113,6 +113,8 @@ export const messages = {
   "status.agent.uiBlockClosedByMessage": "Fermé par un nouveau message",
   "status.agent.nextStepContinues": "L’agent s’est arrêté avant l’étape suivante. Il continue ({current} sur {limit}).",
   "status.agent.planContinues": "Le plan a des étapes en cours. L’agent continue ({current} sur {limit}).",
+  "status.agent.planStopped":
+    "L’agent s’est arrêté avec des étapes en cours dans son plan. Envoyez un message pour continuer.",
   "status.agent.compactionContinues":
     "La connexion s’est interrompue pendant que l’agent compactait son contexte. L’agent continue.",
   "status.agent.providerExitContinues": "L’agent s’est arrêté avant de finir sa réponse. L’agent continue.",

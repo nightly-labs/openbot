@@ -97,7 +97,9 @@ export interface AcpFlavor {
    * writes a diagnostic that it redacts first, and `model` is the session's model. `endpoint` is the
    * custom endpoint that serves that model, or null. `savedKey` tells whether OpenBot sent a saved
    * API key for the provider of that model. `providerKeyStored` reads, at each call, whether the
-   * agent's own store has a key for a provider.
+   * agent's own store has a key for a provider. `label` is the agent's name for the user.
+   * `refusalStatus` reads the HTTP status of the provider refusal that the agent's own store keeps
+   * for this turn, or null.
    */
   turnFailure?(
     error: unknown,
@@ -108,6 +110,8 @@ export interface AcpFlavor {
     endpoint: AcpCustomEndpoint | null,
     savedKey: boolean,
     providerKeyStored: (provider: string) => boolean,
+    label: string,
+    refusalStatus: () => number | null,
   ): string;
   /**
    * The cause of a turn's failure that the agent names in a structured field, such as an error name
@@ -220,6 +224,11 @@ export interface AcpFlavor {
     failedSession(stderrLine: string): string | undefined;
     /** The start of an answer that is the failure text, when no stderr line came. */
     answerIsFailure: RegExp;
+    /**
+     * The number of the failed model request that an answer chunk reports while the agent tries it
+     * again, or `null`. The chunk is a status of the turn, not its answer and not yet its failure.
+     */
+    retryNotice?(text: string): number | null;
     /** The failure text of a model step that ended with neither text nor tool calls. */
     emptyOutputFailure?: RegExp;
     /**
@@ -946,8 +955,38 @@ function customEmptyAnswerFailure({ answered }: { answered: boolean }, label: st
   return answered ? null : sourceText("error.provider.acpNoAnswer", { provider: label });
 }
 
+/**
+ * A custom agent's `refusal` stop reason names no cause, and agents use it for other things than
+ * blocked content: WorkBuddy sends it when its sign-in is missing (#8876). The chat showed only the
+ * word "refusal", and analytics counted blocked content.
+ */
+function customRefusal(error: unknown, detail: string, label: string): string {
+  return error === "refusal" ? sourceText("error.provider.acpRefusedNoReason", { provider: label }) : detail;
+}
+
+const customTurnFailure: NonNullable<AcpFlavor["turnFailure"]> = (
+  error,
+  detail,
+  _redact,
+  _log,
+  _model,
+  _endpoint,
+  _savedKey,
+  _providerKeyStored,
+  label,
+) => customRefusal(error, detail, label);
+
+function customFailureCause(error: unknown): CauseCode | null {
+  return error === "refusal" ? "unknown" : null;
+}
+
 /** Oh My Pi (`omp acp`). Its rules are here when they do not apply to every custom agent. */
-const OMP_ACP_FLAVOR: AcpFlavor = { sessionNotFound: ompSessionNotFound, emptyAnswerFailure: customEmptyAnswerFailure };
+const OMP_ACP_FLAVOR: AcpFlavor = {
+  sessionNotFound: ompSessionNotFound,
+  emptyAnswerFailure: customEmptyAnswerFailure,
+  turnFailure: customTurnFailure,
+  failureCause: customFailureCause,
+};
 
 /**
  * A custom agent without a flavor of its own. It keeps omp's rule: the rule needs the exact session
@@ -956,6 +995,8 @@ const OMP_ACP_FLAVOR: AcpFlavor = { sessionNotFound: ompSessionNotFound, emptyAn
 const CUSTOM_ACP_FLAVOR: AcpFlavor = {
   sessionNotFound: ompSessionNotFound,
   emptyAnswerFailure: customEmptyAnswerFailure,
+  turnFailure: customTurnFailure,
+  failureCause: customFailureCause,
 };
 
 const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
@@ -975,8 +1016,9 @@ const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
     mcpServerLimit: HERMES_MCP_SERVER_LIMIT,
     setsConfigOnlyOnChange: true,
     resendsAnswer: true,
-    turnFailure: hermesTurnFailure,
-    failureCause: hermesFailureCause,
+    turnFailure: (error, detail, _redact, _log, _model, _endpoint, _savedKey, _providerKeyStored, label) =>
+      customRefusal(error, hermesTurnFailure(error, detail), label),
+    failureCause: (error, answer) => customFailureCause(error) ?? hermesFailureCause(error, answer),
     failureReport: HERMES_FAILURE_SUMMARY,
     catalogAsMcpTools: true,
   },

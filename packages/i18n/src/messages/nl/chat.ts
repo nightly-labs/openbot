@@ -320,6 +320,7 @@ export const messages = {
   "chat.image.didNotComplete": "Het genereren van de afbeelding is niet voltooid.",
   "chat.image.generating": "Afbeelding genereren",
   "chat.image.unavailable": "Afbeelding niet beschikbaar",
+  "chat.image.unavailableNamed": "Afbeelding niet beschikbaar: {name}",
   "chat.image.interrupted": "Genereren van afbeelding onderbroken",
   "chat.image.failed": "Genereren van afbeelding mislukt",
   "chat.image.attached": "Bijgevoegde afbeelding",

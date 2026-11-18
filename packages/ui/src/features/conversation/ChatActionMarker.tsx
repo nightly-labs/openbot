@@ -1,3 +1,4 @@
+import type { AgentProviderId } from "@openbot/contracts/agent-providers";
 import type { QueueDeliveryStatus, WithdrawFeedbackStatus } from "@openbot/contracts/ipc";
 import type { AppFormat, AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
@@ -10,6 +11,7 @@ import {
   DropdownMenu,
   Globe2,
   LoaderCircle,
+  LogIn,
   Marker,
   MarkerContent,
   MarkerIcon,
@@ -52,6 +54,11 @@ interface ChatActionMarkerProps {
    * for a routine, when the routine has no thread: its runs then show in the chat.
    */
   openRoutineThread?: ((routineId: string) => (() => void) | undefined) | undefined;
+  /**
+   * Why a failed routine run failed, by run id: the reason that the agent reported, or the error of
+   * the run. Absent, or undefined for a run, when this client cannot read the run history.
+   */
+  routineRunFailure?: ((runId: string) => string | undefined) | undefined;
   onOpenHostedSite?: ((url: string) => void) | undefined;
   /** Opens a web link outside the app, such as the issue of sent feedback. */
   onOpenLink?: ((url: string) => void) | undefined;
@@ -72,6 +79,8 @@ interface ChatActionMarkerProps {
   instructions?: AgentInstructionsFileCalls | undefined;
   /** Opens the Instructions page of the agent. Absent where the chat has no settings page for it. */
   onOpenInstructions?: ((agentId: string) => void) | undefined;
+  /** Starts the sign-in of a provider whose expired sign-in failed a turn. Absent, its note has no button. */
+  onSignInProvider?: ((provider: AgentProviderId) => void) | undefined;
 }
 
 /** The actions of a skill or instruction change line, the same in the agent's chat and in its threads. */
@@ -150,6 +159,7 @@ export function ChatActionMarker(props: ChatActionMarkerProps) {
                       onSelectAgent={props.onSelectAgent}
                       onOpenRoutine={props.onOpenRoutine}
                       openRoutineThread={props.openRoutineThread}
+                      routineRunFailure={props.routineRunFailure}
                       onOpenHostedSite={props.onOpenHostedSite}
                       onOpenLink={props.onOpenLink}
                       onToggleRoutineRun={props.onToggleRoutineRun}
@@ -157,6 +167,7 @@ export function ChatActionMarker(props: ChatActionMarkerProps) {
                       agentMessageText={props.agentMessageText}
                       instructions={props.instructions}
                       onOpenInstructions={props.onOpenInstructions}
+                      onSignInProvider={props.onSignInProvider}
                     />
                   )}
                 </Show>
@@ -520,6 +531,13 @@ function SingleChatActionMarker(
     const marker = textMessage();
     return marker?.expanded === true ? marker : undefined;
   };
+  // Without the reason, a failed run next to the answer it gave does not say what went wrong (#11143).
+  const failureReason = () => {
+    const marker = props.marker;
+    if (marker.kind !== "routine-run" || marker.status !== "failed") return undefined;
+    const reason = props.routineRunFailure?.(marker.runId);
+    return reason ? sourceText(reason) : undefined;
+  };
   return (
     <Marker
       class={`chat-action-marker chat-action-marker-${props.marker.kind}`}
@@ -584,6 +602,17 @@ function SingleChatActionMarker(
               <span class="chat-action-marker-label chat-action-run-group-count">
                 {t("chat.marker.agentCount", { count: count() })}
               </span>
+            )}
+          </Show>
+          <Show when={props.marker.kind === "sign-in-failure" && props.onSignInProvider && props.marker}>
+            {(marker) => (
+              <ActionTarget
+                available
+                actionLabel={t("provider.action.signIn")}
+                name={t("provider.action.signIn")}
+                icon={LogIn}
+                onOpen={() => props.onSignInProvider?.(marker().provider)}
+              />
             )}
           </Show>
           <Show when={instructionsChange(props.marker, props.instructions, props.onOpenInstructions)}>
@@ -665,6 +694,13 @@ function SingleChatActionMarker(
             </Button>
           </Show>
         </MarkerContent>
+        <Show when={failureReason()}>
+          {(reason) => (
+            <p class="chat-action-marker-reason" title={reason()}>
+              {reason()}
+            </p>
+          )}
+        </Show>
         <Show when={historyShown() && routineHistory()}>
           {(transitions) => (
             <RoutineRunHistory
@@ -1095,7 +1131,8 @@ function markerLabel(
     marker.kind === "channel-change" ||
     marker.kind === "vault-change" ||
     marker.kind === "plan-continuation" ||
-    marker.kind === "instructions-change"
+    marker.kind === "instructions-change" ||
+    marker.kind === "sign-in-failure"
   )
     return sourceText(marker.text);
   if (marker.kind === "context-reset") return t("chat.marker.contextReset");
@@ -1186,7 +1223,8 @@ function markerAccessibleLabel(
     marker.kind === "channel-change" ||
     marker.kind === "vault-change" ||
     marker.kind === "plan-continuation" ||
-    marker.kind === "instructions-change"
+    marker.kind === "instructions-change" ||
+    marker.kind === "sign-in-failure"
   )
     return label;
   if (marker.kind === "skill-lifecycle") {

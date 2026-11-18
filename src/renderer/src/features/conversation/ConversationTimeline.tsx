@@ -1,3 +1,4 @@
+import type { AgentProviderId } from "@openbot/contracts/agent-providers";
 import { chatVisualReply } from "@openbot/contracts/chat-visual";
 import type { AgentApproval, ConversationMessageSender, MessageReaction } from "@openbot/contracts/ipc";
 import { FEEDBACK_WITHDRAW_CAPABILITY } from "@openbot/contracts/team-protocol/feedback-withdraw-v1";
@@ -49,7 +50,11 @@ import { useShowAgentSteps } from "../../agent-steps-preference";
 import { planItems, planTitle, replacedPlanIds } from "../../app-message-projection";
 import { useChatBubbleStyle } from "../../chat-bubble-style-preference";
 import { useCompactMessageActions } from "../../compact-message-actions-preference";
-import { remoteRoutineRecovery, serverSupportsCapability } from "../servers/server-capabilities";
+import {
+  remoteRoutineRecovery,
+  serverRoleCanAdminister,
+  serverSupportsCapability,
+} from "../servers/server-capabilities";
 import { speechModelReady } from "../speech/speech-model";
 import { recordingGone, speechReading, spokenReply } from "../speech/speech-playback";
 import {
@@ -78,6 +83,7 @@ import { useMessageBackdropAction, watchAgentBackdrops } from "./message-backdro
 import { createMessageImageFiles } from "./message-image-files";
 import { RoutineChatCard } from "./RoutineChatCard";
 import { createChatWebhookRoutines, RoutineWebhookChatCard } from "./RoutineWebhookChatCard";
+import { createRoutineRunFailures, type RoutineRunFailureSource } from "./routine-run-failures";
 import { desktopChatEventRoutinesApi } from "./routine-webhooks-api";
 import { ServerInstallChatCard } from "./ServerInstallChatCard";
 import { SettingLinkChatCard } from "./SettingLinkChatCard";
@@ -652,6 +658,31 @@ export function ConversationTimeline() {
       webhookRoutines.state.routines.find((candidate) => candidate.id === routineId);
     return routine?.runIn === "chat" ? undefined : props.threads?.routineThread(routineId);
   };
+  /**
+   * The run history of this agent, where a failed run keeps its reason. The browser client reads it
+   * through its runtime; the desktop reads it for this computer, or as an owner or admin of a joined
+   * server, as Agent settings > Routines does.
+   */
+  const routineRunFailureSource = createMemo(
+    (): RoutineRunFailureSource | undefined => {
+      const agentId = channel ? undefined : props.agent?.id;
+      const server = props.server;
+      if (!agentId) return undefined;
+      if (props.runtime) {
+        const routines = props.runtime.routines;
+        return routines ? { agentId, serverId: server?.id, listRuns: routines.listRoutineRuns } : undefined;
+      }
+      if (!server || !serverRoleCanAdminister(server)) return undefined;
+      return {
+        agentId,
+        serverId: server.id,
+        listRuns: (input) => window.openbot.agent.listRoutineRuns(input, server.id),
+      };
+    },
+    // A new adapter for the same agent and host is the same history: no new read.
+    { equals: (left, right) => left?.agentId === right?.agentId && left?.serverId === right?.serverId },
+  );
+  const routineRunFailure = createRoutineRunFailures(routineRunFailureSource, timelineMessages);
   // The plain marker of a webhook routine opens it too: the host lists those routines on their own.
   const availableRoutineIds = createMemo(() =>
     props.availableRoutineIds
@@ -682,6 +713,22 @@ export function ConversationTimeline() {
       ? mcpServers().find((config) => config.id === marker.mcpServerId && config.transport === "http")
       : undefined;
   const settingLinkMarker = (marker: ChatActionMarkerModel) => (marker.kind === "setting-link" ? marker : undefined);
+  /**
+   * Only the newest note of an expired sign-in offers Sign in: a later message shows the sign-in worked.
+   * The agent must still use that provider. OpenCode signs in with a key in settings, so its note has no
+   * button, as above the composer.
+   */
+  const signInAction = (message: AgentMessage | undefined) => {
+    const signIn = props.onSignInProvider;
+    const marker = message?.actionMarker;
+    return signIn &&
+      marker?.kind === "sign-in-failure" &&
+      marker.provider !== "opencode" &&
+      marker.provider === props.agent?.provider &&
+      props.messages.at(-1)?.id === message?.id
+      ? (provider: AgentProviderId) => void signIn(provider)
+      : undefined;
+  };
   /** An install command card, where this client can watch its server list. Elsewhere it keeps the marker. */
   const serverInstallCard = (marker: ChatActionMarkerModel) => {
     const watch = props.serverInstall;
@@ -811,7 +858,9 @@ export function ConversationTimeline() {
     props.routines?.find((routine) => routine.instruction.trim())?.instruction;
   // A skill of the agent's own: every agent has the managed OpenBot skills.
   const sampleSkillName = () =>
-    installedSkills().find((skill) => skill.enabled !== false && skill.origin !== "managed")?.name;
+    installedSkills().find(
+      (skill) => skill.enabled !== false && skill.origin !== "managed" && skill.problem === undefined,
+    )?.name;
   return (
     <>
       <span class="sr-only" role="status" aria-live="polite" aria-atomic="true">
@@ -1148,6 +1197,7 @@ export function ConversationTimeline() {
                                                             onSelectAgent={props.onSelectAgent}
                                                             onOpenRoutine={openRoutineSettings}
                                                             openRoutineThread={openRoutineThread}
+                                                            routineRunFailure={routineRunFailure}
                                                             onOpenHostedSite={(url) => void openExternalMessageUrl(url)}
                                                             onOpenLink={(url) => void openExternalMessageUrl(url)}
                                                             onWithdrawFeedback={withdrawFeedback()}
@@ -1157,6 +1207,7 @@ export function ConversationTimeline() {
                                                             agentMessageText={agentMessageText}
                                                             instructions={changeMarkerActions.instructions}
                                                             onOpenInstructions={changeMarkerActions.onOpenInstructions}
+                                                            onSignInProvider={signInAction(message())}
                                                           />
                                                         }
                                                       >

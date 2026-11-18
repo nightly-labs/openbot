@@ -1,4 +1,4 @@
-import type { AgentProviderRef } from "@openbot/contracts/agent-providers";
+import type { AgentProviderId, AgentProviderRef } from "@openbot/contracts/agent-providers";
 import type {
   AgentAccess,
   AgentExchangeSummary,
@@ -205,6 +205,8 @@ export type ChatActionMarkerModel =
   | { kind: "vault-change"; text: string; timestamp: string }
   /** The agent continues by itself, because its plan still has open steps. `text` is the host's note. */
   | { kind: "plan-continuation"; text: string; timestamp: string }
+  /** A turn failed because the provider's sign-in expired. `text` is the host's note of the reason. */
+  | { kind: "sign-in-failure"; provider: AgentProviderId; text: string; timestamp: string }
   /**
    * The agent changed its instruction file in a turn. `text` is the host's note. `change` is absent on a
    * remote client and for a text longer than the editor saves: then the line has no Undo.
@@ -363,7 +365,7 @@ export type ComposerAgent = Pick<
 /** The skill fields that the composer, the queue and rich text read. */
 export type ComposerSkill = Pick<
   InstalledSkill,
-  "skillId" | "slug" | "name" | "state" | "enabled" | "origin" | "description"
+  "skillId" | "slug" | "name" | "state" | "enabled" | "origin" | "description" | "problem"
 >;
 
 /** The MCP server fields that the composer reads. It never reads the environment or the headers. */

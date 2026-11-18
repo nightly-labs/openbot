@@ -86,6 +86,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.runtimeUpdateIncomplete": "The runtime update did not complete.",
   "error.provider.downloadHttp": "Runtime download failed with HTTP {status}.",
   "error.provider.downloadNoData": "Runtime download returned no data.",
+  "error.provider.downloadStalled":
+    "The download stopped because no data arrived for one minute. Check the internet connection, then try again.",
   "error.provider.downloadSize": "The runtime download has an unexpected size.",
   "error.provider.downloadIntegrity": "The runtime download failed its integrity check.",
   "error.provider.runtimeReplacing": "The runtime could not be installed because another instance is replacing it.",
@@ -227,6 +229,8 @@ export const messages = defineMessages("error.provider", {
     "Your OpenCode API key expired. Create a new key in OpenCode Console, paste it in the OpenCode settings, then try again.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go refused your saved API key. The key may have expired. Create a new key in OpenCode Console, paste it in the OpenCode settings, then try again.",
+  "error.provider.opencodeGoRequestRefused":
+    "OpenCode Go refused the request. A new API key does not fix this. Your OpenCode Go plan may not be active, or OpenCode Go may block your network: some services block VPNs, proxies or some countries. Make sure that your plan is active in OpenCode Console, or turn off the VPN, then try again. You can also choose a different model.",
   "error.provider.opencodeServiceFailure":
     "OpenCode could not complete this turn because its local service failed. Try again. If the error continues, reconnect OpenCode in Settings.",
   "error.provider.opencodeRateLimited":
@@ -272,6 +276,7 @@ export const messages = defineMessages("error.provider", {
     "{provider} ended the turn with no answer. Send the message again, or start a new chat.",
   "error.provider.noAnswerAfterSteps":
     "{provider} did some steps, then ended the turn with no answer. Ask the agent what it did before you send the same request again.",
+  "error.provider.acpRefusedNoReason": "{provider} stopped without an answer. Send the message again.",
   "error.provider.chatgptPageFailed": "OpenBot could not open the ChatGPT connection page.",
   "error.provider.noneReady": "No agent provider is ready.",
   "error.provider.claudeTurnActive": "Wait for the active Claude turn before refreshing its context.",

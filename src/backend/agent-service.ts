@@ -2106,11 +2106,31 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               .stopAgentProcess(agentId)
               .pipe(Effect.mapError((failure) => new AgentRemovalFailed({ cause: failure.cause })));
             if (process.platform !== "win32") return false;
-            const release = yield* Effect.try({
-              try: () => this.#releasesSharedOpenCode(agentId),
+            const providers = yield* Effect.try({
+              try: () => this.#sharedProcessesToRelease(agentId),
               catch: (cause) => new AgentRemovalFailed({ cause }),
             });
-            return release ? yield* this.#providers.releaseSharedProcess("opencode") : false;
+            return providers.includes("opencode") ? yield* this.#providers.releaseSharedProcess("opencode") : false;
+          }),
+        releaseFolderHolders: (agentId) =>
+          Effect.gen({ self: this }, function* () {
+            if (process.platform !== "win32") return false;
+            const providers = yield* Effect.try({
+              try: () => this.#sharedProcessesToRelease(agentId),
+              catch: (cause) => new AgentRemovalFailed({ cause }),
+            });
+            let kept = false;
+            // `stopAgentProcess` already released OpenCode. The delete archives each Codex thread, and the
+            // archive ends the processes of that thread (#6266), while a release of Codex would end the
+            // background terminals of the other agents.
+            for (const provider of providers)
+              if (
+                provider !== "opencode" &&
+                provider !== "codex" &&
+                (yield* this.#providers.releaseSharedProcess(provider))
+              )
+                kept = true;
+            return kept;
           }),
         currentClient: (provider) => this.#providers.currentClient(provider),
         usageLimitHolds: (agentId) => !this.#usageLimits.mayDrain(agentId),
@@ -2836,6 +2856,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   cancelMcpSignIn(input: CancelMcpSignInInput): void {
     this.#mcp.cancelSignIn(input.url);
+  }
+
+  mcpSignInLink(input: CancelMcpSignInInput): string | null {
+    return this.#mcp.signInLink(input.url);
   }
 
   signOutMcpServer(input: SignOutMcpServerInput): Effect.Effect<McpSignInState[], AgentLifecycleFailed> {
@@ -6070,23 +6094,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   /**
-   * Whether the delete stops the shared OpenCode process, which can have worked in this agent's folder: the agent is set to it or
-   * has a session on it. False while another OpenCode agent's session settings are read: that read uses the process.
+   * The providers whose shared process can have worked in this agent's folder: the agent is set to the provider or has
+   * a session on it. OpenCode keeps watchers there (#7029), and a command that another CLI, such as Grok, started there
+   * can keep the folder too (#12294). A provider is left out while another of its agents' session settings are read:
+   * that read uses the process.
    */
-  #releasesSharedOpenCode(agentId: string): boolean {
+  #sharedProcessesToRelease(agentId: string): AgentProvider[] {
     const agents = this.#store.list();
     const agent = agents.find((candidate) => candidate.id === agentId);
-    if (!agent) return false;
-    if (
-      agents.some(
-        (candidate) => providerForAgent(candidate) === "opencode" && this.#drain.holdsSessionSettings(candidate.id),
-      )
-    )
-      return false;
-    if (providerForAgent(agent) === "opencode") return true;
-    return agent.threadId
-      ? this.#store.database.listProviderSessions(agent.threadId).some((session) => session.provider === "opencode")
-      : false;
+    if (!agent) return [];
+    const providers = new Set<AgentProvider>([providerForAgent(agent)]);
+    if (agent.threadId)
+      for (const session of this.#store.database.listProviderSessions(agent.threadId)) providers.add(session.provider);
+    for (const candidate of agents)
+      if (this.#drain.holdsSessionSettings(candidate.id)) providers.delete(providerForAgent(candidate));
+    return [...providers];
   }
 
   /** Whether this provider reports a CLI that is installed, current, and signed in. */

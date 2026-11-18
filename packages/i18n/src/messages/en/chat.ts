@@ -311,6 +311,7 @@ export const messages = defineMessages("chat", {
   "chat.image.didNotComplete": "Image generation did not complete.",
   "chat.image.generating": "Generating image",
   "chat.image.unavailable": "Image unavailable",
+  "chat.image.unavailableNamed": "Image unavailable: {name}",
   "chat.image.interrupted": "Image generation interrupted",
   "chat.image.failed": "Image generation failed",
   "chat.image.attached": "Attached image",

@@ -310,6 +310,7 @@ export const messages = {
   "chat.image.didNotComplete": "图片生成未完成。",
   "chat.image.generating": "正在生成图片",
   "chat.image.unavailable": "图片不可用",
+  "chat.image.unavailableNamed": "图片不可用：{name}",
   "chat.image.interrupted": "图片生成已中断",
   "chat.image.failed": "图片生成失败",
   "chat.image.attached": "已附加的图片",

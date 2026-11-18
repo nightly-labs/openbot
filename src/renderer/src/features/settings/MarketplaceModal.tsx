@@ -255,6 +255,8 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
             hostName={props.pluginHostName}
             signInHostName={props.pluginSignInRelay ? props.pluginHostName : undefined}
             onCancelSignIn={controller.cancelSignIn}
+            /* A joined server's sign-in opens on the host or through the relay, which has its own controls. */
+            onCopySignInLink={props.pluginHostName ? undefined : controller.copySignInLink()}
             signInExtra={
               /* The page opens in this computer's browser; the paste field is the way back when the
                  browser cannot reach this computer's listener. A page that only the joined server can

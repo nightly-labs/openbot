@@ -89,7 +89,7 @@ import {
   openCodeModelName,
   openCodeSignInMessage,
 } from "./opencode-config";
-import { hasOpenCodeProviderKey, readOpenCodeGoUsage } from "./opencode-usage";
+import { hasOpenCodeProviderKey, readOpenCodeGoUsage, readOpenCodeRefusalStatus } from "./opencode-usage";
 import { PiAgentClient } from "./pi-client";
 import {
   antigravityStatePaths,
@@ -1286,6 +1286,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         // OpenCode 2.3.0 sends a provider's 403 as a missing sign-in, also with a saved key (#10166).
         providerKeyStored: (provider) =>
           Effect.runSync(hasOpenCodeProviderKey(provider, { ...process.env, ...context.agentEnvironment?.() })),
+        // OpenCode 2.2.5 sends a 401 and a 403 as the same `-32000`; its database keeps the status (#12281).
+        providerRefusalStatus: (sessionId) =>
+          Effect.runSync(readOpenCodeRefusalStatus(sessionId, { ...process.env, ...context.agentEnvironment?.() })),
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
         reportMcpDrops: context.reportMcpDrops,

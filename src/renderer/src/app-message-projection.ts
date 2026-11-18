@@ -26,6 +26,7 @@ import {
   routineConversationEvent,
   routineRunConversationEvent,
   settingLinkEvent,
+  signInFailureProvider,
   skillConversationEvent,
   skillSuggestionEvent,
 } from "@openbot/contracts/ipc";
@@ -510,6 +511,9 @@ function chatActionMarker(
   if (isVaultChangeMarker(message)) return { kind: "vault-change", text: message.text, timestamp: message.createdAt };
   if (isPlanContinuationMarker(message))
     return { kind: "plan-continuation", text: message.text, timestamp: message.createdAt };
+  const signInProvider = signInFailureProvider(message);
+  if (signInProvider)
+    return { kind: "sign-in-failure", provider: signInProvider, text: message.text, timestamp: message.createdAt };
   if (message.author === "system" && message.itemType === AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE)
     return {
       kind: "instructions-change",

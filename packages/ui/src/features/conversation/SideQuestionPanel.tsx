@@ -9,6 +9,7 @@ import { ComposerStackCard } from "@openbot/ui/features/conversation/ComposerSta
 import { formatChatTimestamp } from "@openbot/ui/features/conversation/chat-timestamp";
 import { type ChatBubbleStyle, ownMessageAuthor } from "@openbot/ui/features/conversation/own-bubble";
 import { useText } from "@openbot/ui/text";
+import type { JSX } from "@solidjs/web";
 import { For, onSettled, Show } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
 import { createComposerRowsResize } from "./createComposerRowsResize";
@@ -43,6 +44,8 @@ export interface SideQuestionPanelProps {
   onAsk: (question: string) => void;
   onClosePanel: () => void;
   onOpenLink: (url: string) => void;
+  /** The handle on the start edge that sets the width of the side panel. */
+  resizer?: JSX.Element;
   /** The window draws the macOS window controls over the top start corner. The image viewer leaves room. */
   macWindowControls?: boolean | undefined;
 }
@@ -102,6 +105,7 @@ export function SideQuestionPanel(props: SideQuestionPanelProps) {
       class="browser-panel side-question-panel"
       aria-label={t("conversation.sidePanel.pane.question")}
     >
+      {props.resizer}
       <header class="file-preview-header side-panel-pane-header">
         <h2 class="side-panel-pane-title">{t("conversation.sidePanel.pane.question")}</h2>
         <Button

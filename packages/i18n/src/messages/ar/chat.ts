@@ -464,6 +464,7 @@ export const messages = {
   "chat.image.didNotComplete": "لم يكتمل إنشاء الصورة.",
   "chat.image.generating": "جارٍ إنشاء الصورة",
   "chat.image.unavailable": "الصورة غير متاحة",
+  "chat.image.unavailableNamed": "الصورة غير متاحة: {name}",
   "chat.image.interrupted": "انقطع إنشاء الصورة",
   "chat.image.failed": "فشل إنشاء الصورة",
   "chat.image.attached": "صورة مرفقة",

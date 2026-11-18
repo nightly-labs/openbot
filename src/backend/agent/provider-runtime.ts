@@ -4,7 +4,6 @@ import { statSync } from "node:fs";
 import { basename } from "node:path";
 import type {
   AccountUsage,
-  AccountUsageLimit,
   AgentEvent,
   AgentModelId,
   AgentModelOption,
@@ -1152,7 +1151,8 @@ export class ProviderRuntime implements ProviderPort {
   /**
    * Stops the provider's shared process now, when nothing uses it, as an idle release does. OpenCode
    * keeps watchers in each folder that one of its sessions used until its process ends, also after
-   * `session/close`, and Windows refuses to remove a watched folder (`EBUSY`, #7029). A process that
+   * `session/close`, and a command that a CLI started in a folder can keep it too. Windows refuses to
+   * remove a folder that a process holds (`EBUSY`, #7029, #12294). A process that
    * a turn of another agent uses stays: the delete fails, and a retry after that turn can succeed.
    * True when work keeps the process: a turn, a start, or work that a turn left running.
    */
@@ -2199,29 +2199,40 @@ export class ProviderRuntime implements ProviderPort {
   poolMembers(provider: AgentProvider, model: string): PoolCandidate[] {
     const pool = this.#providerAccounts?.pool(provider);
     if (!pool || !this.#providerAccounts) return [];
-    const quota = (limit: AccountUsageLimit | null | undefined) => {
-      const windows = limit ? usageQuotaForModel(limit, model) : undefined;
-      return windows ? { primary: windows.primary, secondary: windows.secondary } : null;
-    };
     const ownSignIn =
       this.#clients.has(provider) || this.#released.has(provider)
         ? this.status().providers?.find((row) => row.id === provider)?.state === "available" &&
           !this.ownSignInUsesKey(provider)
         : false;
-    const members: PoolCandidate[] = [
+    const members = [
       ...(ownSignIn
         ? [
             {
               accountId: DEFAULT_PROVIDER_ACCOUNT_ID,
-              reading: this.#usageUnreported.has(provider) ? null : quota(this.#lastUsage.get(provider)),
+              limit: this.#usageUnreported.has(provider) ? null : (this.#lastUsage.get(provider) ?? null),
             },
           ]
         : []),
       ...this.#providerAccounts
         .planAccounts(provider)
-        .map((accountId) => ({ accountId, reading: quota(this.#providerAccounts?.keptUsage(accountId)) })),
-    ];
-    return members.filter((member) => !pool.leftOut.includes(member.accountId));
+        .map((accountId) => ({ accountId, limit: this.#providerAccounts?.keptUsage(accountId) ?? null })),
+    ].map(({ accountId, limit }) => ({
+      accountId,
+      windows: limit ? usageQuotaForModel(limit, model) : undefined,
+      namesModels: limit?.groups?.some((group) => group.models.length > 0) === true,
+    }));
+    // A reading whose quota groups name their models, but no group names this model: the account's
+    // plan does not have the model, such as Gemini 4 Argon on a Plus plan (#12276). The account is
+    // left out only when the group of another account names the model, so a model that no group
+    // names, such as a code name, stays usable on each account.
+    const named = members.some((member) => member.namesModels && member.windows !== undefined);
+    return members
+      .filter((member) => !pool.leftOut.includes(member.accountId))
+      .filter((member) => !(named && member.namesModels && member.windows === undefined))
+      .map(({ accountId, windows }) => ({
+        accountId,
+        reading: windows ? { primary: windows.primary, secondary: windows.secondary } : null,
+      }));
   }
 
   /** Shows the account that the pool uses now in the provider's row. */

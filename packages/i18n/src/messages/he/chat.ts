@@ -327,6 +327,7 @@ export const messages = {
   "chat.image.didNotComplete": "יצירת התמונה לא הושלמה.",
   "chat.image.generating": "יוצר תמונה",
   "chat.image.unavailable": "התמונה אינה זמינה",
+  "chat.image.unavailableNamed": "התמונה אינה זמינה: {name}",
   "chat.image.interrupted": "יצירת התמונה הופסקה",
   "chat.image.failed": "יצירת התמונה נכשלה",
   "chat.image.attached": "תמונה מצורפת",

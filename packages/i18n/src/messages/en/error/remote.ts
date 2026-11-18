@@ -25,6 +25,13 @@ export const messages = defineMessages("error.remote", {
     "The host has not allowed OpenBot to record its screen. Grant screen recording on the host, then try again.",
   "error.remote.windowsSessionDisconnected":
     "The Windows session on the host is disconnected, so it has no screen to share. Sign in to Windows at the screen of the host, then try again.",
+  // The remote desktop viewer decoded no frame for 20 seconds: the connection cannot carry the stream.
+  // The desktop app and the browser then use a lower quality for the next stream.
+  "error.remote.streamTooSlowLowerQuality":
+    "The connection to the host is too slow for the picture. Try again: the next connection uses a lower quality.",
+  // The same stall on the phone app, which has its own quality menu, or at the lower quality already.
+  "error.remote.streamTooSlow":
+    "The connection to the host is too slow for the picture. Use a faster network, then try again.",
   "error.remote.teamSessionExpired": "The team session has expired.",
   "error.remote.finishTestBeforeSwitch": "Finish the remote desktop test before switching displays.",
   "error.remote.displayNotFound": "Remote display not found.",

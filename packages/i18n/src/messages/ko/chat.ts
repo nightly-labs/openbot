@@ -311,6 +311,7 @@ export const messages = {
   "chat.image.didNotComplete": "이미지 생성을 완료하지 못했어요.",
   "chat.image.generating": "이미지 생성 중",
   "chat.image.unavailable": "이미지를 사용할 수 없음",
+  "chat.image.unavailableNamed": "이미지를 사용할 수 없음: {name}",
   "chat.image.interrupted": "이미지 생성 중단됨",
   "chat.image.failed": "이미지 생성 실패",
   "chat.image.attached": "첨부된 이미지",

@@ -87,6 +87,8 @@ export const messages = {
   "error.provider.runtimeUpdateIncomplete": "Обновление среды выполнения не завершено.",
   "error.provider.downloadHttp": "Загрузка среды выполнения не удалась: HTTP {status}.",
   "error.provider.downloadNoData": "Загрузка среды выполнения не вернула данных.",
+  "error.provider.downloadStalled":
+    "Загрузка остановилась, потому что данные не поступали в течение минуты. Проверьте подключение к интернету и повторите попытку.",
   "error.provider.downloadSize": "У загруженной среды выполнения неожиданный размер.",
   "error.provider.downloadIntegrity": "Загруженная среда выполнения не прошла проверку целостности.",
   "error.provider.runtimeReplacing": "Не удалось установить среду выполнения, потому что другой экземпляр заменяет её.",
@@ -229,6 +231,8 @@ export const messages = {
     "Срок действия API-ключа OpenCode истёк. Создайте новый ключ в OpenCode Console, вставьте его в настройках OpenCode, затем повторите попытку.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go отклонил сохранённый API-ключ. Возможно, срок действия ключа истёк. Создайте новый ключ в OpenCode Console, вставьте его в настройках OpenCode, затем повторите попытку.",
+  "error.provider.opencodeGoRequestRefused":
+    "OpenCode Go отклонил запрос. Новый API-ключ это не исправит. Возможно, ваш план OpenCode Go не активен или OpenCode Go блокирует вашу сеть: некоторые сервисы блокируют VPN, прокси или некоторые страны. Проверьте в OpenCode Console, что план активен, или отключите VPN, затем повторите попытку. Также можно выбрать другую модель.",
   "error.provider.opencodeServiceFailure":
     "OpenCode не смог завершить этот ход из-за сбоя локальной службы. Повторите попытку. Если ошибка повторяется, подключите OpenCode заново в настройках.",
   "error.provider.opencodeRateLimited":
@@ -275,6 +279,7 @@ export const messages = {
     "{provider} завершил ход без ответа. Отправьте сообщение ещё раз или начните новый чат.",
   "error.provider.noAnswerAfterSteps":
     "{provider} выполнил несколько шагов, а затем завершил ход без ответа. Прежде чем снова отправить тот же запрос, спросите агента, что он сделал.",
+  "error.provider.acpRefusedNoReason": "{provider} остановился без ответа. Отправьте сообщение ещё раз.",
   "error.provider.chatgptPageFailed": "OpenBot не смог открыть страницу подключения ChatGPT.",
   "error.provider.noneReady": "Ни один провайдер агентов не готов.",
   "error.provider.claudeTurnActive": "Дождитесь завершения текущего хода Claude, прежде чем обновлять его контекст.",

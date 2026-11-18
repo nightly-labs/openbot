@@ -242,6 +242,7 @@ import { sidebarAgentThreads } from "../agent-threads/sidebar-agent-threads";
 import { type NewAgentDraft, newAgentInput } from "../agents/agent-create-input";
 import { type CreationPreference, resolveCreationModel } from "../agents/agent-creation-model";
 import { agentErrorDetails, claimErrorToast, createRetryNotices, readableAgentError } from "../agents/agent-error-text";
+import { agentTakeoverTabIds } from "../agents/agent-thread-attention";
 import { withHostAccountUsage, withHostProfileAccount } from "../agents/host-provider-accounts";
 import { createRemoteAgentAdmin, updateRemoteAgent } from "../agents/remote-agent-admin";
 import type { ServerBrowserProfilesOptions } from "../browser/ServerBrowserProfilesPanel";
@@ -341,6 +342,7 @@ import { createWebAccountCalls } from "./web-account";
 import { createWebAccountUsage } from "./web-account-usage";
 import { createWebAgentImportCalls } from "./web-agent-import";
 import { createWebAgentThreads } from "./web-agent-threads";
+import { createWebAttachmentMedia } from "./web-attachment-media";
 import { openWebLink } from "./web-attachments";
 import { createWebBillingCalls, createWebLicenseCalls, type WebAppStart } from "./web-billing";
 import { webBitwardenConnectorPort } from "./web-bitwarden-connector";
@@ -1342,6 +1344,13 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       if (online && wasOnline === false) for (const listener of hostOnlineListeners) listener();
     },
   );
+  // The canvas cards show small copies of the host pictures. They have their own budget, so a large
+  // chat file does not push them out.
+  const workflowPreviews = createWebAttachmentMedia(
+    { download: (id) => workspace.runtime.downloadPreview(id) },
+    () => workspace.state.host?.hostId ?? "",
+  );
+  onCleanup(workflowPreviews.dispose);
   const workflowHost = webWorkflowHost({
     request: () => hostRequest(),
     capabilities: () => workspace.state.capabilities,
@@ -1356,6 +1365,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     },
     githubConnector: githubPort,
     attachmentMedia: runtime.attachmentMedia,
+    previewMedia: workflowPreviews,
   });
   // As on desktop: the rail shows the Sunra and Higgsfield credits of the host while the Canvas page is open.
   const mediaCredits = createWorkflowMediaCredits(
@@ -2385,6 +2395,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     }),
   );
   const agentWaits = createMemo(() => sidebarAgentWaits(sidebarActivity()));
+  const agentTakeoverTabs = createMemo(() => agentTakeoverTabIds(workspace.state.agents, workspace.state.takeovers));
   const sidebarAgentMoods = createMemo(() => computeAgentAvatarMoods(sidebarActivity()));
   const browserEnabled = createMemo(
     () =>
@@ -4146,11 +4157,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   promptUiBlock={view.promptUiBlock()}
                   approval={view.approval()}
                   browserTakeover={browserTakeover()}
-                  onSelectAgent={(id) => {
+                  onSelectAgent={(id, tabId) => {
+                    // The tab is written first, so the chat opens at it, as on the desktop.
+                    if (tabId !== undefined) agentThreads()?.tabs.open(id, tabId);
                     setMobilePane("conversation");
                     void select(id);
                   }}
                   agentWaits={agentWaits()}
+                  agentTakeoverTabIds={agentTakeoverTabs()}
                   onUpdateAgent={async (agentId, updates) => {
                     await updateRemoteAgent(remoteAgentAdmin, { agentId, ...updates }, workspace.runtime.updateAgent);
                     await workspace.refresh();

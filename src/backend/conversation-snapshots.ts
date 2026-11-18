@@ -114,11 +114,13 @@ export function messagesFromThreadItems(
         status: failed ? "failed" : providerStatus === "interrupted" ? "interrupted" : "completed",
         itemType: "image_generation",
         imageGeneration: {
-          ...(isString(item.revised_prompt)
-            ? { prompt: item.revised_prompt }
-            : isString(item.prompt)
-              ? { prompt: item.prompt }
-              : {}),
+          ...(isString(item.revisedPrompt)
+            ? { prompt: item.revisedPrompt }
+            : isString(item.revised_prompt)
+              ? { prompt: item.revised_prompt }
+              : isString(item.prompt)
+                ? { prompt: item.prompt }
+                : {}),
           // The stored message has the real size (`image-gen-runtime.ts`); the merge keeps it.
           resolution: isString(item.resolution) ? item.resolution : "",
           aspectRatio: imageGenerationAspectRatio(item) ?? "square",

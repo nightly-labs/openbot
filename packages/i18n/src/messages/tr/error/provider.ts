@@ -88,6 +88,8 @@ export const messages = {
   "error.provider.runtimeUpdateIncomplete": "Çalışma zamanı güncellemesi tamamlanmadı.",
   "error.provider.downloadHttp": "Çalışma zamanı indirmesi HTTP {status} ile başarısız oldu.",
   "error.provider.downloadNoData": "Çalışma zamanı indirmesi veri döndürmedi.",
+  "error.provider.downloadStalled":
+    "Bir dakika boyunca veri gelmediği için indirme durdu. İnternet bağlantısını kontrol edin, ardından yeniden deneyin.",
   "error.provider.downloadSize": "Çalışma zamanı indirmesi beklenmeyen bir boyuta sahip.",
   "error.provider.downloadIntegrity": "Çalışma zamanı indirmesi bütünlük denetiminde başarısız oldu.",
   "error.provider.runtimeReplacing": "Başka bir örnek onun yerini aldığından çalışma zamanı yüklenemedi.",
@@ -237,6 +239,8 @@ export const messages = {
     "OpenCode API anahtarınızın süresi doldu. OpenCode Console'da yeni bir anahtar oluşturun, OpenCode ayarlarına yapıştırın, ardından tekrar deneyin.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go kayıtlı API anahtarınızı reddetti. Anahtarın süresi dolmuş olabilir. OpenCode Console'da yeni bir anahtar oluşturun, OpenCode ayarlarına yapıştırın, ardından tekrar deneyin.",
+  "error.provider.opencodeGoRequestRefused":
+    "OpenCode Go isteği reddetti. Yeni bir API anahtarı bunu düzeltmez. OpenCode Go planınız etkin olmayabilir veya OpenCode Go ağınızı engelliyor olabilir: bazı hizmetler VPN'leri, proxy'leri veya bazı ülkeleri engeller. Planınızın OpenCode Console'da etkin olduğundan emin olun ya da VPN'i kapatın, sonra yeniden deneyin. Başka bir model de seçebilirsiniz.",
   "error.provider.opencodeServiceFailure":
     "Yerel hizmeti başarısız olduğu için OpenCode bu turu tamamlayamadı. Tekrar deneyin. Hata devam ederse Ayarlar'dan OpenCode'a yeniden bağlanın.",
   "error.provider.opencodeRateLimited":
@@ -283,6 +287,7 @@ export const messages = {
     "{provider} turu yanıt vermeden bitirdi. Mesajı yeniden gönderin veya yeni bir sohbet başlatın.",
   "error.provider.noAnswerAfterSteps":
     "{provider} bazı adımları uyguladı, sonra turu yanıt vermeden bitirdi. Aynı isteği yeniden göndermeden önce ajana ne yaptığını sorun.",
+  "error.provider.acpRefusedNoReason": "{provider} yanıt vermeden durdu. Mesajı yeniden gönderin.",
   "error.provider.chatgptPageFailed": "OpenBot ChatGPT bağlantı sayfasını açamadı.",
   "error.provider.noneReady": "Hiçbir ajan sağlayıcısı hazır değil.",
   "error.provider.claudeTurnActive": "Bağlamını yenilemeden önce etkin Claude turunun bitmesini bekleyin.",

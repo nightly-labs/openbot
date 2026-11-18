@@ -335,6 +335,7 @@ export const messages = {
   "chat.image.didNotComplete": "Die Bilderstellung wurde nicht abgeschlossen.",
   "chat.image.generating": "Bild wird erstellt",
   "chat.image.unavailable": "Bild nicht verfügbar",
+  "chat.image.unavailableNamed": "Bild nicht verfügbar: {name}",
   "chat.image.interrupted": "Bilderstellung unterbrochen",
   "chat.image.failed": "Bilderstellung fehlgeschlagen",
   "chat.image.attached": "Angehängtes Bild",

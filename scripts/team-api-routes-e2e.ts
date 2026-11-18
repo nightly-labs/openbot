@@ -64,6 +64,7 @@ import {
   decodeHostProviderAccountPools,
   decodeHostWhatsAppLinkState,
   decodeHostWhatsAppOverview,
+  decodeInstalledSkills,
   disconnectedPasswordManager,
   type HermesImportPreview,
   type HiddenAgentsSnapshot,
@@ -78,6 +79,7 @@ import {
   type ProviderDetectionSettings,
   type QueueDelivery,
   type QueueSnapshot,
+  ROUTINE_QUIET_ANSWER_ITEM_TYPE,
   type Routine,
   type RoutineResultConnectionOption,
   type RoutineResultDestination,
@@ -178,6 +180,7 @@ import {
   AGENT_WAITS_REQUEST_TEXT_LIMIT,
   AGENT_WAITS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-waits-v1";
+import { ATTACHMENT_PREVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-preview-v1";
 import {
   BACKGROUND_PROCESS_COMMAND_LIMIT,
   BACKGROUND_PROCESSES_CAPABILITY,
@@ -237,7 +240,12 @@ import {
   CONVERSATION_UNREAD_FROM_CAPABILITY,
   CONVERSATION_UNREAD_FROM_ROUTE,
 } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
-import { AGENT_HIDDEN_WORK_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import {
+  AGENT_HIDDEN_WORK_CAPABILITY,
+  decodeTeamProtocolSupportExpanded,
+  TEAM_CURRENT_CAPABILITIES,
+  teamCapabilityHeaders,
+} from "@openbot/contracts/team-protocol/current";
 import {
   CUSTOM_AGENTS_CAPABILITY,
   CUSTOM_AGENTS_CODECS,
@@ -378,6 +386,7 @@ import {
   ROUTINE_PAUSE_REASONS_CAPABILITY,
   ROUTINE_PAUSE_REASONS_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-pause-reasons-v1";
+import { ROUTINE_QUIET_ANSWERS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-quiet-answers-v1";
 import {
   ROUTINE_RESULTS_CAPABILITY,
   ROUTINE_RESULTS_ROUTES,
@@ -397,6 +406,7 @@ import { SIDE_QUESTION_CAPABILITY, SIDE_QUESTION_ROUTES } from "@openbot/contrac
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { SIDEBAR_PINS_CAPABILITY, SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { SKILL_LEARNING_CAPABILITY, SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
+import { SKILL_PROBLEMS_CAPABILITY } from "@openbot/contracts/team-protocol/skill-problems-v1";
 import { SKILLS_ADMIN_CAPABILITY, SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { STORAGE_DISK_CAPABILITY, STORAGE_DISK_ROUTES } from "@openbot/contracts/team-protocol/storage-disk-v1";
 import {
@@ -416,6 +426,7 @@ import {
   TEAM_PROTOCOL_VERSION_HEADER,
 } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
+import { encodeTeamProtocolV9WebRtcHttpRequest } from "@openbot/contracts/team-protocol/v9-webrtc-adapter";
 import { TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
 import { VAULT_IMPORT_CAPABILITY, VAULT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY, VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
@@ -521,11 +532,12 @@ import { RemoteRequestError } from "../src/main/remote-server-errors";
 import { RemoteWorkflowError } from "../src/main/remote-service-effects";
 import { SidebarPinStore } from "../src/main/sidebar-pin-store";
 import { SkillLearningPreferenceStore } from "../src/main/skill-learning-preference-store";
-import { SkillMarketplaceFailure, type SkillMarketplaceService } from "../src/main/skill-marketplace-service";
+import { SkillMarketplaceFailure, SkillMarketplaceService } from "../src/main/skill-marketplace-service";
 import type {
   TeamApiAgentAccess,
   TeamApiAgents,
   TeamApiAgentTasks,
+  TeamApiAttachmentPreviews,
   TeamApiBrowser,
   TeamApiConnectors,
   TeamApiLiveVoice,
@@ -742,6 +754,12 @@ const sharedPath = join(files, "shared.txt");
 writeFileSync(sharedPath, "shared file bytes\n");
 const workspacePath = join(files, "notes.md");
 writeFileSync(workspacePath, "# workspace notes\n");
+// A picture and its small copy, for `attachment-preview-v1`. The fake copy service does not decode it.
+const pictureAttachmentPath = join(files, "picture.png");
+writeFileSync(pictureAttachmentPath, "the whole picture\n");
+const picturePreviewPath = join(files, "picture-preview.jpg");
+const picturePreviewBytes = "the small copy of the picture\n";
+writeFileSync(picturePreviewPath, picturePreviewBytes);
 
 function agent(id: string, name: string, provider: AgentProviderId, model: string): AgentSummary {
   return {
@@ -1520,7 +1538,32 @@ const fakeAgents: TeamApiAgents = {
   setAvatar: unused("setAvatar"),
   resolveAvatar: unused("resolveAvatar"),
   readConversation: unused("readConversation"),
-  readConversationFor: unused("readConversationFor"),
+  // A quiet routine run: its run row and the report that the agent ended quiet (#11174).
+  readConversationFor: (agentId) =>
+    Effect.succeed({
+      agentId,
+      threadId: `thread-${agentId}`,
+      activeTurnId: null,
+      revision: 1,
+      messages: [
+        {
+          id: "run-answer",
+          author: "assistant",
+          text: "Reply",
+          createdAt: "2026-11-05T08:00:00.000Z",
+          status: "completed",
+        },
+        {
+          id: "quiet-report",
+          author: "assistant",
+          text: "Inbox rundown",
+          createdAt: "2026-11-05T08:01:00.000Z",
+          status: "completed",
+          itemType: ROUTINE_QUIET_ANSWER_ITEM_TYPE,
+        },
+      ],
+      readState: { unreadCount: 0, firstUnreadMessageId: null, throughMessageId: "quiet-report" },
+    }),
   // The chat of each agent shows every message but `message-gone`. A page around a message starts with it.
   readConversationPageFor: (agentId, memberId, anchor, limit, options) => {
     record("readConversationPageFor", agentId, memberId, anchor, limit, options);
@@ -1843,7 +1886,25 @@ const fakeAgentTasks: TeamApiAgentTasks = {
 
 const mailbox: TeamApiMailbox = {
   resolveAttachment: (id) =>
-    Effect.succeed(id === "att-1" ? { path: attachmentPath, mimeType: "text/plain", name: "report one.txt" } : null),
+    Effect.succeed(
+      id === "att-1"
+        ? { path: attachmentPath, mimeType: "text/plain", name: "report one.txt" }
+        : id === "att-picture"
+          ? { path: pictureAttachmentPath, mimeType: "image/png", name: "picture.png" }
+          : id === "att-large-webp"
+            ? { path: pictureAttachmentPath, mimeType: "image/webp", name: "large.webp" }
+            : null,
+    ),
+};
+
+/** The copy service of `attachment-preview-v1`: it records the file that the route gives it. */
+const attachmentPreviews: TeamApiAttachmentPreviews = {
+  file: (attachmentId, source) =>
+    Effect.sync(() => {
+      record("attachmentPreview", attachmentId, source);
+      // A large file with no copy.
+      return attachmentId === "att-large-webp" ? null : { path: picturePreviewPath, mimeType: "image/jpeg" };
+    }),
 };
 
 // What a member did in the tab while the host recorded: a page, then a click. No step has typed text.
@@ -1857,8 +1918,13 @@ const releasedHolders: Parameters<TeamApiBrowser["releaseUserControlHeldBy"]>[0]
 const releasedSession = (sessionId: string | undefined) =>
   releasedHolders.some((holder) => holder.kind === "session" && holder.sessionId === sessionId);
 
+// The tabs of the host, and the tabs that people hold. Only the check of the tabs of a closed agent
+// sets them.
+let browserTabs: ReturnType<TeamApiBrowser["listTabs"]> = [];
+let userControlHolds: [string, Parameters<Parameters<TeamApiBrowser["releaseUserControlRefused"]>[0]>[1]][] = [];
+
 const browser: TeamApiBrowser = {
-  listTabs: unused("listTabs"),
+  listTabs: () => browserTabs,
   getControlState: unused("getControlState"),
   open: unused("open"),
   activate: unused("activate"),
@@ -1879,10 +1945,18 @@ const browser: TeamApiBrowser = {
   releaseUserControlHeldBy: (holder) => {
     releasedHolders.push(holder);
   },
+  releaseUserControlRefused: (refused) => {
+    record(
+      "releaseUserControlRefused",
+      userControlHolds
+        .filter(([tabId, holder]) => refused(tabId, holder))
+        .map(([tabId, holder]) => `${tabId}:${holder.kind === "member" ? holder.memberId : "local"}`),
+    );
+  },
   close: unused("close"),
   capturePreview: unused("capturePreview"),
   setVisible: unused("setVisible"),
-  getDisplayState: unused("getDisplayState"),
+  getDisplayState: () => ({ tabs: browserTabs, activeTabId: null }),
   loadUrl: unused("loadUrl"),
   // Only the browser-profiles tab route asks. `tab-private` holds an administrator's MCP sign-in.
   isPrivate: (tabId) => tabId === "tab-private",
@@ -2312,6 +2386,25 @@ const githubSkillsAdmin: Pick<
   setEnabled: () => Effect.die(new Error("Not used.")),
 };
 
+// The real skill reader over Ada's workspace (#9006): one skill folder that the provider reads, and one
+// whose `SKILL.md` starts with the byte order mark that Windows PowerShell 5.1 writes.
+const adaSkills = join(root, "workspaces", "agent-ada", ".claude", "skills");
+mkdirSync(join(adaSkills, "good-skill"), { recursive: true });
+writeFileSync(join(adaSkills, "good-skill", "SKILL.md"), "---\nname: good-skill\ndescription: Works.\n---\n# Good\n");
+mkdirSync(join(adaSkills, "settlement-economy"), { recursive: true });
+writeFileSync(
+  join(adaSkills, "settlement-economy", "SKILL.md"),
+  "\uFEFF---\r\nname: settlement-economy\r\ndescription: Settles.\r\n---\r\n# Settle\r\n",
+);
+const chatSkills = new SkillMarketplaceService(
+  {
+    requestAuthorized: () => Effect.die("Not used."),
+    downloadAuthorized: () => Effect.die("Not used."),
+    resolveApiUrl: () => "",
+  },
+  () => agents,
+);
+
 // The real skill learning store on a temporary file, as the host keeps it.
 const skillLearningFile = join(root, "skill-learning.json");
 const skillLearning = new SkillLearningPreferenceStore(skillLearningFile);
@@ -2458,8 +2551,10 @@ try {
     agentTasks: fakeAgentTasks,
     agentAccess,
     mailbox,
+    attachmentPreviews,
     browser,
     chat: new TeamChatStore(database),
+    skills: chatSkills,
     // The real host-settings service, over an agent writer that records each change.
     admin: {
       skills: githubSkillsAdmin,
@@ -6160,6 +6255,64 @@ try {
     );
   }
 
+  // ---- Quiet routine answers (routine-quiet-answers-v1) ----
+  {
+    // A capability after protocol 9: the protocol 9 list is full.
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, {
+      protocol: TEAM_PROTOCOL_V10,
+      headers: teamCapabilityHeaders(TEAM_PROTOCOL_V10, TEAM_CURRENT_CAPABILITIES),
+    });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises routine-quiet-answers-v1 to a protocol 10 peer only",
+      decodeTeamProtocolSupportExpanded(compatibility.body).capabilities.includes(ROUTINE_QUIET_ANSWERS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(ROUTINE_QUIET_ANSWERS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    // A user on a server reads a report that the agent ended quiet in its closed run, as on desktop.
+    const ids = (response: Awaited<ReturnType<typeof call>>) =>
+      list(field(response.body, "messages")).map((message) => field(message, "id"));
+    const conversationPath = TEAM_API_ROUTES.agent.conversation("agent-ada");
+    const withQuiet = await call("GET", conversationPath, {
+      token: bobToken,
+      protocol: TEAM_PROTOCOL_V10,
+      capabilities: [ROUTINE_QUIET_ANSWERS_CAPABILITY],
+    });
+    const withoutQuiet = await call("GET", conversationPath, { token: bobToken, protocol: TEAM_PROTOCOL_V10 });
+    const through = (response: Awaited<ReturnType<typeof call>>) =>
+      field(field(response.body, "readState"), "throughMessageId");
+    check(
+      "a conversation keeps a quiet routine answer, and a read through it, only for a client with routine-quiet-answers-v1",
+      withQuiet.status === 200 &&
+        isDeepStrictEqual(ids(withQuiet), ["run-answer", "quiet-report"]) &&
+        through(withQuiet) === "quiet-report" &&
+        withoutQuiet.status === 200 &&
+        isDeepStrictEqual(ids(withoutQuiet), ["run-answer"]) &&
+        through(withoutQuiet) === "run-answer",
+      [summary(withQuiet), summary(withoutQuiet)],
+    );
+    const pagePath = `${TEAM_API_ROUTES.agent.conversationPage("agent-ada")}?around=quiet-report`;
+    const pageExcludes = () => {
+      const options = callsOf("readConversationPageFor").at(-1)?.[4];
+      return options && typeof options === "object" && "excludeRoutineQuietAnswers" in options
+        ? options.excludeRoutineQuietAnswers
+        : undefined;
+    };
+    await call("GET", pagePath, {
+      token: bobToken,
+      protocol: TEAM_PROTOCOL_V10,
+      capabilities: [ROUTINE_QUIET_ANSWERS_CAPABILITY],
+    });
+    const withQuietExcluded = pageExcludes();
+    await call("GET", pagePath, { token: bobToken, protocol: TEAM_PROTOCOL_V10 });
+    const withoutQuietExcluded = pageExcludes();
+    check(
+      "a conversation page keeps quiet routine answers only for a client with routine-quiet-answers-v1",
+      withQuietExcluded === false && withoutQuietExcluded === true,
+      [withQuietExcluded, withoutQuietExcluded],
+    );
+  }
+
   // ---- Skill learning (skill-learning-v1) ----
   {
     const capabilities = [SKILL_LEARNING_CAPABILITY];
@@ -6489,6 +6642,117 @@ try {
           ],
         ),
       [summary(noSave), summary(saved), summary(discarded)],
+    );
+  }
+
+  // ---- The skills that an agent cannot use, with the reason (skill-problems-v1, #9006) ----
+  {
+    const withSkillProblems = teamCapabilityHeaders(TEAM_PROTOCOL_V10, TEAM_CURRENT_CAPABILITIES);
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, {
+      protocol: TEAM_PROTOCOL_V10,
+      headers: withSkillProblems,
+    });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises skill-problems-v1 to a protocol 10 peer only",
+      decodeTeamProtocolSupportExpanded(compatibility.body).capabilities.includes(SKILL_PROBLEMS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(SKILL_PROBLEMS_CAPABILITY),
+      [summary(compatibility), list(field(older.body, "capabilities")).length],
+    );
+    const path = TEAM_API_ROUTES.agent.skills("agent-ada");
+    const plain = await call("GET", path, {
+      token: bobToken,
+      protocol: TEAM_PROTOCOL_V10,
+      headers: teamCapabilityHeaders(
+        TEAM_PROTOCOL_V10,
+        TEAM_CURRENT_CAPABILITIES.filter((capability) => capability !== SKILL_PROBLEMS_CAPABILITY),
+      ),
+    });
+    const withProblems = await call("GET", path, {
+      token: bobToken,
+      protocol: TEAM_PROTOCOL_V10,
+      headers: withSkillProblems,
+    });
+    // The list also has the host user's own skills in `~/.agents/skills`, which differ on each computer.
+    const named = (reply: Reply) =>
+      decodeInstalledSkills(reply.body)
+        .filter((skill) => skill.skillId.startsWith("workspace:"))
+        .map(({ slug, problem }) => ({ slug, problem }));
+    check(
+      "an older client gets only the usable skill folder, as before",
+      plain.status === 200 && isDeepStrictEqual(named(plain), [{ slug: "good-skill", problem: undefined }]),
+      summary(plain),
+    );
+    check(
+      "a client with skill-problems-v1 also gets the folder whose SKILL.md has a byte order mark, with the reason",
+      withProblems.status === 200 &&
+        isDeepStrictEqual(named(withProblems), [
+          { slug: "good-skill", problem: undefined },
+          { slug: "settlement-economy", problem: sourceText("error.skill.frontmatterMissing") },
+        ]),
+      summary(withProblems),
+    );
+  }
+
+  // ---- The tabs of an agent that the roles close to a member ----
+  {
+    const tab = (id: string, ownerAgentId: string) => ({
+      id,
+      title: id,
+      url: "https://shop.example/",
+      loading: false,
+      ownerThreadId: null,
+      ownerAgentId,
+    });
+    browserTabs = [tab("tab-ada", "agent-ada"), tab("tab-oc", "agent-oc")];
+    const ids = (reply: Reply) => list(reply.body).map((entry) => field(entry, "id"));
+    const opensBefore = callsOf("open").length;
+    const teachesBefore = callsOf("startTeach").length;
+    accessLevels = { revision: 93, everyone: { "agent-ada": "none" }, roles: [] };
+    const memberTabs = await call("GET", TEAM_API_ROUTES.browser.tabs, { token: bobToken });
+    const adminTabs = await call("GET", TEAM_API_ROUTES.browser.tabs, { token: adaToken });
+    const teach = await call("POST", BROWSER_TEACH_ROUTES.start, {
+      token: bobToken,
+      json: { tabId: "tab-ada" },
+      capabilities: [BROWSER_TEACH_CAPABILITY],
+    });
+    const open = await call("POST", TEAM_API_ROUTES.browser.open, {
+      token: bobToken,
+      json: { url: "https://shop.example/", ownerThreadId: null, ownerAgentId: "agent-ada" },
+    });
+    // The access change ends Bob's hold of the closed agent's tab, not his other hold or the holds of others.
+    userControlHolds = [
+      ["tab-ada", { kind: "member", memberId: bobId, sessionId: "bob-session" }],
+      ["tab-oc", { kind: "member", memberId: bobId, sessionId: "bob-session" }],
+      ["tab-ada", { kind: "member", memberId: adaId, sessionId: "ada-session" }],
+      ["tab-ada", { kind: "local" }],
+    ];
+    const notifyAccess = () => {
+      for (const listener of accessListeners) listener(store.getIdentity()?.serverId ?? "", accessLevels);
+    };
+    notifyAccess();
+    const releasedOnClose = callsOf("releaseUserControlRefused").at(-1);
+    accessLevels = { revision: 94, everyone: {}, roles: [] };
+    notifyAccess();
+    const releasedOnOpen = callsOf("releaseUserControlRefused").at(-1);
+    userControlHolds = [];
+    const reopened = await call("GET", TEAM_API_ROUTES.browser.tabs, { token: bobToken });
+    browserTabs = [];
+    check(
+      "when the roles close an agent to a member, the host gives back only that member's hold of the agent's tab; when they open it again, no hold",
+      isDeepStrictEqual(releasedOnClose, [[`tab-ada:${bobId}`]]) && isDeepStrictEqual(releasedOnOpen, [[]]),
+      { releasedOnClose, releasedOnOpen },
+    );
+    check(
+      "a member does not see or use a tab of an agent at none, and cannot open one for it; an admin sees it; the member sees it again when the access opens",
+      isDeepStrictEqual(ids(memberTabs), ["tab-oc"]) &&
+        isDeepStrictEqual(ids(adminTabs), ["tab-ada", "tab-oc"]) &&
+        errorIs(teach, 404, sourceText("error.backend.browserTabNotFound")) &&
+        errorIs(open, 404, sourceText("error.team.agentNotFound")) &&
+        callsOf("open").length === opensBefore &&
+        callsOf("startTeach").length === teachesBefore &&
+        isDeepStrictEqual(ids(reopened), ["tab-ada", "tab-oc"]),
+      [summary(memberTabs), summary(adminTabs), summary(teach), summary(open), summary(reopened)],
     );
   }
 
@@ -11964,6 +12228,70 @@ try {
       "deleting a draft attachment gives 204 and discards it",
       discard.status === 204 && isDeepStrictEqual(callsOf("discardDraftAttachment"), [["draft-1"]]),
       summary(discard),
+    );
+
+    // attachment-preview-v1: a small copy of a picture, with the access of the file itself.
+    const previewV10 = await call("GET", TEAM_API_ROUTES.compatibility, {
+      protocol: TEAM_PROTOCOL_V10,
+      headers: teamCapabilityHeaders(TEAM_PROTOCOL_V10, TEAM_CURRENT_CAPABILITIES),
+    });
+    const previewV9 = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises attachment-preview-v1 to a protocol 10 peer only",
+      decodeTeamProtocolSupportExpanded(previewV10.body).capabilities.includes(ATTACHMENT_PREVIEW_CAPABILITY) &&
+        !list(field(previewV9.body, "capabilities")).includes(ATTACHMENT_PREVIEW_CAPABILITY),
+      [summary(previewV10), list(field(previewV9.body, "capabilities")).length],
+    );
+    const preview = await call("GET", TEAM_API_ROUTES.attachmentPreview("att-picture"), { token: bobToken });
+    check(
+      "a picture preview gives the bytes of its copy as a file, with the copy's type and name",
+      preview.status === 200 &&
+        preview.text === picturePreviewBytes &&
+        preview.headers.get("content-type") === "image/jpeg" &&
+        preview.headers.get("x-content-type-options") === "nosniff" &&
+        preview.headers.get("content-disposition") === "attachment; filename*=UTF-8''picture-preview.jpg" &&
+        isDeepStrictEqual(callsOf("attachmentPreview"), [
+          ["att-picture", { path: pictureAttachmentPath, mimeType: "image/png" }],
+        ]),
+      { status: preview.status, headers: Object.fromEntries(preview.headers), calls: callsOf("attachmentPreview") },
+    );
+    const previewOfText = await call("GET", TEAM_API_ROUTES.attachmentPreview("att-1"), { token: bobToken });
+    const previewMissing = await call("GET", TEAM_API_ROUTES.attachmentPreview("att-missing"), { token: bobToken });
+    const previewNoToken = await call("GET", TEAM_API_ROUTES.attachmentPreview("att-picture"));
+    const previewNoCopy = await call("GET", TEAM_API_ROUTES.attachmentPreview("att-large-webp"), { token: bobToken });
+    check(
+      "a preview of a file that is not a picture or of a large file with no copy gets 415, of a missing file 404, and without a session 401",
+      previewOfText.status === 415 &&
+        previewNoCopy.status === 415 &&
+        errorIs(previewMissing, 404, sourceText("error.team.attachmentNotFound")) &&
+        previewNoToken.status === 401 &&
+        callsOf("attachmentPreview").length === 2,
+      [summary(previewOfText), summary(previewNoCopy), summary(previewMissing), summary(previewNoToken)],
+    );
+    // The preview route is a side route, so the frozen protocol adapters do not change. The frozen
+    // no-body list of protocol 2 does not know the route: without its side codec, a client refused to send it.
+    const previewPath = TEAM_API_ROUTES.attachmentPreview("att-picture");
+    const previewCodec = teamSideRouteCodec(previewPath);
+    const refuses = (run: () => unknown) => {
+      try {
+        run();
+        return false;
+      } catch {
+        return true;
+      }
+    };
+    check(
+      "the WebRTC request frame of a picture preview has no body, and an answer other than a file or an error is refused",
+      previewCodec !== null &&
+        previewCodec.request(previewPath, undefined) === null &&
+        previewCodec.request(previewPath, {}) === null &&
+        refuses(() => previewCodec.request(previewPath, { width: 100 })) &&
+        refuses(() => previewCodec.response(previewPath, 200, { url: "https://example.com" })) &&
+        isDeepStrictEqual(previewCodec.response(previewPath, 404, { error: "Not found.", code: "not_found" }), {
+          error: "Not found.",
+          code: "not_found",
+        }) &&
+        refuses(() => encodeTeamProtocolV9WebRtcHttpRequest("GET", previewPath, undefined)),
     );
 
     const cancelCalls = callsOf("cancelQueuedMessage").length;

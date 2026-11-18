@@ -6,6 +6,7 @@ import { classifyFailure } from "@openbot/telemetry";
 import { toast } from "@openbot/ui";
 import type { AgentProfile } from "@openbot/ui/data";
 import { BROWSER_NEW_TAB_URL, browserAddressUrl } from "@openbot/ui/features/browser/browser-suggestions";
+import { MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, untrack } from "solid-js";
 import { actionToast } from "../../../action-toast";
@@ -309,12 +310,30 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       return;
     }
     // A tab that this view does not list, such as a channel member's tab of another thread, opens in the chat
-    // of the agent that owns it. That chat mounts a new store, so main shows the tab first.
+    // of the agent that owns it.
     const owner = browserTabOwner(tab);
-    if (!owner || !browserInteractionAvailable() || closingBrowserTabIds.has(tab.id)) return;
+    if (owner && showTabInAgentChat(tab, owner.id)) deps.props.onSelectAgent(owner.id);
+  }
+
+  /** Shows a tab in the full view of an agent's chat. That chat mounts a new store, so main shows the tab first. */
+  function showTabInAgentChat(tab: BrowserTab, agentId: string): boolean {
+    if (!browserInteractionAvailable() || closingBrowserTabIds.has(tab.id)) return false;
     deps.props.onActivateBrowserTab(tab.id);
-    deps.panels.setActiveRightPanel("browser-expanded", owner.id);
-    deps.props.onSelectAgent(owner.id);
+    deps.panels.setActiveRightPanel("browser-expanded", agentId);
+    return true;
+  }
+
+  /**
+   * Opens the own chat of an agent that this agent asked and that waits for the user, where its wait is.
+   * For a browser takeover, the page of the takeover also opens, as from the takeover card (#9373).
+   */
+  function openWaitingAgent(agentId: string) {
+    const wait = deps.props.agentWaits?.[agentId];
+    const tabId =
+      wait?.kind === "waiting" && wait.reason === "takeover" ? deps.props.agentTakeoverTabIds?.[agentId] : undefined;
+    const tab = tabId ? allBrowserTabs().find((entry) => entry.id === tabId) : undefined;
+    if (tab) showTabInAgentChat(tab, agentId);
+    deps.props.onSelectAgent(agentId, MAIN_THREAD_ID);
   }
 
   /** False when a press of the page would do nothing: this view does not have the tab, or cannot show it. */
@@ -886,6 +905,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     browserTakeoverResolution,
     respondToBrowserTakeover,
     openBrowserTakeoverTab,
+    openWaitingAgent,
     canOpenBrowserTakeoverTab,
     localSignIn: {
       state: localSignIn,

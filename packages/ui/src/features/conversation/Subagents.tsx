@@ -390,6 +390,8 @@ export interface SubagentPanelProps {
   /** The agent that started the subagent. */
   agentName: string;
   onClosePanel: () => void;
+  /** The handle on the start edge that sets the width of the side panel. */
+  resizer?: JSX.Element;
 }
 
 /** The side panel pane of one subagent: its task, its state, and all of its steps. */
@@ -398,7 +400,12 @@ export function SubagentPanel(props: SubagentPanelProps) {
   const duration = useDuration();
   const now = createClock(() => props.subagent?.status === "running");
   return (
-    <aside class="browser-panel subagents-panel" aria-label={t("conversation.sidePanel.pane.subagent")}>
+    <aside
+      id="subagent-panel"
+      class="browser-panel subagents-panel"
+      aria-label={t("conversation.sidePanel.pane.subagent")}
+    >
+      {props.resizer}
       <header class="file-preview-header side-panel-pane-header">
         <h2 class="side-panel-pane-title">{t("conversation.sidePanel.pane.subagent")}</h2>
         <Button

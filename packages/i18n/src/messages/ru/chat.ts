@@ -410,6 +410,7 @@ export const messages = {
   "chat.image.didNotComplete": "Генерация изображения не завершилась.",
   "chat.image.generating": "Генерация изображения",
   "chat.image.unavailable": "Изображение недоступно",
+  "chat.image.unavailableNamed": "Изображение недоступно: {name}",
   "chat.image.interrupted": "Генерация изображения прервана",
   "chat.image.failed": "Не удалось сгенерировать изображение",
   "chat.image.attached": "Прикреплённое изображение",

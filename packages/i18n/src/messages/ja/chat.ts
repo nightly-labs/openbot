@@ -304,6 +304,7 @@ export const messages = {
   "chat.image.didNotComplete": "画像の生成が完了しませんでした。",
   "chat.image.generating": "画像を生成しています",
   "chat.image.unavailable": "画像を利用できません",
+  "chat.image.unavailableNamed": "画像を利用できません：{name}",
   "chat.image.interrupted": "画像の生成が中断されました",
   "chat.image.failed": "画像の生成に失敗しました",
   "chat.image.attached": "添付画像",

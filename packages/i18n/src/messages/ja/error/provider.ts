@@ -91,6 +91,8 @@ export const messages = {
   "error.provider.runtimeUpdateIncomplete": "ランタイムの更新が完了しませんでした。",
   "error.provider.downloadHttp": "ランタイムのダウンロードが HTTP {status} で失敗しました。",
   "error.provider.downloadNoData": "ランタイムのダウンロードでデータが返されませんでした。",
+  "error.provider.downloadStalled":
+    "1 分間データが届かなかったため、ダウンロードが停止しました。インターネット接続を確認してから、もう一度お試しください。",
   "error.provider.downloadSize": "ランタイムのダウンロードのサイズが予期しないものです。",
   "error.provider.downloadIntegrity": "ランタイムのダウンロードが整合性チェックに失敗しました。",
   "error.provider.runtimeReplacing": "別のインスタンスがランタイムを置き換えているため、インストールできませんでした。",
@@ -243,6 +245,8 @@ export const messages = {
     "OpenCode の API キーの有効期限が切れました。OpenCode Console で新しいキーを作成し、OpenCode の設定に貼り付けてから、もう一度お試しください。",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go が保存済みの API キーを拒否しました。キーの有効期限が切れている可能性があります。OpenCode Console で新しいキーを作成し、OpenCode の設定に貼り付けてから、もう一度お試しください。",
+  "error.provider.opencodeGoRequestRefused":
+    "OpenCode Go がリクエストを拒否しました。新しい API キーでは解決しません。OpenCode Go のプランが有効でないか、OpenCode Go がお使いのネットワークをブロックしている可能性があります。一部のサービスは VPN、プロキシ、または一部の国をブロックします。OpenCode Console でプランが有効か確認するか、VPN をオフにしてから、もう一度お試しください。別のモデルを選ぶこともできます。",
   "error.provider.opencodeServiceFailure":
     "OpenCode のローカルサービスが失敗したため、このターンを完了できませんでした。もう一度お試しください。エラーが続く場合は、設定で OpenCode を再接続してください。",
   "error.provider.opencodeRateLimited":
@@ -289,6 +293,7 @@ export const messages = {
     "{provider} が回答なしでターンを終了しました。メッセージをもう一度送信するか、新しいチャットを開始してください。",
   "error.provider.noAnswerAfterSteps":
     "{provider} はいくつかのステップを実行した後、回答せずにターンを終了しました。同じ依頼をもう一度送る前に、エージェントに何をしたか尋ねてください。",
+  "error.provider.acpRefusedNoReason": "{provider} は回答せずに停止しました。メッセージをもう一度送信してください。",
   "error.provider.chatgptPageFailed": "OpenBot は ChatGPT の接続ページを開けませんでした。",
   "error.provider.noneReady": "準備ができているエージェントのプロバイダーがありません。",
   "error.provider.claudeTurnActive": "コンテキストを更新する前に、実行中の Claude のターンが終わるまでお待ちください。",

@@ -85,6 +85,8 @@ export const messages = {
   "error.provider.runtimeUpdateIncomplete": "De update van de runtime is niet voltooid.",
   "error.provider.downloadHttp": "Download van de runtime is mislukt met HTTP {status}.",
   "error.provider.downloadNoData": "Download van de runtime gaf geen gegevens.",
+  "error.provider.downloadStalled":
+    "De download is gestopt omdat er een minuut lang geen gegevens binnenkwamen. Controleer de internetverbinding en probeer het opnieuw.",
   "error.provider.downloadSize": "De download van de runtime heeft een onverwachte grootte.",
   "error.provider.downloadIntegrity": "De download van de runtime heeft de integriteitscontrole niet doorstaan.",
   "error.provider.runtimeReplacing":
@@ -236,6 +238,8 @@ export const messages = {
     "Je OpenCode-API-sleutel is verlopen. Maak een nieuwe sleutel in OpenCode Console, plak hem in de OpenCode-instellingen en probeer het opnieuw.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go heeft je opgeslagen API-sleutel geweigerd. De sleutel is misschien verlopen. Maak een nieuwe sleutel in OpenCode Console, plak hem in de OpenCode-instellingen en probeer het opnieuw.",
+  "error.provider.opencodeGoRequestRefused":
+    "OpenCode Go heeft het verzoek geweigerd. Een nieuwe API-sleutel lost dit niet op. Je OpenCode Go-abonnement is misschien niet actief, of OpenCode Go blokkeert misschien je netwerk: sommige diensten blokkeren vpn's, proxy's of bepaalde landen. Controleer in OpenCode Console of je abonnement actief is, of zet de vpn uit, en probeer het opnieuw. Je kunt ook een ander model kiezen.",
   "error.provider.opencodeServiceFailure":
     "OpenCode kon deze beurt niet voltooien, omdat de lokale service is mislukt. Probeer het opnieuw. Blijft de fout, verbind OpenCode dan opnieuw in Instellingen.",
   "error.provider.opencodeRateLimited":
@@ -282,6 +286,7 @@ export const messages = {
     "{provider} beëindigde de beurt zonder antwoord. Stuur het bericht opnieuw, of begin een nieuwe chat.",
   "error.provider.noAnswerAfterSteps":
     "{provider} voerde enkele stappen uit en beëindigde de beurt daarna zonder antwoord. Vraag de agent wat hij deed voordat je hetzelfde verzoek opnieuw stuurt.",
+  "error.provider.acpRefusedNoReason": "{provider} stopte zonder antwoord. Stuur het bericht opnieuw.",
   "error.provider.chatgptPageFailed": "OpenBot kon de verbindingspagina van ChatGPT niet openen.",
   "error.provider.noneReady": "Er is geen agentaanbieder klaar.",
   "error.provider.claudeTurnActive": "Wacht op de actieve Claude-beurt voordat je de context vernieuwt.",

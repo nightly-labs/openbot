@@ -51,6 +51,7 @@ import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, createStore, Loading, lazy, Show } from "solid-js";
 import { reportErrorBanner, reportNotification } from "../../error-reports";
 import { deviceSendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "../../send-shortcut-preference";
+import { readableAgentError } from "../agents/agent-error-text";
 import { customProviderRestartMessage } from "../custom-providers/custom-provider-restart";
 import { speechReading } from "../speech/speech-playback";
 import { stopSpokenReply } from "../speech/speech-replies";
@@ -79,6 +80,7 @@ export function ConversationComposer() {
     retryUpload,
     awaitingReplies,
     dismissAwaitingReplies,
+    openWaitingAgent,
     composerFocusRequest,
     composerHasContent,
     currentChatConversationKey,
@@ -257,6 +259,11 @@ export function ConversationComposer() {
       : undefined;
   const newChat = () =>
     props.agent && props.onClearAgentContext ? { agent: props.agent, start: props.onClearAgentContext } : undefined;
+  /** The "+" menu item: it shows also before the provider reports usage, when the ring has no New chat. */
+  const newChatMenuItem = () => {
+    const action = newChat();
+    return action && { ...action, disabled: context()?.compaction?.status === "running" };
+  };
   const compaction = () => {
     const value = context()?.compaction;
     return value && value.id !== dismissedCompactions()[currentChatConversationKey() ?? ""] ? value : null;
@@ -288,6 +295,14 @@ export function ConversationComposer() {
       (key) => error === localizeSourceText(sourceText(key)),
     );
     return keyError ? props.onManageProviders : undefined;
+  };
+  /**
+   * The newest row of the chat is the note of the same expired sign-in, with its Sign in button, so the
+   * banner would only repeat it (#11815). The banner reads the text as `readableAgentError` gives it.
+   */
+  const errorInChat = (error: string) => {
+    const marker = props.messages.at(-1)?.actionMarker;
+    return marker?.kind === "sign-in-failure" && readableAgentError(marker.text) === error;
   };
   /** The button of the error banner: the fix that the error names, or none. */
   const errorBannerAction = () => {
@@ -589,7 +604,7 @@ export function ConversationComposer() {
                 items={items()}
                 title={channel ? t("chat.awaiting.subtasks") : undefined}
                 onDismiss={dismissAwaitingReplies}
-                onOpenAgent={props.onSelectAgent}
+                onOpenAgent={openWaitingAgent}
                 // A channel's rows are its sub-tasks, not queued replies.
                 onSteer={
                   props.activeTurnId && !channel && steers() && !steerRefused() ? props.onSteerQueuedMessage : undefined
@@ -790,7 +805,11 @@ export function ConversationComposer() {
           </Show>
           <ComposerStackCard
             when={
-              currentChatError() && currentChatError() !== providerUpdateRequired()?.message ? currentChatError() : null
+              currentChatError() &&
+              currentChatError() !== providerUpdateRequired()?.message &&
+              !errorInChat(currentChatError() ?? "")
+                ? currentChatError()
+                : null
             }
           >
             {(message) => (
@@ -923,6 +942,7 @@ export function ConversationComposer() {
               onTeach={teachTask()}
               onSideQuestion={askSideQuestion()}
               onVoice={openVoiceConversation()}
+              newChat={newChatMenuItem()}
             />
             <div class="composer-primary-actions">
               <Show when={contextUsageView(context())}>

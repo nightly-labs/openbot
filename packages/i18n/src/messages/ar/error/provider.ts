@@ -81,6 +81,8 @@ export const messages = {
   "error.provider.runtimeUpdateIncomplete": "لم يكتمل تحديث بيئة التشغيل.",
   "error.provider.downloadHttp": "فشل تنزيل بيئة التشغيل برمز HTTP {status}.",
   "error.provider.downloadNoData": "لم يُرجع تنزيل بيئة التشغيل أي بيانات.",
+  "error.provider.downloadStalled":
+    "توقف التنزيل لأنه لم تصل أي بيانات لمدة دقيقة. تحقق من الاتصال بالإنترنت، ثم حاول مرة أخرى.",
   "error.provider.downloadSize": "حجم تنزيل بيئة التشغيل غير متوقع.",
   "error.provider.downloadIntegrity": "فشل تنزيل بيئة التشغيل في فحص السلامة.",
   "error.provider.runtimeReplacing": "تعذّر تثبيت بيئة التشغيل لأن نسخة أخرى تستبدلها.",
@@ -216,6 +218,8 @@ export const messages = {
     "انتهت صلاحية مفتاح OpenCode API الخاص بك. أنشئ مفتاحًا جديدًا في OpenCode Console، والصقه في إعدادات OpenCode، ثم أعد المحاولة.",
   "error.provider.opencodeKeyRefused":
     "رفض OpenCode Go مفتاح API المحفوظ. ربما انتهت صلاحية المفتاح. أنشئ مفتاحًا جديدًا في OpenCode Console، والصقه في إعدادات OpenCode، ثم أعد المحاولة.",
+  "error.provider.opencodeGoRequestRefused":
+    "رفض OpenCode Go الطلب. لا يحل مفتاح API جديد هذه المشكلة. قد لا تكون خطة OpenCode Go نشطة، أو قد يحظر OpenCode Go شبكتك: بعض الخدمات تحظر شبكات VPN أو الخوادم الوكيلة أو بعض البلدان. تأكد من أن خطتك نشطة في OpenCode Console، أو أوقف VPN، ثم حاول مرة أخرى. يمكنك أيضًا اختيار نموذج آخر.",
   "error.provider.opencodeServiceFailure":
     "تعذّر على OpenCode إكمال هذا الدور لأن خدمته المحلية فشلت. أعد المحاولة. إذا استمر الخطأ، أعد ربط OpenCode في الإعدادات.",
   "error.provider.opencodeRateLimited":
@@ -257,6 +261,7 @@ export const messages = {
   "error.provider.acpNoAnswer": "أنهى {provider} الدور بدون إجابة. أرسل الرسالة مرة أخرى، أو ابدأ دردشة جديدة.",
   "error.provider.noAnswerAfterSteps":
     "نفّذ {provider} بعض الخطوات، ثم أنهى الدور بدون إجابة. اسأل الوكيل عمّا فعله قبل أن ترسل الطلب نفسه مرة أخرى.",
+  "error.provider.acpRefusedNoReason": "توقف {provider} بدون إجابة. أرسل الرسالة مرة أخرى.",
   "error.provider.chatgptPageFailed": "تعذّر على OpenBot فتح صفحة ربط ChatGPT.",
   "error.provider.noneReady": "لا يوجد مزوّد وكلاء جاهز.",
   "error.provider.claudeTurnActive": "انتظر انتهاء دور Claude النشط قبل تحديث سياقه.",
