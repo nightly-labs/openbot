@@ -120,7 +120,10 @@ export interface AgentMcpServers {
   signInOffer(config: McpServerConfig): Effect.Effect<McpSignInOffer>;
   /** Masks the MCP secret values in a text that goes back to the agent. */
   redact(text: string): string;
-  /** The saved, enabled servers that the agent gets and that `mcpFallbackRunsServer` allows. */
+  /**
+   * The saved, enabled servers and the GitHub connection that the agent gets and that
+   * `mcpFallbackRunsServer` allows.
+   */
   forAgent(agentId: string): McpServerConfig[];
   /** Whether the agents that the user selected for this saved server include the agent. */
   allowsAgent(mcpServerId: string, agentId: string): boolean;

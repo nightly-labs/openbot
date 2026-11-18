@@ -147,6 +147,7 @@ import {
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   DEFAULT_RESPONSE_STYLE,
+  GITHUB_CONNECTOR_MCP_SERVER_ID,
   isContextResetMarker,
   isCustomProviderHarness,
   isReservedMcpServerName,
@@ -2142,9 +2143,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.screenCapture === undefined ? {} : { screenCapture: options.screenCapture }),
       ...(options.videoReader === undefined ? {} : { videoReader: options.videoReader }),
       ...(options.fitImage === undefined ? {} : { fitImage: options.fitImage }),
-      // The saved rows that the agent gets. The built-in servers are left out: OpenBot gives their
-      // tools another way, and their bearer is the main process's. `mcpFallbackRunsServer` leaves out a
-      // stdio server of a Workspace only agent.
+      // The saved rows that the agent gets, and the GitHub connection, whose bearer the gateway gets
+      // from the main process (#12035). Computer Use is left out: OpenBot gives its tools another way.
+      // `mcpFallbackRunsServer` leaves out a stdio server of a Workspace only agent.
       mcpServers: mcpServersFromGateway(
         this.#mcp,
         options.prepareMcpTest,
@@ -2154,7 +2155,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           const saved = new Set(this.#mcp.list().map((config) => config.id));
           return this.enabledMcpServers(agentId).filter(
             (config) =>
-              saved.has(config.id) && mcpFallbackRunsServer(config, agent) && !isReservedMcpServerName(config.name),
+              (config.id === GITHUB_CONNECTOR_MCP_SERVER_ID ||
+                (saved.has(config.id) && !isReservedMcpServerName(config.name))) &&
+              mcpFallbackRunsServer(config, agent),
           );
         },
         (mcpServerId, agentId) => this.#mcpAgentAccess?.(mcpServerId, agentId) ?? true,
