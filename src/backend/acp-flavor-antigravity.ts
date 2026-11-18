@@ -508,7 +508,7 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   // without notice (#11808). A 1.3 ID with its effort, such as `gemini-3.8-flash-high`, names a listed
   // model and keeps the session's model, as before.
   unlistedModelFailure: (model, listed) =>
-    listed.length === 0 || listed.some((entry) => model.startsWith(`${entry}-`))
+    listed.length === 0 || listed.includes(model.replace(/-(?:minimal|low|medium|high)$/u, ""))
       ? null
       : sourceText("error.provider.antigravityModelUnavailable", { detail: shownFailureDetail(model) }),
   // The 1.5.4 CLI refreshes the Google token when a session opens. When Google refuses it, the CLI
