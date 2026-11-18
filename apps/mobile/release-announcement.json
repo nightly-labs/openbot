@@ -1,10 +1,10 @@
 {
-  "version": "1.4.8",
+  "version": "1.4.11",
   "highlights": [
-    "Control your computer from the phone: open the server menu and tap Control computer to see its screen and use it like a trackpad.",
-    "Type @ in a chat to tag one of the agent's browser tabs or side threads. The host needs OpenBot 0.62.0 or later.",
-    "A new Library in the server drawer shows every picture and file from the chats of a server.",
-    "Talk with an agent by GPT live voice, or dictate on the phone with Parakeet Unified or Qwen3-ASR in 30 languages.",
-    "Sign in with your company account, and connect GitLab, Omnisend and ElevenLabs from the Apps marketplace."
+    "Added new integrations and expanded app connectivity.",
+    "Improved chat with context tracking, subagent progress, and memory updates.",
+    "Redesigned workflow editor with interactive Flow view.",
+    "Added more customization options for chat appearance and behavior.",
+    "Improved file handling, connection reliability, and overall app stability."
   ]
 }

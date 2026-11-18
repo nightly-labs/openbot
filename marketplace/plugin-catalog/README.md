@@ -24,6 +24,11 @@ Rules for a new entry:
   credential goes (`header` for http, `env` for stdio); the user types the
   value in the connect dialog.
 - `http` servers take a `url`. `stdio` servers take a `command` and `args`.
+  A `stdio` server can also take `env`, an object of variable names and values
+  that it always starts with, such as the address of a local app. A value is
+  never a credential, and a key cannot be a variable that an auth field types.
+  When the user connects an installed app again, the row gets each listed key
+  that it does not have. A value that the row has stays.
 - When a new version moves an `http` server to a different address, list the
   earlier address in `earlierUrls`. A row with the catalog name on one of these
   hosts, or on a subdomain, is then still the app's row. Composio lists
@@ -62,23 +67,29 @@ The listing runs `npx -y obsidian-mcp-server@3.7.2`
 (<https://github.com/cyanheads/obsidian-mcp-server>). A third party publishes
 this package and it gets write access to the vault, so the listing names one
 version. Move it only in a reviewed commit, after you check that the release
-keeps `OBSIDIAN_API_KEY` and the `http://127.0.0.1:27123` default. The server talks to the
+keeps `OBSIDIAN_API_KEY`, `OBSIDIAN_BASE_URL`, and `OBSIDIAN_VERIFY_SSL=false` as
+the default. The server talks to the
 Local REST API community plugin in the Obsidian app
 (<https://github.com/coddingtonbear/obsidian-local-rest-api>). The user types the
 plugin's API key in the connect dialog, and OpenBot gives it to the server as
 `OBSIDIAN_API_KEY`.
 
-The server uses `http://127.0.0.1:27123` by default. A listing cannot set other
-environment values, so the user turns on the plugin's HTTP server:
+The server uses `http://127.0.0.1:27123` by default, and the plugin keeps that
+HTTP server off by default. The listing sets
+`OBSIDIAN_BASE_URL=https://127.0.0.1:27124`, the plugin's HTTPS server, which is
+on by default. The plugin signs it with its own certificate, and the server
+accepts that certificate because `OBSIDIAN_VERIFY_SSL` is `false` by default.
 
 1. In Obsidian, install and enable the Local REST API plugin (version 4 or later).
 2. Open Settings > Local REST API. Copy the API key.
-3. Turn on "Enable non-encrypted (HTTP) server". Keep the port at 27123.
-4. Keep Obsidian open while agents use the vault.
+3. Keep Obsidian open while agents use the vault.
+
+Rows that version 1.0.0 saved have no `OBSIDIAN_BASE_URL` and still use port
+27123. They get the setting when the user connects the app again with the key.
 
 Troubleshooting:
 
-- The connection is refused: Obsidian is closed, or the HTTP server is off.
+- The connection is refused: Obsidian is closed, or its HTTPS server is off.
 - The server replies 401: the API key is wrong. Copy it again from the plugin settings.
 
 ## Apple apps
@@ -133,23 +144,31 @@ Troubleshooting:
 ## Omnisend
 
 The listing connects to Omnisend's own MCP server at `https://mcp.omnisend.com/mcp`
-(<https://api-docs.omnisend.com/reference/mcp-server>). The server uses OAuth with
-dynamic client registration, so the user signs in through the browser and types
-no key. The user selects the access level on Omnisend's consent screen. The
-account needs the Owner, Admin, Manager or Partner role.
+(<https://api-docs.omnisend.com/reference/mcp-server>) with an Omnisend API key in an
+`X-Api-Key` header. The user creates the key at
+<https://app.omnisend.com/integrations/api-keys>.
+
+The listing has no browser sign-in (#7722, #9372). Omnisend's documentation names only OAuth
+with dynamic client registration, but the registration endpoint accepts only the client
+names that Omnisend approved and answers OpenBot with 400 `invalid_client_metadata`
+("unknown application: OpenBot"). `/v2/mcp` names the same metadata. The server's 401
+challenge asks for "Authorization or X-Api-Key", and a tool call with a wrong key returns
+the Omnisend API's own 401, so the server passes the key to the API. No Omnisend document
+says that an API key works for MCP, and the listing was not tested with a real key. Add a
+`link` flow again when Omnisend registers OpenBot.
 
 The server shows four tools: `search`, `tool_schema`, `tool_documentation` and
 `execute`. The agent finds an Omnisend operation with `search` and runs it with
-`execute`. With write access, the operations include sending and deleting
-campaigns, automations and segments.
+`execute`. The operations include sending and deleting campaigns, automations and
+segments, when the key allows them.
 
 Troubleshooting:
 
-- A write fails with "Permission denied": the user granted read-only access.
-  Disconnect and sign in again with write access.
-- The account has more than one brand: one connection works on one brand.
-  Omnisend's guide adds a separate server for each brand with a `?brand=` query
-  parameter; add it in the MCP servers settings and select Sign in.
+- A tool answers "downstream returned 401": the key is wrong or was deleted. Create a
+  new key and connect again. The connection test does not find a wrong key: the server
+  lists its tools with any key and checks the key only when `execute` runs.
+- The account has more than one brand: one key works on one brand. Add a separate
+  server for each brand, with the key of that brand, in the MCP servers settings.
 
 ## Honcho
 
@@ -216,6 +235,60 @@ Troubleshooting:
   instance (`NEXT_PUBLIC_BACKEND_URL`) followed by `/mcp`, and the same
   `Authorization` header, in the MCP servers settings.
 
+## TryPost
+
+The listing connects to TryPost's own MCP server at `https://app.trypost.it/mcp/trypost`
+(<https://docs.trypost.it/ai/introduction>). It answers 401 with a `Bearer` challenge. The
+protected-resource metadata names `https://app.trypost.it`, which has dynamic client registration
+with S256, so the user signs in through the browser and types no key. On the consent screen, the
+user chooses the workspace that the connection can use. One connection works on one workspace.
+
+TryPost Cloud needs an active subscription for MCP. A self-hosted TryPost does not.
+
+Troubleshooting:
+
+- The server replies 402 with "Active subscription required.": the TryPost Cloud account of the
+  workspace has no active subscription. Subscribe in TryPost, then test the server again.
+- The agent does not see the posts or channels that the user expects: the connection uses another
+  workspace. In the MCP servers settings, select Sign out on the TryPost server, then Sign in, and
+  choose the correct workspace.
+- A self-hosted TryPost: add an MCP server with the address of the instance followed by
+  `/mcp/trypost`, in the MCP servers settings, and select Sign in.
+
+## Adobe Analytics
+
+The listing connects to Adobe's own MCP server at `https://aa-mcp.adobe.io/mcp`
+(<https://developer.adobe.com/analytics-mcp/docs/aa/>). It answers 401 with a `Bearer` challenge. The
+authorization server metadata names Adobe IMS (`ims-na1.adobelogin.com`) and has dynamic client
+registration with S256, so the user signs in with an Adobe ID through the browser and types no key.
+A registration with the loopback address gets the `offline_access` scope and the `refresh_token`
+grant (checked 2026-11-13). A user whose Adobe ID is in more than one organization selects one at
+sign-in.
+
+The metadata does not list `offline_access` in `scopes_supported`, so OpenBot does not ask for it
+(`withOfflineAccess` in `src/backend/mcp-oauth-provider.ts`). Adobe's authorize endpoint accepts the
+request with or without that scope. Not confirmed with an Adobe account: whether the token answer
+then has a refresh token. Without one, the user signs in again when the access token expires.
+
+An Adobe administrator must add `MCP Read-only Access` or `MCP Full Access` to a product profile of
+the user, in Admin Console > Products > Adobe Analytics > Permissions > Analytics Tools. A product
+administrator always has full access. Full access adds `upsertSegment`, `upsertCalculatedMetric`,
+`createDateRange` and `upsertProject`. The server has no delete tools.
+
+Adobe's server-to-server path (`client_credentials`) is not in the listing. It needs four headers
+(`Authorization`, `x-api-key`, `x-gw-ims-org-id`, `x-global-company-id`), a key flow has at most two
+fields, and its access token expires, so a saved token stops working.
+
+Customer Journey Analytics has a separate server, `https://cja-mcp.adobe.io/mcp`, with the same
+sign-in. It has no listing; the user adds it in the MCP servers settings and selects Sign in.
+
+Troubleshooting:
+
+- The sign-in succeeds but the tools are refused: the account has no MCP permission item. Ask the
+  Adobe administrator, then sign out and sign in again; Adobe says a change can take some time.
+- The agent sees the wrong report suites: the connection uses another organization or login company.
+  Sign out, sign in, and select the correct organization. `findCompanies` lists the login companies.
+
 ## ElevenLabs
 
 The listing connects to ElevenLabs' hosted MCP server at `https://api.elevenlabs.io/v1/mcp`
@@ -232,3 +305,151 @@ Troubleshooting:
 
 - The sign-in page refuses the redirect address: another program uses port 28417, so OpenBot
   listens on another port that the document does not list. Close that program and restart OpenBot.
+
+## Sunra
+
+The listing connects to Sunra's hosted MCP server at `https://mcp.sunra.ai`
+(<https://mcp.sunra.ai/.well-known/oauth-authorization-server>). The server uses OAuth 2.1 with
+dynamic client registration and client ID metadata documents, PKCE S256, refresh tokens and the
+scope `mcp`, so the user signs in through the browser and types no key. The connection pays from the
+Sunra workspace that the user selected at sign-in: Personal or a Team. `select_workspace` changes
+it; an agent must not change it without a request from the user.
+
+A create tool (`create_image`, `create_video`, `create_audio`, `create_model3d`) without
+`auto_confirm` only stages the work and returns a quote with `estimated_credits` and a `plan_id`.
+`confirm_execution`, or `auto_confirm` on the create call, spends the credits. The agent reads the
+result with `get_job`.
+
+Troubleshooting:
+
+- "Insufficient credits": the selected workspace has too few credits. Sunra gives free daily
+  credits; top-ups are only for subscribers. See <https://sunra.ai/pricing>.
+- A video generation fails: video models need an active Sunra plan.
+
+## AppSignal
+
+The listing connects to AppSignal's own MCP server at `https://appsignal.com/api/mcp`
+(<https://docs.appsignal.com/mcp.html>). It answers 401 with a `Bearer` challenge. The
+authorization server (`https://appsignal.com`) has dynamic client registration with S256, so the
+user signs in through the browser and types no key (checked 2026-11-14). The resource metadata asks
+for `app:read app:write`.
+
+A sign-in gives all read and write tools of the account. AppSignal's MCP token can limit the
+applications and the tools, but the listing does not use it: the token is a second way in, and a
+listing has one flow. A user who wants that limit adds an MCP server with the same address and an
+`Authorization: Bearer <token>` header in the MCP servers settings.
+
+Not confirmed with an AppSignal account: whether the token answer has a refresh token. Without one,
+the user signs in again when the access token expires.
+
+Troubleshooting:
+
+- A tool returns no data: the app does not send that data to AppSignal. For example,
+  `get_log_lines` is empty when the app sends no logs.
+
+## Cloud 66
+
+The listing connects to Cloud 66's own MCP server at `https://app.cloud66.com/mcp`
+(<https://help.cloud66.com/sites/mcp/what-is-the-mcp-server/>). It answers 401 with a `Bearer`
+challenge. The authorization server (`https://app.cloud66.com/mcp/oauth`) has dynamic client
+registration with S256 (checked 2026-11-14). The resource metadata lists each scope, so the
+authorization request asks for all of them, and the user can clear some on the consent page. Tools
+outside the granted scopes are hidden. A scope cannot give more than the user's Cloud 66 role.
+
+The access token is valid for 7 days. A second sign-in of the same client revokes the first token.
+Each user can have 10 MCP sessions at a time.
+
+To delete an application or a deployment profile, or to add a cloud, Cloud 66 sends an elicitation
+over the open session. The agent shows a one-time Cloud 66 link, and the user confirms on that page
+in the browser (with 2FA for a delete). Cloud 66 does not document the elicitation mode. OpenBot
+shows a `form` request as a question card in the chat and declines a `url` request
+(`mcpElicitationQuestions` in `src/backend/agent/prompts.ts`). Cloud 66 supports only MCP
+`2025-06-18`, which has no `url` mode, so the request is probably a `form`. Not confirmed with a
+Cloud 66 account. A chat in Slack, Discord or Telegram cancels the request. When the request fails,
+the tool fails with "this tool requires an MCP client with elicitation support" or a decline; do
+the action in the Cloud 66 dashboard. The other tools do not need it.
+
+Troubleshooting:
+
+- `Missing required argument: account_id`: each tool except `list_accounts` needs an account.
+  Ask the agent to list the accounts first.
+- `Token missing scope: <resource>:<action>`: the user cleared that permission on the consent page.
+  Sign out, sign in, and select it.
+- HTTP 429 when the connection opens: the user has 10 open sessions. Wait for old sessions to end.
+- Deleting needs 2FA on the Cloud 66 account.
+
+## HighLevel
+
+The listing connects to HighLevel's MCP server at `https://services.leadconnectorhq.com/mcp` with a
+Private Integration token (<https://marketplace.gohighlevel.com/docs/Authorization/PrivateIntegrationsToken/index.html>)
+in `Authorization: Bearer pit-…` and the sub-account ID in a `locationId` header. Some tools take
+`locationId` as an argument, and other tools have no location input.
+
+The listing has no browser sign-in (#7595). The server's metadata lists 154 scopes, and its
+authorization page refuses 8 of them ("Invalid scope(s): emails/templates.readonly, …"), so a
+sign-in with the published scope list never finishes. The per-client addresses in HighLevel's guide
+(`/mcp/anthropic/v2`, `/mcp/openai/v2`, `/mcp/cursor/v2`) list the same 8 scopes and refuse a client
+that they do not recognize (#7753). Add a `link` flow again only when a sign-in with the published
+scopes finishes.
+
+Troubleshooting:
+
+- A tool answers "Invalid Private Integration token": the token is wrong, was rotated, or belongs to
+  another sub-account. Create a new token and connect again.
+- HighLevel refuses one tool but not others: the token may not have the scope that the tool needs.
+  Edit the Private Integration in HighLevel and select that scope.
+
+## HubSpot
+
+The listing starts HubSpot's own local server, `@hubspot/mcp-server`
+(<https://www.npmjs.com/package/@hubspot/mcp-server>, MIT), through `npx`. The version is pinned
+because the server can write to the CRM. To update it, review the release, change the version in
+`args`, and increase the listing `version`. The server is in beta under HubSpot's Early Adopter
+Program terms.
+
+The server reads one token from `PRIVATE_APP_ACCESS_TOKEN` and sends it as a `Bearer` token to
+`https://api.hubspot.com`. HubSpot stopped the creation of new legacy private apps on 2026-10-26, so
+the connect dialog asks for a service key
+(<https://developers.hubspot.com/docs/apps/developer-platform/build-apps/authentication/account-service-keys>).
+Only a Super admin can create one. An existing private app token also works. Not confirmed with a
+HubSpot account: that the server accepts a service key. HubSpot documents service keys for REST API
+requests with a `Bearer` header, which is what the server sends.
+
+The tools search, read, create and update CRM objects, associations and properties, create and
+update notes and tasks, and read workflows. There are no delete tools. The scopes of the key limit
+the objects that agents can read and change.
+
+HubSpot's remote server, `https://mcp.hubspot.com/`, is not in the listing. Its authorization server
+has no registration endpoint and no client metadata document, and its token endpoint needs a client
+secret (`client_secret_post`), so the smoke refuses a `link` flow. A user who wants it creates an MCP
+connector in HubSpot (Development > MCP Connectors) with the callback URL
+`http://127.0.0.1:28417/mcp-auth`, adds `https://mcp.hubspot.com/` in the MCP servers settings, enters
+the connector in the Sign-in app section, and selects Sign in.
+
+Troubleshooting:
+
+- "HubSpot access token is required": the key is empty. Connect again and paste the key.
+- A tool answers 401: the key was rotated or deleted. Create a new key and connect again.
+- A tool answers 403: the key does not have the scope for that object. Edit the key in HubSpot and
+  add the scope.
+
+## Tessie
+
+The listing connects to Tessie's MCP server at `https://mcp.tessie.com`
+(<https://developer.tessie.com/reference/mcp>) with a Tessie access token in
+`Authorization: Bearer …`. The user creates the token in Tessie's Developer Settings
+(<https://dash.tessie.com/settings/developer>). This is what Tessie's guide gives for
+agents other than Claude, ChatGPT and Grok.
+
+The listing has no browser sign-in (#9372). The authorization server
+`https://auth.tessie.com` lists a registration endpoint, but it registers only the
+clients that match its templates. It answers OpenBot with 400 `invalid_client_metadata`
+("No dynamic client registration template matched this request."). Add a `link` flow
+again only when a registration for OpenBot succeeds.
+
+The token can read the vehicles and send commands, such as unlock and remote start.
+
+Troubleshooting:
+
+- Connect shows "The server answered 401": the token is wrong or was deleted. Create a
+  new token and connect again.

@@ -22,6 +22,8 @@ export const messages = {
   "error.remote.testActive": "Hay una prueba de escritorio remoto activa. Inténtalo de nuevo cuando termine.",
   "error.remote.screenRecordingDenied":
     "El host no ha permitido que OpenBot grabe su pantalla. Concede permiso de grabación de pantalla en el host e inténtalo de nuevo.",
+  "error.remote.windowsSessionDisconnected":
+    "La sesión de Windows del host está desconectada, así que no hay pantalla para compartir. Inicia sesión en Windows en la pantalla del host e inténtalo de nuevo.",
   "error.remote.teamSessionExpired": "La sesión del equipo caducó.",
   "error.remote.finishTestBeforeSwitch": "Termina la prueba de escritorio remoto antes de cambiar de pantalla.",
   "error.remote.displayNotFound": "No se encontró la pantalla remota.",
@@ -84,7 +86,8 @@ export const messages = {
   "error.remote.pinnedKeyMissing": "El host remoto no tiene una clave de dispositivo fijada.",
   "error.remote.hostDidNotConnect": "El host WebRTC no se conectó.",
   "error.remote.connectionCancelled": "Se canceló la conexión remota.",
-  "error.remote.hostDisconnected": "El host WebRTC se desconectó.",
+  "error.remote.hostDisconnected":
+    "Se perdió la conexión con el servidor. Comprueba si la acción se completó y vuelve a intentarlo.",
   "error.remote.eventGap": "La secuencia de eventos del host tiene un vacío.",
   "error.remote.malformedKnownEvent": "El host devolvió un evento conocido con formato incorrecto.",
   "error.remote.fileTransportIsStopped": "El transporte de archivos WebRTC está detenido.",
@@ -150,6 +153,7 @@ export const messages = {
   "error.remote.attachmentRejected": "El host rechazó el archivo adjunto.",
   "error.remote.attachmentTooLarge": "Los archivos adjuntos deben tener 10 MB o menos.",
   "error.remote.attachmentBusy": "Espera a que termine el archivo adjunto actual.",
+  "error.remote.attachmentChanged": "El archivo cambió o no está disponible. Selecciónalo de nuevo.",
   "error.remote.uploadTimeout": "Se agotó el tiempo de carga del archivo adjunto.",
   "error.remote.hostSessionActive": "El host ya tiene una sesión remota activa.",
   "error.remote.tooManyConnections": "Hay demasiadas conexiones remotas activas.",

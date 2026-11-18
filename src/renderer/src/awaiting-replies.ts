@@ -1,4 +1,10 @@
-import { type ChannelTask, isQueuedAgentReply, type QueueDelivery, type QueueSnapshot } from "@openbot/contracts/ipc";
+import {
+  type AgentTask,
+  type ChannelTask,
+  isQueuedAgentReply,
+  type QueueDelivery,
+  type QueueSnapshot,
+} from "@openbot/contracts/ipc";
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
 import type { AwaitingReplyItem, AwaitingReplyState } from "@openbot/ui/features/conversation/AwaitingReplies";
@@ -79,6 +85,29 @@ export function agentAwaitingReplies(input: AgentAwaitingInput): AwaitingReplyIt
   return rows;
 }
 
+/**
+ * The rows of the waiting block of a side thread: each agent that the thread asked and that has not
+ * answered yet. The answer then comes back to the thread and starts it, so the row goes.
+ */
+export function threadAwaitingReplies(
+  task: AgentTask | null | undefined,
+  agents: readonly AgentProfile[],
+  waits: Record<string, SidebarAgentWait> | undefined,
+): AwaitingReplyItem[] {
+  const { t } = currentText();
+  return (task?.awaitedReplies ?? []).map(({ messageId, recipientAgentId, status }) => {
+    const agent = agents.find((candidate) => candidate.id === recipientAgentId);
+    const wait = waits?.[recipientAgentId];
+    return {
+      id: `${messageId}:${recipientAgentId}`,
+      agent,
+      name: agent?.name ?? t("chat.activity.agentFallback"),
+      state: deliveryState(status) ?? "working",
+      ...(wait ? { wait } : {}),
+    };
+  });
+}
+
 /** Null for a delivery that has landed: its answer is in the transcript, or it had none. */
 function deliveryState(status: QueueDelivery["status"]): Exclude<AwaitingReplyState, "replied"> | null {
   if (status === "queued") return "asked";
@@ -94,7 +123,11 @@ export interface ChannelAwaitingInput {
   name: (agentId: string | null) => string;
 }
 
-/** The sub-tasks of each channel task that waits for them. */
+/**
+ * The sub-tasks of each channel task that waits for them. A finished sub-task that the waiting task
+ * already read in an earlier turn is not one it waits for, so a lead that assigns in rounds shows only
+ * the current round (#7505). A host without channel-seen-subtasks-v1 names none, and all show.
+ */
 export function channelAwaitingReplies(input: ChannelAwaitingInput): AwaitingReplyItem[] {
   const { t } = currentText();
   const waiting = new Map(input.tasks.filter((task) => task.state === "waiting").map((task) => [task.id, task]));
@@ -102,7 +135,8 @@ export function channelAwaitingReplies(input: ChannelAwaitingInput): AwaitingRep
     const parent = task.parentTaskId ? waiting.get(task.parentTaskId) : undefined;
     if (!parent) return [];
     const state = channelTaskState(task.state);
-    if (!state) return [];
+    const finished = state === "replied" || state === "failed";
+    if (!state || (finished && parent.seenDependencies?.includes(task.id))) return [];
     return [
       {
         id: task.id,

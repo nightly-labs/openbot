@@ -9,7 +9,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
 import type { DynamicToolCallParams } from "../protocol";
-import { agentReasoningEffort, requestedRuntime, requestedToolModel } from "./model-tools";
+import { agentReasoningEffort, requestedRuntime, requestedToolModel, requireRunnableChange } from "./model-tools";
 import type { OpenBotToolRouterHooks } from "./openbot-tool-router";
 import {
   profileToolErrorMessage,
@@ -53,7 +53,13 @@ export const handleUpdateAgentsTool = Effect.fn("UpdateAgentsTool.handle")(
     senderAgentId: string,
     hooks: Pick<
       OpenBotToolRouterHooks,
-      "listAgents" | "listModels" | "agentModels" | "providerAccounts" | "updateAgent" | "redactMcp"
+      | "listAgents"
+      | "listModels"
+      | "agentModels"
+      | "providerAccounts"
+      | "providerStatuses"
+      | "updateAgent"
+      | "redactMcp"
     >,
   ): Effect.fn.Return<OpenBotToolResponse, ToolOperationFailed> {
     const { agentIds, provider, model, reasoningEffort, access, computerUse, notifications } =
@@ -85,6 +91,7 @@ export const handleUpdateAgentsTool = Effect.fn("UpdateAgentsTool.handle")(
       Effect.gen(function* () {
         const agents = hooks.listAgents();
         const target = agents.find((agent) => agent.id === agentId);
+        // A model that copies an id with a mistake gets the near id, as read_agent gives it (#9771).
         if (!target) return failed(agentId, unknownAgentMessage(agentId, agents));
         if (widensAgentSettings(target, access, computerUse)) {
           return failed(agentId, sourceText("error.agent.onlyUserWidensSettings"));
@@ -96,6 +103,7 @@ export const handleUpdateAgentsTool = Effect.fn("UpdateAgentsTool.handle")(
           providerAccountId: ownProvider === target.provider ? target.providerAccountId : undefined,
         });
         const runtime = yield* toolStep(() => requestedRuntime(target, runtimeRequest, models));
+        yield* toolStep(() => requireRunnableChange(target, runtime, hooks.providerStatuses()));
         const updated = yield* hooks.updateAgent(
           {
             agentId,

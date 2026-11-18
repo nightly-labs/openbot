@@ -1,9 +1,11 @@
-import type {
-  InstalledSkill,
-  InstallSkillInput,
-  OpenBotDesktopApi,
-  SetEnabledSkillInput,
-  UninstallSkillInput,
+import {
+  type GithubSkillSource,
+  type InstalledSkill,
+  type InstallSkillInput,
+  LOCAL_SERVER_ID,
+  type OpenBotDesktopApi,
+  type SetEnabledSkillInput,
+  type UninstallSkillInput,
 } from "@openbot/contracts/ipc";
 
 /**
@@ -23,14 +25,21 @@ export interface SkillsPort {
     | "listInstalledSkills"
     | "listMcpServers"
     | "listMcpSignIns"
+    | "mcpSignInApp"
+    | "mcpSignInPage"
     | "mcpSignInRelay"
     | "openMcpSignInRelay"
     | "onEvent"
+    | "readGithubSkills"
     | "removeMcpServer"
+    | "removeMcpSignInApp"
     | "saveMcpServer"
+    | "saveMcpSignInApp"
     | "setAgentSkillEnabled"
     | "setMcpAccess"
+    | "setMcpServerEnabled"
     | "signInMcpServer"
+    | "signOutMcpServer"
     | "testMcpServer"
     | "uninstallAgentSkill"
   >;
@@ -66,6 +75,11 @@ export interface AgentSkillCalls {
   install(input: InstallSkillInput): Promise<InstalledSkill>;
   uninstall(input: UninstallSkillInput): Promise<void>;
   setEnabled(input: SetEnabledSkillInput): Promise<InstalledSkill>;
+  /**
+   * Reads the skills under a public GitHub link at its newest commit. Absent while the host cannot
+   * (`github-skills-v1`).
+   */
+  readGithub?(link: string): Promise<GithubSkillSource>;
   /** Calls `listener` with the agent id each time the host reports that its skills changed. */
   onChanged?(listener: (agentId: string) => void): () => void;
 }
@@ -87,6 +101,7 @@ export function agentSkillCalls(hostServerId?: string): AgentSkillCalls {
       install: (input) => port.skills.install(input),
       uninstall: (input) => port.skills.uninstall(input),
       setEnabled: (input) => port.skills.setEnabled(input),
+      readGithub: (link) => port.agent.readGithubSkills(link, LOCAL_SERVER_ID),
       onChanged,
     };
   return {
@@ -94,6 +109,7 @@ export function agentSkillCalls(hostServerId?: string): AgentSkillCalls {
     install: (input) => port.agent.installAgentSkill(input, hostServerId),
     uninstall: (input) => port.agent.uninstallAgentSkill(input, hostServerId),
     setEnabled: (input) => port.agent.setAgentSkillEnabled(input, hostServerId),
+    readGithub: (link) => port.agent.readGithubSkills(link, hostServerId),
     onChanged,
   };
 }

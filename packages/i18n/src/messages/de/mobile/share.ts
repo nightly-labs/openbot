@@ -10,6 +10,7 @@ export const messages = {
   "mobile.share.content": "Zum Teilen",
   "mobile.share.footer":
     "Der Chat öffnet sich mit diesem Inhalt im Nachrichtenfeld. Nichts wird gesendet, bevor du es sendest.",
+  "mobile.share.sendFooter": "OpenBot sendet dies an den Agenten und öffnet dann den Chat.",
   "mobile.share.lastUsed": "Zuletzt verwendet",
   "mobile.share.noAgents": "Keine Agenten",
   "mobile.share.chooseAgent": "Agenten wählen",

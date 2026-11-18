@@ -11,6 +11,7 @@ import type { HostedServersDesktopApi } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { currentText } from "@openbot/ui/text";
 import type { AddServerResume } from "../servers/AddServerOverlay";
+import { savedPromotionCode } from "./web-billing";
 
 const REQUEST_TIMEOUT_MS = 15_000;
 const SERVER_CLAIMS_PATH = "v2/server-claims";
@@ -72,13 +73,17 @@ export function createWebHostedServerCalls(
     plans: () => request("plans", parseHostedServerCatalog),
     createServerClaim: () => request(SERVER_CLAIMS_PATH, parseServerClaim, { body: "{}" }),
     async create({ requestId, ...input }) {
-      const body = JSON.stringify(input);
+      const body = JSON.stringify({ ...input, ...savedPromotionCode() });
       return open(
         await request("servers", parseHostedServerCheckout, { body, headers: { "Idempotency-Key": requestId } }),
       );
     },
     openCheckout: async (serverId) =>
-      open(await request(serverPath(serverId, "checkout"), parseHostedServerCheckout, { body: "{}" })),
+      open(
+        await request(serverPath(serverId, "checkout"), parseHostedServerCheckout, {
+          body: JSON.stringify(savedPromotionCode()),
+        }),
+      ),
     wake: (serverId) => request(serverPath(serverId, "wake"), parseHostedServerSummary, { body: "{}" }),
     restart: (serverId) => request(serverPath(serverId, "restart"), parseHostedServerSummary, { body: "{}" }),
     async delete({ serverId, confirmName }) {

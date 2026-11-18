@@ -58,10 +58,10 @@ export const handleDataTool = Effect.fn("DataTools.handle")(function* (
   if (!tables) return openBotToolFailure("Shared data is unavailable.");
 
   switch (tool) {
-    case "list_tables":
-      return openBotToolResult({
-        tables: yield* tables.list().pipe(Effect.mapError((cause) => new ToolOperationFailed({ cause }))),
-      });
+    case "list_tables": {
+      const listed = yield* tables.list().pipe(Effect.mapError((cause) => new ToolOperationFailed({ cause })));
+      return listed.ok ? openBotToolResult({ tables: listed.value }) : openBotToolFailure(listed.message);
+    }
     case "delete_table": {
       const input = yield* toolStep(() => tableNameSchema.parse(args));
       const removed = yield* tables

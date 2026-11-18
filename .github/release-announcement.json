@@ -1,10 +1,10 @@
 {
-  "version": "0.68.0",
+  "version": "0.73.0",
   "highlights": [
-    "Set which members can use the browser in a channel, and see their tabs and the channel's files in the side panel.",
-    "Right-click the Dynamic Island or the agent dock to hide it, drag agents on the dock to move them, and change the dock size.",
-    "A chat that you read no longer stays in the Unread group, and you can turn the group off.",
-    "A Claude chat that got too long now starts a new session with its history, and an agent moves to its backup model at the 5-hour limit.",
-    "New versions now go to about 1 in 10 computers first, and to all computers about one day later."
+    "Update your joined servers to this version too, so that custom image sizes and the Sunra and Higgsfield models work there.",
+    "See the side threads of each agent in the sidebar, and filter the sidebar by agents, channels, unread chats or folders.",
+    "Edit one workflow together with other people at the same time.",
+    "OpenBot uses much less CPU while many agents work, and its database uses much less space.",
+    "Agents finish a checkout when the bank asks for a 3-D Secure code that they can read in your email or SMS."
   ]
 }

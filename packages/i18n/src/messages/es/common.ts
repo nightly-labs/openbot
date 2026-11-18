@@ -27,4 +27,8 @@ export const messages = {
   "common.download": "Descargar",
   "common.removing": "Quitando…",
   "common.sending": "Enviando…",
+  "common.scrollLeft": "Desplazar a la izquierda",
+  "common.scrollRight": "Desplazar a la derecha",
+  "common.scrollUp": "Desplazar hacia arriba",
+  "common.scrollDown": "Desplazar hacia abajo",
 } as const satisfies PartialTranslation<typeof source>;

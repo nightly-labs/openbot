@@ -13,6 +13,7 @@ import {
 import {
   type AgentProviderId,
   type ConnectProviderAccountInput,
+  type ConnectProviderAccountKeyInput,
   isProviderAccountId,
   MAX_PROVIDER_ACCOUNTS,
   PROVIDER_ACCOUNT_LABEL_MAX_LENGTH,
@@ -94,6 +95,9 @@ export function providerIpcHandlers({
       cancelProviderRestart: payloadHandler(parseProviderId, async (provider) =>
         service.cancelProviderRestart(provider),
       ),
+      chooseInstalledCli: payloadHandler(parseInstalledCliChoice, ({ provider, installed }) =>
+        runCauseEffect(service.chooseInstalledCli(provider, installed)),
+      ),
       // The code and the page it is typed on come back; nothing the code is later traded for does.
       startProviderCodeLogin: payloadHandler(parseProviderId, (provider) =>
         runCauseEffect(service.startProviderCodeLogin(provider)),
@@ -141,6 +145,9 @@ export function providerIpcHandlers({
             await openLink(url.toString());
           }),
         ),
+      ),
+      connectProviderAccountKey: payloadHandler(parseConnectProviderAccountKeyInput, ({ provider, accountId, key }) =>
+        runCauseEffect(service.connectProviderAccountKey(provider, accountId, key)),
       ),
       cancelProviderAccountSignIn: payloadHandler(parseRemoveProviderAccountInput, ({ provider, accountId }) =>
         runCauseEffect(service.cancelProviderAccountSignIn(provider, accountId)),
@@ -232,12 +239,21 @@ export function parseProviderUseInput(value: unknown): { provider: AgentProvider
   return { provider, on: value.on };
 }
 
+function parseInstalledCliChoice(value: unknown): { provider: ManagedProviderId; installed: boolean } {
+  if (!isDynamicRecord(value) || typeof value.installed !== "boolean") throw new Error("Invalid provider CLI choice.");
+  return { provider: parseManagedProviderId(value.provider), installed: value.installed };
+}
+
 export function parseConnectProviderAccountInput(value: unknown): ConnectProviderAccountInput {
   if (!isDynamicRecord(value)) throw new Error("Invalid provider account.");
   return {
     provider: parseProviderId(value.provider),
     accountId: value.accountId === null ? null : requireString(value.accountId, "accountId"),
   };
+}
+
+export function parseConnectProviderAccountKeyInput(value: unknown): ConnectProviderAccountKeyInput {
+  return { ...parseConnectProviderAccountInput(value), key: parseProviderApiKeyInput(value).key };
 }
 
 export function parseRemoveProviderAccountInput(value: unknown): RemoveProviderAccountInput {

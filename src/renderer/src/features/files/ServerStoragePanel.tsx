@@ -1,3 +1,4 @@
+import { hostedPlanDisk } from "@openbot/contracts/hosted-servers";
 import {
   LOCAL_SERVER_ID,
   type RemovableRuntimes,
@@ -11,7 +12,7 @@ import { createEffect, createSignal, Show } from "solid-js";
 import { type FilesPort, filesPort } from "./files-port";
 import { createMachineResources } from "./machine-resources";
 import { createServerBackgroundProcesses } from "./server-background-processes";
-import { createServerAgents, createStorageUsage, planDisk } from "./storage-usage";
+import { createServerAgents, createStorageUsage } from "./storage-usage";
 
 export interface ServerStorageOptions {
   /** The computer the numbers belong to, such as "This Mac" or the server name. */
@@ -25,8 +26,8 @@ export interface ServerStorageOptions {
   /** The storage calls of a client with no `window.openbot`, such as the web client. */
   calls?: FilesPort;
   /**
-   * The joined server serves `background-processes-v1`. With `canManage`, Storage lists the programs
-   * that its agents left running. This computer lists its own in Settings > Agents.
+   * This computer, or a joined server that serves `background-processes-v1`. With `canManage`, Storage
+   * lists the programs that its agents left running.
    */
   backgroundProcesses?: boolean;
 }
@@ -50,11 +51,7 @@ export function ServerStoragePanel(
   const processes = createServerBackgroundProcesses(
     () => ({
       serverId: props.serverId,
-      shown:
-        props.serverId !== LOCAL_SERVER_ID &&
-        props.canManage &&
-        props.backgroundProcesses === true &&
-        calls().backgroundProcesses !== undefined,
+      shown: props.canManage && props.backgroundProcesses === true && calls().backgroundProcesses !== undefined,
     }),
     calls,
   );
@@ -123,7 +120,9 @@ export function ServerStoragePanel(
     const scan = storage.state.usage;
     const read = disk();
     if (!scan) return null;
-    return props.storageGb && read?.scan === scan ? planDisk(read.disk, props.storageGb).freeBytes : scan.freeBytes;
+    return props.storageGb && read?.scan === scan
+      ? hostedPlanDisk(read.disk, props.storageGb).freeBytes
+      : scan.freeBytes;
   };
 
   const usage = () => storage.state.usage;

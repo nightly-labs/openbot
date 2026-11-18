@@ -112,7 +112,9 @@ function ThreadRow(props: ThreadHeaderProps) {
       const rightToLeft = getComputedStyle(group).direction === "rtl";
       const fromStart = (rect: DOMRect) => (rightToLeft ? box.right - rect.right : rect.left - box.left);
       const toEnd = (rect: DOMRect) => (rightToLeft ? box.right - rect.left : rect.right - box.left);
-      if (measured() !== "minimal") start = fromStart(row.getBoundingClientRect());
+      // The agent title gives its room to the row, so the row starts where the name alone would end.
+      const titleRoom = group.querySelector(".conversation-agent-title-room")?.getBoundingClientRect().width ?? 0;
+      if (measured() !== "minimal") start = fromStart(row.getBoundingClientRect()) - titleRoom;
       const header = row.closest(".conversation-header");
       const chevron = header?.querySelector(".provider-model-trigger > .provider-model-chevron");
       if (chevron && chevron.getClientRects().length > 0) {

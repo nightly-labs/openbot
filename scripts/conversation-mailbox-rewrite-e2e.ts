@@ -168,7 +168,7 @@ async function startRuntime() {
     conversation,
     routines,
     scope: () => scope,
-    hooks: { emit: () => {}, emitError: () => {}, queueHold: () => null },
+    hooks: { emit: () => {}, emitError: () => {}, queueHold: () => null, threadRequestsChanged: () => {} },
   });
 
   // Records the message ids of each conversation write.

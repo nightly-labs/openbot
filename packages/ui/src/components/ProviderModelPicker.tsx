@@ -120,6 +120,11 @@ interface ProviderModelPickerProps {
    */
   accountUsage?: AccountUsage | null | undefined;
   /**
+   * The agent has Workspace only access. A model that the host cannot run with it
+   * (`workspaceOnlyUnavailable`) shows but cannot be chosen, and its tab says why.
+   */
+  workspaceOnly?: boolean | undefined;
+  /**
    * The agent's provider when this build does not know it. The host still runs the agent, so the
    * picker shows its model, and it cannot open until OpenBot is updated.
    */
@@ -223,7 +228,9 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     const pool = status?.accountPool;
     if (!pool) return null;
     const accounts = status?.accounts ?? [];
-    const members = accounts.filter((account) => !isApiKeyAccount(account.id) && !pool.leftOut.includes(account.id));
+    const members = accounts.filter(
+      (account) => !isApiKeyAccount(account.id, rail) && !pool.leftOut.includes(account.id),
+    );
     const accountsText = t("provider.account.count", { count: members.length });
     const summary = t("provider.account.poolCount", { accounts: accountsText });
     return {
@@ -241,7 +248,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   const railAccounts = (rail: RailId): readonly ProviderAccountStatus[] => {
     if (!props.accountChoice || rail === CUSTOM_RAIL) return [];
     const accounts = props.agentStatus?.providers?.find((status) => status.id === rail)?.accounts ?? [];
-    if (railPool(rail)) return accounts.filter((account) => isApiKeyAccount(account.id));
+    if (railPool(rail)) return accounts.filter((account) => isApiKeyAccount(account.id, rail));
     return accounts.length > 1 ? accounts : [];
   };
   const railKeys = createMemo<RailKey[]>(() =>
@@ -415,16 +422,43 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   );
   const modelAvailable = (model: PickerModel): boolean =>
     providerAvailability(props.agentStatus, props.modelOptions, model.provider, t).state === "available";
+  /** The providers that the host refuses for a Workspace only agent. An account's own models too. */
+  const workspaceOnlyBlockedProviders = createMemo(
+    () =>
+      new Set<string>(
+        props.workspaceOnly
+          ? props.modelOptions.filter((option) => option.workspaceOnlyUnavailable).map((option) => option.provider)
+          : [],
+      ),
+  );
+  const workspaceOnlyBlocked = (model: PickerModel): boolean => workspaceOnlyBlockedProviders().has(model.provider);
   /** The pool's line on the pool's entry, in the place of the account's email, while the provider is available. */
   const poolSummary = (key: RailKey, status: AgentProviderStatus): string | undefined =>
     status.state === "available" && key === railOf(key) ? railPool(railOf(key))?.summary : undefined;
+  /**
+   * The line that says where the provider's models come from when its CLI settings give them from
+   * elsewhere, such as Ollama models under ChatGPT (#9956). It comes before the pool's line: it explains
+   * the list below it. Only the provider's own entry has it, as its own sign-in read those settings.
+   */
+  const sourceSummary = (key: RailKey, status: AgentProviderStatus): string | undefined => {
+    const rail = railOf(key);
+    const source = status.modelSource;
+    if (rail === CUSTOM_RAIL || key !== rail || status.state !== "available" || !source) return undefined;
+    const cli = agentProviderCliName(rail);
+    return source.kind === "provider"
+      ? t("provider.picker.modelSourceProvider", { name: source.name, cli })
+      : t("provider.picker.modelSourceCatalog", { cli });
+  };
   const railSummary = (key: RailKey, status: AgentProviderStatus): string => {
     const rail = railOf(key);
-    return rail === CUSTOM_RAIL ? customSummary() : (poolSummary(key, status) ?? providerSummary(rail, status, text));
+    return rail === CUSTOM_RAIL
+      ? customSummary()
+      : (sourceSummary(key, status) ?? poolSummary(key, status) ?? providerSummary(rail, status, text));
   };
   const railHeadingSummary = (key: RailKey, status: AgentProviderStatus): string => {
     const rail = railOf(key);
-    if (rail !== CUSTOM_RAIL) return poolSummary(key, status) ?? providerHeadingSummary(rail, status, text);
+    if (rail !== CUSTOM_RAIL)
+      return sourceSummary(key, status) ?? poolSummary(key, status) ?? providerHeadingSummary(rail, status, text);
     // OpenCode is what serves a custom endpoint, so its trouble is this tab's trouble.
     return status.state === "available" ? customSummary() : providerStatusLabel(status.state, t);
   };
@@ -444,7 +478,8 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
       model,
       now(),
     );
-    return spent?.covers ? spent.window : undefined;
+    // An account on credits keeps working, so its model is not stopped.
+    return spent?.covers && !spent.onCredits ? spent.window : undefined;
   };
   /** The spent window of each model of a rail entry, in the order of the models. */
   const entrySpentWindows = (key: RailKey): (AccountUsageWindow | undefined)[] => {
@@ -551,7 +586,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   }
 
   function selectModel(option: PickerModel, accountId: string | null, key: RailKey): void {
-    if (props.disabled || !modelAvailable(option)) return;
+    if (props.disabled || !modelAvailable(option) || workspaceOnlyBlocked(option)) return;
     if (!showsReasoningEffort() && !option.variants.length) setOpen(false);
     const queued = queuedEffort();
     setQueuedEffort(undefined);
@@ -891,6 +926,11 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                 };
                 const status = () => entryStatus(key);
                 const models = createMemo(() => pickerModels(entryModelOptions(key), props.customProviders));
+                // OpenCode or Pi can list only the models of the endpoints it runs, and those are on the
+                // Custom tab. Its own tab then points there, not to "no models" (#11231).
+                const endpointModelsElsewhere = () =>
+                  provider !== CUSTOM_RAIL &&
+                  railModelOptions(CUSTOM_RAIL).some((option) => option.provider === provider);
                 const [showOlder, setShowOlder] = createSignal(false);
                 const olderExpanded = () => (showOlder() ? "true" : "false");
                 // An endpoint and a custom agent can both list `goose/default`: match the provider too.
@@ -1004,7 +1044,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                 const available = () => status().state === "available";
                 // An account that is not signed in holds back the models its provider serves.
                 const modelEnabled = (model: PickerModel) =>
-                  modelAvailable(model) && (accountId() === null || available());
+                  modelAvailable(model) && (accountId() === null || available()) && !workspaceOnlyBlocked(model);
                 const effortLocked = () => !available();
                 /** A spent window that limits every model of the tab: a chip beside the provider name. */
                 const headingSpent = createMemo(() => (available() ? entrySpentWindow(key) : undefined));
@@ -1187,6 +1227,11 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                         </Show>
                       </div>
                     </Show>
+                    <Show when={available() && models().some(workspaceOnlyBlocked)}>
+                      <div class="provider-model-empty" role="status">
+                        {t("provider.picker.workspaceOnlyUnavailable")}
+                      </div>
+                    </Show>
                     <Input
                       class="provider-model-search"
                       aria-label={t("provider.picker.search")}
@@ -1203,12 +1248,36 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                               <Show
                                 when={provider === CUSTOM_RAIL && !search().trim()}
                                 fallback={
-                                  search().trim()
-                                    ? t("provider.picker.noMatches")
-                                    : // Meta sends a signed-in Muse account an empty list where Muse is not offered (#5983).
-                                      provider === "muse"
-                                      ? t("provider.picker.museNoModels")
-                                      : t("provider.picker.noModels", { name: railName(provider, t) })
+                                  <Show
+                                    when={!search().trim() && endpointModelsElsewhere()}
+                                    fallback={
+                                      search().trim()
+                                        ? t("provider.picker.noMatches")
+                                        : // Meta sends a signed-in Muse account an empty list where Muse is not offered (#5983).
+                                          provider === "muse"
+                                          ? t("provider.picker.museNoModels")
+                                          : t("provider.picker.noModels", { name: railName(provider, t) })
+                                    }
+                                  >
+                                    <span>
+                                      {t("provider.picker.endpointModelsInCustom", { name: railName(provider, t) })}
+                                    </span>
+                                    <Button
+                                      type="button"
+                                      size="xs"
+                                      variant="outline"
+                                      onClick={() => {
+                                        const custom = providerButtons.get(CUSTOM_RAIL);
+                                        selectRailProvider(CUSTOM_RAIL);
+                                        // Focus that enters the tab list goes back to the tab that had it
+                                        // last. As on a rail click, the second focus then moves it to Custom.
+                                        custom?.focus({ preventScroll: true });
+                                        queueMicrotask(() => custom?.focus({ preventScroll: true }));
+                                      }}
+                                    >
+                                      {t("provider.picker.showCustomModels")}
+                                    </Button>
+                                  </Show>
                                 }
                               >
                                 {/* A saved endpoint lists no model until its provider restarts and reads it. */}

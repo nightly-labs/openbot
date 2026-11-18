@@ -30,6 +30,7 @@ import { useDirectMessages } from "../conversation/direct-messages-context";
 import { useSetup } from "../onboarding/onboarding-context";
 import { useSidebar } from "../sidebar/sidebar-context";
 import { usePresence } from "../team/team-context";
+import { deleteCachedWorkflows, keepCachedWorkflows } from "../workflows/workflow-cache";
 import {
   deleteRemoteWorkspaceFrame,
   deleteRemoteWorkspaceFrames,
@@ -145,9 +146,14 @@ const ServerScope = createSimpleContext({
     const selectedServer = () => servers().find((candidate) => candidate.id === activeServerId());
     // Main refuses a remote request until it knows the account. A load started before then fails, and
     // the workspace shows that failure for a moment when the account comes.
-    const transportReady = () =>
-      selectedServer()?.kind !== "remote" ||
-      (selectedServer()?.state === "online" && centralAuth().status !== "loading");
+    // The host gives its capabilities one round trip after the connection opens. A load started
+    // before then skips the data that needs a capability, and a second full load must follow it.
+    // Main ends the wait also when the capability read fails.
+    const transportReady = () => {
+      const server = selectedServer();
+      if (server?.kind !== "remote") return true;
+      return server.state === "online" && centralAuth().status !== "loading" && !server.capabilitiesPending;
+    };
     const loaded = () =>
       connection.hasContent &&
       !connection.loading &&
@@ -192,7 +198,20 @@ const ServerScope = createSimpleContext({
     let loadedAccount: string | null | undefined;
 
     let loadGeneration = 0;
+    /** The connection that the load in progress reads, with the host capabilities known. Undefined when no such load runs. */
+    let loadingSequence: number | undefined;
     async function loadWorkspace(): Promise<void> {
+      loadingSequence = undefined;
+      try {
+        await readWorkspace((sequence) => {
+          loadingSequence = sequence;
+        });
+      } finally {
+        loadingSequence = undefined;
+      }
+    }
+
+    async function readWorkspace(started: (sequence: number | undefined) => void): Promise<void> {
       const generation = ++loadGeneration;
       const serverId = activeServerId();
       const server = selectedServer();
@@ -200,6 +219,7 @@ const ServerScope = createSimpleContext({
       const isCurrent = () =>
         scopeIsCurrent() && generation === loadGeneration && sequence === selectedServer()?.connectionSequence;
       if (!isCurrent() || !transportReady()) return;
+      if (server?.kind === "remote" && server.compatibility?.hostAppVersion) started(sequence);
       if (server?.kind === "remote") markRemoteSync("workspace-load");
       loadedAccount = untrack(signedInAccount);
       setConnection((draft) => {
@@ -417,11 +437,14 @@ const ServerScope = createSimpleContext({
       },
     );
 
-    // The frames go with the account, with a server that leaves the list, and with ended access.
+    // The frames and the cached workflows go with the account, with a server that leaves the list, and
+    // with ended access.
     createEffect(
       () => centralAuth().status === "signed_out",
       (signedOut) => {
-        if (signedOut) deleteRemoteWorkspaceFrames(null);
+        if (!signedOut) return;
+        deleteRemoteWorkspaceFrames(null);
+        keepCachedWorkflows(null);
       },
     );
     createEffect(
@@ -434,6 +457,7 @@ const ServerScope = createSimpleContext({
         if (!key) return;
         const [account = "", ...serverIds] = key.split("\0");
         deleteRemoteWorkspaceFrames(account, serverIds);
+        keepCachedWorkflows(account, serverIds);
       },
     );
     createEffect(
@@ -448,6 +472,7 @@ const ServerScope = createSimpleContext({
         if (!key) return;
         const [account = "", serverId = ""] = key.split("\0");
         deleteRemoteWorkspaceFrame(account, serverId);
+        deleteCachedWorkflows(serverId);
       },
     );
 
@@ -455,7 +480,12 @@ const ServerScope = createSimpleContext({
       () => serverLoadRequest(),
       (request) =>
         untrack(() => {
-          if (request?.serverId === activeServerId()) recovery.refresh();
+          if (request?.serverId !== activeServerId()) return;
+          // This scope starts a load when its server comes online. A request for a new connection, or
+          // for the capabilities that came with it, asks for that same load. A second load would read
+          // all again and hold the workspace for one more round trip.
+          if (request.connectionSequence !== undefined && request.connectionSequence === loadingSequence) return;
+          recovery.refresh();
         }),
     );
 
