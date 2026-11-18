@@ -24,5 +24,5 @@
 - A thread now looks like the agent's chat. Messages by one sender in a row read as one block, a
   separator shows the day and time, and the "working" and "waiting" rows stand right under the last
   message. With compact message actions, the time no longer shows under each message.
-- The message box of a thread now shows "Message Chief in this thread". Before, it repeated the
-  thread title, which can be a full message.
+- The message box of a thread no longer repeats the thread title, which can be a full message. It now
+  names the agent and "this thread".
