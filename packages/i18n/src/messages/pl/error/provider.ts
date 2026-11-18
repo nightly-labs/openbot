@@ -172,12 +172,20 @@ export const messages = {
     "{provider} nie odpowiedział na czas. Komputer może być zajęty. OpenBot spróbuje ponownie.",
   "error.provider.cliTimedOutRefresh":
     "{provider} nie odpowiedział na czas. Komputer może być zajęty. Odśwież dostawców, aby spróbować ponownie.",
+  "error.provider.stoppedBeforeStart":
+    "{provider} zatrzymał się, zanim ta wiadomość się rozpoczęła. Wyślij wiadomość ponownie.",
+  "error.provider.serviceUnreachable":
+    "{provider} nie może połączyć się ze swoją usługą. Sprawdź połączenie z internetem. OpenBot spróbuje ponownie.",
+  "error.provider.serviceUnreachableRefresh":
+    "{provider} nie może połączyć się ze swoją usługą. Sprawdź połączenie z internetem, a potem odśwież dostawców.",
   "error.provider.acpStartTimedOut":
     "{provider} nie zakończył uruchamiania w ciągu {seconds} s. Komputer może być zajęty.",
   "error.provider.acpModelsTimedOut":
     "{provider} nie podał listy modeli w ciągu {seconds} s. Komputer może być zajęty.",
   "error.provider.startStopped":
     "{provider} kilka razy z rzędu się nie uruchomił, więc OpenBot przestał próbować. Odśwież dostawców, aby spróbować ponownie.",
+  "error.provider.startPaused":
+    "{provider} kilka razy z rzędu się nie uruchomił. OpenBot spróbuje ponownie przy następnej wiadomości lub rutynie. Aby spróbować teraz, odśwież dostawców.",
   "error.provider.tempDiskSpace":
     "{provider} potrzebuje do uruchomienia co najmniej 1 GB wolnego miejsca na dysku. Zwolnij miejsce, a potem odśwież dostawców.",
   "error.provider.noCodeSignIn": "Dostawca {provider} nie obsługuje logowania kodem.",
@@ -260,6 +268,8 @@ export const messages = {
     "Model OpenCode zakończył turę po rozumowaniu, bez odpowiedzi. Spróbuj ponownie albo wybierz inny model.",
   "error.provider.acpNoAnswer":
     "{provider} zakończył turę bez odpowiedzi. Wyślij wiadomość ponownie albo rozpocznij nowy czat.",
+  "error.provider.noAnswerAfterSteps":
+    "{provider} wykonał kilka kroków, a potem zakończył turę bez odpowiedzi. Zanim wyślesz tę samą prośbę ponownie, zapytaj agenta, co zrobił.",
   "error.provider.chatgptPageFailed": "Nie udało się otworzyć strony połączenia ChatGPT.",
   "error.provider.noneReady": "Żaden dostawca agentów nie jest gotowy.",
   "error.provider.claudeTurnActive": "Zaczekaj na zakończenie aktywnej tury Claude, zanim odświeżysz jego kontekst.",
@@ -357,6 +367,8 @@ export const messages = {
     "Codex nie mógł kontynuować tego czatu, ponieważ w jego zapisanej historii brakuje elementu. OpenBot rozpoczął nową sesję Codex z historią czatu. Spróbuj ponownie.",
   "error.provider.codexRequestRefused":
     "{provider} odrzucił żądanie tego czatu i nie podał przyczyny. Może się to zdarzyć w długim czacie z wieloma obrazami. OpenBot rozpoczął nową sesję {provider} z historią czatu. Spróbuj ponownie.",
+  "error.provider.codexAudioRefused":
+    "Model nie przyjął dźwięku z tego czatu. OpenBot rozpoczął nową sesję Codex z historią czatu. Spróbuj ponownie.",
   "error.provider.imageTooSmall":
     "Model nie przyjął obrazu z tego czatu, ponieważ obraz jest za mały. OpenBot rozpoczął nową sesję {provider} z historią czatu. Spróbuj ponownie.",
   "error.provider.imageTooLarge":
@@ -485,12 +497,16 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "Nie udało się odczytać wersji {provider} CLI.",
   "error.provider.piSessionBusy": "Zaczekaj na zakończenie bieżącej tury Pi.",
   "error.provider.acpSessionBusy": "{provider} wciąż kończy zatrzymaną turę. Spróbuj ponownie za chwilę.",
+  "error.provider.acpModelNotOffered":
+    "{provider} nie oferuje teraz modelu {model}. Wybierz inny model dla tego agenta i spróbuj ponownie.",
   "error.provider.piStopped": "Pi nie działa. Połącz Pi i spróbuj ponownie.",
   "error.provider.piSessionMissing": "Plik sesji Pi nie jest dostępny na tym komputerze.",
   "error.provider.piResumeCancelled": "Pi anulował wznowienie sesji. Spróbuj ponownie.",
   "error.provider.piSessionIdentity": "Pi zwrócił inną sesję. Zapisana sesja nie została zastąpiona.",
   "error.provider.piExtensionFailed":
     "Pi zatrzymał się, ponieważ nie mógł wczytać rozszerzenia. Usuń lub zaktualizuj to rozszerzenie, a następnie spróbuj ponownie. {detail}",
+  "error.provider.piThreadStopped":
+    "Pi nieoczekiwanie zatrzymał się przed zakończeniem tej tury. Wyślij wiadomość, aby kontynuować.",
   "error.provider.piModelInvalid": "Wybierz model Pi, który zawiera nazwę dostawcy.",
   "error.provider.piToolInvalid": "Narzędzie zwróciło nieprawidłowy wynik.",
   "error.provider.piSignIn": "Użyj /login w Pi na komputerze hosta. Zamknij Pi po zakończeniu logowania.",

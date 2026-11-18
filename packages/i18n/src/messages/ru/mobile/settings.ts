@@ -133,10 +133,45 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Светлота",
   "mobile.settings.appearance.messageColorFooter":
     "С цветом агента ваши сообщения в чате с агентом окрашиваются в цвет этого агента. Со своим цветом ваши сообщения во всех чатах окрашиваются в выбранный цвет. Цвет текста меняется, чтобы текст оставался читаемым.",
+  "mobile.settings.appearance.bubbleStyle": "Стиль пузырей",
+  "mobile.settings.appearance.bubbleStyleSolid": "Заливка",
+  "mobile.settings.appearance.bubbleStyleTint": "Оттенок",
+  "mobile.settings.appearance.seeThroughBubbles": "Прозрачные пузыри",
+  "mobile.settings.appearance.seeThroughBubblesNote":
+    "Сквозь пузыри агента и пузыри без цвета виден фон. Без фона пузыри всегда непрозрачные.",
+  "mobile.settings.appearance.tab.colors": "Цвета",
+  "mobile.settings.appearance.tab.chat": "Чат",
+  "mobile.settings.appearance.preview.routines": "3 запуска рутины",
+  "mobile.settings.appearance.preview.thinking": "Думал 4 секунды",
+  "mobile.settings.appearance.preview.memory": "Сохранено 1 воспоминание",
+  "mobile.settings.appearance.backdrop.title": "Фон",
+  "mobile.settings.appearance.backdrop.footer":
+    "Показывается за главным экраном и чатами на этом телефоне. Агент может установить его за вас; «Отменить» в чате вернёт прежний.",
+  "mobile.settings.appearance.backdrop.none": "Нет",
+  "mobile.settings.appearance.backdrop.pond": "Пруд с карпами кои",
+  "mobile.settings.appearance.backdrop.jellyfish": "Медузы",
+  "mobile.settings.appearance.backdrop.sunset": "Ретро-закат",
+  "mobile.settings.appearance.backdrop.snowfall": "Снегопад",
+  "mobile.settings.appearance.backdrop.fireflies": "Светлячки",
+  "mobile.settings.appearance.backdrop.agentPage": "Страница агента",
+  "mobile.settings.appearance.backdrop.agentPageNote": "Установлен агентом",
+  "mobile.settings.appearance.backdrop.photo": "Фото",
+  "mobile.settings.appearance.backdrop.photoChoose": "Выбрать из фото",
+  "mobile.settings.appearance.backdrop.photoChange": "Нажмите ещё раз, чтобы выбрать другое фото",
+  "mobile.settings.appearance.backdrop.strength": "Интенсивность фона",
+  "mobile.settings.appearance.backdrop.calm": "Спокойный",
+  "mobile.settings.appearance.backdrop.vivid": "Яркий",
+  "mobile.settings.appearance.backdrop.strengthFooter":
+    "Спокойный фон не мешает читать длинные ответы. Больше всего его видно вверху главного экрана.",
+  "mobile.settings.appearance.backdrop.previewQuestion": "Напишешь заметку о выпуске?",
+  "mobile.settings.appearance.backdrop.previewAnswer":
+    "Вот черновик: фон, который задаёт агент, теперь виден и на телефоне.",
   "mobile.settings.appearance.chatBackground": "Фон чата",
   "mobile.settings.appearance.chatBackgroundDefault": "По умолчанию",
   "mobile.settings.appearance.chatBackgroundFooter":
     "Каждая тема хранит свой цвет. Цвет, на котором текст трудно читать, становится темнее или светлее.",
+  "mobile.settings.appearance.chatBackgroundBackdropFooter":
+    "Фон заменяет фон чата. Чтобы использовать цвет, выберите для фона «Нет».",
   "mobile.settings.appearance.collapseRoutines": "Сворачивать активность регулярных задач",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Идущие подряд события регулярных задач в чате показываются одной свёрнутой строкой. Коснитесь строки, чтобы показать их.",
@@ -565,7 +600,7 @@ export const messages = {
   "mobile.settings.shortcuts.card.locked.title": "OpenBot заблокирован",
   "mobile.settings.shortcuts.card.locked.action": "Открыть OpenBot",
   "mobile.settings.shortcuts.footer":
-    "Send Message в приложении «Команды» отправляет этому агенту. Приложение не открывается.",
+    "Send Message в приложении «Команды» отправляет этому агенту. Приложение не открывается. Open Agent открывает его чат.",
   "mobile.settings.shortcuts.send.sent": "Отправлено",
   "mobile.settings.shortcuts.send.failed": "OpenBot не смог это отправить.",
   "mobile.settings.shortcuts.send.unconfirmed": "Сервер не ответил. Сообщение может быть в чате.",

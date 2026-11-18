@@ -623,7 +623,7 @@ the phone read the profiles again on `browser-profiles-changed` (`browser-profil
 A side thread (in code and on the wire still a **task**) is a separate execution thread of one agent.
 The agent keeps one identity, workspace and provider settings; each side thread has its own provider
 thread, conversation, queue, progress and result. The agent's own chat is its main thread and has no
-side thread row. `projection_agent_threads` (`src/backend/agent-threads/agent-thread-schema.ts`,
+side thread row. `projection_agent_threads` (`src/backend/agent-threads/agent-thread-store.ts`,
 migration 47) holds one row for each side thread, with its title and the source of the title
 (`auto`, `agent` or `user`). Migration 47 moved every task of `projection_agent_tasks` (migration 38)
 there: a closed task became an archived thread, and the task id stays as `legacy_task_id`. The task id
@@ -1002,7 +1002,10 @@ WhatsApp do not steer automatically: each starts a turn of its own. A question b
 expects a reply) asks for no `send_message` reply, so it stays queued and its own turn's answer goes
 back. Channel, messaging and task work, and each answer to a request that went to two or more teammates, stay queued
 (`MailboxStore.joinsChatTurn`), so those answers still start together. A message from an agent that
-cannot steer gets no fallback reason on its row.
+cannot steer gets no fallback reason on its row. A message from an agent also stays queued while a
+turn that only the person's messages started runs, and starts as a turn of its own after it: the tools
+that only a person's message can start check each message of the turn, and a message from an agent
+in the person's turn would make them refuse the person's own request (#11165).
 The person can steer any queued answer into the running turn from the waiting block on desktop, the
 web and mobile; it has no other queue action. That is the person's choice, so it can take one answer
 of a group before the others.

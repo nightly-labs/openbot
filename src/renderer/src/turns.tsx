@@ -7,9 +7,10 @@ import type {
   QueueSnapshot,
   RoutineFields,
 } from "@openbot/contracts/ipc";
+import type { AgentActiveQueues } from "@openbot/contracts/team-protocol/agent-active-queues-v1";
 import { approvalIsCut, withWholeApproval } from "@openbot/team-client/runtime-attention";
 import { currentText } from "@openbot/ui/text";
-import { createEffect, createMemo, createSignal, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, createStore, untrack } from "solid-js";
 import { desktopAnalytics } from "./analytics";
 import { useAnsweredPrompts } from "./answered-prompts";
 import {
@@ -74,7 +75,7 @@ type RoutineSnapshot = { routines: RoutineFields[]; current: boolean };
 const Turns = createSimpleContext({
   name: "Turns",
   init: () => {
-    const { activeServerId } = useServers();
+    const { activeServerId, activeServer } = useServers();
     const { dynamicIslandCoordinator } = useDynamicIsland();
     const { activeAgent, activeAgentId, agentList, agentListSettled, agentStatus, appendUiError } = useAgents();
     const scopeIsCurrent = createScopeGuard();
@@ -84,9 +85,12 @@ const Turns = createSimpleContext({
     const scopeServerId = untrack(activeServerId);
     const seed = dynamicIslandCoordinator.serverState(scopeServerId);
     const [activeTurns, setActiveTurns] = createSignal<Record<string, string | null>>(seed?.activeTurns ?? {});
-    const [turnProgress, setTurnProgress] = createSignal<
+    // A store, so a progress line runs again only the readers of its own agent. The seed is copied, so a
+    // write does not change the record of the coordinator.
+    const [turnProgressStore, setTurnProgress] = createStore<
       Record<string, { turnId: string; detail: string; running?: boolean; activity?: string } | undefined>
-    >(seed?.turnProgress ?? {});
+    >({ ...seed?.turnProgress });
+    const turnProgress = () => turnProgressStore;
     // Every progress line of the newest turns, by turn, for the steps under the activity line.
     const [turnStepLines, setTurnStepLines] = createSignal<TurnStepLines>({});
     const [failedTurns, setFailedTurns] = createSignal<Record<string, string | undefined>>(seed?.failedTurns ?? {});
@@ -232,13 +236,20 @@ const Turns = createSimpleContext({
           setWaits((current) => ({ ...current, [agentId]: snapshot }));
         })
         // As in `loadQueue`: this background read can time out on a joined server while the agent
-        // works. Keep the last waits; the next load (a new phase, agent or server) or a local
-        // `waits-changed` event updates them. A failed cancel still reports an error.
+        // works. Keep the last waits; the next load (a new phase, agent, server or connection) or a
+        // local `waits-changed` event updates them. A failed cancel still reports an error.
         .catch(() => undefined);
     }
 
+    // Changes only when a connection to the server comes up, so a reconnect reads the waits again.
+    const connectionSequence = createMemo(() => activeServer()?.connectionSequence);
     createEffect(
-      () => ({ agentId: activeAgentId(), agentPhase: agentStatus().phase, serverId: activeServerId() }),
+      () => ({
+        agentId: activeAgentId(),
+        agentPhase: agentStatus().phase,
+        serverId: activeServerId(),
+        connectionSequence: connectionSequence(),
+      }),
       ({ agentId }) => {
         if (agentId) loadWaits(agentId);
       },
@@ -247,29 +258,56 @@ const Turns = createSimpleContext({
     /**
      * Reads the queues of many agents and writes them at once. One write for each answer ran every
      * sidebar row again for each agent: on a host with 50 agents, the first conversation waited
-     * seconds for those runs (`bun run perf:remote`).
+     * seconds for those runs (`bun run perf:remote`). The rows need only the open work, so a host with
+     * `agent-active-queues-v1` gives all of it in one read. The open chat keeps its full queue from
+     * `loadQueue`: an answer that arrives after it does not replace it.
      */
     function loadQueues(agentIds: string[]): void {
-      const reads = agentIds.map((agentId) => {
-        const queueRequest = (queueSnapshotRequests.get(agentId) ?? 0) + 1;
-        queueSnapshotRequests.set(agentId, queueRequest);
-        return turnsPort()
-          .agent.listQueue(agentId)
-          .then(
-            (queue) => ({ agentId, queueRequest, queue }),
-            // As in `loadQueue`: keep the last queue; the next load or queue-changed event updates it.
-            () => null,
-          );
-      });
-      void Promise.all(reads).then((results) => {
+      // The open chat needs its finished deliveries too: it gets a full read.
+      const opened = untrack(activeAgentId);
+      if (opened && agentIds.includes(opened)) loadQueue(opened);
+      const rows = agentIds.filter((agentId) => agentId !== opened);
+      if (rows.length === 0) return;
+      const requests = new Map(
+        rows.map((agentId) => {
+          const queueRequest = (queueSnapshotRequests.get(agentId) ?? 0) + 1;
+          queueSnapshotRequests.set(agentId, queueRequest);
+          return [agentId, queueRequest] as const;
+        }),
+      );
+      void readQueues(rows).then((queues) => {
         if (!scopeIsCurrent()) return;
-        const loaded = results.flatMap((result) =>
-          result && queueSnapshotRequests.get(result.agentId) === result.queueRequest
-            ? [[result.agentId, result.queue] as const]
+        const active = untrack(activeAgentId);
+        const loaded = queues.flatMap((queue) =>
+          queue.agentId !== active && queueSnapshotRequests.get(queue.agentId) === requests.get(queue.agentId)
+            ? [[queue.agentId, queue] as const]
             : [],
         );
         if (loaded.length > 0) setQueues((current) => ({ ...current, ...Object.fromEntries(loaded) }));
       });
+    }
+
+    /**
+     * One list read, and a read of each queue that it did not carry. An older host has no list (null), and
+     * a list read can fail, so then each queue is read. As in `loadQueue`, a failed read keeps the last queue; the next load or
+     * queue-changed event updates it.
+     */
+    async function readQueues(agentIds: string[]): Promise<QueueSnapshot[]> {
+      let listed: AgentActiveQueues | null;
+      try {
+        listed = await turnsPort().agent.listActiveQueues(agentIds);
+      } catch {
+        // As on the web client: each queue read can still succeed.
+        listed = null;
+      }
+      const each = await Promise.all(
+        (listed?.omitted ?? agentIds).map((agentId) =>
+          turnsPort()
+            .agent.listQueue(agentId)
+            .catch(() => null),
+        ),
+      );
+      return [...(listed?.queues ?? []), ...each.filter((queue) => queue !== null)];
     }
 
     // The active-agent load above misses everyone else. A routine mark needs each agent's real
@@ -589,9 +627,19 @@ const Turns = createSimpleContext({
         });
     }
 
+    /**
+     * The ended turn whose Codex subagents still work, which Stop stops. Main can stop only Codex
+     * subagents after their turn; a background subagent of another provider has no Stop (#11871).
+     * Only the local host's runtime snapshot carries `subagentTurns`, so a joined server shows no
+     * such Stop until the Team API sends it.
+     */
+    function stoppableSubagentTurn(agent: { id: string; provider: string } | undefined): string | null {
+      return agent?.provider === "codex" ? (subagentTurns()[agent.id] ?? null) : null;
+    }
+
     function stopActiveTurn() {
       const agent = activeAgent();
-      const turnId = agent ? activeTurns()[agent.id] : null;
+      const turnId = agent ? (activeTurns()[agent.id] ?? stoppableSubagentTurn(agent)) : null;
       if (!agent || !turnId) return;
       const serverId = activeServerId();
       const analytics = desktopAnalytics.scope();
@@ -692,6 +740,7 @@ const Turns = createSimpleContext({
       updateQueuedMessage,
       reorderQueue,
       stopActiveTurn,
+      stoppableSubagentTurn,
     };
   },
 });

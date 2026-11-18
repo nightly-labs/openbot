@@ -842,7 +842,7 @@ export const messages = {
     "只有你的“给自己发消息”聊天和你允许的人可以发消息。其他人不会收到回复。关闭后，OpenBot 会给陌生人回复一个代码。",
   "mobile.server.connectors.whatsapp.workingMessage": "“正在处理…”消息",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "代理工作时，OpenBot 会发送这条消息，随后用回答替换它。关闭后只发送回答。",
+    "代理工作时，OpenBot 会发送这条消息，随后用回答替换它。等待之前请求的新请求也会收到一条等待消息。关闭后只发送回答。",
   "mobile.server.connectors.whatsapp.statusReactions": "状态表情回应",
   "mobile.server.connectors.whatsapp.statusReactionsDescription":
     "消息到达时，OpenBot 会用 👀 回应；回答准备好后用 ✅ 回应。关闭后不发送任何表情回应。",
@@ -1513,7 +1513,7 @@ export const messages = {
   "mobile.server.transfer.copyTo": "到",
   "mobile.server.transfer.copyNoAgents": "此服务器没有助手。",
   "mobile.server.transfer.copyNotMoved":
-    "助手所在的频道和共享文件夹也会被复制。API 密钥、登录、连接器和聊天记录不会被复制。请在另一台服务器上重新设置。",
+    "助手所在的频道、自动化任务流程、工作流和共享文件夹也会被复制。API 密钥、登录、连接器和聊天记录不会被复制。请在另一台服务器上重新设置。",
   "mobile.server.transfer.copySubmit": { one: "复制 {count} 个助手", other: "复制 {count} 个助手" },
   "mobile.server.transfer.copying": "正在复制…",
   "mobile.server.transfer.copyFailed": "复制未完成。",

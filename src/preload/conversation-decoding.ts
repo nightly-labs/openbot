@@ -56,6 +56,10 @@ import {
   requiredString,
 } from "@openbot/contracts/ipc-decoding";
 import { isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import {
+  type AgentActiveQueues,
+  decodeAgentActiveQueues,
+} from "@openbot/contracts/team-protocol/agent-active-queues-v1";
 
 export function decodeAttachmentDownloadProgress(value: unknown): AttachmentDownloadProgress {
   const progress = decodeRecord(value, "attachment download progress");
@@ -276,6 +280,10 @@ export function decodeTaskWindow(value: unknown): AgentTaskWindow {
     throw new Error("Invalid task part response.");
   }
   return value;
+}
+
+export function decodeActiveQueues(value: unknown): AgentActiveQueues | null {
+  return value === null ? null : decodeAgentActiveQueues(value);
 }
 
 export function decodeQueue(value: unknown): QueueSnapshot {

@@ -85,7 +85,8 @@ export const messages = {
   "error.remote.pinnedKeyMissing": "Der entfernte Host hat keinen fest hinterlegten Geräteschlüssel.",
   "error.remote.hostDidNotConnect": "Der WebRTC-Host hat sich nicht verbunden.",
   "error.remote.connectionCancelled": "Die entfernte Verbindung wurde abgebrochen.",
-  "error.remote.hostDisconnected": "Der WebRTC-Host hat die Verbindung getrennt.",
+  "error.remote.hostDisconnected":
+    "Die Verbindung zum Server wurde unterbrochen. Prüfe, ob die Aktion abgeschlossen wurde, und versuche es dann erneut.",
   "error.remote.eventGap": "Die Ereignisfolge des Hosts hat eine Lücke.",
   "error.remote.malformedKnownEvent": "Der Host hat ein fehlerhaft formatiertes bekanntes Ereignis zurückgegeben.",
   "error.remote.fileTransportIsStopped": "Der WebRTC-Dateitransport ist gestoppt.",

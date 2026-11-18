@@ -82,7 +82,7 @@ export const messages = {
   "error.remote.pinnedKeyMissing": "لا يملك المضيف البعيد مفتاح جهاز مثبّتًا.",
   "error.remote.hostDidNotConnect": "لم يتصل مضيف WebRTC.",
   "error.remote.connectionCancelled": "أُلغي الاتصال البعيد.",
-  "error.remote.hostDisconnected": "انقطع اتصال مضيف WebRTC.",
+  "error.remote.hostDisconnected": "انقطع الاتصال بالخادم. تحقق مما إذا اكتمل الإجراء، ثم أعد المحاولة.",
   "error.remote.eventGap": "يوجد انقطاع في تسلسل أحداث المضيف.",
   "error.remote.malformedKnownEvent": "أعاد المضيف حدثًا معروفًا مشوّهًا.",
   "error.remote.fileTransportIsStopped": "نقل الملفات عبر WebRTC متوقف.",

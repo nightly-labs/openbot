@@ -8,6 +8,7 @@
 // socket, and the host calls the Bot API through Signal, which holds the bot token. No transport needs
 // a public endpoint on the host.
 
+import { AGENT_PROVIDERS, agentProviderName } from "@openbot/contracts/agent-providers";
 import type { MessagingConnectionState, MessagingPlatform } from "@openbot/contracts/ipc";
 import type { DiscordApiRequest, DiscordDelivery, DiscordEmbed } from "@openbot/contracts/signal-protocol/discord-api";
 import type {
@@ -15,6 +16,7 @@ import type {
   TelegramCallParams,
   TelegramCallResult,
 } from "@openbot/contracts/signal-protocol/telegram-route";
+import { isFixedSourceText, matchingSourceKeys, sourceText } from "@openbot/i18n/source";
 import { type Effect, Schema } from "effect";
 import type { MessagingOperationFailed } from "./messaging-service";
 import type { MessagingAnswerFile } from "./messaging-threads";
@@ -51,6 +53,21 @@ export interface InboundFile {
 /** One message that addresses OpenBot, in the same shape for every platform. */
 /** A message that stops the running request of its conversation instead of starting a new one. */
 export const CANCEL_TEXT = /^(cancel|stop)$/i;
+
+/**
+ * The chat text for the stored failure of a turn, or null for the general text. The platform is
+ * outside this computer, and a provider's own text can hold paths or keys, so only an error from the
+ * catalog goes there: one with no placeholder, such as a spent usage limit, or an expired sign-in that
+ * names a provider (#11303). The WhatsApp loop guard knows these texts as OpenBot's own posts.
+ */
+export function chatFailureReason(error: string | null | undefined): string | null {
+  if (!error) return null;
+  if (isFixedSourceText(error)) return matchingSourceKeys(error).some((key) => key.startsWith("error.")) ? error : null;
+  const signInExpired = AGENT_PROVIDERS.some(
+    (provider) => error === sourceText("error.provider.signInExpired", { provider: agentProviderName(provider) }),
+  );
+  return signInExpired ? error : null;
+}
 
 export interface InboundMessage {
   /** Stable for one message across redeliveries. */

@@ -65,4 +65,10 @@ export const messages = {
   "update.whatsNew.changelog": "전체 변경 내역",
   "update.whatsNew.changelogFailed": "OpenBot에서 변경 내역을 열지 못했어요.",
   "update.whatsNew.done": "확인",
+  "update.required.title": "업데이트 필요",
+  "update.required.description":
+    "OpenBot {version}은(는) 더 이상 지원되지 않습니다. 계속하려면 {minimum} 이상으로 업데이트하세요.",
+  "update.required.download": "OpenBot 다운로드",
+  "update.required.continue": "업데이트 없이 계속",
+  "update.required.failed": "업데이트를 완료하지 못했습니다.",
 } as const satisfies PartialTranslation<typeof source>;

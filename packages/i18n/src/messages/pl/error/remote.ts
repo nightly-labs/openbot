@@ -84,7 +84,8 @@ export const messages = {
   "error.remote.pinnedKeyMissing": "Zdalny host nie ma przypiętego klucza urządzenia.",
   "error.remote.hostDidNotConnect": "Host WebRTC nie połączył się.",
   "error.remote.connectionCancelled": "Zdalne połączenie zostało anulowane.",
-  "error.remote.hostDisconnected": "Host WebRTC rozłączył się.",
+  "error.remote.hostDisconnected":
+    "Połączenie z serwerem zostało przerwane. Sprawdź, czy działanie się zakończyło, i spróbuj ponownie.",
   "error.remote.eventGap": "W sekwencji zdarzeń hosta jest luka.",
   "error.remote.malformedKnownEvent": "Host zwrócił uszkodzone znane zdarzenie.",
   "error.remote.fileTransportIsStopped": "Transport plików WebRTC jest zatrzymany.",

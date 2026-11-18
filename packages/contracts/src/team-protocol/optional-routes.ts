@@ -4,6 +4,7 @@ import { ACP_REGISTRY_CODECS } from "./acp-registry-v1";
 // goes to the protocol adapter.
 import type { OptionalRouteCodec } from "./admin-wire";
 import { AGENT_ACCESS_CODECS } from "./agent-access-v1";
+import { AGENT_ACTIVE_QUEUES_CODECS } from "./agent-active-queues-v1";
 import { AGENT_ADMIN_CODECS } from "./agent-admin-v1";
 import { AGENT_BACKUP_MODELS_CODECS } from "./agent-backup-models-v1";
 import { AGENT_COLORS_CODECS } from "./agent-colors-v1";
@@ -161,6 +162,7 @@ import { WHATSAPP_STATUS_REACTIONS_CODECS } from "./whatsapp-status-reactions-v1
 import { WHATSAPP_WORKING_MESSAGE_CODECS } from "./whatsapp-working-message-v1";
 import { WORKFLOWS_GITHUB_CODECS } from "./workflows-github-v1";
 import { WORKFLOWS_HIGGSFIELD_CODECS } from "./workflows-higgsfield-v1";
+import { WORKFLOWS_MEDIA_CATALOG_CODECS } from "./workflows-media-catalog-v1";
 import { WORKFLOWS_MEDIA_CODECS } from "./workflows-media-v1";
 import { WORKFLOWS_SUNRA_CODECS } from "./workflows-sunra-v1";
 import { WORKFLOWS_CODECS } from "./workflows-v1";
@@ -255,6 +257,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...GITHUB_SKILLS_CODECS,
   ...AGENT_THREAD_QUEUE_CODECS,
   ...AGENT_THREAD_REQUESTS_CODECS,
+  ...AGENT_ACTIVE_QUEUES_CODECS,
   ...AGENT_USAGE_LIMIT_CODECS,
   ...AGENT_PENDING_RUNTIME_CODECS,
   ...HERMES_IMPORT_CODECS,
@@ -322,6 +325,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...WORKFLOWS_MEDIA_CODECS,
   ...WORKFLOWS_SUNRA_CODECS,
   ...WORKFLOWS_HIGGSFIELD_CODECS,
+  ...WORKFLOWS_MEDIA_CATALOG_CODECS,
   ...SIDEBAR_FOLDERS_CODECS,
   ...LIBRARY_FOLDERS_CODECS,
   ...VAULT_CODECS,

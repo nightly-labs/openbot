@@ -84,7 +84,8 @@ export const messages = defineMessages("error.remote", {
   "error.remote.pinnedKeyMissing": "The remote host does not have a pinned device key.",
   "error.remote.hostDidNotConnect": "The WebRTC host did not connect.",
   "error.remote.connectionCancelled": "The remote connection was cancelled.",
-  "error.remote.hostDisconnected": "The WebRTC host disconnected.",
+  "error.remote.hostDisconnected":
+    "The connection to the server was lost. Check whether the action finished, then try again.",
   "error.remote.eventGap": "The host event sequence has a gap.",
   "error.remote.malformedKnownEvent": "The host returned a malformed known event.",
   "error.remote.fileTransportIsStopped": "The WebRTC file transport is stopped.",

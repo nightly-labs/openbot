@@ -1016,7 +1016,7 @@ export const messages = {
     "Pisać mogą tylko twój czat „Wiadomość do siebie” i osoby, którym pozwolisz. Inne osoby nie dostają odpowiedzi. Gdy jest wyłączone, OpenBot odpowiada nieznanym osobom kodem.",
   "mobile.server.connectors.whatsapp.workingMessage": "Wiadomość „Pracuję nad tym…”",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "OpenBot wysyła ją, gdy agent pracuje, a potem zastępuje odpowiedzią. Wyłącz, aby wysyłać tylko odpowiedź.",
+    "OpenBot wysyła ją, gdy agent pracuje, a potem zastępuje odpowiedzią. Żądanie, które czeka na wcześniejsze, też dostaje wiadomość o oczekiwaniu. Wyłącz, aby wysyłać tylko odpowiedź.",
   "mobile.server.connectors.whatsapp.statusReactions": "Reakcje stanu",
   "mobile.server.connectors.whatsapp.statusReactionsDescription":
     "OpenBot reaguje 👀, gdy przychodzi wiadomość, i ✅, gdy odpowiedź jest gotowa. Wyłącz, aby nie wysyłać reakcji.",
@@ -1818,7 +1818,7 @@ export const messages = {
   "mobile.server.transfer.copyTo": "Do",
   "mobile.server.transfer.copyNoAgents": "Ten serwer nie ma agentów.",
   "mobile.server.transfer.copyNotMoved":
-    "Ich kanały i folder współdzielony też są kopiowane. Klucze API, logowania, konektory i historia czatów nie są kopiowane. Skonfiguruj je ponownie na drugim serwerze.",
+    "Ich kanały, przepływy rutyn, przepływy pracy i folder współdzielony też są kopiowane. Klucze API, logowania, konektory i historia czatów nie są kopiowane. Skonfiguruj je ponownie na drugim serwerze.",
   "mobile.server.transfer.copySubmit": {
     one: "Kopiuj {count} agenta",
     few: "Kopiuj {count} agentów",

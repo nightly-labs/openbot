@@ -19,15 +19,28 @@ import { DiscordConnectFailed, toDiscordConnectFailed } from "../backend/messagi
 import { SlackConnectFailed, toSlackConnectFailed } from "../backend/messaging/slack/slack-connect";
 import { routineFlowRoutines } from "../backend/routine-flows/routine-flow-routines";
 import { RoutineFlowStore } from "../backend/routine-flows/routine-flow-store";
-import { createRoutineFlows, type RoutineFlowsHandle } from "../backend/routine-flows/routine-flows";
+import {
+  createRoutineFlows,
+  type RoutineFlowsHandle,
+  routineFlowNoticeEvent,
+} from "../backend/routine-flows/routine-flows";
 import { RoutineResultStore } from "../backend/routine-results/routine-result-store";
-import { createRoutineResults, type RoutineResultsHandle } from "../backend/routine-results/routine-results";
+import {
+  createRoutineResults,
+  type RoutineResultsHandle,
+  routineResultNoticeEvent,
+} from "../backend/routine-results/routine-results";
 import { clearFlatBackground } from "../backend/workflows/flat-background";
 import { WorkflowGitHubStore } from "../backend/workflows/workflow-github-store";
 import { WorkflowRunStore } from "../backend/workflows/workflow-run-store";
 import { WorkflowStore } from "../backend/workflows/workflow-store";
 import { WorkflowTriggers, workflowScheduleDueAt } from "../backend/workflows/workflow-triggers";
-import { createWorkflows, type WorkflowNotice, type WorkflowsHandle } from "../backend/workflows/workflows";
+import {
+  createWorkflows,
+  type WorkflowNotice,
+  type WorkflowsHandle,
+  workflowNoticeEvent,
+} from "../backend/workflows/workflows";
 import { type AcpRegistry, createAcpRegistry } from "./acp-registry";
 import { type AgentAdminSettingsService, createAgentAdminSettings } from "./agent-admin-settings";
 import { checkDatabaseIntegrityInHost, spawnAgentDatabaseHost } from "./agent-database-host-process";
@@ -120,6 +133,7 @@ import {
   latestTurnAnswer,
 } from "@openbot/contracts/ipc";
 import { decodeRecord, requiredString } from "@openbot/contracts/ipc-decoding";
+import { isValidSemver } from "@openbot/contracts/release-version";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { localeDirection } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
@@ -399,6 +413,7 @@ import {
 import { remoteSyncProfileFile } from "./remote-sync-profile-file";
 import { sendToRenderer } from "./renderer-ipc";
 import { RequestedUpdate, RequestedUpdateRefusal } from "./requested-update";
+import { RequiredUpdate } from "./required-update";
 import { ResourceMonitor } from "./resource-monitor";
 import { StatementTimings } from "./resource-summary";
 import { RoutineFeedServer } from "./routine-feed-server";
@@ -446,7 +461,6 @@ import {
   createDisabledUpdateAdapter,
   electronUpdaterCacheDirectory,
   isNixStoreInstall,
-  isValidSemver,
   loadElectronUpdater,
   supportsInstalledUpdates,
   type UpdateAdapter,
@@ -565,6 +579,8 @@ const TEARDOWN_ORDER = {
   // First, so a process that the teardown ends does not count as a crash.
   resourceMonitor: 9,
   startupTiming: 9.5,
+  // Before the updater and the requested update that it drives.
+  requiredUpdate: 9.8,
   updater: 10,
   idleRestart: 11,
   hostUpdateCoordinator: 12,
@@ -737,6 +753,8 @@ export interface ApplicationServices {
   requestedUpdate: RequestedUpdate;
   /** The restart that the user of this computer asked for, when no work runs. */
   idleRestart: IdleRestart;
+  /** Null in a development run and in a local server child. */
+  requiredUpdate: RequiredUpdate | null;
   setupFile: string;
   /** The analytics answer of this computer, kept the same as the account's latest answer. */
   analyticsPreferences: AnalyticsPreferenceService;
@@ -887,7 +905,7 @@ async function accountServiceFetch(input: string | URL | Request, init?: Request
 /** How the driver's own state reads as the capability the Team API projects. */
 function computerUseCapability(state: ComputerUseState): CapabilityState {
   if (state.status === "ready") return "ready";
-  if (state.status === "permissions-required") return "setup-required";
+  if (state.status === "permissions-required" || state.status === "restart-required") return "setup-required";
   return "unavailable";
 }
 
@@ -2451,6 +2469,10 @@ export async function createApplicationServices({
       // never the token; only a test the user pressed may open a browser.
       mcpOAuth,
       mcpOAuthProxySettings,
+      // Chromium's network stack uses the computer's proxy settings, as the built-in browser does.
+      // Node `fetch` ignores them, so the Gemini quota read timed out behind a system proxy (#11278).
+      // The requests carry a bearer token: no browser cookie and no HTTP cache.
+      systemProxyFetch: (url, init) => net.fetch(url, { ...init, credentials: "omit", cache: "no-store" }),
       appVersion: app.getVersion(),
       providerStateDirectory: join(app.getPath("userData"), "provider-state"),
       ...(process.platform === "win32" ? { providerTempDirectory } : {}),
@@ -2682,6 +2704,8 @@ export async function createApplicationServices({
         ),
       mediaProviders: () => service.workflowMediaProviders(),
       mediaCredits: (only) => service.workflowMediaCredits(only),
+      mediaCatalog: (only) => service.workflowMediaCatalog(only),
+      mediaPrice: (request) => service.workflowMediaPrice(request),
       // A kept picture is new in the Library, so the next scan must not answer from before it. A failure
       // after the file is stored also clears the scan.
       keepPicture: (draftId, types) =>
@@ -2806,10 +2830,7 @@ export async function createApplicationServices({
   const routineResultRuntime = await Effect.runPromise(
     createRoutineResults({
       store: new RoutineResultStore(store.database),
-      delivery: (deliveryId) => {
-        const found = mailbox.getDelivery(deliveryId)?.delivery;
-        return found ? { turnId: found.turnId } : null;
-      },
+      runTurns: (deliveryId) => mailbox.routineRunTurns(deliveryId),
       turnAnswer,
       connection: (connectionId) => {
         const record = service.messaging.store.connection(connectionId);
@@ -2822,10 +2843,12 @@ export async function createApplicationServices({
       },
     }),
   );
+  // Most events are streamed text that no sweep waits for, so a fiber starts only for an event that a
+  // sweep uses.
   service.on("event", (event) => {
-    Effect.runFork(routineFlowRuntime.notice(event));
-    Effect.runFork(routineResultRuntime.notice(event));
-    Effect.runFork(workflowRuntime.notice(event));
+    if (routineFlowNoticeEvent(event)) Effect.runFork(routineFlowRuntime.notice(event));
+    if (routineResultNoticeEvent(event)) Effect.runFork(routineResultRuntime.notice(event));
+    if (workflowNoticeEvent(event)) Effect.runFork(workflowRuntime.notice(event));
   });
   teardown.push(TEARDOWN_ORDER.routineResults, "the routine results", () =>
     Effect.runPromise(routineResultRuntime.close()),
@@ -3352,8 +3375,11 @@ export async function createApplicationServices({
       return {
         list: () =>
           library.pipe(
-            Effect.flatMap((local) => local.list()),
-            Effect.map((list) => list.map(({ id, slug, name, version }) => ({ id, slug, name, version }))),
+            Effect.flatMap((local) => local.listWithUnreadable()),
+            Effect.map(({ skills, unreadable }) => ({
+              skills: skills.map(({ id, slug, name, version }) => ({ id, slug, name, version })),
+              unreadable: unreadable.map(({ skillId }) => skillId),
+            })),
           ),
         assigned: (agentIds: readonly string[]) =>
           Effect.forEach(agentIds, (agentId) =>
@@ -3459,6 +3485,7 @@ export async function createApplicationServices({
     providers: providerSignIns,
     accounts: providerAccountsHost,
     receiveMcpGrant: (state, code) => mcpOAuth.receiveAuthorizationCode(state, code),
+    receiveMcpRefusal: (state) => mcpOAuth.refuseAuthorization(state),
     // The search ignores case, so the exact address is checked again on each agent message it finds.
     printedLink: (agentId, url) =>
       agentPrintedLink(
@@ -3466,6 +3493,8 @@ export async function createApplicationServices({
         url,
         Date.now(),
       ),
+    // A server on this computer: only the desktop app here signs in with its owner password.
+    atHost: (sessionId) => localServerChild !== null && teamStore.isStoredOwnerSession(sessionId),
   });
   teardown.push(TEARDOWN_ORDER.mcpHostSignIns, "MCP sign-ins of joined servers", () =>
     Effect.runPromise(mcpHostSignIns.close()),
@@ -4378,6 +4407,10 @@ export async function createApplicationServices({
       (error) => logger.warn("Could not remove the old Whisper model cache.", toLogValue(error)),
     );
   }
+  // A model file that this version replaced, such as the int8 Whisper turbo decoder.
+  void Effect.runPromise(voice.removeRetiredModelFiles()).catch((error) =>
+    logger.warn("Could not remove the old voice model files.", toLogValue(error)),
+  );
   teardown.push(TEARDOWN_ORDER.voice, "voice transcription", () => Effect.runPromise(voice.shutdown()));
   voice.on("modelStatus", forwardVoiceModelStatus);
   voice.on("streamTranscript", forwardVoiceStreamTranscript);
@@ -4604,6 +4637,22 @@ export async function createApplicationServices({
     log: (message) => logger.info(message),
   });
   teardown.push(TEARDOWN_ORDER.idleRestart, "the restart when idle", () => idleRestart.dispose());
+  const requiredUpdate =
+    app.isPackaged && !localServerChild
+      ? new RequiredUpdate({
+          surface: hostedServer || serverModeEnvironment ? "host" : "desktop",
+          currentVersion,
+          resolveApiUrl: (path) => centralAuth.resolveApiUrl(path),
+          updater,
+          setRequired: (required) => remoteUpdate.setRequired(required),
+          log: (message) => logger.info(message),
+        })
+      : null;
+  if (requiredUpdate) {
+    teardown.push(TEARDOWN_ORDER.requiredUpdate, "the minimum version check", () =>
+      Effect.runPromise(requiredUpdate.dispose()),
+    );
+  }
   if (hostedServer) {
     const hostedServerStartRetry = new HostedServerStartRetry({
       hostPhase: () => host.getStatus().phase,
@@ -4818,6 +4867,7 @@ export async function createApplicationServices({
     hostUpdateCoordinator,
     requestedUpdate: remoteUpdate,
     idleRestart,
+    requiredUpdate,
     describeRestartReadiness,
     sidebarLayout,
     host,

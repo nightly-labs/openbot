@@ -41,7 +41,7 @@ import { sidebarAgentOrder } from "@openbot/ui/features/sidebar/sidebar-agent-or
 import { sidebarChannelWaits, sidebarUnreadBadge } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import type { SidebarAgentState } from "@openbot/ui/features/sidebar/sidebar-types";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, createSignal, Match, onCleanup, onSettled, Show, Switch } from "solid-js";
+import { createEffect, createMemo, createSignal, Match, onCleanup, onSettled, Show, Switch, untrack } from "solid-js";
 import { appPort } from "../../app-port";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
@@ -167,7 +167,8 @@ export function AgentDockHost() {
 
 /** The seats, the agents, the channels and the chats of one server's dock, and what its actions change. */
 function createServerDock(serverId: string, options: { readWhenHidden: boolean }) {
-  const { agentList, userHiddenAgentIds, agentStatus, modelOptions, updateAgent, appendUiError } = useAgents();
+  const { activeAgentId, agentList, userHiddenAgentIds, agentStatus, modelOptions, updateAgent, appendUiError } =
+    useAgents();
   const { conversations, markAgentMessagesRead, loadLatestAgentMessages, clearRecentReply, presentPromptResolution } =
     useConversation();
   const { workingTurns, agentStates, agentMoods } = createAgentActivity();
@@ -559,6 +560,32 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
       if (!open?.latest || !readable()) return;
       clearRecentReply(open.agentId);
       void markAgentMessagesRead(open.agentId, open.latest, serverId).catch(() => undefined);
+    },
+  );
+  /* A joined server that connects again, as after its restart, sends only the newest reply of each agent.
+     The main window reads its open agent's latest page again. Each other agent chat that the dock loaded
+     reads its page here, or the messages from the time without a connection stay missing (#11748). A second
+     read of the open agent would replace the main window's read, which then keeps its loading state. */
+  let connectedSequence: number | undefined;
+  createEffect(
+    () => {
+      const server = activeServer();
+      return server?.state === "online" ? server.connectionSequence : undefined;
+    },
+    (sequence) => {
+      if (sequence === undefined || sequence === connectedSequence) return;
+      const reconnected = connectedSequence !== undefined;
+      connectedSequence = sequence;
+      if (!reconnected) return;
+      const loaded = untrack(() =>
+        seats().flatMap((seat) =>
+          seat.kind === "agent" && seat.agent.id !== activeAgentId() && conversations[seat.agent.id]?.messages?.length
+            ? [seat.agent.id]
+            : [],
+        ),
+      );
+      // A failed read keeps the chat as it is; the next change of the agent's chat reads it again.
+      for (const agentId of loaded) void loadLatestAgentMessages(agentId).catch(() => undefined);
     },
   );
   /* A channel is read through the newest message of its page, once for each new message. */

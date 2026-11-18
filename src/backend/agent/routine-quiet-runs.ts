@@ -1,3 +1,5 @@
+import type { AgentProviderRef } from "@openbot/contracts/agent-providers";
+import { isNarrationItemId, showsNarration } from "@openbot/contracts/conversation-narration";
 import {
   CONVERSATION_PLAN_ITEM_TYPE,
   CONVERSATION_SUBAGENTS_ITEM_TYPE,
@@ -126,7 +128,8 @@ export function isNoUpdateAnswer(text: string): boolean {
  * the marker goes: the user never needs to see it. After a call to the no-update tool, each text answer
  * is a quiet answer. When nothing else in the turn tells the user anything, the turn is quiet: its
  * thinking and plan go, and each quiet answer stays as a `ROUTINE_QUIET_ANSWER_ITEM_TYPE` message that
- * the chat shows inside the collapsed run. A file, an image or a question is a report, also after the
+ * the chat shows inside the collapsed run. The agent's narration (`quietNarration`) stays as a quiet
+ * answer too. A file, an image or a question is a report, also after the
  * tool call, and then the quiet answers go. Returns whether the turn is quiet.
  *
  * The turn-completion write rewrites the whole thread, which deletes the projection row of a
@@ -136,6 +139,7 @@ export function settleQuietRoutineTurn(
   snapshot: ConversationSnapshot,
   turnId: string,
   noUpdateCalled: boolean,
+  provider: AgentProviderRef | undefined,
 ): boolean {
   const turnMessages = snapshot.messages.filter(
     (message) => message.author === "assistant" && message.turnId === turnId,
@@ -147,7 +151,10 @@ export function settleQuietRoutineTurn(
   const reported = turnMessages.some(
     (message) => !markers.has(message) && !isWorkNote(message) && carriesContent(message),
   );
-  const dropped = reported ? markers : new Set(turnMessages.filter((message) => !keptQuietAnswer(message)));
+  const narration = quietNarration(provider);
+  const dropped = reported
+    ? markers
+    : new Set(turnMessages.filter((message) => !keptQuietAnswer(message) && !narration(message)));
   for (let index = snapshot.messages.length - 1; index >= 0; index -= 1) {
     const message = snapshot.messages[index];
     if (!message) continue;
@@ -157,6 +164,24 @@ export function settleQuietRoutineTurn(
     }
   }
   return !reported;
+}
+
+/**
+ * Whether a message of a quiet turn is the agent's narration, which the chat showed as a message
+ * while the turn ran, such as a notice before a step. It stays as a quiet answer and does not make
+ * the turn a report. Without this, it went with the thinking when the turn ended (#11848). A filler
+ * or repeated note stays out, as in the chat (`showsNarration`), and so does a note that is only the
+ * no-update marker. Keep one function for each turn,
+ * and call it on the turn's messages in order.
+ */
+export function quietNarration(provider: AgentProviderRef | undefined): (message: ConversationMessage) => boolean {
+  const shown = new Set<string>();
+  return (message) =>
+    message.author === "assistant" &&
+    message.itemType === "commentary" &&
+    isNarrationItemId(message.id, provider) &&
+    !isNoUpdateAnswer(message.text) &&
+    showsNarration(message.text, shown);
 }
 
 /**

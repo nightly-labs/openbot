@@ -38,7 +38,10 @@ class ExternalLinkFailure extends Schema.TaggedError<ExternalLinkFailure>()("Ext
 export interface ExternalLinkOpenerDependencies {
   preference: ExternalLinkPreferenceStore;
   platform: NodeJS.Platform;
-  /** The operating system's own open, `shell.openExternal`. */
+  /**
+   * The operating system's own open, `shell.openExternal`. On Linux it reports success when
+   * `xdg-open` starts, also when no browser then opens, so a web page there goes to `xdg-open`.
+   */
   openDefault: (url: string) => Promise<void>;
   /** Tells the window that the chosen program did not start. */
   onFallback: (fallback: ExternalLinkFallback) => void;
@@ -59,9 +62,13 @@ export class ExternalLinkOpener {
   }
 
   readonly open = Effect.fn("ExternalLinkOpener.open")(function* (this: ExternalLinkOpener, url: string) {
-    const { preference, platform, openDefault, onFallback } = this.#dependencies;
+    const { preference, platform, onFallback } = this.#dependencies;
     const target = preference.get().target;
     const page = webPage(url);
+    const openDefault = () =>
+      platform === "linux" && page
+        ? startProgram("xdg-open", [page], true, XDG_OPEN_ENV)
+        : this.#dependencies.openDefault(url);
     if (target.kind === "app" && page) {
       const launched = yield* Effect.result(launchApp(platform, target.path, page));
       if (Result.isSuccess(launched)) return;
@@ -69,11 +76,11 @@ export class ExternalLinkOpener {
         "The chosen browser did not start, so the default browser opens the page.",
         toLogValue(launched.failure.cause),
       );
-      yield* Effect.tryPromise({ try: () => openDefault(url), catch: (cause) => new ExternalLinkFailure({ cause }) });
+      yield* Effect.tryPromise({ try: openDefault, catch: (cause) => new ExternalLinkFailure({ cause }) });
       onFallback({ name: externalLinkAppName(platform === "darwin" ? target.path : programOf(target.path)) });
       return;
     }
-    yield* Effect.tryPromise({ try: () => openDefault(url), catch: (cause) => new ExternalLinkFailure({ cause }) });
+    yield* Effect.tryPromise({ try: openDefault, catch: (cause) => new ExternalLinkFailure({ cause }) });
   });
 
   /** The applications that open web pages. Empty when the system does not tell, as on Linux and Windows. */
@@ -108,27 +115,70 @@ function programOf(command: string): string {
 }
 
 /**
+ * How long a program on Linux can stop with an error before it counts as started. Some `xdg-open`
+ * setups stop only when the browser closes, so a program that still runs then opened the page.
+ */
+const LINUX_START_FAILURE_WAIT_MS = 3_000;
+
+/** Electron also sets this for `xdg-open`: a mailcap fallback then does not wait for a terminal. */
+const XDG_OPEN_ENV = { MM_NOTTTY: "1" };
+
+/**
+ * Starts a program with no shell. With `watchExit`, a program that stops with an error in the first
+ * seconds failed: `xdg-open` does that when no browser opens web pages, and a browser command when
+ * the browser cannot run.
+ */
+function startProgram(
+  program: string,
+  args: string[],
+  watchExit: boolean,
+  env: Record<string, string> = {},
+): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const child = spawn(program, args, {
+      shell: false,
+      detached: true,
+      stdio: "ignore",
+      env: { ...process.env, ...env },
+    });
+    child.once("error", reject);
+    child.once("spawn", () => {
+      if (!watchExit) {
+        child.unref();
+        resolve();
+        return;
+      }
+      const stopped = (code: number | null, signal: NodeJS.Signals | null) => {
+        clearTimeout(running);
+        if (code === 0) resolve();
+        else reject(new Error(`${program} stopped with ${signal ?? `exit code ${code}`}.`));
+      };
+      const running = setTimeout(() => {
+        child.removeListener("exit", stopped);
+        child.unref();
+        resolve();
+      }, LINUX_START_FAILURE_WAIT_MS);
+      child.once("exit", stopped);
+    });
+  });
+}
+
+/**
  * The address starts with `http`, so neither `open` nor the program can read it as an option.
  * `open -a` stops with an error when the application is missing. It has no time limit: it waits
  * while macOS asks the user to open a downloaded application. A program on Linux or Windows fails
- * to spawn when it is missing or cannot run.
+ * to spawn when it is missing or cannot run. On Linux it also fails when it stops with an error at once.
  */
 function launchApp(platform: NodeJS.Platform, path: string, page: string): Effect.Effect<void, ExternalLinkFailure> {
   return Effect.tryPromise({
-    try: () =>
-      platform === "darwin"
-        ? new Promise<void>((resolve, reject) => {
-            execFile("open", ["-a", path, page], (error) => (error ? reject(error) : resolve()));
-          })
-        : new Promise<void>((resolve, reject) => {
-            const [program = path, ...options] = commandWords(path);
-            const child = spawn(program, [...options, page], { shell: false, detached: true, stdio: "ignore" });
-            child.once("error", reject);
-            child.once("spawn", () => {
-              child.unref();
-              resolve();
-            });
-          }),
+    try: () => {
+      if (platform === "darwin")
+        return new Promise<void>((resolve, reject) => {
+          execFile("open", ["-a", path, page], (error) => (error ? reject(error) : resolve()));
+        });
+      const [program = path, ...options] = commandWords(path);
+      return startProgram(program, [...options, page], platform === "linux");
+    },
     catch: (cause) => new ExternalLinkFailure({ cause }),
   });
 }

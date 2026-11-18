@@ -21,7 +21,7 @@ import {
   useMobileWorkspaceReader,
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
-import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
+import { canToggleChatPin } from "@/features/workspace/model/agent-pins";
 import { showsOnline } from "@/features/workspace/model/server-status";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { type MenuAction, type MenuComponentRef, MenuView } from "@/shared/components/menu-view";
@@ -39,7 +39,7 @@ function useChannelMenuActions(channel: ChannelSummary, serverId: string) {
   const sectionMenu = useChatSectionMenu(serverId, channel.id);
   const isPinned = useMobileWorkspaceSelector(({ pinnedChannelIds }) => pinnedChannelIds.includes(channel.id));
   const canPin = useMobileWorkspaceSelector(({ pinnedAgentIds, pinnedChannelIds }) =>
-    canToggleAgentPin([...pinnedAgentIds, ...pinnedChannelIds], channel.id),
+    canToggleChatPin(pinnedAgentIds, pinnedChannelIds, channel.id),
   );
   const online = useMobileWorkspaceSelector(({ servers }) =>
     servers.some((server) => server.id === serverId && showsOnline(server)),
@@ -287,7 +287,7 @@ export const ChannelListRow = memo(function ChannelListRow({
   const { toggleChannelPinAnimated } = useAgentPinTransition();
   const isPinned = useMobileWorkspaceSelector(({ pinnedChannelIds }) => pinnedChannelIds.includes(channel.id));
   const pinBlocked = useMobileWorkspaceSelector(
-    ({ pinnedAgentIds, pinnedChannelIds }) => !canToggleAgentPin([...pinnedAgentIds, ...pinnedChannelIds], channel.id),
+    ({ pinnedAgentIds, pinnedChannelIds }) => !canToggleChatPin(pinnedAgentIds, pinnedChannelIds, channel.id),
   );
   const disconnected = useMobileWorkspaceSelector(
     ({ servers }) => !servers.some((server) => server.id === serverId && showsOnline(server)),

@@ -1209,7 +1209,7 @@ export const messages = {
     "يمكن فقط لدردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم المراسلة. لا يتلقى الآخرون أي رد. عند إيقافه، يرد OpenBot على الأشخاص غير المعروفين برمز.",
   "mobile.server.connectors.whatsapp.workingMessage": "رسالة «جارٍ العمل على ذلك…»",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "يرسلها OpenBot أثناء عمل الوكيل، ثم يستبدلها بالإجابة. أوقفها لإرسال الإجابة فقط.",
+    "يرسلها OpenBot أثناء عمل الوكيل، ثم يستبدلها بالإجابة. ويرسل أيضًا رسالة انتظار عندما ينتظر طلبٌ طلبًا سابقًا. أوقفها لإرسال الإجابة فقط.",
   "mobile.server.connectors.whatsapp.statusReactions": "تفاعلات الحالة",
   "mobile.server.connectors.whatsapp.statusReactionsDescription":
     "يتفاعل OpenBot بـ 👀 عند وصول رسالة، وبـ ✅ عندما تصبح الإجابة جاهزة. أوقفها لعدم إرسال أي تفاعلات.",
@@ -2195,7 +2195,7 @@ export const messages = {
   "mobile.server.transfer.copyTo": "إلى",
   "mobile.server.transfer.copyNoAgents": "لا يوجد وكلاء على هذا الخادم.",
   "mobile.server.transfer.copyNotMoved":
-    "تُنسخ قنواتهم والمجلد المشترك أيضًا. لا يتم نسخ مفاتيح API وتسجيلات الدخول والموصلات وسجل المحادثات. أعد إعدادها على الخادم الآخر.",
+    "تُنسخ قنواتهم وتدفقات المهام الدورية ومسارات العمل والمجلد المشترك أيضًا. لا يتم نسخ مفاتيح API وتسجيلات الدخول والموصلات وسجل المحادثات. أعد إعدادها على الخادم الآخر.",
   "mobile.server.transfer.copySubmit": {
     zero: "لا وكلاء للنسخ",
     one: "نسخ وكيل واحد",

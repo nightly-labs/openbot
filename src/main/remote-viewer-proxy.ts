@@ -252,6 +252,9 @@ export class RemoteViewerProxy {
       }
       this.#queueFrame(streamId, stream, data, binary);
     });
+    // `ws` throws an `error` that has no listener, as for a bad frame or a write to a dropped viewer.
+    // The close that follows the error ends the stream.
+    socket.on("error", () => socket.close(1011));
     socket.once("close", (code, reason) => {
       // A lost transport already removed the stream. Do not reconnect to send its close.
       if (!this.#streams.delete(streamId)) return;

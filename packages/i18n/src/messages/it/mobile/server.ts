@@ -909,7 +909,7 @@ export const messages = {
     "Possono scrivere solo la tua chat «Messaggio a te stesso» e le persone che autorizzi. Le altre non ricevono risposta. Quando è disattivato, OpenBot risponde alle persone sconosciute con un codice.",
   "mobile.server.connectors.whatsapp.workingMessage": "Messaggio «Ci sto lavorando…»",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "OpenBot lo invia mentre l’agente lavora, poi lo sostituisce con la risposta. Disattiva per inviare solo la risposta.",
+    "OpenBot lo invia mentre l’agente lavora, poi lo sostituisce con la risposta. Una richiesta che attende una richiesta precedente riceve anche un messaggio di attesa. Disattiva per inviare solo la risposta.",
   "mobile.server.connectors.whatsapp.statusReactions": "Reazioni di stato",
   "mobile.server.connectors.whatsapp.statusReactionsDescription":
     "OpenBot reagisce con 👀 quando arriva un messaggio e con ✅ quando la risposta è pronta. Disattiva per non inviare reazioni.",
@@ -1632,7 +1632,7 @@ export const messages = {
   "mobile.server.transfer.copyTo": "A",
   "mobile.server.transfer.copyNoAgents": "Questo server non ha agenti.",
   "mobile.server.transfer.copyNotMoved":
-    "Vengono copiati anche i loro canali e la cartella condivisa. Chiavi API, accessi, connettori e cronologia delle chat non vengono copiati. Configurali di nuovo sull'altro server.",
+    "Vengono copiati anche i loro canali, i flussi di routine, i flussi di lavoro e la cartella condivisa. Chiavi API, accessi, connettori e cronologia delle chat non vengono copiati. Configurali di nuovo sull'altro server.",
   "mobile.server.transfer.copySubmit": { one: "Copia {count} agente", other: "Copia {count} agenti" },
   "mobile.server.transfer.copying": "Copia in corso…",
   "mobile.server.transfer.copyFailed": "La copia non è terminata.",

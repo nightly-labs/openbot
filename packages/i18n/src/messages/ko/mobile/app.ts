@@ -62,6 +62,9 @@ export const messages = {
   "mobile.app.update.group.removed": "제거",
   "mobile.app.update.group.deprecated": "지원 중단",
   "mobile.app.update.group.security": "보안",
+  "mobile.app.update.requiredTitle": "업데이트 필요",
+  "mobile.app.update.requiredBody":
+    "OpenBot {version}은(는) 더 이상 지원되지 않습니다. 계속하려면 {minimum} 이상으로 업데이트하세요.",
   "mobile.app.update.notesFailed": "릴리스 노트를 불러올 수 없습니다.",
   "mobile.app.update.notesEmpty": "이 버전의 릴리스 노트가 아직 없습니다.",
   "mobile.app.update.fullChangelog": "전체 변경 기록",

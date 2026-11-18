@@ -1183,7 +1183,7 @@ export const messages = defineMessages("mobile.server", {
     "Only your “Message yourself” chat and the people you allow can write. Other people get no reply. When it is off, OpenBot replies to unknown people with a code.",
   "mobile.server.connectors.whatsapp.workingMessage": "“Working on it…” message",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "OpenBot posts it while the agent works, then replaces it with the answer. Turn off to post only the answer.",
+    "OpenBot posts it while the agent works, then replaces it with the answer. A request that waits for an earlier request gets a waiting message too. Turn off to post only the answer.",
   "mobile.server.connectors.whatsapp.statusReactions": "Status reactions",
   "mobile.server.connectors.whatsapp.statusReactionsDescription":
     "OpenBot reacts with 👀 when a message arrives and with ✅ when the answer is ready. Turn off to send no reactions.",
@@ -2077,7 +2077,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.transfer.copyTo": "To",
   "mobile.server.transfer.copyNoAgents": "This server has no agents.",
   "mobile.server.transfer.copyNotMoved":
-    "Their channels and the Shared folder are copied too. API keys, sign-ins, connectors, and chat history are not copied. Set them up again on the other server.",
+    "Their channels, routine flows, workflows, and the Shared folder are copied too. API keys, sign-ins, connectors, and chat history are not copied. Set them up again on the other server.",
   "mobile.server.transfer.copySubmit": { one: "Copy {count} agent", other: "Copy {count} agents" },
   "mobile.server.transfer.copying": "Copying…",
   "mobile.server.transfer.copyFailed": "The copy did not finish.",

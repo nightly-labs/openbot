@@ -15,6 +15,7 @@ import type { WorkflowMediaCreditBalance, WorkflowMediaKind, WorkflowMediaSpecs 
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Duration, Effect } from "effect";
+import { type HiggsfieldCatalogEntry, type HiggsfieldPlan, higgsfieldCatalogEntry } from "./higgsfield-catalog";
 import {
   callMediaTool,
   connectSignedIn,
@@ -58,28 +59,14 @@ const HIGGSFIELD_CREDITS_DEADLINE = Duration.seconds(20);
 const HIGGSFIELD_TRANSFER_DEADLINE = { upload: Duration.minutes(2), download: Duration.minutes(5) } as const;
 /** How many `job_status` calls in a row can fail before the step fails. */
 const HIGGSFIELD_POLL_FAILURES = 3;
-
-/**
- * The input pictures that each model takes, from its `medias` roles in Higgsfield's catalog.
- * `references`: the most `image_references`. `frames`: it takes `start_image` and `end_image`.
- * `total`: the most pictures in all roles together. `kling`: the request names its `mode`.
- */
-interface HiggsfieldInputs {
-  references: number;
-  frames: boolean;
-  total?: number;
-  kling?: true;
-}
-
-const HIGGSFIELD_INPUTS: Readonly<Record<string, HiggsfieldInputs>> = {
-  gpt_image_2_6: { references: 16, frames: false },
-  nano_banana_pro: { references: 14, frames: false },
-  seedream_v5_pro: { references: 10, frames: false },
-  flux_3_image: { references: 10, frames: false },
-  seedance_2_0: { references: 9, frames: true, total: 9 },
-  kling4_0: { references: 10, frames: true, total: 10, kling: true },
-  wan2_7: { references: 0, frames: true },
-};
+/** A read of the model list or of a price that takes longer gives no list or no price. */
+const HIGGSFIELD_CATALOG_DEADLINE = Duration.seconds(45);
+const HIGGSFIELD_PRICE_DEADLINE = Duration.seconds(20);
+/** One page of `models_explore`, and the most pages of one kind. */
+const HIGGSFIELD_CATALOG_PAGE = 100;
+const HIGGSFIELD_CATALOG_PAGES = 10;
+/** The description of a price quote. Higgsfield prices a file by its choices, not by its words. */
+const HIGGSFIELD_PRICE_PROMPT = "A picture.";
 
 const TERMINAL_FAILURES: ReadonlySet<string> = new Set(["canceled", "failed"]);
 /** Higgsfield's checks stopped the file. Only the user can confirm the rights to see it. */
@@ -92,6 +79,8 @@ export interface HiggsfieldMediaRequest {
   prompt: string;
   specs: WorkflowMediaSpecs;
   images: readonly { role: MediaImageRole; attachmentId: string }[];
+  /** How the request takes the pictures and the choices of the step. */
+  plan: HiggsfieldPlan;
 }
 
 const notSignedIn = () => mediaFail(sourceText("error.workflow.higgsfieldSignIn"));
@@ -182,47 +171,73 @@ const uploadPicture = Effect.fnUntraced(function* (
 });
 
 /**
- * How a model takes the background choice of the canvas, for the models that `WORKFLOW_MEDIA_MODELS`
- * marks `transparent`. GPT Image 2.6 is told "opaque" for a solid background: its default, "auto",
- * can make a clear background that the canvas did not ask for.
- */
-const HIGGSFIELD_BACKGROUND: Readonly<Record<string, (transparent: boolean) => McpToolArguments>> = {
-  gpt_image_2_6: (transparent) => ({ background: transparent ? "transparent" : "opaque" }),
-  seedream_v5_pro: (transparent) => (transparent ? { remove_bg: true } : {}),
-};
-
-/**
  * The `medias` of the request: each picture in a role that the model takes, within its limits. A
  * model that takes frames but no references (Wan 2.7) gets a reference as the frame that is still
  * free, first frame before last frame, as Higgsfield itself does with such a request.
  */
 function requestMedias(
-  inputs: HiggsfieldInputs,
+  plan: HiggsfieldPlan,
   media: (role: MediaImageRole) => string[],
 ): { value: string; role: string }[] {
-  const asFrames = inputs.frames && inputs.references === 0 ? media("reference") : [];
-  const first = media("first")[0] ?? asFrames.shift();
-  const last = media("last")[0] ?? asFrames.shift();
-  const frames = inputs.frames
-    ? [
-        ...(first === undefined ? [] : [{ value: first, role: "start_image" }]),
-        ...(last === undefined ? [] : [{ value: last, role: "end_image" }]),
-      ]
-    : [];
-  const room = Math.max(0, Math.min(inputs.references, (inputs.total ?? Number.POSITIVE_INFINITY) - frames.length));
-  const references = media("reference")
-    .slice(0, room)
-    .map((value) => ({ value, role: "image_references" }));
-  return [...frames, ...references];
+  const asFrames = (plan.start || plan.end) && plan.referenceRole === null ? media("reference") : [];
+  const first = plan.start ? (media("first")[0] ?? asFrames.shift()) : undefined;
+  const lastFrame = plan.end ? (media("last")[0] ?? asFrames.shift()) : undefined;
+  const last = plan.endNeedsStart && first === undefined ? undefined : lastFrame;
+  const frames = [
+    ...(first === undefined ? [] : [{ value: first, role: "start_image" }]),
+    ...(last === undefined ? [] : [{ value: last, role: "end_image" }]),
+  ];
+  const role = plan.referenceRole;
+  if (role === null || (plan.exclusive && frames.length > 0)) return frames;
+  const room = Math.max(0, Math.min(plan.references, (plan.total ?? Number.POSITIVE_INFINITY) - frames.length));
+  return [
+    ...frames,
+    ...media("reference")
+      .slice(0, room)
+      .map((value) => ({ value, role })),
+  ];
 }
 
 /**
- * The mode of a Kling request, from the pictures it has. With a frame it is "image-to-video", where
- * Kling uses the references as ordered middle frames; Kling has no mode with frames and references.
+ * The `mode` of the request, from the pictures it has. With a frame it is the frame mode; Kling uses
+ * the references there as ordered middle frames.
  */
-function klingMode(medias: readonly { role: string }[]) {
-  if (medias.some((media) => media.role === "start_image" || media.role === "end_image")) return "image-to-video";
-  return medias.length > 0 ? "reference-to-video" : "text-to-video";
+function requestMode(plan: HiggsfieldPlan, medias: readonly { role: string }[]): string | undefined {
+  if (!plan.mode) return undefined;
+  if (medias.some((media) => media.role === "start_image" || media.role === "end_image"))
+    return plan.mode.frames ?? plan.mode.text;
+  return medias.length > 0 ? (plan.mode.references ?? plan.mode.text) : plan.mode.text;
+}
+
+/**
+ * The choices of the step as the model takes them: aspect, resolution, length and background. GPT
+ * Image is told "opaque" for a solid background: its default, "auto", can make a clear background
+ * that the canvas did not ask for.
+ */
+function requestChoices(kind: WorkflowMediaKind, specs: WorkflowMediaSpecs, plan: HiggsfieldPlan): McpToolArguments {
+  const resolution = specs.resolution
+    ? plan.resolution
+      ? { [plan.resolution.param]: plan.resolution.values[specs.resolution] ?? specs.resolution.toLowerCase() }
+      : { resolution: specs.resolution.toLowerCase() }
+    : {};
+  const background =
+    kind !== "image" || !plan.background
+      ? {}
+      : plan.background.param === "remove_bg"
+        ? specs.transparent
+          ? { remove_bg: true }
+          : {}
+        : specs.transparent
+          ? { background: "transparent" }
+          : plan.background.opaque
+            ? { background: "opaque" }
+            : {};
+  return {
+    aspect_ratio: specs.aspect,
+    ...resolution,
+    ...(kind === "video" ? { duration: specs.duration } : {}),
+    ...background,
+  };
 }
 
 /** The address of the finished file in a generation, or null. */
@@ -281,14 +296,15 @@ export const generateHiggsfieldMedia = Effect.fn("generateHiggsfieldMedia")(func
 ) {
   const signIn = dependencies.signIn();
   if (!signIn) return yield* notSignedIn();
-  const inputs = HIGGSFIELD_INPUTS[request.model] ?? { references: 0, frames: request.kind === "video" };
   const files = yield* resolveMediaInputs(dependencies, request.images);
   const made = yield* Effect.scoped(
     Effect.gen(function* () {
       const client = yield* connectSignedIn(signIn, notSignedIn);
       // Only the pictures that the request sends, and one upload for each file, also when a picture is
       // both frames.
-      const sent = requestMedias(inputs, (role) => files.filter((file) => file.role === role).map((file) => file.path));
+      const sent = requestMedias(request.plan, (role) =>
+        files.filter((file) => file.role === role).map((file) => file.path),
+      );
       const uploaded = new Map<string, string>();
       for (const { value: path } of sent) {
         if (uploaded.has(path)) continue;
@@ -304,12 +320,9 @@ export const generateHiggsfieldMedia = Effect.fn("generateHiggsfieldMedia")(func
         model: request.model,
         prompt: request.prompt,
         count: 1,
-        aspect_ratio: request.specs.aspect,
         use_unlim: false,
-        ...(request.specs.resolution ? { resolution: request.specs.resolution.toLowerCase() } : {}),
-        ...(request.kind === "video" ? { duration: request.specs.duration } : {}),
-        ...(request.kind === "image" ? HIGGSFIELD_BACKGROUND[request.model]?.(request.specs.transparent) : {}),
-        ...(inputs.kling ? { mode: klingMode(medias) } : {}),
+        ...requestChoices(request.kind, request.specs, request.plan),
+        mode: requestMode(request.plan, medias),
         ...(medias.length > 0 ? { medias } : {}),
       };
       const answer = yield* callTool(client, request.kind === "video" ? "generate_video" : "generate_image", {
@@ -359,4 +372,83 @@ export const readHiggsfieldCredits = Effect.fn("readHiggsfieldCredits")(function
       return higgsfieldCredits(yield* callTool(client, "balance", {}));
     }),
   ).pipe(Effect.timeoutOrElse({ duration: HIGGSFIELD_CREDITS_DEADLINE, orElse: () => Effect.fail(timedOut()) }));
+});
+
+/** One page of `models_explore`: its items, and the cursor of the next page or null. */
+function catalogPage(answer: DynamicRecord): { items: DynamicRecord[]; next: string | null } {
+  const items = Array.isArray(answer.items) ? answer.items.filter(isDynamicRecord) : [];
+  return { items, next: answer.has_more === true ? mediaText(answer.next_page_token) : null };
+}
+
+/**
+ * The image and video models of Higgsfield's catalog that the canvas can run, with their plans.
+ * `models_explore` only reads the catalog: it spends no credits.
+ */
+export const readHiggsfieldCatalog = Effect.fn("readHiggsfieldCatalog")(function* (signIn: McpMediaSignIn) {
+  return yield* Effect.scoped(
+    Effect.gen(function* () {
+      const client = yield* connectSignedIn(signIn, notSignedIn);
+      const entries: HiggsfieldCatalogEntry[] = [];
+      const seen = new Set<string>();
+      for (const type of ["image", "video"] as const) {
+        let after: string | null = null;
+        for (let page = 0; page < HIGGSFIELD_CATALOG_PAGES; page += 1) {
+          const answer = catalogPage(
+            yield* callTool(client, "models_explore", {
+              action: "list",
+              type,
+              limit: HIGGSFIELD_CATALOG_PAGE,
+              ...(after ? { after } : {}),
+            }),
+          );
+          for (const item of answer.items) {
+            const entry = higgsfieldCatalogEntry(item);
+            if (!entry || seen.has(entry.model.id)) continue;
+            seen.add(entry.model.id);
+            entries.push(entry);
+          }
+          after = answer.next;
+          if (!after) break;
+        }
+      }
+      return entries;
+    }),
+  ).pipe(Effect.timeoutOrElse({ duration: HIGGSFIELD_CATALOG_DEADLINE, orElse: () => Effect.fail(timedOut()) }));
+});
+
+export interface HiggsfieldPriceRequest {
+  kind: WorkflowMediaKind;
+  model: string;
+  specs: WorkflowMediaSpecs;
+  plan: HiggsfieldPlan;
+}
+
+/**
+ * What one file costs with the choices of the step, in credits, or null when Higgsfield gives no
+ * price. `get_cost` only asks for the price: Higgsfield starts no job and spends no credits. The quote
+ * sends no picture, so a mode is the mode with no picture.
+ */
+export const readHiggsfieldPrice = Effect.fn("readHiggsfieldPrice")(function* (
+  signIn: McpMediaSignIn,
+  request: HiggsfieldPriceRequest,
+) {
+  return yield* Effect.scoped(
+    Effect.gen(function* () {
+      const client = yield* connectSignedIn(signIn, notSignedIn);
+      const answer = yield* callTool(client, request.kind === "video" ? "generate_video" : "generate_image", {
+        params: {
+          model: request.model,
+          prompt: HIGGSFIELD_PRICE_PROMPT,
+          count: 1,
+          use_unlim: false,
+          ...requestChoices(request.kind, request.specs, request.plan),
+          mode: request.plan.mode?.text,
+          get_cost: true,
+        },
+      });
+      const cost = isDynamicRecord(answer.cost) ? answer.cost : null;
+      const credits = cost?.credits_exact ?? cost?.credits;
+      return typeof credits === "number" && Number.isFinite(credits) && credits >= 0 ? credits : null;
+    }),
+  ).pipe(Effect.timeoutOrElse({ duration: HIGGSFIELD_PRICE_DEADLINE, orElse: () => Effect.fail(timedOut()) }));
 });

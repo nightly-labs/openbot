@@ -82,7 +82,7 @@ export const messages = {
   "error.remote.pinnedKeyMissing": "원격 호스트에 고정된 기기 키가 없어요.",
   "error.remote.hostDidNotConnect": "WebRTC 호스트가 연결되지 않았어요.",
   "error.remote.connectionCancelled": "원격 연결이 취소되었어요.",
-  "error.remote.hostDisconnected": "WebRTC 호스트의 연결이 끊어졌어요.",
+  "error.remote.hostDisconnected": "서버와의 연결이 끊어졌어요. 작업이 완료되었는지 확인한 후 다시 시도해 주세요.",
   "error.remote.eventGap": "호스트 이벤트 순서에 누락이 있어요.",
   "error.remote.malformedKnownEvent": "호스트가 형식이 잘못된 알려진 이벤트를 반환했어요.",
   "error.remote.fileTransportIsStopped": "WebRTC 파일 전송이 중지되었어요.",

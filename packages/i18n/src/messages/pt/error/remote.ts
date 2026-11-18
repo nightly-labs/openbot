@@ -89,7 +89,8 @@ export const messages = {
   "error.remote.pinnedKeyMissing": "O computador anfitrião remoto não tem uma chave de dispositivo fixada.",
   "error.remote.hostDidNotConnect": "O computador anfitrião WebRTC não se conectou.",
   "error.remote.connectionCancelled": "A conexão remota foi cancelada.",
-  "error.remote.hostDisconnected": "O computador anfitrião WebRTC se desconectou.",
+  "error.remote.hostDisconnected":
+    "A conexão com o servidor foi perdida. Verifique se a ação foi concluída e tente novamente.",
   "error.remote.eventGap": "Há uma lacuna na sequência de eventos do computador anfitrião.",
   "error.remote.malformedKnownEvent": "O computador anfitrião retornou um evento conhecido malformado.",
   "error.remote.fileTransportIsStopped": "O transporte de arquivos WebRTC está parado.",

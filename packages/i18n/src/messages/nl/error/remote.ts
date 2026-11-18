@@ -87,7 +87,8 @@ export const messages = {
   "error.remote.pinnedKeyMissing": "De externe host heeft geen vastgezette apparaatsleutel.",
   "error.remote.hostDidNotConnect": "De WebRTC-host heeft geen verbinding gemaakt.",
   "error.remote.connectionCancelled": "De externe verbinding is geannuleerd.",
-  "error.remote.hostDisconnected": "De verbinding met de WebRTC-host is verbroken.",
+  "error.remote.hostDisconnected":
+    "De verbinding met de server is verbroken. Controleer of de actie is voltooid en probeer het dan opnieuw.",
   "error.remote.eventGap": "De volgorde van events van de host heeft een gat.",
   "error.remote.malformedKnownEvent": "De host gaf een misvormd bekend event terug.",
   "error.remote.fileTransportIsStopped": "Het WebRTC-bestandstransport is gestopt.",

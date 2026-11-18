@@ -34,11 +34,22 @@ import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
-import { createMemo, createSignal, createUniqueId, For, onCleanup, Show } from "solid-js";
+import { createContext, createMemo, createSignal, createUniqueId, For, onCleanup, Show, useContext } from "solid-js";
 import { createAutoScroll, MenuMark } from "./CrmSheet";
 import { FIELD_KEY, matches, PAY_STATE_KEY, payState, payVariant, SOURCE_KEY } from "./crm-model";
 import type { CrmViewModel } from "./crm-state";
 import { useCrmText } from "./crm-text";
+
+/**
+ * The open form dialog. A list that opens in the dialog mounts in it: at the body, the list is on the
+ * popover layer, under the dialog, and the modal dialog hides it from assistive technology.
+ */
+export const CrmPopupLayer = createContext<() => HTMLElement | undefined>(() => undefined);
+
+/** The element that a list of a select mounts in: the form dialog, or the body outside a dialog. */
+export function usePopupMount(): () => HTMLElement | undefined {
+  return useContext(CrmPopupLayer);
+}
 
 /** The first letter of a customer, in place of a logo. */
 export function Logo(props: { name: string }) {
@@ -94,8 +105,10 @@ export function OwnerSelect(props: {
   // The picker keeps one options array while the agents stay the same.
   const options = createMemo(() => [NO_OWNER, ...props.crm.agents().map((agent) => agent.id)]);
   const idOf = (option: string) => (option === NO_OWNER ? null : option);
+  const mount = usePopupMount();
   return (
     <SearchSelect<string>
+      mount={mount()}
       options={options()}
       value={props.value ?? NO_OWNER}
       onChange={(option) => {
@@ -272,6 +285,7 @@ export function ChoiceSelect<T extends string>(props: {
   onChange: (value: T) => void;
   labelledBy: string;
 }) {
+  const mount = usePopupMount();
   return (
     <Select<T>
       options={props.options}
@@ -284,7 +298,7 @@ export function ChoiceSelect<T extends string>(props: {
       <SelectTrigger size="sm" class="crm-select" aria-labelledby={props.labelledBy}>
         <SelectValue<T>>{() => props.text(props.value)}</SelectValue>
       </SelectTrigger>
-      <SelectContent />
+      <SelectContent mount={mount()} />
     </Select>
   );
 }

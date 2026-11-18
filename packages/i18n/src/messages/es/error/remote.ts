@@ -86,7 +86,8 @@ export const messages = {
   "error.remote.pinnedKeyMissing": "El host remoto no tiene una clave de dispositivo fijada.",
   "error.remote.hostDidNotConnect": "El host WebRTC no se conectó.",
   "error.remote.connectionCancelled": "Se canceló la conexión remota.",
-  "error.remote.hostDisconnected": "El host WebRTC se desconectó.",
+  "error.remote.hostDisconnected":
+    "Se perdió la conexión con el servidor. Comprueba si la acción se completó y vuelve a intentarlo.",
   "error.remote.eventGap": "La secuencia de eventos del host tiene un vacío.",
   "error.remote.malformedKnownEvent": "El host devolvió un evento conocido con formato incorrecto.",
   "error.remote.fileTransportIsStopped": "El transporte de archivos WebRTC está detenido.",

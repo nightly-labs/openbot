@@ -11,6 +11,7 @@ import type {
   UpdateStatus,
 } from "@openbot/contracts/ipc";
 import { isUpdateBusyPhase } from "@openbot/contracts/ipc";
+import { isNewerRelease } from "@openbot/contracts/release-version";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Cause, Deferred, Effect, Fiber, Result, Schema, Scope, Semaphore } from "effect";
@@ -108,12 +109,6 @@ export function electronUpdaterCacheDirectory(): string {
         ? join(homedir(), "Library", "Caches")
         : process.env.XDG_CACHE_HOME || join(homedir(), ".cache");
   return join(root, "openbot-updater");
-}
-
-export function isValidSemver(version: string): boolean {
-  return /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/u.test(
-    version,
-  );
 }
 
 type UpdateOperation = "check" | "download" | "install";
@@ -274,6 +269,8 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   #rolloutMiss: string | null = null;
   /** A newer release in its staged rollout that the last check did not offer to this install. */
   #stagedVersion: string | null = null;
+  /** The supported minimum, while this install is below it. */
+  #requiredVersion: string | null = null;
 
   constructor(updater: UpdateAdapter, options: UpdateServiceOptions) {
     super();
@@ -406,7 +403,15 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       status.scheduledRestart = { ...this.#scheduledRestart, waitingFor: [...this.#scheduledRestart.waitingFor] };
     if (this.#idleRestart) status.idleRestart = { ...this.#idleRestart, waitingFor: [...this.#idleRestart.waitingFor] };
     if (this.#stagedVersion && status.phase === "up-to-date") status.stagedVersion = this.#stagedVersion;
+    if (this.#requiredVersion) status.requiredVersion = this.#requiredVersion;
     return status;
+  }
+
+  /** Carries the minimum from `RequiredUpdate` to the renderer. It is not a phase change. */
+  setRequiredVersion(version: string | null): void {
+    if (this.#requiredVersion === version) return;
+    this.#requiredVersion = version;
+    this.emit("status", this.getStatus());
   }
 
   /**
@@ -446,18 +451,32 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   setManagedByHost(managed: boolean): void {
     if (this.#managedByHost === managed) return;
     this.#managedByHost = managed;
-    if (!managed) {
-      this.#downloadedVersion = null;
-      this.#setStatus({
-        phase: this.#options.enabled ? "idle" : "unsupported",
-        availableVersion: null,
-        progress: null,
-        message: null,
-        errorCode: null,
-      });
-      if (this.#options.enabled) this.#scheduleCheck(this.#options.initialCheckDelayMs);
+    if (managed) {
+      // The host owns the updates now. A check or a download of this tenant that is still out must not
+      // write its result over the host state, and the download must not use the network for nothing.
+      this.#checkGeneration += 1;
+      this.#downloadGeneration += 1;
+      this.#activeDownload = null;
+      this.#cancellationToken?.cancel();
+      this.#cancellationToken = null;
+      // An install keeps its phase: its shutdown preparation runs, and the app quits.
+      if (this.#installStarted) {
+        this.#setStatus({});
+        return;
+      }
     }
-    this.#setStatus({});
+    // Also on a takeover: no phase deadline runs while the host manages the updates, so a busy phase
+    // of this tenant would stay on screen until the host state replaces it, and forever for a tenant
+    // that the host does not list.
+    this.#downloadedVersion = null;
+    this.#setStatus({
+      phase: this.#options.enabled ? "idle" : "unsupported",
+      availableVersion: null,
+      progress: null,
+      message: null,
+      errorCode: null,
+    });
+    if (!managed && this.#options.enabled) this.#scheduleCheck(this.#options.initialCheckDelayMs);
   }
 
   setHostState(state: HostUpdateState): void {
@@ -1144,26 +1163,11 @@ function pruneInstalledUpdate(directory: string, currentVersion: string): Effect
   }).pipe(Effect.catch(() => Effect.void));
 }
 
-/**
- * Compares the release numbers only. The feed offers no prereleases (`allowPrerelease` is off), so
- * a candidate with the same numbers is not newer. A stale feed answer that names an older release
- * must not replace a newer download.
- */
 /** The rollout percentage as electron-updater reads it, or null when the release has no stage. */
 function stagingPercentage(value: unknown): number | null {
   if (value === null || value === undefined) return null;
   const percentage = Number.parseInt(String(value), 10);
   return Number.isNaN(percentage) ? null : percentage;
-}
-
-function isNewerRelease(candidate: string, current: string): boolean {
-  const parse = (version: string) => version.split(/[-+]/u, 1)[0]?.split(".").map(Number) ?? [];
-  const [left, right] = [parse(candidate), parse(current)];
-  for (let index = 0; index < 3; index += 1) {
-    const difference = (left[index] ?? 0) - (right[index] ?? 0);
-    if (difference !== 0) return difference > 0;
-  }
-  return false;
 }
 
 /** A percent that is not a number means that the download runs but its progress is not known. */

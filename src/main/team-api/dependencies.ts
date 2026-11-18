@@ -171,6 +171,7 @@ type TeamApiAgentMethods = Pick<
   | "listWorkspaceDirectory"
   | "sendMessage"
   | "listQueue"
+  | "listActiveQueues"
   | "acknowledgeFailedTurn"
   | "setMessageReaction"
   | "deleteConversationMessage"
@@ -477,6 +478,8 @@ export type TeamApiWorkflows = Pick<
   | "keepPicture"
   | "mediaProviders"
   | "mediaCredits"
+  | "mediaCatalog"
+  | "mediaPrice"
 > &
   Pick<HostEventsService, "rotateWorkflowSecret"> & {
     /**
