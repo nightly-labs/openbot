@@ -189,6 +189,30 @@ function isActiveDelivery(delivery: StoredDelivery): boolean {
   return delivery.status === "queued" || delivery.status === "starting" || delivery.status === "running";
 }
 
+/** One mailbox message of an agent's own chat, as `conversationMessages` selects it. */
+interface ConversationIndexEntry {
+  message: StoredMessage;
+  active: boolean;
+  conversationTime: string;
+}
+
+/**
+ * What `conversationMessages` reads from the whole mailbox, made once for one mailbox state. Each chat
+ * page read asks for the mailbox messages of its agent, and a scan of all of them for each read kept
+ * the main thread of a busy server busy (#11884).
+ */
+interface ConversationIndex {
+  generation: number;
+  state: StoredState;
+  messages: StoredMessage[];
+  deliveries: StoredDelivery[];
+  idempotency: StoredState["idempotency"];
+  deliveriesByMessage: Map<string, StoredDelivery[]>;
+  positions: Map<string, number>;
+  turnIds: Map<string, string | undefined>;
+  entriesByAgent: Map<string, ConversationIndexEntry[]>;
+}
+
 interface StoredState {
   version: 3;
   messages: StoredMessage[];
@@ -322,6 +346,9 @@ export class MailboxStore {
   readonly #deliveryGate = new MailboxDeliveryGate();
   readonly #stagedGeneratedAttachments = new Map<string, StoredGeneratedAttachment>();
   #state: StoredState = structuredClone(EMPTY_STATE);
+  /** Grows at each saved change, and at each change that has no row mark, so a kept index is not used. */
+  #stateGeneration = 0;
+  #keptConversationIndex: ConversationIndex | undefined;
   /**
    * The app start loads the store before the window opens, and the agent service initializes the same
    * store again. A second load reads every message and delivery again, which stops the main process
@@ -515,6 +542,7 @@ export class MailboxStore {
           !key.startsWith(prefix) || (createdAt.get(messageId) ?? Number.NEGATIVE_INFINITY) >= cutoff,
       ),
     );
+    this.#stateGeneration += 1;
   }
 
   /** The receipt of the message an idempotency key already stored, or null. */
@@ -526,6 +554,7 @@ export class MailboxStore {
   /** Forgets one idempotency key. The next persist writes the map without it. */
   forgetIdempotencyKey(key: string): void {
     delete this.#state.idempotency[key];
+    this.#stateGeneration += 1;
   }
 
   /** The task of the message an idempotency key already stored, or null for a chat message or no message. */
@@ -1655,40 +1684,11 @@ export class MailboxStore {
       1,
       Math.min(options.limit ?? MAILBOX_CONVERSATION_MESSAGE_LIMIT, MAILBOX_CONVERSATION_MESSAGE_LIMIT),
     );
-    const deliveriesByMessage = new Map<string, StoredDelivery[]>();
-    for (const delivery of this.#state.deliveries) {
-      const deliveries = deliveriesByMessage.get(delivery.messageId) ?? [];
-      deliveries.push(delivery);
-      deliveriesByMessage.set(delivery.messageId, deliveries);
-    }
+    const index = this.#conversationIndex();
+    const { deliveriesByMessage, positions, turnIds } = index;
     const selectedStoredMessages: StoredMessage[] = [];
     let completedCount = 0;
-    for (let index = this.#state.messages.length - 1; index >= 0; index -= 1) {
-      const message = this.#state.messages[index];
-      if (!message || message.channelId || message.messaging) continue;
-      const ownMessage = message.sender.kind === "agent" && message.sender.agentId === agentId;
-      // A task message runs in a side thread of its recipient. A teammate's answer to that thread
-      // still shows in the teammate's own chat; the brief of a thread the agent started does not.
-      if (
-        message.taskId &&
-        (!ownMessage || !deliveriesByMessage.get(message.id)?.some((delivery) => delivery.recipientAgentId !== agentId))
-      )
-        continue;
-      // A request the agent sent from a Slack thread or a side thread belongs to that thread, not to
-      // its own chat. The teammate it went to still sees it.
-      if ((message.messagingReturn || message.senderTaskId) && ownMessage) continue;
-      const deliveries = deliveriesByMessage.get(message.id) ?? [];
-      let relevant = ownMessage;
-      let active = false;
-      for (const delivery of deliveries) {
-        if (!ownMessage && delivery.recipientAgentId !== agentId) continue;
-        relevant = true;
-        if (isActiveDelivery(delivery)) active = true;
-      }
-      if (!relevant) continue;
-      const conversationTime = ownMessage
-        ? message.createdAt
-        : (deliveries.find((delivery) => delivery.recipientAgentId === agentId)?.steeredAt ?? message.createdAt);
+    for (const { message, active, conversationTime } of this.#conversationEntries(index, agentId)) {
       if (!active && options.fromCreatedAt && conversationTime < options.fromCreatedAt) continue;
       if (!active && completedCount >= limit) continue;
       selectedStoredMessages.push(message);
@@ -1696,8 +1696,6 @@ export class MailboxStore {
     }
     selectedStoredMessages.reverse();
     const messages: ConversationMessage[] = [];
-    const positions = this.#queuedPositions();
-    const turnIds = this.#sourceTurnIds();
     for (const message of selectedStoredMessages) {
       const deliveries = deliveriesByMessage.get(message.id) ?? [];
       if (message.sender.kind === "agent" && message.sender.agentId === agentId) {
@@ -1805,6 +1803,78 @@ export class MailboxStore {
       }
     }
     return messages;
+  }
+
+  /**
+   * The index of the current mailbox state. A change that is not saved yet can still be undone, so
+   * the store keeps an index only while no change waits: each save makes a new generation.
+   */
+  #conversationIndex(): ConversationIndex {
+    const state = this.#state;
+    const unsaved = Object.values(this.#changes).some((keys) => keys.size > 0);
+    const kept = this.#keptConversationIndex;
+    if (
+      !unsaved &&
+      kept?.generation === this.#stateGeneration &&
+      kept.state === state &&
+      kept.messages === state.messages &&
+      kept.deliveries === state.deliveries &&
+      kept.idempotency === state.idempotency
+    )
+      return kept;
+    const deliveriesByMessage = new Map<string, StoredDelivery[]>();
+    for (const delivery of state.deliveries) {
+      const deliveries = deliveriesByMessage.get(delivery.messageId) ?? [];
+      deliveries.push(delivery);
+      deliveriesByMessage.set(delivery.messageId, deliveries);
+    }
+    const index: ConversationIndex = {
+      generation: this.#stateGeneration,
+      state,
+      messages: state.messages,
+      deliveries: state.deliveries,
+      idempotency: state.idempotency,
+      deliveriesByMessage,
+      positions: this.#queuedPositions(),
+      turnIds: this.#sourceTurnIds(),
+      entriesByAgent: new Map(),
+    };
+    this.#keptConversationIndex = unsaved ? undefined : index;
+    return index;
+  }
+
+  /** The mailbox messages of an agent's own chat, newest first. */
+  #conversationEntries(index: ConversationIndex, agentId: string): ConversationIndexEntry[] {
+    const known = index.entriesByAgent.get(agentId);
+    if (known) return known;
+    const entries: ConversationIndexEntry[] = [];
+    for (let position = index.messages.length - 1; position >= 0; position -= 1) {
+      const message = index.messages[position];
+      if (!message || message.channelId || message.messaging) continue;
+      const ownMessage = message.sender.kind === "agent" && message.sender.agentId === agentId;
+      const deliveries = index.deliveriesByMessage.get(message.id) ?? [];
+      // A task message runs in a side thread of its recipient. A teammate's answer to that thread
+      // still shows in the teammate's own chat; the brief of a thread the agent started does not.
+      if (message.taskId && (!ownMessage || !deliveries.some((delivery) => delivery.recipientAgentId !== agentId)))
+        continue;
+      // A request the agent sent from a Slack thread or a side thread belongs to that thread, not to
+      // its own chat. The teammate it went to still sees it.
+      if ((message.messagingReturn || message.senderTaskId) && ownMessage) continue;
+      let relevant = ownMessage;
+      let active = false;
+      for (const delivery of deliveries) {
+        if (!ownMessage && delivery.recipientAgentId !== agentId) continue;
+        relevant = true;
+        if (isActiveDelivery(delivery)) active = true;
+      }
+      if (!relevant) continue;
+      const conversationTime = ownMessage
+        ? message.createdAt
+        : (deliveries.find((delivery) => delivery.recipientAgentId === agentId)?.steeredAt ?? message.createdAt);
+      entries.push({ message, active, conversationTime });
+    }
+    index.entriesByAgent.set(agentId, entries);
+    return entries;
   }
 
   reactionFor(
@@ -3837,6 +3907,7 @@ export class MailboxStore {
     fileDeletions: string[] = [],
     replaceAll = false,
   ): void {
+    this.#stateGeneration += 1;
     const ownsTransaction = !this.#database.connection.isTransaction;
     const wrote = replaceAll
       ? this.#database.replaceMailboxState(commandId, this.#state, eventType, fileDeletions, true)
@@ -3846,6 +3917,7 @@ export class MailboxStore {
 
   #clearChanges(): void {
     for (const keys of Object.values(this.#changes)) keys.clear();
+    this.#stateGeneration += 1;
   }
 
   #drainFileDeletionOutboxEffect = Effect.fn("MailboxStore.drainFileDeletionOutbox")(function* (this: MailboxStore) {
