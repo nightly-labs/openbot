@@ -853,6 +853,44 @@
           "b3ff6bf1df3cbe51"
         ]
       }
+    },
+    {
+      "tag": "v0.73.0",
+      "newInstall": {
+        "migrations": [[0, 56], 64, 65],
+        "objects": [
+          [0, 7],
+          "939f6728620744f0",
+          "0320c0d732f7e15d",
+          "ca7e66e154082f58",
+          [10, 13],
+          "5dc170fe2990727f",
+          [14, 16],
+          "7a0526e83fa8b6f9",
+          "e0e83bb8cadafba7",
+          [20, 28],
+          [29, 38],
+          "efb653208a101a01",
+          [38, 57],
+          "5c035f5ec0cef9a1",
+          [58, 61],
+          "582f40d7935374f3",
+          [62, 70],
+          "3fc5890632b6b809",
+          "92a94c6acdc3419f",
+          [70, 125],
+          [128, 135],
+          "aa33528f340c0b3c",
+          [136, 138],
+          [139, 149],
+          "d72cbcc52d37f1d0",
+          [126, 128],
+          "713fdd673bb050ea",
+          [149, 192],
+          "3245c20ac0b2fc8b"
+        ]
+      },
+      "upgraded": { "migrations": [[0, 59], 64, 65], "objects": [[0, 192], "3245c20ac0b2fc8b"] }
     }
   ],
   "statements": {
@@ -907,6 +945,7 @@
     "300c513b8d8ac77b": "CREATE TABLE routine_flow_links (\n    link_id TEXT PRIMARY KEY,\n    routine_id TEXT NOT NULL REFERENCES projection_agent_routines(routine_id) ON DELETE CASCADE,\n    from_agent_id TEXT NOT NULL,\n    to_agent_id TEXT NOT NULL,\n    instruction TEXT NOT NULL DEFAULT '',\n    created_at TEXT NOT NULL,\n    CHECK(from_agent_id <> to_agent_id),\n    UNIQUE(routine_id, from_agent_id, to_agent_id)\n  )",
     "30ae3b2d9dffba90": "CREATE TABLE routine_flow_steps (\n    step_id TEXT PRIMARY KEY,\n    run_id TEXT NOT NULL REFERENCES projection_routine_runs(run_id) ON DELETE CASCADE,\n    agent_id TEXT NOT NULL,\n    delivery_id TEXT,\n    input TEXT NOT NULL,\n    output TEXT,\n    status TEXT NOT NULL CHECK(status IN ('running', 'succeeded', 'failed', 'skipped', 'cancelled')),\n    error TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    UNIQUE(run_id, agent_id)\n  )",
     "3193ba8746a113ff": "CREATE TABLE crm_counters (\n    name TEXT NOT NULL PRIMARY KEY CHECK(name IN ('customer', 'payment')),\n    value INTEGER NOT NULL CHECK(value >= 0)\n  )",
+    "3245c20ac0b2fc8b": "CREATE TABLE thread_event_compaction (\n    thread_id TEXT PRIMARY KEY REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n    through_sequence INTEGER NOT NULL CHECK(through_sequence >= 0),\n    compacted_at TEXT NOT NULL\n  )",
     "324c9810c995037d": "CREATE INDEX crm_customers_stripe ON crm_customers(stripe_customer_id) WHERE stripe_customer_id <> ''",
     "3264438531c104d1": "CREATE TABLE crm_activity (\n    activity_id TEXT NOT NULL PRIMARY KEY CHECK(length(activity_id) = 32),\n    customer_id TEXT NOT NULL REFERENCES crm_customers(customer_id) ON DELETE CASCADE,\n    actor_kind TEXT NOT NULL CHECK(actor_kind IN ('person', 'agent', 'source')),\n    actor_id TEXT CHECK(actor_id IS NULL OR length(actor_id) BETWEEN 1 AND 255),\n    actor_name TEXT CHECK(actor_name IS NULL OR length(actor_name) <= 200),\n    kind TEXT NOT NULL CHECK(length(kind) BETWEEN 1 AND 48),\n    details_json TEXT NOT NULL CHECK(json_valid(details_json)),\n    proposed_by TEXT CHECK(proposed_by IS NULL OR length(proposed_by) BETWEEN 1 AND 255),\n    created_at TEXT NOT NULL\n  )",
     "32c2c9a4c6ee3540": "CREATE INDEX crm_proposals_agent ON crm_proposals(agent_id) WHERE state = 'pending'",
