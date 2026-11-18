@@ -296,6 +296,12 @@ function useElapsed(running: () => boolean) {
  * The price of one file with the choices of the step, in the credits of the service, or null while
  * there is no quote. It asks again when a choice changes; an answer for older choices is dropped.
  */
+/**
+ * The shown name of a resolution: Sunra lists "2k", Higgsfield "2K". Only the name changes; the step
+ * keeps the value of the model, which hosts in the support window match exactly.
+ */
+const resolutionName = (value: string) => value.replace(/k$/u, "K");
+
 function useMediaPrice(request: () => WorkflowMediaPriceRequest | null) {
   const board = useBoard();
   const [credits, setCredits] = createSignal<number | null>(null);
@@ -771,11 +777,11 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
               <Show when={!specs().size && specs().resolution}>
                 {(current) => (
                   <ChipMenu
-                    label={t("workflow.video.resolutionLabel", { value: current() })}
+                    label={t("workflow.video.resolutionLabel", { value: resolutionName(current()) })}
                     title={t("workflow.video.resolution")}
-                    text={current()}
+                    text={resolutionName(current())}
                     value={current()}
-                    groups={[{ options: resolutions().map((value) => ({ value, label: value })) }]}
+                    groups={[{ options: resolutions().map((value) => ({ value, label: resolutionName(value) })) }]}
                     disabled={specsDisabled()}
                     onSelect={setResolution}
                   />
