@@ -10,7 +10,7 @@ import type {
 import type { AgentActiveQueues } from "@openbot/contracts/team-protocol/agent-active-queues-v1";
 import { approvalIsCut, withWholeApproval } from "@openbot/team-client/runtime-attention";
 import { currentText } from "@openbot/ui/text";
-import { createEffect, createMemo, createSignal, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, createStore, untrack } from "solid-js";
 import { desktopAnalytics } from "./analytics";
 import { useAnsweredPrompts } from "./answered-prompts";
 import {
@@ -85,9 +85,12 @@ const Turns = createSimpleContext({
     const scopeServerId = untrack(activeServerId);
     const seed = dynamicIslandCoordinator.serverState(scopeServerId);
     const [activeTurns, setActiveTurns] = createSignal<Record<string, string | null>>(seed?.activeTurns ?? {});
-    const [turnProgress, setTurnProgress] = createSignal<
+    // A store, so a progress line runs again only the readers of its own agent. The seed is copied, so a
+    // write does not change the record of the coordinator.
+    const [turnProgressStore, setTurnProgress] = createStore<
       Record<string, { turnId: string; detail: string; running?: boolean; activity?: string } | undefined>
-    >(seed?.turnProgress ?? {});
+    >({ ...seed?.turnProgress });
+    const turnProgress = () => turnProgressStore;
     // Every progress line of the newest turns, by turn, for the steps under the activity line.
     const [turnStepLines, setTurnStepLines] = createSignal<TurnStepLines>({});
     const [failedTurns, setFailedTurns] = createSignal<Record<string, string | undefined>>(seed?.failedTurns ?? {});

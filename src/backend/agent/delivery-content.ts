@@ -5,6 +5,7 @@ import { chatTagReferences, expandChatTagReferences } from "@openbot/contracts/c
 import type {
   AgentSummary,
   AgentWait,
+  ConversationMessage,
   ConversationPlanStep,
   ConversationSnapshot,
   QueueDelivery,
@@ -46,15 +47,23 @@ export function visualReplyFileName(title: string): string {
   );
 }
 
-/** A digest, because each thread keeps its signature: the JSON itself would be a second copy of the history. */
-export function conversationContentSignature(snapshot: ConversationSnapshot): string {
-  const content = JSON.stringify({
-    agentId: snapshot.agentId,
-    threadId: snapshot.threadId,
-    activeTurnId: snapshot.activeTurnId,
-    messages: snapshot.messages,
+/**
+ * A digest, because each thread keeps its signature: the JSON itself would be a second copy of the history.
+ * It hashes the same text as `JSON.stringify` of the agent, thread, active turn and messages, in parts, so
+ * a caller that already has the JSON of each message gives it in `messageJson` and nothing is made twice.
+ */
+export function conversationContentSignature(
+  snapshot: ConversationSnapshot,
+  messageJson: (message: ConversationMessage) => string = (message) => JSON.stringify(message),
+): string {
+  const hash = createHash("sha256").update(
+    `{"agentId":${JSON.stringify(snapshot.agentId)},"threadId":${JSON.stringify(snapshot.threadId)},"activeTurnId":${JSON.stringify(snapshot.activeTurnId)},"messages":[`,
+  );
+  snapshot.messages.forEach((message, index) => {
+    if (index > 0) hash.update(",");
+    hash.update(messageJson(message));
   });
-  return createHash("sha256").update(content).digest("base64");
+  return hash.update("]}").digest("base64");
 }
 
 /**

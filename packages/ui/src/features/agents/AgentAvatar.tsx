@@ -22,6 +22,27 @@ import { documentSoftwareRendering } from "../../document-rendering";
 // frame. Each of those frames also restyled every running CSS animation in the window.
 const AVATAR_FPS = 30;
 
+// One observer for all avatars: a sidebar can hold a hundred of them.
+const avatarVisibilityListeners = new WeakMap<Element, (visible: boolean) => void>();
+let avatarVisibilityObserver: IntersectionObserver | undefined;
+
+/**
+ * Tells `onChange` when the avatar enters or leaves the screen, as the `autoPause` of the Bloub loop
+ * does. Without an observer, the avatar counts as on screen.
+ */
+function observeAvatarVisibility(element: Element, onChange: (visible: boolean) => void): () => void {
+  if (typeof IntersectionObserver === "undefined") return () => {};
+  avatarVisibilityObserver ??= new IntersectionObserver((entries) => {
+    for (const entry of entries) avatarVisibilityListeners.get(entry.target)?.(entry.isIntersecting);
+  });
+  avatarVisibilityListeners.set(element, onChange);
+  avatarVisibilityObserver.observe(element);
+  return () => {
+    avatarVisibilityObserver?.unobserve(element);
+    avatarVisibilityListeners.delete(element);
+  };
+}
+
 interface PlushMood {
   state: PlushState;
   /** `null` = the face the seed chose. `failed` and `asleep` set their own face and ignore it. */
@@ -250,6 +271,7 @@ function GeneratedAvatar(props: {
   let element: HTMLSpanElement | undefined;
   const [interacting, setInteracting] = createSignal(false);
   const [prefersReduced, setPrefersReduced] = createSignal(prefersReducedMotion());
+  const [onScreen, setOnScreen] = createSignal(true);
   // On the CPU, six moving avatars took a third of a core. A window drawn there shows the still
   // avatars of reduced motion, which run no animation loop.
   const reducedMotion = () => prefersReduced() || documentSoftwareRendering();
@@ -329,8 +351,10 @@ function GeneratedAvatar(props: {
     interacting();
 
   // Reduced motion keeps one face: it is a frozen plush, and a frozen plush cannot morph between faces.
+  // An avatar off screen keeps its face: with 100 working agents, the avatars changed faces about 50
+  // times a second, most of them in sidebar rows that were scrolled away.
   createEffect(
-    () => cyclesFaces() && !reducedMotion() && ambientMotion(),
+    () => cyclesFaces() && !reducedMotion() && ambientMotion() && onScreen(),
     (cycling) => {
       if (!cycling) return;
       let timer = 0;
@@ -353,6 +377,7 @@ function GeneratedAvatar(props: {
     const syncReducedMotion = () => setPrefersReduced(media?.matches ?? false);
     syncReducedMotion();
     media?.addEventListener?.("change", syncReducedMotion);
+    const stopObservingVisibility = element ? observeAvatarVisibility(element, setOnScreen) : undefined;
 
     // What must be hovered or focused for a resting avatar to move: the control the avatar sits in or
     // beside, marked with `data-avatar-hover` when the avatar is only a neighbour of it. A dialog and a
@@ -381,6 +406,7 @@ function GeneratedAvatar(props: {
     interactionTarget?.addEventListener("focusout", stopFocusInteraction);
 
     return () => {
+      stopObservingVisibility?.();
       media?.removeEventListener?.("change", syncReducedMotion);
       interactionTarget?.removeEventListener("pointerenter", startInteraction);
       interactionTarget?.removeEventListener("pointerleave", stopInteraction);

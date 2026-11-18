@@ -22,7 +22,6 @@ import {
   retainThinkingMessages,
   toAgentMessage,
   toAgentMessages,
-  withoutAgent,
 } from "../../app-message-projection";
 import { createStoredMessage, updateStored } from "../../app-stored-values";
 import { usePlatform } from "../../platform";
@@ -352,15 +351,25 @@ const Conversation = createSimpleContext({
     // Main adds text to a message before it sends the buffered delta, so the preview can hold text
     // that the first delta also holds. A message added from the preview starts with an empty raw body.
     function applyRuntimeMessages(messages: AgentRuntimeSnapshot["latestMessages"]): void {
-      const agentIds = new Set(messages.map((message) => message.agentId));
       // The draft includes pending page writes from this event batch. Outside
       // the setter, store keys can precede their committed conversation values.
       setConversations((current) => {
-        const currentMessages = Object.fromEntries(
-          Object.entries(current).map(([id, conversation]) => [id, conversation.messages]),
-        );
-        const next = appendLatestRuntimeMessages(currentMessages, messages);
-        for (const message of messages) {
+        // Most snapshots repeat messages that are loaded. Only a new message, or an agent that is not
+        // open and holds more than a page, has work.
+        const pending = messages.filter((message) => {
+          const loaded = current[message.agentId]?.messages;
+          if (!loaded?.some((candidate) => candidate.id === message.id)) return true;
+          return message.agentId !== activeAgentId() && loaded.length > LATEST_PAGE_SIZE;
+        });
+        if (pending.length === 0) return;
+        const agentIds = new Set(pending.map((message) => message.agentId));
+        const currentMessages: Record<string, ConversationState["messages"]> = {};
+        for (const agentId of agentIds) {
+          const loaded = current[agentId]?.messages;
+          if (loaded) currentMessages[agentId] = loaded;
+        }
+        const next = appendLatestRuntimeMessages(currentMessages, pending);
+        for (const message of pending) {
           if (currentMessages[message.agentId]?.some((candidate) => candidate.id === message.id)) continue;
           if (!next[message.agentId]?.some((candidate) => candidate.id === message.id)) continue;
           rawAgentMessageBodies.set(agentMessageKey(message.agentId, message.id), "");
@@ -613,11 +622,14 @@ const Conversation = createSimpleContext({
         applyConversation(pendingSnapshot, isAgentChatReadable(event.agentId));
       }
       const messageKey = agentMessageKey(event.agentId, event.messageId);
+      const animate = conversations[event.agentId]?.loaded === true;
       let appended = false;
       updateConversation(event.agentId, (conversation) => {
         conversation.revision = event.revision;
+        if (conversation.loaded !== true) conversation.loaded = true;
         const messages = conversation.messages;
-        const existing = messages.find((message) => message.id === event.messageId);
+        // A streamed message is near the end, so the search starts there.
+        const existing = messages.findLast((message) => message.id === event.messageId);
         const thinking = existing
           ? undefined
           : messages.find((message) => message.kind === "thinking" && message.itemIds?.includes(event.messageId));
@@ -650,7 +662,7 @@ const Conversation = createSimpleContext({
           time: formatMessageTime(event.createdAt),
           createdAt: event.createdAt,
           streaming: true,
-          animate: conversations[event.agentId]?.loaded === true,
+          animate,
           kind: "text",
         });
         appended = true;
@@ -669,9 +681,6 @@ const Conversation = createSimpleContext({
           });
         }
       }
-      updateConversation(event.agentId, (conversation) => {
-        conversation.loaded = true;
-      });
     }
 
     function applyConversation(snapshot: ConversationSnapshot, markNewMessagesRead = false) {
@@ -758,7 +767,7 @@ const Conversation = createSimpleContext({
       }));
       setTurnProgress((current) => {
         const progress = current[agentId];
-        return progress && progress.turnId !== snapshot.activeTurnId ? withoutAgent(current, agentId) : current;
+        if (progress && progress.turnId !== snapshot.activeTurnId) delete current[agentId];
       });
       const readState = conversations[agentId]?.read;
       const latestIncomingMessage = markNewMessagesRead

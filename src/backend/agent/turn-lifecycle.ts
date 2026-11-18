@@ -349,6 +349,19 @@ export interface TurnTiming {
 /** Entries kept for starts and finished turns that nothing took. Older ones go first. */
 const TURN_TIMING_LIMIT = 64;
 
+/** The methods that stream text: most notifications while agents answer. */
+const STREAMING_DELTA_METHODS: ReadonlySet<string> = new Set([
+  "item/reasoning/summaryTextDelta",
+  "item/reasoning/textDelta",
+  "item/reasoning/summaryPartAdded",
+  "item/agentMessage/delta",
+]);
+
+/** Whether `handleStreamingDelta` takes this notification, so the caller can run it with no fiber. */
+export function isStreamingDelta(method: string): boolean {
+  return STREAMING_DELTA_METHODS.has(method);
+}
+
 function keepBounded<V>(map: Map<string, V>, key: string, value: V): void {
   map.delete(key);
   map.set(key, value);
@@ -1100,17 +1113,80 @@ export class TurnLifecycle {
     this.#usageLimits.failed(agentId, model, resetDelayMs, spent);
   }
 
-  readonly handleNotification = Effect.fn("TurnLifecycle.handleNotification")(function* (
-    this: TurnLifecycle,
-    notification: AppServerNotification,
-    source: AgentClient,
-  ) {
-    const params = notification.params;
+  /** The time of the last event of the agent and of the turn, which the stall checks read. */
+  #noteEvent(params: unknown): { threadId: string | null; agentId: string | undefined } {
     const threadId = getString(params, "threadId");
     const agentId = threadId ? this.#conversation.agentForThread(threadId) : undefined;
     if (agentId) this.#lastEventAt.set(agentId, Date.now());
     const eventTurn = this.#runningTurns.get(getString(params, "turnId") ?? "");
     if (eventTurn) eventTurn.lastEventAt = Date.now();
+    return { threadId, agentId };
+  }
+
+  /**
+   * Adds one piece of streamed text (see `isStreamingDelta`). A provider sends one for each few tokens
+   * of each agent, and all of the work is synchronous, so the caller runs it with no fiber.
+   */
+  handleStreamingDelta(notification: AppServerNotification): void {
+    const params = notification.params;
+    const { threadId, agentId } = this.#noteEvent(params);
+    if (!threadId || !agentId) return;
+    const turnId = getString(params, "turnId");
+    const itemId = getString(params, "itemId");
+    const delta = notification.method === "item/reasoning/summaryPartAdded" ? "\n\n" : getString(params, "delta");
+    if (!turnId || !itemId || delta === null) return;
+    this.#itemTurns.set(itemId, turnId);
+    const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
+    const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
+    let message = snapshot.messages.find((candidate) => candidate.id === itemId);
+    if (!message) {
+      message = newAssistantMessage(itemId, turnId);
+      snapshot.messages.push(message);
+    }
+    // Claude streams its thinking as message deltas on a commentary item, which is not an answer.
+    this.#markProduced(
+      turnId,
+      notification.method === "item/agentMessage/delta" && delta.trim() !== "" && message.itemType !== "commentary",
+      delta.trim() !== "",
+    );
+    // A delta can come before its `item/started`, so it can start the step.
+    this.#traces.observe(
+      turnId,
+      itemId,
+      notification.method.startsWith("item/reasoning/") || message.itemType === "commentary" ? "reasoning" : "message",
+      { completed: false },
+    );
+    if (notification.method.startsWith("item/reasoning/")) {
+      if (message.itemType !== "commentary") {
+        message.itemType = "commentary";
+        this.#conversation.emitConversation(snapshot);
+      }
+      if (notification.method === "item/reasoning/summaryPartAdded" && !message.text) return;
+    }
+    message.text += delta;
+    message.status = "streaming";
+    this.#deltas.buffer({
+      agentId,
+      externalThreadId: threadId,
+      publicThreadId,
+      turnId,
+      messageId: itemId,
+      text: delta,
+      createdAt: message.createdAt,
+    });
+  }
+
+  readonly handleNotification = Effect.fn("TurnLifecycle.handleNotification")(function* (
+    this: TurnLifecycle,
+    notification: AppServerNotification,
+    source: AgentClient,
+  ) {
+    if (isStreamingDelta(notification.method)) {
+      this.handleStreamingDelta(notification);
+      return;
+    }
+    const params = notification.params;
+    const { threadId, agentId } = this.#noteEvent(params);
 
     if (
       threadId &&
@@ -1215,7 +1291,7 @@ export class TurnLifecycle {
         }
         this.#hooks.emit({ type: "turn-started", agentId, threadId: publicThreadId, turnId, origin });
         this.#conversation.emitConversation(snapshot, "turn.started", { turnId });
-        const workspace = this.#store.list().find((entry) => entry.id === agentId)?.workspacePath;
+        const workspace = this.#store.get(agentId)?.workspacePath;
         if (workspace) yield* this.#instructions.startTurn(agentId, turnId, workspace);
         return;
       }
@@ -1300,58 +1376,6 @@ export class TurnLifecycle {
         const threadItem = toThreadItem(item);
         if (!threadItem) return;
         yield* this.#applyItem(agentId, threadId, turnId, threadItem, notification.method === "item/completed");
-        return;
-      }
-      case "item/reasoning/summaryTextDelta":
-      case "item/reasoning/textDelta":
-      case "item/reasoning/summaryPartAdded":
-      case "item/agentMessage/delta": {
-        if (!threadId || !agentId) return;
-        const turnId = getString(params, "turnId");
-        const itemId = getString(params, "itemId");
-        const delta = notification.method === "item/reasoning/summaryPartAdded" ? "\n\n" : getString(params, "delta");
-        if (!turnId || !itemId || delta === null) return;
-        this.#itemTurns.set(itemId, turnId);
-        const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
-        const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
-        let message = snapshot.messages.find((candidate) => candidate.id === itemId);
-        if (!message) {
-          message = newAssistantMessage(itemId, turnId);
-          snapshot.messages.push(message);
-        }
-        // Claude streams its thinking as message deltas on a commentary item, which is not an answer.
-        this.#markProduced(
-          turnId,
-          notification.method === "item/agentMessage/delta" && delta.trim() !== "" && message.itemType !== "commentary",
-          delta.trim() !== "",
-        );
-        // A delta can come before its `item/started`, so it can start the step.
-        this.#traces.observe(
-          turnId,
-          itemId,
-          notification.method.startsWith("item/reasoning/") || message.itemType === "commentary"
-            ? "reasoning"
-            : "message",
-          { completed: false },
-        );
-        if (notification.method.startsWith("item/reasoning/")) {
-          if (message.itemType !== "commentary") {
-            message.itemType = "commentary";
-            this.#conversation.emitConversation(snapshot);
-          }
-          if (notification.method === "item/reasoning/summaryPartAdded" && !message.text) return;
-        }
-        message.text += delta;
-        message.status = "streaming";
-        this.#deltas.buffer({
-          agentId,
-          externalThreadId: threadId,
-          publicThreadId,
-          turnId,
-          messageId: itemId,
-          text: delta,
-          createdAt: message.createdAt,
-        });
         return;
       }
       case PLAN_UPDATED_METHOD: {
@@ -2007,7 +2031,7 @@ export class TurnLifecycle {
       const association = this.#turnAssociations.get(turnId);
       if (association) yield* Deferred.await(association).pipe(Effect.catch(() => Effect.void));
       const memoryChanges = this.#memories.finishTurn(turnId, status).get(agentId) ?? [];
-      const workspace = this.#store.list().find((entry) => entry.id === agentId)?.workspacePath;
+      const workspace = this.#store.get(agentId)?.workspacePath;
       const instructionsChange = yield* this.#instructions.finishTurn(agentId, turnId, workspace);
       // A refused session is closed below, and a spent plan would refuse the summary turn too, so
       // neither is compacted.
@@ -2809,7 +2833,7 @@ export class TurnLifecycle {
       .answerFailedRequest(
         deliveryId,
         (taskId) => this.#hooks.taskOpen(taskId),
-        (id) => this.#store.list().some((agent) => agent.id === id),
+        (id) => this.#store.has(id),
       )
       .pipe(
         Effect.match({
@@ -2838,7 +2862,7 @@ export class TurnLifecycle {
     const originAgentId = this.#mailbox.chainOriginAgentId(messageId);
     const recipientAgentId = delivery.sender.agentId;
     // The user deleted the agent that asked. A result for it would make the agent again (#6106).
-    if (!this.#store.list().some((agent) => agent.id === recipientAgentId)) return false;
+    if (!this.#store.has(recipientAgentId)) return false;
     // The requests of this sender that the turn read. A reply to one of them answers only that one.
     const requestIds = new Set(
       turnDeliveries
@@ -2911,7 +2935,7 @@ export class TurnLifecycle {
 
   /** The agent and provider session that own the usage of a provider thread. */
   #usageSession(agentId: string, threadId: string, source: AgentClient) {
-    const agent = this.#store.list().find((entry) => entry.id === agentId);
+    const agent = this.#store.get(agentId);
     if (!agent) return undefined;
     // A task or other side thread keeps its provider sessions under its own thread, not the agent's.
     // A routine run's own session is not saved, so its usage has its own session id.

@@ -372,6 +372,7 @@ function stringArraysEqual(left: string[], right: string[]): boolean {
 }
 
 export function agentMessagesEqual(left: AgentMessage, right: AgentMessage): boolean {
+  if (left === right) return true;
   return (
     left.id === right.id &&
     left.turnId === right.turnId &&
@@ -389,26 +390,86 @@ export function agentMessagesEqual(left: AgentMessage, right: AgentMessage): boo
     left.replyToMessageId === right.replyToMessageId &&
     left.steered === right.steered &&
     left.reaction === right.reaction &&
-    JSON.stringify(left.reactions) === JSON.stringify(right.reactions) &&
-    JSON.stringify(left.reactionSummary) === JSON.stringify(right.reactionSummary) &&
-    JSON.stringify(left.attachments) === JSON.stringify(right.attachments) &&
-    JSON.stringify(left.questionPrompt) === JSON.stringify(right.questionPrompt) &&
-    JSON.stringify(left.exchange) === JSON.stringify(right.exchange) &&
-    JSON.stringify(left.routine) === JSON.stringify(right.routine) &&
-    JSON.stringify(left.actionMarker) === JSON.stringify(right.actionMarker) &&
-    JSON.stringify(left.items) === JSON.stringify(right.items) &&
-    JSON.stringify(left.itemIds) === JSON.stringify(right.itemIds) &&
-    JSON.stringify(left.itemStreaming) === JSON.stringify(right.itemStreaming) &&
-    JSON.stringify(left.itemCreatedAt) === JSON.stringify(right.itemCreatedAt) &&
-    JSON.stringify(left.plan) === JSON.stringify(right.plan) &&
-    JSON.stringify(left.subagents) === JSON.stringify(right.subagents) &&
-    JSON.stringify(left.voiceRecording) === JSON.stringify(right.voiceRecording) &&
-    JSON.stringify(left.imageGeneration) === JSON.stringify(right.imageGeneration) &&
-    JSON.stringify(left.videoGeneration) === JSON.stringify(right.videoGeneration) &&
-    JSON.stringify(left.uiBlock) === JSON.stringify(right.uiBlock) &&
-    JSON.stringify(left.memoryChanges) === JSON.stringify(right.memoryChanges) &&
-    JSON.stringify(left.trace) === JSON.stringify(right.trace)
+    sameJson(left.reactions, right.reactions) &&
+    sameJson(left.reactionSummary, right.reactionSummary) &&
+    sameJson(left.attachments, right.attachments) &&
+    sameJson(left.questionPrompt, right.questionPrompt) &&
+    sameJson(left.exchange, right.exchange) &&
+    sameJson(left.routine, right.routine) &&
+    sameJson(left.actionMarker, right.actionMarker) &&
+    sameJson(left.items, right.items) &&
+    sameJson(left.itemIds, right.itemIds) &&
+    sameJson(left.itemStreaming, right.itemStreaming) &&
+    sameJson(left.itemCreatedAt, right.itemCreatedAt) &&
+    sameJson(left.plan, right.plan) &&
+    sameJson(left.subagents, right.subagents) &&
+    sameJson(left.voiceRecording, right.voiceRecording) &&
+    sameJson(left.imageGeneration, right.imageGeneration) &&
+    sameJson(left.videoGeneration, right.videoGeneration) &&
+    sameJson(left.uiBlock, right.uiBlock) &&
+    sameJson(left.memoryChanges, right.memoryChanges) &&
+    sameJson(left.trace, right.trace)
   );
+}
+
+/**
+ * Whether `JSON.stringify` gives the same text for both values, without the text: a chat of many
+ * agents compares its messages on each change. A value with its own JSON form, such as a `Date`,
+ * compares through `JSON.stringify`.
+ */
+function sameJson(left: unknown, right: unknown): boolean {
+  if (left === right) return true;
+  if (hasOwnJson(left) || hasOwnJson(right)) return JSON.stringify(left) === JSON.stringify(right);
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right)) return false;
+    if (left.some(hasOwnJson) || right.some(hasOwnJson)) return JSON.stringify(left) === JSON.stringify(right);
+    return left.length === right.length && left.every((item, index) => sameJsonArrayItem(item, right[index]));
+  }
+  if (isJsonObject(left) || isJsonObject(right)) {
+    if (!isJsonObject(left) || !isJsonObject(right)) return false;
+    const leftEntries = Object.entries(left).filter(([, value]) => !leftOutOfJson(value));
+    const rightEntries = Object.entries(right).filter(([, value]) => !leftOutOfJson(value));
+    const ownJson = ([, value]: [string, unknown]) => hasOwnJson(value);
+    if (leftEntries.some(ownJson) || rightEntries.some(ownJson)) return JSON.stringify(left) === JSON.stringify(right);
+    return (
+      leftEntries.length === rightEntries.length &&
+      leftEntries.every(([key, value], index) => {
+        const other = rightEntries[index];
+        return other !== undefined && other[0] === key && sameJson(value, other[1]);
+      })
+    );
+  }
+  return jsonScalar(left) === jsonScalar(right);
+}
+
+/** A value that is not a plain object, array or primitive, or that has a `toJSON`. */
+function hasOwnJson(value: unknown): boolean {
+  if (typeof value === "bigint") return true;
+  if (typeof value !== "object" || value === null) return false;
+  if ("toJSON" in value) return true;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype !== Object.prototype && prototype !== Array.prototype && prototype !== null;
+}
+
+function isJsonObject(value: unknown): value is object {
+  return typeof value === "object" && value !== null;
+}
+
+/** `JSON.stringify` leaves these out of an object and writes `null` for them in an array. */
+function leftOutOfJson(value: unknown): boolean {
+  return typeof value === "undefined" || typeof value === "function" || typeof value === "symbol";
+}
+
+/** `sameJson` for two array items, which `JSON.stringify` writes as `null` when it leaves them out of an object. */
+function sameJsonArrayItem(left: unknown, right: unknown): boolean {
+  return sameJson(leftOutOfJson(left) ? null : left, leftOutOfJson(right) ? null : right);
+}
+
+/** The value of a primitive as JSON has it: `null` for a number that is not finite, `undefined` when left out. */
+function jsonScalar(value: unknown): string | number | boolean | null | undefined {
+  if (typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  return value === null ? null : undefined;
 }
 
 function chatActionMarker(
@@ -583,7 +644,9 @@ export function retainThinkingMessages(
   return result;
 }
 
+/** `values` without the agent's entry. The same object when it has none, so its readers do not run again. */
 export function withoutAgent<T>(values: Record<string, T>, agentId: string): Record<string, T> {
+  if (!Object.hasOwn(values, agentId)) return values;
   const next = { ...values };
   delete next[agentId];
   return next;
