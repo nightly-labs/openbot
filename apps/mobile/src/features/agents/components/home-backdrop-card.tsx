@@ -3,7 +3,7 @@ import { View } from "react-native";
 import { useChatBackdropBase } from "@/features/chat/components/chat-backdrop-layer";
 
 /** The corner radius of the list card. */
-export const HOME_CARD_RADIUS = 28;
+const HOME_CARD_RADIUS = 28;
 
 /**
  * Whether Home shows its list as a card over the backdrop. With no backdrop, the header and the list
