@@ -286,7 +286,7 @@ function customProviderEntries(
  * Mistral's API failed with HTTP 422 `extra_forbidden` after its first tool call (#10094). The
  * `provider` format cannot turn this off: OpenCode reads `compatibility` only from `providers`.
  */
-function isMistralApi(baseUrl: string): boolean {
+export function isMistralApi(baseUrl: string): boolean {
   const url = URL.parse(baseUrl);
   return url?.protocol === "https:" && (url.hostname === "mistral.ai" || url.hostname.endsWith(".mistral.ai"));
 }
