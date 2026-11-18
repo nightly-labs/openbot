@@ -2195,12 +2195,19 @@ function releaseDownloadResponse(response: Response): Effect.Effect<void> {
   }).pipe(Effect.catch(() => Effect.void));
 }
 
-/** Fails a download step that gets no answer for `DOWNLOAD_STALL_MS`. Its interruption aborts the request. */
-const failWhenStalled = Effect.timeoutOrElse({
-  duration: DOWNLOAD_STALL_MS,
-  orElse: () =>
-    Effect.fail(new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.downloadStalled")) })),
-});
+/**
+ * Fails a download step that gets no answer for `DOWNLOAD_STALL_MS`. Its interruption aborts the request.
+ * The step is interruptible also where it runs as the acquire step of `acquireRelease`.
+ */
+const failWhenStalled = <A>(step: Effect.Effect<A, ProviderRuntimeFailure>): Effect.Effect<A, ProviderRuntimeFailure> =>
+  step.pipe(
+    Effect.interruptible,
+    Effect.timeoutOrElse({
+      duration: DOWNLOAD_STALL_MS,
+      orElse: () =>
+        Effect.fail(new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.downloadStalled")) })),
+    }),
+  );
 
 const streamResponse = Effect.fn("ProviderRuntime.streamResponse")(function* (
   response: Response,
