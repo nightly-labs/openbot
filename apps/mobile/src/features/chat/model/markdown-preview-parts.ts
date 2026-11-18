@@ -57,54 +57,101 @@ export interface MarkdownPreviewSeries {
   parts: MarkdownPreviewPart[];
   /** The offset of the next part in the file, or null at the end of the file. */
   next: number | null;
-  /** The reference link definitions found so far, which each later row also gets. */
-  definitions: string;
+  /** The reference link definitions found so far, by label, for the rows of later parts. */
+  definitions: Readonly<Record<string, string>>;
+}
+
+/** A fence that opens or closes a fenced code block, such as ```` ``` ```` or `~~~`. */
+const FENCE = /^ {0,3}(`{3,}|~{3,})/u;
+
+/**
+ * The end of the part of `source` from `start`: after a blank line outside a fenced code block, at
+ * about `PREVIEW_PART_CHARACTERS`, so a block is never cut. A code block longer than one part makes
+ * the part longer. The cut comes from the text, not from the lengths of the parsed blocks: the
+ * parser does not keep each character of the text in its blocks.
+ */
+function partEnd(source: string, start: number): number {
+  const limit = start + PREVIEW_PART_CHARACTERS;
+  if (source.length <= limit) return source.length;
+  let fence: string | null = null;
+  let cut = -1;
+  let index = start;
+  while (index < source.length) {
+    const newline = source.indexOf("\n", index);
+    const end = newline === -1 ? source.length : newline + 1;
+    const line = source.slice(index, end);
+    const marker = FENCE.exec(line)?.[1];
+    if (fence) {
+      if (marker && marker[0] === fence[0] && marker.length >= fence.length && line.trim() === marker) fence = null;
+    } else if (marker) fence = marker;
+    else if (!line.trim() && index > start) {
+      if (end <= limit || cut === -1) cut = end;
+      if (end > limit) break;
+    }
+    index = end;
+  }
+  return cut === -1 ? source.length : cut;
 }
 
 /**
  * The rows of the part of a Markdown file from `start`, about `PREVIEW_PART_CHARACTERS` long, so a
- * long file shows in parts as the reader scrolls. A part ends after a whole block: the last block of
- * the cut text can go on past the cut, so it starts the next part. A block longer than one part
- * makes the part longer. `source` has `\n` line ends, as the parser counts them.
+ * long file shows in parts as the reader scrolls. A part ends at a blank line between blocks. A part
+ * with no rows, such as one of only link definitions, reads on, so each call that is not at the end
+ * of the file gives rows. `source` has `\n` line ends.
  *
  * Blocks of Markdown join into rows of a few thousand characters. A code block of more than 25
- * lines, or of more characters than one piece, is a row of its own that scrolls inside. The
- * definitions of reference links go with each row, so a link in a row opens.
+ * lines, or of more characters than one piece, is a row of its own that scrolls inside. A row gets
+ * the definitions of the reference links that it uses, so its links open.
  */
-export function markdownPreviewSeries(source: string, start = 0, known = ""): MarkdownPreviewSeries {
-  let length = PREVIEW_PART_CHARACTERS;
+export function markdownPreviewSeries(
+  source: string,
+  start = 0,
+  known: Readonly<Record<string, string>> = {},
+): MarkdownPreviewSeries {
+  let from = start;
+  let definitions = known;
   for (;;) {
-    const end = Math.min(source.length, start + length);
-    const tokens = parseChatMarkdownDocument(source.slice(start, end));
-    const last = end === source.length;
-    const blocks = last ? tokens : tokens.slice(0, -1);
-    const read = blocks.reduce((total, token) => total + token.raw.length, 0);
-    if (!last && read === 0) {
-      length *= 2;
-      continue;
-    }
-    const found = Object.entries(tokens.links)
-      .map(
-        ([label, link]) => `[${label}]: <${link.href}>${link.title ? ` "${link.title.replaceAll('"', '\\"')}"` : ""}`,
-      )
-      .join("\n");
-    const definitions = [known, found].filter(Boolean).join("\n");
-    return { parts: previewRows(blocks, start, definitions), next: last ? null : start + read, definitions };
+    const end = partEnd(source, from);
+    const tokens = parseChatMarkdownDocument(source.slice(from, end));
+    const found = Object.entries(tokens.links).map(([label, link]) => [
+      label,
+      `[${label}]: <${link.href}>${link.title ? ` "${link.title.replaceAll('"', '\\"')}"` : ""}`,
+    ]);
+    definitions = { ...definitions, ...Object.fromEntries(found) };
+    const parts = previewRows(tokens, from, definitions);
+    const next = end === source.length ? null : end;
+    if (parts.length || next === null) return { parts, next, definitions };
+    from = next;
   }
 }
 
-function previewRows(tokens: Token[], from: number, definitions: string): MarkdownPreviewPart[] {
+/** The definitions of the reference links that a row of Markdown uses, such as `[text][label]`. */
+function usedDefinitions(markdown: string, definitions: Readonly<Record<string, string>>): string {
+  const labels = Object.keys(definitions);
+  if (!labels.length) return "";
+  const text = markdown.toLowerCase();
+  return labels
+    .filter((label) => text.includes(`[${label}]`))
+    .map((label) => definitions[label])
+    .join("\n");
+}
+
+function previewRows(
+  tokens: Token[],
+  from: number,
+  definitions: Readonly<Record<string, string>>,
+): MarkdownPreviewPart[] {
   const parts: MarkdownPreviewPart[] = [];
   let markdown = "";
-  let offset = from;
-  let start = from;
   const flush = () => {
-    if (markdown.trim())
+    if (markdown.trim()) {
+      const used = usedDefinitions(markdown, definitions);
       parts.push({
         kind: "markdown",
-        key: `markdown-${start}`,
-        source: definitions ? `${markdown}\n\n${definitions}` : markdown,
+        key: `${from}-${parts.length}`,
+        source: used ? `${markdown}\n\n${used}` : markdown,
       });
+    }
     markdown = "";
   };
   for (const token of tokens) {
@@ -113,17 +160,15 @@ function previewRows(tokens: Token[], from: number, definitions: string): Markdo
       const text: string = token.text;
       parts.push({
         kind: "code",
-        key: `code-${offset}`,
+        key: `${from}-${parts.length}`,
         text,
         language: typeof token.lang === "string" && token.lang ? token.lang : undefined,
         pieces: codePieces(text),
       });
     } else {
-      if (!markdown) start = offset;
       markdown += token.raw;
       if (markdown.length >= MARKDOWN_PART_CHARACTERS) flush();
     }
-    offset += token.raw.length;
   }
   flush();
   return parts;

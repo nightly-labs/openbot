@@ -130,7 +130,8 @@ export function messageLinkFilePath(href: string): string {
  */
 export function messageChipFileNames(body: string, agentId: string | undefined): Set<string> {
   const names = new Set<string>();
-  if (!body.includes("`") && !body.includes("](")) return names;
+  // A chip comes from a code span, a link or an autolink. A message with none of them has no chip.
+  if (!body.includes("`") && !body.includes("[") && !body.includes("<")) return names;
   const directory = messageFileDirectory(body);
   walkChatMarkdown(parseFinishedChatMarkdown(body), (token) => {
     const file =

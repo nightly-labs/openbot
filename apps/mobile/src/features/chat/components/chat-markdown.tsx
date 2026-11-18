@@ -274,22 +274,33 @@ function CodeFileReference({
 /**
  * A Markdown link to a file, such as `[report](/Users/me/report.md)`. It is the same chip as a code
  * span that names a file, with the link text, as the desktop link chip is. Outside a chat message, or
- * when the message cannot name the file, it is the link text.
+ * when the message cannot name the file, it is the link text with its formatting.
  */
 function LinkFileReference({
   href,
-  label,
+  token,
   presentation,
   inRow = false,
 }: {
   href: string;
-  label: string;
+  token: Tokens.Link;
   presentation: TextPresentation;
   /** The chip is an item of a wrapping row, not a view inside text. */
   inRow?: boolean;
 }) {
   const open = useOpenMessageFile()?.link(href) ?? null;
-  if (!open) return label;
+  if (!open) {
+    const text = inline(token.tokens, { ...presentation, agents: [] });
+    // An item of a row is no text, so its words need a text of their own.
+    return inRow ? (
+      <Text selectable={presentation.selectable} style={[CHAT_TEXT_STYLES[presentation.type], presentation.style]}>
+        {text}
+      </Text>
+    ) : (
+      text
+    );
+  }
+  const label = markdownInlinePlainText(token.text) || token.href;
   return (
     <FileReference
       name={fileReferenceName(messageLinkFilePath(href))}
@@ -654,14 +665,7 @@ function inline(tokens: Token[], parentPresentation: TextPresentation): ReactNod
         : inline(token.tokens, { ...presentation, agents: [] });
       if (!url) {
         if (isFileLink(token))
-          return (
-            <LinkFileReference
-              key={offset}
-              href={token.href}
-              label={fileLinkLabel(token)}
-              presentation={presentation}
-            />
-          );
+          return <LinkFileReference key={offset} href={token.href} token={token} presentation={presentation} />;
         return <Fragment key={offset}>{label}</Fragment>;
       }
       const open = () => openMessageLink(url);
@@ -692,10 +696,6 @@ function inline(tokens: Token[], parentPresentation: TextPresentation): ReactNod
 /** A Markdown link to a file path, which the message draws as a file chip. */
 function isFileLink(token: Token): token is Tokens.Link {
   return tokenIs(token, "link") && isMessageFileLink(token.href);
-}
-
-function fileLinkLabel(token: Tokens.Link): string {
-  return markdownInlinePlainText(token.text) || token.href;
 }
 
 function ListParagraph({ tokens, presentation }: { tokens: Token[]; presentation: TextPresentation }) {
@@ -743,13 +743,7 @@ function ListParagraph({ tokens, presentation }: { tokens: Token[]; presentation
             }
             if (isFileLink(token)) {
               return (
-                <LinkFileReference
-                  key={offset}
-                  href={token.href}
-                  label={fileLinkLabel(token)}
-                  presentation={presentation}
-                  inRow
-                />
+                <LinkFileReference key={offset} href={token.href} token={token} presentation={presentation} inRow />
               );
             }
             return (
