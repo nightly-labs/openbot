@@ -1662,7 +1662,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     };
     // A profile generation has no tools and no skills, so it needs none of the OpenBot settings.
     const { settings: openBotSettings, firstPartyApi } = config.profileGeneration
-      ? { settings: {}, firstPartyApi: CLAUDE_OTHER_API_VARIABLES.every((name) => !cliEnvironment[name]) }
+      ? {
+          settings: {},
+          // The sign-in settings send the `env` of the user settings to the CLI, also for a profile generation.
+          firstPartyApi: CLAUDE_OTHER_API_VARIABLES.every(
+            (name) => !(signInSettings.env?.[name] ?? cliEnvironment[name]),
+          ),
+        }
       : yield* claudeFlagSettings(userSettingsFile, configDirectory, config.cwd, settingSources, cliEnvironment);
     const flagSettings: Settings = {
       ...openBotSettings,
