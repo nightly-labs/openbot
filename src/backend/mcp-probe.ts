@@ -27,6 +27,7 @@ import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result, Schema } from "effect";
+import { z } from "zod";
 import { causeHelpers } from "./effect-boundary";
 import {
   isLoopback,
@@ -476,8 +477,25 @@ const connectAndCountEffect = Effect.fnUntraced(function* (
   return yield* countOverEffect(timeoutMs, () => {
     const client = new Client(PROBE_CLIENT_INFO, { capabilities: {} });
     const transport = createTransport(server, signIn, onChallenge);
-    return { client, transport, connect: (signal) => client.connect(transport, { signal }) };
+    const lister: ProbeClient = {
+      listTools: (params, options) => client.request({ method: "tools/list", params }, LISTED_TOOLS_PAGE, options),
+      close: () => client.close(),
+    };
+    return { client: lister, transport, connect: (signal) => client.connect(transport, { signal }) };
   });
+});
+
+/**
+ * The part of a `tools/list` page that the probe reads.
+ *
+ * The SDK v1 `listTools` decodes each tool with a schema that refuses a property schema that is not
+ * an object, such as `"data": true`, which JSON Schema permits. One such tool failed the whole test
+ * and the server was not added (#11931). The provider reads the tool schemas itself, so the probe
+ * decodes only the names and the cursor. The SDK v2 client already accepts these schemas.
+ */
+const LISTED_TOOLS_PAGE = z.object({
+  tools: z.array(z.object({ name: z.string() })),
+  nextCursor: z.string().optional(),
 });
 
 /**
