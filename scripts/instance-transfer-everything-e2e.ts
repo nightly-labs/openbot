@@ -632,6 +632,15 @@ try {
     },
   });
 
+  // A workflow that only posts to the channel of the copied agents.
+  source.workflows.create({
+    title: "Channel digest",
+    graph: {
+      nodes: [{ id: "post", kind: "output", at, fields: { target: "chat-channel", channelId: channel.id } }],
+      edges: [],
+      strokes: [],
+    },
+  });
   // A workflow of an agent that the copy leaves out.
   source.workflows.create({
     title: "Archive sweep",
@@ -1109,6 +1118,23 @@ try {
     source.transfer.exportTo(copyFile, { agentIds: [writer.id, editor.id], includeFiles: true, includeSettings: true }),
   );
   const exportedCopy = new Uint8Array(await readFile(copyFile));
+  // This computer's export for a copy does not read the shared skills.
+  const localCopyFile = join(root, "copy-local.zip");
+  const localExport = await runCauseEffect(
+    source.transfer.prepareExport(
+      { agentIds: [writer.id, editor.id], includeFiles: true, includeSettings: true },
+      undefined,
+      undefined,
+      { sharedSkills: false },
+    ),
+  );
+  await runCauseEffect(localExport.write(localCopyFile));
+  pass(
+    "this computer's copy export has no shared skills",
+    !Object.keys(unzipSync(new Uint8Array(await readFile(localCopyFile)))).some((name) =>
+      name.startsWith("library/"),
+    ) && Object.keys(unzipSync(exportedCopy)).some((name) => name.startsWith("library/")),
+  );
   const phoneUpload = copiedTransferUpload({
     name: "copy.zip",
     mimeType: "application/zip",
@@ -1134,9 +1160,9 @@ try {
     sharedSkills?: unknown;
   } = JSON.parse(new TextDecoder().decode(copyEntries[INSTANCE_TRANSFER_MANIFEST]));
   pass(
-    "the copy keeps only the workflows and routine canvas of the copied agents",
-    JSON.stringify(copyManifest.settings?.workflows?.map((workflow) => workflow.title)) ===
-      JSON.stringify(["Paper pipeline"]) &&
+    "the copy keeps only the workflows and routine canvas of the copied agents and their channel",
+    JSON.stringify(copyManifest.settings?.workflows?.map((workflow) => workflow.title).sort()) ===
+      JSON.stringify(["Channel digest", "Paper pipeline"]) &&
       (copyManifest.settings?.routineFlowPositions?.length ?? 0) > 0 &&
       copyManifest.settings?.mcpServers.length === 0 &&
       copyManifest.settings.customProviders.length === 0 &&
@@ -1167,10 +1193,12 @@ try {
       destination.agents.listRoutines(copiedWriter.id).some((item) => item.name === "Morning notes"),
     );
     const copiedWorkflows = destination.workflows.listWithGraphs();
+    const paper = copiedWorkflows.find((item) => item.summary.title === "Paper pipeline");
     pass(
-      `${label} copy: the workflow of the copied agents arrives`,
-      JSON.stringify(copiedWorkflows.map((item) => item.summary.title)) === JSON.stringify(["Paper pipeline"]) &&
-        copiedWorkflows[0]?.graph.nodes.find((item) => item.id === "write")?.fields.agentId === copiedWriter.id,
+      `${label} copy: the workflows of the copied agents and their channel arrive`,
+      JSON.stringify(copiedWorkflows.map((item) => item.summary.title).sort()) ===
+        JSON.stringify(["Channel digest", "Paper pipeline"]) &&
+        paper?.graph.nodes.find((item) => item.id === "write")?.fields.agentId === copiedWriter.id,
       JSON.stringify(copiedWorkflows.map((item) => item.summary.title)),
     );
     pass(

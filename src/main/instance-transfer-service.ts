@@ -430,6 +430,8 @@ export class InstanceTransferService {
     input: ExportInstanceInput,
     limits: ArchiveLimits = ARCHIVE,
     exporter?: string,
+    /** `sharedSkills: false`: Copy to another server leaves the shared skills out, so they are not read. */
+    options: { sharedSkills?: boolean } = {},
   ): Effect.fn.Return<PreparedExport, ArchiveOperationError> {
     const all = this.options.agents.listAgents();
     const selected = input.agentIds.map((id) => all.find((agent) => agent.id === id));
@@ -640,13 +642,14 @@ export class InstanceTransferService {
         });
       }
     }
-    const sharedSkills = input.includeSettings
-      ? yield* this.#exportSharedSkills(
-          agents.map((agent) => agent.id),
-          entries,
-          warnings,
-        )
-      : { skills: [], bytes: 0 };
+    const sharedSkills =
+      input.includeSettings && options.sharedSkills !== false
+        ? yield* this.#exportSharedSkills(
+            agents.map((agent) => agent.id),
+            entries,
+            warnings,
+          )
+        : { skills: [], bytes: 0 };
     bytes += sharedSkills.bytes;
     // Before the limits, so the logo counts.
     const serverIdentity = input.includeServerPreferences ? yield* this.#exportServerIdentity(entries) : {};

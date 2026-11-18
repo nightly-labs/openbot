@@ -617,7 +617,8 @@ export function copiedTransferUpload(upload: RemoteFileUpload): RemoteFileUpload
     const bytes = base64ToBytes(base64.slice(first * 4, Math.ceil((offset + length) / 3) * 4));
     return bytes.subarray(offset - first * 3, offset - first * 3 + length);
   };
-  const copy = copyTransfer({ size: (base64.length / 4) * 3 - padding, read });
+  // Also right for Base64 without padding.
+  const copy = copyTransfer({ size: Math.floor((base64.length * 3) / 4) - padding, read });
   if (!copy) return null;
   const kept = Math.floor(copy.offset / 3);
   const rest = read(kept * 3, copy.offset - kept * 3);

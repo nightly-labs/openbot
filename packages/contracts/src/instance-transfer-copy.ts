@@ -2,8 +2,9 @@
  * Server settings > Transfer > Copy to another server moves agents with an instance transfer file.
  * The client asks the source server for the file with its server settings, then keeps only the
  * settings that belong to the copied agents: the routine flows between them, the places on their
- * routine canvas, and the workflows with a step for one of them. MCP servers, model providers, custom
- * agents, sidebar sections and shared skills stay on the source server.
+ * routine canvas, and the workflows with a step for one of them or an output to one of their channels.
+ * MCP servers, model providers, custom agents, sidebar sections and shared skills stay on the source
+ * server.
  *
  * The client changes the file, not the hosts, so each host in the support window can send and read
  * it. A reader finds each entry through the central directory at the end of the file. The new
@@ -15,12 +16,12 @@
  * file in memory as Base64 and uses `copyTransfer`, which reads only the parts that it needs.
  */
 
-import { inflateSync } from "fflate";
-import { isWorkflowGraph } from "./ipc-workflows";
 import { type DynamicRecord, isDynamicRecord, isString } from "./runtime-values";
 
 /** The manifest at the root of an instance transfer file. */
 export const INSTANCE_TRANSFER_MANIFEST = "openbot-transfer.json";
+/** The largest manifest that the copy reads, as the import (`MANIFEST_MAX_BYTES` in main). */
+const MANIFEST_MAX_BYTES = 64 * 1024 * 1024;
 /** The shared skills of a file (`sharedSkills`). A copy leaves them out. */
 const LIBRARY_PREFIX = "library/";
 
@@ -55,17 +56,23 @@ export function copyManifestBytes(bytes: Uint8Array): Uint8Array | null {
   return new TextEncoder().encode(JSON.stringify(copyManifest(manifest), null, 2));
 }
 
+/** The `key` of each item of a manifest list. */
+function keysOf(items: unknown): ReadonlySet<string> {
+  return new Set(
+    (Array.isArray(items) ? items : []).flatMap((item) =>
+      isDynamicRecord(item) && isString(item.key) ? [item.key] : [],
+    ),
+  );
+}
+
 function copyManifest(manifest: DynamicRecord): DynamicRecord {
   const { sharedSkills: _left, ...rest } = manifest;
   const settings = manifest.settings;
   if (!isDynamicRecord(settings)) return rest;
-  const agentKeys = new Set(
-    (Array.isArray(manifest.agents) ? manifest.agents : []).flatMap((agent) =>
-      isDynamicRecord(agent) && isString(agent.key) ? [agent.key] : [],
-    ),
-  );
+  const agentKeys = keysOf(manifest.agents);
+  const channelKeys = keysOf(manifest.channels);
   const workflows = (Array.isArray(settings.workflows) ? settings.workflows : []).filter((workflow) =>
-    hasAgentStep(workflow, agentKeys),
+    usesCopiedItems(workflow, agentKeys, channelKeys),
   );
   return {
     ...rest,
@@ -83,14 +90,21 @@ function copyManifest(manifest: DynamicRecord): DynamicRecord {
 }
 
 /**
- * A workflow with a step for an agent in the file. The export empties a step whose agent is not in
- * the file, as the import of the file does.
+ * A workflow with a step for an agent in the file, or an output to a channel in the file. The export
+ * empties a step whose agent or channel is not in the file, as the import of the file does. Only the
+ * fields that name them are read: the destination checks the graph, so a node kind that is newer than
+ * this app does not drop the workflow here.
  */
-function hasAgentStep(workflow: unknown, agentKeys: ReadonlySet<string>): boolean {
-  if (!isDynamicRecord(workflow) || !isWorkflowGraph(workflow.graph)) return false;
+function usesCopiedItems(workflow: unknown, agentKeys: ReadonlySet<string>, channelKeys: ReadonlySet<string>): boolean {
+  if (!isDynamicRecord(workflow) || !isDynamicRecord(workflow.graph) || !Array.isArray(workflow.graph.nodes))
+    return false;
   return workflow.graph.nodes.some((node) => {
-    const agentId = node.fields.agentId;
-    return node.kind === "agent" && isString(agentId) && agentKeys.has(agentId);
+    if (!isDynamicRecord(node) || !isDynamicRecord(node.fields)) return false;
+    const { agentId, channelId } = node.fields;
+    return (
+      (node.kind === "agent" && isString(agentId) && agentKeys.has(agentId)) ||
+      (node.kind === "output" && isString(channelId) && channelKeys.has(channelId))
+    );
   });
 }
 
@@ -117,6 +131,7 @@ interface CentralRecord {
   /** The whole record, as the directory has it. */
   record: Uint8Array;
   method: number;
+  crc: number;
   compressedSize: number;
   localHeaderOffset: number;
 }
@@ -136,6 +151,7 @@ function centralRecords(directory: Uint8Array): CentralRecord[] | null {
       name: new TextDecoder().decode(directory.subarray(offset + CENTRAL_BYTES, offset + CENTRAL_BYTES + nameBytes)),
       record: directory.subarray(offset, next),
       method: view.getUint16(offset + 10, true),
+      crc: view.getUint32(offset + 16, true),
       compressedSize: view.getUint32(offset + 20, true),
       localHeaderOffset: view.getUint32(offset + 42, true),
     });
@@ -223,20 +239,16 @@ export function copyTransfer(file: TransferFileReader): { offset: number; tail: 
   if (!directory || !entry || !header || dataView(header).getUint32(0, true) !== LOCAL) return null;
   const start =
     entry.localHeaderOffset + LOCAL_BYTES + dataView(header).getUint16(26, true) + dataView(header).getUint16(28, true);
-  const stored = start + entry.compressedSize <= location.offset ? read(start, entry.compressedSize) : null;
+  const stored =
+    entry.compressedSize <= MANIFEST_MAX_BYTES && start + entry.compressedSize <= location.offset
+      ? read(start, entry.compressedSize)
+      : null;
   if (!stored) return null;
-  const manifest = copyManifestBytes(entry.method === 8 ? inflateIfValid(stored) : stored);
+  // An export writes the manifest stored, not compressed. The CRC shows a damaged manifest.
+  if (entry.method !== 0 || crc32(stored) !== entry.crc) return null;
+  const manifest = copyManifestBytes(stored);
   const tail = manifest && copyTail(directory, location.offset, manifest);
   return tail ? { offset: location.offset, tail } : null;
-}
-
-/** A damaged deflate stream reads as no bytes, which are not a manifest. */
-function inflateIfValid(bytes: Uint8Array): Uint8Array {
-  try {
-    return inflateSync(bytes);
-  } catch {
-    return new Uint8Array();
-  }
 }
 
 function dataView(bytes: Uint8Array): DataView {

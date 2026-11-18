@@ -340,9 +340,12 @@ the channels that have a selected agent as a member and the Shared folder. Each 
 channels again as new channels. Main then keeps only the settings of the copied agents in the file
 (`InstanceTransferService.keepCopiedSettings`, with `@openbot/contracts/instance-transfer-copy`): the
 routine flows between them, the places on their routine canvas, and the workflows with a step for one
-of them. MCP servers, custom providers and agents, sidebar sections and shared skills stay out. It
-writes a new manifest and a new central directory over the old directory, so the other entries are
-not copied; nothing reads the old manifest and the shared skill bytes that stay in the file. Each host
+of them or an output to one of their channels. MCP servers, custom providers and agents, sidebar
+sections and shared skills stay out. It writes a new manifest and a new central directory over the old
+directory, so the other entries are not copied; nothing reads the old manifest that stays in the file.
+This computer's export leaves the shared skills out; a joined source server still puts them in the
+file, and the new directory leaves them out. The manifest must be stored, not compressed, as every
+export writes it. Each host
 in the support window reads the result, so the copy needs no new capability. Main stages the file at
 the destination, applies all of its agents with the settings, and removes the file. Each side uses the routes above, in parts when its host has
 `instance-transfer-chunks-v1`, so a host needs no new route; a destination with only

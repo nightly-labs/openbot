@@ -207,7 +207,9 @@ export function instanceTransferIpcHandlers({
   const exportTo = async (serverId: string, agentIds: string[], path: string): Promise<string[]> => {
     const input: ExportInstanceInput = { agentIds, includeFiles: true, includeSettings: true };
     if (serverId === LOCAL_SERVER_ID) {
-      const prepared = await runCauseEffect(instanceTransfer.prepareExport(input));
+      const prepared = await runCauseEffect(
+        instanceTransfer.prepareExport(input, undefined, undefined, { sharedSkills: false }),
+      );
       return (await runCauseEffect(prepared.write(path))).warnings;
     }
     requireRemote(serverId);
