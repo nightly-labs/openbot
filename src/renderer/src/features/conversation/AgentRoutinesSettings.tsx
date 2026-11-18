@@ -91,7 +91,11 @@ type PendingRoutineExit =
   | "new"
   | { kind: "routine-selection"; routine: RoutineEditorRecord | null; routineName: string }
   | { kind: "conversation-message"; messageId: string; routineId: string | null }
-  | { kind: "routine-thread"; routineId: string };
+  | { kind: "routine-thread"; routineId: string }
+  | { kind: "leave"; leave: () => void };
+
+/** Calls `leave` when the page can go, such as after the user discards an edit. It does not call it on "Keep editing". */
+export type DetailLeaveGuard = (leave: () => void) => void;
 
 interface RoutineDraft {
   id: string | null;
@@ -134,6 +138,8 @@ interface AgentRoutinesSettingsProps {
   onCountChange: (count: number) => void;
   onBack?: (() => void) | undefined;
   onClose?: (() => void) | undefined;
+  /** Gives the parent the guard that a setting card goes through before it moves away from this page. */
+  registerLeaveGuard?: ((guard: DetailLeaveGuard | null) => void) | undefined;
   selectionRequest?: RoutineSelectionRequest | null | undefined;
   onSelectionRequestHandled?: ((nonce: number) => void) | undefined;
   /** `routineId` names the routine of the run, so a run in the routine's side thread opens there. */
@@ -324,6 +330,32 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     },
   );
 
+  // A setting card leaves through Back: the editor closes first, so a card for the routines shows the
+  // list, and the user can keep an edit that is not saved.
+  const [waitingLeave, setWaitingLeave] = createSignal<(() => void) | null>(null);
+  function requestLeave(leave: () => void): void {
+    if (!draft()) {
+      leave();
+      return;
+    }
+    // Back is disabled during a save, so the card waits for the save to end.
+    if (saving()) {
+      setWaitingLeave(() => leave);
+      return;
+    }
+    requestExit({ kind: "leave", leave });
+  }
+  createEffect(
+    () => ({ leave: waitingLeave(), saving: saving() }),
+    ({ leave, saving: isSaving }) => {
+      if (!leave || isSaving) return;
+      setWaitingLeave(null);
+      untrack(() => requestLeave(leave));
+    },
+  );
+  untrack(() => props.registerLeaveGuard?.(requestLeave));
+  onCleanup(() => props.registerLeaveGuard?.(null));
+
   createEffect(
     () => [draft(), routines().length, runs().length, loading(), confirmDelete(), error()] as const,
     () => {
@@ -488,6 +520,11 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     }
     if (target.kind === "routine-thread") {
       void props.onOpenThread?.(target.routineId);
+      return;
+    }
+    if (target.kind === "leave") {
+      closeEditor();
+      target.leave();
       return;
     }
     closeEditor();
