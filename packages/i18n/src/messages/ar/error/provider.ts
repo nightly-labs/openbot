@@ -340,6 +340,8 @@ export const messages = {
     "لم يتمكن Codex من متابعة هذه الدردشة، لأن عنصرًا في سجله المحفوظ مفقود. بدأ OpenBot جلسة Codex جديدة بسجل الدردشة. أعد المحاولة.",
   "error.provider.codexRequestRefused":
     "رفض {provider} طلب هذه الدردشة ولم يذكر السبب. قد يحدث هذا في دردشة طويلة تحتوي على صور كثيرة. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. حاول مرة أخرى.",
+  "error.provider.codexAudioRefused":
+    "لم يقبل النموذج الصوت في هذه الدردشة. بدأ OpenBot جلسة Codex جديدة مع سجل الدردشة. حاول مرة أخرى.",
   "error.provider.imageTooSmall":
     "لم يقبل النموذج صورة في هذه الدردشة لأن الصورة صغيرة جدًا. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. حاول مرة أخرى.",
   "error.provider.imageTooLarge":

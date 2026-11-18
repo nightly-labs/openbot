@@ -370,6 +370,8 @@ export const messages = {
     "O Codex não pôde continuar este chat porque falta um item no histórico salvo. O OpenBot iniciou uma nova sessão do Codex com o histórico do chat. Tente novamente.",
   "error.provider.codexRequestRefused":
     "O {provider} recusou a solicitação deste chat e não informou a causa. Isso pode acontecer em um chat longo com muitas imagens. O OpenBot iniciou uma nova sessão do {provider} com o histórico do chat. Tente novamente.",
+  "error.provider.codexAudioRefused":
+    "O modelo não aceitou o áudio deste chat. O OpenBot iniciou uma nova sessão do Codex com o histórico do chat. Tente novamente.",
   "error.provider.imageTooSmall":
     "O modelo não aceitou uma imagem deste chat porque a imagem é pequena demais. O OpenBot iniciou uma nova sessão do {provider} com o histórico do chat. Tente novamente.",
   "error.provider.imageTooLarge":

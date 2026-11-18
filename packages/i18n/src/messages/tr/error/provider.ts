@@ -372,6 +372,8 @@ export const messages = {
     "Kayıtlı geçmişindeki bir öğe eksik olduğu için Codex bu sohbete devam edemedi. OpenBot sohbet geçmişiyle yeni bir Codex oturumu başlattı. Tekrar deneyin.",
   "error.provider.codexRequestRefused":
     "{provider}, bu sohbetin isteğini reddetti ve nedenini belirtmedi. Bu, çok sayıda görsel içeren uzun bir sohbette olabilir. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
+  "error.provider.codexAudioRefused":
+    "Model bu sohbetteki sesi kabul etmedi. OpenBot, sohbet geçmişiyle yeni bir Codex oturumu başlattı. Tekrar deneyin.",
   "error.provider.imageTooSmall":
     "Görsel çok küçük olduğu için model bu sohbetteki bir görseli kabul etmedi. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
   "error.provider.imageTooLarge":
