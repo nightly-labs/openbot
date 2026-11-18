@@ -133,6 +133,7 @@
     border-radius: var(--openbot-radius-md);
   }
 
+  /* The update button keeps its accent colour on hover (`app-shell.css`). */
   @media (hover: hover) and (pointer: fine) {
     .app-window
       > .window-rail:not([hidden])
@@ -141,6 +142,14 @@
       .sidebar-topbar-actions
       > .sidebar-icon-button:hover:not(:disabled) {
       background: var(--openbot-bg-control-hover);
+    }
+
+    .app-window
+      > .window-rail:not([hidden])
+      ~ .app-frame-edge
+      > .sidebar
+      .sidebar-topbar-actions
+      > .sidebar-icon-button:hover:not(:disabled, .sidebar-update-button) {
       color: var(--openbot-text-primary);
     }
   }
