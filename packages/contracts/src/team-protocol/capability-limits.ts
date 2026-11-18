@@ -13,6 +13,9 @@ export const TEAM_PROTOCOL_CAPABILITY_LIMITS = {
   7: 128,
   8: 128,
   9: 256,
+  // Protocol 10 lists only the capabilities after protocol 9 and the names of absent baseline
+  // capabilities (`v10.ts`). Each list can have 256 names, so many releases fit before a new limit.
+  10: 256,
 } as const;
 
 /**

@@ -57,6 +57,7 @@ import {
   encodeTeamProtocolV8CurrentHttpResponse,
 } from "./v8-adapter";
 import { decodeTeamProtocolSupportV9, TEAM_PROTOCOL_V9 } from "./v9";
+import { decodeTeamProtocolSupportV10, TEAM_PROTOCOL_V10 } from "./v10";
 
 export interface TeamHttpCodecOptions {
   preserveSemanticTags?: boolean;
@@ -173,6 +174,22 @@ const V9_CODEC: TeamHttpCodec = {
       : V8_CODEC.decodeResponse(method, path, status, value),
 };
 
+/**
+ * Protocol 10: the protocol 9 routes and bodies. Only its compatibility response is new: it has the
+ * `absent` list (`v10.ts`).
+ */
+const V10_CODEC: TeamHttpCodec = {
+  ...V9_CODEC,
+  encodeResponse: (method, path, status, value, options) =>
+    isCompatibilityRead(method, path, status)
+      ? JSON.stringify(decodeTeamProtocolSupportV10(value))
+      : V9_CODEC.encodeResponse(method, path, status, value, options),
+  decodeResponse: (method, path, status, value) =>
+    isCompatibilityRead(method, path, status)
+      ? { ...decodeTeamProtocolSupportV10(value) }
+      : V9_CODEC.decodeResponse(method, path, status, value),
+};
+
 function isCompatibilityRead(method: string, path: string, status: number): boolean {
   return (
     method === "GET" &&
@@ -190,6 +207,7 @@ const V6_CODEC: TeamHttpCodec = {
 
 /** The HTTP adapter of a negotiated protocol. No protocol, or one older than V3, gets V1. */
 export function teamHttpCodec(protocol: number | undefined): TeamHttpCodec {
+  if (protocol === TEAM_PROTOCOL_V10) return V10_CODEC;
   if (protocol === TEAM_PROTOCOL_V9) return V9_CODEC;
   if (protocol === TEAM_PROTOCOL_V8) return V8_CODEC;
   if (protocol === TEAM_PROTOCOL_V7) return V7_CODEC;

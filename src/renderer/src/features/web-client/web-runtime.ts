@@ -165,7 +165,7 @@ import {
   CONVERSATION_UNREAD_FROM_CAPABILITY,
   CONVERSATION_UNREAD_FROM_ROUTE,
 } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
-import { TEAM_BROWSER_NAVIGATION_CAPABILITY, teamWebRtcClientProtocol } from "@openbot/contracts/team-protocol/current";
+import { TEAM_BROWSER_NAVIGATION_CAPABILITY, TEAM_WEB_CLIENT_PROTOCOL } from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import {
@@ -207,7 +207,6 @@ import {
 import { USAGE_CREDITS_CAPABILITY, USAGE_CREDITS_ROUTES } from "@openbot/contracts/team-protocol/usage-credits-v1";
 import type { TeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V2_MAX_FILE_BYTES, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
-import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
 import {
   WORKSPACE_DIRECTORY_CAPABILITY,
   WORKSPACE_DIRECTORY_ROUTES,
@@ -273,6 +272,7 @@ import { toast } from "@openbot/ui/toast";
 import { referenceFrom } from "@openbot/user-errors";
 import { Effect } from "effect";
 import type { ServerAdminPort } from "../servers/servers-port";
+import { readWebHostCompatibility } from "./web-host-compatibility";
 import {
   createWebHostConnections,
   type WebHostConnections,
@@ -707,7 +707,14 @@ export function createWebWorkspaceRuntime(
   };
   function createOpenedPeer() {
     const actions = { current: openedActions };
-    return { peer: dependencies.createPeer(actions, { waitForHost: true, hostProtocols }), actions };
+    return {
+      peer: dependencies.createPeer(actions, {
+        waitForHost: true,
+        hostProtocols,
+        clientProtocol: TEAM_WEB_CLIENT_PROTOCOL,
+      }),
+      actions,
+    };
   }
   // Each host switch replaces the peer, so the old host's session can end while the new host connects.
   let { peer, actions: peerActions } = createOpenedPeer();
@@ -738,7 +745,7 @@ export function createWebWorkspaceRuntime(
         channel: hostChannel,
         actions: sessionActions,
         createPeer: dependencies.createPeer,
-        peerOptions: { hostProtocols },
+        peerOptions: { hostProtocols, clientProtocol: TEAM_WEB_CLIENT_PROTOCOL },
         acquireHostLock: dependencies.acquireHostLock,
         pinHostKey: (host) => pinWebHostKey(accountId, host),
         onState: (hostId, state) => events.hostState?.(hostId, state),
@@ -1221,8 +1228,9 @@ export function createWebWorkspaceRuntime(
         );
       const knownProtocol = savedHostProtocol(accountId, host.hostId);
       if (knownProtocol !== undefined) early?.start();
-      const support = decodeTeamProtocolSupportV9(await request("GET", TEAM_API_ROUTES.compatibility));
-      const negotiated = teamWebRtcClientProtocol(support.protocol);
+      const { support, negotiated } = await readWebHostCompatibility(() =>
+        request("GET", TEAM_API_ROUTES.compatibility),
+      );
       if (knownProtocol !== undefined && negotiated.protocol !== knownProtocol) early?.drop();
       if (negotiated.update) throw new WebHostIncompatibleError(support, negotiated.update);
       capabilities = support.capabilities;
