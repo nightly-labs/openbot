@@ -10,6 +10,7 @@
 import { createContext, createEffect, createSignal, onCleanup, useContext } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
 import { createSidebarDragEngine } from "./createSidebarDragEngine";
+import { SIDEBAR_NO_LIST_FILTER } from "./sidebar-list-filter";
 import { type SidebarProps, sidebarChatOrderSortsSections } from "./sidebar-types";
 import { createSidebarAnnouncementStore } from "./stores/announcement-store";
 import { createSidebarDataStore } from "./stores/data-store";
@@ -89,10 +90,18 @@ export function createSidebarScope(props: SidebarProps) {
     saveSectionEditor,
     sectionDeleteTarget,
     setSectionNameInput,
-    startCreateSection,
+    startCreateSection: startCreateSectionEditor,
     startRenameSection,
     updateSectionEditorName,
   } = createSidebarPendingStore({ customSectionById, props });
+  /**
+   * A new folder has no chats, so a filter hides it and its name editor. Thus a new folder clears the
+   * filter first.
+   */
+  const startCreateSection = (agentId?: string, parentId?: string) => {
+    setListFilter(SIDEBAR_NO_LIST_FILTER);
+    startCreateSectionEditor(agentId, parentId);
+  };
   let agentList: HTMLElement | undefined;
   const foldersSupported = () => props.foldersSupported === true && layoutMutable();
   const dragFolders = () =>

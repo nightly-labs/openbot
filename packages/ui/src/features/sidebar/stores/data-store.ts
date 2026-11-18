@@ -63,7 +63,19 @@ export function createSidebarDataStore(deps: {
   const channels = () => props.channels ?? [];
   const channelById = createMemo(() => new Map(channels().map((channel) => [channel.id, channel])));
   /** The filter of the list. It is a view only: it does not change the layout or any saved value. */
-  const [listFilter, setListFilter] = createSignal<SidebarListFilter>(SIDEBAR_NO_LIST_FILTER);
+  const [chosenListFilter, setListFilter] = createSignal<SidebarListFilter>(SIDEBAR_NO_LIST_FILTER);
+  /**
+   * The filter without the folders that the layout no longer has: a folder that is deleted here or on
+   * another client, or a server with other folders. Without this, the list stays empty.
+   */
+  const listFilter = createMemo((): SidebarListFilter => {
+    const filter = chosenListFilter();
+    if (filter.folders.length === 0) return filter;
+    const known = new Set(props.layout.sections.map((section) => section.id));
+    const folders =
+      known.size === 0 ? [] : filter.folders.filter((id) => id === SIDEBAR_UNASSIGNED_SECTION_ID || known.has(id));
+    return folders.length === filter.folders.length ? filter : { ...filter, folders };
+  });
   const listFiltered = createMemo(() => sidebarListFilterIsSet(listFilter()));
   let pinnedItemCache = new Map<string, { source: PinnedItemSource; item: ResolvedPinnedItem }>();
   /** Both kinds of pinned chat, resolved against the chats the sidebar has: a pin that names none is
@@ -154,8 +166,8 @@ export function createSidebarDataStore(deps: {
             id: agent.id,
             kind: "agent",
             folder: sectionOf(agent.id),
-            unread: props.agentStates[agent.id]?.kind === "unread" || (props.unreadAgentIds?.has(agent.id) ?? false),
-            working: props.agentStates[agent.id]?.kind === "working",
+            unread: chatIsUnread(agent.id),
+            working: agentWorks(agent.id),
           }),
         ),
         ...channels().map(
@@ -163,7 +175,7 @@ export function createSidebarDataStore(deps: {
             id: channel.id,
             kind: "channel",
             folder: sectionOf(channel.id),
-            unread: (channel.unreadCount ?? 0) > 0,
+            unread: chatIsUnread(channel.id),
             working: false,
           }),
         ),
@@ -171,6 +183,11 @@ export function createSidebarDataStore(deps: {
     },
     { lazy: true },
   );
+  /** An agent that does a turn, or a routine that runs now. */
+  const agentWorks = (agentId: string) => {
+    const state = props.agentStates[agentId];
+    return state?.kind === "working" || (state?.kind === "routine" && state.phase === "running");
+  };
   /**
    * The chats that the filter shows. The open chat stays while the pointer is over the list, so a
    * chat that the user reads under "Unread" does not go away under the pointer. A new filter drops it.
