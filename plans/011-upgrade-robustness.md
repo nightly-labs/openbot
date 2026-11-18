@@ -297,4 +297,21 @@ macOS Host Manager. Each claim below was checked in the code.
 | 19 | Mailbox unit of work | TODO |
 | 20 | Tables that can be rebuilt move to a separate database | TODO |
 | 21 | Effect Schema for new codecs | TODO |
-| 22 | Split `scripts/team-api-routes-e2e.ts` | TODO |
+| 22 | Split `scripts/team-api-routes-e2e.ts` | NOT DONE: audit of 2026-11-18 (see below); new route areas go in their own script |
+
+### 22. Routes E2E split (not done)
+
+Measured on 2026-11-18 (`main` at `641fc1e429`):
+
+- **No CI gain.** The file has 14,263 lines, but the `Team API routes E2E` job takes 39 s (with
+  the CRM and comparator scripts), and `Check` takes about 4 min. The job is not on the critical path.
+- **The size causes no merge conflicts.** 104 commits changed the file in 30 days. Of the 6 open PRs
+  that change it, `git merge-tree` with `origin/main` finds a conflict in it for 1 PR only (#8198,
+  which also has conflicts in many other files). A split moves each line, so all 6 PRs would get a conflict.
+- **The checks are one sequence.** Lines 2336-14252 are one `try` block on one server, and later
+  checks read stand-in state that earlier checks wrote. Separate scripts would each need the 2,300
+  lines of stand-ins, or a shared context module that only moves the code.
+
+Do instead: give a new route area its own script, as `scripts/crm-team-api-e2e.ts` does for `crm-v1`.
+Open this item again when the job time is on the critical path, or when conflicts in the file are
+frequent.
