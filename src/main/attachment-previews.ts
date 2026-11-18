@@ -38,7 +38,7 @@ export type MakeAttachmentPreview = (
 ) => AttachmentPreviewFile | "unsupported" | "tooLarge";
 
 /** The attachment file could not be read. The cause stays private. */
-export class AttachmentPreviewReadFailure extends Schema.TaggedError<AttachmentPreviewReadFailure>()(
+class AttachmentPreviewReadFailure extends Schema.TaggedError<AttachmentPreviewReadFailure>()(
   "AttachmentPreviewReadFailure",
   { cause: Schema.Defect() },
 ) {}
