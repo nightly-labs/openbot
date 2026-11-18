@@ -490,7 +490,6 @@ export const messages = {
   "mobile.chat.thinking.latest": "Lo último",
   "mobile.chat.history.loadingOlder": "Cargando mensajes anteriores…",
   "mobile.chat.history.retryOlder": "Volver a intentar cargar mensajes anteriores",
-  "mobile.chat.history.loadOlder": "Cargar mensajes anteriores",
   "mobile.chat.history.connecting": "Conectando con el servidor",
   "mobile.chat.history.loading": "Cargando el historial del chat",
   "mobile.chat.history.waiting": "Esperando conexión",

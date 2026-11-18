@@ -478,7 +478,6 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.thinking.latest": "Latest",
   "mobile.chat.history.loadingOlder": "Loading older messages…",
   "mobile.chat.history.retryOlder": "Try loading older messages again",
-  "mobile.chat.history.loadOlder": "Load older messages",
   "mobile.chat.history.connecting": "Connecting to server",
   "mobile.chat.history.loading": "Loading chat history",
   "mobile.chat.history.waiting": "Waiting for connection",

@@ -485,7 +485,6 @@ export const messages = {
   "mobile.chat.thinking.latest": "En yeni",
   "mobile.chat.history.loadingOlder": "Daha eski mesajlar yükleniyor…",
   "mobile.chat.history.retryOlder": "Eski mesajları tekrar yükle",
-  "mobile.chat.history.loadOlder": "Daha eski mesajları yükle",
   "mobile.chat.history.connecting": "Sunucuya bağlanılıyor",
   "mobile.chat.history.loading": "Sohbet geçmişi yükleniyor",
   "mobile.chat.history.waiting": "Bağlantı bekleniyor",

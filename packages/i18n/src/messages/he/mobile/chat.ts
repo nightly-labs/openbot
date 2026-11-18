@@ -486,7 +486,6 @@ export const messages = {
   "mobile.chat.thinking.latest": "אחרונה",
   "mobile.chat.history.loadingOlder": "טוען הודעות ישנות יותר…",
   "mobile.chat.history.retryOlder": "ניסיון חוזר לטעינת הודעות ישנות יותר",
-  "mobile.chat.history.loadOlder": "טעינת הודעות ישנות יותר",
   "mobile.chat.history.connecting": "מתחבר לשרת",
   "mobile.chat.history.loading": "טוען את היסטוריית הצ'אט",
   "mobile.chat.history.waiting": "ממתין לחיבור",
