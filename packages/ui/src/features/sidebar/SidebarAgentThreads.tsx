@@ -6,7 +6,7 @@
  */
 
 import { Button, ChevronDown, MessageCirclePlus, Popover } from "@openbot/ui";
-import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { useText } from "../../text";
 import { ThreadStatusText, ThreadTabIcon } from "../conversation/threads/ThreadStatusMark";
 import { ThreadTitle } from "../conversation/threads/ThreadTitle";
@@ -239,6 +239,18 @@ export function SidebarAgentThreads(threadProps: {
   });
   createEffect(card, (open) => {
     threadProps.onCardChange?.(open);
+  });
+  // The card goes with the last thread, and it does not open again by itself when a thread comes back.
+  createEffect(
+    () => threads().length === 0,
+    (empty) => {
+      if (empty) close();
+    },
+  );
+  // The row stops hiding its tooltip when this part goes, such as in a compact sidebar.
+  onCleanup(() => {
+    clear();
+    threadProps.onCardChange?.(false);
   });
   createEffect(
     () => threadProps.menuOpen,

@@ -55,14 +55,15 @@
   visibility: hidden;
 }
 
-/* With a side thread open, the thread is the open chat, not the agent's own chat. */
-.sidebar-agent-item:has(.sidebar-threads [aria-current]) .agent-row-active {
+/* With a side thread open in the open list, the thread is the open chat, not the agent's own chat. A closed
+   list keeps its rows, so the agent row stays marked then. */
+.sidebar-agent-item:has(.sidebar-threads[data-open] [aria-current]) .agent-row-active {
   --agent-avatar-outline: var(--openbot-bg-sidebar, transparent);
 
   background: transparent;
 }
 
-.sidebar-agent-item:has(.sidebar-threads [aria-current]) .agent-row-active:hover {
+.sidebar-agent-item:has(.sidebar-threads[data-open] [aria-current]) .agent-row-active:hover {
   background: var(--openbot-hover);
 }
 
