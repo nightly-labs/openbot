@@ -88,6 +88,7 @@ const SAFE_CONNECTION_ERRORS = new Set(
       "error.remote.channelNotOpen",
       "error.remote.signalOffline",
       "error.remote.mobileUpdateRequired",
+      "error.team.hostUpdateRequired",
       "error.remote.hostBusy",
       "error.remote.signalPermissionDenied",
       "error.remote.signalProtocolError",
@@ -342,7 +343,8 @@ export function createRemoteConnectionRecovery(
         if (running) return;
         else if (retryAt !== null) scheduleRetry();
         else {
-          checkOnReturn = online;
+          // A refresh asked for while inactive, such as after lost events, still loads everything.
+          checkOnReturn = online && !refreshRequested;
           startRun();
         }
       }

@@ -1,4 +1,10 @@
-import type { BrowserPreview, BrowserTakeoverRequest, LocalBrowserSecretResponse } from "@openbot/contracts/ipc";
+import type {
+  BrowserPreview,
+  BrowserTakeoverRequest,
+  BrowserVaultSkipReason,
+  LocalBrowserSecretResponse,
+} from "@openbot/contracts/ipc";
+import type { AppTextKey } from "@openbot/i18n";
 import { Button, Checkbox, ErrorReference, Input, Lock, Maximize2, Monitor, ShieldCheck, X } from "@openbot/ui";
 import { OtpInput } from "@openbot/ui/features/account/OtpInput";
 import { BrowserTakeoverPreview } from "@openbot/ui/features/conversation/BrowserTakeoverPreview";
@@ -6,6 +12,15 @@ import { useText } from "@openbot/ui/text";
 import { errorReference } from "@openbot/user-errors";
 import { createEffect, createMemo, createSignal, createUniqueId, onCleanup, Show } from "solid-js";
 import { UiBlockCard } from "./ui-blocks/UiBlockCard";
+
+/** Why a saved login that fits the site was not filled, as the user reads it. */
+const VAULT_SKIP_TEXT = {
+  "agent-script": "browser.secret.vaultSkip.agentScript",
+  "field-kind": "browser.secret.vaultSkip.fieldKind",
+  "login-choice": "browser.secret.vaultSkip.loginChoice",
+  "no-secret": "browser.secret.vaultSkip.noPassword",
+  "vault-unreadable": "browser.secret.vaultSkip.vaultUnreadable",
+} as const satisfies Record<BrowserVaultSkipReason, AppTextKey>;
 
 /**
  * The Vault that a typed password can go to. `server` is null for this computer, or the name of the
@@ -24,7 +39,8 @@ export interface BrowserSecretVault {
  * Cancel is the X. The value goes only to the agent, and
  * the card clears it after each answer. With `vault`, a password can also go to the Vault of the server
  * that runs the agent. The box starts checked for this computer and unchecked for a joined server; a
- * server that cannot save shows the box off, with the reason.
+ * server that cannot save shows the box off, with the reason. When a saved login fits the site but was
+ * not filled, a line above the value says why.
  */
 export function BrowserSecretCard(props: {
   request: BrowserTakeoverRequest;
@@ -80,6 +96,15 @@ export function BrowserSecretCard(props: {
     if (vault.blocked === "version") return t("browser.secret.saveBlockedVersion", { server: vault.server });
     return t("browser.secret.saveHintRemote", { server: vault.server });
   };
+  const vaultSkipText = () => {
+    const reason = props.request.vaultSkip;
+    if (!reason) return null;
+    if (reason === "no-secret" && !password()) return t("browser.secret.vaultSkip.noAuthenticatorKey");
+    return t(VAULT_SKIP_TEXT[reason]);
+  };
+  const vaultSkipNote = () => (
+    <Show when={vaultSkipText()}>{(text) => <p class="browser-secret-vault-skip">{text()}</p>}</Show>
+  );
   const valid = () => (password() ? value().length > 0 : value().length === digits());
   onCleanup(() => setValue(""));
   createEffect(
@@ -272,6 +297,7 @@ export function BrowserSecretCard(props: {
         }
       >
         <form id={formId} class="browser-secret-fields" aria-label={t("browser.secret.label")} onSubmit={onSubmit}>
+          {vaultSkipNote()}
           {valueField()}
         </form>
         <Show when={!previewHidden()}>
@@ -339,6 +365,7 @@ export function BrowserSecretCard(props: {
             <X aria-hidden="true" />
           </Button>
         </header>
+        {vaultSkipNote()}
         {valueField()}
         <footer class="browser-secret-footer">
           {privateNote()}

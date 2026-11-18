@@ -1,3 +1,4 @@
+import { parseAppMinimumVersion } from "@openbot/contracts/app-minimum-version";
 import {
   MOBILE_FEATURES_PATH,
   type MobileFeatureFlags,
@@ -23,24 +24,33 @@ const FLAGS_TIMEOUT_MS = 10_000;
  * The feature flags of this app version, from the account server that the phone signed in to. Before the
  * first answer every feature is off, and a failed read keeps the last answer. An account server
  * without the flags endpoint, such as an older or self-hosted one, leaves every feature off. The same
- * answer names the newest store version, which an older account server does not send.
+ * answer names the newest store version and the lowest supported one, which an older account server
+ * does not send.
  */
 const useMobileFeatures = create<{
   apiUrl: string | null;
   flags: MobileFeatureFlags;
   latestVersion: string | null;
+  minimumVersion: string | null;
   checkedAt: number;
 }>(() => ({
   apiUrl: null,
   flags: mobileFeaturesOff(),
   latestVersion: null,
+  minimumVersion: null,
   checkedAt: 0,
 }));
 
 export async function refreshMobileFeatures(apiUrl: string, force = false): Promise<MobileFeatureFlags> {
   const current = useMobileFeatures.getState();
   if (current.apiUrl !== apiUrl) {
-    useMobileFeatures.setState({ apiUrl, flags: mobileFeaturesOff(), latestVersion: null, checkedAt: 0 });
+    useMobileFeatures.setState({
+      apiUrl,
+      flags: mobileFeaturesOff(),
+      latestVersion: null,
+      minimumVersion: null,
+      checkedAt: 0,
+    });
   } else if (!force && Date.now() - current.checkedAt < FLAGS_TTL_MS) {
     return current.flags;
   }
@@ -59,7 +69,12 @@ export async function refreshMobileFeatures(apiUrl: string, force = false): Prom
     const flags = parseMobileFeatureFlags(body);
     if (!flags) return useMobileFeatures.getState().flags;
     if (useMobileFeatures.getState().apiUrl === apiUrl) {
-      useMobileFeatures.setState({ flags, latestVersion: parseMobileLatestVersion(body), checkedAt: Date.now() });
+      useMobileFeatures.setState({
+        flags,
+        latestVersion: parseMobileLatestVersion(body),
+        minimumVersion: parseAppMinimumVersion(body),
+        checkedAt: Date.now(),
+      });
     }
     return flags;
   } catch {
@@ -89,4 +104,9 @@ export function useMobileFeature(apiUrl: string, feature: keyof MobileFeatureFla
 export function useLatestAppVersion(apiUrl: string): string | null {
   const latest = useMobileFeatures((state) => (state.apiUrl === apiUrl ? state.latestVersion : null));
   return devLatestAppVersion() ?? latest;
+}
+
+/** The lowest supported store version. Null until the account server answers, or when it sends none. */
+export function useMinimumAppVersion(apiUrl: string): string | null {
+  return useMobileFeatures((state) => (state.apiUrl === apiUrl ? state.minimumVersion : null));
 }

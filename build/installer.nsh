@@ -91,8 +91,9 @@
   ; would move them with the app files and delete them, or it stops the update with "Failed to
   ; uninstall old application files". Do not run that uninstaller: `customCheckAppRunning` removes its
   ; registry entry, and `customInstall` removes only the app files. A copy whose registry entry is
-  ; already gone, for example after an install that stopped, is removed too. A silent update installs
-  ; in the default folder; the page that chooses a folder refuses the folder with user data.
+  ; already gone, for example after an install that stopped, is removed too. An update installs in the
+  ; default folder: this macro sets it for a silent run, and in a visible run the page after the folder
+  ; page (`customPageAfterChangeDir`) refuses the folder with user data.
   !macro customInit
     ReadRegStr $1 SHCTX "${INSTALL_REGISTRY_KEY}" InstallLocation
     !insertmacro openBotHoldsUserData $1 $0
@@ -221,6 +222,38 @@
   StrCpy $isForceCurrentInstall "1"
 !macroend
 
+; The app starts an update visibly (`src/main/update-service.ts`), so the user sees the progress page
+; until the new version opens. An update skips every other page; the earlier uninstaller deletes
+; OpenBot.exe before the new files are copied, and a silent update gave no sign of that. This is the
+; default finish page of the assisted installer, but in an update it opens the app at once and skips
+; the page, which also closes the installer. The installer opens the app by itself only in a silent run.
+!macro customFinishPage
+  Function StartApp
+    ${if} ${isUpdated}
+      StrCpy $1 "--updated"
+    ${else}
+      StrCpy $1 ""
+    ${endif}
+    ${StdUtils.ExecShellAsUser} $0 "$launchLink" "open" "$1"
+  FunctionEnd
+
+  Function openBotSkipFinishPageInUpdate
+    ${if} ${isUpdated}
+      ${if} ${isForceRun}
+        ; Otherwise the app window opens behind the installer window.
+        HideWindow
+        Call StartApp
+      ${endIf}
+      Abort
+    ${endIf}
+  FunctionEnd
+
+  !define MUI_PAGE_CUSTOMFUNCTION_PRE openBotSkipFinishPageInUpdate
+  !define MUI_FINISHPAGE_RUN
+  !define MUI_FINISHPAGE_RUN_FUNCTION "StartApp"
+  !insertmacro MUI_PAGE_FINISH
+!macroend
+
 ; The uninstaller and each update delete the whole installation folder. electron-builder adds an
 ; OpenBot subfolder only when the chosen path does not contain "OpenBot", so a choice such as
 ; %USERPROFILE%\OpenBot (the agent workspaces) or %APPDATA%\OpenBot (the user data) would be
@@ -228,7 +261,8 @@
 ; that does not exist or that holds this user's earlier installation. Until then, add an OpenBot
 ; subfolder. The app makes %USERPROFILE%\OpenBot only at its first start, so that folder can also not
 ; exist yet: use the default folder for it and for a folder that holds it. The page shows nothing;
-; Abort skips it.
+; Abort skips it. In a visible update, the install mode page has set the folder from the registry
+; again, so this page uses the folder that `customInit` uses for a silent update.
 !macro customPageAfterChangeDir
   !include FileFunc.nsh
 
@@ -237,6 +271,15 @@
   Function openBotSafeInstallDirectory
     Push $0
     Push $1
+    ${if} ${isUpdated}
+      !insertmacro openBotHoldsUserData $INSTDIR $0
+      ${if} $0 == "1"
+        StrCpy $INSTDIR "$LocalAppData\Programs\${APP_FILENAME}"
+      ${endIf}
+      Pop $1
+      Pop $0
+      Abort
+    ${endIf}
     ReadRegStr $1 HKCU "${INSTALL_REGISTRY_KEY}" InstallLocation
     StrCpy $0 $INSTDIR 1 -1
     ${if} $0 == "\"

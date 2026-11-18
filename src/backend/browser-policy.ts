@@ -57,17 +57,19 @@ export function browserRequestHeaders(
       }
     }
   }
-  setRequestHeader(headers, "Accept-Language", preferredBrowserLanguages());
   return headers;
 }
 
 /**
- * The `Accept-Language` value. As Chrome does, each language with a region also gives its base
- * language, after the last language of that base: `en-GB` gives `en-GB,en;q=0.9`.
- * `navigator.languages` keeps the list without the added base languages, also as in Chrome.
+ * The languages of the `Accept-Language` header, for `session.setUserAgent`. Chromium adds the
+ * q-values, and sends the header only on a request that has none: a value that the page set stays,
+ * because a site can sign it (#8272). As Chrome does, each language with a region also gives its
+ * base language, after the last language of that base: `en-GB` gives `en-GB,en;q=0.9`.
+ * `navigator.languages` does not read this list, so it has no added base languages, also as in Chrome.
  */
-function preferredBrowserLanguages(): string {
-  const codes = preferredBrowserLanguageCodes().split(",");
+export function preferredBrowserLanguageCodes(): string {
+  const languages = app.getPreferredSystemLanguages();
+  const codes = languages.length > 0 ? languages : [app.getLocale()];
   const base = (code: string) => code.split("-")[0] ?? code;
   const expanded: string[] = [];
   for (const [index, code] of codes.entries()) {
@@ -76,14 +78,7 @@ function preferredBrowserLanguages(): string {
     if (code.includes("-") && (next === undefined || base(next) !== base(code)) && !expanded.includes(base(code)))
       expanded.push(base(code));
   }
-  return expanded
-    .map((language, index) => (index === 0 ? language : `${language};q=${Math.max(1 - index * 0.1, 0.1).toFixed(1)}`))
-    .join(",");
-}
-
-export function preferredBrowserLanguageCodes(): string {
-  const languages = app.getPreferredSystemLanguages();
-  return (languages.length > 0 ? languages : [app.getLocale()]).join(",");
+  return expanded.join(",");
 }
 
 function setRequestHeader(headers: Record<string, string>, name: string, value: string): void {
@@ -97,14 +92,19 @@ export function isAllowedMainUrl(value: string): boolean {
 }
 
 /**
- * The embedded browser grants exactly one page permission: writing plain, sanitized content to the
- * clipboard. Chromium only asks for it behind a user gesture, which is what a page's own "copy
- * link" button is, and refusing it left such a button silently doing nothing. Reading the clipboard
- * stays refused -- a page must never see what the user copied elsewhere -- and so does everything
- * else, so camera, microphone, location and notifications are unchanged.
+ * The embedded browser grants two page permissions. The first is writing plain, sanitized content
+ * to the clipboard. Chromium only asks for it behind a user gesture, which is what a page's own
+ * "copy link" button is, and refusing it left such a button silently doing nothing. Reading the
+ * clipboard stays refused -- a page must never see what the user copied elsewhere -- and so does
+ * everything other than the two, so camera, microphone, location and notifications are unchanged.
+ *
+ * The second is `storage-access`. It is not a new right: the session already sends a frame of another site its
+ * cookies. Chrome grants the Storage Access API in that state, and a refusal made
+ * `requestStorageAccess()` fail in a frame such as a Google picker (#8298).
+ * `top-level-storage-access` stays refused: Chrome grants it only in a Related Website Set.
  */
 export function isAllowedBrowserPermission(permission: string): boolean {
-  return permission === "clipboard-sanitized-write";
+  return permission === "clipboard-sanitized-write" || permission === "storage-access";
 }
 
 /**

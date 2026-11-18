@@ -23,7 +23,7 @@ computer of the user who signs in. A sign-in uses one of these kinds:
 | Loopback callback | URL MCP servers (`McpOAuth`), Codex browser sign-in, a page that an agent's CLI prints | The page sends the browser to `http://127.0.0.1:<port>/...`. The MCP listener uses port 28417 and path `/mcp-auth` ([`mcp-oauth-redirect-server.ts`](../../src/main/mcp-oauth-redirect-server.ts)). | The [callback relay](#remote-sign-in-the-callback-relay) (`sign-in-relay-v1`). MCP on an older host: the host's live view (`mcp-sign-in-v1`). |
 | Device code | Codex (`codex-device`), Grok, Cline, Kimi, Muse, the GitHub connector | The user types a short code on the provider's page. Nothing comes back to OpenBot. | The host starts it and the client shows the code (`providers-v1` to `providers-v5`; Kimi `providers-v8` only). Muse: the relay opens its device page with no callback. GitHub: `connectors-v1`. |
 | Pasted code | Claude on Linux (`cli` / `paste`), Cursor (`cli` / `link`) | The page shows a code, and the user pastes it into OpenBot. | The host starts it and the client takes the code (`providers-v3` to `providers-v5`). |
-| CLI-owned browser login | Claude (`auth login`), Codex, Gemini (`acp-authenticate`) | The provider's CLI opens the browser and takes its own callback. | The relay (`provider/start`): the host captures the page, and the client sends the callback query to the CLI's listener on the host. Grok, Cursor and Cline: a code kind. |
+| CLI-owned browser login | Claude (`auth login`), Codex, Gemini (`acp-authenticate`) | The provider's CLI opens the browser and takes its own callback. | The relay (`provider/start`): the host captures the page, and the client sends the callback query to the CLI's listener on the host. Grok, Cursor and Cline: a code kind. Mistral: the host takes the page from Vibe (`acp-delegated`) and the client shows it as a link (`providers-v8` with `mistral-code-sign-in-v1`). |
 | Deep link | Slack, Discord (`openbot://slack-workspace`, `openbot://discord-guild`), MCP fallback (`openbot://mcp-auth`) | A hosted page ends in an `openbot://` link, which reaches only the computer that opened it. | Slack and Discord: `connectors-v1`. The client sends the sealed grant on to the host that started the install. The browser client gets the grant from a return page of its own origin (`web-messaging-install.ts`). |
 | Terminal | Pi | OpenBot opens the CLI in a terminal on the host ([`provider-terminal-login.ts`](../../src/backend/provider-terminal-login.ts)). | Sign in on the host. |
 | Key or local session | API keys, 1Password, Bitwarden, Proton Pass | The user types a key or gives a CLI session. Proton Pass also signs in on Proton's web page. | Keys go to the host over the encrypted channel. Vault approval stays on the host. A Bitwarden session key works only on the computer that made it; a joined server gets an API key and the master password. Proton Pass: `password-managers-v1`; the client opens the host's sign-in page. |
@@ -178,11 +178,12 @@ three start routes, and `provider-account-relay-v1` and `-v2` add one more each.
 
 | Start route | What it signs in | How the host delivers the callback |
 | --- | --- | --- |
-| `mcp/start` | A URL MCP server, from server settings or the Marketplace | It gives the code to `McpOAuth` (owned flow). |
+| `mcp/start` | A URL MCP server, from the Marketplace | It gives the code to `McpOAuth` (owned flow). |
 | `provider/start` | The CLI of a provider in `SIGN_IN_RELAY_PROVIDERS`: Codex, Claude, Gemini (`antigravity`) and Muse | It replays the query to the CLI's own loopback listener on the host. A Muse device page has no callback: the client only opens it. |
 | `link/start` | A sign-in page that an agent of the host printed in its conversation | It replays the query to the loopback address of that page. |
 | `provider-account/start` | An account after the first of Codex or Claude (`PROVIDER_ACCOUNT_RELAY_PROVIDERS`), new or signed out. The separate capability `provider-account-relay-v1` adds this route ([`provider-account-relay-v1.ts`](../../packages/contracts/src/team-protocol/provider-account-relay-v1.ts)) | It replays the query to the loopback listener of the account's CLI on the host, as for `provider/start`. |
 | `provider-account/v2/start` | An account after the first of Codex, Claude or Gemini (`PROVIDER_ACCOUNT_RELAY_V2_PROVIDERS`), new or signed out. The separate capability `provider-account-relay-v2` adds this route ([`provider-account-relay-v2.ts`](../../packages/contracts/src/team-protocol/provider-account-relay-v2.ts)). A host advertises it with v1, and a client uses the newest one that the host advertises | As for `provider-account/start`. |
+| `mcp/start-deep-link` | As `mcp/start`. The separate capability `sign-in-relay-deep-link-v1` adds this route ([`sign-in-relay-deep-link-v1.ts`](../../packages/contracts/src/team-protocol/sign-in-relay-deep-link-v1.ts)). A desktop client sends it only while its operating system opens `openbot://` in OpenBot. After two sign-ins of the same address got no grant back on `127.0.0.1` and on `localhost`, the host registers `openbot://mcp-auth`: TradingView's firewall blocks a page that returns to a loopback name (#9209) | The client takes the callback from `openbot://mcp-auth` by `state` and sends it with `complete`; the host gives the code to `McpOAuth`. |
 
 ### Sequence
 
@@ -550,13 +551,27 @@ host route [`route-whatsapp-working-message.ts`](../../src/main/team-api/route-w
 reads and sets, for each WhatsApp number, whether OpenBot posts “Working on it…” while the agent
 works. The setting is on by default and is kept with the number's connection values, so it needs no
 migration. With the setting off, `MessagingService` posts no “Waiting” and no “Working on it…” line
-and edits no progress into one: the reaction shows that OpenBot read the message, and the end of the
-request (the answer, or a line such as “Stopped”) is the only post. A reply of `stop` still stops the
-request; in a group, the person replies to their own request, because there is no status post to
-reply to. The released `whatsapp-connector-v1`
-overview cannot carry the value, so a client reads this list and merges it
-(`withWhatsAppWorkingMessages`). A client hides the switch while the host does not have the
-capability. Only protocol 9 peers get it.
+and edits no progress into one: the reaction shows that OpenBot read the message, and the answer is
+the only post. A request that is given to a teammate or stopped, or that ends without an answer,
+posts no line and leaves only its reaction. An error still posts its line (“Too many requests are
+waiting”, “OpenBot could not finish this request”), so the person knows that it did not succeed.
+A reply of `stop` still stops the request; in a group, the person replies to their own request,
+because there is no status post to reply to. The released `whatsapp-connector-v1` overview cannot
+carry the value, so a client reads this list and merges it (`withWhatsAppWorkingMessages`). A client
+hides the switch while the host does not have the capability. Only protocol 9 peers get it.
+
+The optional capability `whatsapp-status-reactions-v1`
+([`whatsapp-status-reactions-v1.ts`](../../packages/contracts/src/team-protocol/whatsapp-status-reactions-v1.ts),
+host route [`route-whatsapp-status-reactions.ts`](../../src/main/team-api/route-whatsapp-status-reactions.ts))
+reads and sets, for each WhatsApp number, whether OpenBot puts status reactions on a message: 👀 when
+it arrives, then ✅, ❌ or 🫡 when the request ends. The setting is on by default and is kept with the
+number's connection values, so it needs no migration. `MessagingService` reads it at each reaction,
+so with the setting off a WhatsApp message gets no reaction, and the posts do not change. A removal
+still goes out, so a request that started before the setting went off loses its 👀 at its end. In a
+quiet chat of a personal number, a failed or stopped request then shows nothing to the other person. With both this setting and “Working on it…”
+off, only the answer shows that OpenBot read the message. A client reads this list and merges it into
+the released overview (`withWhatsAppStatusReactions`), and hides the switch while the host does not
+have the capability. Only protocol 9 peers get it.
 
 The phone uses the same routes in Marketplace › Apps › WhatsApp
 (`apps/mobile/src/features/servers/components/whatsapp-connector-page.tsx`). It links only with a
@@ -634,7 +649,7 @@ user removes it there.
 ## Add a Team API capability
 
 A new remote feature is a new optional capability. Do not change a shipped capability: released
-Team API adapters are permanent (see [Team API compatibility](team-api.md)). Worked example:
+Team API adapters stay while a release in the support window speaks them (see [Team API compatibility](team-api.md)). Worked example:
 `sign-in-relay-v1`, which follows `mcp-sign-in-app-v1`.
 
 1. **Frozen codec.** Add `packages/contracts/src/team-protocol/<name>-v1.ts`. Build each route with

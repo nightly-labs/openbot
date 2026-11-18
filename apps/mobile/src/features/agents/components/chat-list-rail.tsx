@@ -10,11 +10,13 @@ import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressa
 import { useChatRowBackground } from "@/features/agents/components/chat-list-pane-context";
 import { ChannelAvatar } from "@/features/channels/components/channel-avatar";
 import {
+  agentListWaitReason,
+  useAgentListActivity,
   useAgentListUnreadCount,
   useAgentListUnreadThreads,
-  useAgentListWaitReason,
 } from "@/features/workspace/components/use-agent-activity";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
+import { agentActivityMood } from "@/features/workspace/model/agent-activity";
 import type { MobileSidebarItem } from "@/features/workspace/model/sidebar-layout";
 import { useBarTop } from "@/shared/lib/native-bar";
 import { useText } from "@/shared/lib/text";
@@ -64,7 +66,9 @@ const RailAgent = memo(function RailAgent({ agent }: { agent: MobileAgent }) {
   const unreadCount = useAgentListUnreadCount(agent.id);
   const unreadThreads = useAgentListUnreadThreads(agent.id);
   const openLabel = t("mobile.agent.list.open", { name: agent.name });
-  const waitReason = useAgentListWaitReason(agent.id);
+  // The rail item reads the activity once and gives it to the avatar and the badge.
+  const activity = useAgentListActivity(agent.id);
+  const waitReason = agentListWaitReason(activity);
   return (
     <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id } }} asChild>
       <ChatLinkPressable
@@ -91,10 +95,11 @@ const RailAgent = memo(function RailAgent({ agent }: { agent: MobileAgent }) {
             hue={agent.avatarHue}
             color={agent.avatarColor}
             seed={agent.avatarSeed}
+            avatarUrl={agent.avatarUrl}
             size={AVATAR_SIZE}
             animateIdle={false}
             rings
-            withThreads
+            activityMood={agentActivityMood(activity)}
           />
           {waitReason ? (
             <AgentWaitBadge reason={waitReason} size={16} />
@@ -197,6 +202,9 @@ export function ChatListRail({
         contentContainerClassName="items-center gap-1"
         contentContainerStyle={{ paddingTop: 8, paddingBottom: insets.bottom + 16 }}
         showsVerticalScrollIndicator={false}
+        // Android clips off-screen rows by default. With Fabric, a clipped row that mounts again can
+        // crash with "The specified child already has a parent". iOS does not clip by default.
+        removeClippedSubviews={false}
       />
     </View>
   );

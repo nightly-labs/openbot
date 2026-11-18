@@ -1,0 +1,1105 @@
+{
+  "releases": [
+    {
+      "tag": "v0.1.12",
+      "newInstall": {
+        "migrations": [3],
+        "objects": [
+          "6fa4246f83fbb687",
+          "15d7b2806014d421",
+          "94a45939fc0c9da2",
+          "e00bebf2a138da3f",
+          "6536f39aa1d4f63f",
+          "8ffaab8ac1f36fe1",
+          "d0c3adbb13132c66",
+          "f8cb6432fda26c76",
+          "7a0526e83fa8b6f9",
+          "f2a2e8554b27b475",
+          "4b85086cafebe1e0",
+          "0b37cb8ca6deefdf",
+          "17bc0def04314adc",
+          "06b774f493e0ddf6",
+          "9fe27ba1abec0160",
+          "d0a4e3f7e044a1ee",
+          "35a3906b37da95d0",
+          "ba62871cdd4e70f6",
+          "333c7ae7f374194a",
+          "5bdf87f25c5c5be0",
+          "4ad69b2cb1e68721",
+          "ef1a33ee1baf4964",
+          "b6e9ef0c3a508271",
+          "0506acd0d04f04cb",
+          "44b5d19a7ae2cca8",
+          "64447cea22035dec",
+          "fa01dd7eec7a3b3b"
+        ]
+      }
+    },
+    {
+      "tag": "v0.1.15",
+      "newInstall": { "migrations": [4], "objects": [[0, 3], "159d4a89abfa70ae", [3, 27]] },
+      "upgraded": {
+        "migrations": [3, 4],
+        "objects": [
+          [0, 2],
+          [3, 7],
+          [8, 10],
+          [11, 21],
+          "0506acd0d04f04cb",
+          [25, 27],
+          "94a45939fc0c9da2",
+          "f8cb6432fda26c76",
+          "4b85086cafebe1e0",
+          [21, 23],
+          "44b5d19a7ae2cca8",
+          "159d4a89abfa70ae"
+        ]
+      }
+    },
+    {
+      "tag": "v0.1.18",
+      "newInstall": { "migrations": [4], "objects": [[0, 12], "d6a0e5605f097a81", [12, 28]] },
+      "upgraded": { "migrations": [[0, 2]], "objects": [[0, 28], "d6a0e5605f097a81"] }
+    },
+    {
+      "tag": "v0.2.1",
+      "newInstall": {
+        "migrations": [6],
+        "objects": [
+          [0, 7],
+          "3fd6c0c1fb41db20",
+          "0320c0d732f7e15d",
+          "f7073b55f01b89ab",
+          "0f4bad6eb87db0c3",
+          "bc9420e43dae1065",
+          "73c353147d267569",
+          "33b4bf992f4842c9",
+          "a2c83eebd805be00",
+          "36816e73135e7894",
+          [7, 29]
+        ]
+      },
+      "upgraded": {
+        "migrations": [[0, 2], 6],
+        "objects": [
+          [0, 21],
+          "3fd6c0c1fb41db20",
+          "f7073b55f01b89ab",
+          "bc9420e43dae1065",
+          "33b4bf992f4842c9",
+          [21, 29],
+          "0320c0d732f7e15d",
+          "0f4bad6eb87db0c3",
+          "73c353147d267569",
+          "a2c83eebd805be00",
+          "36816e73135e7894"
+        ]
+      }
+    },
+    {
+      "tag": "v0.3.0",
+      "newInstall": {
+        "migrations": [8, 9, 10],
+        "objects": [[0, 16], "9af4ef0e2f26f9ca", [17, 28], "020c26df670fd64b", [29, 38]]
+      },
+      "upgraded": {
+        "migrations": [[0, 3], 8, 9, 10],
+        "objects": [
+          [0, 5],
+          [6, 14],
+          [15, 25],
+          "454b786fb53e8f8b",
+          "3f205310c3eb5d46",
+          "94a45939fc0c9da2",
+          [27, 38],
+          "92a94c6acdc3419f"
+        ]
+      }
+    },
+    {
+      "tag": "v0.4.0",
+      "newInstall": { "migrations": [[0, 3], 11], "objects": [[0, 38]] },
+      "upgraded": { "migrations": [[0, 6], 11], "objects": [[0, 38]] }
+    },
+    {
+      "tag": "v0.5.0",
+      "newInstall": { "migrations": [[0, 4], 12, 13, 14], "objects": [[0, 28], "aeb25f3c9cf6436f", [29, 38]] },
+      "upgraded": { "migrations": [[0, 7], 12, 13, 14], "objects": [[0, 24], "efb653208a101a01", [25, 38]] }
+    },
+    {
+      "tag": "v0.6.0",
+      "newInstall": {
+        "migrations": [[0, 7], 15, 16],
+        "objects": [
+          [0, 38],
+          "e2f2f47eb8c921fa",
+          "f4c8b2c4680e9713",
+          "60116b283290fc98",
+          "ccbb237db5601f7d",
+          "14808a8cfb4f3bcd",
+          "74151fa7584abaac",
+          "4ece60dce82ccc39"
+        ]
+      },
+      "upgraded": {
+        "migrations": [[0, 10], 15, 16],
+        "objects": [
+          [0, 38],
+          "e2f2f47eb8c921fa",
+          "f4c8b2c4680e9713",
+          "60116b283290fc98",
+          "ccbb237db5601f7d",
+          "14808a8cfb4f3bcd",
+          "74151fa7584abaac",
+          "4ece60dce82ccc39"
+        ]
+      }
+    },
+    {
+      "tag": "v0.7.0",
+      "newInstall": { "migrations": [[0, 9], 17], "objects": [[0, 16], "5b9db6570e4c4363", [17, 45]] },
+      "upgraded": {
+        "migrations": [[0, 12], 17],
+        "objects": [[0, 23], [24, 37], [38, 45], "dc12b29d0abc6e8f", "92a94c6acdc3419f"]
+      }
+    },
+    {
+      "tag": "v0.8.0",
+      "newInstall": {
+        "migrations": [[0, 10], 18, 19],
+        "objects": [
+          [0, 45],
+          "7e46c6a08409e7c6",
+          "1dee8cb3b7b25c42",
+          "c39840a6b7b1ab1b",
+          "24b5ce1cc1b7791c",
+          "9921864c2e5c6bfe",
+          "4503eca57f31aa15",
+          "4110ac3c08ce5a66",
+          "8329a49d1bf1263c",
+          "c90b9f809141cd59",
+          "294f8ab8da4f8136",
+          "f5f4799b594bf424",
+          "855bbae408042552",
+          "0800b8f4be22d040",
+          "163d62820efcc913",
+          "e57f7dd7c34152d8",
+          "24ab17b980bcc3b3",
+          "2acc498758cb0f52",
+          "6a672cebb39cad0c",
+          "1ad01a533e5dba1d"
+        ]
+      },
+      "upgraded": {
+        "migrations": [[0, 13], 18, 19],
+        "objects": [
+          [0, 45],
+          "7e46c6a08409e7c6",
+          "1dee8cb3b7b25c42",
+          "c39840a6b7b1ab1b",
+          "24b5ce1cc1b7791c",
+          "9921864c2e5c6bfe",
+          "4503eca57f31aa15",
+          "4110ac3c08ce5a66",
+          "8329a49d1bf1263c",
+          "c90b9f809141cd59",
+          "294f8ab8da4f8136",
+          "f5f4799b594bf424",
+          "855bbae408042552",
+          "0800b8f4be22d040",
+          "163d62820efcc913",
+          "e57f7dd7c34152d8",
+          "24ab17b980bcc3b3",
+          "2acc498758cb0f52",
+          "6a672cebb39cad0c",
+          "1ad01a533e5dba1d"
+        ]
+      }
+    },
+    {
+      "tag": "v0.10.0",
+      "newInstall": {
+        "migrations": [[0, 12], 20],
+        "objects": [[0, 64], "ca711bc762a9dbc7", "054143d4c8c41d4b", "c98e0c7f566d9c47"]
+      },
+      "upgraded": {
+        "migrations": [[0, 15], 20],
+        "objects": [[0, 64], "ca711bc762a9dbc7", "054143d4c8c41d4b", "c98e0c7f566d9c47"]
+      }
+    },
+    {
+      "tag": "v0.17.0",
+      "newInstall": { "migrations": [[0, 13], 21], "objects": [[0, 67]] },
+      "upgraded": { "migrations": [[0, 16], 21], "objects": [[0, 67]] }
+    },
+    {
+      "tag": "v0.22.0",
+      "newInstall": { "migrations": [[0, 14], 22], "objects": [[0, 16], "3755520b73b2b665", [17, 67]] },
+      "upgraded": {
+        "migrations": [[0, 17], 22],
+        "objects": [[0, 43], [45, 67], "60872b4dfbff7174", "92a94c6acdc3419f"]
+      }
+    },
+    {
+      "tag": "v0.24.0",
+      "newInstall": { "migrations": [[0, 15], 23], "objects": [[0, 16], "d6308da7f0f233b4", [17, 67]] },
+      "upgraded": { "migrations": [[0, 18], 23], "objects": [[0, 65], "dc167eab0f1845bd", "92a94c6acdc3419f"] }
+    },
+    {
+      "tag": "v0.27.0",
+      "newInstall": { "migrations": [[0, 16], 24], "objects": [[0, 16], "1d76a4156dbb86d9", [17, 67]] },
+      "upgraded": { "migrations": [[0, 19], 24], "objects": [[0, 65], "b5f403404a29c59f", "92a94c6acdc3419f"] }
+    },
+    {
+      "tag": "v0.28.0",
+      "newInstall": {
+        "migrations": [[0, 17], 25, 26],
+        "objects": [[0, 16], "e4d5906a4b063f3f", [17, 67], "b6b779f972dfc66a", "b05036f9c71064ee", "6beda140c579aaeb"]
+      },
+      "upgraded": {
+        "migrations": [[0, 20], 25, 26],
+        "objects": [
+          [0, 65],
+          "b6b779f972dfc66a",
+          "b05036f9c71064ee",
+          "6beda140c579aaeb",
+          "2d79003fac210881",
+          "92a94c6acdc3419f"
+        ]
+      }
+    },
+    {
+      "tag": "v0.30.0",
+      "newInstall": {
+        "migrations": [[0, 19], 27],
+        "objects": [[0, 9], "a0ea911ffe2e284b", [10, 57], "f4e777fea6fb1e23", [58, 70]]
+      },
+      "upgraded": {
+        "migrations": [[0, 22], 27],
+        "objects": [[0, 20], "7952fdcd1a1e994c", [21, 55], "62e05ebd2b1be2be", [56, 70]]
+      }
+    },
+    {
+      "tag": "v0.31.0",
+      "newInstall": { "migrations": [[0, 20], 28], "objects": [[0, 16], "7748a4765cd78c28", [17, 70]] },
+      "upgraded": { "migrations": [[0, 23], 28], "objects": [[0, 68], "3fc5890632b6b809", "92a94c6acdc3419f"] }
+    },
+    {
+      "tag": "v0.32.0",
+      "newInstall": {
+        "migrations": [[0, 21], 29],
+        "objects": [
+          [0, 70],
+          "3c8b10b1a595bcc0",
+          "c2dd4dd5fe273544",
+          "c7c9204751a9e4a9",
+          "df220ef3e3b74f07",
+          "2f93eb469ade1152",
+          "10e3054f0be5017b",
+          "4a6f0a8f78175f2d"
+        ]
+      },
+      "upgraded": {
+        "migrations": [[0, 24], 29],
+        "objects": [
+          [0, 70],
+          "3c8b10b1a595bcc0",
+          "c2dd4dd5fe273544",
+          "c7c9204751a9e4a9",
+          "df220ef3e3b74f07",
+          "2f93eb469ade1152",
+          "10e3054f0be5017b",
+          "4a6f0a8f78175f2d"
+        ]
+      }
+    },
+    {
+      "tag": "v0.33.0",
+      "newInstall": {
+        "migrations": [[0, 22], 30],
+        "objects": [
+          [0, 77],
+          "208b29e9b59e989a",
+          "80fdaf7bf05421f4",
+          "aea8628ea2cfa725",
+          "aef3c078d5d2b584",
+          "882e9a500d12db8c",
+          "c65be0a9e81cf3e3"
+        ]
+      },
+      "upgraded": {
+        "migrations": [[0, 25], 30],
+        "objects": [
+          [0, 77],
+          "208b29e9b59e989a",
+          "80fdaf7bf05421f4",
+          "aea8628ea2cfa725",
+          "aef3c078d5d2b584",
+          "882e9a500d12db8c",
+          "c65be0a9e81cf3e3"
+        ]
+      }
+    },
+    {
+      "tag": "v0.34.0",
+      "newInstall": {
+        "migrations": [[0, 23], 31],
+        "objects": [
+          [0, 83],
+          "300c513b8d8ac77b",
+          "4d2f3d213571289a",
+          "7c815d23c57282ca",
+          "30ae3b2d9dffba90",
+          "b8b94622fa3d16d5",
+          "d9367cfbdce3d922"
+        ]
+      },
+      "upgraded": {
+        "migrations": [[0, 26], 31],
+        "objects": [
+          [0, 83],
+          "300c513b8d8ac77b",
+          "4d2f3d213571289a",
+          "7c815d23c57282ca",
+          "30ae3b2d9dffba90",
+          "b8b94622fa3d16d5",
+          "d9367cfbdce3d922"
+        ]
+      }
+    },
+    {
+      "tag": "v0.35.0",
+      "newInstall": {
+        "migrations": [[0, 24], 32],
+        "objects": [
+          [0, 89],
+          "5430dd425baf5537",
+          "ea8ad72e851b3c98",
+          "09994a47a86e513a",
+          "bbd84eb86c74d61d",
+          "56473ecb26a8a62f"
+        ]
+      },
+      "upgraded": {
+        "migrations": [[0, 27], 32],
+        "objects": [
+          [0, 89],
+          "5430dd425baf5537",
+          "ea8ad72e851b3c98",
+          "09994a47a86e513a",
+          "bbd84eb86c74d61d",
+          "56473ecb26a8a62f"
+        ]
+      }
+    },
+    {
+      "tag": "v0.37.0",
+      "newInstall": {
+        "migrations": [[0, 25], 33],
+        "objects": [
+          [0, 9],
+          "ffa0cbe4afa4598a",
+          [10, 13],
+          "13caac42ce861df9",
+          [14, 57],
+          "aabe8fbd0ae3ab44",
+          [58, 61],
+          "678a29b54363683c",
+          [62, 94]
+        ]
+      },
+      "upgraded": {
+        "migrations": [[0, 28], 33],
+        "objects": [
+          [0, 20],
+          "5b744e487b298827",
+          "bc9420e43dae1065",
+          "3dc42e60c107fb80",
+          [23, 55],
+          "5c035f5ec0cef9a1",
+          [56, 59],
+          "00acb60245c9ce5c",
+          [60, 94]
+        ]
+      }
+    },
+    {
+      "tag": "v0.38.1",
+      "newInstall": {
+        "migrations": [[0, 26], 34, 35, 36],
+        "objects": [
+          [0, 13],
+          "cc78854198e9c0b9",
+          [14, 61],
+          "9baa17e5c53a0efe",
+          [62, 94],
+          "eb4df201a2f2ef23",
+          "3c5817a6ca48af51",
+          "f5c97acbfb4439ba",
+          "a99baffe60a6d144",
+          "d8c348d5f08cfc3a"
+        ]
+      },
+      "upgraded": {
+        "migrations": [[0, 29], 34, 35, 36],
+        "objects": [
+          [0, 22],
+          "5dc170fe2990727f",
+          [23, 59],
+          "582f40d7935374f3",
+          [60, 94],
+          "eb4df201a2f2ef23",
+          "3c5817a6ca48af51",
+          "f5c97acbfb4439ba",
+          "a99baffe60a6d144",
+          "d8c348d5f08cfc3a"
+        ]
+      }
+    },
+    {
+      "tag": "v0.40.0",
+      "newInstall": {
+        "migrations": [[0, 29], 37],
+        "objects": [[0, 99], "c2f4be18155264e3", "961125f79b117edd", "0053b6f2c79657de", "a16bc095d275006e"]
+      },
+      "upgraded": {
+        "migrations": [[0, 32], 37],
+        "objects": [[0, 99], "c2f4be18155264e3", "961125f79b117edd", "0053b6f2c79657de", "a16bc095d275006e"]
+      }
+    },
+    {
+      "tag": "v0.41.0",
+      "newInstall": {
+        "migrations": [[0, 30], 38, 39, 40],
+        "objects": [
+          [0, 19],
+          "ad2c1fa7d27d41a7",
+          [20, 103],
+          "a86dea9968869cef",
+          "df437a27fd5c2e90",
+          "fb1fd5a48e28151a",
+          "b3b1654a1ae23760"
+        ]
+      },
+      "upgraded": {
+        "migrations": [[0, 33], 38, 39, 40],
+        "objects": [
+          [0, 6],
+          "e0e83bb8cadafba7",
+          [7, 24],
+          "e2f2f47eb8c921fa",
+          [38, 40],
+          [43, 45],
+          "24b5ce1cc1b7791c",
+          "4503eca57f31aa15",
+          [50, 54],
+          "5c035f5ec0cef9a1",
+          "e57f7dd7c34152d8",
+          "582f40d7935374f3",
+          "ca711bc762a9dbc7",
+          [65, 67],
+          "3fc5890632b6b809",
+          "3c8b10b1a595bcc0",
+          "c7c9204751a9e4a9",
+          "2f93eb469ade1152",
+          [77, 81],
+          "300c513b8d8ac77b",
+          [85, 87],
+          "5430dd425baf5537",
+          "eb4df201a2f2ef23",
+          "a99baffe60a6d144",
+          [99, 101],
+          "a86dea9968869cef",
+          [24, 36],
+          "f4c8b2c4680e9713",
+          [40, 43],
+          "c39840a6b7b1ab1b",
+          "9921864c2e5c6bfe",
+          "4110ac3c08ce5a66",
+          "855bbae408042552",
+          "163d62820efcc913",
+          "24ab17b980bcc3b3",
+          [60, 62],
+          [63, 65],
+          "6beda140c579aaeb",
+          "92a94c6acdc3419f",
+          "c2dd4dd5fe273544",
+          "df220ef3e3b74f07",
+          [75, 77],
+          [81, 83],
+          "4d2f3d213571289a",
+          [87, 89],
+          [95, 97],
+          "d8c348d5f08cfc3a",
+          [101, 103],
+          "df437a27fd5c2e90",
+          [90, 94],
+          "fb1fd5a48e28151a",
+          "b3b1654a1ae23760"
+        ]
+      }
+    },
+    {
+      "tag": "v0.43.0",
+      "newInstall": {
+        "migrations": [[0, 33], 41, 42, 43],
+        "objects": [
+          [0, 107],
+          "474c018c55b0c261",
+          "0eacaec295b4a1dc",
+          "97053d4d708b72dc",
+          "a363599c4127c6bf",
+          "6fa6044e09b2d566"
+        ]
+      },
+      "upgraded": {
+        "migrations": [[0, 36], 41, 42, 43],
+        "objects": [
+          [0, 107],
+          "474c018c55b0c261",
+          "0eacaec295b4a1dc",
+          "97053d4d708b72dc",
+          "a363599c4127c6bf",
+          "6fa6044e09b2d566"
+        ]
+      }
+    },
+    {
+      "tag": "v0.45.0",
+      "newInstall": { "migrations": [[0, 36], 44], "objects": [[0, 112], "114b8e8e5fd8266f"] },
+      "upgraded": { "migrations": [[0, 39], 44], "objects": [[0, 112], "114b8e8e5fd8266f"] }
+    },
+    {
+      "tag": "v0.49.0",
+      "newInstall": { "migrations": [[0, 37], 45], "objects": [[0, 113], "d0695bbc0d4e7d50"] },
+      "upgraded": { "migrations": [[0, 40], 45], "objects": [[0, 113], "d0695bbc0d4e7d50"] }
+    },
+    {
+      "tag": "v0.50.0",
+      "newInstall": {
+        "migrations": [[0, 38], 46],
+        "objects": [
+          [0, 114],
+          "4a404a9059ffc4da",
+          "99a98ef4923471ce",
+          "7327b24c5fea1110",
+          "7a7e7b3febe454fa",
+          "f99eba9f4ed46b49",
+          "fdffb47a03a7cec3",
+          "58b58439a49610b5",
+          "eacf231a1c01be5c",
+          "c0ad21eede1e95f5",
+          "a53ccfcbc2ea583f",
+          "7ce3f8b06078e9a2",
+          "36aa16e13afe3297",
+          "da677f49f96e8e64",
+          "e82230fd0b8f5836",
+          "2ee39d761501afb1",
+          "84cdaa52a85017b1",
+          "e0cbf83cb929abdc",
+          "7a654c8eef30df9d",
+          "3d703fc3327a38e3",
+          "4e4d87d26243d7b6",
+          "74c9dd1dc33a5650",
+          "188e4cbd669d0bf2",
+          "2bd62f2ac6efdfbe"
+        ]
+      },
+      "upgraded": {
+        "migrations": [[0, 41], 46],
+        "objects": [
+          [0, 114],
+          "4a404a9059ffc4da",
+          "99a98ef4923471ce",
+          "7327b24c5fea1110",
+          "7a7e7b3febe454fa",
+          "f99eba9f4ed46b49",
+          "fdffb47a03a7cec3",
+          "58b58439a49610b5",
+          "eacf231a1c01be5c",
+          "c0ad21eede1e95f5",
+          "a53ccfcbc2ea583f",
+          "7ce3f8b06078e9a2",
+          "36aa16e13afe3297",
+          "da677f49f96e8e64",
+          "e82230fd0b8f5836",
+          "2ee39d761501afb1",
+          "84cdaa52a85017b1",
+          "e0cbf83cb929abdc",
+          "7a654c8eef30df9d",
+          "3d703fc3327a38e3",
+          "4e4d87d26243d7b6",
+          "74c9dd1dc33a5650",
+          "188e4cbd669d0bf2",
+          "2bd62f2ac6efdfbe"
+        ]
+      }
+    },
+    {
+      "tag": "v0.52.0",
+      "newInstall": {
+        "migrations": [[0, 39], 47],
+        "objects": [[0, 103], [105, 137], "5b2e32b096e98a60", "e1cf4e87de17ce75", "87c5a06e45d10962"]
+      },
+      "upgraded": {
+        "migrations": [[0, 42], 47],
+        "objects": [[0, 57], [58, 100], [101, 137], "5b2e32b096e98a60", "e1cf4e87de17ce75", "87c5a06e45d10962"]
+      }
+    },
+    {
+      "tag": "v0.57.0",
+      "newInstall": { "migrations": [[0, 40], 48], "objects": [[0, 135], "20eaa6c46b6427c8", [136, 138]] },
+      "upgraded": { "migrations": [[0, 43], 48], "objects": [[0, 135], "e697136198710b2e", [136, 138]] }
+    },
+    {
+      "tag": "v0.58.0",
+      "newInstall": {
+        "migrations": [[0, 41], 49],
+        "objects": [
+          [0, 125],
+          "7d36847da1ab1bf4",
+          [126, 138],
+          "c7c14fc5770f28c2",
+          "bf2ea5b835618622",
+          "efe941f3b0cf4bf7",
+          "df042a2b6bda0497",
+          "47042e589e1559ca",
+          "d1ac16f2f0fb4c7d",
+          "53963f56be02c336",
+          "255b1a9f3fdfc16b",
+          "5b6c47b72065b7a6"
+        ]
+      },
+      "upgraded": {
+        "migrations": [[0, 44], 49],
+        "objects": [
+          [0, 125],
+          [128, 138],
+          "c601edae9088ddfc",
+          [126, 128],
+          "c7c14fc5770f28c2",
+          "bf2ea5b835618622",
+          "efe941f3b0cf4bf7",
+          "df042a2b6bda0497",
+          "47042e589e1559ca",
+          "d1ac16f2f0fb4c7d",
+          "53963f56be02c336",
+          "255b1a9f3fdfc16b",
+          "5b6c47b72065b7a6"
+        ]
+      }
+    },
+    {
+      "tag": "v0.59.0",
+      "newInstall": { "migrations": [[0, 42], 50], "objects": [[0, 125], "622bba9256e0a02a", [126, 147]] },
+      "upgraded": { "migrations": [[0, 45], 50], "objects": [[0, 135], [138, 147], "778c8dcf3944cbd4", [136, 138]] }
+    },
+    {
+      "tag": "v0.60.0",
+      "newInstall": {
+        "migrations": [[0, 43], 51, 52, 53],
+        "objects": [[0, 125], "b2936bde871c0b7d", [126, 147], "ae410272e1211b80"]
+      },
+      "upgraded": {
+        "migrations": [[0, 46], 51, 52, 53],
+        "objects": [[0, 144], "ae410272e1211b80", "d72cbcc52d37f1d0", [145, 147]]
+      }
+    },
+    {
+      "tag": "v0.61.0",
+      "newInstall": {
+        "migrations": [[0, 46], 54, 55],
+        "objects": [[0, 135], "8afcde681016cbcf", [136, 138], "713fdd673bb050ea", [138, 148], "00f4a2dd7596f541"]
+      },
+      "upgraded": {
+        "migrations": [[0, 49], 54, 55],
+        "objects": [[0, 132], "aa33528f340c0b3c", [133, 148], "713fdd673bb050ea", "00f4a2dd7596f541"]
+      }
+    },
+    {
+      "tag": "v0.62.0",
+      "newInstall": {
+        "migrations": [[0, 48], 56, 57],
+        "objects": [
+          [0, 9],
+          "f8779e5e9c685544",
+          [10, 150],
+          "29449c91273b087f",
+          "b5f52c78ff7b6493",
+          "386b03e29f73a08d",
+          "efc6d9d666e1f975"
+        ]
+      },
+      "upgraded": {
+        "migrations": [[0, 51], 56, 57],
+        "objects": [
+          [0, 20],
+          "ca7e66e154082f58",
+          [21, 150],
+          "29449c91273b087f",
+          "b5f52c78ff7b6493",
+          "386b03e29f73a08d",
+          "efc6d9d666e1f975"
+        ]
+      }
+    },
+    {
+      "tag": "v0.63.0",
+      "newInstall": {
+        "migrations": [[0, 50], 58],
+        "objects": [[0, 154], "5e4303474998a5eb", "134cc4ad91ca8125", "5c5fd65b0e7a2e76"]
+      },
+      "upgraded": {
+        "migrations": [[0, 53], 58],
+        "objects": [[0, 154], "5e4303474998a5eb", "134cc4ad91ca8125", "5c5fd65b0e7a2e76"]
+      }
+    },
+    {
+      "tag": "v0.66.0",
+      "newInstall": { "migrations": [[0, 51], 59], "objects": [[0, 157], "39400c5f0d1416ac"] },
+      "upgraded": { "migrations": [[0, 54], 59], "objects": [[0, 157], "39400c5f0d1416ac"] }
+    },
+    {
+      "tag": "v0.67.0",
+      "newInstall": {
+        "migrations": [[0, 52], 60],
+        "objects": [[0, 7], "2d7e4ef7374984fc", [8, 158], "442db9321149f26b"]
+      },
+      "upgraded": {
+        "migrations": [[0, 55], 60],
+        "objects": [[0, 19], "939f6728620744f0", [20, 158], "442db9321149f26b"]
+      }
+    },
+    {
+      "tag": "v0.69.0",
+      "newInstall": { "migrations": [[0, 53], 61], "objects": [[0, 159], "087697f3ede0f213"] },
+      "upgraded": { "migrations": [[0, 56], 61], "objects": [[0, 159], "087697f3ede0f213"] }
+    },
+    {
+      "tag": "v0.72.0",
+      "newInstall": {
+        "migrations": [[0, 54], 62, 63],
+        "objects": [
+          [0, 160],
+          "e45c6b6ea1c1a2a3",
+          "70aa114b23308e5b",
+          "20012710f842f569",
+          "d180e0e7b3ded6cd",
+          "3193ba8746a113ff",
+          "9ce7be1b16eaa732",
+          "17b02072abae30a6",
+          "213f10a86808072c",
+          "c24e80d37759babe",
+          "be7c51d9cb20ba40",
+          "324c9810c995037d",
+          "eb9bdb4ed06ddf7b",
+          "e302eba272c9fad6",
+          "a771c3ca93157387",
+          "26edb9202e277d28",
+          "54f00f2bf0f61afc",
+          "c3489cfbaf5b9b2a",
+          "8a86548f3476d2b2",
+          "be79e12906c4eb5d",
+          "ab704a193420697c",
+          "0c329f0ce93afa26",
+          "1c012385caa68aba",
+          "45655d961cb0dd8a",
+          "8171533cb5e0fb80",
+          "3264438531c104d1",
+          "413adfd73a4e4542",
+          "688971c0fc30ef1f",
+          "b24b0afc2223a397",
+          "32c2c9a4c6ee3540",
+          "074c68f03672f050",
+          "060e73905e00cbe7",
+          "b3ff6bf1df3cbe51"
+        ]
+      },
+      "upgraded": {
+        "migrations": [[0, 57], 62, 63],
+        "objects": [
+          [0, 160],
+          "e45c6b6ea1c1a2a3",
+          "70aa114b23308e5b",
+          "20012710f842f569",
+          "d180e0e7b3ded6cd",
+          "3193ba8746a113ff",
+          "9ce7be1b16eaa732",
+          "17b02072abae30a6",
+          "213f10a86808072c",
+          "c24e80d37759babe",
+          "be7c51d9cb20ba40",
+          "324c9810c995037d",
+          "eb9bdb4ed06ddf7b",
+          "e302eba272c9fad6",
+          "a771c3ca93157387",
+          "26edb9202e277d28",
+          "54f00f2bf0f61afc",
+          "c3489cfbaf5b9b2a",
+          "8a86548f3476d2b2",
+          "be79e12906c4eb5d",
+          "ab704a193420697c",
+          "0c329f0ce93afa26",
+          "1c012385caa68aba",
+          "45655d961cb0dd8a",
+          "8171533cb5e0fb80",
+          "3264438531c104d1",
+          "413adfd73a4e4542",
+          "688971c0fc30ef1f",
+          "b24b0afc2223a397",
+          "32c2c9a4c6ee3540",
+          "074c68f03672f050",
+          "060e73905e00cbe7",
+          "b3ff6bf1df3cbe51"
+        ]
+      }
+    }
+  ],
+  "statements": {
+    "0053b6f2c79657de": "CREATE INDEX routine_result_deliveries_routine\n    ON routine_result_deliveries(routine_id, created_at DESC)",
+    "00acb60245c9ce5c": "CREATE TABLE projection_channel_routine_runs (\n    run_id TEXT PRIMARY KEY,\n    routine_id TEXT NOT NULL REFERENCES projection_channel_routines(routine_id) ON DELETE CASCADE,\n    channel_id TEXT NOT NULL,\n    trigger_id TEXT,\n    run_kind TEXT NOT NULL CHECK(run_kind IN ('scheduled', 'manual')),\n    scheduled_for TEXT NOT NULL,\n    routine_name TEXT NOT NULL,\n    instruction TEXT NOT NULL,\n    request_message_id TEXT,\n    status TEXT NOT NULL CHECK(status IN (\n      'queued', 'running', 'needs-attention', 'succeeded', 'failed', 'cancelled'\n    )),\n    error TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL, missed_count INTEGER CHECK(missed_count IS NULL OR missed_count >= 1), missed_until TEXT,\n    UNIQUE(trigger_id, scheduled_for)\n  )",
+    "00f4a2dd7596f541": "CREATE TABLE projection_deleted_thread_messages (\n    thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n    message_id TEXT NOT NULL CHECK(length(message_id) > 0),\n    deleted_at TEXT NOT NULL,\n    PRIMARY KEY(thread_id, message_id)\n  )",
+    "020c26df670fd64b": "CREATE TABLE projection_reactions (\n    agent_id TEXT NOT NULL,\n    message_id TEXT NOT NULL,\n    emoji TEXT NOT NULL,\n    actor_kind TEXT NOT NULL CHECK(actor_kind IN ('user', 'bot')),\n    actor_bot_id TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL,\n    PRIMARY KEY(agent_id, message_id, actor_kind, actor_bot_id)\n  )",
+    "0320c0d732f7e15d": "CREATE INDEX agent_memories_agent\n    ON projection_agent_memories(agent_id, updated_at DESC, memory_id)",
+    "0506acd0d04f04cb": "CREATE TABLE projection_direct_messages (\n    message_id TEXT PRIMARY KEY,\n    thread_id TEXT NOT NULL REFERENCES projection_direct_threads(thread_id) ON DELETE CASCADE,\n    sender_member_id TEXT NOT NULL,\n    recipient_member_id TEXT NOT NULL,\n    text TEXT NOT NULL,\n    created_at TEXT NOT NULL,\n    message_json TEXT NOT NULL CHECK(json_valid(message_json)),\n    last_event_sequence INTEGER NOT NULL\n  )",
+    "054143d4c8c41d4b": "CREATE INDEX mcp_servers_order ON projection_mcp_servers(position, mcp_server_id)",
+    "060e73905e00cbe7": "CREATE TABLE crm_private_fields (\n    field TEXT NOT NULL PRIMARY KEY CHECK(field IN ('name', 'contactName', 'contactEmail', 'phone',\n      'billingEmail', 'domain', 'taxId', 'address', 'stripeCustomerId', 'notes', 'amounts', 'dates', 'status',\n      'tags', 'plans', 'method', 'owner'))\n  )",
+    "06b774f493e0ddf6": "CREATE TABLE projection_thread_activities (\n    activity_id TEXT PRIMARY KEY,\n    thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n    turn_id TEXT,\n    activity_type TEXT NOT NULL,\n    payload_json TEXT NOT NULL CHECK(json_valid(payload_json)),\n    created_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL\n  )",
+    "074c68f03672f050": "CREATE INDEX crm_proposals_customer ON crm_proposals(customer_id) WHERE customer_id IS NOT NULL",
+    "0800b8f4be22d040": "CREATE TABLE projection_channel_routines (\n    routine_id TEXT PRIMARY KEY,\n    channel_id TEXT NOT NULL REFERENCES projection_channels(channel_id) ON DELETE CASCADE,\n    name TEXT NOT NULL,\n    instruction TEXT NOT NULL,\n    active INTEGER NOT NULL CHECK(active IN (0, 1)),\n    timezone TEXT NOT NULL,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL\n  )",
+    "087697f3ede0f213": "CREATE TABLE projection_pinned_thread_messages (\n    thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n    message_id TEXT NOT NULL CHECK(length(message_id) > 0),\n    pinned_at TEXT NOT NULL,\n    pinned_by_kind TEXT NOT NULL CHECK(pinned_by_kind IN ('person', 'agent')),\n    pinned_by_id TEXT CHECK(pinned_by_id IS NULL OR length(pinned_by_id) > 0),\n    pinned_by_name TEXT,\n    PRIMARY KEY(thread_id, message_id),\n    CHECK(\n      (pinned_by_kind = 'agent' AND pinned_by_id IS NOT NULL AND pinned_by_name IS NULL) OR\n      (pinned_by_kind = 'person' AND (pinned_by_id IS NULL) = (pinned_by_name IS NULL))\n    )\n  )",
+    "09994a47a86e513a": "CREATE TRIGGER agent_memory_insert AFTER INSERT ON projection_agent_memories BEGIN\n    INSERT INTO agent_memory_selections(memory_id) VALUES (new.memory_id);\n    INSERT INTO agent_memory_search(rowid, text) VALUES (new.rowid, new.text);\n  END",
+    "0b37cb8ca6deefdf": "CREATE TABLE projection_thread_reads (\n    thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n    member_id TEXT NOT NULL,\n    through_message_id TEXT,\n    updated_at TEXT NOT NULL,\n    PRIMARY KEY(thread_id, member_id)\n  )",
+    "0c329f0ce93afa26": "CREATE INDEX crm_payments_open ON crm_payments(due_on, number) WHERE paid_at IS NULL",
+    "0eacaec295b4a1dc": "CREATE INDEX routine_runs_status_updated ON projection_routine_runs(status, updated_at)",
+    "0f4bad6eb87db0c3": "CREATE INDEX agent_routines_agent\n    ON projection_agent_routines(agent_id, updated_at DESC, routine_id)",
+    "10e3054f0be5017b": "CREATE INDEX provider_history_staging_turn\n    ON provider_history_staging(session_id, turn_id, item_index, item_key)",
+    "114b8e8e5fd8266f": "CREATE TABLE projection_messaging_allowed_roles (\n    connection_id TEXT NOT NULL REFERENCES projection_messaging_connections(connection_id),\n    role_id TEXT NOT NULL,\n    role_name TEXT NOT NULL,\n    created_at TEXT NOT NULL,\n    PRIMARY KEY (connection_id, role_id)\n  )",
+    "134cc4ad91ca8125": "CREATE INDEX agent_usage_skill_loads_date ON agent_usage_skill_loads(agent_id, occurred_at)",
+    "13caac42ce861df9": "CREATE TABLE projection_routine_runs (\n    run_id TEXT PRIMARY KEY,\n    routine_id TEXT NOT NULL REFERENCES projection_agent_routines(routine_id) ON DELETE CASCADE,\n    agent_id TEXT NOT NULL,\n    trigger_id TEXT,\n    run_kind TEXT NOT NULL CHECK(run_kind IN ('scheduled', 'manual')),\n    scheduled_for TEXT NOT NULL,\n    routine_name TEXT NOT NULL,\n    instruction TEXT NOT NULL,\n    delivery_id TEXT,\n    status TEXT NOT NULL CHECK(status IN (\n      'queued', 'running', 'needs-attention', 'succeeded', 'failed', 'interrupted', 'cancelled'\n    )),\n    error TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL,\n    missed_count INTEGER CHECK(missed_count IS NULL OR missed_count >= 1),\n    missed_until TEXT,\n    UNIQUE(trigger_id, scheduled_for)\n  )",
+    "14808a8cfb4f3bcd": "CREATE INDEX agent_usage_activity_date ON agent_usage_activity(agent_id, occurred_at)",
+    "159d4a89abfa70ae": "CREATE INDEX orchestration_events_command\n    ON orchestration_events(command_id)",
+    "15d7b2806014d421": "CREATE TABLE orchestration_events (\n    sequence INTEGER PRIMARY KEY AUTOINCREMENT,\n    event_id TEXT NOT NULL UNIQUE,\n    command_id TEXT NOT NULL,\n    aggregate_type TEXT NOT NULL,\n    aggregate_id TEXT NOT NULL,\n    event_type TEXT NOT NULL,\n    occurred_at TEXT NOT NULL,\n    payload_json TEXT NOT NULL CHECK(json_valid(payload_json))\n  )",
+    "163d62820efcc913": "CREATE INDEX channel_routines_channel\n    ON projection_channel_routines(channel_id, updated_at DESC, routine_id)",
+    "17b02072abae30a6": "CREATE TABLE crm_sources (\n    source_id TEXT NOT NULL PRIMARY KEY CHECK(length(source_id) = 32),\n    kind TEXT NOT NULL UNIQUE CHECK(kind IN ('stripe')),\n    test_mode INTEGER NOT NULL CHECK(test_mode IN (0, 1)),\n    account_label TEXT NOT NULL DEFAULT '' CHECK(length(account_label) <= 200),\n    key_hint TEXT NOT NULL CHECK(length(key_hint) <= 8),\n    state TEXT NOT NULL CHECK(state IN ('syncing', 'ok', 'error')),\n    error_code TEXT CHECK(error_code IS NULL OR error_code IN ('invalid-key', 'permission', 'rate-limited',\n      'network', 'stripe')),\n    synced_at TEXT,\n    skipped_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(skipped_json)),\n    connected_at TEXT NOT NULL\n  )",
+    "17bc0def04314adc": "CREATE TABLE projection_thread_read_baselines (\n    thread_id TEXT PRIMARY KEY REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n    through_message_id TEXT,\n    initialized_at TEXT NOT NULL\n  )",
+    "188e4cbd669d0bf2": "CREATE INDEX workflow_steps_agent ON workflow_steps(agent_id) WHERE agent_id IS NOT NULL",
+    "1ad01a533e5dba1d": "CREATE UNIQUE INDEX channel_routine_runs_request\n    ON projection_channel_routine_runs(request_message_id) WHERE request_message_id IS NOT NULL",
+    "1c012385caa68aba": "CREATE INDEX crm_payments_paid ON crm_payments(paid_at, number) WHERE paid_at IS NOT NULL",
+    "1d76a4156dbb86d9": "CREATE TABLE projection_provider_sessions (\n    id TEXT PRIMARY KEY,\n    thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n    provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok', 'opencode', 'antigravity', 'acp', 'cursor')),\n    external_session_id TEXT NOT NULL,\n    model TEXT NOT NULL,\n    effort TEXT NOT NULL,\n    state TEXT NOT NULL CHECK(state IN ('active', 'inactive', 'failed')),\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    resume_cursor TEXT,\n    last_event_sequence INTEGER NOT NULL,\n    UNIQUE(provider, external_session_id)\n  )",
+    "1dee8cb3b7b25c42": "CREATE TABLE projection_channel_messages (\n    channel_id TEXT NOT NULL REFERENCES projection_channels(channel_id),\n    message_id TEXT NOT NULL,\n    sequence INTEGER NOT NULL,\n    message_json TEXT NOT NULL CHECK(json_valid(message_json)),\n    PRIMARY KEY(channel_id, message_id)\n  )",
+    "20012710f842f569": "CREATE INDEX idx_projection_messaging_history_sent\n    ON projection_messaging_history(connection_id, platform_channel_id, sent_at)",
+    "208b29e9b59e989a": "CREATE TABLE projection_routine_webhooks (\n    routine_id TEXT PRIMARY KEY REFERENCES projection_agent_routines(routine_id) ON DELETE CASCADE,\n    route_id TEXT NOT NULL UNIQUE,\n    event_type TEXT,\n    filters_json TEXT NOT NULL CHECK(json_valid(filters_json)),\n    secret_ciphertext TEXT NOT NULL,\n    url TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL\n  )",
+    "20eaa6c46b6427c8": "CREATE TABLE projection_agent_threads (\n    thread_id TEXT PRIMARY KEY REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n    agent_id TEXT NOT NULL,\n    legacy_task_id TEXT UNIQUE,\n    origin TEXT NOT NULL CHECK(origin IN ('user', 'agent')),\n    title TEXT NOT NULL,\n    title_source TEXT NOT NULL CHECK(title_source IN ('auto', 'agent', 'user')),\n    outcome TEXT CHECK(outcome IS NULL OR outcome IN ('completed', 'failed', 'interrupted')),\n    error TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    archived_at TEXT,\n    last_event_sequence INTEGER NOT NULL,\n    branch_source_thread_id TEXT,\n    branch_source_message_id TEXT,\n    branch_through_message_id TEXT\n  )",
+    "213f10a86808072c": "CREATE TABLE crm_source_ignored (\n    source_ref TEXT NOT NULL PRIMARY KEY CHECK(length(source_ref) BETWEEN 1 AND 255)\n  ) WITHOUT ROWID",
+    "24ab17b980bcc3b3": "CREATE INDEX channel_routine_triggers_due\n    ON projection_channel_routine_triggers(next_run_at, routine_id)",
+    "24b5ce1cc1b7791c": "CREATE TABLE projection_channel_tasks (\n    task_id TEXT PRIMARY KEY,\n    channel_id TEXT NOT NULL REFERENCES projection_channels(channel_id),\n    task_json TEXT NOT NULL CHECK(json_valid(task_json))\n  )",
+    "255b1a9f3fdfc16b": "CREATE INDEX workflow_github_actions_item ON workflow_github_actions(repository, number, created_at)",
+    "26edb9202e277d28": "CREATE INDEX crm_customer_tags_tag ON crm_customer_tags(tag_id)",
+    "29449c91273b087f": "CREATE TABLE browser_proxies (\n    proxy_id TEXT NOT NULL PRIMARY KEY CHECK(length(proxy_id) = 32),\n    kind TEXT NOT NULL DEFAULT 'address' CHECK(kind IN ('address', 'computer')),\n    scheme TEXT CHECK(scheme IN ('socks5', 'http', 'https')),\n    host TEXT CHECK(length(host) BETWEEN 1 AND 255),\n    port INTEGER CHECK(port BETWEEN 1 AND 65535),\n    username TEXT,\n    password BLOB,\n    member_id TEXT CHECK(length(member_id) BETWEEN 1 AND 255),\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    CHECK(password IS NULL OR username IS NOT NULL),\n    CHECK(\n      (kind = 'address' AND scheme IS NOT NULL AND host IS NOT NULL AND port IS NOT NULL AND member_id IS NULL)\n      OR (kind = 'computer' AND member_id IS NOT NULL AND scheme IS NULL AND host IS NULL AND port IS NULL\n        AND username IS NULL AND password IS NULL)\n    )\n  )",
+    "294f8ab8da4f8136": "CREATE TABLE projection_channel_reads (\n    channel_id TEXT NOT NULL REFERENCES projection_channels(channel_id),\n    member_id TEXT NOT NULL,\n    through_sequence INTEGER NOT NULL,\n    PRIMARY KEY(channel_id, member_id)\n  )",
+    "2acc498758cb0f52": "CREATE TABLE projection_channel_routine_runs (\n    run_id TEXT PRIMARY KEY,\n    routine_id TEXT NOT NULL REFERENCES projection_channel_routines(routine_id) ON DELETE CASCADE,\n    channel_id TEXT NOT NULL,\n    trigger_id TEXT,\n    run_kind TEXT NOT NULL CHECK(run_kind IN ('scheduled', 'manual')),\n    scheduled_for TEXT NOT NULL,\n    routine_name TEXT NOT NULL,\n    instruction TEXT NOT NULL,\n    request_message_id TEXT,\n    status TEXT NOT NULL CHECK(status IN (\n      'queued', 'running', 'needs-attention', 'succeeded', 'failed', 'cancelled'\n    )),\n    error TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL,\n    UNIQUE(trigger_id, scheduled_for)\n  )",
+    "2bd62f2ac6efdfbe": "CREATE TABLE workflow_output_deliveries (\n    step_id TEXT PRIMARY KEY REFERENCES workflow_steps(step_id) ON DELETE CASCADE,\n    connection_id TEXT NOT NULL REFERENCES projection_messaging_connections(connection_id),\n    place_id TEXT NOT NULL,\n    text TEXT NOT NULL,\n    status TEXT NOT NULL CHECK(status IN ('pending', 'sending', 'sent', 'failed', 'uncertain')),\n    reason TEXT,\n    attempts INTEGER NOT NULL DEFAULT 0 CHECK(attempts >= 0),\n    sent_at TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL\n  )",
+    "2d79003fac210881": "CREATE TABLE \"projection_provider_sessions\" (\n      id TEXT PRIMARY KEY,\n      thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n      provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok', 'opencode', 'antigravity', 'acp', 'cursor', 'cline')),\n      external_session_id TEXT NOT NULL,\n      model TEXT NOT NULL,\n      effort TEXT NOT NULL,\n      state TEXT NOT NULL CHECK(state IN ('active', 'inactive', 'failed')),\n      created_at TEXT NOT NULL,\n      updated_at TEXT NOT NULL,\n      resume_cursor TEXT,\n      last_event_sequence INTEGER NOT NULL,\n      UNIQUE(provider, external_session_id)\n    )",
+    "2d7e4ef7374984fc": "CREATE TABLE projection_agent_memories (\n    memory_id TEXT PRIMARY KEY,\n    agent_id TEXT NOT NULL,\n    text TEXT NOT NULL,\n    normalized_text TEXT NOT NULL,\n    origin TEXT NOT NULL CHECK(origin IN ('automatic', 'manual')),\n    source_turn_id TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL,\n    site TEXT CHECK(site IS NULL OR length(site) BETWEEN 1 AND 253),\n    UNIQUE(agent_id, normalized_text)\n  )",
+    "2ee39d761501afb1": "CREATE INDEX workflow_runs_recent ON workflow_runs(workflow_id, started_at DESC, run_id)",
+    "2f93eb469ade1152": "CREATE TABLE provider_history_staging (\n    session_id TEXT NOT NULL REFERENCES provider_history_imports(session_id) ON DELETE CASCADE,\n    turn_id TEXT NOT NULL,\n    item_key TEXT NOT NULL,\n    item_index INTEGER NOT NULL,\n    item_json TEXT NOT NULL CHECK(json_valid(item_json)),\n    imported INTEGER NOT NULL DEFAULT 0 CHECK(imported IN (0, 1)),\n    updated_at TEXT NOT NULL,\n    PRIMARY KEY(session_id, turn_id, item_key)\n  )",
+    "300c513b8d8ac77b": "CREATE TABLE routine_flow_links (\n    link_id TEXT PRIMARY KEY,\n    routine_id TEXT NOT NULL REFERENCES projection_agent_routines(routine_id) ON DELETE CASCADE,\n    from_agent_id TEXT NOT NULL,\n    to_agent_id TEXT NOT NULL,\n    instruction TEXT NOT NULL DEFAULT '',\n    created_at TEXT NOT NULL,\n    CHECK(from_agent_id <> to_agent_id),\n    UNIQUE(routine_id, from_agent_id, to_agent_id)\n  )",
+    "30ae3b2d9dffba90": "CREATE TABLE routine_flow_steps (\n    step_id TEXT PRIMARY KEY,\n    run_id TEXT NOT NULL REFERENCES projection_routine_runs(run_id) ON DELETE CASCADE,\n    agent_id TEXT NOT NULL,\n    delivery_id TEXT,\n    input TEXT NOT NULL,\n    output TEXT,\n    status TEXT NOT NULL CHECK(status IN ('running', 'succeeded', 'failed', 'skipped', 'cancelled')),\n    error TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    UNIQUE(run_id, agent_id)\n  )",
+    "3193ba8746a113ff": "CREATE TABLE crm_counters (\n    name TEXT NOT NULL PRIMARY KEY CHECK(name IN ('customer', 'payment')),\n    value INTEGER NOT NULL CHECK(value >= 0)\n  )",
+    "324c9810c995037d": "CREATE INDEX crm_customers_stripe ON crm_customers(stripe_customer_id) WHERE stripe_customer_id <> ''",
+    "3264438531c104d1": "CREATE TABLE crm_activity (\n    activity_id TEXT NOT NULL PRIMARY KEY CHECK(length(activity_id) = 32),\n    customer_id TEXT NOT NULL REFERENCES crm_customers(customer_id) ON DELETE CASCADE,\n    actor_kind TEXT NOT NULL CHECK(actor_kind IN ('person', 'agent', 'source')),\n    actor_id TEXT CHECK(actor_id IS NULL OR length(actor_id) BETWEEN 1 AND 255),\n    actor_name TEXT CHECK(actor_name IS NULL OR length(actor_name) <= 200),\n    kind TEXT NOT NULL CHECK(length(kind) BETWEEN 1 AND 48),\n    details_json TEXT NOT NULL CHECK(json_valid(details_json)),\n    proposed_by TEXT CHECK(proposed_by IS NULL OR length(proposed_by) BETWEEN 1 AND 255),\n    created_at TEXT NOT NULL\n  )",
+    "32c2c9a4c6ee3540": "CREATE INDEX crm_proposals_agent ON crm_proposals(agent_id) WHERE state = 'pending'",
+    "333c7ae7f374194a": "CREATE TABLE projection_attachments (\n    attachment_id TEXT PRIMARY KEY,\n    owner_kind TEXT NOT NULL,\n    owner_id TEXT NOT NULL,\n    name TEXT NOT NULL,\n    path TEXT NOT NULL,\n    metadata_json TEXT NOT NULL CHECK(json_valid(metadata_json)),\n    created_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL\n  )",
+    "33b4bf992f4842c9": "CREATE TABLE projection_routine_runs (\n    run_id TEXT PRIMARY KEY,\n    routine_id TEXT NOT NULL REFERENCES projection_agent_routines(routine_id) ON DELETE CASCADE,\n    agent_id TEXT NOT NULL,\n    trigger_id TEXT,\n    run_kind TEXT NOT NULL CHECK(run_kind IN ('scheduled', 'manual')),\n    scheduled_for TEXT NOT NULL,\n    routine_name TEXT NOT NULL,\n    instruction TEXT NOT NULL,\n    delivery_id TEXT,\n    status TEXT NOT NULL CHECK(status IN (\n      'queued', 'running', 'needs-attention', 'succeeded', 'failed', 'interrupted', 'cancelled'\n    )),\n    error TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL,\n    UNIQUE(trigger_id, scheduled_for)\n  )",
+    "35a3906b37da95d0": "CREATE TABLE projection_queue_state (\n    agent_id TEXT PRIMARY KEY,\n    paused INTEGER NOT NULL CHECK(paused IN (0, 1)),\n    metadata_json TEXT NOT NULL CHECK(json_valid(metadata_json)),\n    last_event_sequence INTEGER NOT NULL\n  )",
+    "36816e73135e7894": "CREATE UNIQUE INDEX routine_runs_delivery\n    ON projection_routine_runs(delivery_id) WHERE delivery_id IS NOT NULL",
+    "36aa16e13afe3297": "CREATE TABLE workflow_webhook_receipts (\n    receipt_id TEXT PRIMARY KEY,\n    workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id) ON DELETE CASCADE,\n    node_id TEXT NOT NULL,\n    delivery_id TEXT NOT NULL,\n    status TEXT NOT NULL CHECK(status IN ('started', 'ignored')),\n    reason TEXT CHECK(reason IS NULL OR reason IN ('busy', 'refused')),\n    run_id TEXT,\n    received_at TEXT NOT NULL,\n    UNIQUE(workflow_id, node_id, delivery_id)\n  )",
+    "3755520b73b2b665": "CREATE TABLE projection_provider_sessions (\n    id TEXT PRIMARY KEY,\n    thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n    provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok', 'opencode', 'antigravity')),\n    external_session_id TEXT NOT NULL,\n    model TEXT NOT NULL,\n    effort TEXT NOT NULL,\n    state TEXT NOT NULL CHECK(state IN ('active', 'inactive', 'failed')),\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    resume_cursor TEXT,\n    last_event_sequence INTEGER NOT NULL,\n    UNIQUE(provider, external_session_id)\n  )",
+    "386b03e29f73a08d": "CREATE TABLE browser_profile_proxies (\n    profile_id TEXT NOT NULL PRIMARY KEY REFERENCES browser_profiles(profile_id) ON DELETE CASCADE,\n    proxy_id TEXT NOT NULL REFERENCES browser_proxies(proxy_id) ON DELETE CASCADE\n  )",
+    "39400c5f0d1416ac": "CREATE TABLE projection_messaging_pings (\n    connection_id TEXT NOT NULL REFERENCES projection_messaging_connections(connection_id),\n    platform_channel_id TEXT NOT NULL,\n    thread_key TEXT NOT NULL,\n    user_id TEXT NOT NULL,\n    agent_id TEXT NOT NULL,\n    text TEXT NOT NULL,\n    created_at TEXT NOT NULL,\n    PRIMARY KEY (connection_id, platform_channel_id, thread_key, user_id)\n  )",
+    "3c5817a6ca48af51": "CREATE INDEX agent_waits_agent ON agent_waits(agent_id)",
+    "3c8b10b1a595bcc0": "CREATE TABLE provider_history_imports (\n    session_id TEXT PRIMARY KEY,\n    thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n    provider TEXT NOT NULL,\n    external_session_id TEXT NOT NULL,\n    cursor_json TEXT CHECK(cursor_json IS NULL OR json_valid(cursor_json)),\n    state TEXT NOT NULL CHECK(state IN ('pending', 'active', 'complete', 'failed')),\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    UNIQUE(provider, external_session_id)\n  )",
+    "3d703fc3327a38e3": "CREATE UNIQUE INDEX workflow_steps_delivery\n    ON workflow_steps(delivery_id) WHERE delivery_id IS NOT NULL",
+    "3dc42e60c107fb80": "CREATE TABLE projection_routine_runs (\n    run_id TEXT PRIMARY KEY,\n    routine_id TEXT NOT NULL REFERENCES projection_agent_routines(routine_id) ON DELETE CASCADE,\n    agent_id TEXT NOT NULL,\n    trigger_id TEXT,\n    run_kind TEXT NOT NULL CHECK(run_kind IN ('scheduled', 'manual')),\n    scheduled_for TEXT NOT NULL,\n    routine_name TEXT NOT NULL,\n    instruction TEXT NOT NULL,\n    delivery_id TEXT,\n    status TEXT NOT NULL CHECK(status IN (\n      'queued', 'running', 'needs-attention', 'succeeded', 'failed', 'interrupted', 'cancelled'\n    )),\n    error TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL, missed_count INTEGER CHECK(missed_count IS NULL OR missed_count >= 1), missed_until TEXT,\n    UNIQUE(trigger_id, scheduled_for)\n  )",
+    "3f205310c3eb5d46": "CREATE TABLE \"projection_reactions\" (\n      agent_id TEXT NOT NULL,\n      message_id TEXT NOT NULL,\n      emoji TEXT NOT NULL,\n      actor_kind TEXT NOT NULL CHECK(actor_kind IN ('user', 'bot')),\n      actor_bot_id TEXT NOT NULL,\n      updated_at TEXT NOT NULL,\n      last_event_sequence INTEGER NOT NULL,\n      PRIMARY KEY(agent_id, message_id, actor_kind, actor_bot_id)\n    )",
+    "3fc5890632b6b809": "CREATE TABLE \"projection_provider_sessions\" (\n      id TEXT PRIMARY KEY,\n      thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n      provider TEXT NOT NULL,\n      external_session_id TEXT NOT NULL,\n      model TEXT NOT NULL,\n      effort TEXT NOT NULL,\n      state TEXT NOT NULL CHECK(state IN ('active', 'inactive', 'failed')),\n      created_at TEXT NOT NULL,\n      updated_at TEXT NOT NULL,\n      resume_cursor TEXT,\n      last_event_sequence INTEGER NOT NULL,\n      UNIQUE(provider, external_session_id)\n    )",
+    "3fd6c0c1fb41db20": "CREATE TABLE projection_agent_memories (\n    memory_id TEXT PRIMARY KEY,\n    agent_id TEXT NOT NULL,\n    text TEXT NOT NULL,\n    normalized_text TEXT NOT NULL,\n    origin TEXT NOT NULL CHECK(origin IN ('automatic', 'manual')),\n    source_turn_id TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL,\n    UNIQUE(agent_id, normalized_text)\n  )",
+    "4110ac3c08ce5a66": "CREATE INDEX channel_assignments_channel ON projection_channel_assignments(channel_id)",
+    "413adfd73a4e4542": "CREATE INDEX crm_activity_customer ON crm_activity(customer_id, created_at DESC, activity_id DESC)",
+    "442db9321149f26b": "CREATE INDEX agent_memories_site\n    ON projection_agent_memories(agent_id, site) WHERE site IS NOT NULL",
+    "44b5d19a7ae2cca8": "CREATE INDEX direct_messages_thread\n    ON projection_direct_messages(thread_id, last_event_sequence)",
+    "4503eca57f31aa15": "CREATE TABLE projection_channel_assignments (\n    assignment_id TEXT PRIMARY KEY,\n    channel_id TEXT NOT NULL REFERENCES projection_channels(channel_id),\n    task_id TEXT NOT NULL REFERENCES projection_channel_tasks(task_id),\n    delivery_id TEXT UNIQUE,\n    assignment_json TEXT NOT NULL CHECK(json_valid(assignment_json))\n  )",
+    "454b786fb53e8f8b": "CREATE TABLE \"projection_provider_sessions\" (\n      id TEXT PRIMARY KEY,\n      thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n      provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok')),\n      external_session_id TEXT NOT NULL,\n      model TEXT NOT NULL,\n      effort TEXT NOT NULL,\n      state TEXT NOT NULL CHECK(state IN ('active', 'inactive', 'failed')),\n      created_at TEXT NOT NULL,\n      updated_at TEXT NOT NULL,\n      resume_cursor TEXT,\n      last_event_sequence INTEGER NOT NULL,\n      UNIQUE(provider, external_session_id)\n    )",
+    "45655d961cb0dd8a": "CREATE INDEX crm_payments_customer ON crm_payments(customer_id, due_on)",
+    "47042e589e1559ca": "CREATE INDEX workflow_github_deliveries_recent\n    ON workflow_github_deliveries(workflow_id, node_id, received_at DESC)",
+    "474c018c55b0c261": "CREATE INDEX attachments_owner ON projection_attachments(owner_kind, owner_id)",
+    "4a404a9059ffc4da": "CREATE TABLE workflows (\n    workflow_id TEXT PRIMARY KEY,\n    title TEXT NOT NULL CHECK(length(title) BETWEEN 1 AND 160),\n    graph_revision INTEGER NOT NULL DEFAULT 0 CHECK(graph_revision >= 0),\n    strokes_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(strokes_json)),\n    next_run_number INTEGER NOT NULL DEFAULT 1 CHECK(next_run_number >= 1),\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL\n  )",
+    "4a6f0a8f78175f2d": "CREATE INDEX provider_history_staging_pending\n    ON provider_history_staging(session_id, imported, turn_id, item_index)",
+    "4ad69b2cb1e68721": "CREATE TABLE projection_direct_threads (\n    thread_id TEXT PRIMARY KEY,\n    member_a_id TEXT NOT NULL,\n    member_b_id TEXT NOT NULL,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_message_id TEXT,\n    last_event_sequence INTEGER NOT NULL,\n    UNIQUE(member_a_id, member_b_id)\n  )",
+    "4b85086cafebe1e0": "CREATE INDEX thread_messages_order\n    ON projection_thread_messages(thread_id, created_at, ordinal)",
+    "4d2f3d213571289a": "CREATE INDEX routine_flow_links_to ON routine_flow_links(to_agent_id)",
+    "4e4d87d26243d7b6": "CREATE INDEX workflow_steps_solo\n    ON workflow_steps(workflow_id, created_at DESC, step_id) WHERE run_id IS NULL",
+    "4ece60dce82ccc39": "CREATE INDEX agent_usage_activity_occurred ON agent_usage_activity(occurred_at)",
+    "53963f56be02c336": "CREATE TABLE workflow_github_actions (\n    action_key TEXT PRIMARY KEY,\n    workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id) ON DELETE CASCADE,\n    run_id TEXT REFERENCES workflow_runs(run_id) ON DELETE CASCADE,\n    step_id TEXT NOT NULL,\n    repository TEXT NOT NULL,\n    number INTEGER CHECK(number IS NULL OR number >= 1),\n    action TEXT NOT NULL,\n    status TEXT NOT NULL CHECK(status IN ('sending', 'done')),\n    object_id TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL\n  )",
+    "5430dd425baf5537": "CREATE TABLE agent_memory_selections (\n    memory_id TEXT PRIMARY KEY REFERENCES projection_agent_memories(memory_id) ON DELETE CASCADE,\n    inclusion TEXT NOT NULL DEFAULT 'searchable' CHECK(inclusion IN ('essential', 'searchable')),\n    user_controlled INTEGER NOT NULL DEFAULT 0 CHECK(user_controlled IN (0, 1)),\n    revision INTEGER NOT NULL DEFAULT 0 CHECK(revision >= 0)\n  )",
+    "54f00f2bf0f61afc": "CREATE TABLE crm_plans (\n    plan_id TEXT NOT NULL PRIMARY KEY CHECK(length(plan_id) = 32),\n    customer_id TEXT NOT NULL REFERENCES crm_customers(customer_id) ON DELETE CASCADE,\n    name TEXT NOT NULL CHECK(length(name) BETWEEN 1 AND 80),\n    amount_minor INTEGER NOT NULL CHECK(amount_minor BETWEEN 0 AND 1000000000000),\n    every TEXT NOT NULL CHECK(every IN ('month', 'quarter', 'year', 'once')),\n    starts_on TEXT NOT NULL CHECK(starts_on GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),\n    ends_on TEXT CHECK(ends_on IS NULL OR (ends_on GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'\n      AND ends_on >= starts_on)),\n    source_id TEXT REFERENCES crm_sources(source_id) ON DELETE SET NULL,\n    source_ref TEXT CHECK(source_ref IS NULL OR length(source_ref) BETWEEN 1 AND 255),\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL\n  )",
+    "56473ecb26a8a62f": "CREATE TRIGGER agent_memory_delete AFTER DELETE ON projection_agent_memories BEGIN\n    INSERT INTO agent_memory_search(agent_memory_search, rowid, text) VALUES ('delete', old.rowid, old.text);\n  END",
+    "582f40d7935374f3": "CREATE TABLE projection_channel_routine_runs (\n    run_id TEXT PRIMARY KEY,\n    routine_id TEXT NOT NULL REFERENCES projection_channel_routines(routine_id) ON DELETE CASCADE,\n    channel_id TEXT NOT NULL,\n    trigger_id TEXT,\n    run_kind TEXT NOT NULL CHECK(run_kind IN ('scheduled', 'manual')),\n    scheduled_for TEXT NOT NULL,\n    routine_name TEXT NOT NULL,\n    instruction TEXT NOT NULL,\n    request_message_id TEXT,\n    status TEXT NOT NULL CHECK(status IN (\n      'queued', 'running', 'needs-attention', 'succeeded', 'failed', 'cancelled'\n    )),\n    error TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL, missed_count INTEGER CHECK(missed_count IS NULL OR missed_count >= 1), missed_until TEXT, run_source TEXT CHECK(run_source IS NULL OR run_source IN ('test', 'script', 'webhook')),\n    UNIQUE(trigger_id, scheduled_for)\n  )",
+    "58b58439a49610b5": "CREATE TABLE workflow_versions (\n    version_id TEXT PRIMARY KEY,\n    workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id) ON DELETE CASCADE,\n    graph_revision INTEGER NOT NULL CHECK(graph_revision >= 0),\n    kind TEXT NOT NULL CHECK(kind IN ('auto', 'restore', 'run')),\n    graph_json TEXT NOT NULL CHECK(json_valid(graph_json)),\n    created_at TEXT NOT NULL\n  )",
+    "5b2e32b096e98a60": "CREATE TABLE projection_agent_threads (\n    thread_id TEXT PRIMARY KEY REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n    agent_id TEXT NOT NULL,\n    legacy_task_id TEXT UNIQUE,\n    origin TEXT NOT NULL CHECK(origin IN ('user', 'agent')),\n    title TEXT NOT NULL,\n    title_source TEXT NOT NULL CHECK(title_source IN ('auto', 'agent', 'user')),\n    outcome TEXT CHECK(outcome IS NULL OR outcome IN ('completed', 'failed', 'interrupted')),\n    error TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    archived_at TEXT,\n    last_event_sequence INTEGER NOT NULL\n  )",
+    "5b6c47b72065b7a6": "CREATE INDEX workflow_github_actions_run ON workflow_github_actions(run_id)",
+    "5b744e487b298827": "CREATE TABLE projection_agent_routines (\n    routine_id TEXT PRIMARY KEY,\n    agent_id TEXT NOT NULL,\n    name TEXT NOT NULL,\n    instruction TEXT NOT NULL,\n    active INTEGER NOT NULL CHECK(active IN (0, 1)),\n    timezone TEXT NOT NULL,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL\n  , limit_policy TEXT NOT NULL DEFAULT 'wait' CHECK(limit_policy IN ('wait', 'skip')), missed_policy TEXT NOT NULL DEFAULT 'skip' CHECK(missed_policy IN ('skip', 'run-once')))",
+    "5b9db6570e4c4363": "CREATE TABLE projection_provider_sessions (\n    id TEXT PRIMARY KEY,\n    thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n    provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok', 'opencode')),\n    external_session_id TEXT NOT NULL,\n    model TEXT NOT NULL,\n    effort TEXT NOT NULL,\n    state TEXT NOT NULL CHECK(state IN ('active', 'inactive', 'failed')),\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    resume_cursor TEXT,\n    last_event_sequence INTEGER NOT NULL,\n    UNIQUE(provider, external_session_id)\n  )",
+    "5bdf87f25c5c5be0": "CREATE TABLE projection_thread_summaries (\n    summary_id TEXT PRIMARY KEY,\n    thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n    through_message_id TEXT,\n    summary_text TEXT NOT NULL,\n    estimated_tokens INTEGER NOT NULL,\n    created_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL\n  )",
+    "5c035f5ec0cef9a1": "CREATE TABLE projection_channel_routines (\n    routine_id TEXT PRIMARY KEY,\n    channel_id TEXT NOT NULL REFERENCES projection_channels(channel_id) ON DELETE CASCADE,\n    name TEXT NOT NULL,\n    instruction TEXT NOT NULL,\n    active INTEGER NOT NULL CHECK(active IN (0, 1)),\n    timezone TEXT NOT NULL,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL\n  , limit_policy TEXT NOT NULL DEFAULT 'wait' CHECK(limit_policy IN ('wait', 'skip')), missed_policy TEXT NOT NULL DEFAULT 'skip' CHECK(missed_policy IN ('skip', 'run-once')))",
+    "5c5fd65b0e7a2e76": "CREATE INDEX agent_usage_skill_loads_occurred ON agent_usage_skill_loads(occurred_at)",
+    "5dc170fe2990727f": "CREATE TABLE projection_routine_runs (\n    run_id TEXT PRIMARY KEY,\n    routine_id TEXT NOT NULL REFERENCES projection_agent_routines(routine_id) ON DELETE CASCADE,\n    agent_id TEXT NOT NULL,\n    trigger_id TEXT,\n    run_kind TEXT NOT NULL CHECK(run_kind IN ('scheduled', 'manual')),\n    scheduled_for TEXT NOT NULL,\n    routine_name TEXT NOT NULL,\n    instruction TEXT NOT NULL,\n    delivery_id TEXT,\n    status TEXT NOT NULL CHECK(status IN (\n      'queued', 'running', 'needs-attention', 'succeeded', 'failed', 'interrupted', 'cancelled'\n    )),\n    error TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL, missed_count INTEGER CHECK(missed_count IS NULL OR missed_count >= 1), missed_until TEXT, run_source TEXT CHECK(run_source IS NULL OR run_source IN ('test', 'script', 'webhook')),\n    UNIQUE(trigger_id, scheduled_for)\n  )",
+    "5e4303474998a5eb": "CREATE TABLE agent_usage_skill_loads (\n    agent_id TEXT NOT NULL,\n    load_id TEXT NOT NULL,\n    session_id TEXT NOT NULL,\n    turn_id TEXT NOT NULL,\n    provider TEXT NOT NULL,\n    model TEXT NOT NULL,\n    skill TEXT NOT NULL CHECK(length(skill) BETWEEN 1 AND 128),\n    tokens INTEGER CHECK(tokens IS NULL OR tokens >= 0),\n    estimated_cost_usd REAL CHECK(estimated_cost_usd IS NULL OR estimated_cost_usd >= 0),\n    occurred_at TEXT NOT NULL,\n    PRIMARY KEY(agent_id, load_id)\n  )",
+    "60116b283290fc98": "CREATE TABLE agent_usage_checkpoints (\n    agent_id TEXT NOT NULL,\n    counter_id TEXT NOT NULL,\n    tokens_json TEXT NOT NULL CHECK(json_valid(tokens_json)),\n    PRIMARY KEY(agent_id, counter_id)\n  )",
+    "60872b4dfbff7174": "CREATE TABLE \"projection_provider_sessions\" (\n      id TEXT PRIMARY KEY,\n      thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n      provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok', 'opencode', 'antigravity')),\n      external_session_id TEXT NOT NULL,\n      model TEXT NOT NULL,\n      effort TEXT NOT NULL,\n      state TEXT NOT NULL CHECK(state IN ('active', 'inactive', 'failed')),\n      created_at TEXT NOT NULL,\n      updated_at TEXT NOT NULL,\n      resume_cursor TEXT,\n      last_event_sequence INTEGER NOT NULL,\n      UNIQUE(provider, external_session_id)\n    )",
+    "622bba9256e0a02a": "CREATE TABLE workflow_runs (\n    run_id TEXT PRIMARY KEY,\n    workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id) ON DELETE CASCADE,\n    number INTEGER NOT NULL CHECK(number >= 1),\n    trigger_node_id TEXT,\n    from_node_id TEXT,\n    source TEXT NOT NULL CHECK(source IN ('manual', 'schedule', 'webhook', 'github', 'discord')),\n    scheduled_for TEXT,\n    idempotency_key TEXT NOT NULL,\n    graph_revision INTEGER NOT NULL CHECK(graph_revision >= 0),\n    graph_json TEXT NOT NULL CHECK(json_valid(graph_json)),\n    payload TEXT,\n    status TEXT NOT NULL CHECK(status IN ('running', 'approval', 'stopping', 'done', 'failed', 'stopped')),\n    error TEXT,\n    started_at TEXT NOT NULL,\n    ended_at TEXT,\n    updated_at TEXT NOT NULL,\n    UNIQUE(workflow_id, number),\n    UNIQUE(workflow_id, idempotency_key)\n  )",
+    "62e05ebd2b1be2be": "CREATE TABLE projection_channel_routines (\n    routine_id TEXT PRIMARY KEY,\n    channel_id TEXT NOT NULL REFERENCES projection_channels(channel_id) ON DELETE CASCADE,\n    name TEXT NOT NULL,\n    instruction TEXT NOT NULL,\n    active INTEGER NOT NULL CHECK(active IN (0, 1)),\n    timezone TEXT NOT NULL,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL\n  , limit_policy TEXT NOT NULL DEFAULT 'wait' CHECK(limit_policy IN ('wait', 'skip')))",
+    "64447cea22035dec": "CREATE TABLE projection_direct_reads (\n    thread_id TEXT NOT NULL REFERENCES projection_direct_threads(thread_id) ON DELETE CASCADE,\n    member_id TEXT NOT NULL,\n    last_read_sequence INTEGER NOT NULL,\n    updated_at TEXT NOT NULL,\n    PRIMARY KEY(thread_id, member_id)\n  )",
+    "6536f39aa1d4f63f": "CREATE TABLE projection_threads (\n    thread_id TEXT PRIMARY KEY,\n    agent_id TEXT NOT NULL,\n    title TEXT NOT NULL,\n    active_turn_id TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL\n  )",
+    "678a29b54363683c": "CREATE TABLE projection_channel_routine_runs (\n    run_id TEXT PRIMARY KEY,\n    routine_id TEXT NOT NULL REFERENCES projection_channel_routines(routine_id) ON DELETE CASCADE,\n    channel_id TEXT NOT NULL,\n    trigger_id TEXT,\n    run_kind TEXT NOT NULL CHECK(run_kind IN ('scheduled', 'manual')),\n    scheduled_for TEXT NOT NULL,\n    routine_name TEXT NOT NULL,\n    instruction TEXT NOT NULL,\n    request_message_id TEXT,\n    status TEXT NOT NULL CHECK(status IN (\n      'queued', 'running', 'needs-attention', 'succeeded', 'failed', 'cancelled'\n    )),\n    error TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL,\n    missed_count INTEGER CHECK(missed_count IS NULL OR missed_count >= 1),\n    missed_until TEXT,\n    UNIQUE(trigger_id, scheduled_for)\n  )",
+    "688971c0fc30ef1f": "CREATE TABLE crm_proposals (\n    proposal_id TEXT NOT NULL PRIMARY KEY CHECK(length(proposal_id) = 32),\n    agent_id TEXT NOT NULL CHECK(length(agent_id) BETWEEN 1 AND 255),\n    customer_id TEXT REFERENCES crm_customers(customer_id) ON DELETE CASCADE,\n    thread_id TEXT CHECK(thread_id IS NULL OR length(thread_id) BETWEEN 1 AND 255),\n    reason TEXT NOT NULL CHECK(length(reason) <= 1000),\n    change_json TEXT NOT NULL CHECK(json_valid(change_json)),\n    state TEXT NOT NULL DEFAULT 'pending' CHECK(state IN ('pending', 'approved', 'rejected')),\n    created_at TEXT NOT NULL,\n    decided_at TEXT,\n    decided_by_id TEXT,\n    decided_by_name TEXT,\n    CHECK((state = 'pending') = (decided_at IS NULL))\n  )",
+    "6a672cebb39cad0c": "CREATE INDEX channel_routine_runs_routine\n    ON projection_channel_routine_runs(routine_id, created_at DESC, run_id)",
+    "6beda140c579aaeb": "CREATE INDEX messaging_threads_agent ON projection_messaging_threads(agent_id, updated_at DESC)",
+    "6fa4246f83fbb687": "CREATE TABLE schema_migrations (\n    version INTEGER PRIMARY KEY,\n    applied_at TEXT NOT NULL\n  )",
+    "6fa6044e09b2d566": "CREATE INDEX orchestration_events_thread_type\n    ON orchestration_events(aggregate_id, event_type, sequence) WHERE aggregate_type = 'thread'",
+    "70aa114b23308e5b": "CREATE INDEX idx_projection_messaging_history_place\n    ON projection_messaging_history(connection_id, platform_channel_id, seq)",
+    "713fdd673bb050ea": "CREATE UNIQUE INDEX agent_threads_routine ON projection_agent_threads(agent_id, routine_id)\n    WHERE routine_id IS NOT NULL",
+    "7327b24c5fea1110": "CREATE INDEX workflow_nodes_agent ON workflow_nodes(agent_id) WHERE agent_id IS NOT NULL",
+    "73c353147d267569": "CREATE INDEX routine_triggers_due\n    ON projection_routine_triggers(next_run_at, routine_id)",
+    "74151fa7584abaac": "CREATE INDEX agent_usage_occurred ON agent_usage_records(occurred_at)",
+    "74c9dd1dc33a5650": "CREATE INDEX workflow_steps_open\n    ON workflow_steps(status) WHERE status IN ('running', 'approval')",
+    "7748a4765cd78c28": "CREATE TABLE projection_provider_sessions (\n    id TEXT PRIMARY KEY,\n    thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n    provider TEXT NOT NULL,\n    external_session_id TEXT NOT NULL,\n    model TEXT NOT NULL,\n    effort TEXT NOT NULL,\n    state TEXT NOT NULL CHECK(state IN ('active', 'inactive', 'failed')),\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    resume_cursor TEXT,\n    last_event_sequence INTEGER NOT NULL,\n    UNIQUE(provider, external_session_id)\n  )",
+    "778c8dcf3944cbd4": "CREATE TABLE \"workflow_runs\" (\n      run_id TEXT PRIMARY KEY,\n      workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id) ON DELETE CASCADE,\n      number INTEGER NOT NULL CHECK(number >= 1),\n      trigger_node_id TEXT,\n      from_node_id TEXT,\n      source TEXT NOT NULL CHECK(source IN ('manual', 'schedule', 'webhook', 'github', 'discord')),\n      scheduled_for TEXT,\n      idempotency_key TEXT NOT NULL,\n      graph_revision INTEGER NOT NULL CHECK(graph_revision >= 0),\n      graph_json TEXT NOT NULL CHECK(json_valid(graph_json)),\n      payload TEXT,\n      status TEXT NOT NULL CHECK(status IN ('running', 'approval', 'stopping', 'done', 'failed', 'stopped')),\n      error TEXT,\n      started_at TEXT NOT NULL,\n      ended_at TEXT,\n      updated_at TEXT NOT NULL,\n      UNIQUE(workflow_id, number),\n      UNIQUE(workflow_id, idempotency_key)\n    )",
+    "7952fdcd1a1e994c": "CREATE TABLE projection_agent_routines (\n    routine_id TEXT PRIMARY KEY,\n    agent_id TEXT NOT NULL,\n    name TEXT NOT NULL,\n    instruction TEXT NOT NULL,\n    active INTEGER NOT NULL CHECK(active IN (0, 1)),\n    timezone TEXT NOT NULL,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL\n  , limit_policy TEXT NOT NULL DEFAULT 'wait' CHECK(limit_policy IN ('wait', 'skip')))",
+    "7a0526e83fa8b6f9": "CREATE TABLE projection_turns (\n    turn_id TEXT PRIMARY KEY,\n    thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n    provider_session_id TEXT REFERENCES projection_provider_sessions(id) ON DELETE SET NULL,\n    status TEXT NOT NULL,\n    started_at TEXT NOT NULL,\n    completed_at TEXT,\n    last_event_sequence INTEGER NOT NULL\n  )",
+    "7a654c8eef30df9d": "CREATE UNIQUE INDEX workflow_steps_attempt\n    ON workflow_steps(run_id, node_id, attempt) WHERE run_id IS NOT NULL",
+    "7a7e7b3febe454fa": "CREATE TABLE workflow_edges (\n    workflow_id TEXT NOT NULL,\n    edge_id TEXT NOT NULL,\n    position INTEGER NOT NULL CHECK(position >= 0),\n    from_node_id TEXT NOT NULL,\n    to_node_id TEXT NOT NULL,\n    port_type TEXT NOT NULL CHECK(port_type IN ('text', 'image', 'file')),\n    branch TEXT CHECK(branch IS NULL OR branch IN ('yes', 'no')),\n    CHECK(from_node_id <> to_node_id),\n    PRIMARY KEY(workflow_id, edge_id),\n    FOREIGN KEY(workflow_id, from_node_id) REFERENCES workflow_nodes(workflow_id, node_id) ON DELETE CASCADE,\n    FOREIGN KEY(workflow_id, to_node_id) REFERENCES workflow_nodes(workflow_id, node_id) ON DELETE CASCADE\n  )",
+    "7c815d23c57282ca": "CREATE TABLE routine_flow_positions (\n    canvas_agent_id TEXT NOT NULL,\n    node_key TEXT NOT NULL,\n    x REAL NOT NULL,\n    y REAL NOT NULL,\n    updated_at TEXT NOT NULL,\n    PRIMARY KEY(canvas_agent_id, node_key)\n  )",
+    "7ce3f8b06078e9a2": "CREATE TABLE workflow_trigger_webhooks (\n    workflow_id TEXT NOT NULL,\n    node_id TEXT NOT NULL,\n    route_id TEXT NOT NULL UNIQUE,\n    secret_ciphertext TEXT NOT NULL,\n    url TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    PRIMARY KEY(workflow_id, node_id),\n    FOREIGN KEY(workflow_id, node_id) REFERENCES workflow_triggers(workflow_id, node_id) ON DELETE CASCADE\n  )",
+    "7d36847da1ab1bf4": "CREATE TABLE workflow_runs (\n    run_id TEXT PRIMARY KEY,\n    workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id) ON DELETE CASCADE,\n    number INTEGER NOT NULL CHECK(number >= 1),\n    trigger_node_id TEXT,\n    from_node_id TEXT,\n    source TEXT NOT NULL CHECK(source IN ('manual', 'schedule', 'webhook', 'github')),\n    scheduled_for TEXT,\n    idempotency_key TEXT NOT NULL,\n    graph_revision INTEGER NOT NULL CHECK(graph_revision >= 0),\n    graph_json TEXT NOT NULL CHECK(json_valid(graph_json)),\n    payload TEXT,\n    status TEXT NOT NULL CHECK(status IN ('running', 'approval', 'stopping', 'done', 'failed', 'stopped')),\n    error TEXT,\n    started_at TEXT NOT NULL,\n    ended_at TEXT,\n    updated_at TEXT NOT NULL,\n    UNIQUE(workflow_id, number),\n    UNIQUE(workflow_id, idempotency_key)\n  )",
+    "7e46c6a08409e7c6": "CREATE TABLE projection_channels (\n    channel_id TEXT PRIMARY KEY,\n    channel_json TEXT NOT NULL CHECK(json_valid(channel_json))\n  )",
+    "80fdaf7bf05421f4": "CREATE TABLE projection_channel_routine_webhooks (\n    routine_id TEXT PRIMARY KEY REFERENCES projection_channel_routines(routine_id) ON DELETE CASCADE,\n    route_id TEXT NOT NULL UNIQUE,\n    event_type TEXT,\n    filters_json TEXT NOT NULL CHECK(json_valid(filters_json)),\n    secret_ciphertext TEXT NOT NULL,\n    url TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL\n  )",
+    "8171533cb5e0fb80": "CREATE INDEX crm_payments_plan ON crm_payments(plan_id) WHERE plan_id IS NOT NULL",
+    "8329a49d1bf1263c": "CREATE TABLE projection_channel_contexts (\n    channel_id TEXT NOT NULL REFERENCES projection_channels(channel_id),\n    agent_id TEXT NOT NULL,\n    thread_id TEXT NOT NULL UNIQUE REFERENCES projection_threads(thread_id),\n    session_id TEXT,\n    through_sequence INTEGER NOT NULL DEFAULT 0,\n    summary_version INTEGER NOT NULL DEFAULT 0,\n    PRIMARY KEY(channel_id, agent_id)\n  )",
+    "84cdaa52a85017b1": "CREATE INDEX workflow_runs_open\n    ON workflow_runs(status) WHERE status IN ('running', 'approval', 'stopping')",
+    "855bbae408042552": "CREATE INDEX channel_memories_channel\n    ON projection_channel_memories(channel_id, updated_at DESC, memory_id)",
+    "87c5a06e45d10962": "CREATE INDEX agent_threads_agent ON projection_agent_threads(agent_id, created_at DESC)",
+    "882e9a500d12db8c": "CREATE INDEX webhook_receipts_recent\n    ON projection_webhook_receipts(owner_kind, routine_id, received_at DESC, receipt_id)",
+    "8a86548f3476d2b2": "CREATE UNIQUE INDEX crm_plans_source ON crm_plans(source_ref) WHERE source_ref IS NOT NULL",
+    "8afcde681016cbcf": "CREATE TABLE projection_agent_threads (\n    thread_id TEXT PRIMARY KEY REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n    agent_id TEXT NOT NULL,\n    legacy_task_id TEXT UNIQUE,\n    origin TEXT NOT NULL CHECK(origin IN ('user', 'agent')),\n    title TEXT NOT NULL,\n    title_source TEXT NOT NULL CHECK(title_source IN ('auto', 'agent', 'user')),\n    outcome TEXT CHECK(outcome IS NULL OR outcome IN ('completed', 'failed', 'interrupted')),\n    error TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    archived_at TEXT,\n    last_event_sequence INTEGER NOT NULL,\n    branch_source_thread_id TEXT,\n    branch_source_message_id TEXT,\n    branch_through_message_id TEXT,\n    routine_id TEXT\n  )",
+    "8ffaab8ac1f36fe1": "CREATE TABLE projection_agents (\n    agent_id TEXT PRIMARY KEY,\n    thread_id TEXT,\n    model TEXT NOT NULL,\n    updated_at TEXT,\n    sort_order INTEGER NOT NULL,\n    agent_json TEXT NOT NULL CHECK(json_valid(agent_json)),\n    last_event_sequence INTEGER NOT NULL\n  )",
+    "92a94c6acdc3419f": "CREATE INDEX provider_sessions_thread\n      ON projection_provider_sessions(thread_id, provider, state)",
+    "939f6728620744f0": "CREATE TABLE projection_agent_memories (\n    memory_id TEXT PRIMARY KEY,\n    agent_id TEXT NOT NULL,\n    text TEXT NOT NULL,\n    normalized_text TEXT NOT NULL,\n    origin TEXT NOT NULL CHECK(origin IN ('automatic', 'manual')),\n    source_turn_id TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL, site TEXT CHECK(site IS NULL OR length(site) BETWEEN 1 AND 253),\n    UNIQUE(agent_id, normalized_text)\n  )",
+    "94a45939fc0c9da2": "CREATE INDEX orchestration_events_aggregate\n    ON orchestration_events(aggregate_type, aggregate_id, sequence)",
+    "961125f79b117edd": "CREATE TABLE routine_result_deliveries (\n    run_id TEXT PRIMARY KEY REFERENCES projection_routine_runs(run_id) ON DELETE CASCADE,\n    routine_id TEXT NOT NULL,\n    agent_id TEXT NOT NULL,\n    connection_id TEXT NOT NULL,\n    platform TEXT NOT NULL,\n    connection_name TEXT NOT NULL,\n    place_id TEXT NOT NULL,\n    place_name TEXT NOT NULL,\n    text TEXT,\n    status TEXT NOT NULL CHECK(status IN ('pending', 'sending', 'sent', 'failed', 'uncertain', 'quiet')),\n    reason TEXT,\n    attempts INTEGER NOT NULL DEFAULT 0 CHECK(attempts >= 0),\n    next_attempt_at TEXT,\n    expires_at TEXT,\n    sent_at TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL\n  )",
+    "97053d4d708b72dc": "CREATE INDEX routine_flow_steps_running ON routine_flow_steps(created_at, step_id)\n    WHERE status = 'running'",
+    "9921864c2e5c6bfe": "CREATE INDEX channel_tasks_channel ON projection_channel_tasks(channel_id)",
+    "99a98ef4923471ce": "CREATE TABLE workflow_nodes (\n    workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id) ON DELETE CASCADE,\n    node_id TEXT NOT NULL,\n    position INTEGER NOT NULL CHECK(position >= 0),\n    kind TEXT NOT NULL CHECK(kind IN ('text', 'prompt', 'asset', 'llm', 'agent', 'image', 'trigger', 'condition',\n      'approval', 'output', 'note', 'shape')),\n    agent_id TEXT,\n    x REAL NOT NULL,\n    y REAL NOT NULL,\n    width REAL,\n    height REAL,\n    font REAL,\n    locked INTEGER NOT NULL DEFAULT 0 CHECK(locked IN (0, 1)),\n    fields_json TEXT NOT NULL CHECK(json_valid(fields_json)),\n    schedule_json TEXT CHECK(schedule_json IS NULL OR (kind = 'trigger' AND json_valid(schedule_json))),\n    PRIMARY KEY(workflow_id, node_id)\n  )",
+    "9af4ef0e2f26f9ca": "CREATE TABLE projection_provider_sessions (\n    id TEXT PRIMARY KEY,\n    thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n    provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok')),\n    external_session_id TEXT NOT NULL,\n    model TEXT NOT NULL,\n    effort TEXT NOT NULL,\n    state TEXT NOT NULL CHECK(state IN ('active', 'inactive', 'failed')),\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    resume_cursor TEXT,\n    last_event_sequence INTEGER NOT NULL,\n    UNIQUE(provider, external_session_id)\n  )",
+    "9baa17e5c53a0efe": "CREATE TABLE projection_channel_routine_runs (\n    run_id TEXT PRIMARY KEY,\n    routine_id TEXT NOT NULL REFERENCES projection_channel_routines(routine_id) ON DELETE CASCADE,\n    channel_id TEXT NOT NULL,\n    trigger_id TEXT,\n    run_kind TEXT NOT NULL CHECK(run_kind IN ('scheduled', 'manual')),\n    scheduled_for TEXT NOT NULL,\n    routine_name TEXT NOT NULL,\n    instruction TEXT NOT NULL,\n    request_message_id TEXT,\n    status TEXT NOT NULL CHECK(status IN (\n      'queued', 'running', 'needs-attention', 'succeeded', 'failed', 'cancelled'\n    )),\n    error TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL,\n    missed_count INTEGER CHECK(missed_count IS NULL OR missed_count >= 1),\n    missed_until TEXT,\n    run_source TEXT CHECK(run_source IS NULL OR run_source IN ('test', 'script', 'webhook')),\n    UNIQUE(trigger_id, scheduled_for)\n  )",
+    "9ce7be1b16eaa732": "CREATE TABLE crm_statuses (\n    status_id TEXT NOT NULL PRIMARY KEY\n      CHECK(length(status_id) = 32 OR status_id IN ('lead', 'customer', 'former')),\n    label TEXT COLLATE NOCASE UNIQUE CHECK(label IS NULL OR length(label) BETWEEN 1 AND 80),\n    tone TEXT NOT NULL\n      CHECK(tone IN ('info-light', 'secondary', 'outline', 'warning-light', 'success-light', 'primary-light')),\n    position INTEGER NOT NULL CHECK(position >= 0),\n    created_at TEXT NOT NULL,\n    CHECK((status_id IN ('lead', 'customer', 'former')) = (label IS NULL))\n  )",
+    "9fe27ba1abec0160": "CREATE TABLE projection_mailbox_messages (\n    message_id TEXT PRIMARY KEY,\n    sender_kind TEXT NOT NULL,\n    sender_agent_id TEXT,\n    text TEXT NOT NULL,\n    reply_to_message_id TEXT,\n    created_at TEXT NOT NULL,\n    message_json TEXT NOT NULL CHECK(json_valid(message_json)),\n    last_event_sequence INTEGER NOT NULL\n  )",
+    "a0ea911ffe2e284b": "CREATE TABLE projection_agent_routines (\n    routine_id TEXT PRIMARY KEY,\n    agent_id TEXT NOT NULL,\n    name TEXT NOT NULL,\n    instruction TEXT NOT NULL,\n    active INTEGER NOT NULL CHECK(active IN (0, 1)),\n    timezone TEXT NOT NULL,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL,\n    limit_policy TEXT NOT NULL DEFAULT 'wait' CHECK(limit_policy IN ('wait', 'skip'))\n  )",
+    "a16bc095d275006e": "CREATE INDEX routine_result_deliveries_status\n    ON routine_result_deliveries(status, next_attempt_at)",
+    "a2c83eebd805be00": "CREATE INDEX routine_runs_routine\n    ON projection_routine_runs(routine_id, created_at DESC, run_id)",
+    "a363599c4127c6bf": "CREATE INDEX routine_flow_steps_updated ON routine_flow_steps(updated_at)",
+    "a53ccfcbc2ea583f": "CREATE INDEX workflow_triggers_due\n    ON workflow_triggers(next_due_at) WHERE next_due_at IS NOT NULL",
+    "a771c3ca93157387": "CREATE TABLE crm_customer_tags (\n    customer_id TEXT NOT NULL REFERENCES crm_customers(customer_id) ON DELETE CASCADE,\n    tag_id TEXT NOT NULL REFERENCES crm_tags(tag_id) ON DELETE CASCADE,\n    PRIMARY KEY (customer_id, tag_id)\n  ) WITHOUT ROWID",
+    "a86dea9968869cef": "CREATE TABLE projection_agent_tasks (\n    task_id TEXT PRIMARY KEY,\n    agent_id TEXT NOT NULL,\n    thread_id TEXT NOT NULL UNIQUE REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n    origin TEXT NOT NULL CHECK(origin IN ('user', 'agent')),\n    title TEXT NOT NULL,\n    outcome TEXT CHECK(outcome IS NULL OR outcome IN ('completed', 'failed', 'interrupted')),\n    error TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    closed_at TEXT,\n    last_event_sequence INTEGER NOT NULL\n  )",
+    "a99baffe60a6d144": "CREATE TABLE projection_messaging_memories (\n    memory_id TEXT PRIMARY KEY,\n    connection_id TEXT NOT NULL REFERENCES projection_messaging_connections(connection_id),\n    text TEXT NOT NULL,\n    normalized_text TEXT NOT NULL,\n    origin TEXT NOT NULL CHECK(origin IN ('automatic', 'manual')),\n    source_turn_id TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL,\n    UNIQUE(connection_id, normalized_text)\n  )",
+    "aa33528f340c0b3c": "CREATE TABLE projection_agent_threads (\n    thread_id TEXT PRIMARY KEY REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n    agent_id TEXT NOT NULL,\n    legacy_task_id TEXT UNIQUE,\n    origin TEXT NOT NULL CHECK(origin IN ('user', 'agent')),\n    title TEXT NOT NULL,\n    title_source TEXT NOT NULL CHECK(title_source IN ('auto', 'agent', 'user')),\n    outcome TEXT CHECK(outcome IS NULL OR outcome IN ('completed', 'failed', 'interrupted')),\n    error TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    archived_at TEXT,\n    last_event_sequence INTEGER NOT NULL\n  , branch_source_thread_id TEXT, branch_source_message_id TEXT, branch_through_message_id TEXT, routine_id TEXT)",
+    "aabe8fbd0ae3ab44": "CREATE TABLE projection_channel_routines (\n    routine_id TEXT PRIMARY KEY,\n    channel_id TEXT NOT NULL REFERENCES projection_channels(channel_id) ON DELETE CASCADE,\n    name TEXT NOT NULL,\n    instruction TEXT NOT NULL,\n    active INTEGER NOT NULL CHECK(active IN (0, 1)),\n    timezone TEXT NOT NULL,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL,\n    limit_policy TEXT NOT NULL DEFAULT 'wait' CHECK(limit_policy IN ('wait', 'skip')),\n    missed_policy TEXT NOT NULL DEFAULT 'skip' CHECK(missed_policy IN ('skip', 'run-once'))\n  )",
+    "ab704a193420697c": "CREATE UNIQUE INDEX crm_payments_source ON crm_payments(source_ref) WHERE source_ref IS NOT NULL",
+    "ad2c1fa7d27d41a7": "CREATE TABLE projection_thread_messages (\n    thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n    message_id TEXT NOT NULL,\n    turn_id TEXT,\n    author TEXT NOT NULL,\n    status TEXT NOT NULL,\n    item_type TEXT,\n    created_at TEXT NOT NULL,\n    ordinal INTEGER NOT NULL,\n    message_json TEXT NOT NULL CHECK(json_valid(message_json)),\n    last_event_sequence INTEGER NOT NULL,\n    group_start TEXT,\n    group_first INTEGER,\n    group_id TEXT,\n    turn_rank INTEGER,\n    PRIMARY KEY(thread_id, message_id)\n  )",
+    "ae410272e1211b80": "CREATE TABLE projection_messaging_allowed_senders (\n    connection_id TEXT NOT NULL REFERENCES projection_messaging_connections(connection_id),\n    sender_id TEXT NOT NULL,\n    kind TEXT NOT NULL CHECK(kind IN ('contact', 'group')),\n    name TEXT NOT NULL,\n    created_at TEXT NOT NULL,\n    PRIMARY KEY (connection_id, sender_id)\n  )",
+    "aea8628ea2cfa725": "CREATE TABLE projection_webhook_route_revocations (\n    route_id TEXT PRIMARY KEY,\n    created_at TEXT NOT NULL\n  )",
+    "aeb25f3c9cf6436f": "CREATE TABLE projection_reactions (\n    agent_id TEXT NOT NULL,\n    message_id TEXT NOT NULL,\n    emoji TEXT NOT NULL,\n    actor_kind TEXT NOT NULL CHECK(actor_kind IN ('user', 'agent')),\n    actor_agent_id TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL,\n    PRIMARY KEY(agent_id, message_id, actor_kind, actor_agent_id)\n  )",
+    "aef3c078d5d2b584": "CREATE TABLE projection_webhook_receipts (\n    receipt_id TEXT PRIMARY KEY,\n    owner_kind TEXT NOT NULL CHECK(owner_kind IN ('agent', 'channel')),\n    routine_id TEXT NOT NULL,\n    delivery_id TEXT NOT NULL,\n    event_type TEXT NOT NULL,\n    status TEXT NOT NULL CHECK(status IN ('started', 'ignored')),\n    reason TEXT CHECK(reason IS NULL OR reason IN ('event-type', 'filter', 'inactive')),\n    run_id TEXT,\n    received_at TEXT NOT NULL,\n    UNIQUE(owner_kind, routine_id, delivery_id)\n  )",
+    "b05036f9c71064ee": "CREATE TABLE projection_messaging_threads (\n    link_id TEXT PRIMARY KEY,\n    connection_id TEXT NOT NULL REFERENCES projection_messaging_connections(connection_id),\n    agent_id TEXT NOT NULL,\n    platform_channel_id TEXT NOT NULL,\n    thread_key TEXT NOT NULL,\n    is_direct INTEGER NOT NULL CHECK(is_direct IN (0, 1)),\n    thread_id TEXT NOT NULL UNIQUE REFERENCES projection_threads(thread_id),\n    title TEXT NOT NULL,\n    history_cursor TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    UNIQUE(connection_id, platform_channel_id, thread_key)\n  )",
+    "b24b0afc2223a397": "CREATE INDEX crm_proposals_pending ON crm_proposals(created_at DESC, proposal_id DESC)\n    WHERE state = 'pending'",
+    "b2936bde871c0b7d": "CREATE TABLE workflow_runs (\n    run_id TEXT PRIMARY KEY,\n    workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id) ON DELETE CASCADE,\n    number INTEGER NOT NULL CHECK(number >= 1),\n    trigger_node_id TEXT,\n    from_node_id TEXT,\n    source TEXT NOT NULL CHECK(source IN ('manual', 'schedule', 'webhook', 'github', 'discord', 'telegram', 'slack')),\n    scheduled_for TEXT,\n    idempotency_key TEXT NOT NULL,\n    graph_revision INTEGER NOT NULL CHECK(graph_revision >= 0),\n    graph_json TEXT NOT NULL CHECK(json_valid(graph_json)),\n    payload TEXT,\n    status TEXT NOT NULL CHECK(status IN ('running', 'approval', 'stopping', 'done', 'failed', 'stopped')),\n    error TEXT,\n    started_at TEXT NOT NULL,\n    ended_at TEXT,\n    updated_at TEXT NOT NULL,\n    UNIQUE(workflow_id, number),\n    UNIQUE(workflow_id, idempotency_key)\n  )",
+    "b3b1654a1ae23760": "CREATE INDEX thread_messages_turn ON projection_thread_messages(thread_id, turn_id)",
+    "b3ff6bf1df3cbe51": "CREATE TABLE crm_agent_access (\n    agent_id TEXT NOT NULL PRIMARY KEY CHECK(length(agent_id) BETWEEN 1 AND 255),\n    granted_at TEXT NOT NULL\n  )",
+    "b5f403404a29c59f": "CREATE TABLE \"projection_provider_sessions\" (\n      id TEXT PRIMARY KEY,\n      thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n      provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok', 'opencode', 'antigravity', 'acp', 'cursor')),\n      external_session_id TEXT NOT NULL,\n      model TEXT NOT NULL,\n      effort TEXT NOT NULL,\n      state TEXT NOT NULL CHECK(state IN ('active', 'inactive', 'failed')),\n      created_at TEXT NOT NULL,\n      updated_at TEXT NOT NULL,\n      resume_cursor TEXT,\n      last_event_sequence INTEGER NOT NULL,\n      UNIQUE(provider, external_session_id)\n    )",
+    "b5f52c78ff7b6493": "CREATE UNIQUE INDEX browser_proxies_computer ON browser_proxies(member_id) WHERE kind = 'computer'",
+    "b6b779f972dfc66a": "CREATE TABLE projection_messaging_connections (\n    connection_id TEXT PRIMARY KEY,\n    platform TEXT NOT NULL,\n    workspace_id TEXT NOT NULL,\n    workspace_name TEXT NOT NULL,\n    enabled INTEGER NOT NULL CHECK(enabled IN (0, 1)),\n    bot_user_id TEXT,\n    app_id TEXT,\n    orchestrator_agent_id TEXT,\n    last_error_code TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    UNIQUE(platform, workspace_id)\n  )",
+    "b6e9ef0c3a508271": "CREATE INDEX direct_threads_member_b\n    ON projection_direct_threads(member_b_id, updated_at DESC)",
+    "b8b94622fa3d16d5": "CREATE UNIQUE INDEX routine_flow_steps_delivery\n    ON routine_flow_steps(delivery_id) WHERE delivery_id IS NOT NULL",
+    "ba62871cdd4e70f6": "CREATE TABLE projection_reactions (\n    agent_id TEXT NOT NULL,\n    message_id TEXT NOT NULL,\n    emoji TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL,\n    PRIMARY KEY(agent_id, message_id)\n  )",
+    "bbd84eb86c74d61d": "CREATE TRIGGER agent_memory_update AFTER UPDATE ON projection_agent_memories BEGIN\n    INSERT INTO agent_memory_search(agent_memory_search, rowid, text) VALUES ('delete', old.rowid, old.text);\n    INSERT INTO agent_memory_search(rowid, text) VALUES (new.rowid, new.text);\n    UPDATE agent_memory_selections SET revision = revision + 1 WHERE memory_id = new.memory_id;\n  END",
+    "bc9420e43dae1065": "CREATE TABLE projection_routine_triggers (\n    trigger_id TEXT PRIMARY KEY,\n    routine_id TEXT NOT NULL REFERENCES projection_agent_routines(routine_id) ON DELETE CASCADE,\n    schedule_json TEXT NOT NULL CHECK(json_valid(schedule_json)),\n    next_run_at TEXT NOT NULL,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL,\n    UNIQUE(routine_id)\n  )",
+    "be79e12906c4eb5d": "CREATE TABLE crm_payments (\n    payment_id TEXT NOT NULL PRIMARY KEY CHECK(length(payment_id) = 32),\n    number INTEGER NOT NULL UNIQUE CHECK(number >= 1),\n    customer_id TEXT NOT NULL REFERENCES crm_customers(customer_id) ON DELETE CASCADE,\n    plan_id TEXT REFERENCES crm_plans(plan_id) ON DELETE SET NULL,\n    label TEXT NOT NULL CHECK(length(label) BETWEEN 1 AND 80),\n    amount_minor INTEGER NOT NULL CHECK(amount_minor BETWEEN 0 AND 1000000000000),\n    due_on TEXT NOT NULL CHECK(due_on GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),\n    paid_at TEXT CHECK(paid_at IS NULL OR length(paid_at) BETWEEN 1 AND 64),\n    method TEXT CHECK(method IS NULL OR method IN ('stripe', 'transfer', 'crypto', 'paypal', 'cash')),\n    source_id TEXT REFERENCES crm_sources(source_id) ON DELETE SET NULL,\n    source_ref TEXT CHECK(source_ref IS NULL OR length(source_ref) BETWEEN 1 AND 255),\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL\n  )",
+    "be7c51d9cb20ba40": "CREATE INDEX crm_customers_status ON crm_customers(status_id)",
+    "bf2ea5b835618622": "CREATE INDEX workflow_github_runs_item\n    ON workflow_github_runs(repository, number, started_at)",
+    "c0ad21eede1e95f5": "CREATE TABLE workflow_triggers (\n    workflow_id TEXT NOT NULL,\n    node_id TEXT NOT NULL,\n    kind TEXT NOT NULL CHECK(kind IN ('manual', 'schedule', 'webhook')),\n    timezone TEXT,\n    schedule_json TEXT CHECK(schedule_json IS NULL OR json_valid(schedule_json)),\n    next_due_at TEXT,\n    updated_at TEXT NOT NULL,\n    PRIMARY KEY(workflow_id, node_id),\n    FOREIGN KEY(workflow_id, node_id) REFERENCES workflow_nodes(workflow_id, node_id) ON DELETE CASCADE\n  )",
+    "c24e80d37759babe": "CREATE TABLE crm_customers (\n    customer_id TEXT NOT NULL PRIMARY KEY CHECK(length(customer_id) = 32),\n    number INTEGER NOT NULL UNIQUE CHECK(number >= 1),\n    name TEXT NOT NULL CHECK(length(name) BETWEEN 1 AND 200),\n    status_id TEXT NOT NULL REFERENCES crm_statuses(status_id),\n    owner_agent_id TEXT CHECK(owner_agent_id IS NULL OR length(owner_agent_id) BETWEEN 1 AND 255),\n    method TEXT CHECK(method IS NULL OR method IN ('stripe', 'transfer', 'crypto', 'paypal', 'cash')),\n    currency TEXT NOT NULL CHECK(length(currency) = 3 AND currency GLOB '[A-Z][A-Z][A-Z]'),\n    contact_name TEXT NOT NULL DEFAULT '' CHECK(length(contact_name) <= 500),\n    contact_email TEXT NOT NULL DEFAULT '' CHECK(length(contact_email) <= 500),\n    phone TEXT NOT NULL DEFAULT '' CHECK(length(phone) <= 500),\n    billing_email TEXT NOT NULL DEFAULT '' CHECK(length(billing_email) <= 500),\n    domain TEXT NOT NULL DEFAULT '' CHECK(length(domain) <= 500),\n    tax_id TEXT NOT NULL DEFAULT '' CHECK(length(tax_id) <= 500),\n    address TEXT NOT NULL DEFAULT '' CHECK(length(address) <= 500),\n    stripe_customer_id TEXT NOT NULL DEFAULT '' CHECK(length(stripe_customer_id) <= 500),\n    notes TEXT NOT NULL DEFAULT '' CHECK(length(notes) <= 4000),\n    search_text TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(search_text)),\n    source_id TEXT REFERENCES crm_sources(source_id) ON DELETE SET NULL,\n    source_ref TEXT CHECK(source_ref IS NULL OR length(source_ref) BETWEEN 1 AND 255),\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    revision INTEGER NOT NULL DEFAULT 1 CHECK(revision >= 1)\n  )",
+    "c2dd4dd5fe273544": "CREATE INDEX provider_history_imports_thread\n    ON provider_history_imports(thread_id, provider, state)",
+    "c2f4be18155264e3": "CREATE TABLE routine_result_destinations (\n    routine_id TEXT PRIMARY KEY REFERENCES projection_agent_routines(routine_id) ON DELETE CASCADE,\n    connection_id TEXT NOT NULL REFERENCES projection_messaging_connections(connection_id),\n    platform TEXT NOT NULL,\n    connection_name TEXT NOT NULL,\n    place_id TEXT NOT NULL,\n    place_name TEXT NOT NULL,\n    updated_at TEXT NOT NULL\n  )",
+    "c3489cfbaf5b9b2a": "CREATE INDEX crm_plans_customer ON crm_plans(customer_id)",
+    "c39840a6b7b1ab1b": "CREATE INDEX channel_messages_sequence ON projection_channel_messages(channel_id, sequence)",
+    "c601edae9088ddfc": "CREATE TABLE \"workflow_runs\" (\n      run_id TEXT PRIMARY KEY,\n      workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id) ON DELETE CASCADE,\n      number INTEGER NOT NULL CHECK(number >= 1),\n      trigger_node_id TEXT,\n      from_node_id TEXT,\n      source TEXT NOT NULL CHECK(source IN ('manual', 'schedule', 'webhook', 'github')),\n      scheduled_for TEXT,\n      idempotency_key TEXT NOT NULL,\n      graph_revision INTEGER NOT NULL CHECK(graph_revision >= 0),\n      graph_json TEXT NOT NULL CHECK(json_valid(graph_json)),\n      payload TEXT,\n      status TEXT NOT NULL CHECK(status IN ('running', 'approval', 'stopping', 'done', 'failed', 'stopped')),\n      error TEXT,\n      started_at TEXT NOT NULL,\n      ended_at TEXT,\n      updated_at TEXT NOT NULL,\n      UNIQUE(workflow_id, number),\n      UNIQUE(workflow_id, idempotency_key)\n    )",
+    "c65be0a9e81cf3e3": "CREATE INDEX webhook_receipts_received ON projection_webhook_receipts(received_at)",
+    "c7c14fc5770f28c2": "CREATE TABLE workflow_github_runs (\n    run_id TEXT PRIMARY KEY REFERENCES workflow_runs(run_id) ON DELETE CASCADE,\n    workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id) ON DELETE CASCADE,\n    node_id TEXT NOT NULL,\n    delivery_id TEXT,\n    repository TEXT NOT NULL,\n    number INTEGER NOT NULL CHECK(number >= 1),\n    pull_request INTEGER NOT NULL CHECK(pull_request IN (0, 1)),\n    title TEXT NOT NULL,\n    caused_by_bot INTEGER NOT NULL CHECK(caused_by_bot IN (0, 1)),\n    started_at TEXT NOT NULL\n  )",
+    "c7c9204751a9e4a9": "CREATE TABLE provider_history_turns (\n    session_id TEXT NOT NULL REFERENCES provider_history_imports(session_id) ON DELETE CASCADE,\n    turn_id TEXT NOT NULL,\n    turn_status TEXT,\n    turn_started_at INTEGER,\n    complete INTEGER NOT NULL CHECK(complete IN (0, 1)),\n    imported INTEGER NOT NULL DEFAULT 0 CHECK(imported IN (0, 1)),\n    updated_at TEXT NOT NULL,\n    PRIMARY KEY(session_id, turn_id)\n  )",
+    "c90b9f809141cd59": "CREATE TABLE projection_channel_summaries (\n    channel_id TEXT PRIMARY KEY REFERENCES projection_channels(channel_id),\n    version INTEGER NOT NULL,\n    through_sequence INTEGER NOT NULL,\n    text TEXT NOT NULL\n  )",
+    "c98e0c7f566d9c47": "CREATE UNIQUE INDEX mcp_servers_name ON projection_mcp_servers(name)",
+    "ca711bc762a9dbc7": "CREATE TABLE projection_mcp_servers (\n    mcp_server_id TEXT PRIMARY KEY,\n    name TEXT NOT NULL,\n    transport TEXT NOT NULL CHECK(transport IN ('stdio', 'http')),\n    enabled INTEGER NOT NULL CHECK(enabled IN (0, 1)),\n    command TEXT NOT NULL,\n    args_json TEXT NOT NULL CHECK(json_valid(args_json)),\n    env_json TEXT NOT NULL CHECK(json_valid(env_json)),\n    env_passthrough_json TEXT NOT NULL CHECK(json_valid(env_passthrough_json)),\n    working_directory TEXT NOT NULL,\n    url TEXT NOT NULL,\n    headers_json TEXT NOT NULL CHECK(json_valid(headers_json)),\n    position INTEGER NOT NULL,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL\n  )",
+    "ca7e66e154082f58": "CREATE TABLE projection_agent_routines (\n    routine_id TEXT PRIMARY KEY,\n    agent_id TEXT NOT NULL,\n    name TEXT NOT NULL,\n    instruction TEXT NOT NULL,\n    active INTEGER NOT NULL CHECK(active IN (0, 1)),\n    timezone TEXT NOT NULL,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL\n  , limit_policy TEXT NOT NULL DEFAULT 'wait' CHECK(limit_policy IN ('wait', 'skip')), missed_policy TEXT NOT NULL DEFAULT 'skip' CHECK(missed_policy IN ('skip', 'run-once')), run_in TEXT NOT NULL DEFAULT 'chat' CHECK(run_in IN ('chat', 'thread')))",
+    "cc78854198e9c0b9": "CREATE TABLE projection_routine_runs (\n    run_id TEXT PRIMARY KEY,\n    routine_id TEXT NOT NULL REFERENCES projection_agent_routines(routine_id) ON DELETE CASCADE,\n    agent_id TEXT NOT NULL,\n    trigger_id TEXT,\n    run_kind TEXT NOT NULL CHECK(run_kind IN ('scheduled', 'manual')),\n    scheduled_for TEXT NOT NULL,\n    routine_name TEXT NOT NULL,\n    instruction TEXT NOT NULL,\n    delivery_id TEXT,\n    status TEXT NOT NULL CHECK(status IN (\n      'queued', 'running', 'needs-attention', 'succeeded', 'failed', 'interrupted', 'cancelled'\n    )),\n    error TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL,\n    missed_count INTEGER CHECK(missed_count IS NULL OR missed_count >= 1),\n    missed_until TEXT,\n    run_source TEXT CHECK(run_source IS NULL OR run_source IN ('test', 'script', 'webhook')),\n    UNIQUE(trigger_id, scheduled_for)\n  )",
+    "ccbb237db5601f7d": "CREATE TABLE agent_usage_activity (\n    agent_id TEXT NOT NULL,\n    activity_id TEXT NOT NULL,\n    session_id TEXT NOT NULL,\n    turn_id TEXT NOT NULL,\n    provider TEXT NOT NULL,\n    model TEXT NOT NULL,\n    kind TEXT NOT NULL CHECK(kind IN ('turn', 'user', 'assistant')),\n    occurred_at TEXT NOT NULL,\n    PRIMARY KEY(agent_id, activity_id)\n  )",
+    "d0695bbc0d4e7d50": "CREATE TABLE browser_profiles (\n    profile_id TEXT NOT NULL PRIMARY KEY CHECK(length(profile_id) = 32),\n    name TEXT NOT NULL,\n    hue INTEGER NOT NULL CHECK(hue IN (0, 30, 55, 100, 150, 185, 215, 245, 280, 320)),\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL\n  )",
+    "d0a4e3f7e044a1ee": "CREATE TABLE projection_deliveries (\n    delivery_id TEXT PRIMARY KEY,\n    message_id TEXT NOT NULL REFERENCES projection_mailbox_messages(message_id) ON DELETE CASCADE,\n    recipient_agent_id TEXT NOT NULL,\n    status TEXT NOT NULL,\n    turn_id TEXT,\n    error TEXT,\n    created_at TEXT NOT NULL,\n    delivery_json TEXT NOT NULL CHECK(json_valid(delivery_json)),\n    last_event_sequence INTEGER NOT NULL\n  )",
+    "d0c3adbb13132c66": "CREATE TABLE projection_provider_sessions (\n    id TEXT PRIMARY KEY,\n    thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n    provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude')),\n    external_session_id TEXT NOT NULL,\n    model TEXT NOT NULL,\n    effort TEXT NOT NULL,\n    state TEXT NOT NULL CHECK(state IN ('active', 'inactive', 'failed')),\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    resume_cursor TEXT,\n    last_event_sequence INTEGER NOT NULL,\n    UNIQUE(provider, external_session_id)\n  )",
+    "d180e0e7b3ded6cd": "CREATE INDEX idx_projection_messaging_history_saved\n    ON projection_messaging_history(saved_at)",
+    "d1ac16f2f0fb4c7d": "CREATE INDEX workflow_github_deliveries_waiting\n    ON workflow_github_deliveries(workflow_id, repository, number, received_at) WHERE outcome = 'waiting'",
+    "d6308da7f0f233b4": "CREATE TABLE projection_provider_sessions (\n    id TEXT PRIMARY KEY,\n    thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n    provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok', 'opencode', 'antigravity', 'acp')),\n    external_session_id TEXT NOT NULL,\n    model TEXT NOT NULL,\n    effort TEXT NOT NULL,\n    state TEXT NOT NULL CHECK(state IN ('active', 'inactive', 'failed')),\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    resume_cursor TEXT,\n    last_event_sequence INTEGER NOT NULL,\n    UNIQUE(provider, external_session_id)\n  )",
+    "d6a0e5605f097a81": "CREATE INDEX thread_messages_page_order\n    ON projection_thread_messages(thread_id, created_at, ordinal, message_id)",
+    "d72cbcc52d37f1d0": "CREATE TABLE \"workflow_runs\" (\n      run_id TEXT PRIMARY KEY,\n      workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id) ON DELETE CASCADE,\n      number INTEGER NOT NULL CHECK(number >= 1),\n      trigger_node_id TEXT,\n      from_node_id TEXT,\n      source TEXT NOT NULL CHECK(source IN ('manual', 'schedule', 'webhook', 'github', 'discord', 'telegram', 'slack')),\n      scheduled_for TEXT,\n      idempotency_key TEXT NOT NULL,\n      graph_revision INTEGER NOT NULL CHECK(graph_revision >= 0),\n      graph_json TEXT NOT NULL CHECK(json_valid(graph_json)),\n      payload TEXT,\n      status TEXT NOT NULL CHECK(status IN ('running', 'approval', 'stopping', 'done', 'failed', 'stopped')),\n      error TEXT,\n      started_at TEXT NOT NULL,\n      ended_at TEXT,\n      updated_at TEXT NOT NULL,\n      UNIQUE(workflow_id, number),\n      UNIQUE(workflow_id, idempotency_key)\n    )",
+    "d8c348d5f08cfc3a": "CREATE INDEX messaging_memories_connection\n    ON projection_messaging_memories(connection_id, updated_at DESC, memory_id)",
+    "d9367cfbdce3d922": "CREATE INDEX routine_flow_steps_agent ON routine_flow_steps(agent_id)",
+    "da677f49f96e8e64": "CREATE INDEX workflow_webhook_receipts_received ON workflow_webhook_receipts(received_at)",
+    "dc12b29d0abc6e8f": "CREATE TABLE \"projection_provider_sessions\" (\n      id TEXT PRIMARY KEY,\n      thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n      provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok', 'opencode')),\n      external_session_id TEXT NOT NULL,\n      model TEXT NOT NULL,\n      effort TEXT NOT NULL,\n      state TEXT NOT NULL CHECK(state IN ('active', 'inactive', 'failed')),\n      created_at TEXT NOT NULL,\n      updated_at TEXT NOT NULL,\n      resume_cursor TEXT,\n      last_event_sequence INTEGER NOT NULL,\n      UNIQUE(provider, external_session_id)\n    )",
+    "dc167eab0f1845bd": "CREATE TABLE \"projection_provider_sessions\" (\n      id TEXT PRIMARY KEY,\n      thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n      provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok', 'opencode', 'antigravity', 'acp')),\n      external_session_id TEXT NOT NULL,\n      model TEXT NOT NULL,\n      effort TEXT NOT NULL,\n      state TEXT NOT NULL CHECK(state IN ('active', 'inactive', 'failed')),\n      created_at TEXT NOT NULL,\n      updated_at TEXT NOT NULL,\n      resume_cursor TEXT,\n      last_event_sequence INTEGER NOT NULL,\n      UNIQUE(provider, external_session_id)\n    )",
+    "df042a2b6bda0497": "CREATE TABLE workflow_github_deliveries (\n    workflow_id TEXT NOT NULL,\n    node_id TEXT NOT NULL,\n    delivery_id TEXT NOT NULL,\n    event TEXT NOT NULL,\n    repository TEXT,\n    number INTEGER CHECK(number IS NULL OR number >= 1),\n    pull_request INTEGER CHECK(pull_request IS NULL OR pull_request IN (0, 1)),\n    title TEXT,\n    received_at TEXT NOT NULL,\n    outcome TEXT NOT NULL CHECK(outcome IN ('started', 'waiting', 'skipped')),\n    reason TEXT CHECK(reason IS NULL OR reason IN ('filter', 'self', 'chain', 'offline', 'refused')),\n    run_id TEXT,\n    payload TEXT,\n    caused_by_bot INTEGER NOT NULL DEFAULT 0 CHECK(caused_by_bot IN (0, 1)),\n    CHECK((repository IS NULL) = (number IS NULL) AND (number IS NULL) = (pull_request IS NULL)\n      AND (number IS NULL) = (title IS NULL)),\n    CHECK((outcome = 'skipped') = (reason IS NOT NULL)),\n    CHECK(payload IS NULL OR outcome = 'waiting'),\n    PRIMARY KEY(workflow_id, node_id, delivery_id),\n    FOREIGN KEY(workflow_id, node_id) REFERENCES workflow_nodes(workflow_id, node_id) ON DELETE CASCADE\n  )",
+    "df220ef3e3b74f07": "CREATE INDEX provider_history_turns_pending\n    ON provider_history_turns(session_id, imported, turn_id)",
+    "df437a27fd5c2e90": "CREATE INDEX agent_tasks_agent ON projection_agent_tasks(agent_id, created_at DESC)",
+    "e00bebf2a138da3f": "CREATE TABLE orchestration_command_receipts (\n    command_id TEXT PRIMARY KEY,\n    accepted_at TEXT NOT NULL,\n    first_sequence INTEGER NOT NULL,\n    last_sequence INTEGER NOT NULL,\n    result_json TEXT NOT NULL CHECK(json_valid(result_json))\n  )",
+    "e0cbf83cb929abdc": "CREATE TABLE workflow_steps (\n    step_id TEXT PRIMARY KEY,\n    workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id) ON DELETE CASCADE,\n    run_id TEXT REFERENCES workflow_runs(run_id) ON DELETE CASCADE,\n    node_id TEXT NOT NULL,\n    attempt INTEGER NOT NULL CHECK(attempt >= 1),\n    request_id TEXT NOT NULL,\n    kind TEXT NOT NULL CHECK(kind IN ('prompt', 'asset', 'llm', 'agent', 'image', 'trigger', 'condition', 'approval',\n      'output')),\n    agent_id TEXT,\n    status TEXT NOT NULL CHECK(status IN ('running', 'approval', 'done', 'failed', 'stopped', 'skipped')),\n    delivery_id TEXT,\n    turn_id TEXT,\n    input TEXT NOT NULL DEFAULT '',\n    output TEXT,\n    branch TEXT CHECK(branch IS NULL OR branch IN ('yes', 'no')),\n    error TEXT,\n    started_at TEXT,\n    ended_at TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    UNIQUE(workflow_id, request_id)\n  )",
+    "e0e83bb8cadafba7": "CREATE TABLE projection_thread_messages (\n    thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n    message_id TEXT NOT NULL,\n    turn_id TEXT,\n    author TEXT NOT NULL,\n    status TEXT NOT NULL,\n    item_type TEXT,\n    created_at TEXT NOT NULL,\n    ordinal INTEGER NOT NULL,\n    message_json TEXT NOT NULL CHECK(json_valid(message_json)),\n    last_event_sequence INTEGER NOT NULL, group_start TEXT, group_first INTEGER, group_id TEXT, turn_rank INTEGER,\n    PRIMARY KEY(thread_id, message_id)\n  )",
+    "e1cf4e87de17ce75": "CREATE INDEX agent_threads_open ON projection_agent_threads(agent_id, updated_at DESC)\n    WHERE archived_at IS NULL",
+    "e2f2f47eb8c921fa": "CREATE TABLE agent_usage_records (\n    agent_id TEXT NOT NULL,\n    record_id TEXT NOT NULL,\n    session_id TEXT NOT NULL,\n    turn_id TEXT NOT NULL,\n    provider TEXT NOT NULL,\n    model TEXT NOT NULL,\n    occurred_at TEXT NOT NULL,\n    tokens_json TEXT NOT NULL CHECK(json_valid(tokens_json)),\n    estimated_cost_usd REAL,\n    rate_basis TEXT,\n    recorded_at TEXT NOT NULL,\n    PRIMARY KEY(agent_id, record_id)\n  )",
+    "e302eba272c9fad6": "CREATE TABLE crm_tags (\n    tag_id TEXT NOT NULL PRIMARY KEY CHECK(length(tag_id) = 32),\n    label TEXT NOT NULL COLLATE NOCASE UNIQUE CHECK(length(label) BETWEEN 1 AND 40),\n    created_at TEXT NOT NULL\n  )",
+    "e45c6b6ea1c1a2a3": "CREATE TABLE projection_messaging_history (\n    seq INTEGER PRIMARY KEY,\n    connection_id TEXT NOT NULL REFERENCES projection_messaging_connections(connection_id),\n    platform_channel_id TEXT NOT NULL,\n    message_id TEXT NOT NULL,\n    thread_key TEXT NOT NULL,\n    author_id TEXT NOT NULL,\n    author_name TEXT NOT NULL,\n    text TEXT NOT NULL,\n    sent_at TEXT NOT NULL,\n    files_json TEXT NOT NULL,\n    saved_at TEXT NOT NULL,\n    UNIQUE (connection_id, platform_channel_id, message_id)\n  )",
+    "e4d5906a4b063f3f": "CREATE TABLE projection_provider_sessions (\n    id TEXT PRIMARY KEY,\n    thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n    provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok', 'opencode', 'antigravity', 'acp', 'cursor', 'cline')),\n    external_session_id TEXT NOT NULL,\n    model TEXT NOT NULL,\n    effort TEXT NOT NULL,\n    state TEXT NOT NULL CHECK(state IN ('active', 'inactive', 'failed')),\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    resume_cursor TEXT,\n    last_event_sequence INTEGER NOT NULL,\n    UNIQUE(provider, external_session_id)\n  )",
+    "e57f7dd7c34152d8": "CREATE TABLE projection_channel_routine_triggers (\n    trigger_id TEXT PRIMARY KEY,\n    routine_id TEXT NOT NULL REFERENCES projection_channel_routines(routine_id) ON DELETE CASCADE,\n    schedule_json TEXT NOT NULL CHECK(json_valid(schedule_json)),\n    next_run_at TEXT NOT NULL,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL,\n    UNIQUE(routine_id)\n  )",
+    "e697136198710b2e": "CREATE TABLE projection_agent_threads (\n    thread_id TEXT PRIMARY KEY REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n    agent_id TEXT NOT NULL,\n    legacy_task_id TEXT UNIQUE,\n    origin TEXT NOT NULL CHECK(origin IN ('user', 'agent')),\n    title TEXT NOT NULL,\n    title_source TEXT NOT NULL CHECK(title_source IN ('auto', 'agent', 'user')),\n    outcome TEXT CHECK(outcome IS NULL OR outcome IN ('completed', 'failed', 'interrupted')),\n    error TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    archived_at TEXT,\n    last_event_sequence INTEGER NOT NULL\n  , branch_source_thread_id TEXT, branch_source_message_id TEXT, branch_through_message_id TEXT)",
+    "e82230fd0b8f5836": "CREATE TABLE workflow_runs (\n    run_id TEXT PRIMARY KEY,\n    workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id) ON DELETE CASCADE,\n    number INTEGER NOT NULL CHECK(number >= 1),\n    trigger_node_id TEXT,\n    from_node_id TEXT,\n    source TEXT NOT NULL CHECK(source IN ('manual', 'schedule', 'webhook')),\n    scheduled_for TEXT,\n    idempotency_key TEXT NOT NULL,\n    graph_revision INTEGER NOT NULL CHECK(graph_revision >= 0),\n    graph_json TEXT NOT NULL CHECK(json_valid(graph_json)),\n    payload TEXT,\n    status TEXT NOT NULL CHECK(status IN ('running', 'approval', 'stopping', 'done', 'failed', 'stopped')),\n    error TEXT,\n    started_at TEXT NOT NULL,\n    ended_at TEXT,\n    updated_at TEXT NOT NULL,\n    UNIQUE(workflow_id, number),\n    UNIQUE(workflow_id, idempotency_key)\n  )",
+    "ea8ad72e851b3c98": "CREATE VIRTUAL TABLE agent_memory_search USING fts5(\n    text, content='projection_agent_memories', content_rowid='rowid', tokenize='unicode61'\n  )",
+    "eacf231a1c01be5c": "CREATE INDEX workflow_versions_recent ON workflow_versions(workflow_id, created_at DESC, version_id)",
+    "eb4df201a2f2ef23": "CREATE TABLE agent_waits (\n    wait_id TEXT PRIMARY KEY,\n    agent_id TEXT NOT NULL,\n    request_delivery_id TEXT NOT NULL,\n    request_text TEXT NOT NULL,\n    note TEXT NOT NULL,\n    routine_id TEXT REFERENCES projection_agent_routines(routine_id) ON DELETE SET NULL,\n    created_at TEXT NOT NULL,\n    woken_at TEXT,\n    wake_delivery_id TEXT\n  )",
+    "eb9bdb4ed06ddf7b": "CREATE UNIQUE INDEX crm_customers_source ON crm_customers(source_ref) WHERE source_ref IS NOT NULL",
+    "ef1a33ee1baf4964": "CREATE INDEX direct_threads_member_a\n    ON projection_direct_threads(member_a_id, updated_at DESC)",
+    "efb653208a101a01": "CREATE TABLE \"projection_reactions\" (\n      agent_id TEXT NOT NULL,\n      message_id TEXT NOT NULL,\n      emoji TEXT NOT NULL,\n      actor_kind TEXT NOT NULL CHECK(actor_kind IN ('user', 'agent')),\n      actor_agent_id TEXT NOT NULL,\n      updated_at TEXT NOT NULL,\n      last_event_sequence INTEGER NOT NULL,\n      PRIMARY KEY(agent_id, message_id, actor_kind, actor_agent_id)\n    )",
+    "efc6d9d666e1f975": "CREATE INDEX browser_profile_proxies_proxy ON browser_profile_proxies(proxy_id)",
+    "efe941f3b0cf4bf7": "CREATE INDEX workflow_github_runs_workflow ON workflow_github_runs(workflow_id)",
+    "f2a2e8554b27b475": "CREATE TABLE projection_thread_messages (\n    thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n    message_id TEXT NOT NULL,\n    turn_id TEXT,\n    author TEXT NOT NULL,\n    status TEXT NOT NULL,\n    item_type TEXT,\n    created_at TEXT NOT NULL,\n    ordinal INTEGER NOT NULL,\n    message_json TEXT NOT NULL CHECK(json_valid(message_json)),\n    last_event_sequence INTEGER NOT NULL,\n    PRIMARY KEY(thread_id, message_id)\n  )",
+    "f4c8b2c4680e9713": "CREATE INDEX agent_usage_date ON agent_usage_records(agent_id, occurred_at)",
+    "f4e777fea6fb1e23": "CREATE TABLE projection_channel_routines (\n    routine_id TEXT PRIMARY KEY,\n    channel_id TEXT NOT NULL REFERENCES projection_channels(channel_id) ON DELETE CASCADE,\n    name TEXT NOT NULL,\n    instruction TEXT NOT NULL,\n    active INTEGER NOT NULL CHECK(active IN (0, 1)),\n    timezone TEXT NOT NULL,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL,\n    limit_policy TEXT NOT NULL DEFAULT 'wait' CHECK(limit_policy IN ('wait', 'skip'))\n  )",
+    "f5c97acbfb4439ba": "CREATE INDEX agent_waits_routine ON agent_waits(routine_id) WHERE routine_id IS NOT NULL",
+    "f5f4799b594bf424": "CREATE TABLE projection_channel_memories (\n    memory_id TEXT PRIMARY KEY,\n    channel_id TEXT NOT NULL REFERENCES projection_channels(channel_id) ON DELETE CASCADE,\n    text TEXT NOT NULL,\n    normalized_text TEXT NOT NULL,\n    origin TEXT NOT NULL CHECK(origin IN ('automatic', 'manual')),\n    source_turn_id TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL,\n    UNIQUE(channel_id, normalized_text)\n  )",
+    "f7073b55f01b89ab": "CREATE TABLE projection_agent_routines (\n    routine_id TEXT PRIMARY KEY,\n    agent_id TEXT NOT NULL,\n    name TEXT NOT NULL,\n    instruction TEXT NOT NULL,\n    active INTEGER NOT NULL CHECK(active IN (0, 1)),\n    timezone TEXT NOT NULL,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL\n  )",
+    "f8779e5e9c685544": "CREATE TABLE projection_agent_routines (\n    routine_id TEXT PRIMARY KEY,\n    agent_id TEXT NOT NULL,\n    name TEXT NOT NULL,\n    instruction TEXT NOT NULL,\n    active INTEGER NOT NULL CHECK(active IN (0, 1)),\n    timezone TEXT NOT NULL,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL,\n    limit_policy TEXT NOT NULL DEFAULT 'wait' CHECK(limit_policy IN ('wait', 'skip')),\n    missed_policy TEXT NOT NULL DEFAULT 'skip' CHECK(missed_policy IN ('skip', 'run-once')),\n    run_in TEXT NOT NULL DEFAULT 'chat' CHECK(run_in IN ('chat', 'thread'))\n  )",
+    "f8cb6432fda26c76": "CREATE INDEX provider_sessions_thread\n    ON projection_provider_sessions(thread_id, provider, state)",
+    "f99eba9f4ed46b49": "CREATE INDEX workflow_edges_from ON workflow_edges(workflow_id, from_node_id)",
+    "fa01dd7eec7a3b3b": "CREATE TABLE file_deletion_outbox (\n    id TEXT PRIMARY KEY,\n    path TEXT NOT NULL UNIQUE,\n    reason TEXT NOT NULL,\n    created_at TEXT NOT NULL,\n    attempts INTEGER NOT NULL DEFAULT 0,\n    last_error TEXT\n  )",
+    "fb1fd5a48e28151a": "CREATE INDEX thread_messages_shown_order ON projection_thread_messages(\n    thread_id, group_start, group_first, group_id, turn_rank, created_at, ordinal, message_id, author, item_type\n  )",
+    "fdffb47a03a7cec3": "CREATE INDEX workflow_edges_to ON workflow_edges(workflow_id, to_node_id)",
+    "ffa0cbe4afa4598a": "CREATE TABLE projection_agent_routines (\n    routine_id TEXT PRIMARY KEY,\n    agent_id TEXT NOT NULL,\n    name TEXT NOT NULL,\n    instruction TEXT NOT NULL,\n    active INTEGER NOT NULL CHECK(active IN (0, 1)),\n    timezone TEXT NOT NULL,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL,\n    limit_policy TEXT NOT NULL DEFAULT 'wait' CHECK(limit_policy IN ('wait', 'skip')),\n    missed_policy TEXT NOT NULL DEFAULT 'skip' CHECK(missed_policy IN ('skip', 'run-once'))\n  )"
+  }
+}

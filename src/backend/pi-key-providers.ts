@@ -89,10 +89,21 @@ const KEY_EXTENSIONS = {
   // DeepSeek, a registration with only the key keeps that list, and the Authorization header replaces a
   // key from Pi's auth.json or OPENROUTER_API_KEY. Pi sends Anthropic models to OpenRouter's Anthropic
   // Messages endpoint, which also gets the auth.json key as `x-api-key`, so that header is replaced too.
+  // Pi asks for the full output limit of the model, about 944K tokens for some models, and OpenRouter
+  // holds credit for all of it before it answers. A balance of a few dollars then fails with 402
+  // (#8578; Pi declined a change, earendil-works/pi#11517). The cap only lowers a request above it,
+  // and models up to 128K, Claude included, send what they sent before.
   openrouter: {
     variable: "OPENBOT_PI_OPENROUTER_API_KEY",
     source: `export default function (pi) {${readKey("openrouter", "OPENBOT_PI_OPENROUTER_API_KEY")}
   pi.registerProvider("openrouter", { apiKey, headers: { Authorization: "Bearer " + literal, "x-api-key": literal } });
+  const OUTPUT_CAP = 128000;
+  pi.on("before_provider_request", (event) => {
+    const payload = event.payload;
+    const field = ["max_tokens", "max_completion_tokens"].find((name) => payload?.[name] > OUTPUT_CAP);
+    if (!field || (payload.thinking?.budget_tokens ?? 0) >= OUTPUT_CAP) return undefined;
+    return { ...payload, [field]: OUTPUT_CAP };
+  });
 }
 `,
   },

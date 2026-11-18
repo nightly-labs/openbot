@@ -23,10 +23,9 @@ export function agentTaskStatus(task: AgentTask, t: MobileTranslate): string {
   return t(OUTCOME_TEXT[task.outcome]);
 }
 
-/** As on desktop: why the next message of a queued task waits. */
+/** As on desktop: why the next message of a queued task waits. Without a known hold, no reason. */
 export function agentTaskHoldText(task: AgentTask, limit: number, t: MobileTranslate): string | null {
-  if (task.state !== "queued") return null;
-  if (task.hold === "task-limit" || task.hold === null)
-    return t("mobile.server.threads.hold.threadLimit", { count: limit });
+  if (task.state !== "queued" || task.hold === null) return null;
+  if (task.hold === "task-limit") return t("mobile.server.threads.hold.threadLimit", { count: limit });
   return t(HOLD_TEXT[task.hold]);
 }

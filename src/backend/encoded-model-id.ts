@@ -26,3 +26,17 @@ export function providerModelValue(model: string): string {
     ? Buffer.from(model.slice(ENCODED_MODEL.length), "base64url").toString("utf8")
     : model;
 }
+
+/**
+ * True when `id` is the model id that `encodedModelId` made of `value`, the provider's own text. An
+ * agent can name a model as the provider lists it, such as Pi's `openrouter-presets/@preset/x`, and
+ * not as the catalog holds it (#8697). The match is exact: an `@` gateway id is opaque, so no other
+ * model is near enough.
+ */
+export function isEncodedModelOf(id: string, value: string): boolean {
+  // base64url has no `/`, so the encoded part starts after the last `/` of the id, or at its start.
+  const start = id.lastIndexOf("/") + 1;
+  if (!id.startsWith(ENCODED_MODEL, start)) return false;
+  const prefix = id.slice(0, start);
+  return value.startsWith(prefix) && encodedModelId(prefix, value.slice(prefix.length)) === id;
+}

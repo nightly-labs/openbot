@@ -71,7 +71,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "Очистить журнал поддержки?",
   "mobile.settings.support.clearBody": "Все события будут удалены из журнала на этом телефоне.",
   "mobile.settings.support.logFooter":
-    "Журнал хранится на этом телефоне, OpenBot его не отправляет. В нём записаны шаги подключения, запросы и ошибки, но не сообщения и файлы; пароли и токены скрыты. Прочитайте файл, прежде чем делиться им.",
+    "Журнал хранится на этом телефоне. OpenBot отправляет его строки только с отчётом об ошибке в приложении на телефоне, который отправляете вы, и карточка отчёта сначала их показывает. В нём записаны шаги подключения, запросы и ошибки, но не сообщения и файлы; пароли и токены скрыты. Прочитайте файл, прежде чем делиться им.",
   "mobile.settings.support.saveFailed": "Не удалось сохранить файл журнала. Повторите попытку.",
   "mobile.settings.support.sharingUnavailable": "На этом телефоне нельзя поделиться файлом.",
   "mobile.settings.support.newestFirst": "Сначала новые.",
@@ -133,19 +133,65 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Светлота",
   "mobile.settings.appearance.messageColorFooter":
     "С цветом агента ваши сообщения в чате с агентом окрашиваются в цвет этого агента. Со своим цветом ваши сообщения во всех чатах окрашиваются в выбранный цвет. Цвет текста меняется, чтобы текст оставался читаемым.",
+  "mobile.settings.appearance.bubbleStyle": "Стиль пузырей",
+  "mobile.settings.appearance.bubbleStyleSolid": "Заливка",
+  "mobile.settings.appearance.bubbleStyleTint": "Оттенок",
+  "mobile.settings.appearance.seeThroughBubbles": "Прозрачные пузыри",
+  "mobile.settings.appearance.seeThroughBubblesNote":
+    "Сквозь пузыри агента и пузыри без цвета виден фон. Без фона пузыри всегда непрозрачные.",
+  "mobile.settings.appearance.tab.colors": "Цвета",
+  "mobile.settings.appearance.tab.chat": "Чат",
+  "mobile.settings.appearance.preview.routines": "3 запуска рутины",
+  "mobile.settings.appearance.preview.thinking": "Думал 4 секунды",
+  "mobile.settings.appearance.preview.memory": "Сохранено 1 воспоминание",
+  "mobile.settings.appearance.backdrop.title": "Фон",
+  "mobile.settings.appearance.backdrop.footer":
+    "Показывается за главным экраном и чатами на этом телефоне. Агент может установить его за вас; «Отменить» в чате вернёт прежний.",
+  "mobile.settings.appearance.backdrop.none": "Нет",
+  "mobile.settings.appearance.backdrop.pond": "Пруд с карпами кои",
+  "mobile.settings.appearance.backdrop.jellyfish": "Медузы",
+  "mobile.settings.appearance.backdrop.sunset": "Ретро-закат",
+  "mobile.settings.appearance.backdrop.snowfall": "Снегопад",
+  "mobile.settings.appearance.backdrop.fireflies": "Светлячки",
+  "mobile.settings.appearance.backdrop.agentPage": "Страница агента",
+  "mobile.settings.appearance.backdrop.agentPageNote": "Установлен агентом",
+  "mobile.settings.appearance.backdrop.photo": "Фото",
+  "mobile.settings.appearance.backdrop.photoChoose": "Выбрать из фото",
+  "mobile.settings.appearance.backdrop.photoChange": "Нажмите ещё раз, чтобы выбрать другое фото",
+  "mobile.settings.appearance.backdrop.strength": "Интенсивность фона",
+  "mobile.settings.appearance.backdrop.calm": "Спокойный",
+  "mobile.settings.appearance.backdrop.vivid": "Яркий",
+  "mobile.settings.appearance.backdrop.strengthFooter":
+    "Спокойный фон не мешает читать длинные ответы. Больше всего его видно вверху главного экрана.",
+  "mobile.settings.appearance.backdrop.previewQuestion": "Напишешь заметку о выпуске?",
+  "mobile.settings.appearance.backdrop.previewAnswer":
+    "Вот черновик: фон, который задаёт агент, теперь виден и на телефоне.",
+  "mobile.settings.appearance.chatBackground": "Фон чата",
+  "mobile.settings.appearance.chatBackgroundDefault": "По умолчанию",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "Каждая тема хранит свой цвет. Цвет, на котором текст трудно читать, становится темнее или светлее.",
+  "mobile.settings.appearance.chatBackgroundBackdropFooter":
+    "Фон заменяет фон чата. Чтобы использовать цвет, выберите для фона «Нет».",
   "mobile.settings.appearance.collapseRoutines": "Сворачивать активность регулярных задач",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Идущие подряд события регулярных задач в чате показываются одной свёрнутой строкой. Коснитесь строки, чтобы показать их.",
+  "mobile.settings.appearance.replyDetails": "Детали ответов",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "Выключите деталь, чтобы скрыть её строку в чатах. Агент продолжает размышлять, запускать субагентов и сохранять воспоминания.",
+  "mobile.settings.appearance.showThinking": "Показывать размышления агента",
+  "mobile.settings.appearance.showSubagents": "Показывать субагентов",
+  "mobile.settings.appearance.showMemoryChanges": "Показывать сохранённые воспоминания",
+  "mobile.settings.appearance.fullVisuals": "Показывать визуальные превью полностью",
+  "mobile.settings.appearance.fullVisualsFooter":
+    "Визуальный ответ агента показывается в чате на всю высоту. Если выключено, высокий ответ обрезается; нажмите на него, чтобы увидеть всё.",
   "mobile.settings.animations.title": "Анимации",
-  "mobile.settings.animations.footer":
-    "Выключите «Анимации», чтобы убрать движение во всём приложении. Если в настройках телефона включено «Уменьшение движения», приложение тоже уменьшает движение, и анимации ниже остаются выключенными.",
-  "mobile.settings.animations.all": "Анимации",
+  "mobile.settings.animations.fullMotion": "Полная анимация",
+  "mobile.settings.animations.reduced": "Меньше",
+  "mobile.settings.animations.motionFooter":
+    "«Меньше» уменьшает движение во всём приложении и оставляет анимации ниже выключенными. Если в настройках телефона включено «Уменьшение движения», приложение тоже уменьшает движение.",
   "mobile.settings.animations.agentFaces": "Живые лица агентов",
   "mobile.settings.animations.agentFacesFooter":
     "Аватары агентов двигаются, пока агенты работают и отдыхают. Если выключить, лица останутся неподвижными, а персонажи на экране приветствия и на пустом главном экране перестанут парить.",
-  "mobile.settings.animations.composerResize": "Компактное поле сообщения",
-  "mobile.settings.animations.composerResizeFooter":
-    "Пока клавиатура закрыта, поле сообщения превращается в узкую полоску. Если выключить, поле остаётся полного размера.",
   "mobile.settings.animations.textReveal": "Анимация ответов",
   "mobile.settings.animations.textRevealFooter":
     "Ответ появляется слово за словом, а его облачко плавно растёт. Если выключить, текст показывается сразу по мере поступления.",
@@ -154,6 +200,9 @@ export const messages = {
     "Результаты и сообщения поиска плавно появляются и исчезают с лёгким размытием, когда меняются. Когда движение уменьшено, они только плавно появляются и исчезают. Если выключено, они меняются сразу.",
   "mobile.settings.feedback.footer": "Тактильный отклик на действия в приложении на этом устройстве.",
   "mobile.settings.feedback.haptics": "Вибрация",
+  "mobile.settings.feedback.replies": "Вибрация ответов",
+  "mobile.settings.feedback.repliesFooter":
+    "Вибрация, пока в чате появляется ответ агента. Остальная вибрация остаётся включённой.",
   "mobile.settings.feedback.retry": "Повторить сохранение настройки вибрации",
   "mobile.settings.liveActivities.title": "Live Activities",
   "mobile.settings.liveActivities.footer":
@@ -236,6 +285,27 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Скачивать большие файлы автоматически",
   "mobile.settings.conversations.largeFilesFooter":
     "Изображения, видео и аудио больше {small} скачиваются только по нажатию. Включите, чтобы скачивать их сразу, до {large}. Это может расходовать много мобильного трафика.",
+  "mobile.settings.conversations.messageField": "Поле сообщения",
+  "mobile.settings.conversations.compact": "Компактное",
+  "mobile.settings.conversations.fullSize": "Полный размер",
+  "mobile.settings.conversations.compactFooter":
+    "«Компактное» превращает поле сообщения в небольшую полосу, пока клавиатура закрыта.",
+  "mobile.settings.conversations.compactComposerReduced":
+    "Движение уменьшено в разделе «Анимации» или в настройках телефона, поэтому поле сообщения остаётся полного размера.",
+  "mobile.settings.conversations.media": "Фото и файлы",
+  "mobile.settings.conversations.swipeLeft": "Свайп влево в чате агента",
+  "mobile.settings.conversations.swipeRight": "Свайп вправо в чате агента",
+  "mobile.settings.conversations.swipeThreads": "Ветки",
+  "mobile.settings.conversations.swipeBrowser": "Браузер",
+  "mobile.settings.conversations.swipeOff": "Выкл.",
+  "mobile.settings.conversations.swipeFooter":
+    "Свайп в сторону, обратную «Назад», в чате агента открывает это. Тот же свайп по сообщению показывает время сообщений.",
+  "mobile.settings.conversations.pullInfo": "Потянуть вверх: сведения",
+  "mobile.settings.conversations.pullInfoFooter":
+    "Потяните вверх за последнее сообщение в чате, канале или ветке и отпустите, чтобы открыть сведения.",
+  "mobile.settings.conversations.fullQualityPhotos": "Отправлять фото в полном качестве",
+  "mobile.settings.conversations.fullQualityPhotosFooter":
+    "Когда это выключено, приложение отправляет уменьшенную копию каждого фото, до 2048 пикселей по длинной стороне. Она быстрее доходит при медленном соединении. Включите, чтобы отправлять исходное фото.",
   "mobile.settings.profile.nameUnsafe": "Уберите из имени переносы строк и управляющие символы.",
   "mobile.settings.profile.nameLength": "Имя должно содержать от 3 до 20 символов.",
   "mobile.settings.profile.saveFailed": "Не удалось сохранить изменения. Повторите попытку.",
@@ -511,4 +581,29 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "Не удалось остановить процесс.",
   "mobile.settings.agents.processes.stopTitle": "Остановить эту программу?",
   "mobile.settings.agents.processes.stopLabel": "Остановить процесс {pid}",
+  "mobile.settings.quickActions.title": "Меню значка приложения",
+  "mobile.settings.quickActions.footer":
+    "Нажмите и удерживайте значок OpenBot, чтобы увидеть эти действия. Можно включить до {count}.",
+  "mobile.settings.quickActions.latestChat": "Последний чат",
+  "mobile.settings.quickActions.secondChat": "Предпоследний чат",
+  "mobile.settings.shortcuts.title": "Быстрые команды",
+  "mobile.settings.shortcuts.agent": "Агент",
+  "mobile.settings.shortcuts.none": "Нет",
+  "mobile.settings.shortcuts.unsupported": "Для быстрых команд нужна iOS 26 или новее.",
+  "mobile.settings.shortcuts.card.agents": "Агенты",
+  "mobile.settings.shortcuts.card.noAgents": "Агентов пока нет",
+  "mobile.settings.shortcuts.card.setUp.title": "Откройте OpenBot, чтобы настроить команды",
+  "mobile.settings.shortcuts.card.setUp.action": "Открыть OpenBot",
+  "mobile.settings.shortcuts.card.noAgent.title": "Выберите агента для команд",
+  "mobile.settings.shortcuts.card.noAgent.detail": "Команды отправляют одному агенту.",
+  "mobile.settings.shortcuts.card.noAgent.action": "Выбрать агента",
+  "mobile.settings.shortcuts.card.locked.title": "OpenBot заблокирован",
+  "mobile.settings.shortcuts.card.locked.action": "Открыть OpenBot",
+  "mobile.settings.shortcuts.footer":
+    "Send Message в приложении «Команды» отправляет этому агенту. Приложение не открывается. Open Agent открывает его чат.",
+  "mobile.settings.shortcuts.send.sent": "Отправлено",
+  "mobile.settings.shortcuts.send.failed": "OpenBot не смог это отправить.",
+  "mobile.settings.shortcuts.send.unconfirmed": "Сервер не ответил. Сообщение может быть в чате.",
+  "mobile.settings.shortcuts.send.inApp": "Отправить в OpenBot",
+  "mobile.settings.shortcuts.send.openChat": "Открыть чат",
 } as const satisfies PartialTranslation<typeof source>;

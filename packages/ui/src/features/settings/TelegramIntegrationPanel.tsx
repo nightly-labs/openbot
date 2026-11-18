@@ -18,6 +18,7 @@ import {
   type ChannelState,
   type ChannelText,
   channelRowKind,
+  pausedChannelState,
 } from "./ChannelParts";
 import { type IntegrationPageSlots, Stepper, UNKNOWN_STATUS, WizardDialog, type WizardLink } from "./IntegrationLayout";
 import { messagingStateUnknown } from "./SlackIntegrationPanel";
@@ -93,6 +94,7 @@ const TELEGRAM_TEXT = {
 const STATE_HELP: Partial<Record<MessagingConnection["state"], AppTextKey>> = {
   removed: "connector.telegram.helpRemoved",
   relay_unavailable: "connector.telegram.helpRelayUnavailable",
+  not_linked: "connector.telegram.helpNotLinked",
   invalid_token: "connector.telegram.helpError",
   secret_storage_unavailable: "connector.telegram.helpError",
   error: "connector.telegram.helpError",
@@ -128,7 +130,9 @@ export function telegramIntegrationState(
   ).length;
   if (attention > 0) return { status: "attention", label: "connector.telegram.statusAttention", attention };
   if (connections.length === 0) return { status: "idle", label: "marketplace.app.notConnected", attention };
-  return { status: "connected", label: "connector.telegram.statusConnected", attention };
+  return (
+    pausedChannelState(connections) ?? { status: "connected", label: "connector.telegram.statusConnected", attention }
+  );
 }
 
 /** Where the connect dialog starts: at the chat link, or at the orchestrator of the linked chats. */

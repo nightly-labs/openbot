@@ -3,6 +3,7 @@ import {
   type PropsWithChildren,
   useContext,
   useLayoutEffect,
+  useRef,
   useState,
   useSyncExternalStore,
 } from "react";
@@ -84,11 +85,23 @@ function useWorkspaceValueStore(): WorkspaceValueStore {
 /**
  * One part of the workspace. The component renders again only when that part changes (`Object.is`),
  * so `select` returns a primitive or a value that the workspace holds, never a new object or array.
- * For a command, use `useMobileWorkspaceActions` instead.
+ * With `isEqual`, the component keeps the value that it has while `isEqual` says that the new one is
+ * the same for it. For a command, use `useMobileWorkspaceActions` instead.
  */
-export function useMobileWorkspaceSelector<T>(select: (workspace: MobileWorkspaceContextValue) => T): T {
+export function useMobileWorkspaceSelector<T>(
+  select: (workspace: MobileWorkspaceContextValue) => T,
+  isEqual?: (previous: T, next: T) => boolean,
+): T {
   const store = useWorkspaceValueStore();
-  return useSyncExternalStore(store.subscribe, () => select(store.get()));
+  const kept = useRef<{ value: T } | null>(null);
+  return useSyncExternalStore(store.subscribe, () => {
+    const next = select(store.get());
+    if (!isEqual) return next;
+    const previous = kept.current;
+    if (previous && (Object.is(previous.value, next) || isEqual(previous.value, next))) return previous.value;
+    kept.current = { value: next };
+    return next;
+  });
 }
 
 /** Reads the latest workspace when an event occurs. The component does not render again for changes. */

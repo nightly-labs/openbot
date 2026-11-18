@@ -29,10 +29,13 @@ export const messages = {
   "billing.status.paused": "일시 정지됨",
   "billing.otherServers": "다른 서버",
   "billing.action.menu": "{server} 요금제 작업",
-  "billing.action.change": "요금제 변경",
+  "billing.action.addStorage": "저장 공간 추가",
   "billing.action.cancel": "요금제 취소",
   "billing.action.renew": "요금제 갱신",
   "billing.action.updatePayment": "결제 수단 업데이트",
+  "billing.storage.title": "{server}의 공간 늘리기",
+  "billing.storage.add": "{size} 추가",
+  "billing.storage.failed": "저장 공간을 추가할 수 없어요.",
   "billing.lifecycle.cancelRenewal": "갱신 취소",
   "billing.lifecycle.cancelTitle": "{name}의 갱신을 취소할까요?",
   "billing.lifecycle.cancelDescription":
@@ -195,4 +198,10 @@ export const messages = {
     other:
       "라이선스가 최대치인 사용자 {count}명이에요. 더 큰 라이선스가 필요하면 문의해 주세요. 새로운 사람은 서버에 참여할 수 없어요.",
   },
+  "billing.details.country": "청구 국가",
+  "billing.details.countryPlaceholder": "국가 선택",
+  "billing.details.vatId": "EU VAT ID (선택)",
+  "billing.details.vatIdInvalid": "선택한 국가의 VAT ID가 아니에요.",
+  "billing.details.countryMissing": "청구 국가를 선택해 주세요.",
+  "billing.details.saveFailed": "청구 정보를 저장할 수 없어요",
 } as const satisfies PartialTranslation<typeof source>;

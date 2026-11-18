@@ -53,6 +53,10 @@ export interface OrderFormProps {
   licenseTrialEnd?: number | undefined;
   initialServer?: BillingPlanId | null | undefined;
   initialLicense?: LicenseTier | null | undefined;
+  /** The first billing interval. Without it, the form starts with yearly billing. */
+  initialInterval?: BillingInterval | undefined;
+  /** The first number of Team license users. It is never less than the users that the license needs. */
+  initialUsers?: number | undefined;
   /** The title of the choice without a server. The app runs on the user's computer, so it says so. */
   noServerTitle?: string | undefined;
   /** Shows left of the switches, such as the heading of the page. */
@@ -377,7 +381,7 @@ export function OrderForm(props: OrderFormProps) {
   const id = createUniqueId();
   const serverTitleId = `order-form-servers-${id}`;
   const licenseTitleId = `order-form-license-${id}`;
-  const [interval, setInterval] = createSignal<BillingInterval>("year");
+  const [interval, setInterval] = createSignal<BillingInterval>(untrack(() => props.initialInterval) ?? "year");
   const [chosenCurrency, setCurrency] = createSignal<BillingCurrency>(untrack(() => props.currency) ?? "eur");
   const plans = () => props.plans;
   /** BRL is in the catalog only when each Stripe Price has it. A form without plans sells in the base currencies. */
@@ -394,7 +398,9 @@ export function OrderForm(props: OrderFormProps) {
   const [serverId, setServerId] = createSignal<ServerChoice>(untrack(() => props.initialServer) ?? "none");
   const [license, setLicense] = createSignal<LicenseChoice>(untrack(() => props.initialLicense) ?? "none");
   // The Team license starts with its included users, or with the people who use the servers now when they are more.
-  const [members, setMembers] = createSignal(untrack(minTeam));
+  const [members, setMembers] = createSignal(
+    untrack(() => clamp(props.initialUsers ?? 0, minTeam(), LICENSE_MAX_USERS)),
+  );
 
   const server = (): HostedServerCatalogPlan | undefined => plans().find((plan) => plan.id === serverId());
   const isYearly = () => interval() === "year";

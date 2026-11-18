@@ -41,6 +41,7 @@ import {
   isClientAgentModelOption,
   isClientAgentSummary,
   isProviderAccountId,
+  isProviderAccountPool,
   isProviderAccountStatus,
   isRoutine,
   isRoutineCalendar,
@@ -174,7 +175,13 @@ export function decodeHostProviderAccountsFromMain(value: unknown): HostProvider
       throw invalid();
     return { agentId: row.agentId, accountId: row.accountId };
   });
-  return { providers, agents };
+  if (value.pools === undefined) return { providers, agents };
+  if (!Array.isArray(value.pools)) throw invalid();
+  const pools = value.pools.map((row: unknown) => {
+    if (!isDynamicRecord(row) || !isAgentProvider(row.provider) || !isProviderAccountPool(row.pool)) throw invalid();
+    return { provider: row.provider, pool: { leftOut: row.pool.leftOut, inUse: row.pool.inUse } };
+  });
+  return { providers, pools, agents };
 }
 
 // Fails closed on a member for the same reason as `decodeAgentModelOptions` in the main process, and

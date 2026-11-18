@@ -30,7 +30,8 @@ continue without the user.
    it is clearly the same feature.
 2. Find the current code for the feature, when it exists. Read it and its
    existing stories. Note what the user can do now, and the states it has
-   (empty, loading, error, long data, narrow width).
+   (empty, loading, error, long data). Phones use the mobile app: do not plan a
+   phone width for desktop or web client UI.
 3. Find the surface:
 
    | Surface | Story location | Stylesheet |
@@ -186,8 +187,8 @@ Rules:
   stories, prototype files beside them, or `apps/auth-api`. On desktop, use
   existing i18n keys when they fit; the chosen variant moves its other text
   to catalog keys in Step 7.
-- When you reuse a shared class, check its media queries at phone width.
-  Some site classes, such as `compare-table`, change layout below 640 px.
+- On public web, when you reuse a site class, check its media queries at phone
+  width. Some site classes, such as `compare-table`, change layout below 640 px.
 - Keep `a11y: { test: "error" }`. Fix each accessibility violation. Use real
   roles, labels, and focus order.
 - Do not add `play` functions or `data-testid`. `check:ui` rejects them.
@@ -216,7 +217,8 @@ Run these checks one at a time:
 5. Take a screenshot of each variant with the Playwright or Chrome DevTools
    tools. Save them in `.openbot-build/prototypes/<feature>/`
    (git ignores this directory), for example `a-plan-cards.png`. Use a
-   desktop width (1440 px) and, for public web, also a phone width (390 px).
+   desktop width (1440 px). For public web only, also use a phone width (390 px).
+   Desktop and web client UI get no phone-width screenshot.
    The desktop stylesheet sets `overflow: hidden` on `html` and `body`, so a
    full-page screenshot shows only the viewport. Before each screenshot,
    resize the viewport height to the `scrollHeight` of `#storybook-root`.

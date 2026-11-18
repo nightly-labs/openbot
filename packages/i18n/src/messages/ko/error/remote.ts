@@ -21,6 +21,8 @@ export const messages = {
   "error.remote.testActive": "원격 데스크톱 테스트가 진행 중이에요. 테스트가 끝난 후에 다시 시도해 주세요.",
   "error.remote.screenRecordingDenied":
     "호스트에서 OpenBot의 화면 녹화를 허용하지 않았어요. 호스트에서 화면 녹화 권한을 허용한 다음 다시 시도해 주세요.",
+  "error.remote.windowsSessionDisconnected":
+    "호스트의 Windows 세션 연결이 끊겨 공유할 화면이 없어요. 호스트 화면에서 Windows에 로그인한 다음 다시 시도해 주세요.",
   "error.remote.teamSessionExpired": "팀 세션이 만료되었어요.",
   "error.remote.finishTestBeforeSwitch": "디스플레이를 전환하기 전에 원격 데스크톱 테스트를 끝내 주세요.",
   "error.remote.displayNotFound": "원격 디스플레이를 찾을 수 없어요.",
@@ -80,7 +82,7 @@ export const messages = {
   "error.remote.pinnedKeyMissing": "원격 호스트에 고정된 기기 키가 없어요.",
   "error.remote.hostDidNotConnect": "WebRTC 호스트가 연결되지 않았어요.",
   "error.remote.connectionCancelled": "원격 연결이 취소되었어요.",
-  "error.remote.hostDisconnected": "WebRTC 호스트의 연결이 끊어졌어요.",
+  "error.remote.hostDisconnected": "서버와의 연결이 끊어졌어요. 작업이 완료되었는지 확인한 후 다시 시도해 주세요.",
   "error.remote.eventGap": "호스트 이벤트 순서에 누락이 있어요.",
   "error.remote.malformedKnownEvent": "호스트가 형식이 잘못된 알려진 이벤트를 반환했어요.",
   "error.remote.fileTransportIsStopped": "WebRTC 파일 전송이 중지되었어요.",
@@ -146,6 +148,7 @@ export const messages = {
   "error.remote.attachmentRejected": "호스트가 첨부 파일을 거부했어요.",
   "error.remote.attachmentTooLarge": "첨부 파일은 10MB 이하여야 해요.",
   "error.remote.attachmentBusy": "현재 첨부 파일이 끝날 때까지 기다려 주세요.",
+  "error.remote.attachmentChanged": "파일이 변경되었거나 사용할 수 없어요. 다시 선택해 주세요.",
   "error.remote.uploadTimeout": "첨부 파일 업로드 시간이 초과되었어요.",
   "error.remote.hostSessionActive": "호스트에 이미 활성 원격 세션이 있어요.",
   "error.remote.tooManyConnections": "활성 원격 연결이 너무 많아요.",

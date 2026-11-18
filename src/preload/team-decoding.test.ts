@@ -54,6 +54,7 @@ const hostStatus = {
   serverName: "Studio",
   apiUrl: "https://studio.example.test",
   logoUrl: null,
+  appearance: null,
   apiOnline: true,
   remoteDesktopReady: false,
   remoteDesktopScreenRecordingDenied: false,
@@ -328,6 +329,7 @@ describe("team decoders", () => {
       { ...remoteServer, compatibility: { ...remoteServer.compatibility, localProtocol: { minimum: 1 } } },
     ],
     ["server with a text connection sequence", decodeServer, { ...remoteServer, connectionSequence: "2" }],
+    ["server with a false capability wait", decodeServer, { ...remoteServer, capabilitiesPending: false }],
     ["server with an invalid hosted issue", decodeServer, { ...remoteServer, hostedIssue: "<script>" }],
     ["server with an invalid restart flag", decodeServer, { ...remoteServer, restartAvailable: "false" }],
     [

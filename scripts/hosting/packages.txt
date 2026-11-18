@@ -10,10 +10,30 @@ gnome-keyring
 libsecret-1-0
 openssl
 x11-utils
+# xsetroot: an arrow pointer on the agent display, in place of the default "×".
+x11-xserver-utils
 xauth
 xvfb
+# The accessibility bus (org.a11y.Bus), which D-Bus starts on request. Computer Use reads the
+# buttons and fields of a window through it; without it, agents can only click at screen points.
+at-spi2-core
+# The desktop of the agent display (openbot-desktop): a window manager, the terminal and the file
+# manager of its menu, and the tool that draws the background. Its theme uses DejaVu Sans, which a
+# minimal Ubuntu 26.04 does not have.
+openbox
+lxterminal
+pcmanfm
+hsetroot
+fonts-dejavu-core
+# The emoji of the pages that the agent browser opens. Without an emoji font, each emoji is an empty box.
+fonts-noto-color-emoji
+# The Thai text of these pages. DejaVu has no Thai letters, so without this font each one is a box.
+fonts-tlwg-loma-otf
 # The Codex sandbox. Without it on PATH, Codex uses its bundled copy and reports an error.
 bubblewrap
+# The Claude sandbox needs bubblewrap and socat. Without socat, each turn of a Claude agent with
+# "Workspace only" fails before it starts.
+socat
 # The Hermes Agent installer clones Hermes with git, and the Node.js that it downloads needs
 # libatomic1. Without them, the install stops, and the service user cannot install them: that user
 # has no sudo.

@@ -77,8 +77,8 @@ export function mockWebRuntimeFor(mock: MockOpenBotControls, events: WebRuntimeE
         limit: 50,
         anchor: before ? { type: "before", cursor: before } : { type: "latest" },
       }),
-    conversationAround: (agentId, messageId) =>
-      agent.readConversationPage({ agentId, limit: 50, anchor: { type: "around", messageId } }),
+    conversationAround: (agentId, messageId, limit = 50) =>
+      agent.readConversationPage({ agentId, limit, anchor: { type: "around", messageId } }),
     markRead: (agentId, throughMessageId) => agent.markConversationRead({ agentId, throughMessageId }),
     markUnreadFrom: (agentId, fromMessageId) => agent.markConversationUnread({ agentId, fromMessageId }),
     conversationReads: () => agent.listConversationReads(),
@@ -103,6 +103,7 @@ export function mockWebRuntimeFor(mock: MockOpenBotControls, events: WebRuntimeE
     stop: (agentId, turnId) => agent.interrupt({ agentId, turnId }),
     setTyping: () => {},
     queue: (agentId) => agent.listQueue(agentId),
+    activeQueues: async (agentIds) => (await agent.listActiveQueues(agentIds)) ?? { queues: [], omitted: agentIds },
     editQueue: (input) => agent.editQueuedMessage(input),
     cancelQueued: (input) => agent.cancelQueuedMessage(input),
     steerQueued: (input) => agent.steerQueuedMessage(input),
