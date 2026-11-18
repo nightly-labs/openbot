@@ -4,8 +4,9 @@
 // `client_id_metadata_document_supported`. OpenBot must send its client metadata document URL as
 // the `client_id`, with no secret, and keep a record that the encrypted store can read again after
 // a restart. A server that offers registration as well must keep the registration. A server that
-// refuses each registration, as Railway does (#7855), must get the document instead. So must a
-// server that refuses each redirect address with `invalid_redirect_uri`, as YNAB does (#8417).
+// refuses each registration, as Railway does (#7855), must get the document instead. A server that
+// refuses each redirect address with `invalid_redirect_uri`, as YNAB does (#8417), must not: YNAB
+// also refuses the document, on its sign-in page (#12367).
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
@@ -423,49 +424,26 @@ async function main(): Promise<void> {
     check(noDocument, !noDocument.signedIn, "a token is stored after a refused registration");
     report.cases.push(noDocument);
 
-    // YNAB refuses `127.0.0.1` and `localhost` with `invalid_redirect_uri` and takes the document.
-    const redirect = await runCase("redirect-refused", true, "redirect");
-    check(redirect, redirect.attempts[0]?.error === null, `the sign-in failed: ${redirect.attempts[0]?.error}`);
-    check(redirect, redirect.attempts[0]?.toolCount === 1, "the tools were not listed after the sign-in");
-    check(redirect, redirect.registrations === 2, `the sign-in registered ${redirect.registrations} times`);
-    check(
-      redirect,
-      redirect.pageClientIds.join() === CLIENT_METADATA_URL,
-      `the pages named ${redirect.pageClientIds.join()}`,
-    );
-    check(
-      redirect,
-      redirect.tokenClientIds.join() === CLIENT_METADATA_URL,
-      `the token requests named ${redirect.tokenClientIds.join()}`,
-    );
-    check(
-      redirect,
-      redirect.storedClient?.clientId === CLIENT_METADATA_URL,
-      `the stored client is ${JSON.stringify(redirect.storedClient)}`,
-    );
-    check(redirect, redirect.afterRestart?.error === null, `after a restart: ${redirect.afterRestart?.error}`);
-    check(redirect, redirect.signedIn, "no token is stored after the sign-in");
-    report.cases.push(redirect);
-
-    // The same refusal with no document says so in plain words, not in the server's words.
-    const redirectNoDocument = await runCase("redirect-refused-no-document", true, "redirect", false);
-    check(
-      redirectNoDocument,
-      redirectNoDocument.attempts[0]?.error?.startsWith("The sign-in server does not accept OpenBot as an app yet.") ??
-        false,
-      `the sign-in said: ${redirectNoDocument.attempts[0]?.error}`,
-    );
-    check(
-      redirectNoDocument,
-      redirectNoDocument.pageClientIds.length === 0,
-      `the pages named ${redirectNoDocument.pageClientIds.join()}`,
-    );
-    check(
-      redirectNoDocument,
-      redirectNoDocument.storedClient === null,
-      `the stored client is ${JSON.stringify(redirectNoDocument.storedClient)}`,
-    );
-    report.cases.push(redirectNoDocument);
+    // YNAB refuses `127.0.0.1` and `localhost` with `invalid_redirect_uri`. It lists the document, but
+    // refuses it too, on its sign-in page, where OpenBot cannot see the refusal (#12367). With or
+    // without the document, the sign-in says so in plain words and opens no page.
+    for (const document of [true, false]) {
+      const redirect = await runCase(
+        document ? "redirect-refused" : "redirect-refused-no-document",
+        true,
+        "redirect",
+        document,
+      );
+      check(
+        redirect,
+        redirect.attempts[0]?.error?.startsWith("The sign-in server does not accept OpenBot as an app yet.") ?? false,
+        `the sign-in said: ${redirect.attempts[0]?.error}`,
+      );
+      check(redirect, redirect.pageClientIds.length === 0, `the pages named ${redirect.pageClientIds.join()}`);
+      check(redirect, redirect.storedClient === null, `the stored client is ${JSON.stringify(redirect.storedClient)}`);
+      check(redirect, !redirect.signedIn, "a token is stored after a refused registration");
+      report.cases.push(redirect);
+    }
 
     // Google: no registration endpoint and no document support (#8398). Only a sign-in app can be
     // the client, so the sentence names it.

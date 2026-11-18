@@ -1364,7 +1364,8 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    *
    * A server that refuses each address with `invalid_redirect_uri` registers only the MCP clients it
    * approved: YNAB answers "Redirect URI is not an allowed MCP client" (#8417). The client metadata
-   * document then takes the place of the registration, as for a 401 or a 403.
+   * document does not take its place: YNAB also refuses the document, on its own sign-in page, where
+   * OpenBot cannot see the refusal (#12367). The probe shows the plain refusal sentence instead.
    */
   watchRegistration(fetch: FetchLike): FetchLike {
     return async (input, init) => {
@@ -1385,7 +1386,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       this.#registrationStatus = response.status;
       const redirectRefused = (await registrationErrorCode(response)) === "invalid_redirect_uri";
       this.#redirectRefused = redirectRefused;
-      if (!this.#documentReplacesRefusal(response.status, redirectRefused)) return response;
+      if (!this.#documentReplacesRefusal(response.status)) return response;
       this.#redirectRefused = false;
       await response.body?.cancel();
       return Response.json(
@@ -1416,8 +1417,8 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    * registers OpenBot keeps that registration: only a refusal changes the client. The document has
    * no secret, so the server must list `none`.
    */
-  #documentReplacesRefusal(status: number, redirectRefused: boolean): boolean {
-    if (status !== 401 && status !== 403 && !redirectRefused) return false;
+  #documentReplacesRefusal(status: number): boolean {
+    if (status !== 401 && status !== 403) return false;
     const metadata = this.#discoveryState?.authorizationServerMetadata;
     return (
       metadata?.client_id_metadata_document_supported === true &&
