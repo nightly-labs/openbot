@@ -129,6 +129,9 @@ export const messages = defineMessages("settings", {
   "settings.compactMessageActions.title": "Compact message actions",
   "settings.compactMessageActions.description":
     "Show React, Reply and More beside a message, and the time between messages. When this is off, every action and the time show under each message.",
+  "settings.messagesOnLeft.title": "Your messages on the left",
+  "settings.messagesOnLeft.description":
+    "Show your messages on the left with the agents' messages, in one column, as in Slack.",
   "settings.busyMessage.title": "Steer agents while they work",
   "settings.busyMessage.description":
     "New messages join the agent’s current work, not the queue. Agents that cannot do this keep new messages in the queue.",

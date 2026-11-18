@@ -128,6 +128,9 @@ export const messages = {
   "settings.compactMessageActions.title": "Azioni dei messaggi compatte",
   "settings.compactMessageActions.description":
     "Mostra Reagisci, Rispondi e Altro accanto a un messaggio e l’ora tra i messaggi. Se disattivato, tutte le azioni e l’ora compaiono sotto ogni messaggio.",
+  "settings.messagesOnLeft.title": "I tuoi messaggi a sinistra",
+  "settings.messagesOnLeft.description":
+    "Mostra i tuoi messaggi a sinistra con quelli degli agenti, in una sola colonna, come in Slack.",
   "settings.busyMessage.title": "Indirizza gli agenti mentre lavorano",
   "settings.busyMessage.description":
     "I nuovi messaggi si uniscono al lavoro in corso dell'agente, non alla coda. Con gli agenti che non lo supportano, restano in coda.",

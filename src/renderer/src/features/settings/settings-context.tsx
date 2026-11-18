@@ -22,6 +22,7 @@ import {
   useCompactMessageActions,
 } from "../../compact-message-actions-preference";
 import { playSoundChoice, readTaskSound, setTaskSound } from "../../completion-sound";
+import { readMessagesOnLeft, setMessagesOnLeft, useMessagesOnLeft } from "../../messages-on-left-preference";
 import { usePlatform } from "../../platform";
 import { readSendShortcutMode, setSendShortcutMode, useSendShortcutMode } from "../../send-shortcut-preference";
 import { createSimpleContext } from "../../simple-context";
@@ -196,6 +197,7 @@ const Settings = createSimpleContext({
         sendShortcut: readSendShortcutMode(),
         showAgentSteps: readShowAgentSteps(),
         compactMessageActions: readCompactMessageActions(),
+        messagesOnLeft: readMessagesOnLeft(),
         soundFeedback: isActionSoundEnabled(),
         soundTheme: readActionSoundTheme(),
       },
@@ -226,6 +228,15 @@ const Settings = createSimpleContext({
       (compact) => {
         setGeneralSettings((current) =>
           current.compactMessageActions === compact ? current : { ...current, compactMessageActions: compact },
+        );
+      },
+    );
+    const messagesOnLeft = useMessagesOnLeft();
+    createEffect(
+      () => messagesOnLeft(),
+      (left) => {
+        setGeneralSettings((current) =>
+          current.messagesOnLeft === left ? current : { ...current, messagesOnLeft: left },
         );
       },
     );
@@ -321,6 +332,9 @@ const Settings = createSimpleContext({
       }
       if (previous.compactMessageActions !== value.compactMessageActions) {
         setCompactMessageActions(value.compactMessageActions);
+      }
+      if (previous.messagesOnLeft !== value.messagesOnLeft) {
+        setMessagesOnLeft(value.messagesOnLeft);
       }
       if (previous.soundFeedback !== value.soundFeedback || previous.soundTheme !== value.soundTheme) {
         setActionSoundChoice(value.soundFeedback ? value.soundTheme : "off");

@@ -41,6 +41,7 @@ import { setCompactMessageActions, useCompactMessageActions } from "../../compac
 import { playSoundChoice, readTaskSound, setTaskSound } from "../../completion-sound";
 import { webReportsEnabled } from "../../error-reports";
 import { useLayout } from "../../layout";
+import { setMessagesOnLeft, useMessagesOnLeft } from "../../messages-on-left-preference";
 import { currentDevicePlatform, setSendShortcutMode, useSendShortcutMode } from "../../send-shortcut-preference";
 import { ChatBackdropSetting } from "../settings/ChatBackdropSetting";
 import type { WebAccountCalls } from "./web-account";
@@ -106,6 +107,7 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
   const layout = useLayout();
   const showAgentSteps = useShowAgentSteps();
   const compactMessageActions = useCompactMessageActions();
+  const messagesOnLeft = useMessagesOnLeft();
   const bubbleStyle = useChatBubbleStyle();
   const chatBackground = useWebChatBackground();
   const webLiveVoice = useWebLiveVoice();
@@ -248,6 +250,12 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
                 onChange={(checked) => setCompactMessageActions(checked)}
                 label={t("settings.compactMessageActions.title")}
                 description={t("settings.compactMessageActions.description")}
+              />
+              <SwitchField
+                checked={messagesOnLeft()}
+                onChange={(checked) => setMessagesOnLeft(checked)}
+                label={t("settings.messagesOnLeft.title")}
+                description={t("settings.messagesOnLeft.description")}
               />
               <Item class="settings-modal-row">
                 <ItemContent>

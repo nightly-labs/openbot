@@ -129,6 +129,9 @@ export const messages = {
   "settings.compactMessageActions.title": "Kompakte Nachrichtenaktionen",
   "settings.compactMessageActions.description":
     "Zeigt Reagieren, Antworten und Mehr neben einer Nachricht und die Uhrzeit zwischen den Nachrichten. Ist es aus, stehen alle Aktionen und die Uhrzeit unter jeder Nachricht.",
+  "settings.messagesOnLeft.title": "Deine Nachrichten links",
+  "settings.messagesOnLeft.description":
+    "Zeige deine Nachrichten links bei den Nachrichten der Agenten, in einer Spalte wie in Slack.",
   "settings.busyMessage.title": "Agenten während der Arbeit steuern",
   "settings.busyMessage.description":
     "Neue Nachrichten fließen in die aktuelle Arbeit des Agenten ein, nicht in die Warteschlange. Bei Agenten, die das nicht können, warten sie in der Warteschlange.",

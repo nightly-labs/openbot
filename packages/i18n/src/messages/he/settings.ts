@@ -124,6 +124,8 @@ export const messages = {
   "settings.compactMessageActions.title": "פעולות הודעה קומפקטיות",
   "settings.compactMessageActions.description":
     "הצגת תגובה, מענה ועוד לצד הודעה, ואת השעה בין הודעות. כשההגדרה כבויה, כל הפעולות והשעה מוצגות מתחת לכל הודעה.",
+  "settings.messagesOnLeft.title": "ההודעות שלך משמאל",
+  "settings.messagesOnLeft.description": "הצגת ההודעות שלך משמאל יחד עם הודעות הסוכנים, בעמודה אחת, כמו ב-Slack.",
   "settings.busyMessage.title": "הכוונת סוכנים בזמן שהם עובדים",
   "settings.busyMessage.description":
     "הודעות חדשות מצטרפות לעבודה הנוכחית של הסוכן ולא לתור. בסוכנים שלא תומכים בזה, ההודעות ממתינות בתור.",
