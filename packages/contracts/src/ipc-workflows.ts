@@ -447,11 +447,12 @@ export function workflowMediaSpecs(
     durations[0] ?? WORKFLOW_VIDEO_DURATIONS[0],
   );
   const resolutions = workflowMediaResolutions(model, kind);
-  const preferred = (typeof fields.resolution === "string" ? fields.resolution : "720p").toLowerCase();
-  // A step saved with "2k" keeps it when the list now shows "2K".
+  const preferred = typeof fields.resolution === "string" ? fields.resolution : "720p";
   const resolution = size
     ? resolutionForSize(resolutions, size)
-    : (resolutions.find((value) => value.toLowerCase() === preferred) ?? resolutions[0] ?? null);
+    : resolutions.includes(preferred)
+      ? preferred
+      : (resolutions[0] ?? null);
   const transparent = kind === "image" && model?.transparent === true && fields.background === "transparent";
   return { aspect, duration, resolution, transparent, size };
 }

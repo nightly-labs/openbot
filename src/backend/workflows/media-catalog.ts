@@ -31,7 +31,7 @@ import { readSunraCatalog, readSunraPrice } from "./sunra-media";
 /** How long a model list that a service gave is used, and how long after a failed read it is read again. */
 const CATALOG_TTL_MS = 10 * 60_000;
 const FAILED_TTL_MS = 60_000;
-/** How long a price is used, and the most prices that are kept. */
+/** How long a price is used, and the most prices that are kept. A failed quote gives no price for FAILED_TTL_MS. */
 const PRICE_TTL_MS = 10 * 60_000;
 const PRICE_ENTRIES = 300;
 
@@ -140,7 +140,7 @@ export class WorkflowMediaCatalogCache {
   readonly #options: WorkflowMediaCatalogCacheOptions;
   readonly #sunra: ReturnType<typeof serviceList<SunraPlan>>;
   readonly #higgsfield: ReturnType<typeof serviceList<HiggsfieldPlan>>;
-  readonly #prices = new Map<string, { at: number; credits: number | null }>();
+  readonly #prices = new Map<string, { at: number; ttl: number; credits: number | null }>();
   /** The quotes that run now, by price key. */
   readonly #quotes = new Map<string, Deferred.Deferred<number | null>>();
 
@@ -154,12 +154,12 @@ export class WorkflowMediaCatalogCache {
     return this.#options.now?.() ?? Date.now();
   }
 
-  #keepPrice(key: string, credits: number | null): void {
+  #keepPrice(key: string, credits: number | null, ttl: number): void {
     if (this.#prices.size >= PRICE_ENTRIES) {
       const oldest = this.#prices.keys().next();
       if (!oldest.done) this.#prices.delete(oldest.value);
     }
-    this.#prices.set(key, { at: this.#now(), credits });
+    this.#prices.set(key, { at: this.#now(), ttl, credits });
   }
 
   #list(provider: WorkflowCatalogProvider): Effect.Effect<Listed<unknown> | null> {
@@ -246,7 +246,7 @@ export class WorkflowMediaCatalogCache {
       specs.transparent,
     ]);
     const kept = this.#prices.get(key);
-    if (kept && this.#now() - kept.at < PRICE_TTL_MS) return { credits: kept.credits } satisfies WorkflowMediaPrice;
+    if (kept && this.#now() - kept.at < kept.ttl) return { credits: kept.credits } satisfies WorkflowMediaPrice;
     const ask = { kind: request.kind, model: providerModel, specs };
     const quote =
       provider === "sunra"
@@ -262,11 +262,13 @@ export class WorkflowMediaCatalogCache {
     this.#quotes.set(key, shared);
     const credits = yield* quote.pipe(
       // Sunra for a Team gives no price, which is kept as no price. An answer without a price fails.
-      Effect.tap((value) => Effect.sync(() => this.#keepPrice(key, value))),
-      // A failed quote is not kept, so the next change of a choice asks again.
+      Effect.tap((value) => Effect.sync(() => this.#keepPrice(key, value, PRICE_TTL_MS))),
+      // A failed quote gives no price for a short time only: a short fault does not hide the price for
+      // long, and a model that never gives a price is not asked at each request.
       Effect.catch((failure) =>
         Effect.sync(() => {
           this.#options.warn("Could not read the media price.", { service: provider, error: failure.message });
+          this.#keepPrice(key, null, FAILED_TTL_MS);
           return null;
         }),
       ),

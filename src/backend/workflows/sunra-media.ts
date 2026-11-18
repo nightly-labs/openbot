@@ -193,7 +193,7 @@ const download = (url: string, kind: WorkflowMediaKind) =>
 function sunraChoices(kind: WorkflowMediaKind, specs: WorkflowMediaSpecs, plan: SunraPlan): McpToolArguments {
   return {
     aspect_ratio: specs.aspect,
-    ...(specs.resolution ? { resolution: plan.resolutions?.[specs.resolution] ?? specs.resolution } : {}),
+    ...(specs.resolution ? { resolution: specs.resolution } : {}),
     ...(kind === "video" ? { duration: specs.duration } : {}),
     ...(kind === "image" && plan.transparent && specs.transparent ? { background: "transparent" } : {}),
   };

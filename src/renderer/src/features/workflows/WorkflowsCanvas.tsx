@@ -81,24 +81,33 @@ export function WorkflowsCanvas(props: {
   };
   readMediaProviders();
   // A Sunra or Higgsfield step spends credits, so the rail reads them again when one ends: in a run, or
-  // alone. A fast step can show as ended in the first view after its start, so each end that this
-  // canvas did not see before counts. The ends of a workflow at its first view are only remembered.
-  const seenEnds = new Set<string>();
-  const seenWorkflows = new Set<string>();
+  // alone. A fast step can show as ended in the first view after its start, so each end after the
+  // newest time of the first view of the workflow counts. Older runs that "load more" shows do not.
+  // The times come from the host, so the clock of this computer does not matter.
+  let shown: { workflowId: string; since: string; ends: Set<string> } | null = null;
   createEffect(
-    () => workflows.props.runs,
-    (view) => {
-      const workflow = untrack(() => workflows.detail());
+    () => ({ view: workflows.props.runs, workflow: workflows.detail() }),
+    ({ view, workflow }) => {
       if (!workflow) return;
-      const first = !seenWorkflows.has(workflow.summary.id);
-      seenWorkflows.add(workflow.summary.id);
+      const steps = [...view.runs.flatMap((run) => run.steps), ...view.soloSteps].filter(
+        (step) => step.workflowId === workflow.summary.id,
+      );
+      if (shown?.workflowId !== workflow.summary.id) {
+        const times = steps.flatMap((step) => [step.startedAt ?? "", step.endedAt ?? ""]);
+        shown = {
+          workflowId: workflow.summary.id,
+          since: times.reduce((a, b) => (b > a ? b : a), ""),
+          ends: new Set(),
+        };
+        return;
+      }
       let ended = false;
-      for (const step of [...view.runs.flatMap((run) => run.steps), ...view.soloSteps]) {
-        if (step.endedAt === null || step.workflowId !== workflow.summary.id) continue;
-        const end = `${step.id}:${step.attempt}:${step.endedAt}`;
-        if (seenEnds.has(end)) continue;
-        seenEnds.add(end);
-        if (first) continue;
+      for (const step of steps) {
+        if (step.endedAt === null || step.endedAt <= shown.since) continue;
+        // A retry ends the same step again, with a new attempt.
+        const end = `${step.id}:${step.attempt}`;
+        if (shown.ends.has(end)) continue;
+        shown.ends.add(end);
         const model = workflow.graph.nodes.find((node) => node.id === step.nodeId)?.fields.model;
         if (typeof model === "string" && workflowCatalogProvider(model)) ended = true;
       }
