@@ -908,7 +908,7 @@ export function TasksView(props: TasksViewProps) {
               attention={answerCard(agent().name)}
               stepsAbove={turnSteps.stepsAbove}
               factsAbove={turnSteps.factsAbove}
-              traceAbove={(messageId) => turnTrace(messageId)}
+              traceAbove={turnTrace}
               activeSteps={turnSteps.activeSteps()}
               stepsOpenByDefault={showAgentSteps()}
               sendShortcut={props.sendShortcut}

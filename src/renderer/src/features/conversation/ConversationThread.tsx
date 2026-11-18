@@ -345,7 +345,7 @@ export function ConversationThread() {
             newerMessages={current().threads.newerMessages}
             stepsAbove={turnSteps.stepsAbove}
             factsAbove={turnSteps.factsAbove}
-            traceAbove={(messageId) => turnTrace(messageId)}
+            traceAbove={turnTrace}
             activeSteps={turnSteps.activeSteps()}
             stepsOpenByDefault={showAgentSteps()}
             sendShortcut={deviceSendShortcut(props.platform)}

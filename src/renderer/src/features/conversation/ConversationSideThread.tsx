@@ -245,7 +245,7 @@ export function ConversationSideThread(props: { threadId: string }) {
             focusMessage={current().thread.focusMessage}
             stepsAbove={turnSteps.stepsAbove}
             factsAbove={turnSteps.factsAbove}
-            traceAbove={(messageId) => turnTrace(messageId)}
+            traceAbove={turnTrace}
             activeSteps={turnSteps.activeSteps()}
             stepsOpenByDefault={showAgentSteps()}
             onCopyMessage={(message) => void copyMessage(message)}
