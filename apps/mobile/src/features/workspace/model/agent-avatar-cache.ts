@@ -71,15 +71,25 @@ function savedImage(folderOf: () => Directory, url: string): string | null {
  */
 export function saveAgentAvatar(serverId: string, agentId: string, avatarUrl: string, dataUrl: string): string {
   const uri = saveImage(() => agentFolder(serverId, agentId), avatarUrl, dataUrl);
-  if (uri !== dataUrl) {
-    savedAgentAvatars += 1;
-    for (const listener of savedAgentAvatarListeners) listener();
-  }
+  if (uri !== dataUrl && savedAgentAvatarNotice === null)
+    savedAgentAvatarNotice = setTimeout(noticeSavedAgentAvatars, SAVED_NOTICE_DELAY_MS);
   return uri;
 }
 
+/**
+ * A burst of saves, such as the photos of all agents at the first start, gives one notice. Each notice
+ * makes the workspace and the parts that give pictures to the system compute again.
+ */
+const SAVED_NOTICE_DELAY_MS = 1_000;
 let savedAgentAvatars = 0;
+let savedAgentAvatarNotice: ReturnType<typeof setTimeout> | null = null;
 const savedAgentAvatarListeners = new Set<() => void>();
+
+function noticeSavedAgentAvatars() {
+  savedAgentAvatarNotice = null;
+  savedAgentAvatars += 1;
+  for (const listener of savedAgentAvatarListeners) listener();
+}
 
 /**
  * Tells the parts that give agent pictures to the system (notifications, the share extension, the

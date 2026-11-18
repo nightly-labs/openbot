@@ -15,7 +15,7 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 // Overlapping weak blurs approximate a radius ramp. Each layer is transparent
 // before the physical view edge, so clipping cannot leave a visible seam.
 const OUTER_BLUR_LAYER_END = 0.94;
-type BlurLayerCount = 2 | 3;
+export type BlurLayerCount = 2 | 3;
 /**
  * The number of blur layers. Each layer is a native blur that samples and blurs the content behind it
  * again on each scroll frame, so the GPU cost increases with each layer. More layers make smaller steps
@@ -32,13 +32,14 @@ const SHORT_BAND_BLUR_LAYER_COUNT: BlurLayerCount = 2;
  * edge stays approximately the same. The tint of the material is lighter, because the sum of the
  * intensities is lower (51 or 42 in place of 72).
  */
-const layerIntensity = (count: BlurLayerCount) => Math.round(12 * Math.sqrt(6 / count));
+export const layerIntensity = (count: BlurLayerCount) => Math.round(12 * Math.sqrt(6 / count));
 /**
- * Where the fade of each layer ends, as a fraction of `OUTER_BLUR_LAYER_END`. A least-squares fit of the
- * sum of the mask opacities to that of the 6 layers that ended at 0.94, 0.8, 0.66, 0.52, 0.38 and 0.24.
- * The largest difference is 2% of the full value with 3 layers, and 7% with 2 layers.
+ * Where the fade of each layer ends, as a fraction of the end of the outer layer. A least-squares fit of
+ * the sum of the mask opacities to that of the 6 layers that ended at 0.94, 0.8, 0.66, 0.52, 0.38 and
+ * 0.24. The largest difference is 2% of the full value with 3 layers, and 7% with 2 layers. The drawer
+ * header uses the same values: its 6 layers had the same ramp.
  */
-const BLUR_LAYER_END_RATIOS: Record<BlurLayerCount, readonly number[]> = {
+export const BLUR_LAYER_END_RATIOS: Record<BlurLayerCount, readonly number[]> = {
   2: [1, 0.36],
   3: [1, 0.595, 0.325],
 };

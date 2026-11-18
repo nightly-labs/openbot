@@ -17,7 +17,7 @@ import {
   useMobileWorkspaceReader,
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
-import { canAddChatPin } from "@/features/workspace/model/agent-pins";
+import { canToggleChatPin } from "@/features/workspace/model/agent-pins";
 import { type MenuAction, type MenuComponentRef, MenuView } from "@/shared/components/menu-view";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
@@ -27,13 +27,8 @@ function useAgentMenuActions(agent: MobileAgent) {
   const { toggleAgentPinAnimated } = useAgentPinTransition();
   const sectionMenu = useChatSectionMenu(agent.serverId, agent.id);
   const isPinned = useMobileWorkspaceSelector(({ pinnedAgentIds }) => pinnedAgentIds.includes(agent.id));
-  // The same result as `canToggleAgentPin` on the agent and channel pins together, without a new list
-  // for each row at each change of the workspace.
-  const canPin = useMobileWorkspaceSelector(
-    ({ pinnedAgentIds, pinnedChannelIds }) =>
-      pinnedAgentIds.includes(agent.id) ||
-      pinnedChannelIds.includes(agent.id) ||
-      canAddChatPin(pinnedAgentIds.length + pinnedChannelIds.length),
+  const canPin = useMobileWorkspaceSelector(({ pinnedAgentIds, pinnedChannelIds }) =>
+    canToggleChatPin(pinnedAgentIds, pinnedChannelIds, agent.id),
   );
   const isUnread = useAgentUnread(agent.id);
   // The user's own level of the agent, on a host that keeps the levels. "nothing" is a muted agent.

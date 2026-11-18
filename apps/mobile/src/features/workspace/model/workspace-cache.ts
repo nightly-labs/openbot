@@ -47,7 +47,8 @@ interface CachedServer {
 
 export interface WorkspaceCache {
   read(serverId: string): Promise<CachedServer | null>;
-  write(serverId: string, value: CachedServer): Promise<void>;
+  /** True when the file is written. False when the keychain gives no key, so nothing is written. */
+  write(serverId: string, value: CachedServer): Promise<boolean>;
   remove(serverId: string): Promise<void>;
   /** Deletes the files of the servers that the account no longer lists, also those removed while the app was closed. */
   retain(serverIds: readonly string[]): Promise<void>;
@@ -274,7 +275,7 @@ export function createWorkspaceCache(scope: string): WorkspaceCache | null {
     write: (serverId, value) =>
       inOrder(serverId, async () => {
         const key = await cacheKey();
-        if (!key) return;
+        if (!key) return false;
         // A provider that this build does not know goes back to `provider`, where the decoder reads it.
         const agents = value.agents.map(({ foreignProvider, ...agent }) => ({
           ...agent,
@@ -315,6 +316,7 @@ export function createWorkspaceCache(scope: string): WorkspaceCache | null {
           .replace(`"${conversationsMarker}"`, () => `[${conversations.join(",")}]`)
           .replace(`"${channelPagesMarker}"`, () => `[${channelPages.join(",")}]`);
         await seal(serverId, key, json);
+        return true;
       }),
     remove: (serverId) =>
       inOrder(serverId, async () => {

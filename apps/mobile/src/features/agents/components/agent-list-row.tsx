@@ -36,7 +36,7 @@ import {
 } from "@/features/workspace/components/use-agent-activity";
 import { type MobileAgent, useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { agentActivityMood } from "@/features/workspace/model/agent-activity";
-import { canAddChatPin } from "@/features/workspace/model/agent-pins";
+import { canToggleChatPin } from "@/features/workspace/model/agent-pins";
 import { isAndroid, longPressDelay } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { END_X, lineDirectionStyle } from "@/shared/lib/text-direction";
@@ -113,15 +113,8 @@ interface AgentListRowProps {
 export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, rightInset = 20 }: AgentListRowProps) {
   const { t } = useText();
   const background = useChatRowBackground(agent.id);
-  // The same result as `canToggleAgentPin` on the agent and channel pins together, without a new list
-  // for each row at each change of the workspace.
   const pinBlocked = useMobileWorkspaceSelector(
-    ({ pinnedAgentIds, pinnedChannelIds }) =>
-      !(
-        pinnedAgentIds.includes(agent.id) ||
-        pinnedChannelIds.includes(agent.id) ||
-        canAddChatPin(pinnedAgentIds.length + pinnedChannelIds.length)
-      ),
+    ({ pinnedAgentIds, pinnedChannelIds }) => !canToggleChatPin(pinnedAgentIds, pinnedChannelIds, agent.id),
   );
   const { toggleAgentPinAnimated, transition } = useAgentPinTransition();
   // Each long press mounts the Android menu again, so it opens even if an earlier one did not close.

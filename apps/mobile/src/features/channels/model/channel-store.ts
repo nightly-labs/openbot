@@ -286,6 +286,8 @@ export class MobileChannelStore {
       if (count) entry.observed.set(channelId, count);
       else {
         entry.observed.delete(channelId);
+        // The kept view holds the full page. Without a screen it goes, so the trimmed page is all that stays.
+        entry.views.delete(channelId);
         // Match single chats: keep short windows for reopening while offline.
         if ((entry.state.pages.get(channelId)?.messages.length ?? 0) > 50) {
           const pages = new Map(entry.state.pages);

@@ -199,7 +199,7 @@ import {
   subscribeSavedAgentAvatars,
 } from "@/features/workspace/model/agent-avatar-cache";
 import {
-  canToggleAgentPin,
+  canToggleChatPin,
   phoneSidebarPins,
   reconcileAgentPins,
   reconcileChannelPins,
@@ -1075,9 +1075,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           drawer: drawerSnapshot(serverId),
           channels: channelStore.cachedChannels(serverId),
         })
-        .catch(() => {
-          // The next save writes the file again.
-          if (persistedInputs.current.get(serverId) === inputs) persistedInputs.current.delete(serverId);
+        .catch(() => false)
+        .then((written) => {
+          // With no key or after a failure, the next save writes the file again.
+          if (!written && persistedInputs.current.get(serverId) === inputs) persistedInputs.current.delete(serverId);
         });
     },
     [workspaceCache, conversationStore, channelStore],
@@ -2495,7 +2496,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         let result: "pinned" | "unpinned" = "pinned";
         const saved = updatePreferences(serverId, (current) => {
           const pinned = current.pinnedChannels ?? [];
-          if (!canToggleAgentPin([...current.pinned, ...pinned], channelId)) return current;
+          if (!canToggleChatPin(pinned, current.pinned, channelId)) return current;
           result = pinned.includes(channelId) ? "unpinned" : "pinned";
           return {
             ...current,
@@ -2547,7 +2548,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         const pinned = currentPinnedAgentIds();
         const serverId = currentActiveServer().id;
         const pinnedChannels = preferencesRef.current[serverId]?.pinnedChannels ?? NO_IDS;
-        if (!canToggleAgentPin([...pinned, ...pinnedChannels], agentId)) return "error";
+        if (!canToggleChatPin(pinned, pinnedChannels, agentId)) return "error";
         if (pinned.includes(agentId)) {
           return updatePreferences(serverId, (current) => ({
             ...current,

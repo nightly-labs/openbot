@@ -6,15 +6,21 @@ import type { MobileAgent } from "./workspace-types";
  */
 const MESSAGE_FIELDS: ReadonlySet<string> = new Set<keyof MobileAgent>(["preview", "updatedAt", "updatedLabel"]);
 
+/** The key is a field of the record. `next` has the same keys when `previous` has this one. */
+function isOwnField(agent: MobileAgent, key: string): key is keyof MobileAgent {
+  return Object.hasOwn(agent, key);
+}
+
 /** Whether the two records differ only in the fields of the latest message. */
 export function sameAgentApartFromMessage(previous: MobileAgent, next: MobileAgent): boolean {
   if (previous === next) return true;
-  const before = new Map<string, unknown>(Object.entries(previous));
-  const after = Object.entries(next);
-  if (after.length !== before.size) return false;
-  return after.every(
-    ([key, value]) => MESSAGE_FIELDS.has(key) || (before.has(key) && Object.is(before.get(key), value)),
-  );
+  const keys = Object.keys(next);
+  if (keys.length !== Object.keys(previous).length) return false;
+  for (const key of keys) {
+    if (MESSAGE_FIELDS.has(key)) continue;
+    if (!isOwnField(previous, key) || !Object.is(previous[key], next[key])) return false;
+  }
+  return true;
 }
 
 /** Whether the two lists differ only in the fields of the latest message. */
