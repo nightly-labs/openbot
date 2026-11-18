@@ -167,7 +167,8 @@ export function AgentDockHost() {
 
 /** The seats, the agents, the channels and the chats of one server's dock, and what its actions change. */
 function createServerDock(serverId: string, options: { readWhenHidden: boolean }) {
-  const { agentList, userHiddenAgentIds, agentStatus, modelOptions, updateAgent, appendUiError } = useAgents();
+  const { activeAgentId, agentList, userHiddenAgentIds, agentStatus, modelOptions, updateAgent, appendUiError } =
+    useAgents();
   const { conversations, markAgentMessagesRead, loadLatestAgentMessages, clearRecentReply, presentPromptResolution } =
     useConversation();
   const { workingTurns, agentStates, agentMoods } = createAgentActivity();
@@ -562,8 +563,9 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     },
   );
   /* A joined server that connects again, as after its restart, sends only the newest reply of each agent.
-     The main window reads its open agent's latest page again. Each agent chat that the dock loaded reads
-     its page here, or the messages from the time without a connection stay missing (#11748). */
+     The main window reads its open agent's latest page again. Each other agent chat that the dock loaded
+     reads its page here, or the messages from the time without a connection stay missing (#11748). A second
+     read of the open agent would replace the main window's read, which then keeps its loading state. */
   let connectedSequence: number | undefined;
   createEffect(
     () => {
@@ -577,7 +579,9 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
       if (!reconnected) return;
       const loaded = untrack(() =>
         seats().flatMap((seat) =>
-          seat.kind === "agent" && conversations[seat.agent.id]?.messages?.length ? [seat.agent.id] : [],
+          seat.kind === "agent" && seat.agent.id !== activeAgentId() && conversations[seat.agent.id]?.messages?.length
+            ? [seat.agent.id]
+            : [],
         ),
       );
       // A failed read keeps the chat as it is; the next change of the agent's chat reads it again.
