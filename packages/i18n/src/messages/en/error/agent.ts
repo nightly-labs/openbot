@@ -122,6 +122,8 @@ export const messages = defineMessages("error.agent", {
   "error.agent.deletionBusy": "Agent deletion is already in progress.",
   "error.agent.stopBeforeDelete": "Stop the agent and cancel its queued messages before deleting it.",
   "error.agent.deleteIncomplete": "The agent data could not be removed completely. Retry deleting the agent.",
+  "error.agent.deleteFolderInUse":
+    "Work of another agent still uses this agent's folder. Delete this agent again when that work ends, or after you restart OpenBot.",
   "error.agent.duplicationBusy": "This agent is already being duplicated.",
   "error.agent.waitBeforeDuplicate": "Wait for the agent to finish and clear its queue before duplicating it.",
   "error.agent.saveOtherAgent": "This save belongs to another agent.",

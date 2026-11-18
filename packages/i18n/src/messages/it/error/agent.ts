@@ -131,6 +131,8 @@ export const messages = {
   "error.agent.deletionBusy": "L'eliminazione dell'agente è già in corso.",
   "error.agent.stopBeforeDelete": "Ferma l'agente e annulla i suoi messaggi in coda prima di eliminarlo.",
   "error.agent.deleteIncomplete": "Non è stato possibile rimuovere del tutto i dati dell'agente. Riprova a eliminarlo.",
+  "error.agent.deleteFolderInUse":
+    "Il lavoro di un altro agente usa ancora la cartella di questo agente. Eliminalo di nuovo quando quel lavoro finisce, o dopo aver riavviato OpenBot.",
   "error.agent.duplicationBusy": "Questo agente è già in fase di duplicazione.",
   "error.agent.waitBeforeDuplicate": "Aspetta che l'agente finisca e svuoti la coda prima di duplicarlo.",
   "error.agent.saveOtherAgent": "Questo salvataggio appartiene a un altro agente.",

@@ -124,6 +124,8 @@ export const messages = {
   "error.agent.deletionBusy": "Usuwanie agenta już trwa.",
   "error.agent.stopBeforeDelete": "Zatrzymaj agenta i anuluj wiadomości w kolejce, zanim go usuniesz.",
   "error.agent.deleteIncomplete": "Nie udało się całkowicie usunąć danych agenta. Spróbuj ponownie usunąć agenta.",
+  "error.agent.deleteFolderInUse":
+    "Praca innego agenta nadal używa folderu tego agenta. Usuń agenta ponownie, gdy ta praca się zakończy, lub po ponownym uruchomieniu OpenBot.",
   "error.agent.duplicationBusy": "Ten agent jest już duplikowany.",
   "error.agent.waitBeforeDuplicate": "Poczekaj, aż agent skończy i opróżni kolejkę, zanim go zduplikujesz.",
   "error.agent.saveOtherAgent": "Ten zapis należy do innego agenta.",

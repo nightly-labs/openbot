@@ -125,6 +125,8 @@ export const messages = {
   "error.agent.deletionBusy": "Агент уже удаляется.",
   "error.agent.stopBeforeDelete": "Остановите агента и отмените его сообщения в очереди, прежде чем удалять.",
   "error.agent.deleteIncomplete": "Данные агента удалены не полностью. Повторите удаление.",
+  "error.agent.deleteFolderInUse":
+    "Работа другого агента ещё использует папку этого агента. Удалите агента снова, когда эта работа закончится, или после перезапуска OpenBot.",
   "error.agent.duplicationBusy": "Этот агент уже дублируется.",
   "error.agent.waitBeforeDuplicate":
     "Дождитесь, пока агент закончит работу, и очистите его очередь, прежде чем дублировать.",

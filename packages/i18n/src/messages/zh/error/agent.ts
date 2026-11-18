@@ -107,6 +107,8 @@ export const messages = {
   "error.agent.deletionBusy": "助手正在删除中。",
   "error.agent.stopBeforeDelete": "请先停止该助手并取消它的排队消息，再删除它。",
   "error.agent.deleteIncomplete": "助手数据未能完全移除，请重试删除。",
+  "error.agent.deleteFolderInUse":
+    "另一个助手的工作仍在使用此助手的文件夹。请在该工作结束后，或重启 OpenBot 后，再次删除此助手。",
   "error.agent.duplicationBusy": "该助手正在被复制。",
   "error.agent.waitBeforeDuplicate": "请等该助手结束并清空队列后再复制。",
   "error.agent.saveOtherAgent": "该保存操作属于另一个助手。",

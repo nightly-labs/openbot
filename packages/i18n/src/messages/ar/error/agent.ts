@@ -112,6 +112,8 @@ export const messages = {
   "error.agent.deletionBusy": "حذف الوكيل قيد التنفيذ بالفعل.",
   "error.agent.stopBeforeDelete": "أوقف الوكيل وألغِ رسائله في قائمة الانتظار قبل حذفه.",
   "error.agent.deleteIncomplete": "تعذّرت إزالة بيانات الوكيل بالكامل. أعد محاولة حذف الوكيل.",
+  "error.agent.deleteFolderInUse":
+    "لا يزال عمل وكيل آخر يستخدم مجلد هذا الوكيل. احذف هذا الوكيل مرة أخرى عند انتهاء ذلك العمل، أو بعد إعادة تشغيل OpenBot.",
   "error.agent.duplicationBusy": "يجري تكرار هذا الوكيل بالفعل.",
   "error.agent.waitBeforeDuplicate": "انتظر انتهاء الوكيل وإفراغ قائمة انتظاره قبل تكراره.",
   "error.agent.saveOtherAgent": "عملية الحفظ هذه تخص وكيلًا آخر.",

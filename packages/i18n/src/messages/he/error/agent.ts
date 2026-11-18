@@ -113,6 +113,8 @@ export const messages = {
   "error.agent.deletionBusy": "מחיקת הסוכן כבר מתבצעת.",
   "error.agent.stopBeforeDelete": "יש לעצור את הסוכן ולבטל את ההודעות שלו בתור לפני המחיקה.",
   "error.agent.deleteIncomplete": "לא ניתן היה להסיר את נתוני הסוכן לגמרי. יש לנסות למחוק את הסוכן שוב.",
+  "error.agent.deleteFolderInUse":
+    "עבודה של סוכן אחר עדיין משתמשת בתיקייה של הסוכן הזה. יש למחוק את הסוכן שוב כשהעבודה הזו מסתיימת, או אחרי הפעלה מחדש של OpenBot.",
   "error.agent.duplicationBusy": "הסוכן הזה כבר משוכפל.",
   "error.agent.waitBeforeDuplicate": "יש להמתין שהסוכן יסיים ולרוקן את התור שלו לפני השכפול.",
   "error.agent.saveOtherAgent": "השמירה הזו שייכת לסוכן אחר.",
