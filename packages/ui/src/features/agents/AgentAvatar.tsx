@@ -15,33 +15,13 @@ import {
 import type { AgentProfile } from "../../data";
 import { documentFocused } from "../../document-focus";
 import { documentSoftwareRendering } from "../../document-rendering";
+import { observeOnScreen } from "../../on-screen";
 
 // Cap avatar animation at 30fps: uncapped bloub clocks measured 30% renderer / 24% GPU
 // for two visible avatars. The shape is 24-40px, so the eye cannot see the difference.
 // The bloub patch in `patches/` waits between capped frames instead of asking for every display
 // frame. Each of those frames also restyled every running CSS animation in the window.
 const AVATAR_FPS = 30;
-
-// One observer for all avatars: a sidebar can hold a hundred of them.
-const avatarVisibilityListeners = new WeakMap<Element, (visible: boolean) => void>();
-let avatarVisibilityObserver: IntersectionObserver | undefined;
-
-/**
- * Tells `onChange` when the avatar enters or leaves the screen, as the `autoPause` of the Bloub loop
- * does. Without an observer, the avatar counts as on screen.
- */
-function observeAvatarVisibility(element: Element, onChange: (visible: boolean) => void): () => void {
-  if (typeof IntersectionObserver === "undefined") return () => {};
-  avatarVisibilityObserver ??= new IntersectionObserver((entries) => {
-    for (const entry of entries) avatarVisibilityListeners.get(entry.target)?.(entry.isIntersecting);
-  });
-  avatarVisibilityListeners.set(element, onChange);
-  avatarVisibilityObserver.observe(element);
-  return () => {
-    avatarVisibilityObserver?.unobserve(element);
-    avatarVisibilityListeners.delete(element);
-  };
-}
 
 interface PlushMood {
   state: PlushState;
@@ -377,7 +357,7 @@ function GeneratedAvatar(props: {
     const syncReducedMotion = () => setPrefersReduced(media?.matches ?? false);
     syncReducedMotion();
     media?.addEventListener?.("change", syncReducedMotion);
-    const stopObservingVisibility = element ? observeAvatarVisibility(element, setOnScreen) : undefined;
+    const stopObservingVisibility = element ? observeOnScreen(element, setOnScreen) : undefined;
 
     // What must be hovered or focused for a resting avatar to move: the control the avatar sits in or
     // beside, marked with `data-avatar-hover` when the avatar is only a neighbour of it. A dialog and a

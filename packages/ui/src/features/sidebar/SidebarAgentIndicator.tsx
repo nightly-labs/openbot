@@ -1,9 +1,10 @@
 import { Clock3, MessageCircleQuestionMark, MousePointer2, ShieldCheck, X } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createMemo, createSignal, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, onSettled, Show, untrack } from "solid-js";
 import type { AvatarMood } from "../../bloub-avatar";
 import { TypingDots } from "../../components/TypingDots";
 import type { AgentProfile } from "../../data";
+import { observeOnScreen } from "../../on-screen";
 import { useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
 import { AgentAvatar } from "../agents/AgentAvatar";
@@ -245,6 +246,10 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
     <Show when={shown()}>
       {(state) => {
         const current = () => held() ?? state();
+        /* The balls of a working badge hop only on screen. With 100 working agents, about 300 balls
+           hopped, most of them in rows scrolled away, and each frame restyled all of them. */
+        const [onScreen, setOnScreen] = createSignal(true);
+        onSettled(() => (badge ? observeOnScreen(badge, setOnScreen) : undefined));
         return (
           <span
             ref={badge}
@@ -257,6 +262,7 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
                 "agent-row-agent-status-bumping": phase() === "bump",
                 "agent-row-agent-status-bumping-b": phase() === "bump-b",
                 "agent-row-agent-status-leaving": phase() === "out",
+                "agent-row-agent-status-still": !onScreen(),
               },
             ]}
             aria-hidden="true"
