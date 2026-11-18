@@ -110,5 +110,5 @@ export const messages = {
     "{name}: waarden die een geheim kunnen bevatten, zijn verwijderd uit de argumenten of het adres. Voer ze opnieuw in bij Instellingen.",
   "error.import.transferSharedKept": "{number} bestanden in de map Shared staan hier al, dus ze blijven zoals ze zijn.",
   "error.import.transferPartSkipped":
-    "Sommige delen van het bestand konden niet worden geïmporteerd. De geïmporteerde agents en kanalen staan op deze server, dus importeer het bestand niet opnieuw.",
+    "Sommige delen van het bestand konden niet worden geïmporteerd. De andere delen staan op deze server, dus importeer het bestand niet opnieuw.",
 } as const satisfies PartialTranslation<typeof source>;

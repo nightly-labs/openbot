@@ -94,5 +94,5 @@ export const messages = {
   "error.import.transferSharedKept":
     "Paylaşılan klasördeki {number} dosya zaten burada, bu yüzden oldukları gibi korunuyor.",
   "error.import.transferPartSkipped":
-    "Dosyanın bazı bölümleri içe aktarılamadı. İçe aktarılan ajanlar ve kanallar bu sunucuda, bu yüzden dosyayı yeniden içe aktarmayın.",
+    "Dosyanın bazı bölümleri içe aktarılamadı. Diğer bölümler bu sunucuda, bu yüzden dosyayı yeniden içe aktarmayın.",
 } as const satisfies PartialTranslation<typeof source>;

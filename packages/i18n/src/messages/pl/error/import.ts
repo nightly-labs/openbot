@@ -100,5 +100,5 @@ export const messages = {
   "error.import.transferSharedKept":
     "Liczba plików z folderu współdzielonego, które już tu są: {number}. Zostają bez zmian.",
   "error.import.transferPartSkipped":
-    "Nie udało się zaimportować części pliku. Zaimportowani agenci i kanały są na tym serwerze, więc nie importuj pliku ponownie.",
+    "Nie udało się zaimportować części pliku. Pozostałe części są na tym serwerze, więc nie importuj pliku ponownie.",
 } as const satisfies PartialTranslation<typeof source>;

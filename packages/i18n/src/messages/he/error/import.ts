@@ -97,5 +97,5 @@ export const messages = {
     "{name}: ערכים שעשויים להכיל סוד הוסרו מהארגומנטים או מהכתובת שלו. יש להזין אותם שוב בהגדרות.",
   "error.import.transferSharedKept": "{number} קבצים בתיקייה Shared כבר נמצאים כאן, ולכן הם נשמרים כפי שהם.",
   "error.import.transferPartSkipped":
-    "לא ניתן היה לייבא חלקים מהקובץ. הסוכנים והערוצים שיובאו נמצאים בשרת הזה, לכן אל תייבאו את הקובץ שוב.",
+    "לא ניתן היה לייבא חלקים מהקובץ. החלקים האחרים נמצאים בשרת הזה, לכן אל תייבאו את הקובץ שוב.",
 } as const satisfies PartialTranslation<typeof source>;

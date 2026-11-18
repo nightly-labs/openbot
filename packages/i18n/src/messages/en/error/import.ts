@@ -107,7 +107,7 @@ export const messages = defineMessages("error.import", {
   "error.import.transferSharedKept":
     "{number} files in the Shared folder are already here, so they are kept as they are.",
   "error.import.transferPartSkipped":
-    "Some parts of the file could not be imported. The imported agents and channels are on this server, so do not import the file again.",
+    "Some parts of the file could not be imported. The other parts are on this server, so do not import the file again.",
   "error.import.transferChannelInvalid": "Channel {number} in the file is invalid, so it is skipped.",
   "error.import.transferChannelLimit": "Only the first {limit} channels are in the file.",
   "error.import.transferWorkflowInvalid": "A workflow in the file is invalid, so it is skipped.",

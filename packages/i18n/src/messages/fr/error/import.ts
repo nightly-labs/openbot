@@ -102,5 +102,5 @@ export const messages = {
   "error.import.transferSharedKept":
     "{number} fichiers du dossier partagé sont déjà présents ici. Ils restent tels quels.",
   "error.import.transferPartSkipped":
-    "Certaines parties du fichier n’ont pas pu être importées. Les agents et canaux importés sont sur ce serveur : n’importez pas le fichier une deuxième fois.",
+    "Certaines parties du fichier n’ont pas pu être importées. Les autres parties sont sur ce serveur : n’importez pas le fichier une deuxième fois.",
 } as const satisfies PartialTranslation<typeof source>;

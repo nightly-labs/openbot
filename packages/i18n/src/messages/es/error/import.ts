@@ -99,5 +99,5 @@ export const messages = {
   "error.import.transferSharedKept":
     "{number} archivos de la carpeta compartida ya están aquí, así que se conservan tal como están.",
   "error.import.transferPartSkipped":
-    "Algunas partes del archivo no se pudieron importar. Los agentes y canales importados están en este servidor, así que no vuelvas a importar el archivo.",
+    "Algunas partes del archivo no se pudieron importar. Las demás partes están en este servidor, así que no vuelvas a importar el archivo.",
 } as const satisfies PartialTranslation<typeof source>;

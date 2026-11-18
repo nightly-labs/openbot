@@ -1284,17 +1284,18 @@ export class InstanceTransferService {
     const routineIds = new Map<string, string>();
     /** The new id of each imported run, by its id in the file, so a chat names the copy. */
     const runIds = new Map<string, string>();
-    // From the first agent on, a part that fails is a warning or a skipped item, also when it throws:
-    // what is already here stays, so the result must list it, or a retry adds it again (#12291).
+    // From the first agent on, each agent, channel and later part that fails, also when it throws, is a
+    // skipped item or a warning: what is already here stays, so the result must list it, or a retry
+    // adds it again (#12291). The note comes first, so the warning limit does not cut it.
     const partSkipped = sourceText("error.import.transferPartSkipped");
     const optional = (effect: Effect.Effect<unknown, unknown>) =>
       afterImport(effect, () => {
-        if (!warnings.includes(partSkipped)) warnings.push(partSkipped);
+        if (!warnings.includes(partSkipped)) warnings.unshift(partSkipped);
       });
     for (const agent of selected) {
       const result = yield* Effect.result(
         this.#importAgent(archive, staged, agent, routineIds, runIds, warnings, fallbackTimezone).pipe(
-          Effect.catchDefect((defect) => Effect.fail(failure(defect))),
+          Effect.catchDefect(defectFailure),
         ),
       );
       if (Result.isFailure(result)) {
@@ -1311,7 +1312,12 @@ export class InstanceTransferService {
     const scratch = uploads
       ? yield* this.#prepareUploadDirectory(uploads).pipe(
           Effect.as(uploads),
-          Effect.orElseSucceed(() => tmpdir()),
+          Effect.catch((error) =>
+            Effect.sync(() => {
+              logger.warn("The transfer upload folder could not be prepared.", toLogValue(error.cause));
+              return tmpdir();
+            }),
+          ),
         )
       : tmpdir();
     for (const agent of selected) {
@@ -1351,7 +1357,7 @@ export class InstanceTransferService {
           warnings,
           fallbackTimezone,
           scratch,
-        ).pipe(Effect.catchDefect((defect) => Effect.fail(failure(defect)))),
+        ).pipe(Effect.catchDefect(defectFailure)),
       );
       if (Result.isFailure(result))
         warnings.push(
@@ -2304,11 +2310,17 @@ function afterImport(effect: Effect.Effect<unknown, unknown>, skipped: () => voi
   return effect.pipe(
     Effect.asVoid,
     Effect.catchCause((cause) => {
-      if (Cause.hasInterruptsOnly(cause)) return Effect.interrupt;
+      if (Cause.hasInterrupts(cause)) return Effect.interrupt;
       logger.warn("A part of the transfer import failed after the agents.", toLogValue(Cause.squash(cause)));
       return Effect.sync(skipped);
     }),
   );
+}
+
+/** A part of an apply that throws is logged, and then fails as one that returns its error. */
+function defectFailure(defect: unknown): Effect.Effect<never, ArchiveOperationError> {
+  logger.warn("A part of the transfer import threw an error.", toLogValue(defect));
+  return Effect.fail(failure(defect));
 }
 
 function failure(error: unknown): ArchiveOperationError {

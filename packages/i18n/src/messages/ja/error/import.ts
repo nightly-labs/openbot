@@ -97,5 +97,5 @@ export const messages = {
   "error.import.transferSharedKept":
     "共有フォルダー内の {number} 個のファイルはすでにここにあるため、そのまま保持されます。",
   "error.import.transferPartSkipped":
-    "ファイルの一部をインポートできませんでした。インポートしたエージェントとチャンネルはこのサーバーにあるため、ファイルを再度インポートしないでください。",
+    "ファイルの一部をインポートできませんでした。ほかの部分はこのサーバーにあるため、ファイルを再度インポートしないでください。",
 } as const satisfies PartialTranslation<typeof source>;

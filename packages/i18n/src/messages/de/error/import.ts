@@ -101,5 +101,5 @@ export const messages = {
   "error.import.transferSharedKept":
     "{number} Dateien im gemeinsamen Ordner sind hier schon vorhanden und bleiben unverändert.",
   "error.import.transferPartSkipped":
-    "Einige Teile der Datei konnten nicht importiert werden. Die importierten Agenten und Kanäle sind auf diesem Server, also importiere die Datei nicht noch einmal.",
+    "Einige Teile der Datei konnten nicht importiert werden. Die anderen Teile sind auf diesem Server, also importiere die Datei nicht noch einmal.",
 } as const satisfies PartialTranslation<typeof source>;
