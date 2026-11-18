@@ -1192,10 +1192,10 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
               // The wait for the provider's turns, if there was one, is over.
               const status = this.#statuses[spec.runtime];
               if (status.message !== null) this.#setStatus(spec.runtime, { ...status, message: null });
-              if (download) {
-                installed = yield* this.#runDownloadEffect(spec, signal);
-                yield* this.#removePartialEffect(spec);
-              }
+              // The archive stays until the new copy runs. A copy that installs but does not connect,
+              // such as one that answers too late, is removed below, and a Retry installs it again from
+              // the archive when it still verifies, without a second download (#11713).
+              if (download) installed = yield* this.#runDownloadEffect(spec, signal);
               this.#stages.set(spec.runtime, "activate");
               return join(this.#installRoot(spec), "bin", spec.executableName);
             }),
@@ -1211,6 +1211,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         if (installed) yield* runtimeIO(() => rm(this.#installRoot(spec), { recursive: true, force: true }));
         return yield* result.failure;
       }
+      if (download) yield* this.#removePartialEffect(spec);
       // This instance runs the version now. Its stamp is also what lets `removeDownload` remove an
       // install it made itself: the install leaves the directory with a time no stamp recorded.
       yield* this.#stampInUseEffect(spec.runtime, this.#installRoot(spec));

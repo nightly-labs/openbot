@@ -1733,7 +1733,12 @@ export class ProviderRuntime implements ProviderPort {
     for (const [provider, file] of this.#signInFiles) {
       const row = this.#status.providers?.find((candidate) => candidate.id === provider);
       if (row?.state !== "sign-in-required") continue;
-      if (this.#cliLogin.has(provider) || this.#providerConnectionCommands.has(provider)) continue;
+      if (
+        this.#cliLogin.has(provider) ||
+        this.#providerConnectionCommands.has(provider) ||
+        (provider === "codex" && this.#codexLogin.pending)
+      )
+        continue;
       const version = signInFileVersion(file.paths);
       if (version === file.seen) continue;
       file.seen = version;
