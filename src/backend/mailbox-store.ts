@@ -2641,6 +2641,8 @@ export class MailboxStore {
               if (delivery.recipientAgentId !== agentId) continue;
               if (isActiveDelivery(delivery)) waiting = true;
               if (delivery.status !== "completed" || !delivery.turnId || turns.has(delivery.turnId)) continue;
+              // An answer that joined a running turn of other work: that turn's answer is for the other work.
+              if (delivery.steeredAt !== undefined) continue;
               turns.add(delivery.turnId);
               for (const turnId of delivery.resumeAfterUsageLimit?.previousTurnIds ?? []) turns.add(turnId);
               read.push({ turnId: delivery.turnId, createdAt: delivery.createdAt });
