@@ -259,6 +259,27 @@ export function declinedMcpElicitationText(params: unknown): string {
 }
 
 /**
+ * Whether a completed Codex item is a ChatGPT app that refused to run because Codex has full access
+ * and its own approval review is off (#12353). Some apps, such as Finances and Health, ask for the
+ * Codex mode "Approve for me", which OpenBot does not set: approvals go to the user (#7800). The app
+ * sends English text and no code, so only both parts of that text match. Codex marks a tool result
+ * that is an error as `failed`, with the text in the result or in `error`.
+ */
+export function codexAppNeedsAutoReview(item: unknown): boolean {
+  if (getString(item, "type") !== "mcpToolCall" || getString(item, "server") !== CODEX_APPS_MCP_SERVER_NAME)
+    return false;
+  if (getString(item, "status") !== "failed") return false;
+  const texts = [
+    getString(getRecord(item, "error"), "message"),
+    ...getArray(getRecord(item, "result"), "content").map((part) => getString(part, "text")),
+  ];
+  return texts.some((text) => {
+    const lower = text?.toLowerCase() ?? "";
+    return lower.includes("automatic approval review") && lower.includes("full access");
+  });
+}
+
+/**
  * Codex asks this before it runs an MCP tool, and says so in `_meta`. The marker tells the ask from a
  * plugin's own yes or no, which can carry the same words and the same `persist` list.
  */

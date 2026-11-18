@@ -73,6 +73,7 @@ import type { MailboxSync } from "./mailbox-sync";
 import { memoryChangesMessage } from "./memory-changes-message";
 import { type PlanContinuation, waitsForUser } from "./plan-continuation";
 import { PLAN_UPDATED_METHOD, planFromNotification } from "./plan-updates";
+import { codexAppNeedsAutoReview } from "./prompts";
 import {
   GEMINI_INVALID_CREDENTIALS,
   isBalanceDiagnostic,
@@ -117,6 +118,7 @@ import {
 import { TurnTraces, traceMessage } from "./turn-traces";
 import { collectProviderUsage } from "./usage-collection";
 import { USAGE_LIMIT_METHOD, type UsageLimitGate } from "./usage-limit-gate";
+import { codexSandboxMode } from "./workspace-sandbox";
 
 const logger = createOpenBotLogger("turn-lifecycle");
 /** The retry of one turn after which the user gets a notice. A single retry is a normal network error. */
@@ -1427,6 +1429,13 @@ export class TurnLifecycle {
           [...getArray(params, "filePaths"), ...shellReadPaths(item)],
           [...getArray(params, "folderPaths"), ...shellWorkFolders(item)],
         );
+        if (notification.method === "item/completed" && source.provider === "codex" && codexAppNeedsAutoReview(item)) {
+          // Workspace only sends no full access, so the app's text does not describe it; that agent
+          // keeps the app's own error.
+          const agent = this.#store.get(agentId);
+          if (agent && codexSandboxMode(agent) === "danger-full-access")
+            this.#hooks.emitError("mcp_app_auto_review", sourceText("error.backend.mcpAppAutoReview"), agentId);
+        }
         const itemId = getString(item, "id");
         if (itemId) this.#itemTurns.set(itemId, turnId);
         if (itemId && item.failureReport === true) this.#runningTurns.get(turnId)?.failureReports.add(itemId);

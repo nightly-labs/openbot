@@ -291,6 +291,8 @@ export const messages = defineMessages("error.backend", {
     "{provider} could not start the MCP server {name}, because the server did not answer in time. Start a new chat to try again.",
   "error.backend.mcpAppReconnect":
     "{name} on ChatGPT asks you to sign in again. Reconnect {name} on ChatGPT, then ask the agent again.",
+  "error.backend.mcpAppAutoReview":
+    "This ChatGPT app does not run when the agent has Ask first or Full access. The app needs the automatic approval review of Codex, which OpenBot does not support yet. You can try Workspace only for Access in the agent settings, then ask the agent again.",
   "error.backend.mcpServerSignInPage":
     "The MCP server {name} asked you to sign in on a web page. OpenBot does not open this page for a server, so it declined. Open {name} in Marketplace, Apps, and sign in, then ask the agent again.",
   "error.backend.mcpServerRequestDeclined":
