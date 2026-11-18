@@ -34,6 +34,8 @@ export interface BootRecoveryHooks {
   deliveryThreadId?(deliveryId: string): string | null;
   /** Tells the external conversation of a delivery that the recovery settled it. */
   deliverySettled?(deliveryId: string, terminal: "completed" | "failed" | "interrupted"): void;
+  /** Whether this task is still open, so the note for a stopped teammate request can go to its thread. */
+  taskOpen(taskId: string): boolean;
   /**
    * Whether this routine delivery can have ended quiet: a scheduled run, or a run of a deleted
    * routine, whose record is gone. A Test, script or webhook run cannot.
@@ -325,6 +327,28 @@ export class BootRecovery {
       else yield* this.#mailbox.markTerminal(id, terminal, reason).pipe(toBootRecoveryFailed);
       // Settled with this one, so the next deliveries of this pass do not run a recovery of their own.
       if (id !== delivery.id) this.#orphanedDeliveryIds.delete(id);
+    }
+    // No turn sends a result for these requests now, so the agent that asked gets a note and does not
+    // wait with no end (#11561). The drains after the recovery start it.
+    if (!continuation) {
+      for (const id of deliveryIds) {
+        const requesterId = yield* this.#mailbox
+          .answerFailedRequest(
+            id,
+            (taskId) => this.#hooks.taskOpen(taskId),
+            (agentId) => this.#store.list().some((agent) => agent.id === agentId),
+            true,
+          )
+          .pipe(
+            Effect.catch((failure) =>
+              Effect.sync(() => {
+                this.#hooks.emitError("failed_request_answer_failed", failure.cause, delivery.recipientAgentId);
+                return null;
+              }),
+            ),
+          );
+        if (requesterId) this.#mailboxSync.emitQueue(requesterId);
+      }
     }
     // The agent's own chat shows the error above its composer and the failed turn, as other failed turns do.
     if (ownChat && !continuation) {
