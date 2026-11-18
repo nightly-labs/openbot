@@ -34,6 +34,7 @@ import {
   CURRENT_MESSAGE_SEPARATOR,
   combinedPromptInput,
   deliveryPromptInput,
+  restartedResultInput,
   restatedContinuationInput,
   type TagReferenceSource,
 } from "./delivery-content";
@@ -1103,7 +1104,7 @@ export class DrainScheduler {
       const promptInput = (executionText: string | undefined) => {
         // The deliveries of one interrupted turn share its continuation, so the prompt states it once.
         const continued = new Set<string>();
-        return combinedPromptInput(
+        const input = combinedPromptInput(
           batch.map((item) => {
             const { resumeAfterUsageLimit, ...rest } = item;
             const repeated = resumeAfterUsageLimit !== undefined && continued.has(resumeAfterUsageLimit.turnId);
@@ -1126,6 +1127,7 @@ export class DrainScheduler {
           [...requestIds].flatMap((requestId) => this.#mailbox.unansweredRecipients(requestId)),
           agentNames,
         );
+        return batch.some((item) => item.restartedResult) ? restartedResultInput(input) : input;
       };
       // The request is already in the session, so a plan continuation sends only its note. A new
       // session, which gets the history handoff, gets the request again before the note (#8779).
