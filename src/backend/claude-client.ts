@@ -29,6 +29,7 @@ import { type AgentContextCategoryUsage, agentProviderName, defaultProviderModel
 import { type DynamicRecord, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
+import { classifyFailure } from "@openbot/telemetry";
 import { Deferred, Effect, Exit, Fiber, Option, Scope } from "effect";
 import { z } from "zod";
 import { advertisedZodShape } from "./agent/advertised-json-schema";
@@ -2938,12 +2939,17 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       if (blocked) queryLogger.warn("Cloudflare blocked a Claude request.", { error: redactText(String(error)) });
       const signInFailed = !blocked && (turn.authenticationFailed || CLAUDE_NOT_LOGGED_IN.test(String(error)));
       const billing = turn.billingFailed || (turn.balanceSpent && isBalanceDiagnostic(String(error)));
+      const message = claudeTurnError(error, this.#usesApiKey());
+      // A crash of the CLI that no rule names, as Claude Code 2.1.327 with a Bun panic on Windows
+      // (#12175). The message keeps the CLI text for the classifiers of the turn's end, such as a
+      // refused session, and that end continues the turn once, as after a provider exit.
+      const crashed = message === String(error) && claudeProcessExited(error) && classifyFailure(message) === "unknown";
       this.emit("notification", {
         method: "error",
         params: {
           threadId: runtime.id,
           turnId: turn.id,
-          message: claudeTurnError(error, this.#usesApiKey()),
+          message,
           ...(blocked
             ? { causeCode: "provider_unavailable" }
             : signInFailed
@@ -2952,7 +2958,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
                 ? { causeCode: "billing" }
                 : turn.stalled
                   ? { causeCode: "stalled" }
-                  : {}),
+                  : crashed
+                    ? { causeCode: "provider_exited" }
+                    : {}),
         },
       });
     }
@@ -3461,6 +3469,22 @@ function claudeTurnError(error: unknown, apiKey: boolean): string {
   if (!apiKey && CLAUDE_NOT_LOGGED_IN.test(text))
     return sourceText("error.provider.signInExpired", { provider: agentProviderName("claude") });
   return CLAUDE_SANDBOX_UNAVAILABLE.test(text) ? sourceText("error.agent.claudeNoSandbox") : text;
+}
+
+/**
+ * The SDK's error for a CLI process that exited with a code other than 0 or that a signal ended. The
+ * SDK marks it with `errorClass`, also inside the error that adds the stderr. A Stop ends the process
+ * with an abort error instead.
+ */
+function claudeProcessExited(error: unknown): boolean {
+  for (let cause = error, depth = 0; cause instanceof Error && depth < 3; cause = cause.cause, depth += 1) {
+    if (
+      "errorClass" in cause &&
+      (cause.errorClass === "process_exited_nonzero" || cause.errorClass === "process_killed_by_signal")
+    )
+      return true;
+  }
+  return false;
 }
 
 /**
