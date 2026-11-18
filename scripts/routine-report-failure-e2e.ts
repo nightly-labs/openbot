@@ -444,7 +444,7 @@ try {
     "Quiet failed",
     `Check quietly. ${calls(noUpdate, reportFailure(REASON))}`,
   );
-  const quietOk = createRoutine(checker.id, "Quiet ok", `Check quietly. ${calls(noUpdate)}`);
+  const quietOk = createRoutine(checker.id, "Quiet ok", `Check quietly. NOTICE ${calls(noUpdate)}`);
   const quietEmpty = createRoutine(checker.id, "Quiet empty", `Check quietly. EMPTY-ANSWER ${calls(noUpdate)}`);
   const quietHang = createRoutine(checker.id, "Quiet hang", `Check quietly. QUIET-HANG ${calls(noUpdate)}`);
   const quietLoop = createRoutine(checker.id, "Quiet loop", "Check quietly. QUIET-LOOP");
@@ -888,8 +888,10 @@ try {
     noUpdateAfterFailure,
   );
   // A quiet run keeps no normal answer in its routine thread: its answers are dropped or marked quiet.
+  const routineThreadOf = (routineId: string) =>
+    agents.listTasks(checker.id).tasks.find((task) => task.routineId === routineId);
   const shownAnswers = (routineId: string, turnId: string | null) => {
-    const thread = agents.listTasks(checker.id).tasks.find((task) => task.routineId === routineId);
+    const thread = routineThreadOf(routineId);
     if (!thread) return null;
     return agents
       .readTask(checker.id, thread.id)
@@ -912,6 +914,24 @@ try {
       quietness.quietFailed?.includes(FAILED_ANSWER) === true &&
       quietness.failedThenQuiet?.includes(FAILED_ANSWER) === true,
     quietness,
+  );
+  // The notice that the quiet run wrote before its step stays in its routine thread as a quiet answer,
+  // and its thought goes (#11848).
+  const quietOkThread = routineThreadOf(quietOk.id);
+  const quietOkNotes = quietOkThread
+    ? agents
+        .readTask(checker.id, quietOkThread.id)
+        .messages.filter((message) => message.turnId === quietOkRun.delivery.turnId && message.author === "assistant")
+    : [];
+  pass(
+    "A quiet script run keeps the notice that the agent wrote before its step",
+    quietOkNotes.some(
+      (message) =>
+        message.id.startsWith("msg_") &&
+        message.text === NOTICE_TEXT &&
+        message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE,
+    ) && quietOkNotes.every((message) => !message.id.startsWith("rs_")),
+    quietOkNotes,
   );
   // A run in a routine thread notifies through its own event, and a quiet run does not notify.
   const routineTurns = (turnId: string | null) =>

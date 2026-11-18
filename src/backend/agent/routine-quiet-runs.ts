@@ -170,7 +170,8 @@ export function settleQuietRoutineTurn(
  * Whether a message of a quiet turn is the agent's narration, which the chat showed as a message
  * while the turn ran, such as a notice before a step. It stays as a quiet answer and does not make
  * the turn a report. Without this, it went with the thinking when the turn ended (#11848). A filler
- * or repeated note stays out, as in the chat (`showsNarration`). Keep one function for each turn,
+ * or repeated note stays out, as in the chat (`showsNarration`), and so does a note that is only the
+ * no-update marker. Keep one function for each turn,
  * and call it on the turn's messages in order.
  */
 export function quietNarration(provider: AgentProviderRef | undefined): (message: ConversationMessage) => boolean {
@@ -179,6 +180,7 @@ export function quietNarration(provider: AgentProviderRef | undefined): (message
     message.author === "assistant" &&
     message.itemType === "commentary" &&
     isNarrationItemId(message.id, provider) &&
+    !isNoUpdateAnswer(message.text) &&
     showsNarration(message.text, shown);
 }
 
