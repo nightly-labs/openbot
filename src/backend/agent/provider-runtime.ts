@@ -1339,8 +1339,9 @@ export class ProviderRuntime implements ProviderPort {
               const kept = released ? this.#lastUsage.get(provider) : undefined;
               if (kept && !usageWindowHasReset(kept)) return kept;
               if (released && this.#usageUnreported.has(provider)) return null;
-              // A poll is not a request: it must not start a provider after its failed starts in a row.
-              if (this.#startPaused(provider)) return null;
+              // A poll is not a request: it must not start a provider after its failed starts in a row. The
+              // row keeps its last reading, as it did when the start failed, so it does not leave the rail.
+              if (this.#startPaused(provider)) return keptReading(provider);
               if (!this.#clients.has(provider)) yield* this.ensureProvider(provider);
               const client = this.#clients.get(provider);
               if (!client) return null;
