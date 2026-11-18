@@ -5,9 +5,10 @@
 // picture small, such as a step on the Workflows canvas. The member reads it with the same access as
 // the file itself (`GET /v1/attachments/<id>`). The copy has the shape of the file, and its longest side
 // is at most `ATTACHMENT_PREVIEW_EDGE` pixels. It is a JPEG, or a PNG when the picture has clear pixels.
-// The `Content-Type` header names the type. When the host cannot make a smaller copy (a type that it
-// cannot decode, or a picture that is already small), it answers the file itself, with its own type.
-// A file that is not an image gets 415. An attachment id names bytes that do not change, so a client can
+// The `Content-Type` header names the type. When the host makes no smaller copy of a small file (a
+// picture that is already small, or a type that it cannot decode), it answers the file itself, with its
+// own type. A larger file with no copy, such as a large WebP or GIF file, and a file that is not an
+// image, get 415: the client reads the whole file, at the pace of other file downloads. An attachment id names bytes that do not change, so a client can
 // keep the answer as long as it keeps the file. A client asks for it only from a host that sends this
 // capability; without it, the client reads the whole file, as before. Over WebRTC the route is a side
 // route (`side-routes.ts`): its request frame has no body, and an error answer is the error envelope.

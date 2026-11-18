@@ -146,6 +146,8 @@ export async function routeFiles(
     const preview = await runCauseEffect(
       attachmentPreviews.file(attachmentId, { path: attachment.path, mimeType: attachment.mimeType }),
     );
+    // The client reads the whole file instead, so no user sees this text.
+    if (!preview) throw new HttpError(415, "The attachment has no preview.");
     // As for the file itself: the WebRTC host sends an answer with this header as a file, whatever its type.
     return sendFile(response, preview.path, null, (size) => ({
       "Content-Type": preview.mimeType,

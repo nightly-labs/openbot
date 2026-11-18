@@ -51,8 +51,8 @@ const FILE_LIMITS: RemoteAttachmentCacheLimits = {
 
 /**
  * The limits of the small copies of pictures (`attachment-preview-v1`). A copy is at most about 150
- * KB, so six can download together and stay far under the channel's send buffer, and 48 MB holds
- * some hundreds of them. They stay for an hour: a canvas that the user opens again shows at once.
+ * KB, and the host sends a file with no copy only when it is at most 256 KB, so six can download
+ * together and stay far under the channel's send buffer. 48 MB holds some hundreds of them. They stay for an hour: a canvas that the user opens again shows at once.
  */
 export const REMOTE_ATTACHMENT_PREVIEW_LIMITS: RemoteAttachmentCacheLimits = {
   bytes: 48 * 1024 * 1024,

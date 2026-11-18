@@ -2730,7 +2730,9 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
 
   /**
    * A small copy of a picture on a joined server, for a card that shows it small. A host without
-   * `attachment-preview-v1` sends the whole file, as `downloadAttachment` does.
+   * `attachment-preview-v1` sends the whole file, as `downloadAttachment` does. When the host has no
+   * copy (a large WebP or GIF file), or the copy fails, the whole file comes through the file cache,
+   * at its own pace.
    */
   readonly downloadAttachmentPreview = Effect.fn("RemoteManager.downloadAttachmentPreview")(
     function* (
@@ -2741,25 +2743,27 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       if (!this.supportsCapability(serverId, ATTACHMENT_PREVIEW_CAPABILITY))
         return yield* this.downloadAttachment(attachmentId, serverId, true);
       const server = yield* remoteDecode(() => this.#store.require(serverId));
-      return yield* this.#attachmentPreviews.get(
-        server.id,
-        attachmentId,
-        () =>
-          this.#owned(
-            Effect.gen({ self: this }, function* () {
-              const response = yield* this.#client.fetch(
-                server,
-                new URL(TEAM_API_ROUTES.attachmentPreview(attachmentId), server.apiUrl),
-              );
-              return {
-                bytes: yield* remoteCall(() => response.arrayBuffer().then((buffer) => new Uint8Array(buffer))),
-                name: attachmentId,
-                mimeType: response.headers.get("content-type") ?? "application/octet-stream",
-              };
-            }),
-          ),
-        true,
-      );
+      return yield* this.#attachmentPreviews
+        .get(
+          server.id,
+          attachmentId,
+          () =>
+            this.#owned(
+              Effect.gen({ self: this }, function* () {
+                const response = yield* this.#client.fetch(
+                  server,
+                  new URL(TEAM_API_ROUTES.attachmentPreview(attachmentId), server.apiUrl),
+                );
+                return {
+                  bytes: yield* remoteCall(() => response.arrayBuffer().then((buffer) => new Uint8Array(buffer))),
+                  name: attachmentId,
+                  mimeType: response.headers.get("content-type") ?? "application/octet-stream",
+                };
+              }),
+            ),
+          true,
+        )
+        .pipe(Effect.catch(() => this.downloadAttachment(attachmentId, serverId, true)));
     },
     (operation) => this.#owned(operation),
   ).bind(this);

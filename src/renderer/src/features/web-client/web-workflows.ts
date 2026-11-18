@@ -130,8 +130,10 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
   const githubSupported = () => has(WORKFLOWS_GITHUB_CAPABILITY);
   const tooOld = () => new Error(currentText().t("error.workflow.serverTooOld"));
   // The files that did not load: too large for the page, or a failed download. A card shows its icon
-  // for them, not a loading pulse that does not end.
+  // for them, not a loading pulse that does not end. When the host is online again, which is also after
+  // a change of server, each of them loads again. The listener lives as long as the workspace.
   const [unloaded, setUnloaded] = createSignal<ReadonlySet<string>>(new Set());
+  options.onReconnect(() => setUnloaded(new Set()));
   const loaded = (
     media: AttachmentMediaSource,
     attachmentId: string,
@@ -333,9 +335,13 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
     mediaUrl,
     mediaPreviewUrl(attachmentId) {
       const previews = options.previewMedia;
-      if (!previews || !has(ATTACHMENT_PREVIEW_CAPABILITY)) return mediaUrl(attachmentId, "image");
-      // A host that makes no copy sends the file itself, which can be larger than a thumbnail.
-      return loaded(previews, attachmentId, "image", "generated", `preview:${attachmentId}`);
+      const key = `preview:${attachmentId}`;
+      // A host without the capability, or with no copy of the picture (a large WebP or GIF file), gives
+      // the whole file.
+      if (!previews || !has(ATTACHMENT_PREVIEW_CAPABILITY) || unloaded().has(key)) {
+        return mediaUrl(attachmentId, "image");
+      }
+      return loaded(previews, attachmentId, "image", "thumbnail", key);
     },
     githubConnector: options.githubConnector,
     hostName: options.hostName,

@@ -671,7 +671,8 @@ interface TeamApiProviders {
 export type TeamApiMailbox = Pick<MailboxStore, "resolveAttachment">;
 /** `attachment-preview-v1`: the file to send as the small copy of an image attachment (`AttachmentPreviews`). */
 export interface TeamApiAttachmentPreviews {
-  file(attachmentId: string, source: PreviewFile): Effect.Effect<PreviewFile>;
+  /** Null when the host has no copy and the file is too large to send as its own preview. */
+  file(attachmentId: string, source: PreviewFile): Effect.Effect<PreviewFile | null>;
 }
 export type TeamApiSidebarLayout = Pick<
   SidebarLayoutStore,

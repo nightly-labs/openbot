@@ -1862,7 +1862,9 @@ const mailbox: TeamApiMailbox = {
         ? { path: attachmentPath, mimeType: "text/plain", name: "report one.txt" }
         : id === "att-picture"
           ? { path: pictureAttachmentPath, mimeType: "image/png", name: "picture.png" }
-          : null,
+          : id === "att-large-webp"
+            ? { path: pictureAttachmentPath, mimeType: "image/webp", name: "large.webp" }
+            : null,
     ),
 };
 
@@ -1871,7 +1873,8 @@ const attachmentPreviews: TeamApiAttachmentPreviews = {
   file: (attachmentId, source) =>
     Effect.sync(() => {
       record("attachmentPreview", attachmentId, source);
-      return { path: picturePreviewPath, mimeType: "image/jpeg" };
+      // A large file with no copy.
+      return attachmentId === "att-large-webp" ? null : { path: picturePreviewPath, mimeType: "image/jpeg" };
     }),
 };
 
@@ -12024,13 +12027,15 @@ try {
     const previewOfText = await call("GET", TEAM_API_ROUTES.attachmentPreview("att-1"), { token: bobToken });
     const previewMissing = await call("GET", TEAM_API_ROUTES.attachmentPreview("att-missing"), { token: bobToken });
     const previewNoToken = await call("GET", TEAM_API_ROUTES.attachmentPreview("att-picture"));
+    const previewNoCopy = await call("GET", TEAM_API_ROUTES.attachmentPreview("att-large-webp"), { token: bobToken });
     check(
-      "a preview of a file that is not a picture gets 415, of a missing file 404, and without a session 401",
+      "a preview of a file that is not a picture or of a large file with no copy gets 415, of a missing file 404, and without a session 401",
       previewOfText.status === 415 &&
+        previewNoCopy.status === 415 &&
         errorIs(previewMissing, 404, sourceText("error.team.attachmentNotFound")) &&
         previewNoToken.status === 401 &&
-        callsOf("attachmentPreview").length === 1,
-      [summary(previewOfText), summary(previewMissing), summary(previewNoToken)],
+        callsOf("attachmentPreview").length === 2,
+      [summary(previewOfText), summary(previewNoCopy), summary(previewMissing), summary(previewNoToken)],
     );
     // The preview route is a side route, so the frozen protocol adapters do not change. The frozen
     // no-body list of protocol 2 does not know the route: without its side codec, a client refused to send it.

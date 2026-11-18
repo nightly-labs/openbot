@@ -28,7 +28,11 @@ const PRUNE_EVERY = 64;
 const PREVIEW_SOURCE_BYTES = 40 * 1024 * 1024;
 /** 40 million pixels is about 160 MB decoded and about 0.4 s of decode. A larger picture is sent as it is. */
 const PREVIEW_SOURCE_PIXELS = 40_000_000;
-/** A file of at most this size, with its longest side at most the preview edge, is sent as it is. */
+/**
+ * A file of at most this size, with its longest side at most the preview edge, is sent as it is. A
+ * larger file with no copy is not sent: a client downloads several previews at the same time, and
+ * several large files would fill the send buffer of the data channel.
+ */
 const SMALL_FILE_BYTES = 256 * 1024;
 const JPEG_QUALITY = 82;
 /** The copies whose place is known, so a hit needs no disk read. */
@@ -104,7 +108,8 @@ export class AttachmentPreviews {
 
   /**
    * The file to send as the preview of an image attachment: its copy, made now when there is none, or
-   * the attachment itself. A failure sends the attachment itself, and the next request tries again.
+   * the attachment itself when it is small. Null for a larger file with no copy. A failure is treated
+   * as no copy, and the next request tries again.
    */
   readonly file = Effect.fn("AttachmentPreviews.file")(function* (
     this: AttachmentPreviews,
@@ -115,12 +120,12 @@ export class AttachmentPreviews {
     const known = this.#known.get(key);
     if (known) {
       this.#remember(key, known);
-      return known === "source" ? source : known;
+      return known === "source" ? yield* smallSource(source) : known;
     }
     const pending = this.#pending.get(key);
     if (pending) {
       const found = yield* Deferred.await(pending);
-      return found === "source" ? source : found;
+      return found === "source" ? yield* smallSource(source) : found;
     }
     const request = Deferred.makeUnsafe<PreviewFile | "source">();
     this.#pending.set(key, request);
@@ -136,7 +141,7 @@ export class AttachmentPreviews {
       Effect.onExit((exit) => Deferred.done(request, exit)),
       Effect.ensuring(Effect.sync(() => this.#pending.delete(key))),
     );
-    return found === "source" ? source : found;
+    return found === "source" ? yield* smallSource(source) : found;
   });
 
   #find = Effect.fn("AttachmentPreviews.find")(function* (this: AttachmentPreviews, key: string, source: PreviewFile) {
@@ -207,6 +212,14 @@ export class AttachmentPreviews {
       this.#known.delete(oldKey);
     }
   }
+}
+
+/** The attachment itself, when it is small enough to send as its own preview. */
+function smallSource(source: PreviewFile): Effect.Effect<PreviewFile | null> {
+  return Effect.tryPromise(() => stat(source.path)).pipe(
+    Effect.map((metadata) => (metadata.isFile() && metadata.size <= SMALL_FILE_BYTES ? source : null)),
+    Effect.catch(() => Effect.succeed(null)),
+  );
 }
 
 function exists(path: string): Effect.Effect<boolean> {
