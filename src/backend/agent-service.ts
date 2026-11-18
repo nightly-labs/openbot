@@ -1205,6 +1205,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           this.#retryHeldMoves();
         },
         onAccountsChanged: () => this.#retryHeldMoves(),
+        onProvidersUnready: () => this.#refreshHeldAgents(),
       },
       emit: (event) => this.#emit(event),
       emitError: (code, error, agentId, context) => this.#emitError(code, error, agentId, context),
@@ -4621,19 +4622,23 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * account connects or its own limit ends; nothing else reads the held queue again before the reset (#9877).
    */
   #retryHeldMoves(): void {
-    let held = false;
-    for (const agent of this.#store.list()) {
-      if (this.#usageLimits.mayDrain(agent.id)) continue;
-      held = true;
+    for (const agent of this.#store.list())
       if (
+        !this.#usageLimits.mayDrain(agent.id) &&
         this.#hasWaitingWork(agent.id) &&
         (this.#usageLimitBackup(agent.id, this.#queuedContinuation(agent.id)) !== undefined ||
           this.#poolBackup(agent.id))
       )
         this.#drain.scheduleDrain(agent.id);
-    }
-    // A ready backup decides whether an idle held agent shows that it waits for its limit (#12360).
-    if (held) this.#emitRuntimeSnapshot();
+    this.#refreshHeldAgents();
+  }
+
+  /**
+   * Sends the runtime snapshot again while a usage limit holds an agent. A backup that became ready or
+   * not ready decides whether an idle held agent shows that it waits for its limit (#12360).
+   */
+  #refreshHeldAgents(): void {
+    if (this.#usageLimits.limitedAgents().length > 0) this.#emitRuntimeSnapshot();
   }
 
   /**

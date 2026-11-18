@@ -419,6 +419,8 @@ export interface ProviderHooks {
   onAccountModelsListed?(provider: AgentProvider, accountId: string): Effect.Effect<void>;
   /** Runs after a change to the accounts of a provider, such as an account that connected. */
   onAccountsChanged?(): void;
+  /** Runs after a provider stops being ready: it was turned off, or it left the available state. */
+  onProvidersUnready?(): void;
   /**
    * The configuration a process spawning now reads. A CLI reads the endpoint files once, at spawn,
    * so a change made while it starts is not in the process that arrives.
@@ -5167,6 +5169,7 @@ export class ProviderRuntime implements ProviderPort {
 
   #setStatus(patch: Partial<AgentStatus>): void {
     const available: AgentProvider[] = [];
+    let unready = false;
     if (patch.providers) {
       logProviderStateChanges(this.#status.providers ?? [], patch.providers, this.#redactMcp);
       // A provider with no CLI has nothing left to diagnose, and its row already says why: an error
@@ -5175,6 +5178,8 @@ export class ProviderRuntime implements ProviderPort {
       for (const row of patch.providers) {
         const current = this.#status.providers?.find((candidate) => candidate.id === row.id);
         if (row.state === "available" && current?.state !== "available") available.push(row.id);
+        if (current?.state === "available" && current.off !== true && (row.state !== "available" || row.off === true))
+          unready = true;
       }
     }
     this.#status = {
@@ -5186,6 +5191,7 @@ export class ProviderRuntime implements ProviderPort {
     // The drain holds the messages of a provider that waits for a sign-in, and no other event wakes
     // them. A provider that becomes available again can start them.
     for (const provider of available) this.#hooks.onProviderResumed(provider);
+    if (unready) this.#hooks.onProvidersUnready?.();
   }
 }
 
