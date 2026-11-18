@@ -324,6 +324,7 @@ export const messages = {
   "chat.image.didNotComplete": "Görsel oluşturma tamamlanmadı.",
   "chat.image.generating": "Görsel oluşturuluyor",
   "chat.image.unavailable": "Görsel kullanılamıyor",
+  "chat.image.unavailableNamed": "Görsel kullanılamıyor: {name}",
   "chat.image.interrupted": "Görsel oluşturma kesildi",
   "chat.image.failed": "Görsel oluşturma başarısız oldu",
   "chat.image.attached": "Ekli görsel",

@@ -157,6 +157,28 @@
   max-height: clamp(360px, 55vh, 640px);
 }
 
+/*
+ * A picture in a list item or a table cell is one of a set, such as one picture for each suggestion.
+ * Each one fits the same box, so the pictures of a set have a similar size and a table row stays
+ * short. The image viewer shows the full size.
+ */
+.message-entry-agent .message-content-blocks li .message-markdown-image {
+  max-width: min(100%, 360px);
+  max-height: 360px;
+}
+
+.message-entry-agent .message-content-blocks :is(td, th) .message-markdown-image {
+  max-width: min(100%, 240px);
+  max-height: 240px;
+}
+
+/* The label takes the place of a block picture, so it stays on its own line. */
+.message-markdown-image-unavailable {
+  display: block;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}
+
 /* The image opens in the image viewer. The button keeps the image's own size. */
 .message-markdown-image-button {
   display: block;
