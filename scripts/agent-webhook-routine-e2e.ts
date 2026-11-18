@@ -212,6 +212,8 @@ const report: {
     statuses: Record<string, number>;
     channelRefusal: string | null;
     keyAfterDelete: boolean;
+    pendingKeyGiven: boolean;
+    pendingKeyAfterSchedule: boolean;
   };
   checks: { name: string; passed: boolean }[];
   passed: boolean;
@@ -289,6 +291,8 @@ const agents = new AgentService({
   browser,
   preferredProvider: "codex",
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
+  // As in the app: a routine delete removes the agent's key of the routine secret.
+  agentApiKeys: apiKeys,
   // As in the app: the events service is built after the agent service.
   webhookRoutines: () => agentWebhookRoutineWriter(events),
 });
@@ -682,6 +686,32 @@ try {
     (error: unknown) => String(error),
   );
   pass("A channel routine has no single agent to give the secret to", channelRefusal !== null);
+  // A save that changes the trigger to a schedule removes the route, so the key is old.
+  const pendingId = pending.body?.routineId ?? "";
+  const hasPendingKey = async () =>
+    (await Effect.runPromise(apiKeys.list(agent.id))).some((key) => key.name === pendingKey);
+  await Effect.runPromise(events.giveSecretToAgent({ owner, id: pendingId }));
+  const pendingKeyGiven = await hasPendingKey();
+  const pendingRoutine = (await Effect.runPromise(events.listRoutines({ owner }))).find(
+    (item) => item.id === pendingId,
+  );
+  assert.ok(pendingRoutine, "the routine from the relay-down step is gone");
+  await Effect.runPromise(
+    events.saveRoutine({
+      id: pendingId,
+      owner,
+      name: pendingRoutine.name,
+      instruction: pendingRoutine.instruction,
+      active: pendingRoutine.active,
+      timezone: pendingRoutine.timezone,
+      trigger: { kind: "schedule", schedule: { kind: "hourly", minute: 0 } },
+    }),
+  );
+  const pendingKeyAfterSchedule = await hasPendingKey();
+  pass(
+    "A trigger change to a schedule removes the agent's key of the routine",
+    pendingKeyGiven && !pendingKeyAfterSchedule,
+  );
   const chatAfterKey = JSON.stringify((await runCauseEffect(agents.readConversation(agent.id))).messages);
   pass(
     "No given secret is in the chat",
@@ -709,7 +739,15 @@ try {
   );
   const keyAfterDelete = (await ownKey()) !== undefined;
   pass("delete_routine removes the agent's key of the routine", !keyAfterDelete);
-  report.agentKey = { name: keyName, answer, statuses: keyStatuses, channelRefusal, keyAfterDelete };
+  report.agentKey = {
+    name: keyName,
+    answer,
+    statuses: keyStatuses,
+    channelRefusal,
+    keyAfterDelete,
+    pendingKeyGiven,
+    pendingKeyAfterSchedule,
+  };
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

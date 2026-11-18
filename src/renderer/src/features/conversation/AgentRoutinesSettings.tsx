@@ -785,12 +785,12 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     const events = props.port.events;
     const give = events?.api.giveSecretToAgent;
     const agentName = props.agentName;
-    if (!events || !give || !agentName || events.owner.kind !== "agent") return undefined;
+    const id = draft()?.id;
+    if (!events || !give || !agentName || !id || events.owner.kind !== "agent") return undefined;
     return {
+      routineId: id,
       agentName,
       give: async () => {
-        const id = draft()?.id;
-        if (!id) throw new Error(t("routine.webhook.giveSecretFailed", { name: agentName }));
         await give({ id, owner: events.owner });
         if (draft()?.id !== id) return;
         setWebhook((state) => {

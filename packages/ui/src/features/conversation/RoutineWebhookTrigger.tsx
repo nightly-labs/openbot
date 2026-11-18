@@ -129,6 +129,7 @@ export function RoutineWebhookTrigger(props: RoutineWebhookTriggerProps) {
     const action = props.agentSecret;
     if (!action) return undefined;
     return {
+      routineId: action.routineId,
       agentName: action.agentName,
       give: async () => {
         await action.give();

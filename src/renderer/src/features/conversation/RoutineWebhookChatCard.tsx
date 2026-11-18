@@ -204,6 +204,7 @@ export function RoutineWebhookChatCard(props: RoutineWebhookChatCardProps) {
     const agentName = props.agentName;
     if (!give || !agentName || routine().owner.kind !== "agent") return undefined;
     return {
+      routineId: routine().id,
       agentName,
       give: async () => {
         await give({ owner: plainOwner(routine()), id: routine().id });

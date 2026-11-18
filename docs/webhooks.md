@@ -26,11 +26,11 @@ the agent makes the routine for another agent, get the secret in that agent's ro
 The agent can also add the secret to the sender itself, for example when it sets up the sender
 through an API. Press **Give the signing secret to <agent>** (the agent button next to the
 regenerate button) on the card or in the routine editor, and confirm. The host makes a new secret
-and saves it as an API key of that agent only, with the name `WEBHOOK_SECRET_<routine ID>`. The old
+and saves it as an API key of that agent only, with a name such as `WEBHOOK_SECRET_3F2A…` (the routine ID in upper case, with no dashes). The old
 secret stops working immediately. Nobody copies the secret, and it does not show in the chat. The
 agent reads it from the key file (`openbot.list_api_keys` gives the path). When you regenerate the
 secret or use the sender's secret later, the host also updates the key. When you delete the
-routine, the host deletes the key. A channel routine has no single agent, so it does not show the
+routine or change its trigger to a schedule, the host deletes the key. A channel routine has no single agent, so it does not show the
 button.
 
 To change the event type or the filters from the chat, ask the agent: it calls

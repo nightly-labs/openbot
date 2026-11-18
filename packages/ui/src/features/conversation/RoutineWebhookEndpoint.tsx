@@ -11,7 +11,7 @@ import {
   RefreshCw,
   Text,
 } from "@openbot/ui";
-import { createSignal, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, Show } from "solid-js";
 import { useText } from "../../text";
 
 export interface RoutineWebhookUrlFieldProps {
@@ -58,6 +58,8 @@ export function RoutineWebhookUrlField(props: RoutineWebhookUrlFieldProps) {
 
 /** Gives a new signing secret to the agent of the routine, which saves it as an API key. */
 export interface RoutineWebhookAgentSecret {
+  /** The routine that gets the secret. Another routine starts with no result. */
+  routineId: string;
   agentName: string;
   give: () => Promise<void>;
 }
@@ -95,16 +97,26 @@ export function RoutineWebhookSecretField(props: RoutineWebhookSecretFieldProps)
     given: false,
   });
   const [agentConfirm, setAgentConfirm] = createSignal(false);
+  // A draft change gives a new action object, and an effect runs again for an equal value. The memo
+  // resets the result only when another routine opens.
+  const agentRoutine = createMemo(() => props.agentSecret?.routineId);
+  createEffect(agentRoutine, () => {
+    setAgent({ pending: false, error: null, given: false });
+    setAgentConfirm(false);
+  });
 
   async function giveToAgent(): Promise<void> {
     const action = props.agentSecret;
     if (!action || agent().pending) return;
+    const sameRoutine = () => props.agentSecret?.routineId === action.routineId;
     setAgent({ pending: true, error: null, given: false });
     try {
       await action.give();
+      if (!sameRoutine()) return;
       setAgent({ pending: false, error: null, given: true });
       setAgentConfirm(false);
     } catch (cause) {
+      if (!sameRoutine()) return;
       setAgent({
         pending: false,
         error: errorMessage(cause, t("routine.webhook.giveSecretFailed", { name: action.agentName })),
