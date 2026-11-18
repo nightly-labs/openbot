@@ -26,6 +26,7 @@ import { useThreadMcpSignInCard } from "./McpSignInChatCard";
 import { useMessageBackdropAction } from "./message-backdrop";
 import { useThreadSettingLinkCard } from "./SettingLinkChatCard";
 import { createTurnSteps } from "./turn-steps";
+import { useTurnTrace } from "./turn-trace";
 
 /**
  * A side thread in the side panel, beside the agent's own chat. Its message box takes text only:
@@ -82,6 +83,11 @@ export function ConversationSideThread(props: { threadId: string }) {
     messages: () => messages,
     lines: () => undefined,
     activeTurnId: () => thread()?.task.activeTurnId,
+  });
+  const turnTrace = useTurnTrace({
+    turnSteps,
+    agentName: () => view.agent?.name,
+    agents: () => view.agents,
   });
   const showAgentSteps = useShowAgentSteps();
   const compactMessageActions = useCompactMessageActions();
@@ -239,6 +245,7 @@ export function ConversationSideThread(props: { threadId: string }) {
             focusMessage={current().thread.focusMessage}
             stepsAbove={turnSteps.stepsAbove}
             factsAbove={turnSteps.factsAbove}
+            traceAbove={(messageId) => turnTrace(messageId)}
             activeSteps={turnSteps.activeSteps()}
             stepsOpenByDefault={showAgentSteps()}
             onCopyMessage={(message) => void copyMessage(message)}

@@ -48,6 +48,7 @@ import { insertAtSelection, insertPastedText, rowAttachments } from "../conversa
 import { latestVisibleAgentMessageId } from "../conversation/conversation-read-state";
 import { importPastedFiles, type PastePreview, pastePreviewTracker } from "../conversation/stores/composer-actions";
 import { createTurnSteps } from "../conversation/turn-steps";
+import { useTurnTrace } from "../conversation/turn-trace";
 import { createPageHeaderFrame } from "../window/page-header-frame";
 import type { TaskEvent, TasksSource } from "./tasks-port";
 
@@ -796,6 +797,11 @@ export function TasksView(props: TasksViewProps) {
       lines: () => undefined,
       activeTurnId: () => hosted()?.activeTurnId,
     });
+    const turnTrace = useTurnTrace({
+      turnSteps,
+      agentName: () => (owner() ?? props.agents[0])?.name,
+      agents: () => props.agents,
+    });
     const input = () => {
       const current = hosted();
       return current ? { agentId: current.agentId, taskId: current.id } : null;
@@ -902,6 +908,7 @@ export function TasksView(props: TasksViewProps) {
               attention={answerCard(agent().name)}
               stepsAbove={turnSteps.stepsAbove}
               factsAbove={turnSteps.factsAbove}
+              traceAbove={(messageId) => turnTrace(messageId)}
               activeSteps={turnSteps.activeSteps()}
               stepsOpenByDefault={showAgentSteps()}
               sendShortcut={props.sendShortcut}
