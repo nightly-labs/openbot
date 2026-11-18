@@ -64,7 +64,7 @@ import { browserSecretVault } from "../conversation/browser-secret-vault";
 import { useConversation } from "../conversation/conversation-context";
 import { latestVisibleAgentMessageId } from "../conversation/conversation-read-state";
 import { createAgentMessageDeleteAccess, desktopAgentMessageDeleteAccess } from "../conversation/message-delete-access";
-import { narrationRows } from "../conversation/narration-rows";
+import { narrationRows, placeTurnRowsByTime } from "../conversation/narration-rows";
 import { usageLimitAskFrom } from "../conversation/usage-limit-ask";
 import { serverSupportsCapability } from "../servers/server-capabilities";
 import { useServers } from "../servers/servers-context";
@@ -1137,8 +1137,9 @@ function dockMessage(message: AgentMessage): AgentDockMessage {
 /**
  * The rows of a dock chat. A turn that ends on a tool call has no answer: its text stays in the turn's
  * steps, which the dock does not show, so the chat showed only the reader's messages (#12030). Such a
- * turn shows its last note to the reader as its answer. A turn in `running` waits until it ends, so a
- * note does not show and then go when the answer comes.
+ * turn shows its last note to the reader as its answer, at the time of the note, as the main chat
+ * places it. A turn in `running` waits until it ends, so a note does not show and then go when the
+ * answer comes.
  */
 function withStepAnswers(
   messages: readonly AgentMessage[],
@@ -1148,12 +1149,18 @@ function withStepAnswers(
   const answered = new Set<string>();
   for (const message of messages)
     if (message.turnId && message.author === "agent" && isDockMessage(message)) answered.add(message.turnId);
-  return messages.map((message) => {
+  const notes: AgentMessage[][] = [];
+  const rows = messages.flatMap((message) => {
     const turnId = message.turnId;
     if (message.kind !== "thinking" || message.streaming || !turnId || answered.has(turnId) || running.has(turnId))
-      return message;
-    return narrationRows(message, provider(message)).at(-1) ?? message;
+      return [message];
+    const note = narrationRows(message, provider(message)).at(-1);
+    if (!note) return [message];
+    if (!note.createdAt) return [note];
+    notes.push([note]);
+    return [];
   });
+  return notes.length > 0 ? placeTurnRowsByTime(rows, notes) : rows;
 }
 
 /** The unread agent answers: from the first unread message, or the last `count` messages. */
