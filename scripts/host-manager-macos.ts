@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { chmod, lstat, mkdir, readdir, readlink, rename, rm } from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
 import { promisify } from "node:util";
+import { isNewerRelease as isNewerSharedRelease } from "@openbot/contracts/release-version";
 import { z } from "zod";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import type { HostManagerOperations } from "../src/main/host-manager";
@@ -234,16 +235,14 @@ export function macHostOperations(): HostManagerOperations {
   };
 }
 
+/**
+ * The shared release order, with one more rule: this helper runs as root and replaces the shared
+ * application, so it refuses an installed bundle that is not a stable release. Both callers read the
+ * candidate through a schema that accepts only `X.Y.Z`.
+ */
 export function isNewerRelease(candidate: string, current: string): boolean {
   if (!/^\d+\.\d+\.\d+$/.test(current)) throw new Error("Installed version is not a stable release.");
-  const next = candidate.split(".").map(Number);
-  const previous = current.split(".").map(Number);
-  for (let index = 0; index < 3; index += 1) {
-    const nextPart = next[index] ?? 0;
-    const previousPart = previous[index] ?? 0;
-    if (nextPart !== previousPart) return nextPart > previousPart;
-  }
-  return false;
+  return isNewerSharedRelease(candidate, current);
 }
 
 export async function openSharedApplication(): Promise<void> {

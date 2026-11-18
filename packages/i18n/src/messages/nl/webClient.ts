@@ -19,6 +19,12 @@ export const messages = {
   "webClient.pane.chat": "Chat",
   "webClient.pane.routines": "Routines",
   "webClient.pane.workspace": "Werkruimte",
+  "webClient.phoneApp.title": "Gebruik de OpenBot-app",
+  "webClient.phoneApp.description":
+    "Op een telefoon werkt OpenBot het best in de app. Log in met hetzelfde e-mailadres.",
+  "webClient.phoneApp.ios": "Downloaden voor iPhone",
+  "webClient.phoneApp.android": "Downloaden voor Android",
+  "webClient.phoneApp.continue": "Doorgaan in browser",
   "webClient.notice.connecting": "Verbinden met je server",
   "webClient.notice.findingHosts": "Je servers zoeken",
   "webClient.notice.hostsFailed": "Kan je servers niet laden",

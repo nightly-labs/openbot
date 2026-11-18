@@ -16,4 +16,6 @@ export const messages = {
     "OpenBot kan de opgeslagen tokens op deze computer niet lezen. Verbreek de verbinding met de Discord-server en verbind hem daarna opnieuw.",
   "messaging.discordHelp.relay_unavailable":
     "OpenBot kan geen Discord-events ontvangen op deze computer. Log in, geef deze computer een naam in de serverinstellingen en houd OpenBot open.",
+  "messaging.discordHelp.not_linked":
+    "Deze Discord-server is niet gekoppeld aan deze OpenBot-server. Kies Opnieuw verbinden om hem te koppelen.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -1,4 +1,4 @@
-// Checks two Discord servers on one OpenBot server, the role list of a Discord server, the
+// Checks two Discord servers on one OpenBot server, the place list of a large Discord server, the role list of a Discord server, the
 // replied-to message as context, a forwarded message as context, embeds as context, and an earlier image posted without a mention as context. A Gateway event goes through Signal's normalizer
 // (`remote/api/src/discord-events.ts`), a JSON round trip and the host's decoder, into the real
 // Discord driver and messaging service on a temporary profile. Signal's API (`makeDiscordApi`) runs
@@ -13,6 +13,7 @@ import { DISCORD_GATEWAY_INTENTS, DISCORD_MESSAGE_CONTENT_INTENT } from "@openbo
 import { isDiscordRoleList } from "@openbot/contracts/ipc";
 import {
   decodeDiscordApiError,
+  decodeDiscordChannels,
   decodeDiscordDelivery,
   decodeDiscordHistory,
 } from "@openbot/contracts/signal-protocol/discord-api";
@@ -451,6 +452,66 @@ try {
     return { base: DISCORD_GATEWAY_INTENTS, messageContent: DISCORD_MESSAGE_CONTENT_INTENT };
   });
 
+  await step("a server with more than 500 places lists the newest threads and says what it left out", async () => {
+    const guildId = "1300000000000000100";
+    const parentId = "1300000000000000200";
+    // View Channel, Send Messages and Send Messages in Threads.
+    const permissions = String((1n << 10n) | (1n << 11n) | (1n << 38n));
+    // 182 channels and 330 active threads, the oldest thread first: 12 places more than the limit.
+    const channels = Array.from({ length: 182 }, (_, index) => ({
+      id: String(BigInt(parentId) + BigInt(index)),
+      type: 0,
+      name: `channel-${index}`,
+      permission_overwrites: [],
+    }));
+    const threads = Array.from({ length: 330 }, (_, index) => ({
+      id: String(1400000000000000000n + BigInt(index)),
+      type: 11,
+      parent_id: parentId,
+      name: `thread-${index}`,
+    }));
+    const api = makeDiscordApi(
+      {
+        request: ({ route }) =>
+          Effect.succeed(
+            route.endsWith("/roles")
+              ? [{ id: guildId, permissions }]
+              : route.includes("/members/")
+                ? { roles: [] }
+                : route.endsWith("/channels")
+                  ? channels
+                  : { threads, members: [] },
+          ),
+      },
+      new DiscordState(APP),
+    );
+    const adapter = discordDriver({
+      ingress: {
+        ...ingress,
+        discord: (request, decode) =>
+          api.call(request, null).pipe(
+            Effect.map((result) => decode(JSON.parse(JSON.stringify(result)))),
+            Effect.mapError(
+              () => new MessagingAdapterError({ cause: new DiscordApiError(request.op, "discord_failed") }),
+            ),
+          ),
+      },
+    }).createAdapter({ guildId }, { rateLimited: () => {} });
+    const listed = await runCauseEffect(adapter.places());
+    const threadIds = listed.places.filter((place) => place.kind === "thread").map((place) => place.id);
+    assert.equal(listed.places.length, 500);
+    assert.ok(
+      listed.places.slice(0, 182).every((place) => place.kind === "channel"),
+      "A channel was left out.",
+    );
+    assert.equal(threadIds[0], threads.at(-1)?.id, "The newest thread is not the first thread.");
+    assert.ok(!threadIds.includes(threads[0]?.id ?? ""), "The oldest thread was kept instead of a newer one.");
+    assert.match(listed.note ?? "", /^This server has 12 more places/u);
+    // An older Signal sends no count: the host reads it as a full list.
+    assert.equal(decodeDiscordChannels({ channels: [] }).omitted, 0);
+    return { listed: listed.places.length, firstThread: threadIds[0], note: listed.note };
+  });
+
   await step("a mention of OpenBot's own role reaches OpenBot; a mention of another role does not", async () => {
     // Discord's autocomplete can choose the role that Discord made for the bot instead of the bot.
     const BOT_ROLE = "1300000000000000001";
@@ -813,7 +874,7 @@ try {
         const prompt = await promptOf(services, GUILD_ONE, id, CHANNEL_ONE);
         assert.match(
           prompt,
-          /--- earlier messages \(context, oldest first\) ---\n\[2026-10-19T11:46:00\.000Z\] tomek: \(Attached files: crash\.png\)\n/u,
+          /--- earlier messages \(context, oldest first, with their message id\) ---\n\[2026-10-19T11:46:00\.000Z\] \(id \d+\) tomek: \(Attached files: crash\.png\)\n/u,
         );
         assert.match(
           prompt,
@@ -938,7 +999,7 @@ try {
         await received(asked);
         assert.match(
           await promptOf(services, GUILD_ONE, asked, CHANNEL_ONE),
-          /--- earlier messages \(context, oldest first\) ---\n\[2026-10-19T11:46:00\.000Z\] tomek: \(Forwarded message\)\nReport: the export button does nothing\.\n/u,
+          /--- earlier messages \(context, oldest first, with their message id\) ---\n\[2026-10-19T11:46:00\.000Z\] \(id \d+\) tomek: \(Forwarded message\)\nReport: the export button does nothing\.\n/u,
         );
       } finally {
         channelOne.length = 0;
@@ -1022,7 +1083,7 @@ try {
           await received(asked);
           assert.match(
             await promptOf(services, GUILD_ONE, asked, CHANNEL_ONE),
-            /--- earlier messages \(context, oldest first\) ---\n\[2026-10-19T11:46:00\.000Z\] tomek: \(Embed\)\nLogin fails after the update\nLink: https:\/\/github\.com\/nightly-labs\/openbot\/issues\/1\nThe app closes at start\.\n/u,
+            /--- earlier messages \(context, oldest first, with their message id\) ---\n\[2026-10-19T11:46:00\.000Z\] \(id \d+\) tomek: \(Embed\)\nLogin fails after the update\nLink: https:\/\/github\.com\/nightly-labs\/openbot\/issues\/1\nThe app closes at start\.\n/u,
           );
         } finally {
           channelOne.length = 0;

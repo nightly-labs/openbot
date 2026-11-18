@@ -39,6 +39,10 @@ import { MCP_ACCESS_CAPABILITY, MCP_ACCESS_ROUTES } from "@openbot/contracts/tea
 import { MCP_SIGN_IN_APP_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in-app-v1";
 import { MCP_SIGN_IN_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
+import {
+  SIGN_IN_RELAY_DEEP_LINK_CAPABILITY,
+  SIGN_IN_RELAY_DEEP_LINK_ROUTES,
+} from "@openbot/contracts/team-protocol/sign-in-relay-deep-link-v1";
 import { SIGN_IN_RELAY_ROUTES } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
 import { sourceText } from "@openbot/i18n/source";
@@ -205,9 +209,11 @@ const signIns: TeamApiMcpSignIns = {
     }),
 };
 const relay: TeamApiSignInRelay = {
-  startMcp: (memberId, input) =>
+  startMcp: (memberId, input, deepLinkRedirectUrl) =>
     Effect.sync(() => {
-      calls.push(`relay ${input.config.url}`);
+      calls.push(
+        deepLinkRedirectUrl ? `relay ${input.config.url} ${deepLinkRedirectUrl}` : `relay ${input.config.url}`,
+      );
       return { flowId: `flow-${memberId}`, expiresAt: Date.now() + 60_000 };
     }),
   startProvider: unused,
@@ -442,6 +448,19 @@ try {
       body: { config: { ...renamed, enabled: true } },
     });
     assert.equal(relayed.status, 200, `Relay returned ${relayed.status}: ${JSON.stringify(relayed.body)}`);
+    // A client whose computer opens `openbot://mcp-auth` lets the host return there (#9209).
+    const deepLinked = await call("POST", SIGN_IN_RELAY_DEEP_LINK_ROUTES.mcpStart, {
+      token: memberToken,
+      body: { config: { ...renamed, enabled: true } },
+    });
+    assert.equal(deepLinked.status, 200, `Deep link relay returned ${deepLinked.status}.`);
+    // A client without the capability gets the reason, and the host starts nothing.
+    const older = await call("POST", SIGN_IN_RELAY_DEEP_LINK_ROUTES.mcpStart, {
+      token: memberToken,
+      body: { config: { ...renamed, enabled: true } },
+      capabilities: CURRENT.filter((capability) => capability !== SIGN_IN_RELAY_DEEP_LINK_CAPABILITY),
+    });
+    assert.equal(older.status, 400, `A client without the deep link capability got ${older.status}.`);
     const app = await call("POST", MCP_SIGN_IN_APP_ROUTES.save, {
       token: memberToken,
       body: { mcpServerId: memberRow.id, clientId: "member-app", clientSecret: null, scope: "" },
@@ -455,6 +474,7 @@ try {
     assert.deepEqual(calls, [
       `start ${MEMBER_URL}`,
       `relay ${MEMBER_URL}`,
+      `relay ${MEMBER_URL} openbot://mcp-auth`,
       `save-app ${memberRow.id}`,
       `sign-out ${memberRow.id}`,
     ]);
@@ -477,6 +497,10 @@ try {
         body: { mcpServerId: ownerRow.id },
       }),
       relay: await call("POST", SIGN_IN_RELAY_ROUTES.mcpStart, { token: memberToken, body: { config: ownerRow } }),
+      deepLinkRelay: await call("POST", SIGN_IN_RELAY_DEEP_LINK_ROUTES.mcpStart, {
+        token: memberToken,
+        body: { config: ownerRow },
+      }),
       app: await call("POST", MCP_SIGN_IN_APP_ROUTES.remove, {
         token: memberToken,
         body: { mcpServerId: ownerRow.id },

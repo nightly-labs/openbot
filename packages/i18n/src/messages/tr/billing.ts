@@ -29,10 +29,13 @@ export const messages = {
   "billing.status.paused": "Duraklatıldı",
   "billing.otherServers": "Diğer sunucular",
   "billing.action.menu": "{server} için plan işlemleri",
-  "billing.action.change": "Planı değiştir",
+  "billing.action.addStorage": "Depolama alanı ekle",
   "billing.action.cancel": "Planı iptal et",
   "billing.action.renew": "Planı yenile",
   "billing.action.updatePayment": "Ödeme yöntemini güncelle",
+  "billing.storage.title": "{server} için daha fazla alan",
+  "billing.storage.add": "{size} ekle",
+  "billing.storage.failed": "Depolama alanı eklenemedi.",
   "billing.lifecycle.cancelRenewal": "Yenilemeyi iptal et",
   "billing.lifecycle.cancelTitle": "{name} için yenileme iptal edilsin mi?",
   "billing.lifecycle.cancelDescription":
@@ -205,4 +208,10 @@ export const messages = {
     other:
       "Lisansınızda azami sayı olan {count} kullanıcı var. Daha büyük bir lisans için bize ulaşın. Yeni kişiler sunucularınıza katılamaz.",
   },
+  "billing.details.country": "Fatura ülkesi",
+  "billing.details.countryPlaceholder": "Ülke seçin",
+  "billing.details.vatId": "AB KDV numarası (isteğe bağlı)",
+  "billing.details.vatIdInvalid": "Bu, seçilen ülkenin KDV numarası değil.",
+  "billing.details.countryMissing": "Fatura ülkenizi seçin.",
+  "billing.details.saveFailed": "Fatura bilgileri kaydedilemedi",
 } as const satisfies PartialTranslation<typeof source>;

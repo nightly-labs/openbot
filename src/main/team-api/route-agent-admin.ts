@@ -34,6 +34,7 @@ import {
   AGENT_TASK_LIMIT_CAPABILITY,
   AGENT_TASK_LIMIT_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
+import { MODEL_STEERING_CAPABILITY, MODEL_STEERING_ROUTES } from "@openbot/contracts/team-protocol/model-steering-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { AgentNotFoundError } from "../agent-admin-settings";
@@ -343,6 +344,28 @@ export async function routeAgentSpeed(
     if (error instanceof AgentNotFoundError) throw new HttpError(404, error.message);
     throw error;
   }
+}
+
+/**
+ * The models of this computer whose custom agent takes a message into its running turn. Every member
+ * reads it: it holds no more than the model list. Frozen by `model-steering-v1`.
+ */
+export async function routeModelSteering(
+  context: TeamApiRequestContext,
+  admin: TeamApiAdmin | undefined,
+): Promise<RouteOutcome> {
+  const { method, url, capabilities, request, json } = context;
+  if (method !== "POST" || url.pathname !== MODEL_STEERING_ROUTES.list) return "unmatched";
+  const settings = admin?.agentHost;
+  if (!settings || !capabilities.has(MODEL_STEERING_CAPABILITY))
+    throw new HttpError(400, sourceText("error.team.modelVisibilityUnsupported"));
+  // `readJson` runs the empty body through the model-steering wire codec.
+  await readJson(request);
+  const models = settings.listSteeringModels();
+  // A member does not read a model that the server's model picker hides.
+  const visibility = admin?.modelVisibility;
+  const listed = visibility ? await runCauseEffect(visibility.picker(models)) : models;
+  return json(200, { models: listed.map(({ provider, id }) => ({ provider, id })) });
 }
 
 /**

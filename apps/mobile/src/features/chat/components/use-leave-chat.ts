@@ -1,18 +1,24 @@
 import { router } from "expo-router";
-import { useCallback, useRef } from "react";
+import { useCallback } from "react";
 import { KeyboardController } from "react-native-keyboard-controller";
 
+import { useCloseScreen } from "@/shared/lib/use-close-screen";
+
+/** A chat opened from a notification or a link can be first in its stack: a parent stack or home is under it. */
+function leaveFirstChat() {
+  if (router.canGoBack()) router.back();
+  else router.replace("/connected");
+}
+
 /**
- * Leaves the chat, once. A second press during the close would pop the screen under the chat. A
- * swipe back does not block Back: a swipe that starts and does not finish leaves the chat open.
+ * Leaves the chat, a channel or a thread. Back closes the chat route and each route above it, not
+ * only the route on top of the stack: after a sheet or the browser closes, Back still closes the
+ * chat. A close that does not happen does not block the next press.
  */
 export function useLeaveChat(): () => void {
-  const leaving = useRef(false);
+  const closeChat = useCloseScreen(leaveFirstChat);
   return useCallback(() => {
-    if (leaving.current) return;
-    leaving.current = true;
     void KeyboardController.dismiss();
-    if (router.canGoBack()) router.back();
-    else router.replace("/connected");
-  }, []);
+    closeChat();
+  }, [closeChat]);
 }

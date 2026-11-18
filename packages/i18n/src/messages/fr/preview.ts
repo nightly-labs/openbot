@@ -20,6 +20,9 @@ export const messages = {
   "preview.unsupported.title": "Aperçu indisponible",
   "preview.unsupported.description": "Vous pouvez ouvrir ce type de fichier dans son application par défaut.",
   "preview.unsupported.openExternally": "Ouvrir en externe",
+  "preview.tooLarge.title": "Fichier trop volumineux pour l'aperçu",
+  "preview.tooLarge.description":
+    "L'aperçu s'arrête à 100 Mo. Vous pouvez ouvrir ce fichier dans son application par défaut.",
   "preview.spreadsheet.readFailed": "Impossible de lire cette feuille de calcul.",
   "preview.spreadsheet.truncated": "Aperçu limité aux {rows} premières lignes et aux {columns} premières colonnes.",
 } as const satisfies PartialTranslation<typeof source>;

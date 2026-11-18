@@ -337,7 +337,7 @@ export const HermesDone: Story = {
             channels: [],
             warnings: [
               "Research desk: SOUL.md is longer than 2000 characters, so the instructions keep its start. The full file is in imported/hermes/SOUL.md.",
-              "filesystem: the MCP server is added turned off. Check its command, enter its values and full address again, and turn it on in MCP settings.",
+              "filesystem: the MCP server is added turned off. Check its command, enter its values and full address again, and turn it on in Marketplace, Apps.",
             ],
           },
         })}

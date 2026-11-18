@@ -133,6 +133,7 @@ export function ServerTimezoneSetting(
         {(current) => (
           <ItemActions>
             <SearchSelect<string>
+              class="settings-modal-select settings-modal-link-select"
               options={zones()}
               value={current().timezone ?? AUTOMATIC}
               label={label}

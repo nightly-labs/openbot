@@ -9,6 +9,11 @@ export const messages = {
   "status.provider.confirmCancel": "إلغاء",
   "status.provider.retryUnreachable": "لا يستطيع {provider} الاتصال بخادمه. المحاولة {attempt} من {maxAttempts}.",
   "status.provider.retryServerError": "خادم {provider} مشغول أو به خطأ. المحاولة {attempt} من {maxAttempts}.",
+  "status.provider.modelRetryUnreachable":
+    "لا يستطيع {provider} الاتصال بمزود النموذج. يحاول مرة أخرى: المحاولة {attempt}.",
+  "status.provider.modelRetryServerError":
+    "مزود النموذج مشغول أو به خطأ. يحاول {provider} مرة أخرى: المحاولة {attempt}.",
+  "status.provider.modelRetryRecovered": "يجيب مزود النموذج مجددًا.",
   "status.provider.retryRecovered": "يتلقى {provider} الإجابات من خادمه مجددًا.",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "أجاب Claude بالسرعة العادية. مع اشتراك Claude، يستخدم الوضع السريع أرصدة الاستخدام. شغّلها في حسابك على Claude.",
@@ -21,4 +26,6 @@ export const messages = {
     "أجاب Claude بالسرعة العادية. الوضع السريع متوقف في إعدادات Claude Code أو من قِبل مؤسستك.",
   "status.provider.claudeFastModeUnavailable":
     "أجاب Claude بالسرعة العادية. تعذّر على Claude Code استخدام الوضع السريع في هذا الدور.",
+  "status.provider.claudeOwnApiKey":
+    "Claude Code مضبوط لاستخدام مفتاح Anthropic API. تحتسب Anthropic كل طلب من رصيد API للمفتاح، وليس من خطة Claude الخاصة بك. لاستخدام خطتك، أزل المفتاح من إعدادات Claude Code أو من متغيرات البيئة، ثم أعد تشغيل OpenBot.",
 } as const satisfies PartialTranslation<typeof source>;

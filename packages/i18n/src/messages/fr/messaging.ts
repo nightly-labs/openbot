@@ -16,4 +16,6 @@ export const messages = {
     "OpenBot ne peut pas lire les jetons enregistrés sur cet ordinateur. Déconnectez le serveur Discord, puis connectez-le à nouveau.",
   "messaging.discordHelp.relay_unavailable":
     "OpenBot ne peut pas recevoir les événements Discord sur cet ordinateur. Connectez-vous, donnez un nom à cet ordinateur dans les réglages du serveur et gardez OpenBot ouvert.",
+  "messaging.discordHelp.not_linked":
+    "Ce serveur Discord n’est pas lié à ce serveur OpenBot. Sélectionnez Reconnecter pour le lier.",
 } as const satisfies PartialTranslation<typeof source>;

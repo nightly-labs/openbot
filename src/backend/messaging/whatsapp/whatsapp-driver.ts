@@ -1,24 +1,22 @@
-import { createWriteStream } from "node:fs";
-import { stat } from "node:fs/promises";
+import { chmod, copyFile, stat } from "node:fs/promises";
 import { extname } from "node:path";
-import { Transform } from "node:stream";
-import { pipeline } from "node:stream/promises";
 import { parseWhatsAppPhoneNumber } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { WhatsAppStoreUnreadable } from "@openbot/whatsapp/auth-store";
 import {
   type AnyMessageContent,
-  downloadMediaMessage,
   isJidGroup,
   type MiscMessageGenerationOptions,
   type WAMessage,
   type WAMessageKey,
 } from "@openbot/whatsapp/baileys";
 import { Effect, Result } from "effect";
+import { imageSize } from "../../image-size";
 import type { MessagingAnswerFile } from "../messaging-threads";
 import {
   type ConnectionIdentity,
   type ContextEntry,
+  type HistoryFilter,
   type InboundFile,
   type MessageBody,
   type MessageTarget,
@@ -27,9 +25,12 @@ import {
   MessagingConnectionError,
   type MessagingDriver,
   type MessagingPlace,
+  type MessagingPlaces,
+  type RecentMessages,
   type StatusReaction,
   WhatsAppAnswerPartlySent,
 } from "../messaging-types";
+import { WhatsAppArchive } from "./whatsapp-archive";
 import {
   userJid,
   WHATSAPP_DIRECT_THREAD,
@@ -37,7 +38,7 @@ import {
   whatsAppQuoteId,
   whatsAppThreadKey,
 } from "./whatsapp-events";
-import { imageSize } from "./whatsapp-image-size";
+import { downloadWhatsAppMedia } from "./whatsapp-media";
 import { whatsAppChunks, whatsAppText } from "./whatsapp-render";
 import type { WhatsAppConnectionHandle, WhatsAppRuntime } from "./whatsapp-runtime";
 import { allowsContact, whatsAppNumberForms } from "./whatsapp-senders";
@@ -48,6 +49,12 @@ const WHATSAPP_FILE_BYTES_LIMIT = 64 * 1024 * 1024;
 /** WhatsApp clients show an edit only within 15 minutes; a later edit is lost without an error. */
 const EDIT_WINDOW_MS = 14 * 60_000;
 const PLACE_NAME_TIMEOUT_MS = 5_000;
+/**
+ * Why a history read has fewer messages than it asked for. Without it, an empty read looks like a
+ * broken connection. The rules are in `senderDecision` and `whatsAppInbound`.
+ */
+const SAVED_HISTORY_NOTE =
+  "WhatsApp sends no older messages to OpenBot. OpenBot has only the messages that it received after the number was linked and the chat was allowed, up to 1 day old on arrival, for 90 days. In a chat with a contact, the messages that the user sent from their phone are not saved. Fewer messages here does not mean that the connection has a problem: tell the user what OpenBot can read.";
 
 /** The reaction on the person's message: arrived, then done, failed or stopped. */
 const REACTIONS: Record<StatusReaction, string> = {
@@ -77,6 +84,8 @@ export interface WhatsAppCredentials {
   ownNumber: boolean;
   /** False when the owner turned off the "Working on it…" post: a request then gets only its answer. */
   workingMessage: boolean;
+  /** False when the owner turned off the status reactions: a request then gets no 👀, ✅, ❌ or 🫡. */
+  statusReactions: boolean;
 }
 
 export function whatsAppCredentials(values: Record<string, string>): WhatsAppCredentials {
@@ -85,6 +94,7 @@ export function whatsAppCredentials(values: Record<string, string>): WhatsAppCre
     storeKey: Buffer.from(values.whatsappStoreKey ?? "", "base64"),
     ownNumber: values.ownNumber !== "0",
     workingMessage: values.workingMessage !== "0",
+    statusReactions: values.statusReactions !== "0",
   };
 }
 
@@ -104,6 +114,7 @@ export function maskedNumber(number: string): string {
 /** The outbound side of one linked number. It never logs message text or phone numbers. */
 class WhatsAppAdapter implements MessagingAdapter {
   readonly platform = "whatsapp" as const;
+  readonly searchesHistory = true;
   readonly #runtime: WhatsAppRuntime;
   readonly #credentials: WhatsAppCredentials;
   #opened: WhatsAppConnectionHandle | null = null;
@@ -293,49 +304,49 @@ class WhatsAppAdapter implements MessagingAdapter {
     afterId: string | null,
     beforeId: string,
   ): Effect.Effect<ContextEntry[], MessagingAdapterError> {
-    return Effect.sync(() => this.#handle.chats.history(platformChannelId, threadKey, afterId, beforeId));
+    return Effect.try({
+      try: () => this.#handle.chats.history(platformChannelId, threadKey, afterId, beforeId),
+      catch: (cause) => new MessagingAdapterError({ cause }),
+    });
   }
 
-  /** WhatsApp sends no history to this device: this is what it saw since it started. */
+  /** WhatsApp sends no history to this device: this is what it saw and saved, for 90 days. */
   recent(
     platformChannelId: string,
     threadKey: string | null,
     limit: number,
-  ): Effect.Effect<ContextEntry[], MessagingAdapterError> {
-    return Effect.sync(() => this.#handle.chats.recent(platformChannelId, threadKey, limit));
+    filter?: HistoryFilter,
+  ): Effect.Effect<RecentMessages, MessagingAdapterError> {
+    return Effect.try({
+      try: () => {
+        const messages = this.#handle.chats.recent(platformChannelId, threadKey, limit, filter);
+        return messages.length < limit ? { messages, note: SAVED_HISTORY_NOTE } : { messages };
+      },
+      catch: (cause) => new MessagingAdapterError({ cause }),
+    });
   }
 
+  /** Copies the file that the archive saved at arrival, or else downloads it from WhatsApp. */
   readonly download = Effect.fnUntraced(function* (
     this: WhatsAppAdapter,
     file: InboundFile,
     destination: string,
     maxBytes: number,
   ) {
+    if (file.size > maxBytes) return yield* new MessagingAdapterError({ cause: new Error("file_too_large") });
+    const chats = this.#handle.chats;
+    const saved = yield* Effect.promise(() => chats.savedFile(file));
+    if (saved) {
+      const copied = yield* Effect.tryPromise(() => copySaved(saved, destination, maxBytes)).pipe(
+        Effect.orElseSucceed(() => false),
+      );
+      if (copied) return;
+    }
     const message = this.#handle.chats.media(file.url);
     if (!message) return yield* new MessagingAdapterError({ cause: new Error("file_unavailable") });
-    if (file.size > maxBytes) return yield* new MessagingAdapterError({ cause: new Error("file_too_large") });
-    const socket = this.#handle.session.socket();
+    const session = this.#handle.session;
     yield* Effect.tryPromise({
-      try: async () => {
-        const stream = await downloadMediaMessage(
-          message,
-          "stream",
-          {},
-          {
-            logger: silentLogger,
-            reuploadRequest: (stale) =>
-              socket ? socket.updateMediaMessage(stale) : Promise.reject(new Error("not_connected")),
-          },
-        );
-        let total = 0;
-        const limit = new Transform({
-          transform(chunk: Buffer, _encoding, done) {
-            total += chunk.byteLength;
-            done(total > maxBytes ? new Error("file_too_large") : null, chunk);
-          },
-        });
-        await pipeline(stream, limit, createWriteStream(destination, { mode: 0o600 }));
-      },
+      try: () => downloadWhatsAppMedia(session, message, destination, maxBytes),
       catch: (cause) => new MessagingAdapterError({ cause }),
     });
   });
@@ -352,19 +363,21 @@ class WhatsAppAdapter implements MessagingAdapter {
       }
       const known = this.#handle.chats.groupName(platformChannelId);
       if (known) return known;
-      const metadata = yield* this.#handle.session
-        .groupMetadata(platformChannelId)
-        .pipe(Effect.timeoutOrElse({ duration: PLACE_NAME_TIMEOUT_MS, orElse: () => Effect.succeed(null) }));
+      // A name is not worth a failed list: a slow or refused lookup gives the fallback name, and the next call asks again.
+      const metadata = yield* this.#handle.session.groupMetadata(platformChannelId).pipe(
+        Effect.timeoutOrElse({ duration: PLACE_NAME_TIMEOUT_MS, orElse: () => Effect.succeed(null) }),
+        Effect.orElseSucceed(() => null),
+      );
       this.#handle.chats.rememberGroup(platformChannelId, metadata?.subject);
       return this.#handle.chats.groupName(platformChannelId) ?? "WhatsApp group";
     });
   }
 
   /** The owner's own chat and the allowed chats. OpenBot posts nowhere else. */
-  places(): Effect.Effect<MessagingPlace[], MessagingAdapterError> {
+  places(): Effect.Effect<MessagingPlaces, MessagingAdapterError> {
     return Effect.gen({ self: this }, function* () {
       const identity = whatsAppIdentity(this.#handle);
-      if (!identity) return [];
+      if (!identity) return { places: [] };
       const rules = this.#runtime.policy.rules(identity.number);
       const places: MessagingPlace[] = [];
       if (rules.ownNumber)
@@ -373,14 +386,15 @@ class WhatsAppAdapter implements MessagingAdapter {
           name: sourceText("status.messaging.whatsappOwnChat"),
           kind: "chat",
         });
-      for (const contact of rules.contacts)
+      // The name that the user saved in the app settings comes first, so an agent finds the contact by it.
+      for (const [contact, savedName] of rules.contacts)
         places.push({
           id: userJid(contact),
-          name: this.#handle.chats.name(contact) ?? maskedNumber(contact),
+          name: savedName || (this.#handle.chats.name(contact) ?? maskedNumber(contact)),
           kind: "chat",
         });
       for (const group of rules.groups) places.push({ id: group, name: yield* this.placeName(group), kind: "channel" });
-      return places;
+      return { places };
     });
   }
 
@@ -445,6 +459,8 @@ class WhatsAppAdapter implements MessagingAdapter {
       id: postId,
       chatJid: target.platformChannelId,
       threadKey: this.#threadKey(target, postId),
+      // The linked number sent it: an edit or a delete from the owner's phone matches.
+      authorId: whatsAppIdentity(this.#handle)?.number ?? "",
       authorName: "OpenBot",
       text,
       sentAt: new Date().toISOString(),
@@ -522,6 +538,15 @@ export function whatsAppDriver(options: WhatsAppDriverOptions): MessagingDriver 
       const values = whatsAppCredentials(credentials);
       const handle = runtime.open(values.storeId, values.storeKey);
       const me = whatsAppIdentity(handle) ?? { number: identity.workspaceId, lid: null };
+      const history = runtime.policy.history(identity.workspaceId);
+      if (history)
+        handle.chats.attach(
+          new WhatsAppArchive({
+            ...history,
+            folder: runtime.filesPath(history.connectionId),
+            session: handle.session,
+          }),
+        );
       return new WhatsAppTransport({ runtime, handle, identity: me, workspaceId: identity.workspaceId });
     },
   };
@@ -531,12 +556,11 @@ function userPart(jid: string): string | null {
   return jid.split("@")[0]?.split(":")[0] ?? null;
 }
 
-const silentLogger = {
-  level: "silent",
-  child: () => silentLogger,
-  trace: () => undefined,
-  debug: () => undefined,
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined,
-};
+/** Copies a saved file. False when the copy is gone or larger than `maxBytes`. */
+async function copySaved(path: string, destination: string, maxBytes: number): Promise<boolean> {
+  const { size } = await stat(path);
+  if (size > maxBytes) return false;
+  await copyFile(path, destination);
+  await chmod(destination, 0o600);
+  return true;
+}

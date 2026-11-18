@@ -3,6 +3,7 @@ import { Button, Check, Copy } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { type ShjLanguage, type ShjToken, tokenize } from "@speed-highlight/core";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack } from "solid-js";
+import { ScrollEdges } from "../../components/ScrollEdges";
 import { useText } from "../../text";
 import type { MessageCodeBlock } from "./DataTable";
 
@@ -191,25 +192,27 @@ export function CodeBlock(props: {
 
   // One element, so the code keeps its scroll position when a caller moves it into its body.
   const code = (
-    <pre class="message-code-scroll" tabindex="0" dir="ltr">
-      <code>
-        <For each={lines()}>
-          {(line, lineIndex) => (
-            <span class="message-code-line">
-              <span class="message-code-line-number" aria-hidden="true">
-                {lineIndex() + 1}
+    <ScrollEdges axis="x" class="message-code-frame" viewClass="message-code-scroll" dir="ltr">
+      <pre class="message-code-pre">
+        <code>
+          <For each={lines()}>
+            {(line, lineIndex) => (
+              <span class="message-code-line">
+                <span class="message-code-line-number" aria-hidden="true">
+                  {lineIndex() + 1}
+                </span>
+                <span class="message-code-line-source">
+                  <For each={line}>{(token) => <span data-code-token={token.type}>{token.text}</span>}</For>
+                  <Show when={streaming() && lineIndex() === lines().length - 1}>
+                    <span class="message-code-caret" aria-hidden="true" />
+                  </Show>
+                </span>
               </span>
-              <span class="message-code-line-source">
-                <For each={line}>{(token) => <span data-code-token={token.type}>{token.text}</span>}</For>
-                <Show when={streaming() && lineIndex() === lines().length - 1}>
-                  <span class="message-code-caret" aria-hidden="true" />
-                </Show>
-              </span>
-            </span>
-          )}
-        </For>
-      </code>
-    </pre>
+            )}
+          </For>
+        </code>
+      </pre>
+    </ScrollEdges>
   );
 
   return (

@@ -28,6 +28,10 @@ export const messages = {
     "No se pudieron verificar otras sesiones de OpenBot. Inténtalo de nuevo antes de instalar.",
   "error.update.readOnlyLocation":
     "OpenBot no puede instalar actualizaciones desde esta ubicación. Cierra OpenBot. En Finder, arrastra OpenBot a la carpeta Aplicaciones (si ya está allí, sácalo y vuelve a ponerlo). Después abre OpenBot e instala la actualización de nuevo.",
+  "error.update.appImageMissing":
+    "OpenBot no puede instalar la actualización porque su archivo AppImage se movió, se renombró o se reemplazó. Cierra OpenBot y vuelve a abrir el archivo AppImage.",
+  "error.update.appImageReadOnly":
+    "OpenBot no puede instalar actualizaciones en la carpeta de su archivo AppImage. Cierra OpenBot, mueve el archivo AppImage a una carpeta de tu carpeta personal, ábrelo e instala la actualización de nuevo.",
   "error.update.remoteDisabled":
     "Las actualizaciones por parte de administradores del servidor están desactivadas en este equipo.",
   "error.update.restartStarted": "OpenBot ya se está reiniciando para instalar la actualización.",

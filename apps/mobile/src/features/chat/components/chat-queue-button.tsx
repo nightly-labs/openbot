@@ -6,6 +6,7 @@ import { useThemeColor } from "heroui-native/hooks";
 import ChevronUp from "lucide-react-native/icons/chevron-up";
 import Clock from "lucide-react-native/icons/clock";
 import CornerDownRight from "lucide-react-native/icons/corner-down-right";
+import GitBranch from "lucide-react-native/icons/git-branch";
 import Pencil from "lucide-react-native/icons/pencil";
 import Trash2 from "lucide-react-native/icons/trash";
 import { memo, type ReactNode, useState } from "react";
@@ -193,6 +194,24 @@ function ChatQueueCard({
               {preview}
             </Typography.Paragraph>
           </Pressable>
+          {queue.activeTurnId ? (
+            <CardAction
+              accessibilityLabel={t(queue.steers ? "mobile.chat.queue.steerNext" : "mobile.chat.queue.sendNowNext")}
+              disabled={locked || editedElsewhere || queue.steerRefused}
+              onPress={() => {
+                if (!next) return;
+                void haptics.selection();
+                finish(queue.steers ? queue.steer(next) : queue.sendNow(next));
+              }}
+            >
+              <View className="flex-row items-center gap-1 px-1">
+                <CornerDownRight color={foreground} size={18} strokeWidth={2} style={MIRROR_IN_RTL} />
+                <Typography.Paragraph type="body-sm" weight="semibold">
+                  {t(queue.steers ? "mobile.chat.queue.steer" : "mobile.chat.queue.sendNow")}
+                </Typography.Paragraph>
+              </View>
+            </CardAction>
+          ) : null}
           <CardAction
             accessibilityLabel={t("mobile.chat.queue.editNext")}
             disabled={locked || editedElsewhere || !queue.canEdit}
@@ -204,22 +223,24 @@ function ChatQueueCard({
           >
             <Pencil color={foreground} size={18} strokeWidth={2} />
           </CardAction>
-          {queue.activeTurnId ? (
+          {queue.canRunAsThread ? (
             <CardAction
-              accessibilityLabel={t("mobile.chat.queue.steerNext")}
-              disabled={locked || editedElsewhere}
+              accessibilityLabel={t("mobile.chat.queue.runNextInNewThread")}
+              disabled={locked || editedElsewhere || Boolean(locks?.heldForEdit)}
               onPress={() => {
                 if (!next) return;
                 void haptics.selection();
-                finish(queue.steer(next));
+                void queue.runAsThread(next).then((task) => {
+                  void haptics.notification(task ? "success" : "error");
+                  if (task)
+                    router.push({
+                      pathname: "/task/[taskId]",
+                      params: { taskId: task.id, agentId: task.agentId, serverId: queue.serverId },
+                    });
+                });
               }}
             >
-              <View className="flex-row items-center gap-1 px-1">
-                <CornerDownRight color={foreground} size={18} strokeWidth={2} style={MIRROR_IN_RTL} />
-                <Typography.Paragraph type="body-sm" weight="semibold">
-                  {t("mobile.chat.queue.steer")}
-                </Typography.Paragraph>
-              </View>
+              <GitBranch color={foreground} size={18} strokeWidth={2} />
             </CardAction>
           ) : null}
           <CardAction

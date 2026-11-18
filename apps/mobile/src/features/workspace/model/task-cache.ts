@@ -1,5 +1,6 @@
 import type {
   AgentEvent,
+  AgentTask,
   AgentTasksSnapshot,
   ConversationMessage,
   ConversationSnapshot,
@@ -134,6 +135,15 @@ export function applyTaskEvent(
   } else if (event.type === "agent-task-conversation-delta") {
     queueTaskDelta(queryClient, scope, serverId, event);
   }
+}
+
+/** Adds a task that this phone started to the cached list, so it shows before its list event arrives. */
+export function addStartedTask(queryClient: QueryClient, scope: QueryScope, serverId: string, task: AgentTask): void {
+  queryClient.setQueryData<AgentTasksSnapshot>(queryKeys.agentTasks(scope, serverId, task.agentId), (stored) =>
+    stored && !stored.tasks.some((entry) => entry.id === task.id)
+      ? { ...stored, tasks: [task, ...stored.tasks] }
+      : stored,
+  );
 }
 
 /** True when `threadId` is the thread of a task of the agent that the phone has read. */

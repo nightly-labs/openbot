@@ -16,4 +16,6 @@ export const messages = {
     "OpenBot nie może odczytać zapisanych tokenów na tym komputerze. Rozłącz serwer Discord, a potem połącz go ponownie.",
   "messaging.discordHelp.relay_unavailable":
     "OpenBot nie może odbierać zdarzeń Discord na tym komputerze. Zaloguj się, nadaj temu komputerowi nazwę w ustawieniach serwera i nie zamykaj OpenBot.",
+  "messaging.discordHelp.not_linked":
+    "Ten serwer Discord nie jest połączony z tym serwerem OpenBot. Wybierz Połącz ponownie, aby go połączyć.",
 } as const satisfies PartialTranslation<typeof source>;

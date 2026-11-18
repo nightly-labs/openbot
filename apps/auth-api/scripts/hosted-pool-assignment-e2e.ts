@@ -71,7 +71,7 @@ async function purchaseStartsOnThePoolOrOnBoat() {
     .prepare("INSERT INTO users(id, identity_key, email, created_at, updated_at) VALUES (?, ?, ?, 1, 1)")
     .run(OWNER.id, `email:${OWNER.email}`, OWNER.email);
 
-  const created: { serverId: string; from: string; claim: string }[] = [];
+  const created: { serverId: string; from: string; claim: string; type: string }[] = [];
   const alerts: string[] = [];
   const boatFetch = async (input: string, init: RequestInit) => {
     if (input === ALERT_URL) {
@@ -83,7 +83,12 @@ async function purchaseStartsOnThePoolOrOnBoat() {
     if (method === "POST" && path === "/sandboxes") {
       const body = JSON.parse(String(init.body));
       const serverId = String(body.env.OPENBOT_HOSTED_HOST_ID);
-      created.push({ serverId, from: String(body.from), claim: String(body.env.OPENBOT_HOSTED_CLAIM) });
+      created.push({
+        serverId,
+        from: String(body.from),
+        claim: String(body.env.OPENBOT_HOSTED_CLAIM),
+        type: String(body.type),
+      });
       return Response.json({ ok: true, sandbox: { id: `bx_${serverId}`, state: "provisioning" } });
     }
     if (path.endsWith("/commands"))
@@ -96,7 +101,7 @@ async function purchaseStartsOnThePoolOrOnBoat() {
   };
   const sandboxOf = (serverId: string) => created.filter((entry) => entry.serverId === serverId);
   /** For the report: the sandboxes with no claim. */
-  const sandboxes = () => created.map((entry) => ({ serverId: entry.serverId, from: entry.from }));
+  const sandboxes = () => created.map((entry) => ({ serverId: entry.serverId, from: entry.from, type: entry.type }));
 
   const tracked: Action[] = [];
   const work: Promise<void>[] = [];
@@ -196,6 +201,7 @@ async function purchaseStartsOnThePoolOrOnBoat() {
         plan,
         interval: "month",
         currency: currency === "usd" ? "usd" : "eur",
+        storageTier: 0,
       }),
     );
     await Promise.all(work.splice(0));
@@ -284,12 +290,12 @@ async function purchaseStartsOnThePoolOrOnBoat() {
   check(
     "a start on boat alerts the operator once, with the plan, the currency, the server and the reason",
     alertsAbout("eur-2").length === 1 &&
-      alertsAbout("eur-2")[0] === "A standard server (eur, eur-2) starts on boat: no ready VPS02 in AMS-01.",
+      alertsAbout("eur-2")[0] === "⛵ **Boat start** · standard server · eur · eur-2 · no ready VPS02 in AMS-01",
     alerts,
   );
   check(
     "a purchase that takes the last free machine of its group alerts the operator",
-    alertsAbout("Pool WDC-02 VPS02: 0 free machines left.").length === 1,
+    alertsAbout("🔴 **Pool** WDC-02 VPS02 · 0 free left").length === 1,
     alerts,
   );
   const serversOn = (hostId: string) =>
@@ -340,6 +346,44 @@ async function purchaseStartsOnThePoolOrOnBoat() {
     onStarter === 1 && sandboxOf("starter-1").length + sandboxOf("starter-2").length === 1,
     { machine: serversOn(starter), sandboxes: sandboxes() },
   );
+  // A boat `small` sandbox has less disk than the Starter storage. Its VPS 1 keeps the plan size.
+  const starterOnBoat = [...sandboxOf("starter-1"), ...sandboxOf("starter-2")][0];
+  const starters = (await Effect.runPromise(service.list(OWNER))).servers.filter((server) =>
+    server.serverId.startsWith("starter-"),
+  );
+  check(
+    "a Starter on boat gets a `default` sandbox, a Starter on its VPS 1 stays `small`, and both have 25 GB",
+    starterOnBoat?.type === "default" &&
+      starters.length === 2 &&
+      starters.every(
+        (server) =>
+          server.size === (server.serverId === starterOnBoat.serverId ? "default" : "small") && server.storageGb === 25,
+      ),
+    {
+      sandboxes: sandboxes(),
+      starters: starters.map(({ serverId, size, storageGb }) => ({ serverId, size, storageGb })),
+    },
+  );
+
+  // A Starter that waits for its payment has no machine yet. Its `small` row size is not a boat disk.
+  insertServer.run(
+    "starter-unpaid",
+    OWNER.id,
+    "Server starter-unpaid",
+    null,
+    null,
+    HOSTED_PLAN_SIZE.starter,
+    "starter",
+    "eur",
+    "awaiting_payment",
+    "key-starter-unpaid",
+    clock.now,
+    clock.now,
+  );
+  const unpaid = (await Effect.runPromise(service.list(OWNER))).servers.find(
+    (server) => server.serverId === "starter-unpaid",
+  );
+  check("a Starter with no machine yet shows the plan storage of 25 GB", unpaid?.storageGb === 25, { unpaid });
 
   // 5. A server with an earlier boat attempt stays on boat: boat can still make the sandbox of that attempt.
   const spare = await machine(1010, "VPS02", "AMS-01");
@@ -440,7 +484,7 @@ async function purchaseStartsOnThePoolOrOnBoat() {
 
   check(
     "a retry of an earlier boat attempt sends no alert: it never asks the pool",
-    alertsAbout("(eur, retry)").length === 0,
+    alertsAbout("eur · retry").length === 0,
     alerts,
   );
 
@@ -482,10 +526,15 @@ async function purchaseStartsOnThePoolOrOnBoat() {
     alerts.length === alertsBefore + 2 * unsigned.length &&
       unsigned.every(
         (serverId) =>
-          alertsAbout(`(${serverId.slice(0, 8)}) did not start on pool machine`).length === 1 &&
+          alertsAbout(`**Pool start lost** · `).filter((alert) =>
+            alert.includes(` · ${serverId.slice(0, 8)} · machine `),
+          ).length === 1 &&
           alerts
             .slice(alertsBefore)
-            .filter((alert) => alert.includes(`${serverId.slice(0, 8)}) starts on boat: pool machine`)).length === 1,
+            .filter(
+              (alert) =>
+                alert.startsWith("⛵ **Boat start**") && alert.includes(`${serverId.slice(0, 8)} · pool machine`),
+            ).length === 1,
       ),
     alerts.slice(alertsBefore),
   );
@@ -556,6 +605,7 @@ async function purchaseStartsOnThePoolOrOnBoat() {
       plan: "standard",
       interval: "month",
       currency: "eur",
+      storageTier: 0,
     }),
   );
   await Promise.all(work.splice(0));
@@ -573,8 +623,7 @@ async function purchaseStartsOnThePoolOrOnBoat() {
       released.desired_state === "stopped" &&
       sandboxOf("lapsed").length === 0 &&
       machineRow(lapsing)?.assign_token_hash === null &&
-      alerts.at(-1) ===
-        `A standard server (lapsed) did not start on pool machine ${lapsing}. Prepare the machine again.`,
+      alerts.at(-1) === `🛠️ **Pool start lost** · standard server · lapsed · machine ${lapsing} · prepare it again`,
     { ended, endedPoll, released, machine: machineRow(lapsing), alert: alerts.at(-1) },
   );
 }

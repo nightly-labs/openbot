@@ -5,6 +5,7 @@
 // `packages/console/app/src/routes/zen/go/v1/usage.ts` in anomalyco/opencode; it answers
 // `{ usage: { rolling, weekly, monthly } }`, each with an integer `percent` and an ISO `resetsAt`.
 
+import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -40,6 +41,23 @@ class OpenCodeUsageFailed extends Schema.TaggedError<OpenCodeUsageFailed>()("Ope
 const OPENCODE_CONSOLE_URL = "https://opencode.ai/console";
 /** OpenCode keeps its database in WAL mode; a read waits this long for a writer, not more. */
 const OPENCODE_DB_BUSY_TIMEOUT_MS = 100;
+
+/** The file of OpenCode's database, or null when OpenCode keeps it in memory (`OPENCODE_DB=:memory:`). */
+export function openCodeDatabasePath(env: NodeJS.ProcessEnv, home?: string): string | null {
+  const databaseFile = env.OPENCODE_DB || "opencode.db";
+  return databaseFile === ":memory:" ? null : resolve(openCodeDataDirectory(env, home), databaseFile);
+}
+
+/** Runs `read` on OpenCode's database, opened read-only. It throws when the open or `read` fails. */
+export function readOpenCodeDatabase<A>(databasePath: string, read: (database: DatabaseSync) => A): A {
+  const database = new DatabaseSync(databasePath, { readOnly: true });
+  try {
+    database.exec(`PRAGMA busy_timeout = ${OPENCODE_DB_BUSY_TIMEOUT_MS}`);
+    return read(database);
+  } finally {
+    database.close();
+  }
+}
 
 /** An API key in OpenCode's `auth.json` (OpenCode 1.x), the file `OPENCODE_AUTH_CONTENT` replaces. */
 const AuthFileKey = Schema.Struct({ type: Schema.Literal("api"), key: Schema.String });
@@ -82,10 +100,52 @@ const readOwnKeys = Effect.fn("OpenCode.readOwnKeys")(function* () {
       catch: (cause) => new OpenCodeUsageFailed({ cause }),
     }).pipe(Effect.orElseSucceed(() => "")));
   const goKey = (authFileGoKey(authText) ?? env.OPENCODE_API_KEY)?.trim();
-  const databaseFile = env.OPENCODE_DB || "opencode.db";
-  const consoleKey =
-    inlineAuth || databaseFile === ":memory:" ? undefined : yield* readConsoleKey(resolve(dataDirectory, databaseFile));
+  const databasePath = openCodeDatabasePath(env);
+  const consoleKey = inlineAuth || !databasePath ? undefined : yield* readConsoleKey(databasePath);
   return [...new Set([consoleKey, goKey].filter((key): key is string => Boolean(key)))];
+});
+
+const AuthFileEntries = Schema.Record(Schema.String, Schema.Unknown);
+const AuthFileEntry = Schema.Struct({ type: Schema.String });
+
+/**
+ * Whether OpenCode has its own key for a model provider: an active `credential` row in OpenCode 2's
+ * database, or an entry in `auth.json` (OpenCode 1.x) or in `OPENCODE_AUTH_CONTENT`, which replaces
+ * both. A key in an environment variable or in a config file is not found. It reads only when a turn
+ * fails, so it reads synchronously.
+ */
+export const hasOpenCodeProviderKey = Effect.fn("OpenCode.hasProviderKey")(function* (
+  provider: string,
+  env: NodeJS.ProcessEnv,
+) {
+  const dataDirectory = openCodeDataDirectory(env);
+  const inlineAuth = env.OPENCODE_AUTH_CONTENT;
+  const authText =
+    inlineAuth ||
+    (yield* Effect.try({
+      try: () => readFileSync(join(dataDirectory, "auth.json"), "utf8"),
+      catch: (cause) => new OpenCodeUsageFailed({ cause }),
+    }).pipe(Effect.orElseSucceed(() => "")));
+  const entries = Schema.decodeUnknownOption(Schema.fromJsonString(AuthFileEntries))(authText);
+  if (
+    Option.isSome(entries) &&
+    Object.hasOwn(entries.value, provider) &&
+    Option.isSome(Schema.decodeUnknownOption(AuthFileEntry)(entries.value[provider]))
+  )
+    return true;
+  const databasePath = openCodeDatabasePath(env);
+  if (inlineAuth || !databasePath) return false;
+  return yield* Effect.try({
+    try: () =>
+      readOpenCodeDatabase(
+        databasePath,
+        (database) =>
+          database
+            .prepare("SELECT 1 FROM credential WHERE integration_id = ? AND active IS NOT 0 LIMIT 1")
+            .get(provider) !== undefined,
+      ),
+    catch: (cause) => new OpenCodeUsageFailed({ cause }),
+  }).pipe(Effect.orElseSucceed(() => false));
 });
 
 function authFileGoKey(text: string): string | undefined {
@@ -103,27 +163,23 @@ function authFileGoKey(text: string): string | undefined {
 const readConsoleKey = Effect.fn("OpenCode.readConsoleKey")(function* (databasePath: string) {
   return yield* Effect.try({
     try: () => {
-      const database = new DatabaseSync(databasePath, { readOnly: true });
-      try {
-        database.exec(`PRAGMA busy_timeout = ${OPENCODE_DB_BUSY_TIMEOUT_MS}`);
-        const row = database
+      const row = readOpenCodeDatabase(databasePath, (database) =>
+        database
           .prepare(
             `SELECT value FROM credential
              WHERE integration_id = 'opencode' AND active IS NOT 0
              ORDER BY active DESC, time_created DESC, id DESC LIMIT 1`,
           )
-          .get();
-        const stored = Schema.decodeUnknownOption(Schema.fromJsonString(StoredKey))(row?.value);
-        if (Option.isNone(stored)) return undefined;
-        const server = stored.value.metadata?.server;
-        if (typeof server === "string") {
-          const url = new URL(server);
-          if (`${url.origin}${url.pathname.replace(/\/+$/u, "")}` !== OPENCODE_CONSOLE_URL) return undefined;
-        }
-        return stored.value.key.trim() || undefined;
-      } finally {
-        database.close();
+          .get(),
+      );
+      const stored = Schema.decodeUnknownOption(Schema.fromJsonString(StoredKey))(row?.value);
+      if (Option.isNone(stored)) return undefined;
+      const server = stored.value.metadata?.server;
+      if (typeof server === "string") {
+        const url = new URL(server);
+        if (`${url.origin}${url.pathname.replace(/\/+$/u, "")}` !== OPENCODE_CONSOLE_URL) return undefined;
       }
+      return stored.value.key.trim() || undefined;
     },
     catch: (cause) => new OpenCodeUsageFailed({ cause }),
   }).pipe(Effect.orElseSucceed(() => undefined));

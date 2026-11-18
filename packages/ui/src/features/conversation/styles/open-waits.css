@@ -12,6 +12,19 @@
   font-size: var(--openbot-text-sm);
 }
 
+/*
+ * An agent can keep 20 waits open, and each row is 50px. From the seventh wait, six and a half rows
+ * show and the rest scroll, so the chat and the input stay in view. A shorter list keeps its
+ * clip, so it shows no scrollbar while its row opens or closes. Each row keeps its height: in a list
+ * with a height limit, the grid would shrink the rows to fit.
+ */
+.open-waits .task-list-items:has(> :nth-child(7)) {
+  grid-auto-rows: max-content;
+  max-height: 325px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .open-waits-row {
   align-items: flex-start;
 }

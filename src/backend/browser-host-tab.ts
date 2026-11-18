@@ -35,6 +35,11 @@ export interface BrowserHostTab {
    */
   secretDocument?: boolean;
   /**
+   * The kept document of `secretDocument` can still show the secret: its fields did not empty, or the
+   * page copied the value. Images of the tab stay blocked, as for `filledCard`, until it navigates.
+   */
+  secretShown?: boolean;
+  /**
    * `fill_card` typed a saved card into the current document. Its fields show the number and the
    * security code, and page code can read them, so screenshots, previews, evaluation and recording
    * stay blocked until a main-frame navigation replaces the document.
@@ -43,7 +48,7 @@ export interface BrowserHostTab {
   /**
    * The origins whose agent code can run in the current document: the agent ran `evaluate` in it,
    * or a scripted page of a connected tab could reach it. While it is set, no page of the origin in
-   * the session fills. A main-frame navigation replaces the document and clears this.
+   * the session fills. A main-frame navigation or an idle unload ends the document and clears this.
    */
   scriptedOrigins?: Set<string>;
   /**
@@ -78,6 +83,8 @@ export interface BrowserHostTab {
   scope: Scope.Closeable;
   /** Operations queued or running on `queue`, so a preview can tell the agent is working on the tab. */
   pendingOperations: number;
+  /** True while `open` waits for the tab's first page. That wait is not on `queue`, and it is a use of the tab. */
+  opening?: boolean;
   /** How often the page renderer crashed. A `run_script` stops when this changes. */
   crashes?: number;
   /** Main-frame documents the tab has loaded. A reload keeps the URL, so a saved preview checks this too. */
@@ -182,7 +189,11 @@ export function toPublicTab(tab: BrowserHostTab): BrowserTab {
       : tab.environment;
   return {
     id: tab.id,
-    title: tab.secret ? "Secure authentication" : restoredTabTitle(tab) || tab.contents.getTitle() || "New tab",
+    // A page can put a typed card value or password in its title. The address stays as it is: the
+    // app loads it again and looks up saved logins with it.
+    title: tab.secret
+      ? "Secure authentication"
+      : restoredTabTitle(tab) || tab.engine.scrubText(tab.contents.getTitle()) || "New tab",
     url: tab.secret?.origin ?? currentTabUrl(tab),
     loading: tab.contents.isLoading(),
     ownerThreadId: tab.ownerThreadId,
