@@ -158,6 +158,9 @@ function executableArchiveEntries(bytes: Uint8Array): Set<string> {
   return names;
 }
 
+/** Example env files that ship with a project and hold no secrets, so they may travel in a package. */
+const ENV_EXAMPLE_FILE = /\.env\.(?:example|sample|template|dist)$/u;
+
 /** A path that escapes its folder, or a file that must not travel: secrets, VCS data, nested archives. */
 export function isUnsafeArchivePath(name: string): boolean {
   const parts = name.split("/");
@@ -168,7 +171,7 @@ export function isUnsafeArchivePath(name: string): boolean {
     parts.some((part) => !part || part === "." || part === "..") ||
     parts.includes(".git") ||
     parts.includes("node_modules") ||
-    file.startsWith(".env") ||
+    (file.startsWith(".env") && !ENV_EXAMPLE_FILE.test(file)) ||
     /private.*key/iu.test(file) ||
     /\.(?:zip|tar|tgz|gz|7z|rar)$/iu.test(file)
   );
