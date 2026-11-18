@@ -155,9 +155,16 @@ export interface WorkflowCatalogs {
   files: readonly StoredFileRow[];
   /**
    * The address of an image or a video that a media step made, from the attachment id of its result.
-   * A host without it shows the results that `files` names.
+   * A host without it shows the results that `files` names. Undefined while it loads, and null when
+   * it cannot show here: a card then shows its icon, not a loading pulse.
    */
-  media?: ((attachmentId: string, kind: WorkflowMediaKind) => string | undefined) | undefined;
+  media?: ((attachmentId: string, kind: WorkflowMediaKind) => string | null | undefined) | undefined;
+  /**
+   * The address of a small copy of a picture, from its attachment id, for a card, a strip or a
+   * thumbnail. Undefined while it loads, null as for `media`. The viewer and a download read `media`.
+   * Without it, the cards show `media` and the `previewUrl` of `files`.
+   */
+  mediaPreview?: ((attachmentId: string) => string | null | undefined) | undefined;
   /**
    * Sends a picture from the computer to the host and answers it as a Library file. The host shows
    * why it refused one. Without it, a file from the computer stays in the page.

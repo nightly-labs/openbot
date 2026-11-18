@@ -1,6 +1,12 @@
 import { fileReferenceName, isFileReference } from "@openbot/brand/file-reference";
 import { attachmentReferenceAt } from "@openbot/contracts/attachment-references";
-import { blockChatMath, chatMathBlockStart, chatMathStart, inlineChatMath } from "@openbot/contracts/chat-math";
+import {
+  blockChatMath,
+  chatMathBlockInterrupts,
+  chatMathBlockStart,
+  chatMathStart,
+  inlineChatMath,
+} from "@openbot/contracts/chat-math";
 import { chatPreviewKind } from "@openbot/contracts/chat-preview";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { Button, Checkbox } from "@openbot/ui";
@@ -90,6 +96,14 @@ interface MathToken extends Tokens.Generic {
 const markdown = new Marked({
   gfm: true,
   breaks: true,
+  tokenizer: {
+    // Marked tries a heading underlined by `=` or `-` before it ends a paragraph at a math block, so
+    // a formula with such a line became a heading. Return `undefined` to read a paragraph instead.
+    lheading(source) {
+      const heading = this.rules.block.lheading.exec(source);
+      return heading && chatMathBlockInterrupts(source, heading[0].length) ? undefined : false;
+    },
+  },
   extensions: [
     {
       name: "blockMath",
@@ -558,16 +572,8 @@ function MarkdownList(props: {
   });
   const list = () => (
     <For each={renderedItems()}>
-      {(renderedItem, index) => (
-        <li class={renderedItem.item.task ? "message-markdown-task" : undefined} dir="auto">
-          <Show when={renderedItem.item.task}>
-            <Checkbox
-              class="message-markdown-checkbox"
-              checked={renderedItem.item.checked === true}
-              disabled
-              aria-label={renderedItem.item.text}
-            />
-          </Show>
+      {(renderedItem, index) => {
+        const blocks = () => (
           <MarkdownBlocks
             tokens={renderedItem.item.tokens.filter((child) => child.type !== "checkbox")}
             content={props.content}
@@ -578,8 +584,24 @@ function MarkdownList(props: {
               tailAfter()[index()],
             )}
           />
-        </li>
-      )}
+        );
+        return (
+          <li class={renderedItem.item.task ? "message-markdown-task" : undefined} dir="auto">
+            <Show when={renderedItem.item.task}>
+              <Checkbox
+                class="message-markdown-checkbox"
+                checked={renderedItem.item.checked === true}
+                disabled
+                aria-label={renderedItem.item.text}
+              />
+            </Show>
+            {/* A task item is a row. One body keeps its text, code and nested lists in one column. */}
+            <Show when={renderedItem.item.task} fallback={blocks()}>
+              <div class="message-markdown-task-body">{blocks()}</div>
+            </Show>
+          </li>
+        );
+      }}
     </For>
   );
 
@@ -741,7 +763,7 @@ function MarkdownInline(props: {
               return <RichText body={item.semanticTag} content={props.content} streamingTailAfter={after()} />;
             }
             const url = safeBrowserUrl(token.href);
-            const { shared: sharedPath, workspace: workspacePath } = linkFileTargets(token.href);
+            const { shared: sharedPath, workspace: workspacePath } = linkFileTargets(writtenLinkTarget(token));
             return url ? (
               <MessageLink
                 url={url}
@@ -1334,13 +1356,43 @@ export function messageImageFiles(blocks: readonly string[]): MessageImageFile[]
       const file = tokenIs(token, "codespan")
         ? mentionedFileTarget(token.text, directory)
         : tokenIs(token, "link")
-          ? linkFileTarget(token.href)
+          ? linkFileTarget(writtenLinkTarget(token))
           : null;
       if (file && IMAGE_FILE_PATTERN.test(fileReferenceName(file.path)))
         files.set(`${file.kind}:${file.path}`, { path: file.path, kind: file.kind });
     });
   }
   return [...files.values()].slice(0, IMAGE_FILE_LIMIT);
+}
+
+/** A character that a backslash escapes in CommonMark. */
+const MARKDOWN_ESCAPABLE = /[!-/:-@[-`{-~]/u;
+const WINDOWS_ABSOLUTE_PATH = /^(?:[A-Za-z]:[/\\]|\\\\)/u;
+
+/**
+ * The target of a link as the agent wrote it, when that is a Windows path. CommonMark reads the `\.`
+ * in `C:\me\.logs\x` as an escape, but each backslash of a Windows path is a separator (#9010). A
+ * path written with escaped separators, such as `C:\\me\\.logs`, keeps the parsed text.
+ */
+function writtenLinkTarget(token: { raw: string; href: string }): string {
+  const { raw, href } = token;
+  for (const match of raw.matchAll(/\]\(\s*<?/gu)) {
+    const start = match.index + match[0].length;
+    let index = start;
+    let parsed = 0;
+    // Walk the written text and the parsed target together; a backslash before punctuation is an escape.
+    while (parsed < href.length && index < raw.length) {
+      const escaped = raw[index] === "\\" && MARKDOWN_ESCAPABLE.test(raw[index + 1] ?? "");
+      if ((escaped ? raw[index + 1] : raw[index]) !== href[parsed]) break;
+      index += escaped ? 2 : 1;
+      parsed += 1;
+    }
+    const written = raw.slice(start, index);
+    // Only a network path starts with two backslashes; a pair after that start is an escaped separator.
+    if (parsed !== href.length || !WINDOWS_ABSOLUTE_PATH.test(written)) continue;
+    return written.slice(2).includes("\\\\") ? href : written;
+  }
+  return href;
 }
 
 /** The shared and workspace paths that a link target can open as a chip. */

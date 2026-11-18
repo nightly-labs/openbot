@@ -271,6 +271,8 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · OpenBot がダウンロード",
   "provider.settings.otherVersionInstalledByUser": "未使用：{version} · 自分でインストール",
   "provider.settings.otherVersionDownloaded": "未使用：{version} · OpenBot がダウンロード",
+  "provider.settings.installedVersionIncomplete":
+    "一部のモデルには、このバージョンにない部品が必要です。使うには OpenBot のバージョンをダウンロードしてください。",
   "provider.settings.useInstalledVersion": "インストール版を使う",
   "provider.settings.useDownloadedVersion": "OpenBot 版を使う",
   "provider.settings.cache": "キャッシュ",

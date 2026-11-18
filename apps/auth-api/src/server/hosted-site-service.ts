@@ -40,6 +40,7 @@ import {
   type HostedSiteScope,
   type HostedSiteSlots,
   hostedSiteSlots,
+  idleNewSiteUploadsSql,
   resolveHostedSiteBucket,
   scopeServerId,
 } from "./hosted-site-server";
@@ -209,6 +210,9 @@ export class HostedSiteService {
 
       yield* this.enforceCreationRateEffect(userId, now);
       const bucket = yield* resolveHostedSiteBucket(database, userId, serverId, now);
+      if (!(yield* this.bucketHasRoomEffect(userId, bucket, null, now))) {
+        yield* this.abandonIdleNewSiteUploadsEffect(userId, bucket, now);
+      }
       const room = bucketHasRoomSql(bucket, userId, null, now);
       const siteId = crypto.randomUUID();
       const hostname = yield* this.uniqueHostnameEffect(`${request.title} ${request.description}`);
@@ -1702,6 +1706,47 @@ export class HostedSiteService {
         yield* this.deleteDeploymentEffect(siteId, upload.id);
       }
       return freed;
+    },
+  );
+
+  /**
+   * A new site whose first upload failed or stopped keeps its slot until the upload expires, and the list does not
+   * show it. So a new site of a full bucket stops the oldest idle first upload of a new site in that bucket. A new
+   * site needs one slot. A later file upload of the stopped session gets `upload_expired`.
+   */
+  private readonly abandonIdleNewSiteUploadsEffect = Effect.fn("HostedSites.abandonIdleNewSiteUploads")(
+    { self: this },
+    function* (
+      userId: string,
+      siteBucket: HostedSiteBucket,
+      now: number,
+    ): Effect.fn.Return<void, HostedSiteFailure, HostedSiteStorage> {
+      const { database } = yield* HostedSiteStorage;
+
+      const idleBefore = now - HOSTED_SITE_LIMITS.idleUploadMs;
+      const idle = idleNewSiteUploadsSql(siteBucket, userId, now, idleBefore, 1);
+      const uploads = yield* siteCall(() =>
+        database
+          .prepare(idle.sql)
+          .bind(...idle.binds)
+          .all<{ id: string; site_id: string }>(),
+      );
+      for (const upload of uploads.results) {
+        // A file upload that started or finished after the select keeps the session.
+        const claim = yield* siteCall(() =>
+          database
+            .prepare(
+              `UPDATE site_deployments SET status = 'abandoned'
+           WHERE id = ? AND user_id = ? AND status = 'uploading' AND in_flight_uploads = 0
+             AND NOT EXISTS (
+               SELECT 1 FROM site_upload_files f WHERE f.deployment_id = site_deployments.id AND f.uploaded_at > ?
+             )`,
+            )
+            .bind(upload.id, userId, idleBefore)
+            .run(),
+        );
+        if (claim.meta.changes === 1) yield* this.deleteDeploymentEffect(upload.site_id, upload.id);
+      }
     },
   );
 

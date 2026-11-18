@@ -85,7 +85,10 @@ export const messages = {
   "error.remote.ownerOnlyRemove": "このサーバーを削除できるのはオーナーだけです。",
   "error.remote.requestTimeout": "リモートリクエストがタイムアウトしました。",
   "error.remote.requestFailed": "リモートリクエストに失敗しました。",
-  "error.remote.pinnedKeyMissing": "リモートホストに固定されたデバイスキーがありません。",
+  "error.remote.hostKeyMissing":
+    "セキュリティキーがないか変更されたため、OpenBot はこのサーバーを確認できません。サーバーの所有者にサーバーの確認を依頼してください。",
+  "error.remote.connectionNotStarted":
+    "OpenBot はこのサーバーへの接続を開始できませんでした。問題が続く場合は、OpenBot を終了してもう一度開いてください。",
   "error.remote.hostDidNotConnect": "WebRTC ホストが接続しませんでした。",
   "error.remote.connectionCancelled": "リモート接続がキャンセルされました。",
   "error.remote.hostDisconnected":

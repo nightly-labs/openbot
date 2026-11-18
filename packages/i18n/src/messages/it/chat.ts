@@ -485,6 +485,7 @@ export const messages = {
   "chat.suggestion.undo": "Annulla",
   "chat.suggestion.localOnly": "Connetti {name} in OpenBot sul tuo computer.",
   "chat.suggestion.unavailable": "Questo server non può connettere {name}.",
+  "chat.suggestion.notAllowed": "Solo il proprietario del server o un amministratore può connettere {name}.",
   "chat.mcpSignIn.signIn": "Accedi",
   "chat.mcpSignIn.signInNamed": "Accedi a {name}",
   "chat.mcpSignIn.signedIn": "Accesso effettuato",

@@ -7,6 +7,7 @@ export const messages = {
   "error.mcp.redirectRefused": "Se rechazó el inicio de sesión. Vuelve a OpenBot e inténtalo de nuevo.",
   "error.mcp.redirectNoSignIn": "Ningún inicio de sesión está esperando esto. Es posible que haya terminado.",
   "error.mcp.redirectSignedIn": "OpenBot ha iniciado sesión. Puedes cerrar esta ventana.",
+  "error.mcp.redirectNotSaved": "El inicio de sesión no terminó. Vuelve a OpenBot para ver el motivo.",
   "error.mcp.signInFileUnreadable": "El archivo de inicio de sesión de MCP no se puede leer.",
   "error.mcp.signInFileTooLarge": "El archivo de inicio de sesión de MCP es demasiado grande.",
   "error.mcp.unsupported": "Este servidor no admite servidores MCP.",

@@ -965,6 +965,8 @@ export const messages = {
   "mobile.server.connectors.protonPass.keyHelp":
     "In Proton Pass, crea una chiave di accesso che può leggere solo il vault che condividi con OpenBot, poi incollala qui. {host} conserva la chiave; questo telefono no.",
   "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.protonPass.plan":
+    "Il tuo piano Proton non include lo strumento da riga di comando di Proton Pass. Serve un piano Proton che includa Pass Plus. Altri piani a pagamento, come Mail Plus, non lo includono. Cambia il piano del tuo account, poi connetti di nuovo.",
   "mobile.server.connectors.passwordManager.unavailable": "{name} non è disponibile su questo server.",
   "mobile.server.connectors.passwordManager.howItWorks":
     "Accedi a {name} su questo telefono. Poi {host} crea un vault condiviso e una chiave di accesso in sola lettura per il vault, e conserva solo quella chiave. Gli agenti non vedono mai una password.",
@@ -993,8 +995,6 @@ export const messages = {
   "mobile.server.connectors.passwordManager.keyReadOnly": "Sola lettura",
   "mobile.server.connectors.passwordManager.keyExpires": "Sola lettura. Scade il {date}.",
   "mobile.server.connectors.passwordManager.keyExpired": "Scaduta il {date}",
-  "mobile.server.connectors.passwordManager.plan":
-    "Lo strumento da riga di comando di {name} richiede un piano a pagamento. Cambia il piano del tuo account, poi connetti di nuovo.",
   "mobile.server.connectors.passwordManager.expiredTitle": "La chiave di {name} è scaduta",
   "mobile.server.connectors.passwordManager.expiredBody":
     "Gli agenti su {host} non possono accedere con i tuoi login condivisi finché non connetti di nuovo.",

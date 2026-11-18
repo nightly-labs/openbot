@@ -137,6 +137,11 @@ export function createSettingsGeneralStore(props: GeneralStoreProps) {
         // the copy's version, while the agent status can still name the user's CLI.
         cliSource: agentVersionShown || agent?.cliSource === "managed" ? agent?.cliSource : undefined,
         otherCliVersion: agentVersionShown || agent?.cliSource === "managed" ? agent?.otherCliVersion : undefined,
+        // The row keeps the Download of the copy, and names the user's CLI that runs meanwhile (#11854).
+        incompleteCliVersion:
+          agent?.cliSource === "system" && agent.cliIncomplete && runtime?.phase === "not-downloaded"
+            ? (agent.version ?? undefined)
+            : undefined,
       };
     }),
   );

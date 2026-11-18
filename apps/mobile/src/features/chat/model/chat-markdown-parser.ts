@@ -1,4 +1,10 @@
-import { blockChatMath, chatMathBlockStart, chatMathStart, inlineChatMath } from "@openbot/contracts/chat-math";
+import {
+  blockChatMath,
+  chatMathBlockInterrupts,
+  chatMathBlockStart,
+  chatMathStart,
+  inlineChatMath,
+} from "@openbot/contracts/chat-math";
 import { chatTagReferences } from "@openbot/contracts/chat-tag-references";
 import { replaceEqualDeep } from "@tanstack/react-query";
 import { Marked, type Token, type TokensList } from "marked";
@@ -6,6 +12,14 @@ import { Marked, type Token, type TokensList } from "marked";
 const markdown = new Marked({
   gfm: true,
   breaks: true,
+  tokenizer: {
+    // Marked tries a heading underlined by `=` or `-` before it ends a paragraph at a math block, so
+    // a formula with such a line became a heading. Return `undefined` to read a paragraph instead.
+    lheading(source) {
+      const heading = this.rules.block.lheading.exec(source);
+      return heading && chatMathBlockInterrupts(source, heading[0].length) ? undefined : false;
+    },
+  },
   extensions: [
     {
       name: "blockMath",

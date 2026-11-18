@@ -228,6 +228,8 @@ export const messages = {
     "OpenCode heeft dit gratis model geweigerd. Sommige gratis modellen zijn niet in elk land beschikbaar. Kies een ander model met het label Gratis, of plak een OpenCode Go-sleutel in de OpenCode-instellingen en kies een OpenCode Go-model.",
   "error.provider.customEndpointKeyRefused":
     "Het endpoint “{provider}” heeft zijn API-sleutel of headers geweigerd. Voer ze opnieuw in bij Serverinstellingen → Aanbieders en probeer het daarna opnieuw.",
+  "error.provider.customEndpointAccessRefused":
+    "Het endpoint “{provider}” heeft het verzoek geweigerd. Zijn API-sleutel of headers kunnen onjuist zijn, of zijn account mag dit model niet gebruiken. Controleer ze bij Serverinstellingen → Aanbieders of kies een ander model. Probeer het daarna opnieuw.",
   "error.provider.customEndpointKeyMissing":
     "Het endpoint “{provider}” heeft een API-sleutel nodig. Voeg de sleutel toe bij Serverinstellingen → Aanbieders en probeer het daarna opnieuw.",
   "error.provider.opencodeKeyExpired":
@@ -244,6 +246,8 @@ export const messages = {
     "De modelaanbieder van OpenCode meldde een ongeldig uploadverzoek. Kies een ander model en ga verder. Controleer opgeslagen routines voordat je ze opnieuw maakt.\n{detail}",
   "error.provider.opencodeUnreadableContent":
     "Dit model kan een bestand of afbeelding in deze chat niet lezen. OpenBot heeft een nieuwe OpenCode-sessie gestart met de chatgeschiedenis. Stuur je bericht opnieuw zonder het bestand, of kies een model dat bestanden kan lezen. Heb je dit model aan een eigen aanbieder toegevoegd, schakel dan in de instellingen bij ‘Accepteert’ ‘Afbeeldingen’ uit.",
+  "error.provider.opencodeOutOfMemory":
+    "De modelserver heeft niet genoeg geheugen voor deze chat. Begin een nieuwe chat, of laad het model met een kleinere contextlengte en vul hetzelfde venster in bij de providerinstellingen in OpenBot.",
   "error.provider.opencodeContextTooSmall":
     "Deze chat past niet in het contextvenster van het model. Laad het model in Ollama of LM Studio met een grotere contextlengte, en vul hetzelfde venster in bij de providerinstellingen in OpenBot. Of kies een groter model.",
   "error.provider.opencodeFreeLimit":
@@ -256,6 +260,8 @@ export const messages = {
     "Het antwoord van het model werd afgebroken of was ongeldig. Stuur je bericht opnieuw of kies een ander model.\n{detail}",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode kon de redenering van dit model bij dit denkniveau niet lezen. Kies een lager denkniveau of een ander model en stuur je bericht dan opnieuw.",
+  "error.provider.opencodeModelNotServed":
+    "De modelaanbieder biedt dit model nu niet aan je account aan. Kies een ander model en stuur je bericht daarna opnieuw.",
   "error.provider.opencodeNetwork":
     "OpenCode kon geen verbinding maken met de modelaanbieder. Controleer de netwerkverbinding van de computer waarop OpenBot draait en probeer het opnieuw.\n{detail}",
   "error.provider.codexStateBusy":
@@ -276,6 +282,7 @@ export const messages = {
     "{provider} beëindigde de beurt zonder antwoord. Stuur het bericht opnieuw, of begin een nieuwe chat.",
   "error.provider.noAnswerAfterSteps":
     "{provider} voerde enkele stappen uit en beëindigde de beurt daarna zonder antwoord. Vraag de agent wat hij deed voordat je hetzelfde verzoek opnieuw stuurt.",
+  "error.provider.acpRefusedNoReason": "{provider} stopte zonder antwoord. Stuur het bericht opnieuw.",
   "error.provider.chatgptPageFailed": "OpenBot kon de verbindingspagina van ChatGPT niet openen.",
   "error.provider.noneReady": "Er is geen agentaanbieder klaar.",
   "error.provider.claudeTurnActive": "Wacht op de actieve Claude-beurt voordat je de context vernieuwt.",
@@ -329,6 +336,8 @@ export const messages = {
   "error.provider.cursorNotStarted": "De Cursor-agent is gevonden, maar de versie kan niet worden gelezen.",
   "error.provider.cursorVersionUnreadable": "Kan de versie van de Cursor-agent niet lezen.",
   "error.provider.cursorSignIn": "Log in met Cursor of stel CURSOR_API_KEY in om Cursor te gebruiken.",
+  "error.provider.cursorSignInUnusable":
+    "Cursor kon met je aanmelding geen verbinding maken met zijn server. Controleer je internetverbinding en log daarna opnieuw in bij Cursor.",
   "error.provider.clineArchivePath": "Het Cline-archief heeft een onverwacht pad.",
   "error.provider.clinePackageMismatch": "Het Cline-pakket komt niet overeen met de runtimecatalogus.",
   "error.provider.clineChecksum": "Checksum van de Cline-runtime komt niet overeen.",
@@ -367,6 +376,8 @@ export const messages = {
     "Deze chat is te lang geworden voor Claude. OpenBot heeft een nieuwe Claude Code-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.claudeApiKeyNoCredit":
     "De Anthropic-API-sleutel heeft geen API-tegoed. Een Claude-abonnement betaalt geen verzoeken met een API-sleutel. Voeg tegoed toe in de Anthropic Console, of log bij Instellingen in bij Claude en kies het Claude-account in het modelmenu van de agent.",
+  "error.provider.claudeAccountNoCredit":
+    "Het tegoed van je Claude-account is te laag. Sommige verzoeken, zoals de snelle modus, gebruiken gebruikstegoed, ook als je Claude-abonnement nog gebruik over heeft. Voeg gebruikstegoed toe in je Claude-account, of kies een ander model in het modelmenu van de agent.",
   "error.provider.claudeServiceBlocked":
     "De Claude-dienst heeft dit verzoek geblokkeerd. Meestal is dit een kort probleem bij Claude, geen probleem met je account. Stuur het bericht over een paar minuten opnieuw.",
   "error.provider.foreignReasoning":

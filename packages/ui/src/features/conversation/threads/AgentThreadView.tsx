@@ -10,7 +10,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { isAgentTaskActive } from "@openbot/team-client/agent-tasks";
-import { Button } from "@openbot/ui";
+import { Button, CopyButton, toast } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import type {
   AgentMessage,
@@ -24,6 +24,7 @@ import {
   type AgentStep,
   AgentStepsDisclosure,
   type AgentStepsFacts,
+  type AgentStepsTrace,
 } from "@openbot/ui/features/conversation/AgentSteps";
 import {
   AttachmentCards,
@@ -216,6 +217,14 @@ export interface AgentThreadViewProps {
   onStop: () => void;
   onOpenLink: (url: string) => void;
   /**
+   * Opens a file that a message links to: from the shared folder, or from the workspace of `agentId`, the
+   * agent that wrote the message. `asWritten` is the file name as the message wrote it, when the path joins
+   * it to a folder. Without it, a file link shows as text.
+   */
+  onOpenFile?:
+    | ((kind: "shared" | "workspace", agentId: string | undefined, path: string, asWritten?: string) => void)
+    | undefined;
+  /**
    * Opens an agent's chat, or one of its threads by tab id. With it, a message to or from another agent
    * shows as a marker, as in the agent's own chat. Without it, the message shows as a row.
    */
@@ -261,6 +270,8 @@ export interface AgentThreadViewProps {
   stepsAbove?: ((messageId: string) => AgentStep[] | undefined) | undefined;
   /** The time that the turn of an answer took, and how many of its steps failed. */
   factsAbove?: ((messageId: string) => AgentStepsFacts | undefined) | undefined;
+  /** The trace that the steps row above an answer opens, with the token usage and the time of each step. */
+  traceAbove?: ((messageId: string) => AgentStepsTrace) | undefined;
   /** The steps of the running turn, for its activity row. */
   activeSteps?: readonly AgentStep[] | undefined;
   /** The "Show agent steps" setting: the steps are open at first. */
@@ -320,6 +331,8 @@ export interface AgentThreadViewProps {
   queue?: AgentThreadQueue | undefined;
   /** The agents that the thread asked and that have not answered yet, as the agent's own chat shows them. */
   awaiting?: readonly AwaitingReplyItem[] | undefined;
+  /** Opens an agent of `awaiting` that waits for the user, where it waits. Without it, `onSelectAgent` opens the agent. */
+  onOpenWaitingAgent?: ((agentId: string) => void) | undefined;
   /**
    * The actions for text selected in the thread. Quote puts the text in this message box, and a send
    * goes to this thread. Without it, selected text has no actions.
@@ -339,7 +352,7 @@ export interface AgentThreadSelectionActions {
  * busy-message mode says.
  */
 export function AgentThreadView(props: AgentThreadViewProps) {
-  const { t } = useText();
+  const { t, errorMessage } = useText();
   // Resolved once, so the card is built one time for the check and the row.
   const attention = children(() => props.attention);
   const [sending, setSending] = createSignal(false);
@@ -570,6 +583,18 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     const marker = message.actionMarker;
     return marker?.kind === "skill-lifecycle" || marker?.kind === "instructions-change" ? marker : undefined;
   };
+  /** Opens the shared files that a message of `agentId` links to, as in the agent's chat. */
+  const sharedFileOpener = (agentId: string | undefined) => {
+    const open = props.onOpenFile;
+    return open ? (path: string, asWritten?: string) => open("shared", agentId, path, asWritten) : undefined;
+  };
+  /** Opens the workspace files that a message of `agentId` links to, as in the agent's chat. */
+  const workspaceFileOpener = (agentId: string | undefined) => {
+    const open = props.onOpenFile;
+    return open && agentId
+      ? (path: string, asWritten?: string) => open("workspace", agentId, path, asWritten)
+      : undefined;
+  };
   /** The text of an open agent message, under its marker, as the sender's message. Its attachments stay under the marker. */
   const agentMessageText = (messageId: string) => {
     const message = () => props.messages.find((candidate) => candidate.exchange?.messageId === messageId);
@@ -600,6 +625,9 @@ export function AgentThreadView(props: AgentThreadViewProps) {
             onOpenLink={props.onOpenLink}
             onPreview={props.onPreview}
             onAttachmentAction={props.onAttachmentAction}
+            // A path is in the workspace of the agent that sent the message.
+            onOpenSharedFile={sharedFileOpener(current().exchange?.senderAgentId)}
+            onOpenWorkspaceFile={workspaceFileOpener(current().exchange?.senderAgentId)}
             macWindowControls={props.macWindowControls}
           />
         )}
@@ -698,6 +726,18 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     return branchDividerId() === messageId ? props.branchSource : undefined;
   }
   const failed = () => (props.task?.state === "idle" && props.task.outcome === "failed" ? props.task : undefined);
+  /**
+   * The reason of the failed turn, as the main chat shows it. A thread keeps the provider's text (#5220),
+   * which can be technical; the notice then shows the general sentence, and Copy details keeps the
+   * text, which the host redacted, for a report (#10888).
+   */
+  const failure = (error: string | null) => {
+    const reason = error?.trim() ?? "";
+    if (!reason) return { body: t("conversation.threads.view.failedBody"), details: null };
+    const fallback = t("agent.error.continueFailed");
+    const body = errorMessage(reason, fallback);
+    return { body, details: body === fallback ? reason : null };
+  };
   const running = () =>
     props.task?.state === "running" && !props.approval && !props.waitsForAnswer ? props.task : undefined;
   const queued = () => (props.task && props.task.queuedMessages.length > 0 ? props.task : undefined);
@@ -823,6 +863,8 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                       <AgentStepsDisclosure
                         steps={steps()}
                         defaultOpen={props.stepsOpenByDefault ?? false}
+                        // A turn with no answer shows its steps on its thinking row, with no trace, as in the chat.
+                        trace={message().kind === "thinking" ? undefined : props.traceAbove?.(message().id)}
                         facts={props.factsAbove?.(message().id)}
                       />
                     )}
@@ -881,6 +923,8 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                           onOpenLink={props.onOpenLink}
                           onPreview={props.onPreview}
                           onAttachmentAction={props.onAttachmentAction}
+                          onOpenSharedFile={sharedFileOpener(props.agent.id)}
+                          onOpenWorkspaceFile={workspaceFileOpener(props.agent.id)}
                           mediaSource={props.mediaSource}
                           downloads={props.downloads}
                           onDownload={(attachment) => props.onAttachmentAction(attachment, "download")}
@@ -956,16 +1000,34 @@ export function AgentThreadView(props: AgentThreadViewProps) {
         {/* One card for everything above the input: see composer-stack.css. */}
         <div class="composer-stack">
           <ComposerStackCard when={failed()}>
-            {(task) => (
-              <ComposerNotice
-                tone="danger"
-                title={t("conversation.threads.view.failed")}
-                body={task().error || t("conversation.threads.view.failedBody")}
-              />
-            )}
+            {(task) => {
+              const shown = () => failure(task().error);
+              return (
+                <ComposerNotice
+                  tone="danger"
+                  title={t("conversation.threads.view.failed")}
+                  body={shown().body}
+                  action={
+                    <Show when={shown().details}>
+                      {(details) => (
+                        <CopyButton
+                          value={details()}
+                          variant="outline"
+                          size="sm"
+                          label={t("agent.error.copyDetails")}
+                          onCopyError={() => toast.error(t("app.clipboard.copyFailed"))}
+                        />
+                      )}
+                    </Show>
+                  }
+                />
+              );
+            }}
           </ComposerStackCard>
           <ComposerStackCard when={props.awaiting?.length ? props.awaiting : undefined}>
-            {(items) => <AwaitingReplies items={items()} onOpenAgent={props.onSelectAgent} />}
+            {(items) => (
+              <AwaitingReplies items={items()} onOpenAgent={props.onOpenWaitingAgent ?? props.onSelectAgent} />
+            )}
           </ComposerStackCard>
           <Show when={props.queue}>
             {(queue) => (

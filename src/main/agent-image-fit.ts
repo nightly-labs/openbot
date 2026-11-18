@@ -14,7 +14,7 @@ const MAX_KEPT_BYTES = 3 * 1024 * 1024;
  * pixels is about 480 MB decoded, more than a 108-megapixel phone photo.
  */
 const MAX_PIXELS = 120_000_000;
-const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+export const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 /** For each EXIF orientation, the stored pixel that an upright pixel shows. 5 to 8 swap the sides. */
 const STORED_PIXEL: Record<number, (x: number, y: number, width: number, height: number) => [number, number]> = {
@@ -76,7 +76,7 @@ export function fitImageForAgent(bytes: Uint8Array): ImageFitResult {
   };
 }
 
-function upright(image: NativeImage, orientation: number): NativeImage {
+export function upright(image: NativeImage, orientation: number): NativeImage {
   const storedPixel = STORED_PIXEL[orientation];
   if (!storedPixel) return image;
   const { width, height } = image.getSize();
@@ -95,7 +95,7 @@ function upright(image: NativeImage, orientation: number): NativeImage {
 }
 
 /** The EXIF orientation (1 is upright) and the pixel count of a JPEG file, from the segments before its image data. */
-function jpegFacts(file: Buffer): { orientation: number; pixels: number } {
+export function jpegFacts(file: Buffer): { orientation: number; pixels: number } {
   let orientation = 1;
   let pixels = 0;
   let offset = 2;

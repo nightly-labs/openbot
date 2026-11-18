@@ -15,6 +15,7 @@ import {
   PLAN_CONTINUATION_ITEM_TYPE,
   ROUTINE_EVENT_ITEM_TYPE_PREFIX,
   ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX,
+  SIGN_IN_FAILURE_ITEM_TYPE_PREFIX,
 } from "./ipc-conversation-events";
 import { CONVERSATION_MEMORY_CHANGES_ITEM_TYPE } from "./ipc-conversation-memory-changes";
 import { ROUTINE_QUIET_ANSWER_ITEM_TYPE } from "./ipc-conversation-messages";
@@ -48,6 +49,7 @@ export const READ_EXCLUDED_ITEM_TYPE_PREFIXES = [
   MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX,
   SETTING_LINK_ITEM_TYPE_PREFIX,
   MODEL_SWITCH_ITEM_TYPE_PREFIX,
+  SIGN_IN_FAILURE_ITEM_TYPE_PREFIX,
 ] as const;
 
 const excludedItemTypes: ReadonlySet<string> = new Set(READ_EXCLUDED_ITEM_TYPES);

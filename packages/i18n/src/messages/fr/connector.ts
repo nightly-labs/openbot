@@ -630,9 +630,9 @@ export const messages = {
   "connector.protonPass.expiredDescription":
     "Les agents ne peuvent plus utiliser vos identifiants partagés tant que vous ne vous reconnectez pas.",
   "connector.protonPass.reconnect": "Reconnecter",
-  "connector.protonPass.planTitle": "Proton Pass demande une offre payante",
+  "connector.protonPass.planTitle": "Proton Pass nécessite une offre avec Pass Plus",
   "connector.protonPass.planDescription":
-    "La CLI Proton Pass fonctionne uniquement avec une offre Proton payante. Changez d’offre, puis connectez à nouveau.",
+    "La CLI Proton Pass nécessite une offre Proton qui inclut Pass Plus. Les autres offres payantes, comme Mail Plus, ne l’incluent pas. Changez d’offre, puis connectez à nouveau.",
   "connector.protonPass.vaultTitle": "Coffre partagé",
   "connector.protonPass.vaultDescription":
     "Les agents peuvent se connecter avec les identifiants de ce coffre. Déplacez-y un identifiant pour le partager.",

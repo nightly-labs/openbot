@@ -128,6 +128,7 @@ export const messages = {
   "composer.voice.noSpeechRecorded": "녹음된 음성이 없어요.",
   "composer.voice.noSpeechDetected": "감지된 음성이 없어요.",
   "composer.voice.readFailed": "답장을 소리 내어 읽을 수 없었어요.",
+  "composer.voice.languageUnsupported": "답장을 소리 내어 읽을 수 없었어요. 이 언어는 아직 지원하지 않아요.",
   "composer.error.saveEditTryAgain": "이 컴퓨터에 수정 내용을 저장할 수 없었어요. 다시 시도해 주세요.",
   "composer.error.saveUnconfirmed": "저장 여부를 확인하지 못했어요. 저장을 다시 시도해 결과를 확인하세요.",
   "composer.error.changeModel": "모델을 변경할 수 없었어요. 다시 시도해 주세요.",

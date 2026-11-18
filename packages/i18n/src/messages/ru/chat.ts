@@ -572,6 +572,7 @@ export const messages = {
   "chat.suggestion.undo": "Отменить",
   "chat.suggestion.localOnly": "Подключите {name} в OpenBot на своём компьютере.",
   "chat.suggestion.unavailable": "Этот сервер не может подключить {name}.",
+  "chat.suggestion.notAllowed": "Подключить {name} может только владелец сервера или администратор.",
   "chat.serverInstall.title": "Новый сервер",
   "chat.serverInstall.expired": "Срок действия команды истёк. Попросите агента сделать новую.",
   "chat.compaction.running": "Сжатие контекста",

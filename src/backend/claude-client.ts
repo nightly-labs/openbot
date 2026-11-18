@@ -29,6 +29,7 @@ import { type AgentContextCategoryUsage, agentProviderName, defaultProviderModel
 import { type DynamicRecord, isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
+import { classifyFailure } from "@openbot/telemetry";
 import { Deferred, Effect, Exit, Fiber, Option, Scope } from "effect";
 import { z } from "zod";
 import { advertisedZodShape } from "./agent/advertised-json-schema";
@@ -276,7 +277,7 @@ const claudeFlagSettings = Effect.fn("claudeFlagSettings")(function* (
       : {}),
     ...(sources.includes("project") && !sources.includes("user") ? { claudeMdExcludes: claudeHomeMemoryFiles() } : {}),
   };
-  return settings;
+  return { settings, firstPartyApi };
 });
 
 /**
@@ -522,6 +523,8 @@ interface ActiveTurn {
 
 interface ThreadRuntime {
   id: string;
+  /** No gateway, Bedrock or Vertex in the environment or the settings files: requests go to the Anthropic API. */
+  firstPartyApi: boolean;
   usageCounterId: string;
   usageCost: number;
   /**
@@ -1501,6 +1504,15 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     );
   }
 
+  /**
+   * Whether the CLI's last sign-in status of this folder is a Claude account sign-in, not a Console
+   * sign-in or a key. Read from the cache: each status read can spend the sign-in's refresh token (#4831).
+   */
+  #onClaudeAccount(): boolean {
+    const last = lastAuthStatuses.get(this.#environment(false).CLAUDE_CONFIG_DIR ?? "");
+    return last?.loggedIn === true && last.authMethod === "claude.ai";
+  }
+
   /** The agent environment, with the saved key when `withApiKey`. */
   #environment(withApiKey: boolean): Readonly<Record<string, string>> {
     const key = withApiKey ? this.#fallbackApiKey?.() : null;
@@ -1649,8 +1661,14 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       ...this.#environment(this.#onApiKey),
     };
     // A profile generation has no tools and no skills, so it needs none of the OpenBot settings.
-    const openBotSettings: Settings = config.profileGeneration
-      ? {}
+    const { settings: openBotSettings, firstPartyApi } = config.profileGeneration
+      ? {
+          settings: {},
+          // The sign-in settings send the `env` of the user settings to the CLI, also for a profile generation.
+          firstPartyApi: CLAUDE_OTHER_API_VARIABLES.every(
+            (name) => !(signInSettings.env?.[name] ?? cliEnvironment[name]),
+          ),
+        }
       : yield* claudeFlagSettings(userSettingsFile, configDirectory, config.cwd, settingSources, cliEnvironment);
     const flagSettings: Settings = {
       ...openBotSettings,
@@ -1778,6 +1796,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     ).pipe(Effect.onError(() => removeQueryFiles));
     const runtime: ThreadRuntime = {
       id: threadId,
+      firstPartyApi,
       usageCounterId: randomUUID(),
       usageCost: 0,
       resumedUsage: resume,
@@ -2938,12 +2957,18 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       if (blocked) queryLogger.warn("Cloudflare blocked a Claude request.", { error: redactText(String(error)) });
       const signInFailed = !blocked && (turn.authenticationFailed || CLAUDE_NOT_LOGGED_IN.test(String(error)));
       const billing = turn.billingFailed || (turn.balanceSpent && isBalanceDiagnostic(String(error)));
+      const apiKey = this.#usesApiKey();
+      const message = claudeTurnError(error, apiKey, !apiKey && runtime.firstPartyApi && this.#onClaudeAccount());
+      // A crash of the CLI that no rule names, as Claude Code 2.1.327 with a Bun panic on Windows
+      // (#12175). The message keeps the CLI text for the classifiers of the turn's end, such as a
+      // refused session, and that end continues the turn once, as after a provider exit.
+      const crashed = message === String(error) && claudeProcessExited(error) && classifyFailure(message) === "unknown";
       this.emit("notification", {
         method: "error",
         params: {
           threadId: runtime.id,
           turnId: turn.id,
-          message: claudeTurnError(error, this.#usesApiKey()),
+          message,
           ...(blocked
             ? { causeCode: "provider_unavailable" }
             : signInFailed
@@ -2952,7 +2977,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
                 ? { causeCode: "billing" }
                 : turn.stalled
                   ? { causeCode: "stalled" }
-                  : {}),
+                  : crashed
+                    ? { causeCode: "provider_exited" }
+                    : {}),
         },
       });
     }
@@ -3406,9 +3433,13 @@ const CLAUDE_SANDBOX_BLOCKED = /^apply-seccomp: (?:unshare\(|write \/proc\/self\
  * The CLI's report of an Anthropic API key with no API credit: "Credit balance is too low", from the
  * API's "Your credit balance is too low to access the Anthropic API" (Claude Code 2.1.309). A Claude
  * plan does not pay for API key requests, and a plan subscriber read it as a fault (#5550). Only a
- * turn on a key gets the key text: a gateway or a plan's extra usage can send the same words. The
- * key text keeps "credit balance is too low", so `isUsageLimitDiagnostic` still moves the turn to a
- * backup model (#4616).
+ * turn on a key gets the key text. A plan's usage credits can send the same words; a turn of a
+ * Claude account sign-in on the Anthropic API gets the account text, because the CLI text names no
+ * provider (#9710). Another sign-in, such as a Console account, and a turn on another API
+ * (`CLAUDE_OTHER_API_VARIABLES`) keep the CLI text: OpenBot does not know whose credit it is. Both
+ * texts keep "credit balance … too low", so `isUsageLimitDiagnostic` still moves the turn to a
+ * backup model (#4616). The account text keeps "credit balance is too low", so `classifyFailure`
+ * gives it `usage_limit` as it gives the CLI text, and started work continues on a backup (#11516).
  */
 const CLAUDE_API_CREDIT_EMPTY = /\bcredit balance (?:is )?too low\b/iu;
 
@@ -3453,14 +3484,31 @@ function claudeFastModeWarning(reason: string): string | null {
   }
 }
 
-function claudeTurnError(error: unknown, apiKey: boolean): string {
+function claudeTurnError(error: unknown, apiKey: boolean, claudeAccount: boolean): string {
   const text = String(error);
   if (apiKey && CLAUDE_API_CREDIT_EMPTY.test(text)) return sourceText("error.provider.claudeApiKeyNoCredit");
+  if (claudeAccount && CLAUDE_API_CREDIT_EMPTY.test(text)) return sourceText("error.provider.claudeAccountNoCredit");
   if (CLAUDE_CLOUDFLARE_BLOCK.test(text)) return sourceText("error.provider.claudeServiceBlocked");
   // With an API key there is no sign-in to renew, so the key turn keeps the CLI text.
   if (!apiKey && CLAUDE_NOT_LOGGED_IN.test(text))
     return sourceText("error.provider.signInExpired", { provider: agentProviderName("claude") });
   return CLAUDE_SANDBOX_UNAVAILABLE.test(text) ? sourceText("error.agent.claudeNoSandbox") : text;
+}
+
+/**
+ * The SDK's error for a CLI process that exited with a code other than 0 or that a signal ended. The
+ * SDK marks it with `errorClass`, also inside the error that adds the stderr. A Stop ends the process
+ * with an abort error instead.
+ */
+function claudeProcessExited(error: unknown): boolean {
+  for (let cause = error, depth = 0; cause instanceof Error && depth < 3; cause = cause.cause, depth += 1) {
+    if (
+      "errorClass" in cause &&
+      (cause.errorClass === "process_exited_nonzero" || cause.errorClass === "process_killed_by_signal")
+    )
+      return true;
+  }
+  return false;
 }
 
 /**

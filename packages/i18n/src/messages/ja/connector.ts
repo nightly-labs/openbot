@@ -626,9 +626,9 @@ export const messages = {
   "connector.protonPass.expiredDescription":
     "もう一度サインインするまで、エージェントは共有ログイン情報でサインインできません。",
   "connector.protonPass.reconnect": "再接続",
-  "connector.protonPass.planTitle": "Proton Pass には有料プランが必要です",
+  "connector.protonPass.planTitle": "Proton Pass には Pass Plus を含むプランが必要です",
   "connector.protonPass.planDescription":
-    "Proton Pass CLI は有料の Proton プランでのみ使えます。プランを変更してから、もう一度接続してください。",
+    "Proton Pass CLI には、Pass Plus を含む Proton プランが必要です。Mail Plus などのほかの有料プランには含まれません。プランを変更してから、もう一度接続してください。",
   "connector.protonPass.vaultTitle": "共有保管庫",
   "connector.protonPass.vaultDescription":
     "エージェントはこの保管庫のログイン情報でサインインできます。共有するログイン情報をここに移動してください。",

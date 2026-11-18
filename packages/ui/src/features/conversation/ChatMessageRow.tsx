@@ -103,7 +103,7 @@ export interface ChatMessageRowProps {
   onOpenLink: (url: string) => void;
   onPreview: (attachment: AttachmentSummary) => void;
   onAttachmentAction: (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => void;
-  onOpenSharedFile?: (path: string, asWritten?: string) => void;
+  onOpenSharedFile?: ((path: string, asWritten?: string) => void) | undefined;
   onOpenWorkspaceFile?: ((path: string, asWritten?: string) => void) | undefined;
   onOpenQuote?: ((messageId: string, text: string) => void) | undefined;
   onOpenTag?: ((kind: "tab" | "thread", id: string) => void) | undefined;
@@ -134,7 +134,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
   const own = () => props.author.kind === "you";
   const member = () => props.author.kind === "member";
   const person = () => own() || member();
-  // A memo, because `Bubble` reads the variant more than once and it splits the whole body.
+  // A memo, because `Bubble` reads the variant more than once.
   const variant = createMemo(() => conversationBubbleVariant(props.message));
   const seed = () => props.author.agent?.avatarSeed ?? props.author.avatarSeed;
   // A colour literal in an inline style is refused by `check:ui`, and rightly: this is the agent's

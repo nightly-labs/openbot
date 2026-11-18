@@ -87,6 +87,7 @@ import {
   AGENT_PUBLISH_CAPABILITY,
   AGENT_UPDATE_CAPABILITY,
   ANDROID_PUSH_NOTIFICATIONS_CAPABILITY,
+  ATTACHMENT_PREVIEW_CAPABILITY,
   BITWARDEN_CONNECTOR_CAPABILITY,
   BROWSER_SECRET_VAULT_CAPABILITY,
   BROWSER_SIGN_IN_CAPABILITY,
@@ -178,6 +179,7 @@ import {
   VAULT_V2_CAPABILITY,
   VAULT_V3_CAPABILITY,
   VAULT_V4_CAPABILITY,
+  WEBHOOK_AGENT_SECRET_CAPABILITY,
   WEBHOOK_SENDER_SECRET_CAPABILITY,
   WEBHOOK_TESTS_CAPABILITY,
   WHATSAPP_CONNECTOR_CAPABILITY,
@@ -1532,7 +1534,11 @@ export class TeamApiServer {
   }
 
   #routeFiles(context: TeamApiRequestContext): Promise<RouteOutcome> {
-    return routeFiles(context, { agents: this.#options.agents, mailbox: this.#options.mailbox });
+    return routeFiles(context, {
+      agents: this.#options.agents,
+      mailbox: this.#options.mailbox,
+      attachmentPreviews: this.#options.attachmentPreviews,
+    });
   }
 
   #routeAgents(context: TeamApiRequestContext): Promise<RouteOutcome> {
@@ -2758,6 +2764,7 @@ export class TeamApiServer {
         if (capability === "remote-desktop-setup")
           return this.#options.remoteScreen?.checkSetup !== undefined && this.#options.remoteScreen?.test !== undefined;
         if (capability === MCP_SERVERS_CAPABILITY) return this.#options.mcpServers !== undefined;
+        if (capability === ATTACHMENT_PREVIEW_CAPABILITY) return this.#options.attachmentPreviews !== undefined;
         if (capability === LIVE_VOICE_CAPABILITY) return this.#options.liveVoice !== undefined;
         // Each account signs in with the browser, so it needs the sign-in routes too.
         if (capability === MCP_ACCOUNTS_CAPABILITY)
@@ -2926,6 +2933,7 @@ export class TeamApiServer {
         if (capability === ROUTINE_PAUSE_REASONS_CAPABILITY) return this.#options.routineRunPlaces !== undefined;
         if (capability === WEBHOOK_TESTS_CAPABILITY) return this.#options.events !== undefined;
         if (capability === WEBHOOK_SENDER_SECRET_CAPABILITY) return this.#options.events !== undefined;
+        if (capability === WEBHOOK_AGENT_SECRET_CAPABILITY) return this.#options.events !== undefined;
         if (capability === AGENT_IMPORT_CAPABILITY || capability === AGENT_IMPORT_V2_CAPABILITY)
           return this.#options.agentImport !== undefined;
         if (capability === HERMES_IMPORT_CAPABILITY) return this.#options.hermesImport !== undefined;

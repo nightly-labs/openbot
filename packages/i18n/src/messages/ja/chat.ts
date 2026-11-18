@@ -462,6 +462,7 @@ export const messages = {
   "chat.suggestion.undo": "元に戻す",
   "chat.suggestion.localOnly": "{name} は自分のコンピューターの OpenBot で接続してください。",
   "chat.suggestion.unavailable": "このサーバーでは {name} を接続できません。",
+  "chat.suggestion.notAllowed": "{name} を接続できるのはサーバーの所有者または管理者だけです。",
   "chat.serverInstall.title": "新しいサーバー",
   "chat.serverInstall.expired": "コマンドの有効期限が切れました。エージェントに新しいコマンドを頼んでください。",
   "chat.compaction.running": "コンテキストを圧縮しています",

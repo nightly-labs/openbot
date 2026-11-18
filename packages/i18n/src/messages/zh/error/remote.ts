@@ -75,7 +75,9 @@ export const messages = {
   "error.remote.ownerOnlyRemove": "只有所有者可以移除该服务器。",
   "error.remote.requestTimeout": "远程请求超时。",
   "error.remote.requestFailed": "远程请求失败。",
-  "error.remote.pinnedKeyMissing": "远程主机没有固定的设备密钥。",
+  "error.remote.hostKeyMissing":
+    "此服务器的安全密钥缺失或已更改，OpenBot 无法验证此服务器。请让服务器所有者检查服务器。",
+  "error.remote.connectionNotStarted": "OpenBot 无法开始连接此服务器。如果问题持续，请退出 OpenBot 并重新打开。",
   "error.remote.hostDidNotConnect": "WebRTC 主机未连接。",
   "error.remote.connectionCancelled": "远程连接已取消。",
   "error.remote.hostDisconnected": "与服务器的连接已断开。请确认该操作是否已完成，然后重试。",
