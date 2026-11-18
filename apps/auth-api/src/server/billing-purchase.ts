@@ -9,12 +9,8 @@ import { type StripeSubscription, subscriptionPeriodEnd } from "./stripe-client"
 const CLAIM_PREFIX = {
   started: "openbot_purchase:",
   ended: "openbot_purchase_end:",
-  cancel_scheduled: "openbot_purchase_cancel:",
-  cancel_withdrawn: "openbot_purchase_resume:",
-} as const satisfies Record<PurchaseEvent, string>;
-
-/** A cancel and a resume of one renewal remove the claim of the other, so the next change sends again. */
-const OPPOSITE_CLAIM = { cancel_scheduled: "cancel_withdrawn", cancel_withdrawn: "cancel_scheduled" } as const;
+  cancel: "openbot_purchase_cancel:",
+} as const;
 
 /**
  * The changes of a subscription that the operator gets: its start, the cancel of its renewal, the
@@ -33,6 +29,8 @@ interface PurchaseTerms {
   event: PurchaseEvent;
   /** When a cancelled renewal ends the subscription, in milliseconds (`subscriptionEnd`). */
   periodEnd: number | null;
+  /** The Stripe `canceled_at` of the subscription: the time of its last cancel request, in seconds. */
+  cancelRequest: number | null;
   /** Why an ended subscription ended. */
   endReason?: PlanEndReason;
   interval: BillingInterval;
@@ -69,8 +67,8 @@ export interface PurchaseReport {
  * Gives a subscription change to `send`. Stripe sends the events of a new subscription at the same
  * time, and each one can see the start, so only the event that adds the claim reports a start. An end
  * has a claim too: a refund and the Stripe event of the end can store it at the same time. Two events
- * can also see one cancel or resume of a renewal, so each has a claim. A subscription can cancel and
- * resume many times, so each of the two claims removes the other. The claims are kept as long as the
+ * can also see one cancel of a renewal, so a cancel has a claim for its cancel request (`canceled_at`):
+ * each new cancel request has a new time. A resume has no claim. The claims are kept as long as the
  * webhook events. A failure skips the message, not the sync.
  */
 export const reportPurchase = Effect.fn("reportPurchase")(
@@ -85,30 +83,32 @@ export const reportPurchase = Effect.fn("reportPurchase")(
       console.warn("billing: purchase message skipped: the account is gone");
       return;
     }
-    const claim = yield* billingCall(() =>
-      report.database
-        .prepare("INSERT OR IGNORE INTO billing_webhook_events(event_id, type, received_at) VALUES (?, ?, ?)")
-        .bind(`${CLAIM_PREFIX[details.event]}${subscriptionId}`, "purchase", report.now())
-        .run(),
-    );
-    if (claim.meta.changes !== 1) return;
-    send({ ...details, email: account.email });
-    // After the send: a failed delete can only lose the message of a later change.
-    if (details.event === "cancel_scheduled" || details.event === "cancel_withdrawn") {
-      const opposite = CLAIM_PREFIX[OPPOSITE_CLAIM[details.event]];
-      yield* billingCall(() =>
+    const key = claimKey(subscriptionId, details);
+    if (key) {
+      const claim = yield* billingCall(() =>
         report.database
-          .prepare("DELETE FROM billing_webhook_events WHERE event_id = ?")
-          .bind(`${opposite}${subscriptionId}`)
+          .prepare("INSERT OR IGNORE INTO billing_webhook_events(event_id, type, received_at) VALUES (?, ?, ?)")
+          .bind(key, "purchase", report.now())
           .run(),
       );
+      if (claim.meta.changes !== 1) return;
     }
+    send({ ...details, email: account.email });
   },
   (operation) =>
     operation.pipe(
       Effect.catch(() => Effect.sync(() => console.warn("billing: purchase message skipped: the database failed"))),
     ),
 );
+
+/** The claim of a change, or null for a change with no claim. */
+function claimKey(subscriptionId: string, details: BillingPurchaseDetails): string | null {
+  if (details.event === "started") return `${CLAIM_PREFIX.started}${subscriptionId}`;
+  if (details.event === "ended") return `${CLAIM_PREFIX.ended}${subscriptionId}`;
+  if (details.event === "cancel_scheduled" && details.cancelRequest !== null)
+    return `${CLAIM_PREFIX.cancel}${subscriptionId}:${details.cancelRequest}`;
+  return null;
+}
 
 /** The emoji and the word that start the message of each change, so that the operator can scan the channel. */
 const EVENT_TEXT = {
@@ -162,12 +162,14 @@ const INTERVAL_TEXT = { month: "/mo", year: "/yr" } as const satisfies Record<Bi
  */
 export function alertAmount(amount: number | null, currency: BillingCurrency, interval?: BillingInterval): string {
   const code = currency.toUpperCase();
-  const value =
-    amount === null
-      ? `? ${code}`
-      : new Intl.NumberFormat("en", { style: "currency", currency: code, trailingZeroDisplay: "stripIfInteger" })
-          .format(amount / 100)
-          .replace("\u00a0", " ");
+  if (amount === null) return `amount not known (${code})`;
+  const value = new Intl.NumberFormat("en", {
+    style: "currency",
+    currency: code,
+    trailingZeroDisplay: "stripIfInteger",
+  })
+    .format(amount / 100)
+    .replace("\u00a0", " ");
   return interval ? `${value}${INTERVAL_TEXT[interval]}` : value;
 }
 

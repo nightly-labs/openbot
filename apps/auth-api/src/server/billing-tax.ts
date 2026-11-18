@@ -171,7 +171,7 @@ export const setCustomerBillingDetails = Effect.fn("BillingTax.setCustomerBillin
   const changed = yield* syncSubscriptionTax(stripe, customerId, treatment);
   const vatChanges = changed.map(
     (subscription) =>
-      `🧾 **VAT check** · customer ${customerId} changed its billing details from ${tax.country ?? "no country"} to ${request.country}, so subscription ${subscription.id} changed from ${subscription.from} to ${treatment} VAT from its next invoice. Check the country.`,
+      `VAT check: customer ${customerId} changed its billing details from ${tax.country ?? "no country"} to ${request.country}, so subscription ${subscription.id} changed from ${subscription.from} to ${treatment} VAT from its next invoice. Check the country.`,
   );
   return { details: { country: request.country, vatId }, vatChanges };
 });
@@ -237,6 +237,14 @@ const paidCheckoutSchema = Schema.Struct({
  * The operator text for a paid Checkout page whose billing address is in another country than the one
  * that decided its VAT. Null when they agree, or for a page from before the billing details step.
  */
+/**
+ * The Discord form of a VAT text (`VAT check: ...` or `VAT limit: ...`): an emoji and the bold label.
+ * The log keeps the plain text.
+ */
+export function vatAlertText(text: string): string {
+  return text.replace(/^(VAT check|VAT limit): /, "🧾 **$1** · ");
+}
+
 export function checkoutCountryMismatch(object: StripeEvent["data"]["object"]): string | null {
   const session = Schema.decodeUnknownOption(paidCheckoutSchema)(object);
   if (Option.isNone(session)) return null;
@@ -244,5 +252,5 @@ export function checkoutCountryMismatch(object: StripeEvent["data"]["object"]): 
   const paid = session.value.customer_details?.address?.country;
   if (!declared || !paid || declared === paid) return null;
   const treatment = session.value.metadata?.[VAT_METADATA.treatment] ?? "unknown";
-  return `🧾 **VAT check** · Checkout page ${session.value.id} took the VAT of ${declared} (${treatment}), but its billing address is in ${paid}. Check the VAT of its invoice.`;
+  return `VAT check: Checkout page ${session.value.id} took the VAT of ${declared} (${treatment}), but its billing address is in ${paid}. Check the VAT of its invoice.`;
 }

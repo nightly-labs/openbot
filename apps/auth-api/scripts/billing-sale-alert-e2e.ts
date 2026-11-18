@@ -35,10 +35,10 @@ function invoice(type: StripeEvent["type"], id: string, object: StripeEvent["dat
 }
 
 const SERVER_RENEWED = "💵 **Renewed** server · `owner@example.test` · standard · $29/mo";
-const SERVER_ADJUSTED = "💵 **Paid** server · `owner@example.test` · standard · $12.50/mo · adjustment";
+const SERVER_ADJUSTED = "💵 **Paid** server · `owner@example.test` · standard · $12.50 · adjustment";
 const SERVER_FAILED = "⚠️ **Payment failed** server · `owner@example.test` · standard · $29/mo · card_declined";
 const LICENSE_PAID = "💵 **Renewed** license · `owner@example.test` · 5 users · PLN 480/yr";
-const LICENSE_REFUNDED = "↩️ **Refunded** license · `owner@example.test` · 5 users · PLN 120/yr";
+const LICENSE_REFUNDED = "↩️ **Refunded** license · `owner@example.test` · 5 users · PLN 120";
 
 async function eachPaidInvoiceSendsOneMessage() {
   const database = new DatabaseSync(":memory:");

@@ -1264,6 +1264,7 @@ export class BillingService {
         {
           event,
           periodEnd: subscriptionEnd(subscription),
+          cancelRequest: subscription.canceled_at ?? null,
           ...(event === "ended" ? { endReason: planEndReason(previous) } : {}),
           product: "server",
           plan: key.plan,

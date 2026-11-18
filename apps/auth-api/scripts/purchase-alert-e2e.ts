@@ -157,8 +157,10 @@ async function run(alertUrl: string | undefined) {
     await Promise.all(work.splice(0));
   };
   /** Changes a subscription in the fake Stripe API, as a cancel in the Customer Portal does. */
-  const change = (id: string, patch: { cancel_at_period_end?: boolean; cancel_at?: number; status?: string }) =>
-    stored.set(id, { ...stored.get(id), ...patch });
+  const change = (
+    id: string,
+    patch: { cancel_at_period_end?: boolean; cancel_at?: number; canceled_at?: number; status?: string },
+  ) => stored.set(id, { ...stored.get(id), ...patch });
   /** Delivers events at the same time, after each one read the subscription from Stripe. */
   const deliverTogether = (events: Parameters<typeof deliver>[]) => {
     gate.reads = events.length;
@@ -166,6 +168,11 @@ async function run(alertUrl: string | undefined) {
   };
   return { database, alerts, deliver, deliverTogether, change };
 }
+
+/** The `canceled_at` times of the cancel requests, in seconds. */
+const FIRST_CANCEL = 1_790_000_000;
+const SECOND_CANCEL = 1_790_000_100;
+const LICENSE_CANCEL = 1_790_000_200;
 
 async function purchasesAlertTheOperator() {
   const { database, alerts, deliver, deliverTogether, change } = await run(ALERT_URL);
@@ -202,7 +209,8 @@ async function purchasesAlertTheOperator() {
   check("a second event of the license sends no message", alerts.length === 2, alerts);
 
   const serverTerms = `server · \`${SERVER_BUYER.email}\` · standard · $35/mo`;
-  change("sub_server", { cancel_at_period_end: true });
+  // Stripe sets `canceled_at` to the time of each cancel request and keeps it after a resume.
+  change("sub_server", { cancel_at_period_end: true, canceled_at: FIRST_CANCEL });
   // Stripe can send two events of one cancel at the same time, and each one can see the old state.
   await deliverTogether([
     ["customer.subscription.updated", { id: "sub_server" }],
@@ -224,7 +232,7 @@ async function purchasesAlertTheOperator() {
     alerts,
   );
 
-  change("sub_server", { cancel_at_period_end: true });
+  change("sub_server", { cancel_at_period_end: true, canceled_at: SECOND_CANCEL });
   await deliver("customer.subscription.updated", { id: "sub_server" });
   change("sub_server", { cancel_at_period_end: false });
   await deliver("customer.subscription.updated", { id: "sub_server" });
@@ -247,7 +255,7 @@ async function purchasesAlertTheOperator() {
 
   const licenseTerms = `license · \`${LICENSE_BUYER.email}\` · team · 7 users · ${amount}/yr`;
   // A cancel date from the Dashboard is not the end of the paid period.
-  change("sub_license", { cancel_at: Date.UTC(2027, 0, 31) / 1000 });
+  change("sub_license", { cancel_at: Date.UTC(2027, 0, 31) / 1000, canceled_at: LICENSE_CANCEL });
   await deliver("customer.subscription.updated", { id: "sub_license" });
   change("sub_license", { status: "past_due" });
   await deliver("customer.subscription.updated", { id: "sub_license" });
@@ -265,15 +273,16 @@ async function purchasesAlertTheOperator() {
     .prepare("SELECT event_id FROM billing_webhook_events WHERE type = 'purchase' ORDER BY event_id")
     .all();
   check(
-    "each subscription has one start claim, one end claim, and the claim of its last cancel or resume",
+    "each subscription has one start claim, one end claim, and one claim for each cancel request",
     claims.map((claim) => claim.event_id).join() ===
       [
         "openbot_purchase:sub_license",
         "openbot_purchase:sub_server",
-        "openbot_purchase_cancel:sub_license",
+        `openbot_purchase_cancel:sub_license:${LICENSE_CANCEL}`,
+        `openbot_purchase_cancel:sub_server:${FIRST_CANCEL}`,
+        `openbot_purchase_cancel:sub_server:${SECOND_CANCEL}`,
         "openbot_purchase_end:sub_license",
         "openbot_purchase_end:sub_server",
-        "openbot_purchase_resume:sub_server",
       ].join(),
     claims,
   );

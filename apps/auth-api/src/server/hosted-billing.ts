@@ -4,6 +4,7 @@ import { BillingOss } from "./billing-oss";
 import { purchaseAlertText } from "./billing-purchase";
 import { BillingSales } from "./billing-sales";
 import { BillingService } from "./billing-service";
+import { vatAlertText } from "./billing-tax";
 import {
   createLicenseEmailDelivery,
   createWelcomeEmailDelivery,
@@ -102,13 +103,13 @@ export function createHostedBilling(
           database: bindings.DB,
           fetch: send,
           alert: (text) => {
-            if (operatorAlert) options.schedule(operatorAlert(text));
+            if (operatorAlert) options.schedule(operatorAlert(vatAlertText(text)));
           },
         }),
         ...(operatorAlert
           ? {
               onPurchase: (purchase) => options.schedule(operatorAlert(purchaseAlertText(purchase))),
-              onVatMismatch: (text) => options.schedule(operatorAlert(text)),
+              onVatMismatch: (text) => options.schedule(operatorAlert(vatAlertText(text))),
             }
           : {}),
         onSubscriptionSynced: (sync) =>

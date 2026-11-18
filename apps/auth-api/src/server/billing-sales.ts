@@ -178,24 +178,31 @@ const SALE_EVENT_TEXT: Partial<Record<FactType, string>> = {
 
 /**
  * The operator message of one payment fact, in the form of `purchaseAlertText`: the event, the product,
- * the account email, the plan, and the amount of the payment for its period. `email` is null when the
+ * the account email, the plan, and the amount. Only the payment of a renewal is the amount of one period,
+ * so only it has the period. `event` is the `SALE_EVENT_TEXT` of the fact. `email` is null when the
  * account is gone.
  */
-function saleAlertText(type: FactType, attributes: FactAttributes, email: string | null): string {
+function saleAlertText(type: FactType, event: string, attributes: FactAttributes, email: string | null): string {
   const license = (attributes.product ?? "server") === "license";
-  const event =
-    type === "payment_succeeded" && attributes.paymentKind === "renewal" ? "💵 **Renewed**" : SALE_EVENT_TEXT[type];
-  return alertLine(`${event} ${license ? "license" : "server"}`, [
+  const renewal = attributes.paymentKind === "renewal";
+  const paid = type === "payment_succeeded";
+  return alertLine(`${paid && renewal ? "💵 **Renewed**" : event} ${license ? "license" : "server"}`, [
     email === null ? "unknown account" : alertCode(email),
     ...(license
       ? attributes.users === undefined
         ? []
         : [alertUsers(attributes.users)]
       : [attributes.plan ?? "plan not known"]),
-    ...(attributes.currency ? [alertAmount(attributes.amount ?? null, attributes.currency, attributes.interval)] : []),
-    ...(type === "payment_succeeded" && (attributes.paymentKind ?? "adjustment") === "adjustment"
-      ? ["adjustment"]
+    ...(attributes.currency
+      ? [
+          alertAmount(
+            attributes.amount ?? null,
+            attributes.currency,
+            renewal && (paid || type === "payment_failed") ? attributes.interval : undefined,
+          ),
+        ]
       : []),
+    ...(paid && (attributes.paymentKind ?? "adjustment") === "adjustment" ? ["adjustment"] : []),
     ...(type === "payment_failed" && attributes.failureReason ? [attributes.failureReason] : []),
   ]);
 }
@@ -945,7 +952,8 @@ export class BillingSales {
     // Only the run that marked the fact sends the message, so a fact that stayed pending after a failed
     // FX lookup, or that two cron runs read, sends one message. An imported payment sends none, and a
     // $0 invoice (a trial start or a $0 proration) moves no money, so it sends none too.
-    if (!this.#saleAlert || !SALE_EVENT_TEXT[row.fact_type] || marked.meta.changes !== 1) return;
+    const event = SALE_EVENT_TEXT[row.fact_type];
+    if (!this.#saleAlert || !event || marked.meta.changes !== 1) return;
     if (attributes.suppressBillingAction) return;
     // A first purchase is the start of a subscription, which sends its own `New` message.
     if (
@@ -959,7 +967,7 @@ export class BillingSales {
           this.#database.prepare("SELECT email FROM users WHERE id = ?").bind(row.user_id).first<{ email: string }>(),
         ).pipe(Effect.catch(() => Effect.succeed(null)))
       : null;
-    yield* this.#saleAlert(saleAlertText(row.fact_type, attributes, account?.email ?? null));
+    yield* this.#saleAlert(saleAlertText(row.fact_type, event, attributes, account?.email ?? null));
   }).bind(this);
 
   readonly #usd = Effect.fn("BillingSales.usd")(function* (

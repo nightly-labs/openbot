@@ -1787,8 +1787,9 @@ With the Worker secret `HOSTED_POOL_ALERT_WEBHOOK_URL` (a Discord webhook, HTTPS
 sends the operator one message for each event below.
 
 Each message is one line: an emoji and a bold word for the event, then the parts after a middle dot
-(` · `). An amount has the currency symbol, no cents when it is whole, and `/mo` or `/yr` for the period,
-such as `€30/mo` or `PLN 480/yr`.
+(` · `). An amount has the currency symbol and no cents when it is whole. The amount of one period adds
+`/mo` or `/yr`, such as `€30/mo` or `PLN 480/yr`. An amount that Stripe does not give shows as
+`amount not known (<currency>)`.
 
 | Event | Message | Action |
 | --- | --- | --- |
@@ -1806,7 +1807,8 @@ such as `€30/mo` or `PLN 480/yr`.
 
 A purchase message (the 6 rows with an email) and a payment message (below) have the email of the
 account, on a developer decision, so keep the webhook in a private channel. A pool message has no
-account, email or name.
+account, email or name. A VAT message is the text of its log line with the emoji; the log line stays
+plain.
 
 The same webhook also gets one payment message for each invoice line of a server plan or a license
 that is paid or that fails, and for each refund and dispute:
@@ -1821,7 +1823,8 @@ that is paid or that fails, and for each refund and dispute:
 | A dispute, and a lost dispute | ``🚨 **Disputed** ...``, ``🚨 **Dispute lost** ...`` |
 
 The product of a server plan is its plan, and of a license its number of users, such as `5 users`. The
-amount is the amount of the payment, the refund or the dispute. An adjustment is a plan change or a
+amount is the amount of the payment, the refund or the dispute. Only a renewal and a failed renewal have
+the period (`/mo` or `/yr`): the other amounts are not the amount of one period. An adjustment is a plan change or a
 manual invoice. The sales ledger sends the message (`BillingSales.processPending`, in the cron of each
 5 minutes), in the run that puts the fact in the OpenPanel ledger, so the message comes at most some
 minutes after the payment and one time. It needs `OPENPANEL_CLIENT_ID` and `OPENPANEL_CLIENT_SECRET`
@@ -1833,10 +1836,10 @@ send no message either. An account that is gone shows as `unknown account`.
 The amount of a purchase message is the list amount of one period, before a discount. A license at the
 bundle price adds `bundle`. A claim in `billing_webhook_events` stops a second message for one change:
 `openbot_purchase:<subscription ID>` for the start, `openbot_purchase_end:<subscription ID>` for the
-end, and `openbot_purchase_cancel:<subscription ID>` and `openbot_purchase_resume:<subscription ID>` for
-a cancel and a resume. Two Stripe events can see one cancel at the same time; only the event that adds
-the claim sends. A cancel removes the resume claim, and a resume removes the cancel claim, so the next
-change sends again. A cancel or resume message goes out with the sync that stores the change, so a
+end, and `openbot_purchase_cancel:<subscription ID>:<canceled_at>` for a cancel. Two Stripe events can
+see one cancel at the same time; only the event that adds the claim sends. Stripe sets `canceled_at` to
+the time of each cancel request, so a later cancel of the same subscription has a new claim and sends
+again. A resume has no claim. A cancel or resume message goes out with the sync that stores the change, so a
 repeated event sends nothing. A cancel date that Stripe has for the subscription (`cancel_at`) is the
 date of the cancel message. One sync sends one message: a cancel that Stripe stores together with a
 change of plan or users sends no cancel message. A change of plan or users sends no purchase message.
