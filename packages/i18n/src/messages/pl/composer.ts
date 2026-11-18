@@ -132,6 +132,8 @@ export const messages = {
   "composer.voice.noSpeechRecorded": "Nie nagrano mowy.",
   "composer.voice.noSpeechDetected": "Nie wykryto mowy.",
   "composer.voice.readFailed": "Nie udało się przeczytać odpowiedzi na głos.",
+  "composer.voice.languageUnsupported":
+    "Nie udało się przeczytać odpowiedzi na głos. Ten język nie jest jeszcze dostępny.",
   "composer.error.saveEditTryAgain": "Nie udało się zapisać tej edycji na tym komputerze. Spróbuj ponownie.",
   "composer.error.saveUnconfirmed": "Zapis nie jest potwierdzony. Ponów zapis, aby sprawdzić wynik.",
   "composer.error.changeModel": "Nie udało się zmienić modelu. Spróbuj ponownie.",

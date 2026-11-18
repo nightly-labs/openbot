@@ -134,6 +134,7 @@ export const messages = {
   "composer.voice.noSpeechRecorded": "Er is geen spraak opgenomen.",
   "composer.voice.noSpeechDetected": "Er is geen spraak gedetecteerd.",
   "composer.voice.readFailed": "Kan het antwoord niet voorlezen.",
+  "composer.voice.languageUnsupported": "Kan het antwoord niet voorlezen. Deze taal is nog niet beschikbaar.",
   "composer.error.saveEditTryAgain": "Kan deze wijziging niet opslaan op deze computer. Probeer het opnieuw.",
   "composer.error.saveUnconfirmed": "Opslaan is niet bevestigd. Kies opnieuw Opslaan om het resultaat te controleren.",
   "composer.error.changeModel": "Kan het model niet wijzigen. Probeer het opnieuw.",
