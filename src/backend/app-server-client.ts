@@ -11,6 +11,7 @@ import {
   AgentProcessExitError,
   type AgentProvider,
   ProviderSessionBusyError,
+  ProviderStoppedError,
   RequestTimeoutError,
 } from "./agent-client";
 import { cliSpawnTarget } from "./cli";
@@ -685,8 +686,9 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   }
 
   #write(message: unknown): void {
+    // Thrown before the write: Codex did not get this request.
     if (!this.running || !this.#process) {
-      throw new Error("Codex App Server is not running.");
+      throw new ProviderStoppedError("Codex", "Codex App Server is not running.");
     }
     this.#process.stdin.write(`${JSON.stringify(message)}\n`);
   }

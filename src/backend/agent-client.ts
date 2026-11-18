@@ -193,6 +193,20 @@ export class ProviderSessionBusyError extends ProviderTurnActiveError {
 }
 
 /**
+ * The provider process stopped, or did not answer, before the turn was sent. Nothing ran, so the
+ * caller can queue the message again for the next process (#11843).
+ */
+export class ProviderStoppedError extends Error {
+  constructor(
+    readonly providerName: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ProviderStoppedError";
+  }
+}
+
+/**
  * The session does not offer the model that the turn asks for, so no prompt was sent. Antigravity can
  * resume a session with a model list that leaves out a model it offered before (#11797). The caller
  * moves the agent to a backup model, or shows this message.
