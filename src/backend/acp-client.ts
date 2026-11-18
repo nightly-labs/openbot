@@ -3472,7 +3472,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
    *
    * A server that asks for a sign-in, or that did not answer in time, gets the sentence that the
    * provider runtime shows for the agent's stderr line of the same failure. Grok writes both, and the
-   * user got two toasts, one of them with the `rmcp` transport text. The reason goes to the log.
+   * user got two toasts, one of them with the `rmcp` transport text. The reason goes to the log. The
+   * sentence names the provider as the runtime does, not by the label of a custom agent, so the two
+   * texts stay the same.
    */
   #reportMcpServerFailure(thread: AcpThread, { name, reason }: AcpMcpServerFailure): void {
     const server = thread.restore.mcpServers.find((entry) => entry.name === name);
@@ -3496,7 +3498,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       {
         name: saved,
         reason: "failed_in_provider",
-        detail: sourceText(MCP_PROVIDER_FAILURE_TEXT[kind], { provider: this.#label, name: saved }),
+        detail: sourceText(MCP_PROVIDER_FAILURE_TEXT[kind], {
+          provider: agentProviderName(this.provider),
+          name: saved,
+        }),
       },
     ]);
   }

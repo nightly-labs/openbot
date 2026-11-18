@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import { mcpProviderFailureKind } from "../src/backend/agent/provider-diagnostics";
 import type { AgentClient } from "../src/backend/agent-client";
 import { resolveGrokCli } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
@@ -94,6 +95,10 @@ try {
   const firstDrop = new Promise<void>((done) => {
     dropped = done;
   });
+  let diagnosed: () => void = () => undefined;
+  const firstDiagnostic = new Promise<void>((done) => {
+    diagnosed = done;
+  });
   const cli = await runCauseEffect(resolveGrokCli({ bundledExecutable: process.env.GROK_CLI ?? null }));
   report.grokVersion = cli.version;
   const client = requireProviderDriver("grok").createClient(cli, 60_000, {
@@ -108,14 +113,19 @@ try {
   });
   clients.push(client);
   client.on("diagnostic", (line: string) => {
-    if (/\b(mcp|rmcp)\b|AuthRequired/i.test(line)) report.diagnostics.push(line);
+    if (!/\b(mcp|rmcp)\b|AuthRequired/i.test(line)) return;
+    report.diagnostics.push(line);
+    diagnosed();
   });
   client.start();
   await startThread(client, { cwd: workspace });
   await Promise.race([
-    firstDrop,
+    Promise.all([firstDrop, firstDiagnostic]),
     new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("Grok reported no failed MCP server.")), STATUS_TIMEOUT_MS),
+      setTimeout(
+        () => reject(new Error("Grok did not report the failed MCP server on both paths.")),
+        STATUS_TIMEOUT_MS,
+      ),
     ),
   ]);
 
@@ -129,6 +139,13 @@ try {
   assert.ok(
     report.drops.every((drop) => !/rmcp|Transport/u.test(drop.detail)),
     "No report carries the rmcp text.",
+  );
+  // The provider runtime reads these stderr lines and shows the sentence of their kind. The same
+  // kind gives the same text as the drop, so the renderer shows one toast.
+  assert.deepEqual(
+    [...new Set(report.diagnostics.map(mcpProviderFailureKind))],
+    ["sign_in"],
+    "The stderr lines of the failure read as a sign-in too.",
   );
   report.passed = true;
 } catch (error) {
