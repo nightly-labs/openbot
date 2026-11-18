@@ -8,6 +8,7 @@
  * fields. A run reads none of them, and a host keeps fields as they are.
  */
 
+import { WORKFLOW_GROUP_FIELDS } from "@openbot/contracts/ipc";
 import { Button, Image as ImageIcon, Input, Layers } from "@openbot/ui";
 import { For, Show } from "solid-js";
 import { useText } from "../../text";
@@ -21,9 +22,6 @@ import {
 } from "./workflow-board";
 import type { Box } from "./workflow-ink";
 import { PortIcon } from "./workflow-node-parts";
-
-/** The fields of a member: the id of its group, the name of the group, and whether the group is collapsed. */
-export const GROUP_FIELDS = { id: "group", name: "groupName", folded: "groupFolded" } as const;
 
 export interface CanvasGroup {
   id: string;
@@ -54,18 +52,18 @@ export const outputTypes = (outputs: readonly (readonly WfnPortType[])[]) =>
 export function groupsOf(ids: readonly string[], field: (id: string, key: string) => WfnFieldValue | undefined) {
   const found = new Map<string, CanvasGroup>();
   for (const id of ids) {
-    const group = field(id, GROUP_FIELDS.id);
+    const group = field(id, WORKFLOW_GROUP_FIELDS.id);
     if (typeof group !== "string" || group === "") continue;
     const entry = found.get(group);
     if (entry) {
       found.set(group, { ...entry, members: [...entry.members, id] });
       continue;
     }
-    const name = field(id, GROUP_FIELDS.name);
+    const name = field(id, WORKFLOW_GROUP_FIELDS.name);
     found.set(group, {
       id: group,
       name: typeof name === "string" ? name : "",
-      folded: field(id, GROUP_FIELDS.folded) === true,
+      folded: field(id, WORKFLOW_GROUP_FIELDS.folded) === true,
       members: [id],
     });
   }
@@ -81,7 +79,11 @@ export function joinPatch(ids: readonly string[], name: string, folded = false):
   return Object.fromEntries(
     ids.map((member) => [
       member,
-      { [GROUP_FIELDS.id]: id, [GROUP_FIELDS.name]: name, [GROUP_FIELDS.folded]: folded || undefined },
+      {
+        [WORKFLOW_GROUP_FIELDS.id]: id,
+        [WORKFLOW_GROUP_FIELDS.name]: name,
+        [WORKFLOW_GROUP_FIELDS.folded]: folded || undefined,
+      },
     ]),
   );
 }
@@ -91,7 +93,11 @@ export function leavePatch(ids: readonly string[]): WfnFieldPatch {
   return Object.fromEntries(
     ids.map((member) => [
       member,
-      { [GROUP_FIELDS.id]: undefined, [GROUP_FIELDS.name]: undefined, [GROUP_FIELDS.folded]: undefined },
+      {
+        [WORKFLOW_GROUP_FIELDS.id]: undefined,
+        [WORKFLOW_GROUP_FIELDS.name]: undefined,
+        [WORKFLOW_GROUP_FIELDS.folded]: undefined,
+      },
     ]),
   );
 }
@@ -108,17 +114,22 @@ export function groupPatch(group: CanvasGroup, key: string, value: WfnFieldValue
 export function regroupCopies(fields: Record<string, WfnFields>): Record<string, WfnFields> {
   const counts = new Map<string, number>();
   for (const entry of Object.values(fields)) {
-    const group = entry[GROUP_FIELDS.id];
+    const group = entry[WORKFLOW_GROUP_FIELDS.id];
     if (typeof group === "string") counts.set(group, (counts.get(group) ?? 0) + 1);
   }
   const fresh = new Map([...counts.keys()].map((group) => [group, `group-${crypto.randomUUID()}`]));
   return Object.fromEntries(
     Object.entries(fields).map(([id, entry]) => {
-      const group = entry[GROUP_FIELDS.id];
+      const group = entry[WORKFLOW_GROUP_FIELDS.id];
       if (typeof group !== "string") return [id, entry];
-      const { [GROUP_FIELDS.id]: _id, [GROUP_FIELDS.name]: _name, [GROUP_FIELDS.folded]: _folded, ...rest } = entry;
+      const {
+        [WORKFLOW_GROUP_FIELDS.id]: _id,
+        [WORKFLOW_GROUP_FIELDS.name]: _name,
+        [WORKFLOW_GROUP_FIELDS.folded]: _folded,
+        ...rest
+      } = entry;
       const next = fresh.get(group);
-      return [id, (counts.get(group) ?? 0) > 1 && next ? { ...entry, [GROUP_FIELDS.id]: next } : rest];
+      return [id, (counts.get(group) ?? 0) > 1 && next ? { ...entry, [WORKFLOW_GROUP_FIELDS.id]: next } : rest];
     }),
   );
 }
@@ -164,6 +175,8 @@ export function GroupFrame(props: {
   /** The run state of the hidden members of a collapsed group: failed, approval or running. */
   status?: WfnRunStatus | undefined;
   readOnly: boolean;
+  /** The person cannot rename, collapse, expand or end the group. Its ports still connect. */
+  fixed: boolean;
   onRename: (name: string) => void;
   onEndRename: () => void;
   onExpand: () => void;
@@ -195,7 +208,11 @@ export function GroupFrame(props: {
       }}
       onFocusIn={() => props.onSelect()}
       onDblClick={(event) => {
-        if (props.group.folded && !(event.target instanceof Element && event.target.closest("input, button")))
+        if (
+          props.group.folded &&
+          !props.fixed &&
+          !(event.target instanceof Element && event.target.closest("input, button"))
+        )
           props.onExpand();
       }}
     >
@@ -206,7 +223,7 @@ export function GroupFrame(props: {
           value={props.group.name}
           placeholder={t("workflow.canvas.group.defaultName")}
           aria-label={t("workflow.canvas.group.name")}
-          readonly={props.readOnly}
+          readonly={props.readOnly || props.fixed}
           spellcheck={false}
           // A new name replaces the old one, as in a rename.
           onFocus={(event) => event.currentTarget.select()}

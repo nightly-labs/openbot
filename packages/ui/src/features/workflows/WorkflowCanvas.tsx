@@ -15,6 +15,7 @@
 import {
   isWorkflowStepKind,
   type StoredFileRow,
+  WORKFLOW_GROUP_FIELDS,
   WORKFLOW_PICTURE_TYPES,
   type WorkflowDetail,
   type WorkflowGraph,
@@ -139,7 +140,6 @@ import type { WorkflowGitHubCanvas } from "./workflow-github";
 import {
   type CanvasGroup,
   frameBox,
-  GROUP_FIELDS,
   GroupFrame,
   type GroupPort,
   groupPatch,
@@ -365,6 +365,9 @@ const BUILD_FADE = 240;
 const FIT_MARGIN = 64;
 /** The run states that a collapsed group shows for its members, most important first. */
 const FOLDED_STATUS: readonly WfnRunStatus[] = ["failed", "approval", "running"];
+/** The trigger types and output targets of host steps: on a joined server, only an owner or admin changes them. */
+const HOST_TRIGGERS: readonly string[] = ["github", "discord", "telegram", "slack"];
+const HOST_OUTPUTS: readonly string[] = [...HOST_TRIGGERS, "chat-channel"];
 /**
  * In screen pixels, as in workflows.css: the gap between a node and its toolbar, and the room that
  * the results strip takes under a node with its gap.
@@ -1873,36 +1876,52 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     const entry = first === undefined ? undefined : groupIndex().get(first);
     return entry && isWhole(entry) ? entry : undefined;
   });
-  /** Puts nodes in a new group. A group that keeps only one member ends. */
   /** The last group that the selection was, for the toolbar while it closes. */
   const heldGroup = createMemo((last?: CanvasGroup) => selectedGroup() ?? last);
+  /**
+   * Whether the person can change the group fields of a node. A host step that `features` does not offer
+   * belongs to an owner or admin of the joined server, and a host from before this release refuses a save
+   * that changes any field of one, its group fields too.
+   */
+  const groupable = (id: string) => {
+    const kind = live().find((node) => node.id === id)?.kind;
+    const type = board.field(id, kind === "trigger" ? "trigger" : "target");
+    if (typeof type !== "string") return true;
+    if (kind === "trigger") return !HOST_TRIGGERS.includes(type) || props.features.triggers.some((one) => one === type);
+    if (kind === "output") return !HOST_OUTPUTS.includes(type) || props.features.outputs.some((one) => one === type);
+    return true;
+  };
+  /** Whether the person can rename, collapse, expand or end a group. */
+  const changeable = (entry: CanvasGroup) => !frozen() && entry.members.every(groupable);
+  /** Puts nodes in a new group. A group that keeps only one member ends. */
   const groupNodes = (ids: readonly string[], name = "") => {
-    const members = ids.filter((id) => !board.isRemoved(id));
+    const members = ids.filter((id) => !board.isRemoved(id) && groupable(id));
     // A group that is already all of the selection stays as it is, with its name.
     if (members.length < 2 || frozen() || selectedGroup()) return;
+    // A member that the person cannot change keeps its old fields: a group with one member is no group.
     const left = nodeGroups().flatMap((entry) => {
       const rest = entry.members.filter((id) => !members.includes(id));
-      return rest.length === 1 ? rest : [];
+      return rest.length === 1 ? rest.filter(groupable) : [];
     });
     canvas.patchFields({ ...leavePatch(left), ...joinPatch(members, name) });
     canvas.select(members);
   };
   /** Ends the groups of the nodes. The members stay where they are. */
   const ungroup = (ids: readonly string[]) => {
-    const ended = nodeGroups().filter((entry) => entry.members.some((id) => ids.includes(id)));
-    if (ended.length === 0 || frozen()) return;
+    const ended = nodeGroups().filter((entry) => entry.members.some((id) => ids.includes(id)) && changeable(entry));
+    if (ended.length === 0) return;
     canvas.patchFields(leavePatch(ended.flatMap((entry) => entry.members)));
   };
   const foldGroup = (entry: CanvasGroup, folded: boolean) => {
-    if (frozen()) return;
-    canvas.patchFields(groupPatch(entry, GROUP_FIELDS.folded, folded || undefined));
+    if (!changeable(entry)) return;
+    canvas.patchFields(groupPatch(entry, WORKFLOW_GROUP_FIELDS.folded, folded || undefined));
   };
   const renameGroup = (entry: CanvasGroup, name: string) => {
-    if (frozen()) return;
+    if (!changeable(entry)) return;
     // The burst is `<node id>:<field>` of the first member, so a sync keeps it while the member stays.
     canvas.patchFields(
-      groupPatch(entry, GROUP_FIELDS.name, name || undefined),
-      `${entry.members[0]}:${GROUP_FIELDS.name}`,
+      groupPatch(entry, WORKFLOW_GROUP_FIELDS.name, name || undefined),
+      `${entry.members[0]}:${WORKFLOW_GROUP_FIELDS.name}`,
     );
   };
   const foldText = (entry: CanvasGroup) =>
@@ -2034,9 +2053,9 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                 added.map((member) => [
                   member,
                   {
-                    [GROUP_FIELDS.id]: entry.id,
-                    [GROUP_FIELDS.name]: entry.name || undefined,
-                    [GROUP_FIELDS.folded]: entry.folded || undefined,
+                    [WORKFLOW_GROUP_FIELDS.id]: entry.id,
+                    [WORKFLOW_GROUP_FIELDS.name]: entry.name || undefined,
+                    [WORKFLOW_GROUP_FIELDS.folded]: entry.folded || undefined,
                   },
                 ]),
               )
@@ -3490,6 +3509,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                         pictures={stackPictures(entry())}
                         status={foldedStatus(entry())}
                         readOnly={frozen()}
+                        fixed={!changeable(entry())}
                         onRename={(name) => renameGroup(entry(), name)}
                         onEndRename={() => canvas.endTyping()}
                         onExpand={() => foldGroup(entry(), false)}
@@ -3596,19 +3616,21 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                       <Show
                         when={selectedGroup()}
                         fallback={
-                          <ToolAction
-                            text={t("workflow.canvas.group.make")}
-                            keys={[MOD_KEY, "G"]}
-                            icon={<GroupIcon />}
-                            onClick={() => groupNodes(group())}
-                          />
+                          <Show when={group().filter(groupable).length > 1}>
+                            <ToolAction
+                              text={t("workflow.canvas.group.make")}
+                              keys={[MOD_KEY, "G"]}
+                              icon={<GroupIcon />}
+                              onClick={() => groupNodes(group())}
+                            />
+                          </Show>
                         }
                       >
                         {(entry) => {
                           // Solid can run this once more after the group ends: read the held group then.
                           const shown = () => heldGroup() ?? entry();
                           return (
-                            <>
+                            <Show when={changeable(shown())}>
                               <ToolAction
                                 text={foldText(shown())}
                                 icon={<FoldIcon folded={shown().folded} />}
@@ -3620,7 +3642,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                                 icon={<Ungroup />}
                                 onClick={() => ungroup(shown().members)}
                               />
-                            </>
+                            </Show>
                           );
                         }}
                       </Show>
