@@ -1,11 +1,12 @@
 // Checks that Gemini token usage through Antigravity is metered once per turn, with thinking as
 // output. Runs the real agent service on a temporary profile with a fake Antigravity CLI 1.5.4 that
 // prints its version and answers `session/prompt` as Antigravity does: `usage` holds the tokens of
-// that prompt only, and `thoughtTokens` is apart from `outputTokens`. A message
-// `tokens=<input>,<cached>,<output>,<thought>` sets the usage of its turn. Cases: a first turn, a
-// smaller second turn in the same session (the session counter before this change booked 0 for it), a
-// larger third turn (it booked only the excess over the largest turn), and a turn after the provider
-// process starts again and resumes the session. The plan quota comes from a local `node:http` fake of
+// that prompt only, `inputTokens` leave out `cachedReadTokens`, and `thoughtTokens` is apart from
+// `outputTokens`. A message `tokens=<input>,<cached>,<output>,<thought>` sets the usage of its turn.
+// Cases: a first turn, a smaller second turn in the same session (the session counter before this
+// change booked 0 for it), a larger third turn (it booked only the excess over the largest turn), a
+// turn whose cache reads are larger than its input (before #10010 it had no input count and no cost),
+// and a turn after the provider process starts again and resumes the session. The plan quota comes from a local `node:http` fake of
 // Google's Code Assist service (`OPENBOT_DEV_ANTIGRAVITY_CODE_ASSIST_URL`) with the CLI's token in a
 // temporary `GEMINI_HOME`: a usage read after the turns gives the fake's window, sends no prompt to the
 // CLI, and adds no turn or tokens to the metering.
@@ -277,7 +278,7 @@ async function check(name: string, threadId: string, index: number, sent: Turn):
   assert.deepEqual(
     recorded[0],
     {
-      uncachedInput: sent.input - sent.cached,
+      uncachedInput: sent.input,
       cachedInput: sent.cached,
       cacheCreation: 0,
       output: sent.output + sent.thought,
@@ -326,6 +327,10 @@ try {
   await send(agent.id, { input: 15_000, cached: 6_000, output: 900, thought: 400 }, "larger third turn");
   await check("larger third turn", threadId, 2, { input: 15_000, cached: 6_000, output: 900, thought: 400 });
 
+  const cacheRead: Turn = { input: 3_165, cached: 100_717, output: 700, thought: 120 };
+  await send(agent.id, cacheRead, "turn with more cache reads than input");
+  await check("turn with more cache reads than input", threadId, 3, cacheRead);
+
   // The provider process stops between turns. The runtime starts it again and resumes the session,
   // and Antigravity measures the next turn from the restored total.
   const session = store.activeProviderSession(agent.id)?.externalSessionId;
@@ -338,7 +343,7 @@ try {
   await waitFor("Antigravity to start again", () => protocol().filter((entry) => entry.start).length > startsBefore);
   await waitFor("the provider to be ready again", () => agents.getStatus().phase === "ready");
   await send(agent.id, { input: 7_000, cached: 6_500, output: 100, thought: 50 }, "turn after a restart");
-  await check("turn after a restart", threadId, 3, { input: 7_000, cached: 6_500, output: 100, thought: 50 });
+  await check("turn after a restart", threadId, 4, { input: 7_000, cached: 6_500, output: 100, thought: 50 });
   assert.equal(
     store.activeProviderSession(agent.id)?.externalSessionId,
     session,
@@ -376,8 +381,11 @@ try {
     turns: analytics.totals.turns,
     missingUsageTurns: analytics.totals.missingUsageTurns,
   };
-  const sent = report.cases.reduce((sum, entry) => sum + entry.sent.input + entry.sent.output + entry.sent.thought, 0);
-  assert.equal(analytics.totals.turns, 4, "Analytics count every turn.");
+  const sent = report.cases.reduce(
+    (sum, entry) => sum + entry.sent.input + entry.sent.cached + entry.sent.output + entry.sent.thought,
+    0,
+  );
+  assert.equal(analytics.totals.turns, 5, "Analytics count every turn.");
   assert.equal(analytics.totals.missingUsageTurns, 0, "Every turn has usage.");
   assert.equal(analytics.totals.processedTokens, sent, "Analytics count every turn's tokens once.");
   report.passed = true;

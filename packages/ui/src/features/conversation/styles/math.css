@@ -6,8 +6,15 @@
   overflow-y: hidden;
 }
 
+/* A formula of its own is in a ScrollEdges, and its KaTeX output is one level down. */
+.message-math-display > span {
+  display: block;
+  width: max-content;
+  min-width: 100%;
+}
+
 /* KaTeX gives display math a vertical margin; the message already spaces its blocks. */
-.message-math-display > * {
+.message-math-display .katex-display {
   margin: 0;
   padding: var(--openbot-space-1) 0;
 }

@@ -10,6 +10,7 @@ import { Button, Kbd, LabelTooltip, Repeat, X } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import {
   createContext,
+  createMemo,
   createProjection,
   createSignal,
   createStore,
@@ -198,6 +199,8 @@ export interface WfnBoard {
   setFields: (id: string, values: WfnFields) => void;
   /** The GitHub triggers that lead to a node, nearest first. A GitHub output acts on their events. */
   githubTriggers: (id: string) => string[];
+  /** The nodes that connect into a node with a `type` port, in connection order. */
+  inputs: (id: string, type: WfnPortType) => string[];
   /** Copies a node. Only the canvas has it. */
   duplicate?: ((id: string) => void) | undefined;
   status: (id: string) => WfnRunStatus | undefined;
@@ -243,8 +246,11 @@ export interface WfnBoard {
   step: (id: string) => string | undefined;
   /** The files that the user added from the computer while the board is open, newest first. */
   uploads: () => readonly StoredFileRow[];
-  /** Adds a file from the computer to the files of the board. An image shows its own preview. */
-  upload: (file: File) => StoredFileRow;
+  /**
+   * Adds a file from the computer to the files of the board: through the host when it keeps pictures,
+   * or in the page, where an image shows its own preview. Rejects when the host refused it.
+   */
+  upload: (file: File) => Promise<StoredFileRow>;
   /** Whether the nodes show a resize handle. Only the canvas resizes them. */
   resizable: boolean;
   size: (id: string) => WfnSize | undefined;
@@ -328,6 +334,11 @@ export interface BoardOptions {
   stretch?: (id: string) => WfnStretch;
   resetSize?: (id: string) => void;
   edgeTone?: (edge: WfnEdge) => WfnEdgeTone;
+  /**
+   * The node that the user works on, such as a hovered or selected asset. Its connections draw again
+   * above the other nodes, in the highlight colour.
+   */
+  focus?: () => string | null;
   /** The results that the steps have before the story opens. */
   results?: Record<string, readonly WfnResult[]> | undefined;
   /**
@@ -580,6 +591,22 @@ export function createBoard(options: BoardOptions) {
   const hasEdge = (from: string, to: string, type: WfnPortType, branch?: string) =>
     state.edges.some((edge) => edge.from === from && edge.to === to && edge.type === type && edge.branch === branch);
 
+  /**
+   * The named inputs of a node that hold a source, as the first frame of a video. A named input is an
+   * input port with a branch; the field of the same name holds the node that comes in on it. The edge
+   * stays one edge, so a source can fill more than one named input.
+   */
+  const slotsOf = (edge: WfnEdge): string[] =>
+    Object.entries(state.fields[edge.to] ?? {}).flatMap(([key, value]) =>
+      value === edge.from && state.points[portKey(edge.to, "in", edge.type, key)] ? [key] : [],
+    );
+
+  /** The named inputs of a node that a source fills, read when the user changes a connection. */
+  const heldSlots = (to: string, from: string, type: WfnPortType) =>
+    Object.entries(state.fields[to] ?? {}).flatMap(([key, value]) =>
+      value === from && ports.has(portKey(to, "in", type, key)) ? [key] : [],
+    );
+
   /** Whether a path of edges already goes from one node to the other. */
   const reaches = (from: string, to: string) => {
     const seen = new Set<string>();
@@ -612,8 +639,11 @@ export function createBoard(options: BoardOptions) {
       return end.side === "in" ? t("workflow.board.refusal.takes", types) : t("workflow.board.refusal.gives", types);
     }
     const [from, to] = orient(start, end);
-    if (hasEdge(from.node, to.node, from.type, from.branch)) return t("workflow.board.refusal.connected");
-    return null;
+    if (!hasEdge(from.node, to.node, from.type, from.branch)) return null;
+    // A source that is connected can still move to another named input of the same node.
+    const held = heldSlots(to.node, from.node, from.type);
+    const moves = to.branch === undefined ? held.length > 0 : !held.includes(to.branch);
+    return moves ? null : t("workflow.board.refusal.connected");
   };
 
   const accepts = (port: PortRef) => {
@@ -646,8 +676,10 @@ export function createBoard(options: BoardOptions) {
     const matches = [...ports.values()].filter(
       (port) => port.node === node && port.side === side && port.type === start.type,
     );
-    const [only] = matches;
-    if (matches.length > 1) return null;
+    // A node with named inputs takes a line on its body at the input with no name.
+    const plain = matches.length > 1 ? matches.find((port) => port.branch === undefined) : undefined;
+    const [only] = plain ? [plain] : matches;
+    if (matches.length > 1 && !plain) return null;
     if (only) return { port: refOf(only), reason: refusal(start, refOf(only)) };
     const type = { type: t(PORT_WORD[start.type]) };
     return {
@@ -656,16 +688,41 @@ export function createBoard(options: BoardOptions) {
     };
   };
 
-  const connect = (from: string, to: string, type: WfnPortType, branch?: string) => {
-    if (from === to || hasEdge(from, to, type, branch)) return;
+  /** While true, `connect` joins the undo step that is open, so one connection to many nodes is one undo. */
+  let joined = false;
+
+  /**
+   * Connects an output to an input. `slot` names the input, as the first frame of a video: its field
+   * then holds the source, and a source that held it before loses its connection.
+   */
+  const connect = (from: string, to: string, type: WfnPortType, branch?: string, slot?: string) => {
+    if (from === to) return;
+    const exists = hasEdge(from, to, type, branch);
+    const held = heldSlots(to, from, type);
+    if (exists && (slot === undefined ? held.length === 0 : held.includes(slot))) return;
     const loop = reaches(to, from);
-    options.beforeChange?.();
+    if (!joined) options.beforeChange?.();
     const fromName = nameOf(ports.get(portKey(from, "out", type, branch))?.element);
-    const toName = nameOf(ports.get(portKey(to, "in", type))?.element);
+    const toName = nameOf(ports.get(portKey(to, "in", type, slot))?.element);
     const edge: WfnEdge = { id: `${from}${branch ? `.${branch}` : ""}>${to}:${type}`, from, to, type };
     if (branch) edge.branch = branch;
+    const previous = slot === undefined ? undefined : state.fields[to]?.[slot];
+    // The source that held the input goes, unless it also holds another named input.
+    const replaced =
+      typeof previous === "string" &&
+      previous !== "" &&
+      previous !== from &&
+      heldSlots(to, previous, type).every((key) => key === slot)
+        ? previous
+        : undefined;
     setState((draft) => {
-      draft.edges.push(edge);
+      if (!exists) draft.edges.push(edge);
+      if (replaced !== undefined)
+        draft.edges = draft.edges.filter((line) => !(line.from === replaced && line.to === to && line.type === type));
+      const fields = { ...draft.fields[to] };
+      if (slot === undefined) for (const key of held) fields[key] = "";
+      else fields[slot] = from;
+      if (slot !== undefined || held.length > 0) draft.fields[to] = fields;
       draft.pending = null;
       draft.message = t(loop ? "workflow.board.live.connectedLoop" : "workflow.board.live.connected", {
         from: fromName,
@@ -674,9 +731,65 @@ export function createBoard(options: BoardOptions) {
     });
   };
 
+  /**
+   * The same port on the other selected nodes, when the port is on a node of a selection of two or
+   * more. A connection from it also goes from each of them, so that many pictures go into one input.
+   */
+  const companions = (start: PortRef): PortRef[] => {
+    if (state.selection.length < 2 || !state.selection.includes(start.node)) return [];
+    return state.selection.flatMap((node) =>
+      node !== start.node && ports.has(portKey(node, start.side, start.type, start.branch))
+        ? [{ node, side: start.side, type: start.type, branch: start.branch }]
+        : [],
+    );
+  };
+
+  /**
+   * The companions that can end on a port. A named input, as the first frame of a video, takes one
+   * source. A companion that is already connected to the node of the port keeps its connection as it is.
+   */
+  const companionsTo = (start: PortRef, end: PortRef): PortRef[] => {
+    if (end.side === "in" && end.branch !== undefined) return [];
+    return companions(start).filter((port) => {
+      if (port.node === end.node || refusal(port, end) !== null) return false;
+      const [from, to] = orient(port, end);
+      return !hasEdge(from.node, to.node, from.type, from.branch);
+    });
+  };
+
+  /** The companions of the open connection. A port reads it to show that it is armed. */
+  const pendingCompanions = createMemo(() => (state.pending ? companions(state.pending) : []));
+
+  /** Whether a port is the start of the open connection, or the same port on another selected node. */
+  const isArmed = (port: PortRef) => {
+    const pending = state.pending;
+    return pending !== null && (samePort(pending, port) || pendingCompanions().some((other) => samePort(other, port)));
+  };
+
   const link = (start: PortRef, end: PortRef) => {
+    const others = companionsTo(start, end);
     const [from, to] = orient(start, end);
-    connect(from.node, to.node, from.type, from.branch);
+    if (others.length === 0) {
+      connect(from.node, to.node, from.type, from.branch, to.branch);
+      return;
+    }
+    const starts = [start, ...others];
+    const loop = makesLoop(starts, end);
+    options.beforeChange?.();
+    joined = true;
+    try {
+      for (const port of starts) {
+        const [source, target] = orient(port, end);
+        connect(source.node, target.node, source.type, source.branch, target.branch);
+      }
+    } finally {
+      joined = false;
+    }
+    setState((draft) => {
+      draft.message = t(loop ? "workflow.board.live.connectedManyLoop" : "workflow.board.live.connectedMany", {
+        count: starts.length,
+      });
+    });
   };
 
   const cancelDraft = () => {
@@ -689,15 +802,26 @@ export function createBoard(options: BoardOptions) {
 
   /** Connects an open connection to a node that the canvas added at its drop point. */
   const attach = (start: PortRef, node: string) => {
-    if (start.side === "out") connect(start.node, node, start.type, start.branch);
-    else connect(node, start.node, start.type);
+    const starts = start.side === "out" ? [start, ...companions(start)] : [start];
+    for (const port of starts) {
+      if (port.side === "out") connect(port.node, node, port.type, port.branch);
+      else connect(node, port.node, port.type, undefined, port.branch);
+    }
+    if (starts.length > 1)
+      setState((draft) => {
+        draft.message = t("workflow.board.live.connectedMany", { count: starts.length });
+      });
     cancelDraft();
   };
 
   const disconnect = (id: string) => {
+    const gone = state.edges.find((edge) => edge.id === id);
+    const held = gone ? heldSlots(gone.to, gone.from, gone.type) : [];
     options.beforeChange?.();
     setState((draft) => {
       draft.edges = draft.edges.filter((edge) => edge.id !== id);
+      if (gone && held.length > 0)
+        draft.fields[gone.to] = { ...draft.fields[gone.to], ...Object.fromEntries(held.map((key) => [key, ""])) };
       draft.edge = null;
       draft.hover = null;
       draft.removing = null;
@@ -769,7 +893,10 @@ export function createBoard(options: BoardOptions) {
 
   /** Files from the computer. Their previews are blob addresses, which the board frees when it closes. */
   const [uploads, setUploads] = createSignal<readonly StoredFileRow[]>([]);
-  const upload = (file: File): StoredFileRow => {
+  const upload = async (file: File): Promise<StoredFileRow> => {
+    // The host's picture comes back in its files, so the board keeps no copy of it.
+    const host = options.catalogs().upload;
+    if (host) return host(file);
     const image = file.type.startsWith("image/");
     const row: StoredFileRow = {
       id: crypto.randomUUID(),
@@ -826,6 +953,10 @@ export function createBoard(options: BoardOptions) {
       }
       return found;
     },
+    inputs: (id, type) =>
+      state.edges.flatMap((edge) =>
+        edge.to === id && edge.type === type && !state.removed.includes(edge.from) ? [edge.from] : [],
+      ),
     setField: (id, key, value, burst = false) => {
       if (state.fields[id]?.[key] === value) return;
       const edit = `${id}:${key}`;
@@ -891,12 +1022,14 @@ export function createBoard(options: BoardOptions) {
         draft.picked = {};
       }),
     connected: (node, side, type, branch) =>
-      state.edges.some(
-        (edge) =>
-          edge.type === type && (side === "out" ? edge.from === node && edge.branch === branch : edge.to === node),
-      ),
-    armed: (node, side, type, branch) =>
-      state.pending !== null && samePort(state.pending, { node, side, type, branch }),
+      state.edges.some((edge) => {
+        if (edge.type !== type) return false;
+        if (side === "out") return edge.from === node && edge.branch === branch;
+        if (edge.to !== node) return false;
+        const slots = slotsOf(edge);
+        return branch === undefined ? slots.length === 0 : slots.includes(branch);
+      }),
+    armed: (node, side, type, branch) => isArmed({ node, side, type, branch }),
     accepts: (node, side, type, branch) => accepts({ node, side, type, branch }),
     refused: (node, side, type, branch) => {
       const target = state.target;
@@ -923,7 +1056,7 @@ export function createBoard(options: BoardOptions) {
       const pending = state.pending;
       // With no open connection, or one from the same side, the press arms this port or disarms it.
       if (!pending || pending.side === side) {
-        const wasArmed = pending !== null && samePort(pending, port);
+        const wasArmed = isArmed(port);
         setState((draft) => {
           draft.pending = wasArmed ? null : port;
           draft.message = wasArmed ? "" : t(CHOOSE_PORT[side][type]);
@@ -1084,6 +1217,40 @@ export function createBoard(options: BoardOptions) {
     schedule();
   };
 
+  /**
+   * Takes the connections, the locks and the fields of a snapshot that another device changed, and
+   * writes only what is different. Typing, a drag, an open connection and the selection stay, unless
+   * the snapshot no longer has their node or connection.
+   */
+  const sync = (saved: BoardSnapshot) => {
+    const gone = new Set(saved.removed);
+    const kept = (id: string) => id in saved.fields && !gone.has(id);
+    const edgeIds = new Set(saved.edges.map((edge) => edge.id));
+    if (typing !== null && !kept(typing.slice(0, typing.lastIndexOf(":")))) typing = null;
+    setState((draft) => {
+      if (JSON.stringify(draft.edges) !== JSON.stringify(saved.edges)) {
+        draft.edges = saved.edges.map((edge) => ({ ...edge }));
+      }
+      if (draft.removed.join("\u0000") !== saved.removed.join("\u0000")) draft.removed = [...saved.removed];
+      if (draft.locked.join("\u0000") !== saved.locked.join("\u0000")) draft.locked = [...saved.locked];
+      for (const id of Object.keys(draft.fields)) if (!(id in saved.fields)) delete draft.fields[id];
+      for (const [id, fields] of Object.entries(saved.fields)) {
+        if (JSON.stringify(draft.fields[id]) !== JSON.stringify(fields)) draft.fields[id] = { ...fields };
+      }
+      if (draft.selection.some((id) => !kept(id))) draft.selection = draft.selection.filter(kept);
+      if (draft.pending && !kept(draft.pending.node)) {
+        draft.pending = null;
+        draft.draft = null;
+        draft.target = null;
+      }
+      if (draft.edge !== null && !edgeIds.has(draft.edge)) draft.edge = null;
+      if (draft.hover !== null && !edgeIds.has(draft.hover)) draft.hover = null;
+      if (draft.hoverAt && !edgeIds.has(draft.hoverAt.edge)) draft.hoverAt = null;
+      if (draft.removing !== null && !edgeIds.has(draft.removing)) draft.removing = null;
+    });
+    schedule();
+  };
+
   onSettled(() => {
     const onKey = (event: KeyboardEvent) => {
       const active = document.activeElement;
@@ -1169,31 +1336,57 @@ export function createBoard(options: BoardOptions) {
       turn: { x: from.x + LOOP_BEND * 0.75, y: (from.y + y) / 2 },
     };
   };
-  /** Whether the open connection would close a loop on the port under the pointer. */
+  /** Whether one of the given connections to a port closes a loop. */
+  const makesLoop = (starts: readonly PortRef[], end: PortRef) =>
+    starts.some((port) => {
+      const [from, to] = orient(port, end);
+      return reaches(to.node, from.node);
+    });
+  /** Whether the open connection, or a line from another selected node, would close a loop on the port under the pointer. */
   const draftLoops = () => {
     const pending = state.pending;
     const port = state.target?.reason === null ? state.target.port : null;
     if (!pending || !port) return false;
-    const [from, to] = orient(pending, port);
-    return reaches(to.node, from.node);
+    return makesLoop([pending, ...companionsTo(pending, port)], port);
   };
 
   /** The connections, under the nodes. Put it first inside the world element. */
   function Edges() {
-    const ends = (edge: WfnEdge) => {
+    /** The line of an edge to one input. A source that fills two named inputs has a line to each. */
+    const endsAt = (edge: WfnEdge, slot: string | undefined) => {
       const from = point(edge.from, "out", edge.type, edge.branch);
-      const to = point(edge.to, "in", edge.type);
+      const to = point(edge.to, "in", edge.type, slot);
       return from && to ? shapeOf(edge, from, to) : null;
     };
+    const ends = (edge: WfnEdge) => endsAt(edge, slotsOf(edge)[0]);
+    /** The inputs that an edge ends on: its named inputs, else the input with no name. */
+    const targets = (edge: WfnEdge): (string | undefined)[] => {
+      const slots = slotsOf(edge);
+      return slots.length > 0 ? slots : [undefined];
+    };
     /** The line follows the pointer, and snaps to a port that can take it. */
-    const draftPath = () => {
+    /** The port that the open connection snaps to, if one can take it. */
+    const draftTarget = () => (state.target?.reason === null ? state.target.port : null);
+    /** Where the open connection ends: the port that it snaps to, else the pointer. */
+    const draftEnd = () => {
+      const port = draftTarget();
+      return (port && point(port.node, port.side, port.type, port.branch)) ?? state.draft;
+    };
+    /** The line of the open connection from one port to its end. */
+    const draftLine = (from: PortRef) => {
+      const anchor = point(from.node, from.side, from.type, from.branch);
+      const end = draftEnd();
+      if (!anchor || !end) return null;
+      return from.side === "out" ? diagramEdgePath(anchor, end) : diagramEdgePath(end, anchor);
+    };
+    const draftPath = () => (state.pending ? draftLine(state.pending) : null);
+    /** The lines from the other selected nodes, which connect with the dragged one. */
+    const companionPaths = () => {
       const pending = state.pending;
-      const pointer = state.draft;
-      const anchor = pending ? point(pending.node, pending.side, pending.type, pending.branch) : undefined;
-      if (!pending || !anchor || !pointer) return null;
-      const port = state.target?.reason === null ? state.target.port : null;
-      const end = (port && point(port.node, port.side, port.type, port.branch)) ?? pointer;
-      return pending.side === "out" ? diagramEdgePath(anchor, end) : diagramEdgePath(end, anchor);
+      if (!pending || !state.draft) return [];
+      const port = draftTarget();
+      const others = port ? companionsTo(pending, port) : pendingCompanions();
+      return others.flatMap((other) => draftLine(other) ?? []);
     };
     const draftState = () => {
       const target = state.target;
@@ -1207,48 +1400,78 @@ export function createBoard(options: BoardOptions) {
       if (reason) return { text: reason, tone: "refused" };
       return draftLoops() ? { text: t("workflow.board.loop.makes"), tone: "loop" } : null;
     };
+    /** The connections of the focused node. A second layer draws them above the other nodes. */
+    const isFocusEdge = (edge: WfnEdge) => {
+      const focus = options.focus?.() ?? null;
+      return focus !== null && (edge.from === focus || edge.to === focus);
+    };
+    const focusEdges = () => state.edges.filter(isFocusEdge);
+    /** One connection line. Only the layer under the nodes has the hit path that takes the pointer. */
+    const EdgeLine = (props: { edge: WfnEdge; path: string; focus: boolean; hit?: boolean }) => (
+      <g
+        class="wfn-edge"
+        data-type={props.edge.type}
+        data-tone={tone(props.edge)}
+        data-selected={state.edge === props.edge.id ? "" : undefined}
+        data-focus={props.focus ? "" : undefined}
+        data-removing={
+          state.removing === props.edge.id || isDoomed(props.edge.from) || isDoomed(props.edge.to) ? "" : undefined
+        }
+        data-motion={motion ? "" : undefined}
+        data-build={options.buildState?.(props.edge.id)}
+      >
+        <path class="wfn-edge-line" d={props.path} />
+        <Show when={tone(props.edge) === "run"}>
+          <path class="wfn-edge-comet" d={props.path} pathLength="1" />
+        </Show>
+        <Show when={props.hit}>
+          <path
+            class="wfn-edge-hit"
+            data-edge-id={props.edge.id}
+            d={props.path}
+            onPointerDown={() =>
+              setState((draft) => {
+                draft.edge = props.edge.id;
+              })
+            }
+            onPointerMove={(event) => trackEdge(props.edge.id, event)}
+            onPointerLeave={(event) => leaveEdge(props.edge.id, event.relatedTarget)}
+          />
+        </Show>
+      </g>
+    );
     return (
       <>
         <svg ref={edgeLayer} class="wfn-edges" aria-hidden="true">
           <For each={state.edges}>
             {(edge) => (
-              <Show when={ends(edge)}>
-                {(line) => (
-                  <g
-                    class="wfn-edge"
-                    data-type={edge.type}
-                    data-tone={tone(edge)}
-                    data-selected={state.edge === edge.id ? "" : undefined}
-                    data-removing={
-                      state.removing === edge.id || isDoomed(edge.from) || isDoomed(edge.to) ? "" : undefined
-                    }
-                    data-motion={motion ? "" : undefined}
-                    data-build={options.buildState?.(edge.id)}
-                  >
-                    <path class="wfn-edge-line" d={line().path} />
-                    <Show when={tone(edge) === "run"}>
-                      <path class="wfn-edge-comet" d={line().path} pathLength="1" />
-                    </Show>
-                    <path
-                      class="wfn-edge-hit"
-                      data-edge-id={edge.id}
-                      d={line().path}
-                      onPointerDown={() =>
-                        setState((draft) => {
-                          draft.edge = edge.id;
-                        })
-                      }
-                      onPointerMove={(event) => trackEdge(edge.id, event)}
-                      onPointerLeave={(event) => leaveEdge(edge.id, event.relatedTarget)}
-                    />
-                  </g>
+              <For each={targets(edge)}>
+                {(slot) => (
+                  <Show when={endsAt(edge, slot)}>
+                    {(line) => <EdgeLine edge={edge} path={line().path} focus={isFocusEdge(edge)} hit />}
+                  </Show>
                 )}
-              </Show>
+              </For>
             )}
           </For>
           <Show when={draftPath()}>
             {(path) => <path class="wfn-edge-draft" data-state={draftState()} d={path()} />}
           </Show>
+          <For each={companionPaths()}>
+            {(path) => <path class="wfn-edge-draft" data-state={draftState()} d={path} />}
+          </For>
+        </svg>
+        {/* The lines only: the hit paths stay in the layer under the nodes. */}
+        <svg class="wfn-edges wfn-edges-focus" aria-hidden="true">
+          <For each={focusEdges()}>
+            {(edge) => (
+              <For each={targets(edge)}>
+                {(slot) => (
+                  <Show when={endsAt(edge, slot)}>{(line) => <EdgeLine edge={edge} path={line().path} focus />}</Show>
+                )}
+              </For>
+            )}
+          </For>
         </svg>
         <Show when={draftNote()}>
           {(note) => (
@@ -1355,6 +1578,7 @@ export function createBoard(options: BoardOptions) {
     addEdges,
     snapshot,
     restore,
+    sync,
     /** Ends the typing burst, so the next key stroke is a new change. */
     endTyping: () => {
       typing = null;

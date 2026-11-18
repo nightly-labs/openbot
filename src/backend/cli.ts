@@ -1,6 +1,6 @@
 import { execFile, spawn } from "node:child_process";
 import { constants } from "node:fs";
-import { access, stat } from "node:fs/promises";
+import { access, lstat, open, realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, delimiter, dirname, extname, isAbsolute, join, posix, resolve, win32 } from "node:path";
 import { promisify, stripVTControlCharacters } from "node:util";
@@ -33,6 +33,11 @@ interface ResolvedCli {
    * too, when the resolver runs the CLI. Absent on Windows, which has no login shell.
    */
   launchPath?: string;
+  /**
+   * The user's CLI starts, but a part that some models need is missing, such as the code-mode host of
+   * a bare `codex` program (#9139). OpenBot's own copy wins over it.
+   */
+  incomplete?: true;
 }
 
 export interface CodexCliInfo extends ResolvedCli {
@@ -118,6 +123,10 @@ export const resolveCodexCli: (input?: {
     const failures: CodexCliError[] = [];
     // The copy that OpenBot tried first. The message for it tells the user which copy to repair.
     let firstFailedSource: "system" | "managed" | undefined;
+    // A Codex of the user's without its code-mode host runs only when no complete one starts. A path
+    // that the user set stays under their control.
+    const configured = input.systemCandidates === undefined ? configuredCliPath("codex") : null;
+    let incomplete: CodexCliInfo | undefined;
 
     for (const candidate of candidates) {
       if (!(yield* isExecutable(candidate.executable))) continue;
@@ -133,10 +142,20 @@ export const resolveCodexCli: (input?: {
           return { executable: candidate.executable, version, source: candidate.source, ...launch };
         }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
       );
-      if (Result.isSuccess(attempt)) return attempt.success;
+      if (Result.isSuccess(attempt)) {
+        const cli = attempt.success;
+        if (cli.source === "managed" || cli.executable === configured || (yield* hasCodeModeHost(cli.executable))) {
+          return cli;
+        }
+        incomplete ??= { ...cli, incomplete: true };
+        continue;
+      }
       const error = attempt.failure.cause;
 
-      if (isCliTimeout(error)) throw error;
+      if (isCliTimeout(error)) {
+        if (incomplete) return incomplete;
+        throw error;
+      }
       firstFailedSource ??= candidate.source;
       failures.push(
         error instanceof CodexCliError
@@ -145,6 +164,7 @@ export const resolveCodexCli: (input?: {
       );
     }
 
+    if (incomplete) return incomplete;
     const outdated = failures.find((failure) => failure.code === "outdated");
     if (outdated) throw outdated;
     if (failures.length > 0) {
@@ -170,6 +190,44 @@ function bundledCodexExecutable(
 ): string | null {
   return bundledProviderExecutable("codex", platform, architecture, resourcesPath);
 }
+
+/** Version-manager shims that start a full Codex package, by the name of their real program. */
+const CODEX_LAUNCHER = /^(?:volta-shim|mise|aqua-proxy)(?:\.exe)?$/iu;
+
+/**
+ * Whether Codex can start `codex-code-mode-host`, which code-mode models such as GPT-6 need for MCP
+ * tools. Codex looks beside its real program and in `codex-resources` of its package
+ * (`code_mode_host_program` in codex-rs). A bare `codex` copied alone has neither (#9139). A launcher,
+ * such as npm's `codex.js`, a version-manager shim or a bun or Scoop shim on Windows, starts a full
+ * package. A file that cannot be read counts as complete.
+ */
+const hasCodeModeHost = Effect.fn("Cli.hasCodeModeHost")((executable: string) =>
+  providerCall(async () => {
+    const program = await realpath(executable);
+    if (CODEX_LAUNCHER.test(basename(program))) return true;
+    const isFile = (path: string) =>
+      stat(path).then(
+        (info) => info.isFile(),
+        () => false,
+      );
+    if (process.platform === "win32") {
+      if (extname(program).toLowerCase() !== ".exe") return true;
+      const stem = program.slice(0, -".exe".length);
+      if ((await isFile(`${stem}.bunx`)) || (await isFile(`${stem}.shim`))) return true;
+    } else {
+      const file = await open(program, "r");
+      try {
+        const { buffer, bytesRead } = await file.read(Buffer.alloc(2), 0, 2, 0);
+        if (bytesRead === 2 && buffer.toString("latin1") === "#!") return true;
+      } finally {
+        await file.close();
+      }
+    }
+    const host = process.platform === "win32" ? "codex-code-mode-host.exe" : "codex-code-mode-host";
+    const folder = dirname(program);
+    return (await isFile(join(folder, host))) || (await isFile(join(folder, "..", "codex-resources", host)));
+  }).pipe(Effect.orElseSucceed(() => true)),
+);
 
 export const resolveClaudeCli: (input?: {
   systemCandidates?: string[];
@@ -442,17 +500,24 @@ export const resolveHermesCli: (input?: {
     for (const candidate of candidates) {
       if (!(yield* isExecutable(candidate.executable))) continue;
       found = true;
-      const attempt = yield* Effect.result(
+      const read = (args: readonly string[]) =>
         Effect.gen(function* () {
-          const { stdout, launch } = yield* readCliVersion(candidate, "hermes");
+          const { stdout, launch } = yield* readCliVersion(candidate, "hermes", args);
           return {
             executable: candidate.executable,
             version: parseHermesVersion(stdout),
             source: "system" as const,
             ...launch,
           };
-        }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
-      );
+        }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))));
+      // `hermes --version` waits for a network update check, which can take more than the limit and
+      // then never saves its result, so every check timed out (#7989). `hermes acp --version` prints
+      // only the version. A Hermes before 0.14 refuses that flag at once and gets `--version`.
+      const quick = yield* Effect.result(read(["acp", "--version"]));
+      const attempt =
+        Result.isSuccess(quick) || isCliTimeout(quick.failure.cause)
+          ? quick
+          : yield* Effect.result(read(["--version"]));
       if (Result.isSuccess(attempt)) return attempt.success;
       const error = attempt.failure.cause;
 
@@ -468,11 +533,12 @@ export const resolveHermesCli: (input?: {
 );
 
 /**
- * Hermes prints its release and its build on the first line, such as
+ * `hermes acp --version` prints only the version, such as `0.21.5+5805.g54bc5e5`. `hermes --version`
+ * prints its release and its build on the first line, such as
  * `Hermes Agent v0.21.5+5805.g54bc5e5 (2026.9.24) · upstream 54bc5e50`. A line about an update can follow.
  */
 function parseHermesVersion(output: string): string {
-  const version = output.match(/^Hermes Agent v(\d+\.\d+\.\d+)\b/mu)?.[1];
+  const version = output.match(/^(?:Hermes Agent v)?(\d+\.\d+\.\d+)\b/mu)?.[1];
   if (!version) throw new CodexCliError(sourceText("error.provider.hermesVersionUnreadable"), "invalid");
   return version;
 }
@@ -858,6 +924,14 @@ function parseMistralVersion(output: string): string {
   return match[1] ?? match[0];
 }
 
+/**
+ * GitHub Copilot CLI 1.0.105 updates itself unless told not to, and without this variable it also runs
+ * the newest package in its cache, so `--version` names that package (#9888). OpenBot owns the
+ * version, so every process gets the variable, the version check too: `copilot login` rejects the
+ * `--no-auto-update` flag.
+ */
+export const COPILOT_ENV: Readonly<Record<string, string>> = { COPILOT_AUTO_UPDATE: "false" };
+
 /** The providers whose CLI is one native program that OpenBot can download. */
 type NativeCliProvider = "pi" | "muse" | "devin" | "copilot" | "mistral" | "antigravity";
 
@@ -898,24 +972,67 @@ export function resolveInstalledFirst<Cli extends AgentCliInfo, E>(
   resolve: (input: { bundledExecutable?: string | null }) => Effect.Effect<Cli, E>,
   bundledExecutable: string | null | undefined,
   preferInstalled: boolean,
+  installedChosen = false,
 ): Effect.Effect<Cli, E> {
+  return chooseInstalledFirst(resolve, bundledExecutable, preferInstalled, installedChosen).pipe(
+    Effect.map((choice) => choice.cli),
+  );
+}
+
+/**
+ * The CLI that runs, and the one the user can switch to: the CLI the user installed while OpenBot's
+ * copy runs, or the newer copy while the user's CLI runs because they chose it.
+ */
+export interface InstalledFirstChoice<Cli> {
+  readonly cli: Cli;
+  readonly passedOver: {
+    readonly source: "system" | "managed";
+    readonly version: string;
+    /** The user's CLI lacks parts that it needs (`AgentCliInfo.incomplete`). */
+    readonly incomplete?: boolean;
+  } | null;
+}
+
+/**
+ * `resolveInstalledFirst`, with the CLI it passed over. `installedChosen`: the user chose their own
+ * CLI, so it runs also when the copy is newer. A launcher of the user's, such as a script that picks
+ * Pi's settings folder, then still runs after an update (#6327).
+ */
+export function chooseInstalledFirst<Cli extends AgentCliInfo, E>(
+  resolve: (input: { bundledExecutable?: string | null }) => Effect.Effect<Cli, E>,
+  bundledExecutable: string | null | undefined,
+  preferInstalled: boolean,
+  installedChosen = false,
+): Effect.Effect<InstalledFirstChoice<Cli>, E> {
   const copy = resolve(bundledExecutable === undefined ? {} : { bundledExecutable });
-  if (!preferInstalled) return copy;
   const installedCli = resolve({ bundledExecutable: null }).pipe(Effect.orElseSucceed(() => null));
-  const choose = (resolved: Cli, installed: Cli | null): Cli =>
-    resolved.source === "managed" &&
-    installed?.source === "system" &&
-    (installed.version === resolved.version || olderVersion(resolved.version, installed.version))
-      ? installed
-      : resolved;
+  const choose = (resolved: Cli, installed: Cli | null): InstalledFirstChoice<Cli> => {
+    if (resolved.source !== "managed" || installed?.source !== "system") return { cli: resolved, passedOver: null };
+    const asNew = installed.version === resolved.version || olderVersion(resolved.version, installed.version);
+    // An incomplete CLI of the user's runs over the copy only when the user chose it. It stays a choice.
+    if (preferInstalled && (installedChosen || (asNew && !installed.incomplete))) {
+      // The copy stays a choice over an incomplete CLI, also when the copy is older.
+      const copyOffered = installed.incomplete || olderVersion(installed.version, resolved.version);
+      return { cli: installed, passedOver: copyOffered ? { source: "managed", version: resolved.version } : null };
+    }
+    return {
+      cli: resolved,
+      passedOver: {
+        source: "system",
+        version: installed.version,
+        ...(installed.incomplete ? { incomplete: true } : {}),
+      },
+    };
+  };
   return Effect.gen(function* () {
     // With a copy, the two probes run at once: the user's CLI adds no wait unless it is the slower one.
+    // An update starts the copy, but still reads the user's CLI, so that it can offer it afterwards.
     if (bundledExecutable) {
       const [resolved, installed] = yield* Effect.all([copy, installedCli], { concurrency: 2 });
       return choose(resolved, installed);
     }
     const resolved = yield* copy;
-    return resolved.source === "managed" ? choose(resolved, yield* installedCli) : resolved;
+    return resolved.source === "managed" ? choose(resolved, yield* installedCli) : { cli: resolved, passedOver: null };
   });
 }
 
@@ -1024,6 +1141,7 @@ function windowsFallbackPaths(
     paths.push(win32.join(userHome, ".opencode", "bin", "opencode.exe"));
     if (localAppData) paths.push(win32.join(localAppData, "Microsoft", "WinGet", "Links", "opencode.exe"));
   }
+  if (command === "kimi") paths.push(win32.join(userHome, ".kimi-code", "bin", "kimi.exe"));
   if (appData) paths.push(win32.join(appData, "npm", `${command}.cmd`));
   paths.push(
     win32.join(userHome, ".local", "bin", `${command}.exe`),
@@ -1229,6 +1347,8 @@ function posixFallbackPaths(
   if (command === "claude") paths.push(posix.join(userHome, ".claude", "local", "claude"));
   if (command === "opencode") paths.push(posix.join(userHome, ".opencode", "bin", "opencode"));
   if (command === "grok") paths.push(posix.join(userHome, ".grok", "bin", "grok"));
+  // Kimi Code's installer adds its folder to `PATH` only in `~/.bashrc` or `~/.zshrc` (#11790).
+  if (command === "kimi") paths.push(posix.join(userHome, ".kimi-code", "bin", "kimi"));
   paths.push(
     posix.join(userHome, ".npm-global", "bin", command),
     posix.join(userHome, ".volta", "bin", command),
@@ -1293,9 +1413,19 @@ export function cliSpawnTarget(
 /**
  * A busy computer can take many seconds to start a CLI, so the limit is generous. A timeout is
  * reported apart from a failure: the CLI is not broken, and reinstalling it does not help. The
- * provider runtime tries again later, so this limit only has to cover one slow answer.
+ * provider runtime tries again later, with `SLOW_CLI_VERSION_TIMEOUT_MS`.
  */
 const CLI_VERSION_TIMEOUT_MS = 10_000;
+/**
+ * The limit of a version read after a read of the same CLI timed out. The first read from a cold disk
+ * cache took 85 s, and 3 reads with `CLI_VERSION_TIMEOUT_MS` in a row stopped the provider (#8548). The
+ * longer limit stays after a read in time: the files can leave the disk cache again. A read that also
+ * times out with this limit is from a CLI that does not answer, and the next read has the short limit
+ * again: a hung CLI does not hold a start for 2 minutes each time.
+ */
+const SLOW_CLI_VERSION_TIMEOUT_MS = 120_000;
+/** The executables whose next version read waits `SLOW_CLI_VERSION_TIMEOUT_MS`. */
+const slowVersionReads = new Set<string>();
 
 /**
  * A busy computer makes every candidate slow, so the resolvers report the first timeout and do not
@@ -1306,46 +1436,59 @@ function isCliTimeout(error: unknown): error is CodexCliError {
 }
 
 /**
- * Runs `--version` with the `PATH` that the CLI's processes get, so a `#!/usr/bin/env node` CLI that
- * starts here also starts as the provider. `launch` holds that `PATH` for the resolved CLI info.
+ * Runs `--version` (or the fixed `args` that print the version) with the `PATH` that the CLI's
+ * processes get, so a `#!/usr/bin/env node` CLI that starts here also starts as the provider.
+ * `launch` holds that `PATH` for the resolved CLI info.
  */
 const readCliVersion = Effect.fn("Cli.readVersion")(function* (
   { executable: candidate, source }: { executable: string; source: "system" | "managed" },
   provider: AgentProviderId,
+  args: readonly string[] = ["--version"],
 ) {
   const launchPath = yield* cliLaunchPath(candidate, source);
   const launch = launchPath ? { launchPath } : {};
   const target = process.platform === "win32" && [".bat", ".cmd"].includes(extname(candidate).toLowerCase());
-  const timeout = providerCheckTimeoutMs(CLI_VERSION_TIMEOUT_MS);
-  const output = yield* providerCall(() =>
-    target
-      ? execFileAsync(
-          process.env.ComSpec?.trim() || "cmd.exe",
-          ["/d", "/s", "/c", `""${candidate.replaceAll("%", "%%")}" --version"`],
-          {
+  const slow = slowVersionReads.has(candidate);
+  const timeout = providerCheckTimeoutMs(slow ? SLOW_CLI_VERSION_TIMEOUT_MS : CLI_VERSION_TIMEOUT_MS);
+  // A Copilot CLI without `COPILOT_ENV` reports the newest package in its cache (#9888).
+  const providerEnv = provider === "copilot" ? COPILOT_ENV : {};
+  // The signal stops the process when the start that waits for it ends.
+  const output = yield* Effect.tryPromise({
+    try: (signal) =>
+      target
+        ? execFileAsync(
+            process.env.ComSpec?.trim() || "cmd.exe",
+            ["/d", "/s", "/c", `""${candidate.replaceAll("%", "%%")}" ${args.join(" ")}"`],
+            {
+              signal,
+              timeout,
+              maxBuffer: 64 * 1024,
+              env: { ...process.env, ...providerEnv },
+              windowsHide: true,
+              windowsVerbatimArguments: true,
+            },
+          )
+        : execFileAsync(candidate, [...args], {
+            signal,
             timeout,
             maxBuffer: 64 * 1024,
-            windowsHide: true,
-            windowsVerbatimArguments: true,
-          },
-        )
-      : execFileAsync(candidate, ["--version"], {
-          timeout,
-          maxBuffer: 64 * 1024,
-          windowsHide: process.platform === "win32",
-          env: { ...process.env, ...cliPathEnvironment(launch) },
-        }),
-  ).pipe(
-    Effect.mapError((failure) =>
-      isDynamicRecord(failure.cause) && failure.cause.killed === true
-        ? providerFailure(
-            new CodexCliError(
-              sourceText("error.provider.cliTimedOutRefresh", { provider: agentProviderName(provider) }),
-              "timeout",
-            ),
-          )
-        : failure,
-    ),
+            windowsHide: process.platform === "win32",
+            env: { ...process.env, ...providerEnv, ...cliPathEnvironment(launch) },
+          }),
+    catch: providerFailure,
+  }).pipe(
+    Effect.mapError((failure) => {
+      if (!(isDynamicRecord(failure.cause) && failure.cause.killed === true)) return failure;
+      // The timeout changes the limit of the next read (`SLOW_CLI_VERSION_TIMEOUT_MS`).
+      if (slow) slowVersionReads.delete(candidate);
+      else slowVersionReads.add(candidate);
+      return providerFailure(
+        new CodexCliError(
+          sourceText("error.provider.cliTimedOutRefresh", { provider: agentProviderName(provider) }),
+          "timeout",
+        ),
+      );
+    }),
   );
   return { stdout: output.stdout, launch };
 });
@@ -1354,6 +1497,15 @@ const readCliVersion = Effect.fn("Cli.readVersion")(function* (
 export const isExecutable = Effect.fn("Cli.isExecutable")((path: string) =>
   providerCall(async () => {
     await access(path, process.platform === "win32" ? constants.F_OK : constants.X_OK);
-    return (await stat(path)).isFile();
+    return await stat(path).then(
+      (info) => info.isFile(),
+      async (error: unknown) => {
+        // A Microsoft Store install puts only an app execution alias in WindowsApps on the `PATH`
+        // (#10985). It is a link that `stat` refuses with `EACCES`, but it starts as a program, so
+        // the version read decides.
+        if (process.platform !== "win32" || !isDynamicRecord(error) || error.code !== "EACCES") throw error;
+        return (await lstat(path)).isSymbolicLink();
+      },
+    );
   }).pipe(Effect.match({ onSuccess: (file) => file, onFailure: () => false })),
 );

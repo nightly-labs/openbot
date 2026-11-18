@@ -63,15 +63,26 @@ export const InServerSettings: Story = {
   name: "Server settings",
   render: () => (
     <ServerSettingsStory
-      settings={{ ...serverSettingsArgs(), instanceTransfer: { onSignIn: fn() }, initialSection: "transfer" }}
+      settings={{
+        ...serverSettingsArgs(),
+        instanceTransfer: { onSignIn: fn(), history: true, fullCopy: true },
+        initialSection: "transfer",
+      }}
     />
   ),
 };
 
 export const Home: Story = { name: "Which computer", render: () => <Stage args={viewArgs()} /> };
 
+/** This computer, or a host with `instance-transfer-full-copy-v1`: each part has its own switch. */
 export const Export: Story = {
   name: "Export",
+  render: () => <Stage args={viewArgs({ screen: "export", historyAvailable: true, fullCopyAvailable: true })} />,
+};
+
+/** A host with only `instance-transfer-chunks-v1`: the chat history also carries the channel messages. */
+export const ExportOlderHost: Story = {
+  name: "Export: older host",
   render: () => <Stage args={viewArgs({ screen: "export", historyAvailable: true })} />,
 };
 
@@ -103,6 +114,32 @@ export const ExportFailed: Story = {
 };
 
 export const ImportStart: Story = { name: "Import", render: () => <Stage args={viewArgs({ screen: "import" })} /> };
+
+export const ImportSending: Story = {
+  name: "Import: sending to a joined server",
+  render: () => (
+    <Stage
+      args={viewArgs({
+        screen: "import",
+        importPhase: "reading",
+        importProgress: { sent: 629_145_600, total: 1_468_550_085 },
+      })}
+    />
+  ),
+};
+
+export const ImportServerReading: Story = {
+  name: "Import: the server reads the file",
+  render: () => (
+    <Stage
+      args={viewArgs({
+        screen: "import",
+        importPhase: "reading",
+        importProgress: { sent: 1_468_550_085, total: 1_468_550_085 },
+      })}
+    />
+  ),
+};
 
 export const ImportReview: Story = {
   name: "Import: review",
@@ -184,6 +221,13 @@ export const CopyLoading: Story = {
 export const CopyCopying: Story = {
   name: "Copy: copying",
   render: () => <CopyAgentsDialog {...copyArgs({ phase: "copying" })} />,
+};
+
+export const CopySending: Story = {
+  name: "Copy: sending to a joined server",
+  render: () => (
+    <CopyAgentsDialog {...copyArgs({ phase: "copying", progress: { sent: 184_549_376, total: 314_691_120 } })} />
+  ),
 };
 
 export const CopyDone: Story = {

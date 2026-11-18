@@ -8,6 +8,8 @@ body:
       value: |
         Thanks for reporting a bug in the mobile app. Complete all required fields. We close reports that do not have the app version.
 
+        The easiest way is in the app: tell an agent about the problem in the OpenBot mobile app and select **Send** on its report card. The app then adds its version, your device and the support log. If the app cannot connect, open Settings → Support → "Report a problem on GitHub" in the mobile app: it opens this form with the app version and the device filled in.
+
         **For a connection or network problem, attach the support log from Settings → Support → "Save log file". We will most probably close a connection or network report that does not have this log.**
 
         Do not include credentials, private files, conversation contents, or unreviewed logs. Report vulnerabilities through the private security process.
@@ -39,6 +41,7 @@ body:
         - App Store
         - TestFlight
         - Google Play
+        - APK from openbot.run
         - Built from source
         - Other
     validations:
@@ -49,6 +52,15 @@ body:
     attributes:
       label: Device and system version
       placeholder: iPhone 16 Plus, iOS 27.0
+    validations:
+      required: true
+
+  - type: input
+    id: network
+    attributes:
+      label: Network and VPN
+      description: Wi-Fi or mobile data, and the VPN or mesh network that is on (Tailscale, ZeroTier, WireGuard, NordVPN and others). The link from the app fills this in. Give no network address.
+      placeholder: Wi-Fi, Tailscale on
     validations:
       required: true
 

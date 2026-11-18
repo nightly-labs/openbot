@@ -14,6 +14,7 @@ export type WindowPage =
   | "workflows"
   | "usage"
   | "library"
+  | "crm"
   | "marketplace"
   | "settings"
   | "server-settings"
@@ -202,10 +203,11 @@ const context = createSimpleContext({
         const serverId = activeServerId();
         if (serverId) usage.openSchedule(serverId, source);
       },
-      openWorkflows(source: HTMLElement | null) {
+      /** Opens the workflows page of the active server, or on `workflow` when it is given. */
+      openWorkflows(source: HTMLElement | null, workflow?: { serverId: string; workflowId: string }) {
         leavePricing();
-        const serverId = activeServerId();
-        if (serverId) usage.openWorkflows(serverId, source);
+        const serverId = workflow?.serverId ?? activeServerId();
+        if (serverId) usage.openWorkflows(serverId, source, workflow?.workflowId);
       },
       openUsage(source: HTMLElement | null) {
         leavePricing();
@@ -216,6 +218,11 @@ const context = createSimpleContext({
         leavePricing();
         const serverId = activeServerId();
         if (serverId) usage.openLibrary(serverId, source);
+      },
+      openCrm(source: HTMLElement | null, connectors = false) {
+        leavePricing();
+        const serverId = activeServerId();
+        if (serverId) usage.openCrm(serverId, source, connectors);
       },
       openSettings(source: HTMLElement | null) {
         leavePricing();

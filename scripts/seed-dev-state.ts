@@ -34,6 +34,7 @@ import { resolveClaudeCli } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { isMissingFileError } from "../src/backend/file-errors";
 import { MailboxStore } from "../src/backend/mailbox-store";
+import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { TeamChatStore } from "../src/backend/team-chat-store";
 import { developmentUserDataName, readDevelopmentInstanceId } from "../src/main/development-profile";
 import { ProviderRuntimeManager, providerRuntimeRoot } from "../src/main/provider-runtime-manager";
@@ -373,7 +374,7 @@ async function buildSeedProfile(
   agentModel: SeededAgentModel,
   scale: SeedScale,
 ): Promise<void> {
-  const agentStore = new AgentStore(profilePath, homeDirectory);
+  const agentStore = new AgentStore(profilePath, homeDirectory, new OpenBotDatabase(profilePath));
   await runCauseEffect(agentStore.initialize());
   const mailbox = new MailboxStore(profilePath, agentStore.sharedRoot, agentStore.database);
   await runCauseEffect(mailbox.initialize());

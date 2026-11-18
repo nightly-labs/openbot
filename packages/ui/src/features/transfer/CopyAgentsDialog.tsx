@@ -1,5 +1,6 @@
 import { agentProviderName } from "@openbot/contracts/agent-providers";
 import type { InstanceTransferAgent, InstanceTransferResult } from "@openbot/contracts/ipc";
+import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import {
   ArrowRight,
   Button,
@@ -17,7 +18,13 @@ import { createEffect, createMemo, createSignal, createUniqueId, For, Show, untr
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { ServerLogo } from "../servers/ServerLogo";
-import { NotMoved, TransferAlert, TransferNotes } from "./InstanceTransferView";
+import {
+  NotMoved,
+  TransferAlert,
+  TransferNotes,
+  TransferUploadProgress,
+  type TransferUploadState,
+} from "./InstanceTransferView";
 
 export type CopyAgentsAgent = Pick<InstanceTransferAgent, "id" | "name" | "avatarSeed" | "avatarHue" | "avatarUrl">;
 
@@ -25,6 +32,7 @@ export interface CopyAgentsServer {
   id: string;
   name: string;
   logoUrl: string | null;
+  appearance?: ServerAppearance | null | undefined;
 }
 
 export type CopyAgentsPhase = "idle" | "copying" | "done";
@@ -42,6 +50,8 @@ export interface CopyAgentsDialogProps {
   /** The agents of a side could not be read. */
   loadError: string | null;
   phase: CopyAgentsPhase;
+  /** While `copying`: the bytes sent to a joined destination. Null before the first part, and for this computer. */
+  progress?: TransferUploadState | null | undefined;
   result: InstanceTransferResult | null;
   error: string | null;
   onCopy: (agentIds: string[]) => void;
@@ -79,6 +89,12 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
   });
   const takenNames = createMemo(() => new Set((props.toAgents ?? []).map((agent) => agent.name.toLowerCase())));
   const busy = () => props.phase === "copying";
+  const uploading = () => (busy() ? props.progress : null);
+  // After the last byte the server reads the file and then adds the agents: both are the copy.
+  const sendingFile = () => {
+    const progress = uploading();
+    return progress ? progress.sent < progress.total : false;
+  };
   const done = () => props.phase === "done";
   const from = () => props.servers.find((server) => server.id === props.fromId) ?? null;
   const to = () => props.servers.find((server) => server.id === props.toId) ?? null;
@@ -233,6 +249,7 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
               <Show when={props.error}>
                 {(message) => <TransferAlert title={t("settings.transfer.copy.failed")} description={message()} />}
               </Show>
+              <Show when={uploading()}>{(progress) => <TransferUploadProgress progress={progress()} />}</Show>
               <Show when={doneResult()} fallback={<NotMoved text="settings.transfer.copy.notCopied" />}>
                 {(result) => <CopyResult result={result()} server={to()?.name ?? ""} />}
               </Show>
@@ -249,7 +266,9 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
                       type="button"
                       disabled={!to() || selected().length === 0}
                       loading={busy()}
-                      loadingLabel={t("settings.transfer.copy.copying")}
+                      loadingLabel={t(
+                        sendingFile() ? "settings.transfer.upload.sending" : "settings.transfer.copy.copying",
+                      )}
                       onClick={() => props.onCopy(selected().map((agent) => agent.id))}
                     >
                       {t("settings.transfer.copy.submit", { count: selected().length })}
@@ -279,7 +298,7 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
 function ServerName(props: { server: CopyAgentsServer }) {
   return (
     <span class="copy-agents-server">
-      <ServerLogo serverId={props.server.id} url={props.server.logoUrl} />
+      <ServerLogo serverId={props.server.id} url={props.server.logoUrl} appearance={props.server.appearance} />
       <span class="copy-agents-server-name">{props.server.name}</span>
     </span>
   );

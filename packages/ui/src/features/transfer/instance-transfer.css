@@ -12,6 +12,20 @@
   justify-content: flex-start;
 }
 
+.instance-transfer-upload {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-1-5);
+  max-width: 320px;
+}
+
+.instance-transfer-upload-status {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
 .instance-transfer-back {
   align-self: flex-start;
   padding-inline: 0;
@@ -131,6 +145,54 @@
   height: var(--openbot-icon-sm);
   flex: none;
   color: var(--openbot-text-muted);
+}
+
+/* Export: the size of the workspace files in the file, and the two presets. */
+.instance-transfer-meter {
+  display: grid;
+  gap: var(--openbot-space-2);
+}
+
+.instance-transfer-meter-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--openbot-space-2);
+}
+
+.instance-transfer-meter-total {
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-xl);
+  font-weight: var(--openbot-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.instance-transfer-meter-of {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+.instance-transfer-presets {
+  margin-inline-start: auto;
+}
+
+.instance-transfer-preset-custom {
+  display: none;
+}
+
+/* A custom choice: the pill fades out where it is, then moves. A preset after that: the pill is at
+   its place at once and fades in. */
+.instance-transfer-presets[data-pill="none"] .ui-sliding-tabs-pill {
+  opacity: 0;
+  transition:
+    opacity 120ms var(--openbot-ease-out),
+    transform 0s 120ms,
+    width 0s 120ms;
+}
+
+.instance-transfer-presets[data-pill="appear"] .ui-sliding-tabs-pill {
+  transition: opacity 150ms var(--openbot-ease-out);
 }
 
 .instance-transfer-not-moved {

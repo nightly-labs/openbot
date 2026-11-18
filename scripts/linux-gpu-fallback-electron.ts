@@ -1,9 +1,9 @@
 // Electron side of `scripts/linux-gpu-fallback-e2e.ts`. It starts the GPU mode as `src/main/index.ts`
 // does and opens a window with a blurred backdrop. It reports the WebGL renderer of the page.
 // It writes the state to `--ready-file` when the page has loaded. A "quit" line or the end of stdin
-// quits the app, so the app also quits when the test stops.
+// quits the app, so the app also quits when the test stops. A "crash" line crashes the main process.
 import { writeFileSync } from "node:fs";
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, crashReporter } from "electron";
 import { configureLinuxGpu } from "../src/main/linux-gpu-mode";
 
 function argument(name: string): string {
@@ -17,6 +17,8 @@ process.stdout.on("error", () => undefined);
 process.stderr.on("error", () => undefined);
 const userDataPath = argument("user-data");
 app.setPath("userData", userDataPath);
+// As `src/main/index.ts`, with its default `crashDumps` path: the next start reads the dumps.
+crashReporter.start({ uploadToServer: false });
 const mode = configureLinuxGpu({
   userDataPath,
   ownsInstance: true,
@@ -56,10 +58,12 @@ void app.whenReady().then(async () => {
       hardwareAccelerationEnabled: app.isHardwareAccelerationEnabled(),
       gpuCompositing: app.getGPUFeatureStatus().gpu_compositing,
       webglRenderer,
+      crashDumps: app.getPath("crashDumps"),
     }),
   );
   process.stdin.setEncoding("utf8");
   process.stdin.on("data", (chunk: string) => {
+    if (chunk.includes("crash")) process.crash();
     if (chunk.includes("quit")) app.quit();
   });
   process.stdin.on("end", () => app.quit());

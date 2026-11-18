@@ -226,6 +226,10 @@ export const messages = defineMessages("routine", {
   "routine.calendar.entryMeta": "{when} · {schedule} · {status}",
   "routine.calendar.openAgent": "Open {name}",
   "routine.calendar.completed": "Completed",
+  "routine.calendar.new": "New routine",
+  "routine.calendar.newOn": "New routine on {day}",
+  "routine.calendar.agent": "Agent",
+  "routine.calendar.agentChoice": "Agent: {name}",
 
   "routine.settings.loadFailed": "Could not load routines.",
   "routine.settings.loadRunsFailed": "Could not load run history.",
@@ -242,6 +246,7 @@ export const messages = defineMessages("routine", {
   "routine.settings.loading": "Loading routines…",
   "routine.settings.empty": "No routines yet.",
   "routine.settings.paused": "Paused",
+  "routine.settings.pausedByRun": "Paused by its {time} run",
   "routine.settings.completed": "Done · {schedule}",
   "routine.settings.active": "Active",
   "routine.settings.pauseFailed": "Could not pause this routine.",

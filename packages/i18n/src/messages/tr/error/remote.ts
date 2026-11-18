@@ -22,6 +22,8 @@ export const messages = {
   "error.remote.testActive": "Bir uzak masaüstü testi etkin. Bittiğinde tekrar deneyin.",
   "error.remote.screenRecordingDenied":
     "Ana makine OpenBot'un ekranını kaydetmesine izin vermedi. Ana makinede ekran kaydı izni verin, ardından tekrar deneyin.",
+  "error.remote.windowsSessionDisconnected":
+    "Ana makinedeki Windows oturumunun bağlantısı kesik, bu yüzden paylaşılacak ekran yok. Ana makinenin ekranında Windows'ta oturum açın, ardından tekrar deneyin.",
   "error.remote.teamSessionExpired": "Ekip oturumunun süresi doldu.",
   "error.remote.finishTestBeforeSwitch": "Ekranları değiştirmeden önce uzak masaüstü testini tamamlayın.",
   "error.remote.displayNotFound": "Uzak ekran bulunamadı.",
@@ -83,7 +85,8 @@ export const messages = {
   "error.remote.pinnedKeyMissing": "Uzak ana makinenin sabitlenmiş bir cihaz anahtarı yok.",
   "error.remote.hostDidNotConnect": "WebRTC ana makinesi bağlanmadı.",
   "error.remote.connectionCancelled": "Uzak bağlantı iptal edildi.",
-  "error.remote.hostDisconnected": "WebRTC ana makinesinin bağlantısı kesildi.",
+  "error.remote.hostDisconnected":
+    "Sunucuyla bağlantı kesildi. Eylemin tamamlanıp tamamlanmadığını kontrol edin, ardından tekrar deneyin.",
   "error.remote.eventGap": "Ana makine etkinlik dizisinde bir boşluk var.",
   "error.remote.malformedKnownEvent": "Ana makine bozuk biçimli bir bilinen etkinlik döndürdü.",
   "error.remote.fileTransportIsStopped": "WebRTC dosya iletimi durduruldu.",
@@ -149,6 +152,7 @@ export const messages = {
   "error.remote.attachmentRejected": "Ana makine eki reddetti.",
   "error.remote.attachmentTooLarge": "Ekler 10 MB veya daha küçük olmalıdır.",
   "error.remote.attachmentBusy": "Mevcut ekin tamamlanmasını bekleyin.",
+  "error.remote.attachmentChanged": "Dosya değişti veya kullanılamıyor. Yeniden seçin.",
   "error.remote.uploadTimeout": "Ek yükleme zaman aşımına uğradı.",
   "error.remote.hostSessionActive": "Ana makinede zaten etkin bir uzak oturum var.",
   "error.remote.tooManyConnections": "Çok fazla etkin uzak bağlantı.",

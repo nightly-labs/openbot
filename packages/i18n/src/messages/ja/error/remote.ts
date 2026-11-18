@@ -24,6 +24,8 @@ export const messages = {
   "error.remote.testActive": "リモートデスクトップのテストを実行中です。終了してから再試行してください。",
   "error.remote.screenRecordingDenied":
     "ホストが OpenBot に画面の収録を許可していません。ホストで画面収録を許可してから、再試行してください。",
+  "error.remote.windowsSessionDisconnected":
+    "ホストの Windows セッションが切断されているため、共有する画面がありません。ホストの画面で Windows にサインインしてから、再試行してください。",
   "error.remote.teamSessionExpired": "チームのセッションの期限が切れました。",
   "error.remote.finishTestBeforeSwitch":
     "ディスプレイを切り替える前に、リモートデスクトップのテストを終了してください。",
@@ -86,7 +88,8 @@ export const messages = {
   "error.remote.pinnedKeyMissing": "リモートホストに固定されたデバイスキーがありません。",
   "error.remote.hostDidNotConnect": "WebRTC ホストが接続しませんでした。",
   "error.remote.connectionCancelled": "リモート接続がキャンセルされました。",
-  "error.remote.hostDisconnected": "WebRTC ホストの接続が切れました。",
+  "error.remote.hostDisconnected":
+    "サーバーとの接続が切れました。操作が完了したか確認してから、もう一度お試しください。",
   "error.remote.eventGap": "ホストのイベントのシーケンスに欠落があります。",
   "error.remote.malformedKnownEvent": "ホストが不正な形式の既知のイベントを返しました。",
   "error.remote.fileTransportIsStopped": "WebRTC ファイル転送は停止しています。",
@@ -152,6 +155,7 @@ export const messages = {
   "error.remote.attachmentRejected": "ホストが添付ファイルを拒否しました。",
   "error.remote.attachmentTooLarge": "添付ファイルは 10 MB 以下にしてください。",
   "error.remote.attachmentBusy": "現在の添付ファイルが完了するまでお待ちください。",
+  "error.remote.attachmentChanged": "ファイルが変更されたか、利用できません。もう一度選択してください。",
   "error.remote.uploadTimeout": "添付ファイルのアップロードがタイムアウトしました。",
   "error.remote.hostSessionActive": "ホストにはすでに有効なリモートセッションがあります。",
   "error.remote.tooManyConnections": "有効なリモート接続が多すぎます。",

@@ -26,10 +26,28 @@ export const MOBILE_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 export type RemoteFileUpload = {
   name: string;
   mimeType: string;
+  /** The file bytes. Empty when `file` gives the bytes. */
   base64: string;
   /** A larger cap for one kind of upload, such as an agent export. The host's file limit still applies. */
   maxBytes?: number;
+  /**
+   * A file that stays on the device. The sender reads it in parts through a `RemoteFileReader`,
+   * so a large file does not cross the native/DOM bridge as one Base64 string.
+   */
+  file?: { ref: string; size: number };
 };
+
+/** Reads a device file that a `RemoteFileUpload.file` names. */
+export type RemoteFileReader = {
+  /** The SHA-256 digest of the file, as 64 lowercase hex characters. */
+  digest: (ref: string) => Effect.Effect<string, FileTransferError>;
+  read: (ref: string, offset: number, length: number) => Effect.Effect<Uint8Array, FileTransferError>;
+};
+
+const CHUNK_BYTES = 60 * 1024;
+/** One read from a device file: 16 chunks. A part crosses the bridge as one Base64 string. */
+const FILE_PART_BYTES = 16 * CHUNK_BYTES;
+const SHA256_HEX = /^[0-9a-f]{64}$/;
 
 /** The slowest upload rate a transfer waits for, in bytes per millisecond (256 KB/s). */
 const MINIMUM_UPLOAD_RATE = 256;
@@ -37,6 +55,7 @@ const MINIMUM_UPLOAD_RATE = 256;
 export function createRemoteFileSender<E, R>(
   send: (data: string | ArrayBuffer) => Effect.Effect<void, E, R>,
   createId: () => string,
+  reader?: RemoteFileReader,
 ) {
   const pending = new Map<string, { opened: () => void; reject: (error: Error) => void; error: Error | null }>();
   const sendFrame = (data: string | ArrayBuffer) => send(data).pipe(Effect.mapError(fileTransferError));
@@ -44,14 +63,11 @@ export function createRemoteFileSender<E, R>(
     input: RemoteFileUpload,
     onProgress?: (sent: number, total: number) => void,
   ) {
-    const maxBytes = Math.min(input.maxBytes ?? MOBILE_ATTACHMENT_BYTES, TEAM_PROTOCOL_V2_MAX_FILE_BYTES);
-    if (input.base64.length > Math.ceil(maxBytes / 3) * 4)
-      return yield* new FileTransferError({ message: sourceText("error.remote.attachmentTooLarge") });
-    const decoded = yield* Effect.try({ try: () => atob(input.base64), catch: fileTransferError });
-    const bytes = Uint8Array.from(decoded, (character) => character.charCodeAt(0));
-    if (bytes.length > maxBytes)
-      return yield* new FileTransferError({ message: sourceText("error.remote.attachmentTooLarge") });
-    if (pending.size !== 0) return yield* new FileTransferError({ message: sourceText("error.remote.attachmentBusy") });
+    const busy = () => new FileTransferError({ message: sourceText("error.remote.attachmentBusy") });
+    // Check before the digest too: a device file can take seconds to read.
+    if (pending.size !== 0) return yield* busy();
+    const source = yield* uploadSource(input);
+    if (pending.size !== 0) return yield* busy();
     const transferId = createId();
     const acknowledged = Deferred.makeUnsafe<void, FileTransferError>();
     const opened = () => {
@@ -72,7 +88,7 @@ export function createRemoteFileSender<E, R>(
         transfer.error = new Error(sourceText("error.remote.uploadTimeout"));
         reject(transfer.error);
       },
-      Math.max(60_000, bytes.length / MINIMUM_UPLOAD_RATE),
+      Math.max(60_000, source.size / MINIMUM_UPLOAD_RATE),
     );
     return yield* Effect.gen(function* () {
       // Observe rejection before starting I/O, including a synchronous native disconnect.
@@ -86,22 +102,27 @@ export function createRemoteFileSender<E, R>(
               transferId,
               name: input.name,
               mimeType: input.mimeType,
-              size: bytes.length,
-              sha256: Array.from(sha256(bytes), (byte) => byte.toString(16).padStart(2, "0")).join(""),
+              size: source.size,
+              sha256: source.sha256,
             }),
           ),
         ],
         { concurrency: "unbounded" },
       );
-      for (let offset = 0; offset < bytes.length; offset += 60 * 1024) {
+      for (let partOffset = 0; partOffset < source.size; partOffset += FILE_PART_BYTES) {
         if (transfer.error) return yield* fileTransferError(transfer.error);
-        const chunk = encodeTeamProtocolV2FileChunk({
-          transferId,
-          offset,
-          bytes: bytes.slice(offset, offset + 60 * 1024),
-        });
-        yield* sendFrame(new Uint8Array(chunk).buffer);
-        onProgress?.(Math.min(offset + 60 * 1024, bytes.length), bytes.length);
+        const part = yield* source.read(partOffset, Math.min(FILE_PART_BYTES, source.size - partOffset));
+        for (let index = 0; index < part.length; index += CHUNK_BYTES) {
+          if (transfer.error) return yield* fileTransferError(transfer.error);
+          const offset = partOffset + index;
+          const chunk = encodeTeamProtocolV2FileChunk({
+            transferId,
+            offset,
+            bytes: part.slice(index, index + CHUNK_BYTES),
+          });
+          yield* sendFrame(new Uint8Array(chunk).buffer);
+          onProgress?.(Math.min(offset + CHUNK_BYTES, source.size), source.size);
+        }
       }
       if (transfer.error) return yield* fileTransferError(transfer.error);
       yield* sendFrame(encodeTeamProtocolV2Frame({ version: 2, type: "file-complete", transferId }));
@@ -114,6 +135,38 @@ export function createRemoteFileSender<E, R>(
         }),
       ),
     );
+  });
+  const uploadSource = Effect.fn("RemoteFileSender.source")(function* (input: RemoteFileUpload) {
+    const tooLarge = () => new FileTransferError({ message: sourceText("error.remote.attachmentTooLarge") });
+    const unavailable = () => new FileTransferError({ message: sourceText("error.remote.attachmentChanged") });
+    const file = input.file;
+    if (file) {
+      if (!reader || !Number.isSafeInteger(file.size) || file.size < 0) return yield* unavailable();
+      if (input.maxBytes !== undefined && file.size > input.maxBytes) return yield* tooLarge();
+      if (file.size > TEAM_PROTOCOL_V2_MAX_FILE_BYTES)
+        return yield* new FileTransferError({ message: sourceText("error.remote.fileTooLarge") });
+      const digest = yield* reader.digest(file.ref);
+      if (!SHA256_HEX.test(digest)) return yield* unavailable();
+      return {
+        size: file.size,
+        sha256: digest,
+        // A part with a different length means that the file changed after it was selected.
+        read: (offset: number, length: number) =>
+          reader
+            .read(file.ref, offset, length)
+            .pipe(Effect.filterOrFail((bytes) => bytes.length === length, unavailable)),
+      };
+    }
+    const maxBytes = Math.min(input.maxBytes ?? MOBILE_ATTACHMENT_BYTES, TEAM_PROTOCOL_V2_MAX_FILE_BYTES);
+    if (input.base64.length > Math.ceil(maxBytes / 3) * 4) return yield* tooLarge();
+    const decoded = yield* Effect.try({ try: () => atob(input.base64), catch: fileTransferError });
+    const bytes = Uint8Array.from(decoded, (character) => character.charCodeAt(0));
+    if (bytes.length > maxBytes) return yield* tooLarge();
+    return {
+      size: bytes.length,
+      sha256: Array.from(sha256(bytes), (byte) => byte.toString(16).padStart(2, "0")).join(""),
+      read: (offset: number, length: number) => Effect.succeed(bytes.subarray(offset, offset + length)),
+    };
   });
   const cancelUpload = Effect.fn("RemoteFileSender.cancel")(function* () {
     for (const [transferId, transfer] of pending) {

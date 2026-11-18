@@ -15,6 +15,7 @@ import type {
   CustomAgentUsage,
   CustomProviderHarness,
   CustomProviderRestart,
+  ProviderAccountCodeLoginStatus,
   ProviderAccountPool,
   ProviderAccountStatus,
   ProviderCodeLoginStart,
@@ -48,14 +49,14 @@ import {
   type AgentProvider,
   PROCESSOR_FEATURE_MISSING,
 } from "./../agent-client";
-import { CodexAppServerClient } from "./../app-server-client";
+import { AppServerError, CodexAppServerClient } from "./../app-server-client";
 import {
   type AgentCliInfo,
   type BundledProviderExecutables,
   CodexCliError,
+  chooseInstalledFirst,
   cliPathEnvironment,
   cliSpawnTarget,
-  resolveInstalledFirst,
 } from "./../cli";
 import { readCursorUsage } from "./../cursor-usage";
 import { DISK_RESTORE_WAIT_MS, diskRestoring, providerCheckTimeoutMs } from "../disk-restore";
@@ -63,7 +64,7 @@ import { causeHelpers } from "../effect-boundary";
 import { isPythonKimiCli, type SignInRegion } from "../kimi-region";
 import { readKimiUsage } from "../kimi-usage";
 import { McpHandoffLog } from "./../mcp-handoff-log";
-import { providerMcpServerName } from "./../mcp-provider-shapes";
+import { grokMcpServerName, providerMcpServerName } from "./../mcp-provider-shapes";
 import { customProvidersOn, openCodeSignInMessage } from "./../opencode-config";
 import { readOpenCodeGoUsage } from "./../opencode-usage";
 import type { ProcessConfinement } from "../process-confinement";
@@ -71,9 +72,11 @@ import {
   type AccountLoginCompletedResult,
   type AccountReadResult,
   CLAUDE_API_KEY_ACCOUNT_TYPE,
+  CODEX_MODEL_PROVIDER_ACCOUNT_TYPE,
   decodeAccountRateLimitsReadResult,
   decodeAccountRateLimitsUpdated,
   decodeAccountReadResult,
+  decodeCodexAccountReadResult,
   decodeRateLimitResetCreditConsumeResult,
   decodeRecordResponse,
   getString,
@@ -82,6 +85,7 @@ import { ProviderSignInError } from "../provider-client-effects";
 import {
   antigravityTemp,
   BUILT_IN_PROVIDER_DRIVERS,
+  isKeyAccountSupport,
   type ProviderClientContext,
   requireProviderDriver,
   savedCustomAgents,
@@ -92,8 +96,8 @@ import { recordRestartActivity } from "../restart-activity";
 import { shortenDiagnostic } from "./../stderr-diagnostics";
 import { stopProcessTree } from "../windows-process-tree";
 import { normalizeAccountUsage, usageWindowHasReset, usageWindowResetSince } from "./account-usage";
-import { captureBrowser } from "./browser-capture";
-import { startCliCodeLogin } from "./cli-code-login";
+import { captureBrowser, signInPageByOpenBot } from "./browser-capture";
+import { CliCodeLoginFailed, type CliCodePrompt, PROMPT_TIMEOUT_MS, startCliCodeLogin } from "./cli-code-login";
 import { CliLoginFailed, CliLoginFlow, toCliLoginFailed } from "./cli-login-flow";
 import { CodexLoginFlow, toCodexLoginFailed } from "./codex-login";
 import type { ConversationRuntime } from "./conversation-runtime";
@@ -102,7 +106,7 @@ import { ModelCatalog } from "./model-catalog";
 import { startMuseDeviceLogin } from "./muse-login";
 import type { PoolCandidate } from "./provider-account-pool";
 import type { ProviderAccountStore, StoredProviderAccount } from "./provider-account-store";
-import { defaultUsageModel, ProviderAccountFailed, ProviderAccounts } from "./provider-accounts";
+import { defaultUsageModel, ownApiKeyNotice, ProviderAccountFailed, ProviderAccounts } from "./provider-accounts";
 import {
   createAcpRequestEchoReader,
   isAcpHandlerDiagnostic,
@@ -111,6 +115,7 @@ import {
   isIgnoredConfigDiagnostic,
   isMcpSignInDiagnostic,
   isMcpSubsystemDiagnostic,
+  isMcpTimeoutDiagnostic,
   isRustLogBelowErrorDiagnostic,
   isTelemetryExportDiagnostic,
   isToolCallDiagnostic,
@@ -120,10 +125,12 @@ import {
 } from "./provider-diagnostics";
 import {
   isProviderTimeout,
+  orNewSavedSignIn,
   providerFailureStatus,
   setProviderStatus,
   updateProviderStatus,
-  waitForSuccessfulProcess,
+  waitForSignInProcess,
+  watchSavedSignIn,
 } from "./provider-status";
 import { hasZeroRealtimeLimit } from "./realtime-limit";
 import { providerForAgent, providerLabel } from "./thread-items";
@@ -144,6 +151,10 @@ const CUSTOM_AGENT_USAGE_REUSE_MS = 60_000;
 const CUSTOM_AGENT_USAGE_WAKE_MS = 60 * 60_000;
 /** The providers whose app server spends a usage reset credit (`account/rateLimitResetCredit/consume`). */
 const USAGE_RESET_PROVIDERS: ReadonlySet<AgentProvider> = new Set(["codex"]);
+
+/** Codex reports a model provider that needs no OpenAI login as no account (#7501). */
+const accountReadDecoder = (provider: AgentProvider) =>
+  provider === "codex" ? decodeCodexAccountReadResult : decodeAccountReadResult;
 /**
  * How long a start may take when it holds back no other provider: the first start of a CLI that was
  * just installed, a start that follows a sign-in or a key change, the wake of a provider stopped when
@@ -190,6 +201,17 @@ function signInFileVersion(paths: readonly string[]): string {
     })
     .join("|");
 }
+
+/**
+ * Whether a sign-in that a host starts for a client (`signInProviderOnHost`) runs as one for a user
+ * at another device. `atHost`: the user is at this computer, such as the desktop app that runs a
+ * server on this computer. Only Gemini on Windows then signs in as a Connect here: its CLI opens the
+ * Google page on this computer by itself, so `startAcpAuthentication` refuses it for another device,
+ * and the user at this computer could not connect (#11677). Every other sign-in keeps its page.
+ */
+function fromAnotherDevice(provider: AgentProvider, atHost: boolean): boolean {
+  return !(atHost && provider === "antigravity" && process.platform === "win32");
+}
 /**
  * Starts that fail in a row before OpenBot stops starting a provider by itself. A start that fails,
  * that times out, or whose process ends within `STABLE_RUN_MS` counts. Only a user action starts the
@@ -198,8 +220,34 @@ function signInFileVersion(paths: readonly string[]): string {
  */
 const START_FAILURE_LIMIT = 3;
 const STABLE_RUN_MS = 2 * 60_000;
+/**
+ * Codex's words when its account check could not reach the ChatGPT service: every failure but a 401,
+ * such as no network yet. Codex does not try again itself, and a later `account/read` does.
+ */
+const CODEX_SERVICE_UNREACHABLE = new Set([
+  "workspace routing discovery failed",
+  "workspace routing discovery timed out",
+]);
+
+function isCodexServiceUnreachable(error: unknown): boolean {
+  return error instanceof AppServerError && CODEX_SERVICE_UNREACHABLE.has(error.message);
+}
 /** How often a restart the user asked for checks whether the provider's turns have ended. */
 const PROVIDER_RESTART_POLL_MS = 1_000;
+/**
+ * The waits before a model list that failed is read again. The first read after a CLI update can
+ * fail for a short time, and a read at once failed again.
+ */
+const FAILED_MODEL_LIST_RETRY_DELAYS_MS = [2_000, 15_000];
+/**
+ * How old the model list of a running provider with `relistWhileRunning` can be before the idle
+ * check reads it again. Such a CLI changes its list while it runs: a model that the user adds in its
+ * own settings, such as a GitHub Copilot model with the user's own key. With active agents the
+ * process never stops, so the picker kept the old list until a restart, and a joined server has no
+ * refresh action (#8495). An ACP agent reads its list in a probe session, so the wait is the idle
+ * release time: a process that no turn uses stops after it, and the next turn reads its list.
+ */
+const MODEL_LIST_REREAD_MS = PROVIDER_IDLE_RELEASE_MS;
 /** The start failure of OpenCode 1 on a database that OpenCode 2 made. */
 const OPENCODE_NEWER_DATABASE = /\bDatabase is not empty and has no session table\b/u;
 /**
@@ -266,7 +314,12 @@ function pushedUsageLimit(provider: AgentProvider, params: unknown): AccountUsag
     return null;
   }
   if ((rateLimits.limitId ?? provider) !== provider) return null;
-  const limit = normalizeAccountUsage({ rateLimits, rateLimitsByLimitId: null }).limits[0];
+  // A push with no credit state leaves the credits as they were, as Codex's own view keeps them.
+  const { credits, ...windows } = rateLimits;
+  const limit = normalizeAccountUsage({
+    rateLimits: credits ? rateLimits : windows,
+    rateLimitsByLimitId: null,
+  }).limits[0];
   return limit && (limit.primary || limit.secondary) ? limit : null;
 }
 
@@ -322,6 +375,8 @@ export interface ProviderHooks {
   isStopping(): boolean;
   /** True while a turn on this provider runs or starts, which replacing its CLI would cut short. */
   isProviderBusy(provider: AgentProvider): boolean;
+  /** `isProviderBusy` without the turns of this agent. Absent: as `isProviderBusy`. */
+  isProviderBusyApartFrom?(provider: AgentProvider, agentId: string): boolean;
   /** True while a turn of this agent runs. An agent's own process stays while its own turn runs. */
   isAgentBusy(agentId: string): boolean;
   /** True while an agent is set to this provider, so a turn on it can come at any time. */
@@ -345,6 +400,10 @@ export interface ProviderHooks {
    * they were at `configRevision`, which is what `captureConfigRevision` answered when it spawned.
    */
   onProviderActivated(provider: AgentProvider, configRevision: number): Effect.Effect<void, ProviderOperationFailed>;
+  /** Runs after an account after the first listed its models, which `accountModels` now answers. */
+  onAccountModelsListed?(provider: AgentProvider, accountId: string): Effect.Effect<void>;
+  /** Runs after a change to the accounts of a provider, such as an account that connected. */
+  onAccountsChanged?(): void;
   /**
    * The configuration a process spawning now reads. A CLI reads the endpoint files once, at spawn,
    * so a change made while it starts is not in the process that arrives.
@@ -382,6 +441,13 @@ const INITIAL_STATUS: AgentStatus = {
   message: null,
   fullAccess: true,
 };
+
+/** The text of each kind of provider MCP failure that `#reportMcpServerFailure` shows. */
+const MCP_SERVER_FAILURE_TEXT = {
+  sign_in: "error.backend.mcpServerSignInForProvider",
+  timeout: "error.backend.mcpServerTimedOutInProvider",
+  failed: "error.backend.mcpServerFailedInProvider",
+} as const;
 
 /**
  * Owns provider processes, their CLIs, accounts, login flows and the derived AgentStatus.
@@ -439,9 +505,14 @@ export class ProviderRuntime implements ProviderPort {
    * `#cli` holds only the CLI a client runs on, and a provider that is signed out has no client
    * although its binary is resolved and its version is on the row. Without this record that row
    * names no owner, and an unowned CLI is read as the managed copy: the user's own install would be
-   * offered a download instead of its own updater.
+   * offered a download instead of its own updater. `incomplete` goes on the row too (#9139).
    */
-  readonly #cliSources = new Map<AgentProvider, AgentCliInfo["source"]>();
+  readonly #cliSources = new Map<AgentProvider, Pick<AgentCliInfo, "source" | "incomplete">>();
+  /** The CLI the last resolution passed over, which the user can switch to (`chooseInstalledCli`). */
+  readonly #passedOverClis = new Map<
+    AgentProvider,
+    { source: AgentCliInfo["source"]; version: string; incomplete?: boolean }
+  >();
   readonly #accounts = new Map<AgentProvider, AccountReadResult["account"]>();
   readonly #providerStarts = new Map<AgentProvider, Deferred.Deferred<void, ProviderOperationFailed>>();
   /**
@@ -472,11 +543,13 @@ export class ProviderRuntime implements ProviderPort {
   /** A custom agent change that a turn delayed. The idle check applies it when the turn stops. */
   #customAgentsReloadPending = false;
   /**
-   * Providers that a turn kept on the old agent environment or OpenCode config. The idle check
-   * restarts each after its turn.
+   * Providers that a turn kept on the old agent environment or OpenCode config, or whose restart
+   * waited for an update that was cancelled. The idle check restarts each after its turn.
    */
   readonly #environmentReloadPending = new Set<AgentProvider>();
   readonly #lastUsed = new Map<AgentProvider, number>();
+  /** The compaction mode of each provider's last process. An idle release keeps it. */
+  readonly #compactionModes = new Map<AgentProvider, NonNullable<AgentClient["contextCompaction"]>>();
   /**
    * The last failure of each provider: a start, an exit, a model list or a diagnostic shown to the
    * user. The provider row keeps it after the toast is gone, until a model list that started after
@@ -484,8 +557,12 @@ export class ProviderRuntime implements ProviderPort {
    */
   readonly #lastErrors = new Map<AgentProvider, { message: string; at: number; serial: number }>();
   #errorSerial = 0;
-  /** The providers whose model list is read again after it timed out. */
+  /** The providers whose model list is read again: after it timed out, or because it is old. */
   readonly #relisting = new Set<AgentProvider>();
+  /** When the model lists were last read, for `MODEL_LIST_REREAD_MS`. */
+  #modelsReadAt = 0;
+  /** The clients whose failed model list was read again. Each client gets these reads one time. */
+  readonly #relistedAfterFailure = new WeakSet<AgentClient>();
   /** The MCP server failures shown in this run, by provider, server and kind. */
   readonly #reportedMcpFailures = new Set<string>();
   /** The last usage each provider reported, shown for a released provider instead of starting it. */
@@ -499,6 +576,8 @@ export class ProviderRuntime implements ProviderPort {
   readonly #resetCredits = new WeakMap<AgentClient, number | null>();
   /** The same count for each provider's own sign-in, kept for a released provider as `#lastUsage` is. */
   readonly #ownResetCredits = new Map<AgentProvider, number | null>();
+  /** Whether the last reading of each client's own quota said that the account works on credits. */
+  readonly #creditsAvailable = new WeakMap<AgentClient, boolean>();
   /**
    * Providers whose last usage read returned no limit, such as custom ACP agents. The dock polls
    * every five minutes, so starting a released one to ask again would keep its process running.
@@ -549,12 +628,28 @@ export class ProviderRuntime implements ProviderPort {
   readonly #modelCatalog: ModelCatalog;
   readonly #off: Set<AgentProvider>;
   readonly #saveProviderUse: (provider: AgentProvider, on: boolean) => Effect.Effect<void, ProviderOperationFailed>;
+  /** The managed CLIs that the user chose to run in their own install, also when OpenBot's copy is newer. */
+  readonly #installedChosen: Set<AgentProvider>;
+  /**
+   * The managed CLIs whose newer copy from OpenBot failed each start, so the CLI that the user installed
+   * runs in its place until the app restarts, the copy changes, or the user chooses (#10174). Not saved.
+   */
+  readonly #installedFallback = new Set<AgentProvider>();
+  readonly #saveInstalledChoice: (
+    provider: AgentProvider,
+    installed: boolean,
+  ) => Effect.Effect<void, ProviderOperationFailed>;
   /** Null without a store, as in tests: each provider then holds its own sign-in only. */
   readonly #providerAccounts: ProviderAccounts | null;
 
   constructor(options: {
     offProviders?: readonly AgentProvider[];
     saveProviderUse?: (provider: AgentProvider, on: boolean) => Effect.Effect<void, ProviderOperationFailed>;
+    installedCliProviders?: readonly AgentProvider[];
+    saveInstalledCliChoice?: (
+      provider: AgentProvider,
+      installed: boolean,
+    ) => Effect.Effect<void, ProviderOperationFailed>;
     conversation: ConversationRuntime;
     hooks: ProviderHooks;
     emit: (event: AgentEvent) => void;
@@ -572,6 +667,8 @@ export class ProviderRuntime implements ProviderPort {
   }) {
     this.#off = new Set(options.offProviders);
     this.#saveProviderUse = options.saveProviderUse ?? (() => Effect.void);
+    this.#installedChosen = new Set(options.installedCliProviders);
+    this.#saveInstalledChoice = options.saveInstalledCliChoice ?? (() => Effect.void);
     this.#conversation = options.conversation;
     this.#hooks = options.hooks;
     this.#emit = options.emit;
@@ -587,6 +684,7 @@ export class ProviderRuntime implements ProviderPort {
     this.#redactMcp = options.redactMcp;
     this.#codexLogin = new CodexLoginFlow({
       bundledExecutable: () => this.#bundledExecutables.codex,
+      installedChosen: () => this.#installedChosen.has("codex") || this.#installedFallback.has("codex"),
       createClient: (cli) => {
         const client = this.#clientFactory
           ? this.#clientFactory("codex", cli)
@@ -631,6 +729,19 @@ export class ProviderRuntime implements ProviderPort {
             return account ? { email: account.email ?? null, organization: account.organization ?? null } : null;
           },
           apiKey: (provider) => this.#credentials.apiKey(provider),
+          accountKey: (provider, accountId) => this.#credentials.accountKeys?.get(provider, accountId) ?? null,
+          saveAccountKey: (provider, accountId, key) =>
+            this.#credentials.accountKeys
+              ? this.#credentials.accountKeys
+                  .set(provider, accountId, key)
+                  .pipe(Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })))
+              : Effect.fail(
+                  new ProviderAccountFailed({
+                    cause: new Error(
+                      sourceText("error.provider.accountsUnsupported", { provider: providerLabel(provider) }),
+                    ),
+                  }),
+                ),
           defaultUsesApiKey: (provider) => this.ownSignInUsesKey(provider),
           signInTemp: (provider) => {
             const temp = provider === "antigravity" ? antigravityTemp(this.#credentials) : undefined;
@@ -693,7 +804,16 @@ export class ProviderRuntime implements ProviderPort {
             this.#consumeUsageReset(client).pipe(
               Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })),
             ),
-          changed: () => this.#setStatus({}),
+          changed: () => {
+            this.#setStatus({});
+            this.#hooks.onAccountsChanged?.();
+          },
+          // Forked: the hook can move agents, and the check that listed the models must not wait for that.
+          modelsListed: (provider, accountId) =>
+            (this.#hooks.onAccountModelsListed?.(provider, accountId) ?? Effect.void).pipe(
+              Effect.forkIn(this.#scope),
+              Effect.asVoid,
+            ),
           usageChanged: (limit) => this.#emit({ type: "usage-changed", usage: { limits: [structuredClone(limit)] } }),
           redact: (text) => this.#redactMcp(redactText(text)),
         })
@@ -701,9 +821,12 @@ export class ProviderRuntime implements ProviderPort {
     this.#modelCatalog = new ModelCatalog({
       client: (provider) => (this.#off.has(provider) ? undefined : this.#clients.get(provider)),
       isSignedOut: (provider) => this.signInRequired(provider),
-      credentials: this.#credentials,
       requestTimeoutMs: this.#requestTimeoutMs,
       recordProviderError: (provider, error) => this.#recordProviderError(provider, error),
+      // Apart from the read: the restart reads the catalogue again itself. An agent's own process, such
+      // as one of an account after the first, read the same settings at its start, so it starts again too.
+      startSettingsChanged: (provider) =>
+        this.spawnSettingsChanged(provider).pipe(Effect.ignore, Effect.forkIn(this.#scope), Effect.asVoid),
     });
   }
 
@@ -726,25 +849,31 @@ export class ProviderRuntime implements ProviderPort {
       ...status,
       providers: status.providers.map((row) => {
         if (this.#off.has(row.id)) return { id: row.id, state: "not-started", version: null, message: null, off: true };
-        const source = this.#cli.get(row.id)?.source ?? this.#cliSources.get(row.id);
+        const resolved = this.#cli.get(row.id) ?? this.#cliSources.get(row.id);
+        const source = resolved?.source ?? this.#cliSources.get(row.id)?.source;
+        const passedOver = this.#passedOverClis.get(row.id);
         const lastError = this.#lastErrors.get(row.id);
         const unverified =
           row.id === "muse" && row.state === "available" && this.#accounts.get(row.id)?.type === "muse-unverified";
+        const modelSource = this.#modelCatalog.source(row.id);
         const withSource = {
           ...row,
           ...(unverified
             ? { state: "sign-in-required" as const, message: sourceText("error.provider.museAuthUnverified") }
             : {}),
           ...(source ? { cliSource: source } : {}),
+          ...(source === "system" && resolved?.incomplete ? { cliIncomplete: true } : {}),
+          ...(passedOver && source && passedOver.source !== source ? { otherCliVersion: passedOver.version } : {}),
           ...(lastError ? { lastError: lastError.message, lastErrorAt: lastError.at } : {}),
           ...(row.id === "antigravity" && this.#credentials.apiKey("antigravity") ? { apiKeyInUse: true } : {}),
           ...(row.id === "codex" && this.#accounts.get("codex")?.type === "apiKey" ? { apiKeyInUse: true } : {}),
           ...(row.id === "muse" && this.#credentials.apiKey("muse") ? { apiKeyInUse: true } : {}),
+          ...(modelSource ? { modelSource } : {}),
         };
         const accounts =
           row.state === "available" && row.id !== "acp"
             ? this.#providerAccounts
-                ?.rows(row.id, row.email ?? null)
+                ?.rows(row.id, row.email ?? null, ownApiKeyNotice(this.#accounts.get(row.id)))
                 ?.map((account) => this.#extraModels(row.id, account))
             : undefined;
         const pool = accounts ? this.accountPool(row.id) : null;
@@ -859,18 +988,22 @@ export class ProviderRuntime implements ProviderPort {
         });
       }
       const driver = requireProviderDriver(provider);
-      const bundledExecutable = this.#bundledExecutables[driver.cliProvider ?? provider];
-      const cli = yield* resolveInstalledFirst(
+      const cliProvider = driver.cliProvider ?? provider;
+      const { cli, passedOver } = yield* chooseInstalledFirst(
         (input) => driver.resolveCli(input),
-        bundledExecutable,
+        this.#bundledExecutables[cliProvider],
         preferInstalled,
+        this.#installedChosen.has(cliProvider) || this.#installedFallback.has(cliProvider),
       ).pipe(toProviderOperationFailed);
-      this.#cliSources.set(provider, cli.source);
+      this.#cliSources.set(provider, cli);
+      if (passedOver) this.#passedOverClis.set(provider, passedOver);
+      else this.#passedOverClis.delete(provider);
       return cli;
     }).pipe(
       Effect.onError(() =>
         Effect.sync(() => {
           this.#cliSources.delete(provider);
+          this.#passedOverClis.delete(provider);
         }),
       ),
     );
@@ -966,10 +1099,17 @@ export class ProviderRuntime implements ProviderPort {
     }
   }, Effect.uninterruptible);
 
-  /** True while a turn, a start, a connection command, a CLI change or a sign-in uses the provider's process. */
-  #providerInUse(provider: AgentProvider): boolean {
+  /**
+   * True while a turn, a start, a connection command, a CLI change or a sign-in uses the provider's
+   * process. `apartFrom` leaves out the turns of that agent.
+   */
+  #providerInUse(provider: AgentProvider, apartFrom?: string): boolean {
+    const busy =
+      apartFrom === undefined
+        ? this.#hooks.isProviderBusy(provider)
+        : (this.#hooks.isProviderBusyApartFrom?.(provider, apartFrom) ?? this.#hooks.isProviderBusy(provider));
     return (
-      this.#hooks.isProviderBusy(provider) ||
+      busy ||
       this.#providerStarts.has(provider) ||
       this.#providerConnectionCommands.has(provider) ||
       this.isReplacingCli(provider) ||
@@ -998,16 +1138,21 @@ export class ProviderRuntime implements ProviderPort {
    * keeps watchers in each folder that one of its sessions used until its process ends, also after
    * `session/close`, and Windows refuses to remove a watched folder (`EBUSY`, #7029). A process that
    * a turn of another agent uses stays: the delete fails, and a retry after that turn can succeed.
+   * True when work keeps the process: a turn, a start, or work that a turn left running.
    */
   readonly releaseSharedProcess = Effect.fn("ProviderRuntime.releaseSharedProcess")(function* (
     this: ProviderRuntime,
     provider: AgentProvider,
   ) {
     const client = this.#clients.get(provider);
-    if (!client || this.#hooks.isStopping() || this.#status.phase !== "ready") return;
-    if (client.canReleaseProcess?.() === false || this.#providerInUse(provider)) return;
+    if (!client || this.#hooks.isStopping() || this.#status.phase !== "ready") return false;
+    if (client.canReleaseProcess?.() === false || this.#providerInUse(provider)) {
+      logger.info("Kept a provider CLI that holds a deleted agent's folder, because work uses it.", { provider });
+      return true;
+    }
     logger.info("Stopped a provider CLI that holds a deleted agent's folder.", { provider });
     yield* this.#releaseClient(provider, client);
+    return false;
   }, Effect.uninterruptible).bind(this);
 
   /** Closes the idle threads of each client and each Workspace only process, when memory is low. */
@@ -1045,6 +1190,15 @@ export class ProviderRuntime implements ProviderPort {
    * as the agent's own process does, so the generation does not spend the limit of the provider's own sign-in.
    */
   createProfileClient(provider: AgentProvider, accountId?: string): AgentClient {
+    return this.#sideClient(provider, accountId, "profile");
+  }
+
+  /** A client that makes one image or video with the provider's media tools, and runs no other tool. */
+  createMediaClient(provider: AgentProvider, accountId?: string): AgentClient {
+    return this.#sideClient(provider, accountId, "media");
+  }
+
+  #sideClient(provider: AgentProvider, accountId: string | undefined, purpose: "profile" | "media"): AgentClient {
     this.requireProviderOn(provider);
     if (provider === "acp" && this.#removingCustomRuntime)
       throw new Error(sourceText("error.provider.registryRemoveBusy"));
@@ -1058,6 +1212,8 @@ export class ProviderRuntime implements ProviderPort {
     if (this.#clientFactory) return this.#clientFactory(provider, cli, undefined, accountEnvironment);
     const context = accountEnvironment ? { ...this.#credentials, accountEnvironment } : this.#credentials;
     const driver = requireProviderDriver(provider);
+    if (purpose === "media" && driver.createMediaClient)
+      return driver.createMediaClient(cli, this.#requestTimeoutMs, context);
     if (driver.createProfileClient) return driver.createProfileClient(cli, this.#requestTimeoutMs, context);
     return driver.createClient(cli, this.#requestTimeoutMs, context);
   }
@@ -1139,12 +1295,22 @@ export class ProviderRuntime implements ProviderPort {
             // Starting a provider that has no usage reading only to get nothing back cost a cold
             // start on every dock poll.
             if (!agentProviderDescriptor(provider).reportsUsage) return null;
-            // A Codex API-key login has no plan usage: Codex refuses the read.
-            if (provider === "codex" && this.#accounts.get(provider)?.type === "apiKey") return null;
+            // A Codex API-key login, or a model provider with no OpenAI login, has no plan usage:
+            // Codex refuses the read.
+            const codexType = provider === "codex" ? this.#accounts.get(provider)?.type : undefined;
+            if (codexType === "apiKey" || codexType === CODEX_MODEL_PROVIDER_ACCOUNT_TYPE) return null;
             const released = this.#released.has(provider) && !this.#clients.has(provider);
             const cli = this.#cli.get(provider);
             const accounts = ProviderAccounts.support(provider);
-            if (released && !this.#usageUnreported.has(provider) && cli && accounts && !accounts.usageLeavesSession) {
+            // A provider with key accounts reads its own usage as before them: from the kept reading.
+            if (
+              released &&
+              !this.#usageUnreported.has(provider) &&
+              cli &&
+              accounts &&
+              !isKeyAccountSupport(accounts) &&
+              !accounts.usageLeavesSession
+            ) {
               // The CLI stopped when idle. A short process reads the usage, as for an account after the first,
               // so use outside OpenBot shows and the CLI stays stopped (#6818). The gate paces these reads.
               usage = yield* Effect.acquireUseRelease(
@@ -1166,7 +1332,15 @@ export class ProviderRuntime implements ProviderPort {
               // first does, so it does not leave the rail.
               const first = usage.limits[0];
               const last = this.#lastUsage.get(provider);
-              if (accounts?.usageLeavesSession && last && !first?.primary && !first?.secondary) return last;
+              if (
+                accounts &&
+                !isKeyAccountSupport(accounts) &&
+                accounts.usageLeavesSession &&
+                last &&
+                !first?.primary &&
+                !first?.secondary
+              )
+                return last;
             }
           }
           const limit = usage.limits[0];
@@ -1468,8 +1642,15 @@ export class ProviderRuntime implements ProviderPort {
 
   readonly start = Effect.fn("ProviderRuntime.start")(function* (this: ProviderRuntime) {
     if (this.#scope.state._tag === "Closed") this.#scope = Scope.makeUnsafe();
+    // The model lists are read after the release, so a process that this check stops is not read.
     this.#idleCheck ??= setInterval(
-      () => Effect.runFork(this.#releaseIdleProviders().pipe(Effect.forkIn(this.#scope))),
+      () =>
+        Effect.runFork(
+          Effect.exit(this.#releaseIdleProviders()).pipe(
+            Effect.andThen(this.#rereadModels()),
+            Effect.forkIn(this.#scope),
+          ),
+        ),
       PROVIDER_IDLE_CHECK_MS,
     );
     this.#idleCheck.unref?.();
@@ -1557,7 +1738,12 @@ export class ProviderRuntime implements ProviderPort {
     for (const [provider, file] of this.#signInFiles) {
       const row = this.#status.providers?.find((candidate) => candidate.id === provider);
       if (row?.state !== "sign-in-required") continue;
-      if (this.#cliLogin.has(provider) || this.#providerConnectionCommands.has(provider)) continue;
+      if (
+        this.#cliLogin.has(provider) ||
+        this.#providerConnectionCommands.has(provider) ||
+        (provider === "codex" && this.#codexLogin.pending)
+      )
+        continue;
       const version = signInFileVersion(file.paths);
       if (version === file.seen) continue;
       file.seen = version;
@@ -1701,13 +1887,23 @@ export class ProviderRuntime implements ProviderPort {
     onHost: boolean,
     region: SignInRegion = "global",
   ) {
+    const state = () => this.#status.providers?.find((row) => row.id === provider)?.state;
+    const before = state();
     this.#startFailures.delete(provider);
     const start = this.#providerStarts.get(provider);
     if (start) yield* Deferred.await(start);
     if (start && this.#clients.has(provider) && this.#accounts.has(provider)) return this.status();
-    if (this.#providerRefresh || (!start && ["starting", "restarting"].includes(this.#status.phase))) {
-      return this.status();
+    // A check of the providers cancels each sign-in that has not finished (`#refreshProviders`), so a
+    // Connect during a check waits for its end. Before, the Connect ended with no sign-in and no
+    // message (#9384). When the check finds a signed-out provider connected, the Connect has nothing
+    // to do. A row that showed the check gives no such state, so its Connect signs in.
+    let waited = false;
+    while (this.#providerRefresh) {
+      waited = true;
+      yield* Deferred.await(this.#providerRefresh).pipe(Effect.ignore);
     }
+    if (waited && before !== "available" && before !== "checking" && state() === "available") return this.status();
+    if (!start && ["starting", "restarting"].includes(this.#status.phase)) return this.status();
     const signIn = requireProviderDriver(provider).signIn;
     return yield* this.#runProviderConnectionCommand(provider, () =>
       this.#signIn(provider, signIn, openExternal, onHost, region),
@@ -1732,19 +1928,21 @@ export class ProviderRuntime implements ProviderPort {
         yield* this.#cliLogin
           .start(provider, (cli) =>
             Effect.gen(function* () {
-              const browser = onHost ? yield* captureBrowser(openExternal) : {};
-              const { argv } = signIn.command;
+              const browser = signInPageByOpenBot(onHost, signIn.command) ? yield* captureBrowser(openExternal) : {};
+              const { argv, savedSignIn } = signIn.command;
               const target = cliSpawnTarget(
                 cli.executable,
                 typeof argv === "function" ? yield* argv(cli, region) : argv,
               );
+              const env = { ...process.env, ...signIn.command.env(cli, region), ...browser };
+              const watch = yield* watchSavedSignIn(savedSignIn?.(cli, env));
               const child = yield* Effect.acquireRelease(
                 Effect.try({
                   try: () =>
                     spawn(target.command, target.args, {
                       cwd: process.cwd(),
-                      env: { ...process.env, ...signIn.command.env(cli, region), ...browser },
-                      stdio: "ignore",
+                      env,
+                      stdio: signIn.command.failureText ? ["ignore", "pipe", "pipe"] : "ignore",
                       shell: false,
                       windowsHide: process.platform === "win32",
                       windowsVerbatimArguments: target.windowsVerbatimArguments,
@@ -1753,7 +1951,7 @@ export class ProviderRuntime implements ProviderPort {
                 }),
                 (child) => stopProcessTree(child).pipe(Effect.orDie),
               );
-              return { child, done: waitForSuccessfulProcess(child, signIn.command.timeoutMs) };
+              return { child, done: orNewSavedSignIn(waitForSignInProcess(child, signIn.command), watch, undefined) };
             }),
           )
           .pipe(toProviderOperationFailed);
@@ -1858,27 +2056,78 @@ export class ProviderRuntime implements ProviderPort {
   }).bind(this);
 
   /**
+   * Gives a provider account after the first its API key: a new account when `accountId` is null.
+   * Answers when the provider accepted the key, and fails with the reason when it did not.
+   */
+  readonly connectProviderAccountKey = Effect.fn("ProviderRuntime.connectProviderAccountKey")(function* (
+    this: ProviderRuntime,
+    provider: AgentProvider,
+    accountId: string | null,
+    key: string,
+  ) {
+    yield* providerStep(() => this.requireProviderOn(provider));
+    const accounts = yield* this.#requireAccounts(provider);
+    yield* accounts.connectKey(provider, accountId, key).pipe(toProviderOperationFailed);
+    return this.status();
+  }).bind(this);
+
+  /**
    * Signs a provider account after the first in through the page that its CLI prints, which
    * `openPage` shows, and waits until the sign-in ends. For a host whose browser the user reaches only
    * through a live view (`provider-accounts-v1`). An interrupt cancels the sign-in.
+   * `atHost`: the user who started it is at this computer (`fromAnotherDevice`).
    */
   readonly signInProviderAccountOnHost = Effect.fn("ProviderRuntime.signInProviderAccountOnHost")(function* (
     this: ProviderRuntime,
     provider: AgentProvider,
     accountId: string | null,
     openPage: (url: string) => Promise<void>,
+    atHost = false,
   ) {
     yield* providerStep(() => this.requireProviderOn(provider));
     const accounts = yield* this.#requireAccounts(provider);
     // The start runs uninterruptible, so an interrupt at any point cancels the sign-in it started.
     const error = yield* Effect.acquireUseRelease(
-      accounts.connect(provider, accountId, openPage, true).pipe(toProviderOperationFailed),
+      accounts
+        .connect(provider, accountId, openPage, fromAnotherDevice(provider, atHost))
+        .pipe(toProviderOperationFailed),
       (signIn) => signIn.ended,
       (signIn, exit) =>
         Exit.hasInterrupts(exit) ? accounts.cancel(provider, signIn.accountId, signIn.signIn) : Effect.void,
     );
     if (error) return yield* new ProviderOperationFailed({ cause: new Error(error) });
   }).bind(this);
+
+  /**
+   * Signs a provider account after the first in with a code or a link that the user finishes on any
+   * device: a new one when `accountId` is null. Answers with what the provider's CLI printed.
+   * `providerAccountCodeLoginStatus` tells how it ends, and `cancelProviderAccountSignIn` stops it.
+   */
+  readonly startProviderAccountCodeLogin = Effect.fn("ProviderRuntime.startProviderAccountCodeLogin")(function* (
+    this: ProviderRuntime,
+    provider: AgentProvider,
+    accountId: string | null,
+  ) {
+    yield* providerStep(() => this.requireProviderOn(provider));
+    const accounts = yield* this.#requireAccounts(provider);
+    return yield* accounts.connectWithCode(provider, accountId).pipe(toProviderOperationFailed);
+  }).bind(this);
+
+  /** See `ProviderAccounts.submitCode`. Throws when the provider has no account that waits for a code. */
+  submitProviderAccountCodeLogin(provider: AgentProvider, accountId: string, code: string): void {
+    const accounts = this.#providerAccounts;
+    if (!accounts || provider === "acp") throw new Error(sourceText("error.provider.codeLoginNotWaiting"));
+    accounts.submitCode(provider, accountId, code);
+  }
+
+  /** See `ProviderAccounts.codeSignInStatus`. */
+  providerAccountCodeLoginStatus(provider: AgentProvider, accountId: string): ProviderAccountCodeLoginStatus {
+    const accounts = this.#providerAccounts;
+    if (accounts && provider !== "acp") return accounts.codeSignInStatus(provider, accountId);
+    return {
+      result: { error: sourceText("error.provider.accountsUnsupported", { provider: providerLabel(provider) }) },
+    };
+  }
 
   /** Stops the sign-in of an account. A new account goes with its folder; another one shows as signed out. */
   readonly cancelProviderAccountSignIn = Effect.fn("ProviderRuntime.cancelProviderAccountSignIn")(function* (
@@ -2047,6 +2296,12 @@ export class ProviderRuntime implements ProviderPort {
     return this.#providerAccounts?.models(provider, accountId) ?? [];
   }
 
+  /** As `accountModels`, but null while an account after the first has not listed its models yet. */
+  listedAccountModels(provider: AgentProvider, accountId: string | undefined): AgentModelOption[] | null {
+    if (this.#off.has(provider)) return [];
+    return this.#providerAccounts?.listedModels(provider, accountId) ?? [];
+  }
+
   /** True when `accountId` names an account after the first that this computer holds. */
   hasProviderAccount(provider: AgentProvider, accountId: string): boolean {
     return this.#providerAccounts?.account(provider, accountId) != null;
@@ -2066,13 +2321,15 @@ export class ProviderRuntime implements ProviderPort {
    * Signs `provider` in through the page that its CLI prints, which `openPage` shows, and waits until
    * the sign-in ends. For a host whose browser the user reaches only through a live view
    * (`provider-host-sign-in-v1`). Fails with the reason when the provider is not signed in at the end.
+   * `atHost`: the user who started it is at this computer (`fromAnotherDevice`).
    */
   readonly signInProviderOnHost = Effect.fn("ProviderRuntime.signInProviderOnHost")(function* (
     this: ProviderRuntime,
     provider: AgentProvider,
     openPage: (url: string) => Promise<void>,
+    atHost = false,
   ) {
-    yield* this.#connectProvider(provider, openPage, true);
+    yield* this.#connectProvider(provider, openPage, fromAnotherDevice(provider, atHost));
     // A sign-in that ended before this read leaves no task; the clients then tell how it ended.
     const pending =
       requireProviderDriver(provider).signIn.kind === "browser"
@@ -2150,6 +2407,47 @@ export class ProviderRuntime implements ProviderPort {
         )
         .pipe(toProviderOperationFailed);
     }
+    if (codeSignIn.kind === "acp-delegated") {
+      const page = Deferred.makeUnsafe<string>();
+      const noLink = () => new CliCodeLoginFailed({ cause: new Error(sourceText("error.provider.codeLoginNoLink")) });
+      return yield* this.#cliLogin
+        .startCode(
+          provider,
+          (cli) =>
+            startAcpAuthentication({
+              executable: cli.executable,
+              argv: codeSignIn.argv,
+              env: { ...codeSignIn.env },
+              methodId: codeSignIn.methodId,
+              timeoutMs: codeSignIn.timeoutMs,
+              onSignInUrl: (url) => Deferred.doneUnsafe(page, Effect.succeed(url)),
+            }).pipe(
+              Effect.map(({ child, done }) => ({
+                child,
+                done,
+                // The server's page, null when it signed in with no page, or the reason it stopped first.
+                prompt: Effect.raceFirst(
+                  Deferred.await(page).pipe(
+                    Effect.map((verificationUrl): CliCodePrompt => ({ flow: "link", verificationUrl })),
+                  ),
+                  done.pipe(
+                    Effect.as(null),
+                    Effect.mapError((cause) => new CliCodeLoginFailed({ cause })),
+                  ),
+                ).pipe(
+                  Effect.timeoutOrElse({ duration: PROMPT_TIMEOUT_MS, orElse: () => Effect.fail(noLink()) }),
+                  // A sign-in with no page stops, as a CLI code sign-in does.
+                  Effect.tapError(() => stopProcessTree(child).pipe(Effect.ignore)),
+                ),
+                submit() {
+                  throw new Error(sourceText("error.provider.codeLoginNotWaiting"));
+                },
+              })),
+            ),
+          codeSignIn.timeoutMs,
+        )
+        .pipe(toProviderOperationFailed);
+    }
     const { command, flow } = codeSignIn;
     return yield* this.#cliLogin
       .startCode(
@@ -2157,13 +2455,15 @@ export class ProviderRuntime implements ProviderPort {
         (cli) =>
           Effect.gen(function* () {
             const argv = typeof command.argv === "function" ? yield* command.argv(cli, "global") : command.argv;
+            const env = { ...cliPathEnvironment(cli), ...command.env(cli, "global") };
             return yield* startCliCodeLogin({
               flow,
               executable: cli.executable,
               argv,
-              env: { ...cliPathEnvironment(cli), ...command.env(cli, "global") },
+              env,
               timeoutMs: command.timeoutMs,
               ...(command.closeInput ? { closeInput: true } : {}),
+              ...(command.savedSignIn ? { savedSignIn: command.savedSignIn(cli, { ...process.env, ...env }) } : {}),
             });
           }),
         command.timeoutMs,
@@ -2308,7 +2608,14 @@ export class ProviderRuntime implements ProviderPort {
     this: ProviderRuntime,
   ): Effect.fn.Return<CustomProviderRestart, ProviderOperationFailed> {
     if (!this.#clients.has("acp")) {
-      if (this.#released.has("acp") || savedCustomAgents(this.#credentials).length === 0) return "not-running";
+      if (savedCustomAgents(this.#credentials).length === 0) return "not-running";
+      // A process stopped for idle keeps its old catalogue, and only an agent's turn starts it again.
+      // A changed agent would then list no model, so no agent could be set to it (#10026). As for a
+      // custom endpoint, the start is not awaited; a failure shows on the status.
+      if (this.#released.has("acp")) {
+        yield* this.ensureProvider("acp").pipe(Effect.ignore, Effect.forkIn(this.#scope));
+        return "not-running";
+      }
       yield* this.refreshProvider("acp").pipe(toProviderOperationFailed);
       return this.#clients.has("acp") ? "restarted" : "not-running";
     }
@@ -2479,9 +2786,18 @@ export class ProviderRuntime implements ProviderPort {
     }
   });
 
-  /** Ends a wait that did not reach the install, because it was cancelled or failed. */
+  /**
+   * Ends a wait that did not reach the install, because it was cancelled or failed. A restart that
+   * waits for the same turns then runs when they end, and new turns do not wait for it: one Cancel
+   * releases them (#10825).
+   */
   #endUpdateWhenIdle(provider: AgentProvider): void {
-    if (this.#updatesWhenIdle.delete(provider)) this.#hooks.onProviderResumed(provider);
+    if (!this.#updatesWhenIdle.delete(provider)) return;
+    if (this.#restartsWhenIdle.get(provider) && this.#hooks.isProviderBusy(provider)) {
+      this.cancelProviderRestart(provider);
+      this.#environmentReloadPending.add(provider);
+    }
+    this.#hooks.onProviderResumed(provider);
   }
 
   /** Answers null, and installs nothing, when a turn started on the provider after the wait. */
@@ -2532,6 +2848,16 @@ export class ProviderRuntime implements ProviderPort {
               cause: new Error(sourceText("error.provider.cliSelectFailed")),
             });
           yield* this.#reloadProviderCli(provider, cli, firstInstall);
+          // The new process does a restart that waits, also one that a cancelled update gave to the idle check.
+          this.cancelProviderRestart(provider);
+          this.#environmentReloadPending.delete(provider);
+          // The new copy runs from now on, also when a client of the user's CLI ran during the update.
+          this.#installedFallback.delete(provider);
+          // An update asks for OpenBot's copy, so it ends the choice of the user's own CLI.
+          if (this.#installedChosen.delete(provider))
+            yield* this.#saveInstalledChoice(provider, false).pipe(
+              Effect.catch(() => Effect.sync(() => logger.warn("The provider CLI choice did not save.", { provider }))),
+            );
         }).pipe(
           Effect.mapError((error) => {
             if (previousExecutable === undefined) delete this.#bundledExecutables[provider];
@@ -2588,6 +2914,14 @@ export class ProviderRuntime implements ProviderPort {
       return confined.client;
     }
     return this.#ownProcessFor(agent) ? null : this.clientFor(providerForAgent(agent));
+  }
+
+  /**
+   * The compaction mode of the last process that ran this agent's provider, also after an idle
+   * release stopped it. Undefined before its first start.
+   */
+  lastCompactionMode(agent: AgentSummary): AgentClient["contextCompaction"] | undefined {
+    return this.#compactionModes.get(providerForAgent(agent));
   }
 
   /**
@@ -2675,6 +3009,18 @@ export class ProviderRuntime implements ProviderPort {
     agent: AgentSummary,
   ) {
     const provider = providerForAgent(agent);
+    const shared = this.#clients.get(provider);
+    // Checked again after the replacement check, which waits for the process.
+    if (
+      shared &&
+      !this.#providerInUse(provider, agent.id) &&
+      (yield* this.#mustReplace(shared)) &&
+      this.#clients.get(provider) === shared &&
+      !this.#providerInUse(provider, agent.id)
+    ) {
+      logger.info("Replaced a provider CLI that still runs a stopped turn.", { provider });
+      yield* this.#releaseClient(provider, shared);
+    }
     yield* this.ensureProvider(provider);
     yield* this.#awaitConfinedStart(agent.id);
     if (provider === "acp" && this.#removingCustomRuntime)
@@ -2683,7 +3029,7 @@ export class ProviderRuntime implements ProviderPort {
     const own = this.#ownProcessFor(agent);
     const current = this.#confined.get(agent.id);
     const key = own ? this.#confinedKey(provider, own) : null;
-    if (current && current.key === key) {
+    if (current && current.key === key && !(yield* this.#mustReplace(current.client))) {
       current.lastUsed = Date.now();
       return current.client;
     }
@@ -2696,6 +3042,15 @@ export class ProviderRuntime implements ProviderPort {
     if (this.#confinedStarts.get(agent.id) === completion) this.#confinedStarts.delete(agent.id);
     return yield* exit;
   }, Effect.uninterruptible).bind(this);
+
+  /**
+   * Codex adds a new turn of a thread to the turn that runs there. A process that still runs a stopped
+   * turn, as when a command hangs (#11100), would hold each next turn of that thread too. It is
+   * replaced as an idle one is, so the next turn resumes the thread on a new process.
+   */
+  #mustReplace(client: AgentClient): Effect.Effect<boolean> {
+    return client.replaceForNextTurn?.(this.#conversation.clientThreads(client)) ?? Effect.succeed(false);
+  }
 
   #countActivation(provider: AgentProvider): void {
     this.#activations.set(provider, (this.#activations.get(provider) ?? 0) + 1);
@@ -2764,7 +3119,21 @@ export class ProviderRuntime implements ProviderPort {
       startTimeoutMs: this.#longStartWaitMs(provider),
       ...(own.confinement ? { confinement: own.confinement } : {}),
       ...(accountEnvironment ? { accountEnvironment } : {}),
-    });
+    }).pipe(
+      // The account's row still says "Connected" from its last check. Only the answer "no account"
+      // changes it: a timeout or a stopped process says nothing about the login (#8277).
+      Effect.mapError((failure) => {
+        const cause = failure.cause;
+        if (
+          !own.account ||
+          !(cause instanceof ProviderSignInError) ||
+          cause.message !== this.#noAccountMessage(provider)
+        )
+          return failure;
+        const message = this.#providerAccounts?.foundSignedOut(own.account);
+        return message ? new ProviderOperationFailed({ cause: new ProviderSignInError({ message }) }) : failure;
+      }),
+    );
     if (disposals !== this.#disposals || this.#hooks.isStopping()) {
       yield* client.stop().pipe(Effect.catch(() => Effect.void));
       return yield* new ProviderOperationFailed({
@@ -2772,6 +3141,7 @@ export class ProviderRuntime implements ProviderPort {
       });
     }
     this.#confined.set(agentId, { client, key, accountId: own.account?.id ?? null, lastUsed: Date.now() });
+    this.#compactionModes.set(provider, client.contextCompaction ?? "unsupported");
     logger.info("Started an agent's own provider process.", {
       provider,
       agentId,
@@ -2846,6 +3216,41 @@ export class ProviderRuntime implements ProviderPort {
     });
     yield* this.#checkRestartWhenIdle(provider);
     return this.status();
+  }).bind(this);
+
+  /**
+   * A setting that each process of the provider reads at its start changed, such as the CLI proxy.
+   * The shared process restarts when its turns end, as for `restartProviderWhenIdle`, and an agent's
+   * own process, such as one of an account after the first, starts again before the agent's next turn.
+   */
+  readonly spawnSettingsChanged = Effect.fn("ProviderRuntime.spawnSettingsChanged")(function* (
+    this: ProviderRuntime,
+    provider: AgentProvider,
+  ) {
+    yield* providerStep(() => this.#countActivation(provider));
+    return yield* this.restartProviderWhenIdle(provider);
+  }).bind(this);
+
+  /**
+   * `installed`: runs the CLI the user installed, also when OpenBot's copy is newer. A launcher of
+   * theirs, such as a script that picks Pi's settings folder, then runs again (#6327). Otherwise the
+   * newer of the two runs, as before the choice. The provider restarts when its turns end. A provider
+   * that runs on its CLI, such as DeepSeek on Pi, takes the choice at its next start: both CLIs stay
+   * on disk, and its restart now would read the model list of the process this one replaces.
+   */
+  readonly chooseInstalledCli = Effect.fn("ProviderRuntime.chooseInstalledCli")(function* (
+    this: ProviderRuntime,
+    provider: AgentProvider,
+    installed: boolean,
+  ) {
+    yield* providerStep(() => this.requireProviderOn(provider));
+    this.#installedFallback.delete(provider);
+    if (installed !== this.#installedChosen.has(provider)) {
+      yield* this.#saveInstalledChoice(provider, installed);
+      if (installed) this.#installedChosen.add(provider);
+      else this.#installedChosen.delete(provider);
+    }
+    return yield* this.restartProviderWhenIdle(provider);
   }).bind(this);
 
   /** Removes a restart that still waits for turns to end. One that already runs goes on. */
@@ -2952,13 +3357,27 @@ export class ProviderRuntime implements ProviderPort {
       id: provider,
       primary: pushed.primary ?? kept?.primary ?? null,
       secondary: pushed.secondary ?? kept?.secondary ?? null,
+      ...(pushed.creditsAvailable === undefined ? {} : { creditsAvailable: pushed.creditsAvailable }),
     };
     this.#usageUnreported.delete(provider);
     this.#lastUsage.set(provider, limit);
+    this.#noteCredits(source, limit);
     const limits = [...this.#lastUsage]
       .filter(([item]) => !this.#usageUnreported.has(item) && (this.#clients.has(item) || this.#released.has(item)))
       .map(([, item]) => item);
     this.#emit({ type: "usage-changed", usage: structuredClone({ limits }) });
+  }
+
+  /**
+   * A joined server's usage event does not say whether an account works on credits, so a change of it
+   * gets its own event, and `usage-credits-v1` clients read the usage again. A model's own quota, which
+   * has a different id, says nothing about it.
+   */
+  #noteCredits(client: AgentClient, limit: AccountUsage["limits"][number] | undefined): void {
+    const available = limit?.creditsAvailable;
+    if (available === undefined || this.#creditsAvailable.get(client) === available) return;
+    this.#creditsAvailable.set(client, available);
+    this.#emit({ type: "usage-credits-changed" });
   }
 
   /** Refresh the notice once when one provider reports the same exhausted balance several ways. */
@@ -3108,8 +3527,9 @@ export class ProviderRuntime implements ProviderPort {
   ) {
     const result = yield* Effect.result(
       Effect.gen({ self: this }, function* () {
+        // Without a forced refresh, as at a start: see `#authenticateClient`.
         const account = yield* client
-          .request("account/read", { refreshToken: true }, decodeAccountReadResult, 5_000)
+          .request("account/read", { refreshToken: false }, accountReadDecoder(provider), 5_000)
           .pipe(toProviderOperationFailed);
         // An activation can replace this client while the account request is pending.
         if (this.#clients.get(provider) !== client) return;
@@ -3271,8 +3691,14 @@ export class ProviderRuntime implements ProviderPort {
               ),
             );
             logger.info("A provider answered initialize.", { provider, durationMs: durationMs() });
+            // No forced refresh. Codex processes of one sign-in folder share its single-use refresh
+            // token, and a refresh at each start made processes that start together spend it twice:
+            // OpenAI then ends the sign-in with "refresh token was already used" (#10372). Codex
+            // refreshes by itself when the token expires, and reads the folder again first. After a
+            // refresh that fails for good, Codex 0.160.1 and later answer with no account, while
+            // `codex login status` still reads the saved file as signed in.
             const response = yield* client
-              .request("account/read", { refreshToken: true }, decodeAccountReadResult)
+              .request("account/read", { refreshToken: false }, accountReadDecoder(provider))
               .pipe(toProviderOperationFailed);
             const account = response.account;
             if (!account)
@@ -3316,6 +3742,7 @@ export class ProviderRuntime implements ProviderPort {
         const wasReleased = this.#released.delete(provider);
         if (!wasReleased && previousClient !== client) this.#countActivation(provider);
         this.#clients.set(provider, client);
+        this.#compactionModes.set(provider, client.contextCompaction ?? "unsupported");
         if (previousClient !== client) this.#activatedAt.set(provider, Date.now());
         this.#cli.set(provider, cli);
         this.#accounts.set(provider, account);
@@ -3571,7 +3998,21 @@ export class ProviderRuntime implements ProviderPort {
     const disposals = this.#disposals;
     const candidate = yield* this.#authenticateClient(provider, cli, {
       startTimeoutMs: this.#longStartWaitMs(provider),
-    });
+    }).pipe(
+      // The new copy runs, but its sign-in is gone, such as after a spent refresh token: Codex then
+      // answers with no account while the old process works on until its token ends. That is a
+      // signed-out account, as for a released provider above, not a failed update (#11713).
+      Effect.catchIf(
+        (failure) =>
+          failure.cause instanceof ProviderSignInError && failure.cause.message === this.#noAccountMessage(provider),
+        () => Effect.succeed(null),
+      ),
+    );
+    if (!candidate) {
+      // The update waited for the provider to be idle, so this stops no turn. The row names the new copy.
+      yield* this.#endSignedOutClient(provider, disposals, cli.version);
+      return;
+    }
     yield* this.#activateProviderClient(provider, candidate.client, cli, candidate.account, {
       notifyReady: false,
       disposals,
@@ -3647,15 +4088,16 @@ export class ProviderRuntime implements ProviderPort {
 
   /**
    * Stops the client that still runs on a credential that a Reconnect signed out, and reports the
-   * provider signed out. A failed sign-in then reports its own reason; a cancel keeps this one.
+   * provider signed out. A failed sign-in then reports its own reason; a cancel keeps this one. An
+   * update gives the `version` of its new copy.
    */
   readonly #endSignedOutClient = Effect.fn("ProviderRuntime.endSignedOutClient")(function* (
     this: ProviderRuntime,
     provider: AgentProvider,
     disposals: number,
+    version = this.#cli.get(provider)?.version,
   ) {
     if (disposals !== this.#disposals || this.#hooks.isStopping()) return;
-    const version = this.#cli.get(provider)?.version;
     yield* this.#stopProviderClient(provider).pipe(Effect.ignore);
     this.#setProviderConnectionFailure(
       provider,
@@ -3778,7 +4220,12 @@ export class ProviderRuntime implements ProviderPort {
           stage = "account";
           stageStartedAt = performance.now();
           const account = yield* candidate
-            .request("account/read", { refreshToken: false }, decodeAccountReadResult, providerCheckTimeoutMs(5_000))
+            .request(
+              "account/read",
+              { refreshToken: false },
+              accountReadDecoder(provider),
+              providerCheckTimeoutMs(5_000),
+            )
             .pipe(toProviderOperationFailed);
           if (!account.account) {
             const message = this.#signInRequiredMessage(provider);
@@ -3803,6 +4250,7 @@ export class ProviderRuntime implements ProviderPort {
           if (!this.#released.has(provider)) this.#countActivation(provider);
           this.#cli.set(provider, resolvedCli);
           this.#clients.set(provider, candidate);
+          this.#compactionModes.set(provider, candidate.contextCompaction ?? "unsupported");
           this.#activatedAt.set(provider, Date.now());
           this.#accounts.set(provider, account.account);
           activated.push(provider);
@@ -3849,6 +4297,10 @@ export class ProviderRuntime implements ProviderPort {
                 });
                 return message;
               }
+              // Codex could not reach its service to check the account, for example before the network
+              // is ready. A later check works, so OpenBot tries again and does not count it (#11632).
+              const unreachable = provider === "codex" && stage === "account" && isCodexServiceUnreachable(error);
+              const retrying = unreachable && this.#scheduleStartRetry(provider, !disposed());
               // An expired sign-in fails the account check in the CLI's own words, such as Codex's
               // "workspace routing discovery unauthorized (401)". Ask for a new sign-in instead.
               const failed =
@@ -3856,7 +4308,15 @@ export class ProviderRuntime implements ProviderPort {
                   ? new ProviderSignInError({
                       message: sourceText("error.provider.signInExpired", { provider: providerLabel(provider) }),
                     })
-                  : error;
+                  : unreachable
+                    ? new Error(
+                        sourceText(
+                          retrying ? "error.provider.serviceUnreachable" : "error.provider.serviceUnreachableRefresh",
+                          { provider: providerLabel(provider) },
+                        ),
+                        { cause: error },
+                      )
+                    : error;
               // The CLI's own words reach the status message and the joined start failure below, so
               // the MCP values go first. `providerFailureStatus` applies only the generic redaction.
               const message = this.#redactMcp(failed instanceof Error ? failed.message : String(failed));
@@ -3870,8 +4330,15 @@ export class ProviderRuntime implements ProviderPort {
               if (!(failed instanceof CodexCliError || failed instanceof ProviderSignInError)) {
                 this.#emitProviderError(provider, "start_failed", failed);
                 // No process started, and the row keeps the reason the user can act on.
-                if (!(failed instanceof ProviderTempDiskSpaceError) && this.#countStartFailure(provider))
-                  return this.#showStartStopped(provider);
+                if (
+                  !(failed instanceof ProviderTempDiskSpaceError) &&
+                  !unreachable &&
+                  this.#countStartFailure(provider)
+                )
+                  // Only a copy that fails its first request: an account check can fail on the network.
+                  return stage === "initialize" && !disposed() && this.#fallBackToInstalledCli(provider, cli)
+                    ? message
+                    : this.#showStartStopped(provider);
               }
               // OpenCode can fail a start on a slow computer, and a later start works. Without a retry
               // the provider stayed off until the user refreshed it (#4237).
@@ -4004,7 +4471,12 @@ export class ProviderRuntime implements ProviderPort {
         return;
       }
       // A failed tool call names its server too, but is not a server that did not start. A built-in
-      // server is not in the MCP settings, and its failure stays the provider's error, as before.
+      // server is not in the Marketplace apps, and its failure stays the provider's error, as before.
+      // Codex reports each failed start in `mcpServer/startupStatus/updated` too
+      // (`#reportMcpStartupStatus`). Its stderr line of the same failure can give a different
+      // cause, such as the `rmcp` worker's `AuthRequired(…)` beside a status that read as a failed
+      // start, so the user got two toasts that disagree (#9360). For Codex, the status is the one
+      // report.
       const mcpServer =
         isMcpSubsystemDiagnostic(message) && !isToolCallDiagnostic(message)
           ? this.#configuredMcpServerIn(redacted)
@@ -4012,7 +4484,7 @@ export class ProviderRuntime implements ProviderPort {
       if (mcpServer !== undefined && !mcpServer?.builtIn) {
         const server = mcpServer?.name ?? null;
         stderrLogger.warn("A provider reported an MCP server failure.", { provider: client.provider, server, message });
-        if (server) this.#reportMcpServerFailure(client.provider, server, redacted);
+        if (server && client.provider !== "codex") this.#reportMcpServerFailure(client.provider, server, redacted);
         return;
       }
       if (isTelemetryExportDiagnostic(message)) {
@@ -4068,6 +4540,15 @@ export class ProviderRuntime implements ProviderPort {
         stderrLogger.warn("Hermes logged a diagnostic.", { provider: client.provider, message });
         return;
       }
+      if (client.provider === "acp" && origin?.stderr) {
+        // A custom agent can be any program, and its stderr is a log in a form OpenBot cannot read.
+        // A Python traceback is one record per line, so one failure was a stack of toasts with lines
+        // such as `raise HTTPError(...)` (#10908). Failures reach the user in the protocol: a failed
+        // request or turn, and a crash as the process exit, which keeps the last stderr line.
+        // OpenBot's own reports of the agent, such as a model list that failed, have no stderr mark.
+        stderrLogger.warn("A custom agent logged a diagnostic.", { provider: client.provider, message });
+        return;
+      }
       if (client.provider === "mistral") {
         // Mistral Vibe 3.1.0 reports each failure in the protocol: a failed turn in its prompt error
         // (rate limit, refused key, backend error), and a crash as the process exit. Its stderr is the
@@ -4094,6 +4575,9 @@ export class ProviderRuntime implements ProviderPort {
     });
     client.on("notification", (notification) => {
       if (notification.method === "configWarning") this.#reportConfigWarning(client, notification.params);
+      if (notification.method === "mcpServer/startupStatus/updated") {
+        this.#reportMcpStartupStatus(client, notification.params);
+      }
     });
     client.once("exit", (error) => this.#handleExit(client, error));
   }
@@ -4113,6 +4597,33 @@ export class ProviderRuntime implements ProviderPort {
       provider: client.provider,
       message: shortenDiagnostic(this.#redactMcp(summary)),
     });
+  }
+
+  /**
+   * Codex's report that an MCP server did not start, with the server named. The stderr line of the
+   * same failure can name neither the server nor its URL, such as the `rmcp` worker's `Unexpected
+   * content type: … when send initialized notification` (#7895), so `#configuredMcpServerIn` finds
+   * no server in it. Codex names a server by its key (`codexMcpServerKey`): the name in the form it
+   * accepts with `openbot_` in front, or without it when that key is reserved or the user's. Each
+   * server of that file goes to Codex turned off (`codexDisabledServers`), so it does not start and
+   * a failure under either key is the failure of OpenBot's server. A key that matches no row, and a
+   * built-in server, go to the log only, as from stderr.
+   */
+  #reportMcpStartupStatus(client: AgentClient, params: unknown): void {
+    const key = getString(params, "name");
+    if (getString(params, "status") !== "failed" || !key) return;
+    const message = shortenDiagnostic(this.#redactMcp(getString(params, "error") ?? ""));
+    // A row's `openbot_` key comes first: a row named `openbot_x` travels as `openbot_openbot_x`.
+    const rows = this.#credentials.mcpServers();
+    const config =
+      rows.find((row) => key === `openbot_${providerMcpServerName(row.name)}`) ??
+      rows.find((row) => key === providerMcpServerName(row.name));
+    const builtIn = config?.id === COMPUTER_USE_MCP_SERVER_ID || config?.id === GITHUB_CONNECTOR_MCP_SERVER_ID;
+    const server = config && !builtIn ? config.name : null;
+    stderrLogger.warn("A provider reported an MCP server failure.", { provider: client.provider, server, message });
+    if (!server) return;
+    const signIn = getString(params, "failureReason") === "reauthenticationRequired" || isMcpSignInDiagnostic(message);
+    this.#reportMcpServerFailure(client.provider, server, message, signIn);
   }
 
   #handleExit(client: AgentClient, exit: Error): void {
@@ -4241,12 +4752,44 @@ export class ProviderRuntime implements ProviderPort {
   }
 
   #startStoppedMessage(provider: AgentProvider, reason?: string | null): string {
-    // Each start ends in the same way until the user fixes the system, so the fix stays on the row (#4848).
-    const realtimeLimitZero = sourceText("error.provider.realtimeLimitZero");
-    if (reason === realtimeLimitZero) return realtimeLimitZero;
-    const cpuUnsupported = sourceText("error.provider.cpuUnsupported");
-    if (reason === cpuUnsupported) return cpuUnsupported;
+    // Each start ends in the same way until the user fixes the system, so the fix stays on the row (#4848,
+    // #6200). A refresh cannot repair these.
+    const kept = [
+      sourceText("error.provider.realtimeLimitZero"),
+      sourceText("error.provider.cpuUnsupported"),
+      sourceText("error.provider.geminiSettingsUnreadable"),
+      sourceText("error.provider.geminiAccountSettingsUnreadable"),
+    ];
+    if (reason && kept.includes(reason)) return reason;
     return sourceText("error.provider.startStopped", { provider: providerLabel(provider) });
+  }
+
+  /**
+   * OpenBot's copy failed each start, and the CLI that the user installed was passed over because it
+   * is older. That CLI starts now, and the row offers the copy back. The copy showed its version but
+   * failed its first request, so the next refresh started it again and the provider stayed off (#10174).
+   * A CLI of the user's that lacks parts runs only when the user chooses it.
+   */
+  #fallBackToInstalledCli(provider: AgentProvider, cli: AgentCliInfo | null): boolean {
+    const cliProvider = requireProviderDriver(provider).cliProvider ?? provider;
+    const installed = this.#passedOverClis.get(provider);
+    if (
+      cli?.source !== "managed" ||
+      installed?.source !== "system" ||
+      installed.incomplete ||
+      this.#installedFallback.has(cliProvider)
+    )
+      return false;
+    logger.warn("OpenBot's provider CLI did not start, so the installed CLI runs.", {
+      provider,
+      version: cli.version,
+      installedVersion: installed.version,
+    });
+    this.#installedFallback.add(cliProvider);
+    this.#startFailures.delete(provider);
+    this.#resetRestarts(provider);
+    this.#scheduleRestart(provider, 0, true);
+    return true;
   }
 
   /** Shows on the provider row that OpenBot stopped starting it, and answers the message. */
@@ -4298,15 +4841,19 @@ export class ProviderRuntime implements ProviderPort {
    * timeout: whether OpenBot tries again, or the user has to.
    */
   #retryAfterTimeout(provider: AgentProvider, schedule: boolean): string {
+    return sourceText(
+      this.#scheduleStartRetry(provider, schedule) ? "error.provider.cliTimedOut" : "error.provider.cliTimedOutRefresh",
+      { provider: providerLabel(provider) },
+    );
+  }
+
+  /** Starts a provider again after 5, 10 and 20 s, at most 3 times. Answers whether OpenBot will try again. */
+  #scheduleStartRetry(provider: AgentProvider, schedule: boolean): boolean {
     const attempts = this.#restartAttempts.get(provider) ?? 0;
-    const retry = schedule && attempts < 3;
-    if (retry) {
-      this.#restartAttempts.set(provider, attempts + 1);
-      this.#scheduleRestart(provider, 5_000 * 2 ** attempts, true);
-    }
-    return sourceText(retry ? "error.provider.cliTimedOut" : "error.provider.cliTimedOutRefresh", {
-      provider: providerLabel(provider),
-    });
+    if (!schedule || attempts >= 3) return false;
+    this.#restartAttempts.set(provider, attempts + 1);
+    this.#scheduleRestart(provider, 5_000 * 2 ** attempts, true);
+    return true;
   }
 
   /**
@@ -4314,19 +4861,27 @@ export class ProviderRuntime implements ProviderPort {
    * fresh one, when the error is older than the refresh. Answers the providers with a fresh catalogue.
    */
   readonly #refreshModelCatalog = Effect.fn("ProviderRuntime.refreshModelCatalog")(function* (this: ProviderRuntime) {
+    this.#modelsReadAt = Date.now();
     const errorSerialAtStart = this.#errorSerial;
-    const { fresh, timedOut } = yield* this.#modelCatalog.refresh();
-    let cleared = false;
+    const { fresh, timedOut, failed, sourceChanged } = yield* this.#modelCatalog.refresh();
+    let changed = false;
     for (const provider of fresh) {
       const lastError = this.#lastErrors.get(provider);
       if (!lastError || lastError.serial > errorSerialAtStart) continue;
       this.#lastErrors.delete(provider);
-      cleared = true;
+      changed = true;
     }
-    if (cleared) this.#setStatus({});
+    // A list that timed out gets one more read below, which keeps its own failure. A provider that a
+    // read holds already gets none, and the quiet read of `#rereadModels` keeps no error.
+    for (const [provider, cause] of timedOut) {
+      if (!this.#relisting.has(provider)) continue;
+      this.#recordProviderError(provider, cause);
+      changed = true;
+    }
+    if (changed || sourceChanged) this.#setStatus({});
     // A CLI can need more than the 5 s of a pass while many agents start. Without one more read,
     // the picker kept the built-in models until a provider started again (#6212).
-    for (const provider of timedOut) {
+    for (const provider of timedOut.keys()) {
       if (this.#relisting.has(provider)) continue;
       this.#relisting.add(provider);
       yield* this.#relistModels(provider).pipe(
@@ -4334,23 +4889,89 @@ export class ProviderRuntime implements ProviderPort {
         Effect.forkIn(this.#scope),
       );
     }
+    // A list that failed kept the list from before. After an update of the CLI, that is the list of
+    // the old version: the row showed the new version, and the new models came only after a restart
+    // (#8321). Each client gets these reads one time, so a CLI that always fails starts no loop.
+    for (const provider of failed) {
+      const client = this.#clients.get(provider);
+      // The guard is the client, not the provider: the client that replaces this one during the
+      // waits must get its own reads when its list also fails.
+      if (!client || this.#relistedAfterFailure.has(client)) continue;
+      this.#relistedAfterFailure.add(client);
+      yield* Effect.gen({ self: this }, function* () {
+        for (const delayMs of FAILED_MODEL_LIST_RETRY_DELAYS_MS) {
+          yield* Effect.sleep(delayMs);
+          // The start of a new client reads its own list.
+          if (this.#clients.get(provider) !== client) return;
+          if (yield* this.#relistModels(provider)) return;
+        }
+      }).pipe(Effect.forkIn(this.#scope));
+    }
     return fresh;
   });
 
   /**
    * Reads the model list of a provider again, once, with the full request timeout. A fresh list
    * clears the provider's last error, when the error is older than this read, and publishes the
-   * status, so the renderer reads the catalogue again.
+   * status, so the renderer reads the catalogue again. Answers whether the list is fresh.
    */
   readonly #relistModels = Effect.fn("ProviderRuntime.relistModels")(function* (
     this: ProviderRuntime,
     provider: AgentProvider,
   ) {
     const errorSerialAtStart = this.#errorSerial;
-    if (!(yield* this.#modelCatalog.relist(provider))) return;
+    if (!(yield* this.#modelCatalog.relist(provider))) return false;
     const lastError = this.#lastErrors.get(provider);
     if (lastError && lastError.serial <= errorSerialAtStart) this.#lastErrors.delete(provider);
     this.#setStatus({});
+    return true;
+  });
+
+  /**
+   * Reads the model list of each running provider with `relistWhileRunning` again when the last read
+   * is older than `MODEL_LIST_REREAD_MS`. Each provider reads with `relist`, so a client that another
+   * one replaced changes nothing, and only a fresh list replaces the provider's models. The read is
+   * quiet: the user did not ask for it, so a failure stays in the log. A fresh list clears an older
+   * error of the provider, as `#relistModels` does. The status goes out only when a list or an error
+   * changed.
+   */
+  readonly #rereadModels = Effect.fn("ProviderRuntime.rereadModels")(function* (this: ProviderRuntime) {
+    if (this.#hooks.isStopping() || this.#status.phase !== "ready") return;
+    const now = Date.now();
+    if (now - this.#modelsReadAt < MODEL_LIST_REREAD_MS) return;
+    this.#modelsReadAt = now;
+    const providers = [...this.#clients.keys()].filter(
+      (provider) =>
+        BUILT_IN_PROVIDER_DRIVERS.find((driver) => driver.id === provider)?.catalog?.relistWhileRunning &&
+        !this.#off.has(provider) &&
+        !this.#relisting.has(provider),
+    );
+    if (providers.length === 0) return;
+    const errorSerialAtStart = this.#errorSerial;
+    // The source of the models is part of the row too (#9956), so a changed source also sends the status.
+    const listOf = (provider: AgentProvider) =>
+      JSON.stringify([
+        this.#modelCatalog.list().filter((model) => model.provider === provider),
+        this.#modelCatalog.source(provider) ?? null,
+      ]);
+    let changed = false;
+    for (const provider of providers) this.#relisting.add(provider);
+    yield* Effect.forEach(
+      providers,
+      (provider) =>
+        Effect.gen({ self: this }, function* () {
+          const before = listOf(provider);
+          if (!(yield* this.#modelCatalog.relist(provider, { quiet: true }))) return;
+          if (listOf(provider) !== before) changed = true;
+          const lastError = this.#lastErrors.get(provider);
+          if (lastError && lastError.serial <= errorSerialAtStart) {
+            this.#lastErrors.delete(provider);
+            changed = true;
+          }
+        }).pipe(Effect.ensuring(Effect.sync(() => this.#relisting.delete(provider)))),
+      { concurrency: "unbounded", discard: true },
+    );
+    if (changed) this.#setStatus({});
   });
 
   /** Shows a provider failure to the user and keeps it on the provider row. */
@@ -4376,8 +4997,9 @@ export class ProviderRuntime implements ProviderPort {
    * is what the two forms share, and the longest path that matches picks between two servers on one
    * host. The URL is read first. The host counts only as a whole URL authority, so `example.com` is
    * not in `mcp.example.com` and `localhost:3000` is not in `localhost:30001`. A name counts only as
-   * a whole word, so `git` is not in `github`; a name the provider was given counts too, and one with
-   * no letter or digit, such as `__`, would match every `mcp__server__tool` line.
+   * a whole word, so `git` is not in `github`; a name the provider was given counts too, also in
+   * Grok's form (`grokMcpServerName`), and one with no letter or digit, such as `__`, would match
+   * every `mcp__server__tool` line.
    */
   #configuredMcpServerIn(message: string): { name: string; builtIn: boolean } | null {
     const configs = this.#credentials.mcpServers();
@@ -4395,7 +5017,9 @@ export class ProviderRuntime implements ProviderPort {
     const word = (text: string) => bounded(text, "(?<![\\w-])", "(?![\\w-])");
     const named = (name: string) => {
       const given = providerMcpServerName(name);
-      return (name !== "" && word(name)) || (/[A-Za-z0-9]/u.test(given) && word(given));
+      return (
+        (name !== "" && word(name)) || (/[A-Za-z0-9]/u.test(given) && (word(given) || word(grokMcpServerName(given))))
+      );
     };
     const config = configs.find((row) => named(row.name));
     if (config) return { name: config.name, builtIn: builtIn(config.id) };
@@ -4406,20 +5030,23 @@ export class ProviderRuntime implements ProviderPort {
   /**
    * Shows that a provider could not use an MCP server from this app's list, once for each server and
    * kind in this run: a server spawns for each session, so the same line arrives at every start. The
-   * provider works without the server, so its row keeps no error, and the toast sends the user to
-   * the MCP settings, where Sign in and Test connection give the cause.
+   * provider works without the server, so its row keeps no error, and the toast links to the MCP
+   * settings. The provider connects with its own client, so OpenBot's connection test can pass while
+   * the provider fails, and the toast does not send the user to the test for the cause (#7370).
    */
-  #reportMcpServerFailure(provider: AgentProvider, server: string, message: string): void {
-    const signIn = isMcpSignInDiagnostic(message);
-    const key = [provider, server, signIn].join("\u0000");
+  #reportMcpServerFailure(
+    provider: AgentProvider,
+    server: string,
+    message: string,
+    signIn = isMcpSignInDiagnostic(message),
+  ): void {
+    const kind = signIn ? "sign_in" : isMcpTimeoutDiagnostic(message) ? "timeout" : "failed";
+    const key = [provider, server, kind].join("\u0000");
     if (this.#reportedMcpFailures.has(key)) return;
     this.#reportedMcpFailures.add(key);
     this.#emitError(
       "mcp_server_not_started",
-      sourceText(signIn ? "error.backend.mcpServerSignInForProvider" : "error.backend.mcpServerFailedForProvider", {
-        provider: providerLabel(provider),
-        name: server,
-      }),
+      sourceText(MCP_SERVER_FAILURE_TEXT[kind], { provider: providerLabel(provider), name: server }),
     );
   }
 
@@ -4451,6 +5078,10 @@ export class ProviderRuntime implements ProviderPort {
       if (this.#clients.get(client.provider) === client) this.#ownResetCredits.set(client.provider, available);
     }
     const usage = normalizeAccountUsage(rateLimits, client.provider === "codex" ? model : undefined);
+    this.#noteCredits(
+      client,
+      usage.limits.find((limit) => limit.id === client.provider),
+    );
     // The dock's reading, such as when Codex starts: the gate counts it, so the next poll does not read again.
     if (this.#clients.get(client.provider) === client && model === defaultUsageModel(client.provider)) {
       this.#keepUsage(client.provider, usage);

@@ -135,7 +135,7 @@ export function SettingsUpdatesTab(props: SettingsUpdatesTabProps) {
           </ItemContent>
           <ItemActions>
             <Select<UpdateTrack>
-              class="settings-modal-update-track-select"
+              class="settings-modal-select"
               options={updateTrackOptions}
               value="Stable"
               onChange={() => undefined}

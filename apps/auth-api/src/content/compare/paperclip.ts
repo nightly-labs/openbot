@@ -201,7 +201,7 @@ export const PAPERCLIP_COMPARISON: Comparison = {
     {
       question: "Is there a Paperclip cloud?",
       answer:
-        "Paperclip Cloud has a waitlist, with no published date or price. Until then, you run Paperclip on your own computer or server. If you do not want to keep a computer on for OpenBot, a hosted OpenBot server in the EU is available today, from €20 or $25 a month.",
+        "Paperclip Cloud has a waitlist, with no published date or price. Until then, you run Paperclip on your own computer or server. If you do not want to keep a computer on for OpenBot, a hosted OpenBot server in the EU is available today, from €30 or $36 a month.",
     },
     {
       question: "Do agents keep working when my laptop is closed?",

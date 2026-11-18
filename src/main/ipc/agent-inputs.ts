@@ -1,3 +1,4 @@
+import { CHAT_VISUAL_PAGE_LIMIT } from "@openbot/contracts/chat-visual";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AcknowledgeFailedTurnInput,
@@ -55,6 +56,7 @@ import {
   type ReadAgentTaskAroundInput,
   type ReadAgentTaskPageInput,
   type ReadConversationPageInput,
+  type ReadPendingApprovalInput,
   type RenameAgentTaskInput,
   type ReorderQueueInput,
   type RespondToApprovalInput,
@@ -87,8 +89,10 @@ import {
   type UpdateChannelRoutineInput,
   type UpdateQueuedMessageInput,
   type UpdateRoutineInput,
+  type WithdrawFeedbackInput,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import { AGENT_ACTIVE_QUEUES_LIMIT } from "@openbot/contracts/team-protocol/agent-active-queues-v1";
 import { decodeQueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { sourceText } from "@openbot/i18n/source";
 import type { PayloadDecoder } from "../trusted-ipc";
@@ -120,12 +124,23 @@ export function parseAgentId(value: unknown): string {
   return requireString(value, "agentId", INPUT_LIMITS.identifier);
 }
 
+/** The agents of one `listActiveQueues` read. */
+export function parseAgentIdList(value: unknown): string[] {
+  return parseIdentifierList(value, "agent IDs", AGENT_ACTIVE_QUEUES_LIMIT);
+}
+
 export function parseChannelId(value: unknown): string {
   return requireString(value, "channelId", INPUT_LIMITS.identifier);
 }
 
 export function parseAttachmentId(value: unknown): string {
   return requireString(value, "attachmentId", INPUT_LIMITS.identifier);
+}
+
+/** HTML that the renderer holds. Main bounds it again by bytes when it keeps the page. */
+export function parsePreviewPageHtml(value: unknown): string {
+  if (typeof value !== "string" || value.length > CHAT_VISUAL_PAGE_LIMIT) throw new Error("Invalid preview page.");
+  return value;
 }
 
 export function parseFilePreviewPageUrl(value: unknown): string {
@@ -715,6 +730,14 @@ export function parseDeleteConversationMessage(value: unknown): DeleteConversati
   };
 }
 
+export function parseWithdrawFeedback(value: unknown): WithdrawFeedbackInput {
+  if (!isObject(value)) throw new Error("Invalid feedback withdraw request.");
+  return {
+    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
+    messageId: requireString(value.messageId, "messageId", INPUT_LIMITS.identifier),
+  };
+}
+
 export function parseSetMessagePinned(value: unknown): SetMessagePinnedInput {
   if (!isObject(value) || typeof value.pinned !== "boolean") throw new Error("Invalid pinned.");
   return {
@@ -1103,6 +1126,22 @@ export function parsePromptResponse(value: unknown): RespondToPromptInput {
     answers[key] = answer;
   }
   return { requestId: value.requestId, answers };
+}
+
+export function parseReadPendingApprovalInput(value: unknown): ReadPendingApprovalInput {
+  if (
+    !isObject(value) ||
+    !isString(value.agentId) ||
+    value.agentId.length === 0 ||
+    value.agentId.length > INPUT_LIMITS.identifier ||
+    !(
+      (isString(value.requestId) && value.requestId.length > 0 && value.requestId.length <= INPUT_LIMITS.identifier) ||
+      (isNumber(value.requestId) && Number.isFinite(value.requestId))
+    )
+  ) {
+    throw new Error("Invalid pending approval request.");
+  }
+  return { agentId: value.agentId, requestId: value.requestId };
 }
 
 export function parseApprovalResponse(value: unknown): RespondToApprovalInput {

@@ -1,4 +1,5 @@
 import { parseBillingSessionUrl, parseBillingState } from "@openbot/contracts/billing";
+import { parseBillingDetails } from "@openbot/contracts/billing-details";
 import {
   PRICING_ORDER_PARAMS,
   type PricingOrder,
@@ -6,7 +7,9 @@ import {
   parseLicenseState,
   parsePricingOrder,
 } from "@openbot/contracts/license";
+import { readPromotionCode } from "@openbot/contracts/promotion-code";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import type { BillingDetailsCalls } from "@openbot/ui/features/billing/BillingDetailsFields";
 import type { BillingCalls } from "@openbot/ui/features/billing/billing-store";
 import type { LicenseCalls } from "@openbot/ui/features/billing/license-store";
 import { currentText } from "@openbot/ui/text";
@@ -20,8 +23,14 @@ const REQUEST_TIMEOUT_MS = 15_000;
 export function createWebBillingCalls(
   accountFetch: typeof fetch,
   navigate: (url: string) => void = (url) => window.location.assign(url),
-): BillingCalls {
+): BillingCalls & BillingDetailsCalls {
   const request = browserRequest(accountFetch);
+
+  async function details(body?: string) {
+    const value = await request("v1/me/billing/details", parseBillingDetails, body, "PUT");
+    if (!value) throw new Error(currentText().sourceText("error.billing.invalidResponse"));
+    return value;
+  }
 
   async function openStripe(path: string, body: string): Promise<void> {
     const url = await request(path, parseBillingSessionUrl, body);
@@ -36,6 +45,13 @@ export function createWebBillingCalls(
       return state;
     },
     openPortal: (portal) => openStripe("v1/me/billing/portal", JSON.stringify(portal)),
+    async buyStorage(storage) {
+      const state = await request("v1/me/billing/storage", parseBillingState, JSON.stringify(storage));
+      if (!state) throw new Error(currentText().sourceText("error.billing.invalidResponse"));
+      return state;
+    },
+    getDetails: () => details(),
+    setDetails: (value) => details(JSON.stringify(value)),
   };
 }
 
@@ -58,7 +74,8 @@ export function createWebLicenseCalls(
   return {
     getState: () => state("v1/me/license"),
     async openCheckout(checkout) {
-      const url = await request("v1/me/license/checkout", parseLicenseCheckoutUrl, JSON.stringify(checkout));
+      const body = JSON.stringify({ ...checkout, ...savedPromotionCode() });
+      const url = await request("v1/me/license/checkout", parseLicenseCheckoutUrl, body);
       if (!url) throw new Error(currentText().sourceText("error.billing.notStripePage"));
       navigate(url);
     },
@@ -68,12 +85,26 @@ export function createWebLicenseCalls(
   };
 }
 
-/** GET without a body, POST with one. Returns the decoded response, or null when it does not decode. */
+/** The code of a discount link that the website saved in this browser, as a Checkout request field. */
+export function savedPromotionCode(): { promotionCode?: string } {
+  const code = readPromotionCode(() => window.localStorage, Date.now());
+  return code ? { promotionCode: code } : {};
+}
+
+/**
+ * GET without a body, POST (or `method`) with one. Returns the decoded response, or null when it does
+ * not decode.
+ */
 function browserRequest(accountFetch: typeof fetch) {
-  return async <T>(path: string, decode: (value: unknown) => T | null, body?: string): Promise<T | null> => {
+  return async <T>(
+    path: string,
+    decode: (value: unknown) => T | null,
+    body?: string,
+    method: "POST" | "PUT" = "POST",
+  ): Promise<T | null> => {
     const post = body !== undefined;
     const response = await accountFetch(`/api/browser/${path}`, {
-      method: post ? "POST" : "GET",
+      method: post ? method : "GET",
       credentials: "same-origin",
       cache: "no-store",
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),

@@ -212,6 +212,14 @@
     border-radius: inherit;
   }
 
+  /* A file tab is selected only when its file opens. When the file did not open, the focused tab shows
+   * its X, so the X closes it. The X stays under the tab while the tab is pressed, so the press and the
+   * release hit the same button. A file that still reads keeps the tab on top, so a second click selects it. */
+  .side-panel-file-tab[data-unavailable]:not([data-selected]):focus-within:not(:has(> .side-panel-tab-select:active))
+  .side-panel-tab-close {
+    z-index: 1;
+  }
+
   .side-panel-tab:not([data-selected]) .side-panel-tab-label {
     position: absolute;
     width: 1px;

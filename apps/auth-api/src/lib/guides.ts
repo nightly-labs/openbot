@@ -25,6 +25,22 @@ export const GUIDES_COLLECTION: ContentCollection<"guides"> = {
   imageEyebrow: "OPENBOT · GUIDES",
   articles: publishedFirst([
     {
+      slug: "ai-agent-workflow",
+      title: "AI Agent Workflow: From Task to Finished Result",
+      description:
+        "Follow a practical AI agent workflow in OpenBot. Write a clear brief, check official sources, save a result and review it before you share it.",
+      publishedAt: "2026-11-12",
+      author: NEWS_AUTHOR,
+    },
+    {
+      slug: "ai-teammates-vs-ai-chatbots",
+      title: "AI Teammates vs AI Chatbots: When You Need More Than One Conversation",
+      description:
+        "See when a quick AI chat is enough and how to divide research, writing and review between OpenBot agents that can pass files to each other.",
+      publishedAt: "2026-11-10",
+      author: NEWS_AUTHOR,
+    },
+    {
       slug: "ai-workspace-vs-chat",
       title: "AI Agent Workspace vs Chat History: What Changes in Practice?",
       description:

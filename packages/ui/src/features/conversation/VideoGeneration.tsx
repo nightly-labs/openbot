@@ -1,6 +1,5 @@
 import type { AttachmentSummary, ImageGenerationAspectRatio } from "@openbot/contracts/ipc";
-import { Button, Download, Maximize2, Pause, Play, SeekSlider } from "@openbot/ui";
-import { createEffect, createStore, Show } from "solid-js";
+import { createEffect, createStore, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import type { AttachmentMediaSource } from "./AttachmentCards";
 import {
@@ -11,9 +10,9 @@ import {
   type MediaGenerationStatus,
   mediaRatioValue,
 } from "./media-generation-frame";
-
-/** How far an arrow key moves the position, in seconds. */
-const SEEK_STEP_SECONDS = 0.5;
+import { rememberedMediaSize, rememberMediaSize } from "./media-size-memory";
+import { VideoPlayer } from "./VideoPlayer";
+import { VideoStage, type VideoStageMenu } from "./VideoStage";
 
 export interface VideoGenerationProps {
   status: MediaGenerationStatus;
@@ -32,13 +31,9 @@ export interface VideoGenerationProps {
 }
 
 interface VideoPlayerState {
-  playing: boolean;
-  time: number;
   duration: number;
   width: number;
   height: number;
-  /** Where a drag or a key moved the position, in seconds, until the user releases it. */
-  dragged: number | null;
   loading: boolean;
   /** The web client loads the file on a click, then the video plays at once. */
   playOnLoad: boolean;
@@ -47,14 +42,13 @@ interface VideoPlayerState {
 
 /** A video that an agent made: the frame while it is made, then a player with its own controls. */
 export function VideoGeneration(props: VideoGenerationProps) {
-  const { t, errorMessage } = useText();
+  const { t, format, errorMessage } = useText();
+  // A video that loaded before in this window has its shape before its metadata loads again.
+  const remembered = untrack(() => rememberedMediaSize(props.attachment?.id));
   const [player, setPlayer] = createStore<VideoPlayerState>({
-    playing: false,
-    time: 0,
     duration: 0,
-    width: 0,
-    height: 0,
-    dragged: null,
+    width: remembered?.width ?? 0,
+    height: remembered?.height ?? 0,
     loading: false,
     playOnLoad: false,
     failed: false,
@@ -98,7 +92,6 @@ export function VideoGeneration(props: VideoGenerationProps) {
       ? t("chat.media.size", { width: player.width, height: player.height })
       : props.resolution;
   const lengthText = () => (length() > 0 ? clock(length()) : undefined);
-  const elapsed = () => player.dragged ?? player.time;
   const stageRatio = () => {
     if (failed()) return FAILED_MEDIA_RATIO;
     if (player.width > 0 && player.height > 0) return `${player.width} / ${player.height}`;
@@ -119,24 +112,41 @@ export function VideoGeneration(props: VideoGenerationProps) {
           props.status === "interrupted" ? t("chat.video.wasInterrupted") : t("chat.video.didNotComplete"),
         );
 
-  const toggle = async () => {
+  // A finished video shows only its player. Its details show on hover, and its actions on a right click.
+  const menu = (): VideoStageMenu | undefined => {
     const attachment = props.attachment;
-    if (!sourceUrl() && attachment && props.mediaSource && canLoad()) {
-      if (player.loading) return;
-      setPlayer((state) => {
-        state.loading = true;
+    if (!ready() || !attachment) return undefined;
+    const actions = [];
+    const { onOpen, onDownload } = props;
+    if (onOpen)
+      actions.push({
+        label: t("chat.preview.preview"),
+        onSelect: () => {
+          video?.pause();
+          onOpen(attachment);
+        },
       });
-      const loaded = await props.mediaSource.load(attachment).catch(() => false);
-      setPlayer((state) => {
-        state.loading = false;
-        state.playOnLoad = loaded;
-        state.failed = !loaded;
-      });
-      return;
-    }
-    if (!video) return;
-    if (video.paused) void video.play().catch(() => undefined);
-    else video.pause();
+    if (onDownload) actions.push({ label: t("common.download"), onSelect: () => onDownload(attachment) });
+    return {
+      // The same details as a video file. The length is in the controls.
+      details: [attachment.name, format.fileSize(attachment.size), size()],
+      actions,
+    };
+  };
+
+  /** The web client loads the file on Play, then the video plays at once. */
+  const load = async () => {
+    const attachment = props.attachment;
+    if (!attachment || !props.mediaSource || !canLoad() || player.loading) return;
+    setPlayer((state) => {
+      state.loading = true;
+    });
+    const loaded = await props.mediaSource.load(attachment).catch(() => false);
+    setPlayer((state) => {
+      state.loading = false;
+      state.playOnLoad = loaded;
+      state.failed = !loaded;
+    });
   };
 
   return (
@@ -148,7 +158,7 @@ export function VideoGeneration(props: VideoGenerationProps) {
       aria-live={generating() ? "polite" : undefined}
       aria-busy={generating() ? "true" : undefined}
     >
-      <div class="media-generation-stage" style={{ "--media-generation-ratio": stageRatio() }}>
+      <VideoStage ratio={stageRatio()} menu={menu()}>
         <Show when={generating()}>
           <MediaGenerationCanvas />
           <MediaGenerationSpecs class="media-generation-chip" values={[lengthText(), props.resolution]} />
@@ -157,165 +167,50 @@ export function VideoGeneration(props: VideoGenerationProps) {
           <MediaGenerationFailure />
         </Show>
         <Show when={ready()}>
-          <div class="media-generation-player" data-playing={player.playing ? "" : undefined}>
-            <Show when={sourceUrl()}>
-              {(url) => (
-                <video
-                  ref={(element) => {
-                    video = element;
-                  }}
-                  src={url()}
-                  playsinline
-                  preload="metadata"
-                  autoplay={player.playOnLoad}
-                  aria-label={props.prompt ?? t("chat.video.generated")}
-                  onPlay={() =>
-                    setPlayer((state) => {
-                      state.playing = true;
-                    })
-                  }
-                  onPause={() =>
-                    setPlayer((state) => {
-                      state.playing = false;
-                    })
-                  }
-                  onEnded={() =>
-                    setPlayer((state) => {
-                      state.playing = false;
-                    })
-                  }
-                  onTimeUpdate={(event) => {
-                    const time = event.currentTarget.currentTime;
-                    setPlayer((state) => {
-                      state.time = time;
-                    });
-                  }}
-                  onLoadedMetadata={(event) => {
-                    const { duration, videoWidth, videoHeight } = event.currentTarget;
-                    setPlayer((state) => {
-                      if (Number.isFinite(duration)) state.duration = duration;
-                      state.width = videoWidth;
-                      state.height = videoHeight;
-                    });
-                  }}
-                  onError={() =>
-                    setPlayer((state) => {
-                      state.failed = true;
-                    })
-                  }
-                >
-                  {/* A generated video has no caption track. */}
-                  <track kind="captions" />
-                </video>
-              )}
-            </Show>
-            <Show when={!player.playing}>
-              <Button
-                variant="ghost"
-                type="button"
-                class="media-generation-play"
-                aria-label={t("chat.video.play")}
-                aria-busy={player.loading ? "true" : undefined}
-                disabled={player.loading}
-                onClick={() => void toggle()}
-              >
-                <Play aria-hidden="true" />
-              </Button>
-            </Show>
-            <div class="media-generation-bar">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                type="button"
-                aria-label={player.playing ? t("chat.video.pause") : t("chat.video.play")}
-                disabled={player.loading}
-                onClick={() => void toggle()}
-              >
-                {player.playing ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
-              </Button>
-              <SeekSlider
-                class="media-generation-seek"
-                label={t("chat.video.position")}
-                value={elapsed()}
-                maxValue={length()}
-                step={SEEK_STEP_SECONDS}
-                disabled={!sourceUrl() || player.duration <= 0}
-                formatValue={(seconds) =>
-                  t("chat.voice.positionValue", { elapsed: clock(seconds), duration: clock(length()) })
-                }
-                onChange={(seconds) =>
-                  setPlayer((state) => {
-                    state.dragged = seconds;
-                  })
-                }
-                onChangeEnd={(seconds) => {
-                  setPlayer((state) => {
-                    state.dragged = null;
-                    state.time = seconds;
-                  });
-                  if (video) video.currentTime = seconds;
-                }}
-              >
-                <span
-                  class="media-generation-seek-fill"
-                  style={{ "--media-generation-seek": `${length() > 0 ? (elapsed() / length()) * 100 : 0}%` }}
-                  aria-hidden="true"
-                />
-              </SeekSlider>
-              {/* The slider gives the same position to a screen reader. */}
-              <span class="media-generation-time" aria-hidden="true">
-                {t("chat.video.time", { elapsed: clock(elapsed()), duration: clock(length()) })}
-              </span>
-              <Show when={props.attachment && props.onDownload}>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  type="button"
-                  aria-label={t("chat.video.download")}
-                  title={t("chat.video.download")}
-                  onClick={() => {
-                    if (props.attachment) props.onDownload?.(props.attachment);
-                  }}
-                >
-                  <Download aria-hidden="true" />
-                </Button>
-              </Show>
-              <Show when={props.attachment && props.onOpen}>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  type="button"
-                  aria-label={t("chat.video.open")}
-                  title={t("chat.video.open")}
-                  data-attachment-id={props.attachment?.id}
-                  onClick={() => {
-                    video?.pause();
-                    if (props.attachment) props.onOpen?.(props.attachment);
-                  }}
-                >
-                  <Maximize2 aria-hidden="true" />
-                </Button>
-              </Show>
-            </div>
-          </div>
+          <VideoPlayer
+            src={sourceUrl()}
+            label={props.prompt ?? t("chat.video.generated")}
+            durationSeconds={props.durationSeconds}
+            autoplay={player.playOnLoad}
+            loading={player.loading}
+            onLoad={() => void load()}
+            onMetadata={(element) => {
+              const { duration, videoWidth, videoHeight } = element;
+              setPlayer((state) => {
+                if (Number.isFinite(duration)) state.duration = duration;
+                state.width = videoWidth;
+                state.height = videoHeight;
+              });
+              const id = props.attachment?.id;
+              if (id) rememberMediaSize(id, { width: videoWidth, height: videoHeight });
+            }}
+            onError={() =>
+              setPlayer((state) => {
+                state.failed = true;
+              })
+            }
+            ref={(element) => {
+              video = element;
+            }}
+            fullControls
+          />
         </Show>
-      </div>
-      <figcaption class="media-generation-meta">
-        <span class="media-generation-label" data-shine={generating() ? "" : undefined}>
-          {label()}
-          <Show when={ready()}>
-            <MediaGenerationSpecs class="media-generation-specs" values={[lengthText(), size()]} />
-          </Show>
-        </span>
-        <Show when={failed()}>
-          <span class="media-generation-error" role="alert">
-            {failure()}
+      </VideoStage>
+      <Show when={!ready()}>
+        <figcaption class="media-generation-meta">
+          <span class="media-generation-label" data-shine={generating() ? "" : undefined}>
+            {label()}
           </span>
-        </Show>
-        <Show when={props.prompt}>
-          <span class="media-generation-prompt">{t("chat.image.prompt", { prompt: props.prompt ?? "" })}</span>
-        </Show>
-      </figcaption>
+          <Show when={failed()}>
+            <span class="media-generation-error" role="alert">
+              {failure()}
+            </span>
+          </Show>
+          <Show when={props.prompt}>
+            <span class="media-generation-prompt">{t("chat.image.prompt", { prompt: props.prompt ?? "" })}</span>
+          </Show>
+        </figcaption>
+      </Show>
     </figure>
   );
 }

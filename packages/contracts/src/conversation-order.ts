@@ -12,7 +12,9 @@ import type { ConversationMessage } from "./ipc-conversation-messages";
  *
  * A turn can take a second message from the user, a steer. From the steer on, the turn goes by time, so
  * the steer comes after the commentary the agent sent before it, and Grok's answers to the first message
- * and to the steer stay in the order they came (#1540).
+ * and to the steer stay in the order they came (#1540). A turn that the agent started itself, such as
+ * when a background command ends, has no first message: there the first `steered` message is the steer,
+ * so it stays under the question that the turn asked before it.
  */
 export function sortConversationMessages(messages: ConversationMessage[]): ConversationMessage[] {
   const originalIndexes = new Map(messages.map((message, index) => [message, index]));
@@ -56,19 +58,35 @@ export function sortConversationMessages(messages: ConversationMessage[]): Conve
   return messages;
 }
 
-/** When each steered turn took its second message from the user. */
+/**
+ * When each steered turn took its steer: its second message from the user, or an earlier `steered`
+ * message that came after the turn's first row. A steer that a turn of its own answers is that turn's
+ * first row, so it is not a steer there.
+ */
 function turnSteerTimes(messages: readonly ConversationMessage[]): Map<string, number> {
   const userTimes = new Map<string, number[]>();
+  const firstTimes = new Map<string, number>();
   for (const message of messages) {
-    if (!message.turnId || turnMessageRank(message) !== 0) continue;
+    if (!message.turnId) continue;
+    const time = messageTime(message);
+    firstTimes.set(message.turnId, Math.min(firstTimes.get(message.turnId) ?? time, time));
+    if (turnMessageRank(message) !== 0) continue;
     const times = userTimes.get(message.turnId) ?? [];
-    times.push(messageTime(message));
+    times.push(time);
     userTimes.set(message.turnId, times);
   }
   const steeredAt = new Map<string, number>();
   for (const [turnId, times] of userTimes) {
     const second = times.sort((left, right) => left - right)[1];
     if (second !== undefined) steeredAt.set(turnId, second);
+  }
+  for (const message of messages) {
+    if (!message.turnId || !message.steered || turnMessageRank(message) !== 0) continue;
+    const time = messageTime(message);
+    const firstTime = firstTimes.get(message.turnId);
+    const steerAt = steeredAt.get(message.turnId);
+    if (firstTime !== undefined && time > firstTime && (steerAt === undefined || time < steerAt))
+      steeredAt.set(message.turnId, time);
   }
   return steeredAt;
 }

@@ -7,6 +7,7 @@ import { ComposerEditor } from "@openbot/ui/features/conversation/ComposerEditor
 import { ComposerNotice } from "@openbot/ui/features/conversation/ComposerNotice";
 import { ComposerStackCard } from "@openbot/ui/features/conversation/ComposerStackCard";
 import { formatChatTimestamp } from "@openbot/ui/features/conversation/chat-timestamp";
+import { type ChatBubbleStyle, ownMessageAuthor } from "@openbot/ui/features/conversation/own-bubble";
 import { useText } from "@openbot/ui/text";
 import { For, onSettled, Show } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
@@ -23,6 +24,8 @@ export interface SideQuestionExchange {
 
 export interface SideQuestionPanelProps {
   agent: AgentProfile;
+  /** How the reader's questions look: Classic when absent. */
+  bubbleStyle?: ChatBubbleStyle | undefined;
   agents: AgentProfile[];
   exchanges: readonly SideQuestionExchange[];
   /** The agent's skills, for the `$` picker and the skill tags in messages. */
@@ -86,7 +89,12 @@ export function SideQuestionPanel(props: SideQuestionPanelProps) {
   };
   const author = (message: AgentMessage) =>
     message.author === "you"
-      ? { kind: "you" as const, name: t("chat.message.you") }
+      ? ownMessageAuthor({
+          name: t("chat.message.you"),
+          style: props.bubbleStyle ?? "classic",
+          agent: props.agent,
+          chatColor: undefined,
+        })
       : { kind: "agent" as const, name: props.agent.name, agent: props.agent };
   return (
     <aside
