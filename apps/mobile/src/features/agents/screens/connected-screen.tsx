@@ -42,7 +42,13 @@ import {
 } from "@/features/agents/components/chat-drag";
 import { ChatListRail } from "@/features/agents/components/chat-list-rail";
 import { EmptyAgentsScene, type WelcomeHandOff } from "@/features/agents/components/empty-agents-scene";
-import { HomeCardRow, HomeCardTop, useHomeCard } from "@/features/agents/components/home-backdrop-card";
+import {
+  HOME_CARD_RADIUS,
+  HomeCardBackdrop,
+  HomeCardRow,
+  HomeCardTop,
+  useHomeCard,
+} from "@/features/agents/components/home-backdrop-card";
 import { PinnedAgentsGrid } from "@/features/agents/components/pinned-agents-grid";
 import { SidebarSectionHeader } from "@/features/agents/components/sidebar-section-header";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
@@ -54,7 +60,6 @@ import {
 import { useAppUpdate } from "@/features/app-update/model/app-update";
 import { ChannelListRow } from "@/features/channels/components/channel-list";
 import { useChannels } from "@/features/channels/components/use-channels";
-import { HomeBackdropBand } from "@/features/chat/components/chat-backdrop-layer";
 import { OnboardingFlow } from "@/features/onboarding/components/onboarding-flow";
 import { useHomeOnboarding } from "@/features/onboarding/context/home-onboarding-context";
 import { useRatingAskGate } from "@/features/rating-ask/model/use-rating-ask-gate";
@@ -99,6 +104,7 @@ import { LargeTitle, LargeTitleBar, useLargeTitleScroll } from "@/shared/compone
 import { type MenuAction, MenuView } from "@/shared/components/menu-view";
 import { useChromeGlass } from "@/shared/lib/chrome-glass";
 import { haptics } from "@/shared/lib/haptics";
+import { useReducedMotion } from "@/shared/lib/motion";
 import { BAR_BUTTON_SIZE, NATIVE_BAR_HEIGHT, useBarTop } from "@/shared/lib/native-bar";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { currentText, useText } from "@/shared/lib/text";
@@ -109,6 +115,8 @@ const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const ONBOARDING_EXIT = FadeOut.duration(220).easing(EASE_OUT);
 const ROW_ENTER = FadeIn.duration(180).easing(EASE_OUT).reduceMotion(ReduceMotion.System);
 const LIST_REFLOW = LinearTransition.duration(240).easing(EASE_OUT).reduceMotion(ReduceMotion.System);
+/** The move of the card top to the header of a new server. */
+const CARD_MOVE = { duration: 240, easing: EASE_OUT, reduceMotion: ReduceMotion.Never };
 // A row is about 80 pt high. The list keeps a few screens of rows mounted instead of the default 21,
 // so a server with many agents mounts fewer avatars, swipe handlers and menus.
 const LIST_WINDOW_SIZE = 7;
@@ -555,8 +563,40 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   // With a backdrop, the list is a card under the pinned agents.
   const homeCard = useHomeCard();
   const cardBackground = String(useThemeColor("background"));
-  /** The height of the list header at rest: the title, the pinned agents and the top of the card. */
+  /** The height of the band at rest: the list header (the title, the pinned agents and the card top). */
   const [stageHeight, setStageHeight] = useState(0);
+  // The backdrop draws the card top at `cardEdge`. After a change of server it moves there from the
+  // header of the last server. Until it arrives, the card top and the rows of the list are clear, so
+  // the moving card top shows through them; then they are opaque again for the scroll.
+  const cardEdge = useSharedValue(-1);
+  const [settledServerId, setSettledServerId] = useState<string | null>(null);
+  const cardSettled = settledServerId === activeServer.id;
+  const cardMotionOff = useReducedMotion();
+  const settleCard = useCallback((serverId: string, height: number) => {
+    setSettledServerId(serverId);
+    setStageHeight(height);
+  }, []);
+  const layoutStage = useCallback(
+    (height: number) => {
+      const edge = height - HOME_CARD_RADIUS;
+      const serverId = activeServer.id;
+      if (cardSettled || cardEdge.get() < 0 || cardMotionOff) {
+        cancelAnimation(cardEdge);
+        cardEdge.set(edge);
+        settleCard(serverId, height);
+        return;
+      }
+      // The band keeps the taller of the two heights while the card top moves.
+      setStageHeight((current) => Math.max(current, height));
+      cardEdge.set(
+        withTiming(edge, CARD_MOVE, (finished) => {
+          if (finished) scheduleOnRN(settleCard, serverId, height);
+        }),
+      );
+    },
+    [activeServer.id, cardEdge, cardMotionOff, cardSettled, settleCard],
+  );
+  const cardFill = cardSettled ? cardBackground : "transparent";
   const scroll = useLargeTitleScroll(pane ? { headerHeight: barTop + PANE_BAR_HEIGHT } : undefined);
   const { headerHeight } = scroll;
   const search = useHomeSearch();
@@ -670,7 +710,8 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     [serverId, sidebarLayout, workspace],
   );
   // Rows are memoized, so a new message for one agent renders only that agent's row.
-  const rowOffset = hasPins ? 1 : 0;
+  // In the reveal, the title is first, then each pinned tile, then the rows.
+  const rowOffset = hasPins ? 1 + pinnedAgents.length + pinnedChannels.length : 0;
   const renderRow = useCallback(
     ({ item, index }: { item: MobileSidebarItem; index: number }) =>
       item.kind === "waiting" ? (
@@ -733,11 +774,11 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   // In card mode each row is opaque, so the fixed backdrop under the clear list does not show through.
   const renderItem = useCallback(
     (info: { item: MobileSidebarItem; index: number }) => (
-      <HomeCardRow card={homeCard} background={cardBackground}>
+      <HomeCardRow card={homeCard} background={cardFill}>
         {renderRow(info)}
       </HomeCardRow>
     ),
-    [renderRow, homeCard, cardBackground],
+    [renderRow, homeCard, cardFill],
   );
   const listRef = useRef<FlatList>(null);
   /** The scroll of the list while a drag scrolls it. The user cannot scroll during a drag. */
@@ -941,7 +982,14 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
       <AndroidBlurTarget target={barBlurTarget} surface="canvas">
         {/* The backdrop is fixed under the list, so the scroll moves nothing in it. */}
         {homeCard && !onboarding.active && !sceneShows ? (
-          <HomeBackdropBand height={headerHeight + stageHeight} active={focused} />
+          <HomeCardBackdrop
+            height={stageHeight > 0 ? headerHeight + stageHeight : 0}
+            top={headerHeight}
+            edge={cardEdge}
+            scrolled={scroll.scrolled}
+            background={cardBackground}
+            active={focused}
+          />
         ) : null}
         <HomeSearchList search={search} barHeight={searchBarOffset}>
           {onboarding.active ? null : sceneShows ? (
@@ -996,7 +1044,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
                 windowSize={dragging ? LIST_WINDOW_SIZE * 3 : LIST_WINDOW_SIZE}
                 ListHeaderComponent={
                   // Its height places the bottom of the fixed backdrop at the top of the card.
-                  <View onLayout={(event) => setStageHeight(event.nativeEvent.layout.height)}>
+                  <View onLayout={(event) => layoutStage(event.nativeEvent.layout.height)}>
                     <AgentListRowReveal index={0} reveal={listReveal}>
                       {hasSelectedServer ? (
                         <LargeTitle
@@ -1024,25 +1072,27 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
                           </Button>
                         </View>
                       ) : null}
-                      <PinnedAgentsGrid
-                        agents={pinnedAgents}
-                        animateLayout={!updateHeader.moving}
-                        dropZone={dragging && !hasPins}
-                      >
-                        {pinnedChannels.length > 0
-                          ? pinnedChannels.map((channel) => (
-                              <ChannelListRow
-                                key={channel.id}
-                                channel={channel}
-                                serverId={activeServer.id}
-                                agents={channelAgents}
-                                pinned
-                              />
-                            ))
-                          : null}
-                      </PinnedAgentsGrid>
-                      <HomeCardTop card={homeCard} background={cardBackground} />
                     </AgentListRowReveal>
+                    <PinnedAgentsGrid
+                      agents={pinnedAgents}
+                      animateLayout={!updateHeader.moving}
+                      dropZone={dragging && !hasPins}
+                      reveal={listReveal}
+                      revealOffset={1}
+                    >
+                      {pinnedChannels.length > 0
+                        ? pinnedChannels.map((channel) => (
+                            <ChannelListRow
+                              key={channel.id}
+                              channel={channel}
+                              serverId={activeServer.id}
+                              agents={channelAgents}
+                              pinned
+                            />
+                          ))
+                        : null}
+                    </PinnedAgentsGrid>
+                    <HomeCardTop card={homeCard} background={cardFill} />
                   </View>
                 }
                 ListEmptyComponent={

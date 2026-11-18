@@ -1,7 +1,16 @@
 import { BlurView } from "expo-blur";
 import { type Href, router, usePathname } from "expo-router";
 import { useThemeColor } from "heroui-native/hooks";
-import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  type PropsWithChildren,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Pressable, useWindowDimensions, View } from "react-native";
 import {
   Gesture,
@@ -101,6 +110,14 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
     if (!open) setDrawerSettled(false);
   }, []);
   const settleDrawer = useCallback(() => setDrawerSettled(true), []);
+  // A server chosen in the drawer becomes active when the closing motion ends. The new list mounts
+  // many native views, and a mount during the motion drops its frames.
+  const pendingServerId = useRef<string | null>(null);
+  const selectPendingServer = useCallback(() => {
+    const serverId = pendingServerId.current;
+    pendingServerId.current = null;
+    if (serverId) selectServer(serverId);
+  }, [selectServer]);
   const finishOpening = useCallback(
     (finished?: boolean) => {
       "worklet";
@@ -111,11 +128,16 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
   const finishClosing = useCallback(
     (finished?: boolean) => {
       "worklet";
-      if (!finished) return;
+      // A stopped motion still applies the chosen server, so a tap is never lost.
+      if (!finished) {
+        scheduleOnRN(selectPendingServer);
+        return;
+      }
       drawerOpenOnUI.set(false);
       scheduleOnRN(commitDrawerState, false);
+      scheduleOnRN(selectPendingServer);
     },
-    [commitDrawerState, drawerOpenOnUI],
+    [commitDrawerState, drawerOpenOnUI, selectPendingServer],
   );
 
   const openDrawer = useCallback(() => {
@@ -133,6 +155,7 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
 
   useEffect(() => {
     if (session) return;
+    pendingServerId.current = null;
     drawerOpenOnUI.set(false);
     setDrawerOpen(false);
     setDrawerSettled(false);
@@ -271,10 +294,14 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
 
   const selectServerAndClose = useCallback(
     (serverId: string) => {
-      selectServer(serverId);
+      if (!drawerOpenOnUI.get()) {
+        selectServer(serverId);
+        return;
+      }
+      pendingServerId.current = serverId;
       closeDrawer();
     },
-    [closeDrawer, selectServer],
+    [closeDrawer, drawerOpenOnUI, selectServer],
   );
 
   const contextValue = useMemo(
