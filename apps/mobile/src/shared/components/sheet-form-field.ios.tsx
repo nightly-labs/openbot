@@ -3,7 +3,7 @@ import { useNativeState } from "@expo/ui/swift-ui";
 import { accessibilityLabel } from "@expo/ui/swift-ui/modifiers";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { View } from "react-native";
 
 import { useTextScale } from "@/features/settings/model/text-size-store";
@@ -39,7 +39,18 @@ export function SheetFormField({
   // The SwiftUI field is not a React Native `Text`, so it takes the text size of the app here.
   const textScale = useTextScale();
   const nativeValue = useNativeState(value);
+  // On iOS 18 and later, SwiftUI stops the app ("String index is out of bounds") when JS replaces the
+  // text of a focused field: the selection still points into the old text (expo/expo#47434, #48274).
+  // When the user types fast, a re-render can send an older value back. So the field keeps its text
+  // while it has focus, and a different value from JS goes to the field at blur. Clearing is safe at
+  // once: the field drops each selection that is past the end of the new text.
+  const focused = useRef(false);
+  const fieldText = useRef(value);
+  const latestValue = useRef(value);
+  latestValue.current = value;
   useEffect(() => {
+    if ((focused.current && value !== "") || value === fieldText.current) return;
+    fieldText.current = value;
     nativeValue.set(value);
   }, [nativeValue, value]);
   const lines = multiline ? (tall ? 14 : 4) : 1;
@@ -95,7 +106,19 @@ export function SheetFormField({
             }
             textStyle={{ color: String(foreground), fontFamily: APP_FONT, fontSize: 16 * textScale }}
             value={nativeValue}
-            onChangeText={onChangeText}
+            onChangeText={(text) => {
+              fieldText.current = text;
+              onChangeText(text);
+            }}
+            onFocus={() => {
+              focused.current = true;
+            }}
+            onBlur={() => {
+              focused.current = false;
+              if (latestValue.current === fieldText.current) return;
+              fieldText.current = latestValue.current;
+              nativeValue.set(latestValue.current);
+            }}
             onSubmitEditing={onSubmitEditing}
           />
         </Host>
