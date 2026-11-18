@@ -340,7 +340,7 @@ export class McpOAuth implements McpOAuthAuthority {
    * not in here is one this run did not start - which is what makes a forged or replayed
    * `openbot://mcp-auth` link do nothing.
    */
-  readonly #waiting = new Map<string, (code: string) => void>();
+  readonly #waiting = new Map<string, (code: string | null) => void>();
   /** The waiting sign-ins whose page an opener of their own showed, not the user's browser. */
   readonly #openedElsewhere = new Set<string>();
   /**
@@ -522,8 +522,14 @@ export class McpOAuth implements McpOAuthAuthority {
     this.#unanswered.delete(key);
     const state = randomUUID();
     const grant = Deferred.makeUnsafe<string, Error>();
+    // Set when the sign-in page answered with an error instead of a grant (`refuseAuthorization`).
+    let refused = false;
     this.#waiting.set(state, (code) => {
-      Deferred.doneUnsafe(grant, Effect.succeed(code));
+      refused = code === null;
+      Deferred.doneUnsafe(
+        grant,
+        code === null ? Effect.fail(new Error(sourceText("error.backend.mcpSignInRefused"))) : Effect.succeed(code),
+      );
     });
     if (open) this.#openedElsewhere.add(state);
     // Set when the probe moves on: a discovery slow enough to outlast it must neither open a
@@ -545,6 +551,8 @@ export class McpOAuth implements McpOAuthAuthority {
     };
     // The user said stop: the wait ends now rather than at its deadline, with its own sentence.
     const cancel = () => {
+      // A refusal already ended the wait. The cancel that a relay sends after it must not replace its sentence.
+      if (refused) return;
       cancelled = true;
       Deferred.doneUnsafe(grant, Effect.fail(new Error(sourceText("error.backend.mcpSignInCancelled"))));
       abandon();
@@ -640,6 +648,19 @@ export class McpOAuth implements McpOAuthAuthority {
     if (!deliver) return false;
     this.#waiting.delete(state);
     deliver(code);
+    return true;
+  }
+
+  /**
+   * The browser came back with an error instead of a grant (RFC 6749, 4.1.2.1): the sign-in page
+   * refused. The sign-in waiting for this `state` ends now with its own sentence, not as a cancel.
+   * Answers whether one was waiting.
+   */
+  refuseAuthorization(state: string): boolean {
+    const deliver = this.#waiting.get(state);
+    if (!deliver) return false;
+    this.#waiting.delete(state);
+    deliver(null);
     return true;
   }
 
