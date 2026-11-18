@@ -146,6 +146,15 @@
   cursor: grabbing;
 }
 
+/* A press on a text field moves the node, and a click puts the caret in it, so the field shows the text cursor only while it has the focus. */
+.wfn-slot :is(textarea, input.wfn-input):not(:focus, [readonly]) {
+  cursor: grab;
+}
+
+.wfn-viewport[data-dragging] .wfn-slot :is(textarea, input.wfn-input) {
+  cursor: grabbing;
+}
+
 /*
  * The HUD: every bar over the canvas is one glass bar, 40px high, with a 4px inset. Controls inside
  * are 32px with an 8px radius, so the bar radius is 8 + 4 = 12. The bars come in one after another.

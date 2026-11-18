@@ -2,6 +2,7 @@ import type { AgentTask } from "@openbot/contracts/ipc";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { TASKS_CLOSED_SHOWN, type TasksSectionId, taskSections } from "@openbot/team-client/agent-tasks";
 import { router, Stack, useLocalSearchParams } from "expo-router";
+import { useNavigationState, useRoute } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
 import Plus from "lucide-react-native/icons/plus";
 import { useState } from "react";
@@ -48,15 +49,27 @@ export function ServerTasksScreen() {
   const title = agent ? t("mobile.server.threads.agentTitle", { name: agent.name }) : t("mobile.app.route.threads");
   const canStart = Boolean(server) && online && supported && agents.length > 0;
 
+  // One agent's page that opened on top of that agent's chat, from its thread menu or its swipe: a
+  // thread from it takes the place of the page, so Back from the thread returns to the chat, as a
+  // thread from the menu does. Elsewhere, such as over a thread, the page stays under the thread.
+  const route = useRoute();
+  const overAgentChat = useNavigationState((state) => {
+    const below = state.routes[state.routes.findIndex((candidate) => candidate.key === route.key) - 1];
+    const params = below?.params;
+    return (
+      below?.name === "chat/[agentId]" && params !== undefined && "agentId" in params && params.agentId === agentId
+    );
+  });
+  const show = agentId && overAgentChat ? router.replace : router.push;
   // One agent's page starts a thread with that agent, as its thread menu does: its first message
   // starts it. The page of all agents asks which agent starts it.
   const newTask = () => {
     void haptics.impact("soft");
-    if (agentId) router.push({ pathname: "/task/[taskId]", params: { serverId, agentId, taskId: DRAFT_THREAD_ID } });
+    if (agentId) show({ pathname: "/task/[taskId]", params: { serverId, agentId, taskId: DRAFT_THREAD_ID } });
     else router.push({ pathname: "/new-task", params: { serverId } });
   };
   const open = (task: AgentTask) =>
-    router.push({ pathname: "/task/[taskId]", params: { serverId, agentId: task.agentId, taskId: task.id } });
+    show({ pathname: "/task/[taskId]", params: { serverId, agentId: task.agentId, taskId: task.id } });
 
   const note = !server
     ? t("mobile.server.unavailable")

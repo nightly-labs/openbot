@@ -19,11 +19,22 @@ export const messages = {
   "error.workflow.agentStepEnded": "Le message à l’agent a été supprimé avant sa réponse.",
   "error.workflow.conditionUnclear": "Le modèle n’a pas répondu oui ou non.",
   "error.workflow.modelFailed": "Le modèle n’a pas pu répondre. Relancez l’étape.",
+  "error.workflow.modelTimedOut":
+    "Le modèle n’a pas répondu à temps. Choisissez un effort plus bas ou un modèle plus rapide pour cette étape, puis relancez-la.",
+  "error.workflow.modelToolUse":
+    "Le modèle a essayé d’utiliser un outil, mais cette étape ne peut répondre qu’avec du texte. Relancez l’étape ou choisissez un autre modèle pour elle.",
+  "error.workflow.modelUnavailable":
+    "Le modèle de cette étape n’est pas disponible. Choisissez un autre modèle pour cette étape.",
+  "error.workflow.providerBusy": "Le fournisseur est occupé. Attendez quelques minutes, puis relancez l’étape.",
+  "error.workflow.providerOffline":
+    "OpenBot n’a pas pu joindre le fournisseur. Vérifiez la connexion internet, puis relancez l’étape.",
   "error.workflow.modelBusy": "Une autre requête au modèle est en cours. Relancez l’étape bientôt.",
   "error.workflow.mediaFailed": "Le modèle n’a pas pu créer l’image ou la vidéo. Relancez l’étape.",
   "error.workflow.pictureMissing": "L’image n’est plus sur le serveur. Envoyez-la de nouveau.",
   "error.workflow.pictureType": "Utilisez une image PNG, JPEG ou WebP.",
   "error.workflow.mediaInputMissing": "Une image d’une étape précédente n’est pas disponible. Relancez cette étape.",
+  "error.workflow.mediaEmptyRequest":
+    "Écrivez une description, ou exécutez les étapes précédentes pour qu’un texte ou une image arrive.",
   "error.workflow.mediaInputNotImage":
     "Cette étape n’accepte que des images, pas des vidéos. Supprimez la connexion depuis la vidéo.",
   "error.workflow.stepMissing": "Cette étape n’existe plus.",
@@ -84,4 +95,14 @@ export const messages = {
   "error.workflow.sunraFailed": "Sunra n'a pas pu créer le fichier : {reason}",
   "error.workflow.sunraTimeout":
     "Sunra n'a pas terminé le fichier à temps. Regardez le projet OpenBot sur sunra.ai avant de relancer l'étape.",
+  "error.workflow.higgsfieldSignIn": "Connectez-vous à Higgsfield dans Apps pour utiliser les modèles Higgsfield.",
+  "error.workflow.higgsfieldNoCredits":
+    "Votre compte Higgsfield n'a pas assez de crédits. Ajoutez des crédits sur higgsfield.ai/pricing, puis relancez l'étape.",
+  "error.workflow.higgsfieldNeedsPlan":
+    "Ce modèle Higgsfield nécessite un forfait Higgsfield. Choisissez un forfait sur higgsfield.ai/pricing, ou sélectionnez un autre modèle.",
+  "error.workflow.higgsfieldBlocked":
+    "Higgsfield n'a pas créé le fichier, car son contrôle de contenu l'a arrêté. Modifiez le prompt ou les images d'entrée, puis relancez l'étape.",
+  "error.workflow.higgsfieldFailed": "Higgsfield n'a pas pu créer le fichier : {reason}",
+  "error.workflow.higgsfieldTimeout":
+    "Higgsfield n'a pas terminé le fichier à temps. Consultez votre historique sur higgsfield.ai avant de relancer l'étape.",
 } as const satisfies PartialTranslation<typeof source>;

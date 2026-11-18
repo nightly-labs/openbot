@@ -24,7 +24,7 @@ any of them before an upgrade. A renamed constant means the old file is never re
 | `openbot-remote-servers-v1.json` | `REMOTE_SERVERS_FILE`, `src/main/application-services.ts` | `src/main/remote-server-stored-shape.ts` reads v1/v2 as v3, preserves unreadable entries, refuses unknown versions |
 | `openbot-central-auth-v1.bin` | `CENTRAL_AUTH_FILE`, `src/main/application-services.ts` | `safeStorage`-encrypted; `src/main/central-auth-manager.ts` **throws** on anything but `version === 2` and `#initialize` catches that into `#clearStoredSession()`, so a bad shape signs the user out; undecryptable if `appId` or the signing identity changes |
 | `openbot-remote-desktop-credential-v1.json` | `LEGACY_REMOTE_DESKTOP_CREDENTIAL_FILE`, `src/main/application-services.ts` | legacy, still read |
-| `openbot-remote-desktop-runtime-v1.json` | `REMOTE_DESKTOP_RUNTIME_SECRET_FILE`, `src/main/application-services.ts` | `safeStorage`-encrypted; `src/main/remote-desktop-secret-store.ts` accepts only `version: 1` |
+| `openbot-remote-desktop-runtime-v1.json` | no owner since #10248 | legacy, not read; the runtime login is made in memory for each process |
 | `remote/connection-<stack pid>.json` in the dev runtime directory | `developmentRemoteConnectionPath`, `src/main/development-runtime-directory.ts` | development only |
 | `bots.json` | `LEGACY_AGENTS_STATE_FILE`, `src/backend/agent-store.ts` | permanent name; imported once under command id `legacy-import:bots:v1` |
 | `mailbox.json` | `src/backend/mailbox-store.ts` | permanent name |
@@ -55,8 +55,8 @@ use the key-inventory diff there instead. Derive the set rather than reading it 
 | `openbot:sidebar-collapsed:v1` | `src/renderer/src/features/sidebar/sidebar-sections.ts` |
 | `openbot:sidebar-people-order:v1` | `src/renderer/src/features/sidebar/sidebar-people-order.ts` |
 | `openbot:left-panel-collapsed`, `openbot:left-panel-width` | `src/renderer/src/layout.tsx`, `layout-constants.ts` |
-| `openbot:browser-panel-width`, `openbot:browser-pip-native-bounds` | `src/renderer/src/features/conversation/FilePreviewPanel.tsx`, `conversation-controller.ts` |
-| `openbot:settings-panel-width` | `src/renderer/src/features/settings/settings-context.tsx` |
+| `openbot:side-panel-width`; it falls back to the older `openbot:settings-panel-width`. The older `openbot:browser-panel-width` and `openbot:browser-preview-panel-width` are not read | `src/renderer/src/components/side-panel-width.ts` |
+| `openbot:browser-pip-native-bounds` | `src/renderer/src/features/conversation/conversation-controller.ts` |
 | `openbot:completion-sound-enabled`, `openbot:task-sound` | `src/renderer/src/completion-sound.ts`. The app writes both keys; `"false"` in the old key reads as Off, so an older version keeps the choice |
 | `openbot:analytics-app-version` | `src/renderer/src/App.tsx` |
 | `openbot:landing-preview-ready`, `openbot:landing-preview-start` | `packages/contracts/src/landing-preview-messages.ts` |
@@ -110,15 +110,12 @@ All in `src/backend/openbot-database-schema.ts`:
 
 | Constant | Value or meaning |
 | --- | --- |
-| `BASELINE_SCHEMA_VERSION` | `8` — the frozen baseline, `BASELINE_V8_SCHEMA_SQL` |
+| `BASELINE_SCHEMA_VERSION` | `8` — the frozen baseline (`migrations/0008-baseline.ts`), where a new database starts |
 | `MIGRATIONS` | one contiguous entry per version from 8 up; read the last one from the release tag, never from here — a number written down here is stale the next time a migration ships |
 | `LATEST_SCHEMA_VERSION` | derived from the last `MIGRATIONS` entry |
-| `LATEST_SCHEMA_SQL` | `substituteOnce(BASELINE_V8_SCHEMA_SQL, BASELINE_REACTIONS_TABLE_SQL, V12_REACTIONS_TABLE_SQL)` |
-| `substituteOnce` | throws unless the search string appears **exactly once**; handles one table substitution and no more |
 | `validateMigrationRegistry` | throws on a non-contiguous version |
-| `createLatestDatabase` | execs `LATEST_SCHEMA_SQL`, then stamps every `MIGRATIONS` entry as applied without running it |
 
-Tests: `src/backend/openbot-database-schema-parity.test.ts` (the two build paths must agree),
+Tests: `src/backend/openbot-database-schema-parity.test.ts` (a new database from an empty file must match the recorded history),
 `src/backend/openbot-database.test.ts` (including "rejects a database created by a newer
 application").
 

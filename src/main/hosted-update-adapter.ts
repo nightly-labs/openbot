@@ -3,14 +3,10 @@ import { writeFileSync } from "node:fs";
 import { readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { isNewerRelease } from "@openbot/contracts/release-version";
 import type { ProgressInfo, UpdateInfo } from "electron-updater";
-import { fetchLatestLinuxRelease, newerRelease } from "./host-release-service";
-import {
-  isValidSemver,
-  type UpdateAdapter,
-  type UpdateCancellationToken,
-  type UpdateCheckOutcome,
-} from "./update-service";
+import { fetchLatestLinuxRelease } from "./host-release-service";
+import type { UpdateAdapter, UpdateCancellationToken, UpdateCheckOutcome } from "./update-service";
 
 /** The path unit that starts `openbot-hosted-update request`. Without it, no request is acted on. */
 export const HOSTED_UPDATE_TRIGGER = "/etc/systemd/system/openbot-update-request.path";
@@ -104,7 +100,7 @@ export class HostedUpdateAdapter implements UpdateAdapter {
       this.#options.fetch ?? fetch,
       AbortSignal.timeout(15_000),
     );
-    if (!newerRelease(version, this.#options.currentVersion))
+    if (!isNewerRelease(version, this.#options.currentVersion))
       return { isUpdateAvailable: false, updateInfo: { version } };
     return { isUpdateAvailable: true, updateInfo: { version }, cancellationToken: new RequestCancellation() };
   }
@@ -161,7 +157,7 @@ export class HostedUpdateAdapter implements UpdateAdapter {
       (value) => value.trim(),
       () => "",
     );
-    return isValidSemver(version) && newerRelease(version, this.#options.currentVersion) ? version : null;
+    return isNewerRelease(version, this.#options.currentVersion) ? version : null;
   }
 
   /** `percent` is NaN while root waits or prepares the release, which UpdateService shows as no percent. */

@@ -300,6 +300,17 @@ export interface LocalServersOptions {
 
 export type SpawnChild = (command: string, args: readonly string[], options: SpawnOptions) => ChildProcess;
 
+/**
+ * `--no-sandbox` when this process started with it, else nothing. A child is never less sandboxed
+ * than this process. A Linux AppImage adds the switch when the system blocks the user namespaces of
+ * the sandbox (#10585). A child without it then stops before it is ready. The switch is read from
+ * `argv`: `app.commandLine` does not report it. A value after `--` is not a switch.
+ */
+export function sandboxArguments(argv: readonly string[]): string[] {
+  const end = argv.indexOf("--");
+  return (end === -1 ? argv : argv.slice(0, end)).includes("--no-sandbox") ? ["--no-sandbox"] : [];
+}
+
 export class LocalServers {
   readonly #options: LocalServersOptions;
   readonly #registry: LocalServerRegistry;

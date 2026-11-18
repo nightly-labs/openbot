@@ -10,6 +10,12 @@
   background: transparent;
 }
 
+/* The shape that joins the selected tab of a tab row to the card. The app shows it where the row sits on
+   the card. */
+.tab-shape {
+  display: none;
+}
+
 .conversation-heading-group {
   display: flex;
   min-width: 0;

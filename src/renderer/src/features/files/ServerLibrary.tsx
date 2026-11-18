@@ -13,8 +13,13 @@ import { attachmentFilePreview } from "../conversation/attachment-preview";
 import { type AgentLevelsSource, createAgentLevels } from "../conversation/message-delete-access";
 import { serverRoleCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import type { FilesPort } from "./files-port";
-import { readLibraryCollapsedRows, saveLibraryCollapsedRows } from "./library-collapsed-storage";
 import { createLibraryFolders } from "./library-folders";
+import {
+  readLibraryCollapsedRows,
+  readLibraryFavorites,
+  saveLibraryCollapsedRows,
+  saveLibraryFavorites,
+} from "./library-rows-storage";
 import { canManageStorage, createServerAgents, createStorageUsage } from "./storage-usage";
 import { escapeClosesViewer } from "./viewer-escape";
 
@@ -104,6 +109,13 @@ export function ServerLibrary(props: ServerLibraryProps) {
     );
   }
 
+  function saveFavorites(keys: readonly string[]): void {
+    saveLibraryFavorites(
+      untrack(() => props.serverId),
+      keys,
+    );
+  }
+
   function showInChat(file: StoredFileRow): void {
     if (file.agentId && file.messageId) props.onShowInChat(file.agentId, file.messageId);
   }
@@ -158,6 +170,8 @@ export function ServerLibrary(props: ServerLibraryProps) {
             canOrganize={canOrganize}
             initialCollapsed={readLibraryCollapsedRows(props.serverId)}
             onCollapsedChange={saveCollapsedRows}
+            initialFavorites={readLibraryFavorites(props.serverId)}
+            onFavoritesChange={saveFavorites}
             mediaSource={props.mediaSource}
             opensFiles={props.opensFiles}
           />
@@ -211,7 +225,6 @@ function LibraryViewer(props: {
           preview={props.viewing.preview}
           agents={props.agents}
           sourceUrl={file().previewUrl ?? null}
-          defaultWidth={() => VIEWER_WIDTH}
           maxWidth={() => VIEWER_WIDTH}
           onWidthChange={() => undefined}
           onOpenLink={props.onOpenUrl}

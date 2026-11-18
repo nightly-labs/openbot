@@ -37,6 +37,17 @@ export function readDevelopmentClientTransport(value: string | undefined): Devel
   return value === "webrtc" ? "webrtc" : "http";
 }
 
+/**
+ * The account of a development host with no owner: `OPENBOT_DEV_HOST_EMAIL`, or the default. The
+ * account API permits few sign-ins for one email, so hosts that start together on new profiles
+ * (`bun run test:provider-live`) each name their own. Only an `example.com` address is accepted: the
+ * account is a throwaway one.
+ */
+export function readDevelopmentHostEmail(value: string | undefined): string {
+  const email = value?.trim().toLowerCase();
+  return email && /^[a-z0-9.-]{1,64}@example\.com$/u.test(email) ? email : DEVELOPMENT_HOST_EMAIL;
+}
+
 const developmentRemoteServerConnectionSchema: z.ZodType<DevelopmentRemoteServerConnection> = z.object({
   serverId: z.string().min(1),
   serverName: z.string().min(1),
@@ -52,6 +63,7 @@ export interface DevelopmentRemoteAccountOptions {
   role: DevelopmentRemoteRole;
   testClientEnabled: boolean;
   clientTransport: DevelopmentClientTransport;
+  hostEmail: string;
   centralAuth: CentralAuthManager;
   teamStore: TeamStore;
   setupFile: string;
@@ -62,6 +74,7 @@ export const applyDevelopmentRemoteAccount = Effect.fn("DevelopmentRemote.applyA
   role,
   testClientEnabled,
   clientTransport,
+  hostEmail,
   centralAuth,
   teamStore,
   setupFile,
@@ -69,7 +82,7 @@ export const applyDevelopmentRemoteAccount = Effect.fn("DevelopmentRemote.applyA
 }: DevelopmentRemoteAccountOptions) {
   const email =
     role === "host"
-      ? (teamStore.getOwnerEmail() ?? DEVELOPMENT_HOST_EMAIL)
+      ? (teamStore.getOwnerEmail() ?? hostEmail)
       : clientTransport === "webrtc"
         ? DEVELOPMENT_HOST_EMAIL
         : DEVELOPMENT_CLIENT_EMAIL;

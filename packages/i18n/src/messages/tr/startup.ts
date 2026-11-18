@@ -20,6 +20,10 @@ export const messages = {
   "startup.newerDataDownload": "OpenBot’u indir",
   "startup.newerDataGuide": "Kılavuzu aç",
   "startup.newerDataQuit": "Çık",
+  "startup.newerDataLoopTitle": "En son OpenBot açılmadı",
+  "startup.newerDataLoopBody":
+    "OpenBot’un daha yeni bir sürümü verilerinizi kaydetti ve bu sürüm ({version}) onları açamıyor. OpenBot {loopVersion} art arda birkaç kez açılmadan durdu, bu yüzden yeniden yüklenmiyor.\n\n{loopVersion} sürümünden daha yeni bir sürüm çıktığında onu yükleyin. Yardım almak için kılavuzu açın.\n\nYerel verileriniz sıfırlanmadı veya üzerine yazılmadı.",
+  "startup.newerDataReleases": "Sürümleri göster",
   "startup.recoveryWindowTitle": "OpenBot kurtarma",
   "startup.recoveryTitle": "OpenBot açılmadı",
   "startup.recoveryBody": {
@@ -29,8 +33,11 @@ export const messages = {
   },
   "startup.recoveryHint":
     "Yeniden deneyin veya açılan son sürümü yükleyin. Yardım almak için tanılamayı dışa aktarın ve dosyayı raporunuzla gönderin.",
+  "startup.recoveryHintLatest":
+    "OpenBot verilerinizi açabilen daha eski bir sürüm bulamadı. Yeniden deneyin veya en son sürümü yükleyin. Yardım almak için tanılamayı dışa aktarın ve dosyayı raporunuzla gönderin.",
   "startup.recoveryRetry": "Yeniden dene",
   "startup.recoveryPreviousVersion": "Önceki sürümü indir",
+  "startup.recoveryLatestVersion": "En son sürümü indir",
   "startup.recoveryExportDiagnostics": "Tanılamayı dışa aktar",
   "startup.recoveryOpenDataFolder": "Veri klasörünü aç",
   "startup.recoveryQuit": "Çık",

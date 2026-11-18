@@ -630,7 +630,6 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
       ref={transitionRoot}
       class="openbot-dynamic-island-transition-root"
       data-mode-transitioning={modeTransitioning() ? "true" : undefined}
-      data-ambient-motion={ambientMotion() ? undefined : "paused"}
     >
       <AmbientMotion when={ambientMotion()}>
         <DynamicIsland
@@ -1827,7 +1826,6 @@ function IslandAvatar(props: { agent: DynamicIslandAgentIdentity; working?: bool
       // looking at it. Work animates on its own only while the island is looked at: see `AmbientMotion`.
       motion="hover"
       mood={props.working ? "working" : "idle"}
-      shape="cercle"
       class="dynamic-island-surface-avatar"
     />
   );

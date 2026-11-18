@@ -89,6 +89,7 @@ import {
 import { isDynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
 import { INSTANCE_TRANSFER_REMOTE_BYTES } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { copyManifestBytes, copyTail, ZIP_TAIL_BYTES, zipDirectory } from "@openbot/team-client/instance-transfer-copy";
 import { Deferred, Effect, Exit, Result } from "effect";
 import { Zip, ZipPassThrough, zipSync } from "fflate";
 import { isMissingFileError } from "../backend/file-errors";
@@ -102,6 +103,7 @@ import {
   isUnsafeEntry,
   MANIFEST_MAX_BYTES,
   readArchiveEffect,
+  readAtEffect,
   readEntriesEffect,
   readSkillEffect,
   withArchive,
@@ -349,6 +351,8 @@ interface StagedTransfer {
   path: string;
   /** The archive `apply` reads must be the one the preview checked. */
   fingerprint: string;
+  /** The limits the preview checked. A file sent in parts has the local limits, not the one-transfer limits. */
+  limits: ArchiveLimits;
   manifest: TransferManifest;
   avatars: Map<string, AvatarImageInput>;
 }
@@ -426,6 +430,8 @@ export class InstanceTransferService {
     input: ExportInstanceInput,
     limits: ArchiveLimits = ARCHIVE,
     exporter?: string,
+    /** `sharedSkills: false`: Copy to another server leaves the shared skills out, so they are not read. */
+    options: { sharedSkills?: boolean } = {},
   ): Effect.fn.Return<PreparedExport, ArchiveOperationError> {
     const all = this.options.agents.listAgents();
     const selected = input.agentIds.map((id) => all.find((agent) => agent.id === id));
@@ -636,13 +642,14 @@ export class InstanceTransferService {
         });
       }
     }
-    const sharedSkills = input.includeSettings
-      ? yield* this.#exportSharedSkills(
-          agents.map((agent) => agent.id),
-          entries,
-          warnings,
-        )
-      : { skills: [], bytes: 0 };
+    const sharedSkills =
+      input.includeSettings && options.sharedSkills !== false
+        ? yield* this.#exportSharedSkills(
+            agents.map((agent) => agent.id),
+            entries,
+            warnings,
+          )
+        : { skills: [], bytes: 0 };
     bytes += sharedSkills.bytes;
     // Before the limits, so the logo counts.
     const serverIdentity = input.includeServerPreferences ? yield* this.#exportServerIdentity(entries) : {};
@@ -793,6 +800,49 @@ export class InstanceTransferService {
   ): Effect.fn.Return<InstanceTransferPreview, ArchiveOperationError> {
     return yield* this.#stageFile(path, owner, false, ARCHIVE);
   }).bind(this);
+
+  /**
+   * Copy to another server: keeps only the settings of the copied agents in the file at `path`
+   * (`@openbot/team-client/instance-transfer-copy`). The file can be up to 2 GB, so only its end is
+   * read and written again.
+   */
+  readonly keepCopiedSettings = Effect.fn("InstanceTransfer.keepCopiedSettings")(function* (
+    path: string,
+  ): Effect.fn.Return<void, ArchiveOperationError> {
+    const invalid = sourceText("error.import.transferNotFile");
+    const archive = yield* readArchiveEffect(path, ARCHIVE);
+    const bytes = (yield* readEntriesEffect(archive, [INSTANCE_TRANSFER_MANIFEST], MANIFEST_MAX_BYTES))[
+      INSTANCE_TRANSFER_MANIFEST
+    ];
+    const copied = bytes && copyManifestBytes(bytes);
+    if (!copied) return yield* archiveFailure(new Error(invalid));
+    yield* Effect.acquireUseRelease(
+      archiveCall(() => open(path, "r+")),
+      (handle) =>
+        Effect.gen(function* () {
+          const { size } = yield* archiveCall(() => handle.stat());
+          const tailStart = Math.max(0, size - ZIP_TAIL_BYTES);
+          const location = zipDirectory(yield* readAtEffect(handle, tailStart, size - tailStart, invalid), tailStart);
+          if (!location) return yield* archiveFailure(new Error(invalid));
+          const directory = yield* readAtEffect(handle, location.offset, location.bytes, invalid);
+          const replacement = copyTail(directory, location.offset, copied);
+          if (!replacement) return yield* archiveFailure(new Error(invalid));
+          yield* archiveCall(async () => {
+            for (let written = 0; written < replacement.length; ) {
+              const { bytesWritten } = await handle.write(
+                replacement,
+                written,
+                replacement.length - written,
+                location.offset + written,
+              );
+              written += bytesWritten;
+            }
+            await handle.truncate(location.offset + replacement.length);
+          });
+        }),
+      (handle) => archiveCall(() => handle.close()).pipe(Effect.ignore),
+    );
+  });
 
   /** A file that a member of a joined client sends: the service keeps it until the token ends. */
   readonly stageUpload = Effect.fn("InstanceTransfer.stageUpload")(function* (
@@ -1109,6 +1159,7 @@ export class InstanceTransferService {
       temporary,
       path,
       fingerprint: archive.fingerprint,
+      limits,
       manifest: { ...manifest, agents },
       avatars,
     };
@@ -1207,7 +1258,7 @@ export class InstanceTransferService {
       );
     // The file can change after `stage`, so only the same central directory is accepted. Each entry
     // is checked against its size and CRC there when it is read.
-    const archive = yield* readArchiveEffect(staged.path, staged.temporary ? REMOTE_ARCHIVE : ARCHIVE);
+    const archive = yield* readArchiveEffect(staged.path, staged.limits);
     if (archive.fingerprint !== staged.fingerprint)
       return yield* archiveFailure(new Error(sourceText("error.import.exportChanged")));
 

@@ -13,7 +13,13 @@ import {
 import { AGENT_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-folders-v1";
 import { AGENT_INSTRUCTIONS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-instructions-v1";
 import { AGENT_MEMORY_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
+import {
+  decodeFeedbackWithdrawResult,
+  FEEDBACK_WITHDRAW_CAPABILITY,
+  FEEDBACK_WITHDRAW_ROUTES,
+} from "@openbot/contracts/team-protocol/feedback-withdraw-v1";
 import { LIVE_VOICE_CAPABILITY } from "@openbot/contracts/team-protocol/live-voice-v1";
+import { ROUTINE_PAUSE_REASONS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-pause-reasons-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
 import {
   decodeRoutineRunCommandResponse,
@@ -75,6 +81,7 @@ function webHostAdmin(
   webhookSenderSecretEnabled?: () => boolean,
   routineRunPlaceEnabled?: () => boolean,
   routinesOnceEnabled?: () => boolean,
+  routinePauseReasonsEnabled?: () => boolean,
 ): NonNullable<ConversationRuntime["admin"]> {
   // `request()` names the connected host at call time, so a host switch reaches the new host.
   const eventRoutines = webEventRoutinesApi(
@@ -84,6 +91,7 @@ function webHostAdmin(
     () => webhookSenderSecretEnabled?.() === true,
     () => routineRunPlaceEnabled?.() === true,
     () => routinesOnceEnabled?.() === true,
+    () => routinePauseReasonsEnabled?.() === true,
   );
   return {
     get sessionSettings() {
@@ -168,9 +176,11 @@ export function createWebConversationRuntime(
   skillCatalog?: () => SkillCatalogCalls,
 ): ConversationRuntime {
   const routinesOnceEnabled = () => hasCapability?.(ROUTINES_ONCE_CAPABILITY) === true;
+  const routinePauseReasonsEnabled = () => hasCapability?.(ROUTINE_PAUSE_REASONS_CAPABILITY) === true;
   const webLiveVoice = useWebLiveVoice();
   const listeners = new Set<(event: AttachmentImportEvent) => void>();
-  const files = createWebAttachmentFiles(remote, hostId);
+  const attachmentMedia = createWebAttachmentMedia(remote, hostId);
+  const files = createWebAttachmentFiles(remote, hostId, attachmentMedia);
   let importing: { cancelled: boolean; serverId: string } | undefined;
   // A new upload cancels the one in flight (`uploadGeneration` in web-runtime.ts), so one import runs
   // at a time. Each chat sends on its own while another chat imports, so a second import fails, as a
@@ -295,7 +305,6 @@ export function createWebConversationRuntime(
   const emit = (event: AttachmentImportEvent) => {
     for (const listener of listeners) listener(event);
   };
-  const attachmentMedia = createWebAttachmentMedia(remote, hostId);
   onCleanup(() => {
     void cancelImportFiles();
     attachmentMedia.dispose();
@@ -434,6 +443,15 @@ export function createWebConversationRuntime(
           earlier: input.earlier.map(({ question, answer }) => ({ question, answer })),
         });
     },
+    // Only the owner can press Remove (the timeline checks the role); the host checks it again.
+    get withdrawFeedback() {
+      if (!adminRequest || hasCapability?.(FEEDBACK_WITHDRAW_CAPABILITY) !== true) return undefined;
+      return async (input: { agentId: string; messageId: string }) =>
+        adminRequest()("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, decodeFeedbackWithdrawResult, {
+          agentId: input.agentId,
+          messageId: input.messageId,
+        });
+    },
     // A member who can chat with the agent can press Save; the host checks the level.
     get saveSkillSuggestion() {
       if (!adminRequest || skillLearningEnabled?.() !== true) return undefined;
@@ -489,6 +507,7 @@ export function createWebConversationRuntime(
             (...args) => adminRequest()(...args),
             () => routineRunPlaceEnabled?.() === true,
             routinesOnceEnabled,
+            routinePauseReasonsEnabled,
           ),
           onEvent: (listener) =>
             onHostEvent?.((event) => {
@@ -507,6 +526,7 @@ export function createWebConversationRuntime(
           webhookSenderSecretEnabled,
           routineRunPlaceEnabled,
           routinesOnceEnabled,
+          routinePauseReasonsEnabled,
         )
       : undefined,
   };

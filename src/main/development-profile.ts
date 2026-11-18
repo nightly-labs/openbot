@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { realpathSync } from "node:fs";
 
 export type DevelopmentProfile = "app" | "test-client";
 
@@ -34,6 +35,38 @@ export function readAnalyticsCaptureUrl(value: string | undefined): string | nul
 // from existing numeric instance ids; the full digest avoids the old five-digit collisions.
 export function developmentInstanceIdForWorktree(projectRoot: string): string {
   return `wt-${createHash("sha256").update(projectRoot).digest("hex")}`;
+}
+
+/**
+ * The color of a dev build of one worktree: the Dock icon (`development-worktree-icon.ts`) and the
+ * renderer logos and branch label (`scripts/dev-worktree-vite-plugin.ts`) use it, so the apps of two
+ * worktrees that are open at the same time look different. The hue comes from the worktree path, so
+ * it stays the same after a restart. Saturation and lightness stay near the gold dev color. The real
+ * path makes the main process and Vite agree when one of them sees the worktree through a symlink.
+ */
+export function developmentWorktreeColor(projectRoot: string): string {
+  const hue = createHash("sha256").update(realProjectRoot(projectRoot)).digest().readUInt16BE(0) % 360;
+  return hslToHex(hue, 0.62, 0.64);
+}
+
+function realProjectRoot(projectRoot: string): string {
+  try {
+    return realpathSync(projectRoot);
+  } catch {
+    return projectRoot;
+  }
+}
+
+function hslToHex(hue: number, saturation: number, lightness: number): string {
+  const amplitude = saturation * Math.min(lightness, 1 - lightness);
+  const channel = (offset: number) => {
+    const k = (offset + hue / 30) % 12;
+    const value = lightness - amplitude * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    return Math.round(value * 255)
+      .toString(16)
+      .padStart(2, "0");
+  };
+  return `#${channel(0)}${channel(8)}${channel(4)}`;
 }
 
 export function developmentUserDataName(profile: DevelopmentProfile, instanceId: string | null = null): string {

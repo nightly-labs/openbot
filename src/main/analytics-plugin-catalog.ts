@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { McpServerConfig } from "@openbot/contracts/ipc";
+import { isReservedMcpServerName, type McpServerConfig } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
 import { analyticsIO, analyticsSync } from "./analytics-effects";
@@ -71,13 +71,16 @@ function localSetupSteps(flow: unknown): string[] {
 
 /**
  * Whether a provider can report the server named `configured` as `reported`. Claude changes each
- * character outside `[A-Za-z0-9_-]` to `_`, so this compares that form too, without case.
+ * character outside `[A-Za-z0-9_-]` to `_`, so this compares that form too, without case. Codex
+ * reports that form with `openbot_` in front (`codexMcpServerKey`); OpenBot's own browser server
+ * keeps its built-in name.
  */
 export function isReportedMcpServerName(configured: string, reported: string): boolean {
+  const form = (name: string) => name.replace(/[^A-Za-z0-9_-]/gu, "_").toLowerCase();
   return (
     configured === reported ||
-    configured.replace(/[^A-Za-z0-9_-]/gu, "_").toLowerCase() ===
-      reported.replace(/[^A-Za-z0-9_-]/gu, "_").toLowerCase()
+    form(configured) === form(reported) ||
+    (!isReservedMcpServerName(reported) && `openbot_${form(configured)}` === form(reported))
   );
 }
 
