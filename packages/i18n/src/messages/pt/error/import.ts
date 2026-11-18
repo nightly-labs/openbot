@@ -99,4 +99,6 @@ export const messages = {
   "error.import.transferValuesCleared":
     "{name}: valores que podem conter um segredo foram removidos dos argumentos ou do endereço. Digite-os de novo em Configurações.",
   "error.import.transferSharedKept": "{number} arquivos da pasta Shared já estão aqui, então são mantidos como estão.",
+  "error.import.transferPartSkipped":
+    "Algumas partes do arquivo não puderam ser importadas. Os agentes e canais importados estão neste servidor, então não importe o arquivo de novo.",
 } as const satisfies PartialTranslation<typeof source>;

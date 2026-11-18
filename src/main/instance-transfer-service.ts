@@ -89,8 +89,9 @@ import {
 import { isDynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
 import { INSTANCE_TRANSFER_REMOTE_BYTES } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { copyManifestBytes, copyTail, ZIP_TAIL_BYTES, zipDirectory } from "@openbot/team-client/instance-transfer-copy";
-import { Deferred, Effect, Exit, Result } from "effect";
+import { Cause, Deferred, Effect, Exit, Result } from "effect";
 import { Zip, ZipPassThrough, zipSync } from "fflate";
 import { isMissingFileError } from "../backend/file-errors";
 import { isPathInside } from "../backend/path-containment";
@@ -185,6 +186,7 @@ const REMOTE_ARCHIVE: ArchiveLimits = {
   expandedTooLarge: sourceText("error.import.transferRemoteTooLarge"),
   invalid: sourceText("error.import.transferNotFile"),
 };
+const logger = createOpenBotLogger("instance-transfer");
 /** The owner of the files the local user reads. A member's owner is the member id. */
 const LOCAL_OWNER = "local";
 
@@ -1282,9 +1284,18 @@ export class InstanceTransferService {
     const routineIds = new Map<string, string>();
     /** The new id of each imported run, by its id in the file, so a chat names the copy. */
     const runIds = new Map<string, string>();
+    // From the first agent on, a part that fails is a warning or a skipped item, also when it throws:
+    // what is already here stays, so the result must list it, or a retry adds it again (#12291).
+    const partSkipped = sourceText("error.import.transferPartSkipped");
+    const optional = (effect: Effect.Effect<unknown, unknown>) =>
+      afterImport(effect, () => {
+        if (!warnings.includes(partSkipped)) warnings.push(partSkipped);
+      });
     for (const agent of selected) {
       const result = yield* Effect.result(
-        this.#importAgent(archive, staged, agent, routineIds, runIds, warnings, fallbackTimezone),
+        this.#importAgent(archive, staged, agent, routineIds, runIds, warnings, fallbackTimezone).pipe(
+          Effect.catchDefect((defect) => Effect.fail(failure(defect))),
+        ),
       );
       if (Result.isFailure(result)) {
         skipped.push({ key: agent.key, name: agent.name, reason: message(result.failure.cause) });
@@ -1296,29 +1307,34 @@ export class InstanceTransferService {
     // Chats after every agent and routine exists, so each link in a message finds its copy. Their
     // files go to the upload folder, which a restart clears, in a folder with a random name.
     const uploads = this.options.uploadDirectory;
-    const scratch = uploads ? yield* this.#prepareUploadDirectory(uploads).pipe(Effect.as(uploads)) : tmpdir();
+    // An upload folder that cannot be prepared leaves the files in the temporary folder, as with no upload folder.
+    const scratch = uploads
+      ? yield* this.#prepareUploadDirectory(uploads).pipe(
+          Effect.as(uploads),
+          Effect.orElseSucceed(() => tmpdir()),
+        )
+      : tmpdir();
     for (const agent of selected) {
       const agentId = agentIds.get(agent.key);
       if (!agentId || !agent.history) continue;
-      yield* importHistory(
-        archive,
-        this.options.agents,
-        {
-          index: agent.history,
-          agentId,
-          agentName: agent.name,
-          prefix: agentPrefix(agent.key),
-          agentIds,
-          routineIds,
-          runIds,
-          scratch,
-          readerId: actor.id,
-        },
-        warnings,
-      ).pipe(
-        Effect.catch(() =>
-          Effect.sync(() => warnings.push(sourceText("error.import.transferHistorySkipped", { name: agent.name }))),
+      yield* afterImport(
+        importHistory(
+          archive,
+          this.options.agents,
+          {
+            index: agent.history,
+            agentId,
+            agentName: agent.name,
+            prefix: agentPrefix(agent.key),
+            agentIds,
+            routineIds,
+            runIds,
+            scratch,
+            readerId: actor.id,
+          },
+          warnings,
         ),
+        () => warnings.push(sourceText("error.import.transferHistorySkipped", { name: agent.name })),
       );
     }
     const channelIds = new Map<string, string>();
@@ -1335,7 +1351,7 @@ export class InstanceTransferService {
           warnings,
           fallbackTimezone,
           scratch,
-        ),
+        ).pipe(Effect.catchDefect((defect) => Effect.fail(failure(defect)))),
       );
       if (Result.isFailure(result))
         warnings.push(
@@ -1347,36 +1363,47 @@ export class InstanceTransferService {
       else if (result.success) channelIds.set(channel.key, result.success);
     }
     if (settings?.workflows && this.options.settings.workflows)
-      yield* importWorkflows(settings.workflows, this.options.settings.workflows, agentIds, channelIds, warnings);
-    if (settings) yield* this.#applyLayout(settings, agentIds, routineIds, warnings);
+      yield* optional(
+        importWorkflows(settings.workflows, this.options.settings.workflows, agentIds, channelIds, warnings),
+      );
+    if (settings) yield* optional(this.#applyLayout(settings, agentIds, routineIds, warnings));
     // A member who is not on this server yet gets nothing: their member id here is new.
     if (input.includeServerPreferences && staged.manifest.memberPreferences.length > 0)
-      yield* this.#importMemberPreferences(
-        staged.manifest.memberPreferences,
-        agentIds,
-        channelIds,
-        this.#isOwner(staged.owner),
-        warnings,
+      yield* optional(
+        this.#importMemberPreferences(
+          staged.manifest.memberPreferences,
+          agentIds,
+          channelIds,
+          this.#isOwner(staged.owner),
+          warnings,
+        ),
       );
     // After the agents, so a skill that an agent brought is already in the library.
     if (input.includeSettings && staged.manifest.sharedSkills.length > 0)
-      yield* this.#importSharedSkills(archive, staged.manifest.sharedSkills, warnings);
+      yield* optional(this.#importSharedSkills(archive, staged.manifest.sharedSkills, warnings));
     // With the settings, and only by the owner: the name is the one every member and the account see.
     if (input.includeServerPreferences && staged.manifest.serverIdentity && this.#isOwner(staged.owner))
-      yield* this.#importServerIdentity(archive, staged.manifest.serverIdentity, warnings);
+      yield* optional(this.#importServerIdentity(archive, staged.manifest.serverIdentity, warnings));
     // With the settings: the import into a new server sets it up as the old one was.
     // Only on request: "Import server settings" of a released client adds what is missing, and
     // replaces nothing (`instance-transfer-full-copy-v1`).
     if (input.includeServerPreferences && staged.manifest.serverPreferences && this.options.serverPreferences)
-      yield* applyServerPreferences(
-        this.options.serverPreferences,
-        staged.manifest.serverPreferences,
-        this.#isOwner(staged.owner),
-        warnings,
+      yield* optional(
+        applyServerPreferences(
+          this.options.serverPreferences,
+          staged.manifest.serverPreferences,
+          this.#isOwner(staged.owner),
+          warnings,
+        ),
       );
-    if (staged.manifest.shared) yield* this.#importShared(archive, staged.manifest.shared, warnings);
+    if (staged.manifest.shared) yield* optional(this.#importShared(archive, staged.manifest.shared, warnings));
 
-    const signedIn = new Set(this.options.settings.signedInProviders());
+    // A list that cannot be read asks the user to sign in to each provider of the file.
+    const signedIn = new Set(
+      yield* archiveSync(() => this.options.settings.signedInProviders()).pipe(
+        Effect.orElseSucceed((): AgentProviderId[] => []),
+      ),
+    );
     return {
       agents: imported,
       skipped,
@@ -2268,6 +2295,21 @@ const writeZipEffect = Effect.fn("InstanceTransfer.writeZip")(function* (
     return gone;
   }).pipe(Effect.tapError(() => archiveCall(() => rm(part, { force: true })).pipe(Effect.ignore)));
 });
+
+/**
+ * Runs a part of an apply that comes after the first agent. A failure, also an unexpected one, logs its
+ * cause and calls `skipped`, so the apply still returns what it imported. An interruption stops the apply.
+ */
+function afterImport(effect: Effect.Effect<unknown, unknown>, skipped: () => void): Effect.Effect<void> {
+  return effect.pipe(
+    Effect.asVoid,
+    Effect.catchCause((cause) => {
+      if (Cause.hasInterruptsOnly(cause)) return Effect.interrupt;
+      logger.warn("A part of the transfer import failed after the agents.", toLogValue(Cause.squash(cause)));
+      return Effect.sync(skipped);
+    }),
+  );
+}
 
 function failure(error: unknown): ArchiveOperationError {
   return archiveFailure(causeOf(error));

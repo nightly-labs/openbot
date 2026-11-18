@@ -103,4 +103,6 @@ export const messages = {
   "error.import.transferValuesCleared":
     "{name}: أُزيلت من وسائطه أو عنوانه القيم التي يمكن أن تحتوي على سر. أدخلها مرة أخرى في الإعدادات.",
   "error.import.transferSharedKept": "{number} من الملفات في المجلد المشترك موجودة هنا بالفعل، لذا تبقى كما هي.",
+  "error.import.transferPartSkipped":
+    "تعذّر استيراد بعض أجزاء الملف. الوكلاء والقنوات المستوردة موجودة على هذا الخادم، لذا لا تستورد الملف مرة أخرى.",
 } as const satisfies PartialTranslation<typeof source>;

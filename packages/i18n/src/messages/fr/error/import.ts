@@ -101,4 +101,6 @@ export const messages = {
     "{name} : les valeurs qui peuvent contenir un secret ont été retirées de ses arguments ou de son adresse. Saisissez-les de nouveau dans les réglages.",
   "error.import.transferSharedKept":
     "{number} fichiers du dossier partagé sont déjà présents ici. Ils restent tels quels.",
+  "error.import.transferPartSkipped":
+    "Certaines parties du fichier n’ont pas pu être importées. Les agents et canaux importés sont sur ce serveur : n’importez pas le fichier une deuxième fois.",
 } as const satisfies PartialTranslation<typeof source>;
