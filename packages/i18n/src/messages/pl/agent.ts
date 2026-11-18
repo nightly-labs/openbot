@@ -53,6 +53,8 @@ export const messages = {
   "agent.dock.add": "Dodaj do doku",
   "agent.dock.allAdded": "Wszyscy Twoi agenci i kanały są w doku",
   "agent.dock.more": "Więcej",
+  "agent.dock.keepOpen": "Nie zamykaj",
+  "agent.dock.closeOnLeave": "Zamykaj po kliknięciu obok",
   "agent.dock.openInMain": "Otwórz w głównym oknie",
   "agent.dock.openWindow": "Otwórz w nowym oknie",
   "agent.dock.remove": "Usuń z doku",

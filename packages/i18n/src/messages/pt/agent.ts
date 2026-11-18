@@ -53,6 +53,8 @@ export const messages = {
   "agent.dock.add": "Adicionar ao dock",
   "agent.dock.allAdded": "Todos os seus agentes e canais estão no dock",
   "agent.dock.more": "Mais",
+  "agent.dock.keepOpen": "Manter aberto",
+  "agent.dock.closeOnLeave": "Fechar ao clicar fora",
   "agent.dock.openInMain": "Abrir na janela principal",
   "agent.dock.openWindow": "Abrir em nova janela",
   "agent.dock.remove": "Remover do dock",

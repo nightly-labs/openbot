@@ -62,6 +62,7 @@ export function AgentDockSurface() {
   const { t, errorMessage } = useText();
   const [presentation, setPresentation] = createSignal<AgentDockPresentation | null>(null);
   const [closeRequest, setCloseRequest] = createSignal(0);
+  const [blurRequest, setBlurRequest] = createSignal(0);
   const [tucked, setTuckedSignal] = createSignal(false);
   /* A plain copy: a signal write shows in a read only after the next flush. */
   let isTucked = false;
@@ -224,7 +225,8 @@ export function AgentDockSurface() {
       pointerIn = false;
       sync();
     };
-    const onBlur = () => setCloseRequest((value) => value + 1);
+    // A chat that the user keeps open stays when a clipboard overlay or another window takes the focus.
+    const onBlur = () => setBlurRequest((value) => value + 1);
     // A menu opens and closes in a portal on the body.
     const menus = new MutationObserver(() => {
       sync();
@@ -386,6 +388,7 @@ export function AgentDockSurface() {
             availableChannels={availableChannels()}
             chat={chat}
             closeRequest={closeRequest()}
+            blurRequest={blurRequest()}
             voice={voice}
             side={presentation()?.edge ?? "right"}
             tucked={tucked()}

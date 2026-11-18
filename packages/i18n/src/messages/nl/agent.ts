@@ -56,6 +56,8 @@ export const messages = {
   "agent.dock.add": "Aan het dock toevoegen",
   "agent.dock.allAdded": "Al je agents en kanalen staan in het dock",
   "agent.dock.more": "Meer",
+  "agent.dock.keepOpen": "Open houden",
+  "agent.dock.closeOnLeave": "Sluiten bij klikken ernaast",
   "agent.dock.openInMain": "Openen in het hoofdvenster",
   "agent.dock.openWindow": "Openen in nieuw venster",
   "agent.dock.remove": "Uit het dock verwijderen",

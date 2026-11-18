@@ -53,6 +53,8 @@ export const messages = {
   "agent.dock.add": "독에 추가",
   "agent.dock.allAdded": "모든 에이전트와 채널이 독에 있습니다",
   "agent.dock.more": "더 보기",
+  "agent.dock.keepOpen": "열어 두기",
+  "agent.dock.closeOnLeave": "바깥을 클릭하면 닫기",
   "agent.dock.openInMain": "메인 창에서 열기",
   "agent.dock.openWindow": "새 창에서 열기",
   "agent.dock.remove": "독에서 제거",

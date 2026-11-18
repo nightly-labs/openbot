@@ -51,6 +51,8 @@ export const messages = {
   "agent.dock.add": "إضافة إلى الشريط",
   "agent.dock.allAdded": "جميع وكلائك وقنواتك في الشريط",
   "agent.dock.more": "المزيد",
+  "agent.dock.keepOpen": "إبقاء مفتوحة",
+  "agent.dock.closeOnLeave": "إغلاق عند النقر خارجها",
   "agent.dock.openInMain": "فتح في النافذة الرئيسية",
   "agent.dock.openWindow": "فتح في نافذة جديدة",
   "agent.dock.remove": "إزالة من الشريط",
