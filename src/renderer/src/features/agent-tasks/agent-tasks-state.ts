@@ -662,22 +662,33 @@ export function createAgentTasks(options: AgentTasksOptions) {
     }
   }
 
+  /**
+   * The client ids of starts that failed, by the start they sent. A failed start can still have made
+   * its task on the server (the answer got lost), so a retry of the same start sends the same id and
+   * gets that task, not a second one.
+   */
+  const failedStartIds = new Map<string, string>();
+
   /** Sends `attachmentDraftIds` only when there are files, so a server with text-only threads gets no new key. */
   async function startTask(
     agentId: string,
     text: string,
     attachmentDraftIds: string[] = [],
   ): Promise<AgentTask | null> {
+    const attempt = JSON.stringify([agentId, text, attachmentDraftIds]);
+    const clientMessageId = failedStartIds.get(attempt) ?? crypto.randomUUID();
+    failedStartIds.delete(attempt);
     const task = await runAction(
       () =>
         port().startTask({
           agentId,
           text,
           ...(attachmentDraftIds.length ? { attachmentDraftIds } : {}),
-          clientMessageId: crypto.randomUUID(),
+          clientMessageId,
         }),
       "conversation.threads.error.start",
     );
+    if (!task) failedStartIds.set(attempt, clientMessageId);
     if (task && scopeIsCurrent()) rememberTask(task);
     return task;
   }

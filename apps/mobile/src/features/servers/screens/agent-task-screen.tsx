@@ -63,6 +63,7 @@ import { useAgentMentionSkills } from "@/features/chat/model/use-agent-mention-s
 import { useProgressUpdates } from "@/features/chat/model/use-progress-updates";
 import { voiceAccent, voicePalette } from "@/features/chat/model/voice-palette";
 import { agentTaskHoldText } from "@/features/servers/model/agent-task-text";
+import { taskStartId } from "@/features/servers/model/task-start-id";
 import { useThreadActions } from "@/features/servers/model/use-thread-actions";
 import { useChatRowShown, useThinkingDisplayPreference } from "@/features/settings/model/chat-details";
 import { useChatPullPreference } from "@/features/settings/model/chat-swipe";
@@ -550,15 +551,22 @@ function AgentTaskChat({
     // A new thread starts with this message, and the screen then shows the thread.
     if (isDraft) {
       setSending(true);
+      const start = taskStartId(
+        serverId,
+        agentId,
+        text,
+        files.map((file) => file.id),
+      );
       try {
         const started = await withFiles((attachmentDraftIds) =>
-          startAgentTask({ agentId, text, attachmentDraftIds, clientMessageId: Crypto.randomUUID() }, serverId),
+          startAgentTask({ agentId, text, attachmentDraftIds, clientMessageId: start.id }, serverId),
         );
         attachments.clear();
         // The thread shows in the menu before its list event arrives.
         addStartedTask(queryClient, queryScope, serverId, started);
         router.setParams<"/task/[taskId]">({ taskId: started.id });
       } catch (error) {
+        start.failed();
         void haptics.notification("error");
         setDraft((current) => (current.trim() ? current : value));
         setSendError(errorMessage(error, t("mobile.server.threads.error.start")));
