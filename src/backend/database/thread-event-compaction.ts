@@ -280,7 +280,7 @@ export class ThreadEventCompaction {
  * The `changedMessages` items of a "changes" event that a replay needs, or null when it needs all
  * of them. `latest` is the fold before the event.
  */
-export function keptChangedMessages(
+function keptChangedMessages(
   latest: ConversationSnapshot | null,
   record: DynamicRecord,
   messages: ThreadEventMessages,
