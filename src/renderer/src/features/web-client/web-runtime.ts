@@ -195,6 +195,12 @@ import {
 import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
 import {
+  decodeServerSafeModeReason,
+  SERVER_SAFE_MODE_CAPABILITY,
+  SERVER_SAFE_MODE_ROUTES,
+  type ServerSafeModeReason,
+} from "@openbot/contracts/team-protocol/server-safe-mode-v1";
+import {
   SIDEBAR_FOLDERS_CAPABILITY,
   SIDEBAR_FOLDERS_ROUTES,
 } from "@openbot/contracts/team-protocol/sidebar-folders-v1";
@@ -548,14 +554,21 @@ export interface WebRuntimeEvents {
   hostNotice?(hostId: string, event: WebHostNotice, agents: ClientAgentSummary[]): void;
 }
 
-/** The host speaks no Team API protocol that this web build speaks. The workspace shows it in full. */
+/**
+ * The host speaks no Team API protocol that this web build speaks, or it is in safe mode
+ * (`server-safe-mode-v1`) and answers only with the reason. The workspace shows it in full.
+ */
 export class WebHostIncompatibleError extends Error {
-  readonly code: "client_update_required" | "host_update_required";
+  readonly code: "client_update_required" | "host_update_required" | "server_safe_mode";
   readonly hostAppVersion: string;
   readonly hostProtocol: TeamProtocolSupportV1["protocol"];
 
-  constructor(support: TeamProtocolSupportV1, code: WebHostIncompatibleError["code"]) {
-    super(currentText().t("webClient.error.incompatible"));
+  constructor(
+    support: TeamProtocolSupportV1,
+    code: WebHostIncompatibleError["code"],
+    message = currentText().t("webClient.error.incompatible"),
+  ) {
+    super(message);
     this.code = code;
     this.hostAppVersion = support.appVersion;
     this.hostProtocol = support.protocol;
@@ -575,6 +588,14 @@ export class WebHostConnectionError extends Error {
     );
     this.reference = reference;
   }
+}
+
+/** The sentence for the reason of a host in safe mode. */
+function serverSafeModeText({ reason, appVersion }: ServerSafeModeReason): string {
+  return currentText().t(
+    reason === "newer_database" ? "error.team.serverSafeModeNewerDatabase" : "error.team.serverSafeModeStartFailed",
+    { version: appVersion },
+  );
 }
 
 interface WebConnectionDependencies {
@@ -1235,6 +1256,15 @@ export function createWebWorkspaceRuntime(
       );
       if (knownProtocol !== undefined && negotiated.protocol !== knownProtocol) early?.drop();
       if (negotiated.update) throw new WebHostIncompatibleError(support, negotiated.update);
+      if (support.capabilities.includes(SERVER_SAFE_MODE_CAPABILITY))
+        throw new WebHostIncompatibleError(
+          support,
+          "server_safe_mode",
+          await request("GET", SERVER_SAFE_MODE_ROUTES.reason).then(
+            (value) => serverSafeModeText(decodeServerSafeModeReason(value)),
+            () => currentText().t("error.team.serverSafeMode"),
+          ),
+        );
       capabilities = support.capabilities;
       if (retryDraftCleanup) await discardCompletedDrafts(host.hostId);
       return capabilities;

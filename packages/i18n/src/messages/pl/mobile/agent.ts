@@ -239,6 +239,13 @@ export const messages = {
   "mobile.agent.webhook.rotateBody": "Obecny sekret przestanie działać. Host odrzuci żądania, które go używają.",
   "mobile.agent.webhook.rotateConfirm": "Wygeneruj",
   "mobile.agent.webhook.rotateFailed": "Nie udało się wygenerować nowego sekretu. Spróbuj ponownie.",
+  "mobile.agent.webhook.giveToAgent": "Przekaż sekret podpisu agentowi {name}",
+  "mobile.agent.webhook.giveTitle": "Przekazać nowy sekret podpisu agentowi {name}?",
+  "mobile.agent.webhook.giveBody":
+    "Obecny sekret przestanie działać. Agent {name} zapisze nowy sekret jako klucz API i może dodać go u nadawcy.",
+  "mobile.agent.webhook.giveConfirm": "Przekaż",
+  "mobile.agent.webhook.giveFailed": "Nie udało się przekazać sekretu podpisu agentowi. Spróbuj ponownie.",
+  "mobile.agent.webhook.given": "Agent {name} ma nowy sekret podpisu.",
   "mobile.agent.webhook.activity": "Aktywność",
   "mobile.agent.webhook.activityFailed": "Nie udało się wczytać aktywności. Spróbuj ponownie.",
   "mobile.agent.webhook.activity.ignored": "Zignorowano",

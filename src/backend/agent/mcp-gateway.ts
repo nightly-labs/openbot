@@ -710,7 +710,9 @@ export class McpGateway {
       });
       this.#hooks.emitError(
         "mcp_server_not_started",
-        `${providerLabel(provider)} did not get the MCP server "${drop.name}". ${drop.detail}`,
+        drop.reason === "failed_in_provider"
+          ? drop.detail
+          : `${providerLabel(provider)} did not get the MCP server "${drop.name}". ${drop.detail}`,
       );
     }
   }

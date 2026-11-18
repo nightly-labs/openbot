@@ -79,7 +79,10 @@ export const messages = {
   "error.remote.ownerOnlyRemove": "רק הבעלים יכול להסיר את השרת הזה.",
   "error.remote.requestTimeout": "הבקשה המרוחקת חרגה ממגבלת הזמן.",
   "error.remote.requestFailed": "הבקשה המרוחקת נכשלה.",
-  "error.remote.pinnedKeyMissing": "למארח המרוחק אין מפתח מכשיר מוצמד.",
+  "error.remote.hostKeyMissing":
+    "OpenBot לא יכול לאמת את השרת הזה, כי מפתח האבטחה שלו חסר או השתנה. בקשו מבעל השרת לבדוק את השרת.",
+  "error.remote.connectionNotStarted":
+    "OpenBot לא הצליח להתחיל את החיבור לשרת הזה. אם הבעיה נמשכת, צאו מ-OpenBot ופתחו אותו שוב.",
   "error.remote.hostDidNotConnect": "מארח ה-WebRTC לא התחבר.",
   "error.remote.connectionCancelled": "החיבור המרוחק בוטל.",
   "error.remote.hostDisconnected": "החיבור לשרת נותק. יש לבדוק אם הפעולה הושלמה ואז לנסות שוב.",

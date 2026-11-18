@@ -2224,8 +2224,10 @@ fieldset.wfn-picker-group {
     calc(var(--wfn-snap-y, 0px) / var(--wfn-scale, 1));
 }
 
-/* Seven results fit. More scroll, and the arrows move through all of them. */
+/* Seven results fit. More scroll, and the arrows move through all of them. The list is the offset
+ * parent of its items, so the strip can scroll the result on view to the middle. */
 .wfn-strip-list {
+  position: relative;
   display: flex;
   gap: var(--openbot-space-1-5);
   align-items: center;

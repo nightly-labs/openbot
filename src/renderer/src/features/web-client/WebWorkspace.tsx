@@ -100,6 +100,7 @@ import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
 import { VAULT_V3_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v3";
 import { VAULT_V4_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v4";
+import { WEBHOOK_AGENT_SECRET_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-agent-secret-v1";
 import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
@@ -295,6 +296,7 @@ import {
   remoteMcpSignIn,
   remoteUpdateServer,
   serverCanAdminister,
+  serverCanManageMcp,
   serverRoleCanAdminister,
   serverRotatesHostKey,
 } from "../servers/server-capabilities";
@@ -1009,6 +1011,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   // The same owner or admin gives a webhook routine a secret that the sender made.
   const webhookSenderSecretEnabled = () =>
     eventsEnabled() && workspace.state.capabilities.includes(WEBHOOK_SENDER_SECRET_CAPABILITY);
+  // The same owner or admin gives the signing secret of an agent's webhook routine to that agent.
+  const webhookAgentSecretEnabled = () =>
+    eventsEnabled() && workspace.state.capabilities.includes(WEBHOOK_AGENT_SECRET_CAPABILITY);
   // A host with this capability lists and saves the routines that run once.
   const routinesOnceEnabled = () => workspace.state.capabilities.includes(ROUTINES_ONCE_CAPABILITY);
   const providerAdmin = createWebProviderSettings({
@@ -2121,11 +2126,23 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         return;
       }
       const description = readableAgentError(event.message);
-      if (claimErrorToast(description))
-        toast.error(t("webClient.error.hostReported"), {
+      if (!claimErrorToast(description)) return;
+      // As on desktop: an MCP server that a provider could not use is not a failure of the server,
+      // and the button opens the Marketplace, which holds the MCP servers, for a user who can manage them.
+      if (event.code === "mcp_server_not_started") {
+        toast.error(t("agent.error.mcpNotStarted"), {
           ...{ description },
-          report: { operation: "other", source: "system", cause_code: "unknown" },
+          ...(serverCanManageMcp(server())
+            ? { action: { label: t("agent.error.openMarketplace"), onClick: openMarketplace } }
+            : {}),
+          report: { operation: "provider", source: "provider", cause_code: classifyFailure(event.message) },
         });
+        return;
+      }
+      toast.error(t("webClient.error.hostReported"), {
+        ...{ description },
+        report: { operation: "other", source: "system", cause_code: "unknown" },
+      });
     }),
   );
   const channelOpen = () => channels.state.selectedId !== null;
@@ -2180,6 +2197,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     webhookSenderSecretEnabled,
     undefined,
     routinesOnceEnabled,
+    undefined,
+    webhookAgentSecretEnabled,
   );
   // Asks to move the connected host's routines after this device's time zone changed.
   createRoutineTimezonePrompt(() => {
@@ -3606,6 +3625,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         sectionQuery={serverSettingsQuery()}
                         openFirstSectionRequest={openFirstServerSectionRequest()}
                         onFirstSectionOpened={() => setServerSettingsQuery("")}
+                        onOpenMarketplaceApps={() => {
+                          setServerSettingsQuery("");
+                          openMarketplace();
+                        }}
                         restoreFocusTarget={serverSettings.restoreTarget()}
                         initialSection={serverSettingsSection()}
                         initialSectionRequest={serverSettingsRequest()}

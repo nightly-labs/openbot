@@ -108,6 +108,8 @@ const SAFE_CONNECTION_ERRORS = new Set(
       "error.remote.accountSessionInactive",
       "error.remote.hostOtherAccount",
       "error.remote.remoteNotConfigured",
+      "error.remote.hostKeyMissing",
+      "error.remote.connectionNotStarted",
     ] as const satisfies readonly (keyof SourceMessages)[]
   ).map((key) => sourceText(key)),
 );

@@ -723,6 +723,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
             onSelectionRequestHandled={props.onRoutineSelectionRequestHandled}
             onOpenRun={props.onOpenRoutineRun}
             onOpenThread={props.onOpenRoutineThread}
+            agentName={props.agent.name}
           />
         </div>
       </Show>

@@ -77,8 +77,9 @@ export interface AppServerRequest {
    */
   detachAfterMs?: number;
   /**
-   * In process only, never on the wire. A Codex subagent sent it, and OpenBot runs it in the chat and
-   * turn of the parent agent. Its call still waits in the subagent's own turn (#9727).
+   * In process only, never on the wire. A Codex subagent or an OpenCode subagent sent it, and OpenBot
+   * runs it in the chat and turn of the parent agent. Its call still waits in the subagent's own turn
+   * (#9727), or in OpenCode's background subagent after the parent's turn ends (#10657).
    */
   subagent?: true;
   /**

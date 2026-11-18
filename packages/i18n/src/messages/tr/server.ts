@@ -47,6 +47,7 @@ export const messages = {
   "server.compatibility.updateHostTitle": "{name} üzerindeki OpenBot'u güncelleyin",
   "server.compatibility.unsafeDataTitle": "Ana makine güvenli olmayan veri döndürdü",
   "server.compatibility.cannotConnectTitle": "{name} ile bağlantı kurulamıyor",
+  "server.compatibility.safeModeTitle": "{name} başlamıyor",
   "server.compatibility.updateClientDescription":
     "Bu uygulama yalnızca ana makineden daha eski protokolleri destekliyor. Bu uygulamayı güncelleyin, ardından tekrar deneyin.",
   "server.compatibility.updateHostDescription":

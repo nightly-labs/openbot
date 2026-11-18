@@ -79,7 +79,10 @@ export const messages = {
   "error.remote.ownerOnlyRemove": "소유자만 이 서버를 삭제할 수 있어요.",
   "error.remote.requestTimeout": "원격 요청 시간이 초과되었어요.",
   "error.remote.requestFailed": "원격 요청에 실패했어요.",
-  "error.remote.pinnedKeyMissing": "원격 호스트에 고정된 기기 키가 없어요.",
+  "error.remote.hostKeyMissing":
+    "보안 키가 없거나 변경되어 OpenBot이 이 서버를 확인할 수 없어요. 서버 소유자에게 서버를 확인해 달라고 요청하세요.",
+  "error.remote.connectionNotStarted":
+    "OpenBot이 이 서버와 연결을 시작하지 못했어요. 문제가 계속되면 OpenBot을 종료하고 다시 여세요.",
   "error.remote.hostDidNotConnect": "WebRTC 호스트가 연결되지 않았어요.",
   "error.remote.connectionCancelled": "원격 연결이 취소되었어요.",
   "error.remote.hostDisconnected": "서버와의 연결이 끊어졌어요. 작업이 완료되었는지 확인한 후 다시 시도해 주세요.",

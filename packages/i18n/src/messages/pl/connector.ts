@@ -502,7 +502,8 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "Opcjonalnie. Bez nazwy lista pokazuje numer telefonu.",
   "connector.whatsapp.add": "Dodaj",
   "connector.whatsapp.groupTitle": "Dodaj grupę",
-  "connector.whatsapp.groupDescription": "Osoby w tej grupie mogą zlecać pracę twoim agentom.",
+  "connector.whatsapp.groupDescription":
+    "Osoby w tej grupie mogą zlecać pracę twoim agentom, gdy oznaczą ten numer lub odpowiedzą na jego wiadomości.",
   "connector.whatsapp.groupSearch": "Szukaj grup",
   "connector.whatsapp.groupsLoading": "Odczytywanie grup…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot nie mógł odczytać grup",
@@ -661,9 +662,9 @@ export const messages = {
   "connector.protonPass.expiredDescription":
     "Agenci nie mogą logować się udostępnionymi danymi, dopóki nie zalogujesz się ponownie.",
   "connector.protonPass.reconnect": "Połącz ponownie",
-  "connector.protonPass.planTitle": "Proton Pass wymaga płatnego planu",
+  "connector.protonPass.planTitle": "Proton Pass wymaga planu z Pass Plus",
   "connector.protonPass.planDescription":
-    "Proton Pass CLI działa tylko z płatnym planem Proton. Zmień plan, a potem połącz ponownie.",
+    "Proton Pass CLI wymaga planu Proton, który obejmuje Pass Plus. Inne płatne plany, takie jak Mail Plus, go nie obejmują. Zmień plan, a potem połącz ponownie.",
   "connector.protonPass.vaultTitle": "Udostępniony sejf",
   "connector.protonPass.vaultDescription":
     "Agenci mogą logować się danymi z tego sejfu. Przenieś do niego dane logowania, aby je udostępnić.",

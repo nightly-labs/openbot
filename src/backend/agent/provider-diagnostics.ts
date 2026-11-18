@@ -28,15 +28,35 @@ export function isMcpSubsystemDiagnostic(message: string): boolean {
  * Whether an MCP diagnostic says that the server refused the provider for want of a sign-in.
  *
  * Grok's `rmcp` worker writes `AuthRequired(…)` for an http server that answers 401 with an OAuth
- * challenge. Other CLIs write the status next to `HTTP` or `status`, or the word. Codex CLI 0.169.0
- * writes `The <name> MCP server is not logged in.` in its failed startup status (#9360). A bare
- * `401` is not enough: a port, an id or a line number can be 401.
+ * challenge, and Grok CLI 1.0.77 writes `error: Auth required, when send initialize request` in the
+ * detail of its `x.ai/mcp/server_status` for the same server. Other CLIs write the status next to
+ * `HTTP` or `status`, or the word. Codex CLI 0.169.0 writes `The <name> MCP server is not logged in.`
+ * in its failed startup status (#9360). A bare `401` is not enough: a port, an id or a line number
+ * can be 401.
  */
 export function isMcpSignInDiagnostic(message: string): boolean {
-  return /\bAuthRequired\b|\bunauthori[sz]ed\b|\bnot (?:authenticated|logged in)\b|\b(?:HTTP|status(?:\s+code)?)\W{0,3}401\b/i.test(
+  return /\bAuth ?Required\b|\bunauthori[sz]ed\b|\bnot (?:authenticated|logged in)\b|\b(?:HTTP|status(?:\s+code)?)\W{0,3}401\b/i.test(
     message,
   );
 }
+
+/** The kind of a provider's failed MCP start, as its text says it. */
+export type McpProviderFailureKind = "sign_in" | "timeout" | "failed";
+
+export function mcpProviderFailureKind(message: string): McpProviderFailureKind {
+  return isMcpSignInDiagnostic(message) ? "sign_in" : isMcpTimeoutDiagnostic(message) ? "timeout" : "failed";
+}
+
+/**
+ * The sentence for each kind of failed MCP start in a provider. A provider can report one failure on
+ * two paths, such as Grok's status notification and its stderr line. Both use this sentence, so the
+ * renderer, which shows one toast for each text, shows one.
+ */
+export const MCP_PROVIDER_FAILURE_TEXT = {
+  sign_in: "error.backend.mcpServerSignInForProvider",
+  timeout: "error.backend.mcpServerTimedOutInProvider",
+  failed: "error.backend.mcpServerFailedInProvider",
+} as const;
 
 /**
  * Whether an MCP diagnostic says that the server did not answer in time. A provider can wait less
@@ -44,7 +64,7 @@ export function isMcpSignInDiagnostic(message: string): boolean {
  * test and still time out in the provider. `deadline has elapsed` is the Rust `tokio` timeout text.
  * A bare `timeout` does not count: a server name or a quoted option such as `--timeout` can hold it.
  */
-export function isMcpTimeoutDiagnostic(message: string): boolean {
+function isMcpTimeoutDiagnostic(message: string): boolean {
   return /\btimed out\b|\bdeadline has elapsed\b/i.test(message);
 }
 

@@ -174,6 +174,7 @@ import { ROUTINE_RUN_COMMAND_CAPABILITY } from "./routine-run-command-v1";
 import { ROUTINE_RUN_PLACE_CAPABILITY } from "./routine-run-place-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "./routines-once-v1";
 import { SERVER_AUDIT_CAPABILITY } from "./server-audit-v1";
+import { SERVER_SAFE_MODE_CAPABILITY } from "./server-safe-mode-v1";
 import { SETTING_LINK_MARKERS_CAPABILITY } from "./setting-link-markers-v1";
 import { SHARED_TABLES_CAPABILITY } from "./shared-tables-v1";
 import { SIDE_QUESTION_CAPABILITY } from "./side-question-v1";
@@ -223,6 +224,7 @@ import { VAULT_V2_CAPABILITY } from "./vault-v2";
 import { VAULT_V3_CAPABILITY } from "./vault-v3";
 import { VAULT_V4_CAPABILITY } from "./vault-v4";
 import { TEAM_VIDEO_GENERATION_CAPABILITY } from "./video-generation-v1";
+import { WEBHOOK_AGENT_SECRET_CAPABILITY } from "./webhook-agent-secret-v1";
 import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "./webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "./webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "./whatsapp-connector-v1";
@@ -442,6 +444,7 @@ export {
   ROUTINE_RUN_PLACE_CAPABILITY,
   ROUTINES_ONCE_CAPABILITY,
   SERVER_AUDIT_CAPABILITY,
+  SERVER_SAFE_MODE_CAPABILITY,
   SETTING_LINK_MARKERS_CAPABILITY,
   SHARED_TABLES_CAPABILITY,
   SIDE_QUESTION_CAPABILITY,
@@ -485,6 +488,7 @@ export {
   VAULT_V2_CAPABILITY,
   VAULT_V3_CAPABILITY,
   VAULT_V4_CAPABILITY,
+  WEBHOOK_AGENT_SECRET_CAPABILITY,
   WEBHOOK_SENDER_SECRET_CAPABILITY,
   WEBHOOK_TESTS_CAPABILITY,
   WHATSAPP_CONNECTOR_CAPABILITY,
@@ -790,6 +794,8 @@ const TEAM_CAPABILITY_REGISTRY = [
   [AGENT_ACTIVE_QUEUES_CAPABILITY, V9],
   [AGENT_CREATE_OPERATION_CAPABILITY, V9],
   [TEAM_CAPABILITY_BASELINE_CAPABILITY, V10],
+  [SERVER_SAFE_MODE_CAPABILITY, V10],
+  [WEBHOOK_AGENT_SECRET_CAPABILITY, V10],
   [ATTACHMENT_PREVIEW_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
@@ -897,9 +903,9 @@ export const TEAM_WEBRTC_CLIENT_PROTOCOL: TeamProtocolSupportV1["protocol"] = {
   maximum: TEAM_PROTOCOL_V9,
 };
 /**
- * The protocols that the web client speaks through `packages/team-client`. It sends protocol 10 lists to a
- * host of protocol 10. Mobile stays on `TEAM_WEBRTC_CLIENT_PROTOCOL` until a capability after protocol 9
- * needs it there.
+ * The protocols that the web client and the mobile workspace speak through `packages/team-client`. They
+ * send protocol 10 lists to a host of protocol 10. The mobile share extension stays on
+ * `TEAM_WEBRTC_CLIENT_PROTOCOL`.
  */
 export const TEAM_WEB_CLIENT_PROTOCOL: TeamProtocolSupportV1["protocol"] = {
   minimum: TEAM_PROTOCOL_V3,
@@ -1010,6 +1016,23 @@ export function decodeTeamProtocolSupportExpanded(value: unknown): TeamProtocolS
     protocol: support.protocol,
     capabilities: expandTeamCapabilitiesV10(support),
   };
+}
+
+/**
+ * Reads the compatibility of a host with the protocol range of a WebRTC client. The first read of a
+ * connection does not know the protocol, so a host of protocol 10 answers it as protocol 9. Then the
+ * peer knows the protocol, and a second read gets the protocol 10 lists with the full set.
+ */
+export async function readTeamHostCompatibility(
+  read: () => Promise<unknown>,
+  client: TeamProtocolSupportV1["protocol"] = TEAM_WEBRTC_CLIENT_PROTOCOL,
+) {
+  const first = await read();
+  const support = decodeTeamProtocolSupportExpanded(first);
+  const negotiated = teamWebRtcClientProtocol(support.protocol, client);
+  if (hasTeamProtocolV10Lists(first) || negotiated.update || (negotiated.protocol ?? 0) < TEAM_PROTOCOL_V10)
+    return { support, negotiated };
+  return { support: decodeTeamProtocolSupportExpanded(await read()), negotiated };
 }
 
 function capabilitySince(capability: string): TeamCapabilityPlacement["since"] {

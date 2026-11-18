@@ -25,12 +25,17 @@ interface AcpRetryNotice {
   readonly unreachable: boolean;
 }
 
+/**
+ * Why a model request failed: the agent could not connect to the model provider, the model server ran
+ * out of memory for the request, or the provider answered with another error or stopped answering.
+ */
+export type AcpRetryCause = "unreachable" | "outOfMemory" | "serverError";
+
 /** A session update that says that the agent sends a failed model request again (`AcpFlavor.retryUpdate`). */
 interface AcpRetryUpdate {
   /** The number of the retry: 1 for the first request after the failed one. */
   readonly attempt: number;
-  /** The agent could not connect to the model provider. Else the provider answered with an error or stopped answering. */
-  readonly unreachable: boolean;
+  readonly cause: AcpRetryCause;
 }
 
 /** The custom endpoint that serves a model, as a turn's error names it. Never a credential itself. */
@@ -431,6 +436,12 @@ export interface AcpFlavor {
    */
   signInLostChunk?: RegExp;
   /**
+   * The text for a session that the agent could not open because its server refused the saved
+   * sign-in or did not answer, or null for another error. The start asks once more, because the
+   * failure can be short, and then asks the user to sign in again.
+   */
+  signInUnusable?(error: RequestError): string | null;
+  /**
    * A whole answer chunk that tells that the plan is used up, sent as answer text in a turn that
    * then ends as a success. OpenBot fails the turn as a usage limit, so a backup model can take it.
    */
@@ -820,6 +831,12 @@ export const CURSOR_ACP_FLAVOR: AcpFlavor = {
   // again (#4614).
   signInLostChunk:
     /^\n\n(?:Please sign in to continue|Error: \[unauthenticated\] Backend rejected authentication\.[^\n]*)$/u,
+  // Cursor 2026.09.28-64d2043 and 2026.11.05-86047df open a session only when their server accepts the
+  // saved sign-in or key. A refused one and no connection give the same error (#7644).
+  signInUnusable: (error) =>
+    error.code === -32603 && isRecord(error.data) && error.data.message === "Failed to initialize session services"
+      ? sourceText("error.provider.cursorSignInUnusable")
+      : null,
   // Cursor sends a used-up plan as one chunk in the same form, and then ends the turn as a success
   // (#5668), and a plan that needs a payment method too (#4556). Only the full chunk matches, so an
   // answer that quotes the text stays an answer.

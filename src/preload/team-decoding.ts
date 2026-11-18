@@ -60,6 +60,7 @@ const SERVER_ISSUE_CODES = [
   "client_update_required",
   "host_update_required",
   "protocol_error",
+  "server_safe_mode",
   "authentication_required",
   "network_unavailable",
 ] as const;

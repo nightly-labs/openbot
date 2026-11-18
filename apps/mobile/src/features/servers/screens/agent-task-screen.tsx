@@ -665,7 +665,10 @@ function AgentTaskChat({
             {t("mobile.server.threads.failedTitle")}
           </Typography.Paragraph>
           <Typography.Paragraph type="body-xs" className="text-danger-text">
-            {task.error || t("mobile.server.threads.failedBody")}
+            {/* A thread keeps the provider's text, which can be technical: it shows as a failed chat turn does (#10888). */}
+            {task.error?.trim()
+              ? errorMessage(task.error, t("mobile.chat.failure.fallback"))
+              : t("mobile.server.threads.failedBody")}
           </Typography.Paragraph>
         </View>
       ) : null}

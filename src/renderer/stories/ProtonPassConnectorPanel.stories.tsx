@@ -63,7 +63,7 @@ export const Setup: Story = {
 
 export const Connected: Story = { args: args(CONNECTED) };
 
-/** The Proton Pass CLI needs a paid plan. */
+/** The Proton plan does not include Pass Plus, so the Proton Pass CLI refuses it. */
 export const PlanError: Story = {
   args: args({ state: "failed", errorCode: "plan" }),
 };

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createOpenBotLogger,
   type LogValue,
+  redactPostText,
   redactSecrets,
   redactText,
   redactValue,
@@ -183,6 +184,22 @@ describe("redactText", () => {
       'note {"email":"jan@example.com","apiKey":"[redacted]"}',
     );
     expect(redactSecrets('{"jan@example.com":"Bearer abcdef123456"}')).toBe('{"jan@example.com":"[redacted]"}');
+  });
+
+  // An agent's chat app answer keeps the address it wrote for the people there, never a secret.
+  it("keeps emails and redacts secrets in a chat app post", () => {
+    expect(redactPostText("Write to jan@example.com, password=hunter2")).toBe(
+      "Write to jan@example.com, password=[redacted]",
+    );
+    // Only the email rule hid a URL password before, as a part of an address.
+    expect(redactPostText("postgres://admin:s3cretpw@db.example.com/app")).toBe(
+      "postgres://admin:[redacted]@db.example.com/app",
+    );
+    expect(redactText("https://user:s3cretpw@db.example.com/x")).toBe("https://user:[redacted]@db.example.com/x");
+    expect(redactSecrets("redis://:s3cretpw@cache:6379")).toBe("redis://:[redacted]@cache:6379");
+    expect(redactPostText(`${"{} ".repeat(16)}{"headers":{"X-Tenant":"tenant-secret"}}`)).toContain(
+      "[redacted-unscanned]",
+    );
   });
 
   it("redacts secrets inside a payload that arrives as one string", () => {

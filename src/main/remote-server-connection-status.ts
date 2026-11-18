@@ -78,10 +78,18 @@ export function hostUnreachable(
  * A WebRTC attempt to connect that ended with no transport error event, such as a timeout. It stays
  * a network issue, so the workspace stays on screen and the app tries again. The failure gives the
  * reference, and also the sentence when it is one of our fixed connection sentences (#6873).
+ * A failure with no reference ended before the attempt reached the host, so its sentence does not
+ * say that the host is not reachable (#11530).
  */
 export function classifyConnectFailure(failure: unknown): RemoteConnectionOutcome {
-  const message = failure instanceof Error && isSafeConnectionError(failure.message) ? failure.message : undefined;
-  return hostUnreachable(errorReference(failure) ?? "transport/connect_failed", message);
+  const reference = errorReference(failure);
+  const message =
+    failure instanceof Error && isSafeConnectionError(failure.message)
+      ? failure.message
+      : reference === null
+        ? sourceText("error.remote.connectionNotStarted")
+        : undefined;
+  return hostUnreachable(reference ?? "transport/connect_failed", message);
 }
 
 export function classifyRemoteConnectionError(error: unknown): RemoteConnectionOutcome {
@@ -92,7 +100,7 @@ export function classifyRemoteConnectionError(error: unknown): RemoteConnectionO
         referenceFrom("protocol", error.code),
       ),
       // A protocol error is this app and the host disagreeing about the bytes, which is not the same
-      // as either being out of date -- only the two update codes say "incompatible".
+      // as either being out of date -- the two update codes and a host in safe mode say "incompatible".
       state: error.code === "protocol_error" ? "error" : "incompatible",
       suspendReconnect: true,
       hostSupport: error.support,
@@ -112,6 +120,18 @@ export function classifyRemoteConnectionError(error: unknown): RemoteConnectionO
                 : sourceText("error.team.hostUpdateRequired"),
             retryable: true,
           },
+          reference,
+        ),
+        state: "incompatible",
+        suspendReconnect: true,
+        hostSupport: null,
+      };
+    }
+    // A host in safe mode refuses every route but the reason. The next compatibility read gets the reason.
+    if (error.code === "server_safe_mode") {
+      return {
+        issue: withReference(
+          { code: "server_safe_mode", message: sourceText("error.team.serverSafeMode"), retryable: true },
           reference,
         ),
         state: "incompatible",

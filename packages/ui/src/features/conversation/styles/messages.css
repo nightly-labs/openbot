@@ -1522,9 +1522,7 @@ button.chat-action-target:active,
 }
 
 .message-entry-agent
-  .ui-bubble-variant-ghost:has(
-    :is(.image-generation, .media-generation, .image-gallery, .message-code-block, .message-data-table-scroll)
-  )
+  .ui-bubble-variant-ghost:has(:is(.image-generation, .media-generation, .image-gallery))
   > .ui-bubble-content {
   width: 100%;
 }

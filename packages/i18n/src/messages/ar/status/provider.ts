@@ -13,6 +13,8 @@ export const messages = {
     "لا يستطيع {provider} الاتصال بمزود النموذج. يحاول مرة أخرى: المحاولة {attempt}.",
   "status.provider.modelRetryServerError":
     "مزود النموذج مشغول أو به خطأ. يحاول {provider} مرة أخرى: المحاولة {attempt}.",
+  "status.provider.modelRetryOutOfMemory":
+    "نفدت ذاكرة خادم النموذج لهذه المحادثة. يحاول {provider} مرة أخرى: المحاولة {attempt}. المحادثة الجديدة تحتاج إلى ذاكرة أقل.",
   "status.provider.modelRetryRecovered": "يجيب مزود النموذج مجددًا.",
   "status.provider.retryRecovered": "يتلقى {provider} الإجابات من خادمه مجددًا.",
   "status.provider.claudeFastModeNeedsUsageCredits":

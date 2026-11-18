@@ -71,6 +71,8 @@ export const messages = {
     "Доступ к микрофону заблокирован. Разрешите OpenBot использовать микрофон в системных настройках.",
   "composer.voice.noMicrophone": "Микрофон недоступен.",
   "composer.voice.startFailed": "OpenBot не удалось начать запись голоса.",
+  "composer.voice.microphoneUnavailable":
+    "OpenBot не удалось открыть микрофон. Закройте другие приложения, которые его используют, проверьте, что он подключён и разрешён в системных настройках, и повторите попытку.",
   "composer.voice.transcribeFailed": "OpenBot не удалось расшифровать эту запись.",
   "composer.reply.toYou": "Ответ на ваше сообщение",
   "composer.reply.toAgent": "Ответ агенту",
@@ -130,6 +132,7 @@ export const messages = {
   "composer.voice.noSpeechRecorded": "Речь не записана.",
   "composer.voice.noSpeechDetected": "Речь не обнаружена.",
   "composer.voice.readFailed": "Не удалось прочитать ответ вслух.",
+  "composer.voice.languageUnsupported": "Не удалось прочитать ответ вслух. Этот язык пока недоступен.",
   "composer.error.saveEditTryAgain": "Не удалось сохранить это изменение на этом компьютере. Повторите попытку.",
   "composer.error.saveUnconfirmed":
     "Сохранение не подтверждено. Нажмите «Сохранить» ещё раз, чтобы проверить результат.",

@@ -485,6 +485,7 @@ export const messages = {
   "chat.suggestion.undo": "Geri al",
   "chat.suggestion.localOnly": "{name} bağlantısını kendi bilgisayarınızdaki OpenBot'ta kurun.",
   "chat.suggestion.unavailable": "Bu sunucu {name} uygulamasını bağlayamaz.",
+  "chat.suggestion.notAllowed": "{name} uygulamasını yalnızca sunucu sahibi veya bir yönetici bağlayabilir.",
   "chat.serverInstall.title": "Yeni sunucu",
   "chat.serverInstall.expired": "Komutun süresi doldu. Ajandan yenisini isteyin.",
   "chat.compaction.running": "Bağlam sıkıştırılıyor",

@@ -223,6 +223,13 @@ export const messages = {
     "現在のシークレットは使えなくなります。ホストはそれを使ったリクエストを拒否します。",
   "mobile.agent.webhook.rotateConfirm": "再生成",
   "mobile.agent.webhook.rotateFailed": "シークレットを再生成できませんでした。もう一度お試しください。",
+  "mobile.agent.webhook.giveToAgent": "署名シークレットを {name} に渡す",
+  "mobile.agent.webhook.giveTitle": "新しい署名シークレットを {name} に渡しますか？",
+  "mobile.agent.webhook.giveBody":
+    "現在のシークレットは使えなくなります。{name} は新しいシークレットを API キーとして保存し、送信元に追加できます。",
+  "mobile.agent.webhook.giveConfirm": "渡す",
+  "mobile.agent.webhook.giveFailed": "署名シークレットをエージェントに渡せませんでした。もう一度お試しください。",
+  "mobile.agent.webhook.given": "{name} が新しい署名シークレットを受け取りました。",
   "mobile.agent.webhook.activity": "アクティビティ",
   "mobile.agent.webhook.activityFailed": "アクティビティを読み込めませんでした。もう一度お試しください。",
   "mobile.agent.webhook.activity.ignored": "無視",

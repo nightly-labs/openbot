@@ -1,4 +1,5 @@
 import {
+  decodeAgentWebhookSecret,
   decodeEventActivity,
   decodeEventRoutineRuns,
   decodeEventRoutines,
@@ -27,6 +28,10 @@ import {
   ROUTINE_RUN_PLACE_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-run-place-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
+import {
+  WEBHOOK_AGENT_SECRET_CAPABILITY,
+  WEBHOOK_AGENT_SECRET_ROUTES,
+} from "@openbot/contracts/team-protocol/webhook-agent-secret-v1";
 import {
   WEBHOOK_SENDER_SECRET_CAPABILITY,
   WEBHOOK_SENDER_SECRET_ROUTES,
@@ -70,7 +75,8 @@ interface EventsRemoteServers {
       | typeof ROUTINE_RUN_PLACE_CAPABILITY
       | typeof ROUTINES_ONCE_CAPABILITY
       | typeof WEBHOOK_TESTS_CAPABILITY
-      | typeof WEBHOOK_SENDER_SECRET_CAPABILITY,
+      | typeof WEBHOOK_SENDER_SECRET_CAPABILITY
+      | typeof WEBHOOK_AGENT_SECRET_CAPABILITY,
   ): boolean;
   request<T>(
     serverId: string,
@@ -206,6 +212,14 @@ export function eventsIpcHandlers({ events, remoteServers }: EventsIpcDependenci
           if (!remoteServers.supportsCapability(serverId, WEBHOOK_SENDER_SECRET_CAPABILITY))
             throw new Error(sourceText("error.backend.eventsUnavailable"));
           return remote(serverId, WEBHOOK_SENDER_SECRET_ROUTES.set, acceptEmpty, input);
+        },
+      }),
+      giveSecretToAgent: scopedHandler(parseEventRoutineRef, {
+        local: (input) => runCauseEffect(events.giveSecretToAgent(input)),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, WEBHOOK_AGENT_SECRET_CAPABILITY))
+            throw new Error(sourceText("error.backend.eventsUnavailable"));
+          return remote(serverId, WEBHOOK_AGENT_SECRET_ROUTES.give, decodeAgentWebhookSecret, input);
         },
       }),
       sendTestEvent: scopedHandler(parseEventRoutineRef, {
