@@ -96,6 +96,8 @@ docker logs openbot-remote-capacity-report-1 2>&1 | tail -5
 ```
 
 A failed sample writes only `Capacity report failed.` and its source (`turn`, `signal` or `openpanel`).
+The reporter also reads `/proc/net/route` and `/proc/net/dev` of the host network for the public
+traffic. When it cannot read them, the event has no traffic values and the sample does not fail.
 
 ### coturn configuration update
 
@@ -278,7 +280,12 @@ home like `a` and `b`, but it never holds the entry while `a` or `b` answers.
 | `us` | `openbot-signal-us` (Leaseweb VPS 12728289, SFO-12, same reference) | `23.106.44.143` | `signal-us`, `turn-us` | San Jose |
 | `au` | `openbot-signal-au` (Leaseweb VPS 12728295, SYD-12, same reference) | `23.106.243.56` | `signal-au`, `turn-au` | Sydney |
 
-The AU plan has a 5 TB monthly traffic pack. TURN relay traffic counts against it.
+The AU plan has a 5 TB monthly traffic pack. TURN relay traffic counts against it. To see the
+traffic, use `leaseweb-pool.ts traffic` (in and out of each VPS this month, from the Leaseweb metrics,
+and the part of its pack; see [hosted servers](hosted-servers.md#leaseweb-references)), or add up
+`network_in_bytes` and `network_out_bytes` of `signal_capacity` (ANALYTICS.md) by `turn_host`. On
+2026-11-18 the two gave the same numbers for AU. It is not confirmed whether Leaseweb counts in and
+out together against the pack, or only out; the script shows the part of in and out together.
 
 Setup of each machine (Ubuntu 26.04):
 

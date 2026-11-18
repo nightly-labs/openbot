@@ -1052,6 +1052,11 @@ Leaseweb accounts use one scheme:
 | `openbot-signal-<home>` | A Signal machine (see `docs/remote-session-deployment.md`). | `openbot-signal-us` |
 | `pool-test-<NN>` | A test machine of the operator. | `pool-test-01` |
 
+`leaseweb-pool.ts traffic [--from=YYYY-MM-DD] [--to=YYYY-MM-DD]` is read only. It shows the public
+traffic in and out of each VPS on the four accounts, from the first day of this month (UTC) to today,
+and the part of the traffic pack of its contract. The output has the reference with no email, and
+`server` for a hosted server.
+
 To take a VPS:
 
 1. List the VPS of each account (`LEASEWEB_API_KEY_NL`, `_DE`, `_US`, `_AU`) and select one with no
