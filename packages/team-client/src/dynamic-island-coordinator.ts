@@ -108,6 +108,12 @@ export class DynamicIslandCoordinator {
     }
     this.#servers.set(input.serverId, {
       ...input,
+      // `applyEvent` writes into these records. Each one is a copy: the caller's records are its
+      // reactive state, and a write in place made the renderer's next write of the same snapshot read
+      // as no change, so the open chat kept its old queue (#8209).
+      activeTurns: { ...input.activeTurns },
+      queues: { ...input.queues },
+      failedTurns: { ...input.failedTurns },
       turnProgress,
       pendingApprovals,
       pendingPrompts,
