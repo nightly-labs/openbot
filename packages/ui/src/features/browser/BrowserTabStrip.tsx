@@ -2,36 +2,22 @@ import type { BrowserTabProfile } from "@openbot/contracts/ipc";
 import { Button, buttonVariants, ChevronDown, ContextMenu, DropdownMenu, Tabs, X } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { clamp, motionDuration, prefersReducedMotion } from "@openbot/ui/utils";
-import { createEffect, createSignal, createStore, For, onSettled, Show } from "solid-js";
+import { createEffect, createSignal, For, onSettled, Show } from "solid-js";
+import { createTabRow } from "../../components/createTabRow";
 import { browserProfileColor } from "./BrowserProfileColor";
 import { BrowserTabIcon, useBrowserTabTitle } from "./BrowserTabIcon";
 import { BrowserTabMenu } from "./BrowserTabMenu";
 import { type BrowserFullViewProps, browserTabProfileLabel } from "./browser-full-view-types";
 import { useBrowserPageCover } from "./browser-page-cover";
 
-/** A press that travels this far becomes a drag; a shorter one stays a click on the tab or its X. */
 const DRAG_START_PX = 6;
-/** A held tab this close to an edge of the row scrolls the row, at up to this many pixels a frame. */
-const EDGE_ZONE_PX = 40;
-const EDGE_SPEED_PX = 14;
-
-/** What the row shows besides the tabs: the chips out of view, the faded edges, and a kept chip width. */
-interface TabRow {
-  hidden: string[];
-  fadeStart: boolean;
-  fadeEnd: boolean;
-  frozen: number;
-}
-
 interface TabDrag {
   id: string;
   pointerId: number;
   startX: number;
   startScroll: number;
-  /** The pointer now. */
   x: number;
   active: boolean;
-  /** Where each chip was when the drag started, in row coordinates. */
   slots: { el: HTMLElement; left: number; width: number }[];
   gap: number;
   from: number;
@@ -39,12 +25,6 @@ interface TabDrag {
   frame: number;
 }
 
-/**
- * Slides the chips from their last places to their new places (FLIP). The tabs change after an answer
- * from the host, so the row keeps the places of its last layout rather than measuring before a change.
- * A new chip fades in.
- */
-/** A tab of a named profile has a line in the profile's color, as its toolbar label has a dot. */
 function tabProfileColor(profile: BrowserTabProfile | undefined): string | undefined {
   return profile?.hue == null ? undefined : browserProfileColor(profile.hue);
 }
@@ -53,7 +33,6 @@ function createChipMotion(chips: () => HTMLElement[]) {
   let places = new Map<string, number>();
   const read = () => new Map(chips().map((el) => [el.dataset.tabId ?? "", el.offsetLeft]));
   return {
-    /** Keeps the places of the layout now, without a slide. */
     keep: (override?: Map<string, number>) => {
       places = override ?? read();
     },
@@ -90,16 +69,6 @@ function createChipMotion(chips: () => HTMLElement[]) {
   };
 }
 
-/**
- * Every tab, as the chips of the top row.
- * - Drag a chip to move it: the other chips slide out of its way, and near an edge the row scrolls.
- *   Escape puts it back.
- * - A middle click, Delete or the X closes a tab. After a close with the pointer, the chips keep their
- *   width until the pointer leaves the row, so the next X is under the pointer.
- * - A right click (or Control-click) opens the tab menu.
- * - When the chips do not fit, the row scrolls (also with a vertical wheel), its edges fade, and a
- *   menu lists the tabs out of view.
- */
 export function BrowserTabStrip(props: {
   view: BrowserFullViewProps;
   onNewTab: (afterId?: string) => void;
@@ -107,10 +76,24 @@ export function BrowserTabStrip(props: {
 }) {
   const { t } = useText();
   const tabTitle = useBrowserTabTitle();
-  const [row, setRow] = createStore<TabRow>({ hidden: [], fadeStart: false, fadeEnd: false, frozen: 0 });
+  let strip: HTMLElement | undefined;
+  let drag: TabDrag | undefined;
+  let swallowClick = false;
+
+  const activeId = () => props.view.activeTab?.id;
+  const canClose = () => props.view.canCloseTabs !== false;
+  const chips = () => (strip ? [...strip.querySelectorAll<HTMLElement>(":scope > [data-tab-id]")] : []);
+  const motion = createChipMotion(chips);
+  const tabRow = createTabRow({
+    list: () => strip,
+    tabs: () => chips(),
+    key: (el) => el.dataset.tabId ?? "",
+    measured: () => {
+      if (!drag?.active) motion.keep();
+    },
+  });
+  const row = tabRow.row;
   const [hiddenMenuOpen, setHiddenMenuOpen] = createSignal(false);
-  // The menu goes away with its button when every tab fits again, without a close, and a new button
-  // starts closed.
   createEffect(
     () => row.hidden.length > 0,
     (shown) => {
@@ -118,68 +101,20 @@ export function BrowserTabStrip(props: {
     },
   );
   useBrowserPageCover(() => hiddenMenuOpen() && row.hidden.length > 0);
-  let strip: HTMLElement | undefined;
-  let drag: TabDrag | undefined;
-  let swallowClick = false;
-  let measureFrame = 0;
-
-  const activeId = () => props.view.activeTab?.id;
-  const canClose = () => props.view.canCloseTabs !== false;
-  const chips = () => (strip ? [...strip.querySelectorAll<HTMLElement>(":scope > [data-tab-id]")] : []);
-  const chip = (id: string) => chips().find((el) => el.dataset.tabId === id);
-  const motion = createChipMotion(chips);
   const hiddenTabs = () => props.view.tabs.filter((tab) => row.hidden.includes(tab.id));
-
-  /** Scrolls only the row, not the window, until the chip of the tab shows whole. */
-  const reveal = (id: string) => {
-    const el = chip(id);
-    if (!strip || !el) return;
-    const inset = Number.parseFloat(getComputedStyle(strip).paddingInlineStart) || 0;
-    const left = el.offsetLeft - inset;
-    const right = el.offsetLeft + el.offsetWidth + inset;
-    const behavior = prefersReducedMotion() ? "auto" : "smooth";
-    if (left < strip.scrollLeft) strip.scrollTo({ left, behavior });
-    else if (right > strip.scrollLeft + strip.clientWidth)
-      strip.scrollTo({ left: right - strip.clientWidth, behavior });
-  };
-
-  /** Finds the chips out of view. Offsets ignore the slides, so a moving chip counts at its new place. */
-  const measureRow = () => {
-    measureFrame = 0;
-    if (!strip) return;
-    const start = strip.scrollLeft;
-    const end = start + strip.clientWidth;
-    const width = strip.scrollWidth;
-    const hidden = chips()
-      .filter((el) => el.offsetLeft < start - 1 || el.offsetLeft + el.offsetWidth > end + 1)
-      .map((el) => el.dataset.tabId ?? "");
-    setRow((state) => {
-      if (state.hidden.join() !== hidden.join()) state.hidden = hidden;
-      state.fadeStart = start > 1;
-      state.fadeEnd = end < width - 1;
-    });
-    if (!drag?.active) motion.keep();
-  };
-  const scheduleMeasure = () => {
-    if (!measureFrame) measureFrame = requestAnimationFrame(measureRow);
-  };
 
   createEffect(
     () => activeId(),
     (id) => {
-      if (id) reveal(id);
+      if (id) tabRow.reveal(id);
     },
   );
   createEffect(
     () => props.view.tabs.map((tab) => tab.id).join(),
     () => {
       motion.play();
-      scheduleMeasure();
+      tabRow.measure();
     },
-  );
-  createEffect(
-    () => row.frozen,
-    () => scheduleMeasure(),
   );
 
   const close = (ids: readonly string[]) => {
@@ -187,15 +122,10 @@ export function BrowserTabStrip(props: {
   };
   const closeWithPointer = (id: string) => {
     if (!canClose()) return;
-    const width = chip(id)?.offsetWidth;
-    if (width)
-      setRow((state) => {
-        state.frozen = width;
-      });
+    tabRow.freeze(id);
     close([id]);
   };
 
-  /** Puts the held chip under the pointer and moves the chips between its old and new place by one slot. */
   const layout = (current: TabDrag) => {
     const held = current.slots[current.from];
     const first = current.slots[0];
@@ -226,18 +156,8 @@ export function BrowserTabStrip(props: {
 
   const edgeScroll = () => {
     const current = drag;
-    if (!current?.active || !strip) return;
-    const rect = strip.getBoundingClientRect();
-    const speed =
-      current.x < rect.left + EDGE_ZONE_PX
-        ? -(1 - Math.max(0, current.x - rect.left) / EDGE_ZONE_PX)
-        : current.x > rect.right - EDGE_ZONE_PX
-          ? 1 - Math.max(0, rect.right - current.x) / EDGE_ZONE_PX
-          : 0;
-    if (speed) {
-      strip.scrollLeft += speed * EDGE_SPEED_PX;
-      layout(current);
-    }
+    if (!current?.active) return;
+    if (tabRow.scrollAtEdge(current.x)) layout(current);
     current.frame = requestAnimationFrame(edgeScroll);
   };
 
@@ -250,12 +170,10 @@ export function BrowserTabStrip(props: {
     window.removeEventListener("keydown", onDragKey, true);
     if (!current?.active || !strip) return;
     cancelAnimationFrame(current.frame);
-    // The release also clicks the chip or its X; that click is part of the drag.
     swallowClick = true;
     setTimeout(() => {
       swallowClick = false;
     });
-    // The chips settle from where they are drawn now.
     const origin = strip.getBoundingClientRect().left - strip.scrollLeft + strip.clientLeft;
     motion.keep(
       new Map(
@@ -268,7 +186,6 @@ export function BrowserTabStrip(props: {
     }
     strip.removeAttribute("data-dragging");
     if (drop && current.to !== current.from) props.view.onMoveTab(current.id, current.to);
-    // A drop in place changes no tab, so the held chip slides back here.
     else motion.play();
   };
 
@@ -308,10 +225,7 @@ export function BrowserTabStrip(props: {
   }
 
   const onChipPointerDown = (event: PointerEvent, id: string) => {
-    // The middle button closes on release (auxclick); here it only stops the scroll cursor.
     if (event.button === 1) event.preventDefault();
-    // Control-click is the right click of macOS: its menu takes the release, so no drag starts.
-    // A touch scrolls the row; a long press opens the menu.
     if (event.button !== 0 || event.pointerType === "touch" || event.ctrlKey || drag) return;
     drag = {
       id,
@@ -335,39 +249,23 @@ export function BrowserTabStrip(props: {
   onSettled(() => {
     const element = strip;
     if (!element) return;
-    const observer = new ResizeObserver(scheduleMeasure);
-    observer.observe(element);
+    const unbind = tabRow.bind(element);
     const onClick = (event: MouseEvent) => {
       if (!swallowClick) return;
       swallowClick = false;
       event.preventDefault();
       event.stopPropagation();
     };
-    // A vertical wheel scrolls the row, as in other browsers. A pinch (Ctrl+wheel) zooms the page.
-    const onWheel = (event: WheelEvent) => {
-      if (event.ctrlKey) return;
-      if (Math.abs(event.deltaY) <= Math.abs(event.deltaX) || element.scrollWidth <= element.clientWidth) return;
-      event.preventDefault();
-      element.scrollLeft += event.deltaY;
-    };
     element.addEventListener("click", onClick, true);
-    element.addEventListener("wheel", onWheel, { passive: false });
-    element.addEventListener("scroll", scheduleMeasure, { passive: true });
-    element.addEventListener("transitionend", scheduleMeasure);
     return () => {
       finishDrag(false);
-      observer.disconnect();
-      cancelAnimationFrame(measureFrame);
+      unbind();
       element.removeEventListener("click", onClick, true);
-      element.removeEventListener("wheel", onWheel);
-      element.removeEventListener("scroll", scheduleMeasure);
-      element.removeEventListener("transitionend", scheduleMeasure);
     };
   });
 
   return (
     <>
-      {/* The tab list moves the focus with the arrow keys, Home and End; the focus selects the tab. */}
       <Tabs.List
         ref={(element: HTMLDivElement) => {
           strip = element;
@@ -378,12 +276,7 @@ export function BrowserTabStrip(props: {
         data-fade-start={row.fadeStart ? "" : undefined}
         data-fade-end={row.fadeEnd ? "" : undefined}
         style={row.frozen ? { "--browser-full-chip-frozen": `${row.frozen}px` } : undefined}
-        onPointerLeave={() => {
-          if (row.frozen)
-            setRow((state) => {
-              state.frozen = 0;
-            });
-        }}
+        onPointerLeave={tabRow.unfreeze}
       >
         <For each={props.view.tabs} keyed={(tab) => tab.id}>
           {(tab) => {
@@ -438,8 +331,6 @@ export function BrowserTabStrip(props: {
                     value={tab().id}
                     class={buttonVariants({ variant: "ghost", class: "side-panel-tab-select" })}
                     onClick={() => props.view.onActivateTab(tab().id)}
-                    // Focus that comes back from the page or another window has no related target.
-                    // It lands on the tab the user chose before, not on a new choice.
                     onFocus={(event: FocusEvent) => {
                       if (event.relatedTarget !== null && !selected()) props.view.onActivateTab(tab().id);
                     }}
@@ -486,7 +377,7 @@ export function BrowserTabStrip(props: {
                     aria-current={activeId() === tab().id ? "true" : undefined}
                     onSelect={() => {
                       props.view.onActivateTab(tab().id);
-                      reveal(tab().id);
+                      tabRow.reveal(tab().id);
                     }}
                   >
                     <BrowserTabIcon view={props.view} tab={tab()} />

@@ -1,5 +1,3 @@
-/** The zoom bar of the canvas: zoom out, the zoom menu, zoom in, zoom to fit, and the minimap. */
-
 import type { AppTextKey } from "@openbot/i18n";
 import { buttonVariants, DropdownMenu, Kbd, MapIcon, Minus, Plus, Scan } from "@openbot/ui";
 import { For } from "solid-js";
@@ -7,7 +5,6 @@ import { useText } from "../../text";
 import { HudButton, hudBarRect } from "./WorkflowCanvasHud";
 import { MOD_KEY } from "./workflow-board";
 
-/** The zoom levels in the grid of the zoom menu, as on the Higgsfield canvas. */
 const ZOOM_PRESETS = [0.25, 0.5, 0.75, 1, 1.5, 2];
 
 type ZoomAction = "in" | "out" | "reset" | "fit";
@@ -19,7 +16,6 @@ const ZOOM_LABEL = {
   fit: "workflow.canvas.zoom.fit",
 } satisfies Record<ZoomAction, AppTextKey>;
 
-/** The shortcut of each zoom action. */
 export const ZOOM_KEYS: Record<ZoomAction, readonly string[]> = {
   in: [MOD_KEY, "+"],
   out: [MOD_KEY, "−"],

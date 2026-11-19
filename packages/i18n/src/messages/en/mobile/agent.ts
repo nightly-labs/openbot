@@ -216,6 +216,13 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.webhook.rotateBody": "The current secret stops working. The host rejects requests that use it.",
   "mobile.agent.webhook.rotateConfirm": "Regenerate",
   "mobile.agent.webhook.rotateFailed": "Could not regenerate the secret. Try again.",
+  "mobile.agent.webhook.giveToAgent": "Give the signing secret to {name}",
+  "mobile.agent.webhook.giveTitle": "Give a new signing secret to {name}?",
+  "mobile.agent.webhook.giveBody":
+    "The current secret stops working. {name} saves the new secret as an API key and can add it to the sender.",
+  "mobile.agent.webhook.giveConfirm": "Give secret",
+  "mobile.agent.webhook.giveFailed": "Could not give the signing secret to the agent. Try again.",
+  "mobile.agent.webhook.given": "{name} has the new signing secret.",
   "mobile.agent.webhook.activity": "Activity",
   "mobile.agent.webhook.activityFailed": "Could not load the activity. Try again.",
   "mobile.agent.webhook.activity.ignored": "Ignored",
@@ -404,10 +411,11 @@ export const messages = defineMessages("mobile.agent", {
     "This server cannot keep your own notification level for an agent. Update OpenBot on the computer that runs it.",
   "mobile.agent.newChat.title": "New chat",
   "mobile.agent.newChat.starting": "Starting new chat…",
-  "mobile.agent.newChat.footer": "The agent forgets this chat. Its setup stays.",
+  "mobile.agent.newChat.footer":
+    "The agent starts fresh and can still look up this chat when it needs to. Its setup stays.",
   "mobile.agent.newChat.confirmTitle": "Start a new chat with {name}?",
   "mobile.agent.newChat.confirmBody":
-    "The agent forgets this chat. The messages stay visible above a divider. The instructions, model, tools, memories, workspace, and browser do not change.",
+    "The agent starts fresh and can still look up this chat when it needs to. The messages stay visible above a divider. The instructions, model, tools, memories, workspace, and browser do not change.",
   "mobile.agent.newChat.confirm": "Start new chat",
   "mobile.agent.newChat.failed": "Could not start a new chat",
   "mobile.agent.newChat.failedBody": "The host could not start a new chat.",

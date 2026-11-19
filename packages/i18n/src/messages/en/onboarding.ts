@@ -1,7 +1,6 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("onboarding", {
-  // The saved setup could not be read. Retry, or set up again with no saved state.
   "onboarding.readFailed.title": "OpenBot could not read your setup.",
   "onboarding.readFailed.description":
     "Your local data did not change. Try again. If the problem continues, set up OpenBot again.",
@@ -85,6 +84,14 @@ export const messages = defineMessages("onboarding", {
   "onboarding.choice.subscription": "Use my AI subscription",
   "onboarding.choice.subscriptionDetail": "ChatGPT, Claude, or Grok",
   "onboarding.choice.startFreeInstead": "Use free models instead",
+  "onboarding.existing.title": "Welcome back.",
+  "onboarding.existing.description": "Your account already has OpenBot. Open a server to continue here.",
+  "onboarding.existing.open": "Open {name}",
+  "onboarding.existing.openDetail": "Opens its agents and chats here.",
+  "onboarding.existing.offlineDetail": "Offline now. It opens when it is on.",
+  "onboarding.existing.startNew": "Start new on this computer",
+  "onboarding.existing.startNewDetail": "Make a new team here. Your servers keep their agents and chats.",
+  "onboarding.existing.openFailed": "OpenBot could not open {name}.",
   "onboarding.consent.notice": "By continuing, you accept the {terms} and acknowledge the {privacy}.",
   "onboarding.consent.analyticsTitle": "Help make OpenBot better",
   "onboarding.consent.analyticsDetail": "Share usage with your account. Never chats or files.",

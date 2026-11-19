@@ -1,6 +1,3 @@
-/* The images of one agent message, laid out in justified rows by `justifiedGalleryLayout`. The
- * tiles are placed absolutely, so a new width or a loaded aspect ratio moves a tile but never
- * mounts a new image. */
 .image-gallery {
   position: relative;
   width: 100%;
@@ -26,8 +23,6 @@
   color: var(--openbot-text-muted);
 }
 
-/* Over the image until it loads: a remote image arrives only after its last byte. It shows after a
- * delay, so an image that loads at once does not flash a spinner. */
 .image-gallery-tile-loading {
   position: relative;
   z-index: 1;
@@ -66,11 +61,8 @@
   }
 }
 
-/* The viewer. The backdrop is a sibling below the content, and the content covers the window so
- * that its empty stage can take the click that closes it. */
 .ui-dialog-overlay.image-lightbox-backdrop {
   background: var(--openbot-bg-overlay);
-  /* The viewer animates its backdrop from script, with the zoom of the image. */
   animation: none;
 }
 
@@ -80,8 +72,7 @@
   inset: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  /* Clips the slides beside the stage. The window, not the stage, clips them, so the image can
-   * zoom from a thumbnail under the toolbar or the strip. */
+
   overflow: hidden;
   border-radius: 0;
   box-shadow: none;
@@ -109,8 +100,6 @@
   padding: var(--openbot-space-3) var(--openbot-space-4);
 }
 
-/* The macOS traffic lights take x 12..71 (`src/main/main-window.ts`), as in `browser-full-view.css`.
-   They are at the inline start in every language, so the inset is too. */
 .image-lightbox-mac-controls .image-lightbox-toolbar {
   padding-inline-start: 82px;
 }
@@ -142,7 +131,6 @@
   gap: var(--openbot-space-1);
 }
 
-/* The copy and check glyphs draw as the download and close glyphs beside them. */
 .image-lightbox-copy svg {
   width: 14px;
   height: 14px;
@@ -163,17 +151,13 @@
 .image-lightbox-stage {
   position: relative;
   min-height: 0;
-  /* A sideways swipe steps the images, and a pinch or a drag moves the zoom, all from script. */
   touch-action: none;
 }
 
-/* A zoomed image stays inside the stage, clear of the toolbar and the strip. */
 .image-lightbox-stage[data-zoomed] {
   overflow: hidden;
 }
 
-/* The current image and its neighbours sit side by side, one stage width apart. A step moves the
- * track, so the images slide as a carousel. */
 .image-lightbox-track {
   position: absolute;
   inset: 0;
@@ -184,14 +168,12 @@
   position: absolute;
   inset: 0;
   display: grid;
-  /* Fixed tracks, so the image's percentage limits resolve and a tall image fits the stage. */
   grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   place-items: center;
   padding: 0 calc(var(--openbot-space-8) * 2);
   transform: translateX(calc(var(--image-lightbox-slide) * 100%));
 }
 
-/* An image smaller than the stage shows one image pixel on each screen pixel (`ImageLightbox.tsx`). */
 .image-lightbox-image {
   max-width: min(100%, var(--image-lightbox-screen-width, 100%));
   max-height: min(100%, var(--image-lightbox-screen-height, 100%));
@@ -199,11 +181,9 @@
   border-radius: var(--openbot-radius-md);
   user-select: none;
   will-change: transform;
-  /* A drag moves a zoomed image; the browser must not start a drag of the file. */
   -webkit-user-drag: none;
 }
 
-/* A layer of its own would scale the fitted bitmap, so the zoomed image draws again, sharp. */
 .image-lightbox-image[data-zoomed] {
   will-change: auto;
   cursor: grab;
@@ -219,8 +199,6 @@
     translate var(--openbot-duration-slow) var(--openbot-ease-out);
 }
 
-/* Hidden until it loads, so the zoom starts from the thumbnail rather than after a flash of the
- * image at full size. */
 .image-lightbox-image-pending {
   opacity: 0;
 }
@@ -247,17 +225,14 @@
 }
 
 .image-lightbox-strip {
-  /* Above the image, which gets its own layer while it zooms. */
   position: relative;
   display: flex;
   overflow-x: auto;
-  /* `safe` keeps the first thumbnails reachable when the strip is wider than the window. */
   justify-content: safe center;
   gap: var(--openbot-space-2);
   padding: var(--openbot-space-3) var(--openbot-space-4) var(--openbot-space-4);
   scrollbar-width: none;
-  /* The slides, the step buttons, the arrow keys and the swipe go left to right in every language
-     (`ImageLightbox.tsx`), so the thumbnails keep that order too. */
+
   direction: ltr;
 }
 

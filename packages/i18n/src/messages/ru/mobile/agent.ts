@@ -242,6 +242,13 @@ export const messages = {
   "mobile.agent.webhook.rotateBody": "Текущий секрет перестанет работать. Хост будет отклонять запросы с ним.",
   "mobile.agent.webhook.rotateConfirm": "Создать",
   "mobile.agent.webhook.rotateFailed": "Не удалось создать новый секрет. Повторите попытку.",
+  "mobile.agent.webhook.giveToAgent": "Передать секрет подписи агенту {name}",
+  "mobile.agent.webhook.giveTitle": "Передать новый секрет подписи агенту {name}?",
+  "mobile.agent.webhook.giveBody":
+    "Текущий секрет перестанет работать. Агент {name} сохранит новый секрет как API-ключ и сможет добавить его у отправителя.",
+  "mobile.agent.webhook.giveConfirm": "Передать",
+  "mobile.agent.webhook.giveFailed": "Не удалось передать секрет подписи агенту. Повторите попытку.",
+  "mobile.agent.webhook.given": "У агента {name} теперь новый секрет подписи.",
   "mobile.agent.webhook.activity": "Активность",
   "mobile.agent.webhook.activityFailed": "Не удалось загрузить активность. Повторите попытку.",
   "mobile.agent.webhook.activity.ignored": "Пропущено",
@@ -440,10 +447,11 @@ export const messages = {
     "Этот сервер не может хранить ваш уровень уведомлений для агента. Обновите OpenBot на компьютере, где он работает.",
   "mobile.agent.newChat.title": "Новый чат",
   "mobile.agent.newChat.starting": "Начинается новый чат…",
-  "mobile.agent.newChat.footer": "Агент забудет этот чат. Настройки сохранятся.",
+  "mobile.agent.newChat.footer":
+    "Агент начнёт заново, но при необходимости найдёт сообщения этого чата. Настройки сохранятся.",
   "mobile.agent.newChat.confirmTitle": "Начать новый чат с {name}?",
   "mobile.agent.newChat.confirmBody":
-    "Агент забудет этот чат. Сообщения останутся видны над разделителем. Инструкции, модель, инструменты, память, рабочее пространство и браузер не изменятся.",
+    "Агент начнёт заново, но при необходимости найдёт сообщения этого чата. Сообщения останутся видны над разделителем. Инструкции, модель, инструменты, память, рабочее пространство и браузер не изменятся.",
   "mobile.agent.newChat.confirm": "Начать новый чат",
   "mobile.agent.newChat.failed": "Не удалось начать новый чат",
   "mobile.agent.newChat.failedBody": "Хосту не удалось начать новый чат.",

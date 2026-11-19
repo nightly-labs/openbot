@@ -1,10 +1,3 @@
-/**
- * One agent's routine canvas, as the host answers it, turned into the diagram the canvas draws.
- * Node ids are the host's node keys (`routine:<id>`, `agent:<id>`), so a moved node saves under the
- * id it has. A node the user never moved is placed by a simple layout: routines in the first
- * column, each agent one column further than the furthest step it runs in.
- */
-
 import {
   type RoutineFlowCanvas,
   type RoutineFlowStep,
@@ -28,14 +21,12 @@ import type {
 const COLUMN = 360;
 const ROUTINE_ROW = 300;
 const AGENT_ROW = 300;
-/** The edge from a routine to its own agent is the routine itself, not a link the user can remove. */
 const ROUTINE_START_PREFIX = "routine-start:";
 
 export function isRoutineStartEdge(edgeId: string): boolean {
   return edgeId.startsWith(ROUTINE_START_PREFIX);
 }
 
-/** The routine or agent id of a node id, or null when it is the other kind. */
 export function routineIdOfNode(nodeId: string | null): string | null {
   return nodeId?.startsWith("routine:") ? nodeId.slice("routine:".length) : null;
 }
@@ -50,7 +41,6 @@ function runStatus(status: RoutineRunStatus, steps: readonly RoutineFlowStep[]):
   if (status === "cancelled") return "cancelled";
   if (status !== "succeeded") return "failed";
   if (steps.some((step) => step.status === "failed")) return "failed";
-  // The routine's own agent answered, and the user stopped the flow after it.
   return steps.some((step) => step.status === "cancelled") ? "cancelled" : "succeeded";
 }
 
@@ -84,7 +74,6 @@ function step(entry: RoutineFlowStep): DiagramStepRun {
   };
 }
 
-/** The run of the routine's own agent while it has no step yet: queued, or working on it. */
 function ownerStepInProgress(run: RoutineRun): DiagramStepRun | null {
   if (run.status !== "queued" && run.status !== "running" && run.status !== "needs-attention") return null;
   return {
@@ -106,7 +95,6 @@ export function routineFlowDiagram(
   const saved = new Map(canvas.positions.map((position) => [position.nodeKey, { x: position.x, y: position.y }]));
   const positionOf = (key: string, fallback: DiagramPoint) => moved[key] ?? saved.get(key) ?? fallback;
 
-  // How far along each agent runs, over every routine: its column.
   const column = new Map<string, number>();
   for (const entry of canvas.routines) {
     const owner = entry.routine.agentId;
@@ -131,15 +119,12 @@ export function routineFlowDiagram(
       ...canvas.placedAgentIds,
     ]),
   ];
-  // Each agent's row: the row of its first routine, else the row of the first agent that hands work
-  // to it, else the next free one. An edge then runs along its row and not behind another card.
   const rowOf = new Map<string, number>();
   const taken = new Set<string>();
   const routineRow = (agentId: string) => {
     const index = canvas.routines.findIndex((entry) => entry.routine.agentId === agentId);
     return index >= 0 ? index : Number.POSITIVE_INFINITY;
   };
-  // Column by column, so the agents that hand work on have their rows; routine owners first.
   const byColumn = [...agentIds].sort(
     (a, b) => (column.get(a) ?? 1) - (column.get(b) ?? 1) || routineRow(a) - routineRow(b),
   );
@@ -157,8 +142,6 @@ export function routineFlowDiagram(
     rowOf.set(agentId, row);
   }
 
-  // What each agent does in each routine: the routine's own agent follows the routine, and every
-  // other agent the instruction of a link that reaches it in that routine.
   const routineTasks = new Map<string, Record<string, string>>();
   const setTask = (agentId: string, routineKey: string, text: string) => {
     const byRoutine = routineTasks.get(agentId) ?? {};

@@ -139,6 +139,8 @@ export const messages = {
   "provider.picker.olderModels": "Starsze modele",
   "provider.picker.olderModelsList": "Starsze modele {name}",
   "provider.picker.noModels": "Brak dostępnych modeli od: {name}.",
+  "provider.picker.endpointModelsInCustom": "{name} obsługuje Twoje własne endpointy. Ich modele są na karcie Własny.",
+  "provider.picker.showCustomModels": "Pokaż modele",
   "provider.picker.museNoModels":
     "Muse nie wysłał żadnych modeli dla tego konta. Muse może być niedostępny w kraju, w którym działa ten agent. Wybierz model innego dostawcy.",
   "provider.picker.customEmpty":
@@ -290,6 +292,8 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · pobrana przez OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Nieużywana: {version} · zainstalowana przez Ciebie",
   "provider.settings.otherVersionDownloaded": "Nieużywana: {version} · pobrana przez OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "Niektóre modele potrzebują części, której brakuje w tej wersji. Pobierz wersję OpenBot, aby ich używać.",
   "provider.settings.useInstalledVersion": "Użyj zainstalowanej",
   "provider.settings.useDownloadedVersion": "Użyj wersji OpenBot",
   "provider.settings.cache": "Pamięć podręczna",

@@ -2,11 +2,9 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/settings";
 
 export const messages = {
-  // The language setting itself.
   "settings.language.title": "Langue",
   "settings.language.description": "OpenBot affiche les menus, les boutons et les messages dans cette langue.",
   "settings.language.system": "Langue du système",
-  // The logo color setting, General tab.
   "settings.appearance.title": "Apparence",
   "settings.appearance.theme.title": "Thème",
   "settings.appearance.theme.description":
@@ -26,6 +24,13 @@ export const messages = {
   "settings.codeFont.title": "Police du code",
   "settings.codeFont.description": "La police du code, des terminaux et des chemins de fichier.",
   "settings.codeFont.default": "Par défaut",
+  "settings.motion.title": "Mouvement",
+  "settings.backgroundBlur.title": "Flou d’arrière-plan",
+  "settings.backgroundBlur.description":
+    "Flou derrière les menus et les dialogues. Désactivé au départ sur un ordinateur sans GPU.",
+  "settings.movingFaces.title": "Visages d’agents animés",
+  "settings.movingFaces.description":
+    "Les visages des agents clignent et bougent. Immobiles au départ sur un ordinateur sans GPU.",
   "settings.logoColor.title": "Couleur du logo",
   "settings.logoColor.description": "Affichée dans le Dock, la barre des tâches et l’îlot dynamique.",
   "settings.logoColor.buildNote":
@@ -84,7 +89,6 @@ export const messages = {
   "settings.bubbleStyle.solid": "Plein",
   "settings.bubbleStyle.tint": "Teinte",
   "settings.bubbleStyle.classic": "Classique",
-  // The Settings window, General tab.
   "settings.appBehavior.title": "Comportement de l’application",
   "settings.conversations.title": "Conversations",
   "settings.launchAtLogin.title": "Lancer OpenBot à l’ouverture de session",
@@ -110,7 +114,6 @@ export const messages = {
   "settings.externalLinks.title": "Ouvrir les liens externes dans",
   "settings.externalLinks.description":
     "Les liens des discussions, des pages de connexion et de facturation s’ouvrent ici.",
-  // The two link targets. The saved value stays in English; only the label is translated.
   "settings.externalLinks.defaultBrowser": "Navigateur par défaut",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "Navigateur par défaut ({name})",
@@ -314,7 +317,6 @@ export const messages = {
     "Activé : les métadonnées d’utilisation et de fiabilité sont envoyées aux services analytiques auto-hébergés d’OpenBot avec l’identifiant et l’e-mail de votre compte, ainsi que les sites web que vous et vos agents visitez, l’utilisation des outils et un résumé quotidien de votre configuration. Désactivé : seule l’utilisation de base, comme les tours et le nombre de tokens, est envoyée avec un identifiant d’installation aléatoire. Les conversations, fichiers et prompts ne sont jamais envoyés.",
   "settings.analytics.webDescription":
     "Activé : les métadonnées d’utilisation et de fiabilité sont envoyées aux services analytiques auto-hébergés d’OpenBot avec l’identifiant et l’e-mail de votre compte. Désactivé : les mêmes métadonnées sont envoyées avec un identifiant d’installation aléatoire uniquement. Les conversations, fichiers et prompts ne sont jamais envoyés. Ce réglage s’applique à ce navigateur.",
-  // The Settings window shell: its tab list, headers and save bar.
   "settings.tab.general.title": "Général",
   "settings.tab.general.description": "Choisir le fonctionnement des discussions et ce qu’OpenBot partage.",
   "settings.tab.agents.title": "Agents",
@@ -484,7 +486,6 @@ export const messages = {
   "settings.profile.share.copyFailed": "Impossible de copier l’image.",
   "settings.profile.share.createFailed": "Impossible de créer l’image.",
   "settings.profile.share.fileName": "openbot-activity.png",
-  // The text in the image to share.
   "settings.profile.share.caption": "Mes six derniers mois avec OpenBot",
   "settings.profile.activity.title": "Activité sur cet ordinateur",
   "settings.profile.activity.activeDays": {
@@ -494,7 +495,6 @@ export const messages = {
   "settings.profile.activity.empty": "Aucune activité pour l’instant",
   "settings.profile.activity.loading": "Chargement de l’activité…",
   "settings.profile.activity.loadFailed": "Impossible de charger votre activité.",
-  // {tokens} is a short number, such as 1.2M.
   "settings.profile.activity.heatmapLabel": {
     one: "{tokens} jetons en {count} jour actif sur un an",
     other: "{tokens} jetons en {count} jours actifs sur un an",
@@ -619,6 +619,7 @@ export const messages = {
   "settings.hostedServers.state.planEnded": "Forfait terminé",
   "settings.hostedServers.state.creating": "Création",
   "settings.hostedServers.state.starting": "Démarrage",
+  "settings.hostedServers.state.restoring": "Restauration des données",
   "settings.hostedServers.state.running": "En marche",
   "settings.hostedServers.state.stopping": "Arrêt en cours",
   "settings.hostedServers.state.stopped": "Arrêté",
@@ -629,6 +630,8 @@ export const messages = {
   "settings.hostedServers.paymentDescription": "La configuration commence quand Stripe confirme le paiement.",
   "settings.hostedServers.planEndedDescription":
     "Le forfait a pris fin, donc le serveur s’est arrêté. Ses données sont conservées. Renouvelez le forfait pour le démarrer.",
+  "settings.hostedServers.planEndedKeptUntil":
+    "Le forfait a pris fin, donc le serveur s’est arrêté. Ses données sont conservées jusqu’au {date}. Renouvelez le forfait avant cette date pour le démarrer.",
   "settings.hostedServers.pay": "Ouvrir la page de paiement",
   "settings.hostedServers.payLabel": "Ouvrir la page de paiement de {name}",
   "settings.hostedServers.renew": "Renouveler le forfait",
@@ -668,7 +671,6 @@ export const messages = {
   "settings.hostedServers.plan.standard.summary": "Pour une petite équipe avec des routines quotidiennes.",
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Pour de nombreux agents et un usage intensif du navigateur.",
-  // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "Dictée",
   "settings.voice.model.parakeet.description": "Rapide. Détecte seul la langue parlée, parmi 25 langues européennes.",
   "settings.voice.model.parakeetUnified.description":
@@ -737,6 +739,13 @@ export const messages = {
   "settings.voice.speech.sample": "Bonjour. Voici comment vos réponses sonneront.",
   "settings.voice.speech.listenFailed": "Impossible de lire l’extrait.",
   "settings.voice.live.section": "Voix en direct",
+  "settings.voice.talk.section": "Conversation vocale",
+  "settings.voice.talkKey.title": "Touche pour parler",
+  "settings.voice.talkKey.description": "Maintenez ces touches enfoncées pour parler dans une conversation vocale.",
+  "settings.voice.talkKey.change": "Changer la touche pour parler",
+  "settings.voice.talkKey.recording": "Appuyez sur les touches",
+  "settings.voice.talkKey.refused": "Ajoutez une autre touche",
+  "settings.voice.talkKey.reset": "Rétablir",
   "settings.voice.live.signIn": "Connectez-vous à Codex avec votre compte ChatGPT pour utiliser la voix en direct.",
   "settings.transfer.title": "Déplacer ce serveur vers un autre ordinateur",
   "settings.transfer.lede":
@@ -796,6 +805,13 @@ export const messages = {
   "settings.transfer.import.lede": "Choisissez le fichier exporté depuis l’autre serveur. Son nom se termine par .zip.",
   "settings.transfer.import.choose": "Choisir un fichier…",
   "settings.transfer.import.reading": "Lecture du fichier…",
+  "settings.transfer.upload.label": "Envoi vers le serveur",
+  "settings.transfer.upload.sending": "Envoi du fichier…",
+  "settings.transfer.upload.sent": "{sent} sur {total} envoyés",
+  "settings.transfer.upload.serverReading": "Le serveur lit le fichier…",
+  "settings.transfer.upload.etaSoon": "Moins d’une minute restante",
+  "settings.transfer.upload.etaMinutes": "Environ {minutes} min restantes",
+  "settings.transfer.upload.etaHours": "Environ {hours} h {minutes} min restantes",
   "settings.transfer.import.openFailed": "Impossible d’ouvrir le fichier",
   "settings.transfer.import.contains": "Ce fichier contient",
   "settings.transfer.import.source": "OpenBot {version} · exporté le {date}",
@@ -833,8 +849,12 @@ export const messages = {
   "settings.transfer.copy.noAgents": "Ce serveur n’a aucun agent.",
   "settings.transfer.copy.new": "Nouveau",
   "settings.transfer.copy.notCopied":
-    "Leurs canaux et le dossier partagé sont aussi copiés. Les clés d’API, les connexions, les connecteurs et l’historique des chats ne sont pas copiés. Configurez-les à nouveau sur l’autre serveur.",
+    "Leurs canaux, flux de routines, workflows et le dossier partagé sont aussi copiés. Les clés d’API, les connexions, les connecteurs et l’historique des chats ne sont pas copiés. Configurez-les à nouveau sur l’autre serveur.",
   "settings.transfer.copy.submit": { one: "Copier {count} agent", other: "Copier {count} agents" },
+  "settings.transfer.copy.duplicatesTitle": "Copier des agents en double ?",
+  "settings.transfer.copy.duplicatesDescription":
+    "{server} a déjà des agents avec ces noms : {names}. La copie ajoute un deuxième agent pour chacun. Chaque copie est un agent distinct, avec ses propres discussions, fichiers et souvenirs.",
+  "settings.transfer.copy.duplicatesConfirm": "Copier les doublons",
   "settings.transfer.copy.copying": "Copie…",
   "settings.transfer.copy.done": {
     one: "{count} agent copié vers {server}.",

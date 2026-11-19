@@ -1,10 +1,3 @@
-/**
- * The routine canvas before its first routine. A faint sample diagram builds itself behind the
- * pitch: the cards land, the connections draw, and one run passes through. Then it fades and starts
- * again. The backdrop is the real cards and edges, inert, so nothing in it can be clicked or focused,
- * and a reader hears only the pitch.
- */
-
 import type { AppTextKey } from "@openbot/i18n";
 import { Button } from "@openbot/ui";
 import { createMemo, createSignal, For, onSettled, Show } from "solid-js";
@@ -23,23 +16,17 @@ import {
 } from "./diagram-graph";
 import type { DiagramEdge, DiagramNode, DiagramRoutineRun, DiagramStepRun } from "./diagram-model";
 
-/** One step of the loop, in milliseconds. */
 const STEP_MS = 1200;
-/** Steps in one loop. The last `FADE` steps fade the backdrop out. */
 const LENGTH = 12;
 const FADE = 2;
-/** The routine fires on this step, after the last card has landed. */
 const FIRE = 4;
-/** Less motion keeps this step: the run is done and each card shows its answer. */
 const STILL = 9;
-/** The margin the backdrop keeps inside the canvas, and the room a card's answer adds below it. */
 const MARGIN = 48;
 const ANSWER_ROOM = 120;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const ROUTINE_ID = "sample:routine";
 
-/** The sample agents: the morning brief of the stories, with each agent's face, kicker, task and answer. */
 const SAMPLE_AGENTS = [
   {
     id: "research",
@@ -102,7 +89,6 @@ const SAMPLE_AGENTS = [
   seconds: number;
 }[];
 
-/** Each connection draws on the step its target lands on. */
 const SAMPLE_EDGES: (DiagramEdge & { draw: number })[] = [
   { id: "sample:1", from: ROUTINE_ID, to: "research", draw: 1 },
   { id: "sample:2", from: ROUTINE_ID, to: "sales", draw: 1 },
@@ -122,7 +108,6 @@ const RECENT_STATUSES: DiagramRoutineRun["status"][] = [
   "succeeded",
 ];
 
-/** The next weekday mornings at 7:00, as the sample routine's schedule says. */
 function weekdayMornings(from: Date, count: number): string[] {
   const day = new Date(from);
   day.setHours(7, 0, 0, 0);
@@ -136,7 +121,6 @@ function weekdayMornings(from: Date, count: number): string[] {
 }
 
 export interface DiagramBoardEmptyProps {
-  /** Opens the settings of a new routine. Without it, the pitch has no action. */
   onCreateRoutine?: (() => void) | undefined;
 }
 
@@ -192,7 +176,6 @@ export function DiagramBoardEmpty(props: DiagramBoardEmptyProps) {
   );
 }
 
-/** The faint diagram. It is decoration: inert, with no names for a reader. */
 function DiagramEmptyBackdrop(props: { step: number; loop: number }) {
   const { t } = useText();
   let frame: HTMLDivElement | undefined;
@@ -252,7 +235,6 @@ function DiagramEmptyBackdrop(props: { step: number; loop: number }) {
   });
 
   const fired = () => props.step >= FIRE;
-  /** An agent runs on `FIRE + depth` and is done one step later, as the board shows a real run. */
   const stepRun = (nodeId: string): DiagramStepRun | undefined => {
     const agentDepth = depth.get(nodeId);
     const agent = SAMPLE_AGENTS.find((entry) => entry.id === nodeId);
@@ -304,7 +286,6 @@ function DiagramEmptyBackdrop(props: { step: number; loop: number }) {
       aria-hidden="true"
     >
       <div class="diagram-empty-grid" />
-      {/* One world per loop, so each loop lands its cards and draws its connections again. */}
       <For each={[props.loop]}>
         {() => (
           <div
@@ -345,7 +326,6 @@ function DiagramEmptyBackdrop(props: { step: number; loop: number }) {
               </For>
             </svg>
 
-            {/* The run pulse: one dot that rides each connection while its next agent starts. */}
             <For each={SAMPLE_EDGES}>
               {(edge) => (
                 <Show when={edgeState(edge) === "running"}>

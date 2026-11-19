@@ -20,8 +20,6 @@ function snapshot(availableVersion?: string | number | null) {
       copilot: runtime,
       mistral: runtime,
     },
-    // The tool runtimes travel beside the provider CLIs and are decoded the same way. Main and
-    // preload are one build, so a snapshot without them is a main process this one cannot trust.
     toolRuntimes: { bun: runtime },
   };
 }

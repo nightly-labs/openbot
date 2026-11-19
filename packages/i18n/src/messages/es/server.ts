@@ -47,6 +47,7 @@ export const messages = {
   "server.compatibility.updateHostTitle": "Actualiza OpenBot en {name}",
   "server.compatibility.unsafeDataTitle": "El host devolvió datos no seguros",
   "server.compatibility.cannotConnectTitle": "No se puede conectar con {name}",
+  "server.compatibility.safeModeTitle": "{name} no se inicia",
   "server.compatibility.updateClientDescription":
     "Esta aplicación solo admite protocolos anteriores a los del host. Actualiza esta aplicación y vuelve a intentarlo.",
   "server.compatibility.updateHostDescription":
@@ -116,6 +117,7 @@ export const messages = {
   "server.local.create": "Crear servidor",
   "server.local.creating": "Creando servidor…",
   "server.local.createFailed": "No se pudo crear el servidor.",
+  "server.local.createFailedRetry": "Algo salió mal. Inténtalo de nuevo. Si vuelve a fallar, reinicia OpenBot.",
   "server.local.limitReached":
     "Puedes tener como máximo {limit} servidores en este equipo. Elimina uno para crear otro.",
   "server.local.deleteConfirmTitle": "¿Eliminar {name}?",
@@ -166,6 +168,7 @@ export const messages = {
   "server.hosted.detail.create.copy": "Copiando OpenBot a la máquina",
   "server.hosted.detail.create.key": "Añadiendo una clave de inicio de sesión de un solo uso",
   "server.hosted.detail.start.boot": "Encendiendo la máquina",
+  "server.hosted.detail.start.restore": "Restaurando datos",
   "server.hosted.detail.start.app": "Iniciando OpenBot",
   "server.hosted.detail.start.wait": "Esperando la respuesta de OpenBot",
   "server.hosted.detail.connect.signIn": "Iniciando sesión como tú",

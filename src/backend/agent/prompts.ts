@@ -8,6 +8,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   COMPUTER_USE_MCP_SERVER_NAME,
+  isReservedMcpServerName,
   MCP_ELICITATION_DECISION_QUESTION_ID,
   vaultExpiryText,
 } from "@openbot/contracts/ipc";
@@ -31,10 +32,8 @@ import { type DynamicToolResult, getArray, getRecord, getString, isRecord } from
 const MCP_ELICITATION_ALLOW_ONCE = "Allow once";
 const MCP_ELICITATION_ALLOW_ALWAYS = "Always allow";
 const MCP_ELICITATION_DECLINE = "Don't allow";
-// The word of the MCP sign-in card, which tells the agent to continue after the sign-in.
 const MCP_SIGN_IN_PAGE_DONE = sourceText("status.provider.confirmContinue");
 const MCP_SIGN_IN_PAGE_DECLINE = sourceText("status.agent.mcpSignInPageDecline");
-/** Field names a plugin uses for a credential. A match keeps the answer out of stored history. */
 const SECRET_FIELD_PATTERN = /api[_-]?key|secret|token|password|passphrase|credential/i;
 
 export type ElicitationFieldValue = string | number | boolean | string[];
@@ -44,16 +43,29 @@ export function secretElicitationField(id: string, property: DynamicRecord | und
   return SECRET_FIELD_PATTERN.test(`${id} ${getString(property, "title") ?? ""}`);
 }
 
+function elicitationOptionLabel(text: string): string {
+  return text.slice(0, INPUT_LIMITS.promptOptionLabel);
+}
+
+function isElicitationOptionAnswer(text: string, answer: string | undefined): boolean {
+  return text === answer || elicitationOptionLabel(text) === answer;
+}
+
 function elicitationOptions(property: DynamicRecord): Array<{ label: string; description: string }> | null {
   if (Array.isArray(property.oneOf)) {
     return property.oneOf.filter(isRecord).flatMap((option) => {
       const value = getString(option, "const");
       if (!value) return [];
-      return [{ label: getString(option, "title") ?? value, description: getString(option, "description") ?? "" }];
+      return [
+        {
+          label: elicitationOptionLabel(getString(option, "title") ?? value),
+          description: (getString(option, "description") ?? "").slice(0, INPUT_LIMITS.promptOptionDescription),
+        },
+      ];
     });
   }
   if (Array.isArray(property.enum)) {
-    return property.enum.filter(isString).map((value) => ({ label: value, description: "" }));
+    return property.enum.filter(isString).map((value) => ({ label: elicitationOptionLabel(value), description: "" }));
   }
   if (property.type === "boolean") {
     return [
@@ -69,12 +81,16 @@ export function elicitationValue(property: DynamicRecord | undefined, answers: s
   if (property.type === "array") return answers;
   if (property.type === "boolean") return /^(yes|true|1)$/i.test(answers[0] ?? "");
   if (Array.isArray(property.oneOf)) {
-    // The card submits the displayed label, which is the title when the schema names one: the
-    // response must carry the const the schema asked for instead.
     const selected = property.oneOf
       .filter(isRecord)
-      .find((option) => (getString(option, "title") ?? getString(option, "const")) === answers[0]);
+      .find((option) =>
+        isElicitationOptionAnswer(getString(option, "title") ?? getString(option, "const") ?? "", answers[0]),
+      );
     if (selected) return getString(selected, "const") ?? answers[0] ?? "";
+  }
+  if (Array.isArray(property.enum)) {
+    const selected = property.enum.filter(isString).find((value) => isElicitationOptionAnswer(value, answers[0]));
+    if (selected !== undefined) return selected;
   }
   if (property.type === "number" || property.type === "integer") {
     const parsed = Number(answers[0]);
@@ -91,7 +107,6 @@ export function commandText(params: unknown): string | null {
   return null;
 }
 
-/** The short line under a question, when the request has one. */
 function promptQuestionDetail(question: DynamicRecord): { detail?: string } {
   const detail = getString(question, "detail")?.trim();
   return detail ? { detail: detail.slice(0, INPUT_LIMITS.promptQuestion) } : {};
@@ -116,7 +131,6 @@ export function promptQuestions(params: unknown): AgentPromptQuestion[] {
     }));
 }
 
-/** A schema that asks for nothing is a consent hand-off: the plugin wants a yes or no. */
 function elicitationConsentQuestion(params: unknown, serverName: string | null): AgentPromptQuestion | null {
   const message = getString(params, "message")?.trim();
   if (!message) return null;
@@ -137,10 +151,6 @@ function elicitationConsentQuestion(params: unknown, serverName: string | null):
   };
 }
 
-/**
- * One question per requested field, so a plugin can collect an API key or any other value. When a
- * field has its own text, the request message goes under the first question, so it is not lost.
- */
 export function elicitationFieldQuestions(params: unknown, subject: string): AgentPromptQuestion[] {
   const properties = getRecord(getRecord(params, "requestedSchema"), "properties") ?? {};
   const message = getString(params, "message")?.trim() || undefined;
@@ -148,7 +158,14 @@ export function elicitationFieldQuestions(params: unknown, subject: string): Age
     if (!isRecord(property)) return [];
     const description = getString(property, "description");
     const question = description ?? message ?? `${subject} needs more information.`;
-    const detail = index === 0 && description && message && message !== description ? message : undefined;
+    const options = elicitationOptions(property);
+    const hidden = options?.slice(INPUT_LIMITS.promptOptions).map((option) => option.label) ?? [];
+    const detail = [
+      index === 0 && description && message && message !== description ? message : undefined,
+      hidden.length > 0 ? sourceText("status.agent.elicitationMoreOptions", { options: hidden.join(", ") }) : undefined,
+    ]
+      .filter(Boolean)
+      .join(" ");
     return [
       {
         id,
@@ -156,35 +173,23 @@ export function elicitationFieldQuestions(params: unknown, subject: string): Age
         question: question.slice(0, INPUT_LIMITS.promptQuestion),
         ...(detail ? { detail: detail.slice(0, INPUT_LIMITS.promptQuestion) } : {}),
         isSecret: secretElicitationField(id, property),
-        options: elicitationOptions(property),
+        options: options?.slice(0, INPUT_LIMITS.promptOptions) ?? null,
       },
     ];
   });
 }
 
-/**
- * The sign-in page of a URL request, or null when the card must not link to it. As Codex checks it:
- * https, with a host and with no user name or password. `url` is the Markdown link destination, and
- * `address` is what the card shows: the page without its query, as the MCP sign-in card shows a server.
- */
 function mcpSignInPage(params: unknown): { url: string; address: string } | null {
   const url = getString(params, "url");
   if (!url || !URL.canParse(url)) return null;
   const parsed = new URL(url);
   if (parsed.protocol !== "https:" || !parsed.hostname || parsed.username || parsed.password) return null;
   return {
-    // A parenthesis ends a Markdown link destination. A backtick, which a host and a query can hold,
-    // starts a code span, which Markdown reads before a link and which would change what the card shows.
     url: parsed.href.replaceAll("(", "%28").replaceAll(")", "%29").replaceAll("`", "%60"),
     address: `${parsed.origin}${parsed.pathname}`.replaceAll("`", "%60"),
   };
 }
 
-/**
- * A server's request to open its sign-in page, for example after its tool answered -32042 (#10152).
- * The card shows where the page is and links to it, with the words of the MCP sign-in card: Continue
- * accepts the request, and the provider runs the tool call again. Codex's own server for ChatGPT apps keeps its reconnect notice.
- */
 function mcpSignInPageQuestion(params: unknown, serverName: string | null): AgentPromptQuestion | null {
   const page = mcpSignInPage(params);
   const name = serverName?.trim();
@@ -204,8 +209,14 @@ function mcpSignInPageQuestion(params: unknown, serverName: string | null): Agen
   };
 }
 
+function elicitationServerName(params: unknown): string | null {
+  const name = getString(params, "serverName")?.trim() || null;
+  const shown = name?.startsWith("openbot_") ? name.slice("openbot_".length) : name;
+  return shown && name && !isReservedMcpServerName(name) && shown !== CODEX_APPS_MCP_SERVER_NAME ? shown : name;
+}
+
 export function mcpElicitationQuestions(params: unknown): AgentPromptQuestion[] | null {
-  const serverName = getString(params, "serverName");
+  const serverName = elicitationServerName(params);
   const mode = getString(params, "mode") ?? "form";
   const requestedSchema = getRecord(params, "requestedSchema");
   const properties = getRecord(requestedSchema, "properties");
@@ -222,16 +233,10 @@ export function mcpElicitationQuestions(params: unknown): AgentPromptQuestion[] 
   return validPromptQuestions(questions) ? questions : null;
 }
 
-/** Codex's own server for the apps connected on ChatGPT. Its name is not one that the user knows. */
 const CODEX_APPS_MCP_SERVER_NAME = "codex_apps";
 
-/**
- * The notice for a request that OpenBot declines. It names the server, and for a sign-in it says
- * where to sign in. Codex asks to reconnect a ChatGPT app with a link, and puts the app name in
- * `_meta._codex_apps.connector_auth_failure.connector_name`.
- */
 export function declinedMcpElicitationText(params: unknown): string {
-  const serverName = getString(params, "serverName")?.trim() || null;
+  const serverName = elicitationServerName(params);
   const signIn = getString(params, "mode") === "url";
   if (serverName === CODEX_APPS_MCP_SERVER_NAME) {
     const authFailure = getRecord(getRecord(getRecord(params, "_meta"), "_codex_apps"), "connector_auth_failure");
@@ -246,22 +251,12 @@ export function declinedMcpElicitationText(params: unknown): string {
   });
 }
 
-/**
- * Codex asks this before it runs an MCP tool, and says so in `_meta`. The marker tells the ask from a
- * plugin's own yes or no, which can carry the same words and the same `persist` list.
- */
 const CODEX_MCP_TOOL_CALL_APPROVAL_KIND = "mcp_tool_call";
 
-/** The card answer "Allow once", which `mcpElicitationResult` turns into one accepted consent. */
 export const MCP_TOOL_CONSENT_ALLOW_ONCE: Record<string, string[]> = {
   [MCP_ELICITATION_DECISION_QUESTION_ID]: [MCP_ELICITATION_ALLOW_ONCE],
 };
 
-/**
- * Whether the request is Codex's consent to run one MCP tool: a form with no field and the marker. A
- * tool that the user set to ask every time offers no `persist`, but it is the same consent, so Full
- * access answers it too.
- */
 export function mcpToolCallConsent(params: unknown): boolean {
   const mode = getString(params, "mode") ?? "form";
   const meta = getRecord(params, "_meta");
@@ -301,7 +296,6 @@ export function mcpElicitationResult(
   return { action: "cancel", content: null, _meta: null };
 }
 
-/** A skipped required field declines the request: a partial form is not an answer. */
 function elicitationFieldResult(
   params: unknown,
   properties: DynamicRecord,
@@ -319,10 +313,6 @@ function elicitationFieldResult(
   return { action: "accept", content, _meta: null };
 }
 
-/**
- * Why the questions make no card, or null when they make one. The text names the question and the
- * limit, so the agent can correct its call: the advertised schema has no limits (#6268).
- */
 export function promptQuestionsProblem(questions: AgentPromptQuestion[]): string | null {
   if (questions.length === 0) return "questions must be a non-empty array of question objects, not text.";
   if (questions.length > INPUT_LIMITS.promptQuestions)
@@ -395,10 +385,6 @@ export function dynamicPromptResult(answers: Record<string, string[]>): DynamicT
   };
 }
 
-/**
- * The answer for a question that the provider cannot wait for: its call would time out (#6230). The
- * card stays open, and the user's answer reaches the agent as a new message. Only the model reads it.
- */
 export function detachedPromptResult(): DynamicToolResult {
   const value = {
     status: "waiting",
@@ -407,10 +393,6 @@ export function detachedPromptResult(): DynamicToolResult {
   return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
 }
 
-/**
- * The message that carries the answer to a detached question: each answered question as a quote, with
- * its answer below. It holds no words of its own, so it reads the same in each language.
- */
 export function lateAnswerText(questions: AgentPromptQuestion[], answers: Record<string, string[]>): string {
   return questions
     .flatMap((question) => {
@@ -421,10 +403,6 @@ export function lateAnswerText(questions: AgentPromptQuestion[], answers: Record
     .join("\n\n");
 }
 
-/**
- * The message for a detached `request_vault_item` card: its title as a quote, and the name of the saved
- * item below. No form value goes in it. Empty for a skip (null), which sends nothing, as a question does.
- */
 export function vaultLateAnswerText(title: string, savedName: string | null): string {
   if (savedName === null) return "";
   return [title ? quoted(title) : "", savedName].filter(Boolean).join("\n\n");
@@ -437,7 +415,6 @@ function quoted(text: string): string {
     .join("\n");
 }
 
-/** The answer for a question that expired before the user answered it. Only the model reads it. */
 export function expiredPromptResult(
   responseKind: "dynamic-tool" | "mcp-elicitation" | "user-input" | "ui-block",
 ): DynamicToolResult | { answers: Record<string, never> } | { action: "cancel"; content: null; _meta: null } {
@@ -452,17 +429,11 @@ export function expiredPromptResult(
 const USER_MESSAGE_NOTE =
   "The user wrote a new message in this chat instead of answering. Follow that message. If it is not in your input, end your turn: it starts next. Ask again only if you still need the answer.";
 
-/**
- * The answer for a question or block that the user did not answer because they wrote a new message
- * in the chat. Only the model reads it. The message reaches the agent as a steer or as the next turn.
- * `userInputNote`: the client gives the `note` of a `user-input` result to the model (`AgentClient`).
- */
 export function userMessagePromptResult(
   responseKind: "dynamic-tool" | "user-input" | "ui-block",
   blockId: string | undefined,
   userInputNote = false,
 ): DynamicToolResult | { answers: Record<string, never>; note?: string } {
-  // Codex's `request_user_input` has no field for a note: empty answers are what a skip gives.
   if (responseKind === "user-input") return userInputNote ? { answers: {}, note: USER_MESSAGE_NOTE } : { answers: {} };
   const value = {
     status: "skipped",
@@ -472,16 +443,10 @@ export function userMessagePromptResult(
   return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
 }
 
-/** What a blocking UI block (`ask_ui`) ended with. */
 export type UiBlockPromptOutcome =
   | { status: "answered"; blockId: string; response: UiBlockResponse; preview?: string | undefined }
   | { status: "skipped" | "expired"; blockId: string };
 
-/**
- * The `ask_ui` result. Only the model reads it: the ids it gave, the values, and the user's words when
- * the user answered in text, or the preview that the user edited. An expired block is a failed call, as
- * an expired question is.
- */
 export function uiBlockPromptResult(outcome: UiBlockPromptOutcome): DynamicToolResult {
   const value =
     outcome.status === "answered"
@@ -508,21 +473,12 @@ export function uiBlockPromptResult(outcome: UiBlockPromptOutcome): DynamicToolR
   return { success: outcome.status !== "expired", contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
 }
 
-/** The id of the one secret field in the form of `request_api_key`. */
 export const API_KEY_FIELD_ID = "key";
 
-/** The id of the field of the `request_api_key` form that selects who can use the key. */
 export const API_KEY_SCOPE_FIELD_ID = UI_API_KEY_SCOPE_FIELD_ID;
 
-/** The option of the scope field that keeps the key for the asking agent only. */
 export const API_KEY_SCOPE_AGENT = sourceText("status.agent.apiKeyScope.agent");
 
-/**
- * The form of `request_api_key`: one required secret field. Its label is the variable name, because
- * the user finds the key by that name at the service. With `vault`, a second field saves the key in the
- * Vault for every agent, which is the first option, or for the asking agent only. Null when the contract
- * refuses it.
- */
 export function apiKeyFormSpec(input: {
   name: string;
   title: string;
@@ -560,10 +516,6 @@ export function apiKeyFormSpec(input: {
   });
 }
 
-/**
- * The `request_api_key` result: the file of the saved key, or a skip. It never holds a form value, so
- * the key stays out of the provider transcript.
- */
 export function apiKeyPromptResult(blockId: string, saved: SavedApiKey | null): DynamicToolResult {
   const value = saved
     ? {
@@ -579,7 +531,6 @@ export function apiKeyPromptResult(blockId: string, saved: SavedApiKey | null): 
 
 type VaultRequestArguments = BrowserToolArguments<"request_vault_item">;
 
-/** The arguments that an agent may fill in, for each kind. A secret field is never one of them. */
 const VAULT_REQUEST_PREFILL: Record<VaultRequestArguments["kind"], readonly string[]> = {
   login: ["website", "username"],
   card: ["label", "nameOnCard", "expMonth", "expYear"],
@@ -608,7 +559,6 @@ const VAULT_REQUEST_LABEL = {
   email: sourceText("status.agent.vaultField.email"),
 } as const satisfies Record<UiVaultRequestField, string>;
 
-/** Two-digit month and year, as the Vault dialog shows an expiry. */
 function vaultRequestValue(args: VaultRequestArguments, field: UiVaultRequestField): string | undefined {
   if (field === "expiry")
     return args.expMonth !== undefined && args.expYear !== undefined
@@ -619,10 +569,6 @@ function vaultRequestValue(args: VaultRequestArguments, field: UiVaultRequestFie
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
-/**
- * The form of `request_vault_item`: the fields of the Vault dialog for the kind, with the values the
- * agent gave. A secret field has no value. A string tells the agent what is wrong with the arguments.
- */
 export function vaultRequestFormSpec(args: VaultRequestArguments): UiBlockSpec | string {
   const allowed = VAULT_REQUEST_PREFILL[args.kind];
   const misplaced = Object.entries(args).find(
@@ -648,7 +594,6 @@ export function vaultRequestFormSpec(args: VaultRequestArguments): UiBlockSpec |
   );
 }
 
-/** The `request_vault_item` result: what the user saved, or a skip. It never holds a form value. */
 export function vaultPromptResult(
   blockId: string,
   saved: { id: string; kind: string; name: string } | null,
@@ -659,23 +604,12 @@ export function vaultPromptResult(
   return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
 }
 
-/** Done on a phone or in a web browser: the card there cannot send a sign-in from the user's own device. */
 const TAKEOVER_SIGN_IN_MISSING_NEXT =
   "No sign-in came from the user's own device. Take a fresh snapshot. If the page still asks for a sign-in, tell the user in one short sentence that this site accepts only a sign-in from the OpenBot desktop app on their computer, then call request_takeover with reason sign-in-blocked once more so that they can answer the card there. If this result comes again, do not ask again: tell the user and end your turn.";
 
-/**
- * The person selected Cancel on the card. A turn end or a closed tab also cancels, so only this result
- * tells the agent that the user said no; without it the agent asked again (#10452).
- */
 const TAKEOVER_USER_CANCELLED_NEXT =
   "The user selected Cancel. Do not call submit_secret or request_takeover again for this step, and do not try to get the same result another way. Say in your reply that the user cancelled it, and wait for the user before you try again.";
 
-/**
- * `vault` says what happened to a password that the user asked to keep in the Vault. `signInMissing`:
- * the person selected Done on a sign-in-blocked takeover, but no sign-in came from their device.
- * `userCancelled`: the person selected Cancel, not a turn end or a closed tab. `secureInputFailed`: OpenBot
- * could not finish the secure fill, so the user got the page; the fixed reason, or "" when it is unknown.
- */
 export function browserTakeoverResult(
   decision: RespondToBrowserTakeoverInput["decision"],
   vault?: string,
@@ -710,11 +644,6 @@ export function browserTakeoverResult(
   };
 }
 
-/**
- * The answer for a takeover call that the provider cannot wait for: it stops each tool call after a
- * fixed time (#9689). The card stays open, and the next call for the same tab waits on it again. Only
- * the model reads it.
- */
 export function browserTakeoverWaitingResult(tool: string, tabId: string): DynamicToolResult {
   const value = {
     status: "waiting",
@@ -723,7 +652,6 @@ export function browserTakeoverWaitingResult(tool: string, tabId: string): Dynam
   return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
 }
 
-/** The answer for a browser tool call that waited while the user controlled its tab. Only the model reads it. */
 export function browserUserControlResult(): DynamicToolResult {
   return {
     success: true,

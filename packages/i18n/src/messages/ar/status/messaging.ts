@@ -3,7 +3,7 @@ import type { messages as source } from "../../en/status/messaging";
 
 export const messages = {
   "status.messaging.working": "جارٍ العمل على ذلك…",
-  "status.messaging.queued": "في الانتظار: يعمل OpenBot على طلب آخر. ستصل الإجابة هنا.",
+  "status.messaging.queued": "في الانتظار حتى ينتهي طلب سابق. ستصل الإجابة هنا.",
   "status.messaging.busy": "هناك طلبات كثيرة جدًا في الانتظار. أعد المحاولة لاحقًا.",
   "status.messaging.failed": "تعذّر على OpenBot إنهاء هذا الطلب. التفاصيل لدى مضيف OpenBot.",
   "status.messaging.noAnswer": "انتهى OpenBot دون إجابة مكتوبة.",
@@ -12,6 +12,7 @@ export const messages = {
   "status.messaging.stopped": "تم الإيقاف.",
   "status.messaging.stop": "إيقاف",
   "status.messaging.approvalTitle": "يطلب OpenBot الموافقة للمتابعة.",
+  "status.messaging.approvalTitleTeammate": "يطلب الزميل {agent} الموافقة للمتابعة.",
   "status.messaging.approvalCommand": "تشغيل أمر",
   "status.messaging.approvalFileChange": "تغيير الملفات",
   "status.messaging.approvalPermissions": "الحصول على أذونات إضافية",

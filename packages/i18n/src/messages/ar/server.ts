@@ -47,6 +47,7 @@ export const messages = {
   "server.compatibility.updateHostTitle": "حدّث OpenBot على {name}",
   "server.compatibility.unsafeDataTitle": "أعاد المضيف بيانات غير آمنة",
   "server.compatibility.cannotConnectTitle": "تعذّر الاتصال بـ {name}",
+  "server.compatibility.safeModeTitle": "{name} لا يبدأ",
   "server.compatibility.updateClientDescription":
     "يدعم هذا التطبيق بروتوكولات أقدم فقط من المضيف. حدّث هذا التطبيق، ثم أعد المحاولة.",
   "server.compatibility.updateHostDescription":
@@ -118,6 +119,7 @@ export const messages = {
   "server.local.create": "إنشاء خادم",
   "server.local.creating": "جارٍ إنشاء الخادم…",
   "server.local.createFailed": "تعذّر إنشاء الخادم.",
+  "server.local.createFailedRetry": "حدث خطأ ما. حاول مرة أخرى. إذا فشل ذلك مرة أخرى، فأعد تشغيل OpenBot.",
   "server.local.limitReached": "يمكن أن يكون لديك {limit} خادم كحد أقصى على هذا الحاسوب. احذف واحدًا لإنشاء آخر.",
   "server.local.deleteConfirmTitle": "هل تريد حذف {name}؟",
   "server.local.deleteConfirmDescription": "يوقف OpenBot الخادم وينقل وكلاءه ودردشاته وملفاته إلى سلة المهملات.",
@@ -196,6 +198,7 @@ export const messages = {
   "server.hosted.detail.create.copy": "جارٍ نسخ OpenBot إلى الجهاز",
   "server.hosted.detail.create.key": "جارٍ إضافة مفتاح تسجيل دخول لمرة واحدة",
   "server.hosted.detail.start.boot": "جارٍ تشغيل الجهاز",
+  "server.hosted.detail.start.restore": "جارٍ استعادة البيانات",
   "server.hosted.detail.start.app": "جارٍ بدء OpenBot",
   "server.hosted.detail.start.wait": "بانتظار استجابة OpenBot",
   "server.hosted.detail.connect.signIn": "جارٍ تسجيل الدخول باسمك",

@@ -112,8 +112,10 @@ export const messages = {
   "mobile.server.hosted.soldOut": "売り切れ",
   "mobile.server.hosted.serverPlan": "{plan} · {interval}",
   "mobile.server.hosted.serverPlanEnds": "{plan} · {interval} · {date} に終了",
+  "mobile.server.hosted.serverDataKept": "{plan} · データは{date}まで保持",
   "mobile.server.hosted.state.payment": "支払い待ち",
   "mobile.server.hosted.state.setup": "セットアップ中",
+  "mobile.server.hosted.state.restoring": "データを復元中",
   "mobile.server.hosted.state.starting": "起動中",
   "mobile.server.hosted.state.running": "稼働中",
   "mobile.server.hosted.state.stopped": "停止中",
@@ -705,6 +707,8 @@ export const messages = {
   "mobile.server.connectors.protonPass.keyHelp":
     "Proton Pass で、OpenBot と共有する保管庫だけを読み取れるアクセスキーを作成し、ここに貼り付けてください。キーは {host} が保持し、この電話には保存されません。",
   "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.protonPass.plan":
+    "ご利用の Proton プランには Proton Pass のコマンドラインツールが含まれていません。Pass Plus を含む Proton プランが必要です。Mail Plus などのほかの有料プランには含まれません。アカウントのプランを変更してから、もう一度接続してください。",
   "mobile.server.connectors.passwordManager.unavailable": "{name} はこのサーバーでは利用できません。",
   "mobile.server.connectors.passwordManager.howItWorks":
     "この電話で {name} にサインインしてください。その後 {host} が共有保管庫とその読み取り専用アクセスキーを作成し、そのキーだけを保持します。エージェントがパスワードを見ることはありません。",
@@ -734,8 +738,6 @@ export const messages = {
   "mobile.server.connectors.passwordManager.keyReadOnly": "読み取り専用",
   "mobile.server.connectors.passwordManager.keyExpires": "読み取り専用。{date} に期限切れになります。",
   "mobile.server.connectors.passwordManager.keyExpired": "{date} に期限切れ",
-  "mobile.server.connectors.passwordManager.plan":
-    "{name} のコマンドラインツールには有料プランが必要です。アカウントのプランを変更してから、もう一度接続してください。",
   "mobile.server.connectors.passwordManager.expiredTitle": "{name} のキーの期限が切れました",
   "mobile.server.connectors.passwordManager.expiredBody":
     "再接続するまで、{host} のエージェントは共有ログインでサインインできません。",
@@ -884,7 +886,7 @@ export const messages = {
     "あなたの「自分にメッセージ」チャットと、許可した人だけが書き込めます。それ以外の人には返信しません。オフにすると、OpenBot は知らない人にコードを返信します。",
   "mobile.server.connectors.whatsapp.workingMessage": "「対応しています…」メッセージ",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "エージェントの作業中に OpenBot が送信し、その後、回答に置き換えます。回答だけを送信するにはオフにしてください。",
+    "エージェントの作業中に OpenBot が送信し、その後、回答に置き換えます。前のリクエストを待っているリクエストには、待機中のメッセージも送信します。回答だけを送信するにはオフにしてください。",
   "mobile.server.connectors.whatsapp.statusReactions": "ステータスのリアクション",
   "mobile.server.connectors.whatsapp.statusReactionsDescription":
     "メッセージが届くと OpenBot が 👀 で、回答の準備ができると ✅ でリアクションします。リアクションを送信しないにはオフにしてください。",
@@ -958,7 +960,8 @@ export const messages = {
     "省略できます。空の場合、一覧には電話番号が表示されます。",
   "mobile.server.connectors.whatsapp.add": "追加",
   "mobile.server.connectors.whatsapp.groupTitle": "グループを追加",
-  "mobile.server.connectors.whatsapp.groupDescription": "このグループのメンバーは、エージェントに作業を依頼できます。",
+  "mobile.server.connectors.whatsapp.groupDescription":
+    "このグループのメンバーは、この番号をメンションするか、そのメッセージに返信すると、エージェントに作業を依頼できます。",
   "mobile.server.connectors.whatsapp.groupSearch": "グループを検索",
   "mobile.server.connectors.whatsapp.groupsLoading": "グループを読み込んでいます…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot はグループを読み込めませんでした",
@@ -1457,7 +1460,6 @@ export const messages = {
   "mobile.server.audit.roleMemberAdded": "{member} を {role} に追加しました",
   "mobile.server.audit.roleMemberRemoved": "{member} を {role} から削除しました",
   "mobile.server.audit.agentLevel": "{role} の {agent}：{change}",
-  // Server settings › Import agents: Grok Bot and Hermes exports (`agent-import-v1`).
   "mobile.server.settings.importAgents": "エージェントをインポート",
   "mobile.server.route.import": "エージェントをインポート",
   "mobile.server.import.unsupported":
@@ -1535,7 +1537,6 @@ export const messages = {
   "mobile.server.import.channel": "チャンネル",
   "mobile.server.import.notImportedTitle": "インポートされなかった項目",
   "mobile.server.import.resultWarnings": "移行されなかった項目があります",
-  // Server settings › Transfer: the whole server to or from a transfer file (`instance-transfer-v1`).
   "mobile.server.settings.transfer": "移行",
   "mobile.server.route.transfer": "移行",
   "mobile.server.route.transferExport": "エクスポート",
@@ -1610,8 +1611,12 @@ export const messages = {
   "mobile.server.transfer.copyTo": "コピー先",
   "mobile.server.transfer.copyNoAgents": "このサーバーにはエージェントがありません。",
   "mobile.server.transfer.copyNotMoved":
-    "エージェントのチャンネルと共有フォルダーもコピーされます。API キー、サインイン、コネクタ、チャット履歴はコピーされません。別のサーバーで設定し直してください。",
+    "エージェントのチャンネル、ルーティンフロー、ワークフロー、共有フォルダーもコピーされます。API キー、サインイン、コネクタ、チャット履歴はコピーされません。別のサーバーで設定し直してください。",
   "mobile.server.transfer.copySubmit": { other: "エージェント {count} 件をコピー" },
+  "mobile.server.transfer.copyDuplicatesTitle": "重複するエージェントをコピーしますか？",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "{server} には次の名前のエージェントがすでにあります: {names}。コピーすると、それぞれ 2 つ目のエージェントが追加されます。各コピーは別のエージェントで、チャット、ファイル、メモリーはそれぞれ独立しています。",
+  "mobile.server.transfer.copyDuplicatesConfirm": "重複をコピー",
   "mobile.server.transfer.copying": "コピー中…",
   "mobile.server.transfer.copyFailed": "コピーが完了しませんでした。",
   "mobile.server.transfer.copied": { other: "エージェント {count} 件を {server} にコピーしました。" },

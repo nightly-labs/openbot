@@ -115,8 +115,10 @@ export const messages = {
   "mobile.server.hosted.soldOut": "Tükendi",
   "mobile.server.hosted.serverPlan": "{plan} · {interval}",
   "mobile.server.hosted.serverPlanEnds": "{plan} · {interval} · {date} tarihinde sona erer",
+  "mobile.server.hosted.serverDataKept": "{plan} · Veriler {date} tarihine kadar kalır",
   "mobile.server.hosted.state.payment": "Ödeme bekleniyor",
   "mobile.server.hosted.state.setup": "Kuruluyor",
+  "mobile.server.hosted.state.restoring": "Geri yükleniyor",
   "mobile.server.hosted.state.starting": "Başlatılıyor",
   "mobile.server.hosted.state.running": "Çalışıyor",
   "mobile.server.hosted.state.stopped": "Durduruldu",
@@ -715,6 +717,8 @@ export const messages = {
   "mobile.server.connectors.protonPass.keyHelp":
     "Proton Pass'te yalnızca OpenBot ile paylaştığınız kasayı okuyabilen bir erişim anahtarı oluşturun ve buraya yapıştırın. Anahtarı {host} saklar; bu telefon saklamaz.",
   "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.protonPass.plan":
+    "Proton planınız Proton Pass komut satırı aracını içermiyor. Pass Plus içeren bir Proton planı gerekir. Mail Plus gibi diğer ücretli planlar bunu içermez. Hesabınızın planını değiştirin, ardından yeniden bağlanın.",
   "mobile.server.connectors.passwordManager.unavailable": "{name} bu sunucuda kullanılamıyor.",
   "mobile.server.connectors.passwordManager.howItWorks":
     "Bu telefonda {name} hesabınıza giriş yapın. Ardından {host} paylaşılan bir kasa ve onun için salt okunur bir erişim anahtarı oluşturur ve yalnızca bu anahtarı saklar. Ajanlar hiçbir zaman parola görmez.",
@@ -743,8 +747,6 @@ export const messages = {
   "mobile.server.connectors.passwordManager.keyReadOnly": "Salt okunur",
   "mobile.server.connectors.passwordManager.keyExpires": "Salt okunur. Süresi {date} tarihinde dolar.",
   "mobile.server.connectors.passwordManager.keyExpired": "Süresi {date} tarihinde doldu",
-  "mobile.server.connectors.passwordManager.plan":
-    "{name} komut satırı aracı ücretli bir plan gerektirir. Hesabınızın planını değiştirin, ardından yeniden bağlanın.",
   "mobile.server.connectors.passwordManager.expiredTitle": "{name} anahtarının süresi doldu",
   "mobile.server.connectors.passwordManager.expiredBody":
     "Yeniden bağlanana kadar {host} üzerindeki ajanlar paylaşılan girişlerinizle oturum açamaz.",
@@ -913,7 +915,7 @@ export const messages = {
     "Yalnızca “Kendine mesaj gönder” sohbetiniz ve izin verdiğiniz kişiler yazabilir. Diğer kişiler yanıt almaz. Kapalıyken OpenBot tanımadığınız kişilere bir kodla yanıt verir.",
   "mobile.server.connectors.whatsapp.workingMessage": "“Üzerinde çalışılıyor…” mesajı",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "OpenBot bunu ajan çalışırken gönderir, sonra yanıtla değiştirir. Yalnızca yanıtı göndermek için kapatın.",
+    "OpenBot bunu ajan çalışırken gönderir, sonra yanıtla değiştirir. Önceki bir isteği bekleyen istek de bir bekleme mesajı alır. Yalnızca yanıtı göndermek için kapatın.",
   "mobile.server.connectors.whatsapp.statusReactions": "Durum tepkileri",
   "mobile.server.connectors.whatsapp.statusReactionsDescription":
     "OpenBot bir mesaj geldiğinde 👀, yanıt hazır olduğunda ✅ tepkisi verir. Hiç tepki göndermemek için kapatın.",
@@ -984,7 +986,8 @@ export const messages = {
     "İsteğe bağlı. Boş bırakılırsa listede telefon numarası gösterilir.",
   "mobile.server.connectors.whatsapp.add": "Ekle",
   "mobile.server.connectors.whatsapp.groupTitle": "Bir grup ekleyin",
-  "mobile.server.connectors.whatsapp.groupDescription": "Bu gruptaki kişiler ajanlarınıza iş verebilir.",
+  "mobile.server.connectors.whatsapp.groupDescription":
+    "Bu gruptaki kişiler numarayı etiketlediğinde veya mesajlarını yanıtladığında ajanlarınıza iş verebilir.",
   "mobile.server.connectors.whatsapp.groupSearch": "Grup ara",
   "mobile.server.connectors.whatsapp.groupsLoading": "Gruplar okunuyor…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot grupları okuyamadı",
@@ -1479,7 +1482,6 @@ export const messages = {
   "mobile.server.audit.roleMemberAdded": "{member}, {role} rolüne eklendi",
   "mobile.server.audit.roleMemberRemoved": "{member}, {role} rolünden çıkarıldı",
   "mobile.server.audit.agentLevel": "{role} için {agent}: {change}",
-  // Server settings › Import agents: Grok Bot and Hermes exports (`agent-import-v1`).
   "mobile.server.settings.importAgents": "Ajanları içe aktar",
   "mobile.server.route.import": "Ajanları içe aktar",
   "mobile.server.import.unsupported": "Ajanları buradan içe aktarmak için bu sunucudaki OpenBot'u güncelleyin.",
@@ -1552,7 +1554,6 @@ export const messages = {
   "mobile.server.import.channel": "Kanal",
   "mobile.server.import.notImportedTitle": "İçe aktarılmadı",
   "mobile.server.import.resultWarnings": "Bazı öğeler taşınmadı",
-  // Server settings › Transfer: the whole server to or from a transfer file (`instance-transfer-v1`).
   "mobile.server.settings.transfer": "Aktarım",
   "mobile.server.route.transfer": "Aktarım",
   "mobile.server.route.transferExport": "Dışa aktar",
@@ -1626,8 +1627,12 @@ export const messages = {
   "mobile.server.transfer.copyTo": "Hedef",
   "mobile.server.transfer.copyNoAgents": "Bu sunucuda ajan yok.",
   "mobile.server.transfer.copyNotMoved":
-    "Kanalları ve paylaşılan klasör de kopyalanır. API anahtarları, oturum açma bilgileri, bağlayıcılar ve sohbet geçmişi kopyalanmaz. Bunları diğer sunucuda yeniden kurun.",
+    "Kanalları, rutin akışları, iş akışları ve paylaşılan klasör de kopyalanır. API anahtarları, oturum açma bilgileri, bağlayıcılar ve sohbet geçmişi kopyalanmaz. Bunları diğer sunucuda yeniden kurun.",
   "mobile.server.transfer.copySubmit": { one: "{count} ajanı kopyala", other: "{count} ajanı kopyala" },
+  "mobile.server.transfer.copyDuplicatesTitle": "Yinelenen ajanlar kopyalansın mı?",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "{server} üzerinde bu adlara sahip ajanlar zaten var: {names}. Kopyalama her biri için ikinci bir ajan ekler. Her kopya, kendi sohbetleri, dosyaları ve bellekleri olan ayrı bir ajandır.",
+  "mobile.server.transfer.copyDuplicatesConfirm": "Yinelenenleri kopyala",
   "mobile.server.transfer.copying": "Kopyalanıyor…",
   "mobile.server.transfer.copyFailed": "Kopyalama tamamlanmadı.",
   "mobile.server.transfer.copied": {

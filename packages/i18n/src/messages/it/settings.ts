@@ -23,6 +23,13 @@ export const messages = {
   "settings.codeFont.title": "Carattere del codice",
   "settings.codeFont.description": "Il carattere di codice, terminali e percorsi dei file.",
   "settings.codeFont.default": "Predefinito",
+  "settings.motion.title": "Movimento",
+  "settings.backgroundBlur.title": "Sfocatura dello sfondo",
+  "settings.backgroundBlur.description":
+    "Sfocatura dietro menu e finestre di dialogo. All’inizio è spenta su un computer senza GPU.",
+  "settings.movingFaces.title": "Volti degli agenti animati",
+  "settings.movingFaces.description":
+    "I volti degli agenti sbattono le palpebre e si muovono. All’inizio sono fermi su un computer senza GPU.",
   "settings.logoColor.title": "Colore del logo",
   "settings.logoColor.description": "Mostrato nel Dock, nella barra delle applicazioni e nella Dynamic Island.",
   "settings.logoColor.buildNote":
@@ -469,7 +476,6 @@ export const messages = {
   "settings.profile.share.copyFailed": "Impossibile copiare l'immagine.",
   "settings.profile.share.createFailed": "Impossibile creare l'immagine.",
   "settings.profile.share.fileName": "openbot-activity.png",
-  // The text in the image to share.
   "settings.profile.share.caption": "I miei ultimi sei mesi con OpenBot",
   "settings.profile.activity.title": "Attività su questo computer",
   "settings.profile.activity.activeDays": {
@@ -479,7 +485,6 @@ export const messages = {
   "settings.profile.activity.empty": "Ancora nessuna attività",
   "settings.profile.activity.loading": "Caricamento attività…",
   "settings.profile.activity.loadFailed": "Impossibile caricare la tua attività.",
-  // {tokens} is a short number, such as 1.2M.
   "settings.profile.activity.heatmapLabel": {
     one: "{tokens} token in {count} giorno attivo nell'ultimo anno",
     other: "{tokens} token in {count} giorni attivi nell'ultimo anno",
@@ -603,6 +608,7 @@ export const messages = {
   "settings.hostedServers.state.planEnded": "Piano terminato",
   "settings.hostedServers.state.creating": "Creazione",
   "settings.hostedServers.state.starting": "Avvio",
+  "settings.hostedServers.state.restoring": "Ripristino dei dati",
   "settings.hostedServers.state.running": "In esecuzione",
   "settings.hostedServers.state.stopping": "Arresto",
   "settings.hostedServers.state.stopped": "Fermo",
@@ -613,6 +619,8 @@ export const messages = {
   "settings.hostedServers.paymentDescription": "La configurazione parte quando Stripe conferma il pagamento.",
   "settings.hostedServers.planEndedDescription":
     "Il piano è terminato, quindi il server si è fermato. I suoi dati restano. Rinnova il piano per avviarlo.",
+  "settings.hostedServers.planEndedKeptUntil":
+    "Il piano è terminato, quindi il server si è fermato. I suoi dati restano fino al {date}. Rinnova il piano prima di allora per avviarlo.",
   "settings.hostedServers.pay": "Apri la pagina di pagamento",
   "settings.hostedServers.payLabel": "Apri la pagina di pagamento per {name}",
   "settings.hostedServers.renew": "Rinnova il piano",
@@ -719,6 +727,13 @@ export const messages = {
   "settings.voice.speech.sample": "Ciao. Ecco come suoneranno le tue risposte.",
   "settings.voice.speech.listenFailed": "Impossibile riprodurre l’esempio.",
   "settings.voice.live.section": "Voce dal vivo",
+  "settings.voice.talk.section": "Conversazione vocale",
+  "settings.voice.talkKey.title": "Tasto per parlare",
+  "settings.voice.talkKey.description": "Tieni premuti questi tasti per parlare in una conversazione vocale.",
+  "settings.voice.talkKey.change": "Cambia il tasto per parlare",
+  "settings.voice.talkKey.recording": "Premi i tasti",
+  "settings.voice.talkKey.refused": "Aggiungi un altro tasto",
+  "settings.voice.talkKey.reset": "Ripristina",
   "settings.voice.live.signIn": "Accedi a Codex con il tuo account ChatGPT per usare la voce dal vivo.",
   "settings.transfer.title": "Sposta questo server su un altro computer",
   "settings.transfer.lede": "I tuoi agenti, le loro skill, routine, memorie e file vanno in un unico file.",
@@ -777,6 +792,13 @@ export const messages = {
   "settings.transfer.import.lede": "Scegli il file che hai esportato dall'altro server. Termina con .zip.",
   "settings.transfer.import.choose": "Scegli file…",
   "settings.transfer.import.reading": "Lettura del file…",
+  "settings.transfer.upload.label": "Caricamento sul server",
+  "settings.transfer.upload.sending": "Invio del file…",
+  "settings.transfer.upload.sent": "{sent} di {total} inviati",
+  "settings.transfer.upload.serverReading": "Il server legge il file…",
+  "settings.transfer.upload.etaSoon": "Meno di un minuto rimanente",
+  "settings.transfer.upload.etaMinutes": "Circa {minutes} min rimanenti",
+  "settings.transfer.upload.etaHours": "Circa {hours} h {minutes} min rimanenti",
   "settings.transfer.import.openFailed": "Impossibile aprire il file",
   "settings.transfer.import.contains": "Questo file contiene",
   "settings.transfer.import.source": "OpenBot {version} · esportato il {date}",
@@ -813,8 +835,12 @@ export const messages = {
   "settings.transfer.copy.noAgents": "Questo server non ha agenti.",
   "settings.transfer.copy.new": "Nuovo",
   "settings.transfer.copy.notCopied":
-    "Vengono copiati anche i loro canali e la cartella condivisa. Chiavi API, accessi, connettori e cronologia delle chat non vengono copiati. Configurali di nuovo sull'altro server.",
+    "Vengono copiati anche i loro canali, i flussi di routine, i flussi di lavoro e la cartella condivisa. Chiavi API, accessi, connettori e cronologia delle chat non vengono copiati. Configurali di nuovo sull'altro server.",
   "settings.transfer.copy.submit": { one: "Copia {count} agente", other: "Copia {count} agenti" },
+  "settings.transfer.copy.duplicatesTitle": "Copiare gli agenti duplicati?",
+  "settings.transfer.copy.duplicatesDescription":
+    "{server} ha già agenti con questi nomi: {names}. La copia aggiunge un secondo agente per ciascuno. Ogni copia è un agente separato, con le sue chat, i suoi file e le sue memorie.",
+  "settings.transfer.copy.duplicatesConfirm": "Copia i duplicati",
   "settings.transfer.copy.copying": "Copia in corso…",
   "settings.transfer.copy.done": {
     one: "{count} agente copiato su {server}.",

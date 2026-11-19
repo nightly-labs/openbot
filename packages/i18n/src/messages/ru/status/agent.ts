@@ -26,6 +26,7 @@ export const messages = {
   "status.agent.screenCaptureScreen": "Сделать снимок главного экрана и отправить изображение модели агента.",
   "status.agent.screenCaptureChannel":
     "Изображение появится в канале {channel}, и его увидит каждый участник этого сервера, который читает канал.",
+  "status.agent.screenCapturePermissionNext": "Затем macOS может попросить вас разрешить OpenBot запись экрана.",
   "status.agent.screenCaptureDisplay": "Сделать снимок дисплея {name} и отправить изображение модели агента.",
   "status.agent.screenCaptureWindow": "Сделать снимок окна {name} и отправить изображение модели агента.",
   "status.agent.screenCaptureRegion":
@@ -69,6 +70,7 @@ export const messages = {
   "status.agent.browserActing": "Работа с веб-страницей…",
   "status.agent.browserReviewing": "Просмотр веб-страницы…",
   "status.agent.memoriesSearching": "Поиск в памяти…",
+  "status.agent.chatsSearching": "Поиск в прошлых чатах…",
   "status.agent.memoriesSearched": {
     one: "Поиск в памяти: найдено {count}",
     few: "Поиск в памяти: найдено {count}",
@@ -111,8 +113,11 @@ export const messages = {
     "Память: сохранено {saved}, обновлено {updated}, забыто {forgotten}, не изменено {notChanged}, потому что другая ветка изменила их раньше.",
   "status.agent.mcpToolCall": "Запустить инструмент {tool} MCP-сервера {name}.",
   "status.agent.uiBlockClosedByMessage": "Закрыто новым сообщением",
+  "status.agent.finishCheckContinues": "Запрос ещё не выполнен. Агент продолжает ({current} из {limit}).",
   "status.agent.nextStepContinues": "Агент остановился перед следующим шагом. Он продолжает ({current} из {limit}).",
   "status.agent.planContinues": "В плане есть незавершённые шаги. Агент продолжает ({current} из {limit}).",
+  "status.agent.planStopped":
+    "Агент остановился, в плане остались незавершённые шаги. Отправьте сообщение, чтобы продолжить.",
   "status.agent.compactionContinues": "Соединение прервалось, пока агент сжимал контекст. Агент продолжает.",
   "status.agent.providerExitContinues": "Агент остановился, не закончив ответ. Агент продолжает.",
   "status.agent.branchTitle": "Ответвлённый чат",

@@ -131,6 +131,8 @@ export const messages = {
   "error.backend.memoryGone": "Esta memória não existe mais.",
   "error.backend.routineGone": "Esta rotina não existe mais.",
   "error.backend.routineRunGone": "Esta execução da rotina não existe mais.",
+  "error.backend.routineRunFailedNoReason":
+    "A execução parou com um erro, mas nenhum motivo foi informado. Abra a execução para ver o que o agente fez.",
   "error.backend.turnNotStarted": "O provedor não iniciou este turno.",
   "error.backend.routineResultConnectionOff":
     "Esta conexão de mensagens está desativada ou foi removida. Escolha outro lugar.",
@@ -266,6 +268,8 @@ export const messages = {
     "Este agente só pode usar um número limitado de servidores MCP. Para usar este servidor, desative um servidor MCP de que o agente não precisa.",
   "error.backend.mcpRegistrationRefused":
     "O servidor de login ainda não aceita o OpenBot como aplicativo. Sua conta não é a causa. Use outra forma de conexão, como um servidor MCP local.",
+  "error.backend.mcpRegistrationUnavailable":
+    "O servidor de login não consegue registrar o OpenBot como aplicativo. Sua conta não é a causa. Para conectar, salve este servidor na Loja, Apps, e depois adicione um app de login a ele.",
   "error.backend.mcpSignInAbandonedGeneric": "O login foi abandonado.",
   "error.backend.mcpSignInForgotten": "O login MCP foi esquecido enquanto estava em andamento.",
   "error.backend.mcpSignInAbandoned": "O login MCP foi abandonado.",
@@ -278,6 +282,7 @@ export const messages = {
     "Este servidor pede login, e o OpenBot só faz login por https. Altere a URL para {url}.",
   "error.backend.mcpSignInCancelled": "O login foi cancelado.",
   "error.backend.mcpSignInTimedOut": "O login não foi concluído no navegador.",
+  "error.backend.mcpSignInRefused": "A página de login recusou o acesso. Entre novamente.",
   "error.backend.mcpSignInResponseTimedOut": "A resposta do login não chegou a tempo.",
   "error.backend.mcpSignInMetadataUnreadable":
     "O OpenBot não conseguiu ler as informações de login deste servidor. Verifique o endereço do servidor e tente novamente.",
@@ -289,6 +294,7 @@ export const messages = {
   "error.backend.mcpServerFailedToStart": "O servidor não iniciou: {reason}",
   "error.backend.mcpServerStartAbandoned":
     "{provider} parou de esperar antes de o servidor iniciar, por isso os agentes dele não recebem as ferramentas deste servidor.",
+  "error.backend.mcpServerStoppedDuringCall": "O servidor MCP parou antes de responder a esta chamada.",
   "error.backend.mcpToolSchemaRefused":
     "A ferramenta {tool} dele tem um formato de entrada que este provedor não consegue ler. Agentes de outros provedores continuam recebendo o servidor.",
   "error.backend.mcpServerSignInForProvider":
@@ -299,6 +305,10 @@ export const messages = {
     "{provider} não conseguiu iniciar o servidor MCP {name}. As ferramentas dele não estão disponíveis para o {provider}. O {provider} inicia o servidor por conta própria, então o teste de conexão no OpenBot pode funcionar. Inicie um novo chat para tentar de novo.",
   "error.backend.mcpServerTimedOutInProvider":
     "{provider} não conseguiu iniciar o servidor MCP {name}, porque o servidor não respondeu a tempo. Inicie um novo chat para tentar de novo.",
+  "error.backend.mcpServerUnavailableInProvider":
+    "{provider} não conseguiu iniciar o servidor MCP {name}, porque o servidor não está disponível agora. Aguarde alguns minutos e depois inicie um novo chat para tentar de novo.",
+  "error.backend.mcpServerUnreachableInProvider":
+    "{provider} não conseguiu acessar o servidor MCP {name}. Abra {name} na Loja, Apps, e confira se o endereço está correto e se o servidor está em execução. Depois inicie um novo chat para tentar de novo.",
   "error.backend.mcpAppReconnect":
     "{name} no ChatGPT pede que você entre de novo. Reconecte {name} no ChatGPT e peça de novo ao agente.",
   "error.backend.mcpServerSignInPage":
@@ -375,9 +385,9 @@ export const messages = {
   "error.backend.takeoverInactive": "Este controle manual do navegador não está mais ativo.",
   "error.backend.authSubmitting": "O envio da autenticação já está em andamento.",
   "error.backend.apiKeySaveFailed": "O OpenBot não conseguiu salvar a chave de API. Tente novamente.",
-  "error.backend.apiKeyNotAllowed":
-    "Somente o proprietário do servidor ou um administrador pode inserir uma chave de API.",
   "error.backend.apiKeySaving": "A chave de API já está sendo salva.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "O OpenBot não conseguiu ler a chave de API. Digite uma chave de até 8.000 caracteres e escolha quem pode usá-la.",
   "error.backend.authRequestInactive": "Esta solicitação de autenticação segura não está mais ativa.",
   "error.backend.secureAuthUnavailable": "A autenticação segura está indisponível.",
   "error.backend.browserUrlRequired": "É necessário informar uma URL para o navegador.",
@@ -420,7 +430,7 @@ export const messages = {
   "error.backend.popupLoadFailed": "Não foi possível carregar o pop-up. Tente entrar novamente pela página original.",
   "error.backend.browserTabNotFound": "Aba do navegador não encontrada.",
   "error.backend.authActive": "A autenticação já está ativa.",
-  "error.backend.authHttpsRequired": "A autenticação segura exige HTTPS.",
+  "error.backend.authWebPageRequired": "A autenticação segura exige HTTP/HTTPS.",
   "error.backend.authDigitsRange": "Os códigos de autenticação exigem de 4 a 12 dígitos.",
   "error.backend.authExpired": "A solicitação de autenticação expirou.",
   "error.backend.authDigitsRequired": "Digite a quantidade de dígitos solicitada.",

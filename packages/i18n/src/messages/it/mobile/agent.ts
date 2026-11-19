@@ -221,6 +221,13 @@ export const messages = {
     "Il segreto attuale smette di funzionare. L'host rifiuta le richieste che lo usano.",
   "mobile.agent.webhook.rotateConfirm": "Rigenera",
   "mobile.agent.webhook.rotateFailed": "Impossibile rigenerare il segreto. Riprova.",
+  "mobile.agent.webhook.giveToAgent": "Dai il segreto di firma a {name}",
+  "mobile.agent.webhook.giveTitle": "Dare un nuovo segreto di firma a {name}?",
+  "mobile.agent.webhook.giveBody":
+    "Il segreto attuale smette di funzionare. {name} salva il nuovo segreto come chiave API e può aggiungerlo al mittente.",
+  "mobile.agent.webhook.giveConfirm": "Dai segreto",
+  "mobile.agent.webhook.giveFailed": "Impossibile dare il segreto di firma all'agente. Riprova.",
+  "mobile.agent.webhook.given": "{name} ha il nuovo segreto di firma.",
   "mobile.agent.webhook.activity": "Attività",
   "mobile.agent.webhook.activityFailed": "Impossibile caricare l'attività. Riprova.",
   "mobile.agent.webhook.activity.ignored": "Ignorata",
@@ -411,10 +418,11 @@ export const messages = {
     "Questo server non può salvare il tuo livello di notifiche per un agente. Aggiorna OpenBot sul computer che lo esegue.",
   "mobile.agent.newChat.title": "Nuova chat",
   "mobile.agent.newChat.starting": "Avvio della nuova chat…",
-  "mobile.agent.newChat.footer": "L'agente dimentica questa chat. La sua configurazione resta.",
+  "mobile.agent.newChat.footer":
+    "L'agente riparte da zero e può ancora consultare questa chat quando serve. La sua configurazione resta.",
   "mobile.agent.newChat.confirmTitle": "Iniziare una nuova chat con {name}?",
   "mobile.agent.newChat.confirmBody":
-    "L'agente dimentica questa chat. I messaggi restano visibili sopra un divisore. Istruzioni, modello, tool, memorie, workspace e browser non cambiano.",
+    "L'agente riparte da zero e può ancora consultare questa chat quando serve. I messaggi restano visibili sopra un divisore. Istruzioni, modello, tool, memorie, workspace e browser non cambiano.",
   "mobile.agent.newChat.confirm": "Inizia nuova chat",
   "mobile.agent.newChat.failed": "Impossibile iniziare una nuova chat",
   "mobile.agent.newChat.failedBody": "L'host non ha potuto iniziare una nuova chat.",

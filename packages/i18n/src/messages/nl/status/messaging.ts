@@ -3,7 +3,7 @@ import type { messages as source } from "../../en/status/messaging";
 
 export const messages = {
   "status.messaging.working": "Mee bezig…",
-  "status.messaging.queued": "Even wachten: OpenBot werkt aan een ander verzoek. Het antwoord komt hier.",
+  "status.messaging.queued": "Even wachten tot een eerder verzoek klaar is. Het antwoord komt hier.",
   "status.messaging.busy": "Er wachten te veel verzoeken. Probeer het later opnieuw.",
   "status.messaging.failed": "OpenBot kon dit verzoek niet afronden. De OpenBot-host heeft de details.",
   "status.messaging.noAnswer": "OpenBot is klaar zonder geschreven antwoord.",
@@ -12,6 +12,7 @@ export const messages = {
   "status.messaging.stopped": "Gestopt.",
   "status.messaging.stop": "Stop",
   "status.messaging.approvalTitle": "OpenBot vraagt om goedkeuring om door te gaan.",
+  "status.messaging.approvalTitleTeammate": "Teamgenoot {agent} vraagt om goedkeuring om door te gaan.",
   "status.messaging.approvalCommand": "Een opdracht uitvoeren",
   "status.messaging.approvalFileChange": "Bestanden wijzigen",
   "status.messaging.approvalPermissions": "Meer machtigingen krijgen",

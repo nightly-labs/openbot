@@ -1,13 +1,3 @@
-// Checks the schedule triggers of workflows on the real SQLite, the real workflow service and the real
-// routine timer, on a temporary profile with a clock that the script moves. A save plans the next
-// occurrence; a due occurrence starts one run, also when the timer fires twice; missed occurrences
-// become one run; a workflow that still runs skips an occurrence; a one-time schedule ends; a save
-// that changes the schedule plans it again, and one that does not keeps the plan; a schedule that is
-// too frequent is refused; the plan stays after a restart. No app, provider, account or network is
-// started.
-//
-// Run: bun scripts/workflow-schedule-e2e.ts
-// Writes .openbot-build/workflow-schedule-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -31,6 +21,8 @@ const EVERY_15: RoutineSchedule = { kind: "interval", amount: 15, unit: "minutes
 
 interface Report {
   checks: string[];
+  triggerOutputs?: string[];
+  modelPrompt?: string;
   runs?: { workflow: string; number: number; source: string; scheduledFor: string | null; status: string }[];
   passed: boolean;
   failure?: string;
@@ -49,7 +41,35 @@ const trigger = (schedule: RoutineSchedule | undefined): WorkflowNode => ({
   fields: { trigger: "schedule" },
   ...(schedule ? { schedule } : {}),
 });
-/** A trigger and a step after it: a notice ends at once, an approval keeps the run open. */
+const modelPrompts: string[] = [];
+const changeListeners = new Set<() => void>();
+const nextChange = () =>
+  new Promise<void>((resolve) => {
+    const listener = () => {
+      changeListeners.delete(listener);
+      resolve();
+    };
+    changeListeners.add(listener);
+  });
+async function until(test: () => Promise<boolean>, what: string) {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    const change = nextChange();
+    if (await test()) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([change, new Promise((resolve) => (timer = setTimeout(resolve, deadline - Date.now())))]);
+    clearTimeout(timer);
+  }
+  assert.fail(`timed out: ${what}`);
+}
+const modelGraph = (schedule: RoutineSchedule, timezone: string): WorkflowGraph => ({
+  nodes: [
+    { ...trigger(schedule), fields: { trigger: "schedule", timezone } },
+    { id: "model", kind: "llm", at: { x: 300, y: 0 }, fields: { prompt: "Summarize the last 24 hours." } },
+  ],
+  edges: [{ id: "edge", from: "trigger", to: "model", type: "text" }],
+  strokes: [],
+});
 const graphOf = (schedule: RoutineSchedule | undefined, step: "notify" | "approval"): WorkflowGraph => ({
   nodes: [
     trigger(schedule),
@@ -79,11 +99,17 @@ async function open() {
       turnAnswer: () => null,
       sendHandoff: () => Effect.fail({ cause: new Error("No agent step runs in this test.") }),
       stopDelivery: () => Effect.void,
-      generateText: () => Effect.fail({ message: "No model step runs in this test." }),
+      generateText: (request) =>
+        Effect.sync(() => {
+          modelPrompts.push(request.prompt);
+          return "Summary.";
+        }),
       notify: () => {},
       connectionOn: () => false,
       post: () => Effect.die(new Error("No output posts in this test.")),
-      changed: () => {},
+      changed: () => {
+        for (const listener of [...changeListeners]) listener();
+      },
       rearm: () => {},
       timezone: () => ZONE,
       now: () => clock,
@@ -101,12 +127,10 @@ async function open() {
     () => true,
     () => {},
   );
-  /** One pass of the timer at the current clock, as the timer runs it. */
   const fire = () => runCauseEffect(triggers.processDue(clock, () => true));
   const nextDueAt = async (workflowId: string) =>
     (await runCauseEffect(workflows.get(workflowId))).triggers.find((entry) => entry.nodeId === "trigger")?.nextDueAt ??
     null;
-  /** The runs, newest first, with the occurrence each one is for: the public run does not carry it. */
   const runsOf = async (workflowId: string) => {
     const occurrence = database.connection.prepare("SELECT scheduled_for FROM workflow_runs WHERE run_id = ?");
     return (await runCauseEffect(workflows.runs({ workflowId, limit: 50 }))).runs.map(({ run }) => {
@@ -115,7 +139,9 @@ async function open() {
       return { ...run, scheduledFor };
     });
   };
-  return { workflows, timer, fire, nextDueAt, runsOf };
+  const triggerOutput = async (runId: string) =>
+    (await runCauseEffect(workflows.run(runId))).steps.find((step) => step.nodeId === "trigger")?.output ?? null;
+  return { workflows, timer, fire, nextDueAt, runsOf, triggerOutput };
 }
 
 async function close() {
@@ -156,9 +182,16 @@ try {
   await runCauseEffect(app.workflows.sweep());
   runs = await app.runsOf(quarterId);
   check("the run ends", runs[0]?.status === "done", runs[0]?.status);
+  const quarterOutput = runs[0] ? await app.triggerOutput(runs[0].id) : null;
+  check(
+    "the schedule trigger gives the time of its occurrence to the next step",
+    quarterOutput?.startsWith(
+      "Run time: 2026-10-24T09:15:00.000Z\nLocal time of this run: Saturday, 2026-10-24 09:15 in UTC (GMT",
+    ) === true,
+    quarterOutput,
+  );
   check("the trigger moves to the next occurrence", (await app.nextDueAt(quarterId)) === "2026-10-24T09:30:00.000Z");
 
-  // The app slept through four occurrences: 09:30, 09:45, 10:00 and 10:15.
   clock = new Date("2026-10-24T10:20:00.000Z");
   await app.fire();
   runs = await app.runsOf(quarterId);
@@ -214,7 +247,6 @@ try {
   check("a schedule that is too frequent is refused", refused !== null && refused.length > 0, refused);
   check("the refused save keeps the plan", (await app.nextDueAt(quarterId)) === "2026-10-24T11:05:00.000Z");
 
-  // A workflow whose run waits for an approval is not due: its occurrence waits for the run to end.
   const gated = await runCauseEffect(app.workflows.create({ title: "Waits for a person" }));
   assert.ok(
     (
@@ -250,7 +282,6 @@ try {
     app.timer.nextDueAt() === "2026-10-24T11:05:00.000Z",
     app.timer.nextDueAt(),
   );
-  /** Approves the step that the newest run of the gated workflow waits on, so the run ends. */
   const approveNewest = async () => {
     const newest = (await app.runsOf(gated.summary.id))[0];
     assert.ok(newest, "the gated workflow has a run");
@@ -291,7 +322,6 @@ try {
   );
   check("a one-time schedule is planned", (await app.nextDueAt(once.summary.id)) === "2026-10-24T12:00:00.000Z");
 
-  // The plan is in the database: a restart keeps it.
   await close();
   database = new OpenBotDatabase(directory);
   app = await open();
@@ -307,6 +337,47 @@ try {
     onceRuns,
   );
   check("a one-time schedule ends after its run", (await app.nextDueAt(once.summary.id)) === null);
+
+  const model = await runCauseEffect(app.workflows.create({ title: "Daily summary" }));
+  const modelSchedule: RoutineSchedule = { kind: "once", date: "2026-10-24", time: "14:30" };
+  assert.ok(
+    (
+      await runCauseEffect(
+        app.workflows.saveGraph({
+          workflowId: model.summary.id,
+          baseRevision: model.revision,
+          graph: modelGraph(modelSchedule, "Europe/Warsaw"),
+        }),
+      )
+    ).ok,
+  );
+  check(
+    "a schedule in the trigger's time zone is planned",
+    (await app.nextDueAt(model.summary.id)) === "2026-10-24T12:30:00.000Z",
+  );
+  clock = new Date("2026-10-24T12:30:00.000Z");
+  await app.fire();
+  await until(async () => (await app.runsOf(model.summary.id))[0]?.status === "done", "the model step run ends");
+  const modelRuns = await app.runsOf(model.summary.id);
+  check("the model step run ends", modelRuns.length === 1 && modelRuns[0]?.status === "done", modelRuns);
+  const prompt = modelPrompts.at(-1) ?? "";
+  report.modelPrompt = prompt;
+  check(
+    "the model step reads the run time in the trigger's time zone",
+    modelPrompts.length === 1 &&
+      prompt.includes("Run time: 2026-10-24T12:30:00.000Z") &&
+      prompt.includes("Local time of this run: Saturday, 2026-10-24 14:30 in Europe/Warsaw (GMT+02:00)."),
+    prompt,
+  );
+
+  const manual = await runCauseEffect(app.workflows.startRun({ workflowId: once.summary.id, requestId: "manual-1" }));
+  const manualOutput = await app.triggerOutput(manual.run.id);
+  check(
+    "a manual run of a schedule trigger gives the time it started",
+    manualOutput?.startsWith(`Run time: ${manual.run.startedAt}\n`) === true,
+    manualOutput,
+  );
+  report.triggerOutputs = [quarterOutput ?? "", manualOutput ?? ""];
 
   report.runs = [];
   for (const [workflow, id] of [

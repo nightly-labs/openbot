@@ -10,13 +10,9 @@ export interface QrCodeProps {
   label?: string;
   size?: number;
   class?: string;
-  /** Small logos in the center. The code then uses the highest error correction and leaves a clear
-   * hole of whole modules for them, so a camera rebuilds the missing modules. Keep the mark under a
-   * third of the code's width. */
   children?: JSX.Element;
 }
 
-/** The quiet zone around the code, in modules. */
 const QR_MARGIN = 2;
 
 interface MarkBox {
@@ -24,8 +20,6 @@ interface MarkBox {
   height: number;
 }
 
-/** The smallest odd number of modules that holds `pixels` plus one clear module on each side. A
- * code is always an odd number of modules wide, so an odd hole sits exactly in the center. */
 function holeModules(pixels: number, modulePixels: number): number {
   const modules = Math.ceil(pixels / modulePixels) + 2;
   return modules % 2 === 1 ? modules : modules + 1;
@@ -62,8 +56,6 @@ export function QrCode(props: QrCodeProps): JSX.Element {
   let markElement: HTMLSpanElement | undefined;
   let disposed = false;
 
-  // The hole is cut to the size of the logos, so the code waits until they have a size. A code in a
-  // hidden panel has none yet, and is drawn when the panel shows.
   onSettled(() => {
     const element = markElement;
     if (!element) return;

@@ -1,5 +1,3 @@
-// The programs that agents left running, as main lists them.
-
 import { type BackgroundProcess, isBackgroundProcess } from "@openbot/contracts/ipc";
 
 function decodeBackgroundProcess(value: unknown): BackgroundProcess {

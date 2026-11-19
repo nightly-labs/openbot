@@ -1,27 +1,11 @@
 import { SPEECH_LIMITS } from "@openbot/contracts/ipc";
 
-/**
- * The first part is short, so the first words play soon after the reply ends. It ends at the first
- * sentence that makes it at least the minimum length.
- */
 const FIRST_PART_MINIMUM = 40;
 const FIRST_PART_LENGTH = 80;
-/**
- * A later part is synthesized while the part before it plays. On a fast computer a part may be at
- * most three times as long as the part before it. On a slower computer, `partBudget` keeps it
- * shorter, so that it is ready before the part before it ends.
- */
 const PART_GROWTH = 3;
 const PART_LENGTH = 400;
-/** The share of the playing time that the synthesis of the next part may use. The rest is a margin. */
 const SYNTHESIS_SHARE = 0.8;
 
-/**
- * The text in parts that `speak` takes, made one part at a time. Parts end at a sentence where they
- * can, and a sentence that is too long for one part ends at a comma or a space. `speed` is the
- * playback speed, where 1 is normal: a part that plays faster leaves less time to synthesize the
- * next part, so the parts grow more slowly. The first part does not change with the speed.
- */
 export class SpeechParts {
   readonly #sentences: string[];
   readonly #growth: number;
@@ -33,11 +17,6 @@ export class SpeechParts {
     this.#growth = PART_GROWTH / Math.max(1, speed);
   }
 
-  /**
-   * The next part, or undefined at the end of the text. `budget` is the most characters that the
-   * computer can synthesize in time (see `partBudget`). It joins fewer sentences, but it does not cut
-   * a sentence: a part always has at least one sentence, or one piece of a long sentence.
-   */
   next(budget = Number.POSITIVE_INFINITY): string | undefined {
     const last = this.#last;
     const first = last === undefined;
@@ -64,17 +43,12 @@ export class SpeechParts {
   }
 }
 
-/**
- * The most characters of the next part that the computer can synthesize while `part` plays, from
- * the time that the synthesis of `part` took. `seconds` is the length of its audio at normal speed.
- */
 export function partBudget(part: string, seconds: number, synthesisMs: number, speed: number): number {
   if (!part || synthesisMs <= 0) return Number.POSITIVE_INFINITY;
   const playMs = (seconds * 1000) / Math.max(speed, Number.EPSILON);
   return Math.floor((playMs * SYNTHESIS_SHARE * part.length) / synthesisMs);
 }
 
-/** The first piece of a sentence that is longer than `limit`: it ends at a comma or a space where it can. */
 function firstPiece(sentence: string, limit: number): string {
   const window = sentence.slice(0, limit);
   const comma = Math.max(window.lastIndexOf(", "), window.lastIndexOf("; "), window.lastIndexOf("、"));

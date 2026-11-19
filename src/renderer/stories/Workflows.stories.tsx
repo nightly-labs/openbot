@@ -1,10 +1,3 @@
-/**
- * Workflows: the canvas over the preview mock, and the nodes one component at a time, each in its
- * empty and filled states. Press a node to select it and show its toolbar. Drag from a port to a port
- * of the other side, in either direction, to connect two nodes, or press the two ports one after the
- * other. A run in these stories uses the preview mock, not a provider.
- */
-
 import { Toaster } from "@openbot/ui";
 import { AgentNode } from "@openbot/ui/features/workflows/WorkflowAgentNode";
 import { ApprovalNode } from "@openbot/ui/features/workflows/WorkflowApprovalNode";
@@ -25,12 +18,14 @@ import {
   AGENT_RESULT,
   competitorWatch,
   githubTriage,
+  higgsfieldVideo,
   LLM_RESULT,
   newCompetitorAlert,
   STORY_CATALOGS,
   STORY_GITHUB,
   STORY_IMAGES,
   STORY_SEED,
+  type StoryWorkflow,
   storyWebhook,
   todayAt,
 } from "./workflow-story-data";
@@ -40,7 +35,6 @@ const TASK = "Check competitor sites, changelogs and launch posts since yesterda
 const RESULT = AGENT_RESULT;
 const AGENT = STORY_SEED.agentId;
 
-/** The story catalogs with a ChatGPT sign-in that the user did not do. */
 const CHATGPT_NOT_CONNECTED: WorkflowCatalogs = {
   ...STORY_CATALOGS,
   status: {
@@ -54,7 +48,6 @@ const CHATGPT_NOT_CONNECTED: WorkflowCatalogs = {
 const meta = {
   title: "Workflows",
   parameters: { layout: "fullscreen", a11y: { test: "error" } },
-  // One Toaster for the page, as the app has at its root. A canvas that opens again keeps it.
   decorators: [
     (Story) => (
       <>
@@ -68,12 +61,10 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Competitor watch has every node type, so its stories offer every node kind. */
 export const Example: Story = {
   render: () => <WorkflowStory workflows={[competitorWatch()]} features={STORY_ALL_FEATURES} />,
 };
 
-/** Two other people of the team work on the same canvas: their cursors move, and they select nodes. */
 export const ExampleWithCollaborators: Story = {
   name: "Example with collaborators",
   render: () => {
@@ -88,10 +79,14 @@ export const ExampleWithCollaborators: Story = {
   },
 };
 
-/** The canvas in the desktop window, where the Routines page shows its board today. */
 export const InApp: Story = {
   name: "In app",
   render: () => <WorkflowInAppStory workflows={[competitorWatch(), newCompetitorAlert()]} />,
+};
+
+export const HiggsfieldVideo: Story = {
+  name: "Higgsfield video",
+  render: () => <WorkflowStory workflows={[higgsfieldVideo()]} features={STORY_ALL_FEATURES} />,
 };
 
 export const ExampleAfterRun: Story = {
@@ -99,22 +94,16 @@ export const ExampleAfterRun: Story = {
   render: () => <WorkflowStory workflows={[competitorWatch("done")]} features={STORY_ALL_FEATURES} />,
 };
 
-/** The last run failed at the summary. Retry on it runs the summary and the steps after it again. */
 export const RunWithFailedStep: Story = {
   name: "Run with a failed step",
   render: () => <WorkflowStory workflows={[competitorWatch("failed")]} features={STORY_ALL_FEATURES} />,
 };
 
-/** A run stops at the approval until you decide. The condition of the preview always answers yes. */
 export const BranchAndApproval: Story = {
   name: "Branch and approval",
   render: () => <WorkflowStory workflows={[newCompetitorAlert()]} />,
 };
 
-/**
- * A GitHub trigger that answers new comments. Two runs are open, one for each issue, and a second
- * comment on one issue waits. The run bar lists the open runs; the Events row lists what GitHub sent.
- */
 export const GitHubRuns: Story = {
   name: "GitHub runs",
   render: () => <WorkflowStory workflows={[githubTriage()]} features={STORY_ALL_FEATURES} />,
@@ -127,6 +116,48 @@ export const EmptyCanvas: Story = {
       workflows={[{ id: "untitled", title: "Untitled workflow", graph: { nodes: [], edges: [], strokes: [] } }]}
     />
   ),
+};
+
+function moodboardGroup(folded: boolean): StoryWorkflow {
+  const open = { group: "story-moodboard", groupName: "Moodboard" };
+  const group = folded ? { ...open, groupFolded: true } : open;
+  const pictures = ["moodboard-01.jpg", "moodboard-02.jpg", "moodboard-03.jpg"];
+  return {
+    id: "moodboard-group",
+    title: "Moodboard cover",
+    graph: {
+      nodes: [
+        ...pictures.map((file, index) => ({
+          kind: "asset" as const,
+          id: `picture-${index + 1}`,
+          at: { x: index * 300, y: 0 },
+          fields: { file, ...group },
+        })),
+        {
+          kind: "image",
+          id: "cover",
+          at: { x: 1100, y: 0 },
+          fields: { prompt: "Cover image for the note, in the moodboard style", aspect: "16:9" },
+        },
+      ],
+      edges: pictures.map((_, index) => ({
+        id: `picture-${index + 1}>cover:image`,
+        from: `picture-${index + 1}`,
+        to: "cover",
+        type: "image" as const,
+      })),
+      strokes: [],
+    },
+  };
+}
+
+export const Groups: Story = {
+  render: () => <WorkflowStory workflows={[moodboardGroup(false)]} features={STORY_ALL_FEATURES} />,
+};
+
+export const GroupsCollapsed: Story = {
+  name: "Groups, collapsed",
+  render: () => <WorkflowStory workflows={[moodboardGroup(true)]} features={STORY_ALL_FEATURES} />,
 };
 
 export const Text: Story = {
@@ -146,6 +177,47 @@ export const Prompt: Story = {
       <PromptNode id="filled" text={TASK} />
     </NodeGallery>
   ),
+};
+
+const REFERENCES = [
+  { id: "file-1", name: "launch-hero.png" },
+  { id: "file-2", name: "launch-hero-dark.png" },
+];
+
+const agentWithReferences: StoryWorkflow = {
+  id: "agent-references",
+  title: "Launch illustration",
+  graph: {
+    nodes: [
+      ...REFERENCES.map((file, index) => ({
+        kind: "asset" as const,
+        id: `reference-${index + 1}`,
+        at: { x: 0, y: index * 340 },
+        fields: { fileId: file.id, file: file.name },
+      })),
+      {
+        kind: "agent",
+        id: "illustrate",
+        at: { x: 420, y: 120 },
+        fields: {
+          agentId: AGENT,
+          task: "Make one 4:5 illustration that keeps the character and the style of the two pictures. Do not invent a new character.",
+        },
+      },
+    ],
+    edges: REFERENCES.map((_, index) => ({
+      id: `reference-${index + 1}>illustrate:image`,
+      from: `reference-${index + 1}`,
+      to: "illustrate",
+      type: "image" as const,
+    })),
+    strokes: [],
+  },
+};
+
+export const AgentWithPictures: Story = {
+  name: "Agent with connected pictures",
+  render: () => <WorkflowStory workflows={[agentWithReferences]} features={STORY_ALL_FEATURES} />,
 };
 
 export const Agent: Story = {
@@ -182,10 +254,6 @@ export const Llm: Story = {
   ),
 };
 
-/**
- * ChatGPT is not connected. A new LLM step takes a Claude model, and its list has no ChatGPT tab. The
- * agent step keeps ChatGPT, because its agent runs on it.
- */
 export const LlmChatGptNotConnected: Story = {
   name: "LLM, ChatGPT not connected",
   render: () => (
@@ -211,7 +279,87 @@ export const ImageStory: Story = {
   ),
 };
 
-/** A cut-out PNG: a figure on clear pixels, with a soft shadow that is half clear. */
+const RANGE_VIDEO_MODEL = {
+  id: "higgsfield-kling3_0_story",
+  provider: "higgsfield",
+  name: "Kling 3.0",
+  maker: "Kuaishou",
+  subscription: "Higgsfield",
+  credits: true,
+  kinds: ["video"],
+  voices: false,
+  aspects: ["16:9", "9:16", "1:1"],
+  durations: Array.from({ length: 13 }, (_, index) => index + 3),
+  resolutions: ["720p", "1080p"],
+} as const satisfies WorkflowCatalogs["imageModels"][number];
+
+export const VideoCustomLength: Story = {
+  name: "Video, custom length",
+  render: () => (
+    <NodeGallery
+      selected="custom"
+      catalogs={{ ...STORY_CATALOGS, imageModels: [RANGE_VIDEO_MODEL, ...STORY_CATALOGS.imageModels] }}
+      fields={{
+        listed: { media: "video", model: RANGE_VIDEO_MODEL.id, aspect: "16:9", duration: 10 },
+        custom: { media: "video", model: RANGE_VIDEO_MODEL.id, aspect: "16:9", duration: 7 },
+      }}
+    >
+      <ImageNode id="listed" prompt="A drone shot over a coastal town at sunrise" />
+      <ImageNode id="custom" prompt="A drone shot over a coastal town at sunrise" />
+    </NodeGallery>
+  ),
+};
+
+export const ImageManyResults: Story = {
+  name: "Image, many results",
+  render: () => (
+    <NodeGallery
+      selected="filled"
+      results={{
+        filled: Array.from({ length: 12 }, (_, index) => ({
+          id: `image-result-${index + 1}`,
+          at: todayAt(9, index * 4),
+          value: STORY_IMAGES[index % STORY_IMAGES.length]?.name ?? "",
+        })),
+      }}
+    >
+      <ImageNode id="filled" prompt="Hero image for the Atlas comparison page, one product window" />
+    </NodeGallery>
+  ),
+};
+
+const TWO_HIGGSFIELD_ACCOUNTS: WorkflowCatalogs = {
+  ...STORY_CATALOGS,
+  imageModels: STORY_CATALOGS.imageModels?.map((model) =>
+    model.provider === "higgsfield"
+      ? {
+          ...model,
+          accounts: [
+            { id: "default", label: "Higgsfield", email: null, state: "connected", message: null },
+            { id: "a1b2c3d4", label: "Higgsfield 2", email: null, state: "connected", message: null },
+          ],
+        }
+      : model,
+  ),
+};
+
+export const ImageTwoHiggsfieldAccounts: Story = {
+  name: "Image, two Higgsfield accounts",
+  render: () => {
+    const model = TWO_HIGGSFIELD_ACCOUNTS.imageModels?.find((entry) => entry.provider === "higgsfield")?.id ?? "";
+    return (
+      <NodeGallery
+        selected="second"
+        catalogs={TWO_HIGGSFIELD_ACCOUNTS}
+        fields={{ first: { model, account: "" }, second: { model, account: "a1b2c3d4" } }}
+      >
+        <ImageNode id="first" prompt="Hero image for the Atlas comparison page" />
+        <ImageNode id="second" prompt="Hero image for the Atlas comparison page" />
+      </NodeGallery>
+    );
+  },
+};
+
 function cutOutPicture(): string {
   const canvas = document.createElement("canvas");
   canvas.width = 480;

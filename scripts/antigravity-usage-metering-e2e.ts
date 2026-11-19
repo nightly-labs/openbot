@@ -1,17 +1,3 @@
-// Checks that Gemini token usage through Antigravity is metered once per turn, with thinking as
-// output. Runs the real agent service on a temporary profile with a fake Antigravity CLI 1.5.4 that
-// prints its version and answers `session/prompt` as Antigravity does: `usage` holds the tokens of
-// that prompt only, `inputTokens` leave out `cachedReadTokens`, and `thoughtTokens` is apart from
-// `outputTokens`. A message `tokens=<input>,<cached>,<output>,<thought>` sets the usage of its turn.
-// Cases: a first turn, a smaller second turn in the same session (the session counter before this
-// change booked 0 for it), a larger third turn (it booked only the excess over the largest turn), a
-// turn whose cache reads are larger than its input (before #10010 it had no input count and no cost),
-// and a turn after the provider process starts again and resumes the session. The plan quota comes from a local `node:http` fake of
-// Google's Code Assist service (`OPENBOT_DEV_ANTIGRAVITY_CODE_ASSIST_URL`) with the CLI's token in a
-// temporary `GEMINI_HOME`: a usage read after the turns gives the fake's window, sends no prompt to the
-// CLI, and adds no turn or tokens to the metering.
-// `bun scripts/antigravity-usage-metering-e2e.ts`. Writes
-// .openbot-build/antigravity-usage-metering-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -30,19 +16,16 @@ const home = join(root, "home");
 const install = join(root, "antigravity", "1.5.4");
 const fakeAgy = join(install, "bin", "antigravity");
 const logPath = join(root, "agy.jsonl");
-// Bun reads the home folder once at its start, so the CLI's folder is set apart: never `~/.gemini`.
 const geminiHome = join(home, ".gemini");
 const ACCESS_TOKEN = "fake-metering-access-token";
 const PROJECT = "fake-metering-project";
 
-// Before the service modules load: the stores read the home folder.
 process.env.HOME = home;
 process.env.GEMINI_HOME = geminiHome;
 process.env.OPENBOT_ANTIGRAVITY_PATH = fakeAgy;
 process.env.FAKE_AGY_LOG = logPath;
 mkdirSync(home, { recursive: true });
 
-/** The Code Assist calls, with the token that each one carried. */
 const quotaCalls: { path: string | undefined; authorization: string | undefined }[] = [];
 const quotaServer = createServer((request, response) => {
   request.resume();
@@ -82,7 +65,6 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
-/** An Antigravity CLI with the ACP methods that the service calls. It has no `/usage`. */
 const FAKE_AGY = `#!/usr/bin/env node
 if (process.argv[2] === "--version") {
   process.stdout.write("1.5.4\\n");
@@ -177,7 +159,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service or of its database. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -211,7 +192,6 @@ function protocol(): LogEntry[] {
 
 await mkdir(join(install, "bin"), { recursive: true });
 await writeFile(fakeAgy, FAKE_AGY, { mode: 0o755 });
-// The CLI's own token file, as after a Google sign-in.
 await mkdir(join(geminiHome, "antigravity-acp"), { recursive: true });
 await writeFile(
   join(geminiHome, "antigravity-acp", "antigravity-oauth-token"),
@@ -244,7 +224,6 @@ const sqlite = () => {
 };
 const closeReader = () => connection?.close();
 
-/** The usage records of one provider turn. */
 function records(turnId: string): UsageTokens[] {
   return sqlite()
     .prepare("SELECT tokens_json FROM agent_usage_records WHERE turn_id = ? ORDER BY recorded_at, rowid")
@@ -252,7 +231,6 @@ function records(turnId: string): UsageTokens[] {
     .map((row) => decodeUsageTokens(JSON.parse(String(row.tokens_json))));
 }
 
-/** The provider turns that ran in one public thread, oldest first. */
 function turnsOf(threadId: string): string[] {
   return sqlite()
     .prepare(
@@ -265,7 +243,6 @@ function turnsOf(threadId: string): string[] {
 
 const message = (turn: Turn) => `tokens=${turn.input},${turn.cached},${turn.output},${turn.thought}`;
 
-/** Checks that the turn at `index` of the thread has one record with the tokens of `sent`. */
 async function check(name: string, threadId: string, index: number, sent: Turn): Promise<void> {
   const turnId = await waitFor(`${name}: usage`, () => {
     const id = turnsOf(threadId)[index];
@@ -331,13 +308,10 @@ try {
   await send(agent.id, cacheRead, "turn with more cache reads than input");
   await check("turn with more cache reads than input", threadId, 3, cacheRead);
 
-  // The provider process stops between turns. The runtime starts it again and resumes the session,
-  // and Antigravity measures the next turn from the restored total.
   const session = store.activeProviderSession(agent.id)?.externalSessionId;
   assert.ok(session, "the agent has a provider session");
   const killedPid = protocol().find((entry) => entry.start)?.pid ?? 0;
   assert.ok(killedPid, "the fake server logged its start");
-  // Each session has a process of its own, so a start before the kill is not the restart.
   const startsBefore = protocol().filter((entry) => entry.start).length;
   process.kill(killedPid, "SIGTERM");
   await waitFor("Antigravity to start again", () => protocol().filter((entry) => entry.start).length > startsBefore);
@@ -350,7 +324,6 @@ try {
     "the turn after a restart resumes the session",
   );
 
-  // The plan usage comes from Code Assist, not from a prompt: it adds no turn and no tokens.
   const promptsBefore = protocol().filter((entry) => entry.prompt !== undefined).length;
   const plan = await runCauseEffect(agents.getUsage(agent.id));
   const prompts = protocol().flatMap((entry) => (entry.prompt === undefined ? [] : [entry.prompt]));

@@ -1,5 +1,3 @@
-/** An LLM step: one model call with no agent, no tools and no workspace. */
-
 import { AGENT_REASONING_EFFORTS, type AgentModelId, type AgentReasoningEffort } from "@openbot/contracts/ipc";
 import { Button, Play, Sparkles, Textarea } from "@openbot/ui";
 import { untrack } from "solid-js";
@@ -22,10 +20,6 @@ import {
   type WfProvider,
 } from "./workflow-node-parts";
 
-/**
- * One model call with no agent, no tools and no workspace: a prompt, an optional system prompt and
- * the model with its effort, as the Higgsfield LLM Assistant has them.
- */
 export function LlmNode(props: { id: string; prompt?: string; system?: string }) {
   const board = useBoard();
   const { t } = useText();

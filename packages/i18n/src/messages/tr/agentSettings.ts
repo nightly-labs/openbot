@@ -172,11 +172,12 @@ export const messages = {
   "agentSettings.notificationLevel.note":
     "Bu seçim yalnızca sizin için geçerlidir ve tüm cihazlarınızda uygulanır. Sunucu sessize alınmışsa veya “Hiçbir şey” seçiliyse bu ajan da sessiz kalır.",
   "agentSettings.newChat.title": "Yeni sohbet",
-  "agentSettings.newChat.description": "Ajan bu sohbeti unutur. Yapılandırması kalır.",
+  "agentSettings.newChat.description":
+    "Ajan sıfırdan başlar ve gerektiğinde bu sohbette arama yapabilir. Yapılandırması kalır.",
   "agentSettings.newChat.button": "Başlat",
   "agentSettings.newChat.confirmTitle": "{name} ile yeni bir sohbet başlatılsın mı?",
   "agentSettings.newChat.confirmDescription":
-    "Ajan bu sohbeti unutur. Mesajlar bir ayırıcının üzerinde görünür kalır. Talimatlar, model, araçlar, bellekler, çalışma alanı ve tarayıcı değişmez.",
+    "Ajan sıfırdan başlar ve gerektiğinde bu sohbette arama yapabilir. Mesajlar bir ayırıcının üzerinde görünür kalır. Talimatlar, model, araçlar, bellekler, çalışma alanı ve tarayıcı değişmez.",
   "agentSettings.newChat.confirm": "Yeni sohbet başlat",
   "agentSettings.newChat.failed": "Yeni bir sohbet başlatılamadı.",
   "agentSettings.deleteHistory.title": "Geçmişi sil",
@@ -196,6 +197,8 @@ export const messages = {
   "agentSettings.fullAccess.confirm": "Tam erişime izin ver",
   "agentSettings.fullAccess.askConfirm": "Önce sor",
   "agentSettings.links.usage": "Kullanım",
+  "agentSettings.links.apps": "Uygulamalar",
+  "agentSettings.links.appsScope": "Tüm ajanlar",
   "agentSettings.links.memories": "Bellekler",
   "agentSettings.links.memoriesCount": { one: "{count} kayıtlı", other: "{count} kayıtlı" },
   "agentSettings.links.skills": "Beceriler",

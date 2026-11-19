@@ -114,6 +114,8 @@ export const messages = {
   "error.backend.memoryGone": "הזיכרון הזה כבר אינו קיים.",
   "error.backend.routineGone": "השגרה הזו כבר אינה קיימת.",
   "error.backend.routineRunGone": "הרצת השגרה הזו כבר אינה קיימת.",
+  "error.backend.routineRunFailedNoReason":
+    "ההרצה נעצרה עם שגיאה, אך לא התקבלה סיבה. פתחו את ההרצה כדי לראות מה הסוכן עשה.",
   "error.backend.turnNotStarted": "הספק לא התחיל את התור הזה.",
   "error.backend.routineResultConnectionOff": "חיבור ההודעות הזה כבוי או הוסר. יש לבחור מקום אחר.",
   "error.backend.routineResultNoDelivery": "להרצה הזו אין תשובה לשלוח שוב.",
@@ -239,6 +241,8 @@ export const messages = {
     "הסוכן הזה יכול להשתמש רק במספר מוגבל של שרתי MCP. כדי להשתמש בשרת הזה, כבו שרת MCP שהסוכן לא צריך.",
   "error.backend.mcpRegistrationRefused":
     "שרת ההתחברות עדיין אינו מקבל את OpenBot כאפליקציה. החשבון שלך אינו הסיבה. יש להשתמש בדרך חיבור אחרת, כמו שרת MCP מקומי.",
+  "error.backend.mcpRegistrationUnavailable":
+    "שרת ההתחברות אינו יכול לרשום את OpenBot כאפליקציה. החשבון שלך אינו הסיבה. כדי להתחבר, יש לשמור את השרת הזה בחנות, אפליקציות, ואחר כך להוסיף לו אפליקציית התחברות.",
   "error.backend.mcpSignInAbandonedGeneric": "ההתחברות ננטשה.",
   "error.backend.mcpSignInForgotten": "התחברות ה-MCP נשכחה בזמן שהיא רצה.",
   "error.backend.mcpSignInAbandoned": "התחברות ה-MCP ננטשה.",
@@ -250,6 +254,7 @@ export const messages = {
     "השרת הזה דורש התחברות, ו-OpenBot מתחבר רק דרך https. יש לשנות את הכתובת ל-{url}.",
   "error.backend.mcpSignInCancelled": "ההתחברות בוטלה.",
   "error.backend.mcpSignInTimedOut": "ההתחברות לא הושלמה בדפדפן.",
+  "error.backend.mcpSignInRefused": "דף ההתחברות דחה את הגישה. התחבר שוב.",
   "error.backend.mcpSignInResponseTimedOut": "תשובת ההתחברות לא הגיעה בזמן.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot לא הצליח לקרוא את פרטי ההתחברות של השרת הזה. יש לבדוק את כתובת השרת ולנסות שוב.",
@@ -260,6 +265,7 @@ export const messages = {
   "error.backend.mcpServerFailedToStart": "השרת לא התחיל: {reason}",
   "error.backend.mcpServerStartAbandoned":
     "{provider} הפסיק לחכות לפני שהשרת התחיל, ולכן הסוכנים שלו לא מקבלים את הכלים של השרת הזה.",
+  "error.backend.mcpServerStoppedDuringCall": "שרת ה-MCP נעצר לפני שענה לקריאה הזו.",
   "error.backend.mcpToolSchemaRefused":
     "לכלי {tool} שלו יש תבנית קלט שהספק הזה לא יכול לקרוא. סוכנים אצל ספקים אחרים עדיין מקבלים את השרת.",
   "error.backend.mcpServerSignInForProvider":
@@ -270,6 +276,10 @@ export const messages = {
     "{provider} לא הצליח להפעיל את שרת ה-MCP {name}. הכלים שלו אינם זמינים ל-{provider}. {provider} מפעיל את השרת בעצמו, ולכן בדיקת החיבור ב-OpenBot יכולה לעבור. יש להתחיל צ׳אט חדש כדי לנסות שוב.",
   "error.backend.mcpServerTimedOutInProvider":
     "{provider} לא הצליח להפעיל את שרת ה-MCP {name}, כי השרת לא ענה בזמן. יש להתחיל צ׳אט חדש כדי לנסות שוב.",
+  "error.backend.mcpServerUnavailableInProvider":
+    "{provider} לא הצליח להפעיל את שרת ה-MCP {name}, כי השרת לא זמין כרגע. יש להמתין כמה דקות ואז להתחיל צ׳אט חדש כדי לנסות שוב.",
+  "error.backend.mcpServerUnreachableInProvider":
+    "{provider} לא הצליח להגיע לשרת ה-MCP {name}. יש לפתוח את {name} בחנות, אפליקציות, ולוודא שהכתובת שלו נכונה ושהשרת פועל. לאחר מכן יש להתחיל צ׳אט חדש כדי לנסות שוב.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot לא הצליח להפעיל את חיבור ההתחברות המקומי שלו עבור השרת הזה. יש להפעיל מחדש את OpenBot ולנסות שוב.",
   "error.backend.mcpOAuthSignInNeeded": "ההתחברות לשרת ה-MCP הזה הסתיימה. המשתמש צריך להתחבר אליו שוב ב-OpenBot.",
@@ -338,9 +348,9 @@ export const messages = {
   "error.backend.takeoverInactive": "השתלטות הדפדפן הזו אינה פעילה עוד.",
   "error.backend.authSubmitting": "שליחת האימות כבר מתבצעת.",
   "error.backend.apiKeySaveFailed": "OpenBot לא הצליח לשמור את מפתח ה-API. יש לנסות שוב.",
-  "error.backend.apiKeyNotAllowed": "רק בעל השרת או מנהל יכולים להזין מפתח API.",
   "error.backend.apiKeySaving": "מפתח ה-API כבר נשמר.",
-  "error.backend.vaultItemNotAllowed": "רק בעל השרת או מנהל יכולים להוסיף פריט לכספת.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot לא הצליח לקרוא את מפתח ה-API. יש להזין מפתח של עד 8,000 תווים ולבחור מי יכול להשתמש בו.",
   "error.backend.vaultItemSaving": "פריט הכספת כבר נשמר.",
   "error.backend.authRequestInactive": "בקשת האימות המאובטח הזו אינה פעילה עוד.",
   "error.backend.secureAuthUnavailable": "אימות מאובטח אינו זמין.",
@@ -378,7 +388,7 @@ export const messages = {
   "error.backend.popupLoadFailed": "החלון הקופץ לא נטען. יש לנסות להתחבר שוב מהדף המקורי.",
   "error.backend.browserTabNotFound": "לשונית הדפדפן לא נמצאה.",
   "error.backend.authActive": "אימות כבר פעיל.",
-  "error.backend.authHttpsRequired": "אימות מאובטח דורש HTTPS.",
+  "error.backend.authWebPageRequired": "אימות מאובטח דורש HTTP/HTTPS.",
   "error.backend.authDigitsRange": "קודי אימות דורשים 4–12 ספרות.",
   "error.backend.authExpired": "תוקף בקשת האימות פג.",
   "error.backend.authDigitsRequired": "יש להזין את מספר הספרות המבוקש.",

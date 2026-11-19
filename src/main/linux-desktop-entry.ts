@@ -7,21 +7,10 @@ import { causeHelpers } from "../backend/effect-boundary";
 
 const logger = createOpenBotLogger("linux-desktop-entry");
 
-/**
- * The file name has to stay `openbot.desktop`: it is `desktopName` in package.json, which is what
- * Electron uses as the application id it hands to `xdg-settings`, and what electron-builder writes
- * into `StartupWMClass` so a window groups with this entry.
- */
 const DESKTOP_FILE_NAME = "openbot.desktop";
 const ICON_FILE_NAME = "openbot.png";
 const WM_CLASS = "openbot";
 
-/**
- * The desktop entry that makes an `openbot://` link reach the app.
- *
- * `Exec` names the AppImage itself, because that is the only path that survives a restart, and `%U`
- * is what passes the invitation URL to it.
- */
 function linuxDesktopEntry(appImagePath: string, iconPath: string): string {
   return `${[
     "[Desktop Entry]",
@@ -37,15 +26,6 @@ function linuxDesktopEntry(appImagePath: string, iconPath: string): string {
   ].join("\n")}\n`;
 }
 
-/**
- * Writes the desktop entry for an AppImage, and reports the path it wrote, or `null` when there was
- * nothing to write.
- *
- * `app.setAsDefaultProtocolClient` calls `xdg-settings` on Linux, and `xdg-settings` can only name a
- * desktop entry that already exists. A downloaded AppImage has none, so without this the scheme
- * registration silently does nothing and every invitation link fails. Any other Linux build was
- * installed by a package manager, which owns the entry; this leaves that one alone.
- */
 interface DesktopEntryOptions {
   platform: NodeJS.Platform;
   environment: NodeJS.ProcessEnv;
@@ -81,16 +61,6 @@ export const installLinuxDesktopEntry = Effect.fn("LinuxDesktopEntry.install")(f
   return null;
 });
 
-/**
- * Copies the launcher icon to a path that outlives the process, and reports the path the entry has
- * to name. Reports the packaged path instead when the copy fails, because an entry with an icon
- * that can disappear is still better than no invitation links at all.
- *
- * An AppImage mounts its resources in a temporary directory that the runtime removes when the app
- * exits, so an entry that points there loses its icon as soon as OpenBot is not running. The entry
- * names the copy by absolute path, which the desktop entry specification allows, rather than by
- * icon theme name: one loose file under the data home is not a theme.
- */
 const installIcon = Effect.fn("LinuxDesktopEntry.installIcon")(function* (dataDirectory: string, iconPath: string) {
   const directory = join(dataDirectory, "icons");
   const path = join(directory, ICON_FILE_NAME);
@@ -126,10 +96,6 @@ class DesktopEntryFailure extends Schema.TaggedError<DesktopEntryFailure>()("Des
 
 const { io: desktopEntryIO } = causeHelpers(DesktopEntryFailure);
 
-/**
- * Quotes a path for the `Exec` key. The desktop entry specification reserves a set of characters
- * inside a quoted argument, and a backslash is what escapes them.
- */
 function quoteExecutable(path: string): string {
   return `"${path.replace(/(["`$\\])/gu, "\\$1")}"`;
 }

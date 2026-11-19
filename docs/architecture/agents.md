@@ -62,7 +62,9 @@ it finds the marker by its text. When a turn that ran only quiet routine runs co
 answer is the marker, or the agent called the tool and the turn gave no file, image or question, the
 turn drops its markers, thinking and plan from the conversation. Each other text answer stays with the
 item type `routine_quiet_answer`. A quiet answer does not count as unread, does not change the agent
-preview, and no Team API client gets it; the desktop chat shows it under its run, which starts closed.
+preview, and only a Team API client with `routine-quiet-answers-v1` gets it; the desktop chat and the web
+client show it under its run, which starts closed. `history_read` marks it `quiet`, so the agent does not
+say that the user saw it.
 The turn puts back the agent preview from
 before the run (the run start shows the task there; memory only, so after a restart the task stays),
 and its `turn-completed`
@@ -110,7 +112,16 @@ answers it names those turns (`continues` on `turn/started`). When each of them 
 turn can end quiet in the same way: the no-update tool accepts the call, and its text answers become
 quiet answers (#10847). Work that ends while that turn runs goes to it too
 (`openbot/turn-continues`). Work of a person's request, or of an unknown turn, keeps the answer in
-the chat. The lifecycle keeps the newest quiet turns in memory only, so after a restart such a turn shows.
+the chat. That answer is the first one after the request. Work that a turn of the provider's own
+started can end quiet too, so a watcher that a person started and that wakes again does not post each
+time; a result that the agent writes without the no-update call still shows (#11090). On the first
+answer after a person's request, the tool returns `shown`, not a refusal: after a refusal, the model
+did not call the tool on the later wakes. The CLI wakes the model with its own prompt, which does not
+name the tool, so a Claude agent always loads the tool (not behind the tool search) and its developer
+instructions say when a wake needs no answer. The model decides: in tests, Sonnet called the tool on
+a wake with nothing new, and Haiku often wrote a status line instead. The lifecycle
+keeps the newest quiet turns and the newest such turns in memory only, so after a restart such a turn
+shows.
 
 A completed turn that a teammate's message started (`origin: "agent"`: a request from another agent,
 or its answer) is work between agents. Its answer shows in the chat and counts as unread, but the
@@ -325,8 +336,11 @@ changed, on this computer and on a joined host.
   (`workflow-walk.ts`). Passes run one at a time; a pass runs after a turn or queue event, after
   each user action, and at startup. A node runs again when a node before it has a newer step, as
   after a retry. A retry uses the node's current settings, so a fix made after the failure applies;
-  it uses the run's copy when the node is gone or is now another kind. An edge back to an earlier node (`workflowLoopEdges` in the contracts) is a loop:
-  when its source is done and newer, the earlier node runs again with that answer as one more
+  it uses the run's copy when the node is gone or is now another kind. An edge back to the start of a group of nodes that each reach the
+  others (`workflowLoopEdges` in the contracts) is a loop. The start is the entry from outside the
+  group; when more than one node is an entry, it is the leftmost entry on the canvas, then the
+  topmost, then the first that the walk reaches. The edge order does not change it. When its source
+  is done and newer, the earlier node runs again with that answer as one more
   input. A loop has no pass limit. It ends when a condition takes the other branch, a step fails or
   is rejected, or the user stops the run. The canvas marks a loop with no condition as endless.
 - An agent step is a routine handoff (`AgentService.enqueueRoutineHandoff`, with the workflow as the
@@ -341,7 +355,9 @@ changed, on this computer and on a joined host.
   posts to a messaging place.
 - `WorkflowTriggers` (`workflow-triggers.ts`) gives schedule triggers to the routine timer as an
   extra due source. An occurrence is skipped while the workflow has an open run, and missed
-  occurrences become one run. A webhook trigger has a route of its own owner kind (`workflow`); see
+  occurrences become one run. A schedule trigger gives the next steps the run time in UTC and in
+  the time zone of the trigger, the same "Local time of this run" line that a routine prompt has.
+  A manual run of a schedule trigger gives its start time. A webhook trigger has a route of its own owner kind (`workflow`); see
   [Route lifecycle](events.md#route-lifecycle).
 - A GitHub trigger starts a run for each event of the OpenBot GitHub App that matches it
   (`github-matching.ts`); see [Workflow GitHub triggers](events.md#workflow-github-triggers). A
@@ -623,7 +639,7 @@ the phone read the profiles again on `browser-profiles-changed` (`browser-profil
 A side thread (in code and on the wire still a **task**) is a separate execution thread of one agent.
 The agent keeps one identity, workspace and provider settings; each side thread has its own provider
 thread, conversation, queue, progress and result. The agent's own chat is its main thread and has no
-side thread row. `projection_agent_threads` (`src/backend/agent-threads/agent-thread-schema.ts`,
+side thread row. `projection_agent_threads` (`src/backend/agent-threads/agent-thread-store.ts`,
 migration 47) holds one row for each side thread, with its title and the source of the title
 (`auto`, `agent` or `user`). Migration 47 moved every task of `projection_agent_tasks` (migration 38)
 there: a closed task became an archived thread, and the task id stays as `legacy_task_id`. The task id
@@ -868,10 +884,17 @@ the MCP server tools (`src/backend/agent/mcp-tools.ts`, issue #2673). Each chang
 approval of `AttentionRegistry.awaitToolApproval`, which states that every agent on the server gets
 the tools. Full access answers it, as for other built-in tool approvals. `save_mcp_server` connects
 before it saves (`inspectMcpServer`, the silent Test): a server that does not answer is not saved; a
-server that needs an OAuth sign-in or a key is saved. The tools never take or return a header or
-environment value, and show an address without its query: the user enters a key with Edit on the
-server's page in Marketplace, Apps. An edit keeps the row's headers and environment, and an edit that would send them to another
-transport, origin, command, arguments or folder is refused. The approval masks known secrets in the command line and names
+server that needs an OAuth sign-in or a key is saved. `save_mcp_server` takes the headers of an http
+server that the user gave in the conversation, such as `Authorization: Bearer <token>`: each one sets or
+replaces the header of that name, and an empty value removes it. OpenBot registers the value of each
+header with a secret name before it parses the call, so logs mask it, and a failure masks every new
+value. A key value needs the same source as `save_api_key`: never an external chat, in a channel only a
+key that the local user wrote in the request of the task, and elsewhere only a person's message. The
+approval names the headers that change. The tools never take an environment value and
+never return a header or environment value, and show an address without its query. The user can also
+enter a key with Edit on the server's page in Marketplace, Apps. An edit keeps the row's other headers
+and environment, and an edit that would send them to another transport, origin, command, arguments or
+folder is refused; headers that the same edit replaces do not count. The approval masks known secrets in the command line and names
 the folder a stdio server starts in. A sign-in shows an `mcp-sign-in:<id>` card in
 the conversation. Its Sign in opens the row's page in Marketplace, Apps, and starts the row's normal sign-in,
 so a joined server signs in through its relay (`sign-in-relay-v1`). A host without the relay shows no
@@ -923,10 +946,17 @@ of the turn, also with no backup model. A backup model then runs the turn again,
 error. With no backup, a turn that only teammate results started runs once more on the same model.
 A thread turn does the same: a backup model runs it again, and with no backup it runs once more on
 the same model (#8503, #8406). So
-does the turn of an external chat conversation, such as WhatsApp (#8573); a channel task does not.
+does the turn of an external chat conversation, such as WhatsApp (#8573).
 `MessagingThreads` keeps the conversation's status post while the turn's messages wait in the queue,
-so the conversation gets no "Stopped." before the answer. The turn did no step, so it repeats
-nothing. A second empty run, or an empty turn from the person, shows the error.
+so the conversation gets no "Stopped." before the answer. A channel task's empty turn runs once more
+in its session too, from any sender, also a person: the channel keeps the task's assignment
+(`ChannelService.keepForRetry`), as `requeueForLimit` keeps it for a backup, but with no limit rule,
+so a routine set to skip at a limit keeps its run. Only a turn of one request runs again this way.
+When a backup model would take the turn in the agent's own chat, the run again is on that backup.
+Before, the task stopped until the person clicked Continue (#11425). The turn did no step, so it
+repeats nothing. A second empty run, or an empty turn from the person outside a channel, shows the
+error. A Codex channel task shows `error.provider.channelNoAnswer`, which names Continue and Reassign
+on its card.
 A turn that a failed sign-in or a provider that does not answer ended after work started continues
 on the backup model, with the work steps of the turn, as after a usage limit, when the agent is set
 to switch without asking (#8406).
@@ -1002,7 +1032,10 @@ WhatsApp do not steer automatically: each starts a turn of its own. A question b
 expects a reply) asks for no `send_message` reply, so it stays queued and its own turn's answer goes
 back. Channel, messaging and task work, and each answer to a request that went to two or more teammates, stay queued
 (`MailboxStore.joinsChatTurn`), so those answers still start together. A message from an agent that
-cannot steer gets no fallback reason on its row.
+cannot steer gets no fallback reason on its row. A message from an agent also stays queued while a
+turn that only the person's messages started runs, and starts as a turn of its own after it: the tools
+that only a person's message can start check each message of the turn, and a message from an agent
+in the person's turn would make them refuse the person's own request (#11165).
 The person can steer any queued answer into the running turn from the waiting block on desktop, the
 web and mobile; it has no other queue action. That is the person's choice, so it can take one answer
 of a group before the others.

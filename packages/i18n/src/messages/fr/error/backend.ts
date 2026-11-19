@@ -131,6 +131,8 @@ export const messages = {
   "error.backend.memoryGone": "Ce souvenir n’existe plus.",
   "error.backend.routineGone": "Cette routine n’existe plus.",
   "error.backend.routineRunGone": "Cette exécution de la routine n’existe plus.",
+  "error.backend.routineRunFailedNoReason":
+    "L’exécution s’est arrêtée sur une erreur, sans raison indiquée. Ouvrez l’exécution pour voir ce que l’agent a fait.",
   "error.backend.turnNotStarted": "Le fournisseur n’a pas démarré ce tour.",
   "error.backend.routineResultConnectionOff":
     "Cette connexion de messagerie est désactivée ou supprimée. Choisissez un autre emplacement.",
@@ -270,6 +272,8 @@ export const messages = {
     "Cet agent ne peut utiliser qu’un nombre limité de serveurs MCP. Pour utiliser ce serveur, désactivez un serveur MCP dont l’agent n’a pas besoin.",
   "error.backend.mcpRegistrationRefused":
     "Le serveur de connexion n’accepte pas encore OpenBot comme application. Votre compte n’en est pas la cause. Utilisez un autre moyen de connexion, par exemple un serveur MCP local.",
+  "error.backend.mcpRegistrationUnavailable":
+    "Le serveur de connexion ne peut pas enregistrer OpenBot comme application. Votre compte n’en est pas la cause. Pour vous connecter, enregistrez ce serveur dans Marketplace, Apps, puis ajoutez-lui une app de connexion.",
   "error.backend.mcpSignInAbandonedGeneric": "La connexion a été abandonnée.",
   "error.backend.mcpSignInForgotten": "La connexion MCP a été oubliée pendant son exécution.",
   "error.backend.mcpSignInAbandoned": "La connexion MCP a été abandonnée.",
@@ -283,6 +287,7 @@ export const messages = {
     "Ce serveur demande une connexion, et OpenBot ne se connecte qu’en https. Remplacez l’URL par {url}.",
   "error.backend.mcpSignInCancelled": "La connexion a été annulée.",
   "error.backend.mcpSignInTimedOut": "La connexion n’a pas été terminée dans le navigateur.",
+  "error.backend.mcpSignInRefused": "La page de connexion a refusé l’accès. Reconnectez-vous.",
   "error.backend.mcpSignInResponseTimedOut": "La réponse à la connexion n’est pas arrivée à temps.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot n’a pas pu lire les informations de connexion de ce serveur. Vérifiez l’adresse du serveur et réessayez.",
@@ -294,6 +299,7 @@ export const messages = {
   "error.backend.mcpServerFailedToStart": "Le serveur n’a pas démarré : {reason}",
   "error.backend.mcpServerStartAbandoned":
     "{provider} a cessé d’attendre avant le démarrage du serveur : ses agents n’ont donc pas les outils de ce serveur.",
+  "error.backend.mcpServerStoppedDuringCall": "Le serveur MCP s’est arrêté avant de répondre à cet appel.",
   "error.backend.mcpToolSchemaRefused":
     "Son outil {tool} a un format d’entrée que ce fournisseur ne peut pas lire. Les agents des autres fournisseurs reçoivent toujours le serveur.",
   "error.backend.mcpServerSignInForProvider":
@@ -304,6 +310,10 @@ export const messages = {
     "{provider} n’a pas pu démarrer le serveur MCP {name}. Ses outils ne sont pas disponibles pour {provider}. {provider} démarre le serveur lui-même, donc le test de connexion dans OpenBot peut réussir. Commencez une nouvelle discussion pour réessayer.",
   "error.backend.mcpServerTimedOutInProvider":
     "{provider} n’a pas pu démarrer le serveur MCP {name}, car le serveur n’a pas répondu à temps. Commencez une nouvelle discussion pour réessayer.",
+  "error.backend.mcpServerUnavailableInProvider":
+    "{provider} n’a pas pu démarrer le serveur MCP {name}, car le serveur n’est pas disponible pour le moment. Attendez quelques minutes, puis commencez une nouvelle discussion pour réessayer.",
+  "error.backend.mcpServerUnreachableInProvider":
+    "{provider} n’a pas pu joindre le serveur MCP {name}. Ouvrez {name} dans Marketplace, Apps, et vérifiez que son adresse est correcte et que le serveur fonctionne. Commencez ensuite une nouvelle discussion pour réessayer.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot n’a pas pu démarrer sa connexion locale de connexion pour ce serveur. Redémarrez OpenBot, puis réessayez.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -378,8 +388,9 @@ export const messages = {
   "error.backend.takeoverInactive": "Cette prise de contrôle du navigateur n’est plus active.",
   "error.backend.authSubmitting": "L’envoi de l’authentification est déjà en cours.",
   "error.backend.apiKeySaveFailed": "OpenBot n’a pas pu enregistrer la clé d’API. Réessayez.",
-  "error.backend.apiKeyNotAllowed": "Seul le propriétaire du serveur ou un administrateur peut saisir une clé d’API.",
   "error.backend.apiKeySaving": "La clé d’API est déjà en cours d’enregistrement.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot n’a pas pu lire la clé d’API. Saisissez une clé de 8 000 caractères au plus, puis choisissez qui peut l’utiliser.",
   "error.backend.authRequestInactive": "Cette demande d’authentification sécurisée n’est plus active.",
   "error.backend.secureAuthUnavailable": "L’authentification sécurisée est indisponible.",
   "error.backend.browserUrlRequired": "Une URL de navigateur est requise.",
@@ -423,7 +434,7 @@ export const messages = {
     "La fenêtre contextuelle n’a pas pu se charger. Réessayez la connexion depuis la page d’origine.",
   "error.backend.browserTabNotFound": "Onglet de navigateur introuvable.",
   "error.backend.authActive": "L’authentification est déjà active.",
-  "error.backend.authHttpsRequired": "L’authentification sécurisée nécessite HTTPS.",
+  "error.backend.authWebPageRequired": "L’authentification sécurisée nécessite HTTP/HTTPS.",
   "error.backend.authDigitsRange": "Les codes d’authentification doivent comporter de 4 à 12 chiffres.",
   "error.backend.authExpired": "La demande d’authentification a expiré.",
   "error.backend.authDigitsRequired": "Saisissez le nombre de chiffres demandé.",

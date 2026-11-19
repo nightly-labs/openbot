@@ -25,7 +25,6 @@ import { installFakeAgent, readJsonl, runTurn, startThread, stopClients } from "
 const OUT = resolve(import.meta.dirname, "../.openbot-build/acp-subagents-e2e");
 const WAIT_MS = 20_000;
 
-/** The parts of a subagent that the card shows, without its times. */
 interface Card {
   title: string;
   agentType: string | null;
@@ -38,9 +37,7 @@ interface Card {
 
 interface Report {
   passed: boolean;
-  /** The last list of each turn, by provider and prompt. */
   cards: Record<string, Card[]>;
-  /** How many `turn/subagents/updated` notifications each case sent. */
   notifications: Record<string, number>;
   openCodeAskedForChildUpdates: boolean | null;
   /** The context fills that the Kiro case showed. */
@@ -63,7 +60,6 @@ function card(subagent: ConversationSubagent): Card {
   };
 }
 
-/** The subagent lists of one thread, and a wait for a list that matches. */
 function watch(client: AgentClient, thread: string) {
   const lists: ConversationSubagent[][] = [];
   const waiters = new Set<() => void>();
@@ -130,7 +126,6 @@ try {
   const workspace = join(root, "workspace");
   await mkdir(workspace);
 
-  // OpenCode, through its driver.
   {
     const log = join(root, "opencode.jsonl");
     const cli = await fakeCli("opencode", "opencode", log);
@@ -187,7 +182,6 @@ try {
     ]);
   }
 
-  // Kimi: the arguments come as content, and a background call is not shown.
   {
     const client = await flavoredClient("kimi");
     const thread = await startThread(client, { cwd: workspace, model: "fake/model" });
@@ -215,7 +209,6 @@ try {
     ]);
   }
 
-  // Cline: the task is in `rawInput`; another tool is not a subagent. A stopped turn stops its subagent.
   {
     const client = await flavoredClient("cline");
     const thread = await startThread(client, { cwd: workspace, model: "fake/model" });
@@ -251,7 +244,6 @@ try {
     assert.equal(cards[0]?.status, "stopped", "Stopping the turn stops its foreground subagent.");
   }
 
-  // Hermes: the goal is in the title.
   {
     const client = await flavoredClient("hermes");
     const thread = await startThread(client, { cwd: workspace, model: "fake/model" });

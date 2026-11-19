@@ -223,6 +223,13 @@ export const messages = {
     "現在のシークレットは使えなくなります。ホストはそれを使ったリクエストを拒否します。",
   "mobile.agent.webhook.rotateConfirm": "再生成",
   "mobile.agent.webhook.rotateFailed": "シークレットを再生成できませんでした。もう一度お試しください。",
+  "mobile.agent.webhook.giveToAgent": "署名シークレットを {name} に渡す",
+  "mobile.agent.webhook.giveTitle": "新しい署名シークレットを {name} に渡しますか？",
+  "mobile.agent.webhook.giveBody":
+    "現在のシークレットは使えなくなります。{name} は新しいシークレットを API キーとして保存し、送信元に追加できます。",
+  "mobile.agent.webhook.giveConfirm": "渡す",
+  "mobile.agent.webhook.giveFailed": "署名シークレットをエージェントに渡せませんでした。もう一度お試しください。",
+  "mobile.agent.webhook.given": "{name} が新しい署名シークレットを受け取りました。",
   "mobile.agent.webhook.activity": "アクティビティ",
   "mobile.agent.webhook.activityFailed": "アクティビティを読み込めませんでした。もう一度お試しください。",
   "mobile.agent.webhook.activity.ignored": "無視",
@@ -415,10 +422,11 @@ export const messages = {
     "このサーバーはエージェントごとの通知レベルを保存できません。サーバーを実行しているコンピューターで OpenBot をアップデートしてください。",
   "mobile.agent.newChat.title": "新しいチャット",
   "mobile.agent.newChat.starting": "新しいチャットを始めています…",
-  "mobile.agent.newChat.footer": "エージェントはこのチャットを忘れます。設定はそのままです。",
+  "mobile.agent.newChat.footer":
+    "エージェントは新しく始めますが、必要なときはこのチャットを検索できます。設定はそのままです。",
   "mobile.agent.newChat.confirmTitle": "{name} と新しいチャットを始めますか？",
   "mobile.agent.newChat.confirmBody":
-    "エージェントはこのチャットを忘れます。メッセージは区切り線の上に表示されたままです。指示、モデル、ツール、メモリー、ワークスペース、ブラウザーは変わりません。",
+    "エージェントは新しく始めますが、必要なときはこのチャットを検索できます。メッセージは区切り線の上に表示されたままです。指示、モデル、ツール、メモリー、ワークスペース、ブラウザーは変わりません。",
   "mobile.agent.newChat.confirm": "新しいチャットを始める",
   "mobile.agent.newChat.failed": "新しいチャットを始められませんでした",
   "mobile.agent.newChat.failedBody": "ホストは新しいチャットを始められませんでした。",

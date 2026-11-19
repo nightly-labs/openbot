@@ -49,6 +49,7 @@ export const messages = {
   "server.compatibility.updateHostTitle": "Werk OpenBot bij op {name}",
   "server.compatibility.unsafeDataTitle": "De host gaf onveilige gegevens terug",
   "server.compatibility.cannotConnectTitle": "Kan niet verbinden met {name}",
+  "server.compatibility.safeModeTitle": "{name} start niet",
   "server.compatibility.updateClientDescription":
     "Deze app ondersteunt alleen oudere protocollen dan de host. Werk deze app bij en probeer het opnieuw.",
   "server.compatibility.updateHostDescription":
@@ -106,6 +107,8 @@ export const messages = {
   "server.local.create": "Server maken",
   "server.local.creating": "Server maken…",
   "server.local.createFailed": "Kan de server niet maken.",
+  "server.local.createFailedRetry":
+    "Er ging iets mis. Probeer het opnieuw. Lukt het weer niet, start OpenBot dan opnieuw.",
   "server.local.limitReached":
     "Je kunt maximaal {limit} servers op deze computer hebben. Wis er een om een nieuwe te maken.",
   "server.local.deleteConfirmTitle": "{name} wissen?",
@@ -175,6 +178,7 @@ export const messages = {
   "server.hosted.detail.create.copy": "OpenBot naar de machine kopiëren",
   "server.hosted.detail.create.key": "Eenmalige inlogsleutel toevoegen",
   "server.hosted.detail.start.boot": "Machine aanzetten",
+  "server.hosted.detail.start.restore": "Gegevens herstellen",
   "server.hosted.detail.start.app": "OpenBot starten",
   "server.hosted.detail.start.wait": "Wachten tot OpenBot antwoordt",
   "server.hosted.detail.connect.signIn": "Inloggen als jou",

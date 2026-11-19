@@ -14,6 +14,8 @@ export const messages = {
     "Das Werkzeug wurde nicht ausgeführt. tool_call kann openbot.tool_search und openbot.tool_describe nicht ausführen. Rufe sie direkt mit denselben Argumenten auf.",
   "error.agent.toolCallEnvelopeKeys":
     "Das Werkzeug wurde nicht ausgeführt. tool_call nimmt nur name und arguments an. Gib die Argumente des Werkzeugs in arguments als Objekt an und sende den Aufruf erneut.",
+  "error.agent.toolCallMissingName":
+    "Das Werkzeug wurde nicht ausgeführt. Der tool_call hat keinen name. Gib in name den qualifizierten Namen aus tool_search an, zum Beispiel openbot.history_read, und sende den Aufruf erneut.",
   "error.agent.toolCallUnknownTool":
     "Das Werkzeug wurde nicht ausgeführt. tool_call hat kein Werkzeug mit diesem Namen gefunden. Verwende den genauen qualifizierten Namen aus tool_search, zum Beispiel openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
@@ -140,6 +142,10 @@ export const messages = {
     "Stoppe den Agenten und storniere seine Nachrichten in der Warteschlange, bevor du ihn löschst.",
   "error.agent.deleteIncomplete":
     "Die Agentendaten konnten nicht vollständig entfernt werden. Versuche erneut, den Agenten zu löschen.",
+  "error.agent.deleteFolderInUse":
+    "Die Arbeit eines anderen Agenten nutzt noch den Ordner dieses Agenten. Lösche den Agenten erneut, wenn diese Arbeit endet, oder nach einem Neustart von OpenBot.",
+  "error.agent.deleteWhenFolderFree":
+    "Die Arbeit eines anderen Agenten nutzt noch den Ordner dieses Agenten. OpenBot löscht diesen Agenten, wenn diese Arbeit endet.",
   "error.agent.duplicationBusy": "Dieser Agent wird bereits dupliziert.",
   "error.agent.waitBeforeDuplicate":
     "Warte, bis der Agent fertig ist, und leere seine Warteschlange, bevor du ihn duplizierst.",
@@ -208,6 +214,8 @@ export const messages = {
     "Der Bereich liegt nicht innerhalb eines Bildschirms. Verwende Desktop-Punkte innerhalb der Grenzen eines Bildschirms aus list_capture_sources.",
   "error.agent.screenCapturePermissionMissing":
     "OpenBot hat keine Berechtigung zur Bildschirmaufnahme. Bitte den Benutzer, Systemeinstellungen → Datenschutz & Sicherheit → Bildschirm- & Systemaudioaufnahme zu öffnen, OpenBot zu aktivieren und OpenBot dann zu beenden und neu zu öffnen.",
+  "error.agent.screenCaptureListPermission":
+    "OpenBot hat noch keine Berechtigung zur Bildschirmaufnahme und kann die Fenster daher nicht auflisten. Um einen Bildschirm aufzunehmen, rufe capture_screen mit target screen auf. Der Benutzer erlaubt die Aufnahme zuerst, danach kann macOS den Benutzer um die Berechtigung bitten.",
   "error.agent.screenCaptureEmptyWindows":
     "Windows hat ein leeres Bild geliefert. Bitte den Benutzer, den Computer zu entsperren und geschützte Inhalte zu schließen. Auch eine Richtlinie der Organisation kann die Bildschirmaufnahme verhindern.",
   "error.agent.screenCaptureFailed": "Die Bildschirmaufnahme ist fehlgeschlagen. Versuche es erneut.",

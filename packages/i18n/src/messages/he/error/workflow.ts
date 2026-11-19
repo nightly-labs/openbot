@@ -15,12 +15,16 @@ export const messages = {
   "error.workflow.agentMissing": "יש לבחור סוכן לשלב הזה.",
   "error.workflow.handoffFailed": "OpenBot לא הצליח לשלוח את השלב הזה לסוכן שלו.",
   "error.workflow.agentStepEnded": "ההודעה של הסוכן לשלב הזה הוסרה לפני שהוא ענה.",
+  "error.workflow.agentStepStopped": "הסוכן נעצר לפני שענה על השלב הזה. יש להריץ את השלב שוב.",
   "error.workflow.conditionUnclear": "המודל לא ענה כן או לא.",
   "error.workflow.modelFailed": "המודל לא הצליח לענות. יש להריץ את השלב שוב.",
   "error.workflow.modelTimedOut":
     "המודל לא ענה בזמן. יש לבחור רמת מאמץ נמוכה יותר או מודל מהיר יותר לשלב הזה, ואז להריץ אותו שוב.",
   "error.workflow.modelToolUse":
     "המודל ניסה להשתמש בכלי, אבל השלב הזה יכול לענות רק בטקסט. יש להריץ את השלב שוב, או לבחור לו מודל אחר.",
+  "error.workflow.modelImageUnsupported":
+    "המודל של השלב הזה לא יכול לקרוא תמונות. בחר מודל שיכול, או הסר את חיבור התמונה.",
+  "error.workflow.modelImageType": "שלב מודל יכול לקרוא רק תמונות PNG,‏ JPEG,‏ GIF ו-WebP. חבר תמונה מאחד הסוגים האלה.",
   "error.workflow.modelUnavailable": "המודל של השלב הזה לא זמין. יש לבחור מודל אחר לשלב הזה.",
   "error.workflow.providerBusy": "הספק עמוס. יש להמתין כמה דקות ואז להריץ את השלב שוב.",
   "error.workflow.providerOffline": "ל-OpenBot אין גישה לספק. יש לבדוק את החיבור לאינטרנט ואז להריץ את השלב שוב.",
@@ -31,6 +35,7 @@ export const messages = {
   "error.workflow.mediaInputMissing": "תמונה משלב קודם אינה זמינה. יש להריץ את השלב הזה שוב.",
   "error.workflow.mediaEmptyRequest": "יש לכתוב תיאור, או להריץ את השלבים שלפני השלב הזה כדי שיגיע טקסט או תמונה.",
   "error.workflow.mediaInputNotImage": "שלב זה מקבל רק תמונות, לא סרטונים. יש להסיר את החיבור מהסרטון.",
+  "error.workflow.mediaInputNotClip": "הקלט הזה מקבל רק סרטונים וקובצי שמע. יש להסיר את החיבור מהקובץ.",
   "error.workflow.stepMissing": "השלב הזה כבר לא קיים.",
   "error.workflow.nodeMissing": "השלב הזה אינו בתהליך העבודה.",
   "error.workflow.runMissing": "ההרצה הזו כבר לא קיימת.",

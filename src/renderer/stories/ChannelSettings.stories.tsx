@@ -17,16 +17,6 @@ import AgentSettingsPanel from "../src/features/conversation/AgentSettingsPanel"
 import { STORY_AGENT, STORY_AGENT_STATUS, STORY_AGENTS, STORY_MODELS, storyRuntimeSettings } from "./fixtures";
 import { createMockOpenBot } from "./mock-openbot";
 
-/*
- * The channel panel and the agent panel open in the same slot, so this file draws them together:
- * a mismatch in header height, divider, field rhythm or link row is only visible side by side.
- *
- * The channel body is written out here rather than mounted from `ChannelEditor`, because that
- * component reads the channels context, which needs the account, server and agent contexts and a
- * channel-aware `window.openbot` behind it. What is under test here is the shared panel, and the
- * body below uses the same components the editor does.
- */
-
 const members = STORY_AGENTS.slice(0, 4);
 
 function ChannelPanelBody() {
@@ -102,7 +92,6 @@ function ChannelPanelStory(props: { title: string; body: () => ReturnType<typeof
   );
 }
 
-/** The agent panel beside it, so the two headers and the two field stacks can be compared. */
 function AgentPanelStory() {
   const previousApi = window.openbot;
   const mock = createMockOpenBot({});
@@ -171,7 +160,6 @@ export const ChannelSettingsWithoutMembers: Story = {
   ),
 };
 
-/** The panel this one has to match. Compare the header, the divider and the field rhythm. */
 export const AgentSettingsForComparison: Story = {
   render: () => <AgentPanelStory />,
 };

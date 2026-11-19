@@ -116,6 +116,8 @@ export const messages = {
   "error.backend.memoryGone": "هذه الذكرى لم تعد موجودة.",
   "error.backend.routineGone": "هذه المهمة الدورية لم تعد موجودة.",
   "error.backend.routineRunGone": "تشغيل المهمة الدورية هذا لم يعد موجودًا.",
+  "error.backend.routineRunFailedNoReason":
+    "توقف التشغيل بسبب خطأ، لكن لم يصل معه أي سبب. افتح التشغيل لترى ما فعله الوكيل.",
   "error.backend.turnNotStarted": "لم يبدأ المزوّد هذا الدور.",
   "error.backend.routineResultConnectionOff": "اتصال المراسلة هذا متوقف أو تمت إزالته. اختر مكانًا آخر.",
   "error.backend.routineResultNoDelivery": "لا توجد لهذا التشغيل إجابة لإرسالها مرة أخرى.",
@@ -239,6 +241,8 @@ export const messages = {
     "يمكن لهذا الوكيل استخدام عدد محدود فقط من خوادم MCP. لاستخدام هذا الخادم، أوقف خادم MCP لا يحتاجه الوكيل.",
   "error.backend.mcpRegistrationRefused":
     "لا يقبل خادم تسجيل الدخول OpenBot كتطبيق بعد. حسابك ليس السبب. استخدم طريقة أخرى للاتصال، مثل خادم MCP محلي.",
+  "error.backend.mcpRegistrationUnavailable":
+    "لا يستطيع خادم تسجيل الدخول تسجيل OpenBot كتطبيق. حسابك ليس السبب. للاتصال، احفظ هذا الخادم في المتجر، التطبيقات، ثم أضف إليه تطبيق تسجيل دخول.",
   "error.backend.mcpSignInAbandonedGeneric": "تم التخلي عن تسجيل الدخول.",
   "error.backend.mcpSignInForgotten": "تم نسيان تسجيل الدخول إلى MCP أثناء تشغيله.",
   "error.backend.mcpSignInAbandoned": "تم التخلي عن تسجيل الدخول إلى MCP.",
@@ -250,6 +254,7 @@ export const messages = {
     "يطلب هذا الخادم تسجيل الدخول، ولا يسجّل OpenBot الدخول إلا عبر https. غيّر URL إلى {url}.",
   "error.backend.mcpSignInCancelled": "تم إلغاء تسجيل الدخول.",
   "error.backend.mcpSignInTimedOut": "لم يكتمل تسجيل الدخول في المتصفح.",
+  "error.backend.mcpSignInRefused": "رفضت صفحة تسجيل الدخول الوصول. سجّل الدخول مرة أخرى.",
   "error.backend.mcpSignInResponseTimedOut": "لم تصل استجابة تسجيل الدخول في الوقت المحدد.",
   "error.backend.mcpSignInMetadataUnreadable":
     "تعذّر على OpenBot قراءة معلومات تسجيل الدخول لهذا الخادم. تحقق من عنوان الخادم وحاول مرة أخرى.",
@@ -260,6 +265,7 @@ export const messages = {
   "error.backend.mcpServerFailedToStart": "لم يبدأ الخادم: {reason}",
   "error.backend.mcpServerStartAbandoned":
     "توقف {provider} عن الانتظار قبل أن يبدأ الخادم، لذلك لا يحصل وكلاؤه على أدوات هذا الخادم.",
+  "error.backend.mcpServerStoppedDuringCall": "توقف خادم MCP قبل أن يرد على هذا الاستدعاء.",
   "error.backend.mcpToolSchemaRefused":
     "أداته {tool} لها صيغة إدخال لا يستطيع هذا المزوّد قراءتها. الوكلاء على مزوّدين آخرين ما زالوا يحصلون على الخادم.",
   "error.backend.mcpServerSignInForProvider":
@@ -270,6 +276,10 @@ export const messages = {
     "تعذّر على {provider} تشغيل خادم MCP {name}. أدواته غير متاحة لـ {provider}. يشغّل {provider} الخادم بنفسه، لذلك قد ينجح اختبار الاتصال في OpenBot. ابدأ محادثة جديدة للمحاولة مرة أخرى.",
   "error.backend.mcpServerTimedOutInProvider":
     "تعذّر على {provider} تشغيل خادم MCP {name}، لأن الخادم لم يردّ في الوقت المحدد. ابدأ محادثة جديدة للمحاولة مرة أخرى.",
+  "error.backend.mcpServerUnavailableInProvider":
+    "تعذّر على {provider} تشغيل خادم MCP {name}، لأن الخادم غير متاح الآن. انتظر بضع دقائق، ثم ابدأ محادثة جديدة للمحاولة مرة أخرى.",
+  "error.backend.mcpServerUnreachableInProvider":
+    "تعذّر على {provider} الوصول إلى خادم MCP {name}. افتح {name} في المتجر، التطبيقات، وتأكد من أن عنوانه صحيح وأن الخادم يعمل. ثم ابدأ محادثة جديدة للمحاولة مرة أخرى.",
   "error.backend.mcpOAuthProxyUnavailable":
     "تعذّر على OpenBot بدء اتصال تسجيل الدخول المحلي لهذا الخادم. أعد تشغيل OpenBot، ثم حاول مرة أخرى.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -339,9 +349,9 @@ export const messages = {
   "error.backend.takeoverInactive": "تولي التحكم في المتصفح هذا لم يعد نشطًا.",
   "error.backend.authSubmitting": "إرسال المصادقة قيد التنفيذ بالفعل.",
   "error.backend.apiKeySaveFailed": "تعذّر على OpenBot حفظ مفتاح API. حاول مرة أخرى.",
-  "error.backend.apiKeyNotAllowed": "يمكن لمالك الخادم أو المسؤول فقط إدخال مفتاح API.",
   "error.backend.apiKeySaving": "يتم حفظ مفتاح API بالفعل.",
-  "error.backend.vaultItemNotAllowed": "يمكن لمالك الخادم أو المسؤول فقط إضافة عنصر إلى الخزنة.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "تعذّر على OpenBot قراءة مفتاح API. أدخل مفتاحًا من 8000 حرف أو أقل، واختر من يمكنه استخدامه.",
   "error.backend.vaultItemSaving": "يتم حفظ عنصر الخزنة بالفعل.",
   "error.backend.authRequestInactive": "طلب المصادقة الآمنة هذا لم يعد نشطًا.",
   "error.backend.secureAuthUnavailable": "المصادقة الآمنة غير متاحة.",
@@ -382,7 +392,7 @@ export const messages = {
   "error.backend.popupLoadFailed": "تعذّر تحميل النافذة المنبثقة. أعد محاولة تسجيل الدخول من الصفحة الأصلية.",
   "error.backend.browserTabNotFound": "لم يتم العثور على علامة تبويب المتصفح.",
   "error.backend.authActive": "المصادقة نشطة بالفعل.",
-  "error.backend.authHttpsRequired": "تتطلب المصادقة الآمنة HTTPS.",
+  "error.backend.authWebPageRequired": "تتطلب المصادقة الآمنة HTTP/HTTPS.",
   "error.backend.authDigitsRange": "تتطلب رموز المصادقة من 4 إلى 12 رقمًا.",
   "error.backend.authExpired": "انتهت صلاحية طلب المصادقة.",
   "error.backend.authDigitsRequired": "أدخل العدد المطلوب من الأرقام.",

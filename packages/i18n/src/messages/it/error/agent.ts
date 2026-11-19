@@ -14,6 +14,8 @@ export const messages = {
     "Il tool non è stato eseguito. tool_call non può eseguire openbot.tool_search o openbot.tool_describe. Chiamali direttamente con gli stessi argomenti.",
   "error.agent.toolCallEnvelopeKeys":
     "Il tool non è stato eseguito. tool_call accetta solo name e arguments. Metti gli argomenti del tool in arguments, come oggetto, e invia di nuovo la chiamata.",
+  "error.agent.toolCallMissingName":
+    "Il tool non è stato eseguito. Il tool_call non ha name. Metti in name il nome qualificato fornito da tool_search, ad esempio openbot.history_read, e invia di nuovo la chiamata.",
   "error.agent.toolCallUnknownTool":
     "Il tool non è stato eseguito. tool_call non ha trovato nessun tool con questo nome. Usa il nome qualificato esatto fornito da tool_search, ad esempio openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
@@ -129,6 +131,10 @@ export const messages = {
   "error.agent.deletionBusy": "L'eliminazione dell'agente è già in corso.",
   "error.agent.stopBeforeDelete": "Ferma l'agente e annulla i suoi messaggi in coda prima di eliminarlo.",
   "error.agent.deleteIncomplete": "Non è stato possibile rimuovere del tutto i dati dell'agente. Riprova a eliminarlo.",
+  "error.agent.deleteFolderInUse":
+    "Il lavoro di un altro agente usa ancora la cartella di questo agente. Eliminalo di nuovo quando quel lavoro finisce, o dopo aver riavviato OpenBot.",
+  "error.agent.deleteWhenFolderFree":
+    "Il lavoro di un altro agente usa ancora la cartella di questo agente. OpenBot elimina questo agente quando quel lavoro finisce.",
   "error.agent.duplicationBusy": "Questo agente è già in fase di duplicazione.",
   "error.agent.waitBeforeDuplicate": "Aspetta che l'agente finisca e svuoti la coda prima di duplicarlo.",
   "error.agent.saveOtherAgent": "Questo salvataggio appartiene a un altro agente.",
@@ -194,6 +200,8 @@ export const messages = {
     "L'area non è dentro un solo schermo. Usa punti del desktop entro i limiti di uno schermo indicato da list_capture_sources.",
   "error.agent.screenCapturePermissionMissing":
     "OpenBot non ha il permesso Registrazione schermo. Chiedi all'utente di aprire Impostazioni di Sistema > Privacy e sicurezza > Registrazione schermo e audio di sistema, attivare OpenBot, poi uscire e riaprire OpenBot.",
+  "error.agent.screenCaptureListPermission":
+    "OpenBot non ha ancora il permesso Registrazione schermo, quindi non può elencare le finestre. Per catturare uno schermo, chiama capture_screen con target screen. L'utente approva prima la cattura, poi macOS può chiedergli il permesso.",
   "error.agent.screenCaptureEmptyWindows":
     "Windows ha restituito un'immagine vuota. Chiedi all'utente di sbloccare il computer e chiudere i contenuti protetti. Anche un criterio dell'organizzazione può bloccare l'acquisizione dello schermo.",
   "error.agent.screenCaptureFailed": "L'acquisizione dello schermo non è riuscita. Riprova.",

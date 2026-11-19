@@ -1,8 +1,3 @@
-// Run: bun run test:skill-revision
-// Report: .openbot-build/skill-revision-e2e.json
-// Drives the agent skill tools that create and revise a local skill through the real local skill
-// library and installer, on temporary workspaces. Only the marketplace network boundary is a stub.
-
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -116,7 +111,6 @@ async function main(): Promise<void> {
       await check();
       report.cases.push({ name, status: "pass" });
     } catch (error) {
-      // Do not copy messages, stacks or values into the report.
       const reason = error instanceof assert.AssertionError ? "Assertion failed." : "An operation failed.";
       report.cases.push({ name, status: "fail", reason });
     }
@@ -139,7 +133,6 @@ async function main(): Promise<void> {
       const before = report.events.length;
       const revised = await run("caller", "revise_skill", { skillId, expectedRevision: 1, sourcePath: "drafts/v2" });
       assert.ok(Exit.isSuccess(revised));
-      // One "Revised skill" line, and no separate "Installed skill" line.
       assert.deepEqual(
         report.events.slice(before).map((event) => [event.action, event.revision]),
         [["revised", 2]],
@@ -180,12 +173,10 @@ async function main(): Promise<void> {
       const saved = await Effect.runPromise(library.get(report.events.at(-1)?.skillId ?? ""));
       assert.equal(saved.description, description);
       assert.equal(saved.instructions, "Write it.");
-      // The draft in the workspace stays as the agent wrote it.
       assert.equal(await readFile(join(otherWorkspace, "drafts/colon/SKILL.md"), "utf8"), draft);
     });
 
     await scenario("create saves a name with no Latin letter", async () => {
-      // A review writes the name in the user's language.
       const name = "月次レポート";
       await writeSkill(
         otherWorkspace,

@@ -227,7 +227,8 @@ available member. These selections use no model. Other requests use
 the lead's provider, model, and reasoning setting in a separate session with no work tools. The
 request supplies the accepted result schema and the channel summary in place of the transcript.
 Routing selects each member whose role or area the request touches, and only those (`agentIds`). A
-request in the area of one member goes to that member. A greeting, a question about the channel, an
+request in the area of one member goes to that member. A request that tells one member to get parts from
+other members or to combine their answers goes to that member only, and it gives out the parts. A greeting, a question about the channel, an
 unclear request, or a request in the area of no member goes to the lead only (the prompt names the
 lead), and the lead can ask the person in its own reply. A request for opinions or feedback on shared work goes to each member whose area gives a
 different view, and a request to the whole group goes to all of them. Each selected member gets its own root task for the same request message, answers in its own reply, and
@@ -272,7 +273,8 @@ them. A lead change does not move a task that already has an owner. The member p
 Channel tools retrieve history, assign a child task, transfer ownership, and report results. The
 runtime supplies channel and caller identity. A child keeps its parent owner; a transfer changes it.
 Only assignments and awaited results start turns. Completed child results are combined before the
-owner returns. The limit is eight automatic assignments per root request and two active assignments
+owner returns. `channel_assign` and `channel_transfer` refuse a member that answers the same request in a root
+task of its own: another task made it post the same answer again (#11082). The limit is eight automatic assignments per root request and two active assignments
 per channel (`CHANNEL_PARALLEL_LIMIT`).
 
 An agent can also give work to a channel from another conversation, such as its direct chat with
@@ -737,7 +739,8 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
   from a direct message. The two outbound tools, `messaging_list_places` and `messaging_post`, are
   the exception: the router passes them to `MessagingThreads.outboundTool` from any thread, their
   arguments name an enabled connection and a place, and `MessagingService` answers them through
-  `MessagingThreads.setOutbound` with the adapter's `places` and `postAnswer`, after `redactText`.
+  `MessagingThreads.setOutbound` with the adapter's `places` and `postAnswer`, after `redactPostText`
+  (the secret rules of `redactText`; an email address that the agent wrote stays).
   A `messaging_history` call that names a connection and a place goes the same way
   (`isMessagingOutboundCall`): `MessagingService` reads the adapter's `recent` only for a place that
   `places` lists. `outboundTool` refuses this read in a thread that has a messaging link, and in a
@@ -891,8 +894,11 @@ is one linked number (`workspace_id` is the number in digits).
   and its copy, and an edit changes the text, only when the sender is the saved `author_id`: the sender
   chooses the message id. A group admin's delete of another person's message is not followed. `MessagingService` deletes the rows and copies older than 90 days at start and
   each hour, also those of a number that is off; a disconnect deletes all of them for the connection.
-- **Not on joined servers.** `connectors-v1` and `routine-results-v1` stay as released: a host leaves
-  WhatsApp out of both, and the desktop IPC endpoints `messaging:*-whatsapp-*` are local only.
+- **Joined servers.** `connectors-v1` and `routine-results-v1` stay as released: a host leaves
+  WhatsApp out of both, and the desktop IPC endpoints `messaging:*-whatsapp-*` are local only. A client
+  that sends `routine-results-whatsapp-v1` also gets the WhatsApp numbers in the routine-results
+  options, so a routine or a workflow on a joined server can send to WhatsApp. A client without it
+  gets `destination: null` for a WhatsApp destination.
 
 ## Mobile chat queue
 

@@ -44,6 +44,7 @@ export const messages = {
   "server.compatibility.updateHostTitle": "עדכון OpenBot ב-{name}",
   "server.compatibility.unsafeDataTitle": "המארח החזיר נתונים לא בטוחים",
   "server.compatibility.cannotConnectTitle": "לא ניתן להתחבר אל {name}",
+  "server.compatibility.safeModeTitle": "{name} לא מופעל",
   "server.compatibility.updateClientDescription":
     "האפליקציה הזו תומכת רק בפרוטוקולים ישנים יותר מהמארח. יש לעדכן את האפליקציה ולנסות שוב.",
   "server.compatibility.updateHostDescription":
@@ -112,6 +113,7 @@ export const messages = {
   "server.local.create": "יצירת שרת",
   "server.local.creating": "יוצר שרת…",
   "server.local.createFailed": "לא ניתן ליצור את השרת.",
+  "server.local.createFailedRetry": "משהו השתבש. יש לנסות שוב. אם זה נכשל שוב, יש להפעיל מחדש את OpenBot.",
   "server.local.limitReached": "אפשר להחזיק לכל היותר {limit} שרתים במחשב הזה. יש למחוק אחד כדי ליצור אחר.",
   "server.local.deleteConfirmTitle": "למחוק את {name}?",
   "server.local.deleteConfirmDescription": "OpenBot עוצר את השרת ומעביר את הסוכנים, הצ'אטים והקבצים שלו לפח.",
@@ -179,6 +181,7 @@ export const messages = {
   "server.hosted.detail.create.copy": "מעתיק את OpenBot למכונה",
   "server.hosted.detail.create.key": "מוסיף מפתח התחברות חד-פעמי",
   "server.hosted.detail.start.boot": "מדליק את המכונה",
+  "server.hosted.detail.start.restore": "משחזר נתונים",
   "server.hosted.detail.start.app": "מפעיל את OpenBot",
   "server.hosted.detail.start.wait": "ממתין ש-OpenBot יענה",
   "server.hosted.detail.connect.signIn": "מתחבר בשמך",

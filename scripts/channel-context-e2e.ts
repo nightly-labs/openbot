@@ -1,37 +1,3 @@
-// Checks the context packet that a channel member gets. Runs the real agent service and channel
-// service on a temporary profile with a fake Codex app-server that logs the input of each turn.
-// Checks:
-//   1. The packet gives the assignment first and, when it is short, again at the end (#3630). The
-//      task facts in the packet do not give the instruction a second time.
-//   2. A delta packet does not give the member its own replies, which its session already has. It
-//      does not give the channel rules again, and it gives the channel facts only after they change.
-//   3. A task source that the member's cursor passed, but no summary covers, is in the packet (#3557).
-//   4. A long channel is summarized after a turn ends, so the next packet does not wait for the
-//      model. The summary keeps the newest messages as they are, and a complete packet then has the
-//      summary and a transcript in its part of the budget, with no message left out of both (#3905).
-//      The summary runs on the provider's smaller model, and the Lead's turns on its own model.
-//   5. A reply that continues a task marks its earlier turn superseded and keeps the channel summary,
-//      so the next turn does not summarize the channel again from the first message (#3761).
-//   6. Two compactions that leave a session at 76% of its window give one notice, and OpenBot asks
-//      for no more compactions of that session when it grows over 80% (#3905, #5150). A session
-//      that becomes smaller than 70% in another way compacts again when it grows over 80%.
-//   7. A provider that retries a request three times gives one notice, and a session at 60% of its
-//      window then compacts before its next turn (#4374). When no usage came after that compaction,
-//      a turn that retries again does not compact the session again (#4819).
-//   8. A channel_history page stays near 24,000 characters. It cuts a long message, and a read by
-//      messageId and offset gives the rest of it. It cuts a long task instruction. A long request is
-//      in the packet once, and a long handoff of an agent is cut with a pointer to the rest.
-//   9. A session at 60% of its window compacts before a turn whose input fills it over 80% (#4374).
-//  10. In an isolated channel, openbot.remember saves a channel memory and the agent keeps none of
-//      it. The packet says when isolation is on and when it is off (#4332).
-//  11. A reply that quotes a member's message and only mentions another member gives the quote in
-//      the assignment. The quote continues its task, and the packet does not show it superseded (#4841).
-//  12. Saved channel memories go in a delta only when they changed. A delta with the same memories says
-//      that the session has them.
-// `bun scripts/channel-context-e2e.ts`. Writes .openbot-build/channel-context-e2e/report.json.
-// `CHANNEL_CONTEXT_MEASURE=<label> bun scripts/channel-context-e2e.ts` runs no checks. It sends
-// MEASURE_TURNS requests to three members in turn, with long replies, and writes the size of each
-// packet and summary request to .openbot-build/channel-context-e2e/measure-<label>.json.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -52,11 +18,8 @@ const userData = join(root, "user-data");
 const home = join(root, "home");
 const fakeCodex = join(root, "codex");
 const fakeLog = join(root, "codex.jsonl");
-// A HOLD turn of the fake stays open until this file exists, so the check can call a channel tool.
-// The file stays, so a later turn of the same task ends at once.
 const release = join(root, "release");
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -77,21 +40,15 @@ const CHANNEL_RULE = "Use channel_history for earlier history";
 const SUMMARY_REQUEST = "Summarize shared facts";
 const UNCHANGED_MEMORIES = "The saved channel memories are the same as in your earlier channel message";
 const SUMMARY_TEXT = "Summary: the team discussed the release.";
-// The complete packet budget is 120,000 characters, and its transcript part is a quarter of that.
 const TRANSCRIPT_CHARACTERS = 30_000;
 const MEASURE = process.env.CHANNEL_CONTEXT_MEASURE?.replace(/[^\w-]/g, "") || null;
 const MEASURE_TURNS = 30;
-// A reply and a summary of about the size that a real member writes.
 const MEASURE_MEMORIES = 8;
 const measureMemory = (index: number) =>
   `Memory ${index}: ${"The release checklist needs a signed build and a tested database backup. ".repeat(6)}`;
 const MEASURE_REPLY = `Reply: ${"I checked this step and wrote down what is left to do. ".repeat(36)}`;
 const MEASURE_SUMMARY = `${SUMMARY_TEXT} ${"The members checked one more step of the plan. ".repeat(85)}`;
 
-/**
- * A Codex app-server with the methods that the service calls. It logs the text input of each turn
- * with its thread, answers a summary request with a short summary, and every other turn with "Done.".
- */
 const FAKE_CODEX = `#!/usr/bin/env node
 const { appendFileSync, existsSync } = require("node:fs");
 if (process.argv.includes("--version")) {
@@ -106,14 +63,12 @@ let threads = 0;
 let turns = 0;
 let calls = 0;
 const quietCompactions = new Set();
-// The tool calls that wait for the answer of OpenBot, by request id.
 const waiting = new Map();
 process.stdout.on("error", (error) => {
   if (error.code === "EPIPE") process.exit(0);
   throw error;
 });
 const log = (entry) => appendFileSync(LOG, JSON.stringify(entry) + "\\n");
-// Runs each step on its own tick, as a provider sends them one by one.
 const run = (steps) => {
   const next = () => {
     const step = steps.shift();
@@ -151,15 +106,12 @@ const answer = (message) => {
       log({ threadId, turnId, text, model: params.model });
       write({ id: message.id, result: { turn: { id: turnId, status: "inProgress", items: [] } } });
       write({ method: "turn/started", params: { threadId, turn: { id: turnId } } });
-      // Only the current assignment selects a behavior: the transcript repeats earlier ones.
       const assignment = (text.match(/Current assignment:\\n([^\\n]*)/) || [])[1] || "";
       const reply = text.includes(${JSON.stringify(SUMMARY_REQUEST)})
         ? ${JSON.stringify(MEASURE ? MEASURE_SUMMARY : SUMMARY_TEXT)}
         : assignment.startsWith("MEASURE") ? ${JSON.stringify(MEASURE_REPLY)} : "Done.";
       const steps = [];
       if (assignment.startsWith("STUCK")) {
-        // Codex compacts by itself twice, and each time the session stays at 76% of its window.
-        // Then the turn grows it over the threshold again.
         for (let index = 0; index < 2; index++) {
           const item = { type: "contextCompaction", id: "compaction-" + turnId + "-" + index };
           steps.push(() => write({ method: "item/started", params: { threadId, turnId, item } }));
@@ -171,7 +123,6 @@ const answer = (message) => {
       if (assignment.startsWith("USAGE")) steps.push(() => usage(threadId, turnId, 60000));
       if (assignment.startsWith("FULL")) steps.push(() => usage(threadId, turnId, 84000));
       if (assignment.startsWith("RETRY")) {
-        // As in #4819, a compaction of this session and a turn that fails after retries report no usage.
         quietCompactions.add(threadId);
         if (!assignment.startsWith("RETRY AGAIN")) steps.push(() => usage(threadId, turnId, 60000));
         for (let index = 0; index < 3; index++)
@@ -182,7 +133,6 @@ const answer = (message) => {
         write({ method: "item/completed", params: { threadId, turnId, item } });
         write({ method: "turn/completed", params: { threadId, turn: { id: turnId, status: "completed" } } });
       };
-      // An agent saves a fact with openbot.remember: first with a memoryId, then without one.
       const call = (args, then) => {
         const id = "tool-" + (++calls);
         waiting.set(id, (response) => {
@@ -304,7 +254,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service or the fake's log. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -339,10 +288,8 @@ function pass(name: string, condition: boolean, detail?: string) {
   assert.ok(condition, detail ? `${name}: ${detail}` : name);
 }
 
-/** The blocks of a packet, which are separated by blank lines. An empty block adds more of them. */
 const blocks = (packet: string) => packet.split(/\n{2,}/);
 
-/** The transcript block of a packet: the recent messages of a complete one, or the unread ones of a delta. */
 function transcript(packet: string): string {
   const block = blocks(packet).find(
     (entry) => entry.startsWith("Recent shared messages:") || entry.startsWith("Shared messages after"),
@@ -351,7 +298,6 @@ function transcript(packet: string): string {
   return block;
 }
 
-/** The message rows of one block, parsed. */
 function rows(block: string): { id: string; author: { id: string } }[] {
   return block
     .split("\n")
@@ -360,7 +306,6 @@ function rows(block: string): { id: string; author: { id: string } }[] {
     .map((line) => JSON.parse(line));
 }
 
-/** The JSON block with the channel and task facts. */
 function facts(packet: string): {
   channel?: { instructions: string; isolated?: boolean };
   task?: { id?: string; instruction?: string; expectedResult?: string };
@@ -406,7 +351,6 @@ agents.on("event", (event: AgentEvent) => {
     events.push({ code: event.code, message: event.message, ...(event.agentId ? { agentId: event.agentId } : {}) });
 });
 
-/** Waits until no task of the channel is open and no member turn runs. */
 function settled(channelId: string) {
   return waitFor("the channel tasks to end", () =>
     channels()
@@ -415,10 +359,6 @@ function settled(channelId: string) {
   );
 }
 
-/**
- * Sends a person's message to one member and waits for its packet. Without `open`, it also waits
- * for the channel to settle.
- */
 async function send(
   channelId: string,
   recipientAgentId: string,
@@ -473,7 +413,6 @@ try {
     );
     return agent;
   };
-  // The Lead's model costs more than the provider's default model, which the summaries then use.
   const lead = await create("Lead", "gpt-6-sol");
   const tester = await create("Tester");
   const writer = MEASURE ? await create("Writer") : null;
@@ -501,7 +440,6 @@ try {
   await save("Ship the release.", false);
 
   if (MEASURE) {
-    // Saved channel memories go in each packet that has a changed memory list.
     for (let index = 0; index < MEASURE_MEMORIES; index++)
       channels().memories.saveFromTool(channelId, measureMemory(index), randomUUID(), randomUUID());
     const members = [lead, tester, writer ?? lead];
@@ -529,7 +467,6 @@ try {
         agent: items[0]?.agent,
         turns: items.length,
         packetCharacters: items.reduce((total, turn) => total + turn.characters, 0),
-        // The provider session holds each packet and each reply of the member.
         contextCharacters: items.reduce((total, turn) => total + turn.characters + MEASURE_REPLY.length, 0),
       };
     });
@@ -548,7 +485,6 @@ try {
       deltaTurns: turns.filter((turn) => turn.delta).length,
       summaryRequests: summaries.length,
       summaryCharacters,
-      // About four characters make one token.
       estimatedInputTokens: Math.round((packetCharacters + summaryCharacters) / 4),
       sessions,
       perTurn: turns.map(({ agent, characters, delta, memories }) => ({ agent, characters, delta, memories })),
@@ -557,7 +493,6 @@ try {
     writeFileSync(join(OUT, `measure-${MEASURE}.json`), `${JSON.stringify(measured, null, 2)}\n`);
     process.stdout.write(`MEASURE ${join(OUT, `measure-${MEASURE}.json`)}\n`);
   } else {
-    // 1. The assignment is first, and a short one again at the end.
     const first = await send(channelId, lead.id, "Plan the release checklist.");
     record("Lead", first);
     const firstBlocks = blocks(first);
@@ -584,8 +519,6 @@ try {
       first.includes(CHANNEL_RULE) && Boolean(firstFacts.channel),
     );
 
-    // 2 and 3. A reply to the first request continues its task: the delta has no own reply, and the
-    // first request, which the cursor passed and no summary covers, is a referenced message.
     const request = messages(channelId).find((message) => message.message.text === "Plan the release checklist.");
     assert.ok(request, "The first request is not stored.");
     const reply = await send(channelId, lead.id, "Add the database backup step.", request.id);
@@ -612,7 +545,6 @@ try {
       !facts(reply).channel,
       JSON.stringify(facts(reply)),
     );
-    // A person changes the instructions in the channel settings. That writes no channel message.
     await save("Ship the release on Friday.");
     const changed = await send(channelId, lead.id, "Check the date.");
     record("Lead", changed);
@@ -622,14 +554,12 @@ try {
       JSON.stringify(facts(changed)),
     );
 
-    // 12. Saved channel memories go in a delta only when they changed. The delta says that the
-    // session has them, and a changed memory list goes again in full.
     const remembered = "The release needs a signed build.";
-    channels().memories.saveFromTool(channelId, remembered, randomUUID(), randomUUID());
+    const memory = channels().memories.saveFromTool(channelId, remembered, randomUUID(), randomUUID());
     const withMemory = await send(channelId, lead.id, "Read the saved memory.");
     pass(
-      "A delta after a new memory gives the memories",
-      withMemory.includes(`<channel_memories>\n${remembered}\n</channel_memories>`),
+      "A delta after a new memory gives the memories, each after its id",
+      withMemory.includes(`<channel_memories>\n[${memory.id}] ${remembered}\n</channel_memories>`),
       blocks(withMemory).find((entry) => entry.includes("channel memories")),
     );
     const sameMemory = await send(channelId, lead.id, "Check the build again.");
@@ -649,8 +579,6 @@ try {
     channels().memories.deleteByText(channelId, remembered);
     channels().memories.deleteByText(channelId, added);
 
-    // 4. Grow the history over the start of the summary after a turn, but not over the packet
-    // threshold. Only the summary after a turn summarizes it now: no packet is prepared.
     const paragraph = (index: number) => `Note ${index}: ${"the release needs one more check. ".repeat(180)}`;
     const notes: string[] = [];
     for (let index = 0; index < 4; index++) notes.push(await send(channelId, lead.id, paragraph(index)));
@@ -685,7 +613,6 @@ try {
     const aheadInput = summaryInputs().at(-1)?.text ?? "";
     pass("The summary keeps the newest note as it is", !aheadInput.includes("Note 3:"));
 
-    // The Tester has no session in this channel, so its first packet is complete.
     for (let index = 4; index < 6; index++) await send(channelId, lead.id, paragraph(index));
     const complete = await send(channelId, tester.id, "Review the checklist.");
     record("Tester", complete);
@@ -704,7 +631,6 @@ try {
     pass("The transcript keeps the newest notes", complete.includes("Note 4:") && complete.includes("Note 5:"));
     pass("The new request of the Tester is in the packet", complete.includes("Review the checklist."));
 
-    // 5. Grow the history more, then continue a summarized task.
     for (let index = 8; index < 16; index++) await send(channelId, lead.id, paragraph(index));
     await send(channelId, lead.id, "Summarize where we are.");
     const before = channels().store.summary(channelId);
@@ -735,7 +661,6 @@ try {
       after.throughSequence >= before.throughSequence && after.text === SUMMARY_TEXT,
       JSON.stringify(report.summary),
     );
-    // A rebuild starts again at the first message, so the model gets the first request again.
     pass(
       "The channel is not summarized again from the first message",
       summaryInputs()
@@ -744,7 +669,6 @@ try {
       JSON.stringify(report.summaryRequests),
     );
 
-    // 6. Codex compacts the Tester's session twice in one turn, and the session stays almost full.
     const stuck = await send(channelId, tester.id, "STUCK: check the context of this chat.");
     const stuckThread = packets().find((entry) => entry.text === stuck)?.threadId;
     assert.ok(stuckThread, "The Tester's packet has no thread.");
@@ -753,7 +677,6 @@ try {
     );
     pass("The notice gives the share of the window", ineffective.message.includes("76%"), ineffective.message);
     pass("OpenBot asks for no compaction of the full session", compactions(stuckThread) === 0);
-    // Tools that the agent no longer has leave the session at 60%, and it then grows over 80%.
     const smaller = await send(channelId, tester.id, "USAGE: report the size.");
     await send(channelId, tester.id, "FULL: report the size.");
     pass(
@@ -763,7 +686,6 @@ try {
     await waitFor("the compaction of the session that became smaller", () => compactions(stuckThread) > 0);
     pass("A session that became smaller compacts again", compactions(stuckThread) === 1);
 
-    // 7. Codex retries a request of the Lead three times while its session is at 60% of the window.
     const retried = await send(channelId, lead.id, "RETRY: run the release check.");
     const retryThread = packets().find((entry) => entry.text === retried)?.threadId;
     assert.ok(retryThread, "The Lead's packet has no thread.");
@@ -778,17 +700,13 @@ try {
     );
     await waitFor("the compaction after the retries", () => compactions(retryThread) > 0);
     pass("The session compacts after a turn that the provider retried", compactions(retryThread) === 1);
-    // The compaction reported no usage, so nothing tells whether it helped. Each turn compacted again (#4819).
     await send(channelId, lead.id, "RETRY AGAIN: run the release check.");
-    // A compaction at the end of that turn would start before the next turn of the session.
     await send(channelId, lead.id, "Say one word.");
     pass(
       "A retried turn with no usage since the last compaction does not compact again",
       compactions(retryThread) === 1,
     );
 
-    // 8. A person posts a message longer than one history part. The Tester then reads the history
-    // during an open turn.
     const long = `Long log start. ${"The release log has one more line. ".repeat(1_200)}Long log end.`;
     const longPacket = await send(channelId, lead.id, long);
     pass(
@@ -865,7 +783,6 @@ try {
       "A read by messageId gives the long message in parts",
       parts === Math.ceil(long.length / 16_000) && text === long,
     );
-    // The Tester hands a pasted log to the Lead. The Lead's packet cuts it, and points to the rest.
     const handoffText = `Handoff log start. ${"One more line of the pasted log. ".repeat(900)}Handoff log end.`;
     const holdRequest = messages(channelId).find((message) => message.message.text === "HOLD: read the history.");
     assert.ok(holdRequest, "The HOLD request is not stored.");
@@ -904,8 +821,6 @@ try {
     writeFileSync(release, "");
     await settled(channelId);
 
-    // 9. The Lead's session is at 60% of its window. A short message does not compact it, and a
-    // message of about 22,000 tokens compacts it before its turn.
     const usageThread = retryThread;
     await send(channelId, lead.id, "USAGE: report the size.");
     const atSixty = compactions(usageThread);
@@ -925,8 +840,6 @@ try {
       `${beforeLarge} -> ${compactions(usageThread)}, ${large.length} characters`,
     );
 
-    // 10. #4332: in an isolated channel, openbot.remember saves a channel memory, and the agent keeps
-    // none of it. A save without the field, as from a client before it, keeps the channel isolated.
     await save("Ship the release.", true, true);
     await save("Ship the release.");
     pass("A save without isolated keeps the channel isolated", channels().store.get(channelId).isolated === true);
@@ -968,7 +881,6 @@ try {
         !sharedPacket.includes("openbot.remember saves a channel memory here"),
     );
 
-    // 11. The person quotes the Tester's answer and only mentions the Lead.
     const answer = messages(channelId)
       .filter((message) => message.author.id === tester.id && message.message.text === "Done.")
       .at(-1);

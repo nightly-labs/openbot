@@ -718,16 +718,18 @@ Frozen protocol projections continue to show ordinary takeover to older clients.
 carry validated metadata beside those projections. There is no database schema change.
 
 A password can also go to the Vault of the server that runs the agent. The local app sends
-`saveToVault` over IPC. A remote client sends the same submit on `browser-secret-vault-v1`, which
-only an owner or admin can use; the released route keeps its fields. The card shows the save box on
-every password request, and for a member or an older host it shows the box off with the reason.
+`saveToVault` over IPC. A remote client sends the same submit on `browser-secret-vault-v1`; the
+released route keeps its fields. A host with `vault-member-save-v1` takes the save from any member;
+an older host takes it only from an owner or admin. The card shows the save box checked on every
+password request, and for a member of an older host, or an older host without the route, it shows
+the box off with the reason.
 
 `openbot_browser.request_vault_item` asks the user to add a login, a card or contact info that the
 Vault does not have. The attention registry surfaces a `form` UI block with `uiBlock.vault.kind`.
 The agent can fill in the fields that are not secret; the password, card number and security code
 are secret form fields, so the stored block never holds them. The desktop card opens the Vault
-dialog with the agent's values. The host saves the answer through `VaultItems.addEntered` (owner or
-admin only) and answers the tool with only the item's id, kind and name. The `ui-blocks-v1` wire
+dialog with the agent's values. The host saves the answer through `VaultItems.addEntered` (any
+member on a host with `vault-member-save-v1`, an owner or admin on an older host) and answers the tool with only the item's id, kind and name. The `ui-blocks-v1` wire
 leaves out `vault`; `ui-block-vault-v1` (protocol 9) adds it back, and the mobile app then shows the
 same card, which opens its Vault item form with the agent's values and answers the prompt with the
 form's field ids. Another remote client shows the ordinary form. Messaging threads refuse the tool.
@@ -746,4 +748,13 @@ URL with GET to replace the document without replaying a form POST. Failure reta
 clears navigation history; manual takeover
 completion alone cannot release it. Secrets are not retried. Authentication inside unsupported frames,
 unclear OAuth account selection, CAPTCHA (after the one checkbox click that a snapshot offers),
-passkeys, and payment confirmation use takeover.
+passkeys, and a payment confirmation that the agent cannot complete, such as approval in a bank app,
+use takeover.
+
+A bank's payment code at checkout (3-D Secure) is not an OpenBot secret. When the code is in an email
+or SMS that the agent can read, such as a mail tab that it reloads, the agent types it into the bank's frame, so a weekly order
+does not wait for a person. The browser core guidance (`tool-guidance.ts`) limits this to a checkout
+that the user approved, and to a message that names the same merchant and amount; the agent types the
+newest code once. Any other case, or a refused code, goes to takeover, or in a routine run to the report.
+`bun run bench:browser-tools --variants=S --tasks=checkout-3ds-inbox-tab,checkout-3ds,checkout-3ds-mismatch`
+checks these cases on a loopback shop, bank frame and inbox.

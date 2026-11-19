@@ -141,6 +141,8 @@ class QuickActionsModule : Module() {
     when (icon) {
       "routines" -> R.drawable.openbot_quick_action_routines
       "search" -> R.drawable.openbot_quick_action_search
+      "share" -> R.drawable.openbot_quick_action_share
+      "support" -> R.drawable.openbot_quick_action_support
       else -> R.drawable.openbot_quick_action_agent
     }
 }

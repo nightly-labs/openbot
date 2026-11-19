@@ -14,6 +14,8 @@ export const messages = {
     "Инструмент не запущен. tool_call не может запускать openbot.tool_search и openbot.tool_describe. Вызовите их напрямую с теми же аргументами.",
   "error.agent.toolCallEnvelopeKeys":
     "Инструмент не запущен. tool_call принимает только name и arguments. Передайте аргументы инструмента в arguments как объект и отправьте вызов снова.",
+  "error.agent.toolCallMissingName":
+    "Инструмент не запущен. В tool_call нет name. Укажите в name полное имя из tool_search, например openbot.history_read, и отправьте вызов снова.",
   "error.agent.toolCallUnknownTool":
     "Инструмент не запущен. tool_call не нашёл инструмент с таким именем. Используйте точное полное имя из tool_search, например openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
@@ -123,6 +125,10 @@ export const messages = {
   "error.agent.deletionBusy": "Агент уже удаляется.",
   "error.agent.stopBeforeDelete": "Остановите агента и отмените его сообщения в очереди, прежде чем удалять.",
   "error.agent.deleteIncomplete": "Данные агента удалены не полностью. Повторите удаление.",
+  "error.agent.deleteFolderInUse":
+    "Работа другого агента ещё использует папку этого агента. Удалите агента снова, когда эта работа закончится, или после перезапуска OpenBot.",
+  "error.agent.deleteWhenFolderFree":
+    "Работа другого агента ещё использует папку этого агента. OpenBot удалит этого агента, когда эта работа закончится.",
   "error.agent.duplicationBusy": "Этот агент уже дублируется.",
   "error.agent.waitBeforeDuplicate":
     "Дождитесь, пока агент закончит работу, и очистите его очередь, прежде чем дублировать.",
@@ -184,6 +190,8 @@ export const messages = {
     "Область не помещается в один дисплей. Используйте точки рабочего стола в границах одного дисплея из list_capture_sources.",
   "error.agent.screenCapturePermissionMissing":
     "У OpenBot нет разрешения «Запись экрана». Попросите пользователя открыть «Системные настройки» → «Конфиденциальность и безопасность» → «Запись экрана и системного звука», включить OpenBot, затем закрыть и снова открыть OpenBot.",
+  "error.agent.screenCaptureListPermission":
+    "У OpenBot ещё нет разрешения «Запись экрана», поэтому он не может показать список окон. Чтобы снять экран, вызовите capture_screen с target screen. Пользователь сначала одобряет снимок, затем macOS может запросить у него разрешение.",
   "error.agent.screenCaptureEmptyWindows":
     "Windows вернула пустое изображение. Попросите пользователя разблокировать компьютер и закрыть защищённое содержимое. Снимки экрана также может запрещать политика организации.",
   "error.agent.screenCaptureFailed": "Не удалось сделать снимок экрана. Повторите попытку.",

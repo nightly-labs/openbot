@@ -1,5 +1,84 @@
 [
   {
+    "version": "0.74.0",
+    "date": "2026-11-19",
+    "notices": [
+      "Werk ook elke server waarbij je bent aangesloten bij naar deze versie. Op een server werken kleine kopieën van de afbeeldingen op het workflowcanvas, aangepaste videolengtes en agents die een verzoek afronden zonder dat je «doorgaan» typt, alleen als de server deze versie heeft.",
+      "Als OpenBot op Linux na de update nog steeds traag is, verwijder dan het bestand `~/.config/OpenBot/gpu-crash.json` en start OpenBot opnieuw.",
+      "Als je bij Instellingen van aanbieder Nadenken voor een Mistral-agent hebt ingesteld, selecteer dan het niveau opnieuw in het menu Denkniveau en reset de oude rij Nadenken."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Deel je uitnodigingslink in Instellingen > Invite friends. Het tabblad toont je tegoed en de vrienden die zich hebben aangemeld. Een vriend krijgt 10% korting op elke betaling, en jij krijgt 10% van elke betaalde factuur van je vriend als tegoed.",
+          "Zet knooppunten van een workflowcanvas in een groep. Selecteer ze en druk op Groeperen (⌘G). Vouw een groep samen tot één stapelkaart, en druk op Groep opheffen (⇧⌘G) om de groep te beëindigen.",
+          "Geef een videostap op het workflowcanvas elke lengte die het Sunra- of Higgsfield-model ondersteunt. Selecteer Aangepast in het menu Lengte en gebruik de schuifregelaar.",
+          "Open de Marktplaats vanuit de rij Apps in de instellingen van een agent. Koppel een app, of voeg je eigen MCP-server toe met Eigen toevoegen.",
+          "Wanneer je inlogt op een nieuwe computer en je account heeft al servers, toont de eerste stap ze. Open een server om verder te gaan met de agents en chats daarvan."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Agents ronden je verzoek af zonder dat je «doorgaan» hoeft te typen. Als een deel van het verzoek nog niet klaar is, gaat de agent met dat deel verder, maximaal 3 keer. Een vraag die jouw keuze of goedkeuring nodig heeft, stopt de agent nog steeds.",
+          "Tabbladen van het zijpaneel behouden hun titel en één breedte. Als de tabbladen niet passen, scrolt de rij, en een menu aan het eind van de rij toont de andere tabbladen. Met een middelklik sluit je een tabblad.",
+          "Op een server waarbij je bent aangesloten, verschijnen de afbeeldingen op het workflowcanvas veel sneller. Het canvas krijgt een kleine kopie van elke afbeelding, en de volledige afbeelding opent in de viewer.",
+          "Een thread ziet er nu uit als de chat van de agent. Berichten van dezelfde afzender lezen als één blok, en de stappen van een antwoord staan ernaast."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Een Claude- of ChatGPT-agent blijft niet meer uren op «Bezig» staan wanneer de provider niet meer reageert. Na 15 minuten zonder uitvoer (60 minuten terwijl een tool draait) beëindigt OpenBot de beurt, en de wachtende berichten gaan verder.",
+          "Met «Mijn Claude Code-configuratie gebruiken» uit, laden Claude-agents je algemene Claude Code-instructies en -regels niet meer. Elke beurt is sneller en kost minder. Wil je ze houden, zet «Mijn Claude Code-configuratie gebruiken» dan aan.",
+          "Je agents blijven werken terwijl OpenBot een providerupdate downloadt. Een download die een minuut geen gegevens krijgt, stopt en gaat verder waar hij was gebleven wanneer je het opnieuw probeert.",
+          "Agents sturen berichten weer rechtstreeks naar hun teamgenoten. Eerder vroeg een kaart je om elke overdracht goed te keuren, en het werk stopte tot je goedkeurde.",
+          "Een agent met automatische reservemodellen gaat in meer gevallen naar zijn volgende reservemodel, bijvoorbeeld na een limiet op het aantal verzoeken of wanneer Gemini de verbinding met Google verliest."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.73.0",
+    "date": "2026-11-18",
+    "notices": [
+      "Nadat je deze versie hebt geïnstalleerd, kun je niet meer terug naar een oudere OpenBot-versie op deze computer of server. Deze versie maakt de database kleiner, en een oudere versie kan die niet openen.",
+      "Update ook elke server waarbij je bent aangesloten naar deze versie. Op een server werken eigen afbeeldingsformaten, de Sunra- en Higgsfield-modellen en -prijzen, en het sneller laden van veel agents alleen als de server deze versie heeft."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Bekijk de zijthreads van elke agent in de zijbalk. Selecteer de pijl aan het eind van een agentrij, of houd de aanwijzer op de rij om al zijn threads te zien.",
+          "Filter de zijbalk met de filterknop aan het einde van het zoekveld. Toon alleen agents of kanalen, alleen ongelezen chats of agents die aan het werk zijn, of alleen de chats in de mappen die je selecteert.",
+          "Geef een afbeeldingsstap op het workflowcanvas een eigen formaat in pixels, of gebruik de beeldverhouding 4:5 of 5:4.",
+          "Het workflowcanvas toont alle afbeeldings- en videomodellen van Sunra en Higgsfield, en de knop Uitvoeren toont de prijs in credits.",
+          "Zet Achtergrondvervaging en Bewegende agentgezichten uit bij Instellingen → Weergave → Beweging om OpenBot sneller te maken op een trage computer."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Meerdere mensen kunnen tegelijk dezelfde workflow bewerken. Het canvas voegt de wijzigingen van de anderen toe zodra ze opslaan.",
+          "OpenBot gebruikt veel minder CPU terwijl veel agents werken, en je kunt typen zonder vertraging.",
+          "Agents ronden een betaling af wanneer de bank om een 3-D Secure-code vraagt. Staat de code in een e-mail of sms die de agent kan lezen, dan typt de agent hem in.",
+          "Serverinstellingen → Overdracht → Kopiëren naar een andere server kopieert nu ook de workflows en routinestromen van de agents."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "De OpenBot-database neemt veel minder ruimte in. Na de update verwijdert OpenBot in kleine stappen oude kopieën van chatberichten.",
+          "Op Windows toont een update weer de voortgang.",
+          "Een aangesloten server met veel agents en een groot kanaal openen sneller.",
+          "Gemini-chats met veel afbeeldingen of een lange geschiedenis blijven werken, en Gemini vraagt niet meer om opnieuw in te loggen wanneer een nieuwe chat begint.",
+          "De desktopapp maakt weer verbinding met een server op OpenBot v0.34.1 of ouder."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.72.0",
     "date": "2026-11-16",
     "notices": [

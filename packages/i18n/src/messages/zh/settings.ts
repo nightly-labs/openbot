@@ -2,11 +2,9 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/settings";
 
 export const messages = {
-  // The language setting itself.
   "settings.language.title": "语言",
   "settings.language.description": "OpenBot 的菜单、按钮和消息将使用该语言显示。",
   "settings.language.system": "跟随系统",
-  // The logo color setting, General tab.
   "settings.appearance.title": "外观",
   "settings.appearance.theme.title": "主题",
   "settings.appearance.theme.description": "浅色或深色。“跟随系统”会使用设备的设置。",
@@ -24,6 +22,11 @@ export const messages = {
   "settings.codeFont.title": "代码字体",
   "settings.codeFont.description": "代码、终端和文件路径使用的字体。",
   "settings.codeFont.default": "默认",
+  "settings.motion.title": "动效",
+  "settings.backgroundBlur.title": "背景模糊",
+  "settings.backgroundBlur.description": "菜单和对话框背后的模糊效果。在没有 GPU 的电脑上默认关闭。",
+  "settings.movingFaces.title": "动态智能体面孔",
+  "settings.movingFaces.description": "智能体面孔会眨眼和移动。在没有 GPU 的电脑上默认静止。",
   "settings.logoColor.title": "标志颜色",
   "settings.logoColor.description": "显示在 Dock、任务栏和灵动岛中。",
   "settings.logoColor.buildNote": "当前版本使用自己的标志颜色，该选项仅对正式版生效。",
@@ -79,7 +82,6 @@ export const messages = {
   "settings.bubbleStyle.solid": "纯色",
   "settings.bubbleStyle.tint": "淡色",
   "settings.bubbleStyle.classic": "经典",
-  // The Settings window, General tab.
   "settings.appBehavior.title": "应用行为",
   "settings.conversations.title": "对话",
   "settings.launchAtLogin.title": "登录时启动 OpenBot",
@@ -101,7 +103,6 @@ export const messages = {
   "settings.quitGuard.never": "从不",
   "settings.externalLinks.title": "打开外部链接的方式",
   "settings.externalLinks.description": "聊天、登录页面和账单页面中的链接在这里打开。",
-  // The two link targets. The saved value stays in English; only the label is translated.
   "settings.externalLinks.defaultBrowser": "默认浏览器",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "默认浏览器（{name}）",
@@ -112,7 +113,6 @@ export const messages = {
   "settings.externalLinks.useCommand": "使用",
   "settings.externalLinks.fallback.title": "无法打开 {name}",
   "settings.externalLinks.fallback.description": "链接已在默认浏览器中打开。",
-  // The message send shortcut. The saved mode stays in English; only the labels are translated.
   "settings.sendShortcut.title": "发送快捷键",
   "settings.sendShortcut.description": "选择在这台设备和浏览器上发送消息的按键。",
   "settings.chatOrder.description": "选择此设备的侧栏如何排列聊天。选择手动或最近活动会关闭未读分组。",
@@ -127,7 +127,6 @@ export const messages = {
   "settings.busyMessage.title": "助手工作时的消息处理方式",
   "settings.busyMessage.description":
     "新消息会并入助手当前的工作，而不是进入队列。不支持此功能的助手会让消息在队列中等待。",
-  // The Agents tab: the defaults of the agents on this computer.
   "settings.agentDefaults.title": "默认值",
   "settings.agentDefaults.description": "助手会遵循这些默认值，除非你为某个助手单独更改。",
   "settings.agentDefaults.value": "默认：{value}",
@@ -291,7 +290,6 @@ export const messages = {
     "开启：使用情况和可靠性元数据连同你的账号 ID 和邮箱发送到 OpenBot 自托管的分析服务，包括你和你的助手访问的网站、工具使用情况和每日设置摘要。关闭：仅随一个随机安装 ID 发送基本使用情况，例如轮次和 token 数量。绝不发送聊天、文件和提示词。",
   "settings.analytics.webDescription":
     "开启：使用情况和可靠性元数据连同你的账号 ID 和邮箱发送到 OpenBot 自托管的分析服务。关闭：相同的元数据仅随一个随机安装 ID 发送。绝不发送聊天、文件和提示词。该设置仅对该浏览器生效。",
-  // The Settings window shell: its tab list, headers and save bar.
   "settings.tab.general.title": "通用",
   "settings.tab.general.description": "选择聊天的工作方式以及 OpenBot 共享的内容。",
   "settings.tab.agents.title": "助手",
@@ -327,14 +325,11 @@ export const messages = {
   "settings.sections.group.thisComputer": "这台电脑",
   "settings.sections.label": "设置分区",
   "settings.panel.resize": "调整右侧面板宽度",
-  // A failed read or save of the app preferences on the General, Notifications, Dynamic Island and Updates tabs.
   "settings.preferences.loadFailed": "无法加载你的设置。",
   "settings.preferences.saveFailed": "无法保存该设置，请重试。",
-  // The agent picker on the skill and plugin install pages.
   "settings.agentSelect.placeholder": "选择助手",
   "settings.agentSelect.empty": "没有本地助手",
   "settings.agentSelect.label": "安装到",
-  // A device or an account session that the user disconnects.
   "settings.disconnect.action": "断开连接",
   "settings.disconnect.pending": "正在断开…",
   "settings.mobileConnect.phones.title": "你的手机",
@@ -426,7 +421,6 @@ export const messages = {
   "settings.mobileConnect.time.justNow": "刚刚",
   "settings.mobileConnect.time.minutesAgo": "{minutes} 分钟前",
   "settings.mobileConnect.time.hoursAgo": "{hours} 小时前",
-  // The Profile tab.
   "settings.profile.name.title": "显示名称",
   "settings.profile.name.description": "在共享工作区中可见。",
   "settings.profile.name.unsafe": "请移除换行符以及隐藏或控制字符。",
@@ -452,14 +446,12 @@ export const messages = {
   "settings.profile.share.copyFailed": "无法复制图片。",
   "settings.profile.share.createFailed": "无法生成图片。",
   "settings.profile.share.fileName": "openbot-activity.png",
-  // The text in the image to share.
   "settings.profile.share.caption": "我与 OpenBot 的过去六个月",
   "settings.profile.activity.title": "这台电脑上的活动",
   "settings.profile.activity.activeDays": { other: "过去一年有 {count} 个活跃日" },
   "settings.profile.activity.empty": "暂无活动",
   "settings.profile.activity.loading": "正在加载活动…",
   "settings.profile.activity.loadFailed": "无法加载你的活动。",
-  // {tokens} is a short number, such as 1.2M.
   "settings.profile.activity.heatmapLabel": { other: "过去一年在 {count} 个活跃日中使用了 {tokens} 个 token" },
   "settings.profile.activity.less": "较少",
   "settings.profile.activity.more": "较多",
@@ -494,14 +486,12 @@ export const messages = {
   "settings.profile.sessions.kind.mobile": "手机端",
   "settings.profile.sessions.kind.hostedServer": "托管服务器",
   "settings.profile.sessions.hostedServerNote": "断开连接会让服务器退出登录。重新登录需要重启服务器。",
-  // {kind} is Desktop or Mobile. {signedIn} and {lastActive} are a date and a time.
   "settings.profile.sessions.details": "{kind} · 登录于 {signedIn} · 最近活动 {lastActive}",
   "settings.profile.sessions.disconnectLabel": "断开 {name} 会话（{signedIn}）",
   "settings.profile.sessions.loadFailed": "无法加载账号会话，请重试。",
   "settings.profile.sessions.disconnectFailed": "无法断开该会话，请重试。",
   "settings.profile.sessions.disconnectConfirm.title": "断开该会话？",
   "settings.profile.sessions.disconnectConfirm.description": "这台设备将退出你的账号登录，必须重新登录才能连接。",
-  // The Updates tab. {target} is "OpenBot v1.2.3" or settings.updates.target.latest.
   "settings.updates.title": "OpenBot 更新",
   "settings.updates.track.title": "更新通道",
   "settings.updates.track.description": "稳定版只接收经过测试的 OpenBot 版本。",
@@ -524,7 +514,6 @@ export const messages = {
   "settings.updates.status.checking": "正在稳定版通道检查更新…",
   "settings.updates.status.available": "{target} 可下载。",
   "settings.updates.status.downloading": "正在下载 {target}…",
-  // {progress} is a percent, such as 42%.
   "settings.updates.status.downloadingProgress": "正在下载 {target} · {progress}",
   "settings.updates.status.ready": "{target} 已就绪，重启后生效。",
   "settings.updates.status.installing": "正在重启以应用 {target}…",
@@ -536,7 +525,6 @@ export const messages = {
   "settings.updates.autoInstall.title": "自动安装更新",
   "settings.updates.autoInstall.description":
     "助手空闲时，OpenBot 会重启并应用已下载的更新。你的服务器成员会短暂断开连接。",
-  // Restart OpenBot, or install a downloaded update, when no agent works.
   "settings.updates.idleRestart.title": "重启 OpenBot",
   "settings.updates.idleRestart.relaunchDescription": "助手空闲时 OpenBot 会重启。新的自动化任务会等到那时再运行。",
   "settings.updates.idleRestart.updateDescription":
@@ -546,7 +534,6 @@ export const messages = {
   "settings.updates.allowRemote.title": "允许服务器成员触发更新",
   "settings.updates.allowRemote.description":
     "所有已登录的服务器成员都可以在这台电脑空闲时请求更新。所有者和管理员还可以强制重启。",
-  // The Hosted sites tab.
   "settings.hostedSites.title": "已发布的站点",
   "settings.hostedSites.unavailable": "站点托管不可用。",
   "settings.hostedSites.usage": { one: "{used} / {count} 个站点", other: "{used} / {count} 个站点" },
@@ -564,7 +551,6 @@ export const messages = {
   "settings.hostedSites.loadFailed": "无法加载托管站点。",
   "settings.hostedSites.deleteFailed": "无法删除站点。",
   "settings.hostedSites.reloadFailed": "无法重新加载托管站点。",
-  // The Hosted servers tab. {vcpu}, {memory} and {disk} are numbers, such as 2, 4 and 12.
   "settings.hostedServers.title": "你的服务器",
   "settings.hostedServers.description": "每个服务器都有独立的助手、文件和自动化任务。",
   "settings.hostedServers.add": "添加服务器",
@@ -578,6 +564,7 @@ export const messages = {
   "settings.hostedServers.state.planEnded": "套餐已结束",
   "settings.hostedServers.state.creating": "创建中",
   "settings.hostedServers.state.starting": "启动中",
+  "settings.hostedServers.state.restoring": "正在恢复数据",
   "settings.hostedServers.state.running": "运行中",
   "settings.hostedServers.state.stopping": "停止中",
   "settings.hostedServers.state.stopped": "已停止",
@@ -587,6 +574,8 @@ export const messages = {
   "settings.hostedServers.errorDescription": "服务器无法启动，请启动它以重试。",
   "settings.hostedServers.paymentDescription": "Stripe 确认付款后开始配置。",
   "settings.hostedServers.planEndedDescription": "套餐已结束，服务器因此停止，数据仍保留。续费后即可启动。",
+  "settings.hostedServers.planEndedKeptUntil":
+    "套餐已结束，服务器因此停止。数据保留至{date}。请在此之前续费以启动服务器。",
   "settings.hostedServers.pay": "打开支付页面",
   "settings.hostedServers.payLabel": "打开 {name} 的支付页面",
   "settings.hostedServers.renew": "续费套餐",
@@ -606,23 +595,17 @@ export const messages = {
   "settings.hostedServers.createFailed": "无法创建服务器。",
   "settings.hostedServers.wakeFailed": "无法启动服务器。",
   "settings.hostedServers.deleteFailed": "无法删除服务器。",
-  // The plan picker. {count} is a number, such as 4. {price} is a formatted amount, such as "€50".
   "settings.hostedServers.plan.label": "套餐",
   "settings.hostedServers.plan.recommended": "最划算",
   "settings.hostedServers.plan.soldOut": "已售罄",
   "settings.hostedServers.plan.perMonth": "/ 月",
   "settings.hostedServers.plan.disk": "{count} GB 存储",
-  // Each plan is a Linux virtual machine. Agents run Linux commands and apps there, not macOS or Windows ones.
   "settings.hostedServers.plan.linux": "Linux 机器",
-  // A server stops when no one uses it, and starts again for a message or a scheduled routine.
   "settings.hostedServers.plan.startsOnUse": "使用时启动",
-  // The most active members of the server, the owner included.
   "settings.hostedServers.plan.members": { one: "最多 {count} 名成员", other: "最多 {count} 名成员" },
   "settings.hostedServers.plan.sites": { one: "最多 {count} 个托管站点", other: "最多 {count} 个托管站点" },
-  // Work at a company needs a commercial license. With a Starter server, the 1-user license costs less.
   "settings.hostedServers.plan.license.starter": "商业许可证：{price} / 月",
   "settings.hostedServers.plan.license.team": "工作需要团队版许可证",
-  // The speed of a plan compared with Starter. {factor} is a number, such as 2.
   "settings.hostedServers.plan.speed.base": "基础速度",
   "settings.hostedServers.plan.speed.faster": "快 {factor} 倍",
   "settings.hostedServers.plan.starter.name": "入门版",
@@ -631,7 +614,6 @@ export const messages = {
   "settings.hostedServers.plan.standard.summary": "适合有日常自动化任务的小团队。",
   "settings.hostedServers.plan.pro.name": "专业版",
   "settings.hostedServers.plan.pro.summary": "适合多个助手和大量浏览器操作。",
-  // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "听写",
   "settings.voice.model.parakeet.description": "速度快，可自动识别语言，支持 25 种欧洲语言。",
   "settings.voice.model.parakeetUnified.description": "速度快，仅支持英语。会加标点，错误比 Parakeet TDT 少。",
@@ -693,9 +675,14 @@ export const messages = {
   "settings.voice.speech.sample": "你好，你的回复听起来就是这样。",
   "settings.voice.speech.listenFailed": "无法播放示例。",
   "settings.voice.live.section": "实时语音",
+  "settings.voice.talk.section": "语音对话",
+  "settings.voice.talkKey.title": "按键说话快捷键",
+  "settings.voice.talkKey.description": "在语音对话中按住这些键即可说话。",
+  "settings.voice.talkKey.change": "更改按键说话快捷键",
+  "settings.voice.talkKey.recording": "请按下按键",
+  "settings.voice.talkKey.refused": "再加一个键",
+  "settings.voice.talkKey.reset": "重置",
   "settings.voice.live.signIn": "请用 ChatGPT 账号登录 Codex 以使用实时语音。",
-  // No value may end with the word "import": the CommonJS shim of electron-vite reads `import"` in the
-  // main bundle as an import statement and inserts its code inside the string.
   "settings.transfer.title": "把这台服务器迁移到另一台电脑",
   "settings.transfer.lede": "你的助手、它们的技能、自动化任务、记忆和文件都会打包进一个文件。",
   "settings.transfer.flow.label": "迁移流程",
@@ -752,6 +739,13 @@ export const messages = {
   "settings.transfer.import.lede": "选择从另一台服务器导出的文件，扩展名为 .zip。",
   "settings.transfer.import.choose": "选择文件…",
   "settings.transfer.import.reading": "正在读取文件…",
+  "settings.transfer.upload.label": "上传到服务器",
+  "settings.transfer.upload.sending": "正在发送文件…",
+  "settings.transfer.upload.sent": "已发送 {sent}，共 {total}",
+  "settings.transfer.upload.serverReading": "服务器正在读取文件…",
+  "settings.transfer.upload.etaSoon": "剩余不到 1 分钟",
+  "settings.transfer.upload.etaMinutes": "剩余约 {minutes} 分钟",
+  "settings.transfer.upload.etaHours": "剩余约 {hours} 小时 {minutes} 分钟",
   "settings.transfer.import.openFailed": "无法打开该文件",
   "settings.transfer.import.contains": "该文件包含",
   "settings.transfer.import.source": "OpenBot {version} · 导出于 {date}",
@@ -788,8 +782,12 @@ export const messages = {
   "settings.transfer.copy.noAgents": "此服务器没有助手。",
   "settings.transfer.copy.new": "新",
   "settings.transfer.copy.notCopied":
-    "助手所在的频道和共享文件夹也会被复制。API 密钥、登录、连接器和聊天记录不会被复制。请在另一台服务器上重新设置。",
+    "助手所在的频道、自动化任务流程、工作流和共享文件夹也会被复制。API 密钥、登录、连接器和聊天记录不会被复制。请在另一台服务器上重新设置。",
   "settings.transfer.copy.submit": { one: "复制 {count} 个助手", other: "复制 {count} 个助手" },
+  "settings.transfer.copy.duplicatesTitle": "复制重复的助手？",
+  "settings.transfer.copy.duplicatesDescription":
+    "{server} 上已有这些名称的助手：{names}。复制会为每个再添加一个助手，每份都是独立助手，拥有各自的对话、文件和记忆。",
+  "settings.transfer.copy.duplicatesConfirm": "复制副本",
   "settings.transfer.copy.copying": "正在复制…",
   "settings.transfer.copy.done": {
     one: "已将 {count} 个助手复制到 {server}。",

@@ -2,44 +2,44 @@
   "schemaVersion": 1,
   "codex": {
     "repository": "https://github.com/openai/codex",
-    "version": "0.160.1",
-    "tag": "rust-v0.160.1",
+    "version": "0.170.0",
+    "tag": "rust-v0.170.0",
     "license": "Apache-2.0",
     "licenseSha256": "d17f227e4df5da1600391338865ce0f3055211760a36688f816941d58232d8dc",
     "artifacts": {
       "darwin-arm64": {
         "asset": "codex-package-aarch64-apple-darwin.tar.gz",
-        "assetSha256": "f73527ee09c6db869acbb37b709866b339ea74ef91d2de255e9c74ec960c6314",
-        "downloadBytes": 129977637,
-        "installedBytes": 360000000,
+        "assetSha256": "975524bf13aedd1b122d8d0e00c09ee67091b8f688c0b374943dbb3cf22c7893",
+        "downloadBytes": 173593904,
+        "installedBytes": 490000000,
         "executable": "bin/codex"
       },
       "darwin-x64": {
         "asset": "codex-package-x86_64-apple-darwin.tar.gz",
-        "assetSha256": "a98f330c9b1652cef2edc7bc2ee4c47a0fe19fa098b686381be3c8842abf0ac0",
-        "downloadBytes": 141316108,
-        "installedBytes": 380000000,
+        "assetSha256": "2e971524460a570b913dbdc9b49e5e9c14556e44e7f62f00b95b4a8f1e2cdf25",
+        "downloadBytes": 188621592,
+        "installedBytes": 510000000,
         "executable": "bin/codex"
       },
       "linux-x64": {
         "asset": "codex-package-x86_64-unknown-linux-musl.tar.gz",
-        "assetSha256": "340801565906a7028f6baaa9ab6853addaef221f0016a1417a7c1ffdd96c21f0",
-        "downloadBytes": 160785122,
-        "installedBytes": 410000000,
+        "assetSha256": "a77ff87be7ba809d715728270a78f5ce3527dc07529416d1ef8929b90b8475eb",
+        "downloadBytes": 193641516,
+        "installedBytes": 510000000,
         "executable": "bin/codex"
       },
       "linux-arm64": {
         "asset": "codex-package-aarch64-unknown-linux-musl.tar.gz",
-        "assetSha256": "dff0954438fa455c2197ddb1f421d8d68625d98de610f76bedb6e5bc837ea35b",
-        "downloadBytes": 150931915,
-        "installedBytes": 380000000,
+        "assetSha256": "3f7e1ae38c4fe27322e082b855e8eec936d08fa538d62b71c07e2a53f34e8847",
+        "downloadBytes": 195884517,
+        "installedBytes": 500000000,
         "executable": "bin/codex"
       },
       "win32-x64": {
         "asset": "codex-package-x86_64-pc-windows-msvc.tar.gz",
-        "assetSha256": "25c6fe4e46d5bff939312fc46de67ace37561f6f1f89b409af63fd8cc6098425",
-        "downloadBytes": 157434529,
-        "installedBytes": 450000000,
+        "assetSha256": "6ff4b22c63645ffd83aed9b722cbb0b9e5b79dc6e8916f50e362b3015fb327a9",
+        "downloadBytes": 210098091,
+        "installedBytes": 610000000,
         "executable": "bin/codex.exe"
       }
     }
@@ -395,53 +395,53 @@
   "bun": {
     "registry": "https://registry.npmjs.org",
     "repository": "https://github.com/oven-sh/bun",
-    "version": "1.4.4",
-    "tag": "bun-v1.4.4",
+    "version": "1.4.5",
+    "tag": "bun-v1.4.5",
     "license": "MIT",
     "licenseSha256": "362fe32c954ec829240bd7429c53d705eef08c6bfa45ffc2d02005f857cba4dd",
     "artifacts": {
       "darwin-arm64": {
         "package": "@oven/bun-darwin-aarch64",
-        "asset": "bun-darwin-aarch64-1.4.4.tgz",
-        "assetSha256": "be5f17d636d699b2eaa2c1a8ac802c87f0815ccb5fe26cbe63d2395354ae5d0d",
-        "binarySha256": "0a2237cdcfa0d16ef501d9acca9f0026309ef348bea7393a64e8d1e3609565cc",
-        "downloadBytes": 41545333,
+        "asset": "bun-darwin-aarch64-1.4.5.tgz",
+        "assetSha256": "88c398ee13212e8b189119a2bddc7d240ae4f1252c1d0ae2ac1fd44c921fdcb1",
+        "binarySha256": "e2984124f1514e1e6bbda20adedbf07a02c443c6a5828853a15c7c7abf78e19f",
+        "downloadBytes": 41036588,
         "installedBytes": 190000000,
         "executable": "bun"
       },
       "darwin-x64": {
         "package": "@oven/bun-darwin-x64-baseline",
-        "asset": "bun-darwin-x64-baseline-1.4.4.tgz",
-        "assetSha256": "1f4b4d1fa9e3b1dcb7890e4594703c7d5fac54c950964d89a2770760bc2cacbd",
-        "binarySha256": "c35307c7d45d65c5a385a58c4a6cb0bb9499e4e626abdee207c177a77ba666ab",
-        "downloadBytes": 43895192,
+        "asset": "bun-darwin-x64-baseline-1.4.5.tgz",
+        "assetSha256": "477144886f6cb00238da93e805b225cc85a8933a1d6da895234794dd28aab6b1",
+        "binarySha256": "88f97645b270aef20f9f9442f1658461cab3e7128e658af4615144e3396f084a",
+        "downloadBytes": 43925447,
         "installedBytes": 210000000,
         "executable": "bun"
       },
       "linux-x64": {
         "package": "@oven/bun-linux-x64-baseline",
-        "asset": "bun-linux-x64-baseline-1.4.4.tgz",
-        "assetSha256": "2ce69fadd00b741513c52adb8aad3fbee93170d0abaa3b6d04df47ca8659bd40",
-        "binarySha256": "10702245766b225e70bbf6235fd6b47214fd94b4760d00ffaed8ab0df57ac235",
-        "downloadBytes": 52418564,
+        "asset": "bun-linux-x64-baseline-1.4.5.tgz",
+        "assetSha256": "c18ff4130882eaa8209f0b3e66a202abd1e07a137f38a254d0b7431bc6a03827",
+        "binarySha256": "f05d28a3862f4b84395c7fa32480b835dd47482e80b7e7a49a115227f0c06083",
+        "downloadBytes": 51946584,
         "installedBytes": 230000000,
         "executable": "bun"
       },
       "linux-arm64": {
         "package": "@oven/bun-linux-aarch64",
-        "asset": "bun-linux-aarch64-1.4.4.tgz",
-        "assetSha256": "ab95e7e692a53d25a1baa98ee395a17f5f264aedfb3cb15811432d54142f70eb",
-        "binarySha256": "354c2b049c716aca07b2e5cddb887928ac58950675d1258bb6312083917793b6",
-        "downloadBytes": 53132992,
+        "asset": "bun-linux-aarch64-1.4.5.tgz",
+        "assetSha256": "c3cd56594c9d5d025df87f77c68ad4699a49b52551f0f3232be6f727533fe08c",
+        "binarySha256": "04778f1f42399a69d086853e9c7af4acf574b2f21a43d0dc673853d8b84a2923",
+        "downloadBytes": 52595012,
         "installedBytes": 230000000,
         "executable": "bun"
       },
       "win32-x64": {
         "package": "@oven/bun-windows-x64-baseline",
-        "asset": "bun-windows-x64-baseline-1.4.4.tgz",
-        "assetSha256": "ad1576a7c9a524b1dc377608c0bc16529c3f121f59c21aba981c019a528ff4fc",
-        "binarySha256": "cb1d8e6564e655e49d30cead359750a1cbbd12f42651caa4b62244d7bd93c244",
-        "downloadBytes": 55606170,
+        "asset": "bun-windows-x64-baseline-1.4.5.tgz",
+        "assetSha256": "a1ff85b3016f55d7bf28cc12284fc7d445f3e2601211a898d7c6b33e07b2e0e8",
+        "binarySha256": "e06ad0864463c68892ae71a2a64af7eae1585cac5dd9b80bc042f45605587cb1",
+        "downloadBytes": 55298167,
         "installedBytes": 250000000,
         "executable": "bun.exe"
       }

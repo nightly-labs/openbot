@@ -131,8 +131,10 @@ export const messages = {
   "mobile.server.hosted.soldOut": "Распродано",
   "mobile.server.hosted.serverPlan": "{plan} · {interval}",
   "mobile.server.hosted.serverPlanEnds": "{plan} · {interval} · Заканчивается {date}",
+  "mobile.server.hosted.serverDataKept": "{plan} · Данные хранятся до {date}",
   "mobile.server.hosted.state.payment": "Ожидает оплаты",
   "mobile.server.hosted.state.setup": "Настраивается",
+  "mobile.server.hosted.state.restoring": "Восстановление данных",
   "mobile.server.hosted.state.starting": "Запускается",
   "mobile.server.hosted.state.running": "Работает",
   "mobile.server.hosted.state.stopped": "Остановлен",
@@ -798,6 +800,8 @@ export const messages = {
   "mobile.server.connectors.protonPass.keyHelp":
     "Создайте в Proton Pass ключ доступа, который может читать только хранилище, открытое для OpenBot, и вставьте его сюда. {host} хранит ключ; этот телефон — нет.",
   "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.protonPass.plan":
+    "Ваш тариф Proton не включает инструмент командной строки Proton Pass. Нужен тариф Proton, который включает Pass Plus. Другие платные тарифы, например Mail Plus, его не включают. Измените тариф аккаунта, затем подключитесь снова.",
   "mobile.server.connectors.passwordManager.unavailable": "{name} недоступен на этом сервере.",
   "mobile.server.connectors.passwordManager.howItWorks":
     "Войдите в {name} на этом телефоне. Затем {host} создаст общее хранилище и ключ доступа только для чтения к нему и будет хранить только этот ключ. Агенты никогда не видят пароль.",
@@ -831,8 +835,6 @@ export const messages = {
   "mobile.server.connectors.passwordManager.keyReadOnly": "Только чтение",
   "mobile.server.connectors.passwordManager.keyExpires": "Только чтение. Истекает {date}.",
   "mobile.server.connectors.passwordManager.keyExpired": "Истёк {date}",
-  "mobile.server.connectors.passwordManager.plan":
-    "Для инструмента командной строки {name} нужен платный тариф. Измените тариф аккаунта, затем подключитесь снова.",
   "mobile.server.connectors.passwordManager.expiredTitle": "Срок действия ключа {name} истёк",
   "mobile.server.connectors.passwordManager.expiredBody":
     "Агенты на {host} не смогут входить с вашими общими логинами, пока вы не подключитесь снова.",
@@ -1010,7 +1012,7 @@ export const messages = {
     "Писать могут только вы в чате «Сообщение себе» и люди, которым вы разрешили. Другие люди не получают ответа. Если выключено, OpenBot отвечает незнакомым людям кодом.",
   "mobile.server.connectors.whatsapp.workingMessage": "Сообщение «Уже работаю…»",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "OpenBot отправляет его, пока агент работает, а затем заменяет ответом. Выключите, чтобы отправлять только ответ.",
+    "OpenBot отправляет его, пока агент работает, а затем заменяет ответом. Запрос, который ждёт предыдущий, тоже получает сообщение об ожидании. Выключите, чтобы отправлять только ответ.",
   "mobile.server.connectors.whatsapp.statusReactions": "Реакции статуса",
   "mobile.server.connectors.whatsapp.statusReactionsDescription":
     "OpenBot ставит 👀, когда приходит сообщение, и ✅, когда ответ готов. Выключите, чтобы не отправлять реакции.",
@@ -1084,7 +1086,8 @@ export const messages = {
     "Необязательно. Если пусто, в списке будет номер телефона.",
   "mobile.server.connectors.whatsapp.add": "Добавить",
   "mobile.server.connectors.whatsapp.groupTitle": "Добавить группу",
-  "mobile.server.connectors.whatsapp.groupDescription": "Участники этой группы могут поручать работу вашим агентам.",
+  "mobile.server.connectors.whatsapp.groupDescription":
+    "Участники этой группы могут поручать работу вашим агентам, когда упоминают этот номер или отвечают на его сообщения.",
   "mobile.server.connectors.whatsapp.groupSearch": "Поиск групп",
   "mobile.server.connectors.whatsapp.groupsLoading": "Загрузка групп…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot не смог прочитать группы",
@@ -1626,7 +1629,6 @@ export const messages = {
   "mobile.server.audit.roleMemberAdded": "Участник {member} добавлен в роль {role}",
   "mobile.server.audit.roleMemberRemoved": "Участник {member} удалён из роли {role}",
   "mobile.server.audit.agentLevel": "{agent} для {role}: {change}",
-  // Server settings › Import agents: Grok Bot and Hermes exports (`agent-import-v1`).
   "mobile.server.settings.importAgents": "Импорт агентов",
   "mobile.server.route.import": "Импорт агентов",
   "mobile.server.import.unsupported": "Обновите OpenBot на этом сервере, чтобы импортировать агентов отсюда.",
@@ -1729,7 +1731,6 @@ export const messages = {
   "mobile.server.import.channel": "Канал",
   "mobile.server.import.notImportedTitle": "Не импортировано",
   "mobile.server.import.resultWarnings": "Часть элементов не перенесена",
-  // Server settings › Transfer: the whole server to or from a transfer file (`instance-transfer-v1`).
   "mobile.server.settings.transfer": "Перенос",
   "mobile.server.route.transfer": "Перенос",
   "mobile.server.route.transferExport": "Экспорт",
@@ -1814,13 +1815,17 @@ export const messages = {
   "mobile.server.transfer.copyTo": "Куда",
   "mobile.server.transfer.copyNoAgents": "На этом сервере нет агентов.",
   "mobile.server.transfer.copyNotMoved":
-    "Их каналы и общая папка тоже копируются. Ключи API, входы в аккаунты, коннекторы и история чатов не копируются. Настройте их заново на другом сервере.",
+    "Их каналы, схемы регулярных задач, рабочие процессы и общая папка тоже копируются. Ключи API, входы в аккаунты, коннекторы и история чатов не копируются. Настройте их заново на другом сервере.",
   "mobile.server.transfer.copySubmit": {
     one: "Копировать {count} агента",
     few: "Копировать {count} агентов",
     many: "Копировать {count} агентов",
     other: "Копировать {count} агента",
   },
+  "mobile.server.transfer.copyDuplicatesTitle": "Скопировать дубликаты агентов?",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "На {server} уже есть агенты с такими именами: {names}. Копирование добавит второго агента для каждого. Каждая копия — отдельный агент со своими чатами, файлами и записями памяти.",
+  "mobile.server.transfer.copyDuplicatesConfirm": "Копировать дубликаты",
   "mobile.server.transfer.copying": "Копирование…",
   "mobile.server.transfer.copyFailed": "Копирование не завершено.",
   "mobile.server.transfer.copied": {

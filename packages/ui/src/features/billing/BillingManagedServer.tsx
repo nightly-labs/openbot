@@ -62,7 +62,6 @@ export function BillingManagedServer(props: {
         draft.action = null;
       });
     } catch (error) {
-      // A lost response can follow a completed Stripe mutation. Read the actual state.
       await props.hosting.load();
       await props.billing.load();
       setDialog((draft) => {
@@ -112,7 +111,9 @@ export function BillingManagedServer(props: {
         price={price()}
         paidThrough={props.server.deletionScheduledAt ?? props.paidThrough}
         running={props.server.state === "running"}
-        statusLabel={t(stateNames[props.server.state])}
+        statusLabel={t(
+          props.server.restoring ? "settings.hostedServers.state.restoring" : stateNames[props.server.state],
+        )}
         cancelAtPeriodEnd={props.plan.cancelAtPeriodEnd}
         scheduled={props.server.deletionScheduledAt != null}
         deleted={false}

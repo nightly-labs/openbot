@@ -165,11 +165,12 @@ export const messages = {
   "agentSettings.notificationLevel.note":
     "이 설정은 나에게만 적용되며 내 모든 기기에 적용돼요. 서버가 음소거되었거나 '없음'으로 설정되면 이 에이전트도 알리지 않아요.",
   "agentSettings.newChat.title": "새 채팅",
-  "agentSettings.newChat.description": "에이전트가 이 채팅을 잊어요. 설정은 그대로 유지돼요.",
+  "agentSettings.newChat.description":
+    "에이전트가 새로 시작하지만, 필요하면 이 채팅을 찾아볼 수 있어요. 설정은 그대로 유지돼요.",
   "agentSettings.newChat.button": "시작",
   "agentSettings.newChat.confirmTitle": "{name}과(와) 새 채팅을 시작할까요?",
   "agentSettings.newChat.confirmDescription":
-    "에이전트가 이 채팅을 잊어요. 메시지는 구분선 위에 계속 표시돼요. 지침, 모델, 도구, 메모리, 워크스페이스, 브라우저는 바뀌지 않아요.",
+    "에이전트가 새로 시작하지만, 필요하면 이 채팅을 찾아볼 수 있어요. 메시지는 구분선 위에 계속 표시돼요. 지침, 모델, 도구, 메모리, 워크스페이스, 브라우저는 바뀌지 않아요.",
   "agentSettings.newChat.confirm": "새 채팅 시작",
   "agentSettings.newChat.failed": "새 채팅을 시작할 수 없어요.",
   "agentSettings.deleteHistory.title": "기록 삭제",
@@ -189,6 +190,8 @@ export const messages = {
   "agentSettings.fullAccess.confirm": "전체 접근 허용",
   "agentSettings.fullAccess.askConfirm": "먼저 묻기 사용",
   "agentSettings.links.usage": "사용량",
+  "agentSettings.links.apps": "앱",
+  "agentSettings.links.appsScope": "모든 에이전트",
   "agentSettings.links.memories": "메모리",
   "agentSettings.links.memoriesCount": { other: "{count}개 저장됨" },
   "agentSettings.links.skills": "스킬",

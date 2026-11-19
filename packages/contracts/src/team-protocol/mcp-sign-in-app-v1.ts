@@ -1,16 +1,3 @@
-// Frozen optional mcp-sign-in-app-v1 wire contract.
-//
-// An owner or admin of a joined server gives one of the host's http MCP rows an OAuth app that they
-// registered with its authorization server themselves, for a server that offers no dynamic
-// registration. The host keeps the app in its encrypted sign-in store, and the next sign-in on the
-// host (`mcp-sign-in-v1`) uses it. A member cannot use any route; `requireAdmin` on the host is the
-// only gate.
-//
-// The client secret travels once, in `save`, and no response contains it: `secretSaved` says only
-// whether one is on file. `clientSecret: null` keeps the secret on file and an empty string removes
-// it. `redirectUrl` is the exact callback the host's loopback listener answers, which the
-// administrator registers with the app; it is `null` when the host has no sign-in store. Every route
-// answers the row's app state after the change; `app` is `null` when the row has none.
 import { adminRoute, boolean, fields, identifier, nullable, type OptionalRouteCodec, string } from "./admin-wire";
 
 export const MCP_SIGN_IN_APP_CAPABILITY = "mcp-sign-in-app-v1";

@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/team";
 
 export const messages = {
-  // Errors that the Team API and the team store send to clients.
   "error.team.ownerNotLinked": "Bu ana makine bir OpenBot sahibi hesabına bağlı değil.",
   "error.team.ownerEmailRequired": "Bu ana makineyi oluşturan OpenBot e-postası ile oturum açın.",
   "error.team.hostNotConfigured": "Ekip ana makinesi yapılandırılmamış.",
@@ -53,6 +52,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "Çok fazla oturum açma denemesi. Daha sonra tekrar deneyin.",
   "error.team.clientUpdateRequired": "Bu ana makineye bağlanmadan önce bu OpenBot istemcisini güncelleyin.",
   "error.team.hostUpdateRequired": "Bağlanmadan önce ana makinedeki OpenBot'u güncelleyin.",
+  "error.team.serverSafeMode": "OpenBot bu sunucuda başlamadığı için sunucu güvenli moddadır.",
+  "error.team.serverSafeModeNewerDatabase":
+    "Bu sunucudaki OpenBot {version}, verilerini açamıyor çünkü onları daha yeni bir OpenBot sürümü kaydetti. Sunucudaki daha yeni bir OpenBot sürümü bunu düzeltir.",
+  "error.team.serverSafeModeStartFailed":
+    "Bu sunucudaki OpenBot {version}, birçok kez başlatılamadıktan sonra durdu. Sunucudaki daha yeni bir OpenBot sürümü bunu düzeltir.",
   "error.team.sidebarLayoutUnavailable": "Kenar çubuğu düzeni kullanılamıyor.",
   "error.team.providersUnsupported": "Sağlayıcı ayarları bu bağlantı tarafından desteklenmiyor.",
   "error.team.providerNotManaged": "OpenBot bu sağlayıcının CLI aracını yönetmiyor.",
@@ -73,6 +77,7 @@ export const messages = {
   "error.team.chatColorsUnsupported": "Sohbet renkleri bu bağlantı tarafından desteklenmiyor.",
   "error.team.routineRunPlaceUnsupported": "Bu bağlantı bir rutinin nerede çalıştığını değiştiremez.",
   "error.team.routinePauseReasonsUnsupported": "Bu bağlantı bir rutinin neden duraklatıldığını gösteremez.",
+  "error.team.activeQueuesUnsupported": "Bu bağlantı tüm ajanların kuyruklarını gösteremez.",
   "error.team.routinesOnceUnsupported": "Bu bağlantı bir kez çalışan rutinleri kaydedemez.",
   "error.team.routineRunCommandUnsupported": "Bu bağlantı bir rutinin çalıştırma komutunu veremez.",
   "error.team.threadQueueUnsupported": "Bu bağlantı bir yan konunun kuyruğunu gösteremez.",

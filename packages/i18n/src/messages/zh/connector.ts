@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/connector";
 
 export const messages = {
-  // Marketplace > Apps > GitHub: the built-in GitHub connection.
   "connector.github.title": "GitHub",
   "connector.github.description": "这台电脑上的每个助手都可以使用你的 GitHub 仓库、Issue 和拉取请求，以及 gh 和 git。",
   "connector.github.connect": "连接 GitHub",
@@ -20,9 +19,7 @@ export const messages = {
   "connector.github.repositoriesLoading": "正在从 GitHub 读取仓库",
   "connector.github.repositoriesFailed": "OpenBot 无法从 GitHub 读取仓库。",
   "connector.github.noRepositories": "尚未在任何仓库上安装 OpenBot GitHub App。",
-  // {count} is a number, such as 12.
   "connector.github.moreRepositories": { one: "还有 {count} 个仓库", other: "还有 {count} 个仓库" },
-  // A badge next to a repository that only its members can see.
   "connector.github.private": "私有",
   "connector.github.disconnect": "断开连接",
   "connector.github.disconnectTitle": "断开 GitHub？",
@@ -31,38 +28,30 @@ export const messages = {
   "connector.github.expiredDescription": "以 @{login} 重新连接，即可让助手继续使用 GitHub。",
   "connector.github.reconnect": "重新连接",
   "connector.github.actionFailed": "OpenBot 无法更改 GitHub 连接。",
-  // The status next to the name at the top of the GitHub page.
   "connector.github.statusConnected": "已连接",
   "connector.github.statusConnecting": "连接中",
   "connector.github.statusExpired": "已过期",
   "connector.github.accountTitle": "账号",
-  // {count} is the number of repositories in the list, such as 12.
   "connector.github.filterPlaceholder": { one: "筛选 {count} 个仓库", other: "筛选 {count} 个仓库" },
   "connector.github.filterLabel": "筛选仓库",
-  // {query} is the text the user typed in the filter.
   "connector.github.noMatch": "没有匹配“{query}”的仓库。",
-  // The connect dialog. The steps show as numbers; screen readers read the names.
   "connector.github.stepSignIn": "登录",
   "connector.github.stepConnected": "已连接",
   "connector.github.requestingCode": "OpenBot 正在向 GitHub 请求验证码。",
-  // {code} is the code to type on GitHub, such as WDJB-MJHT.
   "connector.github.codeLabel": "验证码 {code}",
   "connector.github.failedTitle": "GitHub 未连接成功",
   "connector.github.cancelConnecting": "取消连接 GitHub",
-  // {count} is the number of repositories that agents can use.
   "connector.github.connectedSummary": {
     one: "{count} 个仓库 · 这台电脑上的所有助手",
     other: "{count} 个仓库 · 这台电脑上的所有助手",
   },
   "connector.github.done": "完成",
   "connector.github.later": "稍后",
-  // The confirmation before Disconnect. {login} is the GitHub account name, such as octocat.
   "connector.github.disconnectConfirmTitle": "断开 GitHub？",
   "connector.github.disconnectConfirmDescription": "断开后会从这台电脑移除 @{login} 的登录信息。",
   "connector.github.disconnectEffectTools": "所有助手都将失去 GitHub 工具、gh 和 git。",
   "connector.github.disconnectEffectRevoke": "随后会打开 GitHub，你可以在那里撤销 OpenBot。",
   "connector.github.disconnectEffectKept": "聊天、文件和助手记忆仍保留在这台电脑上。",
-  // The same text for the connection of a joined server. {host} is the server name, such as Studio.
   "connector.github.descriptionHost":
     "{host} 上的每个助手都可以使用你的 GitHub 仓库、Issue 和拉取请求，以及 gh 和 git。",
   "connector.github.connectedSummaryHost": {
@@ -73,18 +62,14 @@ export const messages = {
   "connector.github.disconnectEffectKeptHost": "聊天、文件和助手记忆仍保留在 {host} 上。",
   "connector.github.keepConnected": "保持连接",
   "connector.github.close": "关闭",
-  // The last section of an integration page, with the action that removes it.
   "connector.dangerZone": "危险操作",
 
   "connector.statusUnknown": "未知",
   "connector.readFailed": "OpenBot 无法读取该连接的状态。",
-  // Marketplace > Apps > Slack: a workspace installs the one OpenBot app, and the Slack
-  // Orchestrator agent receives each request, asks the team and answers.
   "connector.slack.title": "Slack",
   "connector.slack.description": "人们在 Slack 中提及 @OpenBot 或给它发私信，Slack 调度助手会找到合适的助手来回答。",
   "connector.slack.statusConnected": "已连接",
   "connector.slack.statusAttention": "需要关注",
-  // {workspace} is the Slack workspace name.
   "connector.slack.summaryConnected": "{workspace} · 由 Slack 调度助手回答",
   "connector.slack.summaryNoAgent": "{workspace} · 还没有助手回答",
   "connector.slack.attentionTitle": {
@@ -106,7 +91,6 @@ export const messages = {
   "connector.slack.reconnect": "重新连接",
   "connector.slack.pause": "暂停",
   "connector.slack.resume": "恢复",
-  // {action} is a button, such as Pause; {name} is the workspace name.
   "connector.slack.rowAction": "{action}：{name}",
   "connector.slack.orchestratorTitle": "Slack 调度助手",
   "connector.slack.orchestratorDescription":
@@ -115,7 +99,6 @@ export const messages = {
   "connector.slack.orchestratorNoneDescription": "请添加 Slack 调度助手，否则 Slack 中不会有人回答。",
   "connector.slack.inviteNote":
     "OpenBot 会自动加入每个公开频道以及之后新建的公开频道。私有频道需要邀请：/invite @OpenBot。",
-  // The connect dialog. The steps show as numbers; screen readers read the names.
   "connector.slack.stepWorkspace": "工作区",
   "connector.slack.stepAgent": "助手",
   "connector.slack.connectTitle": "连接 Slack 工作区",
@@ -126,7 +109,6 @@ export const messages = {
   "connector.slack.connectInSlack": "在 Slack 中连接",
   "connector.slack.connectWaiting": "正在等待 Slack，请在浏览器中完成安装。",
   "connector.slack.agentStepTitle": "添加 Slack 调度助手",
-  // {workspace} is the Slack workspace name.
   "connector.slack.agentStepDescription": "这个新助手会回答人们在 {workspace} 中发给 @OpenBot 的所有内容。",
   "connector.slack.orchestratorName": "Slack 调度助手",
   "connector.slack.orchestratorRole": "在 Slack 中回答并调度团队",
@@ -147,19 +129,13 @@ export const messages = {
   "connector.slack.close": "关闭",
 
   "connector.slack.addWorkspace": "添加工作区",
-  // Shown when the page has the maximum number of workspaces.
   "connector.slack.limitReached": { other: "最多可连接 {count} 个工作区。" },
-  // {count} is the number of Slack workspaces: two or more.
   "connector.slack.summaryMany": { other: "{count} 个工作区 · 由 Slack 调度助手回答" },
-  // Marketplace > Apps > Discord: a Discord server (a guild) adds the one OpenBot bot, and
-  // the Discord Orchestrator agent receives each request, asks the team and answers. Always write
-  // "Discord server": "server" alone is an OpenBot server.
   "connector.discord.title": "Discord",
   "connector.discord.description":
     "人们在 Discord 服务器的频道中提及 @OpenBot，Discord 调度助手会找到合适的助手来回答。",
   "connector.discord.statusConnected": "已连接",
   "connector.discord.statusAttention": "需要关注",
-  // {workspace} is the Discord server name.
   "connector.discord.summaryConnected": "{workspace} · 由 Discord 调度助手回答",
   "connector.discord.summaryNoAgent": "{workspace} · 还没有助手回答",
   "connector.discord.attentionTitle": {
@@ -182,7 +158,6 @@ export const messages = {
   "connector.discord.reconnect": "重新连接",
   "connector.discord.pause": "暂停",
   "connector.discord.resume": "恢复",
-  // {action} is a button, such as Pause; {name} is the Discord server name.
   "connector.discord.rowAction": "{action}：{name}",
   "connector.discord.orchestratorTitle": "Discord 调度助手",
   "connector.discord.orchestratorDescription":
@@ -190,7 +165,6 @@ export const messages = {
   "connector.discord.orchestratorNone": "还没有助手回答",
   "connector.discord.orchestratorNoneDescription": "请添加 Discord 调度助手，否则 Discord 中不会有人回答。",
   "connector.discord.channelsNote": "OpenBot 能看到其角色可见的频道。",
-  // The connect dialog. The steps show as numbers; screen readers read the names.
   "connector.discord.stepWorkspace": "Discord 服务器",
   "connector.discord.stepAgent": "助手",
   "connector.discord.connectTitle": "连接 Discord 服务器",
@@ -201,7 +175,6 @@ export const messages = {
   "connector.discord.connectInDiscord": "在 Discord 中连接",
   "connector.discord.connectWaiting": "正在等待 Discord，请在浏览器中完成授权。",
   "connector.discord.agentStepTitle": "添加 Discord 调度助手",
-  // {workspace} is the Discord server name.
   "connector.discord.agentStepDescription": "这个新助手会回答人们在 {workspace} 中发给 @OpenBot 的所有内容。",
   "connector.discord.orchestratorName": "Discord 调度助手",
   "connector.discord.orchestratorRole": "在 Discord 中回答并调度团队",
@@ -223,35 +196,26 @@ export const messages = {
 
   "connector.discord.addWorkspace": "添加 Discord 服务器",
   "connector.discord.limitReached": { other: "最多可连接 {count} 个 Discord 服务器。" },
-  // {count} is the number of Discord servers: two or more.
   "connector.discord.summaryMany": { other: "{count} 个 Discord 服务器 · 由 Discord 调度助手回答" },
-  // Who can use OpenBot in one Discord server: the members with one of the chosen Discord roles.
   "connector.discord.accessTitle": "谁可以使用 OpenBot",
   "connector.discord.accessDescription": "OpenBot 只回答这些人。其他人的提及会被忽略。",
   "connector.discord.accessEveryone": "服务器中的所有人",
   "connector.discord.accessEveryoneDescription": "凡是能在 OpenBot 可见的频道中发消息的人，都可以提及它。",
-  // {roles} is a list of Discord role names, such as "Admin and Moderator".
   "connector.discord.accessRoles": "拥有 {roles} 的成员",
   "connector.discord.accessChoose": "选择角色",
-  // {workspace} is the Discord server name.
   "connector.discord.accessDialogTitle": "谁可以在 {workspace} 中使用 OpenBot？",
   "connector.discord.accessDialogDescription": "不选择任何角色时，所有人都可以提及 OpenBot。",
   "connector.discord.accessLoading": "正在加载角色…",
   "connector.discord.accessLoadFailed": "Discord 角色未能加载",
   "connector.discord.accessNoRoles": "该服务器没有可选的角色。",
-  // {role} is the name of a Discord role that the server no longer has.
   "connector.discord.accessRoleDeleted": "{role}（已删除）",
   "connector.discord.accessSave": "保存",
-  // {host} is the joined server's name.
   "connector.discord.accessHostUpdate": "请更新 {host} 上的 OpenBot，以选择角色。",
-  // Marketplace > Apps > Telegram: each chat adds the one OpenBot bot, and the Telegram
-  // Orchestrator agent receives the messages of all chats, asks the team and answers.
   "connector.telegram.title": "Telegram",
   "connector.telegram.description":
     "把 OpenBot 机器人加入 Telegram 群组，或与它开启私聊。Telegram 调度助手会找到合适的助手来回答。",
   "connector.telegram.statusConnected": "已连接",
   "connector.telegram.statusAttention": "需要关注",
-  // {count} is the number of linked Telegram chats.
   "connector.telegram.summaryConnected": {
     one: "{count} 个聊天 · 由 Telegram 调度助手回答",
     other: "{count} 个聊天 · 由 Telegram 调度助手回答",
@@ -287,7 +251,6 @@ export const messages = {
   "connector.telegram.disconnectAllSummary": "所有聊天都将断开，其他人无法再通过 OpenBot 机器人联系你的助手。",
   "connector.telegram.disconnectAllSummaryOrchestrator":
     "所有聊天都将断开，Telegram 调度助手及其对话将从 OpenBot 中删除。",
-  // {action} is a button, such as Pause; {name} is the chat name.
   "connector.telegram.rowAction": "{action}：{name}",
   "connector.telegram.linkChat": "关联聊天",
   "connector.telegram.addToGroup": "加入群组",
@@ -298,7 +261,6 @@ export const messages = {
   "connector.telegram.orchestratorNone": "还没有助手回答",
   "connector.telegram.orchestratorNoneDescription": "请添加 Telegram 调度助手，否则 Telegram 中不会有人回答。",
   "connector.telegram.mentionNote": "在群组中请提及机器人或回复它的消息；在私聊中所有消息都会发给机器人。",
-  // The connect dialog. The steps show as numbers; screen readers read the names.
   "connector.telegram.stepChat": "聊天",
   "connector.telegram.stepAgent": "助手",
   "connector.telegram.connectTitle": "关联 Telegram 聊天",
@@ -309,7 +271,6 @@ export const messages = {
   "connector.telegram.connectStepReturn": "聊天关联完成后该对话框会继续",
   "connector.telegram.connectWaiting": "正在等待 Telegram，请在 Telegram 中选择聊天。",
   "connector.telegram.agentStepTitle": "添加 Telegram 调度助手",
-  // {chat} is the Telegram chat name.
   "connector.telegram.agentStepDescription":
     "这个新助手会回答 {chat} 中以及你之后关联的每个聊天中发给 OpenBot 的消息。",
   "connector.telegram.orchestratorName": "Telegram 调度助手",
@@ -333,7 +294,6 @@ export const messages = {
     "把一个 WhatsApp 号码关联到这台服务器。WhatsApp 调度助手会找到合适的助手来回答。",
   "connector.whatsapp.statusConnected": "已连接",
   "connector.whatsapp.statusAttention": "需要关注",
-  // {count} is the number of linked WhatsApp numbers.
   "connector.whatsapp.summaryConnected": {
     one: "{count} 个号码 · 由 WhatsApp 调度助手回答",
     other: "{count} 个号码 · 由 WhatsApp 调度助手回答",
@@ -368,14 +328,13 @@ export const messages = {
   "connector.whatsapp.disconnectAllSummary": "所有号码都将断开，其他人无法再通过 WhatsApp 联系你的助手。",
   "connector.whatsapp.disconnectAllSummaryOrchestrator":
     "所有号码都将断开，WhatsApp 调度助手及其对话将从 OpenBot 中删除。",
-  // {action} is a button, such as Pause; {name} is the WhatsApp number or a person's name.
   "connector.whatsapp.rowAction": "{action}：{name}",
   "connector.whatsapp.ownNumber": "个人号码",
   "connector.whatsapp.ownNumberDescription":
     "只有你的“给自己发消息”聊天和你允许的人可以发消息。其他人不会收到回复。关闭后，OpenBot 会给陌生人回复一个代码。",
   "connector.whatsapp.workingMessage": "“正在处理…”消息",
   "connector.whatsapp.workingMessageDescription":
-    "代理工作时，OpenBot 会发送这条消息，随后用回答替换它。关闭后只发送回答。",
+    "代理工作时，OpenBot 会发送这条消息，随后用回答替换它。等待之前请求的新请求也会收到一条等待消息。关闭后只发送回答。",
   "connector.whatsapp.statusReactions": "状态表情回应",
   "connector.whatsapp.statusReactionsDescription":
     "消息到达时，OpenBot 会用 👀 回应；回答准备好后用 ✅ 回应。关闭后不发送任何表情回应。",
@@ -385,7 +344,6 @@ export const messages = {
   "connector.whatsapp.orchestratorNone": "还没有助手回答",
   "connector.whatsapp.orchestratorNoneDescription": "请添加 WhatsApp 调度助手，否则 WhatsApp 中不会有人回答。",
   "connector.whatsapp.note": "在个人号码上，请在“给自己发消息”聊天中发消息。你允许的人给该号码发消息。",
-  // The link dialog. The steps show as numbers; screen readers read the names.
   "connector.whatsapp.stepNumber": "号码",
   "connector.whatsapp.stepAgent": "助手",
   "connector.whatsapp.connectTitle": "关联 WhatsApp",
@@ -415,7 +373,6 @@ export const messages = {
   "connector.whatsapp.codeStepDevices": "在 WhatsApp 中打开“已关联的设备”，然后点击“关联新设备”",
   "connector.whatsapp.codeStepPhone": "点击“改用电话号码关联”",
   "connector.whatsapp.codeStepType": "在手机上输入该代码",
-  // {code} is the pairing code, read one character at a time.
   "connector.whatsapp.codeLabel": "配对码 {code}",
   "connector.whatsapp.copyCode": "复制配对码",
   "connector.whatsapp.codeWaiting": "正在等待手机。",
@@ -426,7 +383,6 @@ export const messages = {
   "connector.whatsapp.failedUnavailable": "OpenBot 无法连接 WhatsApp。请检查网络连接。",
   "connector.whatsapp.tryAgain": "重试",
   "connector.whatsapp.agentStepTitle": "添加 WhatsApp 调度助手",
-  // {number} is the WhatsApp number or its name.
   "connector.whatsapp.agentStepDescription":
     "这个新助手会回答 {number} 以及你之后关联的每个号码上发给 OpenBot 的消息。",
   "connector.whatsapp.orchestratorName": "WhatsApp 调度助手",
@@ -445,7 +401,6 @@ export const messages = {
   "connector.whatsapp.removeEffectDeleted": "这是最后一个号码，因此 WhatsApp 调度助手及其对话将从 OpenBot 中删除。",
   "connector.whatsapp.keep": "保持关联",
   "connector.whatsapp.close": "关闭",
-  // Who can give work through one number: contacts by phone number, and groups.
   "connector.whatsapp.sendersTitle": "谁可以给 {number} 发消息",
   "connector.whatsapp.sendersDescription": "这些联系人和群组可以给你的助手分配工作。",
   "connector.whatsapp.sendersEmpty": "只有你可以发消息。请添加联系人或群组。",
@@ -460,34 +415,29 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "可选。留空时，列表中显示电话号码。",
   "connector.whatsapp.add": "添加",
   "connector.whatsapp.groupTitle": "添加群组",
-  "connector.whatsapp.groupDescription": "该群组中的人可以给你的助手分配工作。",
+  "connector.whatsapp.groupDescription": "该群组中的人提及这个号码或回复它的消息时，可以给你的助手分配工作。",
   "connector.whatsapp.groupSearch": "搜索群组",
   "connector.whatsapp.groupsLoading": "正在读取群组…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot 无法读取群组",
   "connector.whatsapp.groupsEmpty": "该号码不在任何群组中。",
   "connector.whatsapp.groupsNoMatch": "没有该名称的群组。",
   "connector.whatsapp.groupAdded": "已添加",
-  // People who wrote to a number only for OpenBot and got a code to give the owner.
   "connector.whatsapp.requestsTitle": "{number} 的请求",
   "connector.whatsapp.requestsDescription": "这些人给该号码发了消息并收到了代码。只有当对方给你的代码相同时才批准。",
   "connector.whatsapp.requestsEmpty": "没有请求。",
-  // {code} is the 6-character code; {number} is the person's phone number, partly hidden.
   "connector.whatsapp.requestDetail": "代码 {code} · {number}",
   "connector.whatsapp.approve": "批准",
   "connector.whatsapp.deny": "拒绝",
-  // Marketplace > 1Password: a vault that the user shares with OpenBot through a service account.
   "connector.onePassword.title": "1Password",
   "connector.onePassword.description":
     "通过服务账号把一个专用的 1Password 保险库共享给 OpenBot，让助手可以在 OpenBot 浏览器中登录网站。",
   "connector.onePassword.howItWorks":
     "连接时会在你的 1Password 账号中创建“Shared with OpenBot”保险库，以及一个只能读取该保险库的服务账号。OpenBot 在这台电脑的浏览器中填充已保存的登录信息，因此只会共享你移入该保险库的条目。助手永远看不到密码。",
   "connector.onePassword.connect": "连接 1Password",
-  // The three setup steps before a connection, each with the one button it needs.
   "connector.onePassword.setupTitle": "设置",
   "connector.onePassword.stepCliTitle": "安装 1Password CLI",
   "connector.onePassword.stepCliChecking": "正在这台电脑上查找 1Password CLI",
   "connector.onePassword.stepCliInstalling": "正在从 1Password 下载 1Password CLI",
-  // {version} is a version number, such as 2.39.0.
   "connector.onePassword.stepCliReady": "已安装版本 {version}。",
   "connector.onePassword.stepCliMissing": "OpenBot 会从 1Password 下载到自己的文件夹，不需要管理员密码。",
   "connector.onePassword.stepCliManual": "OpenBot 无法在这台电脑上安装它。请从 1Password 安装后再回到该页面。",
@@ -514,7 +464,6 @@ export const messages = {
   "connector.onePassword.vaultTitle": "共享保险库",
   "connector.onePassword.vaultDescription": "在 1Password 中把登录信息移入该保险库，助手即可用它登录。移出后即停止。",
   "connector.onePassword.loginsLoading": "正在从 1Password 读取登录信息",
-  // {count} is a number, such as 3.
   "connector.onePassword.loginCount": { one: "{count} 条登录信息", other: "{count} 条登录信息" },
   "connector.onePassword.disconnect": "断开连接",
   "connector.onePassword.disconnectTitle": "断开 1Password",
@@ -523,7 +472,6 @@ export const messages = {
   "connector.onePassword.actionFailed": "OpenBot 无法更改 1Password 连接。",
   "connector.onePassword.statusConnected": "已连接",
   "connector.onePassword.statusConnecting": "连接中",
-  // The same page for the connection of a joined server. {host} is the server name, such as Studio.
   "connector.onePassword.descriptionHost":
     "通过服务账号把一个专用的 1Password 保险库共享给 {host} 上的 OpenBot，让 {host} 上的助手可以在其浏览器中登录网站。",
   "connector.onePassword.howItWorksHost":
@@ -609,8 +557,9 @@ export const messages = {
   "connector.protonPass.expiredTitle": "Proton Pass 密钥已过期",
   "connector.protonPass.expiredDescription": "在你重新登录之前，智能体无法使用共享的登录信息登录。",
   "connector.protonPass.reconnect": "重新连接",
-  "connector.protonPass.planTitle": "Proton Pass 需要付费方案",
-  "connector.protonPass.planDescription": "Proton Pass CLI 仅适用于付费 Proton 方案。请更改方案，然后重新连接。",
+  "connector.protonPass.planTitle": "Proton Pass 需要包含 Pass Plus 的方案",
+  "connector.protonPass.planDescription":
+    "Proton Pass CLI 需要包含 Pass Plus 的 Proton 方案。Mail Plus 等其他付费方案不包含它。请更改方案，然后重新连接。",
   "connector.protonPass.vaultTitle": "共享保管库",
   "connector.protonPass.vaultDescription": "智能体可以使用此保管库中的登录信息登录。将登录信息移入其中即可共享。",
   "connector.protonPass.loginCount": { one: "{count} 条登录信息", other: "{count} 条登录信息" },

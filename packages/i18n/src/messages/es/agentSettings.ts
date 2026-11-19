@@ -171,11 +171,12 @@ export const messages = {
   "agentSettings.notificationLevel.note":
     "Esta opción es solo para ti y se aplica en todos tus dispositivos. Si el servidor está silenciado o en «Nada», este agente también queda en silencio.",
   "agentSettings.newChat.title": "Nuevo chat",
-  "agentSettings.newChat.description": "El agente olvida este chat. Se conserva su configuración.",
+  "agentSettings.newChat.description":
+    "El agente empieza de cero y puede consultar este chat cuando lo necesite. Se conserva su configuración.",
   "agentSettings.newChat.button": "Iniciar",
   "agentSettings.newChat.confirmTitle": "¿Iniciar un nuevo chat con {name}?",
   "agentSettings.newChat.confirmDescription":
-    "El agente olvida este chat. Los mensajes permanecen visibles sobre un separador. Las instrucciones, el modelo, las herramientas, los recuerdos, el espacio de trabajo y el navegador no cambian.",
+    "El agente empieza de cero y puede consultar este chat cuando lo necesite. Los mensajes permanecen visibles sobre un separador. Las instrucciones, el modelo, las herramientas, los recuerdos, el espacio de trabajo y el navegador no cambian.",
   "agentSettings.newChat.confirm": "Iniciar nuevo chat",
   "agentSettings.newChat.failed": "No se pudo iniciar un nuevo chat.",
   "agentSettings.deleteHistory.title": "Eliminar historial",
@@ -196,6 +197,8 @@ export const messages = {
   "agentSettings.fullAccess.confirm": "Permitir acceso completo",
   "agentSettings.fullAccess.askConfirm": "Usar Preguntar antes",
   "agentSettings.links.usage": "Uso",
+  "agentSettings.links.apps": "Apps",
+  "agentSettings.links.appsScope": "Todos los agentes",
   "agentSettings.links.memories": "Recuerdos",
   "agentSettings.links.memoriesCount": {
     one: "{count} guardado",

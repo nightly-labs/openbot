@@ -1,10 +1,5 @@
 import { useCSSVariable } from "uniwind";
 
-/**
- * The colors of the sign-in controls. The brand lavender of the logo marks focus, so the controls
- * match the Scan QR code button. `--openbot-border-strong` is almost invisible on the dark canvas,
- * so a control shows as a filled surface with a clear ring only when it has focus or a state.
- */
 export function useSignInColors() {
   const surface = useCSSVariable("--openbot-bg-control-active");
   const brand = useCSSVariable("--openbot-logo-production");
@@ -28,5 +23,4 @@ export function useSignInColors() {
 
 export type SignInColors = ReturnType<typeof useSignInColors>;
 
-/** The height of every sign-in control, so a button and the field that replaces it match. */
 export const SIGN_IN_CONTROL_HEIGHT = 52;

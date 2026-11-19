@@ -1,17 +1,3 @@
-import { Deferred, Effect, Exit, Result } from "effect";
-import { zipSync } from "fflate";
-import { parseDocument } from "yaml";
-import { type ArchiveOperationError, archiveCall, archiveFailure, archiveSync } from "./archive-effects";
-// Agent import into this host from one `.zip` export: chosen by the local user, or sent by a member
-// of a joined client with `agent-import-v1`, or in parts with `agent-import-v2`.
-//
-// `stage` reads only the manifest and the avatars and measures the other entries without
-// inflating them, so a large export previews quickly. `apply` inflates one agent at a time.
-// Each agent is created through the same services the user reaches by hand. When one step fails,
-// that agent is deleted and reported, and the other agents continue. A workspace file that cannot
-// be written is a warning, not a failed step, so the agent still imports. Group chats become channels
-// after the agents, with the members that imported; a channel needs at least one, as in OpenBot.
-
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, open, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -33,6 +19,9 @@ import {
   isChannelDraft,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import { Deferred, Effect, Exit, Result } from "effect";
+import { zipSync } from "fflate";
+import { parseDocument } from "yaml";
 import type { AgentService } from "../backend/agent-service";
 import type { ChannelService } from "../backend/channel-service";
 import { runCauseEffect } from "../backend/effect-boundary";
@@ -56,24 +45,18 @@ import {
   type ImportChannel,
 } from "./agent-import-manifest";
 import { validTimezone } from "./agent-marketplace-service";
+import { type ArchiveOperationError, archiveCall, archiveFailure, archiveSync } from "./archive-effects";
 import type { LocalSkillLibrary } from "./local-skill-library";
 import type { SkillMarketplaceFailure } from "./skill-marketplace-service";
 import { inspectArchive, SKILL_FRONTMATTER } from "./skill-package";
 
-/** Skill folders are copied here, published to the local library, and removed again. */
 const SKILL_STAGING = ".openbot/import-skills";
-/** Workspace files of an imported agent go under this folder, so they never replace OpenBot's own. */
 const IMPORTED_FILES = "imported";
-/** Archive limits and the errors that name them. */
 const IMPORT_ARCHIVE: ArchiveLimits = {
   files: AGENT_IMPORT_LIMITS.files,
   expandedTooLarge: sourceText("error.import.tooManyFiles", { limit: AGENT_IMPORT_LIMITS.files }),
   invalid: sourceText("error.import.zipInvalid"),
 };
-/**
- * A member's export, sent to this host. `agent-import-v1` limits the upload to 100 MB, and its
- * expanded size keeps the limits it had before, so a small upload cannot inflate up to 2 GB.
- */
 const REMOTE_IMPORT_FILES = 5_000;
 const REMOTE_IMPORT_ARCHIVE: ArchiveLimits = {
   files: REMOTE_IMPORT_FILES,
@@ -103,7 +86,6 @@ export interface AgentImportAgents {
   deleteChannel(channelId: string): ReturnType<AgentService["deleteChannel"]>;
 }
 
-/** Who creates an imported channel: the local user or the member who imports, as when they create one by hand. */
 export interface ChannelActor {
   id: string;
   name: string;
@@ -120,9 +102,7 @@ export interface AgentImportSkills {
 
 interface StagedImport {
   path: string;
-  /** The archive `apply` reads must be the one the preview checked. */
   fingerprint: string;
-  /** The limits the preview checked, which `apply` checks again. */
   limits: ArchiveLimits;
   agents: ImportAgent[];
   channels: ImportChannel[];
@@ -131,22 +111,16 @@ interface StagedImport {
 }
 
 interface StagedSlot {
-  /** Only the owner can apply or discard the token. */
   owner: string;
   value: StagedImport;
-  /** An uploaded export: the service wrote the file and removes it. */
   temporary: boolean;
-  /** Releases an uploaded export nobody applied or discarded. */
   expiry: ReturnType<typeof setTimeout> | null;
 }
 
-/** Who applies an export: the local user, or a member of a joined client. */
 export interface AgentImportCaller {
   owner: string;
   actor: ChannelActor;
-  /** The caller's zone, for a routine the export gives none. */
   timezone?: string;
-  /** False for a member: a skill already in the library is installed as it is, never revised. */
   reviseSkills: boolean;
 }
 
@@ -154,9 +128,7 @@ interface ImportContext {
   actor: ChannelActor;
   timezone: string;
   reviseSkills: boolean;
-  /** The digest of each skill that an imported agent of this run has, by slug. */
   skills: Map<string, string>;
-  /** Each skill of this run that got a new name, by its slug in the export and its digest. */
   renamed: Map<string, ImportSkill>;
 }
 
@@ -165,23 +137,16 @@ interface ImportSkill {
   slug: string;
 }
 
-/** The owner of the exports the local user stages. A member's owner is the member id. */
 const LOCAL_IMPORT_OWNER = "local";
-/** Uploaded exports kept at one time, across all members. */
 const UPLOAD_SLOTS = 4;
-/** An uploaded export nobody applied is released after this. */
 const UPLOAD_TTL_MS = 30 * 60_000;
-/** An `agent-import-v2` upload that gets no part for this long is released. */
 const PART_UPLOAD_IDLE_MS = 10 * 60_000;
 
-/** An export that a member sends in parts with `agent-import-v2`. */
 interface PartUpload {
   owner: string;
   path: string;
   size: number;
-  /** The bytes the file has, so the offset of the next part. */
   received: number;
-  /** A part is being written. */
   writing: boolean;
   expiry: ReturnType<typeof setTimeout> | null;
 }
@@ -189,9 +154,7 @@ interface PartUpload {
 export class AgentImportService {
   readonly #staged = new Map<string, StagedSlot>();
   readonly #uploads = new Map<string, PartUpload>();
-  /** Uploaded files that are not in `#staged`: being staged, or being applied. */
   #busyUploads = 0;
-  /** Files left by an earlier run are removed before the first upload. */
   #uploadDirectoryReady: Deferred.Deferred<void, ArchiveOperationError> | null = null;
 
   constructor(
@@ -200,12 +163,10 @@ export class AgentImportService {
     private readonly channelActor: () => ChannelActor,
     private readonly timezone: () => string = () => Intl.DateTimeFormat().resolvedOptions().timeZone,
     private readonly uploadDirectory: string | null = null,
-    /** `null` when the disk does not say, and then the import does not check. */
     private readonly freeDiskBytes: (path: string) => Effect.Effect<number | null> = (path) =>
       diskSpace(path).pipe(Effect.map((disk) => disk.freeBytes)),
   ) {}
 
-  /** Reads and checks an export. A new stage by the same owner replaces the owner's previous one. */
   readonly stage = Effect.fn("AgentImportService.stage")(function* (
     this: AgentImportService,
     path: string,
@@ -232,7 +193,6 @@ export class AgentImportService {
       const path = join(directory, `${randomUUID()}.zip`);
       yield* archiveCall(() => writeFile(path, bytes, { flag: "wx", mode: 0o600 })).pipe(
         Effect.uninterruptible,
-        // A write that fails part of the way, such as on a full disk, leaves part of the file.
         Effect.tapError(() => archiveCall(() => rm(path, { force: true })).pipe(Effect.ignore)),
       );
       return yield* this.#stageUploadedFile(path, owner, REMOTE_IMPORT_ARCHIVE);
@@ -245,10 +205,6 @@ export class AgentImportService {
     );
   }).bind(this);
 
-  /**
-   * Starts an `agent-import-v2` upload of `size` bytes and answers its id. A new upload by the same
-   * owner releases the owner's earlier upload and export.
-   */
   readonly openUpload = Effect.fn("AgentImportService.openUpload")(function* (
     this: AgentImportService,
     size: number,
@@ -264,10 +220,7 @@ export class AgentImportService {
     return yield* Effect.gen({ self: this }, function* () {
       yield* this.#prepareUploadDirectory(directory);
       const disk = yield* this.freeDiskBytes(directory);
-      // From here to the `set`, nothing waits, so a concurrent open sees this upload. Another open by
-      // the same owner can have ended during the reads above: it is released, as an earlier upload is.
       const earlier = [...this.#uploads].filter(([, other]) => other.owner === owner);
-      // The other uploads still need the bytes they do not have yet.
       const reserved = [...this.#uploads.values()]
         .filter((other) => other.owner !== owner)
         .reduce((total, other) => total + other.size - other.received, 0);
@@ -306,7 +259,6 @@ export class AgentImportService {
     );
   }).bind(this);
 
-  /** Writes the next part of an `agent-import-v2` upload at `offset`, and answers the bytes the upload has. */
   readonly writeUpload = Effect.fn("AgentImportService.writeUpload")(function* (
     this: AgentImportService,
     uploadId: string,
@@ -315,7 +267,6 @@ export class AgentImportService {
     owner: string,
   ): Effect.fn.Return<number, ArchiveOperationError> {
     const upload = this.#uploads.get(uploadId);
-    // Another member's upload reads as a closed export, so the answer does not show that it exists.
     if (!upload || upload.owner !== owner)
       return yield* archiveFailure(new Error(sourceText("error.import.exportClosed")));
     if (upload.writing || offset !== upload.received)
@@ -341,7 +292,6 @@ export class AgentImportService {
         }
       }).pipe(
         Effect.uninterruptible,
-        // A new open or the idle expiry can release the upload, and remove its file, during the write.
         Effect.catch((error) => (closed() ? Effect.void : Effect.fail(error))),
       );
       if (closed()) {
@@ -360,7 +310,6 @@ export class AgentImportService {
     );
   }).bind(this);
 
-  /** Reads a complete `agent-import-v2` upload and answers its preview, as `stageUpload` does. */
   readonly stageParts = Effect.fn("AgentImportService.stageParts")(function* (
     this: AgentImportService,
     uploadId: string,
@@ -374,8 +323,6 @@ export class AgentImportService {
     this.#uploads.delete(uploadId);
     if (upload.expiry) clearTimeout(upload.expiry);
     this.#busyUploads += 1;
-    // The parts are a complete export, so it has the limits of an export on this computer. The
-    // import checks the free disk space of each agent's files.
     return yield* this.#stageUploadedFile(upload.path, owner, IMPORT_ARCHIVE).pipe(
       Effect.ensuring(
         Effect.sync(() => {
@@ -385,13 +332,11 @@ export class AgentImportService {
     );
   }).bind(this);
 
-  /** Uploads that hold a slot: staged, being read, or being sent in parts. */
   #heldUploads(): number {
     const staged = [...this.#staged.values()].filter((slot) => slot.temporary).length;
     return staged + this.#busyUploads + this.#uploads.size;
   }
 
-  /** Restarts the idle timer of a part upload. */
   #keepUpload(uploadId: string, upload: PartUpload) {
     if (upload.expiry) clearTimeout(upload.expiry);
     upload.expiry = setTimeout(() => {
@@ -411,7 +356,6 @@ export class AgentImportService {
     yield* archiveCall(() => rm(upload.path, { force: true })).pipe(Effect.ignore);
   });
 
-  /** Stages an uploaded file, and removes it when it does not stage. */
   readonly #stageUploadedFile = Effect.fn("AgentImportService.stageUploadedFile")(function* (
     this: AgentImportService,
     path: string,
@@ -490,7 +434,6 @@ export class AgentImportService {
     }
 
     const token = randomUUID();
-    // A second stage by the same owner can finish first: the owner keeps one export.
     yield* this.#release(owner);
     const slot: StagedSlot = {
       owner,
@@ -562,12 +505,10 @@ export class AgentImportService {
     caller?: AgentImportCaller,
   ): Effect.fn.Return<AgentImportResult, ArchiveOperationError> {
     const slot = this.#staged.get(input.token);
-    // Another member's token reads as a closed export, so the answer does not show that it exists.
     if (!slot || slot.owner !== (caller?.owner ?? LOCAL_IMPORT_OWNER))
       return yield* archiveFailure(new Error(sourceText("error.import.exportClosed")));
     this.#staged.delete(input.token);
     if (slot.expiry) clearTimeout(slot.expiry);
-    // The file stays on disk until the import ends, so it keeps its upload slot until then.
     if (slot.temporary) this.#busyUploads += 1;
     return yield* Effect.gen({ self: this }, function* () {
       return yield* this.#importSelected(slot.value, input, {
@@ -623,8 +564,6 @@ export class AgentImportService {
         new Error(sourceText("error.import.serverAgentLimit", { limit: INPUT_LIMITS.agents })),
       );
 
-    // The file can change after `stage`, so only the same central directory is accepted. Each entry
-    // is checked against its size and CRC there when it is read.
     const archive = yield* readArchiveEffect(staged.path, staged.limits);
     if (archive.fingerprint !== staged.fingerprint)
       return yield* archiveFailure(new Error(sourceText("error.import.exportChanged")));
@@ -728,24 +667,20 @@ export class AgentImportService {
     context: ImportContext,
     warnings: string[],
   ): Effect.fn.Return<AgentSummary, ArchiveOperationError> {
-    // The manifest keeps each path of an agent inside `agents/<key>/`, so only those entries are searched.
     const prefix = `${staged.wrapper}agents/${source.key}/`;
     const agentEntries = [...archive.entries.values()].filter((entry) => entry.name.startsWith(prefix));
-    /** The entries under a folder of the export, by their names in that folder. */
     const under = (path: string) => {
       const folder = `${staged.wrapper}${path}/`;
       return agentEntries
         .filter((entry) => entry.name.startsWith(folder))
         .map((entry) => [entry.name.slice(folder.length), entry] as const);
     };
-    // Every skill is checked before the agent exists, so a bad one publishes nothing.
     const skills: ImportSkill[] = [];
     const planned = new Map(context.skills);
     const renames = new Map(context.renamed);
     for (const path of source.skills) {
       const skill = yield* readSkillEffect(archive, under(path));
       const digest = skillDigest(skill.files);
-      // The same skill as one that got a new name keeps that name.
       const key = `${skill.slug}\0${digest}`;
       const renamedBefore = renames.get(key);
       if (renamedBefore) {
@@ -758,8 +693,6 @@ export class AgentImportService {
         skills.push(skill);
         continue;
       }
-      // A different skill of this import has a name with the same slug. This one gets a new name,
-      // so that it does not replace that skill.
       const library = yield* this.skills
         .library()
         .list()
@@ -792,7 +725,6 @@ export class AgentImportService {
           let agent = created;
           try {
             if (files.length) {
-              // Each file takes whole disk blocks, so a small file counts as one 4 KB block.
               const needed = files.reduce((total, [, entry]) => total + Math.ceil(entry.size / 4096) * 4096, 0);
               const free = yield* this.freeDiskBytes(agent.workspacePath);
               if (free !== null && needed > free)
@@ -835,7 +767,6 @@ export class AgentImportService {
                 () =>
                   Effect.gen({ self: this }, function* () {
                     yield* writeTreeEffect(target, skill.files);
-                    // A new revision retains the existing library entry.
                     const revision = yield* Effect.gen(function* () {
                       const revision = yield* (
                         current
@@ -881,7 +812,6 @@ export class AgentImportService {
                 );
               }
             }
-            // The limit can be lower now than when the archive was read.
             const memoryLimit = this.agents.memoryLimit();
             if (source.memories.length > memoryLimit)
               warnings.push(sourceText("error.import.memoryLimit", { name: source.name, limit: memoryLimit }));
@@ -914,7 +844,6 @@ export class AgentImportService {
   });
 }
 
-/** The same digest for the same files, in any order. */
 function skillDigest(files: ReadonlyArray<readonly [string, Uint8Array]>): string {
   const hash = createHash("sha256");
   for (const [name, data] of [...files].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
@@ -922,11 +851,6 @@ function skillDigest(files: ReadonlyArray<readonly [string, Uint8Array]>): strin
   return hash.digest("hex");
 }
 
-/**
- * The skill with ` 2`, ` 3`, ... after its frontmatter name, at the first number whose slug this run
- * does not use. A library skill can have that slug only with the same name: an earlier import of
- * the same export saved it, so this import revises it as it revises a skill that keeps its name.
- */
 function renameSkill(
   files: ReadonlyArray<readonly [string, Uint8Array]>,
   planned: ReadonlyMap<string, string>,
@@ -937,14 +861,12 @@ function renameSkill(
   const match = text.match(SKILL_FRONTMATTER);
   const frontmatter = parseDocument(match?.[1] ?? "");
   const from = String(frontmatter.get("name")).trim();
-  // A slug keeps 64 characters, so a long name is cut to keep the number in its slug.
   const base = from.slice(0, 56).trimEnd();
   for (let number = 2; number <= planned.size + library.size + 2; number++) {
     const name = `${base} ${number}`;
     frontmatter.set("name", name);
     const head = `---\n${frontmatter.toString({ lineWidth: 0 })}---\n`;
     const skillFile = new TextEncoder().encode(head + text.slice(match?.[0].length ?? 0));
-    // The slug comes from SKILL.md alone, so the other files are not zipped for each number.
     const { slug } = inspectArchive(zipSync({ "SKILL.md": skillFile }));
     if (!planned.has(slug) && (library.get(slug) ?? name) === name)
       return {
@@ -957,7 +879,6 @@ function renameSkill(
   throw new Error(sourceText("error.skill.localNameTaken"));
 }
 
-/** A zip made by compressing a folder puts everything in that folder. */
 function wrapperFolder(names: string[]): string {
   if (names.includes(AGENT_IMPORT_MANIFEST)) return "";
   const roots = new Set(names.map((name) => name.split("/")[0]));
@@ -969,7 +890,6 @@ function filesUnder(entries: Map<string, ArchiveEntry>, folder: string): Array<[
   return [...entries].filter(([name]) => name.startsWith(`${folder}/`));
 }
 
-/** GB with one decimal place. The needed space rounds up and the free space down, so they never look equal. */
 function gigabytes(bytes: number, round: (value: number) => number): string {
   return (round((bytes / 1024 ** 3) * 10) / 10).toFixed(1);
 }

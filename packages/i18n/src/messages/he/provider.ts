@@ -121,6 +121,9 @@ export const messages = {
   "provider.picker.olderModels": "מודלים ישנים",
   "provider.picker.olderModelsList": "מודלים ישנים של {name}",
   "provider.picker.noModels": "אין מודלים זמינים מ-{name}.",
+  "provider.picker.endpointModelsInCustom":
+    "{name} מפעיל את נקודות הקצה המותאמות שלך. המודלים שלהן נמצאים בכרטיסייה מותאם אישית.",
+  "provider.picker.showCustomModels": "הצגת מודלים",
   "provider.picker.museNoModels":
     "Muse לא שלח מודלים עבור החשבון הזה. ייתכן ש-Muse אינו זמין במדינה שבה הסוכן הזה פועל. בחר מודל מספק אחר.",
   "provider.picker.customEmpty":
@@ -320,6 +323,8 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · הורדה על ידי OpenBot",
   "provider.settings.otherVersionInstalledByUser": "לא בשימוש: {version} · הותקנה על ידיך",
   "provider.settings.otherVersionDownloaded": "לא בשימוש: {version} · הורדה על ידי OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "חלק מהמודלים צריכים רכיב שחסר בגרסה הזו. הורד את הגרסה של OpenBot כדי להשתמש בהם.",
   "provider.settings.useInstalledVersion": "השתמש בגרסה המותקנת",
   "provider.settings.useDownloadedVersion": "השתמש בגרסה של OpenBot",
   "provider.settings.update": "עדכון",

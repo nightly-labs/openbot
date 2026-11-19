@@ -1,20 +1,3 @@
-// Checks the `openbot` workflow tools that agents use, on the real SQLite and the real workflow
-// service, on a temporary profile. Each call goes through `tool_search` and the `tool_call`
-// envelope as an agent sends it. Only the agent mailbox is a stand-in that keeps each delivery
-// running, so no provider, app, account or network is started.
-//
-// It builds a workflow with refs in one call (trigger, agent, condition, output), moves, changes and
-// removes nodes, reads it back, runs it with the input of one case and reads the run, and checks the failures that the model must
-// correct: an edge that a rule refuses, an unknown agent and a locked node. The report keeps the byte
-// size of each tool result, so the context cost is visible. It also checks that a search says to run
-// the tools with tool_call, that tool_call accepts the name as `tool` and gives a number or boolean
-// sent as text the type of the tool's schema, that each delete asks the
-// user and a decline keeps the workflow, and that the change event names the agent that built it.
-// The run input goes from the trigger to the agent step. A run from a trigger takes it, and a run
-// from a later node refuses it.
-//
-// Run: bun scripts/workflow-agent-tools-e2e.ts
-// Writes .openbot-build/workflow-agent-tools-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -36,10 +19,8 @@ import { createWorkflows, type WorkflowsHandle } from "../src/backend/workflows/
 const OUT = resolve(import.meta.dirname, "../.openbot-build/workflow-agent-tools-e2e");
 const WAIT_MS = 5_000;
 const AGENTS = new Set(["agent-research"]);
-/** The agent that calls the tools. */
 const CALLER = "agent-builder";
 
-// Decoders of the tool results that the checks read.
 const created = z.object({ workflowId: z.string(), ids: z.record(z.string(), z.string()) });
 const workflowRead = z.object({
   title: z.string(),
@@ -83,9 +64,7 @@ const runRead = z.object({
 
 interface Report {
   checks: string[];
-  /** Bytes of each tool result that the agent reads. */
   bytes: Record<string, number>;
-  /** Each change event, as `workflowId` or `workflowId by agentId`. */
   changed: string[];
   passed: boolean;
   failure?: string;
@@ -110,10 +89,8 @@ const directory = await mkdtemp(join(tmpdir(), "openbot-workflow-agent-tools-"))
 const database = new OpenBotDatabase(directory);
 let workflows: WorkflowsHandle | null = null;
 
-/** The text of each agent step that a run sent to its agent. */
 const handoffs: string[] = [];
 
-/** The titles that a delete asked the user about, and the user's next answer. */
 const deleteAsked: string[] = [];
 let deleteAnswer = true;
 const confirmDelete = (title: string) =>
@@ -122,14 +99,9 @@ const confirmDelete = (title: string) =>
     return deleteAnswer;
   });
 
-/** The room that a connection and its port chips need between two columns, and the space between two rows. */
 const COLUMN_GAP = 120;
 const ROW_GAP = 64;
 
-/**
- * Reads the workflow with its layout, and gives each place where it does not look clean: a connection
- * that goes left or has no room to show, or two cards nearer than the gaps.
- */
 async function layoutProblems(label: string, workflowId: string) {
   const graph = laidOut.parse((await call(label, "read_workflow", { workflowId, layout: true })).value);
   const byId = new Map(graph.nodes.map((node) => [node.id, node]));
@@ -155,7 +127,6 @@ async function layoutProblems(label: string, workflowId: string) {
 
 let calls = 0;
 
-/** Calls a workflow tool as an agent does: through the `tool_call` envelope. The same `callKey` is a repeated call. */
 async function call(
   label: string,
   name: string,
@@ -183,7 +154,6 @@ try {
       runs: new WorkflowRunStore({ database }),
       github: new WorkflowGitHubStore({ database }),
       githubApp: () => null,
-      // Each delivery stays running, so the run waits on the agent step.
       delivery: () => ({ status: "running", turnId: null, error: null }),
       turnAnswer: () => null,
       sendHandoff: (handoff) =>
@@ -202,9 +172,6 @@ try {
     }),
   );
 
-  // 1. Search finds the tools with their schemas and guidance.
-  // The query names no tool in full, as a model's first search often does. It also names a routine,
-  // as a model that reads "every morning" does, but only the workflow tools come with schemas.
   const search = discoverTools(params("tool_search", { query: "create workflow routine with approval" }), "codex");
   report.bytes.search = Buffer.byteLength(JSON.stringify(search));
   const ready = search.tools.filter((tool) => "inputSchema" in tool).map((tool) => tool.name);
@@ -220,14 +187,12 @@ try {
       !(search.guidance ?? []).some((text) => text.includes("Manage scheduled work")),
     { ready, guidance: search.guidance },
   );
-  // Users call the Workflows board the Canvas. A canvas search found no workflow tool (#9367).
   const canvas = discoverTools(params("tool_search", { query: "create a canvas" }), "claude");
   check(
     "a canvas search gives all 6 workflow tools with schemas",
     canvas.tools.filter((tool) => tool.name.includes("workflow") && "inputSchema" in tool).length === 6,
     canvas.tools.map((tool) => tool.name),
   );
-  // A canvas can also be on a web page or be the Routines canvas, so those schemas stay.
   const otherReady = ["click canvas", "connect routine agents canvas"].flatMap((query) =>
     discoverTools(params("tool_search", { query }), "claude")
       .tools.filter((tool) => "inputSchema" in tool)
@@ -246,7 +211,6 @@ try {
     mixed.tools.some((tool) => tool.name === "openbot_browser.snapshot" && "inputSchema" in tool),
     mixed.tools.map((tool) => tool.name),
   );
-  // Claude called a found tool directly, and then sent its name as `tool`. Each refusal cost a model step.
   check(
     "a workflow search says to run the tools with tool_call, and has no browser note",
     search.call?.includes("tool_call") === true && !("note" in search),
@@ -254,8 +218,6 @@ try {
   );
   const alias = resolveDeferredTool(params("tool_call", { tool: "openbot.list_workflows", arguments: {} }), "codex");
   check("tool_call accepts the qualified name as tool", alias?.tool === "list_workflows", alias);
-  // An ACP agent sent the MCP names that it sees, and no arguments for a tool that has none. Each try
-  // got the same general refusal, and its routine failed until the run ended (#7955).
   const mcpName = resolveDeferredTool(params("tool_call", { name: "mcp__openbot__list_workflows" }), "acp");
   check(
     "tool_call accepts an MCP tool name and no arguments",
@@ -270,7 +232,6 @@ try {
     bareError,
   );
 
-  // 2. One call builds a workflow with refs.
   const built = await call("create", "edit_workflow", {
     title: "Morning news",
     ops: [
@@ -283,7 +244,6 @@ try {
         fields: { agentId: "agent-research", task: "Find the news." },
       },
       { op: "add", ref: "check", kind: "condition", from: "news", fields: { rule: "Is there news?" } },
-      // The "no" child comes first, as a model can send it; the layout still puts "yes" above it.
       { op: "add", ref: "quiet", kind: "output", from: "check", branch: "no", fields: { title: "No news" } },
       { op: "add", ref: "tell", kind: "output", from: "check", branch: "yes" },
       { op: "add", ref: "label", kind: "note", fields: { text: "Built by an agent" } },
@@ -301,8 +261,6 @@ try {
   const read = await call("read", "read_workflow", { workflowId });
   const graph = workflowRead.parse(read.value);
   check("read_workflow has the 6 nodes and 4 edges", graph.nodes.length === 6 && graph.edges.length === 4, graph);
-  // Some model paths see the untyped values of `tool_call.arguments` as text, so their models send
-  // `true` as "true" and `1` as "1" (#9980). The value gets the type of the target's schema.
   const textBoolean = await call("read-layout-text", "read_workflow", { workflowId, layout: "true" });
   check(
     "tool_call gives a boolean sent as text its type",
@@ -367,7 +325,6 @@ try {
     { yes, no },
   );
 
-  // 3. Move, change and remove.
   const edited = await call("edit", "edit_workflow", {
     workflowId,
     title: "Morning news digest",
@@ -393,7 +350,6 @@ try {
     afterGraph,
   );
 
-  // 4. A step put between two nodes moves the later nodes one column right.
   const before = await runCauseEffect(workflows.get(workflowId));
   const was = (id: string | undefined) => before.graph.nodes.find((node) => node.id === id)?.at;
   const inserted = await call("insert", "edit_workflow", {
@@ -432,7 +388,6 @@ try {
     afterInsert,
   );
 
-  // 4b. tidy lays out a graph that the agent made untidy.
   const messy = await call("mess", "edit_workflow", {
     workflowId,
     ops: [
@@ -449,7 +404,6 @@ try {
   const tidy = await layoutProblems("read-layout-tidy", workflowId);
   check("tidy lays the graph out again with room for each connection", tidied.ok && tidy.problems.length === 0, tidy);
 
-  // 5. Failures that the model corrects.
   const badEdge = await call("failure-edge", "edit_workflow", {
     workflowId,
     ops: [{ op: "connect", from: ids.news, to: ids.tell, branch: "no" }],
@@ -467,6 +421,26 @@ try {
     "an unknown agent is refused",
     !badAgent.ok && JSON.stringify(badAgent.value).includes("agent-gone"),
     badAgent.value,
+  );
+  const badModel = await call("failure-model", "edit_workflow", {
+    workflowId,
+    ops: [{ op: "update", node: ids.news, fields: { provider: "grok", model: "grok-4.7" } }],
+  });
+  const clearedModel = await call("clear-model", "edit_workflow", {
+    workflowId,
+    ops: [{ op: "update", node: ids.news, fields: { provider: null, model: "", effort: null } }],
+  });
+  check("an empty or null model on an agent step is accepted as a clear", clearedModel.ok, clearedModel.value);
+  const newsAfterModel = (await runCauseEffect(workflows.get(workflowId))).graph.nodes.find(
+    (node) => node.id === ids.news,
+  );
+  check(
+    "a model on an agent step is refused, with the llm step as the way, and is not saved",
+    !badModel.ok &&
+      JSON.stringify(badModel.value).includes("llm step") &&
+      newsAfterModel !== undefined &&
+      newsAfterModel.fields.model !== "grok-4.7",
+    badModel.value,
   );
   const lockedDetail = await runCauseEffect(workflows.get(workflowId));
   const saved = await runCauseEffect(
@@ -507,7 +481,71 @@ try {
     libraryAfter,
   });
 
-  // 6. Run and read the run.
+  const badEvent = await call("failure-event", "edit_workflow", {
+    title: "Pull request review",
+    ops: [{ op: "add", kind: "trigger", fields: { trigger: "github", event: "pull_request.opened" } }],
+  });
+  check(
+    "an unknown trigger event is refused with the events to use, and makes no workflow",
+    !badEvent.ok &&
+      JSON.stringify(badEvent.value).includes("pull_request.opened") &&
+      JSON.stringify(badEvent.value).includes("pr.opened") &&
+      (await runCauseEffect(workflows.list())).length === libraryBefore,
+    badEvent.value,
+  );
+  const noEvent = await call("failure-no-event", "edit_workflow", {
+    title: "Telegram mentions",
+    ops: [{ op: "add", kind: "trigger", fields: { trigger: "telegram" } }],
+  });
+  check(
+    "a messaging trigger without an event is refused, and makes no workflow",
+    !noEvent.ok &&
+      JSON.stringify(noEvent.value).includes("mention") &&
+      (await runCauseEffect(workflows.list())).length === libraryBefore,
+    noEvent.value,
+  );
+  const review = await call("event", "edit_workflow", {
+    title: "Pull request review",
+    ops: [
+      { op: "add", ref: "pr", kind: "trigger", fields: { trigger: "github", repositories: "acme/app" } },
+      { op: "update", node: "pr", fields: { event: "pr.opened" } },
+    ],
+  });
+  const reviewId = z.object({ workflowId: z.string() }).parse(review.value).workflowId;
+  const reviewDetail = await runCauseEffect(workflows.get(reviewId));
+  const prTrigger = reviewDetail.graph.nodes.find((node) => node.kind === "trigger");
+  check(
+    "a later op of the same call can give a new trigger its event",
+    review.ok && prTrigger?.fields.event === "pr.opened",
+    prTrigger,
+  );
+  assert.ok(prTrigger);
+  const storedBad = await runCauseEffect(
+    workflows.saveGraph({
+      workflowId: reviewId,
+      baseRevision: reviewDetail.revision,
+      graph: {
+        ...reviewDetail.graph,
+        nodes: reviewDetail.graph.nodes.map((node) =>
+          node.id === prTrigger.id ? { ...node, fields: { ...node.fields, event: "pull_request.opened" } } : node,
+        ),
+      },
+    }),
+  );
+  assert.ok(storedBad.ok);
+  const otherField = await call("event-kept", "edit_workflow", {
+    workflowId: reviewId,
+    ops: [{ op: "update", node: prTrigger.id, fields: { filters: "notBot" } }],
+  });
+  const keptTrigger = (await runCauseEffect(workflows.get(reviewId))).graph.nodes.find(
+    (node) => node.id === prTrigger.id,
+  );
+  check(
+    "an edit that does not change the event keeps a saved event as it is",
+    otherField.ok && keptTrigger?.fields.event === "pull_request.opened" && keptTrigger.fields.filters === "notBot",
+    { result: otherField.value, trigger: keptTrigger },
+  );
+
   const caseInput = "Shipment 4417: review the packet from the supplier in Gdansk.";
   const fromNode = await call("failure-run-from-node", "run_workflow", {
     workflowId,
@@ -574,7 +612,6 @@ try {
     await new Promise((done) => setImmediate(done));
     triggerRun = await call("runs-from-trigger", "read_workflow_runs", { workflowId, runId: triggerRunId });
   }
-  // The workflow has two runs now, and a read without a limit gives one.
   const textLimit = await call("runs-limit-text", "read_workflow_runs", { workflowId, limit: "2" });
   check(
     "tool_call gives an integer sent as text its type",
@@ -606,7 +643,6 @@ try {
     trigger,
   );
 
-  // 7. Delete: each one asks the user, and a decline keeps the workflow.
   deleteAnswer = false;
   const declined = await call("failure-delete-declined", "delete_workflow", { workflowId });
   const kept = await call("read-after-decline", "read_workflow", { workflowId });

@@ -1,6 +1,3 @@
-// Agent conversations and member-to-member direct messages, as a host sends them.
-// See `remote-host-decoding.ts` for why the `FromHost` suffix exists and must not be merged away.
-
 import type {
   ConversationMessage,
   ConversationPage,
@@ -171,7 +168,6 @@ function decodePageInfo(value: unknown): ConversationPage["pageInfo"] {
   return {
     hasOlder: requiredBoolean(record, "hasOlder"),
     olderCursor: nullableString(record, "olderCursor"),
-    // history-extent-v1: the host sends the unloaded length only when it was negotiated.
     ...optionalHistoryExtent(record),
   };
 }

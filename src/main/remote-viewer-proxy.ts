@@ -1,3 +1,4 @@
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import {
   createServer,
   type IncomingMessage,
@@ -29,16 +30,11 @@ const requireModule = createRequire(import.meta.url);
 const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("ws/package.json")), "index.js"));
 const MAX_REQUEST_BYTES = 2 * 1024 * 1024;
 const MAX_PENDING_SIGNAL_BYTES = 1024 * 1024;
-// The Moonlight viewer's own files are the same for each session of a host's runtime, but their paths
-// hold the session, so the browser never reuses them. Without a copy here, each open loaded them all
-// again through the server connection, one round trip each (#9397). `config.js` holds the session's
-// path and the host writes the paste script, so they are not kept; nor is a page or a query.
 const VIEWER_FILE_PATH = new RegExp(
   `^${TEAM_API_ROUTES.remoteScreen.sessions}/[A-Za-z0-9-]+/moonlight(/[A-Za-z0-9_./-]+\\.(?:js|mjs|css|wasm|png|svg|ico|woff2?))$`,
   "u",
 );
 const HOST_WRITTEN_VIEWER_FILES = new Set(["/config.js", "/openbot-paste.js"]);
-// The viewer's files are about 1.2 MB. A host that sends more than this gets no more copies.
 const MAX_KEPT_VIEWER_BYTES = 32 * 1024 * 1024;
 const VIEWER_PAGE_POLICY =
   "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; media-src 'self' blob:; worker-src 'self' blob:";
@@ -74,12 +70,9 @@ interface KeptViewerFiles {
 export class RemoteViewerProxy {
   readonly #options: RemoteViewerProxyOptions;
   readonly #operations = new Set<Deferred.Deferred<void>>();
-  readonly #token = crypto.randomUUID().replaceAll("-", "");
+  readonly #tokens = new Map<string, string>();
   readonly #webSockets = new webSockets.WebSocketServer({ noServer: true });
   readonly #streams = new Map<string, ViewerStream>();
-  // By server. A host gets a new runtime only when it restarts, and the client then makes a new
-  // connection, so each connection and each disconnection forgets the server's files. The epoch
-  // changes at the same time: a file asked for before the change can come from the earlier host.
   readonly #viewerFiles = new Map<string, KeptViewerFiles>();
   readonly #viewerFileEpochs = new Map<string, number>();
   #keepsViewerFiles = true;
@@ -113,7 +106,6 @@ export class RemoteViewerProxy {
     this.#options.transport.off("connected", this.#forgetViewerFiles);
     for (const stream of this.#streams.values()) stream.socket.close(1001, "Remote viewer stopped");
     this.#streams.clear();
-    // Nothing forgets them after this.
     this.#keepsViewerFiles = false;
     this.#viewerFiles.clear();
     while (this.#operations.size)
@@ -181,7 +173,9 @@ export class RemoteViewerProxy {
     response: ServerResponse,
   ): Effect.fn.Return<void, RemoteWorkflowError> {
     const route = this.#route(request.url ?? "/");
-    if (!route) return sendText(response, 404, "Not found");
+    if (!route?.upstreamPath.startsWith(`${TEAM_API_ROUTES.remoteScreen.prefix}/`)) {
+      return sendText(response, 404, "Not found");
+    }
     const viewerFile =
       request.method === "GET" || request.method === "HEAD" ? viewerFilePath(route.upstreamPath) : null;
     const keptFile = viewerFile === null ? undefined : this.#viewerFiles.get(route.serverId)?.files.get(viewerFile);
@@ -206,8 +200,6 @@ export class RemoteViewerProxy {
       if (contentType.includes("text/html") || contentType.includes("javascript")) {
         const prefix = this.#basePath(route.serverId);
         const escapedPrefix = prefix.replaceAll("/", "\\/");
-        // Both forms of the namespace the viewer's assets reference: plain in URLs, backslash-escaped
-        // where the bundle embeds it in a regex or a string literal.
         const namespace = TEAM_API_ROUTES.remoteScreen.prefix;
         const escapedNamespace = namespace.replaceAll("/", "\\/");
         const text = new TextDecoder()
@@ -252,8 +244,8 @@ export class RemoteViewerProxy {
       }
       this.#queueFrame(streamId, stream, data, binary);
     });
+    socket.on("error", () => socket.close(1011));
     socket.once("close", (code, reason) => {
-      // A lost transport already removed the stream. Do not reconnect to send its close.
       if (!this.#streams.delete(streamId)) return;
       void Effect.runPromise(
         this.#owned(
@@ -381,26 +373,32 @@ export class RemoteViewerProxy {
       } else if (control.type === "error") {
         stream.socket.close(1011, control.message);
       }
-    } catch {
-      // A malformed optional desktop signal cannot affect Team API channels.
-    }
+    } catch {}
   };
 
   #route(value: string): { serverId: string; upstreamPath: string } | null {
     try {
       const url = new URL(value, "http://127.0.0.1");
-      const match = new RegExp(`^/${this.#token}/([^/]+)(/.*)$`, "u").exec(url.pathname);
+      const match = /^\/([0-9a-f]{32})\/([^/]+)(\/.*)$/u.exec(url.pathname);
       if (!match) return null;
-      const serverId = decodeURIComponent(match[1] ?? "");
+      const serverId = decodeURIComponent(match[2] ?? "");
       if (!/^[A-Za-z0-9:_-]{1,128}$/u.test(serverId)) return null;
-      return { serverId, upstreamPath: `${match[2]}${url.search}` };
+      const expected = this.#tokens.get(serverId);
+      const given = Buffer.from(match[1] ?? "");
+      if (expected === undefined || !timingSafeEqual(given, Buffer.from(expected))) return null;
+      return { serverId, upstreamPath: `${match[3]}${url.search}` };
     } catch {
       return null;
     }
   }
 
   #basePath(serverId: string): string {
-    return `/${this.#token}/${encodeURIComponent(serverId)}`;
+    let token = this.#tokens.get(serverId);
+    if (token === undefined) {
+      token = randomBytes(16).toString("hex");
+      this.#tokens.set(serverId, token);
+    }
+    return `/${token}/${encodeURIComponent(serverId)}`;
   }
 }
 

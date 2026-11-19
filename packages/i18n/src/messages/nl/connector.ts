@@ -377,7 +377,7 @@ export const messages = {
     "Alleen je chat “Bericht aan jezelf” en de mensen die je toestaat kunnen schrijven. Andere mensen krijgen geen antwoord. Als dit uit staat, antwoordt OpenBot onbekende mensen met een code.",
   "connector.whatsapp.workingMessage": "Bericht “Mee bezig…”",
   "connector.whatsapp.workingMessageDescription":
-    "OpenBot stuurt het terwijl de agent werkt en vervangt het daarna door het antwoord. Zet dit uit om alleen het antwoord te sturen.",
+    "OpenBot stuurt het terwijl de agent werkt en vervangt het daarna door het antwoord. Een verzoek dat op een eerder verzoek wacht, krijgt ook een wachtbericht. Zet dit uit om alleen het antwoord te sturen.",
   "connector.whatsapp.statusReactions": "Statusreacties",
   "connector.whatsapp.statusReactionsDescription":
     "OpenBot reageert met 👀 als er een bericht binnenkomt en met ✅ als het antwoord klaar is. Zet dit uit om geen reacties te sturen.",
@@ -465,7 +465,8 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "Optioneel. Zonder naam toont de lijst het telefoonnummer.",
   "connector.whatsapp.add": "Toevoegen",
   "connector.whatsapp.groupTitle": "Voeg een groep toe",
-  "connector.whatsapp.groupDescription": "Mensen in deze groep kunnen werk geven aan je agents.",
+  "connector.whatsapp.groupDescription":
+    "Mensen in deze groep kunnen werk geven aan je agents als ze het nummer vermelden of op de berichten ervan reageren.",
   "connector.whatsapp.groupSearch": "Zoek groepen",
   "connector.whatsapp.groupsLoading": "Groepen lezen…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot kon de groepen niet lezen",
@@ -619,9 +620,9 @@ export const messages = {
   "connector.protonPass.expiredDescription":
     "Agents kunnen niet inloggen met je gedeelde logins tot je opnieuw aanmeldt.",
   "connector.protonPass.reconnect": "Opnieuw verbinden",
-  "connector.protonPass.planTitle": "Proton Pass vraagt een betaald abonnement",
+  "connector.protonPass.planTitle": "Proton Pass heeft een abonnement met Pass Plus nodig",
   "connector.protonPass.planDescription":
-    "De Proton Pass CLI werkt alleen met een betaald Proton-abonnement. Wijzig je abonnement en verbind opnieuw.",
+    "De Proton Pass CLI heeft een Proton-abonnement nodig waarin Pass Plus zit. Andere betaalde abonnementen, zoals Mail Plus, bevatten hem niet. Wijzig je abonnement en verbind opnieuw.",
   "connector.protonPass.vaultTitle": "Gedeelde kluis",
   "connector.protonPass.vaultDescription":
     "Agents kunnen inloggen met de logins in deze kluis. Verplaats een login erheen om hem te delen.",
