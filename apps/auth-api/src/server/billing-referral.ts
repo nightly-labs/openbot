@@ -181,8 +181,9 @@ export class BillingReferral {
       // invoice uses.
       const currency: BillingCurrency =
         customer?.currency && isOneOf(BILLING_CURRENCIES, customer.currency) ? customer.currency : sourceCurrency;
+      // A share that converts to 0 still writes its row: a refund of this invoice then finds it, and the
+      // payment counts toward the friend's second payment.
       const amount = convertReferralAmount(share, sourceCurrency, currency);
-      if (amount === 0) return;
       yield* billingCall(() =>
         this.#database
           .prepare(
@@ -429,10 +430,12 @@ export class BillingReferral {
     ownerId: string | null,
   ): Effect.fn.Return<void, Failure> {
     let credit = yield* this.#creditRow(payment.invoiceId);
+    const share = referralShare(withoutTax(reversal.amount, payment.total, payment.totalExcludingTax));
     // Stripe does not keep the order of events, and sends a failed `invoice.paid` again later. A refund of an
     // invoice of an invited friend that has no credit yet fails, so Stripe sends the refund again after the
-    // credit is written. Otherwise the referrer would keep credit for a refunded payment.
-    if (!credit && ownerId && (yield* this.#referrals.isReferred(ownerId))) {
+    // credit is written. Otherwise the referrer would keep credit for a refunded payment. A refund is not
+    // more than its payment, so a refund with a share of 0 is of an invoice that gives no credit row.
+    if (!credit && share > 0 && ownerId && (yield* this.#referrals.isReferred(ownerId))) {
       return yield* new BillingOperationError({});
     }
     // A queued credit keeps its amount until Stripe accepts it, because its idempotency key is fixed. It goes
@@ -443,7 +446,6 @@ export class BillingReferral {
     }
     if (!credit || !isOneOf(BILLING_CURRENCIES, credit.source_currency)) return;
     if (!isOneOf(BILLING_CURRENCIES, credit.currency)) return;
-    const share = referralShare(withoutTax(reversal.amount, payment.total, payment.totalExcludingTax));
     if (credit.balance_transaction_id === null) {
       // The credit still waits: it gets smaller, and nothing goes to Stripe.
       const amount = Math.max(
