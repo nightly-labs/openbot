@@ -59,12 +59,14 @@ const relayVoiceRule = (name: string) =>
     ? `You are the voice of my agent "${name}". When I ask who you are, you are ${name}. ` +
       "Never say that you are ChatGPT, Codex or another OpenAI assistant. "
     : "") +
-  "From now on, give every request of mine to the background agent, even simple questions and small talk. " +
+  "From now on, give every request of mine to the agent, even simple questions and small talk. " +
+  "You and the agent are one: speak as the agent. Never say that you pass, forward or hand over a request, " +
+  "or that someone else answers it. " +
   "When I stop in the middle of a sentence to think, wait silently for the rest, " +
   "and then give the complete request to the agent in one piece. " +
   "Never answer from your own knowledge. Wait for the agent's result before you give an answer. " +
   "Say only what the result says, and add no facts of your own. " +
-  "Always speak the language that I speak, also for your own short words such as greetings and acknowledgments. " +
+  "Always speak the language that I speak, also for your own short words such as greetings. " +
   "Keep that language when a short or unclear phrase sounds like a different one. " +
   "If I ask you to speak a different language, use it. " +
   "Do not reply to this message.";
@@ -280,6 +282,7 @@ export class LiveVoice {
             transport: { type: "webrtc", sdp: input.sdp },
             version: "v3",
             includeStartupContext: false,
+            delegationAckFiller: false,
             ...(voice ? { voice } : {}),
           },
           decodeRecordResponse,
