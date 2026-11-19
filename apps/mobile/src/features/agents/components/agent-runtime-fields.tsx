@@ -18,7 +18,7 @@ import { Button, Typography } from "heroui-native";
 import { useEffect, useState } from "react";
 import { Platform } from "react-native";
 import { useUniwind } from "uniwind";
-import { AgentFastModeField, type AgentHostFieldsProps } from "@/features/agents/components/agent-host-fields";
+import { type AgentHostFieldsProps, AgentSpeedField } from "@/features/agents/components/agent-host-fields";
 import { useAgentModelPicker, withAccountModels } from "@/features/agents/model/agent-model-picker";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import {
@@ -114,6 +114,7 @@ export function AgentRuntimeFields({
   onAccountChange,
   fastMode,
   modelPickerRoute,
+  workspaceOnly = false,
 }: {
   serverId: string;
   /** The model list page in the stack of this form. */
@@ -136,8 +137,10 @@ export function AgentRuntimeFields({
   accountId?: string;
   onChange: (value: Pick<UpdateAgentInput, "provider" | "model" | "reasoningEffort">) => void;
   onAccountChange?: (accountId: string) => void;
-  /** An existing agent. Its Fast mode switch shows when the chosen model has a fast tier. */
+  /** An existing agent. Its Speed choice shows when the chosen model has a fast tier. */
   fastMode?: AgentHostFieldsProps;
+  /** The agent has Workspace only access: a provider that the host refuses for it gets a note. */
+  workspaceOnly?: boolean;
 }) {
   const { t } = useText();
   const accountName = useProviderAccountName();
@@ -156,6 +159,11 @@ export function AgentRuntimeFields({
   const enabled = available && !saving && options.length > 0;
   const showsModel = foreignProvider === undefined && (!hostDefault || provider !== undefined);
   const spentLimit = useSpentLimitText(serverId, showsModel ? provider : undefined, accountId, model);
+  // The host refuses to save such a provider for a Workspace only agent, so the form says why first.
+  const workspaceOnlyNote =
+    workspaceOnly && options.some((option) => option.workspaceOnlyUnavailable)
+      ? t("mobile.agent.runtime.workspaceOnlyUnavailable")
+      : undefined;
   const openModelPicker = useAgentModelPicker((state) => state.open);
   const chooseModel = (next: AgentModelOption) => {
     onChange({
@@ -168,7 +176,7 @@ export function AgentRuntimeFields({
   };
   return (
     <>
-      <SettingsSection title={title} footer={spentLimit}>
+      <SettingsSection title={title} footer={[workspaceOnlyNote, spentLimit].filter(Boolean).join(" ") || undefined}>
         <SettingsRow
           trailing={
             <SettingsPicker<string>
@@ -285,7 +293,7 @@ export function AgentRuntimeFields({
           </SettingsRow>
         ) : null}
       </SettingsSection>
-      {fastMode && showsModel && selected?.fastServiceTier ? <AgentFastModeField {...fastMode} /> : null}
+      {fastMode && showsModel && selected?.fastServiceTier ? <AgentSpeedField {...fastMode} model={selected} /> : null}
       {models.isError ? (
         <Button variant="ghost" onPress={() => void models.refetch()}>
           <Button.Label>{t("mobile.agent.runtime.retryModels")}</Button.Label>
@@ -320,7 +328,8 @@ function useSpentLimitText(
   const spent = provider
     ? spentUsageWindow(usage?.limits, provider, accountId || DEFAULT_PROVIDER_ACCOUNT_ID, model, now)
     : null;
-  const spentWindow = spent?.covers ? spent.window : null;
+  // An account on credits keeps working, so its model is not stopped.
+  const spentWindow = spent?.covers && !spent.onCredits ? spent.window : null;
   const resetsAt = spentWindow?.resetsAt ?? null;
   useEffect(() => {
     if (resetsAt === null) return;

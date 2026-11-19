@@ -10,6 +10,7 @@ import Trash2 from "lucide-react-native/icons/trash";
 import { useEffect, useRef, useState } from "react";
 import { Alert, View } from "react-native";
 import { useUniwind } from "uniwind";
+import { McpAccessSection } from "@/features/servers/components/mcp-access-section";
 import { ListField, PairField } from "@/features/servers/components/repeatable-fields";
 import {
   type McpServerDraft,
@@ -49,7 +50,7 @@ const URL_PLACEHOLDER = "https://mcp.example.com/mcp";
 type TestState = { status: "testing" } | { status: "done"; result: McpTestResult };
 
 /**
- * Server sheet > MCP servers > one server, or a new one without `mcpServerId`. The header action
+ * Marketplace > Apps > a custom MCP server, or Add custom without `mcpServerId`. The header action
  * saves it. A saved server turns on and off at once, and can be tested, signed out and removed.
  */
 export function ServerMcpServerScreen() {
@@ -359,6 +360,7 @@ function McpServerForm({
           />
         </SettingsRow>
       </SettingsSection>
+      {saved ? <McpAccessSection serverId={serverId} mcpServerId={saved.id} name={saved.name} /> : null}
       <SettingsSection footer={test ? testMessage(test) : t("mobile.server.mcp.testDescription")}>
         <SettingsRow
           disclosure={false}

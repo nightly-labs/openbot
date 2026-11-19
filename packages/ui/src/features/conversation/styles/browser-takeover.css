@@ -225,6 +225,14 @@
   font-size: var(--openbot-text-sm);
 }
 
+/* The card has only the start of the request, so it offers only Deny. */
+.approval-cut-note {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-md);
+}
+
 .approval-detail-row strong {
   color: var(--openbot-text-secondary);
   font-family: var(--openbot-font-mono);

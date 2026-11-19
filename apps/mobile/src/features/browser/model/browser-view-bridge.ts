@@ -50,6 +50,8 @@ export type BrowserViewBridgeOpen = {
   contextMenu: boolean;
   /** The page size to hold while the phone watches, for a host that advertises `browser-view-viewport`. */
   viewport: { width: number; height: number } | null;
+  /** The host advertises `browser-view-page-copy-v1`: the phone gets the text that the page copies. */
+  pageCopy: boolean;
 };
 
 /** What the native screen tells the peer page. */
@@ -104,6 +106,7 @@ export function createBrowserViewBridge(
       cursor: view?.options.cursor ?? false,
       contextMenu: view?.options.contextMenu ?? false,
       viewport: view?.options.viewport ?? null,
+      pageCopy: view?.options.pageCopy ?? false,
     }),
   );
 
@@ -217,6 +220,7 @@ export function createBrowserViewBridge(
           clipboard: value.clipboard === true,
           contextMenu: value.contextMenu === true,
           viewport: pageSize(value.viewport),
+          pageCopy: value.pageCopy === true,
         });
       else if (value.type === "close") close(viewId);
       else if (value.type === "input" && Array.isArray(value.inputs)) input(viewId, value.inputs);

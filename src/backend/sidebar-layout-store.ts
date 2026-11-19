@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { mkdir, readFile, rename } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
@@ -19,10 +19,10 @@ import {
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { isUuidV4, legacyAgentId } from "@openbot/contracts/validation";
 import { sourceText } from "@openbot/i18n/source";
-import { Effect, Exit, Result, Semaphore } from "effect";
+import { Effect, Exit, Semaphore } from "effect";
 import { writeFileAtomically } from "./atomic-json-file";
-import { isMissingFileError } from "./file-errors";
 import { StoredStateFailure, storedIO, storedSync } from "./stored-state-effects";
+import { readVersionedJsonFile, type VersionedJsonFormat } from "./versioned-json-store";
 
 interface StoredSidebarLayout extends SidebarLayoutSnapshot {
   version: 2;
@@ -44,39 +44,44 @@ const DEFAULT_LAYOUT: SidebarLayoutSnapshot = {
   agentOrder: [],
 };
 
+/** Version 1 has no `agentOrder`. Each released version must still load. */
+const SIDEBAR_LAYOUT_FORMAT: VersionedJsonFormat<SidebarLayoutSnapshot> = {
+  current: 2,
+  releases: {
+    1: (file) => {
+      if (!isLegacyStoredSidebarLayout(file)) throw new Error("Invalid sidebar layout state.");
+      return withFolderTree({ ...snapshotFromLegacyStored(file), agentOrder: [] });
+    },
+    2: (file) => {
+      if (!isStoredSidebarLayout(file)) throw new Error("Invalid sidebar layout state.");
+      return snapshotFromStored(file);
+    },
+  },
+};
+
 export class SidebarLayoutStore extends EventEmitter<SidebarLayoutStoreEvents> {
   readonly #path: string;
+  /** The path, or the fallback file while the path holds the file of a newer release. */
+  #writePath: string;
   #layout = structuredClone(DEFAULT_LAYOUT);
   readonly #operationQueue = Semaphore.makeUnsafe(1);
 
   constructor(path: string) {
     super();
     this.#path = path;
+    this.#writePath = path;
   }
 
+  /**
+   * Reads the layout. The file of a newer release stays unchanged: the store starts from the default
+   * layout and writes `<path>.v2`. See `readVersionedJsonFile`.
+   */
   initialize() {
     return Effect.gen({ self: this }, function* () {
       yield* storedIO(() => mkdir(dirname(this.#path), { recursive: true, mode: 0o700 }));
-      const loaded = yield* Effect.result(
-        Effect.gen({ self: this }, function* () {
-          const contents = yield* storedIO(() => readFile(this.#path, "utf8"));
-          return yield* storedSync(() => {
-            const parsed = JSON.parse(contents);
-            if (isStoredSidebarLayout(parsed)) return snapshotFromStored(parsed);
-            if (isLegacyStoredSidebarLayout(parsed))
-              return withFolderTree({ ...snapshotFromLegacyStored(parsed), agentOrder: [] });
-            throw new Error("Invalid sidebar layout state.");
-          });
-        }),
-      );
-      if (Result.isSuccess(loaded)) {
-        this.#layout = loaded.success;
-        return;
-      }
-      if (isMissingFileError(loaded.failure.cause)) return;
-      const backupPath = `${this.#path}.corrupt-${Date.now()}`;
-      yield* storedIO(() => rename(this.#path, backupPath)).pipe(Effect.catch(() => Effect.void));
-      this.#layout = structuredClone(DEFAULT_LAYOUT);
+      const loaded = yield* readVersionedJsonFile(this.#path, SIDEBAR_LAYOUT_FORMAT);
+      this.#writePath = loaded.writePath;
+      this.#layout = loaded.value ?? structuredClone(DEFAULT_LAYOUT);
     });
   }
 
@@ -236,7 +241,7 @@ export class SidebarLayoutStore extends EventEmitter<SidebarLayoutStoreEvents> {
 
   #commit = Effect.fn("SidebarLayout.commit")(function* (this: SidebarLayoutStore, next: SidebarLayoutSnapshot) {
     const stored: StoredSidebarLayout = { version: 2, ...next };
-    yield* writeFileAtomically(this.#path, `${JSON.stringify(stored)}\n`).pipe(
+    yield* writeFileAtomically(this.#writePath, `${JSON.stringify(stored)}\n`).pipe(
       Effect.mapError(({ cause }) => new StoredStateFailure({ cause })),
     );
     this.#layout = next;

@@ -72,6 +72,9 @@ export function DayStrip({
           ref={list}
           horizontal
           showsHorizontalScrollIndicator={false}
+          // Android clips off-screen rows by default. With Fabric, a clipped row that mounts again can
+          // crash with "The specified child already has a parent". iOS does not clip by default.
+          removeClippedSubviews={false}
           snapToInterval={column}
           decelerationRate="fast"
           data={DAYS}

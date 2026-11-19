@@ -1,3 +1,4 @@
+import { referralCodeFromInput } from "@openbot/contracts/referral";
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
 import { classifyFailure } from "@openbot/telemetry";
 import * as Crypto from "expo-crypto";
@@ -82,6 +83,9 @@ export function useEmailSignIn({
 
   const [email, setEmail] = useState("");
   const [emailIssue, setEmailIssue] = useState<SignInIssue | null>(null);
+  const [invite, setInvite] = useState("");
+  // The invite code of the last sent code, so a change on the way back does not count for that code.
+  const sentInvite = useRef<string | undefined>(undefined);
   const [challenge, setChallenge] = useState<MobileEmailChallenge | null>(null);
   const [code, setCode] = useState("");
   const [codeIssue, setCodeIssue] = useState<SignInIssue | null>(null);
@@ -128,6 +132,16 @@ export function useEmailSignIn({
       setEmailIssue({ message: t("mobile.auth.email.error.invalidEmail"), code: "invalid_email" });
       reject();
       return;
+    }
+    if (kind === "send") {
+      const typed = invite.trim();
+      const inviteCode = typed ? referralCodeFromInput(typed) : null;
+      if (typed && !inviteCode) {
+        setEmailIssue({ message: t("mobile.auth.email.error.inviteCode"), code: "invalid_invite_code" });
+        reject();
+        return;
+      }
+      sentInvite.current = inviteCode ?? undefined;
     }
     if (kind === "send" && companyEmail === address) {
       await signInWithCompany(address);
@@ -249,7 +263,7 @@ export function useEmailSignIn({
     setNotice(null);
     try {
       const session = await mobileAnalytics.operation("account_sign_in_completed", { method: "email" }, () =>
-        verifyMobileEmailCode(challenge.challengeId, value),
+        verifyMobileEmailCode(challenge.challengeId, value, sentInvite.current),
       );
       await finish(session);
     } catch (error) {
@@ -305,6 +319,12 @@ export function useEmailSignIn({
       requestId.current = null;
     },
     emailIssue,
+    /** The optional invite link or code. The account server uses it only when the sign-in creates the account. */
+    invite,
+    setInvite: (value: string) => {
+      setInvite(value);
+      setEmailIssue((issue) => (issue?.code === "invalid_invite_code" ? null : issue));
+    },
     sendCode: () => void requestCode("send"),
     resendCode: () => void requestCode("resend"),
     sending: pending === "send" || pending === "company",

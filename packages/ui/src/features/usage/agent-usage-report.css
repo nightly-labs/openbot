@@ -100,9 +100,6 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.agent-usage-table {
-  overflow-x: auto;
-}
 .agent-usage-table table {
   width: 100%;
   border-collapse: collapse;

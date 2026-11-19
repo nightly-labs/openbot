@@ -4,6 +4,7 @@ import {
   AGENT_WELCOME_ITEM_TYPE,
   type AgentSummary,
   type AskSideQuestionInput,
+  CHANNEL_RESUME_ITEM_TYPE,
   CONVERSATION_PLAN_ITEM_TYPE,
   CONVERSATION_SUBAGENTS_ITEM_TYPE,
   type ConversationMessage,
@@ -32,6 +33,7 @@ function chatMessage(message: ConversationMessage): boolean {
     message.itemType !== "agent_attachment" &&
     // The user did not write a new agent's setup message, and does not see it.
     message.itemType !== AGENT_WELCOME_ITEM_TYPE &&
+    message.itemType !== CHANNEL_RESUME_ITEM_TYPE &&
     !message.itemType?.startsWith(CHAT_VISUAL_ITEM_TYPE_PREFIX) &&
     message.itemType !== CONVERSATION_PLAN_ITEM_TYPE &&
     message.itemType !== CONVERSATION_SUBAGENTS_ITEM_TYPE &&

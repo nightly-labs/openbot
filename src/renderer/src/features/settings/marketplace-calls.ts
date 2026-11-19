@@ -21,9 +21,14 @@ export interface MarketplaceCalls {
     | "cancelMcpSignIn"
     | "listMcpServers"
     | "listMcpSignIns"
+    | "mcpSignInApp"
     | "removeMcpServer"
+    | "removeMcpSignInApp"
     | "saveMcpServer"
+    | "saveMcpSignInApp"
+    | "setMcpServerEnabled"
     | "signInMcpServer"
+    | "signOutMcpServer"
     | "testMcpServer"
   >;
   /** Who gets each MCP server (`mcp-access-v1`). Absent: this client cannot change it. */
@@ -33,6 +38,11 @@ export interface MarketplaceCalls {
   openUrl: (url: string) => Promise<void>;
   /** A sign-in that a joined server relays to this computer's browser. Absent: this client cannot take one. */
   signInRelay?: MarketplaceSignInRelay | undefined;
+  /**
+   * Copies the page of a sign-in that waits in this computer's browser. Absent: this client signs in
+   * only on a joined server, whose page is not in this computer's browser.
+   */
+  copySignInLink?: ((url: string, serverId: string) => Promise<void>) | undefined;
   /** Asks macOS on this computer for Automation access to Apple apps. Absent: this client cannot. */
   macAutomation?: SkillsPort["macAutomation"]["request"] | undefined;
   /**
@@ -54,6 +64,11 @@ export interface MarketplaceSignInRelay {
   page: (url: string, serverId: string) => Promise<McpSignInRelayPage | null>;
   open: (url: string, serverId: string) => Promise<void>;
   paste: (url: string, address: string, serverId: string) => Promise<void>;
+  /**
+   * The host tab of a sign-in whose page only the joined server can reach, while it waits. The host
+   * opens it instead of the relay. Absent: this client cannot start such a sign-in.
+   */
+  hostTab?: ((url: string, serverId: string) => Promise<string | null>) | undefined;
 }
 
 /** Read on each call, as `skillsPort` is: tests and stories replace `window.openbot` per case. */
@@ -76,7 +91,9 @@ export function desktopMarketplaceCalls(): MarketplaceCalls {
       page: (url, serverId) => port.agent.mcpSignInRelay({ url }, serverId),
       open: (url, serverId) => port.agent.openMcpSignInRelay({ url }, serverId),
       paste: (url, address, serverId) => port.agent.completeMcpSignInRelay({ url, address }, serverId),
+      hostTab: (url, serverId) => port.agent.mcpSignInPage({ url }, serverId),
     },
+    copySignInLink: (url, serverId) => port.agent.copyMcpSignInLink({ url }, serverId),
     macAutomation: (targets) => port.macAutomation.request(targets),
   };
 }

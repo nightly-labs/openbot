@@ -1,3 +1,4 @@
+import type { BillingCurrency } from "@openbot/contracts/billing";
 import { Button } from "@openbot/ui";
 import { OrderForm, type OrderFormOrder } from "@openbot/ui/features/billing/OrderForm";
 import { useText } from "@openbot/ui/text";
@@ -8,7 +9,7 @@ import { MOCK_HOSTED_SERVER_CATALOG } from "../src/preview/mock-hosted-servers";
 /** The shared order form of the pricing page and of Billing. */
 function OrderFormStory(props: {
   withServers: boolean;
-  currency?: "eur" | "usd" | "pln";
+  currency?: BillingCurrency;
   currencyLocked?: boolean;
   ownedServer?: boolean;
   used?: number;
@@ -74,6 +75,9 @@ export const ThreeMembers: Story = { args: { withServers: true, currency: "eur",
 
 /** An account that pays in złoty cannot change the currency. */
 export const Pln: Story = { args: { withServers: true, currency: "pln", currencyLocked: true } };
+
+/** Reais: the plans offer BRL only when their Stripe Prices have it, as the sandbox catalog does. */
+export const Brl: Story = { args: { withServers: true, currency: "brl" } };
 
 /** A promotion: a license bought now is free until 1 December. */
 export const LicenseTrial: Story = {

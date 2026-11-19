@@ -8,12 +8,12 @@ import type { MobileFeatureConfig, MobileLatestVersions } from "@openbot/contrac
  */
 export const MOBILE_FEATURE_CONFIG: MobileFeatureConfig = {
   cloudServers: {
-    ios: { upTo: "1.4.8" },
-    android: { upTo: "1.4.8" },
+    ios: { upTo: "1.4.11" },
+    android: { upTo: "1.4.11" },
   },
   browser: {
-    ios: { upTo: "1.4.8" },
-    android: { upTo: "1.4.8" },
+    ios: { upTo: "1.4.11" },
+    android: { upTo: "1.4.11" },
   },
 };
 
@@ -23,6 +23,20 @@ export const MOBILE_FEATURE_CONFIG: MobileFeatureConfig = {
  * Worker deploy.
  */
 export const MOBILE_LATEST_VERSIONS: MobileLatestVersions = {
-  ios: "1.4.8",
-  android: "1.4.8",
+  ios: "1.4.11",
+  android: "1.4.11",
 };
+
+/**
+ * The first Android version that has its APK on GitHub, from the `Stage the Android APK` workflow.
+ * From this version on, the site offers the APK of the newest Google Play version above, for a phone
+ * with no Google Play (`apps/auth-api/src/lib/android-apk.ts`). A change of this file on main makes
+ * the APK of that version public (the `Publish the Android APK` workflow).
+ *
+ * `null` hides the APK download. Builds up to 1.4.10 had Play's automatic integrity protection
+ * (`com.pairip.licensecheck`): after an install from the file, the app shows "Get this app from Play"
+ * and stops. The APK of 1.4.9 was public on 2026-11-13 and showed this. The protection is off in
+ * Play Console since 2026-11-16, so the first APK is the one of 1.4.11. The download opens when
+ * `MOBILE_LATEST_VERSIONS.android` is 1.4.11 or newer.
+ */
+export const ANDROID_APK_FIRST_VERSION: string | null = "1.4.11";

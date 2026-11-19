@@ -11,13 +11,10 @@
       "custom_domain": true
     }
   ],
-  // A request has the last fatal error text of the app in a header. Invocation logs record request
-  // headers, so they stay off. The Worker logs only its own storage errors.
+  // Workers Logs stay off, as for the account service. A request also has the last fatal error text of
+  // the app in a header, and invocation logs record request headers. `wrangler tail` shows live events.
   "observability": {
-    "enabled": true,
-    "logs": {
-      "invocation_logs": false
-    }
+    "enabled": false
   },
   "r2_buckets": [
     {

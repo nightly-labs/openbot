@@ -27,7 +27,7 @@ import type { markerExclusionsForCapabilities } from "./team-api/request-helpers
 
 /** Events come in bursts, such as a streamed reply. One update covers each burst. */
 const EVENT_DELAY_MS = 1_000;
-/** iOS limits how often a Live Activity gets updates. A change inside one state waits this long. */
+/** iOS limits how often a Live Activity gets updates. A priority 5 change inside one state waits this long. */
 const SAME_MODE_INTERVAL_MS = 5_000;
 /** Content older than this looks out of date, as when this computer sleeps and sends nothing. */
 const STALE_AFTER_MS = 15 * 60 * 1000;
@@ -81,7 +81,11 @@ interface Registration {
   /** `false` after the connection of the session closed, as when iOS suspends the app. */
   connected: boolean;
   timer: { handle: ReturnType<typeof setTimeout>; at: number } | null;
-  sent: { key: string; mode: string | null; at: number } | null;
+  /**
+   * The last update. `item` is the request, the failure or the reply that it showed, or `null`.
+   * `workers` are the agents that it showed at work, or `null` when it showed no work.
+   */
+  sent: { key: string; mode: string | null; item: string | null; workers: string[] | null; at: number } | null;
   /** The timestamp of the last update, in seconds. iOS drops an update that is not newer than the content it shows. */
   timestamp: number;
   sending: boolean;
@@ -124,6 +128,11 @@ export class LiveActivityPushService {
     if (previous) this.#clearTimer(previous);
     if (previous && !same) this.#stop(previous);
     const now = this.#now();
+    // A phone that signs in again gets a new session. The registration of the old session has the same
+    // token, so it would send each update to the same activity a second time.
+    const others = [...this.#registrations.values()].filter(
+      (other) => other.sessionId !== sessionId && other.value.token === value.token,
+    );
     const registration: Registration = {
       sessionId,
       viewer,
@@ -136,7 +145,7 @@ export class LiveActivityPushService {
           : new DynamicIslandCoordinator(() => liveActivityIslandText(phoneText(value.locale))),
       expiresAt: now + REGISTRATION_LIFETIME_MS,
       // The same token is the same activity.
-      startedAt: same && previous ? previous.startedAt : now,
+      startedAt: Math.min(same && previous ? previous.startedAt : now, ...others.map((other) => other.startedAt)),
       // The phone shows its own state now, so an alert from before is old.
       alert: null,
       // The request came over the connection of this session, so it is open.
@@ -144,12 +153,13 @@ export class LiveActivityPushService {
       timer: null,
       // The phone showed its own state last. The next update is sent, also when it matches the last one.
       sent: null,
-      timestamp: same && previous ? previous.timestamp : 0,
+      timestamp: Math.max(same && previous ? previous.timestamp : 0, ...others.map((other) => other.timestamp)),
       sending: false,
       failures: 0,
       retryAt: 0,
     };
     this.#registrations.set(sessionId, registration);
+    for (const other of others) this.#stop(other);
     this.#schedule(registration, 0);
     this.#listen();
   }
@@ -244,6 +254,12 @@ export class LiveActivityPushService {
       this.#stop(registration);
       return;
     }
+    // iOS ended the activity and ignores its updates. The registration stays until it expires, so the
+    // same token that the phone gives again keeps its start.
+    if (now >= registration.startedAt + ACTIVITY_LIFETIME_MS) {
+      this.#schedule(registration, registration.expiresAt - now);
+      return;
+    }
     if (registration.sending) {
       this.#schedule(registration, EVENT_DELAY_MS);
       return;
@@ -253,8 +269,12 @@ export class LiveActivityPushService {
       this.#schedule(registration, 0);
       return;
     }
-    const props = this.#view(registration);
+    const view = this.#view(registration);
+    const props = view.props;
     const mode = props?.mode ?? null;
+    // A view that shows nothing ends the activity, so it has no item and no work.
+    const item = props ? view.item : null;
+    const workers = props ? view.workers : null;
     const key = JSON.stringify(props);
     const sent = registration.sent;
     // An alert goes at once, also when the view did not change.
@@ -263,7 +283,22 @@ export class LiveActivityPushService {
       if (props) this.#schedule(registration, sent.at + KEEPALIVE_MS - now);
       return;
     }
-    if (!alert && sent && sent.mode === mode && now - sent.at < SAME_MODE_INTERVAL_MS) {
+    // iOS has a budget of priority 10 updates for each hour, and it can delay or drop
+    // the updates above the budget. Several agents change the state often. So priority 10 is only for
+    // the updates that the member must see at once: an alert, a new request, failure or reply, and an
+    // agent that finishes its work. Work that starts, a request that someone answered on another
+    // device, and a count or a text that changes have priority 5, which does not use the budget.
+    const shownWorkers = sent?.workers ?? null;
+    // An agent that the last update showed at work is not in the work of this one.
+    const finished = shownWorkers !== null && (workers === null || shownWorkers.some((id) => !workers.includes(id)));
+    // A phone that says that it goes away showed its own view a moment before, so the first update
+    // repeats that view. A phone whose connection closed can show an old view: iOS can suspend the app
+    // before it gets the last event.
+    const repeats = !sent && registration.value.away && registration.connected;
+    // The first update after the phone went away can end an activity that still shows work.
+    const urgent =
+      alert !== null || (item !== null && !repeats && item !== sent?.item) || finished || (!props && !sent);
+    if (!urgent && sent && sent.mode === mode && now - sent.at < SAME_MODE_INTERVAL_MS) {
       this.#schedule(registration, sent.at + SAME_MODE_INTERVAL_MS - now);
       return;
     }
@@ -277,11 +312,11 @@ export class LiveActivityPushService {
       sealed: props ? this.#sealToFit(props, registration.keys) : null,
       timestamp,
       staleAt: props ? Math.floor((now + STALE_AFTER_MS) / 1000) : null,
-      priority: !alert && sent?.mode === mode ? 5 : 10,
+      priority: urgent ? 10 : 5,
       alert,
     };
     registration.sending = true;
-    registration.sent = { key, mode, at: now };
+    registration.sent = { key, mode, item, workers, at: now };
     yield* this.#options.send(push).pipe(
       Effect.tap((result) =>
         Effect.sync(() => {
@@ -345,7 +380,7 @@ export class LiveActivityPushService {
       const count = counts.get(agent.id);
       return count && agent.notifications ? [{ ...agent, serverId: value.serverId, count }] : [];
     });
-    return liveActivityView(presentation, {
+    const props = liveActivityView(presentation, {
       t: phoneText(value.locale),
       agentColor: avatarHeadColor,
       avatar: (_serverId, agent, mood) =>
@@ -355,6 +390,11 @@ export class LiveActivityPushService {
       threadId: this.#threadId(registration, presentation),
       redact: redactText,
     });
+    return {
+      props,
+      item: shownItem(presentation),
+      workers: presentation.mode === "working" ? presentation.working.map((work) => work.agent.id) : null,
+    };
   }
 
   /** The thread that the links of the view open: the thread of its request, or the side thread that works. */
@@ -412,6 +452,26 @@ function presentationShows(
       return kind === "failed" && presentation.item.agent.id === agentId;
     default:
       return false;
+  }
+}
+
+/**
+ * The request, the failure or the reply that the view shows, or `null` for work and for no view.
+ * A new value is an event that the member must see at once. The same value with another text, another
+ * count or another agent list is not.
+ */
+function shownItem(presentation: DynamicIslandPresentation): string | null {
+  switch (presentation.mode) {
+    case "question":
+    case "approval":
+    case "takeover":
+      return JSON.stringify([presentation.mode, presentation.item.agent.id, presentation.item.requestId]);
+    case "failed":
+      return JSON.stringify(["failed", presentation.item.agent.id, presentation.item.turnId]);
+    case "message":
+      return JSON.stringify(["message", presentation.message.agent.id, presentation.message.messageId]);
+    default:
+      return null;
   }
 }
 

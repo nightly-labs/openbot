@@ -1,11 +1,12 @@
 /**
- * The search field with the New menu at its end, and the compact-mode button in their place. The field
+ * The search field with the filter and the New menu at its end, and the compact-mode button in their place. The field
  * and the button open the global search.
  */
 
 import { Bot, Button, DropdownMenu, FolderPlus, Hash } from "@openbot/ui";
 import { Show } from "solid-js";
 import { useText } from "../../text";
+import { SidebarFilterMenu } from "./SidebarFilterMenu";
 import { PlusIcon, SearchIcon } from "./SidebarIcons";
 import { useSidebarScope } from "./sidebar-scope";
 
@@ -27,6 +28,7 @@ export function SidebarSearch() {
         <SearchIcon />
         <span class="sidebar-search-placeholder">{t("common.search")}</span>
       </Button>
+      <SidebarFilterMenu />
       <Show when={props.createSupported !== false || props.onCreateChannel || layoutMutable()}>
         <DropdownMenu.Root placement="bottom-end" gutter={4}>
           <DropdownMenu.Trigger

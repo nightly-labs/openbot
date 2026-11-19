@@ -30,6 +30,11 @@ import {
   BROWSER_SECRET_VAULT_CAPABILITY,
   BROWSER_SECRET_VAULT_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
+import {
+  PROVIDER_MODEL_SOURCE_CAPABILITY,
+  PROVIDER_MODEL_SOURCE_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-model-source-v1";
+import { SKILL_PROBLEMS_CAPABILITY } from "@openbot/contracts/team-protocol/skill-problems-v1";
 import { V5_AGENT_MODEL } from "@openbot/contracts/team-protocol/v5-adapter";
 import { V6_AGENT_MODEL } from "@openbot/contracts/team-protocol/v6-adapter";
 import { WORKFLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-v1";
@@ -185,6 +190,19 @@ export async function routeAgents(
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.agents.status) {
     return json(200, agents.getStatus());
   }
+  // Where each provider's models come from, when its own settings give them from elsewhere (#9956).
+  // Every member reads it: it says no more than the model list. Frozen by `provider-model-source-v1`.
+  if (method === "POST" && url.pathname === PROVIDER_MODEL_SOURCE_ROUTES.list) {
+    if (!capabilities.has(PROVIDER_MODEL_SOURCE_CAPABILITY))
+      throw new HttpError(400, sourceText("error.team.providerModelSourceUnsupported"));
+    // `readJson` runs the empty body through the wire codec.
+    await readJson(request);
+    // Only a protocol 9 peer has the capability, and it knows every provider (`OPEN_PROVIDER_ID`).
+    const sources = (agents.getStatus().providers ?? []).flatMap((row) =>
+      row.modelSource ? [{ provider: row.id, source: row.modelSource }] : [],
+    );
+    return json(200, { sources });
+  }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.sidebarLayout.state) {
     return json(200, sidebarLayout.getSnapshot());
   }
@@ -205,7 +223,10 @@ export async function routeAgents(
     // Only ids the peer's protocol accepts: its model list decoder fails closed on the whole array, and
     // `isAgentModel` also accepts `=` and `,`, which only protocol 6 knows.
     const modelId = context.protocol < 6 ? V5_AGENT_MODEL : V6_AGENT_MODEL;
-    const models = (await agents.listModels()).filter((model) => modelId.test(model.id));
+    // The released model list does not carry `steersTurns`; `model-steering-v1` gives it on its own route.
+    const models = (await agents.listModels())
+      .filter((model) => modelId.test(model.id))
+      .map(({ steersTurns: _steersTurns, ...model }) => model);
     if (!visibleModels) return json(200, models);
     // The released model list does not carry `listing`; `model-visibility-v1` gives it on its own route.
     const listed = await runCauseEffect(visibleModels.picker(models));
@@ -256,7 +277,9 @@ export async function routeAgents(
       return json(200, await runCauseEffect(agents.getUsage(agentId)));
     }
     if (method === "GET" && action === "skills") {
-      return json(200, skills ? await runCauseEffect(skills.listInstalledForChatTags(agentId)) : []);
+      // An older client would offer a skill that has a problem as a usable one.
+      const problems = capabilities.has(SKILL_PROBLEMS_CAPABILITY);
+      return json(200, skills ? await runCauseEffect(skills.listInstalledForChatTags(agentId, { problems })) : []);
     }
     if (method === "PATCH" && !action) {
       const input = agentUpdate(await readJson(request), agentId);
@@ -271,7 +294,15 @@ export async function routeAgents(
     if (method === "DELETE" && !action) {
       if (!canAdministerServer(member.role))
         throw new HttpError(403, sourceText("error.team.membersCannotDeleteAgents"));
-      await runCauseEffect(agents.deleteAgent(agentId));
+      try {
+        await runCauseEffect(agents.deleteAgent(agentId));
+      } catch (error) {
+        // A busy agent, or a delete that runs, is a refusal the member can act on. The web client shows
+        // a refusal's text, but for a 500 only that the server could not complete the request (#7023).
+        if (error instanceof Error && DELETE_REFUSALS().includes(error.message))
+          throw new HttpError(409, error.message);
+        throw error;
+      }
       await runCauseEffect(sidebarLayout.removeAgent(agentId));
       if (libraryFolders) await runCauseEffect(libraryFolders.removeAgent(agentId));
       return empty(204);
@@ -366,10 +397,13 @@ export async function routeAgents(
     const requestId = promptRequestId(body.requestId);
     requireRequestAgent(agents.agentIdForRequest(requestId));
     await runCauseEffect(
-      agents.respondToBrowserTakeover({
-        requestId,
-        decision: browserTakeoverDecision(body.decision),
-      }),
+      agents.respondToBrowserTakeover(
+        {
+          requestId,
+          decision: browserTakeoverDecision(body.decision),
+        },
+        true,
+      ),
     );
     return empty(204);
   }
@@ -412,3 +446,6 @@ function refusedPromptAnswer(error: unknown): never {
   if (error instanceof ForbiddenAttentionAnswer) throw new HttpError(403, error.message);
   return inactiveAsConflict(error);
 }
+
+/** The texts with which the agent service refuses a delete until the agent is idle. */
+const DELETE_REFUSALS = () => [sourceText("error.agent.stopBeforeDelete"), sourceText("error.agent.deletionBusy")];

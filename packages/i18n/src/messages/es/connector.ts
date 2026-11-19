@@ -283,6 +283,8 @@ export const messages = {
   "connector.telegram.helpRelayUnavailableHost":
     "OpenBot en {host} no puede recibir mensajes de Telegram. En {host}, inicia sesión, ponle un nombre al servidor en Ajustes del servidor y mantén OpenBot abierto.",
   "connector.telegram.helpError": "OpenBot no puede acceder a este chat. Vuelve a conectar o desconecta el chat.",
+  "connector.telegram.helpNotLinked":
+    "Este chat no está vinculado a este servidor. Selecciona Reconectar para vincularlo.",
   "connector.telegram.retryAt": "Telegram pidió a OpenBot que esperara. Lo intentará de nuevo a las {time}.",
   "connector.telegram.pause": "Pausar",
   "connector.telegram.resume": "Reanudar",
@@ -369,6 +371,8 @@ export const messages = {
     "WhatsApp quitó este servidor de los dispositivos vinculados. Vuelve a vincular el número.",
   "connector.whatsapp.helpError":
     "OpenBot no puede acceder a WhatsApp en este número. Vuelve a conectar o desconecta el número.",
+  "connector.whatsapp.helpKeysUnreadable":
+    "OpenBot no puede leer las claves guardadas de este número. Vuelve a vincular el número.",
   "connector.whatsapp.retryAt": "WhatsApp pidió a OpenBot que esperara. Lo intentará de nuevo a las {time}.",
   "connector.whatsapp.pause": "Pausar",
   "connector.whatsapp.resume": "Reanudar",
@@ -383,10 +387,13 @@ export const messages = {
   "connector.whatsapp.rowAction": "{action}: {name}",
   "connector.whatsapp.ownNumber": "Número personal",
   "connector.whatsapp.ownNumberDescription":
-    "Solo pueden escribir tu chat «Envíate un mensaje» y las personas que permitas. Desactívalo para un número solo para OpenBot.",
+    "Solo pueden escribir tu chat «Envíate un mensaje» y las personas que permitas. Las demás no reciben respuesta. Si está desactivado, OpenBot responde a las personas desconocidas con un código.",
   "connector.whatsapp.workingMessage": "Mensaje «Trabajando en ello…»",
   "connector.whatsapp.workingMessageDescription":
-    "OpenBot lo envía mientras el agente trabaja y luego lo sustituye por la respuesta. Desactívalo para enviar solo la respuesta.",
+    "OpenBot lo envía mientras el agente trabaja y luego lo sustituye por la respuesta. Una solicitud que espera a otra anterior también recibe un mensaje de espera. Desactívalo para enviar solo la respuesta.",
+  "connector.whatsapp.statusReactions": "Reacciones de estado",
+  "connector.whatsapp.statusReactionsDescription":
+    "OpenBot reacciona con 👀 cuando llega un mensaje y con ✅ cuando la respuesta está lista. Desactívalas para no enviar reacciones.",
   "connector.whatsapp.orchestratorTitle": "Orquestador de WhatsApp",
   "connector.whatsapp.orchestratorDescription":
     "Este agente recibe los mensajes para OpenBot de todos tus números vinculados. Responde él mismo a los cortos, asigna el resto del trabajo al agente adecuado y responde en WhatsApp.",
@@ -405,10 +412,10 @@ export const messages = {
   "connector.whatsapp.kindLabel": "Número",
   "connector.whatsapp.kindPersonal": "Mi número personal",
   "connector.whatsapp.kindPersonalDescription":
-    "OpenBot solo responde a tu chat «Envíate un mensaje» y a las personas que permitas.",
+    "OpenBot solo responde a tu chat «Envíate un mensaje» y a las personas que permitas. Las demás personas no reciben respuesta.",
   "connector.whatsapp.kindDedicated": "Un número solo para OpenBot",
   "connector.whatsapp.kindDedicatedDescription":
-    "Las personas desconocidas reciben un código para dártelo. Tú las apruebas aquí.",
+    "OpenBot responde desde este número a cada persona desconocida con un código para dártelo. Tú las apruebas aquí.",
   "connector.whatsapp.methodLabel": "Cómo vincular",
   "connector.whatsapp.methodQr": "Código QR",
   "connector.whatsapp.methodCode": "Código de vinculación",
@@ -470,7 +477,8 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "Opcional. Si lo dejas vacío, la lista muestra el número de teléfono.",
   "connector.whatsapp.add": "Añadir",
   "connector.whatsapp.groupTitle": "Añadir un grupo",
-  "connector.whatsapp.groupDescription": "Las personas de este grupo pueden asignar trabajo a tus agentes.",
+  "connector.whatsapp.groupDescription":
+    "Las personas de este grupo pueden asignar trabajo a tus agentes cuando mencionan el número o responden a sus mensajes.",
   "connector.whatsapp.groupSearch": "Buscar grupos",
   "connector.whatsapp.groupsLoading": "Leyendo los grupos…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot no pudo leer los grupos",
@@ -631,9 +639,9 @@ export const messages = {
   "connector.protonPass.expiredDescription":
     "Los agentes no pueden iniciar sesión con tus credenciales compartidas hasta que vuelvas a iniciar sesión.",
   "connector.protonPass.reconnect": "Reconectar",
-  "connector.protonPass.planTitle": "Proton Pass necesita un plan de pago",
+  "connector.protonPass.planTitle": "Proton Pass necesita un plan con Pass Plus",
   "connector.protonPass.planDescription":
-    "La CLI de Proton Pass solo funciona con un plan de pago de Proton. Cambia tu plan y vuelve a conectar.",
+    "La CLI de Proton Pass necesita un plan de Proton que incluya Pass Plus. Otros planes de pago, como Mail Plus, no la incluyen. Cambia tu plan y vuelve a conectar.",
   "connector.protonPass.vaultTitle": "Bóveda compartida",
   "connector.protonPass.vaultDescription":
     "Los agentes pueden iniciar sesión con las credenciales de esta bóveda. Mueve una credencial a ella para compartirla.",

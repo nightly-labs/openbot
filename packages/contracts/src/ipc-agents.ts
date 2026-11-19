@@ -344,8 +344,8 @@ export interface AgentSummary {
   busyMessageMode?: BusyMessageMode;
   /**
    * How many tasks of the agent run a turn at the same time, 1 to `AGENT_TASK_LIMIT_MAX`. Local-only,
-   * like `access`; an owner or admin of a joined server reads it on `agent-task-limit-v1`. Absent
-   * means `AGENT_TASK_LIMIT_DEFAULT`; see `agentTaskLimit`.
+   * like `access`; an owner or admin of a joined server reads it on `agent-task-limit-v1`.
+   * Absent means the host default (`HostTurnLimits.agentTaskLimit`); see `agentTaskLimit`.
    */
   taskLimit?: number;
   /**
@@ -365,6 +365,12 @@ export interface AgentSummary {
    * still runs. Absent means the next turn uses the provider, model, account and effort on this agent.
    */
   pendingRuntime?: AgentPendingRuntime;
+  /**
+   * Local-only. The account that an agent chose for this agent, `default` for the provider's own
+   * sign-in. While the agent is on it and it is ready, a pool of the provider's accounts does not move
+   * the agent. Absent means the pool chooses the account.
+   */
+  pinnedAccountId?: string;
   /**
    * ISO 8601 time when a user hid the agent. Local-only, like `access`: a remote client reads the
    * hidden agents through `agent-hidden-v1`. Absent means the agent is not hidden.
@@ -439,6 +445,7 @@ function hasAgentSummaryFields(value: DynamicRecord): boolean {
     (value.backupModels === undefined || isAgentBackupModels(value.backupModels)) &&
     (value.usageLimitReturn === undefined || isAgentUsageLimitReturn(value.usageLimitReturn)) &&
     (value.pendingRuntime === undefined || isAgentPendingRuntime(value.pendingRuntime)) &&
+    (value.pinnedAccountId === undefined || isProviderAccountId(value.pinnedAccountId)) &&
     (value.hiddenAt === undefined || isHiddenAt(value.hiddenAt)) &&
     (value.threadId === null || isIdentifier(value.threadId)) &&
     isBoundedString(value.workspacePath, INPUT_LIMITS.path) &&
@@ -475,6 +482,11 @@ export interface CreateAgentInput {
    * means the provider's own sign-in. Local-only: the released Team API create route does not carry it.
    */
   providerAccountId?: string;
+  /**
+   * The id of one create, which a Team API client sends again when the answer got lost
+   * (`agent-create-operation-v1`). Team API only: the IPC parser does not read it.
+   */
+  operationId?: string;
 }
 
 export interface UpdateAgentInput {

@@ -1,11 +1,13 @@
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
-import type {
-  AgentEvent,
-  AgentSummary,
-  ConversationMessage,
-  ConversationSnapshot,
-  QueueHold,
-  QueueSnapshot,
+import {
+  type AgentEvent,
+  type AgentSummary,
+  type ConversationMessage,
+  type ConversationSnapshot,
+  modelSwitchReason,
+  type QueueDeliveryStatus,
+  type QueueHold,
+  type QueueSnapshot,
 } from "@openbot/contracts/ipc";
 import { Effect, type Scope } from "effect";
 import { isMailboxMessageCopy } from "../conversation-snapshots";
@@ -15,11 +17,15 @@ import type { ConversationRuntime } from "./conversation-runtime";
 import { conversationContentSignature } from "./delivery-content";
 import type { RoutineScheduler } from "./routine-scheduler";
 
+const OPEN_STATUSES: ReadonlySet<QueueDeliveryStatus> = new Set(["queued", "starting", "running"]);
+
 export interface MailboxSyncHooks {
   emit(event: AgentEvent): void;
   emitError(code: string, error: unknown, agentId?: string): void;
   /** What holds the queue back, when the reason is not this agent's own running turn. */
   queueHold(agentId: string): QueueHold | null;
+  /** The requests that this agent sent from its side threads changed: one was sent, started or ended. */
+  threadRequestsChanged(agentId: string): void;
 }
 
 export interface MailboxSyncOptions {
@@ -47,6 +53,8 @@ export class MailboxSync {
   readonly #routines: RoutineScheduler;
   readonly #scope: () => Scope.Scope;
   readonly #hooks: MailboxSyncHooks;
+  /** The open side-thread requests of each sender, as its thread list last showed them. */
+  #threadRequests = new Map<string, string>();
 
   constructor(options: MailboxSyncOptions) {
     this.#database = options.database;
@@ -62,10 +70,20 @@ export class MailboxSync {
     const message = snapshot.messages.find((candidate) => candidate.id === deliveryId);
     if (!context || !message) return;
     // A plan continuation keeps the request in its first turn, so that turn's plan and answer stay
-    // between the request and the continuation's answer.
-    const turnId = context.planContinuation?.turnIds[0] ?? context.delivery.turnId;
+    // between the request and the continuation's answer. So does work that a backup model continues:
+    // with the request in the continuation's turn, its answer showed above the text of the stopped
+    // turn and the note of the switch (#8406).
+    const turnId =
+      context.planContinuation?.turnIds[0] ??
+      context.resumeAfterUsageLimit?.previousTurnIds[0] ??
+      context.delivery.turnId;
     if (turnId === null) delete message.turnId;
     else message.turnId = turnId;
+    // A switch note waits for this delivery's turn under the delivery's id. A provider that names
+    // its own turn, such as Codex, takes the note into that turn, so it stays above the answer.
+    if (turnId !== null && turnId !== deliveryId)
+      for (const note of snapshot.messages)
+        if (note.turnId === deliveryId && modelSwitchReason(note) !== null) note.turnId = turnId;
     message.delivery = {
       id: context.delivery.id,
       status: context.delivery.status,
@@ -105,12 +123,46 @@ export class MailboxSync {
         snapshot.messages.push(mailboxMessage);
       }
     }
+    // The read gives each open request, but a finished one only among the newest. A request that
+    // ended after newer messages came keeps its copy from when it ran, so "Waiting for replies"
+    // showed its teammate as working (#12554).
+    const read = new Set(mailboxCopies.map((message) => message.id));
+    for (const message of snapshot.messages) if (!read.has(message.id)) this.#refreshOpenRequest(message);
     const reactions = this.#mailbox.reactionsFor(snapshot.agentId);
     for (const message of snapshot.messages) {
       message.reactions = reactions.get(message.id) ?? [];
       message.reaction = message.reactions.find((reaction) => reaction.actor.kind === "user")?.emoji ?? null;
     }
     sortConversationMessages(snapshot.messages);
+  }
+
+  /** Puts the current state of each delivery on a request whose copy has one still open. */
+  #refreshOpenRequest(message: ConversationMessage): void {
+    const exchange = message.exchange;
+    if (exchange?.direction !== "outgoing" || !exchange.deliveries.some(({ status }) => OPEN_STATUSES.has(status)))
+      return;
+    message.exchange = {
+      ...exchange,
+      deliveries: exchange.deliveries.map((delivery) => {
+        const current = this.#mailbox.getDelivery(delivery.id)?.delivery;
+        return current
+          ? { ...delivery, status: current.status, position: current.position, error: current.error }
+          : delivery;
+      }),
+    };
+  }
+
+  /** Sends the thread list of each agent whose side-thread requests changed since the last list. */
+  #emitThreadRequests(): void {
+    const requests = new Map<string, string>();
+    for (const request of this.#mailbox.awaitedThreadRequests()) {
+      const key = `${request.deliveryId}:${request.status};`;
+      requests.set(request.senderAgentId, (requests.get(request.senderAgentId) ?? "") + key);
+    }
+    const before = this.#threadRequests;
+    this.#threadRequests = requests;
+    for (const agentId of new Set([...before.keys(), ...requests.keys()]))
+      if (before.get(agentId) !== requests.get(agentId)) this.#hooks.threadRequestsChanged(agentId);
   }
 
   /**
@@ -182,9 +234,13 @@ export class MailboxSync {
    * wait as the event below.
    */
   queueSnapshot(agentId: string): QueueSnapshot {
-    const queue = this.#mailbox.listQueue(agentId);
+    return this.withHold(this.#mailbox.listQueue(agentId));
+  }
+
+  /** Adds the reason that a queue waits, as `queueSnapshot` does, to a queue read in another way. */
+  withHold(queue: QueueSnapshot): QueueSnapshot {
     if (!queue.deliveries.some((delivery) => delivery.status === "queued")) return queue;
-    const hold = this.#hooks.queueHold(agentId);
+    const hold = this.#hooks.queueHold(queue.agentId);
     return hold ? { ...queue, hold } : queue;
   }
 
@@ -197,15 +253,18 @@ export class MailboxSync {
     }
     this.#hooks.emit({ type: "queue-changed", snapshot: queue });
     if (routinesChanged) this.#routines.stateChanged(agentId);
+    this.#emitThreadRequests();
     const affectedAgents = new Set([agentId, ...this.#mailbox.senderAgentIdsForRecipient(agentId)]);
     for (const affectedAgentId of affectedAgents) {
       const snapshot = this.#conversation.snapshotToUpdate(affectedAgentId);
       if (!snapshot) continue;
       const previousSignature = conversationContentSignature(snapshot);
       this.syncMailboxMessages(snapshot);
-      if (conversationContentSignature(snapshot) !== previousSignature) this.#conversation.emitConversation(snapshot);
+      const signature = conversationContentSignature(snapshot);
+      if (signature !== previousSignature) this.#conversation.emitConversation(snapshot);
+      // The signature is of this snapshot, so the publish does not make it again.
       else if (!this.#conversation.hasPublishedConversation(affectedAgentId))
-        this.#conversation.publishConversation(snapshot);
+        this.#conversation.publishConversation(snapshot, signature);
     }
   }
 

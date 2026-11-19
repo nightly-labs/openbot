@@ -87,6 +87,25 @@ export const UsageLimitReached: Story = {
   },
 };
 
+/** Codex reports credits for the account, so the card says that work goes on, on credits. */
+export const UsageLimitOnCredits: Story = {
+  render: () => {
+    const [dismissed, setDismissed] = createSignal(false);
+    return (
+      <ComposerStack>
+        <Show when={!dismissed()}>
+          <ComposerUsageLimitNotice
+            provider="codex"
+            resetsAt={USAGE_RESETS_AT}
+            onCredits
+            onDismiss={() => setDismissed(true)}
+          />
+        </Show>
+      </ComposerStack>
+    );
+  },
+};
+
 /** Some providers report a spent window with no reset time, so the card names the way out instead. */
 export const UsageLimitWithoutReset: Story = {
   render: () => {

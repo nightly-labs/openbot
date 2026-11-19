@@ -146,6 +146,15 @@
   cursor: grabbing;
 }
 
+/* A press on a text field moves the node, and a click puts the caret in it, so the field shows the text cursor only while it has the focus. */
+.wfn-slot :is(textarea, input.wfn-input):not(:focus, [readonly]) {
+  cursor: grab;
+}
+
+.wfn-viewport[data-dragging] .wfn-slot :is(textarea, input.wfn-input) {
+  cursor: grabbing;
+}
+
 /*
  * The HUD: every bar over the canvas is one glass bar, 40px high, with a 4px inset. Controls inside
  * are 32px with an 8px radius, so the bar radius is 8 + 4 = 12. The bars come in one after another.
@@ -1148,6 +1157,178 @@
 
 .wfn-viewport[data-dragging] .wfn-group-bar {
   opacity: 0;
+}
+
+/* The selection is one whole group: the frame of the group shows it, so the dashed outline does not. */
+.wfn-group[data-whole] {
+  outline: none;
+}
+
+/*
+ * A group: a frame around its members, under the lines, with the name above the members and one
+ * output port for each output type on the right side. It has no stacking context, so its label and
+ * ports go over the lines.
+ */
+.wfn-frame {
+  --wfn-radius-frame: calc(var(--wfn-radius-card) + var(--openbot-space-3));
+  position: absolute;
+  border-radius: var(--wfn-radius-frame);
+  background: color-mix(in srgb, var(--openbot-text-primary) 3%, transparent);
+  box-shadow: 0 0 0 calc(1px / var(--wfn-scale, 1)) var(--wfn-ring-strong);
+  cursor: grab;
+  transition: box-shadow var(--openbot-duration-hover) var(--openbot-ease-out);
+}
+
+.wfn-viewport[data-dragging] .wfn-frame {
+  cursor: grabbing;
+}
+
+.wfn-frame:hover {
+  box-shadow: 0 0 0 calc(1px / var(--wfn-scale, 1)) color-mix(in srgb, var(--openbot-text-primary) 18%, transparent);
+}
+
+.wfn-frame[data-selected] {
+  box-shadow: 0 0 0 calc(1px / var(--wfn-scale, 1)) color-mix(in srgb, var(--openbot-text-primary) 40%, transparent);
+}
+
+/* A collapsed group shows the run state of its hidden members on the stack card, as a node card does. */
+.wfn-frame[data-folded][data-status="running"] {
+  box-shadow: 0 0 0 calc(1px / var(--wfn-scale, 1)) color-mix(in srgb, var(--openbot-text-primary) 40%, transparent);
+}
+
+.wfn-frame[data-folded][data-status="approval"] {
+  box-shadow: 0 0 0 calc(1px / var(--wfn-scale, 1)) color-mix(in srgb, var(--openbot-warning) 64%, transparent);
+}
+
+.wfn-frame[data-folded][data-status="failed"] {
+  box-shadow: 0 0 0 calc(1px / var(--wfn-scale, 1)) color-mix(in srgb, var(--openbot-danger) 64%, transparent);
+}
+
+/* A collapsed group is a stack card: a pile of the pictures of its members. */
+.wfn-frame[data-folded] {
+  display: grid;
+  place-items: center;
+  border-radius: var(--wfn-radius-card);
+  background: var(--wfn-card);
+}
+
+.wfn-frame-label {
+  position: absolute;
+  z-index: 1;
+  top: var(--openbot-space-2);
+  right: var(--openbot-space-4);
+  left: var(--openbot-space-4);
+  display: flex;
+  gap: var(--openbot-space-1-5);
+  align-items: center;
+  min-width: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.wfn-frame-icon {
+  flex: none;
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+.wfn-stage .wfn-frame-name {
+  min-width: 2ch;
+  max-width: 100%;
+  height: auto;
+  min-height: 0;
+  field-sizing: content;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--openbot-text-secondary);
+  font: inherit;
+  font-weight: var(--openbot-weight-medium);
+  text-overflow: ellipsis;
+  cursor: text;
+}
+
+.wfn-stage .wfn-frame-name::placeholder {
+  color: var(--openbot-text-secondary);
+}
+
+.wfn-stage .wfn-frame-name:focus,
+.wfn-stage .wfn-frame-name:focus-visible {
+  outline: none;
+  box-shadow: none;
+  color: var(--openbot-text-primary);
+}
+
+.wfn-stage .wfn-frame-name[readonly] {
+  cursor: inherit;
+}
+
+.wfn-frame-count {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.wfn-frame .wfn-frame-port {
+  position: absolute;
+  z-index: 1;
+  right: 0;
+  translate: 50% -50%;
+}
+
+.wfn-frame .wfn-port {
+  opacity: 1;
+}
+
+.wfn-stack-pile {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 168px;
+  height: 128px;
+  margin-top: var(--openbot-space-6);
+  color: var(--openbot-text-muted);
+}
+
+.wfn-stack-picture {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--openbot-radius-md);
+  box-shadow: 0 0 0 1px var(--wfn-ring-strong);
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.wfn-stack-picture[data-layer="0"] {
+  z-index: 3;
+}
+
+.wfn-stack-picture[data-layer="1"] {
+  z-index: 2;
+  rotate: -6deg;
+  translate: -10px 4px;
+}
+
+.wfn-stack-picture[data-layer="2"] {
+  z-index: 1;
+  rotate: 7deg;
+  translate: 12px 6px;
+}
+
+.wfn-stack-glyph {
+  width: var(--openbot-icon-lg);
+  height: var(--openbot-icon-lg);
+}
+
+/* The members of a collapsed group keep their ports for the lines, but do not show. */
+.wfn-slot[data-folded] {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 /* Alignment guides: 1px at every zoom, a faint tint of the text colour that fades in. */

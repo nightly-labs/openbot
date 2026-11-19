@@ -16,6 +16,7 @@ import {
   buttonVariants,
   Check,
   ChevronDown,
+  Confetti,
   Dialog,
   DropdownMenu,
   ErrorReference,
@@ -31,7 +32,18 @@ import {
 } from "@openbot/ui";
 import { motionDuration, prefersReducedMotion } from "@openbot/ui/utils";
 import type { UserErrorDetails } from "@openbot/user-errors";
-import { createEffect, createSignal, For, Match, onCleanup, onSettled, Show, Switch, untrack } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  Match,
+  onCleanup,
+  onSettled,
+  Show,
+  Switch,
+  untrack,
+} from "solid-js";
 import { useText } from "../../text";
 import {
   guessHostedCurrency,
@@ -44,6 +56,7 @@ import {
   type HostedServerPlanId,
   HostedServerPlans,
   HostedUseSwitch,
+  hostedCurrencies,
   hostedLongestOrderPrice,
   hostedPriceLength,
   hostedWorkYearlyDiscountPercent,
@@ -176,8 +189,6 @@ const DETAIL_MS = 2_000;
 
 const SETUP_ORDER: readonly HostedServerSetupStatus[] = ["creating", "starting", "connecting", "ready"];
 
-const CONFETTI_PIECES = 56;
-
 /**
  * The plus button on the server rail opens this dialog. It shows the plans first: one click on a
  * plan creates a hosted server, and the dialog then shows the setup.
@@ -187,10 +198,20 @@ export function AddServerDialog(props: AddServerDialogProps) {
   const [step, setStep] = createSignal<Step>(untrack(() => props.resume) ? "progress" : "pricing");
   const order = untrack(() => props.order);
   const [billing, setBilling] = createSignal<HostedServerBilling>(order?.billing ?? "yearly");
-  const [currency, setCurrency] = createSignal<HostedCurrency>(
-    untrack(() => (props.currencyLocked ? props.currency : (order?.currency ?? props.currency))) ??
-      guessHostedCurrency(),
+  const currencies = createMemo(() => hostedCurrencies(props.plans));
+  const [chosenCurrency, setCurrency] = createSignal<HostedCurrency | undefined>(
+    untrack(() => (props.currencyLocked ? props.currency : (order?.currency ?? props.currency))),
   );
+  /**
+   * The chosen currency when the plans have it, else a guess from the time zone. A locked currency is the
+   * currency of the Stripe customer, so it stays: a guess only gets a refusal.
+   */
+  const currency = (): HostedCurrency => {
+    const chosen = chosenCurrency();
+    return chosen && (props.currencyLocked || currencies().includes(chosen))
+      ? chosen
+      : guessHostedCurrency(currencies());
+  };
   const [pendingPlan, setPendingPlan] = createSignal<HostedServerPlanId | null>(null);
   const [createError, setCreateError] = createSignal<UserErrorDetails | null>(null);
   const [created, setCreated] = createSignal<CreatedHostedServer | null>(untrack(() => props.resume) ?? null);
@@ -216,13 +237,14 @@ export function AddServerDialog(props: AddServerDialogProps) {
     work()
       ? hostedWorkYearlyDiscountPercent(props.plans, currency())
       : hostedYearlyDiscountPercent(props.plans, currency());
-  // Characters over the 10 that fit in a column at 760 px. The pricing step gets wider for each one.
-  // With a license, the longest old and new prices share the line.
+  // Characters over the 10 that fit in a column at 760 px, with 2 for the space between the old and the
+  // new price. The pricing step gets wider for each one. With a license, the longest old and new prices
+  // share the line.
   const extraPriceChars = () => {
     const longest = longestPrice();
     const length = longest
       ? longest.was.length + longest.now.length + 2
-      : hostedPriceLength(props.plans, currency(), format);
+      : hostedPriceLength(props.plans, currency(), format) + 2;
     return Math.max(0, length - 10);
   };
   let stepHeading: HTMLElement | undefined;
@@ -403,6 +425,7 @@ export function AddServerDialog(props: AddServerDialogProps) {
                         <HostedUseSwitch work={work()} onChange={setWork} disabled={creating()} />
                       </Show>
                       <HostedCurrencySelect
+                        options={currencies().includes(currency()) ? currencies() : [...currencies(), currency()]}
                         currency={currency()}
                         onChange={(next) => {
                           setCurrency(next);
@@ -646,7 +669,7 @@ export function AddServerDialog(props: AddServerDialogProps) {
 }
 
 /** The ways to add a server without a plan, in the corner across from the close button. */
-function AddServerOtherOptions(props: {
+export function AddServerOtherOptions(props: {
   disabled: boolean;
   onCreateLocal: (() => void) | undefined;
   onInstallServer: (() => void) | undefined;
@@ -689,34 +712,6 @@ function AddServerOtherOptions(props: {
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
-    </div>
-  );
-}
-
-/**
- * A burst of paper from the server logo, over the backdrop so that the dialog does not clip it.
- * CSS hides it when the user prefers reduced motion.
- */
-function Confetti(props: { origin: HTMLElement | undefined }) {
-  const box = props.origin?.getBoundingClientRect();
-  const origin = {
-    "--confetti-origin-x": `${box ? box.left + box.width / 2 : window.innerWidth / 2}px`,
-    "--confetti-origin-y": `${box ? box.top + box.height / 2 : window.innerHeight / 3}px`,
-  };
-  const pieces = Array.from({ length: CONFETTI_PIECES }, (_, index) => {
-    const angle = (index / CONFETTI_PIECES) * Math.PI * 2 + Math.random() * 0.4;
-    const reach = 140 + Math.random() * 180;
-    return {
-      "--confetti-x": `${Math.cos(angle) * reach}px`,
-      "--confetti-y": `${Math.sin(angle) * reach * 0.7 - 90}px`,
-      "--confetti-spin": `${Math.round(Math.random() * 720 - 360)}deg`,
-      "--confetti-delay": `${Math.round(Math.random() * 120)}ms`,
-      "--confetti-duration": `${Math.round(1_300 + Math.random() * 700)}ms`,
-    };
-  });
-  return (
-    <div class="add-server-confetti" style={origin} aria-hidden="true">
-      <For each={pieces}>{(style) => <i style={style} />}</For>
     </div>
   );
 }

@@ -8,7 +8,8 @@
  * In Light, at least 0.95 keeps `--openbot-text-muted` at about 4.5:1; the default canvas is 0.97.
  * The chroma limit keeps each hue at that lightness in sRGB. A color out of sRGB is clipped, and the
  * clip makes it lighter: the most saturated sRGB color at hue 29 gave 3.6:1 in Dark. The presets are
- * under the limit. */
+ * under the limit. `readableChatBackground` in `@openbot/brand/chat-colors` applies the same limits on
+ * mobile; keep the two the same. */
 :root[data-openbot-color-scheme="dark"][data-openbot-chat-background-dark] {
   --chat-background: oklch(from var(--openbot-chat-background-dark) min(l, 0.3) min(c, 0.05) h);
 }

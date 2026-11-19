@@ -2,6 +2,7 @@ import type {
   AgentEvent,
   ConversationPage,
   OpenBotDesktopApi,
+  StopRoutineFlowRunInput,
   TeamRealtimeEvent,
   TestRoutineInput,
   UpdateRoutineInput,
@@ -16,7 +17,9 @@ import { desktopEventRoutinesApi, type EventRoutinesApi } from "../conversation/
  */
 export interface RoutineFlowsHost {
   /** Called without a server: the host already names one. */
-  flows: OpenBotDesktopApi["routineFlows"];
+  flows: Omit<OpenBotDesktopApi["routineFlows"], "stopRun">;
+  /** Stops a run that has not ended. Absent for a joined server that cannot; the canvas then shows no Stop. */
+  readonly stopRun: ((input: StopRoutineFlowRunInput) => Promise<void>) | undefined;
   routines: {
     update(input: UpdateRoutineInput): Promise<unknown>;
     test(input: TestRoutineInput): Promise<unknown>;
@@ -39,9 +42,14 @@ export interface RoutineFlowsHost {
 
 /**
  * The desktop adapter for one server. `window.openbot` is read on each call: tests and stories
- * replace it per case. `webhooks` is read when the canvas asks, so a role change reaches it.
+ * replace it per case. `webhooks` and `stops` are read when the canvas asks, so a role or a host
+ * change reaches them.
  */
-export function desktopRoutineFlowsHost(serverId: string, webhooks: () => boolean): RoutineFlowsHost {
+export function desktopRoutineFlowsHost(
+  serverId: string,
+  webhooks: () => boolean,
+  stops: () => boolean,
+): RoutineFlowsHost {
   const flows = () => window.openbot.routineFlows;
   const agent = () => window.openbot.agent;
   return {
@@ -52,6 +60,9 @@ export function desktopRoutineFlowsHost(serverId: string, webhooks: () => boolea
       connect: (input) => flows().connect(input, serverId),
       disconnect: (input) => flows().disconnect(input, serverId),
       updateLink: (input) => flows().updateLink(input, serverId),
+    },
+    get stopRun() {
+      return stops() ? (input: StopRoutineFlowRunInput) => flows().stopRun(input, serverId) : undefined;
     },
     routines: {
       update: (input) => agent().updateRoutine(input, serverId),

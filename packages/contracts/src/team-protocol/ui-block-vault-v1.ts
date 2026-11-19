@@ -1,6 +1,6 @@
 import { isDynamicRecord, isString } from "../runtime-values";
 import { normalizeConversationUiBlock, type UiBlockVaultRequest } from "../ui-blocks";
-import { decodeTeamProtocolV2Json } from "./v2";
+import { decodeTeamProtocolV2Json } from "./webrtc-framing";
 
 /**
  * Frozen optional ui-block-vault-v1 contract. It adds one key to the blocks that `ui-blocks-v1`

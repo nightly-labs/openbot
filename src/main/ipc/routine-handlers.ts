@@ -15,6 +15,11 @@ import {
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import {
+  decodeRoutinePauseReasons,
+  ROUTINE_PAUSE_REASONS_CAPABILITY,
+  ROUTINE_PAUSE_REASONS_ROUTES,
+} from "@openbot/contracts/team-protocol/routine-pause-reasons-v1";
+import {
   decodeRoutineRunCommandResponse,
   ROUTINE_RUN_COMMAND_CAPABILITY,
   ROUTINE_RUN_COMMAND_ROUTES,
@@ -42,7 +47,7 @@ import {
   requireReleasedScheduleOn,
   updateAgentRoutineOnce,
 } from "@openbot/team-client/routines-once";
-import { withRoutineRunPlaces } from "@openbot/team-client/team-api-requests";
+import { withRoutinePauseReasons, withRoutineRunPlaces } from "@openbot/team-client/team-api-requests";
 import type { AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { localRoutineCalendarSource } from "../local-routine-calendar";
@@ -88,18 +93,29 @@ export function routineIpcHandlers({
             serverId,
             Effect.gen(function* () {
               const routines = remoteServers.request(serverId, TEAM_API_ROUTES.agent.routines(agentId), decodeRoutines);
-              if (!remoteServers.supportsCapability(serverId, ROUTINE_RUN_PLACE_CAPABILITY)) return yield* routines;
-              const [list, places] = yield* Effect.all(
+              const runPlaces = remoteServers.supportsCapability(serverId, ROUTINE_RUN_PLACE_CAPABILITY);
+              // A host with `routine-pause-reasons-v1` says which paused routine a run of its own paused.
+              const pauseReasons = remoteServers.supportsCapability(serverId, ROUTINE_PAUSE_REASONS_CAPABILITY);
+              if (!runPlaces && !pauseReasons) return yield* routines;
+              const [list, places, reasons] = yield* Effect.all(
                 [
                   routines,
-                  remoteServers.request(serverId, ROUTINE_RUN_PLACE_ROUTES.list, decodeRoutineRunPlaces, {
-                    method: "POST",
-                    body: { agentId },
-                  }),
+                  runPlaces
+                    ? remoteServers.request(serverId, ROUTINE_RUN_PLACE_ROUTES.list, decodeRoutineRunPlaces, {
+                        method: "POST",
+                        body: { agentId },
+                      })
+                    : Effect.succeed([]),
+                  pauseReasons
+                    ? remoteServers.request(serverId, ROUTINE_PAUSE_REASONS_ROUTES.list, decodeRoutinePauseReasons, {
+                        method: "POST",
+                        body: { agentId },
+                      })
+                    : Effect.succeed([]),
                 ],
                 { concurrency: "unbounded" },
               );
-              return withRoutineRunPlaces(list, places);
+              return withRoutinePauseReasons(withRoutineRunPlaces(list, places), reasons);
             }),
             (send) => listOnceAgentRoutines(send, agentId),
           ),

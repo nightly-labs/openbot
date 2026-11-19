@@ -20,7 +20,11 @@ export interface LiveActivityRelayPush {
   timestamp: number;
   /** When iOS marks the content out of date, in seconds, or `null`. */
   staleAt: number | null;
-  /** 10 shows a change of state at once. 5 is for a change inside one state, which iOS can delay. */
+  /**
+   * 10 shows the update at once and uses the hourly budget that iOS has for them: an alert, a new
+   * request, failure or reply, and an agent that finishes its work. 5 is for each other change, which
+   * iOS can delay.
+   */
   priority: 5 | 10;
   /**
    * An update that shows an event that notifies the member: iOS lights up the screen, shows the

@@ -1,0 +1,210 @@
+/* Invite friends: the split of each payment, the invite link, and the list of friends. */
+.referral-panel {
+  position: relative;
+  display: grid;
+  gap: var(--openbot-space-6);
+}
+
+/*
+ * The split: two rows on the right of the page title and the "Your link" header. The page title is
+ * outside the panel, so the split goes up by the title and the gap after it, and is as tall as both
+ * rows. It plays once when the panel opens.
+ */
+.referral-split {
+  position: absolute;
+  top: calc(-1 * (var(--openbot-leading-3xl) + var(--openbot-space-6)));
+  right: 0;
+  display: flex;
+  align-items: center;
+  height: calc(var(--openbot-leading-3xl) + var(--openbot-space-6) + var(--openbot-leading-lg));
+  pointer-events: none;
+}
+
+.referral-fork {
+  --ui-plush-size: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.referral-fork-stem {
+  width: var(--openbot-space-3);
+  height: 2px;
+  margin-left: var(--openbot-space-2);
+  background: linear-gradient(90deg, var(--openbot-beam-pink), var(--openbot-beam-teal));
+  transform-origin: left center;
+  animation: referral-draw-x 300ms var(--openbot-ease-out) 100ms backwards;
+}
+
+.referral-fork-branches {
+  display: grid;
+  width: var(--openbot-space-3);
+  height: 38px;
+  animation: referral-draw-x 300ms var(--openbot-ease-out) 250ms backwards;
+  transform-origin: left center;
+}
+
+.referral-fork-branches > span {
+  border: 2px solid var(--openbot-beam-pink);
+  border-right: 0;
+  border-bottom: 0;
+  border-top-left-radius: var(--openbot-radius-md);
+}
+
+.referral-fork-branches > [data-side="you"] {
+  border-color: var(--openbot-beam-teal);
+  border-top: 0;
+  border-bottom: 2px solid var(--openbot-beam-teal);
+  border-radius: 0 0 0 var(--openbot-radius-md);
+}
+
+.referral-fork-rows {
+  display: grid;
+  gap: var(--openbot-space-2);
+  justify-items: start;
+  margin-left: var(--openbot-space-1);
+}
+
+.referral-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+  padding: 2px var(--openbot-space-3);
+  border-radius: var(--openbot-radius-pill);
+  color: var(--openbot-text-on-accent);
+  background: linear-gradient(135deg, var(--openbot-beam-teal), var(--openbot-beam-blue));
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
+  line-height: var(--openbot-leading-sm);
+  white-space: nowrap;
+  animation: referral-throw 700ms var(--openbot-ease-out) 560ms backwards;
+}
+
+.referral-chip[data-side="friend"] {
+  background: linear-gradient(135deg, var(--openbot-beam-pink), var(--openbot-beam-blue));
+  animation-delay: 400ms;
+}
+
+.referral-chip > svg {
+  width: 12px;
+  height: 12px;
+}
+
+.referral-link {
+  display: flex;
+  gap: var(--openbot-space-2);
+}
+
+.referral-link .ui-input {
+  flex: 1;
+  min-width: 0;
+  height: auto;
+}
+
+.referral-friends-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.referral-list {
+  display: grid;
+  gap: var(--openbot-space-3);
+}
+
+.referral-pages {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-3);
+}
+
+.referral-pages-buttons {
+  display: flex;
+  gap: var(--openbot-space-2);
+}
+
+@keyframes referral-draw-x {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes referral-throw {
+  0% {
+    opacity: 0;
+    transform: translateX(-48px) scale(0.3);
+  }
+  60% {
+    opacity: 1;
+    transform: translateX(4px) scale(1.04);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .referral-fork * {
+    animation: none;
+  }
+}
+
+/* The credit: one column for each amount, with a line between the columns. */
+.referral-credit {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  margin: 0;
+}
+
+.referral-credit > div {
+  display: grid;
+  align-content: start;
+  gap: var(--openbot-space-1);
+  padding: var(--openbot-space-4);
+}
+
+.referral-credit > div + div {
+  border-left: 1px solid var(--openbot-border);
+}
+
+.referral-credit dt {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+.referral-credit dd {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+.referral-credit .referral-credit-amount {
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-xl);
+  font-weight: var(--openbot-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The credit from one friend, on the left of the status. */
+.referral-friend-credit {
+  display: grid;
+  justify-items: end;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.referral-friend-earned {
+  color: var(--openbot-text-primary);
+  font-weight: var(--openbot-weight-medium);
+}
+
+/* Progress of the ready credit to the minimum, in the colors of the split. */
+.referral-credit-progress {
+  display: grid;
+  gap: var(--openbot-space-1);
+  padding-block: var(--openbot-space-1);
+}
+
+.referral-credit-progress .ui-progress-fill {
+  background: linear-gradient(90deg, var(--openbot-beam-pink), var(--openbot-beam-teal));
+}

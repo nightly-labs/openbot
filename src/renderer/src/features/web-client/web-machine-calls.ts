@@ -18,6 +18,10 @@ import {
   MACHINE_RESOURCES_ROUTES,
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { STORAGE_DISK_CAPABILITY, STORAGE_DISK_ROUTES } from "@openbot/contracts/team-protocol/storage-disk-v1";
+import {
+  STORAGE_USER_FILES_CAPABILITY,
+  STORAGE_USER_FILES_ROUTES,
+} from "@openbot/contracts/team-protocol/storage-user-files-v1";
 import { decodeTeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
 import { currentText } from "@openbot/ui/text";
@@ -51,9 +55,11 @@ export function webMachineCalls(
   return {
     storage: {
       getDisk: async (serverId) =>
-        hasCapability(STORAGE_DISK_CAPABILITY)
-          ? request(serverId)("POST", STORAGE_DISK_ROUTES.disk, decodeStorageDisk, {})
-          : null,
+        hasCapability(STORAGE_USER_FILES_CAPABILITY)
+          ? request(serverId)("POST", STORAGE_USER_FILES_ROUTES.disk, decodeStorageDisk, {})
+          : hasCapability(STORAGE_DISK_CAPABILITY)
+            ? request(serverId)("POST", STORAGE_DISK_ROUTES.disk, decodeStorageDisk, {})
+            : null,
       getMachineMetrics: async (serverId) =>
         hasCapability(MACHINE_RESOURCES_CAPABILITY)
           ? request(serverId)("POST", MACHINE_RESOURCES_ROUTES.metrics, decodeMachineMetrics, {})

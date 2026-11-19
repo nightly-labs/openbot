@@ -74,7 +74,7 @@ const deliveries = new Map<string, FakeDelivery>();
 const updates: UpdateAgentInput[] = [];
 const cleared: string[] = [];
 let busy = false;
-/** The account default "Requests an hour" of Settings › Agents › Local scripts. */
+/** The account default "Requests an hour" of Server Settings › Agents › Local scripts. */
 let automationRunsPerHour = DEFAULT_AGENT_DEFAULTS.automationRunsPerHour;
 
 function deliveryState(

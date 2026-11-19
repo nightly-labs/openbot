@@ -6,7 +6,7 @@ import { holdFlag } from "@openbot/ui/utils";
 import { createEffect, Match, onCleanup, onSettled, Show, Switch } from "solid-js";
 import { MarketplaceAgentPage } from "./MarketplaceAgentPage";
 import { AgentGroupPage } from "./MarketplaceAgents";
-import { MarketplaceAppPage } from "./MarketplaceAppPage";
+import { MarketplaceAppPage, MarketplaceServerPage } from "./MarketplaceAppPage";
 import { AppGroupPage, createBrowseLists, MarketplaceBrowse } from "./MarketplaceBrowse";
 import { MarketplaceNav } from "./MarketplaceNav";
 import { MarketplaceLocalSkillPage, MarketplaceSkillPage } from "./MarketplaceSkillPage";
@@ -46,6 +46,8 @@ function viewTitle(scope: MarketplaceScope, view: MarketplaceView, fallback: str
       return scope.model.apps().find((app) => app.id === view.id)?.name ?? fallback;
     case "skillGroup":
       return view.group === "yours" ? t("marketplace.skills.yours") : t(CATEGORY_LABELS[view.group]);
+    case "server":
+      return view.id === null ? t("mcp.panel.connectTitle") : t("mcp.panel.editTitle");
     case "localSkill":
       for (const agent of scope.model.agents()) {
         const skill = scope.model.installedSkill(agent.id, view.skillId);
@@ -212,6 +214,9 @@ function MarketplaceWindow(props: MarketplaceProps) {
                 </Match>
                 <Match when={view.kind === "localSkill" && view.skillId} keyed>
                   {(skillId) => <MarketplaceLocalSkillPage scope={scope} skillId={skillId} />}
+                </Match>
+                <Match when={view.kind === "server" && view} keyed>
+                  {(server) => <MarketplaceServerPage scope={scope} id={server.id} />}
                 </Match>
               </Switch>
             )}

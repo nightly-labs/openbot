@@ -1,5 +1,5 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { type ChannelDraft, type ChannelSummary, isChannelDraft } from "@openbot/contracts/ipc";
+import { type ChannelDraft, type ChannelSummary, canAdministerServer, isChannelDraft } from "@openbot/contracts/ipc";
 import * as Crypto from "expo-crypto";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
@@ -16,6 +16,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 import { useUniwind } from "uniwind";
 import { ChannelAvatar } from "@/features/channels/components/channel-avatar";
+import { ChannelContextActions } from "@/features/channels/components/channel-context-actions";
 import { useChannels } from "@/features/channels/components/use-channels";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
@@ -70,6 +71,7 @@ export function ChannelFormScreen({ create = false }: { create?: boolean }) {
       channel={create ? undefined : (current ?? last.current)}
       available={available}
       pictureSupported={state.canSetPicture}
+      contextActionsSupported={state.canUseContextActions}
       store={state.store}
     />
   );
@@ -82,6 +84,7 @@ function ChannelForm({
   channel,
   available,
   pictureSupported,
+  contextActionsSupported,
   store,
 }: {
   create: boolean;
@@ -91,13 +94,14 @@ function ChannelForm({
   available: boolean;
   /** The host takes a channel picture (`channel-picture-v1`). */
   pictureSupported: boolean;
+  /** The host takes "New conversation", "Compact context" and "Delete history" (`chat-history-v1`). */
+  contextActionsSupported: boolean;
   store: MobileChannelStore;
 }) {
   const { t, errorMessage } = useText();
   const agents = useMobileWorkspaceSelector((current) => current.agents);
-  const canManage = useMobileWorkspaceSelector(
-    (current) => current.servers.find((server) => server.id === serverId)?.role !== "member",
-  );
+  const role = useMobileWorkspaceSelector((current) => current.servers.find((server) => server.id === serverId)?.role);
+  const canManage = role !== "member";
   const { theme } = useUniwind();
   const openAgentPicker = useChannelAgentPicker((state) => state.open);
   const foreground = String(useThemeColor("foreground"));
@@ -350,12 +354,24 @@ function ChannelForm({
           </SettingsRow>
         </SettingsSection>
       ) : null}
+      {/* The host refuses these for an archived channel. */}
+      {!create && channel && !channel.archived && contextActionsSupported ? (
+        <ChannelContextActions
+          serverId={serverId}
+          channelId={channelId}
+          channelName={channel.name}
+          store={store}
+          available={available && !saving && !finished}
+          canDeleteHistory={canAdministerServer(role)}
+        />
+      ) : null}
       {!create && !channel?.archived ? (
         <SettingsSection>
           {canManage ? (
             <SettingsRow
               leading={<RowIcon icon={Trash2} tone="danger" />}
-              disabled={disabled || dirty}
+              // The host refuses to delete a channel while a task runs there: the user stops it first.
+              disabled={disabled || dirty || (channel?.activeTasks ?? 0) > 0}
               disclosure={false}
               onPress={() => {
                 const text = currentText();

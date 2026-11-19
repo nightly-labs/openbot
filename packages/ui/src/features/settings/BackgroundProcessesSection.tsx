@@ -28,7 +28,7 @@ export interface BackgroundProcessesSectionProps {
 }
 
 /**
- * Settings › Agents › Background processes: the programs that agents left running on this computer,
+ * Server Settings › Storage › Background processes: the programs that agents left running on this computer,
  * such as a dev server, each with the agent, the start time, its ports and Stop.
  */
 export function BackgroundProcessesSection(props: BackgroundProcessesSectionProps) {

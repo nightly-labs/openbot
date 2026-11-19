@@ -28,6 +28,8 @@ import {
   validateMobileSession,
 } from "@/features/auth/api/mobile-auth";
 import { deleteComposerDrafts } from "@/features/chat/model/composer-drafts";
+import { deleteSideQuestions } from "@/features/chat/model/side-questions";
+import { deleteAgentBackdrops } from "@/features/settings/model/chat-backdrop";
 import { deleteAgentAvatars } from "@/features/workspace/model/agent-avatar-cache";
 import { type QueryScope, queryKeys } from "@/features/workspace/model/query-keys";
 import { deleteWorkspaceCaches } from "@/features/workspace/model/workspace-cache";
@@ -52,6 +54,13 @@ interface MobileSessionContextValue {
 
 const MobileSessionContext = createContext<MobileSessionContextValue | null>(null);
 
+/** Deletes the account data that this phone keeps between launches. */
+function deletePhoneCopy() {
+  void deleteWorkspaceCaches();
+  deleteAgentBackdrops();
+  deleteAgentAvatars();
+}
+
 export function MobileSessionProvider({ children }: PropsWithChildren) {
   const [sessionState, setSessionState] = useState<MobileSession | null | undefined>(undefined);
   const sessionRef = useRef<MobileSession | null>(null);
@@ -69,11 +78,13 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
       queryClient.removeQueries({ queryKey: queryKeys.accountSessions() });
       // The hosted server plans keep the last answer for the life of the app; a new session drops it.
       queryClient.removeQueries({ queryKey: queryKeys.hostedServerPlans() });
+      queryClient.removeQueries({ queryKey: queryKeys.billing() });
       // Unsent text belongs to one account. This also drops text that a closing chat wrote after sign-out.
       deleteComposerDrafts();
+      deleteSideQuestions();
     }
     // Sign-out, and a session that the account service refused or that expired, delete the phone's copy.
-    if (sessionRef.current && !session) void deleteWorkspaceCaches();
+    if (sessionRef.current && !session) deletePhoneCopy();
     mobileAnalytics.setUser(session?.user ?? null);
     sessionRef.current = session;
     setSessionState(session);
@@ -97,7 +108,11 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
     void untilForeground().then(loadAnalyticsPreference);
     const read = () =>
       readMobileSession().then((stored) => {
-        if (active && scope === sessionScope.current) setCurrentSession(stored);
+        if (!active || scope !== sessionScope.current) return;
+        // The keychain opened and has no valid session: a copy left by a sign-out or an invalid session
+        // that the app did not finish deleting belongs to no account. A closed keychain throws instead.
+        if (!stored) deletePhoneCopy();
+        setCurrentSession(stored);
       });
     // A start in the background can find the keychain closed. The app reads again when the user
     // opens it, so it does not show sign-in for a session that it still has.

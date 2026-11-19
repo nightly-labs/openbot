@@ -16,8 +16,10 @@ import type { AgentMessage, AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import type { AttachmentDownloads, AttachmentMediaSource } from "./AttachmentCards";
+import { chatBubbleColor, useBackdropBubbles } from "./BackdropBubbles";
 import type { MessageImageFile } from "./MarkdownMessageText";
 import { conversationBubbleVariant, MessageBody } from "./MessageRendering";
+import { solidBubbleTakesDarkText } from "./own-bubble";
 
 /**
  * Who wrote a message, as much as a row needs to draw it.
@@ -39,6 +41,11 @@ export interface ChatMessageAuthor {
    * reader's and an agent's bubbles stay grey, and another person's bubble takes their name colour.
    */
   chatColor?: AvatarColor | undefined;
+  /**
+   * The reader's own bubble in an agent chat fills with `chatColor` instead of a tint of it, as the
+   * Solid bubble style draws it. See `ownMessageAuthor`.
+   */
+  solidBubble?: boolean | undefined;
 }
 
 export interface ChatMessageRowProps {
@@ -96,7 +103,7 @@ export interface ChatMessageRowProps {
   onOpenLink: (url: string) => void;
   onPreview: (attachment: AttachmentSummary) => void;
   onAttachmentAction: (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => void;
-  onOpenSharedFile?: (path: string, asWritten?: string) => void;
+  onOpenSharedFile?: ((path: string, asWritten?: string) => void) | undefined;
   onOpenWorkspaceFile?: ((path: string, asWritten?: string) => void) | undefined;
   onOpenQuote?: ((messageId: string, text: string) => void) | undefined;
   onOpenTag?: ((kind: "tab" | "thread", id: string) => void) | undefined;
@@ -119,21 +126,24 @@ export interface ChatMessageRowProps {
  * It is shared because the agent chat and the channel chat draw the same message. They differed on
  * every part around the bubble - the channel had no entrance animation, no streaming state on the
  * bubble and no toolbar - for as long as each wrote its own row, and this component is what stops
- * that from happening a third time. It reads no context and no store: what a caller knows about a
- * conversation arrives as a prop.
+ * that from happening a third time. It reads no store: what a caller knows about a conversation
+ * arrives as a prop. The one context is the bubble colors of the backdrop (`BackdropBubbles`).
  */
 export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
   const { t } = useText();
   const own = () => props.author.kind === "you";
   const member = () => props.author.kind === "member";
   const person = () => own() || member();
-  // A memo, because `Bubble` reads the variant more than once and it splits the whole body.
+  // A memo, because `Bubble` reads the variant more than once.
   const variant = createMemo(() => conversationBubbleVariant(props.message));
   const seed = () => props.author.agent?.avatarSeed ?? props.author.avatarSeed;
   // A colour literal in an inline style is refused by `check:ui`, and rightly: this is the agent's
   // own head colour, read through the same helper the action markers use, so a name matches the
   // face beside it.
-  const chatColor = () => props.author.chatColor ?? props.author.agent?.chatColor;
+  // The colors of the backdrop that shows now go before the chat colors, so the scene and the
+  // bubbles make one theme.
+  const backdropBubbles = useBackdropBubbles();
+  const chatColor = () => chatBubbleColor(backdropBubbles(), props.author);
   const authorStyle = () => {
     const currentSeed = seed();
     const tint = chatColor();
@@ -145,10 +155,19 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
     ].filter((style) => style !== undefined);
     return styles.length > 0 ? styles.join("; ") : undefined;
   };
-  const bubbleClass = () => ({
-    "message-bubble-member": member(),
-    "message-bubble-colored": chatColor() !== undefined,
-  });
+  const solidColor = () => {
+    const tint = chatColor();
+    return own() && props.author.solidBubble === true ? tint : undefined;
+  };
+  const bubbleClass = () => {
+    const solid = solidColor();
+    return {
+      "message-bubble-member": member(),
+      "message-bubble-colored": chatColor() !== undefined,
+      "message-bubble-solid": solid !== undefined,
+      "message-bubble-solid-dark-text": solid !== undefined && solidBubbleTakesDarkText(solid),
+    };
+  };
   const rowClass = () => [
     "message-entry",
     {

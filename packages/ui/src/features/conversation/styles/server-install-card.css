@@ -1,6 +1,6 @@
 /* Server install card: the loader waits in the icon tile, then the new server's logo pops in. */
 
-.server-install-card[data-step="expired"] .server-install-card-status {
+.server-install-card-status[data-step="expired"] {
   color: var(--openbot-warning);
 }
 
@@ -43,17 +43,21 @@
 }
 
 .server-install-card-tile[data-step] .server-install-card-logo {
-  --server-gradient-logo-size: var(--server-install-size);
-  --server-gradient-logo-radius: var(--server-install-radius);
+  --server-plush-logo-size: var(--server-install-size);
   position: relative;
   overflow: hidden;
   animation: server-install-pop-in 520ms var(--server-install-spring) 380ms backwards;
 }
 
-.server-install-card-logo > img {
+.server-install-card-logo > .server-rail-logo {
   width: 100%;
   height: 100%;
   border-radius: inherit;
+}
+
+/* The plush keeps its own squircle: the tile clip cuts its fur. */
+.server-install-card-tile[data-step] .server-install-card-logo:has(> .ui-server-plush-logo) {
+  overflow: visible;
 }
 
 /* When the server signs in, the plush squints with its happy face, hops, and shrinks away. */
@@ -89,7 +93,8 @@
   height: 18px;
   box-sizing: border-box;
   place-items: center;
-  border: 2px solid var(--openbot-bg-canvas);
+  /* The ring has the fill of the card, so the badge cuts into the logo. */
+  border: 2px solid var(--openbot-bg-surface);
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-bg-surface-raised);
   color: var(--openbot-text-muted);
@@ -101,7 +106,7 @@
 
 .server-install-card-badge[data-step="connected"] {
   background: var(--openbot-success);
-  color: var(--openbot-bg-canvas);
+  color: var(--openbot-bg-surface);
 }
 
 .server-install-card-badge > svg {

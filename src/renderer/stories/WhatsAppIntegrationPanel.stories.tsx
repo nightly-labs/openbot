@@ -58,6 +58,7 @@ const PERSONAL: WhatsAppAccount = {
   workspaceId: "447700900123",
   ownNumber: true,
   workingMessage: true,
+  statusReactions: true,
   allowedSenders: [
     { id: "447700900456", kind: "contact", name: "Charles Babbage" },
     { id: "120363000000000001@g.us", kind: "group", name: "Family" },
@@ -71,6 +72,7 @@ const DEDICATED: WhatsAppAccount = {
   workspaceId: "447700900999",
   ownNumber: false,
   workingMessage: false,
+  statusReactions: false,
   allowedSenders: [{ id: "447700900456", kind: "contact", name: "Charles Babbage" }],
   pendingRequests: [
     { code: "K7Q2ZP", senderId: "447700900555", name: "Grace Hopper", expiresAt: "2026-10-30T15:00:00.000Z" },
@@ -92,6 +94,7 @@ const args = (connections: MessagingConnection[], accounts: WhatsAppAccount[], l
   onSetEnabled: fn(),
   onSetOwnNumber: fn(),
   onSetWorkingMessage: fn(),
+  onSetStatusReactions: fn(),
   onAddOrchestrator: fn(),
   loadGroups: fn(async () => [
     { id: "120363000000000001@g.us", name: "Family" },

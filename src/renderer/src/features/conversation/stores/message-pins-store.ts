@@ -3,7 +3,7 @@ import { formatChatTimestamp } from "@openbot/ui/features/conversation/chat-time
 import type { PinnedMessageItem } from "@openbot/ui/features/conversation/PinnedMessages";
 import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
 import { currentText } from "@openbot/ui/text";
-import { createEffect, createStore } from "solid-js";
+import { createEffect, createMemo, createStore } from "solid-js";
 import { actionToast } from "../../../action-toast";
 import type { ConversationMessagePins, ConversationProps } from "../conversation-types";
 
@@ -82,9 +82,13 @@ export function createMessagePinsStore(deps: MessagePinsStoreDeps) {
   /** The pin of a list item, while the list has it. */
   const pin = (key: string) => pins().find((candidate) => pinKey(candidate) === key);
 
+  // An effect runs again each time its key is computed, and the agent record changes with each status.
+  // Memos keep the key, so only another agent or another pin source reads the list again.
+  const viewedAgentId = createMemo(() => deps.props.agent?.id);
+  const source = createMemo(() => (available() ? api() : undefined));
   // The list of the agent in view, and again each time the host says that one of its pins changed.
   createEffect(
-    () => ({ agentId: deps.props.agent?.id, pins: available() ? api() : undefined }),
+    () => ({ agentId: viewedAgentId(), pins: source() }),
     ({ agentId, pins: source }) => {
       if (!agentId || !source) return;
       read(agentId, source);

@@ -45,6 +45,7 @@ export const messages = defineMessages("server", {
   "server.compatibility.updateHostTitle": "Update OpenBot on {name}",
   "server.compatibility.unsafeDataTitle": "The host returned unsafe data",
   "server.compatibility.cannotConnectTitle": "Cannot connect to {name}",
+  "server.compatibility.safeModeTitle": "{name} does not start",
   "server.compatibility.updateClientDescription":
     "This app supports only older protocols than the host. Update this app, then try again.",
   "server.compatibility.updateHostDescription":
@@ -125,6 +126,7 @@ export const messages = defineMessages("server", {
   "server.local.create": "Create server",
   "server.local.creating": "Creating server…",
   "server.local.createFailed": "Could not create the server.",
+  "server.local.createFailedRetry": "Something went wrong. Try again. If it fails again, restart OpenBot.",
   "server.local.limitReached": "You can have at most {limit} servers on this computer. Delete one to create another.",
   "server.local.deleteConfirmTitle": "Delete {name}?",
   "server.local.deleteConfirmDescription":
@@ -189,16 +191,12 @@ export const messages = defineMessages("server", {
   "server.upsell.offline": "An OpenBot server stays on 24/7, so routines keep running.",
   "server.upsell.seePlans": "See plans",
   "server.upsell.notNow": "Not now",
-  // The dialog that offers the next plan when the disk of a hosted server is almost full.
+  // The dialog that offers more storage when the disk of a hosted server is almost full.
   "server.upgrade.title": "Your agents are running out of space",
   "server.upgrade.description":
     "{server} has little free space left. Upgrade to keep your agents working without interruptions.",
   // Under the disk meter, for example "11 GB of 12 GB used".
   "server.upgrade.used": "{used} of {total} used",
-  // The column of the plan that the server has now, for example "Starter (now)".
-  "server.upgrade.current": "{plan} (now)",
-  "server.upgrade.price": "Price",
-  "server.upgrade.action": "Upgrade to {plan}",
   "server.hosted.progressTitle": "Setting up {name}",
   // The setup waits for the first payment on the Stripe page in the browser.
   "server.hosted.paymentTitle": "Finish the payment in your browser",
@@ -304,14 +302,11 @@ export const messages = defineMessages("server", {
   "server.settings.generalTitle": "General",
   "server.settings.generalDescription": "Manage this server’s name, logo, and preferences.",
   "server.settings.vaultTitle": "Vault",
-  "server.settings.vaultDescription":
-    "Save logins, cards and contact info that every agent on this server can fill in.",
+  "server.settings.vaultDescription": "Save logins, cards, contact info and API keys for the agents on this server.",
   "server.settings.membersTitle": "Members",
   "server.settings.membersDescription": "Publish this server, invite people, and manage access.",
   "server.settings.desktopTitle": "Remote desktop",
   "server.settings.desktopDescription": "Configure or connect to this server’s desktop.",
-  "server.settings.mcpTitle": "MCP",
-  "server.settings.mcpDescription": "Connect MCP servers and choose which ones this server’s agents can use.",
   "server.settings.storageTitle": "Storage",
   "server.settings.storageDescription": "See what OpenBot keeps on this server’s disk, and free space.",
   "server.settings.hostedSitesTitle": "Sites",
@@ -353,10 +348,25 @@ export const messages = defineMessages("server", {
   "server.settings.copyFailedTitle": "Copy failed",
   "server.settings.copyFailed": "OpenBot could not copy this value.",
   "server.settings.unavailableTitle": "Server settings unavailable",
-  "server.settings.unsavedMcpChanges": "Unsaved MCP changes",
   "server.settings.reset": "Reset",
   "server.settings.unsavedChanges": "Unsaved changes",
   "server.settings.changesNotSaved": "Changes not saved",
+  // The labels of the groups in the section list of the server settings.
+  "server.settings.group.agents": "Agents",
+  "server.settings.group.people": "People",
+  "server.settings.group.server": "Server",
+  "server.settings.experimentalTitle": "Experimental",
+  "server.settings.experimentalDescription": "Turn on features that are not complete yet.",
+  "server.settings.experimentalFeatures": "Features",
+  "server.settings.experimentalCrm": "CRM",
+  "server.settings.experimentalCrmDescription":
+    "Show the CRM page to owners and admins, let agents read the CRM, and sync Stripe. When you turn it off, the data stays.",
+  "server.settings.agentDefaultsTitle": "Agent defaults",
+  "server.settings.threadsCard": "Threads and timezone",
+  "server.settings.memoryTitle": "Memory",
+  "server.settings.memoryDescription": "Choose what agents on this server remember and learn.",
+  "server.settings.memoriesCard": "Memories",
+  "server.settings.learningCard": "Learning",
   "server.settings.sections": "Server settings sections",
   "server.settings.identity": "Identity",
   "server.settings.logo": "Server logo",
@@ -369,6 +379,13 @@ export const messages = defineMessages("server", {
   "server.settings.editLogo": "Edit server logo",
   "server.settings.addLogo": "Add server logo",
   "server.settings.removeLogo": "Remove server logo",
+  "server.settings.appearance": "Shape and color",
+  "server.settings.appearanceShapes": "Server shapes",
+  "server.settings.appearanceShapeOption": "Shape {number}",
+  "server.settings.appearanceColors": "Server color",
+  "server.settings.appearanceAutoColor": "Automatic server color",
+  "server.settings.appearanceColorOption": "{color} server color",
+  "server.settings.appearanceReset": "Reset shape and color",
   "server.settings.access": "Access",
   "server.companySignIn.title": "Company sign-in",
   "server.companySignIn.sso": "Single sign-on",
@@ -418,11 +435,24 @@ export const messages = defineMessages("server", {
   "server.settings.later": "Later",
   "server.settings.setUp": "Set up",
   "server.settings.agents": "Agents",
+  "server.settings.agentsDescription":
+    "Choose what the agents on this server can do when you do not set it for an agent.",
   "server.settings.timezone": "Timezone",
   "server.settings.timezoneDescription":
-    "New routines use this timezone when the message does not give the sender's timezone.",
+    "New routines use this timezone when the message does not give the sender's timezone. On a server, the browser also uses it after the next restart.",
   "server.settings.timezoneAutomatic": "Automatic ({zone})",
   "server.settings.timezoneLoadFailed": "Could not load the server timezone.",
+  "server.settings.turnLimit": "Threads at the same time",
+  "server.settings.turnLimitDescription":
+    "How many agent threads can run at the same time on this server. More threads use more memory.",
+  "server.settings.turnLimitAutomatic": "Automatic ({count})",
+  "server.settings.turnLimitAutomaticUnlimited": "Automatic (no limit)",
+  "server.settings.turnLimitUnlimited": "Unlimited",
+  "server.settings.turnLimitsLoadFailed": "Could not load the thread limits of this server.",
+  "server.settings.agentTaskLimit": "Parallel threads per agent",
+  "server.settings.agentTaskLimitDescription":
+    "How many threads each agent can run at the same time when the agent has no limit of its own.",
+  "server.settings.agentTaskLimitDefault": "Default ({count})",
   "server.settings.memoryLimit": "Memories per agent",
   "server.settings.memoryLimitDescription": "How many memories each agent on this server can keep.",
   "server.settings.memoryLimitLoadFailed": "Could not load the memory limit of this server.",
@@ -785,4 +815,14 @@ export const messages = defineMessages("server", {
   "server.settings.responseStyleNatural": "Natural",
   "server.settings.responseStyleClassic": "Classic",
   "server.settings.personalityLoadFailed": "Could not load the server personality.",
+  // The setup page of a server in a container, such as an Umbrel app (ServerSetupScreen.tsx).
+  "server.setup.pageTitle": "OpenBot server",
+  "server.setup.signedInAs": "Signed in as {email}",
+  "server.setup.online": "{name} is online",
+  "server.setup.starting": "{name} is starting",
+  "server.setup.openApp": "Open OpenBot",
+  "server.setup.signOutDescription": "To use another account, run openbot logout in a terminal of the container.",
+  "server.setup.errorCompany": "This email signs in through your company. Use another email.",
+  "server.setup.errorRefused": "OpenBot refused the request.",
+  "server.setup.errorNoAnswer": "OpenBot does not answer. Reload the page.",
 });

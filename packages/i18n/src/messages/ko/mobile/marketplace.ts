@@ -62,6 +62,7 @@ export const messages = {
   "mobile.marketplace.facts.accessSignIn": "로그인",
   "mobile.marketplace.facts.accessLocal": "이 컴퓨터",
   "mobile.marketplace.facts.accessNone": "로그인 없음",
+  "mobile.marketplace.facts.accessMac": "Mac 전용",
   "mobile.marketplace.permission.admin": "마켓플레이스에서는 소유자와 관리자만 설치할 수 있어요.",
   "mobile.marketplace.permission.unavailable":
     "이 서버가 오프라인이거나 서버의 OpenBot 버전이 너무 오래되었어요. 서버를 실행하는 컴퓨터에서 OpenBot을 업데이트해 주세요.",
@@ -94,6 +95,7 @@ export const messages = {
   "mobile.marketplace.skill.doc": "SKILL.md",
   "mobile.marketplace.skill.examplePrompt": "이 스킬을 사용하도록 도와줘.",
   "mobile.marketplace.app.add": "앱 추가",
+  "mobile.marketplace.app.addCustom": "사용자 지정 추가",
   "mobile.marketplace.app.connect": "연결",
   "mobile.marketplace.app.connectTitle": "{name} 연결",
   "mobile.marketplace.app.keyIntro": "계정의 키를 붙여넣으세요. 서버가 앱을 저장하기 전에 키를 테스트해요.",
@@ -111,6 +113,7 @@ export const messages = {
   "mobile.marketplace.app.linkInvalid": "{hostname}의 https 링크를 사용해 주세요.",
   "mobile.marketplace.app.docs": "키 발급받기",
   "mobile.marketplace.app.local": "이 앱은 OpenBot이 있는 컴퓨터에서 실행돼요. 그 컴퓨터에서 설정하세요.",
+  "mobile.marketplace.app.needsMac": "이 앱은 OpenBot을 실행하는 Mac에서만 작동하며, 이 서버는 Mac이 아닙니다.",
   "mobile.marketplace.app.relayUnsupported":
     "이 앱은 브라우저 로그인이 필요해요. 서버의 OpenBot을 업데이트하거나 컴퓨터에서 앱을 연결하세요.",
   "mobile.marketplace.app.waiting": "로그인 페이지를 기다리는 중…",

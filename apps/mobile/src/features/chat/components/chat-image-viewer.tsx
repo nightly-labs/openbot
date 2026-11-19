@@ -99,7 +99,7 @@ export function ChatImageViewerProvider({
   );
 }
 
-/** The viewer, with the share and save actions of the image on screen. */
+/** The viewer, with the share, copy and save actions of the image on screen. */
 function ConversationImageViewer({
   serverId,
   pages,
@@ -125,6 +125,8 @@ function ConversationImageViewer({
       hiddenSource={hiddenSource}
       busy={file.busy}
       onShare={file.share}
+      // The clipboard and the photo library take the same pictures: raster images, not an SVG.
+      onCopy={page && savesToPhotos(page.attachment) ? file.copyImage : undefined}
       onSave={page && savesToPhotos(page.attachment) ? file.saveToPhotos : undefined}
       onIndexChange={setIndex}
       onDismissed={onDismissed}

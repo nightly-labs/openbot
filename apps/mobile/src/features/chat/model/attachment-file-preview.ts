@@ -10,10 +10,11 @@ export type AttachmentPreviewKind = Extract<
 >;
 
 /**
- * The characters of a text or Markdown file that the screen shows. The code view is one native
- * text, which a file of many megabytes makes slow to lay out and to highlight.
+ * The characters of one part of a long text or Markdown file on the preview screen. The code view
+ * is one native text, which a file of many megabytes makes slow to lay out and to highlight, so it
+ * shows one part at a time. The Markdown view reads the next part as the reader scrolls to it.
  */
-export const PREVIEW_TEXT_LIMIT = 200_000;
+export const PREVIEW_PART_CHARACTERS = 200_000;
 
 /**
  * How the preview screen shows a file, as desktop decides it in `attachment-preview.ts`: an HTML

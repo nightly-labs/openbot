@@ -101,9 +101,10 @@ export function collectProviderUsage(
     // Antigravity 1.4.3 sends the tokens of this prompt only: `_extract_turn_usage` subtracts the
     // session's total at the turn's start, and a restored session starts from its saved total. So
     // each prompt is its own counter, also when a delivery that hit a limit runs again with the same
-    // turn ID. Gemini bills thinking as output, and Antigravity sends it apart.
-    const tokens = acpTokens(value);
-    const thought = count(value.thoughtTokens);
+    // turn ID. Its `inputTokens` leave out the cache reads (1.5.9 sent 3,165 input with 100,717 cache
+    // reads, #10010), so they are the uncached input. Gemini bills thinking as output, and
+    // Antigravity sends it apart.
+    const output = count(value.outputTokens);
     usage.record({
       agentId: agent.id,
       sessionId: session.id,
@@ -112,7 +113,12 @@ export function collectProviderUsage(
       model,
       counterId: `${session.id}:antigravity:${getString(params, "promptId") ?? turnId}`,
       baseline: false,
-      tokens: { ...tokens, output: tokens.output === null ? null : tokens.output + (thought ?? 0) },
+      tokens: {
+        uncachedInput: count(value.inputTokens),
+        cachedInput: count(value.cachedReadTokens ?? 0),
+        cacheCreation: count(value.cachedWriteTokens ?? 0),
+        output: output === null ? null : output + (count(value.thoughtTokens) ?? 0),
+      },
     });
     return;
   }
@@ -204,12 +210,12 @@ export function workflowUsageObserver(
 }
 
 /**
- * Collects the usage of one background side session under its agent: a memory review, or an
- * `openbot.web_search` turn. The side session has its own id, so its counters never meet those of
- * the agent's turns.
+ * Collects the usage of one background side session under its agent: a memory review, a finish
+ * check, an `openbot.web_search` turn, or the spoken summary of a long answer for live voice. The side session
+ * has its own id, so its counters never meet those of the agent's turns.
  */
 export function sideSessionUsageObserver(
-  kind: "memory-review" | "web-search",
+  kind: "memory-review" | "finish-check" | "web-search" | "voice-summary",
   usage: AgentUsage,
   agentId: string,
   provider: ProviderSession["provider"],

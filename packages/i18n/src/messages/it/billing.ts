@@ -32,10 +32,13 @@ export const messages = {
   "billing.status.paused": "In pausa",
   "billing.otherServers": "Altri server",
   "billing.action.menu": "Azioni sul piano per {server}",
-  "billing.action.change": "Cambia piano",
+  "billing.action.addStorage": "Aggiungi spazio",
   "billing.action.cancel": "Annulla piano",
   "billing.action.renew": "Rinnova piano",
   "billing.action.updatePayment": "Aggiorna metodo di pagamento",
+  "billing.storage.title": "Più spazio per {server}",
+  "billing.storage.add": "Aggiungi {size}",
+  "billing.storage.failed": "Impossibile aggiungere spazio.",
   "billing.lifecycle.cancelRenewal": "Annulla rinnovo",
   "billing.lifecycle.cancelTitle": "Annullare il rinnovo di {name}?",
   "billing.lifecycle.cancelDescription":
@@ -160,6 +163,7 @@ export const messages = {
   "billing.order.server.summary": "Gestiamo OpenBot per il tuo team.",
   "billing.order.server.none": "Nessun server",
   "billing.order.server.noneDetail": "Esegui OpenBot sul tuo computer",
+  "billing.order.server.thisComputer": "Il tuo computer",
   "billing.order.server.bestValue": "Più conveniente",
   "billing.order.server.bestFor.starter": "Ideale per una persona",
   "billing.order.server.bestFor.standard": "Ideale per un piccolo team",
@@ -201,6 +205,7 @@ export const messages = {
   "billing.order.cta.server": "Crea un server",
   "billing.order.cta.license": "Acquista una licenza",
   "billing.order.cta.download": "Scarica",
+  "billing.order.cta.keepComputer": "Resta su questo computer",
   // Shown before an invite that makes the license too small.
   "billing.license.invite.title": "Aggiungere un utente alla licenza?",
   "billing.license.invite.description": "Questo invito aggiunge 1 utente alla tua licenza: {price} in più al mese.",
@@ -213,4 +218,10 @@ export const messages = {
     other:
       "La tua licenza ha {count} utenti, il massimo. Contattaci per una licenza più grande. Le nuove persone non possono unirsi ai tuoi server.",
   },
+  "billing.details.country": "Paese di fatturazione",
+  "billing.details.countryPlaceholder": "Scegli un paese",
+  "billing.details.vatId": "Partita IVA UE (facoltativa)",
+  "billing.details.vatIdInvalid": "Non è una partita IVA del paese scelto.",
+  "billing.details.countryMissing": "Scegli il paese di fatturazione.",
+  "billing.details.saveFailed": "Impossibile salvare i dati di fatturazione",
 } as const satisfies PartialTranslation<typeof source>;

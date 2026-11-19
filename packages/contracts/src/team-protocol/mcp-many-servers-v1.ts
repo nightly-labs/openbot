@@ -11,7 +11,7 @@
 import { boolean, fields, identifier, list } from "./admin-wire";
 import { MCP_SIGN_IN_ROUTES } from "./mcp-sign-in-v1";
 import { isMcpRoute, MCP_ROUTES, mcpResponse, mcpServerConfigWire } from "./mcp-v1";
-import type { TeamProtocolV2Json } from "./v2";
+import type { TeamProtocolV2Json } from "./webrtc-framing";
 
 export const MCP_MANY_SERVERS_CAPABILITY = "mcp-many-servers-v1";
 /** The rows of one list for a peer that sends `mcp-many-servers-v1`. */

@@ -272,7 +272,9 @@ export function FirstAgentSetup(props: FirstAgentSetupProps) {
     };
     const list = suggestionList;
     // A vertical mouse wheel scrolls the row. At the end of the row, the wheel scrolls the page again.
+    // A pinch (Ctrl+wheel) zooms the page.
     const scrollOnWheel = (event: WheelEvent) => {
+      if (event.ctrlKey) return;
       if (!list || props.submitting || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
       const rightToLeft = getComputedStyle(list).direction === "rtl";
       const position = rightToLeft ? -list.scrollLeft : list.scrollLeft;

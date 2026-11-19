@@ -10,8 +10,13 @@ import {
   type AgentStatus,
   type ClientAgentModelOption,
   type MessagingPlatform,
+  type ProviderAccountStatus,
   type StoredFileRow,
   WORKFLOW_NODE_KINDS,
+  type WorkflowMediaAspect,
+  type WorkflowMediaKind,
+  type WorkflowMediaPrice,
+  type WorkflowMediaPriceRequest,
   type WorkflowNodeKind,
   type WorkflowOutputTarget,
   type WorkflowTriggerType,
@@ -91,6 +96,29 @@ export interface WorkflowImageModel {
   provider: ProviderLogoVariant;
   /** The company that makes the model. */
   maker: string;
+  /** The subscription that pays for the file, such as "ChatGPT". */
+  subscription: string;
+  /** True when the provider uses an API key in place of the subscription, so each file costs money. */
+  apiKey?: boolean;
+  /** True when each file spends credits of the provider account, such as Sunra credits. */
+  credits?: boolean;
+  /** What the model can make. */
+  kinds: readonly WorkflowMediaKind[];
+  /** Whether a video can speak in a preset voice. */
+  voices?: boolean;
+  /** The aspect ratios that it makes. Every one when absent. */
+  aspects?: readonly WorkflowMediaAspect[];
+  /** The lengths of a video in seconds. The default lengths when absent. */
+  durations?: readonly number[];
+  /** The resolutions that it makes, the default first. */
+  resolutions?: readonly string[];
+  /** Whether an image can have a transparent background. */
+  transparent?: boolean;
+  /**
+   * The accounts of the provider, when it has more than one and the host makes a file on the account
+   * of the step (`workflows-media-account-v1`). The picker then has one entry for each account.
+   */
+  accounts?: readonly ProviderAccountStatus[];
 }
 
 /**
@@ -112,8 +140,36 @@ export interface WorkflowCatalogs {
   /** The open OpenBot channels of the host. Only this computer gives them. */
   channels?: readonly WorkflowChannel[] | undefined;
   imageModels: readonly WorkflowImageModel[];
+  /**
+   * What one file of a Sunra or Higgsfield model costs with the choices of a step, as the service
+   * quotes it (`workflows-media-catalog-v1`). Without it, a step shows no price.
+   */
+  mediaPrice?: ((request: WorkflowMediaPriceRequest) => Promise<WorkflowMediaPrice>) | undefined;
+  /**
+   * Whether an image step can have a custom size in pixels, which the host crops and scales the picture
+   * of the model to, or the aspect ratios 4:5 and 5:4 (`workflows-media-size-v1`). An older host reads
+   * them as the first aspect ratio of the model.
+   */
+  mediaSize?: boolean | undefined;
   /** The workspace files that an asset node can take, and the images that image steps made. */
   files: readonly StoredFileRow[];
+  /**
+   * The address of an image or a video that a media step made, from the attachment id of its result.
+   * A host without it shows the results that `files` names. Undefined while it loads, and null when
+   * it cannot show here: a card then shows its icon, not a loading pulse.
+   */
+  media?: ((attachmentId: string, kind: WorkflowMediaKind) => string | null | undefined) | undefined;
+  /**
+   * The address of a small copy of a picture, from its attachment id, for a card, a strip or a
+   * thumbnail. Undefined while it loads, null as for `media`. The viewer and a download read `media`.
+   * Without it, the cards show `media` and the `previewUrl` of `files`.
+   */
+  mediaPreview?: ((attachmentId: string) => string | null | undefined) | undefined;
+  /**
+   * Sends a picture from the computer to the host and answers it as a Library file. The host shows
+   * why it refused one. Without it, a file from the computer stays in the page.
+   */
+  upload?: ((file: File) => Promise<StoredFileRow>) | undefined;
   /** The name of the user, which a new sticky note saves as its author. */
   self?: string | undefined;
 }

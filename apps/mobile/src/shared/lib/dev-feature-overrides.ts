@@ -40,3 +40,14 @@ const DEV_REPLAY_ONBOARDING = false;
 export function devReplayOnboarding(): boolean {
   return __DEV__ && DEV_REPLAY_ONBOARDING;
 }
+
+/**
+ * Development builds only. Set to `true` and reload: home opens the rating ask after each reload,
+ * also when this phone has not used the app on enough days, was asked lately or already answered.
+ * The answer is not saved then. A release build ignores it.
+ */
+const DEV_SHOW_RATING_ASK = false;
+
+export function devShowRatingAsk(): boolean {
+  return __DEV__ && DEV_SHOW_RATING_ASK;
+}

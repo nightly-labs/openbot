@@ -1,10 +1,12 @@
 import type { AgentPromptResolution, ConversationQuestionPrompt } from "@openbot/contracts/ipc";
 import {
   type ConversationUiBlock,
+  UI_BLOCK_LIMITS,
   UI_BLOCK_SUBMIT_ACTION_ID,
   UI_CHOICE_QUESTION_ID,
   UI_CHOICE_VALUES_KEY,
   UI_CONFIRM_ACTION_QUESTION_ID,
+  UI_CONFIRM_EDIT_ACTION_ID,
   type UiAction,
   type UiActionStyle,
   type UiBlockResponse,
@@ -12,6 +14,8 @@ import {
   type UiConfirmBlock,
   type UiConfirmField,
   uiBlockAnswersFromResponse,
+  uiConfirmAnswersWithPreview,
+  uiConfirmPreviewEditable,
 } from "@openbot/contracts/ui-blocks";
 import { router } from "expo-router";
 import { Button, Typography } from "heroui-native";
@@ -25,6 +29,7 @@ import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { storeCodePreview } from "@/features/chat/model/code-preview-store";
 import { promptAnswerLabel } from "@/features/chat/model/question-prompt";
+import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
@@ -116,6 +121,12 @@ export function PromptStatus({ controller, canSend }: { controller: QuestionProm
 }
 
 const PREVIEW_CLIP = { maxHeight: PREVIEW_MAX_HEIGHT };
+const MAX_KNOWN_CUT_OFF = 100;
+/**
+ * Whether each draft that a card showed was cut off. The list draws a card again each time its row
+ * scrolls into view; the card then has "Show all" from its first layout and keeps one height.
+ */
+const knownCutOff = new Map<string, boolean>();
 
 /**
  * A long draft stops at a fixed height. It does not scroll, so the chat is the only part that
@@ -125,11 +136,18 @@ const PREVIEW_CLIP = { maxHeight: PREVIEW_MAX_HEIGHT };
  */
 function ConfirmPreview({ markdown, title }: { markdown: string; title: string }) {
   const { t } = useText();
-  const [cutOff, setCutOff] = useState(false);
+  const [cutOff, setCutOff] = useState(() => knownCutOff.get(markdown) ?? false);
   return (
     <View className="gap-1">
       <View className="overflow-hidden" style={PREVIEW_CLIP} accessibilityLabel={t("mobile.chat.question.preview")}>
-        <View onLayout={(event) => setCutOff(event.nativeEvent.layout.height > PREVIEW_MAX_HEIGHT)}>
+        <View
+          onLayout={(event) => {
+            const cut = event.nativeEvent.layout.height > PREVIEW_MAX_HEIGHT;
+            if (knownCutOff.size >= MAX_KNOWN_CUT_OFF) knownCutOff.clear();
+            knownCutOff.set(markdown, cut);
+            setCutOff(cut);
+          }}
+        >
           <ChatMarkdown
             body={markdown}
             color={undefined}
@@ -189,9 +207,12 @@ export function ConfirmBody({
   onSelect,
   disabled = false,
   closed = false,
+  previewEditor,
 }: {
   spec: UiConfirmBlock;
   compact?: boolean;
+  /** Takes the place of the preview while the person edits it. */
+  previewEditor?: ReactNode;
   /** The card has an answer or expired. As on desktop, only an open card shows its danger. */
   closed?: boolean;
   selectValue: (field: Extract<UiConfirmField, { select: string }>) => string;
@@ -243,7 +264,8 @@ export function ConfirmBody({
           )}
         </View>
       ) : null}
-      {spec.preview && !compact ? <ConfirmPreview markdown={spec.preview} title={spec.title} /> : null}
+      {previewEditor ??
+        (spec.preview && !compact ? <ConfirmPreview markdown={spec.preview} title={spec.title} /> : null)}
     </View>
   );
 }
@@ -310,11 +332,14 @@ export function ChatConfirmPrompt({
   uiBlock,
   controller,
   canSend,
+  canEditPreview = false,
 }: {
   spec: UiConfirmBlock;
   uiBlock: ConversationUiBlock | undefined;
   controller: QuestionPromptController;
   canSend: boolean;
+  /** The `UI_CONFIRM_EDIT_ACTION_ID` button opens the preview for editing in the card. */
+  canEditPreview?: boolean;
 }) {
   const { t } = useText();
   const muted = useThemeColor("muted");
@@ -323,6 +348,11 @@ export function ChatConfirmPrompt({
   const secondsLeft = useSecondsLeft(autoAnswer?.at);
   const [selected, setSelected] = useState<Record<string, string>>({});
   const [confirming, setConfirming] = useState<UiAction>();
+  // The preview as the person edits it in the card.
+  const [draft, setDraft] = useState<string>();
+  const blankDraft = draft !== undefined && !draft.trim();
+  const opensEditor = (action: UiAction) =>
+    canEditPreview && uiConfirmPreviewEditable(spec) && action.id === UI_CONFIRM_EDIT_ACTION_ID;
   const screenReader = useScreenReaderEnabled();
   const holdMs = spec.confirmHold ?? DEFAULT_HOLD_MS;
   const holdsPrimary = spec.danger === true || spec.confirmHold !== undefined;
@@ -332,14 +362,18 @@ export function ChatConfirmPrompt({
     selected[field.select] ?? field.options[0] ?? "";
 
   function respond(action: UiAction): void {
-    if (disabled) return;
+    if (disabled || blankDraft) return;
     setConfirming(undefined);
+    if (opensEditor(action)) {
+      setDraft(spec.preview);
+      return;
+    }
     const values: Record<string, string> = {};
     for (const field of spec.fields ?? []) if ("select" in field) values[field.select] = selectValue(field);
     const response: UiBlockResponse = Object.keys(values).length
       ? { actionId: action.id, values }
       : { actionId: action.id };
-    void submit(uiBlockAnswersFromResponse(spec, response));
+    void submit(uiConfirmAnswersWithPreview(spec, response, draft));
   }
 
   return (
@@ -354,6 +388,21 @@ export function ChatConfirmPrompt({
             selectValue={selectValue}
             disabled={disabled}
             onSelect={(select, option) => setSelected((current) => ({ ...current, [select]: option }))}
+            previewEditor={
+              draft === undefined ? undefined : (
+                <SheetFormField
+                  label={t("mobile.chat.question.preview")}
+                  hideLabel
+                  multiline
+                  tall
+                  autoFocus
+                  editable={!disabled}
+                  maxLength={UI_BLOCK_LIMITS.preview}
+                  value={draft}
+                  onChangeText={setDraft}
+                />
+              )
+            }
           />
         </View>
         {autoAnswer ? null : (
@@ -379,7 +428,7 @@ export function ChatConfirmPrompt({
               size="sm"
               variant={BUTTON_VARIANT[actionStyle(confirming)]}
               className="rounded-full"
-              isDisabled={disabled}
+              isDisabled={disabled || blankDraft}
               onPress={() => {
                 void haptics.selection();
                 respond(confirming);
@@ -396,6 +445,8 @@ export function ChatConfirmPrompt({
         <>
           <View className="flex-row flex-wrap gap-2">
             {spec.actions.map((action) => {
+              // While the person edits the preview, the button that opened it is gone.
+              if (draft !== undefined && opensEditor(action)) return null;
               const held = isHeld(action);
               return (
                 <Button
@@ -403,7 +454,7 @@ export function ChatConfirmPrompt({
                   size="sm"
                   variant={BUTTON_VARIANT[actionStyle(action)]}
                   className="rounded-full"
-                  isDisabled={disabled}
+                  isDisabled={disabled || blankDraft}
                   accessibilityHint={held && !screenReader ? t("mobile.chat.question.holdHint") : undefined}
                   delayLongPress={held ? holdMs : undefined}
                   onLongPress={

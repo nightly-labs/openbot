@@ -3,12 +3,16 @@
 // The authorization server acts as ElevenLabs' does: it has no registration endpoint and sets
 // `client_id_metadata_document_supported`. OpenBot must send its client metadata document URL as
 // the `client_id`, with no secret, and keep a record that the encrypted store can read again after
-// a restart. A server that offers registration as well must keep the registration.
+// a restart. A server that offers registration as well must keep the registration. A server that
+// refuses each registration, as Railway does (#7855), must get the document instead. A server that
+// refuses each redirect address with `invalid_redirect_uri`, as YNAB does (#8417), must not: YNAB
+// also refuses the document, on its sign-in page (#12367).
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { resolve } from "node:path";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { z } from "zod";
 import { runCauseEffect } from "../src/backend/effect-boundary";
@@ -73,8 +77,17 @@ function json(response: ServerResponse, status: number, value: unknown, headers:
   response.end(JSON.stringify(value));
 }
 
-/** `registration` adds an RFC 7591 endpoint next to the client metadata document support. */
-async function fakeServer(registration: boolean): Promise<FakeServer> {
+/**
+ * How the registration endpoint refuses: `access` as Railway's does, with 403, and `redirect` as
+ * YNAB's does, with 400 `invalid_redirect_uri` for each address.
+ */
+type Refusal = false | "access" | "redirect";
+
+/**
+ * `registration` adds an RFC 7591 endpoint next to the client metadata document support. `refused`
+ * makes that endpoint refuse each registration. `document` is the support itself.
+ */
+async function fakeServer(registration: boolean, refused: Refusal = false, document = true): Promise<FakeServer> {
   const state: Omit<FakeServer, "url" | "close"> = {
     pageClientIds: [],
     pageRedirectUris: [],
@@ -99,10 +112,20 @@ async function fakeServer(registration: boolean): Promise<FakeServer> {
           code_challenge_methods_supported: ["S256"],
           grant_types_supported: ["authorization_code", "refresh_token"],
           token_endpoint_auth_methods_supported: ["none", "client_secret_post"],
-          client_id_metadata_document_supported: true,
+          client_id_metadata_document_supported: document,
         });
       if (request.method === "POST" && path === "/register") {
         state.registrations++;
+        if (refused === "redirect")
+          return json(response, 400, {
+            error: "invalid_redirect_uri",
+            error_description: "Redirect URI is not an allowed MCP client",
+          });
+        if (refused)
+          return json(response, 403, {
+            error: "access_denied",
+            error_description: "Dynamic client registration is disabled",
+          });
         const asked = z.object({ redirect_uris: z.array(z.string()) }).parse(JSON.parse(await body(request)));
         return json(response, 201, {
           client_id: REGISTERED_CLIENT,
@@ -220,9 +243,30 @@ function probe(oauth: McpOAuth, url: string): Promise<{ toolCount: number; error
   return runCauseEffect(testMcpServer(httpConfig(url), 10_000, undefined, authority, "here"));
 }
 
-async function runCase(name: string, registration: boolean): Promise<Case> {
-  const server = await fakeServer(registration);
+/**
+ * `storedDocument` starts with the document client that releases 0.71 to 0.73 saved for a server that
+ * refused each redirect address, before they opened its page (#12367).
+ */
+async function runCase(
+  name: string,
+  registration: boolean,
+  refused: Refusal = false,
+  document = true,
+  storedDocument = false,
+): Promise<Case> {
+  const server = await fakeServer(registration, refused, document);
   const records = new Map<string, McpOAuthRecord>();
+  const issuer = new URL(server.url).origin;
+  if (storedDocument)
+    records.set(server.url, {
+      client: {
+        client_id: CLIENT_METADATA_URL,
+        redirect_uris: [REDIRECT_URL],
+        token_endpoint_auth_method: "none",
+        issuer,
+      },
+      discovery: { authorizationServerUrl: issuer },
+    });
   const oauth = oauthOn(records, server);
   let restarted: McpOAuth | null = null;
   try {
@@ -356,6 +400,99 @@ async function main(): Promise<void> {
     check(both, both.afterRestart?.error === null, `after a restart: ${both.afterRestart?.error}`);
     check(both, both.signedIn, "no token is stored after the sign-in");
     report.cases.push(both);
+
+    // Railway: a registration endpoint that refuses each registration. The document is the client.
+    const refused = await runCase("registration-refused", true, "access");
+    check(refused, refused.attempts[0]?.error === null, `the sign-in failed: ${refused.attempts[0]?.error}`);
+    check(refused, refused.attempts[0]?.toolCount === 1, "the tools were not listed after the sign-in");
+    // The refused `/mcp-auth` registration and its refused `/callback` retry (#8025).
+    check(refused, refused.registrations === 2, `the sign-in registered ${refused.registrations} times`);
+    check(
+      refused,
+      refused.pageClientIds.join() === CLIENT_METADATA_URL,
+      `the pages named ${refused.pageClientIds.join()}`,
+    );
+    check(
+      refused,
+      refused.tokenClientIds.join() === CLIENT_METADATA_URL,
+      `the token requests named ${refused.tokenClientIds.join()}`,
+    );
+    check(refused, refused.tokenRequestsWithSecret.join() === "false", "a token request carried a client secret");
+    check(
+      refused,
+      refused.storedClient?.clientId === CLIENT_METADATA_URL &&
+        refused.storedClient.redirectUris.join() === REDIRECT_URL,
+      `the stored client is ${JSON.stringify(refused.storedClient)}`,
+    );
+    check(refused, refused.afterRestart?.error === null, `after a restart: ${refused.afterRestart?.error}`);
+    check(refused, refused.pageClientIds.length === 1, "a restart opened the sign-in page again");
+    check(refused, refused.signedIn, "no token is stored after the sign-in");
+    report.cases.push(refused);
+
+    // A server that refuses each registration and takes no document still says so in plain words.
+    const noDocument = await runCase("registration-refused-no-document", true, "access", false);
+    check(
+      noDocument,
+      noDocument.attempts[0]?.error?.startsWith("The sign-in server does not accept OpenBot as an app yet.") ?? false,
+      `the sign-in said: ${noDocument.attempts[0]?.error}`,
+    );
+    check(noDocument, noDocument.pageClientIds.length === 0, `the pages named ${noDocument.pageClientIds.join()}`);
+    check(
+      noDocument,
+      noDocument.storedClient === null,
+      `the stored client is ${JSON.stringify(noDocument.storedClient)}`,
+    );
+    check(noDocument, !noDocument.signedIn, "a token is stored after a refused registration");
+    report.cases.push(noDocument);
+
+    // YNAB refuses `127.0.0.1` and `localhost` with `invalid_redirect_uri`. It lists the document, but
+    // refuses it too, on its sign-in page, where OpenBot cannot see the refusal (#12367). With or
+    // without the document, the sign-in says so in plain words and opens no page.
+    for (const document of [true, false]) {
+      const redirect = await runCase(
+        document ? "redirect-refused" : "redirect-refused-no-document",
+        true,
+        "redirect",
+        document,
+      );
+      check(
+        redirect,
+        redirect.attempts[0]?.error?.startsWith("The sign-in server does not accept OpenBot as an app yet.") ?? false,
+        `the sign-in said: ${redirect.attempts[0]?.error}`,
+      );
+      check(redirect, redirect.pageClientIds.length === 0, `the pages named ${redirect.pageClientIds.join()}`);
+      check(redirect, redirect.storedClient === null, `the stored client is ${JSON.stringify(redirect.storedClient)}`);
+      check(redirect, !redirect.signedIn, "a token is stored after a refused registration");
+      report.cases.push(redirect);
+    }
+
+    // A document client that an earlier release saved for YNAB must not open the page again.
+    const stored = await runCase("redirect-refused-stored-document", true, "redirect", true, true);
+    check(
+      stored,
+      stored.attempts[0]?.error?.startsWith("The sign-in server does not accept OpenBot as an app yet.") ?? false,
+      `the sign-in said: ${stored.attempts[0]?.error}`,
+    );
+    check(stored, stored.pageClientIds.length === 0, `the pages named ${stored.pageClientIds.join()}`);
+    check(stored, stored.registrations > 0, "the sign-in did not register again");
+    check(stored, !stored.signedIn, "a token is stored after a refused registration");
+    report.cases.push(stored);
+
+    // Google: no registration endpoint and no document support (#8398). Only a sign-in app can be
+    // the client, so the sentence names it.
+    const noRegistration = await runCase("no-registration-no-document", false, false, false);
+    check(
+      noRegistration,
+      noRegistration.attempts[0]?.error === sourceText("error.backend.mcpRegistrationUnavailable"),
+      `the sign-in said: ${noRegistration.attempts[0]?.error}`,
+    );
+    check(
+      noRegistration,
+      noRegistration.registrations === 0,
+      `the sign-in registered ${noRegistration.registrations} times`,
+    );
+    check(noRegistration, !noRegistration.signedIn, "a token is stored with no client");
+    report.cases.push(noRegistration);
   } catch (error) {
     report.failures.push(error instanceof Error ? error.message : String(error));
   }

@@ -5,10 +5,27 @@ import {
   type ProviderAccountState,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
-import { Badge, buttonVariants, DropdownMenu, Ellipsis, Input, LogIn, Pencil, Trash2, X } from "@openbot/ui";
+import {
+  Badge,
+  buttonVariants,
+  DropdownMenu,
+  Ellipsis,
+  Input,
+  LogIn,
+  Pencil,
+  Smartphone,
+  Trash2,
+  X,
+} from "@openbot/ui";
 import { createSignal, For, Show } from "solid-js";
 import { useText } from "../text";
-import { type ProviderAccountActions, type ProviderPickerAccount, providerAccountName } from "./provider-accounts";
+import {
+  accountCodeSignInOffered,
+  isProviderKeyAccount,
+  type ProviderAccountActions,
+  type ProviderPickerAccount,
+  providerAccountName,
+} from "./provider-accounts";
 
 const ACCOUNT_STATE_TEXT = {
   connected: "provider.status.connected",
@@ -72,8 +89,14 @@ export function ProviderAccountList(props: ProviderAccountListProps) {
             // A state that a newer host added shows as a failure.
             const state = (): ProviderAccountState =>
               Object.hasOwn(ACCOUNT_STATE_TEXT, account().state) ? account().state : "error";
-            const signInOffered = () => !own() && (state() === "signed-out" || state() === "error");
-            const connecting = () => !own() && state() === "connecting";
+            // An account that is an API key has no sign-in: its key changes in the provider's settings page.
+            const signInOffered = () =>
+              !own() &&
+              !isProviderKeyAccount(props.provider, account().id) &&
+              (state() === "signed-out" || state() === "error");
+            // The check of a new key has no sign-in to cancel.
+            const connecting = () =>
+              !own() && !isProviderKeyAccount(props.provider, account().id) && state() === "connecting";
             return (
               <li class="provider-picker-account">
                 <span class="provider-picker-account-copy">
@@ -123,6 +146,16 @@ export function ProviderAccountList(props: ProviderAccountListProps) {
                         >
                           <LogIn aria-hidden="true" />
                           {t("provider.account.signInAgain")}
+                        </DropdownMenu.Item>
+                      </Show>
+                      <Show when={signInOffered() && accountCodeSignInOffered(props.provider, props.actions)}>
+                        <DropdownMenu.Item
+                          onSelect={() =>
+                            run(name(), async () => props.actions.connectWithCode?.(props.provider, account().id))
+                          }
+                        >
+                          <Smartphone aria-hidden="true" />
+                          {t("provider.action.signInWithCode")}
                         </DropdownMenu.Item>
                       </Show>
                       <Show when={connecting()}>

@@ -1,5 +1,6 @@
 import type { AppTextKey } from "@openbot/i18n";
 import { createEffect, createSignal, For, onCleanup, onSettled, untrack } from "solid-js";
+import { documentStillFaces } from "../../document-rendering";
 import { PlushLoader } from "../../plush-loader";
 import { useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
@@ -166,7 +167,9 @@ export interface AppLoadingScreenProps {
 
 export function AppLoadingScreen(props: AppLoadingScreenProps) {
   const { t } = useText();
-  const reducedMotion = prefersReducedMotion();
+  // When faces stay still (by default on the CPU, where each frame of the falling crew is a repaint
+  // of the window), the crew shows still.
+  const reducedMotion = prefersReducedMotion() || documentStillFaces();
   // A screen keeps its scene and its pile.
   const pileScene = untrack(() => props.scene !== "thinking");
   const seat = pileScene

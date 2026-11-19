@@ -30,10 +30,13 @@ export const messages = {
   "billing.status.paused": "一時停止中",
   "billing.otherServers": "その他のサーバー",
   "billing.action.menu": "{server} のプラン操作",
-  "billing.action.change": "プランを変更",
+  "billing.action.addStorage": "ストレージを追加",
   "billing.action.cancel": "プランを解約",
   "billing.action.renew": "プランを再開",
   "billing.action.updatePayment": "支払い方法を更新",
+  "billing.storage.title": "{server} の容量を増やす",
+  "billing.storage.add": "{size} を追加",
+  "billing.storage.failed": "ストレージを追加できませんでした。",
   "billing.lifecycle.cancelRenewal": "更新をキャンセル",
   "billing.lifecycle.cancelTitle": "{name} の更新をキャンセルしますか？",
   "billing.lifecycle.cancelDescription":
@@ -154,6 +157,7 @@ export const messages = {
   "billing.order.server.summary": "チームのために OpenBot を運用します。",
   "billing.order.server.none": "サーバーなし",
   "billing.order.server.noneDetail": "自分のコンピューターで OpenBot を実行",
+  "billing.order.server.thisComputer": "自分のコンピューター",
   "billing.order.server.bestValue": "おすすめ",
   "billing.order.server.bestFor.starter": "1 人での利用に最適",
   "billing.order.server.bestFor.standard": "小規模なチームに最適",
@@ -189,6 +193,7 @@ export const messages = {
   "billing.order.cta.server": "サーバーを作成",
   "billing.order.cta.license": "ライセンスを購入",
   "billing.order.cta.download": "ダウンロード",
+  "billing.order.cta.keepComputer": "このコンピューターで続ける",
   // Shown before an invite that makes the license too small.
   "billing.license.invite.title": "ライセンスにユーザーを追加しますか？",
   "billing.license.invite.description": "この招待でライセンスにユーザーが 1 人追加され、月額が {price} 増えます。",
@@ -200,4 +205,10 @@ export const messages = {
     other:
       "ライセンスのユーザー数は上限の {count} 人です。より大きなライセンスについてはお問い合わせください。新しい人はサーバーに参加できません。",
   },
+  "billing.details.country": "請求先の国",
+  "billing.details.countryPlaceholder": "国を選択",
+  "billing.details.vatId": "EU VAT ID（任意）",
+  "billing.details.vatIdInvalid": "選択した国の VAT ID ではありません。",
+  "billing.details.countryMissing": "請求先の国を選択してください。",
+  "billing.details.saveFailed": "請求先情報を保存できませんでした",
 } as const satisfies PartialTranslation<typeof source>;

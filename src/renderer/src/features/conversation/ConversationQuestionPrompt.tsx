@@ -1,6 +1,9 @@
+import { UI_BLOCK_PREVIEW_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/ui-block-preview-edit-v1";
 import type { QuestionPromptComposerAnswer } from "@openbot/ui/components/QuestionPromptBubble";
-import { createMemo, Loading, lazy, Show } from "solid-js";
+import { createMemo, Loading, Show } from "solid-js";
 import { deviceSendShortcut } from "../../send-shortcut-preference";
+import { serverSupportsCapability } from "../servers/server-capabilities";
+import { QuestionPromptBubble, UiBlockPrompt } from "./conversation-cards";
 import { useConversationViewScope } from "./conversation-scope";
 import type { ConversationProps, PromptAnswerOptions } from "./conversation-types";
 
@@ -64,6 +67,7 @@ export function ConversationQuestionPrompt(props: {
                   onOpenLink={(url) => void openExternalMessageUrl(url)}
                   elementRef={(element) => props.elementRef?.(element)}
                   onAnswer={answer}
+                  canEditPreview={serverSupportsCapability(view.server, UI_BLOCK_PREVIEW_EDIT_CAPABILITY)}
                   onAnswered={presentResolution}
                 />
               )}
@@ -74,8 +78,3 @@ export function ConversationQuestionPrompt(props: {
     </Show>
   );
 }
-
-const QuestionPromptBubble = lazy(() =>
-  import("@openbot/ui/components/QuestionPromptBubble").then((module) => ({ default: module.QuestionPromptBubble })),
-);
-const UiBlockPrompt = lazy(() => import("./UiBlockPrompt").then((module) => ({ default: module.UiBlockPrompt })));

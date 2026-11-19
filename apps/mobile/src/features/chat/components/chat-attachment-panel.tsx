@@ -5,8 +5,9 @@ import Camera from "lucide-react-native/icons/camera";
 import Images from "lucide-react-native/icons/images";
 import Paperclip from "lucide-react-native/icons/paperclip";
 import Sparkles from "lucide-react-native/icons/sparkles";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { BackHandler, Keyboard, Pressable, StyleSheet, useWindowDimensions, View, type ViewStyle } from "react-native";
+import { Pressable as GesturePressable } from "react-native-gesture-handler";
 import Animated, {
   cubicBezier,
   Extrapolation,
@@ -22,9 +23,11 @@ import { scheduleOnRN } from "react-native-worklets";
 import { useColumnWidth } from "@/shared/components/adaptive-split";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
+import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { END_X } from "@/shared/lib/text-direction";
 import { ChatCameraContent } from "./chat-camera-panel";
+import { type ComposerContextMeter, ComposerContextRing } from "./composer-context-ring";
 import type { ChatAttachmentAnchor, ChatAttachments } from "./use-chat-attachments";
 
 // iOS presents a SwiftUI `Menu` in a window of its own: it cannot be measured,
@@ -44,8 +47,19 @@ const ROW_PADDING = 16;
 const ROW_ICON = 21;
 const ROW_GAP = 14;
 const ROW_CHROME = ROW_PADDING * 2 + ROW_ICON + ROW_GAP;
-/** The list's height before it is measured: Files, Photos and Camera, and Use skill when the chat has skills. */
-const optionsHeight = (rows: number) => OPTION_ROW * rows + OPTIONS_PADDING * 2;
+// The line between the attachment rows and the Context row, with its room above and below.
+const DIVIDER_SPACE = 9;
+/**
+ * The list's height before it is measured: Files, Photos and Camera, Use skill when the chat has
+ * skills, and Context with its divider when the host reports the context.
+ */
+const optionsHeight = (rows: number, divided: boolean) =>
+  OPTION_ROW * rows + OPTIONS_PADDING * 2 + (divided ? DIVIDER_SPACE : 0);
+// The composer card's gap to the screen edges. The camera keeps the same edges, so it lines up
+// with the card under it.
+const BAR_INSET = 16;
+// Room between the top of the composer card and the card that opens above it.
+const MENU_GAP = 8;
 const SURFACE_RADIUS = 28;
 // One shape change, no overshoot: there is no finger on the card, and a card
 // that springs past its own size reads as a toy. `ReduceMotion.System` lets
@@ -53,6 +67,9 @@ const SURFACE_RADIUS = 28;
 const MORPH = { duration: 320, dampingRatio: 1, reduceMotion: ReduceMotion.System };
 // Room the camera leaves below the top safe area.
 const CAMERA_TOP_GAP = 12;
+// The smallest camera that is still usable. Above a tall composer with the keyboard up, the card
+// moves down over the composer to keep this height, as it did before it opened above the composer.
+const MIN_CAMERA_HEIGHT = 240;
 // The material's own fade. An opacity on the card is what broke the glass, so
 // the card leaves by dissolving its material instead, through the animated
 // style the library itself exposes.
@@ -63,22 +80,42 @@ const PRESS_EASING = cubicBezier(0.23, 1, 0.32, 1);
 // short rise, so a row is pressable from the first frame it is drawn.
 const ROW_STAGGER = 0.1;
 
+// On Android, the gesture handler Pressable, not the React Native one. That one measures the row
+// from the shadow tree when the press starts and cancels the press when the finger leaves that box.
+// With ANDROID_SYNCHRONOUSLY_UPDATE_UI_PROPS, the card's animated transforms reach the shadow tree
+// about a second after the card stops, or at the next render: the first tap measured the closed card
+// at the plus and did nothing. This one checks the touch in the row's own coordinates, which the
+// transforms above it do not change. iOS commits the transforms to the shadow tree on each frame.
+const RowPressable = isAndroid ? GesturePressable : Pressable;
+
 function AttachmentOption({
+  accessibilityLabel,
+  busy,
   disabled,
   foreground,
+  glyph,
   icon: Icon,
   index,
   label,
   onPress,
   progress,
+  value,
 }: {
+  /** For a row whose visible text does not say all of it, such as the Context row. */
+  accessibilityLabel?: string;
+  /** True while the row's value is being worked on, such as a compaction. */
+  busy?: boolean;
   disabled: boolean;
   foreground: ViewStyle["backgroundColor"];
-  icon: LucideIcon;
+  /** Drawn in place of `icon`. */
+  glyph?: ReactNode;
+  icon?: LucideIcon;
   index: number;
   label: string;
   onPress: () => void;
   progress: SharedValue<number>;
+  /** A short value at the row's end. */
+  value?: string;
 }) {
   const [pressed, setPressed] = useState(false);
   const reduceMotion = useReducedMotion();
@@ -99,10 +136,10 @@ function AttachmentOption({
           transitionTimingFunction: PRESS_EASING,
         }}
       >
-        <Pressable
+        <RowPressable
           accessibilityRole="button"
-          accessibilityLabel={label}
-          accessibilityState={{ disabled }}
+          accessibilityLabel={accessibilityLabel ?? label}
+          accessibilityState={{ disabled, busy }}
           disabled={disabled}
           pressRetentionOffset={12}
           style={{
@@ -120,9 +157,14 @@ function AttachmentOption({
           onPressOut={() => setPressed(false)}
           onPress={onPress}
         >
-          <Icon color={String(foreground)} size={ROW_ICON} strokeWidth={1.9} />
+          {glyph ?? (Icon ? <Icon color={String(foreground)} size={ROW_ICON} strokeWidth={1.9} /> : null)}
           <Typography.Paragraph className="min-w-0 shrink">{label}</Typography.Paragraph>
-        </Pressable>
+          {value ? (
+            <Typography.Paragraph className="ms-auto text-muted" style={{ fontVariant: ["tabular-nums"] }}>
+              {value}
+            </Typography.Paragraph>
+          ) : null}
+        </RowPressable>
       </Animated.View>
     </Animated.View>
   );
@@ -136,6 +178,7 @@ export function ChatAttachmentPanel({
   anchor,
   appActive,
   attachments,
+  context,
   fallbackBackground,
   foreground,
   keyboardHeight,
@@ -153,6 +196,8 @@ export function ChatAttachmentPanel({
   /** False while a system prompt or another app holds the foreground. */
   appActive: boolean;
   attachments: ChatAttachments;
+  /** How full the chat's context is, for a host that reports it. A row below the attachment rows opens its sheet. */
+  context?: ComposerContextMeter;
   fallbackBackground: ViewStyle["backgroundColor"];
   foreground: ViewStyle["backgroundColor"];
   /** The composer's own lift. The card rides it, so it stays on the plus. */
@@ -174,7 +219,7 @@ export function ChatAttachmentPanel({
   const safeWidth = useColumnWidth() - insets.left - insets.right;
   // The anchor and the card count from the start edge: the right in a right-to-left layout.
   const startInset = END_X === 1 ? insets.left : insets.right;
-  const { t } = useText();
+  const { t, format } = useText();
   const [mode, setMode] = useState<"options" | "camera">("options");
   const [closing, setClosing] = useState(false);
   const closingRef = useRef(false);
@@ -187,32 +232,50 @@ export function ChatAttachmentPanel({
   // A photo taken but not yet held. It waits for the card to be gone.
   const captured = useRef<string | null>(null);
   const morph = useSharedValue(0);
-  const cameraWidth = Math.min(440, safeWidth - 24);
+  const cameraWidth = Math.min(440, safeWidth - BAR_INSET * 2);
   // Read once, for this card's whole life: the keyboard is not dismissed for
   // the camera any more, and the glass behind the card must never be resized.
   // The card already rides the keyboard's lift, so the camera takes the room
   // that is left above it.
   const [keyboardInset] = useState(() => Math.max(0, (Keyboard.metrics()?.height ?? 0) - keyboardOffset));
-  const cameraHeight = Math.min(height * 0.58, height - insets.top - anchor.bottom - keyboardInset - CAMERA_TOP_GAP);
-  // The card keeps the plus's left edge while it is the options list, and
-  // centres itself once it is the camera.
+  const rowCount = 3 + (onUseSkill ? 1 : 0) + (context ? 1 : 0);
+  // The highest point the card can reach, from the screen's bottom edge, before the keyboard lift.
+  const roomTop = height - insets.top - keyboardInset - CAMERA_TOP_GAP;
+  // The card opens above the composer, not over it: the draft, the plus and Send stay in view.
+  // When a tall composer leaves too little room above it, the card moves down over the composer,
+  // but never below the plus, so the camera and the list stay below the top safe area.
+  const openBottom = Math.max(
+    anchor.bottom,
+    Math.min(
+      anchor.barTop + MENU_GAP,
+      roomTop - Math.max(MIN_CAMERA_HEIGHT, optionsHeight(rowCount, Boolean(context))),
+    ),
+  );
+  const rise = openBottom - anchor.bottom;
+  const cameraHeight = Math.min(height * 0.58, roomTop - openBottom);
+  // The options list takes the composer card's start edge. The camera takes the card's full width
+  // and centres between the side insets, so its sides line up with the open composer.
+  const optionsShift = anchor.barStart - anchor.left;
   const cameraShift = startInset + (safeWidth - cameraWidth) / 2 - anchor.left;
   const maxListWidth = Math.max(
     OPTIONS_MIN_WIDTH,
-    Math.min(cameraWidth, startInset + safeWidth - anchor.left - OPTIONS_EDGE_GAP),
+    Math.min(cameraWidth, startInset + safeWidth - anchor.barStart - OPTIONS_EDGE_GAP),
   );
+  const contextValue =
+    context && !context.compacting ? format.percent(context.share, { maximumFractionDigits: 0 }) : undefined;
   const labels = {
     useSkill: t("mobile.chat.attachment.useSkill"),
     files: t("mobile.chat.attachment.files"),
     photos: t("mobile.chat.attachment.photos"),
     camera: t("mobile.chat.attachment.camera"),
+    context: t("mobile.chat.context.title"),
   };
   // The list's width comes from its longest label, measured once off the card.
   // The list must have a width of its own: inside the card it would be laid
   // out against the card's animated width on every frame. The card starts to
   // grow once the list's height is known, so it grows in one motion.
   const [listWidth, setListWidth] = useState<number | null>(null);
-  const listHeight = useSharedValue(optionsHeight(onUseSkill ? 4 : 3));
+  const listHeight = useSharedValue(optionsHeight(rowCount, Boolean(context)));
   const openedRef = useRef(false);
 
   // Runs once the card has finished leaving, so the heavy part of holding a
@@ -264,11 +327,20 @@ export function ChatAttachmentPanel({
     const openWidth = interpolate(shape, [0, 1], [listWidth ?? OPTIONS_MIN_WIDTH, cameraWidth]);
     const openHeight = interpolate(shape, [0, 1], [listHeight.get(), cameraHeight]);
     return {
-      // The card is the plus until it is anything else, so it never appears
-      // from nothing and never has to travel to reach its own corner.
+      // The card grows from the plus's size, from its bottom corner above the plus. It stays above
+      // the composer for its whole life: a card that passed over the plus covered the turning
+      // plus and its close mark, and an opaque card made them flicker on Android.
       width: interpolate(presented, [0, 1], [anchor.size, openWidth]),
       height: interpolate(presented, [0, 1], [anchor.size, openHeight]),
-      transform: [{ translateX: END_X * interpolate(presented, [0, 1], [0, cameraShift * shape]) }],
+      // Without glass the card is opaque, so it fades in its first part and out in its last part,
+      // and does not leave a small square at the end of a close. Glass dissolves on its own, and an
+      // opacity here would take its material away.
+      opacity: liquidGlassAvailable ? 1 : interpolate(presented, [0, 0.35], [0, 1], Extrapolation.CLAMP),
+      // It moves to the composer card's start edge as it opens.
+      transform: [
+        { translateX: END_X * presented * (optionsShift + (cameraShift - optionsShift) * shape) },
+        { translateY: -rise },
+      ],
     };
   });
   // The composer is lifted by the keyboard and this overlay is not, so the
@@ -322,6 +394,13 @@ export function ChatAttachmentPanel({
             {(onUseSkill ? [labels.useSkill] : []).concat(labels.files, labels.photos, labels.camera).map((label) => (
               <Typography.Paragraph key={label}>{label}</Typography.Paragraph>
             ))}
+            {context ? (
+              <View style={{ flexDirection: "row", gap: ROW_GAP }}>
+                <Typography.Paragraph>{labels.context}</Typography.Paragraph>
+                {/* The widest value, so the width does not change with the reading. */}
+                <Typography.Paragraph>{format.percent(1, { maximumFractionDigits: 0 })}</Typography.Paragraph>
+              </View>
+            ) : null}
           </View>
         </View>
       ) : null}
@@ -384,7 +463,7 @@ export function ChatAttachmentPanel({
           >
             {onUseSkill ? (
               <AttachmentOption
-                index={3}
+                index={context ? 4 : 3}
                 icon={Sparkles}
                 label={labels.useSkill}
                 foreground={foreground}
@@ -394,7 +473,7 @@ export function ChatAttachmentPanel({
               />
             ) : null}
             <AttachmentOption
-              index={2}
+              index={context ? 3 : 2}
               icon={Paperclip}
               label={labels.files}
               foreground={foreground}
@@ -403,7 +482,7 @@ export function ChatAttachmentPanel({
               onPress={() => choose(attachments.chooseFiles)}
             />
             <AttachmentOption
-              index={1}
+              index={context ? 2 : 1}
               icon={Images}
               label={labels.photos}
               foreground={foreground}
@@ -412,7 +491,7 @@ export function ChatAttachmentPanel({
               onPress={() => choose(attachments.choosePhotos)}
             />
             <AttachmentOption
-              index={0}
+              index={context ? 1 : 0}
               icon={Camera}
               label={labels.camera}
               foreground={foreground}
@@ -420,6 +499,30 @@ export function ChatAttachmentPanel({
               disabled={attachments.preparing}
               onPress={() => void chooseCamera()}
             />
+            {context ? (
+              <>
+                <View
+                  className="bg-separator"
+                  style={{
+                    height: StyleSheet.hairlineWidth,
+                    marginVertical: (DIVIDER_SPACE - StyleSheet.hairlineWidth) / 2,
+                    marginHorizontal: ROW_PADDING,
+                  }}
+                />
+                <AttachmentOption
+                  index={0}
+                  glyph={<ComposerContextRing meter={context} />}
+                  label={labels.context}
+                  accessibilityLabel={context.label}
+                  busy={context.compacting}
+                  value={contextValue}
+                  foreground={foreground}
+                  progress={progress}
+                  disabled={false}
+                  onPress={() => choose(context.onPress)}
+                />
+              </>
+            ) : null}
           </Animated.View>
           <Animated.View
             pointerEvents={mode === "camera" && !closing && appActive ? "auto" : "none"}
