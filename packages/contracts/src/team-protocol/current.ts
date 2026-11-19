@@ -224,6 +224,7 @@ import {
   type TeamCapabilitiesV10,
 } from "./v10";
 import { VAULT_IMPORT_CAPABILITY } from "./vault-import-v1";
+import { VAULT_MEMBER_SAVE_CAPABILITY } from "./vault-member-save-v1";
 import { VAULT_CAPABILITY } from "./vault-v1";
 import { VAULT_V2_CAPABILITY } from "./vault-v2";
 import { VAULT_V3_CAPABILITY } from "./vault-v3";
@@ -450,6 +451,7 @@ export {
   USAGE_CREDITS_CAPABILITY,
   VAULT_CAPABILITY,
   VAULT_IMPORT_CAPABILITY,
+  VAULT_MEMBER_SAVE_CAPABILITY,
   VAULT_V2_CAPABILITY,
   VAULT_V3_CAPABILITY,
   VAULT_V4_CAPABILITY,
@@ -756,6 +758,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [SKILL_PROBLEMS_CAPABILITY, V10],
   [ROUTINE_RESULTS_WHATSAPP_CAPABILITY, V10],
   [QUEUE_HOLD_CAPABILITY, V10],
+  [VAULT_MEMBER_SAVE_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

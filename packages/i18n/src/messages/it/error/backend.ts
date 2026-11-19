@@ -373,7 +373,6 @@ export const messages = {
   "error.backend.takeoverInactive": "Questo intervento nel browser non è più attivo.",
   "error.backend.authSubmitting": "L'invio dell'autenticazione è già in corso.",
   "error.backend.apiKeySaveFailed": "OpenBot non è riuscito a salvare la chiave API. Riprova.",
-  "error.backend.apiKeyNotAllowed": "Solo il proprietario del server o un amministratore può inserire una chiave API.",
   "error.backend.apiKeySaving": "La chiave API è già in fase di salvataggio.",
   "error.backend.apiKeyAnswerUnreadable":
     "OpenBot non è riuscito a leggere la chiave API. Inserisci una chiave di massimo 8.000 caratteri e scegli chi può usarla.",
@@ -420,7 +419,7 @@ export const messages = {
   "error.backend.popupLoadFailed": "Impossibile caricare il popup. Riprova ad accedere dalla pagina originale.",
   "error.backend.browserTabNotFound": "Scheda del browser non trovata.",
   "error.backend.authActive": "L'autenticazione è già attiva.",
-  "error.backend.authHttpsRequired": "L'autenticazione sicura richiede HTTPS.",
+  "error.backend.authWebPageRequired": "L'autenticazione sicura richiede HTTP/HTTPS.",
   "error.backend.authDigitsRange": "I codici di autenticazione richiedono da 4 a 12 cifre.",
   "error.backend.authExpired": "La richiesta di autenticazione è scaduta.",
   "error.backend.authDigitsRequired": "Inserisci il numero di cifre richiesto.",

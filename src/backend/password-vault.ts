@@ -58,11 +58,18 @@ export function websiteUrl(value: string): URL | null {
   }
 }
 
+export function isWebProtocol(url: URL): boolean {
+  return url.protocol === "https:" || url.protocol === "http:";
+}
+
 export function websiteMatchesOrigin(website: VaultWebsite, origin: string): boolean {
   if (website.autofill === "never") return false;
   const page = websiteUrl(origin);
   const saved = websiteUrl(website.url);
-  if (!page || !saved || page.protocol !== "https:") return false;
+  if (!page || !saved || !isWebProtocol(saved)) return false;
+  if (page.protocol === "http:") return saved.protocol === "http:" && page.host === saved.host;
+  if (page.protocol !== "https:") return false;
+  if (saved.protocol === "http:") return page.hostname === saved.hostname;
   if (website.autofill === "exact") return page.host === saved.host;
   if (page.hostname === saved.hostname) return true;
   const domain = getDomain(page.hostname, { allowPrivateDomains: true });
