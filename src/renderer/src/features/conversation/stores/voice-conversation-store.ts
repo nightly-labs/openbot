@@ -163,6 +163,13 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   /** The turn ends when the user lets go of the talk button, not at a pause. */
   let pushToTalk = false;
   let talking = false;
+  /** When the user pressed the talk button: a shorter press than PUSH_TO_TALK_MIN_MS sends nothing. */
+  let talkingAt = 0;
+  /**
+   * The user let go while the turn before was transcribed or sent. The microphone stays on until the
+   * pane listens again, then the turn ends as at a release.
+   */
+  let releaseWhenListening = false;
   let livePreview = false;
   let streamed = false;
   /** A cloud model takes the dictation: ElevenLabs streams, Groq takes each whole turn. */
@@ -200,6 +207,13 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
 
   function setStep(next: VoiceConversationStep): void {
     step = next;
+    if (next === "listening" && releaseWhenListening) {
+      releaseWhenListening = false;
+      // After the caller has set up the turn for this step.
+      queueMicrotask(() => {
+        if (!talking && pushToTalk && !disposed) releaseTalk();
+      });
+    }
     setState((draft) => {
       draft.phase = next;
     });
@@ -465,7 +479,8 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       setInterval(() => {
         if (turn !== current || performance.now() - current.startedAt < (VOICE_AUDIO_LIMITS.maximumSeconds - 2) * 1_000)
           return;
-        if (current.spoke) endTurn(current);
+        // A held talk button is a turn, also when the meter heard no speech: the rest is the next turn.
+        if (current.spoke || (pushToTalk && talking)) endTurn(current);
         else restartRecording(current);
       }, 1_000),
     );
@@ -556,8 +571,10 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
             draft.levels = [...draft.levels.slice(1), value];
           });
         silentFor = loudness >= SPEECH_LOUDNESS ? 0 : silentFor + LEVEL_INTERVAL_MS;
+        // A held talk button keeps all of its recording: quiet words can have no loud part.
         if (
           !current.spoke &&
+          !(pushToTalk && talking) &&
           silentFor >= RESTART_QUIET_MS &&
           performance.now() - current.startedAt >= SILENT_RECORDING_MS
         )
@@ -833,6 +850,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     const push = mode === "push";
     if (push === pushToTalk) return;
     pushToTalk = push;
+    releaseWhenListening = false;
     setTalking(false);
     if (push !== muted) applyMute(push);
   }
@@ -840,15 +858,15 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   /**
    * Push to talk: the user presses, and the microphone opens. The reply waits, paused, as when the user
    * speaks over it with the open microphone: words or a short press stop it, and a cancel lets it go on.
+   * While a turn is transcribed or sent, there is no reply to hold yet: the turn listens while it waits,
+   * as with the open microphone.
    */
   function startTalking(): void {
     if (!pushToTalk || talking) return;
     setTalking(true);
-    // While a turn is sent, there is no reply to hold yet: the press stops the wait, as before.
-    if (step === "waiting") {
-      if (sending === 0) holdReply();
-      else interrupt();
-    }
+    talkingAt = performance.now();
+    releaseWhenListening = false;
+    if (step === "waiting" && sending === 0) holdReply();
     if (muted) applyMute(false);
   }
 
@@ -856,14 +874,25 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   function stopTalking(): void {
     if (!pushToTalk || !talking) return;
     setTalking(false);
-    if (muted) return;
+    if (muted) {
+      // The microphone did not open: nothing was said, so a reply that waits goes on.
+      if (held && step === "listening") void resumeReply();
+      return;
+    }
     const current = turn;
-    if (
-      current &&
-      step === "listening" &&
-      current.recorder.state === "recording" &&
-      performance.now() - current.startedAt >= PUSH_TO_TALK_MIN_MS
-    ) {
+    const long = performance.now() - talkingAt >= PUSH_TO_TALK_MIN_MS;
+    // The turn before is still transcribed or sent: this turn ends when the pane listens again.
+    if (long && current?.spoke && (step === "transcribing" || step === "waiting")) {
+      releaseWhenListening = true;
+      return;
+    }
+    releaseTalk(long);
+  }
+
+  /** Ends the turn of a release, or closes the microphone after a short press. */
+  function releaseTalk(long = true): void {
+    const current = turn;
+    if (long && current && step === "listening" && current.recorder.state === "recording") {
       // The ended recording is transcribed and sent after the microphone closes.
       endTurn(current);
       setMuted(true);
@@ -890,7 +919,9 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   function cancelTalking(): void {
     if (!pushToTalk || !talking) return;
     setTalking(false);
+    releaseWhenListening = false;
     if (!muted) applyMute(true);
+    else if (held && step === "listening") void resumeReply();
   }
 
   function applyMute(next: boolean): void {

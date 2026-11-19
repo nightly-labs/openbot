@@ -32,6 +32,21 @@ function writeVoiceTalkMode(mode: VoiceTalkMode): void {
 
 const [voiceTalkMode, setVoiceTalkModeSignal] = createSignal<VoiceTalkMode>(readVoiceTalkMode());
 
+/** A choice in another window of this app or browser reaches this page. */
+function readStorageIntoSignal(event: StorageEvent): void {
+  if (event.key !== null && event.key !== VOICE_TALK_MODE_STORAGE_KEY) return;
+  setVoiceTalkModeSignal(readVoiceTalkMode());
+}
+
+if (typeof window !== "undefined") {
+  // One registration per page: addEventListener ignores the same listener twice, and HMR
+  // disposal removes it when this module is replaced.
+  window.addEventListener("storage", readStorageIntoSignal);
+  import.meta.hot?.dispose(() => {
+    window.removeEventListener("storage", readStorageIntoSignal);
+  });
+}
+
 /** The shared reactive preference: the pill of each chat follows it. */
 export function useVoiceTalkMode(): () => VoiceTalkMode {
   return voiceTalkMode;

@@ -507,18 +507,13 @@ function TalkPad(props: {
       }}
     >
       <span class="voice-pill-talk-face" ref={props.faceRef}>
-        <Show
-          when={props.levels}
-          fallback={
-            <>
-              <Mic aria-hidden="true" />
-              <span class="voice-pill-talk-hint">{t("conversation.voice.holdToTalk")}</span>
-              <TalkKeyCaps binding={props.talkKey} class="voice-pill-talk-key" />
-            </>
-          }
-        >
-          {(levels) => <VoiceWaveform levels={levels()} class="voice-pill-waveform" />}
-        </Show>
+        {/* The hint stays under the waveform, so the pad keeps its width at each press (voice.css). */}
+        <span class="voice-pill-talk-row">
+          <Mic aria-hidden="true" />
+          <span class="voice-pill-talk-hint">{t("conversation.voice.holdToTalk")}</span>
+          <TalkKeyCaps binding={props.talkKey} class="voice-pill-talk-key" />
+        </span>
+        <Show when={props.levels}>{(levels) => <VoiceWaveform levels={levels()} class="voice-pill-waveform" />}</Show>
       </span>
     </Button>
   );

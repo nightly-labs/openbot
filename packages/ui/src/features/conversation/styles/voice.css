@@ -335,16 +335,31 @@
 }
 
 .voice-pill-talk-face {
-  display: flex;
+  display: grid;
   min-width: 196px;
   flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  gap: var(--openbot-space-2);
+  place-items: center;
   padding-inline: var(--openbot-space-3);
   opacity: clamp(0, (var(--voice-pill-push, 0) - 0.4) * 2, 1);
   filter: blur(calc((1 - var(--voice-pill-push-share)) * 4px));
   scale: calc(0.92 + var(--voice-pill-push-share) * 0.08);
+}
+
+/* The hint and the waveform share one cell: the wider one sets the width of the pad. */
+.voice-pill-talk-face > * {
+  grid-area: 1 / 1;
+}
+
+.voice-pill-talk-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: var(--openbot-space-2);
+}
+
+.voice-pill-talk-face:has(> .voice-pill-waveform) > .voice-pill-talk-row {
+  visibility: hidden;
 }
 
 .voice-pill-talk svg {
