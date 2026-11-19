@@ -1,10 +1,3 @@
-// Runs the real `grok` provider driver and the real Grok binary with one http MCP server that asks
-// for a sign-in: it answers 401 with an OAuth challenge. Grok reports the failed start twice, as an
-// `x.ai/mcp/server_status` handshake failure and as an `rmcp` line on stderr. The user got two toasts:
-// one with the raw `rmcp` transport text, one that told them to sign in. Both reports must now carry
-// the same sign-in sentence, so the renderer shows one toast, and no report carries the `rmcp` text.
-// Grok runs with a temporary `GROK_HOME` and a fake key, so no account, quota or user setting is used.
-// `bun run test:grok-mcp-sign-in`. Writes .openbot-build/grok-mcp-sign-in-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -23,14 +16,12 @@ import { startThread, stopClients } from "./provider-fakes/host";
 const OUT = resolve(import.meta.dirname, "../.openbot-build/grok-mcp-sign-in-e2e");
 const NL = String.fromCharCode(10);
 const NAME = "metricool";
-/** Grok gives a server 30 s to start, and a 401 ends the start at once. */
 const STATUS_TIMEOUT_MS = 60_000;
 
 interface Report {
   passed: boolean;
   grokVersion?: string;
   drops: McpServerDrop[];
-  /** The MCP lines that the client sent as diagnostics. */
   diagnostics: string[];
   mcpRequests: number;
   error?: string;
@@ -41,10 +32,6 @@ const root = await realpath(await mkdtemp(join(tmpdir(), "openbot-grok-mcp-sign-
 const clients: AgentClient[] = [];
 const saved = { ...process.env };
 
-/**
- * Answers `/mcp` as an MCP server that needs an OAuth sign-in, as Metricool does. Other paths stand
- * for the xAI endpoint, which no turn reaches.
- */
 const mcp = createServer((request: IncomingMessage, response: ServerResponse) => {
   request.resume();
   if (!request.url?.startsWith("/mcp")) {
@@ -68,7 +55,6 @@ try {
   if (!address || typeof address === "string") throw new Error("The MCP server has no port.");
   const workspace = join(root, "workspace");
   await mkdir(workspace, { recursive: true });
-  // Grok must not read the developer's own sign-in, MCP servers, skills and memory.
   Object.assign(process.env, {
     HOME: root,
     GROK_HOME: join(root, ".grok"),
@@ -107,7 +93,6 @@ try {
     mcpServers: () => [server],
     reportMcpDrops: (_provider, drops) => {
       report.drops.push(...drops);
-      // Each spawn reports its hand-off, also when nothing was dropped.
       if (drops.length > 0) dropped();
     },
   });
@@ -140,8 +125,6 @@ try {
     report.drops.every((drop) => !/rmcp|Transport/u.test(drop.detail)),
     "No report carries the rmcp text.",
   );
-  // The provider runtime reads these stderr lines and shows the sentence of their kind. The same
-  // kind gives the same text as the drop, so the renderer shows one toast.
   assert.deepEqual(
     [...new Set(report.diagnostics.map(mcpProviderFailureKind))],
     ["sign_in"],

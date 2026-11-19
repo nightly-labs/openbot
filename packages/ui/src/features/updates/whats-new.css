@@ -1,7 +1,3 @@
-/* The "What's new" dialog after an app update. One centred card: the logo and version on top, the
- * notes in a scroll area, and the actions in a footer. The groups use the colours of the
- * changelog page on openbot.run, so a reader sees the same notes in the same way. */
-
 .whats-new-dialog {
   position: relative;
   display: flex;
@@ -171,7 +167,6 @@
   list-style: none;
 }
 
-/* A hanging mark in the group's colour, so a long item wraps under its own text. */
 .whats-new-item {
   position: relative;
   padding-inline-start: var(--openbot-space-6);
@@ -257,7 +252,6 @@
   }
 }
 
-/* The Help menu of the window rail. A long release headline ends in an ellipsis before its date. */
 .help-menu {
   width: 320px;
 }

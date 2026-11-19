@@ -1,6 +1,5 @@
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 
-/** A D1 binding over node:sqlite, with the calls that the service makes. */
 export function sqliteD1(database: DatabaseSync): D1Database {
   const changes = () => Number(database.prepare("SELECT total_changes() AS changes").get()?.changes);
   const result = <T>(results: T[], changed: number): D1Result<T> => ({
@@ -21,7 +20,6 @@ export function sqliteD1(database: DatabaseSync): D1Database {
     const rows = JSON.parse(JSON.stringify(database.prepare(query).all(...values)));
     return result<T>(rows, changes() - before);
   };
-  /** The query of each statement, so that a batch runs with no wait, as one unit, as in D1. */
   const queries = new WeakMap<D1PreparedStatement, { query: string; values: SQLInputValue[] }>();
   const statement = (query: string, values: SQLInputValue[] = []): D1PreparedStatement => {
     const prepared: D1PreparedStatement = {

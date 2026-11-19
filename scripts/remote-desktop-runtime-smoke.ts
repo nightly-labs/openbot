@@ -10,7 +10,6 @@ import { SunshineMoonlightRuntime } from "../src/main/sunshine-moonlight-runtime
 
 const logger = createOpenBotLogger("remote-desktop-runtime-smoke");
 
-// Linux runs under a virtual X11 display, such as `xvfb-run`.
 if (process.platform !== "darwin" && process.platform !== "linux") {
   throw new Error("The local runtime smoke test supports macOS and Linux only.");
 }
@@ -34,7 +33,6 @@ const runtime = new SunshineMoonlightRuntime({
     username: process.env.OPENBOT_SMOKE_USERNAME ?? `openbot-${randomBytes(8).toString("hex")}`,
     password: process.env.OPENBOT_SMOKE_PASSWORD ?? randomBytes(24).toString("base64url"),
   },
-  // The runtime shows only the Sunshine displays that match a local display, as Electron lists them.
   getDisplays: () => [{ id: "1", label: "Primary display", width: 1920, height: 1080, primary: true }],
   getIceServers: () => Effect.succeed([{ urls: "stun:127.0.0.1:3478" }]),
   onDiagnostic: (source, message) => process.stderr.write(`[${source}] ${message}`),
@@ -49,7 +47,6 @@ try {
   if (state.displays.length === 0 || !state.selectedDisplayId) {
     throw new Error("Sunshine did not return a native display identifier.");
   }
-  // macOS 27 stops Sunshine when its tray changes AppKit from the pairing thread (#3805).
   if (
     process.platform === "darwin" &&
     (await readFile(join(stateDirectory, "sunshine.log"), "utf8")).includes("Starting system tray")

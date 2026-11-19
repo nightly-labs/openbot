@@ -1,7 +1,6 @@
 import { Link } from "@tanstack/solid-router";
 import { EXTERNAL_LINK_REL, OPENBOT_LINKS } from "../../lib/landing-links";
 
-/** Where a reader goes after the installer: what changed, every file, and what to do when it fails. */
 export function DownloadResources() {
   return (
     <p class="download-resources">

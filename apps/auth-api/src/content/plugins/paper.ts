@@ -1,8 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Paper here is taken from paper.design. Each page used is in
-// `sources`. Check the sources again, and move `checkedAt`, whenever this file changes.
-
 export const PAPER_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

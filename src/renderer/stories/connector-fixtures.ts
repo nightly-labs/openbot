@@ -23,7 +23,6 @@ const workspace = {
   onAddOrchestrator: fn(),
 };
 
-/** GitHub is connected; Slack, Discord, Telegram, WhatsApp, 1Password, Bitwarden and Proton Pass are not set up. */
 export const STORY_CONNECTOR_DETAILS: readonly ConnectorDetail[] = [
   { id: "slack", props: { ...workspace, platform: "slack" } },
   { id: "discord", props: { ...workspace, platform: "discord" } },
@@ -154,10 +153,6 @@ function channel(update: Partial<MessagingConnection> & Pick<MessagingConnection
   };
 }
 
-/**
- * Every connector is set up: a Slack workspace, a Discord server, two Telegram chats, a WhatsApp
- * number, the three password managers.
- */
 export const CONNECTED_CONNECTOR_DETAILS: readonly ConnectorDetail[] = STORY_CONNECTOR_DETAILS.map((detail) => {
   switch (detail.id) {
     case "slack":
@@ -234,7 +229,6 @@ export const CONNECTED_CONNECTOR_DETAILS: readonly ConnectorDetail[] = STORY_CON
   }
 });
 
-/** A controller over fixed props. Its actions only record the call. */
 function storyConnector(detail: ConnectorDetail): ConnectorController {
   return {
     id: detail.id,

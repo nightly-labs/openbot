@@ -4,18 +4,9 @@ import { Effect, Result, Semaphore } from "effect";
 import { isMissingFileError } from "../backend/file-errors";
 import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } from "./preference-file";
 
-/**
- * The dictation model and language. Transcription reads it about once per second while the user
- * speaks, so it is held in memory after `load`.
- *
- * A file that is missing, unreadable as JSON or names an unknown model or language reads as
- * `defaults`, which the app makes from the user's language. They are not saved, so a later change of
- * that language changes them.
- */
 export class VoicePreferenceStore {
   readonly #path: string;
   readonly #defaults: () => VoiceSettings;
-  /** The user's choice, or null before they make one. */
   #settings: VoiceSettings | null = null;
   #writes = Semaphore.makeUnsafe(1);
 

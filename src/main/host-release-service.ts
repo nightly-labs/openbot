@@ -13,7 +13,6 @@ const ReleaseManifest = Schema.Struct({
 
 type ReleaseTarget = { feed: string; asset: (version: string) => string };
 
-/** Only published desktop targets have a compatible release feed. */
 function releaseTarget(platform: NodeJS.Platform, arch: string): ReleaseTarget | null {
   if (arch !== "x64" && arch !== "arm64") return null;
   if (platform === "linux")
@@ -45,7 +44,6 @@ interface HostReleaseOptions {
   fetch?: typeof fetch;
 }
 
-/** Reads only the install marker. No command or application file is executed. */
 export const readInstallationMode = Effect.fn("HostRelease.readInstallationMode")(function* () {
   return yield* Effect.tryPromise({
     try: (signal) => readFile("/opt/OpenBot/hosted/mode", { encoding: "utf8", signal }),
@@ -56,7 +54,6 @@ export const readInstallationMode = Effect.fn("HostRelease.readInstallationMode"
   );
 });
 
-/** Read-only release discovery. Installation stays with the existing updater or administrator. */
 export class HostReleaseService {
   readonly #options: HostReleaseOptions;
   readonly #target: ReleaseTarget | null;
@@ -83,8 +80,6 @@ export class HostReleaseService {
     if (!this.#options.packaged) return "unavailable";
     if (this.#options.updateStatus().managedByHost) return "host-manager";
     if (this.#options.platform === "linux") {
-      // A hosted or self-installed server, or a container of openbot-instance, whose host installs
-      // updates on request.
       if (this.#options.updateStatus().phase !== "unsupported") return "self-update";
       if (this.#options.installationMode === "container") return "container";
       if (this.#options.environment.OPENBOT_HOSTED_SERVER === "1") return "hosted";
@@ -126,7 +121,6 @@ export class HostReleaseService {
   }).bind(this);
 }
 
-/** The version of the latest published release for `target`. Rejects on any fault of the feed. */
 async function fetchLatestRelease(target: ReleaseTarget, request: typeof fetch, signal: AbortSignal): Promise<string> {
   const response = await request(`https://github.com/nightly-labs/openbot/releases/latest/download/${target.feed}`, {
     signal: AbortSignal.any([signal, AbortSignal.timeout(15_000)]),
@@ -156,7 +150,6 @@ async function fetchLatestRelease(target: ReleaseTarget, request: typeof fetch, 
   return manifest.version;
 }
 
-/** The latest Linux release for `arch`, for the hosted installer. */
 export function fetchLatestLinuxRelease(arch: string, request: typeof fetch, signal: AbortSignal): Promise<string> {
   const target = releaseTarget("linux", arch);
   if (!target) return Promise.reject(new Error("No release for this machine"));

@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/provider";
 
 export const messages = {
-  // Provider, provider runtime and custom endpoint errors.
   "error.provider.mcpConfig":
     "OpenBot 无法在 Codex 配置中注册 MCP 服务器。请确认 Codex 的 config.toml 有效且可写，然后重启 OpenBot。",
   "error.provider.computerUseConfig":
@@ -79,6 +78,7 @@ export const messages = {
   "error.provider.runtimeUpdateIncomplete": "运行时更新未完成。",
   "error.provider.downloadHttp": "运行时下载失败，HTTP {status}。",
   "error.provider.downloadNoData": "运行时下载未返回任何数据。",
+  "error.provider.downloadStalled": "由于一分钟内没有收到数据，下载已停止。请检查网络连接，然后重试。",
   "error.provider.downloadSize": "运行时下载的大小异常。",
   "error.provider.downloadIntegrity": "运行时下载未通过完整性校验。",
   "error.provider.runtimeReplacing": "另一个实例正在替换该运行时，无法安装。",
@@ -155,6 +155,8 @@ export const messages = {
   "error.provider.cliTimedOut": "{provider} 未及时响应，电脑可能正忙。OpenBot 将重试。",
   "error.provider.cliTimedOutRefresh": "{provider} 未及时响应，电脑可能正忙。请刷新服务商以重试。",
   "error.provider.stoppedBeforeStart": "{provider} 在此消息开始前停止了。请重新发送此消息。",
+  "error.provider.sessionStartTimedOut":
+    "{provider} 未能及时打开新对话，因此此消息没有开始。请在运行 OpenBot 的电脑上打开服务商，选择 {provider}，点击重启，然后重试。",
   "error.provider.serviceUnreachable": "{provider} 无法连接到其服务。请检查网络连接。OpenBot 将重试。",
   "error.provider.serviceUnreachableRefresh": "{provider} 无法连接到其服务。请检查网络连接，然后刷新服务商。",
   "error.provider.acpStartTimedOut": "{provider} 未在 {seconds} 秒内完成启动，电脑可能正忙。",
@@ -205,6 +207,8 @@ export const messages = {
     "你的 OpenCode API 密钥已过期。请在 OpenCode Console 中创建新密钥，粘贴到 OpenCode 设置中，然后重试。",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go 拒绝了你保存的 API 密钥。密钥可能已过期。请在 OpenCode Console 中创建新密钥，粘贴到 OpenCode 设置中，然后重试。",
+  "error.provider.opencodeGoRequestRefused":
+    "OpenCode Go 拒绝了该请求。新的 API 密钥无法解决此问题。你的 OpenCode Go 套餐可能未激活，或者 OpenCode Go 可能屏蔽了你的网络：某些服务会屏蔽 VPN、代理或某些国家/地区。请在 OpenCode Console 中确认套餐已激活，或关闭 VPN，然后重试。你也可以选择其他模型。",
   "error.provider.opencodeServiceFailure":
     "由于本地服务故障，OpenCode 无法完成本轮对话。请重试；若错误持续，请在设置中重新连接 OpenCode。",
   "error.provider.opencodeRateLimited":
@@ -336,11 +340,14 @@ export const messages = {
     "Claude 服务拦截了这个请求。这通常是 Claude 方面的短暂问题，不是你的账号问题。请过几分钟再发送一次消息。",
   "error.provider.foreignReasoning":
     "此前的推理内容由另一个账号或 API 密钥接收，因此 {provider} 未接受它。OpenBot 已带着聊天记录开启新的 {provider} 会话，请重试。",
+  "error.provider.blankHistoryText":
+    "已保存的历史记录中有一条空消息，因此模型未接受此聊天。OpenBot 已带着聊天记录开启新的 {provider} 会话，请重试。",
   "error.provider.codexHistoryItemMissing":
     "Codex 保存的历史记录中缺少一项内容，因此无法继续此聊天。OpenBot 已带着聊天记录开启新的 Codex 会话，请重试。",
   "error.provider.codexRequestRefused":
     "{provider} 拒绝了此聊天的请求，但没有给出原因。在包含大量图片的长聊天中可能出现这种情况。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
-  "error.provider.codexAudioRefused": "模型未接受此聊天中的音频。OpenBot 已使用聊天记录开始新的 Codex 会话。请重试。",
+  "error.provider.codexAudioRefused":
+    "此模型无法收听音频，因此未接受此聊天中的声音。OpenBot 已使用聊天记录开始新的 Codex 会话。要继续，请重新发送你的请求，并让智能体在不使用声音的情况下工作。要检查声音，请在智能体的模型菜单中选择一个可以收听音频的模型。",
   "error.provider.imageTooSmall":
     "图片太小，模型未接受此聊天中的一张图片。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
   "error.provider.imageTooLarge":

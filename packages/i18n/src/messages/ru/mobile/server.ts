@@ -1627,7 +1627,6 @@ export const messages = {
   "mobile.server.audit.roleMemberAdded": "Участник {member} добавлен в роль {role}",
   "mobile.server.audit.roleMemberRemoved": "Участник {member} удалён из роли {role}",
   "mobile.server.audit.agentLevel": "{agent} для {role}: {change}",
-  // Server settings › Import agents: Grok Bot and Hermes exports (`agent-import-v1`).
   "mobile.server.settings.importAgents": "Импорт агентов",
   "mobile.server.route.import": "Импорт агентов",
   "mobile.server.import.unsupported": "Обновите OpenBot на этом сервере, чтобы импортировать агентов отсюда.",
@@ -1730,7 +1729,6 @@ export const messages = {
   "mobile.server.import.channel": "Канал",
   "mobile.server.import.notImportedTitle": "Не импортировано",
   "mobile.server.import.resultWarnings": "Часть элементов не перенесена",
-  // Server settings › Transfer: the whole server to or from a transfer file (`instance-transfer-v1`).
   "mobile.server.settings.transfer": "Перенос",
   "mobile.server.route.transfer": "Перенос",
   "mobile.server.route.transferExport": "Экспорт",
@@ -1822,6 +1820,10 @@ export const messages = {
     many: "Копировать {count} агентов",
     other: "Копировать {count} агента",
   },
+  "mobile.server.transfer.copyDuplicatesTitle": "Скопировать дубликаты агентов?",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "На {server} уже есть агенты с такими именами: {names}. Копирование добавит второго агента для каждого. Каждая копия — отдельный агент со своими чатами, файлами и записями памяти.",
+  "mobile.server.transfer.copyDuplicatesConfirm": "Копировать дубликаты",
   "mobile.server.transfer.copying": "Копирование…",
   "mobile.server.transfer.copyFailed": "Копирование не завершено.",
   "mobile.server.transfer.copied": {

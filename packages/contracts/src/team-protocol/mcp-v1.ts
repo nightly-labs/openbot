@@ -1,12 +1,3 @@
-// Frozen optional mcp-servers-v1 wire contract. Keep IPC types and limits out of this file: every
-// bound is written as a literal, so a change to `INPUT_LIMITS` cannot move a shipped wire contract.
-//
-// What this contract grants was a deliberate product decision and is recorded here because freezing
-// it makes it permanent: an admin session on a joined server can save an enabled stdio
-// configuration, which makes the host machine spawn that process, and every response carries the
-// full `env` and header values the host holds. `test` goes further still - it spawns the process the
-// caller just described, without saving it. `requireAdmin` on all five routes is the only gate.
-// Narrowing that later needs a second capability string, never an edit to this one.
 import { isDynamicRecord, isString } from "../runtime-values";
 import type { TeamProtocolV2Json } from "./webrtc-framing";
 
@@ -21,8 +12,6 @@ export const MCP_ROUTES = {
 type Decoder = (value: unknown) => TeamProtocolV2Json;
 type Fields = Record<string, Decoder>;
 
-// The typed primitives come first and the combinators wrap them, so each route decoder is built
-// from values that are already the type it promises.
 function text(value: unknown, maximum: number): string {
   if (!isString(value) || value.length > maximum) throw new Error("Invalid MCP text.");
   return value;
@@ -68,8 +57,6 @@ function record(value: unknown, fields: Fields): Record<string, TeamProtocolV2Js
 }
 
 const pair: Decoder = (value) => record(value, { key: string(255), value: string(8_192) });
-// An id that is empty means "not saved yet", which `identifier` rejects, so the draft id is its own
-// bound: the create form and the edit form send the same shape.
 const draftIdentifier: Decoder = (value) => {
   if (!isString(value) || value.length > 128) throw new Error("Invalid MCP identifier.");
   return value;
@@ -88,10 +75,8 @@ const configFields: Fields = {
   headers: list(pair, 32),
 };
 const config: Decoder = (value) => record(value, configFields);
-/** One configuration as this contract bounds it. `mcp-many-servers-v1` reads a longer list of them. */
 export const mcpServerConfigWire: Decoder = config;
 const configs: Decoder = list(config, 32);
-// A test is a question, not a record: it answers what one connection found and nothing is stored.
 const testResult: Decoder = (value) => record(value, { toolCount: count, error: nullable(string(2_000)) });
 
 const MCP_ROUTE_PATHS: ReadonlySet<string> = new Set(Object.values(MCP_ROUTES));
@@ -114,7 +99,6 @@ export function mcpResponse(path: string, status: number, value: unknown): TeamP
   if (status >= 400) return record(value, { error: string(100_000) });
   const pathname = new URL(path, "http://openbot.invalid").pathname;
   if (pathname === MCP_ROUTES.test) return testResult(value);
-  // Every other route answers with the whole list, so the panel never merges a partial result.
   if (MCP_ROUTE_PATHS.has(pathname)) return configs(value);
   throw new Error("Unknown MCP route.");
 }

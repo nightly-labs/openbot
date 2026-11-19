@@ -5,7 +5,6 @@ import { BrowserShortcutHint } from "./BrowserTabIcon";
 import { type BrowserFullViewProps, browserTabStoppable } from "./browser-full-view-types";
 import { useBrowserPageCover } from "./browser-page-cover";
 
-/** The actions of the view in one menu: a new tab, reopen, Picture in Picture, a sign-in on this computer, hide. */
 export function BrowserPageMenu(props: { view: BrowserFullViewProps; narrow: boolean; onNewTab: () => void }) {
   const { t } = useText();
   const tab = () => props.view.activeTab;

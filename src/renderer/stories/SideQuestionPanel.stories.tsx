@@ -26,7 +26,6 @@ const meta = {
     onClosePanel: fn(),
     onOpenLink: fn(),
   },
-  // The draft is local here; in the app the side question store holds it.
   render: (args) => {
     const [draft, setDraft] = createSignal(args.draft);
     return (

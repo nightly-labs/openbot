@@ -53,7 +53,6 @@ import { useQuestionPrompt } from "./use-question-prompt";
 
 const NO_MESSAGE_IDS: ReadonlySet<string> = new Set();
 
-/** `focusMessageId` opens the chat at a message from search instead of at the latest message. */
 export function MobileChatView({
   agent,
   focusMessageId,
@@ -65,8 +64,6 @@ export function MobileChatView({
 }) {
   const { t } = useText();
   const workspace = useMobileWorkspaceReader();
-  // The chat does not show the latest message of each agent, so a new message keeps the same list and
-  // the messages do not render again.
   const agents = useMobileWorkspaceSelector((current) => current.agents, sameAgentsApartFromMessage);
   const conversationStore = useMobileWorkspaceSelector((current) => current.conversationStore);
   const server = useMobileWorkspaceSelector((current) => current.servers.find((item) => item.id === agent.serverId));
@@ -86,9 +83,6 @@ export function MobileChatView({
     (agentId: string, input: RespondToPromptInput) => workspace().respondToPrompt(agentId, input),
     [workspace],
   );
-  // Under a full screen, such as a subagent, a streamed reply does not render the hidden chat on
-  // each chunk. The store keeps the chat current. The chat keeps the conversation that it showed,
-  // also when another change renders it, and takes the latest one when it shows again.
   const covered = useCoveredByScreen();
   const shownConversation = useRef<ReturnType<typeof conversationStore.get>>(undefined);
   const subscribe = useCallback(
@@ -137,7 +131,6 @@ export function MobileChatView({
   const tasks = useOpenAgentTasks(agent.serverId, agent.id);
   const threadMenu = useChatThreadMenu(agent, MAIN_THREAD_ID);
   const contextMeter = useComposerContextMeter({ serverId: agent.serverId, agentId: agent.id });
-  // The pins of the agent's own chat, on a host with `message-pins-v1`.
   const pins = useMessagePins(agent.serverId, agent.id);
   const pinnedMessageIds = useMemo(
     () => new Set(pins.pins.filter((pin) => pin.taskId === null).map((pin) => pin.messageId)),
@@ -150,8 +143,6 @@ export function MobileChatView({
   );
   const liveActivity = openTurnActivity(useAgentActivity(agent.id), conversation);
   const threadId = conversation?.threadId ?? null;
-  // A turn on another thread, such as channel work, is not this chat's work, as on desktop. A host
-  // with channel-attention-v1 names the channel of the thread, and a row below opens it.
   const otherThread = Boolean(liveActivity?.threadId && threadId && liveActivity.threadId !== threadId);
   const channels = useChannelList(agent.serverId);
   const workChannel = otherThread
@@ -159,14 +150,12 @@ export function MobileChatView({
         (channel) => !channel.archived && channel.threads?.some((thread) => thread.threadId === liveActivity?.threadId),
       )
     : undefined;
-  // A thread's turn is the thread's work, not this chat's: the thread menu shows it.
   const activity =
     otherThread || (liveActivity?.turnId && tasks.some((task) => task.activeTurnId === liveActivity.turnId))
       ? undefined
       : liveActivity;
   const serverApprovals = useApprovalRequests(agent.serverId);
   const threadWaits = useThreadWaits(agent.serverId);
-  // As on the desktop, only this chat's thread. A channel task of the same agent asks in the channel.
   const approvals = useMemo(
     () =>
       serverApprovals.filter(
@@ -174,9 +163,7 @@ export function MobileChatView({
       ),
     [serverApprovals, agent.id, threadId],
   );
-  // The history and the queue load again when the connection is back, so they read the live state.
   const online = server?.state === "online";
-  // As on desktop, an agent that cannot steer offers Send now: the message goes first and the turn stops.
   const { steers } = useAgentSteers(agent);
   const queue = useChatQueue(
     agent.id,
@@ -189,8 +176,6 @@ export function MobileChatView({
   const messages = useMemo(() => withFailureReasons(projected, queue.deliveries), [projected, queue.deliveries]);
   const [historyLoadFailed, setHistoryLoadFailed] = useState(false);
   const [catchingUp, setCatchingUp] = useState(false);
-  // The message from search, until the chat shows it. `loaded` is set when its page is in the store.
-  // Without one, a chat with unread messages opens at its NEW line (`unread`), as on desktop.
   const [focus, setFocus] = useState<{ messageId: string; loaded: boolean; unread: boolean } | null>(() =>
     focusMessageId
       ? { messageId: focusMessageId, loaded: false, unread: false }
@@ -200,7 +185,6 @@ export function MobileChatView({
   );
   const focusRef = useRef(focus);
   focusRef.current = focus;
-  // True after the chat showed its opening place. A later unread state does not move the chat.
   const focusEnded = useRef(false);
   const clearFocus = useCallback(() => {
     focusEnded.current = true;
@@ -216,13 +200,10 @@ export function MobileChatView({
     const stored = () =>
       Boolean(messageId && conversationStore.get(agent.id)?.messages.some((message) => message.id === messageId));
     const readLatest = async () => {
-      // Events keep a loaded chat up to date while the connection stays, so it opens without a read.
       if (conversationStore.isUpToDate(agent.id)) return;
-      // The chat shows the messages that the phone kept while the latest page loads.
       const kept = Boolean(conversationStore.get(agent.id));
       if (kept) setCatchingUp(true);
       try {
-        // A latest page that meets the window around the message joins the two.
         await loadConversation(agent.id, agent.serverId);
       } finally {
         if (kept && request.current === id) setCatchingUp(false);
@@ -230,11 +211,8 @@ export function MobileChatView({
     };
     const load = async () => {
       if (pending?.unread) {
-        // The latest page first: it usually holds the first unread message, and a window around a
-        // message adds only older messages to the messages that the phone kept.
         await readLatest();
         if (!stored() && !(await loadConversationAround(agent.id, pending.messageId, agent.serverId))) {
-          // The host no longer has the message. The chat opens at the latest message.
           if (request.current === id) setFocus(null);
           return;
         }
@@ -244,13 +222,11 @@ export function MobileChatView({
       }
       if (messageId && !stored()) {
         if (!(await loadConversationAround(agent.id, messageId, agent.serverId))) {
-          // The host no longer has the message. The chat opens at the latest message.
           if (request.current === id) setFocus(null);
           await loadLatestMessages(agent.id, agent.serverId);
           return;
         }
       }
-      // The list can show the message, and clear the focus, before the request ends.
       if (messageId && request.current === id)
         setFocus((current) => (current?.messageId === messageId ? { ...current, loaded: true } : current));
       await readLatest();
@@ -258,7 +234,6 @@ export function MobileChatView({
     void load().catch(() => {
       if (request.current !== id) return;
       setHistoryLoadFailed(true);
-      // Show what the phone has rather than wait for a message that did not load.
       setFocus(null);
     });
   }, [
@@ -274,12 +249,9 @@ export function MobileChatView({
     fetchHistory();
     return () => {
       request.current += 1;
-      // A run that ends after this cleanup does not clear the flag.
       setCatchingUp(false);
     };
   }, [fetchHistory]);
-  // The unread state can come after the chat opened, such as on a cold start. Until the chat has
-  // messages to show, it still opens at the NEW line.
   useEffect(() => {
     if (!firstUnreadMessageId || focusRef.current || focusEnded.current || conversation) return;
     const next = { messageId: firstUnreadMessageId, loaded: false, unread: true };
@@ -288,8 +260,6 @@ export function MobileChatView({
     fetchHistory();
   }, [firstUnreadMessageId, conversation, fetchHistory]);
   const detached = conversation?.detached ?? false;
-  // A message in the store that the chat shows no row for, such as a thinking step. The NEW line
-  // moves to the next row that has one, and the list opens at the latest message when none has.
   const focusRowMissing = focus?.loaded === true && !focus.unread && chatRowIndex(messages, focus.messageId) < 0;
   useEffect(() => {
     if (!focusRowMissing) return;
@@ -304,27 +274,16 @@ export function MobileChatView({
     void loadOlderMessages(agent.id, agent.serverId);
   }, [agent.id, agent.serverId, loadOlderMessages]);
   const target = useMemo(() => ({ ...agent, kind: "agent" as const }), [agent]);
-  // The live voice conversation follows the turn that answers what the user said. Before the first
-  // read it has an empty conversation, so it can still start.
   const liveConversation = useMemo(
     () => ({ messages: conversation?.messages ?? [], activeTurnId: conversation?.activeTurnId ?? null }),
     [conversation?.messages, conversation?.activeTurnId],
   );
   const latest = latestReadBoundaryMessage(conversation?.messages ?? []);
   const latestId = latest?.id;
-  // After Mark unread, the open chat does not read itself again until the reader leaves it, as on
-  // desktop. A message sheet covers the chat but does not leave it, so its focus loss keeps the hold.
-  // The sheet that marks it is open when the hold starts, so the hold waits until the chat is on
-  // screen again.
   const readHeldFor = useRef<{ agentId: string; shown: boolean } | null>(null);
-  // The NEW line of this visit, as on desktop. The open chat reads itself at once, so the host read
-  // state loses its first unread message: the line keeps it. It takes the host's message until the
-  // chat reads itself, and again after the chat was covered, so it does not jump to a reply that
-  // the reader watches arrive.
   const [unreadLine, setUnreadLine] = useState<{ agentId: string; messageId: string } | null>(() =>
     firstUnreadMessageId ? { agentId: agent.id, messageId: firstUnreadMessageId } : null,
   );
-  // The agent whose chat has read itself since it was last covered.
   const unreadLineSettledFor = useRef<string | null>(null);
   useEffect(() => {
     const held = readHeldFor.current;
@@ -363,9 +322,6 @@ export function MobileChatView({
     },
     [agent.id, agent.serverId, markAgentUnreadFrom],
   );
-  // As on desktop, Mark unread is on the messages that the host counts as unread.
-  // The conversation is a new array on each streamed chunk, with the same messages. Each set stays
-  // the same object while its ids stay, as the list asks.
   const lastMarkUnreadIds = useRef<ReadonlySet<string>>(NO_MESSAGE_IDS);
   const markUnreadMessageIds = useMemo(() => {
     const ids = (conversation?.messages ?? [])
@@ -375,7 +331,6 @@ export function MobileChatView({
     return lastMarkUnreadIds.current;
   }, [conversation?.messages]);
   const unreadLineMessageId = unreadLine?.agentId === agent.id ? unreadLine.messageId : null;
-  // The line shows above the first of these messages that has a row.
   const lastUnreadLineIds = useRef<ReadonlySet<string> | null>(null);
   const unreadLineMessageIds = useMemo(() => {
     const all = conversation?.messages ?? [];
@@ -389,7 +344,6 @@ export function MobileChatView({
           );
     return lastUnreadLineIds.current;
   }, [unreadLineMessageId, conversation?.messages]);
-  // The open question of the running turn, or one that the host still waits for after its turn (#11440).
   const activePrompt = messages.findLast(
     (message) =>
       message.kind === "question" &&
@@ -399,8 +353,6 @@ export function MobileChatView({
   );
   const viewOnly = useAgentViewOnly(agent.serverId, agent.id);
   const messageDelete = useMessageDelete(agent.serverId, { kind: "agent", agentId: agent.id });
-  // As on desktop, the text of a message can start work in an open channel. The channel opens with
-  // the text in its composer. The list changes on each channel event, so it is kept by its contents.
   const channelKey = useMemo(
     () =>
       JSON.stringify(
@@ -436,30 +388,27 @@ export function MobileChatView({
     showsOnline(server) && !viewOnly,
     respondToPrompt,
   );
-  // The swipe away from Back opens the screen chosen in Settings, on top of this chat, so Back returns
-  // here. It is off while the host cannot open that screen, as the header hides the same action.
   const swipeAction = useChatSwipePreference((state) => state.action);
   const browserAllowed = useBrowserFeature();
   const browserView = useMobileWorkspaceSelector((current) => current.browserViewSupport(agent.serverId).view);
   const browserShown = browserAllowed && showsOnline(server) && browserView;
   const threadsShown = threadMenu !== undefined;
+  const sideQuestionShown = useMobileWorkspaceSelector((current) => current.canAskSideQuestion(agent.serverId));
   const swipeForward = useMemo(() => {
     const params = { agentId: agent.id, serverId: agent.serverId };
     if (swipeAction === "off") return null;
-    if (swipeAction === "threads")
+    if (swipeAction === "question" && sideQuestionShown)
+      return () => router.push({ pathname: "/side-question/[agentId]", params });
+    if (swipeAction === "threads" || swipeAction === "question")
       return threadsShown ? () => router.push({ pathname: "/server-tasks", params }) : null;
     return browserShown ? () => router.push({ pathname: "/browser/[agentId]", params }) : null;
-  }, [swipeAction, threadsShown, browserShown, agent.id, agent.serverId]);
-  // A pull past the latest message opens the agent's info sheet on top of this chat, unless Settings
-  // turns the pull off.
+  }, [swipeAction, sideQuestionShown, threadsShown, browserShown, agent.id, agent.serverId]);
   const pullOn = useChatPullPreference((state) => state.enabled);
   const openInfo = useCallback(
     () => router.push({ pathname: "/agent-info/[agentId]", params: { agentId: agent.id, serverId: agent.serverId } }),
     [agent.id, agent.serverId],
   );
   const workActivity = workChannel ? liveActivity : undefined;
-  // One element while its inputs stay, so a new render of this screen does not draw the list again.
-  // The agent's threads are in the thread menu of the header, not in this chat.
   const activityAccessory = useMemo(
     () =>
       workChannel && workActivity ? (
@@ -479,7 +428,6 @@ export function MobileChatView({
       referenceMessages={references}
       ready={Boolean(conversation)}
       historyLoadFailed={historyLoadFailed}
-      // The phone keeps a message while the server is offline and sends it when it is back.
       canSend={!viewOnly}
       notice={viewOnly ? t("mobile.chat.viewOnly") : null}
       activity={activity}
@@ -509,10 +457,8 @@ export function MobileChatView({
       olderLoading={conversation?.olderLoading ?? false}
       olderError={conversation?.olderError ?? false}
       loadOlder={loadOlder}
-      // The NEW line waits for its page: the messages that the phone kept can end before it.
       focusMessageId={focus && (!focus.unread || focus.loaded) ? focus.messageId : null}
       focusUnread={focus?.unread ?? false}
-      // Offline, the chat shows what the phone has and moves to the message when its page loads.
       holdOpening={focus !== null && online}
       catchingUp={catchingUp}
       onFocusPlaced={clearFocus}

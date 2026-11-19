@@ -80,7 +80,7 @@ safe to replay. Keep domain retry and recovery rules at their existing owners.
     line masks that exact value. The provider credential store and the MCP store (for header and
     environment names that look secret) do this. `info` and above is written by default; `OPENBOT_LOG_LEVEL` changes the
     threshold. Machine-readable stdout (piped JSON, tags, harness URLs) uses
-    `process.stdout.write` with a `// Machine-readable:` comment instead. Dev automation
+    `process.stdout.write` instead. Dev automation
     (`scripts/dev-automation`, `bun run dev:automation`) drives the already-running dev app over its
     remote-debugging CDP port and never launches a second instance, seeds, or resets the dev profile.
     Because several worktrees run dev side by side, each instance publishes its worktree, profile,

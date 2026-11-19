@@ -1,7 +1,3 @@
-// The folders a local agent can change besides its workspace and the shared folder, and the folders in
-// them that it must not change. The desktop settings (`agentFolders` IPC) and an owner or admin on
-// another device (`agent-folders-v1`) change them through the same checks.
-
 import { readdir, realpath, stat } from "node:fs/promises";
 import { homedir, userInfo } from "node:os";
 import { dirname, join, parse, resolve } from "node:path";
@@ -25,7 +21,6 @@ import { oneAtATimePerKey } from "./ipc/one-at-a-time";
 
 export interface AgentFoldersDependencies {
   service: Pick<AgentService, "listAgents" | "updateAgent" | "sharedRoot">;
-  /** The app's own data, with `openbot.db`. */
   userDataPath: string;
 }
 
@@ -33,17 +28,14 @@ async function isDirectory(path: string): Promise<boolean> {
   return (await stat(path).catch(() => null))?.isDirectory() === true;
 }
 
-/** The real path, so a sandbox profile and the coverage checks compare the same text. */
 async function realFolder(path: string): Promise<string> {
   return realpath(path).catch(() => resolve(path));
 }
 
-/** The folders in `folder` that are folders or links to folders, without hidden ones. Null when unreadable. */
 async function subfolders(folder: string): Promise<string[] | null> {
   const items = await readdir(folder, { withFileTypes: true }).catch(() => null);
   if (!items) return null;
   const visible = items.filter((item) => !item.name.startsWith("."));
-  // A link to a folder is a folder for the picker too. The links are checked at the same time.
   const kept = await Promise.all(
     visible.map(
       async (item) => item.isDirectory() || (item.isSymbolicLink() && (await isDirectory(join(folder, item.name)))),
@@ -61,10 +53,6 @@ function userName(): string {
   }
 }
 
-/**
- * The disks of this computer, with the start disk first: the drive letters on Windows, `/Volumes` on
- * macOS, and the root with the usual mount folders on Linux.
- */
 async function volumes(): Promise<AgentFolderBrowseEntry[]> {
   let found: AgentFolderBrowseEntry[];
   if (process.platform === "win32") {
@@ -82,11 +70,8 @@ async function volumes(): Promise<AgentFolderBrowseEntry[]> {
         ((await subfolders(holder)) ?? []).map((name) => ({ name, path: join(holder, name) })),
       ),
     );
-    // `/media/<user>` holds disks; it is not one.
     found = [{ name: "/", path: "/" }, ...listed.flat().filter((volume) => !holders.includes(volume.path))];
   }
-  // Real paths, and each disk once. On macOS the start disk is also a link to the root in
-  // `/Volumes`; the root takes the name of that link.
   const seen = new Map<string, AgentFolderBrowseEntry>();
   for (const volume of found) {
     const path = await realFolder(volume.path);
@@ -96,20 +81,15 @@ async function volumes(): Promise<AgentFolderBrowseEntry[]> {
   return [...seen.values()].slice(0, AGENT_FOLDER_VOLUME_LIMIT);
 }
 
-/** How long one list of the disks serves the browse steps after it. */
 const VOLUMES_TTL_MS = 30_000;
 
 export function createAgentFolders({ service, userDataPath }: AgentFoldersDependencies) {
-  // Each browse step sends the disks, and a missing network drive can make the list slow, so the
-  // steps of one browse share one list.
   let disks: { at: number; list: Promise<AgentFolderBrowseEntry[]> } | null = null;
   function currentVolumes(): Promise<AgentFolderBrowseEntry[]> {
     if (!disks || Date.now() - disks.at > VOLUMES_TTL_MS) disks = { at: Date.now(), list: volumes() };
     return disks.list;
   }
 
-  // Each change reads the list, checks the disk, then saves the whole list. One change at a time for
-  // each agent, so an Undo during a remove does not save over it.
   const oneAtATime = oneAtATimePerKey();
 
   function requireAgent(agentId: string): AgentSummary {
@@ -125,7 +105,6 @@ export function createAgentFolders({ service, userDataPath }: AgentFoldersDepend
       realFolder(agent.workspacePath),
       realFolder(service.sharedRoot),
     ]);
-    // Real paths, so a covered folder flashes the row that the coverage check named.
     return {
       workspace,
       shared,
@@ -142,13 +121,7 @@ export function createAgentFolders({ service, userDataPath }: AgentFoldersDepend
     return list(await runCauseEffect(service.updateAgent({ agentId: agent.id, excludedFolders: excluded })));
   }
 
-  /**
-   * A folder in or around OpenBot's own data or the OpenBot folder, or one that holds this agent's
-   * workspace or the shared folder. The OpenBot folder holds the workspaces of the other agents; the
-   * home folder and a disk root hold it too.
-   */
   async function isProtected(path: string, roots: readonly string[]): Promise<boolean> {
-    // The shared folder is in the OpenBot folder, beside the agent workspaces.
     const [openbot, userData] = await Promise.all([realFolder(dirname(service.sharedRoot)), realFolder(userDataPath)]);
     return (
       parse(path).root === path ||
@@ -170,7 +143,6 @@ export function createAgentFolders({ service, userDataPath }: AgentFoldersDepend
     if (coverage) return { outcome: "covered", path, coverage, list: await list(agent) };
     if (await isProtected(path, [workspace, shared]))
       return { outcome: "refused", path, refusal: "protected", list: await list(agent) };
-    // A folder that holds folders already added takes their place.
     const kept = others.filter((folder) => !folderInside(path, folder));
     if (kept.length >= AGENT_FOLDER_LIMIT)
       return { outcome: "refused", path, refusal: "limit", list: await list(agent) };
@@ -195,7 +167,6 @@ export function createAgentFolders({ service, userDataPath }: AgentFoldersDepend
       return { outcome: "refused", path, refusal: "outside", list: current };
     const folder = agentExclusionCoverage(path, current.excluded);
     if (folder) return { outcome: "covered", path, folder, list: current };
-    // A folder that holds folders already excluded takes their place.
     const kept = current.excluded.filter((excluded) => !folderInside(path, excluded));
     if (kept.length >= AGENT_FOLDER_LIMIT) return { outcome: "refused", path, refusal: "limit", list: current };
     return {
@@ -210,7 +181,6 @@ export function createAgentFolders({ service, userDataPath }: AgentFoldersDepend
     requireAgent,
     listAgents: () => service.listAgents(),
     list: (agentId: string) => list(requireAgent(agentId)),
-    /** Adds `picked`, or puts it in the place of `replace`. */
     add: (agentId: string, picked: string, replace?: string) =>
       oneAtATime(agentId, () => addNow(agentId, picked, replace)),
     remove: (agentId: string, path: string) =>
@@ -227,7 +197,6 @@ export function createAgentFolders({ service, userDataPath }: AgentFoldersDepend
           ),
         };
       }),
-    /** Excludes `picked`, a folder in the workspace, the shared folder or an added folder. */
     exclude: (agentId: string, picked: string) => oneAtATime(agentId, () => excludeNow(agentId, picked)),
     include: (agentId: string, path: string) =>
       oneAtATime(agentId, async (): Promise<AgentExclusionChange> => {
@@ -243,11 +212,6 @@ export function createAgentFolders({ service, userDataPath }: AgentFoldersDepend
           ),
         };
       }),
-    /**
-     * The folders in `path`, or in the home folder, sorted by name, for a device that cannot open the
-     * folder picker of this computer. Hidden folders stay out, as the picker hides them. Null when
-     * the folder is not there or this computer does not let OpenBot read it.
-     */
     async browse(path: string | null): Promise<AgentFolderBrowse | null> {
       const folder = await realFolder(path ?? homedir());
       const names = await subfolders(folder);

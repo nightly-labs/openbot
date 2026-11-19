@@ -1,5 +1,3 @@
-// The 1Password service account token of this computer, encrypted at rest by the operating system.
-
 import { readFile, rm } from "node:fs/promises";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result, Semaphore } from "effect";
@@ -9,30 +7,17 @@ import { OnePasswordOperationError, onePasswordCall, onePasswordDecode } from ".
 import type { SecretCipher } from "./provider-credential-store";
 
 const onePasswordConnectorRecordSchema = z.object({
-  /** The service account token. It reads only the vaults that the user shared with OpenBot. */
   token: z.string().min(1),
-  /** The account that the CLI created the service account in, or null for a pasted token. */
   accountId: z.string().min(1).nullable(),
   connectedAt: z.number(),
 });
 
 export type OnePasswordConnectorRecord = z.infer<typeof onePasswordConnectorRecordSchema>;
 
-/**
- * `version` is checked, not tolerated: an envelope that this build cannot read is reported as
- * unreadable. The file stays on disk until a new connection replaces it.
- */
 const envelopeSchema = z.object({ version: z.literal(1), record: z.string() });
 
-/** One token is small; a larger file is not one that this app wrote. */
 const MAX_ENVELOPE_BYTES = 64 * 1024;
 
-/**
- * Reads and writes the 1Password connection. The decrypted record is kept in memory only.
- *
- * `electron` is not imported: the cipher arrives as an argument, so a test can use a fake one.
- * Writes run one at a time, because a connect and a disconnect can arrive together.
- */
 export class OnePasswordConnectorStore {
   readonly #path: string;
   readonly #cipher: SecretCipher;
@@ -44,7 +29,6 @@ export class OnePasswordConnectorStore {
     this.#cipher = cipher;
   }
 
-  /** Reads the file. Returns the error when the file is there but cannot be read. */
   load(): Effect.Effect<Error | null> {
     return Effect.gen({ self: this }, function* () {
       this.#record = null;
@@ -62,11 +46,6 @@ export class OnePasswordConnectorStore {
     return this.#record;
   }
 
-  /**
-   * Stores `record` while `current()` holds. It is asked again after the file is written, in the
-   * same queued change: an attempt that was stopped during the write removes the file again and
-   * leaves no token in memory or on disk. True when the record was kept.
-   */
   write(
     record: OnePasswordConnectorRecord,
     current: () => boolean = () => true,
@@ -77,7 +56,6 @@ export class OnePasswordConnectorStore {
         const encrypted = yield* onePasswordDecode(() =>
           this.#cipher.encrypt(JSON.stringify(record)).toString("base64"),
         );
-        // Write then rename, so a crash leaves the previous connection readable.
         yield* writeJsonFileAtomically(this.#path, { version: 1, record: encrypted }, { createDirectory: true }).pipe(
           Effect.mapError(({ cause }) => new OnePasswordOperationError({ cause })),
         );
@@ -92,7 +70,6 @@ export class OnePasswordConnectorStore {
     );
   }
 
-  /** Forgets the record at once, so no read starts with it, then removes the file. */
   clear(): Effect.Effect<void, OnePasswordOperationError> {
     return Effect.suspend(() => {
       this.#record = null;

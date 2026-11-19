@@ -19,6 +19,8 @@ export const messages = {
   "error.mcp.signInAppUnsupported": "Este servidor no admite apps de inicio de sesión. Actualiza OpenBot en el host.",
   "error.mcp.redirectRelayed": "OpenBot envió el inicio de sesión al servidor. Puedes cerrar esta ventana.",
   "error.mcp.relayEnded": "Este inicio de sesión terminó. Vuelve a iniciarlo.",
+  "error.mcp.signInLinkNotReady":
+    "La página de inicio de sesión aún no está abierta. Inténtalo de nuevo en un momento.",
   "error.mcp.relayNoState":
     "La página de inicio de sesión del servidor no protege su dirección de retorno, así que OpenBot no la abre en este equipo.",
   "error.mcp.relayAddressInvalid":

@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/remote";
 
 export const messages = {
-  // Errors from remote servers, WebRTC transport, remote desktop, and the team client.
   "error.remote.desktopSetupClientUpdate": "Uzak masaüstü kurulumunu kullanmak için istemciyi güncelleyin.",
   "error.remote.desktopSetupUnavailable": "Uzak masaüstü kurulumu kullanılamıyor.",
   "error.remote.desktopTestUnavailable": "Uzak masaüstü testi kullanılamıyor.",
@@ -24,6 +23,10 @@ export const messages = {
     "Ana makine OpenBot'un ekranını kaydetmesine izin vermedi. Ana makinede ekran kaydı izni verin, ardından tekrar deneyin.",
   "error.remote.windowsSessionDisconnected":
     "Ana makinedeki Windows oturumunun bağlantısı kesik, bu yüzden paylaşılacak ekran yok. Ana makinenin ekranında Windows'ta oturum açın, ardından tekrar deneyin.",
+  "error.remote.streamTooSlowLowerQuality":
+    "Ana makineyle bağlantı görüntü için çok yavaş. Tekrar deneyin: sonraki bağlantı daha düşük bir kalite kullanır.",
+  "error.remote.streamTooSlow":
+    "Ana makineyle bağlantı görüntü için çok yavaş. Daha hızlı bir ağ kullanın, ardından tekrar deneyin.",
   "error.remote.teamSessionExpired": "Ekip oturumunun süresi doldu.",
   "error.remote.finishTestBeforeSwitch": "Ekranları değiştirmeden önce uzak masaüstü testini tamamlayın.",
   "error.remote.displayNotFound": "Uzak ekran bulunamadı.",
@@ -200,7 +203,6 @@ export const messages = {
   "error.remote.hostOtherAccount": "Bu ana makine başka bir hesaba ait.",
   "error.remote.remoteNotConfigured": "Bu OpenBot hizmetinde uzak bağlantılar ayarlanmamış.",
   "error.remote.hostRefused": "Ana makine isteği reddetti ({status}).",
-  // Channel actions on mobile.
   "error.remote.formUnavailable": "Bu form artık kullanılamıyor.",
   "error.remote.hostedServerRemoval": "Barındırılan bir sunucuyu silmek için Faturalandırma'yı kullanın.",
   "error.remote.hostRemoved": "Sahibi bu sunucuyu hesaptan kaldırdı.",

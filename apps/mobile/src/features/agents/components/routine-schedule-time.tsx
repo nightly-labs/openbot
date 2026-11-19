@@ -13,7 +13,6 @@ export function RoutineTimePicker({
   onChange,
 }: {
   time: string;
-  /** The row label. Defaults to "Time". */
   label?: string;
   disabled: boolean;
   onChange: (time: string) => void;
@@ -23,7 +22,6 @@ export function RoutineTimePicker({
   const { theme } = useUniwind();
   const [open, setOpen] = useState(false);
   const [hour, minute] = time.split(":").map(Number);
-  // This is a wall-clock time in the routine's zone, not an instant to convert to the phone's zone.
   const value = new Date(2000, 0, 1, hour, minute);
   const picker = (
     <DateTimePicker

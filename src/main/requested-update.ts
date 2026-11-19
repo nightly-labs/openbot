@@ -1,14 +1,3 @@
-import type { PreferenceFileFailure } from "./preference-file";
-import type { UpdateOperationFailure } from "./update-service";
-// An app update that an owner or admin of a joined server asked this host for (`host-update-v1`),
-// or that this host installs by itself when the automatic install is on.
-//
-// The update itself is the one `UpdateService` runs for the local user: the same check, download and
-// install. This module adds the schedule: who asked, whether the restart waits for idle, and what it
-// still waits for. It also owns the update preference, because the host user and a remote admin both
-// change it. The schedule lives in memory, so a host that restarts for another reason forgets it; the
-// admin asks again, and the automatic install schedules the next update again.
-
 import { EventEmitter } from "node:events";
 import type {
   HostUpdateSettingsChange,
@@ -24,12 +13,13 @@ import type { HostRestartState } from "@openbot/contracts/team-protocol/host-upd
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Exit, Schema, Scope } from "effect";
 import { runCauseEffect } from "../backend/effect-boundary";
+import type { PreferenceFileFailure } from "./preference-file";
 import { RemoteWorkflowError, remoteDecode } from "./remote-service-effects";
 import type { RestartReadiness } from "./update-readiness";
+import type { UpdateOperationFailure } from "./update-service";
 
 export type RequestedUpdateRefusalReason = "disabled" | "managed" | "unsupported" | "restarting";
 
-/** A request this host does not carry out. The route turns the reason into a status code. */
 export class RequestedUpdateRefusal extends Schema.TaggedError<RequestedUpdateRefusal>()("RequestedUpdateRefusal", {
   reason: Schema.Literals(["disabled", "managed", "unsupported", "restarting"]),
   message: Schema.String,
@@ -60,28 +50,15 @@ export interface RequestedUpdateOptions {
   updater: RequestedUpdateUpdater;
   describeReadiness: () => RestartReadiness;
   preference: UpdatePreference;
-  /** Stores a change and answers the whole stored preference. */
   savePreference: (change: UpdatePreferenceChange) => Effect.Effect<UpdatePreference, PreferenceFileFailure>;
-  /** A line for the main log. It names the member by id only. */
   log: (message: string) => void;
-  /** Tells every connected member that this host restarts into an update, so a dropped connection has a reason. */
   announce?: (state: HostRestartState, version: string | null) => void;
-  /** How long a restart that waits for idle waits between two readiness checks. */
   pollMs?: number;
-  /**
-   * The wait before the first restart attempt. The restart tears down the Team API, so the answer
-   * to the request that asked for it must have left first.
-   */
   graceMs?: number;
-  /**
-   * Set on a hosted server. It installs each release by itself, as its start applied the staged one
-   * before, and the automatic restart also waits until no client uses the server.
-   */
   clientInUse?: (() => boolean) | undefined;
 }
 
 interface Schedule {
-  /** Null when this host scheduled the restart itself. */
   memberId: string | null;
   requestedBy: string | null;
   mode: UpdateRestartMode;
@@ -91,7 +68,6 @@ interface Schedule {
 const DEFAULT_POLL_MS = 5_000;
 const DEFAULT_GRACE_MS = 1_000;
 
-/** `preference`: an admin of a joined server changed the preference; the host Settings show it. */
 export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreference] }> {
   readonly #updater: RequestedUpdateUpdater;
   readonly #describeReadiness: () => RestartReadiness;
@@ -104,17 +80,11 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
   #allowed: boolean;
   #autoInstall: boolean;
   readonly #clientInUse: (() => boolean) | null;
-  /** This version is below the lowest one that the account service supports. */
   #required = false;
-  /** The version whose restart was cancelled, or whose automatic restart failed. The next version schedules again. */
   #declinedVersion: string | null = null;
   #schedule: Schedule | null = null;
   #timer: ReturnType<typeof setTimeout> | null = null;
   #installError: UpdateFailureCode | null = null;
-  /**
-   * An install attempt runs. The updater stays `ready` while it checks for other sessions, so a
-   * cancel in that time would report a restart that then happens.
-   */
   #installing = false;
   #publishing = false;
   readonly #workScope = Scope.makeUnsafe();
@@ -140,8 +110,6 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
 
   snapshot(): HostUpdateStatus {
     const status = this.#updater.getStatus();
-    // `stagedVersion` stays local: released `host-update-v1` has no field for it. The member's check
-    // (`check`) still gets a release in its staged rollout.
     const schedule = this.#schedule;
     return {
       phase: status.phase,
@@ -158,17 +126,12 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
     };
   }
 
-  /** Asks the updater for a check. The answer shows the check under way; the client reads it again. */
   readonly check = Effect.fn("RequestedUpdate.check")(function* (this: RequestedUpdate) {
     yield* remoteDecode(() => this.#assertAllowed());
     yield* Effect.forkIn(this.#updater.checkForUpdates(), this.#workScope, { startImmediately: true });
     return this.snapshot();
   }).bind(this);
 
-  /**
-   * Checks, downloads, and restarts into the update. A second request replaces the mode of the first,
-   * which is how an admin skips the wait. Nothing is scheduled when there is no update to install.
-   */
   readonly start = Effect.fn("RequestedUpdate.start")(function* (
     this: RequestedUpdate,
     member: RequestedUpdateMember,
@@ -177,7 +140,6 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
     yield* remoteDecode(() => this.#assertAllowed());
     const status = this.#updater.getStatus();
     if (this.#restarting()) return yield* new RemoteWorkflowError({ cause: new RequestedUpdateRefusal("restarting") });
-    // A failed install has run shutdown preparation already, so only a relaunch can recover.
     if (status.phase === "error" && status.errorCode === "install_failed") return this.snapshot();
     this.#installError = null;
     this.#declinedVersion = null;
@@ -192,10 +154,6 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
     return this.snapshot();
   }).bind(this);
 
-  /**
-   * A member can request an idle update but cannot replace the schedule of another member. It
-   * replaces the automatic one, which on a hosted server also waits for the member's own use.
-   */
   readonly requestWhenIdle = Effect.fn("RequestedUpdate.requestWhenIdle")(function* (
     this: RequestedUpdate,
     member: RequestedUpdateMember,
@@ -225,7 +183,6 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
     this.#allowed = preference.allowRemoteUpdates;
     this.#autoInstall = preference.autoInstall;
     if (this.#schedule && !this.#restarting()) {
-      // Each switch removes only the restart it allowed: remote access a member's, auto-install its own.
       const automatic = this.#schedule.memberId === null;
       if (automatic ? !this.#installsByItself() : !this.#allowed) this.#clear();
     }
@@ -233,10 +190,6 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
     return preference;
   }).bind(this);
 
-  /**
-   * This version is below the supported minimum (`RequiredUpdate`). Installs the next release as the
-   * automatic install does: only when no agent turn or other work runs, and once per version.
-   */
   setRequired(required: boolean): void {
     if (this.#required === required) return;
     this.#required = required;
@@ -250,17 +203,11 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
       return;
     }
     if (status.managedByHost || status.phase === "unsupported") return;
-    // A periodic check may not have found the release yet.
     if (status.phase === "idle" || status.phase === "up-to-date" || status.errorCode === "check_failed")
       yield* Effect.forkIn(this.#updater.checkForUpdates(), this.#workScope, { startImmediately: true });
     else yield* this.#advance(status);
   });
 
-  /**
-   * Removes the schedule. A download under way continues; it is the same one auto-download runs. A
-   * cancelled restart stays cancelled for that version, so the automatic install does not schedule
-   * it again.
-   */
   cancel(): HostUpdateStatus {
     const status = this.#updater.getStatus();
     if (this.#restarting()) throw new RequestedUpdateRefusal("restarting");
@@ -286,7 +233,6 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
   }
 
   readonly #advance = Effect.fn("RequestedUpdate.advance")(function* (this: RequestedUpdate, status: UpdateStatus) {
-    // Publishing the schedule emits a status too. That one is not a step of the update.
     if (this.#publishing) return;
     if (!this.#schedule) {
       yield* this.#installAutomatically(status);
@@ -297,12 +243,10 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
     else if (status.phase === "ready") {
       if (!this.#timer) this.#scheduleAttempt(this.#graceMs);
     } else if (status.phase === "up-to-date" || status.phase === "error" || status.phase === "unsupported") {
-      // Nothing to install, or the step failed: the admin reads the outcome and asks again.
       this.#clear();
     }
   });
 
-  /** Downloads a new version and schedules the restart when the host user or an admin turned it on. */
   readonly #installAutomatically = Effect.fn("RequestedUpdate.installAutomatically")(function* (
     this: RequestedUpdate,
     status: UpdateStatus,
@@ -333,7 +277,6 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
     if (!schedule || this.#updater.getStatus().phase !== "ready") return;
     if (schedule.mode === "when-idle") {
       const { safeToRestart, reasons } = this.#describeReadiness();
-      // A member who asks for the restart is a client too, so only the automatic one waits for clients.
       const clientUse = schedule.memberId === null && this.#clientInUse?.() === true;
       if (!safeToRestart || clientUse) {
         const waitingFor = [...new Set(clientUse ? [...reasons, "client-use"] : reasons)];
@@ -359,11 +302,9 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
         Effect.catch((failure) =>
           Effect.sync(() => {
             const error = failure.cause;
-            // A refusal before teardown (another macOS session runs OpenBot) leaves the update ready.
             this.#log(`The requested update restart failed: ${error instanceof Error ? error.message : String(error)}`);
             if (this.#schedule === schedule) {
               this.#installError = "install_failed";
-              // Without this, the next status would schedule the same failing install again.
               if (schedule.memberId === null) this.#declinedVersion = this.#updater.getStatus().availableVersion;
               this.#clear();
             }
@@ -371,7 +312,6 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
         ),
         Effect.ensuring(
           Effect.sync(() => {
-            // The updater is `installing` from the end of its checks, so the latch can end here.
             this.#installing = false;
           }),
         ),
@@ -401,7 +341,6 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
     this.#timer = null;
   }
 
-  /** Members hear each change once. A schedule made before the check names its version later. */
   #announceState(state: HostRestartState): void {
     const version = state === "none" ? null : this.#updater.getStatus().availableVersion;
     if (state === this.#announced.state && version === this.#announced.version) return;
@@ -425,7 +364,6 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
   }
 }
 
-/** The log names a member by id only. */
 function describe(schedule: Schedule): string {
   return schedule.memberId === null ? "the automatic install" : `member ${schedule.memberId}`;
 }

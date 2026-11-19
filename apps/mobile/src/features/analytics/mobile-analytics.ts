@@ -15,9 +15,6 @@ const metadata = {
   build_number: nativeBuildVersion() ?? "unknown",
 };
 
-// RN's SDK adds Android install referrers and paths itself. Replace its final
-// properties so those additions cannot expose campaign URLs or route identifiers.
-// With tracking off, only events go, each with the install ID and no account.
 function filterMobilePayload(event: TrackHandlerPayload): boolean {
   if (!mobileAnalytics.isSending()) return false;
   const installId = mobileAnalytics.anonymousProfileId();
@@ -54,7 +51,6 @@ export const mobileAnalytics = new MobileAnalytics(() => {
     !clientId ||
     !clientSecret ||
     (Platform.OS !== "ios" && Platform.OS !== "android") ||
-    // The SDK imports `expo-application`, which throws in a build without its native module.
     !nativeApplication
   )
     return null;
@@ -66,8 +62,6 @@ export const mobileAnalytics = new MobileAnalytics(() => {
     filter: filterMobilePayload,
     debug: false,
   });
-  // The SDK retries below its payload filter. Keep one signal for each consent
-  // period so even retries delayed until after opt-in remain aborted.
   let transport = new AbortController();
   const send = client.api.fetch.bind(client.api);
   client.api.fetch = (path, data, options) => send(path, data, { ...options, signal: transport.signal });

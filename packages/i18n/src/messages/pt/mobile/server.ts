@@ -1497,7 +1497,6 @@ export const messages = {
   "mobile.server.audit.roleMemberAdded": "Adicionou {member} a {role}",
   "mobile.server.audit.roleMemberRemoved": "Removeu {member} de {role}",
   "mobile.server.audit.agentLevel": "{agent} para {role}: {change}",
-  // Server settings › Import agents: Grok Bot and Hermes exports (`agent-import-v1`).
   "mobile.server.settings.importAgents": "Importar agentes",
   "mobile.server.route.import": "Importar agentes",
   "mobile.server.import.unsupported": "Atualize o OpenBot neste servidor para importar agentes aqui.",
@@ -1571,7 +1570,6 @@ export const messages = {
   "mobile.server.import.channel": "Canal",
   "mobile.server.import.notImportedTitle": "Não importado",
   "mobile.server.import.resultWarnings": "Alguns itens não foram transferidos",
-  // Server settings › Transfer: the whole server to or from a transfer file (`instance-transfer-v1`).
   "mobile.server.settings.transfer": "Transferência",
   "mobile.server.route.transfer": "Transferência",
   "mobile.server.route.transferExport": "Exportar",
@@ -1649,6 +1647,10 @@ export const messages = {
   "mobile.server.transfer.copyNotMoved":
     "Os canais deles, os fluxos de rotinas, os fluxos de trabalho e a pasta Shared também são copiados. Chaves de API, logins, conectores e o histórico de chats não são copiados. Configure-os de novo no outro servidor.",
   "mobile.server.transfer.copySubmit": { one: "Copiar {count} agente", other: "Copiar {count} agentes" },
+  "mobile.server.transfer.copyDuplicatesTitle": "Copiar agentes duplicados?",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "{server} já tem agentes com estes nomes: {names}. A cópia adiciona um segundo agente para cada um. Cada cópia é um agente separado com seus próprios chats, arquivos e memórias.",
+  "mobile.server.transfer.copyDuplicatesConfirm": "Copiar duplicados",
   "mobile.server.transfer.copying": "Copiando…",
   "mobile.server.transfer.copyFailed": "A cópia não terminou.",
   "mobile.server.transfer.copied": {

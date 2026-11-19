@@ -17,12 +17,6 @@ const STATUS_TEXT: Record<GptLiveServerStatus, MobileTextKey> = {
   signIn: "mobile.settings.voice.gptLive.status.signIn",
 };
 
-/**
- * One row for each server: whether it can run GPT live voice. The host must serve `live-voice-v1`,
- * and its Codex must be signed in with ChatGPT. Only an owner or admin can read the Codex status of
- * the host, and can open its Codex page to sign in; a member sees "Supported", and the host says
- * why a start fails.
- */
 export function GptLiveServerRows() {
   const servers = useMobileWorkspaceSelector((current) => current.servers);
   return servers.map((server) => <GptLiveServerRow key={server.id} server={server} />);

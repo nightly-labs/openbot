@@ -2,7 +2,6 @@ import type { Effect } from "effect";
 import { Schema } from "effect";
 import { z } from "zod";
 
-/** A rectangle on the desktop, in the points that the operating system lays the displays out in. */
 export interface ScreenCaptureRectangle {
   x: number;
   y: number;
@@ -12,11 +11,8 @@ export interface ScreenCaptureRectangle {
 
 interface ScreenCaptureDisplay {
   id: string;
-  /** The name the operating system gives the display, or an empty string. */
   name: string;
-  /** Where the display sits on the desktop, in points. A secondary display can start at a negative point. */
   bounds: ScreenCaptureRectangle;
-  /** Pixels for each point. A capture keeps this resolution, so 2 gives an image twice the bounds. */
   scaleFactor: number;
   primary: boolean;
 }
@@ -78,22 +74,13 @@ export interface ScreenCaptureImage {
   png: Uint8Array;
   width: number;
   height: number;
-  /** The display or window name, for the agent. */
   sourceName: string;
 }
 
-/**
- * The capture did not happen. The reason is source text that is safe to give to the agent and to
- * show to the user: it says what to grant or what to correct, and it holds no screen content.
- */
 export class ScreenCaptureFailed extends Schema.TaggedError<ScreenCaptureFailed>()("ScreenCaptureFailed", {
   reason: Schema.String,
 }) {}
 
-/**
- * Captures the desktop of this computer for `capture_screen`. The main process owns the capture and
- * the operating system permission. It captures only after the user approves the request.
- */
 export interface ScreenCaptureHost {
   listSources(): Effect.Effect<ScreenCaptureSources, ScreenCaptureFailed>;
   capture(request: ScreenCaptureRequest): Effect.Effect<ScreenCaptureImage, ScreenCaptureFailed>;

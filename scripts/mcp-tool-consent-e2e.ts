@@ -1,8 +1,3 @@
-// Runs MCP tool consent end to end on the real modules: the real `codex app-server` over its real
-// client, a real MCP server over stdio, the real `AttentionRegistry` and the real `ApprovalAutomation`
-// policy. A local server that speaks the Responses API stands in for the model, so no account or key is
-// used. The fake model calls the tool that each turn names.
-// `bun scripts/mcp-tool-consent-e2e.ts`. Writes .openbot-build/mcp-tool-consent-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
@@ -27,7 +22,6 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/mcp-tool-consent-e2e
 const DECISION = "mcp-elicitation-decision";
 const NL = String.fromCharCode(10);
 
-// A stdio MCP server. `echo_*` tools need Codex's consent. The `ask_*` tools ask the user themselves.
 const MCP_SERVER = `
 const readline = require("node:readline");
 const NAME = process.env.MCP_NAME;
@@ -108,7 +102,6 @@ interface ModelEvent {
   item?: ModelItem;
 }
 
-/** Answers each Responses request with a call to the tool named after "CALL ", then with a short text. */
 async function startFakeModel() {
   const server = createServer((request, response) => {
     let body = "";
@@ -120,7 +113,6 @@ async function startFakeModel() {
       const input = parsed.input ?? [];
       const tools = parsed.tools ?? [];
       const lastUser = input.findLastIndex((entry) => entry.role === "user");
-      // One call per turn: once the tool answered, or the turn holds a call, the model only talks.
       const called = input.slice(lastUser + 1).some((entry) => entry.type?.startsWith("function_call"));
       const wanted = /CALL ([\w./-]+)/.exec(JSON.stringify(input[lastUser]))?.[1];
       const [serverName, toolName] = (wanted ?? "").split("/");
@@ -167,20 +159,17 @@ interface Card {
 
 interface Outcome {
   cards: Card[];
-  /** What OpenBot answered to Codex, in order. The tool consent comes first. */
   responses: Array<{ action: string; persist: unknown; contentKeys: string[] }>;
   toolText: string | null;
   toolStatus: string | null;
   errors: string[];
 }
 
-/** The user's answer to a card. Null leaves the card waiting. */
 type Choose = (card: Card) => Record<string, string[]> | null;
 const allowOnce: Choose = () => ({ [DECISION]: ["Allow once"] });
 const allowAlways: Choose = () => ({ [DECISION]: ["Always allow"] });
 const deny: Choose = () => ({ [DECISION]: ["Don't allow"] });
 
-/** Records what OpenBot answers to Codex, so a step can check the answer and not only the outcome. */
 class RecordingClient extends CodexAppServerClient {
   readonly responses: Outcome["responses"] = [];
 
@@ -202,7 +191,6 @@ interface Setup {
   sandboxed: Set<string>;
 }
 
-/** One `codex app-server` process with one registry, as the application wires them. */
 class Rig {
   readonly #client: RecordingClient;
   readonly #threads = new Map<string, string>();
@@ -248,7 +236,6 @@ class Rig {
       },
       emitRuntimeSnapshot: () => {},
     });
-    // The application answers waiting requests when a grant changes (`AgentService.notifyAgentsChanged`).
     this.#unsubscribe = setup.policy.subscribe(() => this.#registry.answerGrantedRequests());
     this.#client.on("request", (request) => {
       if (request.method === "mcpServer/elicitation/request")
@@ -262,7 +249,6 @@ class Rig {
     if (event.type !== "prompt") return;
     const card = { agentId: event.agentId, questions: event.questions };
     this.#cards.push(card);
-    // The user answers after the registry has stored the card, as in the application.
     queueMicrotask(() => {
       const answers = this.#choose(card);
       if (!answers) return;
@@ -296,7 +282,6 @@ class Rig {
     this.#client.notify("initialized");
   }
 
-  /** The thread settings are the ones OpenBot sends: `on-request`, and full access unless sandboxed. */
   async thread(agentId: string): Promise<string> {
     const existing = this.#threads.get(agentId);
     if (existing) return existing;
@@ -444,7 +429,6 @@ try {
   await config(main, { probe: script, other: script }, model.port);
   let rig = await open(main);
 
-  // A new tool, with auto approve on and off.
   record(
     "new tool, auto approve on: no card, accepted once, nothing saved",
     await rig.call("auto", "probe/echo_a"),
@@ -469,7 +453,6 @@ try {
   );
   assert.equal(await savedApprovals(main), "", "Allow once saved a tool approval");
 
-  // Explicit refusals and limits.
   record(
     "explicit refusal: Don't allow keeps the tool from running",
     await rig.call("manual", "probe/echo_a", deny),
@@ -492,7 +475,6 @@ try {
     notRun(o);
   });
 
-  // Always allow, for one tool of one server.
   record("Always allow: Codex gets persist=always", await rig.call("manual", "probe/echo_a", allowAlways), (o) => {
     oneCard(o);
     ran(o, "probe/echo_a");
@@ -517,7 +499,6 @@ try {
     noCard(o);
     ran(o, "probe/echo_b");
   });
-  // Moving the agent from Ask first to Full access answers for it at once.
   await runCauseEffect(policy.set({ agentId: "manual", autoApprove: true }));
   record("Full access: no card", await rig.call("manual", "other/echo_b"), (o) => {
     noCard(o);
@@ -528,7 +509,6 @@ try {
     oneCard(o);
     ran(o, "other/echo_b");
   });
-  // A card that waits when the agent moves to Full access is answered without the user.
   const grantWhileWaiting: Choose = (card) => {
     void runCauseEffect(policy.set({ agentId: card.agentId, autoApprove: true }));
     return null;
@@ -545,7 +525,6 @@ try {
   );
   await runCauseEffect(policy.set({ agentId: "manual", autoApprove: false }));
 
-  // Requests that are not Codex's consent to run a tool stay with the user, whatever the grant.
   record(
     "form: tool consent accepted, then the field card",
     await rig.call("auto", "probe/ask_form", () => ({ api_key: ["e2e-value"] })),
@@ -569,13 +548,11 @@ try {
     assert.equal(o.toolText, "probe/ask_url:url:decline");
     assert.deepEqual(o.errors, ["mcp_safety_handoff"]);
   });
-  // Codex passes `_meta` on as the server wrote it, so a server can copy the marker. It only answers its own question.
   record("observed: a server that forges the Codex marker", await rig.call("auto", "probe/ask_forged"), (o) => {
     assert.ok(o.toolText?.startsWith("probe/ask_forged:forged:"));
   });
   await rig.stop();
 
-  // The saved approval survives a restart of Codex.
   rig = await open(main);
   record("after restart: saved tool, no card", await rig.call("manual", "probe/echo_a"), (o) => {
     noCard(o);
@@ -587,8 +564,6 @@ try {
   });
   await rig.stop();
 
-  // A tool that the user set to ask every time: Codex offers no Always allow for it. Full access still
-  // answers it, and Ask first keeps its card.
   const restricted = join(OUT, "codex-restricted");
   await mkdir(restricted, { recursive: true });
   await config(
@@ -630,7 +605,6 @@ try {
   });
   await rig.stop();
 
-  // Full access covers Computer Use too; Ask first still shows its card.
   const computerUse = join(OUT, "codex-computer-use");
   await mkdir(computerUse, { recursive: true });
   await config(computerUse, { computer_use: script }, model.port);

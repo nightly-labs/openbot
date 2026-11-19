@@ -1,9 +1,9 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.attachment", {
-  // Attachment and file preview errors.
   "error.attachment.notFound": "Attachment was not found.",
   "error.attachment.fileTooLarge": "A file exceeds the 100 MB limit.",
+  "error.attachment.namedFileTooLarge": "{name} is larger than the 100 MB limit.",
   "error.attachment.totalTooLarge": "Attachments exceed the 250 MB total limit.",
   "error.attachment.unavailable": "This file is no longer available.",
   "error.attachment.tooMany": "Choose at most {limit} files.",

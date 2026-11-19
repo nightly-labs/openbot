@@ -7,7 +7,6 @@ import { marketplaceMissingText, marketplaceSkillText } from "../../../component
 import { readMarketplaceSkill } from "../../../lib/marketplace";
 import { loadPageText } from "../../../lib/page-text";
 
-/** One approved skill. Any other slug is a 404: a skill has no page before its review. */
 export const Route = createFileRoute("/marketplace/skills/$slug")({
   loader: async ({ context, params }) => {
     const skill = await readMarketplaceSkill({ data: params.slug });

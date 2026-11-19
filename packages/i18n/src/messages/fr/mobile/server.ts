@@ -1499,7 +1499,6 @@ export const messages = {
   "mobile.server.audit.roleMemberAdded": "{member} ajouté à {role}",
   "mobile.server.audit.roleMemberRemoved": "{member} retiré de {role}",
   "mobile.server.audit.agentLevel": "{agent} pour {role} : {change}",
-  // Server settings › Import agents: Grok Bot and Hermes exports (`agent-import-v1`).
   "mobile.server.settings.importAgents": "Importer des agents",
   "mobile.server.route.import": "Importer des agents",
   "mobile.server.import.unsupported": "Mettez à jour OpenBot sur ce serveur pour y importer des agents.",
@@ -1573,7 +1572,6 @@ export const messages = {
   "mobile.server.import.channel": "Canal",
   "mobile.server.import.notImportedTitle": "Non importés",
   "mobile.server.import.resultWarnings": "Certains éléments n’ont pas été transférés",
-  // Server settings › Transfer: the whole server to or from a transfer file (`instance-transfer-v1`).
   "mobile.server.settings.transfer": "Transfert",
   "mobile.server.route.transfer": "Transfert",
   "mobile.server.route.transferExport": "Exporter",
@@ -1651,6 +1649,10 @@ export const messages = {
   "mobile.server.transfer.copyNotMoved":
     "Leurs canaux, flux de routines, workflows et le dossier partagé sont aussi copiés. Les clés d’API, les connexions, les connecteurs et l’historique des chats ne sont pas copiés. Configurez-les à nouveau sur l’autre serveur.",
   "mobile.server.transfer.copySubmit": { one: "Copier {count} agent", other: "Copier {count} agents" },
+  "mobile.server.transfer.copyDuplicatesTitle": "Copier des agents en double ?",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "{server} a déjà des agents avec ces noms : {names}. La copie ajoute un deuxième agent pour chacun. Chaque copie est un agent distinct, avec ses propres discussions, fichiers et souvenirs.",
+  "mobile.server.transfer.copyDuplicatesConfirm": "Copier les doublons",
   "mobile.server.transfer.copying": "Copie…",
   "mobile.server.transfer.copyFailed": "La copie n’a pas abouti.",
   "mobile.server.transfer.copied": {

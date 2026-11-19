@@ -1,13 +1,3 @@
-// Runs workflow model steps end to end on the real Antigravity driver, ACP client, warm client and
-// SQLite usage tables, with a fake Antigravity CLI 1.5.4 that answers each prompt with text and token
-// usage.
-// Checks that each step starts its own session on a process of its own that ends after the step
-// (#3925), that the warm process starts once, that a new main client and a failed step each start a
-// new warm process, that shutdown stops the warm process, and that the host usage report shows the
-// tokens in the one Workflows row and not in an agent row.
-//
-// Run: bun scripts/workflow-model-steps-e2e.ts
-// Writes .openbot-build/workflow-model-steps-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -25,8 +15,6 @@ import { NO_PROVIDER_CREDENTIALS, requireProviderDriver } from "../src/backend/p
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/workflow-model-steps-e2e");
 
-// Logs each request with its process id. A prompt answers "ok" and 100 input, 10 output and 5
-// thought tokens; a prompt with "FAIL" in it gets a JSON-RPC error.
 const FAKE_AGY = `#!/usr/bin/env node
 const fs = require("node:fs");
 const NL = String.fromCharCode(10);
@@ -106,7 +94,6 @@ const check = (name: string, ok: boolean, detail?: unknown) => {
 const root = await mkdtemp(join(tmpdir(), "openbot-workflow-model-steps-e2e-"));
 const log = join(root, "agy.jsonl");
 process.env.FAKE_AGY_LOG = log;
-// The driver reads and writes the sign-in in the Gemini home. Keep it off the user's `~/.gemini`.
 process.env.GEMINI_HOME = join(root, "gemini");
 const database = new OpenBotDatabase(join(root, "profile"));
 const clients: AgentClient[] = [];
@@ -119,12 +106,10 @@ async function readLog(): Promise<LogEntry[]> {
     .map((line) => JSON.parse(line));
 }
 
-/** The process of each step, in order, from the prompts in the log. */
 async function promptProcesses(): Promise<number[]> {
   return (await readLog()).filter((entry) => entry.method === "session/prompt").map((entry) => entry.pid);
 }
 
-/** The warm client's own processes, in order: they start, and they run no step. */
 async function warmProcesses(): Promise<number[]> {
   const entries = await readLog();
   const prompted = new Set(entries.filter((entry) => entry.method === "session/prompt").map((entry) => entry.pid));
@@ -140,7 +125,6 @@ const alive = (pid: number) => {
   }
 };
 
-/** Waits for a process to end; `client.stop()` resolves before the kernel reaps it. */
 async function ended(pid: number): Promise<boolean> {
   for (let tries = 0; tries < 200 && alive(pid); tries++) await new Promise((done) => setTimeout(done, 25));
   return !alive(pid);
@@ -165,7 +149,6 @@ try {
     supportedReasoningEfforts: ["medium"],
   };
 
-  // The main client only stands for the provider's settings: a new one means new settings.
   let owner: AgentClient = driver.createClient(cli, 10_000, NO_PROVIDER_CREDENTIALS);
   const profileClients = new ProfileClients();
   const warm = new WarmGenerations({
@@ -182,8 +165,6 @@ try {
       warm.generate("antigravity", model, prompt, workflowUsageObserver(database.usage, "antigravity", modelId)),
     );
 
-  // 1. Each step starts its own session on a process of its own, which ends after the step:
-  // Antigravity frees what a session holds only when its process ends (#3925).
   check("the first step answers", (await step("Say ok.")) === "ok");
   check("the second step answers", (await step("Say ok again.")) === "ok");
   const first = await promptProcesses();
@@ -196,7 +177,6 @@ try {
   const warmFirst = await warmProcesses();
   check("the warm process starts once", warmFirst.length === 1, warmFirst);
 
-  // 2. A new main client means new settings: the next step starts a new warm process, and the old one ends.
   const firstPid = warmFirst[0] ?? 0;
   await runCauseEffect(warm.ownerStopped(owner));
   check("the old process ends when its main client stops", await ended(firstPid));
@@ -206,7 +186,6 @@ try {
   const secondPid = second.at(-1) ?? 0;
   check("the step after a new main client runs on a new process", secondPid !== firstPid, second);
 
-  // 3. A failed step stops its processes, and the next step starts a new warm process.
   const failed = await runCauseEffect(
     warm.generate("antigravity", model, "FAIL", workflowUsageObserver(database.usage, "antigravity", modelId)),
   ).then(
@@ -222,11 +201,9 @@ try {
   check("the step after a failed step runs on a new process", thirdPid !== secondPid, third);
   report.processes.push(second, third);
 
-  // 4. Shutdown stops the warm process.
   await runCauseEffect(warm.dispose());
   check("shutdown stops the warm process", await ended(thirdPid));
 
-  // 5. The usage of the four answered steps is in the Workflows row only.
   const usage = database.usage.readHost(analyticsRange(WORKFLOWS_USAGE_ID, 1));
   const all = database.usage.readHost((({ agentId: _agentId, ...range }) => range)(analyticsRange("", 1)));
   report.usage = { workflows: usage.totals, agents: all.agents, models: all.models };

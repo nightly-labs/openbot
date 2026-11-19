@@ -11,31 +11,22 @@ import { ServerPlushLogo } from "../../server-plush-logo";
 import { useText } from "../../text";
 import { avatarColorChoiceLabel } from "../agents/avatar-hue-label";
 
-/** The agent colours, saved as the lower-case `#rrggbb` of their swatch. */
 const COLOR_CHOICES = AVATAR_COLOR_CHOICES.flatMap((choice) => {
   const hex = choice.swatch.toLowerCase();
   return isServerAppearanceColor(hex) ? [{ choice, hex }] : [];
 });
 
 export interface ServerAppearancePickerProps {
-  /** The server ID. It chooses the automatic colour. */
   serverId: string;
-  /** The look that the server shows now. Null is the automatic look. */
   appearance: ServerAppearance | null;
   disabled?: boolean;
-  /** Called with the new look at each choice. Null gives the automatic look again. */
   onChange: (appearance: ServerAppearance | null) => void;
 }
 
-/**
- * The shapes and colours of the plush that a server shows with no logo. It uses the markup of the
- * agent avatar picker, with no eyes.
- */
 export function ServerAppearancePicker(props: ServerAppearancePickerProps) {
   const { t } = useText();
   const shape = (): ServerAppearanceShape => props.appearance?.shape ?? "squircle";
   const color = (): ServerAppearance["color"] => props.appearance?.color ?? null;
-  /** The squircle in the automatic colour is the automatic look, so it is saved as null. */
   const choose = (next: ServerAppearance) =>
     props.onChange(next.shape === "squircle" && next.color === null ? null : next);
   return (

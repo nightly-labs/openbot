@@ -6,10 +6,6 @@ import { desktopCrmHost } from "../crm/crm-port";
 import { serverCanAdminister } from "../servers/server-capabilities";
 import { useServers } from "../servers/servers-context";
 
-/**
- * The host pane over the middle of the workspace: the usage report, the routine schedule, the
- * tasks, the workflows, the Library or the CRM. One state holds them, so each path that uncovers the conversation closes any of them.
- */
 type HostPaneView = "usage" | "schedule" | "tasks" | "workflows" | "library" | "crm";
 
 const context = createSimpleContext({
@@ -23,20 +19,13 @@ const context = createSimpleContext({
       serverId: null,
       view: "usage",
     });
-    /**
-     * The workflow that the workflows page of `serverId` opens, such as the one of a clicked
-     * notification. The page takes it once, so a later mount opens its first workflow again.
-     */
     const [workflowRequest, setWorkflowRequest] = createSignal<{ serverId: string; workflowId: string }>();
-    /** The server whose CRM page opens its connectors. The page takes it once. */
     const [crmConnectorsRequest, setCrmConnectorsRequest] = createSignal<string>();
     const { activeServer, activeServerId } = useServers();
-    /** The active server when this person may read its CRM: an owner or admin, on a host with `crm-v1`. */
     const crmServerId = createMemo(() => {
       const server = activeServer();
       return serverCanAdminister(server, CRM_CAPABILITY) ? server.id : undefined;
     });
-    /** The Server Settings > Experimental switch of that server. The CRM shows only while it is on. */
     const crm = createCrmEnabled(
       createMemo(() => {
         const serverId = crmServerId();
@@ -81,19 +70,6 @@ const context = createSimpleContext({
       open("crm", serverId, source);
     }
 
-    /**
-     * An open report follows the host the user switches to.
-     *
-     * This has to live here rather than in the shell that renders the panel.
-     * `ServerScopeBoundary` is keyed on the active server, so everything below it
-     * is disposed and rebuilt by a switch - a shell effect would initialize its
-     * "previous" server to the *new* one on every mount and could never see the
-     * change. This provider sits above that boundary, which is the whole reason
-     * the report survives a switch, and so is the only place that can observe it.
-     *
-     * The trigger goes with the old scope, so `null` replaces it: Back has nothing
-     * to return focus to once the element it was opened from is gone.
-     */
     let previousServer = untrack(activeServerId);
     createEffect(activeServerId, (serverId) => {
       if (serverId !== previousServer && untrack(() => state.serverId))
@@ -124,7 +100,6 @@ const context = createSimpleContext({
       takeWorkflowRequest: () => setWorkflowRequest(undefined),
       openLibrary,
       openCrm,
-      /** True when the active server shows its CRM, false when not, and undefined while it is not known. */
       crmEnabled: crm.enabled,
       crmConnectorsRequest,
       takeCrmConnectorsRequest: () => setCrmConnectorsRequest(undefined),
@@ -134,13 +109,6 @@ const context = createSimpleContext({
           if (trigger?.isConnected) trigger.focus({ preventScroll: true });
         });
       },
-      /**
-       * Back gives focus to the element the report was opened from; this does not.
-       * A command that opens a conversation - a global search result, a Dynamic
-       * Island action - has to uncover it first, and the destination owns focus
-       * from there: the transcript scrolls to the message the user picked, and
-       * pulling focus back to the rail button would undo that.
-       */
       dismissUsage: clear,
     };
   },

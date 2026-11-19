@@ -1428,7 +1428,6 @@ export const messages = {
   "mobile.server.audit.roleMemberAdded": "{member} 님을 {role}에 추가했어요",
   "mobile.server.audit.roleMemberRemoved": "{member} 님을 {role}에서 제거했어요",
   "mobile.server.audit.agentLevel": "{role}의 {agent}: {change}",
-  // Server settings › Import agents: Grok Bot and Hermes exports (`agent-import-v1`).
   "mobile.server.settings.importAgents": "에이전트 가져오기",
   "mobile.server.route.import": "에이전트 가져오기",
   "mobile.server.import.unsupported": "여기서 에이전트를 가져오려면 이 서버의 OpenBot을 업데이트하세요.",
@@ -1500,7 +1499,6 @@ export const messages = {
   "mobile.server.import.channel": "채널",
   "mobile.server.import.notImportedTitle": "가져오지 못함",
   "mobile.server.import.resultWarnings": "일부 항목은 옮겨지지 않았어요",
-  // Server settings › Transfer: the whole server to or from a transfer file (`instance-transfer-v1`).
   "mobile.server.settings.transfer": "이전",
   "mobile.server.route.transfer": "이전",
   "mobile.server.route.transferExport": "내보내기",
@@ -1574,6 +1572,10 @@ export const messages = {
   "mobile.server.transfer.copyNotMoved":
     "에이전트의 채널, 루틴 흐름, 워크플로, 공유 폴더도 복사돼요. API 키, 로그인, 커넥터, 채팅 기록은 복사되지 않아요. 다른 서버에서 다시 설정하세요.",
   "mobile.server.transfer.copySubmit": { other: "에이전트 {count}개 복사" },
+  "mobile.server.transfer.copyDuplicatesTitle": "중복된 에이전트를 복사할까요?",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "{server}에 이미 같은 이름의 에이전트가 있어요: {names}. 복사하면 각각 에이전트가 하나 더 추가돼요. 사본은 채팅, 파일, 메모리가 따로 있는 별개의 에이전트예요.",
+  "mobile.server.transfer.copyDuplicatesConfirm": "중복 복사",
   "mobile.server.transfer.copying": "복사하는 중…",
   "mobile.server.transfer.copyFailed": "복사를 완료하지 못했어요.",
   "mobile.server.transfer.copied": { other: "에이전트 {count}개를 {server}에 복사했어요." },

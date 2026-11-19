@@ -1,9 +1,5 @@
 import type { BrowserViewCursor } from "@openbot/contracts/team-protocol/browser-view-v1";
 
-/**
- * Electron's `cursor-changed` names, as the CSS names a live view client draws. Electron calls the
- * arrow `pointer` and the link hand `hand`. A custom image is not sent; the client draws an arrow.
- */
 const CURSORS = new Map<string, BrowserViewCursor>(
   Object.entries({
     pointer: "default",

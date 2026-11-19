@@ -110,6 +110,7 @@ export const messages = {
     "Bellek: {saved} kaydedildi, {updated} güncellendi, {forgotten} unutuldu, {notChanged} değiştirilmedi çünkü önce başka bir mesaj dizisi değiştirdi.",
   "status.agent.mcpToolCall": "{name} MCP sunucusunun {tool} aracını çalıştır.",
   "status.agent.uiBlockClosedByMessage": "Yeni bir mesajla kapatıldı",
+  "status.agent.finishCheckContinues": "İstek henüz bitmedi. Ajan devam ediyor ({current}/{limit}).",
   "status.agent.nextStepContinues": "Ajan bir sonraki adımdan önce durdu. Devam ediyor ({current}/{limit}).",
   "status.agent.planContinues": "Planda açık adımlar var. Ajan devam ediyor ({current}/{limit}).",
   "status.agent.planStopped": "Ajan, planında açık adımlar varken durdu. Devam etmesi için bir mesaj gönderin.",

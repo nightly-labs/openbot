@@ -4,11 +4,6 @@ import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { StoryConversation } from "./conversation-story-support";
 import { requireFixture, STORY_AGENT, STORY_AGENTS, STORY_MARKETPLACE_AGENT_DETAILS } from "./fixtures";
 
-/*
- * A direct chat before its first message. The agent is a new copy of the Marketplace template
- * "Desk Researcher", so its description and its routine are the template's own.
- */
-
 const template = requireFixture(STORY_MARKETPLACE_AGENT_DETAILS["listing-desk-researcher"], "Desk Researcher");
 const templateRoutine = requireFixture(template.routines[0], "Desk Researcher routine");
 
@@ -66,7 +61,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** A template agent: the faint turn asks its routine and plays the host's progress lines. */
 export const TemplateAgent: Story = {
   render: () => <EmptyChat agent={AGENT} routines={[ROUTINE]} />,
 };
@@ -75,7 +69,6 @@ export const TemplateAgentNarrow: Story = {
   render: () => <EmptyChat agent={AGENT} routines={[ROUTINE]} width="420px" />,
 };
 
-/** An agent with no routine and no description: only the title, so nothing in it is made up. */
 export const AgentWithoutRoutine: Story = {
   render: () => <EmptyChat agent={{ ...AGENT, description: "" }} routines={[]} />,
 };

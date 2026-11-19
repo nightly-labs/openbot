@@ -26,6 +26,8 @@ export const messages = {
   "mcp.signIn.waiting": "جارٍ انتظار المتصفح…",
   "mcp.signIn.continue": "المتابعة إلى {name}",
   "mcp.signIn.pageDescription": "هذه الصفحة مفتوحة في المتصفح على {host}. سجّل الدخول هنا.",
+  "mcp.signIn.copyHint": "إذا لم تُحمَّل الصفحة، انسخ الرابط وافتحه في متصفح آخر.",
+  "mcp.signIn.copyLink": "نسخ الرابط",
   "mcp.test.connected": {
     zero: "متصل · لا أدوات",
     one: "متصل · أداة واحدة",

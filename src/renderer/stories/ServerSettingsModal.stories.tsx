@@ -101,7 +101,6 @@ export const FirstSetupInvalidNameSmallViewport: Story = {
   },
 };
 
-/** Members of a server with no name yet: publishing generates one, so the switch is ready. */
 export const LocalFirstPublication: Story = {
   args: { ...LocalFirstSetup.args, initialSection: "members" },
 };
@@ -143,7 +142,6 @@ export const ActionError: Story = {
   },
 };
 
-/** The browser client: the owner sees company sign-in, but setup needs the desktop app. */
 export const RemoteOwnerInBrowser: Story = {
   args: {
     server: remoteServer,
@@ -174,7 +172,6 @@ export const RemoteMember: Story = {
   },
 };
 
-/** A Starter server with one site of its own and one unlinked site from before it was registered. */
 export const Sites: Story = {
   args: {
     initialSection: "sites",
@@ -194,7 +191,6 @@ const STORY_BROWSER_PROFILES: BrowserProfileSummary[] = [
   { id: "1b2c3d4e5f60718293a4b5c6d7e8f90a", name: "Personal", hue: 150, agentIds: [], tabCount: 0 },
 ];
 
-/** One proxy that Client A uses. */
 const STORY_BROWSER_PROXIES: BrowserProxySummary[] = [
   {
     id: "5c6d7e8f90a1b2c3d4e5f60718293a4b",
@@ -208,7 +204,6 @@ const STORY_BROWSER_PROXIES: BrowserProxySummary[] = [
   },
 ];
 
-/** The computer of another member, which Client B uses. */
 const STORY_BROWSER_COMPUTERS: BrowserProxyComputer[] = [
   {
     id: "7e8f90a1b2c3d4e5f60718293a4b5c6d",
@@ -221,19 +216,16 @@ const STORY_BROWSER_COMPUTERS: BrowserProxyComputer[] = [
   },
 ];
 
-/** This app as a client of the server: it can share its connection, and it does not yet. */
 interface StoryComputers {
   computers: readonly BrowserProxyComputer[];
   sharing: boolean;
 }
 
-/** Profiles in memory, so add, rename, color, clear and delete change the list as the host does. */
 function storyBrowserProfiles(
   initial: readonly BrowserProfileSummary[],
   initialProxies: readonly BrowserProxySummary[] = [],
   initialComputers?: StoryComputers,
 ): ServerBrowserProfilesOptions {
-  // Five agents in all: the ones that no named profile has use the shared profile.
   const [state, setState] = createStore<{
     profiles: BrowserProfileSummary[] | undefined;
     sharedAgentIds: string[] | undefined;
@@ -265,7 +257,6 @@ function storyBrowserProfiles(
     store: {
       state,
       refresh: async () => undefined,
-      // The story is one window, so no other device changes the profiles.
       follow: () => () => undefined,
       create: async (name) => {
         if (state.profiles?.some((profile) => profile.name.toLowerCase() === name.toLowerCase()))
@@ -301,7 +292,6 @@ function storyBrowserProfiles(
         setState((draft) => {
           const index = draft.profiles?.findIndex((item) => item.id === profileId) ?? -1;
           if (index < 0) return;
-          // A delete moves the agents of the profile to the shared profile.
           draft.sharedAgentIds?.push(...(draft.profiles?.[index]?.agentIds ?? []));
           draft.profiles?.splice(index, 1);
         }),
@@ -357,7 +347,6 @@ function storyBrowserProfiles(
   };
 }
 
-/** A profile uses at most one proxy or computer. */
 function assignStoryProxy(
   draft: { proxies: BrowserProxySummary[] | undefined; computers: BrowserProxyComputer[] | undefined },
   profileId: string,
@@ -369,7 +358,6 @@ function assignStoryProxy(
   }
 }
 
-/** The named browser profiles of this computer: a color, a name, and one menu for each profile. */
 export const BrowserProfiles: Story = {
   args: { initialSection: "browser-profiles" },
   render: (args) => (
@@ -377,7 +365,6 @@ export const BrowserProfiles: Story = {
   ),
 };
 
-/** Saved proxies above the profiles. Client A uses one; each profile row menu has a Proxy submenu. */
 export const BrowserProfilesWithProxies: Story = {
   args: { initialSection: "browser-profiles" },
   render: (args) => (
@@ -387,7 +374,6 @@ export const BrowserProfilesWithProxies: Story = {
   ),
 };
 
-/** The proxy of Client A does not answer. */
 export const BrowserProfilesProxyFailing: Story = {
   args: { initialSection: "browser-profiles" },
   render: (args) => (
@@ -403,7 +389,6 @@ export const BrowserProfilesProxyFailing: Story = {
   ),
 };
 
-/** The proxy of Client A refuses the saved sign-in. */
 export const BrowserProfilesProxySignInRefused: Story = {
   args: { initialSection: "browser-profiles" },
   render: (args) => (
@@ -419,10 +404,6 @@ export const BrowserProfilesProxySignInRefused: Story = {
   ),
 };
 
-/**
- * A joined server: Client B uses the computer of another member, and the Proxy submenu of each
- * profile can add this computer after a question.
- */
 export const BrowserProfilesWithComputers: Story = {
   args: { initialSection: "browser-profiles" },
   render: (args) => (
@@ -438,7 +419,6 @@ export const BrowserProfilesWithComputers: Story = {
   ),
 };
 
-/** The computer of the member that Client B uses is offline, so its pages do not load. */
 export const BrowserProfilesComputerOffline: Story = {
   args: { initialSection: "browser-profiles" },
   render: (args) => (
@@ -454,7 +434,6 @@ export const BrowserProfilesComputerOffline: Story = {
   ),
 };
 
-/** No named profile yet: the agents use the shared profile or their own. */
 export const BrowserProfilesEmpty: Story = {
   args: { initialSection: "browser-profiles" },
   render: (args) => <ServerSettingsStory settings={{ ...args, browserProfiles: storyBrowserProfiles([]) }} />,
@@ -573,10 +552,6 @@ export const ContainerReleaseAvailable: Story = {
   ),
 };
 
-/**
- * The roles of one story server: Research is closed to Everyone, Legal chats with it, and Finance
- * reads Sales. A save keeps its change until Storybook loads the story file again.
- */
 function storyAgentAccess(): ServerAgentAccessOptions {
   let stored: AgentAccessChange = {
     revision: 3,
@@ -602,7 +577,6 @@ function storyAgentAccess(): ServerAgentAccessOptions {
   };
 }
 
-/** Everyone, then the custom roles. A role page sets the level of each agent. */
 export const Roles: Story = {
   args: { initialSection: "roles", agentAccess: storyAgentAccess() },
 };
@@ -614,10 +588,6 @@ function storyServerAudit(entries: ServerAuditEntry[]): ServerAuditOptions {
   };
 }
 
-/**
- * The changes to members, roles and agent access, newest first, with a filter and a search. The
- * story passes plain settings, not the Storybook args store, so the member list reaches the dialog.
- */
 export const AuditLog: Story = {
   render: () => (
     <ServerSettingsStory
@@ -631,7 +601,6 @@ export const AuditLog: Story = {
   ),
 };
 
-/** No change yet. */
 export const AuditLogEmpty: Story = {
   render: () => (
     <ServerSettingsStory
@@ -640,12 +609,10 @@ export const AuditLogEmpty: Story = {
   ),
 };
 
-/** The role menu of each member row holds the server role and the custom roles. */
 export const MembersWithRoles: Story = {
   args: { initialSection: "members", agentAccess: storyAgentAccess() },
 };
 
-/** Only the owner and no invitation: sample invitations land behind the invite action, one at a time. */
 export const MembersEmpty: Story = {
   args: {
     initialSection: "members",
