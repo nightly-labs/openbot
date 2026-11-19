@@ -5,6 +5,7 @@ import { useText } from "../../text";
 
 /** How far an arrow key moves the position, in seconds. */
 const SEEK_STEP_SECONDS = 0.5;
+const PLAYBACK_SPEEDS = [1, 1.25, 1.5, 2];
 
 export interface VideoPlayerProps {
   /** The address of the file. Without one, Play calls `onLoad`. */
@@ -25,7 +26,7 @@ export interface VideoPlayerProps {
   onError?: (() => void) | undefined;
   ref?: ((video: HTMLVideoElement) => void) | undefined;
   /**
-   * Adds a mute button and a full screen button to the bar. Full screen fills the app window, as a
+   * Adds playback speed, mute, and full screen buttons to the bar. Full screen fills the app window, as a
    * page in the chat does: the player is a manual popover, so it goes to the top layer without a move
    * in the document and plays on.
    */
@@ -41,6 +42,7 @@ interface VideoPlayerState {
   /** Where a drag or a key moved the position, in seconds, until the user releases it. */
   dragged: number | null;
   muted: boolean;
+  speed: number;
   fullScreen: boolean;
   /** True while the video has no data to show at its position: it plays, but the picture stays. */
   buffering: boolean;
@@ -48,13 +50,14 @@ interface VideoPlayerState {
 
 /** A video with a play button over the frame, and a bar with the position and the actions at the bottom. */
 export function VideoPlayer(props: VideoPlayerProps) {
-  const { t } = useText();
+  const { t, format } = useText();
   const [player, setPlayer] = createStore<VideoPlayerState>({
     playing: false,
     time: 0,
     duration: 0,
     dragged: null,
     muted: false,
+    speed: 1,
     fullScreen: false,
     buffering: false,
   });
@@ -67,6 +70,7 @@ export function VideoPlayer(props: VideoPlayerProps) {
   };
   const length = () => player.duration || props.durationSeconds || 0;
   const elapsed = () => player.dragged ?? player.time;
+  const speed = () => format.number(player.speed);
   const setPlaying = (playing: boolean) =>
     setPlayer((state) => {
       state.playing = playing;
@@ -92,6 +96,11 @@ export function VideoPlayer(props: VideoPlayerProps) {
 
   const toggleSound = () => {
     if (video) video.muted = !video.muted;
+  };
+  const cycleSpeed = () => {
+    if (!props.src || !video) return;
+    const current = PLAYBACK_SPEEDS.indexOf(video.playbackRate);
+    video.playbackRate = PLAYBACK_SPEEDS[(current + 1) % PLAYBACK_SPEEDS.length] ?? 1;
   };
   const toggleFullScreen = () => {
     if (!frame) return;
@@ -143,6 +152,19 @@ export function VideoPlayer(props: VideoPlayerProps) {
             onWaiting={() => setBuffering(true)}
             onPlaying={() => setBuffering(false)}
             onCanPlay={() => setBuffering(false)}
+            onLoadStart={(event) => {
+              // The same player can load a different video, so reset the rate and its label together.
+              event.currentTarget.playbackRate = 1;
+              setPlayer((state) => {
+                state.speed = 1;
+              });
+            }}
+            onRateChange={(event) => {
+              const rate = event.currentTarget.playbackRate;
+              setPlayer((state) => {
+                state.speed = rate;
+              });
+            }}
             onVolumeChange={(event) => {
               const { muted } = event.currentTarget;
               setPlayer((state) => {
@@ -237,6 +259,18 @@ export function VideoPlayer(props: VideoPlayerProps) {
           {t("chat.video.time", { elapsed: clock(elapsed()), duration: clock(length()) })}
         </span>
         <Show when={props.fullControls}>
+          <Button
+            variant="ghost"
+            size="xs"
+            type="button"
+            class="media-generation-speed"
+            aria-label={t("chat.voice.speedLabel", { speed: speed() })}
+            title={t("chat.voice.speed")}
+            disabled={!props.src}
+            onClick={cycleSpeed}
+          >
+            {t("chat.voice.speedValue", { speed: speed() })}
+          </Button>
           <Button
             variant="ghost"
             size="icon-sm"

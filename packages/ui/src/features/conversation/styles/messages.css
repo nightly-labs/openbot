@@ -1915,7 +1915,9 @@ button.chat-action-target:active,
 }
 
 .media-generation-bar {
+  container: media-generation-controls / inline-size;
   display: flex;
+  flex-wrap: wrap;
   position: absolute;
   right: 0;
   bottom: 0;
@@ -1954,9 +1956,15 @@ button.chat-action-target:active,
   fill: currentColor;
 }
 
+.media-generation-speed {
+  flex: none;
+  min-inline-size: calc(5ch + 2 * var(--openbot-space-2));
+  font-variant-numeric: tabular-nums;
+}
+
 .media-generation-seek {
   flex: 1;
-  min-width: 0;
+  min-inline-size: var(--openbot-control-sm);
   margin-inline: 4px;
 }
 
@@ -1993,6 +2001,13 @@ button.chat-action-target:active,
   font-size: var(--openbot-text-sm);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+/* Keep room for the seek track and buttons on narrow videos. The slider still gives the time. */
+@container media-generation-controls (width < 300px) {
+  .media-generation-time {
+    display: none;
+  }
 }
 
 @keyframes image-generation-morph {

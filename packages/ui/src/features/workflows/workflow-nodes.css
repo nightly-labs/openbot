@@ -653,19 +653,11 @@
 .wfn-node .media-generation-player:not(:popover-open) .media-generation-bar {
   --wfn-bar-zoom: clamp(1, 1 / var(--wfn-scale, 1), 2);
 
-  container: wfn-video-bar / inline-size;
   right: auto;
   width: calc(100% / var(--wfn-bar-zoom));
   transform-origin: bottom left;
   scale: var(--wfn-bar-zoom);
   padding: 20px 6px 4px;
-}
-
-/* In a narrow card the time goes, so the position keeps space. The slider gives the time to a screen reader. */
-@container wfn-video-bar (width < 300px) {
-  .wfn-node .media-generation-time {
-    display: none;
-  }
 }
 
 .wfn-node:has(.media-generation-player[data-playing]) :is(.wfn-overlay, .wfn-clip-length) {
