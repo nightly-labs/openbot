@@ -293,6 +293,8 @@ export const messages = {
     "{provider}, {name} MCP sunucusunu başlatamadı, çünkü sunucu şu anda kullanılamıyor. Birkaç dakika bekleyin, ardından yeniden denemek için yeni bir sohbet başlatın.",
   "error.backend.mcpServerUnreachableInProvider":
     "{provider}, {name} MCP sunucusuna ulaşamadı. Pazaryeri, Uygulamalar bölümünde {name} öğesini açın ve adresin doğru olduğunu ve sunucunun çalıştığını kontrol edin. Ardından yeniden denemek için yeni bir sohbet başlatın.",
+  "error.backend.githubToolsNotStarted":
+    "{provider}, GitHub yanıt vermediği için GitHub araçlarını alamadı. Pazaryeri, Uygulamalar bölümünde GitHub öğesini açın ve isterse yeniden bağlayın. Ardından yeniden denemek için yeni bir sohbet başlatın.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot bu sunucu için yerel oturum açma bağlantısını başlatamadı. OpenBot'u yeniden başlatın ve tekrar deneyin.",
   "error.backend.mcpOAuthSignInNeeded":

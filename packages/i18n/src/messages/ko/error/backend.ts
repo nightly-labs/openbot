@@ -289,6 +289,8 @@ export const messages = {
     "서버를 지금 사용할 수 없어 {provider}이(가) MCP 서버 {name}을(를) 시작할 수 없었어요. 몇 분 기다린 후 새 채팅을 시작해 다시 시도하세요.",
   "error.backend.mcpServerUnreachableInProvider":
     "{provider}이(가) MCP 서버 {name}에 연결할 수 없었어요. 마켓플레이스, 앱에서 {name}을(를) 열고 주소가 올바른지, 서버가 실행 중인지 확인하세요. 그런 다음 새 채팅을 시작해 다시 시도하세요.",
+  "error.backend.githubToolsNotStarted":
+    "GitHub가 응답하지 않아 {provider}이(가) GitHub 도구를 가져올 수 없었어요. 마켓플레이스, 앱에서 GitHub를 열고, 요청하면 다시 연결하세요. 그런 다음 새 채팅을 시작해 다시 시도하세요.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot이 이 서버용 로컬 로그인 연결을 시작할 수 없었어요. OpenBot을 다시 시작한 후 시도해 주세요.",
   "error.backend.mcpOAuthSignInNeeded":

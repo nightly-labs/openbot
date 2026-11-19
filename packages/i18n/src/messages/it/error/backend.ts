@@ -307,6 +307,8 @@ export const messages = {
     "{provider} non è riuscito ad avviare il server MCP {name}, perché il server ora non è disponibile. Attendi qualche minuto, poi avvia una nuova chat per riprovare.",
   "error.backend.mcpServerUnreachableInProvider":
     "{provider} non è riuscito a raggiungere il server MCP {name}. Apri {name} in Marketplace, App, e verifica che l’indirizzo sia corretto e che il server sia attivo. Poi avvia una nuova chat per riprovare.",
+  "error.backend.githubToolsNotStarted":
+    "{provider} non è riuscito a ottenere gli strumenti di GitHub, perché GitHub non ha risposto. Apri GitHub in Marketplace, App, e collegalo di nuovo se te lo chiede. Poi avvia una nuova chat per riprovare.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot non è riuscito ad avviare la connessione di accesso locale per questo server. Riavvia OpenBot e riprova.",
   "error.backend.mcpOAuthSignInNeeded":
