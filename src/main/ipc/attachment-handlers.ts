@@ -262,11 +262,17 @@ export function attachmentIpcHandlers({
       }),
       openWorkspaceFile: scopedHandler(parseOpenWorkspaceFile, {
         local: async (parsed) => {
-          const workspaceFile = await runCauseEffect(service.resolveLocalWorkspaceFile(parsed.agentId, parsed.path));
+          // A chat link can name a folder. The file manager shows it; nothing opens a folder as an app.
+          const workspaceFile = await runCauseEffect(
+            service.resolveLocalWorkspaceFile(parsed.agentId, parsed.path, {
+              allowDirectory: parsed.action !== "download",
+            }),
+          );
           // A file outside the workspace can be anything on the computer, including a program, so it is
-          // shown in the file manager rather than run.
+          // shown in the file manager rather than run. A folder is also only revealed (macOS bundles are directories).
           await deliverLocalFile(workspaceFile.path, workspaceFile.name, parsed.action, async () => {
-            if (workspaceFile.insideWorkspace) await openPath(workspaceFile.path);
+            if (workspaceFile.isDirectory) shell.showItemInFolder(workspaceFile.path);
+            else if (workspaceFile.insideWorkspace) await openPath(workspaceFile.path);
             else shell.showItemInFolder(workspaceFile.path);
           });
         },

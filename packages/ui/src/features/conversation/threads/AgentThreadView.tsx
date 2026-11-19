@@ -4,6 +4,7 @@ import type {
   AgentTask,
   AgentTaskHold,
   AttachmentSummary,
+  DesktopPlatform,
   DraftAttachment,
   InstalledSkill,
   QueueDelivery,
@@ -68,6 +69,7 @@ import {
 } from "@openbot/ui/features/conversation/MessageRendering";
 import { type ChatBubbleStyle, ownMessageAuthor } from "@openbot/ui/features/conversation/own-bubble";
 import { QueuePanel } from "@openbot/ui/features/conversation/QueuePanel";
+import type { LocalFileLinkTarget } from "@openbot/ui/features/conversation/RichMessageText";
 import {
   MessageSelectionActions,
   type QuoteShortcutModifier,
@@ -226,6 +228,11 @@ export interface AgentThreadViewProps {
   onOpenFile?:
     | ((kind: "shared" | "workspace", agentId: string | undefined, path: string, asWritten?: string) => void)
     | undefined;
+  onLocalFileAction?:
+    | ((file: LocalFileLinkTarget, action: "reveal" | "open", agentId: string | undefined) => void)
+    | undefined;
+  canRevealFolders?: boolean | undefined;
+  fileManagerPlatform?: DesktopPlatform | undefined;
   /**
    * Opens an agent's chat, or one of its threads by tab id. With it, a message to or from another agent
    * shows as a marker, as in the agent's own chat. Without it, the message shows as a row.
@@ -636,6 +643,13 @@ export function AgentThreadView(props: AgentThreadViewProps) {
             // A path is in the workspace of the agent that sent the message.
             onOpenSharedFile={sharedFileOpener(current().exchange?.senderAgentId)}
             onOpenWorkspaceFile={workspaceFileOpener(current().exchange?.senderAgentId)}
+            onLocalFileAction={
+              props.onLocalFileAction
+                ? (file, action) => props.onLocalFileAction?.(file, action, current().exchange?.senderAgentId)
+                : undefined
+            }
+            canRevealFolders={props.canRevealFolders}
+            fileManagerPlatform={props.fileManagerPlatform}
             macWindowControls={props.macWindowControls}
           />
         )}
@@ -1013,6 +1027,13 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                           onAttachmentAction={props.onAttachmentAction}
                           onOpenSharedFile={sharedFileOpener(props.agent.id)}
                           onOpenWorkspaceFile={workspaceFileOpener(props.agent.id)}
+                          onLocalFileAction={
+                            props.onLocalFileAction
+                              ? (file, action) => props.onLocalFileAction?.(file, action, props.agent.id)
+                              : undefined
+                          }
+                          canRevealFolders={props.canRevealFolders}
+                          fileManagerPlatform={props.fileManagerPlatform}
                           mediaSource={props.mediaSource}
                           downloads={props.downloads}
                           onDownload={(attachment) => props.onAttachmentAction(attachment, "download")}

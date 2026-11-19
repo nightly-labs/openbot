@@ -76,6 +76,7 @@ export function ConversationThread() {
     copiedMessageId,
     branchThread,
     changeMarkerActions,
+    localFileAction,
   } = useConversationViewScope();
   const backdropAction = useMessageBackdropAction(conversationRuntime(props));
   const threadBackgroundWorkSince = (taskId: string | undefined) =>
@@ -324,6 +325,11 @@ export function ConversationThread() {
             onStop={() => current().threads.onStop()}
             onOpenLink={(url) => void openExternalMessageUrl(url)}
             onOpenFile={openThreadFile}
+            onLocalFileAction={
+              props.runtime ? undefined : (file, action, agentId) => localFileAction(file, action, agentId)
+            }
+            canRevealFolders={(props.server?.id ?? "local") === "local"}
+            fileManagerPlatform={props.platform}
             onSelectAgent={props.onSelectAgent}
             changeMarkerActions={changeMarkerActions}
             onPreview={(attachment) => void previewAttachment(attachment)}

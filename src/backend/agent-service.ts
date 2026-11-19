@@ -5347,11 +5347,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this: AgentService,
     agentId: string,
     inputPath: string,
-    options: { exactPath?: boolean } = {},
+    options: { allowDirectory?: boolean; exactPath?: boolean } = {},
   ) {
     const agent = yield* lifecycleStep("find workspace agent", () => this.#agentForFile(agentId));
     return yield* resolveWorkspaceFile(agent, inputPath, {
       ...localWorkspaceAccess(agent),
+      ...(options.allowDirectory ? { allowDirectory: true } : {}),
       ...(options.exactPath
         ? { exactPath: true }
         : {

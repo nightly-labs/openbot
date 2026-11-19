@@ -22,6 +22,7 @@ export interface ResolvedSharedFile {
 
 export interface ResolvedWorkspaceFile extends ResolvedSharedFile {
   insideWorkspace: boolean;
+  isDirectory?: boolean;
 }
 
 /** A line or column reference that agents write after a path: `:12`, `:12:3`, `#L12`, `#L12-L20`, `#L12C3`. */
@@ -335,11 +336,18 @@ function isMissing(error: AttachmentOperationError): boolean {
 export const resolveWorkspaceFile = Effect.fn("Workspace.resolveWorkspaceFile")(function* (
   agent: Pick<AgentSummary, "id" | "workspacePath">,
   inputPath: string,
-  options: WorkspacePathAccess & { exactPath?: boolean } & ToolHistory = {},
+  options: WorkspacePathAccess & { allowDirectory?: boolean; exactPath?: boolean } & ToolHistory = {},
 ): Effect.fn.Return<ResolvedWorkspaceFile, AttachmentOperationError> {
-  const { resolvedPath, insideWorkspace, metadata } = yield* resolveWorkspacePath(agent, inputPath, options);
+  const { resolvedPath, insideWorkspace, metadata } = yield* resolveWorkspacePath(agent, inputPath, {
+    ...options,
+    allowRoot: options.allowDirectory === true,
+  });
+  if (metadata.isDirectory()) {
+    if (!options.allowDirectory) return yield* refuse("not-file", sourceText("error.backend.workspacePathNotFile"));
+    return { path: resolvedPath, name: basename(resolvedPath), size: 0, insideWorkspace, isDirectory: true };
+  }
   if (!metadata.isFile()) return yield* refuse("not-file", sourceText("error.backend.workspacePathNotFile"));
-  return { path: resolvedPath, name: basename(resolvedPath), size: metadata.size, insideWorkspace };
+  return { path: resolvedPath, name: basename(resolvedPath), size: metadata.size, insideWorkspace, isDirectory: false };
 });
 
 /**

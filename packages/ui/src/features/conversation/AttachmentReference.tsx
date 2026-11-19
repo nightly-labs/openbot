@@ -6,11 +6,17 @@ export {
   fileReferenceTone as attachmentReferenceTone,
 } from "@openbot/brand/file-reference";
 
-export function AttachmentReferenceVisual(props: { name: string }) {
-  const badge = () => fileReferenceBadge(props.name);
+export function AttachmentReferenceVisual(props: { name: string; folder?: boolean | undefined }) {
+  const badge = () => (props.folder ? null : fileReferenceBadge(props.name));
   return (
     <span class="attachment-reference-visual" data-badge-length={badge()?.length.toString()} aria-hidden="true">
-      {badge() ? <span>{badge()}</span> : <AttachmentReferenceFileIcon />}
+      {props.folder ? (
+        <AttachmentReferenceFolderIcon />
+      ) : badge() ? (
+        <span>{badge()}</span>
+      ) : (
+        <AttachmentReferenceFileIcon />
+      )}
     </span>
   );
 }
@@ -44,6 +50,14 @@ function AttachmentReferenceFileIcon() {
     <svg aria-hidden="true" viewBox="0 0 20 20">
       <path d="M5 2.75h6l4 4v10.5H5z" />
       <path d="M11 2.75v4h4M7.5 11h5M7.5 14h5" />
+    </svg>
+  );
+}
+
+function AttachmentReferenceFolderIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20">
+      <path d="M2.75 5.5a1.5 1.5 0 0 1 1.5-1.5h3.5l1.6 1.75h6.4a1.5 1.5 0 0 1 1.5 1.5v7.25a1.5 1.5 0 0 1-1.5 1.5H4.25a1.5 1.5 0 0 1-1.5-1.5z" />
     </svg>
   );
 }

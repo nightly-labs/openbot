@@ -9,7 +9,8 @@ import {
 } from "@openbot/contracts/chat-math";
 import { chatPreviewKind } from "@openbot/contracts/chat-preview";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { Button, Checkbox } from "@openbot/ui";
+import type { DesktopPlatform } from "@openbot/contracts/ipc";
+import { Button, buttonVariants, Checkbox, ContextMenu, Copy, ExternalLink, FolderOpen, toast } from "@openbot/ui";
 import { Dynamic } from "@solidjs/web";
 import { Marked, type Token, type Tokens, type TokensList } from "marked";
 import { createMemo, createSignal, For, Show } from "solid-js";
@@ -304,6 +305,9 @@ export function MarkdownMessageText(props: MarkdownMessageTextProps) {
       onOpenAttachment: props.onOpenAttachment,
       onOpenSharedFile: props.onOpenSharedFile,
       onOpenWorkspaceFile: props.onOpenWorkspaceFile,
+      onLocalFileAction: props.onLocalFileAction,
+      canRevealFolders: props.canRevealFolders,
+      fileManagerPlatform: props.fileManagerPlatform,
       onOpenQuote: props.onOpenQuote,
       onOpenTag: props.onOpenTag,
       linkFavicons: props.linkFavicons,
@@ -343,6 +347,9 @@ export function MarkdownInlineText(
     onOpenAttachment: props.onOpenAttachment,
     onOpenSharedFile: props.onOpenSharedFile,
     onOpenWorkspaceFile: props.onOpenWorkspaceFile,
+    onLocalFileAction: props.onLocalFileAction,
+    canRevealFolders: props.canRevealFolders,
+    fileManagerPlatform: props.fileManagerPlatform,
     onOpenQuote: props.onOpenQuote,
     onOpenTag: props.onOpenTag,
     linkFavicons: props.linkFavicons,
@@ -734,19 +741,49 @@ function MarkdownInline(props: {
             const file = mentionedFileTarget(token.text, props.content.fileDirectory);
             const openShared = props.content.onOpenSharedFile;
             const openWorkspace = props.content.onOpenWorkspaceFile;
+            const onLocalFileAction = props.content.onLocalFileAction;
             return file && file.kind === "shared" && openShared ? (
               <LocalFileLink
                 path={file.path}
                 label={token.text}
                 kind="shared"
+                folder={file.folder}
                 onOpen={(path) => openShared(path, file.asWritten)}
+                onAction={
+                  onLocalFileAction
+                    ? (action) =>
+                        onLocalFileAction(
+                          { path: file.path, kind: "shared", folder: file.folder === true, asWritten: file.asWritten },
+                          action,
+                        )
+                    : undefined
+                }
+                canRevealFolders={props.content.canRevealFolders}
+                fileManagerPlatform={props.content.fileManagerPlatform}
               />
             ) : file && file.kind === "workspace" && openWorkspace ? (
               <LocalFileLink
                 path={file.path}
                 label={token.text}
                 kind="workspace"
+                folder={file.folder}
                 onOpen={(path) => openWorkspace(path, file.asWritten)}
+                onAction={
+                  onLocalFileAction
+                    ? (action) =>
+                        onLocalFileAction(
+                          {
+                            path: file.path,
+                            kind: "workspace",
+                            folder: file.folder === true,
+                            asWritten: file.asWritten,
+                          },
+                          action,
+                        )
+                    : undefined
+                }
+                canRevealFolders={props.content.canRevealFolders}
+                fileManagerPlatform={props.content.fileManagerPlatform}
               />
             ) : (
               <code dir="ltr">{token.text}</code>
@@ -788,6 +825,17 @@ function MarkdownInline(props: {
                 label={markdownInlinePlainText(token.tokens) || token.text}
                 kind="shared"
                 onOpen={props.content.onOpenSharedFile}
+                onAction={
+                  props.content.onLocalFileAction
+                    ? (action) =>
+                        props.content.onLocalFileAction?.(
+                          { path: sharedPath, kind: "shared", folder: /[/\\]$/u.test(sharedPath) },
+                          action,
+                        )
+                    : undefined
+                }
+                canRevealFolders={props.content.canRevealFolders}
+                fileManagerPlatform={props.content.fileManagerPlatform}
               />
             ) : workspacePath && props.content.onOpenWorkspaceFile ? (
               <LocalFileLink
@@ -795,6 +843,17 @@ function MarkdownInline(props: {
                 label={markdownInlinePlainText(token.tokens) || token.text}
                 kind="workspace"
                 onOpen={props.content.onOpenWorkspaceFile}
+                onAction={
+                  props.content.onLocalFileAction
+                    ? (action) =>
+                        props.content.onLocalFileAction?.(
+                          { path: workspacePath, kind: "workspace", folder: /[/\\]$/u.test(workspacePath) },
+                          action,
+                        )
+                    : undefined
+                }
+                canRevealFolders={props.content.canRevealFolders}
+                fileManagerPlatform={props.content.fileManagerPlatform}
               />
             ) : (
               <RichText body={token.text} content={props.content} streamingTailAfter={after()} />
@@ -1172,32 +1231,101 @@ function LocalFileLink(props: {
   path: string;
   label: string;
   kind: "shared" | "workspace";
+  folder?: boolean | undefined;
   onOpen: (path: string) => void;
+  onAction?: ((action: "reveal" | "open") => void) | undefined;
+  canRevealFolders?: boolean | undefined;
+  fileManagerPlatform?: DesktopPlatform | undefined;
 }) {
   const { t } = useText();
-  // A workspace path that ends with a separator is a folder chip, such as `research/eyeliner/`.
-  const folder = props.kind === "workspace" && /[/\\]$/u.test(props.path);
-  const name = fileReferenceName(folder ? props.path.replace(/[/\\]+$/u, "") : props.path);
+  // A path that ends with a separator, or was recognized as a folder codespan, is a folder chip.
+  const folder = () => props.folder === true || /[/\\]$/u.test(props.path);
+  const name = () => fileReferenceName(folder() ? props.path.replace(/[/\\]+$/u, "") : props.path);
   const label = () => {
-    if (props.kind === "shared") return t("chat.file.openShared", { name });
-    return folder ? t("chat.file.openWorkspaceFolder", { name }) : t("chat.file.openWorkspace", { name });
+    if (props.kind === "shared") {
+      return folder() ? t("chat.file.openSharedFolder", { name: name() }) : t("chat.file.openShared", { name: name() });
+    }
+    return folder()
+      ? t("chat.file.openWorkspaceFolder", { name: name() })
+      : t("chat.file.openWorkspace", { name: name() });
+  };
+  const revealLabel = () => {
+    if (props.fileManagerPlatform === "darwin") return t("chat.file.menu.revealFinder");
+    if (props.fileManagerPlatform === "win32") return t("chat.file.menu.revealExplorer");
+    return t("chat.file.menu.revealFolder");
+  };
+  const showReveal = () => Boolean(props.onAction) && (!folder() || props.canRevealFolders !== false);
+  const showOpenDefault = () => Boolean(props.onAction) && !folder();
+  const copyPath = () => {
+    const clipboard = navigator.clipboard;
+    if (!clipboard?.writeText) {
+      toast.error(t("app.clipboard.copyFailed"));
+      return;
+    }
+    void clipboard.writeText(props.path).then(
+      () => toast.success(t("chat.file.menu.pathCopied")),
+      () => toast.error(t("app.clipboard.copyFailed")),
+    );
   };
   return (
-    <Button
-      variant="ghost"
-      type="button"
-      class="message-file-reference"
-      data-file-tone={attachmentReferenceTone(name)}
-      aria-label={label()}
-      title={props.path}
-      data-cuelume-tap="open"
-      onClick={() => props.onOpen(props.path)}
-    >
-      <AttachmentReferenceVisual name={name} />
-      <span class="inline-file-reference-name" dir="auto">
-        {props.label || name}
-      </span>
-    </Button>
+    <ContextMenu.Root modal={false}>
+      <ContextMenu.Trigger
+        as="button"
+        type="button"
+        class={`${buttonVariants({ variant: "ghost" })} message-file-reference`}
+        data-file-tone={folder() ? "default" : attachmentReferenceTone(name())}
+        aria-label={label()}
+        aria-keyshortcuts="Shift+F10"
+        title={props.path}
+        data-cuelume-tap="open"
+        onClick={() => props.onOpen(props.path)}
+        onContextMenu={(event: MouseEvent) => {
+          event.stopPropagation();
+        }}
+        onKeyDown={(event: KeyboardEvent & { currentTarget: HTMLElement }) => {
+          if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return;
+          event.preventDefault();
+          event.stopPropagation();
+          const bounds = event.currentTarget.getBoundingClientRect();
+          event.currentTarget.dispatchEvent(
+            new MouseEvent("contextmenu", {
+              bubbles: true,
+              cancelable: true,
+              clientX: bounds.left,
+              clientY: bounds.top,
+            }),
+          );
+        }}
+      >
+        <AttachmentReferenceVisual name={name()} folder={folder()} />
+        <span class="inline-file-reference-name" dir="auto">
+          {props.label || name()}
+        </span>
+      </ContextMenu.Trigger>
+      <ContextMenu.Portal>
+        <ContextMenu.Content aria-label={t("chat.file.menu.label", { name: name() })}>
+          <Show when={showReveal()}>
+            <ContextMenu.Item onSelect={() => props.onAction?.("reveal")}>
+              <FolderOpen aria-hidden="true" />
+              <span>{revealLabel()}</span>
+            </ContextMenu.Item>
+          </Show>
+          <Show when={showOpenDefault()}>
+            <ContextMenu.Item onSelect={() => props.onAction?.("open")}>
+              <ExternalLink aria-hidden="true" />
+              <span>{t("chat.file.menu.openDefault")}</span>
+            </ContextMenu.Item>
+          </Show>
+          <Show when={showReveal() || showOpenDefault()}>
+            <ContextMenu.Separator />
+          </Show>
+          <ContextMenu.Item onSelect={copyPath}>
+            <Copy aria-hidden="true" />
+            <span>{t("chat.file.menu.copyPath")}</span>
+          </ContextMenu.Item>
+        </ContextMenu.Content>
+      </ContextMenu.Portal>
+    </ContextMenu.Root>
   );
 }
 
@@ -1352,13 +1480,141 @@ function messageFileDirectory(body: string): FileDirectoryContext | null {
   return contexts.size === 1 ? (contexts.values().next().value ?? null) : null;
 }
 
-/** The file that a code span names. `asWritten` is the span text when the path joins it to `directory`. */
+const FOLDER_FORBIDDEN_CHARS = /[\0\r\n\t|&;<>'"`$*?={}]/u;
+const FOLDER_CLI_FLAG = /(?:^|\s)--?[A-Za-z0-9]/u;
+const FOLDER_PLACEHOLDER_BRACKET = /\[[^/\\\]]+\]/u;
+const FOLDER_DUMMY_PATH = /(?:^|[/\\])path[/\\]to(?:[/\\]|$)/iu;
+const FOLDER_TRAILING_PUNCTUATION = /[.,;:!?)]$/u;
+const FOLDER_LIKELY_EXTENSION = /[^.]\.[A-Za-z0-9]{1,8}$/u;
+const KNOWN_UNIX_FOLDER_ROOTS = new Set([
+  "Applications",
+  "Library",
+  "Users",
+  "Volumes",
+  "etc",
+  "home",
+  "mnt",
+  "opt",
+  "root",
+  "srv",
+  "tmp",
+  "var",
+  "workspace",
+  "workspaces",
+]);
+
+function hasInvalidFolderSegments(segments: readonly string[], allowSpaces: boolean): boolean {
+  if (segments.length === 0) return true;
+  for (const segment of segments) {
+    if (!segment || segment === "." || segment === ".." || segment === "..." || segment === "…") return true;
+    if (segment.includes(":") || segment.trim() !== segment) return true;
+    if (!allowSpaces && /\s/u.test(segment)) return true;
+    if (/\s{2,}/u.test(segment)) return true;
+  }
+  return false;
+}
+
+/**
+ * Whether an inline code span names a local folder path rather than a shell command, URL, API
+ * route, or placeholder example (such as `/path/to/dir/` or `E:\workspaces\...\folder\`).
+ */
+export function mentionedFolderTarget(value: string): (FileDirectoryContext & { folder: true }) | null {
+  const path = value.trim();
+  if (!path || path.startsWith("//") || path.startsWith("\\\\")) return null;
+  if (FOLDER_FORBIDDEN_CHARS.test(path) || FOLDER_CLI_FLAG.test(path)) return null;
+  if (FOLDER_PLACEHOLDER_BRACKET.test(path) || FOLDER_DUMMY_PATH.test(path)) return null;
+
+  const hasTrailingSeparator = /[/\\]$/u.test(path);
+  const normalized = path.replaceAll("\\", "/");
+  const trimmed = normalized.replace(/\/+$/u, "");
+  if (!trimmed) return null;
+
+  // Reject URL schemes other than Windows drive prefixes (e.g. https://, mailto:, file://).
+  const isWindowsDrive = /^[A-Za-z]:[/\\]/u.test(path);
+  if (!isWindowsDrive && /^[A-Za-z][A-Za-z\d+.-]*:/u.test(path)) return null;
+
+  // Shared folder path must name a child folder under OpenBot/Shared (resolveSharedFile rejects root).
+  const shared = sharedFileTarget(hasTrailingSeparator ? path : `${path}/`);
+  if (shared) {
+    const afterShared = normalized.split("/OpenBot/Shared/").at(-1) ?? "";
+    const sharedPrefixStripped = normalized.startsWith("~/OpenBot/Shared/")
+      ? normalized.slice("~/OpenBot/Shared/".length)
+      : normalized.startsWith("OpenBot/Shared/")
+        ? normalized.slice("OpenBot/Shared/".length)
+        : afterShared;
+    const childSegments = sharedPrefixStripped.replace(/\/+$/u, "").split("/").filter(Boolean);
+    if (hasInvalidFolderSegments(childSegments, hasTrailingSeparator)) return null;
+    if (!hasTrailingSeparator) {
+      const last = childSegments.at(-1) ?? "";
+      if (/\s/u.test(last) || FOLDER_LIKELY_EXTENSION.test(last) || FOLDER_TRAILING_PUNCTUATION.test(last)) {
+        return null;
+      }
+    }
+    return { path, kind: "shared", folder: true };
+  }
+
+  // Windows absolute drive path, e.g. `E:\workspaces\openbot\` or `E:\workspaces\openbot`.
+  if (isWindowsDrive) {
+    const rest = trimmed.slice(3);
+    const segments = rest ? rest.split("/") : [];
+    if (hasInvalidFolderSegments(segments, true)) return null;
+    if (!hasTrailingSeparator) {
+      const last = segments.at(-1) ?? "";
+      if (/\s/u.test(last) || FOLDER_LIKELY_EXTENSION.test(last) || FOLDER_TRAILING_PUNCTUATION.test(last)) {
+        return null;
+      }
+    }
+    return { path, kind: "workspace", folder: true };
+  }
+
+  // Tilde path, e.g. `~/projects/openbot/` or `~/projects/openbot`.
+  if (/^~[/\\]/u.test(path)) {
+    const rest = trimmed.slice(2);
+    const segments = rest ? rest.split("/") : [];
+    if (hasInvalidFolderSegments(segments, hasTrailingSeparator)) return null;
+    if (!hasTrailingSeparator) {
+      const last = segments.at(-1) ?? "";
+      if (/\s/u.test(last) || FOLDER_LIKELY_EXTENSION.test(last) || FOLDER_TRAILING_PUNCTUATION.test(last)) {
+        return null;
+      }
+    }
+    return { path, kind: "workspace", folder: true };
+  }
+
+  // Unix absolute path: only known OS roots to avoid API routes like `/api/v1/users/`.
+  if (normalized.startsWith("/")) {
+    const segments = trimmed.slice(1).split("/");
+    const root = segments[0] ?? "";
+    if (!KNOWN_UNIX_FOLDER_ROOTS.has(root)) return null;
+    if (hasInvalidFolderSegments(segments, hasTrailingSeparator)) return null;
+    if (!hasTrailingSeparator) {
+      if (segments.length < 2) return null;
+      const last = segments.at(-1) ?? "";
+      if (/\s/u.test(last) || FOLDER_LIKELY_EXTENSION.test(last) || FOLDER_TRAILING_PUNCTUATION.test(last)) {
+        return null;
+      }
+    }
+    return { path, kind: "workspace", folder: true };
+  }
+
+  // Relative workspace folder path: require explicit trailing separator, no spaces, and either
+  // explicit `./` prefix or at least two segments (e.g. `packages/ui/`, `./docs/`).
+  if (!hasTrailingSeparator || /\s/u.test(path) || path.startsWith("-") || path.startsWith("@")) return null;
+  const explicitRelative = /^\.[/\\]/u.test(path);
+  const body = explicitRelative ? trimmed.slice(2) : trimmed;
+  const segments = body ? body.split("/") : [];
+  if (!explicitRelative && segments.length < 2) return null;
+  if (hasInvalidFolderSegments(segments, false)) return null;
+  return { path, kind: "workspace", folder: true };
+}
+
+/** The file or folder that a code span names. `asWritten` is the span text when the path joins it to `directory`. */
 function mentionedFileTarget(
   value: string,
   directory: FileDirectoryContext | null,
-): (FileDirectoryContext & { asWritten?: string }) | null {
+): (FileDirectoryContext & { asWritten?: string; folder?: boolean }) | null {
   const path = value.trim();
-  if (!isFileReference(path)) return null;
+  if (!isFileReference(path)) return mentionedFolderTarget(path);
   const shared = sharedFileTarget(path);
   if (shared) return { path: shared, kind: "shared" };
   if (/^(?:~[/\\]|[/\\]|[A-Za-z]:[/\\])/u.test(path)) {
@@ -1395,7 +1651,8 @@ export function messageImageFiles(blocks: readonly string[]): MessageImageFile[]
         : tokenIs(token, "link")
           ? linkFileTarget(writtenLinkTarget(token))
           : null;
-      if (file && IMAGE_FILE_PATTERN.test(fileReferenceName(file.path)))
+      const isFolder = (file && "folder" in file && file.folder === true) || (file ? /[/\\]$/u.test(file.path) : false);
+      if (file && !isFolder && IMAGE_FILE_PATTERN.test(fileReferenceName(file.path)))
         files.set(`${file.kind}:${file.path}`, { path: file.path, kind: file.kind });
     });
   }

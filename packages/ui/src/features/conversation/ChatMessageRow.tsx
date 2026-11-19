@@ -1,4 +1,10 @@
-import type { AttachmentSummary, AvatarColor, ConversationReaction, InstalledSkill } from "@openbot/contracts/ipc";
+import type {
+  AttachmentSummary,
+  AvatarColor,
+  ConversationReaction,
+  DesktopPlatform,
+  InstalledSkill,
+} from "@openbot/contracts/ipc";
 import {
   Bubble,
   BubbleContent,
@@ -20,6 +26,7 @@ import { chatBubbleColor, useBackdropBubbles } from "./BackdropBubbles";
 import type { MessageImageFile } from "./MarkdownMessageText";
 import { conversationBubbleVariant, MessageBody } from "./MessageRendering";
 import { solidBubbleTakesDarkText } from "./own-bubble";
+import type { LocalFileLinkTarget } from "./RichMessageText";
 
 /**
  * Who wrote a message, as much as a row needs to draw it.
@@ -105,6 +112,9 @@ export interface ChatMessageRowProps {
   onAttachmentAction: (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => void;
   onOpenSharedFile?: ((path: string, asWritten?: string) => void) | undefined;
   onOpenWorkspaceFile?: ((path: string, asWritten?: string) => void) | undefined;
+  onLocalFileAction?: ((file: LocalFileLinkTarget, action: "reveal" | "open") => void) | undefined;
+  canRevealFolders?: boolean | undefined;
+  fileManagerPlatform?: DesktopPlatform | undefined;
   onOpenQuote?: ((messageId: string, text: string) => void) | undefined;
   onOpenTag?: ((kind: "tab" | "thread", id: string) => void) | undefined;
   onDownload?: ((attachment: AttachmentSummary) => void) | undefined;
@@ -249,6 +259,9 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
       onAttachmentAction={props.onAttachmentAction}
       onOpenSharedFile={props.onOpenSharedFile}
       onOpenWorkspaceFile={props.onOpenWorkspaceFile}
+      onLocalFileAction={props.onLocalFileAction}
+      canRevealFolders={props.canRevealFolders}
+      fileManagerPlatform={props.fileManagerPlatform}
       onOpenQuote={props.onOpenQuote}
       onOpenTag={props.onOpenTag}
       onDownload={props.onDownload}

@@ -9,6 +9,7 @@ import {
 import { matchingSourceKeys } from "@openbot/i18n";
 import type { AgentSettingLinkId, AgentSettingReveal } from "@openbot/ui/features/conversation/agent-setting-links";
 import type { MessageImageFile } from "@openbot/ui/features/conversation/MarkdownMessageText";
+import type { LocalFileLinkTarget } from "@openbot/ui/features/conversation/RichMessageText";
 import { isSidePanelPane } from "@openbot/ui/features/conversation/SidePanel";
 import { currentText } from "@openbot/ui/text";
 import { normalizeMessage } from "@openbot/user-errors/reference";
@@ -769,6 +770,36 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     void request.catch((error) => deps.setComposerError(errorMessage(error, t("attachment.error.download")), target));
   }
 
+  /** Runs a context-menu action (`reveal` or `open`) on a file or folder chip in chat. */
+  function localFileAction(file: LocalFileLinkTarget, action: "reveal" | "open", agentId = deps.props.agent?.id) {
+    const ownerAgentId = conversationOwnerId(deps.props);
+    if (!ownerAgentId || deps.props.runtime) return;
+    const serverId = deps.props.server?.id ?? "local";
+    if (file.folder && serverId !== "local") return;
+    const target = { agentId: ownerAgentId, serverId };
+    const agent = conversationRuntime(deps.props).agent;
+    deps.setComposerError(null, target);
+    const run = (path: string, kind: "shared" | "workspace"): Promise<void> => {
+      if (kind === "shared") return agent.openSharedFile({ path, action });
+      if (!agentId) return Promise.resolve();
+      return agent.openWorkspaceFile({ agentId, path, action });
+    };
+    const showError = (error: unknown) => {
+      deps.setComposerError(errorMessage(error, t("attachment.error.openFile")), target);
+    };
+    void run(file.path, file.kind).catch((error) => {
+      if (file.kind === "workspace" && SHARED_FOLDER_PATH.test(file.path)) {
+        void run(decodedPath(file.path), "shared").catch(() => showError(error));
+        return;
+      }
+      if (file.asWritten && agentId) {
+        void run(file.asWritten, "workspace").catch(() => showError(error));
+        return;
+      }
+      showError(error);
+    });
+  }
+
   /** Drops the shown file, so that no read that is still running shows it again. */
   function clearSidebarFilePreview() {
     deps.invalidateFilePreviewGeneration();
@@ -813,6 +844,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     openSharedFile,
     openThreadFile,
     openWorkspaceFile,
+    localFileAction,
     openWorkspaceFolder,
     openWorkspaceFolderEntry,
     previewQuoteId,

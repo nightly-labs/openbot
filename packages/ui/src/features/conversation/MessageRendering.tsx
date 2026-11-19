@@ -2,7 +2,7 @@ import { fileReferenceName } from "@openbot/brand/file-reference";
 import { attachmentMimeTypeForName, playableMediaKind } from "@openbot/contracts/attachment-files";
 import { removeAttachmentReferences } from "@openbot/contracts/attachment-references";
 import { chatPreviewKind } from "@openbot/contracts/chat-preview";
-import type { AttachmentSummary, InstalledSkill, MessageReaction } from "@openbot/contracts/ipc";
+import type { AttachmentSummary, DesktopPlatform, InstalledSkill, MessageReaction } from "@openbot/contracts/ipc";
 import { canPreviewAttachment, MESSAGE_REACTIONS, MORE_MESSAGE_REACTIONS } from "@openbot/contracts/ipc";
 import { parseSelectionInstruction } from "@openbot/contracts/selection-instruction";
 import {
@@ -65,6 +65,7 @@ import {
   messageImageFiles,
 } from "./MarkdownMessageText";
 import { ReplyQuote } from "./ReplyQuote";
+import type { LocalFileLinkTarget } from "./RichMessageText";
 import {
   nextStreamingReveal,
   type StreamingRevealChunk,
@@ -340,6 +341,9 @@ export function MessageBody(props: {
   onAttachmentAction: (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => void;
   onOpenSharedFile?: ((path: string, asWritten?: string) => void) | undefined;
   onOpenWorkspaceFile?: ((path: string, asWritten?: string) => void) | undefined;
+  onLocalFileAction?: ((file: LocalFileLinkTarget, action: "reveal" | "open") => void) | undefined;
+  canRevealFolders?: boolean | undefined;
+  fileManagerPlatform?: DesktopPlatform | undefined;
   /** Opens the passage that a quote in the message points to. */
   onOpenQuote?: ((messageId: string, text: string) => void) | undefined;
   /** Shows the browser tab or opens the thread that a tag in the message names. */
@@ -687,6 +691,9 @@ export function MessageBody(props: {
       onOpenImage={openMarkdownImage}
       onOpenSharedFile={props.onOpenSharedFile}
       onOpenWorkspaceFile={props.onOpenWorkspaceFile}
+      onLocalFileAction={props.onLocalFileAction}
+      canRevealFolders={props.canRevealFolders}
+      fileManagerPlatform={props.fileManagerPlatform}
       onOpenQuote={props.onOpenQuote}
       onOpenTag={props.onOpenTag}
     />
@@ -856,6 +863,9 @@ export function MessageBody(props: {
                             onOpenImage={openMarkdownImage}
                             onOpenSharedFile={props.onOpenSharedFile}
                             onOpenWorkspaceFile={props.onOpenWorkspaceFile}
+                            onLocalFileAction={props.onLocalFileAction}
+                            canRevealFolders={props.canRevealFolders}
+                            fileManagerPlatform={props.fileManagerPlatform}
                             onOpenQuote={props.onOpenQuote}
                             onOpenTag={props.onOpenTag}
                             showCitationFooter={index === lastTextBlockIndex()}

@@ -192,6 +192,7 @@ export function ConversationTimeline() {
     openAgentSettingRow,
     openSharedFile,
     openWorkspaceFile,
+    localFileAction,
     openQuote,
     openTaggedReference,
     pendingSendFor,
@@ -546,6 +547,13 @@ export function ConversationTimeline() {
               onOpenSharedFile={(path) => openSharedFile(path)}
               // A workspace path is in the workspace of the agent that wrote it, as in a channel.
               onOpenWorkspaceFile={(path) => openWorkspaceFile(path, undefined, current().exchange?.senderAgentId)}
+              onLocalFileAction={
+                props.runtime
+                  ? undefined
+                  : (file, action) => localFileAction(file, action, current().exchange?.senderAgentId)
+              }
+              canRevealFolders={(props.server?.id ?? "local") === "local"}
+              fileManagerPlatform={props.platform}
               onOpenQuote={openQuote}
               onOpenTag={openTaggedReference}
               macWindowControls={props.platform === "darwin"}
@@ -564,6 +572,11 @@ export function ConversationTimeline() {
               onPreview={(attachment) => void previewAttachment(attachment)}
               onAttachmentAction={attachmentAction}
               onOpenWorkspaceFile={(path) => openWorkspaceFile(path, undefined, props.agent?.id)}
+              onLocalFileAction={
+                props.runtime ? undefined : (file, action) => localFileAction(file, action, props.agent?.id)
+              }
+              canRevealFolders={(props.server?.id ?? "local") === "local"}
+              fileManagerPlatform={props.platform}
               onOpenQuote={openQuote}
               onOpenTag={openTaggedReference}
               macWindowControls={props.platform === "darwin"}
@@ -1692,6 +1705,13 @@ export function ConversationTimeline() {
                                     )
                                 : undefined
                             }
+                            onLocalFileAction={
+                              props.runtime
+                                ? undefined
+                                : (file, action) => localFileAction(file, action, workspaceAgentId())
+                            }
+                            canRevealFolders={(props.server?.id ?? "local") === "local"}
+                            fileManagerPlatform={props.platform}
                             onOpenQuote={openQuote}
                             onOpenTag={openTaggedReference}
                             onDownload={(attachment) => attachmentAction(attachment, "download")}

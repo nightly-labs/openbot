@@ -57,6 +57,7 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
     messagePins,
     changeMarkerActions,
     openWaitingAgent,
+    localFileAction,
   } = useConversationViewScope();
   const backdropAction = useMessageBackdropAction(conversationRuntime(view));
   const threadBackgroundWorkSince = (taskId: string | undefined) =>
@@ -229,6 +230,11 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
             onStop={() => current().thread.onStop()}
             onOpenLink={(url) => void openExternalMessageUrl(url)}
             onOpenFile={openThreadFile}
+            onLocalFileAction={
+              view.runtime ? undefined : (file, action, agentId) => localFileAction(file, action, agentId)
+            }
+            canRevealFolders={(view.server?.id ?? "local") === "local"}
+            fileManagerPlatform={view.platform}
             onSelectAgent={view.onSelectAgent}
             onOpenWaitingAgent={openWaitingAgent}
             changeMarkerActions={changeMarkerActions}

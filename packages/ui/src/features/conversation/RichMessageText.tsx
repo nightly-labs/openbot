@@ -1,5 +1,5 @@
 import { type ChatTagKind, chatTagReferences } from "@openbot/contracts/chat-tag-references";
-import type { AttachmentSummary } from "@openbot/contracts/ipc";
+import type { AttachmentSummary, DesktopPlatform } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { AppWindow, Blocks, Button, Puzzle, Split, TextQuote } from "@openbot/ui";
 import { ReferenceChip } from "@openbot/ui/reference-chip";
@@ -21,6 +21,13 @@ import {
   useStreamingReveal,
 } from "./streamingReveal";
 
+export interface LocalFileLinkTarget {
+  path: string;
+  kind: "shared" | "workspace";
+  folder: boolean;
+  asWritten?: string | undefined;
+}
+
 export interface RichMessageTextProps {
   body: string;
   agents: ComposerAgent[];
@@ -36,6 +43,18 @@ export interface RichMessageTextProps {
    */
   onOpenSharedFile?: ((path: string, asWritten?: string) => void) | undefined;
   onOpenWorkspaceFile?: ((path: string, asWritten?: string) => void) | undefined;
+  /**
+   * Opens or reveals a local file or folder chip from its context menu.
+   * Absent when the host cannot open or reveal files on this computer (such as the web client).
+   */
+  onLocalFileAction?: ((file: LocalFileLinkTarget, action: "reveal" | "open") => void) | undefined;
+  /**
+   * Whether folder chips can be revealed in the OS file manager. False for joined servers whose
+   * folders cannot be downloaded to this computer. Defaults to true when `onLocalFileAction` is set.
+   */
+  canRevealFolders?: boolean | undefined;
+  /** Desktop platform for the file manager label (Finder, File Explorer, or generic file manager). */
+  fileManagerPlatform?: DesktopPlatform | undefined;
   /** Shows the passage that a quote tag names. Without it, a quote is a chip that does nothing. */
   onOpenQuote?: ((messageId: string, text: string) => void) | undefined;
   /** Shows the browser tab or opens the thread that a tag names. Without it, the chip does nothing. */
