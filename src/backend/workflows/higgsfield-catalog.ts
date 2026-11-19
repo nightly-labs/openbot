@@ -179,11 +179,11 @@ function optionChoice(
       sent: Object.fromEntries(options.map((value) => [value, value])),
     };
   }
-  const auto = !options.includes(fallback) && !options.includes(SERVICE_CHOICE);
-  const shown = auto ? [SERVICE_CHOICE, ...options] : options;
+  const chosen = options.includes(fallback) ? fallback : SERVICE_CHOICE;
+  const shown = options.includes(chosen) ? options : [SERVICE_CHOICE, ...options];
   if (shown.length > WORKFLOW_MEDIA_OPTION_VALUES_MAX || !options.every(isOptionValue)) return null;
   return {
-    option: { name, kind: "choice", values: shown, default: auto ? SERVICE_CHOICE : fallback },
+    option: { name, kind: "choice", values: shown, default: chosen },
     sent: Object.fromEntries(options.map((value) => [value, value])),
   };
 }
