@@ -2,6 +2,7 @@ import {
   type AgentProviderId,
   type AgentStatus,
   type AppSetupState,
+  type ClientAgentModelOption,
   type CustomProviderRestart,
   type CustomProviderSummary,
   isManagedRuntimeProvider,
@@ -87,6 +88,39 @@ const openCodeInstalledAgentStatus: AgentStatus = {
     { id: "opencode", state: "sign-in-required", version: "1.18.27", message: null },
   ],
 };
+/** Devin connected, with the long names of its Fusion models. */
+const devinAgentStatus: AgentStatus = {
+  ...providerUpdateAgentStatus,
+  providers: [
+    ...(providerUpdateAgentStatus.providers ?? []),
+    { id: "devin", state: "available", version: "3000.11.234", message: null },
+  ],
+};
+function devinModel(id: string, name: string): ClientAgentModelOption {
+  return {
+    provider: "devin",
+    id,
+    name,
+    description: "",
+    defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: ["medium"],
+  };
+}
+const DEVIN_MODELS: ClientAgentModelOption[] = [
+  devinModel("gpt-6-2-astra-medium", "GPT-6.2 Astra"),
+  devinModel("gpt-6-1-sol-medium", "GPT-6.1 Sol"),
+  devinModel("fusion-gpt-6-2-astra-high-thinking-swe-2-medium", "Fusion (GPT-6.2 Astra High Thinking + SWE-2 Medium)"),
+  devinModel("fusion-gpt-6-2-sol-high-thinking-swe-2-medium", "Fusion (GPT-6.2 Sol High Thinking + SWE-2 Medium)"),
+  devinModel(
+    "fusion-gpt-6-2-astra-high-thinking-gpt-5-6-luna-high",
+    "Fusion (GPT-6.2 Astra High Thinking + GPT-5.6 Luna High)",
+  ),
+  devinModel(
+    "fusion-gpt-6-2-sol-high-thinking-gpt-6-1-terra-high",
+    "Fusion (GPT-6.2 Sol High Thinking + GPT-6.1 Terra High)",
+  ),
+  devinModel("fusion-gpt-6-2-astra-high-thinking-glm-5-2-high", "Fusion (GPT-6.2 Astra High Thinking + GLM-5.2 High)"),
+];
 /** Codex with two connected accounts. Codex gave the own sign-in two usage resets, and the other none. */
 const usageResetAgentStatus: AgentStatus = {
   ...providerUpdateAgentStatus,
@@ -286,6 +320,8 @@ function ServerProvidersStory(props: {
    * `remove-only` is an older host, which offers Remove only.
    */
   hostCustomProviders?: "edit" | "remove-only";
+  /** Devin with its long Fusion model names: each model row keeps its switch in view. */
+  devinModels?: boolean;
 }) {
   const usageResetAccounts = props.usageReset ? createUsageResetAccounts() : undefined;
   const poolAccounts = props.accountPool ? createPoolAccounts() : undefined;
@@ -324,6 +360,7 @@ function ServerProvidersStory(props: {
         }
       : {}),
     ...(props.providerUpdateFailure ? { providerRuntimeFailure: true } : {}),
+    ...(props.devinModels ? { models: DEVIN_MODELS } : {}),
   });
   const runtimes = createProviderRuntimeStore(() => (props.providerUpdate ? mock.api.providerRuntimes : undefined));
   window.openbot = mock.api;
@@ -422,6 +459,7 @@ function ServerProvidersStory(props: {
         if (hermesAgentStatus) return hermesAgentStatus;
         if (poolAccounts) return poolAccounts.agentStatus();
         if (props.accountCode) return accountCodeAgentStatus;
+        if (props.devinModels) return devinAgentStatus;
         if (props.hostCodexKey) return props.hostCodexKey === "saved" ? hostCodexKeyAgentStatus : codeSignInAgentStatus;
         return props.usageReset
           ? usageResetAgentStatus
@@ -762,6 +800,11 @@ export const HermesInstalling: Story = {
 /** Hermes is installed: the row offers Connect, which signs in with the Nous Portal code. */
 export const HermesConnect: Story = {
   render: () => <ServerProvidersStory hermes={{ phase: "ready", progress: 100, message: null, version: "0.22.7" }} />,
+};
+
+/** Devin's long model names are cut, and each row keeps the switch that hides the model from the picker. */
+export const DevinModels: Story = {
+  render: () => <ServerProvidersStory devinModels />,
 };
 
 /** A server that the window has not selected. Its providers are managed after a switch to it. */
