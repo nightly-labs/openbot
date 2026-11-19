@@ -6,7 +6,6 @@ import type {
   AgentEvent,
   AgentPromptQuestion,
   AgentPromptResolution,
-  AgentProviderId,
   AgentRuntimeSnapshot,
   BrowserTab,
   BrowserTakeoverRequest,
@@ -52,7 +51,7 @@ import { createOpenBotLogger, redactText, registerSecretValue, toLogValue } from
 import { Deferred, Effect, Option, Result, Schema } from "effect";
 import { getDomain } from "tldts";
 import type { AgentApiKeys, SavedApiKey } from "../agent-api-keys";
-import type { AgentClient } from "../agent-client";
+import type { AgentClient, AgentProvider } from "../agent-client";
 import { type BrowserOperationError, browserFailure, secureInputFailure } from "../browser-effects";
 import type { PreparedBrowserSecret } from "../browser-host";
 import type { BrowserCardVault } from "../browser-tool-actions";
@@ -2079,14 +2078,16 @@ export class AttentionRegistry {
         : { target, timer: setTimeout(() => this.#detachPrompt(request.id, pending), Math.min(...deadlines)) };
   }
 
-  detachPromptsOf(provider: AgentProviderId): void {
+  detachPromptsOf(provider: AgentProvider): void {
     for (const [requestId, pending] of this.#prompts)
-      if (pending.client.provider === provider && pending.detach) this.#detachPrompt(requestId, pending);
+      if (pending.client.provider === provider && pending.detach && !pending.saving)
+        this.#detachPrompt(requestId, pending);
   }
 
   #detachPrompt(requestId: RequestId, pending: PendingPrompt): void {
     const target = pending.detach?.target;
     if (this.#prompts.get(requestId) !== pending || !target) return;
+    clearTimeout(pending.detach?.timer);
     delete pending.detach;
     pending.detached = target;
     this.#routines.markRunningForTurn(pending.turnId);
