@@ -647,6 +647,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
                     channelSeenSubtasks: true,
                     channelTaskWaits: true,
                     mcpManyServers: true,
+                    routineResultsWhatsApp: true,
                   })
                 : decodeTeamProtocolV10WebRtcHttpResponse(method, path, status, envelope.body),
             ).pipe(

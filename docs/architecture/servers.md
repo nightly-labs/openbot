@@ -973,6 +973,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `events-v1` | Manage webhook routines, their secrets, and activity | `events` |
 | `routine-recovery-v1` | Read and set a routine's missed-run policy; read its runs with the missed occurrences | `events` |
 | `routine-results-v1` | List the messaging connections and their places; read and set where an agent routine sends its answers. Deliveries stay on the host | none: only the mobile app sends it |
+| `routine-results-whatsapp-v1` | No route or field of its own. The `routine-results-v1` answers can name `whatsapp`, so the options list the host's WhatsApp numbers and a routine can send its answers to one. The host sends WhatsApp only to a client that sends it. Protocol 10 only | none |
 | `webhook-tests-v1` | Send one signed test event to a webhook routine | `events` |
 | `webhook-sender-secret-v1` | Set a webhook routine's signing secret to a secret that the sender made | `events` |
 | `webhook-agent-secret-v1` | Give a new signing secret of an agent's webhook routine to that agent as an API key. The answer has only the key name | `events` |

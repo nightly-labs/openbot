@@ -24,6 +24,7 @@ import { isChannelHistoryExtentRoute, withChannelHistoryExtent } from "./history
 import { isMcpSignInListRoute, mcpManyServersResponse, mcpManySignInsResponse } from "./mcp-many-servers-v1";
 import { isMcpRoute, mcpRequest, mcpResponse } from "./mcp-v1";
 import { optionalRouteCodec } from "./optional-routes";
+import { isRoutineResultsRoute, routineResultsWhatsAppResponse } from "./routine-results-whatsapp-v1";
 import { isStorageRoute, storageRequest, storageResponse } from "./storage-v1";
 import type { TeamProtocolV2Json } from "./webrtc-framing";
 
@@ -61,6 +62,11 @@ export interface TeamSideRouteOptions {
    * `channelAttention` is.
    */
   mcpManyServers?: boolean;
+  /**
+   * routine-results-whatsapp-v1: a `routine-results-v1` answer can name the platform `whatsapp`. Passed
+   * as `channelAttention` is.
+   */
+  routineResultsWhatsApp?: boolean;
 }
 
 export interface TeamSideRouteCodec {
@@ -131,7 +137,9 @@ export function teamSideRouteCodec(path: string): TeamSideRouteCodec | null {
           const projected =
             options?.mcpManyServers && status < 400 && isMcpSignInListRoute(path)
               ? mcpManySignInsResponse(value)
-              : admin.response(status, value);
+              : options?.routineResultsWhatsApp && status < 400 && isRoutineResultsRoute(path)
+                ? routineResultsWhatsAppResponse(path, value)
+                : admin.response(status, value);
           return options?.agentTaskUiBlocks && status < 400 ? withAgentTaskUiBlocks(path, projected, value) : projected;
         },
       }
