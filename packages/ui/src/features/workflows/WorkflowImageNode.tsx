@@ -534,8 +534,7 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
     setViewer({ images, index: Math.max(0, index), origin: media });
   };
   const making = () => run.running();
-  const pictureLoading = () =>
-    shownValue() !== undefined && shownPicture() === undefined && Boolean(board.catalogs().media);
+  const pictureLoading = () => shownValue() !== undefined && shownPicture() !== null && Boolean(board.catalogs().media);
   const generated = () => !making() && (Boolean(shownPicture()) || pictureLoading());
   const panelShown = () => generated() || !collapsed();
   const specsDisabled = () => locked() || making();
@@ -598,10 +597,7 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
           <Show
             when={shownPicture()}
             fallback={
-              <Show
-                when={shownValue() === undefined || shownPicture() === null || !board.catalogs().media}
-                fallback={<CardPictureLoading />}
-              >
+              <Show when={!pictureLoading()} fallback={<CardPictureLoading />}>
                 <span class="wfn-media-empty" aria-hidden="true">
                   <Show when={kind() === "video"} fallback={<Image />}>
                     <Film />
