@@ -1,28 +1,3 @@
-// Checks that a provider error moves an agent set to switch without asking to its next backup model,
-// and that read_agent shows the move (#2834). Runs the real agent service on a temporary profile. Claude is the real `ClaudeAgentClient`,
-// which the Claude Agent SDK connects to a stand-in `claude` executable. The stand-in answers each
-// message on its current model, and fails it with the CLI's report of an Anthropic overload (529)
-// when that model is in `failing.json`. A message with `act-then-fail` writes text before it fails.
-// Checks:
-//   1. A turn that wrote text before the error continues on the backup model, and a thread turn
-//      moves to it too (#8406). So does a WhatsApp conversation turn, and the conversation gets the
-//      backup's answer (#11015). These run after check 5.
-//   2. An agent with no backup models fails with its error, as before.
-//   3. A turn that did nothing yet runs again on the backup model, with a note and no error. The
-//      stand-in, as Claude Code, does not run a uuid again, and history import keeps one request.
-//   4. read_agent shows the backup model, and the model to go back to with the provider error as cause.
-//   5. After a restart, the agent goes back to its own model, with a note.
-// Also checks continuation after a usage limit interrupts partial work: on a backup, or with no
-// ready backup on the same model when its limit ends (#6660).
-// A spent credit balance moves to a backup with a note that names the spent model and what to do (#7965).
-// A message runs again after its Claude process closed and resumed the saved session, and a message
-// whose uuid the saved session holds runs with a new uuid (#9270).
-// When a usage limit refuses the turn that Claude starts by itself for a background subagent's report,
-// the request that started the subagent continues on the backup with that report. A report that a
-// completed turn read does not make its request run again (#9493). When the plan refuses only the
-// subagent's requests and Claude's own turn then ends with no answer, the request continues on the backup too (#11141).
-// A model that is chosen again while a provider error holds it gets one turn before the agent moves to a backup (#11992).
-// `bun run test:backup-model-failover`. Writes .openbot-build/backup-model-failover-e2e/report.json.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
@@ -62,11 +37,9 @@ const workLog = join(root, "work.jsonl");
 const CODEX_MODEL = defaultProviderModel("codex");
 const PRIMARY: AgentModelId = defaultProviderModel("claude");
 const BACKUP: AgentModelId = PRIMARY === "claude-sonnet-5-5" ? "claude-opus-5-5" : "claude-sonnet-5-5";
-// The text the Claude CLI writes in an outage. It names no HTTP status phrase, only the 529 and its type.
 const PROVIDER_ERROR =
   'API Error: 529 {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"},"request_id":"req_e2e"}';
 
-// Before the service modules load: the stores and the CLI search read these.
 process.env.HOME = home;
 process.env.OPENBOT_CLAUDE_PATH = claudeExecutable;
 process.env.CLAUDE_CONFIG_DIR = join(home, ".claude");
@@ -83,8 +56,6 @@ const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 const { importProviderHistory } = await import("../src/backend/provider-history-import");
 
-// The stand-in for the Claude CLI. It speaks enough of the stream-json protocol for a turn to end,
-// and logs the model and the outcome of each turn.
 const STAND_IN_CLAUDE = `#!/usr/bin/env node
 const fs = require("node:fs");
 const { randomUUID } = require("node:crypto");
@@ -132,11 +103,6 @@ const turn = (message) => {
   const input = JSON.stringify(message);
   const acts = input.includes("act-then-fail");
   fs.appendFileSync(${JSON.stringify(turnLog)}, JSON.stringify({ model, failed: fails, input, pid: process.pid }) + "\\n");
-  // The turn starts a background subagent and ends. When the subagent ends, Claude starts a turn by
-  // itself to read its report, and the plan refuses that turn at once (#9493). With "usage-report-read",
-  // that turn reads the report and completes, and the plan refuses a later turn that Claude starts.
-  // With "usage-subagent", the plan refuses the subagent's request, and Claude's own turn ends with no answer
-  // and no refusal of its own (#11141).
   if ((input.includes("usage-background") || input.includes("usage-report-read") || input.includes("usage-subagent")) && model === ${JSON.stringify(PRIMARY)}) {
     const callId = "toolu_" + randomUUID().replaceAll("-", "");
     write({ type: "assistant", message: { id: "msg_" + randomUUID(), type: "message", role: "assistant", model,
@@ -196,12 +162,7 @@ const turn = (message) => {
   assistant("Done.");
   result({ is_error: false, result: "Done." });
 };
-// As in Claude Code, a message whose uuid this process already took does not run, and gets no result (#6676).
 const taken = new Set();
-// Claude Code also skips a uuid that the saved session holds with a reply after it, such as the error
-// reply of a refused turn, and only reports it completed (#9270). This stand-in reads each message
-// of the saved session as answered. "session-holds" acts as a message that an earlier run of
-// OpenBot sent, so the session holds its first uuid. "session-skips" is skipped with each uuid.
 const saved = new Set(previous.map((row) => row.uuid));
 let heldOnce = false;
 const lifecycle = (uuid, state) =>
@@ -237,15 +198,12 @@ process.stdin.on("data", (chunk) => {
 process.stdin.on("end", () => process.exit(0));
 `;
 
-// Codex's app-server reports a plan refusal through the nested usageLimitExceeded error. The
-// process writes a checkpoint before the refusal and serves it from the paged rollout endpoints.
 const STAND_IN_CODEX = `#!/usr/bin/env node
 const fs = require("node:fs");
 const { randomUUID } = require("node:crypto");
 if (process.argv.includes("--version")) { console.log("codex-cli 0.160.1"); process.exit(0); }
 const threads = new Map();
 const active = new Map();
-// A spent reset credit ends the limit, so later turns run.
 let reset = false;
 const write = (message) => process.stdout.write(JSON.stringify(message) + "\\n");
 const config = { config: { mcp_servers: {} }, layers: [{ name: { type: "user", file: "/fake/.codex/config.toml", profile: null }, version: "1", config: { mcp_servers: {} } }] };
@@ -341,17 +299,11 @@ interface ClientEvents {
   diagnostic: [message: string, origin?: DiagnosticOrigin];
 }
 
-/**
- * The real Claude client. Only the account, usage and model reads are answered here: the real ones
- * run `claude auth status` or a probe query. It also records the provider thread of the last turn, and
- * keeps the answers to the tool calls this check sends as the provider would.
- */
 class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
   readonly provider = "claude";
   readonly contextCompaction = "native";
   readonly #real: InstanceType<typeof ClaudeAgentClient>;
   readonly readHistory: ReadProviderHistory;
-  /** The provider thread of the last turn that started. */
   lastThread: string | null = null;
   readonly toolAnswers = new Map<RequestId, unknown>();
   readonly #started = new Set<string>();
@@ -480,7 +432,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service or of its database. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -504,7 +455,6 @@ function turns(): { model: string; failed: boolean; input: string; pid: number }
 
 const failing = (models: string[]) => writeFileSync(failingFile, JSON.stringify(models));
 
-/** Closes the idle Claude processes before a message runs again, as the 5-minute idle close does (#9270). */
 let closeBeforeRunAgain = false;
 
 function readLog<T>(path: string): T[] {
@@ -565,7 +515,6 @@ function errorsFor(agentId: string, since: number) {
   return events.slice(since).filter((event) => event.type === "error" && event.agentId === agentId);
 }
 
-/** Sends a message and waits for its delivery to end. */
 async function send(agentId: string, text: string, sourcePaths?: string[]) {
   const attachments = await runCauseEffect(mailbox.prepareAttachments(sourcePaths ?? []));
   const receipt = await runCauseEffect(
@@ -580,7 +529,6 @@ async function send(agentId: string, text: string, sourcePaths?: string[]) {
   return { deliveryId, status, error: mailbox.getDelivery(deliveryId)?.delivery.error ?? null };
 }
 
-/** The name the service lists for a model, which the switch notes show. */
 function modelName(model: string): string {
   return service.listModels().find((option) => option.provider === "claude" && option.id === model)?.name ?? model;
 }
@@ -590,7 +538,6 @@ async function markers(agentId: string, itemType: string) {
   return snapshot.messages.filter((message) => message.itemType === itemType).map((message) => message.text);
 }
 
-/** Calls an OpenBot tool from the thread of the last turn, as its provider would, and returns the answer. */
 let toolCalls = 0;
 async function callTool(tool: string, args: unknown) {
   const client = clients.at(-1);
@@ -677,14 +624,11 @@ async function verifyHistoryKeepsRequests(agentId: string) {
       quietRoutineDelivery: () => false,
     }),
   );
-  // The boot backfill of the last restart runs in the background and can import the newest turns
-  // first. Then this import finds no new turn, so the backfill's complete import also counts.
   assert.ok(
     imported.turns > 0 || database.providerHistoryImport(session.id)?.state === "complete",
     "The provider's saved transcript was read and imported.",
   );
   assert.deepEqual(users(), before, "History import keeps one user request after independent continuation turn IDs.");
-  // Each request to this agent has its own text, so a copy from either import shows here.
   const texts = users().map((message) => message.text);
   assert.equal(new Set(texts).size, texts.length, "History import adds no second copy of a user request.");
 }
@@ -751,12 +695,10 @@ try {
     assert.deepEqual(errorsFor(mover.id, since), [], "No error shows for the moved turn.");
     const notes = await markers(mover.id, MODEL_SWITCH_ITEM_TYPES["provider-error"]);
     assert.deepEqual(notes, [sourceText("status.agent.modelSwitchedForError", { model: modelName(BACKUP) })]);
-    // The same Claude process took the message, so it ran again with a new uuid (#6676).
     await verifyHistoryKeepsRequests(mover.id);
     return { ran, notes };
   });
 
-  // `agent-profile-accounts-e2e.ts` checks that update_profile sets and clears the order.
   await check("read_agent shows that a provider error moved the agent", async () => {
     const read = await callTool("read_agent", { agentId: mover.id });
     assert.ok(read.success, read.text);
@@ -790,7 +732,6 @@ try {
     return { notes };
   });
 
-  // A new agent for each check, made while no model fails. The restart ends the hold on the own model.
   const withBackup = async (name: string) => {
     const agent = await create(name);
     await waitFor(`the first turn of ${name} to end`, () =>
@@ -1063,7 +1004,6 @@ try {
       service.getRuntimeSnapshot().usageLimits?.some((limit) => limit.agentId === agent.id),
     );
     assert.equal(readLog<CodexTurn>(codexLog).length, beforeCodex + 1, "The held work does not run again.");
-    // A spent reset credit ends the limit as its reset time does.
     await runCauseEffect(service.resetProviderUsage("codex", DEFAULT_PROVIDER_ACCOUNT_ID));
     const status = await waitFor("the work to continue", () => {
       const value = mailbox.getDelivery(deliveryId)?.delivery.status;
@@ -1133,7 +1073,6 @@ try {
     );
     assert.equal(readLog<CodexTurn>(codexLog).length, beforeCodex + 1);
     assert.ok(mailbox.getDelivery(deliveryId)?.resumeAfterUsageLimit, "The waiting work keeps its continuation.");
-    // The user can remove waiting work from the queue. Later checks start with no work held here.
     await runCauseEffect(service.cancelQueuedMessage(agent.id, deliveryId));
     return { deliveryId, status: mailbox.getDelivery(deliveryId)?.delivery.status };
   });
@@ -1159,7 +1098,6 @@ try {
     return { status: mailbox.getDelivery(deliveryId)?.delivery.status };
   });
 
-  // In the chain, the first backup's plan refuses the continuation before any work.
   for (const { mode, caseId, models } of [
     { mode: "tool-only", caseId: "channel", models: [PRIMARY] },
     { mode: "chain-empty", caseId: "channel-chain", models: [PRIMARY, BACKUP] },
@@ -1489,7 +1427,6 @@ try {
     const choose = () =>
       runCauseEffect(service.updateAgent({ agentId: chooser.id, provider: "claude", model: PRIMARY }));
 
-    // The chosen model still fails: it gets one turn, and the agent moves to the backup again.
     await choose();
     let before = turns().length;
     const failedTry = await send(chooser.id, "try the chosen model");
@@ -1501,7 +1438,6 @@ try {
     assert.equal(agentOf(chooser.id).model, BACKUP, "The agent is on its backup again.");
     assert.equal(agentOf(chooser.id).usageLimitReturn?.model, PRIMARY, "The agent keeps its own model to go back to.");
 
-    // The chosen model works again before the hold ends: the message runs on it and the agent stays (#11992).
     failing([]);
     await choose();
     before = turns().length;

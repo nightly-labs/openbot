@@ -1,15 +1,3 @@
-// Reads two sample replies aloud with the real speech service, sherpa-onnx addon and Supertonic 3
-// model, without the app window. The model downloads to the same directory the dev app uses, with
-// the pinned checksums.
-//
-// The host runs in Electron as Node through `child_process.fork`, which it supports. Electron's V8
-// memory cage rejects what Node and Bun allow, such as an external ArrayBuffer, so a Bun host would
-// not find those faults. A Bun parent and an Electron child share only JSON messages, so the PCM
-// bytes arrive as an object of numbers and are decoded here.
-//
-// Writes one WAV per sample and `report.json` to `.openbot-build/voice-speech-smoke/`.
-// Run `bun run voice:prepare-runtime` first. macOS only: it starts the Electron binary of the package.
-
 import { fork } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -29,7 +17,6 @@ import type { VoiceSpeechHostProcess, VoiceSpeechResponse } from "../src/main/vo
 import { VoiceSpeechService } from "../src/main/voice-speech-service";
 
 const RESOURCES_ROOT = resolve(".openbot-build/voice");
-/** The smoke saves no key. */
 const NO_CIPHER = { canPersist: () => false, encrypt: () => Buffer.alloc(0), decrypt: () => "" };
 const OUTPUT = resolve(".openbot-build/voice-speech-smoke");
 const HOST = resolve("src/main/voice-speech-host.ts");
@@ -115,7 +102,6 @@ function wav({ pcm, sampleRate }: SpeechAudio): Uint8Array {
   return file;
 }
 
-/** The loudest sample, from 0 to 1. Silence would mean the model ran but produced nothing. */
 function peak({ pcm }: SpeechAudio): number {
   const view = new DataView(pcm.buffer, pcm.byteOffset, pcm.byteLength);
   let loudest = 0;
@@ -133,7 +119,6 @@ async function main(): Promise<void> {
     modelDirectory: join(RESOURCES_ROOT, SUPERTONIC_MODEL_DIRECTORY),
     preferences,
     spawnHost,
-    // The smoke reads with Supertonic only, so no key is saved.
     apiKeys: {
       elevenlabs: new VoiceApiKeyStore({ path: join(preferencesDirectory, "elevenlabs-key.json"), cipher: NO_CIPHER }),
       xai: new VoiceApiKeyStore({ path: join(preferencesDirectory, "xai-key.json"), cipher: NO_CIPHER }),

@@ -21,12 +21,12 @@ After switching from the isolated linker to the hoisted linker, move the old
 from the repository root. A normal install can retain old workspace symlinks and cause
 the local fingerprint to differ from the clean EAS installation.
 
-Expo 58.0.17 is patched in `patches/expo@58.0.17.patch` so a DOM component ignores a props
+Expo 58.0.25 is patched in `patches/expo@58.0.25.patch` so a DOM component ignores a props
 message that it sends before Android mounts its web view, or after Android removes it. Android
 rejects these calls, and the rejection shows as a console error. The DOM component asks for the
 props again when it is ready.
 
-expo-splash-screen 58.0.11 is patched in `patches/expo-splash-screen@58.0.11.patch` so Android 12
+expo-splash-screen 58.0.14 is patched in `patches/expo-splash-screen@58.0.14.patch` so Android 12
 and 13 get no splash exit animation listener. With the listener, the platform hides the starting
 window on the first draw, and the app crashes when that window is already gone. Gradle links the
 prebuilt AAR of an Expo module and ignores a patch to its Kotlin source, so
@@ -39,7 +39,7 @@ Expo modules by default, so a patch to Expo Swift code needs `expo.autolinking.i
 extend `NativeMethods`, which React Native 0.87 removed from its types, so `MaskedView` was not a
 valid JSX component. Remove the patch when a release fixes the types.
 
-react-native-screens 4.30.0 is patched in `patches/react-native-screens@4.30.0.patch` so the full
+react-native-screens 4.30.1 is patched in `patches/react-native-screens@4.30.1.patch` so the full
 screen swipe back of a chat waits for a gesture handler pan in the top screen to fail. The swipe back
 starts anywhere in the chat, and a swipe to the right on a message bubble still replies. Without
 the patch, no rule sets which of the two recognizers gets the swipe. Remove the patch when a

@@ -1,10 +1,3 @@
-// Checks issue #11713 on the real `ProviderRuntimeManager`, with a small Codex package served by a
-// fake download and no network. The first update downloads and installs the package, but the new copy
-// does not connect, as when it answers too late. The failed install is removed, so a broken copy does
-// not start at the next launch, and the row shows Retry. The Retry installs the copy again from the
-// archive of the first try, without a second download. Once the copy runs, the archives of each
-// version go.
-// `bun run test:provider-update-retry`. Writes .openbot-build/provider-update-retry-e2e/report.json.
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -35,7 +28,6 @@ interface Report {
 
 const report: Report = { passed: false };
 
-// The package: what the Codex install checks, and a `codex` that reports the version.
 const packageRoot = join(root, "package");
 mkdirSync(join(packageRoot, "bin"), { recursive: true });
 mkdirSync(join(packageRoot, "codex-path"), { recursive: true });
@@ -81,7 +73,6 @@ const fetchImpl = async (input: string | URL | Request): Promise<Response> => {
   return new Response("not found", { status: 404 });
 };
 
-// The backend's part: it starts the new copy. The first start does not connect.
 let starts = 0;
 const manager = new ProviderRuntimeManager({
   root: store,
@@ -122,7 +113,6 @@ try {
   mkdirSync(store, { recursive: true });
   mkdirSync(downloads, { recursive: true });
 
-  // 1. The update installs the copy, but the copy does not connect.
   const failed = codexPhase("download-error");
   await runCauseEffect(manager.download("codex"));
   const failure = await failed;
@@ -133,8 +123,6 @@ try {
     archiveKept: archiveKept(),
   };
 
-  // 2. Retry: the archive of the first try installs the copy again, with no download. An archive of
-  //    an older version, which a failed update kept and no Retry used, goes too.
   writeFileSync(join(downloads, "codex-linux-x64-0.1.0.partial"), "old");
   writeFileSync(join(downloads, "codex-linux-x64-0.1.0.partial.json"), "{}");
   const ready = codexPhase("ready");

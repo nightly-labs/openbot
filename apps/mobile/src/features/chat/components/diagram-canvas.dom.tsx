@@ -3,10 +3,8 @@
 import { useEffect, useRef } from "react";
 
 interface DiagramCanvasProps {
-  /** The diagram as an SVG image URL, drawn by the Mermaid renderer. */
   url: string;
   alt: string;
-  /** The space that the floating header and the home indicator cover. */
   insets: { top: number; bottom: number };
   background: string;
   dom?: import("expo/dom").DOMProps;
@@ -23,20 +21,10 @@ const DOUBLE_TAP_MS = 300;
 const DOUBLE_TAP_DISTANCE = 24;
 const TAP_SLOP = 8;
 const DOUBLE_TAP_ZOOM = 2.5;
-/** How far past its limits a pinch or a drag goes, as a share of the distance. */
 const RUBBER_BAND = 0.35;
-/** The edge of the screen that stays clear of a fitted diagram. */
 const FIT_MARGIN = 16;
 const SETTLE = "transform 280ms cubic-bezier(0.23, 1, 0.32, 1), width 280ms cubic-bezier(0.23, 1, 0.32, 1)";
 
-/**
- * A diagram on a canvas: drag to move it, pinch to zoom around the fingers, double-tap to zoom
- * in or back to the whole diagram. A pinch or a drag past the limits stretches and springs back.
- * Each frame writes the image style directly, so React does not render while a finger moves. The
- * image is sized with `width`, not scaled, so the browser draws the SVG sharp at every zoom.
- * This web view does not contain Mermaid, so it opens at once.
- */
-// Missing in Expo Go on Android until the props come again; see expo-go-dom.ts.
 const NO_INSETS = { top: 0, bottom: 0 };
 
 export default function DiagramCanvas({ url, alt, insets = NO_INSETS, background }: DiagramCanvasProps) {
@@ -78,7 +66,6 @@ export default function DiagramCanvas({ url, alt, insets = NO_INSETS, background
         y: view.top + (view.height - natural.height * scale) / 2,
       };
     };
-    /** The nearest camera inside the limits: a small diagram stays centred, a large one keeps its edges on screen. */
     const settled = (from: Camera): Camera => {
       const view = bounds();
       const scale = Math.min(Math.max(from.scale, fitScale()), MAX_SCALE);
@@ -145,14 +132,12 @@ export default function DiagramCanvas({ url, alt, insets = NO_INSETS, background
       let scale = gesture.camera.scale;
       if (now.distance > 0 && gesture.distance > 0) {
         scale = (gesture.camera.scale * now.distance) / gesture.distance;
-        // Past the limits the pinch slows down, so the user feels the edge.
         const low = fitScale();
         if (scale > MAX_SCALE) scale = MAX_SCALE * (scale / MAX_SCALE) ** RUBBER_BAND;
         if (scale < low) scale = low * (scale / low) ** RUBBER_BAND;
       }
       const zoomed = zoomAround(gesture.camera, scale, gesture.mid);
       const next = { scale, x: zoomed.x + now.mid.x - gesture.mid.x, y: zoomed.y + now.mid.y - gesture.mid.y };
-      // A drag past the edge also slows down.
       const limit = settled(next);
       const band = scale === limit.scale ? RUBBER_BAND : 1;
       camera = { scale, x: limit.x + (next.x - limit.x) * band, y: limit.y + (next.y - limit.y) * band };

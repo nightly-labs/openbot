@@ -2,7 +2,6 @@ import { Button, SlidingTabs } from "@openbot/ui";
 import { Show } from "solid-js";
 import { useText } from "../../text";
 
-/** `localTab` defaults to true. It is false for an agent on a joined server: the library is on the host. */
 export function SkillLibraryToolbar(props: { canCreate: boolean; onCreate: () => void; localTab?: boolean }) {
   const { t } = useText();
   return (

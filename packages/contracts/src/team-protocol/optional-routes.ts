@@ -1,7 +1,4 @@
 import { ACP_REGISTRY_CODECS } from "./acp-registry-v1";
-// The optional admin routes, one table. `teamSideRouteCodec` in `side-routes.ts` asks here, so every
-// HTTP and WebRTC transport encodes an admin route with its frozen codec. A path that is not listed
-// goes to the protocol adapter.
 import type { OptionalRouteCodec } from "./admin-wire";
 import { AGENT_ACCESS_CODECS } from "./agent-access-v1";
 import { AGENT_ACTIVE_QUEUES_CODECS } from "./agent-active-queues-v1";
@@ -165,6 +162,7 @@ import { WHATSAPP_WORKING_MESSAGE_CODECS } from "./whatsapp-working-message-v1";
 import { WORKFLOWS_GITHUB_CODECS } from "./workflows-github-v1";
 import { WORKFLOWS_HIGGSFIELD_CODECS } from "./workflows-higgsfield-v1";
 import { WORKFLOWS_MEDIA_CATALOG_CODECS } from "./workflows-media-catalog-v1";
+import { WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CODECS } from "./workflows-media-service-account-v1";
 import { WORKFLOWS_MEDIA_CODECS } from "./workflows-media-v1";
 import { WORKFLOWS_SUNRA_CODECS } from "./workflows-sunra-v1";
 import { WORKFLOWS_CODECS } from "./workflows-v1";
@@ -329,6 +327,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...WORKFLOWS_MEDIA_CODECS,
   ...WORKFLOWS_SUNRA_CODECS,
   ...WORKFLOWS_HIGGSFIELD_CODECS,
+  ...WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CODECS,
   ...WORKFLOWS_MEDIA_CATALOG_CODECS,
   ...SIDEBAR_FOLDERS_CODECS,
   ...LIBRARY_FOLDERS_CODECS,

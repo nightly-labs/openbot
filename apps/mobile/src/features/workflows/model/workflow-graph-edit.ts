@@ -7,23 +7,12 @@ import {
 } from "@openbot/contracts/ipc";
 import type { AddableKind } from "./workflow-outline";
 
-/**
- * Where a new step goes in a workflow of any shape, the shape that the outline cannot hold:
- *
- * - `edge`: on a connection, between the two steps that it joins.
- * - `after`: after a step that has no next step, or on a path of a condition that goes nowhere yet.
- *
- * The phone edits these workflows on their graph: it changes only the edges at that place and keeps
- * every other edge, as the desktop canvas does when a card is dropped on a line.
- */
 export type GraphPlace = { kind: "edge"; edgeId: string } | { kind: "after"; nodeId: string; branch?: WorkflowBranch };
 
-/** Steps that a run goes through: they take the output of the step before and give text to the next. */
 const CHAIN_KINDS = ["agent", "llm", "approval", "condition"] as const satisfies readonly AddableKind[];
 const isChainKind = (kind: AddableKind): kind is (typeof CHAIN_KINDS)[number] =>
   CHAIN_KINDS.some((chain) => chain === kind);
 
-/** Where a new step sits on the desktop canvas: near the steps that it joins, on the 8 px grid. */
 const STEP_GAP = 360;
 const LANE_OFFSET = 200;
 const snap = (value: number) => Math.round(value / 8) * 8;
@@ -32,32 +21,25 @@ function edgeAt(graph: WorkflowGraph, place: GraphPlace): WorkflowEdge | undefin
   return place.kind === "edge" ? graph.edges.find((edge) => edge.id === place.edgeId) : undefined;
 }
 
-/** The kinds of step that can go at a place, in the order of the Add a step page. */
 export function placeKinds(graph: WorkflowGraph, place: GraphPlace, kinds: readonly AddableKind[]): AddableKind[] {
   const byId = new Map(graph.nodes.map((node) => [node.id, node]));
   if (place.kind === "after") {
     const from = byId.get(place.nodeId);
     const type = from ? WORKFLOW_PORTS[from.kind].out[0] : undefined;
     if (!type) return [];
-    // A prompt feeds a step after it; at the end of a path there is none. A step takes what the step
-    // before sends: an image step sends a picture.
     return kinds.filter((kind) => kind !== "prompt" && WORKFLOW_PORTS[kind].in.includes(type));
   }
   const edge = edgeAt(graph, place);
   const to = edge ? byId.get(edge.to) : undefined;
   if (!edge || !to) return [];
   return kinds.filter((kind) => {
-    // A chain step takes what the edge carries and gives text to the step after it.
     if (isChainKind(kind))
       return WORKFLOW_PORTS[kind].in.includes(edge.type) && WORKFLOW_PORTS[to.kind].in.includes("text");
-    // A prompt gives its text to the step after the edge; the edge stays.
     if (kind === "prompt") return WORKFLOW_PORTS[to.kind].in.includes("text");
-    // An output takes the result of the step before the edge; the edge stays.
     return true;
   });
 }
 
-/** The graph with `node`, a new step of `kind`, at `place`, or null when the place is gone. */
 export function insertAtPlace(
   graph: WorkflowGraph,
   place: GraphPlace,
@@ -92,7 +74,6 @@ export function insertAtPlace(
   const branch = edge.branch ? { branch: edge.branch } : {};
   if (isChainKind(kind)) {
     const into: WorkflowEdge = { id: newId(), from: from.id, to: node.id, type: edge.type, ...branch };
-    // A new condition sends the flow on along its yes path; its no path goes nowhere yet.
     const onward: WorkflowEdge = {
       id: newId(),
       from: node.id,
@@ -116,12 +97,7 @@ export function insertAtPlace(
   return { ...graph, nodes: [...graph.nodes, { ...node, at }], edges: [...graph.edges, takes] };
 }
 
-/**
- * The place right after a step: on its one way on, or after it when it has none. A step with more than
- * one way on gets a new path of its own. A condition names the path with `branch`.
- */
 export function placeAfter(graph: WorkflowGraph, nodeId: string, branch?: WorkflowBranch): GraphPlace {
-  // An output that only takes this step's result, and leads nowhere, is not the way on.
   const sideOutput = (id: string) =>
     graph.nodes.find((item) => item.id === id)?.kind === "output" &&
     !graph.edges.some((edge) => edge.from === id) &&
@@ -134,7 +110,6 @@ export function placeAfter(graph: WorkflowGraph, nodeId: string, branch?: Workfl
   return { kind: "after", nodeId, ...(branch ? { branch } : {}) };
 }
 
-/** A place as route parameters of the Add a step page, and back. */
 export function placeParams(place: GraphPlace): Record<string, string> {
   return place.kind === "edge"
     ? { edge: place.edgeId }

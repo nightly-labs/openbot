@@ -30,9 +30,7 @@ function IncomingLinkContent({ request }: { request?: string }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [paired, setPaired] = useState(false);
-  usePreventRemove(busy, () => {
-    // Redemption saves a session. Keep this screen until that operation settles.
-  });
+  usePreventRemove(busy, () => {});
   useEffect(() => {
     if (!paired || busy) return;
     const pending = pendingSignInLinkId();
@@ -43,9 +41,6 @@ function IncomingLinkContent({ request }: { request?: string }) {
   useEffect(() => {
     if (link.kind !== "template" || !signedIn || opened.current) return;
     opened.current = true;
-    // Return to the running workspace, then open the sheet in its stack. A replace from this root
-    // screen would mount a second workspace, which opens a second connection to each host. With no
-    // workspace under this screen, `dismissTo` replaces this screen with one.
     router.dismissTo("/connected");
     router.push({ pathname: "/install-agent", params: { request } });
   }, [link.kind, signedIn, request]);
@@ -119,7 +114,6 @@ function IncomingLinkContent({ request }: { request?: string }) {
     );
   }
 
-  // A link can name any account service. Show one that is not ours before the phone connects to it.
   const pairingService = link.kind === "pairing" && !session ? parseMobileConnectUrl(link.url)?.apiUrl : undefined;
   const accountService = pairingService && pairingService !== OPENBOT_CONTROL_PLANE_ORIGIN ? pairingService : null;
 

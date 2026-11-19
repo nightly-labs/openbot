@@ -25,7 +25,6 @@ export function useAgentPinSwipe(
   openingGesture: PanGesture,
   onPin: (withHaptic: boolean) => void,
   pinBlocked: boolean,
-  /** The drag of the row. A hold and a move drags the row; the swipe waits until the drag fails. */
   dragGesture?: PanGesture,
 ) {
   const swipeable = useRef<SwipeableMethods>(null);
@@ -41,8 +40,6 @@ export function useAgentPinSwipe(
   const [pinPending, setPinPending] = useState(false);
 
   const close = useCallback(() => swipeable.current?.close(), []);
-  // The offsets are toward the end of the row: the action is on the right, or on the left in a
-  // right-to-left layout, and a swipe toward the start reveals it.
   const restore = useCallback(() => {
     if (restOffset.get() >= 0) swipeable.current?.close();
     else if (END_X === 1) swipeable.current?.openRight();
@@ -84,16 +81,10 @@ export function useAgentPinSwipe(
     }
   };
 
-  // Swipeable owns movement and settling. This simultaneous observer adds only
-  // the full-swipe threshold and resolves conflicts with the server drawer. It is a hook gesture
-  // because ReanimatedSwipeable relations accept only hook gestures. The memoized config keeps
-  // the gesture object stable, so its callbacks need the worklet directive.
   const config = useMemo<PanGestureConfig>(
     () => ({
       manualActivation: true,
       enableTrackpadTwoFingerGesture: true,
-      // A closed row yields movement toward the end to the drawer. An exposed row owns
-      // the same movement so it can close without opening the drawer.
       block: openingGesture,
       requireToFail: dragGesture,
       onTouchesDown: (event) => {
@@ -167,11 +158,6 @@ export function useAgentPinSwipe(
   );
   const gesture = usePanGesture(config);
 
-  // On Android the swipe takes a drag that moves 10 points sideways, also while the list scrolls, and
-  // then the list stops. The swipe waits for this guard to fail, and the guard fails only when the drag
-  // moves sideways before it moves down or up. A drag that moves down or up first stays vertical until
-  // the touch ends, so a later sideways drift does not release the swipe. The guard never activates, so
-  // a vertical drag stays with the list.
   const guardOrigin = useSharedValue({ x: 0, y: 0 });
   const guardVertical = useSharedValue(false);
   const guardConfig = useMemo<PanGestureConfig>(
@@ -206,9 +192,7 @@ export function useAgentPinSwipe(
   return {
     close,
     gesture,
-    /** The gesture of the row's detector: on Android with the scroll guard. */
     detectorGesture: isAndroid ? guardedGesture : gesture,
-    /** What the swipe waits for: the drawer, the drag of the row, and on Android the scroll guard. */
     swipeRequires,
     onClose,
     onWillClose,

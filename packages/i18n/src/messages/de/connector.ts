@@ -65,7 +65,6 @@ export const messages = {
   "connector.github.disconnectEffectRevoke":
     "Danach öffnet sich GitHub. Dort kannst du den Zugriff von OpenBot widerrufen.",
   "connector.github.disconnectEffectKept": "Chats, Dateien und Agentenspeicher bleiben auf diesem Computer erhalten.",
-  // The same text for the connection of a joined server. {host} is the server name, such as Studio.
   "connector.github.descriptionHost":
     "Alle Agenten auf {host} können deine GitHub-Repositories, Issues und Pull Requests sowie gh und git verwenden.",
   "connector.github.connectedSummaryHost": {

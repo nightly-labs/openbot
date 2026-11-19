@@ -3,7 +3,6 @@ import LinkIcon from "lucide-react-native/icons/link";
 import { memo, useState } from "react";
 import { type ColorValue, View } from "react-native";
 
-/** Sites with no favicon, so that a message drawn again does not ask them again. */
 const missingFavicons = new Set<string>();
 
 function faviconUrl(url: string): string | null {
@@ -11,7 +10,6 @@ function faviconUrl(url: string): string | null {
   return protocol === "https:" || protocol === "http:" ? `${origin}/favicon.ico` : null;
 }
 
-/** The linked site's favicon, as on desktop and web. The link symbol shows until it loads, and when it does not. */
 export const ChatLinkIcon = memo(function ChatLinkIcon({
   url,
   favicon: showFavicon,
@@ -19,7 +17,6 @@ export const ChatLinkIcon = memo(function ChatLinkIcon({
   compact,
 }: {
   url: string;
-  /** False keeps the request for the linked site's favicon from being made. */
   favicon: boolean;
   color: ColorValue | undefined;
   compact: boolean;

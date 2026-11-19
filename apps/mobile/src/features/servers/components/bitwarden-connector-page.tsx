@@ -8,7 +8,7 @@ import type { UseQueryResult } from "@tanstack/react-query";
 import { Typography } from "heroui-native";
 import { useState } from "react";
 import { Alert } from "react-native";
-import { ConnectorError, ConnectorHeader } from "@/features/servers/components/connector-header";
+import { ConnectorError, ConnectorHeader, ConnectorLoading } from "@/features/servers/components/connector-header";
 import { CONNECTOR_STATUS_KEYS } from "@/features/servers/model/connectors";
 import { useConnectorAction } from "@/features/servers/model/use-server-connectors";
 import {
@@ -22,17 +22,9 @@ import type { MobileServer } from "@/features/workspace/model/workspace-types";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { useText } from "@/shared/lib/text";
 
-/** The hosted Bitwarden service. A self-hosted Vaultwarden server replaces it in the form. */
 const DEFAULT_SERVER_URL = "https://vault.bitwarden.com";
-/** A personal API key of Bitwarden: its client_id starts with `user.`. */
 const CLIENT_ID_PLACEHOLDER = "user.…";
 
-/**
- * Marketplace › Apps › Bitwarden of a joined server (`bitwarden-connector-v1`). The host
- * signs in with its own `bw` CLI, so the user enters the vault server, a personal API key and the
- * master password here. They go to the host once; this phone keeps no copy. The host answers
- * `connecting` at once, and the page reads the status again while it shows.
- */
 export function BitwardenConnectorPage({
   server,
   query,
@@ -49,16 +41,7 @@ export function BitwardenConnectorPage({
   const [masterPassword, setMasterPassword] = useState("");
   const status = query.data;
   const host = server.name;
-  if (!status)
-    return (
-      <SettingsContent>
-        <SettingsNote>
-          {query.isError
-            ? errorMessage(query.error, t("mobile.server.connectors.readFailed"))
-            : t("mobile.server.connectors.loading")}
-        </SettingsNote>
-      </SettingsContent>
-    );
+  if (!status) return <ConnectorLoading query={query} />;
   const state = status.connecting ? "connecting" : status.connected ? "connected" : "idle";
   const input = {
     serverUrl: serverUrl.trim(),
@@ -72,7 +55,6 @@ export function BitwardenConnectorPage({
     action.reset();
   };
   const connect = () => {
-    // The secrets leave the form when the request starts, as on the desktop.
     setClientSecret("");
     setMasterPassword("");
     void action.perform(async () => {

@@ -1,11 +1,3 @@
-// Runs the real `antigravity` provider driver over a fake `agy acp` (`provider-fakes/agents/antigravity-steer.ts`)
-// to check that a steered message goes into the running turn through a second `session/prompt`.
-// `agy acp` 1.5.0 and later answers the open prompt with `end_turn` at once and goes on under the new one.
-// Cases: one steer, two steers in a row, a steer for a turn that is not the running one, a steer after
-// the turn ended, a steer while a permission card is open, a steer that the CLI refuses because its
-// prompt waits for an approval that has not reached OpenBot yet (#11107), and a CLI older than 1.5.0. Each refused
-// steer must send nothing to the agent and must not stop the running turn, so the message can wait in
-// the queue. `bun run test:antigravity-steer`. Writes .openbot-build/antigravity-steer-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -29,9 +21,7 @@ interface LogEntry {
 interface Finished {
   reply: string;
   status: string | null;
-  /** The `turn/started` notifications of the thread while the turn ran. */
   started: number;
-  /** The `openbot/usage` notifications of the turn. */
   usage: number;
 }
 
@@ -69,7 +59,6 @@ async function open(
   return { client, log };
 }
 
-/** Waits until the fake logs an entry that matches, or fails after `timeoutMs`. */
 async function waitForEntry(log: string, match: (entry: LogEntry) => boolean, timeoutMs = 10_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (!(await readJsonl<LogEntry>(log)).some(match)) {
@@ -85,7 +74,6 @@ interface RunningTurn {
   done: Promise<Finished>;
 }
 
-/** Starts a turn with this text. A `work` turn stays open with one tool call until a steer ends it. */
 async function startTurn(client: AgentClient, thread: string, log: string, text: string): Promise<RunningTurn> {
   let reply = "";
   let started = 0;
@@ -126,7 +114,6 @@ async function startTurn(client: AgentClient, thread: string, log: string, text:
   return { id, done };
 }
 
-/** Steers the turn with this text. Answers the turn id that the client reports. */
 function steer(client: AgentClient, thread: string, turnId: string, text: string): Promise<string | null> {
   return runCauseEffect(
     client.request(
@@ -142,7 +129,6 @@ function steer(client: AgentClient, thread: string, turnId: string, text: string
   );
 }
 
-/** The process of the session that got the `index`th prompt with this text. The fake's session ids hold it. */
 async function sessionPid(log: string, text: string, index: number): Promise<number> {
   const sessionId = (await prompts(log)).filter((entry) => entry.text === text)[index]?.sessionId ?? "";
   const pid = Number(/^agy-(\d+)-/u.exec(sessionId)?.[1]);
@@ -159,7 +145,6 @@ function isRunning(pid: number): boolean {
   }
 }
 
-/** Waits until the process ends, or fails after 10 s. */
 async function waitForExit(pid: number): Promise<void> {
   const deadline = Date.now() + 10_000;
   while (isRunning(pid)) {
@@ -179,7 +164,6 @@ async function refusal(operation: Promise<string | null>): Promise<string> {
 
 try {
   const { client, log } = await open("native", {});
-  /** The permission request that the test holds open, and how to answer it. */
   let heldApproval: (() => void) | undefined;
   let approvals = 0;
   let approvalAsked: () => void = () => undefined;
@@ -198,7 +182,6 @@ try {
   client.start();
   const thread = await startThread(client, { cwd: root });
 
-  // A steer goes into the running turn: one turn, no stop, a usage report for each prompt.
   const turn = await startTurn(client, thread, log, "work");
   assert.equal(await steer(client, thread, turn.id, "use the other branch"), turn.id);
   const steered = await turn.done;
@@ -218,7 +201,6 @@ try {
   assert.equal(cancelSent, false, "The steer must not cancel the turn.");
   report.steered = { turnId: turn.id, ...steered, prompts: steeredPrompts, cancelSent };
 
-  // Two steers in a row: the turn ends only with the reply of the last prompt.
   const twiceTurn = await startTurn(client, thread, log, "work");
   const beforeTwice = (await prompts(log)).length - 1;
   assert.equal(await steer(client, thread, twiceTurn.id, "more context"), twiceTurn.id);
@@ -236,7 +218,6 @@ try {
   );
   report.twice = { ...twice, prompts: twicePrompts };
 
-  // A steer for a turn that is not the running one is refused before it reaches the agent.
   const third = await startTurn(client, thread, log, "work");
   const beforeWrong = (await prompts(log)).length;
   const wrongTurn = await refusal(steer(client, thread, "another-turn", "late"));
@@ -245,13 +226,11 @@ try {
   await steer(client, thread, third.id, "end");
   await third.done;
 
-  // After the turn ended, a second prompt would start a turn of its own.
   const beforeAfter = (await prompts(log)).length;
   const afterTurn = await refusal(steer(client, thread, third.id, "too late"));
   assert.equal((await prompts(log)).length, beforeAfter);
   report.afterTurn = { refused: afterTurn, prompts: (await prompts(log)).length - beforeAfter };
 
-  // A new prompt would close an open permission card, so the steer waits in the queue.
   const asking = await startTurn(client, thread, log, "ask");
   await Promise.race([
     approval,
@@ -273,8 +252,6 @@ try {
     status: asked.status,
   };
 
-  // The CLI waits for an approval before its request reaches OpenBot, and refuses the steer prompts
-  // (#11107). The steers are refused, so the messages wait in the queue, and the turn goes on.
   const toolShown = new Promise<void>((shown) => {
     const listener = (notification: AppServerNotification) => {
       if (notification.method !== "item/started" || getString(notification.params, "threadId") !== thread) return;
@@ -286,7 +263,6 @@ try {
   const approvalsBefore = approvals;
   const holding = await startTurn(client, thread, log, "hold");
   await toolShown;
-  // Two messages at the same time: the second steer must not take the refusal of the first for its own answer.
   const [cliRefused] = await Promise.all([
     refusal(steer(client, thread, holding.id, "do this too")),
     refusal(steer(client, thread, holding.id, "and this")),
@@ -304,7 +280,6 @@ try {
   assert.match(holdFinished.reply, /held: done/u);
   report.refusedByCli = { refused: cliRefused, cliRefusals, reply: holdFinished.reply, status: holdFinished.status };
 
-  // An `agy` older than 1.5.0 cancels the open prompt on a second one, so the steer is refused.
   const old = await open("old-cli", { FAKE_VERSION: "1.4.5" });
   old.client.start();
   const oldThread = await startThread(old.client, { cwd: root });
@@ -320,9 +295,6 @@ try {
     status: oldFinished.status,
   };
 
-  // A turn that ends while a daemon command runs keeps its session's process (#9551). The idle limit
-  // keeps one idle session, so the end of each later turn closes the session that went idle before it,
-  // but not the one whose command runs. The provider's idle stop also keeps the process.
   const held = await open("held-work", {});
   held.client.start();
   const daemonThread = await startThread(held.client, { cwd: root });
@@ -336,7 +308,6 @@ try {
     assert.equal((await (await startTurn(held.client, thread, held.log, "hello")).done).status, "completed");
     laterPids.push(await sessionPid(held.log, "hello", index));
   }
-  // The first two later sessions went idle before another one, so the limit closed them.
   await Promise.all(laterPids.slice(0, 2).map((pid) => waitForExit(pid)));
   const daemonRuns = isRunning(await sessionPid(held.log, "daemon", 0));
   assert.ok(daemonRuns, "The idle limit closed the session whose daemon command runs.");

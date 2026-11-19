@@ -4,13 +4,10 @@ import { Effect, Semaphore } from "effect";
 import { isMissingFileError } from "../backend/file-errors";
 import { readPreferenceFile, writePreferenceFile } from "./preference-file";
 
-/** The file name under the user data folder. */
 export const UPDATE_PREFERENCE_FILE = "openbot-update-preference-v1.json";
 
 const DEFAULT_PREFERENCE: UpdatePreference = { autoDownload: true, allowRemoteUpdates: true, autoInstall: false };
 
-// `allowRemoteUpdates` and `autoInstall` came later in the same version 1 file. A file without them
-// is one written before remote updates existed, and an older app that reads a newer file ignores them.
 export const readUpdatePreference = Effect.fn("readUpdatePreference")((path: string) =>
   readPreferenceFile(path, (parsed): UpdatePreference => {
     if (!isDynamicRecord(parsed) || parsed.version !== 1 || !isBoolean(parsed.autoDownload)) {
@@ -32,11 +29,6 @@ export const readUpdatePreference = Effect.fn("readUpdatePreference")((path: str
   ),
 );
 
-/**
- * Writes are serialized because each one renames its own temporary file into place. Two quick toggles
- * would otherwise race, and the earlier rename could land last and persist the value the user just
- * turned off. Chaining also keeps the replies in invocation order, so the renderer adopts the latest.
- */
 const writeLock = Semaphore.makeUnsafe(1);
 
 export const writeUpdatePreference = Effect.fn("writeUpdatePreference")(

@@ -112,6 +112,7 @@ export const messages = {
     "Wspomnienia: zapisane {saved}, zaktualizowane {updated}, zapomniane {forgotten}, niezmienione {notChanged}, bo inny wątek zmienił je wcześniej.",
   "status.agent.mcpToolCall": "Uruchomić narzędzie {tool} serwera MCP {name}.",
   "status.agent.uiBlockClosedByMessage": "Zamknięto po nowej wiadomości",
+  "status.agent.finishCheckContinues": "Prośba nie jest jeszcze wykonana. Agent kontynuuje ({current} z {limit}).",
   "status.agent.nextStepContinues": "Agent zatrzymał się przed następnym krokiem. Kontynuuje ({current} z {limit}).",
   "status.agent.planContinues": "Plan ma otwarte kroki. Agent kontynuuje ({current} z {limit}).",
   "status.agent.planStopped": "Agent zatrzymał się z otwartymi krokami w planie. Wyślij wiadomość, aby kontynuować.",

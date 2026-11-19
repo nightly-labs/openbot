@@ -31,9 +31,7 @@ import type { SettingsMobileConnectStore } from "./stores/mobile-connect-store";
 type Store = SettingsMobileConnectStore;
 
 const QR_SIZE = 176;
-/** How long a dialog shows the phone that connected before it closes. */
 const CONNECTED_CLOSE_MS = 1_400;
-/** The permanent code hides itself after this, so it does not stay on the screen. */
 const LINK_VISIBLE_SECONDS = 60;
 
 interface PhoneApp {
@@ -44,7 +42,6 @@ interface PhoneApp {
   tag: AppTextKey;
 }
 
-/** The store page of each phone app. Its QR code opens the store on the phone. */
 const PHONE_APPS: readonly PhoneApp[] = [
   {
     platform: "ios",
@@ -66,7 +63,6 @@ function countdown(seconds: number) {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
-/** The tag under each code: what the code does, in words and with an icon. */
 function QrTag(props: { kind: "store" | "signin" | "permanent" | "success" | "idle"; children: JSX.Element }) {
   return (
     <span class="settings-mobile-qr-tag" data-kind={props.kind}>
@@ -89,7 +85,6 @@ function QrTag(props: { kind: "store" | "signin" | "permanent" | "success" | "id
   );
 }
 
-/** A code, the success mark over it when a phone connected, and its tag. */
 function CodeStage(props: { value: string; label: string; connected: boolean; tag: JSX.Element }) {
   return (
     <div class="settings-mobile-qr">
@@ -108,7 +103,6 @@ function CodeStage(props: { value: string; label: string; connected: boolean; ta
   );
 }
 
-/** Where a code appears when there is none. The same size as the code, so nothing moves. */
 function CodeSlot(props: { children: JSX.Element }) {
   return (
     <div class="settings-mobile-qr">
@@ -147,7 +141,6 @@ function DialogFrame(props: { open: boolean; title: string; onClose: () => void;
   );
 }
 
-/** Captures the phone that connected, and closes the dialog a moment later. */
 function createConnectedClose(source: () => { name: string; value: string } | null, close: () => void) {
   const [connected, setConnected] = createSignal<{ name: string; value: string } | null>(null);
   createEffect(source, (found) => {
@@ -163,10 +156,6 @@ function createConnectedClose(source: () => { name: string; value: string } | nu
 
 type AddScreen = "ask" | "install" | "signin";
 
-/**
- * Adds a phone in steps, with one code per step: the store code to get the app, or the one-time
- * sign-in code. Closing the dialog cancels a code that no phone used.
- */
 export function MobileConnectAddPhoneDialog(props: {
   open: boolean;
   store: Store;
@@ -181,7 +170,6 @@ export function MobileConnectAddPhoneDialog(props: {
     const current = session();
     return Boolean(current && !current.collapsing && !current.successDeviceName && !props.store.expired());
   };
-  // A code that no phone used is cancelled when its screen closes, also when it arrives after that.
   createEffect(
     () => !(props.open && screen() === "signin") && live() && !props.store.state.connect.busy && props.canCancelTicket,
     (cancel) => {
@@ -314,7 +302,6 @@ export function MobileConnectAddPhoneDialog(props: {
   );
 }
 
-/** The one-time code with its countdown, the phone that it connected, or a way to get a new code. */
 function SignInCode(props: { store: Store; connected: { name: string; value: string } | null; live: boolean }) {
   const { t } = useText();
   return (
@@ -392,10 +379,6 @@ function SignInCode(props: { store: Store; connected: { name: string; value: str
   );
 }
 
-/**
- * The permanent link: what it is and a way to make one, or its code with a warning. The code shows
- * when the dialog opens, and hides when the dialog closes or after a minute.
- */
 export function MobileConnectLinkDialog(props: { open: boolean; store: Store; onClose: () => void }) {
   const { t } = useText();
   const link = () => props.store.state.link;
@@ -479,7 +462,6 @@ export function MobileConnectLinkDialog(props: { open: boolean; store: Store; on
   );
 }
 
-/** The permanent code with its warning. It counts down from its first render and hides at zero. */
 function LinkCode(props: { url: string; connectedName: string | null; onHide: () => void }) {
   const { t } = useText();
   const shownAt = Date.now();

@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/update";
 
 export const messages = {
-  // Updater state the user reads.
   "error.update.unsupported":
     "Les mises à jour sont disponibles dans les versions installées de l’application de bureau.",
   "error.update.notReady": "Une mise à jour n’est pas prête à être installée.",

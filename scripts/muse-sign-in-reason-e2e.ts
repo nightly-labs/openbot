@@ -1,7 +1,3 @@
-// Connects Muse on the real driver and `ProviderRuntime`, with a fake `muse serve` host that answers
-// the device-code sign-in with each `account/loginCompleted` case. Checks that a refused sign-in
-// shows Muse's own reason, redacted, and that a refusal with no reason keeps the general text (#5544).
-// `bun scripts/muse-sign-in-reason-e2e.ts`. Writes .openbot-build/muse-sign-in-reason-e2e/report.json.
 import assert from "node:assert/strict";
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -20,7 +16,6 @@ const WAIT_MS = 20_000;
 const PAYMENT = "Muse Code requires a payment method — finish onboarding at https://dev.meta.ai, then log in again.";
 const SECRET = "abcdef1234567890";
 
-// Reads its answer from `case.json` in FAKE_MUSE_DIR: `{ outcome, message? }`.
 const FAKE_MUSE = `#!/usr/bin/env node
 const fs = require("node:fs");
 const path = require("node:path");
@@ -101,7 +96,6 @@ const report: {
   cases: { name: string; state?: string; message?: string | null; opened: string[]; error?: string }[];
 } = { passed: false, cases: [] };
 
-/** Connects Muse once and resolves with its row when the sign-in has ended. */
 async function connect(item: Case): Promise<void> {
   const dir = join(root, item.name);
   await mkdir(dir, { recursive: true });
@@ -153,7 +147,6 @@ async function connect(item: Case): Promise<void> {
   });
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    // A signed-out Muse refuses to start: the row asks for a sign-in.
     await Effect.runPromiseExit(runtime.ensureProvider("muse"));
     await Effect.runPromise(
       runtime.connectProvider("muse", async (url) => {

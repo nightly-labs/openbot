@@ -1,13 +1,3 @@
-// Frozen optional provider-environment-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: an owner or admin of a
-// server can read and set the environment variables that each process of one of the server's
-// providers starts with: "claude", "codex" or "antigravity". A list has at most 32 variables. A name
-// has at most 128 characters and a value at most 8,192. A sensitive value goes to the host only: a
-// read gives an empty `value` and `stored: true`, and an update with `value: null` keeps the stored
-// value. The host refuses an invalid, reserved or repeated name with 400. It applies a change to the
-// provider's processes that start after it. A member cannot use either route; `requireAdmin` on the
-// host is the only gate. Widening any of it needs a second capability string.
 import {
   isProviderEnvironmentProvider,
   type ProviderEnvironment,
@@ -58,10 +48,6 @@ export const PROVIDER_ENVIRONMENT_CODECS: ReadonlyMap<string, OptionalRouteCodec
   ],
 ]);
 
-/**
- * The variables that a host answers, as the client type. It is not the preload decoder: the two check
- * different senders.
- */
 export function decodeProviderEnvironmentResponse(value: unknown): ProviderEnvironment {
   if (
     !isDynamicRecord(value) ||

@@ -1,8 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Stripe here is taken from docs.stripe.com. Each page used is in
-// `sources`. Check the sources again, and move `checkedAt`, whenever this file changes.
-
 export const STRIPE_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

@@ -29,7 +29,7 @@ export function AgentPinTransitionOverlay({ progress, transition }: AgentPinTran
       width: transition.from.width,
       zIndex: 100,
     };
-  }, [transition]);
+  });
 
   if (!transition) return null;
 

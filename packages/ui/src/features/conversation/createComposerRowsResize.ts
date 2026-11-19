@@ -1,15 +1,8 @@
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import { onCleanup } from "solid-js";
 
-/** The input row is 28px with one line of text and 48px with two. */
 const ONE_ROW_MAX_PX = 40;
 
-/**
- * A one-row input outside the main chat (dock chat, diagram chat, side question, side thread, Tasks).
- * A draft with more than one line gets card corners (`data-multiline`), as the main message input
- * does, and the input moves to its new height on the curve of the main input
- * (`data-rows-resizing`). A different `key` shows its draft at once.
- */
 export function createComposerRowsResize(key?: () => string) {
   let form: HTMLElement | undefined;
   let paintedHeight = 0;
@@ -29,7 +22,6 @@ export function createComposerRowsResize(key?: () => string) {
     const sameKey = paintedKey === nextKey;
     paintedHeight = to;
     paintedKey = nextKey;
-    // A hidden panel has no height: its next draft shows at once.
     if (!sameKey || from <= 0 || to <= 0 || Math.abs(to - from) < 1 || prefersReducedMotion()) return;
     const style = getComputedStyle(element);
     const current = element.animate([{ height: `${from}px` }, { height: `${to}px` }], {
@@ -51,11 +43,9 @@ export function createComposerRowsResize(key?: () => string) {
   });
 
   return {
-    /** The `.composer` form. */
     form(element: HTMLElement) {
       form = element;
     },
-    /** The `.composer-input-label` that holds the editor. */
     label(element: HTMLElement) {
       rows.disconnect();
       rows.observe(element);

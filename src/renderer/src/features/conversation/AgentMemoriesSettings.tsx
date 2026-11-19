@@ -9,7 +9,6 @@ import { desktopAnalytics } from "../../analytics";
 import type { MemoriesPort } from "./memories-port";
 
 interface AgentMemoriesSettingsProps {
-  /** Names the owner and owns every call. A channel passes `channelMemoriesPort` here. */
   port: MemoriesPort;
   open: boolean;
   onBack: () => void;
@@ -17,10 +16,6 @@ interface AgentMemoriesSettingsProps {
   onCountChange: (count: number) => void;
 }
 
-/**
- * The Memories page of the agent or channel settings. It stays mounted while the settings are open,
- * so a delete that waits for its undo time still runs after the page closes.
- */
 export function AgentMemoriesSettings(props: AgentMemoriesSettingsProps) {
   const { t, errorMessage } = useText();
   const [selection, setSelection] = createSignal<AgentMemorySelectionState | null>(null);
@@ -35,9 +30,6 @@ export function AgentMemoriesSettings(props: AgentMemoriesSettingsProps) {
       : undefined;
   });
   const [memories, setMemories] = createSignal<MemoryEntry[]>([]);
-  // Memories that wait for the undo time to end. The page hides them; the host still has them.
-  // A deleted id stays here: the host never gives the id again, so the set needs no cleanup.
-  // `hidden` is the source; the signal holds a copy, because a read after a write gives the old value.
   const hidden = new Set<string>();
   const [hiddenIds, setHiddenIds] = createSignal<ReadonlySet<string>>(new Set());
   const visibleMemories = createMemo(() => {
@@ -49,25 +41,16 @@ export function AgentMemoriesSettings(props: AgentMemoriesSettingsProps) {
   const [savingId, setSavingId] = createSignal<string | null>(null);
   const [clearConfirmation, setClearConfirmation] = createSignal(false);
 
-  /**
-   * Deletes that wait for the undo time to end, by memory. When the settings go away, each delete runs
-   * at once, against the owner it was made on.
-   */
   const pendingDeletes = new Map<string, { commit: () => void; settle: () => boolean }>();
   onCleanup(() => {
     for (const pending of [...pendingDeletes.values()]) pending.commit();
   });
 
-  /**
-   * The cap the owner reached, or null. A remote host's cap is unknown here; it refuses on save. A
-   * memory that waits for undo is still stored, so it still counts.
-   */
   const reachedLimit = () => {
     const limit = props.port.limit;
     return limit !== null && memories().length >= limit ? limit : null;
   };
 
-  /** Hides or shows a memory while its delete waits. */
   function setHidden(memoryId: string, hide: boolean): void {
     if (hide) hidden.add(memoryId);
     else hidden.delete(memoryId);
@@ -90,8 +73,6 @@ export function AgentMemoriesSettings(props: AgentMemoriesSettingsProps) {
     }
   }
 
-  // The port is new after each activity of the agent, and an effect runs again for an equal value.
-  // The memo keeps the page until the owner changes.
   const ownerId = createMemo(() => props.port.ownerId);
   createEffect(
     () => [props.open, ownerId()] as const,
@@ -121,7 +102,6 @@ export function AgentMemoriesSettings(props: AgentMemoriesSettingsProps) {
       await props.port.create(text);
       analytics.track("memory_action", { action: "create", result: "succeeded" });
       operationSucceeded = true;
-      // The editor closes after the reload, so the empty state does not show again for a moment.
       await loadMemories(false);
       return true;
     } catch (caught) {
@@ -157,10 +137,6 @@ export function AgentMemoriesSettings(props: AgentMemoriesSettingsProps) {
     }
   }
 
-  /**
-   * The memory leaves the list at once, and a toast offers Undo. The host deletes the memory only when
-   * the time is over, so an undo has nothing to restore. If the app quits before then, the memory stays.
-   */
   function deleteMemory(memory: MemoryEntry): void {
     if (pendingDeletes.has(memory.id)) return;
     const port = props.port;
@@ -170,12 +146,10 @@ export function AgentMemoriesSettings(props: AgentMemoriesSettingsProps) {
     setHidden(memory.id, true);
 
     let settled = false;
-    /** Undo and delete each end the same wait, so only the first of them runs. */
     function settle(): boolean {
       if (settled) return false;
       settled = true;
       pendingDeletes.delete(memory.id);
-      // A cleanup can call this, and a write to the Toaster from there stops the reactive system.
       queueMicrotask(() => toast.dismiss(toastId));
       return true;
     }
@@ -219,7 +193,6 @@ export function AgentMemoriesSettings(props: AgentMemoriesSettingsProps) {
       await props.port.clear();
       analytics.track("memory_action", { action: "clear", result: "succeeded" });
       operationSucceeded = true;
-      // The clear removed the memories that wait for their undo time too, so nothing is left to delete.
       for (const pending of [...pendingDeletes.values()]) pending.settle();
       setClearConfirmation(false);
       await loadMemories(false);
@@ -233,10 +206,6 @@ export function AgentMemoriesSettings(props: AgentMemoriesSettingsProps) {
     }
   }
 
-  /**
-   * The switch sets the memory's use, and the user then controls it: the agent no longer moves it.
-   * `automatic` gives control back to the agent.
-   */
   async function setInclusion(memory: MemoryEntry, inclusion: AgentMemorySelectionChange["inclusion"]): Promise<void> {
     const current = selection()?.selections.find((entry) => entry.memoryId === memory.id);
     const port = props.port.selection;
@@ -254,7 +223,6 @@ export function AgentMemoriesSettings(props: AgentMemoriesSettingsProps) {
         ]),
       );
     } catch (caught) {
-      // Refresh revisions after another client changes the selection, but keep the error visible.
       await loadMemories(false);
       setError(errorMessage(caught, t("memory.updateFailed")));
     } finally {
@@ -262,7 +230,6 @@ export function AgentMemoriesSettings(props: AgentMemoriesSettingsProps) {
     }
   }
 
-  /** The confirm dialog shows the error of a clear, so the page does not show it too. */
   const pageError = () => (clearConfirmation() ? null : error());
 
   return (

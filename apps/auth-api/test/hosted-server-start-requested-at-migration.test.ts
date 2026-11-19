@@ -50,7 +50,6 @@ describe("hosted server start time migration", () => {
   it("accepts the writes of the Worker that runs before the deploy", () => {
     const database = beforeMigration();
     database.exec(migration(MIGRATION));
-    // The deployed Worker names no start time in its insert, its wake or its observed state.
     database.exec(`
       INSERT INTO hosted_servers(
         server_id, owner_user_id, name, size, plan, billing_interval, currency, desired_state, observed_state,

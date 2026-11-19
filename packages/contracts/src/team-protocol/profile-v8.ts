@@ -1,5 +1,3 @@
-// The agent-profile-generation payloads on protocol 8. Drafts and requests keep their v4 shape; only a
-// saved agent is read with the v8 schema, which accepts an open provider id.
 import { isDynamicRecord } from "../runtime-values";
 import { decodeProfileV4Draft } from "./profile-v4";
 import { decodeTeamProtocolV8BaseHttpResponse, type TeamProtocolV8BaseJsonObject } from "./v8-base";

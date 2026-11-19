@@ -5,10 +5,6 @@ import { useReducedMotion } from "@/shared/lib/motion";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import type { VoicePalette } from "../model/voice-palette";
 
-// Four soft lobes rise from the bottom edge and sweep from side to side. Each
-// one blends two neighbouring palette colours over time, so the glow moves
-// through the agent's colour range without leaving it. The voice level pushes
-// the lobes up; silence leaves a low, breathing glow.
 const SOURCE = `
 uniform float2 resolution;
 uniform float time;
@@ -24,8 +20,6 @@ float lobe(float2 uv, float centre, float width, float reach) {
   return exp(-dx * dx) * exp(-uv.y / max(reach, 0.001));
 }
 
-// The lobes rise together with the voice, with only a small offset each, and
-// the top edge rolls slowly: separate jumps and fast ripples read as spikes.
 float reachOf(float2 uv, float index, float phase) {
   float voice = level * (0.78 + 0.22 * sin(time * 1.8 + index * 1.9));
   float idle = 0.07 + 0.022 * sin(time * 0.9 + index);
@@ -41,7 +35,6 @@ half4 main(float2 position) {
   float3 k2 = mix(c2, c3, 0.5 + 0.5 * sin(time * 0.35 + 3.14));
   float3 k3 = mix(c3, c0, 0.5 + 0.5 * sin(time * 0.35 + 4.71));
 
-  // Wide lobes: a narrow one that rises far draws a peak.
   float w0 = lobe(uv, 0.5 + 0.32 * sin(time * 0.53), 0.35 + 0.055 * sin(time * 0.71), reachOf(uv, 0.0, 0.0));
   float w1 = lobe(uv, 0.5 + 0.37 * sin(time * 0.41 + 2.1), 0.31, reachOf(uv, 1.0, 1.3));
   float w2 = lobe(uv, 0.5 + 0.28 * sin(time * 0.67 + 4.2), 0.29 + 0.045 * sin(time * 0.5), reachOf(uv, 2.0, 2.6));
@@ -49,22 +42,15 @@ half4 main(float2 position) {
 
   float weight = w0 + w1 + w2 + w3;
   float3 tint = (k0 * w0 + k1 * w1 + k2 * w2 + k3 * w3) / max(weight, 0.0001);
-  // Faint vertical rays, so the glow reads as a curtain and not a flat haze.
   float rays = 0.92 + 0.08 * sin(uv.x * 28.0 + 1.8 * sin(uv.x * 7.0 + time * 0.7));
   float alpha = 1.0 - exp(-weight * 1.6);
-  // Takes more off the bright peaks than off the middle tones, so a loud voice
-  // does not flare and the glow keeps an even contrast.
   alpha = alpha * (1.0 - 0.18 * alpha) * rays;
-  // The faint top of the glow has too little colour to read as the agent's:
-  // it reads as a grey haze. Thin it out, so the glow fades on its own.
   alpha = pow(alpha, 1.4);
 
-  // A brighter core along the bottom edge, where the voice button sits.
   float core = exp(-uv.y / (0.035 + 0.05 * level)) * (0.42 + 0.38 * level) * presence;
   tint = mix(tint, min(tint * 1.3 + 0.12, float3(1.0)), core * 0.5);
   alpha = alpha + core * 0.24;
 
-  // The canvas edge must never show. A long fade, so it does not draw a ceiling.
   alpha *= presence * smoothstep(1.0, 0.45, uv.y);
   float noise = fract(sin(dot(position, float2(12.9898, 78.233))) * 43758.5453);
   alpha = clamp(alpha + (noise - 0.5) / 255.0, 0.0, 1.0);
@@ -72,19 +58,15 @@ half4 main(float2 position) {
 }
 `;
 
-// Compiled on first use, not when the chat loads this module.
 let effect: SkRuntimeEffect | null | undefined;
 function auroraEffect(): SkRuntimeEffect | null {
   if (effect === undefined) effect = Skia.RuntimeEffect.Make(SOURCE);
   return effect;
 }
-// The level rises fast and falls slowly, so the glow follows the voice without flicker.
 const ATTACK_PER_SECOND = 8;
 const RELEASE_PER_SECOND = 2.75;
-// Reduced motion keeps one still glow at a fixed height.
 const STILL_LEVEL = 0.25;
 
-/** Decorative: the voice controls and the transcript carry the state for assistive technology. */
 export function VoiceAurora({
   width,
   height,
@@ -94,14 +76,11 @@ export function VoiceAurora({
 }: {
   width: number;
   height: number;
-  /** Microphone input level from 0 to 1. */
   level: SharedValue<number>;
-  /** 0 hidden, 1 shown. */
   presence: SharedValue<number>;
   palette: VoicePalette;
 }) {
   const reducedMotion = useReducedMotion();
-  // A voice call can go on in the background, where nothing shows the aurora.
   const foreground = useAppForeground();
   const time = useSharedValue(0);
   const smoothed = useSharedValue(0);
@@ -117,7 +96,6 @@ export function VoiceAurora({
     frame.setActive(foreground && !reducedMotion);
     return () => frame.setActive(false);
   }, [foreground, frame, reducedMotion]);
-  // The colours change with the palette, not on each frame.
   const colors = useMemo(() => {
     const [c0, c1, c2, c3] = palette;
     return { c0: [...c0], c1: [...c1], c2: [...c2], c3: [...c3] };

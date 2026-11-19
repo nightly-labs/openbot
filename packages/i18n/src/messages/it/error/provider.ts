@@ -182,6 +182,8 @@ export const messages = {
     "{provider} non ha risposto in tempo. Il computer potrebbe essere occupato. Aggiorna i provider per riprovare.",
   "error.provider.stoppedBeforeStart":
     "{provider} si è fermato prima che questo messaggio iniziasse. Invia di nuovo il messaggio.",
+  "error.provider.sessionStartTimedOut":
+    "{provider} non ha aperto una nuova chat in tempo, quindi questo messaggio non è iniziato. Sul computer che esegue OpenBot, apri Provider, seleziona {provider} e fai clic su Riavvia. Poi riprova.",
   "error.provider.serviceUnreachable":
     "{provider} non riesce a connettersi al suo servizio. Controlla la connessione a internet. OpenBot riproverà.",
   "error.provider.serviceUnreachableRefresh":
@@ -390,12 +392,14 @@ export const messages = {
     "Il servizio di Claude ha bloccato questa richiesta. Di solito è un breve problema di Claude, non del tuo account. Invia di nuovo il messaggio tra qualche minuto.",
   "error.provider.foreignReasoning":
     "{provider} non ha accettato il ragionamento precedente in questa chat, perché lo ha ricevuto un altro account o un'altra chiave API. OpenBot ha avviato una nuova sessione di {provider} con la cronologia della chat. Riprova.",
+  "error.provider.blankHistoryText":
+    "Il modello non ha accettato questa chat, perché la sua cronologia salvata contiene un messaggio vuoto. OpenBot ha avviato una nuova sessione di {provider} con la cronologia della chat. Riprova.",
   "error.provider.codexHistoryItemMissing":
     "Codex non ha potuto continuare questa chat, perché manca un elemento nella sua cronologia salvata. OpenBot ha avviato una nuova sessione di Codex con la cronologia della chat. Riprova.",
   "error.provider.codexRequestRefused":
     "{provider} ha rifiutato la richiesta di questa chat senza indicarne la causa. Può succedere in una chat lunga con molte immagini. OpenBot ha avviato una nuova sessione {provider} con la cronologia della chat. Riprova.",
   "error.provider.codexAudioRefused":
-    "Il modello non ha accettato l'audio in questa chat. OpenBot ha avviato una nuova sessione Codex con la cronologia della chat. Riprova.",
+    "Questo modello non può ascoltare l'audio, quindi non ha accettato il suono di questa chat. OpenBot ha avviato una nuova sessione Codex con la cronologia della chat. Per continuare, invia di nuovo la richiesta e chiedi all'agente di lavorare senza il suono. Per controllare il suono, scegli nel menu dei modelli dell'agente un modello che può ascoltare l'audio.",
   "error.provider.imageTooSmall":
     "Il modello non ha accettato un'immagine in questa chat perché l'immagine è troppo piccola. OpenBot ha avviato una nuova sessione {provider} con la cronologia della chat. Riprova.",
   "error.provider.imageTooLarge":
