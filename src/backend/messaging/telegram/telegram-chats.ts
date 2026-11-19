@@ -1,6 +1,6 @@
 import { createOpenBotLogger } from "@openbot/logging";
 import type { MessagingHistoryStore, ThreadedEntry } from "../messaging-history-store";
-import type { ContextEntry } from "../messaging-types";
+import type { ContextEntry, HistoryFilter } from "../messaging-types";
 
 const logger = createOpenBotLogger("telegram");
 
@@ -114,7 +114,16 @@ export class TelegramChatState {
       .map(({ threadKey: _threadKey, ...entry }) => entry);
   }
 
-  recent(threadKey: string | null, limit: number): ContextEntry[] {
+  get searchesHistory(): boolean {
+    return this.#archive !== null;
+  }
+
+  recent(threadKey: string | null, limit: number, filter: HistoryFilter = {}): ContextEntry[] {
+    const archive = this.#archive;
+    const saved =
+      archive &&
+      archived("restore", () => archive.store.recent(archive.connectionId, archive.chatId, threadKey, limit, filter));
+    if (saved) return saved;
     return this.#recent
       .filter((entry) => threadKey === null || entry.threadKey === threadKey)
       .slice(-limit)

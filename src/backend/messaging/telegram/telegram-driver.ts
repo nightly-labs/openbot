@@ -14,6 +14,7 @@ import type { MessagingAnswerFile } from "../messaging-threads";
 import {
   type ConnectionIdentity,
   type ContextEntry,
+  type HistoryFilter,
   type InboundFile,
   type MessageBody,
   type MessageTarget,
@@ -214,12 +215,17 @@ class TelegramAdapter implements MessagingAdapter {
     return Effect.sync(() => this.#state.history(threadKey, afterId, beforeId));
   }
 
+  get searchesHistory(): boolean {
+    return this.#state.searchesHistory;
+  }
+
   recent(
     _platformChannelId: string,
     threadKey: string | null,
     limit: number,
+    filter?: HistoryFilter,
   ): Effect.Effect<RecentMessages, MessagingAdapterError> {
-    return Effect.sync(() => ({ messages: this.#state.recent(threadKey, limit) }));
+    return Effect.sync(() => ({ messages: this.#state.recent(threadKey, limit, filter) }));
   }
 
   readonly download = Effect.fnUntraced(function* (
