@@ -15,7 +15,7 @@
 - **Size**: L
 - **Planned at**: commit `5fd3a12b9a` (2026-11-19); updated at `39a0642862` for #12721 (new Terms:
   14 days of data, a cancelled and refunded server is deleted at once)
-- **State**: IN PROGRESS (item 1 done)
+- **State**: IN PROGRESS (items 1 and 2 done)
 
 ## Why this matters
 
@@ -102,8 +102,8 @@ subscription. So an archive never races a late payment of the same subscription.
 | EU Central (`AMS-01`) | `openbot-pool-archive-eu`, private, SSE-B2, lifecycle: hide after 15 days, delete 1 day later (was 31; changed 2026-11-19 for the new Terms) | `s3.eu-central-003.backblazeb2.com` | `B2_KEY_ID_EU`, `B2_APPLICATION_KEY_EU` (operator: read, write, delete); `B2_WORKER_KEY_ID_EU`, `B2_WORKER_APPLICATION_KEY_EU` (Worker: read, share) |
 | US East | Not made: the developer decided on 2026-11-19 to use the EU bucket for `WDC-02` too. | — | — |
 
-Both keys reach only this bucket (checked with `b2_authorize_account`). The Worker keys are not yet
-Worker secrets; item 2 adds them.
+Both keys reach only this bucket (checked with `b2_authorize_account`). Item 2 puts the Worker keys
+in the GitHub `cloudflare-production` Environment, and the deploy makes them Worker secrets.
 
 ## Items
 
@@ -131,12 +131,24 @@ Worker secrets; item 2 adds them.
 
 ### 2. D1 table and Worker keys
 
-- **Change**: migration `0060_hosted_server_archives.sql` (main has `0059_referrals.sql`): `server_id`, `region`, `bucket`,
-  `object_key`, `size_bytes`, `sha256`, `wrapped_key`, `created_at`, `verified_at`, `restored_at`,
-  `deleted_at`. Also `hosted_servers.plan_end_reason` (`canceled` or `unpaid`), written by `#endPlan`:
-  today the reason is only computed when the plan ends (`planEndReason`, `billing-service.ts:1519`)
-  and is not stored. Worker secrets for the key wrap and for a read-only B2 key for each region.
-- **Check**: the D1 migration rules of `apps/auth-api/AGENTS.md`.
+- **Done (2026-11-19)**: migration `0061_hosted_server_archives.sql` (#12845 has 0060). One row for
+  each archive, keyed by `object_key`: `server_id`, `region`, `bucket`, `version_id` (a B2 delete
+  needs it), `size_bytes`, `sha256`, `wrapped_key`, `plan_ended_at`, `delete_after`, `created_at`,
+  `restored_at`, `deleted_at`. `sync` writes the row only after the checks, so there is no
+  `verified_at`. The table has no foreign key: the archive must stay findable after a server or
+  account delete, so that the B2 object is deleted too. A deleted archive has no key (a `CHECK`).
+- **Not done, on purpose**: `hosted_servers.plan_end_reason`. Stripe keeps the reason on the
+  subscription (`cancellation_details.reason` is `payment_failed` after the last retry), and `sync`
+  reads the subscription fresh in item 3.
+- **Secrets**: `HOSTED_ARCHIVE_KEY_SECRET` (32 random bytes, encrypts the `age` key in
+  `wrapped_key`), `B2_WORKER_KEY_ID_EU`, `B2_WORKER_APPLICATION_KEY_EU`. They are in
+  `.env.production` and in the GitHub `cloudflare-production` Environment; `deploy-auth-api.ts` and
+  `ci.yml` send them as a set of three. The Stripe "If all retries fail" setting is "cancel the
+  subscription" (developer, 2026-11-19).
+- **Open for item 5**: the Worker B2 key can read and share but not delete. Either `sync` deletes
+  the due archives each day, or the Worker gets a key that can also delete.
+- **Check**: the D1 migration rules of `apps/auth-api/AGENTS.md`;
+  `apps/auth-api/test/hosted-server-archives-migration.test.ts`.
 
 ### 3. Archive job in `leaseweb-pool.ts sync`
 

@@ -1491,6 +1491,9 @@ jobs:
           APNS_KEY_ID: ${{ secrets.APNS_KEY_ID }}
           FCM_SERVICE_ACCOUNT: ${{ secrets.FCM_SERVICE_ACCOUNT }}
           COMPANY_SIGN_IN_SECRET: ${{ secrets.COMPANY_SIGN_IN_SECRET }}
+          HOSTED_ARCHIVE_KEY_SECRET: ${{ secrets.HOSTED_ARCHIVE_KEY_SECRET }}
+          B2_WORKER_KEY_ID_EU: ${{ secrets.B2_WORKER_KEY_ID_EU }}
+          B2_WORKER_APPLICATION_KEY_EU: ${{ secrets.B2_WORKER_APPLICATION_KEY_EU }}
         run: |
           secrets_path="$RUNNER_TEMP/openbot-worker-secrets.json"
           umask 077
@@ -1528,6 +1531,7 @@ jobs:
               ["BOAT_API_KEY", "BOAT_WEBHOOK_SECRET"],
               // The Live Activity relay stays off until both are set.
               ["APNS_PRIVATE_KEY", "APNS_KEY_ID"],
+              ["HOSTED_ARCHIVE_KEY_SECRET", "B2_WORKER_KEY_ID_EU", "B2_WORKER_APPLICATION_KEY_EU"],
             ]) {
               const present = names.filter((name) => process.env[name]?.trim());
               if (present.length === 0) continue;

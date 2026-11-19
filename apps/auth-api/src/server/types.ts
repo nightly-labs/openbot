@@ -37,6 +37,9 @@ export interface WorkerBindings {
   SERVER_CLAIMS_ADMIN_TOKEN?: string;
   SITE_REPORT_HASH_SECRET?: string;
   COMPANY_SIGN_IN_SECRET?: string;
+  HOSTED_ARCHIVE_KEY_SECRET?: string;
+  B2_WORKER_KEY_ID_EU?: string;
+  B2_WORKER_APPLICATION_KEY_EU?: string;
   SITE_COOKIE_ISOLATION_READY?: string;
   SITE_PUBLISH_ENABLED?: string;
   SITE_LOCAL_ORIGIN?: string;
