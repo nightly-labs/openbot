@@ -173,6 +173,7 @@ export const messages = {
   "server.hosted.detail.create.copy": "Копирование OpenBot на машину",
   "server.hosted.detail.create.key": "Добавление одноразового ключа входа",
   "server.hosted.detail.start.boot": "Включение машины",
+  "server.hosted.detail.start.restore": "Восстановление данных",
   "server.hosted.detail.start.app": "Запуск OpenBot",
   "server.hosted.detail.start.wait": "Ожидание ответа OpenBot",
   "server.hosted.detail.connect.signIn": "Вход от вашего имени",

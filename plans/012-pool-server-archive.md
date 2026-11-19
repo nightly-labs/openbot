@@ -15,7 +15,8 @@
 - **Size**: L
 - **Planned at**: commit `5fd3a12b9a` (2026-11-19); updated at `39a0642862` for #12721 (new Terms:
   14 days of data, a cancelled and refunded server is deleted at once)
-- **State**: IN PROGRESS (items 1 and 2 done; items 3, 5 and 6 written, not applied)
+- **State**: IN PROGRESS (items 1 and 2 done; items 3, 5 and 6 written, not applied; item 4 written,
+  not deployed; item 1b open)
 
 ## Why this matters
 
@@ -187,6 +188,45 @@ in the GitHub `cloudflare-production` Environment, and the deploy makes them Wor
   `HOSTED_POOL_ALERT_WEBHOOK_URL`, so the operator can move the server to a VPS later.
 - **Not confirmed**: that an archive from a pool machine imports into the boat image: agent CLIs and
   packages can differ. Test it in item 1b.
+- **Design (2026-11-19, developer approved the UI)**:
+  - No new column on `hosted_servers`: `last_wake_reason` has a CHECK with no `restore`. A server
+    *restores* while it has a live archive (`deleted_at` and `restored_at` NULL) and
+    `desired_state = 'running'`. `ROW_COLUMNS` gets `plan_ended_at` and an `archived` flag; the two
+    queries that alias `hosted_servers` lose the alias.
+  - `#provision` of an archived server calls `#assignRestore` and never makes a boat sandbox. With no
+    ready machine, the server stays `awaiting_payment`, the tick tries again, and the operator gets one
+    alert. Boat fallback waits for item 1b.
+  - The assignment answer gets `restore: { url, key, sha256, bytes }` (presigned GET, 1 hour, Worker
+    key; key unwrapped with WebCrypto) and a claim, for the case that the old session was revoked. A
+    machine that does not send `restoreVersion: 1` gets `waiting`; the Worker takes the server back,
+    clears the token of that machine and alerts "prepare it again".
+  - The machine sends `restored: <serverId>` after `import`. The Worker sets `restored_at`,
+    `observed_state = 'running'`, clears the machine token and sends `ready` (reason `restart`).
+    Then the machine starts OpenBot, which signs in with the session from the archive.
+  - A restore with no report after `POOL_RESTORE_LOST_AFTER_MS` (3 hours) goes back to
+    `awaiting_payment`; the machine leaves the pool with an alert: it can hold customer data.
+  - `sync` does not start a restoring server (`start` query) and deletes the archive after
+    `restored_at`.
+  - Status: `restoring: true` and state `starting` (not `awaiting_payment`); a new start step
+    `restore` with no 15-minute limit; `dataKeptUntil` = `plan_ended_at` + 14 days for an ended pool
+    server.
+- **Written (2026-11-19)**:
+  - Worker: `apps/auth-api/src/server/hosted-archive-restore.ts` (unwrap, presign) and the restore
+    flow in `hosted-server-service.ts`. Bindings `HOSTED_ARCHIVE_KEY_SECRET`, `B2_WORKER_KEY_ID_EU`,
+    `B2_WORKER_APPLICATION_KEY_EU`.
+  - Machine: `openbot-pool-wait` sends `restoreVersion: 1` when `move-from-boat.sh` and `age` are
+    present, gives the key and the URL to `move-from-boat.sh restore <sha256>` on stdin, reports
+    `restored`, then starts OpenBot.
+  - Clients: start step `restore` ("Restoring data") in the connection notice of the desktop and the
+    web client; the badge "Restoring data" in settings and billing; mobile shows the same state. An
+    ended pool server shows the date until which its data is kept.
+  - Tests: `bun run test:hosted-pool-restore` (Worker flow), `scripts/hosting/pool-archive-e2e.ts`
+    (real B2 archive, `restore` on `pool-test-01`).
+- **Known gap**: an `import` failure on the machine is freed only by the 3-hour lost-restore tick. A
+  later machine version can report `restoreFailed`.
+- **Renewal on the last day**: B2 hides an archive 15 days after its upload and deletes it 1 day
+  later. The upload is at most 1 day after `plan_ended_at` (the daily `sync`), so a renewal before
+  `dataKeptUntil` finds the archive.
 
 ### 5. Delete paths
 
@@ -210,8 +250,10 @@ in the GitHub `cloudflare-production` Environment, and the deploy makes them Wor
 
 ## Surfaces
 
-Account service Worker and D1, operator scripts and pool machines, documents. No desktop, mobile,
-web client or Team API change.
+Account service Worker and D1, operator scripts and pool machines, documents. Item 4 also changes
+the hosted server contract (`restoring`, `dataKeptUntil`, start step `restore`), the desktop main
+process and preload decoding, the renderer and web client, `packages/ui` and mobile. No Team API
+change.
 
 ## Not confirmed
 

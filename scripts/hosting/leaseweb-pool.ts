@@ -462,7 +462,9 @@ class Pool {
   #work() {
     const query = (where: string) =>
       this.#rows(
-        `SELECT server_id, operator_host FROM hosted_servers WHERE operator_host IS NOT NULL AND ${where}`,
+        `SELECT server_id, operator_host FROM hosted_servers WHERE operator_host IS NOT NULL AND ${where}
+           AND NOT EXISTS(SELECT 1 FROM hosted_server_archives a WHERE a.server_id = hosted_servers.server_id
+             AND a.deleted_at IS NULL AND a.restored_at IS NULL)`,
         workRowSchema,
       );
     return {
@@ -494,8 +496,8 @@ class Pool {
     return this.#rows(
       `SELECT a.object_key, a.version_id, a.server_id FROM hosted_server_archives a
        LEFT JOIN hosted_servers h ON h.server_id = a.server_id
-       WHERE a.deleted_at IS NULL AND (a.delete_after <= ${literal(Date.now())} OR a.restored_at IS NOT NULL
-         OR h.server_id IS NULL OR h.desired_state = 'deleted')
+       WHERE a.deleted_at IS NULL AND ((a.delete_after <= ${literal(Date.now())} AND h.desired_state != 'running')
+         OR a.restored_at IS NOT NULL OR h.server_id IS NULL OR h.desired_state = 'deleted')
        ORDER BY a.delete_after`,
       storedArchiveSchema,
     );

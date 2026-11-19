@@ -169,6 +169,7 @@ export const messages = {
   "server.hosted.detail.create.copy": "OpenBot makineye kopyalanıyor",
   "server.hosted.detail.create.key": "Tek seferlik oturum açma anahtarı ekleniyor",
   "server.hosted.detail.start.boot": "Makine açılıyor",
+  "server.hosted.detail.start.restore": "Veriler geri yükleniyor",
   "server.hosted.detail.start.app": "OpenBot başlatılıyor",
   "server.hosted.detail.start.wait": "OpenBot'un yanıt vermesi bekleniyor",
   "server.hosted.detail.connect.signIn": "Sizin adınıza oturum açılıyor",

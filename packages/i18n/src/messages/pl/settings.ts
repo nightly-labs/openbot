@@ -624,6 +624,7 @@ export const messages = {
   "settings.hostedServers.state.planEnded": "Plan zakończony",
   "settings.hostedServers.state.creating": "Tworzenie",
   "settings.hostedServers.state.starting": "Uruchamianie",
+  "settings.hostedServers.state.restoring": "Przywracanie danych",
   "settings.hostedServers.state.running": "Działa",
   "settings.hostedServers.state.stopping": "Zatrzymywanie",
   "settings.hostedServers.state.stopped": "Zatrzymany",
@@ -634,6 +635,8 @@ export const messages = {
   "settings.hostedServers.paymentDescription": "Konfiguracja rozpocznie się, gdy Stripe potwierdzi płatność.",
   "settings.hostedServers.planEndedDescription":
     "Plan się zakończył, więc serwer się zatrzymał. Jego dane zostają. Odnów plan, aby go uruchomić.",
+  "settings.hostedServers.planEndedKeptUntil":
+    "Plan się zakończył, więc serwer się zatrzymał. Jego dane zostają do {date}. Odnów plan przed tym dniem, aby go uruchomić.",
   "settings.hostedServers.pay": "Otwórz stronę płatności",
   "settings.hostedServers.payLabel": "Otwórz stronę płatności dla {name}",
   "settings.hostedServers.renew": "Odnów plan",

@@ -564,6 +564,7 @@ export const messages = {
   "settings.hostedServers.state.planEnded": "套餐已结束",
   "settings.hostedServers.state.creating": "创建中",
   "settings.hostedServers.state.starting": "启动中",
+  "settings.hostedServers.state.restoring": "正在恢复数据",
   "settings.hostedServers.state.running": "运行中",
   "settings.hostedServers.state.stopping": "停止中",
   "settings.hostedServers.state.stopped": "已停止",
@@ -573,6 +574,8 @@ export const messages = {
   "settings.hostedServers.errorDescription": "服务器无法启动，请启动它以重试。",
   "settings.hostedServers.paymentDescription": "Stripe 确认付款后开始配置。",
   "settings.hostedServers.planEndedDescription": "套餐已结束，服务器因此停止，数据仍保留。续费后即可启动。",
+  "settings.hostedServers.planEndedKeptUntil":
+    "套餐已结束，服务器因此停止。数据保留至{date}。请在此之前续费以启动服务器。",
   "settings.hostedServers.pay": "打开支付页面",
   "settings.hostedServers.payLabel": "打开 {name} 的支付页面",
   "settings.hostedServers.renew": "续费套餐",

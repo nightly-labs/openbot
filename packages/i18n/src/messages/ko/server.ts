@@ -176,6 +176,7 @@ export const messages = {
   "server.hosted.detail.create.copy": "머신에 OpenBot을 복사하는 중",
   "server.hosted.detail.create.key": "일회용 로그인 키를 추가하는 중",
   "server.hosted.detail.start.boot": "머신을 켜는 중",
+  "server.hosted.detail.start.restore": "데이터 복원 중",
   "server.hosted.detail.start.app": "OpenBot을 시작하는 중",
   "server.hosted.detail.start.wait": "OpenBot의 응답을 기다리는 중",
   "server.hosted.detail.connect.signIn": "내 계정으로 로그인하는 중",
