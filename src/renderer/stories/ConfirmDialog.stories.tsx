@@ -9,7 +9,6 @@ type DemoProps = Omit<ConfirmDialogProps, "open" | "onCancel"> & {
   onCancel?: () => void;
 };
 
-/** Owns the open state the way a caller does: the trigger opens, cancel and a finished confirm close. */
 function ConfirmDialogDemo(props: DemoProps) {
   const [open, setOpen] = createSignal(props.initiallyOpen ?? false);
   return (

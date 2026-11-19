@@ -1,18 +1,9 @@
-/**
- * A provider that only the OpenBot app can sign in from here.
- *
- * Its sign-in page returns to the computer that opened it. The app on that computer receives it and
- * sends it on to the host; a browser tab cannot receive it. So the browser says where the sign-in
- * works, and offers the app. It is the same frame as the code sign-in dialog, which the same rows open.
- */
-
 import { Button, Dialog, IconButton, X } from "@openbot/ui";
 import { useText } from "../text";
 
 export interface ProviderUseAppDialogProps {
   open: boolean;
   providerName: string;
-  /** Opens the page that downloads the OpenBot app. */
   onDownload: () => void;
   onClose: () => void;
 }

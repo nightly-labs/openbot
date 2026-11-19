@@ -1,20 +1,3 @@
-// Checks that a DeepSeek model on a custom endpoint on Mistral's API finishes a turn with a tool call
-// (#10094). OpenCode 2.2.5 adds an empty `reasoning_content` to each earlier assistant message when
-// the model id contains `deepseek`, and Mistral refuses that field with HTTP 422 `extra_forbidden`.
-// Builds the OpenCode config layer with `openCodeConfigEnv`, then runs the real OpenCode CLI with that
-// layer against a fake strict server on loopback (only the base URL changes). The fake server answers
-// the first request with a `bash` tool call, and refuses a request whose assistant message carries
-// `reasoning_content`, as Mistral does. It streams the last answer as Mistral does with reasoning on:
-// `delta.content` is a list of `thinking` and `text` parts, which the OpenAI-compatible adapter refuses
-// as an invalid stream event (#10591).
-// Cases: `other-host`, the `provider` entry that every other endpoint keeps, which must get the 422
-// (the control); `mistral`, which must finish the turn and keep the key, the header, the saved output
-// cap and the saved efforts, use Mistral's own adapter, and show the text of the last answer. A keyless
-// endpoint on Mistral's API keeps the OpenAI-compatible adapter, which reads no `MISTRAL_API_KEY`. The
-// `mistral` layer also holds a second endpoint and an OpenCode Go key, and OpenCode must list the models of both endpoints. The `mistral` endpoint is in both blocks:
-// OpenCode 2 uses its `providers` entry, and OpenCode 1 ignores `providers` and keeps `provider`.
-// `bun scripts/opencode-mistral-reasoning-e2e.ts [<opencode binary>]`. Without an argument it uses
-// `OPENBOT_OPENCODE_PATH`. Writes .openbot-build/opencode-mistral-reasoning-e2e/report.json.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -48,12 +31,10 @@ const root = await mkdtemp(join(tmpdir(), "openbot-opencode-mistral-"));
 interface CapturedRequest {
   readonly status: number;
   readonly model: unknown;
-  /** Whether the request carried the endpoint key. The report keeps no key. */
   readonly auth: "key" | "other" | "none";
   readonly header: string | null;
   readonly maxCompletionTokens: unknown;
   readonly reasoningEffort: unknown;
-  /** The keys of each assistant message that the request sent back. */
   readonly assistantKeys: readonly (readonly string[])[];
   readonly toolResult: boolean;
 }
@@ -91,7 +72,6 @@ function answer(request: IncomingMessage, response: ServerResponse, text: string
     toolResult,
   });
   if (refused >= 0) {
-    // Mistral's answer, as the issue reports it.
     const loc = ["body", "messages", refused, "assistant", "reasoning_content"];
     response.writeHead(422, { "content-type": "application/json" });
     response.end(
@@ -167,12 +147,9 @@ const other: CustomProviderConfig = {
   models: [{ id: OTHER_MODEL, name: "Lab model" }],
 };
 
-/** The layer OpenBot sends, with only the endpoint's base URL moved to the fake server. */
 function configFor(providers: readonly CustomProviderConfig[]): {
   readonly format: "provider" | "providers";
-  /** The endpoint's entry as OpenBot wrote it, with the test key replaced, for the report. */
   readonly entry: unknown;
-  /** The settings that OpenBot wrote: `settings` in `providers`, `options` in `provider`. */
   readonly settings: { readonly baseURL: unknown; readonly headerTimeout: unknown; readonly chunkTimeout: unknown };
   readonly content: string;
 } {
@@ -191,7 +168,6 @@ function configFor(providers: readonly CustomProviderConfig[]): {
     chunkTimeout: written.chunkTimeout,
   };
   written.baseURL = local;
-  // The `provider` entry that stays beside a `providers` entry, for OpenCode 1, moves too.
   config.provider[ENDPOINT].options.baseURL = local;
   return { format, entry, settings, content: JSON.stringify(config) };
 }
@@ -216,7 +192,6 @@ async function runOpenCode(
       OPENCODE_DISABLE_AUTOUPDATE: "1",
     },
     stdio: ["ignore", "pipe", "pipe"],
-    // A turn against the loopback server takes seconds. A hang must end in a failed case and a report.
     timeout: 180_000,
   });
   let stdout = "";
@@ -231,7 +206,6 @@ async function runOpenCode(
   return { code, stdout, stderr: stderr.slice(-2000) };
 }
 
-/** One turn on the endpoint's model at the saved effort, on a private OpenCode server. */
 function runTurn(content: string, name: string) {
   return runOpenCode(content, name, [
     "run",
@@ -260,7 +234,6 @@ const report: { binary: string; model: string; cases: CaseReport[]; result?: "pa
   cases,
 };
 try {
-  // The control: the `provider` entry, which every host other than Mistral's keeps.
   const control = configFor([endpoint("https://llm.example.com/v1")]);
   assert.equal(control.format, "provider", "other-host: format");
   let before = requests.length;

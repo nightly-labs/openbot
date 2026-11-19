@@ -4,24 +4,17 @@ import { ChatActionCard, type ChatActionCardStatus } from "./ChatActionCard";
 import { RoutineWebhookEndpoint, type RoutineWebhookEndpointProps } from "./RoutineWebhookEndpoint";
 import { RoutineWebhookEvents, type RoutineWebhookEventsProps } from "./RoutineWebhookEvents";
 
-/** `changed`: the events differ from the saved ones. */
 export type RoutineWebhookCardState = "idle" | "changed" | "saving" | "saved" | "error";
 
 export interface RoutineWebhookCardProps extends RoutineWebhookEndpointProps, RoutineWebhookEventsProps {
   routineName: string;
   action: "created" | "updated";
   state?: RoutineWebhookCardState;
-  /** With `error`, what is wrong. With `changed`, why the last save failed, shown beside Save. */
   errorText?: string | undefined;
-  /** Saves the event type and the filters. Shown while the state is `changed`. */
   onSave: () => void;
   onOpenRoutine?: (() => void) | undefined;
 }
 
-/**
- * The chat record of a webhook routine an agent created or changed. The agent never gets the
- * signing secret, so the person makes one here. The person can also change which events start it.
- */
 export function RoutineWebhookCard(props: RoutineWebhookCardProps) {
   const { t } = useText();
   const status = (): ChatActionCardStatus | undefined => {
@@ -29,7 +22,6 @@ export function RoutineWebhookCard(props: RoutineWebhookCardProps) {
       case "changed":
         return {
           kind: "note",
-          // After a failed save, the error stays beside Save.
           text: props.errorText ?? t("routine.card.webhookChanged"),
           action: { label: t("common.save"), onClick: props.onSave },
         };

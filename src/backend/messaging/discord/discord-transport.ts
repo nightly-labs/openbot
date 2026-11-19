@@ -9,16 +9,9 @@ import type {
 } from "../messaging-types";
 import { discordInboundAction, discordInboundMessage } from "./discord-events";
 
-/** The Gateway can send an event again after a resume. */
 const RECENT_EVENTS = 2_000;
 const OK: IngressAnswer = { status: 200 };
 
-/**
- * The inbound half of one guild's OpenBot app. Signal keeps the bot's Gateway connection, which only
- * it can, and passes the guild's mentions of OpenBot and its button presses to this host's ingress
- * socket. This holds that socket open while it runs. Signal has already acknowledged each button
- * press to Discord, so nothing here answers Discord.
- */
 export class DiscordTransport implements MessagingTransport {
   readonly #ingress: MessagingIngress;
   readonly #guildId: string;
@@ -27,7 +20,6 @@ export class DiscordTransport implements MessagingTransport {
   #release: (() => void) | null = null;
   #unsubscribe: (() => void) | null = null;
   #unsubscribeRoutes: (() => void) | null = null;
-  /** False when Signal does not route the guild to this host: it is linked to another host, or to none. */
   #linked = true;
 
   constructor(ingress: MessagingIngress, guildId: string) {
@@ -37,9 +29,6 @@ export class DiscordTransport implements MessagingTransport {
 
   start(sink: TransportSink): void {
     this.#sink = sink;
-    // Before `acquire`, which can open the socket. The socket's route ticket is issued after this
-    // start, so a session without the guild means that it was linked to another host, unlinked, or
-    // the bot left it. Reconnect installs the bot again in each case.
     this.#unsubscribeRoutes ??= this.#ingress.onDiscordRoutes((guildIds) => {
       this.#linked = guildIds.has(this.#guildId);
       this.#report(this.#ingress.state());
@@ -49,7 +38,6 @@ export class DiscordTransport implements MessagingTransport {
     this.#report(this.#ingress.state());
   }
 
-  /** The main process reconnects the ingress socket itself when the computer wakes. */
   reconnect(): void {}
 
   readonly stop = Effect.fn("DiscordTransport.stop")(() =>
@@ -99,7 +87,6 @@ export class DiscordTransport implements MessagingTransport {
     );
   }
 
-  /** True when the event was already handled. */
   #remember(key: string): boolean {
     if (this.#seen.has(key)) return true;
     this.#seen.add(key);

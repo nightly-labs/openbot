@@ -1,5 +1,3 @@
-/* Confetti: pieces start at the origin, burst out, then fall. The layer covers the window. */
-
 .ui-confetti {
   position: fixed;
   inset: 0;

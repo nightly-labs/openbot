@@ -1,16 +1,3 @@
-// Checks that an agent creates and changes a channel from its own chat, with its picture: an icon
-// on a colour or an image file. Runs the real agent service, channel service and tool router on a
-// temporary profile with a fake Codex app-server. The fake calls the tool through `tool_call`, as a
-// model does, and logs the tool result that it gets.
-// The check asserts the stored channel after each call: the members, lead, icon and image of a new
-// channel; a rename, member changes, a new lead and an image that replaces the icon; an icon that
-// removes the image; archive and restore; and the refusals: a lead that is not a member, an unusable
-// image file, a routine run and a team member. A channel task that this computer's user started
-// creates a channel and changes another one, but not its own channel; a team member's request in the
-// channel is refused. A repeated tool call makes one channel. A hidden agent becomes a member.
-// In a channel task, save_api_key saves to the Vault only a key that this computer's user wrote in
-// the request of the task (#6369); request_api_key shows its form there, and the answer saves the key.
-// `bun scripts/agent-channel-create-e2e.ts`. Writes .openbot-build/agent-channel-create-e2e/report.json.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -30,7 +17,6 @@ const home = join(root, "home");
 const fakeCodex = join(root, "codex");
 const fakeLog = join(root, "codex.jsonl");
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -49,20 +35,12 @@ const { VaultStore } = await import("../src/main/vault-store");
 
 const CALL_MARK = "CHANNEL-CALL";
 const PERSON = { id: "local", name: "Alex" };
-/** A team member, whose app has only what the Team API gives it. */
 const MEMBER = { id: "member-remote", name: "Sam" };
-// A 1x1 PNG.
 const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
   "base64",
 );
 
-/**
- * A Codex app-server with the methods that the service calls. A turn whose input has
- * `CHANNEL-CALL <<ARGS{"__tool":"…",…}ARGS>>` calls `openbot.<__tool>` with the rest of that JSON
- * through `tool_call`, logs the result, and ends. A channel packet also repeats earlier requests, so
- * the last call in the input is the current assignment. Other turns answer "Done.".
- */
 const FAKE_CODEX = `#!/usr/bin/env node
 const { appendFileSync } = require("node:fs");
 if (process.argv.includes("--version")) {
@@ -74,7 +52,6 @@ const config = { config: { mcp_servers: {} }, layers: [{ name: { type: "user", f
 let buffer = "";
 let threads = 0;
 let turns = 0;
-/** Tool request id -> the turn that waits for its result. */
 const waiting = new Map();
 process.stdout.on("error", (error) => {
   if (error.code === "EPIPE") process.exit(0);
@@ -113,7 +90,6 @@ const answer = (message) => {
       if (!match) return setTimeout(() => finish(params.threadId, turnId), 20);
       const id = "tool-" + turnId;
       waiting.set(id, { threadId: params.threadId, turnId });
-      // The packet carries the request as JSON text, so its quotes arrive escaped.
       const { __tool, ...args } = JSON.parse(match[1].replace(/\\\\"/g, '"'));
       return write({
         id,
@@ -158,7 +134,6 @@ process.stdin.on("data", (chunk) => {
 });
 `;
 
-/** The arguments the fake passes to the tool, valid or not. */
 interface ChannelToolArgs {
   channelId?: string;
   name?: string;
@@ -171,11 +146,8 @@ interface ChannelToolArgs {
   icon?: { name: string; hue: number };
   imagePath?: string;
   archived?: boolean;
-  /** A key that list_channels does not know. */
   query?: string;
-  /** A key that create_channel does not take: the hue belongs in icon (#8627). */
   hue?: number;
-  /** save_api_key. */
   key?: string;
 }
 
@@ -213,7 +185,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service or the fake's log. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -243,7 +214,6 @@ function pass(name: string, condition: boolean, detail?: string) {
 }
 
 await writeFile(fakeCodex, FAKE_CODEX, { mode: 0o755 });
-/** Reverses the bytes, so the Vault file never holds the plain text. */
 const vault = new VaultService({
   store: new VaultStore(join(root, "openbot-vault.json"), {
     encrypt: (value: string) => Buffer.from(value, "utf8").reverse(),
@@ -276,7 +246,6 @@ const channels = () => agents.channels;
 const channelOf = (channelId: string) => channels().store.get(channelId);
 const memberIds = (channelId: string) => channelOf(channelId).members.map((member) => member.agentId);
 
-/** Waits until the agent's chat has no open delivery. */
 function idle(agentId: string) {
   return waitFor("the chat turn to end", () =>
     agents
@@ -285,7 +254,6 @@ function idle(agentId: string) {
   );
 }
 
-/** Logs and returns the tool result of the fake's last call. */
 async function logged(name: string, before: number) {
   const entry = await waitFor(`${name} tool result`, () => toolLogs()[before]);
   const text = entry.result?.contentItems.map((item) => item.text).join("\n") ?? JSON.stringify(entry.error);
@@ -293,7 +261,6 @@ async function logged(name: string, before: number) {
   return { success: entry.result?.success === true, text };
 }
 
-/** Sends the person's message to the agent's own chat that makes the fake call `tool`. */
 async function callFromChat(
   name: string,
   agentId: string,
@@ -313,7 +280,6 @@ async function callFromChat(
   return result;
 }
 
-/** The channel id in a tool result. */
 function resultChannelId(text: string): string {
   return z.object({ channel: z.object({ id: z.string() }) }).parse(JSON.parse(text)).channel.id;
 }
@@ -342,7 +308,6 @@ try {
   await writeFile(imagePath, PNG);
   await writeFile(join(lead.workspacePath, "notes.txt"), "Not an image.");
 
-  // 1. Refusals change nothing.
   const channelCount = () => channels().store.ids().length;
   const outsideLead = await callFromChat("create with an outside lead", lead.id, "create_channel", {
     name: "launch",
@@ -377,7 +342,6 @@ try {
     icon: { name: "megaphone", hue: 31 },
   });
   pass("An unknown hue is refused", !badHue.success && channelCount() === 0, badHue.text);
-  // A model that copies a long id from list_agents can drop a character (#7306).
   const miscopied = await callFromChat("create with a miscopied member id", lead.id, "create_channel", {
     name: "launch",
     memberAgentIds: [lead.id, tester.id.slice(0, -1)],
@@ -405,7 +369,6 @@ try {
     misplacedHue.text,
   );
 
-  // 2. Create a channel with members and an icon. The lead is the first member.
   const created = await callFromChat("create", lead.id, "create_channel", {
     name: "launch",
     title: "Release work",
@@ -442,7 +405,6 @@ try {
       .some((target) => target.id === channelId),
   );
 
-  // 3. Rename, add and remove members, change the lead, and set an image in one call.
   const updated = await callFromChat("update", lead.id, "update_channel", {
     channelId,
     name: "release",
@@ -464,7 +426,6 @@ try {
   );
   pass("The result shows the image", updated.text.includes('"hasImage":true'), updated.text);
 
-  // 4. An icon replaces the image, as in the channel settings.
   const iconAgain = await callFromChat("set an icon", lead.id, "update_channel", {
     channelId,
     icon: { name: "code", hue: 245 },
@@ -476,7 +437,6 @@ try {
     iconAgain.text,
   );
 
-  // 5. Removing the lead without a new one leaves no lead.
   const noLead = await callFromChat("remove the lead", lead.id, "update_channel", {
     channelId,
     removeMemberAgentIds: [writer.id],
@@ -487,7 +447,6 @@ try {
     noLead.text,
   );
 
-  // 6. Archive, then restore with a change.
   const archived = await callFromChat("archive", lead.id, "update_channel", { channelId, archived: true });
   pass("Archiving succeeds", archived.success && channelOf(channelId).archived, archived.text);
   pass(
@@ -531,16 +490,12 @@ try {
   });
   pass("An unknown channel is refused", !unknown.success && unknown.text.includes("list_channels"), unknown.text);
 
-  // 7. A channel task that this computer's user started can create a channel and change another one.
-  // It cannot change its own channel (the channel tools do that), and a team member's request is refused.
   const fromChannel = async (
     name: string,
     tool: string,
     args: ChannelToolArgs,
     sender: { id: string; name: string },
-    /** The JSON of the call as the message writes it, when it is not `args` as JSON. */
     rawArgs?: string,
-    /** Runs before the tool result, such as the answer to a form that the call shows. */
     beforeResult?: () => Promise<void>,
   ) => {
     const before = toolLogs().length;
@@ -621,8 +576,6 @@ try {
     memberInTask.text,
   );
 
-  // 7a. In a channel task, a key goes to the Vault only from the request of this computer's user (#6369).
-  // The agent also reads the lead's and other members' words, which must not choose a key of every agent.
   const vaultKey = (name: string) => vault.items.apiKeys(lead.id).find((key) => key.name === name)?.value;
   const pastedKey = "e2e-channel-key-6369-a1";
   const saved = await fromChannel(
@@ -636,7 +589,6 @@ try {
     saved.success && vaultKey("CHANNEL_TOKEN") === pastedKey && !saved.text.includes(pastedKey),
     saved.text,
   );
-  // The message writes the key with a JSON escape, so its text does not hold the key that the call gives.
   const notInRequest = await fromChannel(
     "save a key that the request does not hold",
     "save_api_key",
@@ -649,8 +601,6 @@ try {
     !notInRequest.success && notInRequest.text.includes("request_api_key") && vaultKey("CHANNEL_TOKEN") === pastedKey,
     notInRequest.text,
   );
-  // Another member's words could pick a word or a part of a key from the request: only a whole token
-  // of 8 or more characters counts. The escaped key is only the start of the token in the notes.
   const partOfToken = await fromChannel(
     "save a part of a token in the request",
     "save_api_key",
@@ -683,7 +633,6 @@ try {
     !memberKey.success && memberKey.text.includes("request_api_key") && vaultKey("CHANNEL_TOKEN") === pastedKey,
     memberKey.text,
   );
-  // Other members' words can still pick a token of the request, so a channel never replaces a saved key.
   const replaced = await fromChannel(
     "replace a saved key from the user's channel request",
     "save_api_key",
@@ -695,7 +644,6 @@ try {
     !replaced.success && replaced.text.includes("saved already") && vaultKey("CHANNEL_TOKEN") === pastedKey,
     replaced.text,
   );
-  // A pasted NAME=value line: the escaped key in the call is not in the text, so only the line gives it.
   const envKey = "e2e-env-key-6369-c3";
   const fromEnvLine = await fromChannel(
     "save a key from a NAME=value line",
@@ -724,7 +672,6 @@ try {
       );
       const spec = apiKeyFormSpec({ ...formArgs, vault: true });
       assert.ok(spec?.type === "form", "the router would refuse this form");
-      // The person keeps the scope that the form selects when it opens: the Vault, for every agent.
       const scope = spec.fields?.find((field) => field.id === API_KEY_SCOPE_FIELD_ID)?.value;
       const values = {
         [API_KEY_FIELD_ID]: formKey,
@@ -744,7 +691,6 @@ try {
     fromForm.text,
   );
 
-  // 7b. A routine run can carry text from outside, such as a webhook body, so it cannot use the tools.
   const beforeRun = toolLogs().length;
   const countBeforeRun = channelCount();
   const runner = agents.createRoutine({
@@ -764,7 +710,6 @@ try {
     fromRun.text,
   );
 
-  // 7c. A team member's message is refused: the Team API checks that member's agent access.
   const fromMember = await callFromChat(
     "create from a team member",
     lead.id,
@@ -778,7 +723,6 @@ try {
     fromMember.text,
   );
 
-  // 8. A repeated tool call makes one channel and gives the same result.
   const params = {
     threadId: "retry-thread",
     turnId: "retry-turn",
@@ -790,7 +734,6 @@ try {
   const dependencies = { channels: channels(), listAgents: () => agents.listAgents() };
   const first = await runCauseEffect(handleChannelAgentTool(params, lead.id, dependencies));
   const count = channelCount();
-  // The user hides a member between the attempts: the retry still finds the first result.
   await runCauseEffect(agents.setAgentHidden({ agentId: writer.id, hidden: true }));
   const second = await runCauseEffect(handleChannelAgentTool(params, lead.id, dependencies));
   const firstText = first.contentItems.map((item) => ("text" in item ? item.text : "")).join();
@@ -804,7 +747,6 @@ try {
     secondText,
   );
 
-  // 9. A hidden agent keeps working, so it becomes a member as a visible agent does.
   const hiddenMember = await callFromChat("create with a hidden agent", lead.id, "create_channel", {
     name: "night",
     memberAgentIds: [lead.id, hidden.id],

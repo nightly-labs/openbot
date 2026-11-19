@@ -5,17 +5,11 @@ import { createSignal, onSettled, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 
 interface InviteCornerProps {
-  /** The invite code that the next new account uses. `null` is no code. */
   code: string | null;
   onChange: (code: string | null) => void;
-  /** A new code was kept. `from` is the corner, so the screen can celebrate there. */
   onAdded: (from: Element | undefined) => void;
 }
 
-/**
- * A quiet text button in a corner of the sign-in screen. It opens a field for an invite link or code.
- * With a code, it shows the code and a button that removes it.
- */
 export function InviteCorner(props: InviteCornerProps) {
   const { t } = useText();
   const [open, setOpen] = createSignal(false);
@@ -64,11 +58,9 @@ export function InviteCorner(props: InviteCornerProps) {
   );
 }
 
-/** The field that takes a link or a code. Enter or the arrow keeps the code; an empty field removes it. */
 function InviteEntry(props: { code: string | null; onDone: (code: string | null) => void }) {
   const { t } = useText();
   let input: HTMLInputElement | undefined;
-  // Kobalte moves the focus into the content only for a modal popover. This one is not modal.
   onSettled(() => input?.focus());
   const [text, setText] = createSignal(untrack(() => props.code ?? ""));
   const [invalid, setInvalid] = createSignal(false);

@@ -2,41 +2,25 @@ import type { Effect } from "effect";
 import type { ThreadItem } from "./protocol";
 import type { ProviderClientOperationError } from "./provider-client-effects";
 
-/** A fragment is never a complete conversation or a replacement snapshot. */
 export interface ProviderHistoryFragment {
   turnId: string;
   status?: string;
   startedAt?: number;
-  /** Stable offset within the turn. This is not a provider cursor. */
   itemOffset?: number;
   items: ThreadItem[];
-  /**
-   * The ID that the live client gave this turn, when it is not `turnId`. The import stores the turn's
-   * messages under it, so they join the messages that the live turn stored.
-   */
   liveTurnId?: string;
-  /** The provider has no stable OpenBot turn identity; retain this record for reads and recovery only. */
   recordsOnly?: boolean;
-  /** The last fragment of this turn in this scan. */
   complete: boolean;
 }
 
 export interface ProviderHistoryRequest {
   threadId: string;
   cwd?: string;
-  /** Metadata reads omit items, for recovery of a known turn. */
   items: "none" | "full";
-  /** Import recovery from the provider; do not satisfy this read from the durable staging seam. */
   providerOnly?: boolean;
-  /**
-   * Given only when the caller committed every complete turn of its earlier reads. A reader that
-   * keeps a scan cursor can then send only the turns that changed after its last full read with this
-   * key. A reader that keeps no cursor ignores it and sends all turns.
-   */
   resumeKey?: string;
 }
 
-/** Return false to stop the scan after this fragment. Cursors stay inside the adapter. */
 export type ProviderHistoryConsumer = (
   fragment: ProviderHistoryFragment,
 ) => Effect.Effect<boolean, ProviderClientOperationError>;

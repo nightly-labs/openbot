@@ -1,9 +1,3 @@
-/**
- * The undo history of the workflow canvas, and the conversion between a canvas snapshot and the saved
- * graph. A snapshot keeps the removed nodes mounted, so redo brings back what the user wrote in them;
- * the graph has only the nodes that are on the canvas.
- */
-
 import {
   type RoutineSchedule,
   WORKFLOW_BRANCHES,
@@ -19,15 +13,12 @@ import type { Stroke } from "./workflow-ink";
 import { defaultWorkflowModel, type WorkflowCatalogs, type WorkflowFeatures } from "./workflow-model";
 import { isColor } from "./workflow-node-parts";
 
-/** A node on the canvas. Its place, size and fields are in their own stores. */
 export interface CanvasItem {
   id: string;
   kind: WorkflowNodeKind;
-  /** The schedule of a trigger node, as the graph has it. */
   schedule?: RoutineSchedule | undefined;
 }
 
-/** What undo restores: the nodes in stack order, where they are, their sizes, the board, and the drawing. */
 export interface CanvasSnapshot {
   nodes: readonly CanvasItem[];
   positions: Record<string, WfnPoint>;
@@ -41,7 +32,6 @@ const HISTORY_LIMIT = 100;
 const itemOf = (node: WorkflowNode): CanvasItem =>
   node.schedule ? { id: node.id, kind: node.kind, schedule: node.schedule } : { id: node.id, kind: node.kind };
 
-/** The canvas of a saved graph, with nothing selected. */
 export function snapshotFromGraph(graph: WorkflowGraph): CanvasSnapshot {
   return {
     nodes: graph.nodes.map(itemOf),
@@ -73,7 +63,6 @@ function sizeOf(size: WfnSize | undefined): WorkflowNodeSize | undefined {
   return Object.keys(kept).length > 0 ? kept : undefined;
 }
 
-/** The graph that a save writes: the nodes on the canvas in stack order, their connections and the drawing. */
 export function graphFromSnapshot(snapshot: CanvasSnapshot): WorkflowGraph {
   const removed = new Set(snapshot.board.removed);
   const locked = new Set(snapshot.board.locked);
@@ -110,7 +99,6 @@ export function graphFromSnapshot(snapshot: CanvasSnapshot): WorkflowGraph {
   return { nodes, edges, strokes };
 }
 
-/** JSON with the keys of each object in order, so two equal graphs give the same text. */
 export function stableJson(value: unknown): string {
   return JSON.stringify(value, (_key, part: unknown) =>
     part !== null && typeof part === "object" && !Array.isArray(part)
@@ -119,29 +107,19 @@ export function stableJson(value: unknown): string {
   );
 }
 
-/**
- * The undo and redo stacks. Each entry is the canvas before one change. A text in a field keeps its
- * own undo, so `beforeCommit` ends the typing step first.
- */
 export function createCanvasHistory(options: {
   capture: () => CanvasSnapshot;
   apply: (snapshot: CanvasSnapshot) => void;
   beforeCommit: () => void;
 }) {
-  /** A snapshot, and the count of rebases before it was saved. */
   type Entry = { snapshot: CanvasSnapshot; at: number };
   let past: Entry[] = [];
   let future: Entry[] = [];
-  /**
-   * The rebases that a snapshot gets only when undo or redo reaches it, from rebase number `first` on.
-   * A rebase merges whole graphs, so a change of each snapshot at once stops the canvas.
-   */
   let rebases: ((snapshot: CanvasSnapshot) => CanvasSnapshot)[] = [];
   let first = 0;
   const entry = (snapshot: CanvasSnapshot): Entry => ({ snapshot, at: first + rebases.length });
   const take = (saved: Entry) =>
     rebases.slice(saved.at - first).reduce((snapshot, change) => change(snapshot), saved.snapshot);
-  /** Drops the rebases that no snapshot needs. */
   const prune = () => {
     const oldest = Math.min(
       first + rebases.length,
@@ -151,11 +129,9 @@ export function createCanvasHistory(options: {
     rebases = rebases.slice(oldest - first);
     first = oldest;
   };
-  /** While above 0, changes join the step that is open, so one action is one undo. */
   let joined = 0;
   const [steps, setSteps] = createSignal({ undo: 0, redo: 0 });
   const count = () => setSteps({ undo: past.length, redo: future.length });
-  /** Puts a snapshot on the undo stack, and clears redo. */
   const push = (snapshot: CanvasSnapshot) => {
     past = [...past, entry(snapshot)].slice(-HISTORY_LIMIT);
     future = [];
@@ -164,7 +140,6 @@ export function createCanvasHistory(options: {
   };
   return {
     steps,
-    /** Saves the canvas before a change. */
     commit: () => {
       options.beforeCommit();
       if (joined === 0) push(options.capture());
@@ -194,14 +169,9 @@ export function createCanvasHistory(options: {
       prune();
       count();
     },
-    /**
-     * Changes each snapshot of both stacks, as when the edits of another device merge into the canvas:
-     * undo then takes back only the edits of this device.
-     */
     rebase: (change: (snapshot: CanvasSnapshot) => CanvasSnapshot) => {
       if (past.length > 0 || future.length > 0) rebases = [...rebases, change];
     },
-    /** Joins the next changes to the open step. The returned function ends the join. */
     join: () => {
       joined += 1;
       let ended = false;
@@ -214,24 +184,14 @@ export function createCanvasHistory(options: {
   };
 }
 
-/**
- * The schedule of a new trigger node: each day at 09:00, as a new routine has. Each call gives a new
- * object, so a node that changes its schedule does not change the schedule of another node.
- */
 export const newTriggerSchedule = () => ({ kind: "daily", time: "09:00" }) satisfies RoutineSchedule;
 
-/** The local time zone, which a new schedule trigger runs in. */
 const localTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-/**
- * The fields that the host needs on a new node, with the first choice of each catalog. A node shows
- * these choices without them, but the host reads only the saved fields.
- */
 export function hostDefaults(
   kind: WorkflowNodeKind,
   catalogs: WorkflowCatalogs,
   features: WorkflowFeatures,
-  /** The fields that the new node starts with, such as `media` of a video. */
   initial?: WfnFields,
 ): WfnFields {
   switch (kind) {
@@ -239,7 +199,6 @@ export function hostDefaults(
       const agent = catalogs.agents[0];
       return agent ? { agentId: agent.id, model: agent.model, provider: agent.provider } : {};
     }
-    // A condition asks a model too, so a new one saves the model of a new LLM step.
     case "llm":
     case "condition": {
       const model = defaultWorkflowModel(catalogs);

@@ -1,10 +1,3 @@
-/**
- * Other people on the same canvas: a cursor with a name in the colour of each person's avatar, a ring
- * on the node that the person selected, and their avatars in the top bar. A press on an avatar moves
- * the camera to that person's cursor. The host gives the places from its presence feed. An agent that
- * builds the workflow has the same cursor while the canvas plays its change.
- */
-
 import type { TeamPresenceMember } from "@openbot/contracts/ipc";
 import { Button, LabelTooltipTrigger } from "@openbot/ui";
 import { For, Show } from "solid-js";
@@ -13,18 +6,14 @@ import { useText } from "../../text";
 import { TeamPersonAvatar, teamMemberName, teamMemberSeed } from "../team/TeamPersonAvatar";
 import { Hint, type WfnPoint } from "./workflow-board";
 
-/** Where another person is on the canvas, in world pixels. */
 export interface WorkflowPeerSpot {
   at: WfnPoint;
-  /** The node that the person selected. */
   selected: string | undefined;
 }
 
 export interface WorkflowPresence {
-  /** The member id of the person who uses this canvas. */
   self: string;
   members: readonly TeamPresenceMember[];
-  /** The place of each other person, by member id. A person with no place shows only in the top bar. */
   spots: Readonly<Record<string, WorkflowPeerSpot>>;
 }
 
@@ -34,26 +23,19 @@ export interface WorkflowPeer {
   color: string;
 }
 
-/** The presence feed sends about 20 updates a second. The cursor eases between two updates. */
 export const WORKFLOW_PRESENCE_FEED_INTERVAL = 50;
 
-/** The other people who are online, each in the colour of their avatar. */
 export function peersOf(presence: Pick<WorkflowPresence, "self" | "members">): readonly WorkflowPeer[] {
   return presence.members
     .filter((member) => member.online && !member.disabled && member.id !== presence.self)
     .map((member) => ({ member, name: teamMemberName(member), color: avatarHeadColor(teamMemberSeed(member), null) }));
 }
 
-/**
- * A cursor, in world pixels, at its screen size at every zoom: a soft arrow and the full name in a
- * pill under it. It takes no pointer events. `glide`: the time in which it eases to a new place.
- */
 function Cursor(props: {
   name: string;
   color: string;
   at: WfnPoint;
   glide: number;
-  /** The easing of the glide. The presence feed moves in short linear steps. */
   ease?: string | undefined;
   leaving?: boolean | undefined;
 }) {
@@ -77,7 +59,6 @@ function Cursor(props: {
   );
 }
 
-/** The cursors of the other people, each at the place from the presence feed. */
 export function PeerCursors(props: {
   peers: readonly WorkflowPeer[];
   spots: Readonly<Record<string, WorkflowPeerSpot>>;
@@ -95,18 +76,14 @@ export function PeerCursors(props: {
   );
 }
 
-/** Where the cursor of an agent is while the canvas plays the change that the agent saved. */
 export interface WorkflowBuilderSpot {
   name: string;
   color: string;
   at: WfnPoint;
-  /** The node that the agent works on. It has a ring in the agent's colour. */
   on: string | undefined;
-  /** The play ended, so the cursor fades out. */
   leaving: boolean;
 }
 
-/** The cursor of an agent that builds the workflow. It eases from node to node in `glide` milliseconds. */
 export function BuilderCursor(props: { spot: WorkflowBuilderSpot; glide: number }) {
   return (
     <Cursor
@@ -120,11 +97,9 @@ export function BuilderCursor(props: { spot: WorkflowBuilderSpot; glide: number 
   );
 }
 
-/** The people on this canvas, next to the run controls. You come last. A click follows a person. */
 export function PresenceBar(props: {
   self: TeamPresenceMember | undefined;
   peers: readonly WorkflowPeer[];
-  /** The person whose cursor the camera follows, or `undefined`. */
   following: string | undefined;
   onFollow: (peer: WorkflowPeer) => void;
 }) {
@@ -165,7 +140,6 @@ export function PresenceBar(props: {
   );
 }
 
-/** While you follow a person, a frame in their colour holds the view, with their name at the top. */
 export function FollowFrame(props: { peer: WorkflowPeer }) {
   const { t } = useText();
   return (

@@ -11,7 +11,6 @@ import type {
 import type { TelegramChatState } from "./telegram-chats";
 import { parseTelegramUpdate, telegramUpdateEvent } from "./telegram-updates";
 
-/** Signal can pass one update twice, such as after a link. */
 const RECENT_UPDATES = 2_000;
 const OK: IngressAnswer = { status: 200 };
 
@@ -22,11 +21,6 @@ export interface TelegramTransportOptions {
   chatId: string;
 }
 
-/**
- * The inbound half of one chat: the updates that Telegram posts to Signal, which Signal passes to
- * this host. This holds the ingress socket open while it runs. A button press is answered at once,
- * so Telegram stops its spinner; the work starts after that.
- */
 export class TelegramTransport implements MessagingTransport {
   readonly #identity: ConnectionIdentity;
   readonly #ingress: MessagingIngress;
@@ -37,7 +31,6 @@ export class TelegramTransport implements MessagingTransport {
   #release: (() => void) | null = null;
   #unsubscribe: (() => void) | null = null;
   #unsubscribeRoutes: (() => void) | null = null;
-  /** False when the socket's route ticket does not name this chat: Signal sends its events elsewhere. */
   #linked = true;
 
   constructor(options: TelegramTransportOptions) {
@@ -58,7 +51,6 @@ export class TelegramTransport implements MessagingTransport {
     this.#report(this.#ingress.state());
   }
 
-  /** The main process reconnects the ingress socket itself when the computer wakes. */
   reconnect(): void {}
 
   readonly stop = Effect.fn("TelegramTransport.stop")(() =>
@@ -110,7 +102,6 @@ export class TelegramTransport implements MessagingTransport {
     );
   }
 
-  /** True when the update was already handled. */
   #remember(updateId: number): boolean {
     if (this.#seen.has(updateId)) return true;
     this.#seen.add(updateId);

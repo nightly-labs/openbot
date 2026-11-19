@@ -29,14 +29,8 @@ import { currentText, useText } from "@/shared/lib/text";
 import { END_X, MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { typeScale } from "@/shared/lib/type-scale";
 
-/** The open chevron turns down: clockwise from the right, or counterclockwise from the mirrored left. */
 const OPEN_ROTATION = `${90 * END_X}deg`;
 
-/**
- * A folder header, as on the desktop: folders do not indent, so a folder in a folder names its parent
- * first ("Parent / Name"). A folder of the user ends with a folder icon; the "Agents" group keeps the
- * chevron.
- */
 export const SidebarSectionHeader = memo(function SidebarSectionHeader({
   id,
   name,
@@ -50,13 +44,11 @@ export const SidebarSectionHeader = memo(function SidebarSectionHeader({
   onToggle,
 }: {
   id: string;
-  /** The path of the folder, for accessibility and the delete question. */
   name: string;
   title: string;
   parentName: string | null;
   custom: boolean;
   empty: boolean;
-  /** The unread messages in a closed folder and in the folders in it; 0 for an open folder. */
   unread: number;
   visibleSectionIds: readonly string[];
   collapsed: boolean;
@@ -79,8 +71,6 @@ export const SidebarSectionHeader = memo(function SidebarSectionHeader({
   const pending = useRef(false);
   const [saving, setSaving] = useState(false);
   const index = layout?.order.indexOf(id) ?? -1;
-  // A folder moves among the folders next to it. Only a host with `sidebar-folders-v1` sends parents,
-  // and that host takes `nest`; a flat `move` over the order can leave a folder in a folder in place.
   const parents = layout ? sidebarFolderParents(layout) : new Map<string, string>();
   const nested = parents.size > 0;
   const parentId = parents.get(id) ?? null;
@@ -90,7 +80,6 @@ export const SidebarSectionHeader = memo(function SidebarSectionHeader({
   const visibleIndex = siblings.indexOf(id);
   const customIds = new Set(layout?.sections.map((section) => section.id));
   const depth = sidebarFolderAncestors(parents, id).length;
-  /** Not into itself or a folder in it, and three levels at most with the folders it holds. */
   const canNestIn = (targetId: string) =>
     customIds.has(targetId) &&
     targetId !== id &&

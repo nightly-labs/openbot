@@ -8,66 +8,40 @@ import {
 import { runTeamEffect } from "@openbot/team-client";
 import { createRemoteBrowserView, type RemoteBrowserView } from "@openbot/team-client/browser-view";
 
-// The phone's live view of a host browser tab runs in the hidden page that holds the Team peer: the
-// frames arrive on its data channel, and the native screen has no channel of its own. The page
-// sends each frame to the screen as base64, and the screen says when it has drawn one. Until then
-// the page keeps only the newest frame, so a slow phone shows the page as it is now, not a queue.
-
-/**
- * The page size the phone asks a host to hold while it watches: a laptop's page. The page keeps its
- * desktop layout, and its shape does not change when the host's window does. The host's frames are
- * at most this size, so a frame is not scaled down.
- */
 export const BROWSER_VIEW_PAGE_SIZE = { width: 1_280, height: 800 };
 
-/** One live view of a host browser tab, as the screen that shows it drives it. */
 export interface RemoteBrowserViewSession {
   input(inputs: BrowserViewInput[]): void;
-  /** The screen is done with a frame: drawn, or not decodable. The next frame comes after this. */
   frameDone(sequence: number, drawn: boolean): void;
   close(): void;
 }
 
-/** What the peer page tells the native screen about one view. */
 export type BrowserViewBridgeEvent =
   | { type: "frame"; viewId: string; sequence: number; width: number; height: number; jpeg: string }
   | { type: "message"; viewId: string; message: BrowserViewHostMessage }
-  /** The view ended. `reason` is the host's English text, or null when nobody gave one. */
   | { type: "ended"; viewId: string; reason: string | null };
 
-// Types, not interfaces: a command crosses the bridge as JSON, and only a type alias is a JSON object.
 export type BrowserViewBridgeOpen = {
-  /** Names this view on both sides, so an event of a view the screen has left is dropped. */
   viewId: string;
   tabId: string;
-  /** The host advertises `browser-view-frame-point`. */
   namesFrames: boolean;
-  /** The host advertises `browser-view-cursor`. */
   cursor: boolean;
-  /** The host advertises `browser-view-clipboard`. */
   clipboard: boolean;
-  /** The host advertises `browser-view-context-menu`: the phone shows the menu of its right-clicks. */
   contextMenu: boolean;
-  /** The page size to hold while the phone watches, for a host that advertises `browser-view-viewport`. */
   viewport: { width: number; height: number } | null;
-  /** The host advertises `browser-view-page-copy-v1`: the phone gets the text that the page copies. */
   pageCopy: boolean;
 };
 
-/** What the native screen tells the peer page. */
 export type BrowserViewBridgeCommand =
   | ({ type: "open" } & BrowserViewBridgeOpen)
   | { type: "close"; viewId: string }
   | { type: "input"; viewId: string; inputs: BrowserViewInput[] }
-  /** The screen is done with a frame. `drawn` is false when the image could not be decoded. */
   | { type: "frame-done"; viewId: string; sequence: number; drawn: boolean };
 
 interface OpenView {
   options: BrowserViewBridgeOpen;
   handle: RemoteBrowserView | null;
-  /** A frame the screen has and has not drawn yet. */
   drawing: boolean;
-  /** The newest frame that arrived while the screen was drawing. */
   waiting: BrowserViewFrame | null;
 }
 
@@ -131,7 +105,6 @@ export function createBrowserViewBridge(
   const deliver = (current: OpenView, input: BrowserViewInput) => {
     const handle = current.handle;
     if (!handle) return;
-    // A refused input is one the view can no longer take; its end arrives as an event.
     void runTeamEffect(handle.input(input)).catch(() => undefined);
   };
 
@@ -175,7 +148,6 @@ export function createBrowserViewBridge(
     if (current.handle) void runTeamEffect(current.handle.close()).catch(() => undefined);
   };
 
-  /** Input from the native screen. Each value is read with the bounds the host reads it with. */
   const input = (viewId: string, inputs: readonly unknown[]) => {
     const current = view;
     if (current?.options.viewId !== viewId) return;
@@ -190,7 +162,6 @@ export function createBrowserViewBridge(
     }
   };
 
-  /** The screen is done with this frame. The host may forget older ones, and the next frame can go. */
   const frameDone = (viewId: string, sequence: number, drawn: boolean) => {
     const current = view;
     if (current?.options.viewId !== viewId) return;
@@ -203,11 +174,9 @@ export function createBrowserViewBridge(
 
   return {
     receive: remote.receive,
-    /** The connection is gone. The open view ends with its reason. */
     disconnect(reason: string | null) {
       remote.disconnect(reason ?? undefined);
     },
-    /** A command from the native screen. It crossed the bridge as JSON, so each field is read here. */
     command(value: unknown) {
       if (!isDynamicRecord(value) || !isString(value.viewId)) return;
       const viewId = value.viewId;

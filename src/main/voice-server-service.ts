@@ -1,10 +1,3 @@
-// The user's own OpenAI-compatible voice server: `POST {address}/audio/transcriptions` for dictation
-// and `POST {address}/audio/speech` for spoken replies. The requests go from main, because the
-// renderer's content security policy blocks a local address and the key must not go back to the page.
-//
-// An error names the host only. The path and the query of an address can hold a token, and the key
-// is a credential, so no message and no log line contains them.
-
 import { EventEmitter } from "node:events";
 import {
   AUTOMATIC_VOICE_LANGUAGE,
@@ -40,14 +33,10 @@ import { VoiceOperationError } from "./voice-model-service";
 
 const logger = createOpenBotLogger("voice-server-service");
 
-/** The user waits for the list in the dialog, and a remote server can be slow. */
 const PROBE_TIMEOUT_MS = 8_000;
-/** A two-minute recording on a server without a GPU. */
 const TRANSCRIPTION_TIMEOUT_MS = 120_000;
-/** One part of a reply is at most `SPEECH_LIMITS.maximumTextLength` characters: about a minute of speech. */
 const SPEECH_TIMEOUT_MS = 120_000;
 const LIST_BODY_LIMIT = 1024 * 1024;
-/** A minute of 48 kHz stereo 16-bit WAV is 11 MB. */
 const SPEECH_BODY_LIMIT = 32 * 1024 * 1024;
 
 interface StoredVoiceServer {
@@ -74,7 +63,6 @@ export function createVoiceServerPreferenceStore(path: string): PreferenceStore<
   });
 }
 
-/** Why a request failed, and the form field that the user must change. */
 class VoiceServerFailure extends Schema.TaggedError<VoiceServerFailure>()("VoiceServerFailure", {
   field: Schema.Literals(["address", "apiKey"]),
   message: Schema.String,
@@ -108,17 +96,14 @@ export class VoiceServerService extends EventEmitter<VoiceServerEvents> {
     return { address: server.address, hasApiKey: this.#apiKeys.get() !== null, routes: { ...server.routes } };
   }
 
-  /** True while the server takes dictation in place of the model on this computer. */
   dictates(): boolean {
     return this.#preferences.get().server?.routes.dictation === true;
   }
 
-  /** True while the server reads replies aloud in place of Supertonic. */
   speaks(): boolean {
     return this.#preferences.get().server?.routes.speech === true;
   }
 
-  /** Lists what the server has for each route. A failure names the field to change; it is not thrown. */
   readonly probe = Effect.fn("VoiceServer.probe")(function* (
     this: VoiceServerService,
     connection: VoiceServerConnection,
@@ -132,13 +117,10 @@ export class VoiceServerService extends EventEmitter<VoiceServerEvents> {
     );
   }).bind(this);
 
-  /** Saves the server, or removes it with its key. Dictation and replies use it from the next request. */
   readonly set = Effect.fn("VoiceServer.set")(function* (this: VoiceServerService, input: VoiceServerInput | null) {
     const apiKey = input ? this.#keyFor(input) : null;
     const previousKey = this.#apiKeys.get();
     yield* this.#apiKeys.set(apiKey).pipe(Effect.mapError(({ cause }) => new VoiceOperationError({ cause })));
-    // The key belongs to the new address. When that address is not saved, the old key goes back, or
-    // no key stays, so the old origin never receives a key that was given for another server.
     const restoreKey = this.#apiKeys.set(previousKey).pipe(
       Effect.catch(() => this.#apiKeys.set(null)),
       Effect.ignore,
@@ -152,7 +134,6 @@ export class VoiceServerService extends EventEmitter<VoiceServerEvents> {
     return settings;
   }).bind(this);
 
-  /** Sends a 16 kHz mono WAV recording to the server's transcription route. */
   readonly transcribe = Effect.fn("VoiceServer.transcribe")(function* (
     this: VoiceServerService,
     wav: Uint8Array,
@@ -171,7 +152,6 @@ export class VoiceServerService extends EventEmitter<VoiceServerEvents> {
     );
   }).bind(this);
 
-  /** Reads one part of a reply with the server's speech route, as 16-bit mono PCM. */
   readonly speak = Effect.fn("VoiceServer.speak")(function* (this: VoiceServerService, text: string) {
     const { server } = this.#preferences.get();
     const routes = server?.routes;
@@ -198,7 +178,6 @@ export class VoiceServerService extends EventEmitter<VoiceServerEvents> {
     ).pipe(Effect.mapError((failure) => new VoiceOperationError({ cause: new Error(failure.message) })));
   }).bind(this);
 
-  /** The key that the form gave, or the saved key while the address keeps the saved origin. */
   #keyFor(connection: VoiceServerConnection): string | null {
     if (connection.apiKey) {
       registerSecretValue(connection.apiKey);
@@ -214,21 +193,13 @@ interface ServerTarget {
   apiKey: string | null;
 }
 
-/** How one caller of `transcribeRecording` names itself in logs and explains refused requests. */
 interface TranscriptionCaller {
-  /** The first words of the failure log line. It names no host. */
   label: string;
-  /** The text for a status that the caller explains itself, or null for the shared text. */
   refused?: StatusText;
 }
 
-/** Localized text for an answer status, or null to use the shared text. */
 type StatusText = (status: number) => string | null;
 
-/**
- * Sends a 16 kHz mono WAV recording to `POST {address}/audio/transcriptions` of an OpenAI-compatible
- * API. The user's own server and Groq dictation use it.
- */
 export function transcribeRecording(
   fetcher: typeof fetch,
   target: ServerTarget,
@@ -279,11 +250,6 @@ function invalidAudio(host: string) {
   return new VoiceServerFailure({ field: "address", message: sourceText("error.voice.server.invalidAudio", { host }) });
 }
 
-/**
- * One request to `{address}/{path}`, with the status checks every route shares. `read` reads the body
- * while the request is still open, so the timeout and the abort cover it too. `refused` explains a
- * status before the shared checks do.
- */
 function exchange<A>(
   fetcher: typeof fetch,
   target: ServerTarget,
@@ -362,10 +328,6 @@ function readJson(response: Response, host: string, limit: number): Effect.Effec
   );
 }
 
-/**
- * `GET /models`, sorted by route, and the voices. A model says its route in `task` on Speaches; for a
- * server that does not, the name decides. A model of neither kind, such as a chat model, is left out.
- */
 function listModels(fetcher: typeof fetch, target: ServerTarget): Effect.Effect<VoiceServerModels, VoiceServerFailure> {
   return Effect.gen(function* () {
     const body = yield* exchange(fetcher, target, "models", { method: "GET" }, PROBE_TIMEOUT_MS, (response, host) =>
@@ -383,10 +345,6 @@ function listModels(fetcher: typeof fetch, target: ServerTarget): Effect.Effect<
   });
 }
 
-/**
- * The voices of a server. There is no standard route: Kokoro-FastAPI answers `/audio/voices` and
- * Speaches `/audio/speech/voices`. A server that answers neither gets the OpenAI voices.
- */
 function listVoices(fetcher: typeof fetch, target: ServerTarget): Effect.Effect<string[]> {
   const attempt = (path: string) =>
     exchange(fetcher, target, path, { method: "GET" }, PROBE_TIMEOUT_MS, (response, host) =>

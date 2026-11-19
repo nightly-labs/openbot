@@ -13,32 +13,19 @@ import {
 import { LandingIcon } from "./LandingIcon";
 import { useSiteChrome } from "./SiteText";
 
-/** One year: the choice stays until the visitor chooses again. */
 const LANGUAGE_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
-/** Keeps the choice, so the English address of a page does not go back to the browser language. */
 function rememberLanguage(locale: SiteLocale) {
   const secure = location.protocol === "https:" ? "; Secure" : "";
   document.cookie = `${SITE_LOCALE_COOKIE}=${locale}; Path=/; Max-Age=${LANGUAGE_COOKIE_MAX_AGE}; SameSite=Lax${secure}`;
 }
 
-/** The address without the slashes at its end, as `pageWithLocalizedCopy` reads it. */
 function withoutTrailingSlash(path: string): string {
   return path.length > 1 ? path.replace(/\/+$/, "") : path;
 }
 
-/**
- * Set when a language item starts a change in the browser. The header is part of each page, so the
- * page in the new language has a new menu, and that menu takes the focus when it mounts.
- */
 let focusMenuAfterChange = false;
 
-/**
- * The language button of the header, on the pages that have a copy in each language. Each item is a
- * link to the copy in its language. A plain click changes the page in the browser, with no page load:
- * the root route reads the language cookie again on each navigation. A modified click opens the link
- * as usual.
- */
 export function SiteLanguageMenu() {
   const location = useLocation();
   const page = () => pageWithLocalizedCopy(location().pathname);
@@ -89,18 +76,14 @@ function LanguageMenu(props: { page: EnglishPagePath }) {
       return;
     event.preventDefault();
     setOpen(false);
-    // The router keeps the pages that it loaded or preloaded, in the earlier language.
     router.clearCache();
     focusMenuAfterChange = true;
     const href = pagePaths(props.page)[item];
-    // The English address shows the browser language when there is no cookie, so English can be the
-    // same address. The router then loads the current page again, with the new cookie.
     const change =
       href === withoutTrailingSlash(router.state.location.pathname)
         ? router.invalidate()
         : router.navigate({ href, resetScroll: false });
     void change.finally(() => {
-      // A new menu took the focus when it mounted. Else this menu stays on the page.
       if (!focusMenuAfterChange || !button?.isConnected) return;
       focusMenuAfterChange = false;
       button.focus();
@@ -147,10 +130,6 @@ function LanguageMenu(props: { page: EnglishPagePath }) {
   );
 }
 
-/**
- * The flag of the usual country of each language, as in the app's language selector. It is drawn,
- * not an emoji: Windows shows a flag emoji as two letters.
- */
 function LanguageFlag(props: { locale: SiteLocale }) {
   return (
     <span class="site-language-flag">
@@ -172,7 +151,6 @@ function LanguageFlag(props: { locale: SiteLocale }) {
   );
 }
 
-/** The flag of Brazil, simplified to the field, the diamond and the globe: the stars and the motto do not show at this size. */
 function BrazilFlag() {
   return (
     <svg viewBox="0 0 20 14" preserveAspectRatio="xMidYMid slice" aria-hidden="true">

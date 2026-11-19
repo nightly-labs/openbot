@@ -23,17 +23,8 @@ interface Cursor {
   readonly cursor: string;
 }
 
-/**
- * Owns the file of the last message that each memory review read, by agent and side thread, so a
- * review after a restart reads only the new part of the conversation and not the latest 200
- * messages again. The cursor is an aid, not data: a missing or damaged file, or a cursor whose
- * message is gone, makes the review read the latest messages as before.
- *
- * It never imports the agent service facade.
- */
 export class MemoryReviewCursors {
   readonly #path: string;
-  /** The path, or the fallback file while the path holds the file of a newer release. */
   #writePath: string;
   readonly #cursors = new Map<string, Cursor>();
   readonly #writes = Semaphore.makeUnsafe(1);
@@ -44,10 +35,6 @@ export class MemoryReviewCursors {
     this.#writePath = path;
   }
 
-  /**
-   * Reads the file once. A failure is logged, and the reviews start with no cursors. The read holds
-   * the write permit, so a call during the read waits for it, and no write can replace the file first.
-   */
   load(): Effect.Effect<void> {
     return this.#loaded ? Effect.void : this.#writes.withPermit(this.#read());
   }
@@ -66,15 +53,10 @@ export class MemoryReviewCursors {
       this.#cursors.set(conversationKey(cursor.agentId, cursor.threadId), cursor);
   }).bind(this);
 
-  /** The cursor of one conversation. Call it after `load`. */
   get(agentId: string, threadId: string | null): string | null {
     return this.#cursors.get(conversationKey(agentId, threadId))?.cursor ?? null;
   }
 
-  /**
-   * Saves the cursor of one conversation, or removes it with `null`. It loads the file first, so a
-   * removal before the first review also removes the saved entry.
-   */
   set(agentId: string, threadId: string | null, cursor: string | null): Effect.Effect<void> {
     return this.load().pipe(
       Effect.andThen(
@@ -89,7 +71,6 @@ export class MemoryReviewCursors {
     );
   }
 
-  /** Removes the cursors of a deleted agent, also before the first review loaded the file. */
   forgetAgent(agentId: string): Effect.Effect<void> {
     return this.load().pipe(
       Effect.andThen(
@@ -106,10 +87,6 @@ export class MemoryReviewCursors {
     );
   }
 
-  /**
-   * Writes the current map. Each write takes the latest map, so the last write in the queue wins. A
-   * write that started ends, so a stop waits for it and does not leave a temporary file.
-   */
   #write(): Effect.Effect<void> {
     return this.#writes
       .withPermit(
@@ -128,7 +105,6 @@ export class MemoryReviewCursors {
   }
 }
 
-/** The key of one reviewed conversation: the agent's own chat (`threadId` null) or one side thread. */
 export function conversationKey(agentId: string, threadId: string | null): string {
   return threadId === null ? agentId : `${agentId}\u0000${threadId}`;
 }

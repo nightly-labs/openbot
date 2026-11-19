@@ -21,13 +21,6 @@ function sameIds(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
   return a.size === b.size && [...a].every((id) => b.has(id));
 }
 
-/**
- * "Branch from here" in a conversation of an agent, as on desktop: the agent's own chat when
- * `sourceTaskId` is null, else a thread. A branch copies the conversation through the turn of the
- * chosen answer into a new thread, which then opens. No turn starts. The host must serve
- * `agent-thread-branches-v1` and be online. While a turn runs, no message offers a branch: the
- * host refuses a source with a running turn.
- */
 export function useBranchThread({
   serverId,
   agentId,
@@ -44,7 +37,6 @@ export function useBranchThread({
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();
   const workspace = useMobileWorkspaceReader();
-  // The host branches only for a member who can write to the agent.
   const viewOnly = useAgentViewOnly(serverId, agentId);
   const enabled =
     useMobileWorkspaceSelector(
@@ -53,7 +45,6 @@ export function useBranchThread({
         current.canUseTasks(serverId) &&
         current.canBranchThreads(serverId),
     ) && !viewOnly;
-  // One set while its ids stay, so a streamed chunk does not draw every row of the chat again.
   const stable = useRef(NO_IDS);
   const branchPoints = useMemo(() => {
     const next = enabled && messages && !activeTurnId ? branchPointIds(messages, null) : NO_IDS;
@@ -61,7 +52,6 @@ export function useBranchThread({
     return stable.current;
   }, [enabled, messages, activeTurnId]);
 
-  // One branch at a time. A second touch while the first request runs does nothing.
   const pending = useRef(false);
   const branch = useCallback(
     async (messageId: string) => {
@@ -73,10 +63,8 @@ export function useBranchThread({
           { agentId, taskId: sourceTaskId, messageId, requestId: Crypto.randomUUID() },
           serverId,
         );
-        // The thread shows in the menu before its list event arrives.
         addStartedTask(queryClient, queryScope, serverId, task);
         void haptics.notification("success");
-        // From a thread, the branch replaces it on the screen, so Back still returns to the agent's chat.
         if (sourceTaskId === null)
           router.push({ pathname: "/task/[taskId]", params: { serverId, agentId, taskId: task.id } });
         else router.setParams<"/task/[taskId]">({ taskId: task.id });

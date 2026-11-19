@@ -1,11 +1,3 @@
-// Runs a takeover card past the provider's tool-call deadline (#9689) on the real `AttentionRegistry`.
-// Antigravity 1.5.9 stops each MCP tool call after 180 s, also with progress. The call must get an
-// answer before then, the card must stay open, and the next call for the same tab must wait on the
-// same card. Cursor asks for no progress and stops each call after 60 s (#10577), so a Vault request
-// card must also answer its call first, stay open, and send only the saved item's name as the late
-// answer. A secure fill that fails gives the page to the user and tells the agent only a fixed reason
-// (#10536). The browser host is a stub: no page, provider or account is used; the Vault is a temporary file.
-// `bun scripts/browser-takeover-deadline-e2e.ts`. Writes .openbot-build/browser-takeover-deadline-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -29,22 +21,18 @@ const THREAD = "thread-1";
 const TAB = "tab-1";
 const SECRET = "e2e-password-7c41";
 const VAULT_SECRET = "e2e-vault-password-93be";
-/** Short, so the script waits for the real timer and not for 165 s. */
 const DEADLINE_MS = 50;
 
-/** The JSON of a takeover tool result. */
 interface AgentAnswer {
   status?: string;
   next?: string;
   secureInput?: string;
 }
 
-/** Records what OpenBot answers to the agent. The process never starts. */
 class RecordingClient extends CodexAppServerClient {
   readonly answers = new Map<RequestId, unknown>();
   readonly #waiters = new Map<RequestId, () => void>();
 
-  /** Resolves when OpenBot answers the request, so that a host timer is awaited, not slept on. */
   answered(id: RequestId): Promise<unknown> {
     if (this.answers.has(id)) return Promise.resolve(this.answers.get(id));
     return new Promise((done) => this.#waiters.set(id, () => done(this.answers.get(id))));
@@ -82,7 +70,6 @@ const tabs: BrowserTab[] = [
 const events: AgentEvent[] = [];
 const browserLog: string[] = [];
 const submitted: string[] = [];
-/** When set, the fill fails with this error, as a page that the fill cannot complete. */
 let fillFailure: Error | undefined;
 
 function preparedSecret(): PreparedBrowserSecret {
@@ -134,7 +121,6 @@ const registry = new AttentionRegistry({
 
 let nextRequest = 1;
 
-/** One provider call of a takeover tool, as the tool router passes it. */
 function call(tool: "submit_secret" | "request_takeover", turnId: string, answerBeforeMs?: number) {
   const id = nextRequest++;
   return runCauseEffect(
@@ -169,7 +155,6 @@ function answerOf(result: unknown): AgentAnswer & { success: boolean } {
 const count = (type: AgentEvent["type"]) => events.filter((event) => event.type === type).length;
 const openCards = () => registry.runtimeAttention().pendingBrowserTakeovers;
 
-/** Waits for the card's event, not for a time. */
 async function cardShown(before: number): Promise<void> {
   while (count("browser-takeover-requested") === before) await new Promise((done) => setImmediate(done));
 }
@@ -206,7 +191,6 @@ try {
     const shown = count("browser-takeover-requested");
     const requestId = openCards()[0]?.requestId;
     assert(requestId !== undefined);
-    // It waits on the card: its own deadline answers it, and no second card shows.
     const second = answerOf(await call("submit_secret", "turn-1", DEADLINE_MS));
     assert.equal(second.status, "waiting");
     assert.equal(openCards()[0]?.requestId, requestId);
@@ -358,7 +342,6 @@ try {
           tool: "request_vault_item",
           arguments: args,
         },
-        // Cursor's call: no progress token, so the bridge sets only this deadline.
         detachAfterMs: DEADLINE_MS,
       };
       const shown = await runCauseEffect(
@@ -370,7 +353,6 @@ try {
       const pending = vaultRegistry.runtimeAttention().pendingPrompts;
       assert.equal(pending.length, 1, "the card closed with its call");
       assert.equal(pending[0]?.detached, true);
-      // The turn ends, as the agent ends it after the waiting answer. The card stays.
       vaultRegistry.clearForTurn(THREAD, "turn-8", true);
       assert.equal(vaultRegistry.runtimeAttention().pendingPrompts.length, 1, "the end of the turn closed the card");
       const spec = vaultRequestFormSpec(args);
@@ -398,7 +380,6 @@ try {
     }
   });
 
-  /** Submits the card while the fill fails, then the user selects Done; returns the agent's answer. */
   const failedFill = async (turnId: string, failure: Error) => {
     fillFailure = failure;
     const shown = count("browser-takeover-requested");
@@ -509,7 +490,6 @@ try {
           }),
         );
       };
-      // Account B: the card opens, and the password of account A does not go in.
       const shown = cards();
       const other = signIn("b@example.test");
       let answered = false;
@@ -532,14 +512,12 @@ try {
       const typed = answerOf(await other);
       assert.equal(typed.status, "completed");
       assert.deepEqual(vaultFills, [SECRET], "the card did not fill what the user typed");
-      // The same account, written in another case, and a call with no username: the saved login goes in.
       const same = answerOf(await signIn(" A@Example.test"));
       const unnamed = answerOf(await signIn());
       assert.equal(same.status, "completed");
       assert.equal(unnamed.status, "completed");
       assert.deepEqual(vaultFills, [SECRET, VAULT_SECRET, VAULT_SECRET], "the saved login was not filled");
       assert.equal(cards(), shown + 1, "a card opened for the saved account");
-      // A login saved with no username names no account, so it is filled as before.
       savedUsername = null;
       const noSavedUsername = answerOf(await signIn("b@example.test"));
       assert.equal(noSavedUsername.status, "completed");

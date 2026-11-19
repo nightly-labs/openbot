@@ -1,15 +1,3 @@
-// Writes the Umbrel app of one OpenBot release (docs/umbrel.md) from the templates in docker/umbrel/openbot.
-// It pins the image to the digest of the multi-architecture index on GHCR, as the Umbrel app store requires,
-// and copies the seccomp profile of the image into the app folder.
-//
-//   bun scripts/umbrel-app.ts --version <x.y.z> [--id=<app id>] [--out=<folder>]
-//   bun scripts/umbrel-app.ts --version <x.y.z> --official [--submission=<pull request URL>]
-//
-// The app id is `openbot` by default. In a community app store, it must start with the id of the store,
-// such as `openbot-server`, and the manifest has an icon. `--official` writes the app of the official
-// Umbrel App Store: the id `openbot` and no icon, because Umbrel keeps the icons of that store in
-// another repository. `--submission` is the URL of the pull request to that store. The default folder
-// is .openbot-build/umbrel/<app id>. Copy it to the app store as a folder with the name of the app id.
 import { chmodSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -41,7 +29,6 @@ if (!/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/u.test(appId)) {
 }
 const out = resolve(ROOT, argument("out") ?? `.openbot-build/umbrel/${appId}`);
 
-// The folder is replaced. Only an empty folder or an earlier app folder can be replaced, never the repository.
 const notAppFolder = existsSync(out) && readdirSync(out).length > 0 && !existsSync(join(out, "umbrel-app.yml"));
 if (out === TEMPLATE || notAppFolder) {
   throw new Error(`${out} is not an Umbrel app folder. Give an empty or new folder as --out.`);
@@ -60,14 +47,12 @@ for (const file of ["umbrel-app.yml", "docker-compose.yml"]) {
   }
   writeFileSync(join(out, file), text);
 }
-// Umbrel needs the source folder of each bind mount in the package.
 cpSync(join(TEMPLATE, "data"), join(out, "data"), { recursive: true });
 cpSync(join(TEMPLATE, "hooks/pre-start"), join(out, "hooks/pre-start"));
 chmodSync(join(out, "hooks/pre-start"), 0o755);
 cpSync(join(ROOT, "docker/seccomp.json"), join(out, "seccomp.json"));
 logger.info(`Wrote the Umbrel app ${appId} of ${version} (${digest}) to ${out}.`);
 
-/** The digest of the image index of a release tag. Public images need no sign-in: GHCR gives an anonymous token. */
 async function indexDigest(tag: string): Promise<string> {
   const tokenResponse = await fetch(`https://ghcr.io/token?scope=repository:${IMAGE}:pull`);
   if (!tokenResponse.ok) throw new Error(`GHCR did not give a pull token (${tokenResponse.status}).`);

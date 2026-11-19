@@ -31,8 +31,6 @@ function useAgentMenuActions(agent: MobileAgent) {
     canToggleChatPin(pinnedAgentIds, pinnedChannelIds, agent.id),
   );
   const isUnread = useAgentUnread(agent.id);
-  // The user's own level of the agent, on a host that keeps the levels. "nothing" is a muted agent.
-  // A host that keeps no levels, or that did not answer yet, has no mute item: the item must not fail.
   const levels = useSyncedNotificationLevels((state) => state.servers[agent.serverId]);
   const canMute =
     useMobileWorkspaceSelector(({ canSetAgentNotificationLevel }) => canSetAgentNotificationLevel(agent.serverId)) &&
@@ -88,7 +86,6 @@ function useAgentMenuActions(agent: MobileAgent) {
     else workspace().markAgentUnread(agent.id);
     void haptics.selection();
   };
-  /** Mutes the agent for the user on all of their devices, or gives it the server level again. */
   const handleMute = () => {
     void haptics.selection();
     workspace()
@@ -185,10 +182,6 @@ function useAgentContextMenu(agent: MobileAgent) {
   );
 }
 
-/**
- * The chat link of an agent on iOS, with its long-press preview and context menu. Android drops both
- * elements from a Link, so it does not build the menu and wraps the link in `AgentAndroidMenu`.
- */
 export function AgentContextMenuLink({
   agent,
   preview,
@@ -208,17 +201,10 @@ export function AgentContextMenuLink({
   );
 }
 
-/**
- * The long-press menu of an agent on Android, with the actions of the iOS context menu. It opens when
- * it mounts and calls `onClose` when it closes, so the parent mounts it only while it shows: a long
- * list would otherwise keep a menu with every item for each row. It covers its parent, so the menu
- * opens at the row, as it did around the row.
- */
 export function AgentAndroidMenu({ agent, onClose }: { agent: MobileAgent; onClose: () => void }) {
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   return (
     <View
-      // The open menu draws in a portal. The row under it keeps its touches.
       pointerEvents="none"
       style={StyleSheet.absoluteFill}
       onLayout={({ nativeEvent }) => setSize({ width: nativeEvent.layout.width, height: nativeEvent.layout.height })}
@@ -313,7 +299,6 @@ function OpenAgentMenu({
         handlers[nativeEvent.event]?.();
       }}
     >
-      {/* The anchor of the menu: the size of the row it covers. */}
       <View style={size} />
     </MenuView>
   );

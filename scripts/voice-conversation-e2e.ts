@@ -1,22 +1,3 @@
-// Drives the voice conversation pill in this worktree's two-client harness (`bun run dev:test-client`). The
-// microphone is a fake: the app's own speech model says a question, and getUserMedia plays it once.
-//   1. Local: the host app talks to its Chief agent. The message keeps a WebM/Opus recording and
-//      shows a player; the reply is read aloud.
-//   2. Remote: the test client talks to the same agent through the host server. Only the text goes;
-//      no player, and no recording draft stays on the client.
-//   3. Storage: the host lists the recording and deletes it; the message keeps its text, no player.
-//   4. Interrupt: the host's microphone stays open while the agent thinks and speaks. The question
-//      said again interrupts the agent and becomes the next turn; then the Stop button interrupts it.
-//      Neither interrupt opens the microphone again.
-//   5. Offline: the host stops serving. The client's pill releases the microphone, shows the offline
-//      error and does not listen. The client stays disconnected after this case: run
-//      `bun run dev:stop` and `bun run dev:test-client` before the next run.
-//   6. Analytics: each window's OpenPanel requests are captured. The conversation, turn and spoken reply
-//      events arrive with their metadata, and no request holds what the user said.
-// Start the harness with the capture address, then run the script with `--allow-mutations`:
-//   OPENBOT_ANALYTICS_CAPTURE_URL=http://localhost:47322 bun run dev:test-client
-//   bun scripts/voice-conversation-e2e.ts --allow-mutations
-// Writes .openbot-build/voice-conversation/report.json and screenshots.
 import assert from "node:assert/strict";
 import { mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -40,10 +21,8 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/voice-conversation")
 const AGENT = "Chief";
 const AGENT_ID = "chief";
 const QUESTION = "What is two plus two? Answer in five words or fewer.";
-/** 120 s of Opus at 32 kbps is about 480 KB; a short question must stay far below this. */
 const MAXIMUM_RECORDING_BYTES = 600_000;
 const TURN_TIMEOUT_MS = 180_000;
-/** The app sends analytics here only when it starts with this capture address; no server listens on it. */
 const ANALYTICS_URL = "http://localhost:47322";
 const EVENT_TIMEOUT_MS = 15_000;
 
@@ -80,8 +59,6 @@ for (const page of [host, client]) page.setDefaultTimeout(30_000);
 mkdirSync(OUT, { recursive: true });
 const checks: Check[] = [];
 type Turn = Awaited<ReturnType<typeof speakOneTurn>>;
-// The body comes from `JSON.parse`, so every value is JSON. `z.json()` in a record makes TypeScript 7.1
-// report TS5115.
 const trackBody = z.object({
   type: z.literal("track"),
   payload: z.object({ name: z.string(), properties: z.record(z.string(), z.unknown()) }),
@@ -93,7 +70,6 @@ interface AnalyticsEvent {
   properties: EventProperties;
 }
 const events: AnalyticsEvent[] = [];
-/** Every analytics request body, to check that none holds what the user said. */
 const analyticsBodies: string[] = [];
 const report: {
   checks: Check[];
@@ -107,7 +83,6 @@ const check = (name: string, passed: boolean, detail: unknown = null) => {
   logger.info(`${passed ? "Passed" : "Failed"}: ${name}.`);
 };
 
-/** A fake microphone. `arm(n)` makes each of the next `n` streams say the question once; others are silent. */
 async function installMicrophone(page: Page): Promise<void> {
   await page.evaluate(async (text) => {
     const speech = await window.openbot.voice.speak({ text, language: "en" });
@@ -144,7 +119,6 @@ async function installMicrophone(page: Page): Promise<void> {
   }, QUESTION);
 }
 
-/** Answers the window's OpenPanel requests in the page and keeps each event. */
 async function captureAnalytics(page: Page, window: AnalyticsEvent["window"]): Promise<void> {
   const info = await page.evaluate(() => globalThis.window.openbot.getAppInfo());
   assert.equal(
@@ -169,7 +143,6 @@ async function captureAnalytics(page: Page, window: AnalyticsEvent["window"]): P
   });
 }
 
-/** Waits for an event that the app sends after a state the script already waited for. */
 async function waitForEvent(
   window: AnalyticsEvent["window"],
   name: string,
@@ -228,7 +201,6 @@ const pillState = (page: Page) =>
     };
   });
 
-/** Waits until the pill shows `phase` or an error. Returns each phase it showed, in sequence. */
 async function waitForPhase(page: Page, phase: string): Promise<string[]> {
   const phases: string[] = [];
   const started = Date.now();
@@ -242,7 +214,6 @@ async function waitForPhase(page: Page, phase: string): Promise<string[]> {
   return phases;
 }
 
-/** Waits for one spoken turn after `openVoicePill`: the reply is read aloud, then the pill listens again. */
 async function speakOneTurn(page: Page, name: string) {
   const phases: string[] = [];
   const started = Date.now();
@@ -264,7 +235,6 @@ async function speakOneTurn(page: Page, name: string) {
     await page.waitForTimeout(100);
   }
   await page.screenshot({ path: join(OUT, `${name}-end.png`) });
-  // The test client shows its own message under its account name, not "You".
   const mine = page.getByRole("article", { name: new RegExp(`^Message from (?!${AGENT}$)`) }).last();
   return {
     phases,
@@ -296,7 +266,6 @@ try {
   await installMicrophone(host);
   await installMicrophone(client);
 
-  // 1. Local.
   await openAgent(host);
   const recordingsBefore = new Set(
     (await hostFiles()).filter((file) => file.mimeType.startsWith("audio/")).map((file) => file.id),
@@ -351,7 +320,6 @@ try {
     recording && { name: recording.name, mimeType: recording.mimeType, size: recording.size },
   );
 
-  // 2. Remote.
   const remote = (await client.evaluate(() => window.openbot.servers.list())).find(
     (server) => server.kind === "remote" && server.state === "online",
   );
@@ -377,9 +345,7 @@ try {
     { draftsBefore, draftsAfter },
   );
 
-  // 3. Storage: delete the local recording.
   if (recording) {
-    // A Storage row has a message id only for a thread placement, so find the message by its recording.
     const page = await host.evaluate(
       (id) =>
         window.openbot.agent.readConversationPage({ agentId: id, anchor: { type: "latest" }, limit: 20 }, "local"),
@@ -394,7 +360,6 @@ try {
     const status = url ? await host.evaluate(async (target) => (await fetch(target)).status, url) : null;
     check("storage: the recording file is gone", status === 404, { status });
     if (message) {
-      // The chat history keeps the message as it was sent; the bubble hides the player of a gone file.
       await host.reload();
       await openAgent(host);
       const bubble = host.getByRole("article", { name: "Message from You" }).filter({ hasText: message.text }).last();
@@ -405,8 +370,6 @@ try {
     }
   }
 
-  // 4. Interrupt. The first stream says the question; the second, opened while the agent thinks, says
-  // it again. A fast reply can start before it: the interrupt event shows that the voice stopped it. The storage case reloaded the host, which removed its microphone.
   await installMicrophone(host);
   await openVoicePill(host, 2);
   const thinking = await waitForPhase(host, "Thinking");
@@ -417,9 +380,7 @@ try {
     byVoice[0] === "Thinking" && byVoice.at(-1) === "Listening",
     { thinking, byVoice },
   );
-  // The next turn is short: the click must come while the agent thinks, before any event check waits.
   const next = await waitForPhase(host, "Thinking");
-  // The microphone opens again after the send. The click waits for it, so the Stop button finds it open.
   await host.waitForFunction(() => window.voiceConversationE2E?.calls() === 3);
   await host.getByRole("button", { name: "Interrupt", exact: true }).click();
   const byButton = await waitForPhase(host, "Listening");
@@ -429,7 +390,6 @@ try {
     next.at(-1) === "Thinking" && byButton.at(-1) === "Listening" && !byButton.includes("Speaking"),
     { next, byButton },
   );
-  // The listening turn, the one open while the agent thought, and the one open while it thought again.
   check("interrupt: no interrupt opens the microphone again", voiceCalls === 2 && buttonCalls === 3, {
     voiceCalls,
     buttonCalls,
@@ -448,9 +408,6 @@ try {
   );
   await closeVoicePill(host);
 
-  // 5. Offline. The client's pill listens; the host stops serving. The dev client reaches the host
-  // through a local API port that a restarted host does not open again, so the client stays
-  // disconnected after this case, and the return to online is not checked here.
   await client.getByText("Listening", { exact: true }).first().waitFor();
   await host.evaluate(() => window.openbot.host.stop());
   hostStopped = true;

@@ -11,10 +11,8 @@ import { createMockLicense, previewLicenseUsers } from "../src/preview/mock-lice
 
 const DAY = 24 * 60 * 60_000;
 
-/** The end of the license promotion: a new license is free until then. */
 const TRIAL_END = Date.UTC(2026, 11, 1);
 
-/** Active server plans only, so the failed-payment alert of a server does not hide the license. */
 const SERVERS = previewBillingServers().filter((server) => server.status === "active");
 
 function license(
@@ -29,14 +27,12 @@ function license(
     amount: licenseMonthlyAmount(plan, users, "eur"),
     ...plan,
     status: "active",
-    // One month after the story opens, so the renewal date is never in the past.
     currentPeriodEnd: Date.now() + 30 * DAY,
     cancelAtPeriodEnd: false,
     ...change,
   };
 }
 
-/** The Billing panel with the license section above the server plans. */
 function LicenseStory(props: { calls: LicenseDesktopApi; details?: BillingDetails }) {
   const api = createMockBilling(SERVERS, props.details);
   const billing = createBillingStore(
@@ -79,94 +75,71 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** No license, and 4 people use the owner's servers. "Buy a license" opens the slider dialog at 4 people. */
 export const Buy: Story = story({});
 
-/**
- * A first purchase: no billing country is saved. "Buy a license" opens the dialog with the billing country, which
- * the payment page needs. An EU country also shows the optional EU VAT ID.
- */
 export const BuyBillingCountry: Story = {
   render: () => <LicenseStory calls={createMockLicense({})} details={{ country: null, vatId: null }} />,
 };
 
-/** A first purchase from France: nothing is saved, so the dialog starts on the country of the IP address. */
 export const BuyBillingCountryGuessed: Story = {
   render: () => (
     <LicenseStory calls={createMockLicense({})} details={{ country: null, vatId: null, suggestedCountry: "FR" }} />
   ),
 };
 
-/** The account bought before from Germany with a VAT ID. The dialog fills in both. */
 export const BuyBillingCountrySaved: Story = {
   render: () => <LicenseStory calls={createMockLicense({})} details={{ country: "DE", vatId: "DE123456789" }} />,
 };
 
-/** No license, and only the owner. The dialog starts on the Starter license. */
 export const BuyStarter: Story = story({ used: 1, users: previewLicenseUsers().slice(0, 1) });
 
-/** No license, and the account pays for a server. Each license has the bundle price. */
 export const BuyWithServer: Story = story({
   used: 1,
   users: previewLicenseUsers().slice(0, 1),
   bundle: true,
 });
 
-/** No license and no open subscription. The dialog uses the currency of the time zone. */
 export const BuyNewCustomer: Story = story({ currency: null, used: 1, users: previewLicenseUsers().slice(0, 1) });
 
-/** No license, and the account pays in złoty. */
 export const BuyPln: Story = story({ currency: "pln" });
 
-/** A promotion: a new license is free until 1 December, and Stripe charges its first payment then. */
 export const BuyTrial: Story = story({ trialEnd: TRIAL_END });
 
-/** A license in its free trial. */
 export const Trial: Story = story({
   license: license(5, { status: "trialing", currentPeriodEnd: TRIAL_END }),
   trialEnd: TRIAL_END,
 });
 
-/** A Starter license. The row menu has Change to Team in place of Change users. */
 export const Starter: Story = story({
   license: license(1, {}, { tier: "starter", interval: "month", bundle: false }),
   used: 1,
   users: previewLicenseUsers().slice(0, 1),
 });
 
-/** A Starter license that 3 people use: the warning offers Change to Team. */
 export const StarterOverLimit: Story = story({
   license: license(1, {}, { tier: "starter", interval: "month", bundle: true }),
   bundle: true,
   used: 3,
 });
 
-/** A yearly Team license. The row shows the yearly price, and the menu has no Change to yearly. */
 export const TeamYearly: Story = story({ license: license(7, {}, { tier: "team", interval: "year", bundle: false }) });
 
-/** 4 of 10 users. The row menu has Users, Change users, Update payment method and Cancel. */
 export const Active: Story = story({ license: license(10) });
 
-/** More people use the license than it pays for: a warning with "Change users". */
 export const OverLimit: Story = story({ license: license(5), used: 7 });
 
-/** The renewal payment failed. */
 export const PaymentFailed: Story = story({ license: license(10, { status: "past_due" }) });
 
-/** The license ends at the end of its period. The menu has Renew. */
 export const Cancelling: Story = story({ license: license(10, { cancelAtPeriodEnd: true }) });
 
-/** A member of a server whose owner has a license. */
 export const CoveredBy: Story = story({
   used: 1,
   users: previewLicenseUsers().slice(0, 1),
   coveredBy: [{ ownerName: "Ana Kowalska", ownerEmail: "ana@example.com" }],
 });
 
-/** The license ended. The account can buy a new one. */
 export const Ended: Story = story({
   license: license(10, { status: "canceled", currentPeriodEnd: Date.now() - 3 * DAY }),
 });
 
-/** The account server has no license price. Only the server plans show. */
 export const Unavailable: Story = story({ available: false });

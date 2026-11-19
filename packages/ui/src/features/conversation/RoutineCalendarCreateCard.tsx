@@ -35,13 +35,10 @@ import {
   routineScheduleFromDraft,
 } from "./routine-schedule-saved";
 
-/** The routine fields that the host keeps. A field the host drops does not show. */
 export interface RoutineCreateFields {
-  /** The host saves a one-time schedule. */
   onceSchedule: boolean;
   limitPolicy: boolean;
   missedPolicy: boolean;
-  /** The host keeps where an agent routine runs: its chat or its own thread. */
   runIn: boolean;
 }
 
@@ -55,17 +52,13 @@ export interface RoutineCalendarNewRoutine {
   runIn?: RoutineRunPlace;
 }
 
-/** Creates a routine from a day of the calendar. The host gives the fields it keeps and the save. */
 export interface RoutineCalendarCreate {
   fields: RoutineCreateFields;
-  /** Rejects with the error to show. The card stays open, so the person can try again. */
   save: (routine: RoutineCalendarNewRoutine) => Promise<void>;
 }
 
-/** The day and time of a new routine, and the point on the screen that the card opens next to. */
 export interface RoutineCalendarSlot {
   day: CalendarDay;
-  /** "HH:mm". */
   time: string;
   x: number;
   y: number;
@@ -94,7 +87,6 @@ const MISSED_LABELS = {
   "run-once": "routine.settings.missedPolicy.runOnce",
 } as const;
 
-/** A one-time run on that day when the host keeps one, else a weekly run on its weekday. */
 function slotSchedule(slot: RoutineCalendarSlot, once: boolean): RoutineScheduleDraft {
   return once
     ? { kind: "once", date: slot.day, time: slot.time }
@@ -105,10 +97,6 @@ function draftValid(draft: CardDraft): boolean {
   return Boolean(draft.name.trim() && draft.instruction.trim() && routineDraftProblem(draft.schedule) === null);
 }
 
-/**
- * The routine form in a card next to the click on a calendar day. It has the fields and checks of
- * the routine settings. Escape, Cancel or a click outside closes it.
- */
 export function RoutineCalendarCreateCard(props: {
   slot: RoutineCalendarSlot | null;
   agents: readonly AgentSearchSelectAgent[];
@@ -118,7 +106,6 @@ export function RoutineCalendarCreateCard(props: {
 }) {
   const { t, errorMessage } = useText();
   const id = createUniqueId();
-  /** The agent of the last card, so a person who adds several routines for one agent picks it once. */
   let lastAgentId: string | undefined;
   const [draft, setDraft] = createStore<CardDraft>({
     agentId: "",
@@ -134,10 +121,8 @@ export function RoutineCalendarCreateCard(props: {
   });
   let card: HTMLElement | undefined;
   let nameInput: HTMLInputElement | undefined;
-  /** The control that had the focus when the card opened, such as the "+" of a day. */
   let opener: HTMLElement | null = null;
 
-  // Only a new slot starts a new draft: a refresh of the agents keeps what the person wrote.
   createEffect(
     () => {
       const slot = props.slot;
@@ -147,8 +132,6 @@ export function RoutineCalendarCreateCard(props: {
     },
     (opened) => {
       if (!opened) {
-        // The card has no trigger, and a card that is not modal does not give the focus back. The focus
-        // goes back to the control that opened the card, unless the person moved it to another control.
         const focused = document.activeElement;
         const lost = !focused || focused === document.body || Boolean(card?.contains(focused));
         if (opener?.isConnected && lost) opener.focus();
@@ -167,25 +150,19 @@ export function RoutineCalendarCreateCard(props: {
         value.instruction = "";
         value.schedule = schedule;
         value.limitPolicy = "wait";
-        // As in the routine settings: a one-time run that came due while OpenBot was closed still runs.
         value.missedPolicy = schedule.kind === "once" ? "run-once" : "skip";
         value.runInThread = false;
         value.showErrors = false;
         value.saving = false;
         value.error = null;
       });
-      // The button or the day that opened the card keeps the focus until the card is on screen. A new
-      // slot on an open card does not open it again, so the open event alone does not move the focus.
       const frame = requestAnimationFrame(() => nameInput?.focus());
       return () => cancelAnimationFrame(frame);
     },
   );
 
-  // Escape closes the card before the page handler, which would close the Schedule page too. An
-  // open menu in the card keeps its own Escape.
   onSettled(() => {
     const key = (event: KeyboardEvent) => {
-      // An Escape that ends an IME composition stays with the field.
       if (event.key !== "Escape" || event.isComposing || event.defaultPrevented || !props.slot || !card) return;
       const own = card;
       const popups = [...document.querySelectorAll("[data-popper-positioner]")];
@@ -227,7 +204,6 @@ export function RoutineCalendarCreateCard(props: {
       value.saving = true;
       value.error = null;
     });
-    // The person can open another day while the host saves. The result is only for this card.
     const slot = props.slot;
     try {
       await props.create.save(routine);
@@ -255,7 +231,6 @@ export function RoutineCalendarCreateCard(props: {
       onOpenChange={(next) => {
         if (!next) props.onClose();
       }}
-      // The point of the click, in the viewport.
       getAnchorRect={() => ({ x: props.slot?.x ?? 0, y: props.slot?.y ?? 0, width: 0, height: 0 })}
       placement="right-start"
       gutter={8}
@@ -265,7 +240,6 @@ export function RoutineCalendarCreateCard(props: {
         <Popover.Content
           ref={card}
           class="ui-popover-menu-surface routine-planner-create"
-          // The name is the first thing to write; the agent is already set.
           onOpenAutoFocus={(event) => {
             event.preventDefault();
             nameInput?.focus();
@@ -344,7 +318,6 @@ export function RoutineCalendarCreateCard(props: {
               </Text>
             </Show>
           </div>
-          {/* The host does not skip a one-time run at a spent plan: it waits, so the reminder is not lost. */}
           <Show when={props.create.fields.limitPolicy && draft.schedule.kind !== "once"}>
             <div class="settings-field">
               <span id={`${id}-limit`}>{t("routine.settings.limitPolicy")}</span>

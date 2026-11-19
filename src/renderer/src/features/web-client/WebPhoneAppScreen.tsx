@@ -9,10 +9,6 @@ import { For } from "solid-js";
 
 const PRODUCT_NAME = "OpenBot";
 const STORAGE_KEY = "openbot.web.phoneBrowser";
-/**
- * A phone: a touch pointer and a narrow screen, or a short screen when the phone is in landscape. A
- * narrow desktop window has a mouse, and a tablet is wider and taller, so both keep the web client.
- */
 const PHONE_QUERY = "(pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px)";
 
 interface StoreLink {
@@ -26,11 +22,6 @@ const STORES: Record<MobilePlatformLogoVariant, StoreLink> = {
   android: { platform: "android", label: "webClient.phoneApp.android", href: ANDROID_PLAY_STORE_URL },
 };
 
-/**
- * True when the web client opens on a phone and this browser has not chosen to stay in the browser.
- * It is read once at start, so a turn of the phone does not swap the screen. Blocked storage counts
- * as no choice.
- */
 export function phoneAppScreenWanted(): boolean {
   if (!window.matchMedia?.(PHONE_QUERY).matches) return false;
   try {
@@ -43,21 +34,13 @@ export function phoneAppScreenWanted(): boolean {
 function rememberBrowserChoice(): void {
   try {
     window.localStorage.setItem(STORAGE_KEY, "1");
-  } catch {
-    // Without storage, the screen shows again on the next visit.
-  }
+  } catch {}
 }
 
-/** The store of this phone first. An iPad in desktop mode reports a Mac and has no coarse narrow screen. */
 function storeOrder(): StoreLink[] {
   return /android/i.test(navigator.userAgent) ? [STORES.android, STORES.ios] : [STORES.ios, STORES.android];
 }
 
-/**
- * The first screen of the web client on a phone. The phone app is the client for phones, so this
- * screen sends the user to its store page. "Continue in browser" opens the web client, and this
- * browser keeps that choice.
- */
 export function WebPhoneAppScreen(props: { variant: AppVariant; onContinue: () => void }) {
   const { t } = useText();
   return (

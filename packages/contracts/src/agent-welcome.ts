@@ -1,14 +1,5 @@
-/**
- * The setup message that a client sends to a new agent on a host with `agent-welcome-v1`. The host
- * keeps it out of the chat, so the first thing the user sees is the agent's welcome.
- *
- * The agent reads it, not the user, so it is not interface text: it stays English in every language.
- * The profile in the agent's instructions already holds its role, so this message does not repeat it.
- */
 export interface AgentWelcomeInput {
-  /** The language of the user's app, by its own name, such as "Deutsch". */
   language: string;
-  /** The user's first request comes in the next message, so the agent only says hello. */
   firstRequestFollows?: boolean;
 }
 

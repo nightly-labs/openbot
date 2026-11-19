@@ -1,20 +1,8 @@
-// A Codex app-server for `dev:bench` scale scenarios. It streams a reply of fixed length at a fixed rate
-// for each turn, so 100 agents can stream at once with no model quota, and each run sends the same
-// text at the same rate. The app starts it through `OPENBOT_CODEX_PATH`, as it starts a real Codex.
-//
-// A process that OpenBot starts for a side turn with no tools, such as a channel summary, greets as
-// "openbot-profile". It answers at once, and its turns are logged as side turns, not as member turns.
-//
-// It writes one JSON line for each ended turn, and one for each request it does not know, to the log
-// that `OPENBOT_BENCH_CODEX_LOG` names. The bench reads that file to see when the turns ended, so the
-// wait adds no work to the app it measures.
 import { chmod, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 export interface FakeCodexOptions {
-  // The time between two pieces of streamed text of one turn.
   deltaMs: number;
-  // The number of pieces in one reply.
   deltas: number;
 }
 
@@ -33,7 +21,6 @@ const LOG = process.env.OPENBOT_BENCH_CODEX_LOG;
 const DELTA_MS = Number(process.env.OPENBOT_BENCH_CODEX_DELTA_MS || "50");
 const DELTAS = Number(process.env.OPENBOT_BENCH_CODEX_DELTAS || "400");
 const log = (entry) => fs.appendFileSync(LOG, JSON.stringify(entry) + "\\n");
-// Markdown of the kind a reply holds: prose, a list, inline code and a fenced block.
 const WORDS = [
   "The ", "server ", "reads ", "each ", "request ", "and ", "sends ", "\`json\` ", "back. ", "\\n\\n",
   "- ", "First, ", "open ", "the ", "**config** ", "file.\\n", "- ", "Then ", "run ", "the ", "tests.\\n\\n",
@@ -136,15 +123,12 @@ process.stdin.on("data", (chunk) => {
 process.stdin.on("end", () => process.exit(0));
 `;
 
-/** Writes the fake Codex and an empty log into `directory`, which the bench owns. */
 export async function writeFakeCodex(directory: string, options: FakeCodexOptions): Promise<FakeCodex> {
   await rm(directory, { recursive: true, force: true });
   await mkdir(join(directory, "codex-home"), { recursive: true });
   const path = join(directory, "codex");
   const logPath = join(directory, "codex.jsonl");
   await writeFile(path, FAKE_CODEX);
-  // The folder is in the repository, whose `package.json` makes Node load a file with no extension
-  // as an ES module. The fake uses `require`.
   await writeFile(join(directory, "package.json"), '{ "type": "commonjs" }\n');
   await chmod(path, 0o755);
   await writeFile(logPath, "");
@@ -152,8 +136,6 @@ export async function writeFakeCodex(directory: string, options: FakeCodexOption
     logPath,
     environment: {
       OPENBOT_CODEX_PATH: path,
-      // The fake reads no Codex files, but the app can write Codex settings: keep them out of the
-      // developer's own Codex home.
       CODEX_HOME: join(directory, "codex-home"),
       OPENBOT_BENCH_CODEX_LOG: logPath,
       OPENBOT_BENCH_CODEX_DELTA_MS: String(options.deltaMs),

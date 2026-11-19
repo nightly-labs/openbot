@@ -1,7 +1,3 @@
-// Run with `node --import tsx scripts/file-preview-e2e.ts --allow-mutations` in a seeded dev app.
-// Open a conversation with a workspace HTML link before running. The file must contain a script.
-// Pass its filename with --file= and text produced by its script with --rendered-text=.
-// The seeded app must have another agent so the test can switch away and back.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";

@@ -1,17 +1,3 @@
-/**
- * The workflow canvas: the node components on a board that pans, zooms and runs. Drag empty space
- * to pan, scroll to pan, and pinch or hold Ctrl or ⌘ and scroll to zoom. Drag a node by its card,
- * and resize the selected node by a corner handle. Right-click a node, a connection or empty canvas
- * for its actions. History lists the past runs of the workflow; pick one to show its results on
- * every step. The Draw tool draws lines over the canvas with a pen or a marker, and the eraser
- * removes them. The Sticky note and Shapes tools show the item under the pointer, and a click puts it
- * there.
- *
- * The canvas is controlled by its host. It edits a local copy of the graph and gives each change to
- * `onGraphChange`. The runs, the versions and the other workflows come from props, and each action on
- * them goes back to the host.
- */
-
 import {
   isWorkflowStepKind,
   type StoredFileRow,
@@ -205,69 +191,36 @@ import { activeRun, indexRunView, isOpenRun, type WorkflowRunView } from "./work
 import { DrawArt, ShapesArt, StickyArt } from "./workflow-tool-art";
 
 export interface WorkflowCanvasProps {
-  /**
-   * The open workflow. The canvas loads its graph when it opens, or when `resetKey` changes. A newer
-   * graph of the same workflow, from another device or an agent, merges into the canvas edits.
-   */
   workflow: WorkflowDetail;
-  /**
-   * A new value loads `workflow.graph` again in place of the canvas edits, as after a restore. Undo then
-   * puts back the canvas from before. A save of the changes of this canvas must not change it.
-   */
   resetKey?: number | undefined;
   runs: WorkflowRunView;
-  /** What this host supports. The canvas hides the kinds, triggers and outputs that it does not list. */
   features: WorkflowFeatures;
   catalogs: WorkflowCatalogs;
-  /** What the GitHub trigger and output cards read from the host. Without it, they show no GitHub data. */
   github?: WorkflowGitHubCanvas | undefined;
-  /** The saved versions of this workflow, newest first. */
   versions: readonly WorkflowVersion[];
-  /** The version that the canvas shows, read-only, in place of the live canvas. */
   versionPreview?: { versionId: string; graph: WorkflowGraph } | undefined;
-  /** The workflows of this host, for the switcher. */
   library: readonly WorkflowSummary[];
-  /** The canvas shows the graph and the runs; nothing on it changes. */
   readOnly?: boolean | undefined;
-  /** The other people on this canvas. It shows only when `features.presence` is on. */
   presence?: WorkflowPresence | undefined;
-  /**
-   * The change that an agent saved. When a reset or the open of `workflow` comes with a new key, the
-   * canvas plays it: the agent's cursor goes to each node that it made or changed, and the new nodes
-   * and connections show one by one. A press on the canvas ends the play.
-   */
   build?: WorkflowBuild | undefined;
-  /** In the desktop window, the top bar is the window's top row, and the canvas fills the card below it. */
   frame?: "window" | undefined;
-  /**
-   * Each change to the graph, after it is done: a drag gives one change when it ends, but a field gives
-   * one for each edit, so the host can wait for a pause before it saves.
-   */
   onGraphChange: (graph: WorkflowGraph) => void;
   onRun: (input: { fromNodeId?: string }) => void;
   onRunStep: (nodeId: string) => void;
   onStopStep: (stepId: string) => void;
   onStopRun: (runId: string) => void;
   onRetry: (stepId: string) => void;
-  /** Sends the answer of an approval. A promise that rejects shows the approval again. */
   onDecide: (stepId: string, approved: boolean) => Promise<unknown>;
-  /**
-   * Makes a new signing secret for a webhook trigger, after the graph that has the trigger is saved.
-   * The first secret also makes the address. Without it, a webhook trigger offers no secret.
-   */
   onRotateWebhookSecret?: ((nodeId: string) => Promise<string>) | undefined;
   onLoadOlderRuns: () => void;
   onRestoreVersion: (versionId: string) => void;
-  /** Shows a version, or the live canvas again with null. Without it, a version in the list restores at once. */
   onPreviewVersion?: ((versionId: string | null) => void) | undefined;
   onSelect: (workflowId: string) => void;
   onCreate: (input: { title: string; graph?: WorkflowGraph }) => void;
   onRename: (workflowId: string, title: string) => void;
-  /** Runs when the Undo toast of a delete closes without Undo. A promise that rejects shows the workflow again. */
   onDelete: (workflowId: string) => Promise<unknown>;
 }
 
-/** What a right-click hit. The canvas keeps the world point, so a new node opens there. */
 type MenuTarget =
   | { kind: "node"; id: string }
   | { kind: "edge"; id: string; at: WfnPoint }
@@ -279,7 +232,6 @@ const MENU_LABEL = {
   canvas: "workflow.canvas.menu.canvas",
 } satisfies Record<MenuTarget["kind"], AppTextKey>;
 
-/** Why the host saved a version. */
 const VERSION_NOTE = {
   auto: "workflow.canvas.version.auto",
   restore: "workflow.canvas.version.restore",
@@ -291,7 +243,6 @@ function MenuItem(props: {
   label: string;
   keys?: readonly string[];
   danger?: boolean;
-  /** Runs while the item has the focus, with true, and when it loses it, with false. */
   onAim?: (aimed: boolean) => void;
   onSelect: () => void;
 }) {
@@ -322,10 +273,8 @@ interface Range {
   max: number;
 }
 
-/** The font sizes that the grip of a text node can give, in world pixels. */
 const TEXT_FONT = { min: 12, max: 120 };
 
-/** The widths a user can give each kind, and the height where the kind has a free height. */
 const RESIZE: Record<WorkflowNodeKind, { width: Range; height?: Range }> = {
   text: { width: { min: 120, max: 960 } },
   prompt: { width: { min: 240, max: 640 }, height: { min: 151, max: 640 } },
@@ -339,53 +288,30 @@ const RESIZE: Record<WorkflowNodeKind, { width: Range; height?: Range }> = {
 const MIN_SCALE = 0.25;
 const MAX_SCALE = 2;
 const ZOOM_STEP = 1.2;
-/** The share of a scroll that pans the canvas. A full scroll moved too far, so this is half, as React Flow does. */
 const WHEEL_PAN_SPEED = 0.5;
-/**
- * The zoom for each pixel of a scroll. A pinch (the browser adds Ctrl) sends many small steps, and a
- * mouse wheel with ⌘ sends few large ones, so the two rates differ.
- */
 const PINCH_ZOOM_RATE = 0.007;
 const WHEEL_ZOOM_RATE = 0.002;
-/** One scroll event zooms no more than one press of the zoom buttons, so a fast wheel does not jump. */
 const WHEEL_ZOOM_MAX = Math.log(ZOOM_STEP);
-/** While you follow a person, the camera moves when their cursor is this share of the view from the centre. */
 const FOLLOW_ZONE = 0.25;
-/** The time constant of the follow camera, in milliseconds: it closes 63% of the gap in this time. */
 const FOLLOW_EASE = 180;
-/**
- * The play of an agent's change, in milliseconds: the wait for the fit of the view, the glide of the
- * cursor to a node, the time of each node, and how long the cursor stays and fades out at the end.
- */
 const BUILD_START = 240;
 const BUILD_GLIDE = 380;
 const BUILD_STEP = 620;
 const BUILD_LINGER = 900;
 const BUILD_FADE = 240;
 const FIT_MARGIN = 64;
-/** The run states that a collapsed group shows for its members, most important first. */
 const FOLDED_STATUS: readonly WfnRunStatus[] = ["failed", "approval", "running"];
-/** The trigger types and output targets of host steps: on a joined server, only an owner or admin changes them. */
 const HOST_TRIGGERS: readonly string[] = ["github", "discord", "telegram", "slack"];
 const HOST_OUTPUTS: readonly string[] = [...HOST_TRIGGERS, "chat-channel"];
-/**
- * In screen pixels, as in workflows.css: the gap between a node and its toolbar, and the room that
- * the results strip takes under a node with its gap.
- */
 const TOOLBAR_GAP = 12;
 const STRIP_ROOM = 8 + 52 + 8;
 const DRAG_THRESHOLD = 4;
 const SNAP = 8;
 const GRID = 20;
-/** How far a copy sits from its original. */
 const DUPLICATE_OFFSET = 32;
-/** The room that a new node takes before it renders and has a measured size. */
 const NEW_NODE = { width: 300, height: 240 };
-/** New files that the user adds at one time go in rows of this many nodes. */
 const PICTURE_ROW = 4;
-/** The distance in screen pixels between the places that a new node can take in the view. */
 const PLACE_STEP = 40;
-/** The fields of each kind that hold text that the user wrote, in the order that the card shows them. */
 const SEARCH_FIELDS: Record<WorkflowNodeKind, readonly string[]> = {
   trigger: [],
   prompt: ["text"],
@@ -400,29 +326,17 @@ const SEARCH_FIELDS: Record<WorkflowNodeKind, readonly string[]> = {
   note: ["text"],
   shape: ["text"],
 };
-/** The arrow keys move the selection by one snap step, or by four with Shift. */
 const NUDGE = { step: SNAP, large: SNAP * 4 };
-/** A box edge or centre this close to another one, in screen pixels, snaps to it and shows a guide. */
 const GUIDE_DISTANCE = 6;
-/** The space on each side of a node that goes into a connection. */
 const INSERT_GAP = 64;
-/** The add menu at the end of a dropped connection: its width, its gap from the line end, and its inset in the view. */
 const DROP_MENU = { width: 240, gap: 8, inset: 16 };
 
-/** What a press on the canvas does. Sticky note and Shapes put their item where the user clicks. */
 type Tool = "select" | "pan" | "draw" | "note" | "shape";
-/** What a press does with the Draw tool. */
 type DrawMode = Brush | "eraser";
 
-/** The size of a new sticky note, as its card in the CSS. */
 const NOTE_SIZE = { width: 240, height: 240 };
 
-function InkLine(props: {
-  stroke: Stroke;
-  erasing?: boolean;
-  /** The points of the line that the user draws now, in place of the points of the stroke. */
-  points?: readonly WfnPoint[];
-}) {
+function InkLine(props: { stroke: Stroke; erasing?: boolean; points?: readonly WfnPoint[] }) {
   return (
     <path
       class="wfn-ink-line"
@@ -435,18 +349,11 @@ function InkLine(props: {
   );
 }
 
-/** Smooth Hermite step from 0 to 1 while the value goes from `from` to `to`. */
 function smoothstep(from: number, to: number, value: number) {
   const t = Math.min(1, Math.max(0, (value - from) / (to - from)));
   return t * t * (3 - 2 * t);
 }
 
-/**
- * The dot grid follows the Higgsfield canvas. A dot is 1 screen pixel at every zoom. Above 100% the
- * dots spread with the zoom. Below it, each halving of the zoom doubles the world step, so the screen
- * step stays between one and two grid steps; the dots of the half step fade in as they spread from
- * two thirds of a grid step to a full one. One dot in each tile is on the world origin.
- */
 function dotGrid(camera: Camera) {
   const level = Math.max(0, Math.ceil(Math.log2(1 / camera.scale) - 1e-9));
   const step = GRID * 2 ** level * camera.scale;
@@ -483,23 +390,18 @@ function DotGrid(props: { camera: Camera }) {
 const snapWithin = (value: number, range: Range) =>
   Math.min(Math.max(Math.round(value / SNAP) * SNAP, range.min), range.max);
 
-/** A screen offset on a whole device pixel. On a half pixel, the icons and text of the world blur. */
 const devicePixel = (value: number) => Math.round(value * window.devicePixelRatio) / window.devicePixelRatio;
 
-/** How a kind resizes. An image keeps its aspect ratio, so its height changes with its width. */
 function stretchOf(kind: WorkflowNodeKind): WfnStretch {
   if (kind === "text") return "text";
   return RESIZE[kind].height || kind === "image" ? "xy" : "x";
 }
 
-/** Whether a handle moves the right or the left side of a box (1 or -1), or neither (0). */
 const sideX = (handle: string) => (handle.includes("e") ? 1 : handle.includes("w") ? -1 : 0);
-/** Whether a handle moves the bottom or the top side of a box (1 or -1), or neither (0). */
 const sideY = (handle: string) => (handle.includes("s") ? 1 : handle.includes("n") ? -1 : 0);
 
 const HANDLES: readonly WfnHandle[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
 
-/** The height of a card with no height set, which is the height of its content. */
 function contentHeight(node: HTMLElement, card: HTMLElement) {
   const set = node.style.getPropertyValue("--wfn-height");
   node.style.setProperty("--wfn-height", "0px");
@@ -509,31 +411,20 @@ function contentHeight(node: HTMLElement, card: HTMLElement) {
   return height;
 }
 
-/** The font size that a text node shows now, in world pixels. */
 function textFont(node: HTMLElement) {
   const input = node.querySelector(".wfn-text-input");
   return input ? Number.parseFloat(getComputedStyle(input).fontSize) : TEXT_FONT.min;
 }
 
-/**
- * The text fields of a node. A press on one that does not have the focus moves the node, and a click
- * without a move puts the caret there, so that a note or a prompt that fills its card is easy to drag.
- */
 const DRAG_FIELD = "textarea, input.wfn-input";
 
-/**
- * The text of a note, a shape or free text. A click on one that is not selected only selects it, and a
- * second click edits it, as a sticky note does on other canvases. A step's field edits on the first click.
- */
 const ITEM_FIELD = ".wfn-note-input, .wfn-shape-input, .wfn-text-input";
 
-/** The caret offset in a text field under a point, or its end when the browser cannot tell. */
 function caretAt(field: HTMLTextAreaElement | HTMLInputElement, x: number, y: number) {
   const position = document.caretPositionFromPoint?.(x, y);
   return position?.offsetNode === field ? position.offset : field.value.length;
 }
 
-/** A press on these starts their own action, not a node drag. */
 const NO_DRAG = [
   ".wfn-port",
   `input:not(${DRAG_FIELD})`,
@@ -544,7 +435,6 @@ const NO_DRAG = [
   ".ui-seek-slider",
 ].join(", ");
 
-/** A node of the canvas. Its fields are on the board, so each node reads them from there. */
 function CanvasNodeView(props: { node: CanvasItem; trigger: WorkflowTriggerState | undefined }) {
   const node = untrack(() => props.node);
   switch (node.kind) {
@@ -581,7 +471,6 @@ function CanvasNodeView(props: { node: CanvasItem; trigger: WorkflowTriggerState
   }
 }
 
-/** An alignment guide in world pixels: a vertical line at `at` for the x axis, else a horizontal one. */
 interface Guide {
   axis: "x" | "y";
   at: number;
@@ -589,7 +478,6 @@ interface Guide {
   to: number;
 }
 
-/** The colours of the fill menu of the Shapes tool. */
 const fillMenu = (t: AppTranslate): readonly PickerGroup<CanvasColor>[] => [
   {
     options: COLORS.map((color) => ({
@@ -600,31 +488,17 @@ const fillMenu = (t: AppTranslate): readonly PickerGroup<CanvasColor>[] => [
   },
 ];
 
-/** A graph as the canvas saves it, so a graph from the host and the same graph from the canvas compare equal. */
 const asSaved = (graph: WorkflowGraph) => graphFromSnapshot(snapshotFromGraph(graph));
 const savedJson = (graph: WorkflowGraph) => stableJson(asSaved(graph));
 
-/**
- * The saves that the canvas remembers until the host sends them back. The canvas sends each change, and
- * the host saves only the last one before the pause, so many changes can come before an echo.
- */
 const SENT_LIMIT = 200;
 
-/**
- * The workflow canvas.
- *
- * Reset rule: the canvas loads `workflow.graph` when it opens, and again only when `workflow.summary.id`
- * or `resetKey` changes. A save of its own changes gives a new `workflow` with the same id and the same
- * key, so the local state, the selection and the undo history stay. A change that the host makes, such
- * as a restore, must change `resetKey`.
- */
 export function WorkflowCanvas(props: WorkflowCanvasProps) {
   const { t, format } = useText();
   const initial = untrack(() => snapshotFromGraph(props.workflow.graph));
   const [nodes, setNodes] = createSignal<readonly CanvasItem[]>(initial.nodes);
   const [positions, setPositions] = createStore<Record<string, WfnPoint>>(initial.positions);
   const [sizes, setSizes] = createStore<Record<string, WfnSize>>(initial.sizes);
-  /** The rendered size of each slot, so a frame around nodes follows new nodes and new content. */
   const [slotSizes, setSlotSizes] = createStore<Record<string, { width: number; height: number }>>({});
   const slotResize = new ResizeObserver((entries) =>
     setSlotSizes((draft) => {
@@ -639,32 +513,21 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
 
   const running = () => openRun() !== undefined;
   const statusOf = (id: string) => runIndex().get(id)?.status;
-  /** The id of the newest step of a node, which Retry, Stop and the approval act on. */
   const stepOf = (id: string) => runIndex().get(id)?.step.id;
 
   let viewport: HTMLElement | undefined;
-  /** The canvas with its bars. Its keys act only when the focus is in it, in its menus or on the page. */
   let root: HTMLElement | undefined;
   let cameraMoved = false;
-  /** The camera glide that runs: how to stop it, and where it ends. */
   const glide: { stop: () => void; goal: Camera | undefined } = { stop: () => {}, goal: undefined };
-  /**
-   * The add menu of a connection: one that the user dropped on the empty canvas, with the world point
-   * where it ends, or one that a node goes into, with its midpoint.
-   */
   const [drop, setDrop] = createSignal<
     { start: PortRef; at: WfnPoint } | { edge: WfnEdge; at: WfnPoint } | { at: WfnPoint }
   >();
   const [dropQuery, setDropQuery] = createSignal("");
-  /** The selection box while the user drags it, in view pixels. */
   const [marquee, setMarquee] = createSignal<Box>();
   const [guides, setGuides] = createSignal<readonly Guide[]>([]);
-  /** A press focuses the node too; only a focus from the keyboard selects. */
   let pressing = false;
-  /** The trigger whose schedule the open undo step changes. */
   let scheduleEdit: string | undefined;
   const [dropHeight, setDropHeight] = createSignal(0);
-  /** The node under the pointer. */
   const [hoveredNode, setHoveredNode] = createSignal<string | null>(null);
 
   const canvas = createBoard({
@@ -676,7 +539,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     edges: initial.board.edges,
     locked: initial.board.locked,
     fields: initial.board.fields,
-    // A node deleted from the keyboard gives the focus to the next node, as in a list.
     focusAfterRemove: (ids, from) => {
       const deleted = from instanceof HTMLElement && from.matches("[data-node-id]") ? from.dataset.nodeId : undefined;
       if (!deleted) return undefined;
@@ -693,7 +555,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     },
     scale: () => camera.scale,
     origin: (id) => positions[id],
-    // The rendered size, as a result can make a card taller than its stored size, and the results strip.
     box: (id) => {
       const at = positions[id];
       const rendered = slotSizes[id];
@@ -731,7 +592,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     endScheduleEdit: () => {
       scheduleEdit = undefined;
     },
-    // A host without it gives a webhook trigger no secret, and the host does not change.
     rotateWebhookSecret: untrack(() => props.onRotateWebhookSecret),
     runStep: (id) => props.onRunStep(id),
     stopStep: (id) => {
@@ -767,32 +627,19 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     },
   });
   const board = canvas.board;
-  /**
-   * The run that has not ended and that the run bar acts on: the open run that the user views, else
-   * the newest open run. GitHub runs on different items can be open at the same time.
-   */
   const openRun = createMemo(() => {
     const number = board.viewing();
     const viewed = props.runs.runs.find((entry) => entry.run.number === number);
     return viewed && isOpenRun(viewed) ? viewed : activeRun(props.runs);
   });
-  /** The run state of each node, from the runs of the host. A viewed open run shows its own steps. */
   const runIndex = createMemo(() => indexRunView(props.runs, openRun()?.run.id));
 
-  /* ---------------------------------------------------------- History */
-
-  /** The lines drawn on the canvas, oldest first. */
   const [strokes, setStrokes] = createSignal<readonly Stroke[]>(initial.strokes);
-  /** The line that the pointer draws now, the lines that the eraser has touched, and the eraser on the screen. */
   const [ink, setInk] = createStore<{ sketch: Stroke | null; erasing: readonly string[]; eraser: WfnPoint | null }>({
     sketch: null,
     erasing: [],
     eraser: null,
   });
-  /**
-   * The points of the line that the pointer draws now. Each move adds to the same array and sets it
-   * again, so the signal does not compare the values, and a move does not copy the line.
-   */
   const [sketchPoints, setSketchPoints] = createSignal<readonly WfnPoint[]>([], { equals: false });
 
   const capture = (): CanvasSnapshot => ({
@@ -803,7 +650,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     strokes: strokes(),
   });
   const putPlaces = (saved: CanvasSnapshot) => {
-    // Copies, so a later edit does not change a snapshot that the history keeps.
     setPositions((draft) => {
       for (const id of Object.keys(draft)) if (!(id in saved.positions)) delete draft[id];
       for (const [id, at] of Object.entries(saved.positions)) draft[id] = { ...at };
@@ -813,10 +659,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       for (const [id, size] of Object.entries(saved.sizes)) draft[id] = { ...size };
     });
   };
-  /**
-   * Puts a snapshot back. A node that the snapshot does not have stays mounted but removed, so its
-   * fields keep what the user wrote when redo brings it back.
-   */
   const apply = (saved: CanvasSnapshot) => {
     scheduleEdit = undefined;
     const ids = new Set(saved.nodes.map((node) => node.id));
@@ -836,9 +678,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   });
   const { steps, commit } = edits;
 
-  /** The layout frames that wait to place a new node, each with what to do when it drops. */
   const frames = new Map<number, () => void>();
-  /** Runs `run` after the next layout. When undo or unmount drops the frame first, `drop` runs in its place. */
   const afterLayout = (run: () => void, drop: () => void = () => {}) => {
     const frame = requestAnimationFrame(() => {
       frames.delete(frame);
@@ -854,9 +694,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     frames.clear();
   };
   onCleanup(dropFrames);
-  /** Ends a drag on the canvas with no change. The gesture code sets it when the canvas is on screen. */
   let stopGesture = () => {};
-  /** A drag or a frame that is still open must not change the canvas after an undo or a redo. */
   const undo = () => {
     stopGesture();
     dropFrames();
@@ -868,12 +706,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     edits.redo();
   };
 
-  /* --------------------------------------------------------- Versions */
-
-  /** The live canvas while a version shows, so Back puts it back. */
   let liveCanvas: CanvasSnapshot | undefined;
   const previewing = () => props.versionPreview !== undefined;
-  /** Nothing on the canvas changes while a version shows or the canvas is read-only. */
   const frozen = () => previewing() || props.readOnly === true;
   const versionList = () =>
     props.versions.map((version) => ({
@@ -881,7 +715,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       label: timeLabel(t, format, version.at),
       meta: t(VERSION_NOTE[version.kind]),
     }));
-  /** Shows a version in place of the live canvas. Nothing on it can change until Back or Make current. */
   const openVersion = (id: string) => {
     if (running()) return;
     if (!props.onPreviewVersion) return props.onRestoreVersion(id);
@@ -912,45 +745,30 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   const closeVersion = () => {
     if (previewing()) props.onPreviewVersion?.(null);
   };
-  /**
-   * Keeps the version as the canvas. Undo puts the live canvas back, and the host keeps the live canvas
-   * as a version too, so nothing is lost.
-   */
   const makeCurrent = () => {
     const open = props.versionPreview;
     const live = liveCanvas;
     if (!open || !live) return;
     edits.push(live);
-    // The host restores the version, so the canvas does not save it again.
     savedGraph = stableJson(graph());
     liveCanvas = undefined;
     props.onRestoreVersion(open.versionId);
     props.onPreviewVersion?.(null);
   };
 
-  /* -------------------------------------------------------- Selection */
-
-  /** The selected nodes that are on the canvas. */
   const group = () => canvas.selection().filter((id) => !board.isRemoved(id));
   const selectAll = () => canvas.select(live().map((node) => node.id));
-  /** A menu on a node of the selection acts on all of it. */
   const targets = (id: string) => (board.isSelected(id) && group().length > 1 ? group() : [id]);
   const groupLocked = () => group().every((id) => board.isLocked(id));
 
-  /** The nodes on the canvas. Many views read the list, so it is made once for each change. */
   const live = createMemo(() => nodes().filter((node) => !board.isRemoved(node.id)));
   const kindOf = (id: string) => nodes().find((node) => node.id === id)?.kind;
-  /**
-   * The asset that the user works on: the hovered asset, else the selected one. Its reference lines
-   * draw above the other nodes, and the nodes that it does not connect to fade a little.
-   */
   const focusAsset = createMemo(() => {
     const hovered = hoveredNode();
     if (hovered !== null && kindOf(hovered) === "asset" && !board.isRemoved(hovered)) return hovered;
     const selected = board.selected();
     return selected !== null && kindOf(selected) === "asset" && !board.isRemoved(selected) ? selected : null;
   });
-  /** A node that goes away under the pointer gets no pointerleave, so its hover ends here. */
   createEffect(
     () => {
       const hovered = hoveredNode();
@@ -960,7 +778,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       if (gone) setHoveredNode(null);
     },
   );
-  /** The nodes that the focused asset connects to, with the asset itself. */
   const focusSet = createMemo(() => {
     const focus = focusAsset();
     if (focus === null) return null;
@@ -971,49 +788,36 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     }
     return linked;
   });
-  /** The saved trigger of each trigger node, by node id. The first trigger of a node wins, as before. */
   const triggers = createMemo(() => {
     const byNode = new Map<string, WorkflowDetail["triggers"][number]>();
     for (const trigger of props.workflow.triggers) if (!byNode.has(trigger.nodeId)) byNode.set(trigger.nodeId, trigger);
     return byNode;
   });
   const triggerOf = (id: string) => triggers().get(id);
-  /** A prompt or a file gives its value with no step, so it counts as done when the steps after it run. */
   const passive = (id: string) => {
     const kind = kindOf(id);
     return kind === "prompt" || kind === "asset";
   };
-  /** The status that the tone of a connection reads. */
   const toneOf = (id: string) => statusOf(id) ?? (passive(id) && props.runs.runs.length > 0 ? "done" : undefined);
-  /** The run whose results the steps show. */
   const viewedRun = () => {
     const number = board.viewing();
     return number === null ? undefined : props.runs.runs.find((entry) => entry.run.number === number);
   };
-  /** Whether a step is done in a run. A node with no step counts as run. */
   const ranIn = (id: string, detail: NonNullable<ReturnType<typeof viewedRun>>) =>
     passive(id) || detail.steps.some((step) => step.nodeId === id && step.status === "done");
   const [menuTarget, setMenuTarget] = createSignal<MenuTarget>({ kind: "canvas", at: { x: 0, y: 0 } });
   const [name, setName] = createSignal(untrack(() => props.workflow.summary.title));
-  /** Rename puts a field in place of the switcher until Enter, Escape or a click outside. */
   const [renaming, setRenaming] = createSignal(false);
   let nameBefore = untrack(() => props.workflow.summary.title);
-  // A rename from another device shows, but not over the name that the user types.
   createEffect(
     () => props.workflow.summary.title,
     (title) => {
       if (!untrack(renaming)) setName(title);
     },
   );
-  /** A deleted workflow hides until its Undo toast closes. Undo brings it back as it was. */
   const [deleted, setDeleted] = createSignal(false);
-  /** Closes the open Undo toast of a delete and keeps the delete. */
   let closeDelete: (() => void) | undefined;
   let workflowMenu: HTMLButtonElement | undefined;
-  /**
-   * Hides the workflow and shows a toast with Undo, as an agent delete does. The host deletes it when
-   * the toast closes without Undo. Undo brings the workflow back and puts focus on its menu button.
-   */
   const deleteWorkflow = () => {
     if (deleted()) return;
     const id = props.workflow.summary.id;
@@ -1033,12 +837,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       },
     });
   };
-  // A canvas that closes keeps the delete. The toast runs the delete in a microtask.
   onCleanup(() => closeDelete?.());
-  /**
-   * The canvas tool, the options of the Draw, Sticky note and Shapes tools, the open HUD panels, and
-   * whether the HUD shows.
-   */
   const [ui, setUi] = createStore<{
     tool: Tool;
     draw: DrawMode;
@@ -1060,7 +859,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     hidden: false,
     search: false,
   });
-  /** The Draw tool and the tools that place an item act over the nodes, so they clear the selection. */
   const setTool = (tool: Tool) => {
     if (tool !== "select" && tool !== "pan") canvas.select([]);
     setUi((draft) => {
@@ -1073,7 +871,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       draft.draw = mode;
     });
   };
-  /** A colour picked with the eraser on goes back to the pen. */
   const setInkColor = (color: CanvasColor) =>
     setUi((draft) => {
       draft.ink = color;
@@ -1091,40 +888,25 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     setUi((draft) => {
       draft.fill = color;
     });
-  /** The kinds that this host can add. */
   const allows = (kind: WorkflowNodeKind) => props.features.kinds.includes(kind);
-  /** Where the item of the Sticky note or Shapes tool shows under the pointer, in view pixels. */
   const [ghost, setGhost] = createSignal<WfnPoint | null>(null);
   const placing = () => ui.tool === "note" || ui.tool === "shape";
-  /** The box that a drag with Shapes draws, in world pixels, until the pointer goes up. */
   const [drawn, setDrawn] = createSignal<Box | null>(null);
   const toggleHud = () =>
     setUi((draft) => {
       draft.hidden = !draft.hidden;
     });
   const [query, setQuery] = createSignal("");
-  /** The nodes that Copy keeps, with their positions at the time of the copy. */
   const clipboard = () => copied()?.clip;
-  /** The pointer on the canvas, in screen pixels, where a paste puts the nodes. */
   let pointer: WfnPoint | undefined;
-  /** The nodes that a Copy item of a menu copies, while the copy event of that item runs. */
   let copying: readonly string[] | undefined;
-  /** The point of the last paste. A paste at the same point goes next to the nodes of that paste. */
   let pastedAt: WfnPoint | undefined;
 
-  /* ------------------------------------------------------------- Save */
-
-  /** While a node drag or a resize runs, the graph waits for the release, so one gesture is one change. */
   const [gesturing, setGesturing] = createSignal(false);
   const graph = createMemo<WorkflowGraph>((previous) =>
     previous && gesturing() ? previous : graphFromSnapshot(capture()),
   );
   const loops = createMemo(() => workflowLoops(graph()));
-  /**
-   * A bar that keeps its screen size in the world, such as a node toolbar, lands on part pixels at a zoom other than
-   * 100%. Then its icons and text blur. After the camera, a node or the selection moves, each bar moves by less than a
-   * pixel onto whole device pixels. The move is in screen pixels; the CSS divides it by the zoom.
-   */
   let worldElement: HTMLElement | undefined;
   let snapFrame = 0;
   const snapBars = () => {
@@ -1135,7 +917,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       const y = box.y - Number(bar.dataset.snapY ?? 0);
       return { bar, x: devicePixel(x) - x, y: devicePixel(y) - y };
     });
-    // All reads come before the writes, so the frame lays out once.
     for (const { bar, x, y } of moves) {
       bar.dataset.snapX = String(x);
       bar.dataset.snapY = String(y);
@@ -1151,19 +932,15 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     },
   );
   onCleanup(() => cancelAnimationFrame(snapFrame));
-  /** The last graph that the canvas sent to the host, or that the host sent, as the canvas saves it. */
   let savedGraph = untrack(() => savedJson(props.workflow.graph));
-  /** The graph of the host that the canvas edits are on. A newer graph of the host merges with it. */
   let baseGraph = untrack(() => asSaved(props.workflow.graph));
   let baseJson = savedGraph;
-  /** The saves that the host did not send back yet, so that their echo does not merge as another edit. */
   let sent: string[] = [];
   const send = (next: WorkflowGraph) => {
     const json = stableJson(next);
     if (json === savedGraph) return;
     savedGraph = json;
     sent = [...sent, json].slice(-SENT_LIMIT);
-    // The host reads its own state in the callback. That read must not track.
     untrack(() => props.onGraphChange(next));
   };
   createEffect(
@@ -1173,10 +950,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     },
   );
 
-  /**
-   * Loads a graph from the host, as when the canvas opens. For the same workflow, the canvas from
-   * before goes on the undo stack, so undo gets back edits that another device replaced.
-   */
   const reset = (next: WorkflowGraph, same: boolean) => {
     const before = same ? (liveCanvas ?? capture()) : undefined;
     const snapshot = snapshotFromGraph(next);
@@ -1190,7 +963,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     closeDrop();
     closeSearch();
     setNodes(snapshot.nodes);
-    // Only a reset unmounts a node: undo keeps it mounted but removed.
     const kept = new Set(snapshot.nodes.map((node) => node.id));
     setSlotSizes((draft) => {
       for (const id of Object.keys(draft)) if (!kept.has(id)) delete draft[id];
@@ -1204,12 +976,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     cameraMoved = false;
     requestAnimationFrame(() => fitView(false));
   };
-  // The reset rule of the component comment. The first run is the graph that the canvas opened with.
-  // The memo stops a new `workflow` object with the same id and key: an effect runs on each change of
-  // what its compute function reads, even when the value is the same.
   const resetToken = createMemo(() => `${props.workflow.summary.id}\u0000${props.resetKey ?? ""}`);
   let openedId: string | undefined;
-  /** The reset token of the graph in `baseGraph`. A graph with another token waits for its reset. */
   let baseToken: string | undefined;
   createEffect(resetToken, (token) => {
     const id = untrack(() => props.workflow.summary.id);
@@ -1219,11 +987,9 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     if (before !== undefined) untrack(() => reset(props.workflow.graph, before === id));
   });
 
-  /** Puts a merged graph on the canvas, and writes only what changed: typing, a drag and the view stay. */
   const mergeIn = (merged: WorkflowGraph) => {
     const snapshot = snapshotFromGraph(merged);
     const ids = new Set(snapshot.nodes.map((node) => node.id));
-    // The same item objects, so that a node that did not change does not mount again.
     const known = new Map(nodes().map((node) => [node.id, node]));
     const items = snapshot.nodes.map((item) => {
       const old = known.get(item.id);
@@ -1254,12 +1020,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       setStrokes(lines);
     }
   };
-  /**
-   * Takes a newer graph of the host for the open workflow. The echo of a save of this canvas only moves
-   * the base. Another edit merges with the canvas edits, and with each snapshot of undo and redo, so
-   * undo takes back only the edits of this device. The merged graph then saves, as the host does not
-   * have the edits of this canvas yet.
-   */
   const takeHostGraph = (incoming: WorkflowGraph) => {
     const theirs = asSaved(incoming);
     const json = stableJson(theirs);
@@ -1270,7 +1030,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     savedGraph = json;
     const echo = sent.indexOf(json);
     if (echo !== -1) {
-      // The later saves are still on their way, so the canvas compares with the last of them.
       sent = sent.slice(echo + 1);
       savedGraph = sent.at(-1) ?? json;
       return;
@@ -1289,8 +1048,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     }
     const merged = asSaved(mergeWorkflowGraphs(before, graphFromSnapshot(capture()), theirs));
     mergeIn(merged);
-    // The canvas reads its stores again only after the flush, so the save takes the merged graph, not
-    // `capture()`. A drag sends its graph when it ends.
     if (!frozen() && !deleted() && !gesturing()) send(merged);
   };
   createEffect(
@@ -1299,18 +1056,13 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       if (token === baseToken) untrack(() => takeHostGraph(incoming));
     },
   );
-  // The host opens another workflow when a delete is kept, so the canvas shows again. A switch while
-  // the Undo toast is open keeps that delete.
   const workflowId = createMemo(() => props.workflow.summary.id);
   createEffect(workflowId, () => {
     closeDelete?.();
     setDeleted(false);
   });
 
-  /* --------------------------------------------------------- Switcher */
-
   const openId = () => props.workflow.summary.id;
-  /** The workflows with the name and the step count of the open one as they are now. */
   const listed = (): readonly SwitcherWorkflow[] => {
     const list = props.library.some((workflow) => workflow.id === openId())
       ? props.library
@@ -1324,7 +1076,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   const onSwitcher = (action: SwitcherAction) => {
     if (action.startsWith("version:")) return openVersion(action.slice("version:".length));
     if (action === "live") return closeVersion();
-    // Another action leaves the version first. A rename changes only the name.
     if (action !== "rename") closeVersion();
     if (action === "new") props.onCreate({ title: t("workflow.canvas.untitled") });
     else if (action === "rename") startRename();
@@ -1350,8 +1101,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     requestAnimationFrame(() => workflowMenu?.focus());
   };
 
-  /* ----------------------------------------------------------- Camera */
-
   const clampScale = (scale: number) => Math.min(Math.max(scale, MIN_SCALE), MAX_SCALE);
   const view = () => ({ width: viewport?.clientWidth ?? 0, height: viewport?.clientHeight ?? 0 });
   const local = (event: { clientX: number; clientY: number }): WfnPoint => {
@@ -1369,13 +1118,11 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       draft.scale = clampScale(next.scale);
     });
   };
-  /** Stops a glide where it is. A gesture or a move without motion stops it. */
   const stopGlide = () => {
     glide.stop();
     glide.goal = undefined;
     if (viewport) delete viewport.dataset.cameraMoving;
   };
-  /** The person whose cursor the camera follows. A move of the camera by you stops it. */
   const [following, setFollowing] = createSignal<string | undefined>();
   let followFrame = 0;
   const stopFollow = () => {
@@ -1384,14 +1131,12 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     setFollowing(undefined);
   };
   onCleanup(() => cancelAnimationFrame(followFrame));
-  /** The wheel, a pinch, a pan and the automatic fit move the camera at once, as on Higgsfield. */
   const moveCamera = (next: Camera, byUser = true) => {
     stopGlide();
     if (byUser) stopFollow();
     cameraMoved ||= byUser;
     placeCamera(next);
   };
-  /** A button, a key, a menu item or a jump moves the camera over some frames. */
   const glideTo = (next: Camera, motion: CameraMotion) => {
     stopGlide();
     stopFollow();
@@ -1406,7 +1151,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       if (viewport) delete viewport.dataset.cameraMoving;
     });
   };
-  /** Where the camera is, or where it glides to, so quick presses add up. */
   const target = (): Camera => glide.goal ?? camera;
   const zoomAround = (scale: number, point: WfnPoint, from: Camera = camera) => {
     const next = clampScale(scale);
@@ -1419,12 +1163,9 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   const zoomTo = (scale: number) =>
     glideTo(zoomAround(scale, { x: view().width / 2, y: view().height / 2 }, target()), "step");
   const zoomBy = (factor: number) => zoomTo(target().scale * factor);
-  /** Fits the nodes and the drawn lines. */
   const fitView = (byUser: boolean) => {
     const { width, height } = view();
     const boxes = [
-      // The resize observer gives the sizes. A node that mounted in this frame has none yet, so the
-      // fit reads its element.
       ...live().flatMap((node) => {
         const box = boxOf(node.id);
         if (box) return [box];
@@ -1453,10 +1194,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     else moveCamera(next, false);
   };
 
-  /* -------------------------------------------------------------- Run */
-
   const canRun = () => !props.readOnly && live().some((node) => isWorkflowStepKind(node.kind));
-  /** Runs that ended, newest first. A run that is still going is in the run bar, not in History. */
   const pastRuns = (): readonly HudRun[] =>
     props.runs.runs.flatMap(({ run }) =>
       run.endedAt === null
@@ -1471,11 +1209,9 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
             },
           ],
     );
-  /** The issue or pull request of each GitHub run. */
   const runItems = createMemo(
     () => new Map(props.github?.history().runs.map((entry) => [entry.runId, `#${entry.item.number}`]) ?? []),
   );
-  /** Runs that have not ended, newest first. */
   const openRuns = (): readonly HudRun[] =>
     props.runs.runs.flatMap(({ run }) =>
       run.endedAt === null
@@ -1484,7 +1220,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     );
   const waitingEvents = () =>
     props.github?.history().deliveries.filter((delivery) => delivery.outcome === "waiting").length ?? 0;
-  /** The steps of the open run that are done, of the steps on the canvas. */
   const progress = () => {
     const total = live().filter((node) => isWorkflowStepKind(node.kind)).length;
     const detail = openRun();
@@ -1500,10 +1235,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     if (detail) props.onStopRun(detail.run.id);
   };
 
-  /**
-   * The step that the run is on: an approval that waits for the user first, else the first step that
-   * runs. After a failed run, the failed step.
-   */
   const current = (): HudStep | undefined => {
     const shown = live().flatMap((node) => {
       const status = statusOf(node.id);
@@ -1518,7 +1249,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     }
     return undefined;
   };
-  /** The name of a step: its kind, and the first words of its first field, as "LLM · Summarize the findings". */
   const stepName = (id: string) => {
     const [label = t("workflow.canvas.step"), ...fields] = searchTexts(id);
     const words = fields
@@ -1529,16 +1259,10 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     return `${label} · ${words.length > 32 ? `${words.slice(0, 31).trimEnd()}…` : words}`;
   };
 
-  /* -------------------------------------------------------------- Add */
-
   const snapPoint = (point: WfnPoint): WfnPoint => ({
     x: Math.round(point.x / SNAP) * SNAP,
     y: Math.round(point.y / SNAP) * SNAP,
   });
-  /**
-   * The box of a shape that a drag draws between two screen points, on the grid and in the size range
-   * of a shape. The corner where the drag starts stays in place.
-   */
   const drawnBox = (from: WfnPoint, to: WfnPoint): Box => {
     const start = snapPoint(toWorld(from));
     const end = toWorld(to);
@@ -1553,17 +1277,9 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     };
   };
 
-  /**
-   * The place in the view nearest to its centre where a box of this size covers no card, on the grid. A
-   * place with a gap to each card comes first. A card that has no measured size yet takes the room of
-   * NEW_NODE. The margin of a fit stays free at the edges, so the bars over the canvas do not hide the
-   * box. When the view has no free place, the box goes to the centre. The view is where the camera stops
-   * after a glide.
-   */
   const freePlace = (size: { width: number; height: number }, except: string): WfnPoint => {
     const { width, height } = view();
     const { x, y, scale } = target();
-    // The frames of groups too, so a new node does not look like a member.
     const cards = untrack(() => [
       ...live().flatMap((node) => {
         if (node.kind === "text" || node.kind === "shape" || node.id === except) return [];
@@ -1580,7 +1296,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     const bottom = top + height / scale - 2 * margin - size.height;
     const center = snapPoint({ x: (left + right) / 2, y: (top + bottom) / 2 });
     if (right < left || bottom < top) return center;
-    // The places are some screen pixels apart, so their count does not change with the zoom.
     const step = Math.max(SNAP, Math.round(PLACE_STEP / scale / SNAP) * SNAP);
     const across = Math.floor((right - left) / 2 / step);
     const down = Math.floor((bottom - top) / 2 / step);
@@ -1596,10 +1311,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     return places.find(free(GRID * 2)) ?? places.find(free(0)) ?? center;
   };
 
-  /**
-   * Adds a node with its top-left corner at a world point, or in a free place in the view. The place in
-   * the view uses the size of the node after its first layout, before the node shows.
-   */
   const addNode = (kind: WorkflowNodeKind, point?: WfnPoint, fields?: WfnFields): string => {
     commit();
     const id = `${kind}-${crypto.randomUUID()}`;
@@ -1620,11 +1331,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     return id;
   };
 
-  /**
-   * Puts a note or a shape with its card centred on a world point, or a shape in the box that a drag
-   * drew. Then it selects the item and puts the cursor in its text. The tool goes back to Select, as on
-   * Higgsfield.
-   */
   const placeItem = (tool: "note" | "shape", point: WfnPoint, box?: Box) => {
     commit();
     const id = `${tool}-${crypto.randomUUID()}`;
@@ -1649,8 +1355,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     setTool("select");
     afterLayout(() => {
       const element = slot(id);
-      // A label above the card moves the node up by its height, so the card stays in place. The layout
-      // offset is in world pixels, and the enter animation that scales the card does not change it.
       let label = 0;
       for (
         let part = element?.querySelector<HTMLElement>(".wfn-card") ?? null;
@@ -1667,7 +1371,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     });
   };
 
-  /** Nodes with their place, their size, their text and style, and the connections between them. */
   const collect = (ids: readonly string[]): Clip => {
     const picked = nodes().flatMap((node) => {
       const at = positions[node.id];
@@ -1682,7 +1385,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     };
   };
 
-  /** Adds copies of nodes, moved by `shift`, with the connections between them, and selects them. */
   const place = (clip: Clip, shift: WfnPoint, tag: string) => {
     if (clip.nodes.length === 0) return;
     commit();
@@ -1701,7 +1403,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     setSizes((draft) => {
       for (const [id, size] of Object.entries(clip.sizes)) draft[ids.get(id) ?? id] = { ...size };
     });
-    // The copies of a group make a new group.
     for (const [id, fields] of Object.entries(regroupCopies(clip.fields))) canvas.putFields(ids.get(id) ?? id, fields);
     setNodes((list) => [...list, ...copies]);
     canvas.addEdges(
@@ -1722,7 +1423,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     canvas.select(copies.map((node) => node.id));
   };
 
-  /** Copies nodes next to themselves, without the connections to other nodes. */
   const duplicateNodes = (ids: readonly string[]) =>
     place(collect(ids), { x: DUPLICATE_OFFSET, y: DUPLICATE_OFFSET }, "copy");
 
@@ -1735,7 +1435,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   };
 
   const slot = (id: string) => viewport?.querySelector<HTMLElement>(`[data-slot="${id}"]`) ?? undefined;
-  /** The box of a node in world pixels. */
   const boxOf = (id: string): Box | undefined => {
     const at = positions[id];
     const rendered = slotSizes[id];
@@ -1745,9 +1444,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   };
   const boxesOf = (ids: readonly string[]) => ids.flatMap((id) => boxOf(id) ?? []);
 
-  /* ----------------------------------------------------------- Groups */
-
-  /** The groups on the canvas, from the fields of their members. */
   const nodeGroups = createMemo(
     () =>
       groupsOf(
@@ -1756,49 +1452,36 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       ),
     { equals: sameGroups },
   );
-  /** The group of each member. */
   const groupIndex = createMemo(() => {
     const index = new Map<string, CanvasGroup>();
     for (const entry of nodeGroups()) for (const id of entry.members) index.set(id, entry);
     return index;
   });
-  /** The box of a group on the canvas: its frame, or its stack card when it is collapsed. */
   const frameOf = (entry: CanvasGroup) => {
     const members = union(boxesOf(entry.members));
     return members ? frameBox(entry, members) : undefined;
   };
-  /** The box that shows for a node: a member of a collapsed group shows as the stack card. */
   const shownBox = (id: string) => {
     const entry = groupIndex().get(id);
     return entry?.folded ? frameOf(entry) : boxOf(id);
   };
   const shownBoxes = (ids: readonly string[]) => ids.flatMap((id) => shownBox(id) ?? []);
-  /** The members of a group that have an output of a type. */
   const typeMembers = (entry: CanvasGroup, type: WfnPortType) =>
     entry.members.filter((id) => canvas.outputs(id).includes(type));
-  /** The output types of each group, once for all the ports and lines that read them. */
   const typesOfGroups = createMemo(
     () => new Map(nodeGroups().map((entry) => [entry.id, outputTypes(entry.members.map((id) => canvas.outputs(id)))])),
   );
   const groupTypes = (entry: CanvasGroup) => typesOfGroups().get(entry.id) ?? [];
-  /** How many members of a group connect to the same input: by `<group>><node>:<type>`. */
   const groupFeeds = createMemo(() => {
     const counts = new Map<string, number>();
     for (const edge of canvas.edges()) {
       const entry = groupIndex().get(edge.from);
-      // A named input, as the first frame of a video, takes one source: its line stays on the member.
       if (!entry || edge.branch !== undefined || canvas.slots(edge).length > 0) continue;
       const key = `${entry.id}>${edge.to}:${edge.type}`;
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
     return counts;
   });
-  /**
-   * Where the line of a port of a member starts or ends. A collapsed group takes all the lines of its
-   * members. An open group takes the lines of an output type that two or more members send to the same
-   * node, and the line that the user drags from its port. Else the line stays on the member, as a line to a
-   * named input does.
-   */
   const groupAnchor = (port: PortRef, other: string | undefined, slot?: string): WfnAnchor | undefined => {
     const entry = groupIndex().get(port.node);
     if (!entry || (other !== undefined && groupIndex().get(other)?.id === entry.id)) return undefined;
@@ -1823,7 +1506,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     if (!many) return undefined;
     return { key: `group:${entry.id}:out:${port.type}`, at: at((box) => portPoint(box, index, types.length, false)) };
   };
-  /** A line between two members of a collapsed group does not show. */
   const hiddenLine = (edge: WfnEdge) => {
     const entry = groupIndex().get(edge.from);
     return entry?.folded === true && groupIndex().get(edge.to)?.id === entry.id;
@@ -1848,7 +1530,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         armed: members.length > 0 && members.every((id) => board.armed(id, "out", type)),
       };
     });
-  /** A drag from the port of a group connects each member that has that output. */
   const groupPortDown = (entry: CanvasGroup, type: WfnPortType, event: PointerEvent) => {
     const members = typeMembers(entry, type);
     const [first] = members;
@@ -1863,7 +1544,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     canvas.select(members);
     board.pressPort(first, "out", type);
   };
-  /** The run state that a collapsed group shows for its hidden members: a failure first, then a wait. */
   const foldedStatus = (entry: CanvasGroup): WfnRunStatus | undefined => {
     if (!entry.folded) return undefined;
     const states = entry.members.map(statusOf);
@@ -1875,19 +1555,12 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     const ids = group();
     return ids.length === entry.members.length && entry.members.every((id) => board.isSelected(id));
   };
-  /** The group that the selection is, when the selection is all of one group and nothing more. */
   const selectedGroup = createMemo(() => {
     const [first] = group();
     const entry = first === undefined ? undefined : groupIndex().get(first);
     return entry && isWhole(entry) ? entry : undefined;
   });
-  /** The last group that the selection was, for the toolbar while it closes. */
   const heldGroup = createMemo((last?: CanvasGroup) => selectedGroup() ?? last);
-  /**
-   * Whether the person can change the group fields of a node. A host step that `features` does not offer
-   * belongs to an owner or admin of the joined server, and a host from before this release refuses a save
-   * that changes any field of one, its group fields too.
-   */
   const groupable = (id: string) => {
     const kind = live().find((node) => node.id === id)?.kind;
     const type = board.field(id, kind === "trigger" ? "trigger" : "target");
@@ -1896,14 +1569,10 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     if (kind === "output") return !HOST_OUTPUTS.includes(type) || props.features.outputs.some((one) => one === type);
     return true;
   };
-  /** Whether the person can rename, collapse, expand or end a group. */
   const changeable = (entry: CanvasGroup) => !frozen() && entry.members.every(groupable);
-  /** Puts nodes in a new group. A group that keeps only one member ends. */
   const groupNodes = (ids: readonly string[], name = "") => {
     const members = ids.filter((id) => !board.isRemoved(id) && groupable(id));
-    // A group that is already all of the selection stays as it is, with its name.
     if (members.length < 2 || frozen() || selectedGroup()) return;
-    // A member that the person cannot change keeps its old fields: a group with one member is no group.
     const left = nodeGroups().flatMap((entry) => {
       const rest = entry.members.filter((id) => !members.includes(id));
       return rest.length === 1 ? rest.filter(groupable) : [];
@@ -1911,7 +1580,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     canvas.patchFields({ ...leavePatch(left), ...joinPatch(members, name) });
     canvas.select(members);
   };
-  /** Ends the groups of the nodes. The members stay where they are. */
   const ungroup = (ids: readonly string[]) => {
     const ended = nodeGroups().filter((entry) => entry.members.some((id) => ids.includes(id)) && changeable(entry));
     if (ended.length === 0) return;
@@ -1923,7 +1591,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   };
   const renameGroup = (entry: CanvasGroup, name: string) => {
     if (!changeable(entry)) return;
-    // The burst is `<node id>:<field>` of the first member, so a sync keeps it while the member stays.
     canvas.patchFields(
       groupPatch(entry, WORKFLOW_GROUP_FIELDS.name, name || undefined),
       `${entry.members[0]}:${WORKFLOW_GROUP_FIELDS.name}`,
@@ -1937,16 +1604,11 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     </Show>
   );
 
-  /** The places of new nodes in rows from a world point, before their first layout. */
   const rowPlaces = (count: number, from: WfnPoint) =>
     Array.from({ length: count }, (_, index) => ({
       x: from.x + (index % PICTURE_ROW) * (NEW_NODE.width + GRID * 2),
       y: from.y + Math.floor(index / PICTURE_ROW) * (NEW_NODE.height + GRID * 2),
     }));
-  /**
-   * The first place right of a box where rows of new nodes cover no card and no frame of another group.
-   * The rows go past the members of the group of the box, so they do not cover them.
-   */
   const rowsRightOf = (box: Box, count: number, group?: string): WfnPoint => {
     const size = rowsSize(count);
     const blocks = blocksBut(group);
@@ -1958,24 +1620,20 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       at = { x: hit.x + hit.width + GRID * 2, y: at.y };
     }
   };
-  /** The size of rows of new nodes, before their first layout. */
   const rowsSize = (count: number) => ({
     width: Math.min(count, PICTURE_ROW) * (NEW_NODE.width + GRID * 2) - GRID * 2,
     height: Math.ceil(count / PICTURE_ROW) * (NEW_NODE.height + GRID * 2) - GRID * 2,
   });
-  /** The cards on the canvas and the frames of its groups, but not the frame of one group. */
   const blocksBut = (group?: string) =>
     untrack(() => [
       ...live().flatMap((node) => shownBox(node.id) ?? []),
       ...nodeGroups().flatMap((entry) => (entry.id === group ? [] : (frameOf(entry) ?? []))),
     ]);
-  /** The box of rows of new nodes at a point, with the room of their frame when they make a group. */
   const rowsBox = (at: WfnPoint, count: number): Box => {
     const size = rowsSize(count);
     if (count < 2) return { ...at, ...size };
     return frameBox({ id: "", name: "", folded: false, members: [] }, { ...at, ...size });
   };
-  /** After their first layout, puts new nodes in rows by their real sizes, a gap apart. */
   const reflowRows = (ids: readonly string[], from: WfnPoint) =>
     afterLayout(() => {
       const next: Record<string, WfnPoint> = {};
@@ -1996,16 +1654,10 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         for (const [id, at] of Object.entries(next)) draft[id] = at;
       });
     });
-  /** The name of a group of new files: Images when all of them are pictures. */
   const filesName = (files: readonly StoredFileRow[]) =>
     files.every((file) => file.previewKind === "image") ? t("workflow.canvas.group.imagesName") : "";
-  /**
-   * Adds an asset node for each file, in rows from a world point or in a free place in the view, and
-   * puts two or more in one group. It is one undo step, and the new nodes are selected.
-   */
   const addFiles = (files: readonly StoredFileRow[], from?: WfnPoint) => {
     if (files.length === 0 || deleted() || frozen() || !allows("asset")) return;
-    // At the pointer when the rows cover nothing there; else in a free place in the view.
     const blocks = blocksBut();
     const fits = (at: WfnPoint) => !blocks.some((block) => overlaps(rowsBox(at, files.length), block));
     const room = rowsBox({ x: 0, y: 0 }, files.length);
@@ -2028,15 +1680,10 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       release();
     }
   };
-  /** Sends files from the computer to the files of the board, and gives the ones that arrive. */
   const uploadAll = (files: readonly File[]) =>
     Promise.allSettled(files.map((file) => board.upload(file))).then((results) =>
       results.flatMap((result) => (result.status === "fulfilled" ? [result.value] : [])),
     );
-  /**
-   * Files dropped on an asset node: the node takes the first, and new asset nodes to its right take the
-   * others. All of them go in the group of the node, or in a new group. It is one undo step.
-   */
   const dropOnAsset = (id: string, files: readonly File[]) => {
     if (frozen() || !props.features.uploads) return;
     void uploadAll(files).then((stored) => {
@@ -2074,15 +1721,11 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     });
   };
 
-  /* --------------------------------------------------------- Presence */
-
   const peers = createMemo(() => (props.features.presence && props.presence ? peersOf(props.presence) : []));
   const self = () =>
     props.features.presence ? props.presence?.members.find((member) => member.id === props.presence?.self) : undefined;
   const spots = () => props.presence?.spots ?? {};
-  /** The other person who selected a node, if any. */
   const peerOn = (id: string) => peers().find((peer) => spots()[peer.member.id]?.selected === id);
-  /** The name of that person under the node, while their cursor, which shows the name, is away. */
   const peerTag = (id: string) => {
     const peer = peerOn(id);
     const at = peer && spots()[peer.member.id]?.at;
@@ -2091,7 +1734,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     const near = at.x >= box.x && at.x <= box.x + box.width && at.y >= box.y - 40 && at.y <= box.y + box.height + 40;
     return near ? undefined : peer;
   };
-  /** Moves the camera so a person's cursor is in the centre of the view, at the same zoom. */
   const showPeer = (peer: WorkflowPeer) => {
     const at = spots()[peer.member.id]?.at;
     if (!at) return;
@@ -2099,11 +1741,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     const scale = target().scale;
     glideTo({ scale, x: width / 2 - at.x * scale, y: height / 2 - at.y * scale }, "flight");
   };
-  /**
-   * Flies to a person, then keeps their cursor in the middle half of the view. When the cursor leaves
-   * it, the camera eases until the cursor is in the centre again, so small moves on a node keep the
-   * view still. With reduced motion, the camera jumps.
-   */
   const follow = (peer: WorkflowPeer) => {
     stopFollow();
     showPeer(peer);
@@ -2112,14 +1749,11 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     let centring = false;
     let last = performance.now();
     const tick = (now: number) => {
-      // The person left the canvas.
       if (!followedPeer()) return stopFollow();
-      // The first frame can start before `follow` read the clock.
       const elapsed = Math.max(0, now - last);
       last = now;
       followFrame = requestAnimationFrame(tick);
       const at = spots()[peer.member.id]?.at;
-      // The flight to the person comes first.
       if (!at || glide.goal) return;
       const { width, height } = view();
       const dx = width / 2 - (at.x * camera.scale + camera.x);
@@ -2138,18 +1772,13 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   const toggleFollow = (peer: WorkflowPeer) => (following() === peer.member.id ? stopFollow() : follow(peer));
   const followedPeer = () => peers().find((peer) => peer.member.id === following());
 
-  /* --------------------------------------------------------- Agent build */
-
-  /** The nodes and connections of the change that do not show yet, and the ones that just showed. */
   const [unbuilt, setUnbuilt] = createSignal<ReadonlySet<string>>(new Set());
   const [arrived, setArrived] = createSignal<ReadonlySet<string>>(new Set());
   const [builder, setBuilder] = createSignal<WorkflowBuilderSpot>();
   let playedBuild: number | undefined;
   let buildTimers: number[] = [];
   const buildState = (id: string) => (unbuilt().has(id) ? "unbuilt" : arrived().has(id) ? "arrived" : undefined);
-  /** The ring of a node: the person who selected it, or the agent that works on it. */
   const ringOn = (id: string) => peerOn(id)?.color ?? (builder()?.on === id ? builder()?.color : undefined);
-  /** Shows the whole change at once, and takes the cursor away. */
   const endBuild = () => {
     for (const timer of buildTimers) clearTimeout(timer);
     buildTimers = [];
@@ -2158,12 +1787,10 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     setBuilder(undefined);
   };
   onCleanup(endBuild);
-  /** The cursor points at the top-left part of a card, where its title is. */
   const buildPoint = (id: string): WfnPoint | undefined => {
     const box = boxOf(id);
     return box ? { x: box.x + Math.min(56, box.width / 2), y: box.y + Math.min(30, box.height / 2) } : positions[id];
   };
-  /** Plays the change of `build` once for each key, unless the person wants less motion. */
   const playBuild = () => {
     endBuild();
     const build = props.build;
@@ -2186,7 +1813,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       ]),
     );
     const color = avatarHeadColor(agent.avatarSeed, agent.avatarHue, agent.avatarColor ?? null);
-    // The reset fits the view and measures the cards in the frames after it.
     later(() => {
       const first = buildPoint(plan.steps[0]?.node ?? "");
       if (!first) return endBuild();
@@ -2208,14 +1834,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     later(() => setBuilder((spot) => spot && { ...spot, leaving: true }), end + BUILD_LINGER);
     later(endBuild, end + BUILD_LINGER + BUILD_FADE);
   };
-  // After the reset effect: each open and each reset can bring a change to play.
   createEffect(resetToken, () => untrack(playBuild));
-  /**
-   * The toolbar of a node goes under the node, and under its results strip, only when above it the
-   * toolbar covers another card and under it the toolbar does not. Text and shapes do not count: a
-   * heading sits above its column, and a shape can be under a group of nodes. The toolbar keeps its
-   * screen size, so the zoom changes the room that it takes in the world.
-   */
   const toolbarBelow = (id: string, bar: { width: number; height: number }) => {
     const box = boxOf(id);
     if (!box) return false;
@@ -2232,7 +1851,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     return !covers(zone(box.y + box.height + room / camera.scale));
   };
 
-  /** The frame around a selection of more than one node, or the box of the group that the selection is. */
   const groupBox = createMemo(() => {
     const whole = selectedGroup();
     if (whole) return frameOf(whole);
@@ -2240,11 +1858,9 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     return ids.length > 1 ? union(shownBoxes(ids)) : undefined;
   });
 
-  /** Moves the selected nodes that are not locked by a world distance. */
   const nudge = (dx: number, dy: number, again: boolean) => {
     const ids = group().filter((id) => !board.isLocked(id));
     if (ids.length === 0) return;
-    // Held keys repeat; the whole move is one undo step.
     if (!again) commit();
     setPositions((draft) => {
       for (const id of ids) {
@@ -2258,7 +1874,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     setDrop(undefined);
     canvas.cancelDraft();
   };
-  /** The kinds that the open menu offers and that match the search, in the groups of the add menu. */
   const dropGroups = (): { label: AppTextKey; items: AddItem[] }[] => {
     const open = drop();
     if (!open) return [];
@@ -2277,11 +1892,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       }))
       .filter((group) => group.items.length > 0);
   };
-  /**
-   * The menu opens at the end of the line: right of it for an output, left of it for an input, so it
-   * does not cover the node that the line comes from. On a connection, it opens under the midpoint.
-   * It stays in the view. The point is in client pixels.
-   */
   const dropAt = () => {
     const open = drop();
     const frame = viewport?.getBoundingClientRect();
@@ -2304,7 +1914,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     const open = drop();
     return open !== undefined && ("edge" in open || "start" in open);
   };
-  /** Adds a node where the line ends, with its matching port on the end, and connects it. */
   const pickDrop = (item: AddItem) => {
     const open = drop();
     if (!open) return;
@@ -2315,7 +1924,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       return;
     }
     const { start } = open;
-    // The node, its place and its connection are one undo step.
     commit();
     const release = edits.join();
     const id = addNode(item.kind, open.at, item.fields);
@@ -2342,10 +1950,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     }, release);
   };
 
-  /**
-   * Puts a new node in the middle of a connection. When the nodes are too close for it, the nodes
-   * from the end of the connection to the right move right to make room.
-   */
   const insertNode = (item: AddItem, edge: WfnEdge, at: WfnPoint) => {
     commit();
     const release = edits.join();
@@ -2354,7 +1958,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       const element = slot(id);
       const from = boxOf(edge.from);
       const to = positions[edge.to];
-      // On a loop, the new node goes where it was dropped, under the nodes the loop runs again.
       if (element && loops().has(edge.id))
         setPositions((draft) => {
           draft[id] = snapPoint({ x: at.x - element.offsetWidth / 2, y: at.y - element.offsetHeight / 2 });
@@ -2362,7 +1965,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       else if (element && from && to) {
         const width = element.offsetWidth;
         const room = to.x - (from.x + from.width);
-        // The new node keeps the gap that the two nodes had on each side of it.
         const need = width + Math.max(INSERT_GAP, room) * 2;
         const shift = Math.ceil(Math.max(0, need - room) / SNAP) * SNAP;
         setPositions((draft) => {
@@ -2373,7 +1975,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
             }
           draft[id] = snapPoint({
             x: from.x + from.width + (room + shift - width) / 2,
-            // Between two nodes in one row, the new node goes in that row.
             y: from.y === to.y ? from.y : at.y - element.offsetHeight / 2,
           });
         });
@@ -2384,21 +1985,15 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     }, release);
   };
 
-  /** Puts nodes on the system clipboard, as ⌘C does, so that ⌘V and other canvases can paste them. */
   const copyNodes = (ids: readonly string[]) => {
     const clip = collect(ids);
     if (clip.nodes.length === 0) return;
     copying = ids;
-    // The copy event writes the key. Without the event, only the Paste items of the menus can paste.
     const written = document.execCommand("copy");
     copying = undefined;
     if (!written) setCopied({ key: "", clip });
   };
 
-  /**
-   * Pastes the copied nodes with their top-left corner at a world point, or next to the place they
-   * were copied from. A second paste at the same point goes next to the first.
-   */
   const pasteNodes = (point?: WfnPoint) => {
     const held = copied();
     const clip = held?.clip;
@@ -2419,7 +2014,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     });
   };
 
-  /** Later nodes paint over earlier ones, so the order of the list is the stack order. */
   const restack = (id: string, where: "front" | "back") => {
     commit();
     setNodes((list) => {
@@ -2430,10 +2024,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     });
   };
 
-  /**
-   * Whether the context menu of a node can run it: a step that is not an approval, or a trigger, while
-   * no run is open and the canvas can change.
-   */
   const runnable = (id: string) => {
     const kind = kindOf(id);
     return kind !== undefined && kind !== "approval" && isWorkflowStepKind(kind) && !running() && !frozen();
@@ -2443,9 +2033,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     else props.onRunStep(id);
   };
 
-  /** Moves the camera so a node is in the centre of the view, and selects it. */
   const showNode = (id: string) => {
-    // A member of a collapsed group does not show: the view goes to the stack card and selects the group.
     const entry = groupIndex().get(id);
     const element = slot(id);
     const at = positions[id];
@@ -2466,7 +2054,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     canvas.select(entry?.folded ? entry.members : [id]);
   };
 
-  /** Pans the least distance that shows a whole node, with a margin. */
   const reveal = (id: string) => {
     const box = boxOf(id);
     if (!box) return;
@@ -2482,21 +2069,15 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     if (dx !== 0 || dy !== 0) glideTo({ scale: from.scale, x: from.x + dx, y: from.y + dy }, "flight");
   };
 
-  /** Gives a node the focus, which selects it, and pans to show it. */
   const focusNode = (id: string) => {
     reveal(id);
     slot(id)?.querySelector<HTMLElement>("[data-node-id]")?.focus({ preventScroll: true });
   };
 
-  /**
-   * The node after or before a node, column by column from the left, then from the top. Past the
-   * last node there is none, so Tab leaves the canvas.
-   */
   const nextNode = (id: string, step: 1 | -1) => {
     const order = live()
       .flatMap((node) => {
         const at = positions[node.id];
-        // The members of a collapsed group do not show, so they cannot take the focus.
         return at && (node.id === id || !groupIndex().get(node.id)?.folded) ? [{ id: node.id, at }] : [];
       })
       .sort((a, b) => a.at.x - b.at.x || a.at.y - b.at.y)
@@ -2505,7 +2086,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     return index < 0 ? undefined : order[index + step];
   };
 
-  /** The texts that search looks in: the name of the kind of a node, then the text that its fields hold. */
   const searchTexts = (id: string) => {
     const kind = kindOf(id);
     if (!kind) return [];
@@ -2515,7 +2095,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     });
     return [t(KIND_LABEL[kind]), ...fields];
   };
-  /** Each match shows the field that holds the words, or its first field when only the label matches. */
   const matches = () => {
     const words = query().trim().toLowerCase();
     if (!words) return [];
@@ -2541,7 +2120,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     setQuery("");
   };
 
-  /** The boxes of the nodes and of the view, and the drawn lines, in minimap pixels. */
   const minimap = createMemo(() => {
     if (!ui.minimap) return undefined;
     const boxes = live().flatMap((node) => {
@@ -2552,9 +2130,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     const seen = { ...toWorld({ x: 0, y: 0 }), width: width / camera.scale, height: height / camera.scale };
     return minimapLayout(boxes, strokes(), seen);
   });
-  /** Where a press on the minimap started. A drag from it follows the pointer at once. */
   let minimapPress: WfnPoint | undefined;
-  /** A press on the minimap glides the view to centre that point, and a drag then pans it. */
   const panMinimap = (event: PointerEvent & { currentTarget: SVGSVGElement }) => {
     const map = minimap();
     if (!map) return;
@@ -2572,7 +2148,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     else moveCamera(next);
   };
 
-  /** Notes what a right-click hit before the menu opens. */
   const onContextMenu = (event: MouseEvent) => {
     const target = event.target instanceof Element ? event.target : null;
     const node = target?.closest<HTMLElement>("[data-node-id]")?.dataset.nodeId;
@@ -2593,14 +2168,12 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     const target = menuTarget();
     return target.kind === "edge" ? target : undefined;
   };
-  /** Opens the add menu at the right-click point, to put a node in the middle of a connection. */
   const insertAt = (id: string, at: WfnPoint) => {
     const edge = canvas.edges().find((entry) => entry.id === id);
     if (!edge) return;
     setDropQuery("");
     setDrop({ edge, at });
   };
-  /** Opens the add menu at the right-click point on the empty canvas. */
   const addAt = (at: WfnPoint) => {
     setDropQuery("");
     setDrop({ at });
@@ -2610,9 +2183,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     return target.kind === "canvas" ? target.at : undefined;
   };
 
-  /* ---------------------------------------------------------- Drawing */
-
-  /** Marks each line that the eraser touches between two points. Release removes them in one step. */
   const eraseAlong = (from: WfnPoint, to: WfnPoint) => {
     const radius = ERASER_RADIUS / camera.scale;
     const count = Math.max(1, Math.ceil(Math.hypot(to.x - from.x, to.y - from.y) / radius));
@@ -2629,8 +2199,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     });
   };
 
-  /* --------------------------------------------------------- Gestures */
-
   onSettled(() => {
     const area = viewport;
     if (!area) return;
@@ -2642,21 +2210,15 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           start: WfnPoint;
           origin: WfnPoint;
           moved: boolean;
-          /** The text field that the press was on, and the caret that a click without a move puts in it. */
           focus?: { field: HTMLTextAreaElement | HTMLInputElement; caret: number };
-          /** The nodes that move together, with their places at the start. */
           group: readonly { id: string; origin: WfnPoint }[];
-          /** The box around the moving nodes at the start. */
           box: Box;
-          /** The boxes of the other nodes, for the alignment guides. */
           others: readonly Box[];
-          /** The press was on the frame of a group, so all its members stay selected. */
           whole?: boolean;
         }
       | {
           kind: "box";
           start: WfnPoint;
-          /** With Shift, the box adds to the selection that was there. */
           base: readonly string[];
           boxes: readonly { id: string; box: Box }[];
           moved: boolean;
@@ -2666,15 +2228,9 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           id: string;
           start: WfnPoint;
           node: WorkflowNodeKind;
-          /** The handle: a corner or a side. The opposite corner or side stays in place. */
           corner: WfnHandle;
           cursor: string;
-          /** The node that resizes. Only it shows its handles until the pointer goes up. */
           element: HTMLElement;
-          /**
-           * The font size of a text node, which a corner scales with its box. The floor is the height
-           * of the content, so a card does not get smaller than what it holds.
-           */
           origin: { at: WfnPoint; width: number; height: number; floor: number; font?: number; wrap?: number };
           moved: boolean;
         }
@@ -2691,16 +2247,13 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       event.preventDefault();
     };
     const onWheel = (event: WheelEvent) => {
-      // A popover, such as a video in full screen, is in the canvas but over it.
       if (event.target instanceof Element && event.target.closest(":popover-open")) return;
-      // A textarea scrolls its own text, but a pinch (Ctrl+wheel) over it zooms the canvas.
       if (
         event.target instanceof Element &&
         event.target.closest(event.ctrlKey ? "[data-wfn-portal]" : "textarea, [data-wfn-portal]")
       )
         return;
       event.preventDefault();
-      // A wheel can count in lines or in pages, not pixels.
       const unit =
         event.deltaMode === WheelEvent.DOM_DELTA_LINE
           ? 16
@@ -2726,7 +2279,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       if (!current) return;
       if (current.kind === "draw" || current.kind === "erase") {
         current.moved = true;
-        // The coalesced events keep a fast line smooth.
         const coalesced = event.getCoalescedEvents?.() ?? [];
         for (const sample of coalesced.length > 0 ? coalesced : [event]) {
           const at = toWorld(local(sample));
@@ -2748,7 +2300,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       if (!current.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
       if (!current.moved && (current.kind === "node" || current.kind === "resize")) {
         commit();
-        // A drag saves once, when it ends.
         setGesturing(true);
       }
       current.moved = true;
@@ -2782,7 +2333,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         const across = sideX(current.corner);
         const down = sideY(current.corner);
         const limits = RESIZE[current.node];
-        // The opposite corner or side stays in place.
         const place = (width: number, height: number) =>
           setPositions((draft) => {
             draft[current.id] = {
@@ -2791,20 +2341,17 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
             };
           });
         if (base !== undefined && down !== 0) {
-          // A corner scales a text: it follows the pointer along the diagonal of the box, as on other canvases.
           const { width, height } = origin;
           const ratio =
             1 + (across * dx * width + down * dy * height) / camera.scale / (width * width + height * height);
           const font = Math.min(Math.max(Math.round(base * ratio), TEXT_FONT.min), TEXT_FONT.max);
           setSizes((draft) => {
-            // A text that wraps at a set width keeps the same line breaks.
             draft[current.id] = wrap === undefined ? { font } : { font, width: Math.round((wrap * font) / base) };
           });
           place((width * font) / base, (height * font) / base);
           return;
         }
         if (base !== undefined) {
-          // A side of a text sets where it wraps, and the font stays.
           const width = snapWithin(origin.width + (across * dx) / camera.scale, limits.width);
           setSizes((draft) => {
             draft[current.id] = { ...draft[current.id], width };
@@ -2818,7 +2365,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         if (free && down !== 0) {
           height = Math.max(snapWithin(origin.height + (down * dy) / camera.scale, free), origin.floor);
         } else if (current.node === "image") {
-          // An image keeps its aspect ratio. A top or bottom side sets the width through the height.
           if (across === 0)
             width = snapWithin(
               (origin.width * (origin.height + (down * dy) / camera.scale)) / origin.height,
@@ -2827,7 +2373,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           height = (origin.height * width) / origin.width;
         }
         setSizes((draft) => {
-          // A side keeps the size that the user set on the other axis.
           const set = draft[current.id];
           draft[current.id] = free
             ? {
@@ -2848,10 +2393,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           draft[member.id] = { x: member.origin.x + x.delta, y: member.origin.y + y.delta };
       });
     };
-    /**
-     * The move along one axis. An edge or the centre of the moving box that comes near the same line
-     * of another node snaps to it and shows a guide; else the pressed node snaps to the grid.
-     */
     const align = (
       axis: "x" | "y",
       current: { origin: WfnPoint; box: Box; others: readonly Box[] },
@@ -2892,7 +2433,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       }
       return { delta, guides };
     };
-    /** Ends the gesture and gives it back. */
     const endGesture = () => {
       const current = gesture;
       gesture = undefined;
@@ -2953,16 +2493,13 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           field.focus({ preventScroll: true });
           field.setSelectionRange(caret, caret);
         }
-        // A click without a move on a node of a selection selects only that node.
         if (current.group.length > 1 && !current.whole) canvas.select([current.id]);
       }
       if (current.moved) {
-        // A drag that ends on a button must not press it.
         window.addEventListener("click", stopClick, { capture: true, once: true });
         setTimeout(() => window.removeEventListener("click", stopClick, { capture: true }));
       }
     };
-    /** A press that calls preventDefault does not move the focus, so it closes here a field that is open for edits. */
     const closeField = () => {
       const open = document.activeElement;
       if (open instanceof HTMLElement && area.contains(open) && isEditable(open)) open.blur();
@@ -2970,11 +2507,9 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     const onDown = (event: PointerEvent) => {
       if (event.target instanceof Element && event.target.closest(":popover-open")) return;
       if ((event.button !== 0 && event.button !== 1) || !(event.target instanceof Element)) return;
-      // A press takes the camera where it is.
       stopGlide();
       const target = event.target;
       const start = local(event);
-      // The middle button, Space held, or the Pan tool pans, and any drag on a version or a read-only canvas. Else a drag on the empty canvas selects.
       if ((event.button === 1 || space || ui.tool === "pan" || frozen()) && !target.closest("[data-wfn-portal]")) {
         event.preventDefault();
         gesture = { kind: "pan", start, camera: { x: camera.x, y: camera.y }, moved: false };
@@ -2984,7 +2519,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         return;
       }
       if (event.button !== 0) return;
-      // The Draw tool draws or erases from any press on the canvas, over the nodes too.
       if (ui.tool === "draw" && !target.closest("[data-wfn-portal]")) {
         event.preventDefault();
         const at = toWorld(start);
@@ -3012,13 +2546,11 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         window.addEventListener("pointercancel", onUp);
         return;
       }
-      // Sticky note puts its item where the user clicks.
       if (ui.tool === "note" && !target.closest("[data-wfn-portal]")) {
         event.preventDefault();
         placeItem("note", toWorld(start));
         return;
       }
-      // A click with Shapes puts the shape at its usual size. A drag draws it from corner to corner.
       if (ui.tool === "shape" && !target.closest("[data-wfn-portal]")) {
         event.preventDefault();
         gesture = { kind: "place", start, moved: false };
@@ -3038,7 +2570,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         const corner = HANDLES.find((value) => value === handle.dataset.corner) ?? "se";
         const wrap = sizes[resized]?.width;
         const cursor = resizeCursor(stretchOf(resizedKind), corner);
-        // The live resize has no transition from here, so the measures below are the current ones.
         area.dataset.resizing = cursor;
         node.dataset.resizing = "";
         gesture = {
@@ -3064,7 +2595,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         return;
       }
       if (target.closest(NO_DRAG) || target.closest(".wfn-edge-hit")) return;
-      // A press on the frame of a group selects all its members, and a drag moves them.
       const frame = target.closest<HTMLElement>("[data-wfn-group]")?.dataset.wfnGroup;
       const pressed = frame === undefined ? undefined : nodeGroups().find((entry) => entry.id === frame);
       if (pressed) {
@@ -3108,17 +2638,13 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       const at = id && !board.isLocked(id) ? positions[id] : undefined;
       if (id && at) {
         const field = target.closest<HTMLTextAreaElement | HTMLInputElement>(DRAG_FIELD);
-        // A press on a text field moves the node; a press without a move edits it. A field that has the focus keeps the press, to select text.
         if (field && document.activeElement === field) return;
-        // Shift and a press adds the node to the selection or takes it out; it does not move.
         if (event.shiftKey) return;
-        // A click on an item that is not selected only selects it. The selection does not change before this press.
         const edits = field !== null && (board.isSelected(id) || !field.matches(ITEM_FIELD));
         if (field) {
           event.preventDefault();
           closeField();
         }
-        // A press on a node of the selection moves all of it.
         const members = board.isSelected(id)
           ? group().filter((member) => member === id || !board.isLocked(member))
           : [id];
@@ -3146,7 +2672,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           kind: "box",
           start,
           base: event.shiftKey ? group() : [],
-          // A member of a collapsed group has the box of the stack card, so a box over the card selects all of them.
           boxes: live().flatMap((node) => {
             const box = shownBox(node.id);
             return box ? [{ id: node.id, box }] : [];
@@ -3160,7 +2685,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       window.addEventListener("pointerup", onUp);
       window.addEventListener("pointercancel", onUp);
     };
-    /** A double click on a resize handle restores the default size. */
     const onDoubleClick = (event: MouseEvent) => {
       const id =
         event.target instanceof Element
@@ -3168,7 +2692,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           : undefined;
       if (id) resetSize(id);
     };
-    /** The eraser shows as a ring under the pointer, and a note or a shape as the item to place. */
     const onHover = (event: PointerEvent) => {
       const over = event.target instanceof Element && !event.target.closest("[data-wfn-portal]");
       pointer = over ? local(event) : undefined;
@@ -3191,12 +2714,10 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     area.addEventListener("pointerdown", onDown);
     area.addEventListener("pointermove", onHover);
     area.addEventListener("pointerleave", onLeave);
-    /** A text field that has focus keeps the menu of the system, for copy and paste. */
     const onNativeMenu = (event: MouseEvent) => {
       if (event.target instanceof Element && event.target === document.activeElement && isEditable(event.target))
         event.stopPropagation();
     };
-    /** ⌘ or Ctrl with =, - or 0 zooms, ⇧1 fits the view, and ⌘ or Ctrl with Enter runs the workflow. */
     const withMod: Partial<Record<string, () => void>> = {
       "=": () => zoomBy(ZOOM_STEP),
       "+": () => zoomBy(ZOOM_STEP),
@@ -3206,22 +2727,15 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         if (canRun() && !running()) props.onRun({});
       },
     };
-    /** Shortcuts that act on the selected nodes. A text field keeps its own undo. */
     const onNodes: Partial<Record<string, (ids: readonly string[]) => void>> = {
       d: duplicateNodes,
     };
-    /** True when the focus is a field with selected text. Then copy and cut act on the text. */
     const selectsText = () => {
       const active = document.activeElement;
       if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement)
         return active.selectionStart !== active.selectionEnd;
       return !(document.getSelection()?.isCollapsed ?? true);
     };
-    /**
-     * ⌘C and ⌘X copy the selected nodes when no text is selected. In a field of a node, they copy that
-     * node, or the selection that holds it. The system clipboard gets only the key of the copy, so a
-     * paste in another app gets no text.
-     */
     const onCopy = (event: ClipboardEvent) => {
       const active = document.activeElement;
       const owner =
@@ -3238,13 +2752,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       pastedAt = undefined;
       if (event.type === "cut") canvas.deleteNodes(ids);
     };
-    /**
-     * Pictures on the clipboard, such as a screenshot or an image copied in a browser, go into the
-     * files of the board, and each becomes an asset node at the pointer. Two or more go in one group. The canvas takes the paste
-     * when it has the focus, or when the pointer is on it and no field has the focus: a click on the
-     * empty canvas does not move the focus from the button that opened it. A field with focus keeps
-     * a paste that also has text.
-     */
     const pastePictures = (event: ClipboardEvent) => {
       const data = event.clipboardData;
       const active = document.activeElement;
@@ -3254,10 +2761,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       if (isEditable(active) && data?.types.includes("text/plain")) return;
       event.preventDefault();
       const start = pointer ? toWorld(pointer) : undefined;
-      // The host shows a failed upload, so the canvas adds no node for it.
       void uploadAll(pictures).then((files) => addFiles(files, start));
     };
-    /** Files from the computer, dropped on the empty canvas, become asset nodes at the drop point. */
     const takesFiles = (event: DragEvent) =>
       event.dataTransfer?.types.includes("Files") === true &&
       !deleted() &&
@@ -3277,7 +2782,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       const at = toWorld(local(event));
       void uploadAll(files).then((stored) => addFiles(stored, at));
     };
-    /** ⌘V pastes copied nodes at the pointer, also into a field, because the clipboard has no text then. */
     const onPaste = (event: ClipboardEvent) => {
       const key = event.clipboardData?.getData(CLIP_TYPE);
       if (deleted() || frozen()) return;
@@ -3295,12 +2799,10 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       ArrowUp: { x: 0, y: -1 },
       ArrowDown: { x: 0, y: 1 },
     };
-    /** Where the arrow keys move nodes: the canvas or a node has focus, not a field, a button or a menu. */
     const onCanvas = (element: Element | null) =>
       element === null ||
       element === document.body ||
       (element instanceof HTMLElement && (element.matches("[data-node-id]") || element === area));
-    /** Keys without a modifier, as on the Higgsfield canvas. */
     const plain: Partial<Record<string, () => void>> = {
       v: () => setTool("select"),
       h: () => setTool("pan"),
@@ -3321,8 +2823,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       const node = active instanceof HTMLElement ? active.closest<HTMLElement>("[data-node-id]") : null;
       const arrow = ARROWS[event.key];
       const action = (() => {
-        // A version and a read-only canvas take only the camera keys. Escape stops a follow, then goes back
-        // to the live canvas.
         if (frozen()) {
           if (inMenu) return undefined;
           if (event.key === "Escape" && following()) return stopFollow;
@@ -3341,20 +2841,17 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         if (mod && !editing && key === "g" && ids.length > 1) return () => groupNodes(ids);
         if (mod && !editing && ids.length > 0 && onNodes[key]) return () => onNodes[key]?.(ids);
         if (mod) return withMod[event.key];
-        // Escape in a field of a node gives the focus back to the node.
         if (event.key === "Escape" && editing && node && !inMenu) return () => node.focus();
         if (editing || event.altKey) return undefined;
         if (arrow && ids.length > 0 && onCanvas(active)) {
           const step = event.shiftKey ? NUDGE.large : NUDGE.step;
           return () => nudge(arrow.x * step, arrow.y * step, event.repeat);
         }
-        // Tab on a node goes to the next node; in a node, Tab goes through its fields.
         const next =
           event.key === "Tab" && node && active === node
             ? nextNode(node.dataset.nodeId ?? "", event.shiftKey ? -1 : 1)
             : undefined;
         if (next) return () => focusNode(next);
-        // Enter on a node goes into its first field or control.
         if (event.key === "Enter" && node && active === node)
           return () =>
             node
@@ -3367,31 +2864,21 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         if (event.key === "Escape" && (ui.tool === "draw" || placing()) && !inMenu) return () => setTool("select");
         if (event.key === "Escape" && following() && !inMenu) return stopFollow;
         if (event.key === "Escape" && ids.length > 0 && !inMenu && !drop()) return () => canvas.select([]);
-        // A menu or a list box takes letters itself, to go to an item.
         return event.shiftKey || inMenu || takesKeys(active) ? undefined : plain[key];
       })();
       if (!action) return;
       event.preventDefault();
       action();
     };
-    /** A pointer press sets it, and a key other than Space clears it. */
     let pointed = false;
     const onPoint = () => {
       pointed = true;
     };
-    /**
-     * A button of a node that has the focus from a click, such as a menu or Run. A button that the
-     * keyboard went to keeps Space, to press it.
-     */
     const clickedButton = (element: Element | null) =>
       pointed &&
       element instanceof HTMLButtonElement &&
       area.contains(element) &&
       element.closest("[data-node-id]") !== null;
-    /**
-     * Space held turns a drag into a pan, as on other canvases, also after a click on a button of a node.
-     * The listener captures the key, because a menu button takes Space before the document gets it.
-     */
     const onSpace = (event: KeyboardEvent) => {
       if (event.code !== "Space") {
         if (event.type === "keydown") pointed = false;
@@ -3401,7 +2888,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       const clicked = clickedButton(document.activeElement);
       if (event.type === "keydown" && !clicked && !onCanvas(document.activeElement)) return;
       space = event.type === "keydown";
-      // The button does not open its menu or run its step.
       if (space && clicked) event.stopPropagation();
       if (space) {
         event.preventDefault();
@@ -3459,7 +2945,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         data-frame={props.frame}
         aria-label={t("workflow.canvas.label", { name: name() })}
         onPointerDown={(event) => {
-          // The person works on the canvas, so the agent's change shows whole.
           if (builder() || unbuilt().size > 0) endBuild();
           if (drop() && !(event.target instanceof Element && event.target.closest(".wfn-drop-menu"))) closeDrop();
           pressing = true;
@@ -3470,7 +2955,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           };
           window.addEventListener("pointerup", release, { capture: true });
           window.addEventListener("pointercancel", release, { capture: true });
-          // A pan keeps the selection.
           const panning = event.button === 1 || ui.tool === "pan" || frozen() || viewport?.hasAttribute("data-space");
           if (!panning && ui.tool === "select") canvas.selectFrom(event.target, event.shiftKey);
         }}
@@ -3501,7 +2985,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                 "--wfn-scale": camera.scale,
               }}
             >
-              {/* The frames of the groups, under the lines, so a line to a member shows over the frame. */}
               <For each={nodeGroups()} keyed={(entry) => entry.id}>
                 {(entry) => (
                   <Show when={frameOf(entry())}>
@@ -3527,11 +3010,9 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                 )}
               </For>
               <canvas.Edges />
-              {/* Keyed by id, so a node keeps its element when undo or a schedule change gives a new item. */}
               <For each={nodes()} keyed={(node) => node.id}>
                 {(node) => {
                   let slotElement: HTMLElement | undefined;
-                  // A cleanup runs while the list updates, where a write halts Solid: `reset` drops the size.
                   onCleanup(() => {
                     if (slotElement) slotResize.unobserve(slotElement);
                   });
@@ -3549,7 +3030,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                       data-build={buildState(node().id)}
                       data-focus={focusSet()?.has(node().id) ? "" : undefined}
                       data-dim={focusSet()?.has(node().id) === false ? "" : undefined}
-                      // A drag (a connection, a move, a frame) that passes over a node does not change the focus.
                       onPointerEnter={(event) => {
                         if (event.buttons === 0) setHoveredNode(node().id);
                       }}
@@ -3580,7 +3060,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                 </For>
                 <Show when={ink.sketch}>{(stroke) => <InkLine stroke={stroke()} points={sketchPoints()} />}</Show>
               </svg>
-              {/* Keyed by its line, so a guide that stays during a drag keeps its element and fades in once. */}
               <For each={guides()} keyed={(guide) => `${guide.axis}:${guide.at}`}>
                 {(guide) => (
                   <span
@@ -3632,7 +3111,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                         }
                       >
                         {(entry) => {
-                          // Solid can run this once more after the group ends: read the held group then.
                           const shown = () => heldGroup() ?? entry();
                           return (
                             <Show when={changeable(shown())}>

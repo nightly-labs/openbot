@@ -38,16 +38,12 @@ import { StorageUsageBar } from "./StorageUsageBar";
 export type StorageScanState = "scanning" | "ready" | "error";
 
 export interface StorageOverviewProps {
-  /** The computer the numbers belong to, such as "This Mac" or a server name. */
   hostName: string;
   state: StorageScanState;
-  /** 0–100 while `state` is "scanning". Leave it out when the scan cannot tell. */
   scanProgress?: number;
   error?: string | null;
-  /** ISO time of the last completed scan. */
   scannedAt?: string | null;
   breakdown: readonly StorageBreakdown[];
-  /** Free space on the disk that holds the OpenBot folder. */
   freeBytes?: number | null;
   agents: readonly AgentProfile[];
   agentUsage: readonly AgentStorageRow[];
@@ -57,30 +53,18 @@ export interface StorageOverviewProps {
   onRescan: () => void;
   onOpenAgent: (agentId: string) => void;
   onOpenConversation: (conversationId: string) => void;
-  /** The viewer can clear caches and delete files. Off for a member of a remote server. */
   canManage?: boolean;
   onClear: (category: ClearableStorageCategory) => void | Promise<void>;
-  /**
-   * What the provider CLI downloads that can go take: the older versions, and the whole download of
-   * each provider in `runtimeProviders`. Only this computer offers it: a server removes its old
-   * versions on its own.
-   */
   runtimeBytes?: number;
   runtimeProviders?: readonly ManagedProviderId[];
   onRemoveRuntimes?: () => void | Promise<void>;
   onPreviewFile: (file: StoredFileRow) => void;
   onFileAction: (file: StoredFileRow, action: StoredFileAction) => void | Promise<void>;
-  /** Shown above the OpenBot folder: the use of the whole machine, when the viewer can see it. */
   machine?: JSX.Element;
 }
 
 const LARGEST_CHATS = 5;
 
-/**
- * The Storage page: how much space OpenBot takes on one computer, which agents and chats take it,
- * every file in one list, and what can go without losing work. Chats and workspaces are never
- * cleared from here; the user deletes them where they live.
- */
 export function StorageOverview(props: StorageOverviewProps) {
   const { t, format } = useText();
   const headingId = `storage-${createUniqueId()}`;
@@ -373,13 +357,11 @@ function relativeTime(iso: string, now: Date, t: AppTranslate, format: AppFormat
   return format.date(new Date(iso), { month: "short", day: "numeric" });
 }
 
-/** `runtimes` removes the old provider CLI versions and the named downloads, not the row's whole size. */
 type CleanupCategory = ClearableStorageCategory | "runtimes";
 
 interface CleanupEntry {
   category: CleanupCategory;
   bytes: number;
-  /** The providers whose whole download a `runtimes` entry also removes. */
   providers?: readonly ManagedProviderId[];
 }
 

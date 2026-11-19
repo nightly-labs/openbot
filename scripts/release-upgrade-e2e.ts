@@ -1,57 +1,3 @@
-// Makes sure that the new build starts on the data of the previous public release, as a user's
-// update does. The release workflow runs it after the launch check, so a failure stops the publish.
-//
-//   1. Downloads the previous public release for this platform from GitHub Releases (the newest
-//      published, non-prerelease version below the new one) and checks it against SHA256SUMS.txt.
-//   2. Installs it the way a user does: macOS extracts the update ZIP to a temporary Applications
-//      folder, Windows runs the NSIS installer silently, Linux puts the AppImage in /opt/OpenBot,
-//      where the shipped AppArmor profile applies (build/linux/openbot.apparmor).
-//   3. Starts it once on an empty user data folder and home folder, so that it makes a real profile
-//      and openbot.db. Through the app's own API (`window.openbot`, over the DevTools protocol), it
-//      adds a custom ACP agent, two agents that each answer a first message, a memory for each
-//      agent, and a channel with both agents and one answered message. The custom agent is a fake
-//      on this computer, so no model and no network is used for the turns.
-//   4. Quits the app with the signal that a user's quit or a log-out sends, and waits for the exit.
-//   5. Installs the new build over it as an update does: macOS replaces the .app, Windows runs the
-//      new installer with `--updated /S`, as electron-updater does, Linux replaces the AppImage.
-//   6. Starts the new build on the same data, waits until main answers the window, and checks the
-//      app version, that every agent, message, memory, channel and the custom agent is still there,
-//      and, after a second quit, that openbot.db has every migration of this source, the tables and
-//      columns of a new database, and no integrity or foreign-key fault.
-//
-// Usage: bun scripts/release-upgrade-e2e.ts <macos|windows|linux|linux-arm64>
-//          [--new=<artifact>] [--previous=<tag> | --previous-age-days=<n>] [--previous-artifact=<file>]
-//          [--history]
-//   --new                The new build: the update ZIP (macOS), the NSIS installer (Windows) or the
-//                        AppImage (Linux). Default: the one such file in dist/.
-//   --previous           The tag of the release to start from. Default: found with `gh release list`.
-//   --previous-age-days  Start from the newest release that is at least this many days old.
-//   --previous-artifact  A downloaded artifact of that release, in place of the download.
-//   --history            The previous release is an old one, not the release before this one
-//                        (`.github/workflows/release-upgrade-history.yml`). The seed step uses only the
-//                        calls that the old release has: a release with no custom agents gets no agents,
-//                        so only its own start data is in the database. Then the check also compares
-//                        the row count of each table before and after the upgrade, and a forced end of
-//                        the old release is a warning, because the new build must start after it too.
-// The download needs `gh` with a token (GH_TOKEN or GITHUB_TOKEN). Windows installs in the real
-// %LOCALAPPDATA%\Programs\OpenBot, so it runs only on a GitHub Actions runner. Linux needs a display
-// (`xvfb-run -a`), a writable /opt/OpenBot and the AppArmor profile; it never uses `--no-sandbox`.
-// Writes .openbot-build/release-upgrade-e2e/report.json with versions and counts only, no user text.
-//
-// The seed step calls the API of the previous release. When a change renames or changes one of
-// these calls, keep the earlier call for the seed step until the next release ships. The seed step
-// looks for each call before it uses it; without `--history`, a missing call is a failure.
-//
-// The update itself is not downloaded by the old app's electron-updater. On macOS its feed is in
-// Contents/Resources/app-update.yml, which the code signature seals: a changed file breaks the
-// signature and Squirrel.Mac refuses the update. The packaged update service has no feed override
-// (no setFeedURL, no forceDevUpdateConfig, no environment variable), so the only way to send the
-// installed app to a local feed is to intercept its HTTPS requests to GitHub with
-// `--ignore-certificate-errors` or a trusted local CA. Both weaken the trust boundary, so this test
-// does not do it. On Windows and Linux app-update.yml is not signed, but a changed copy would test
-// a modified install. electron-updater installs on Windows with the same `--updated /S` arguments
-// that this test uses, and on Linux it replaces the AppImage file, as this test does; macOS
-// replaces the bundle. `bun run verify:update-artifacts` checks the feed files of the new build.
 import { type ChildProcess, execFileSync, spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { createReadStream, existsSync } from "node:fs";
@@ -81,7 +27,6 @@ import { z } from "zod";
 import { migrateOpenBotDatabase } from "../src/backend/openbot-database-schema";
 import { RUN_MARKER_FILE } from "../src/main/run-marker";
 
-// The page functions below run in the app window, where the preload bridge sets this.
 declare global {
   interface Window {
     openbot: OpenBotDesktopApi;
@@ -91,7 +36,6 @@ declare global {
 const logger = createOpenBotLogger("release-upgrade-e2e");
 const REPOSITORY = "nightly-labs/openbot";
 const OUT = resolve(import.meta.dirname, "../.openbot-build/release-upgrade-e2e");
-// Limits only make a hang fail; every wait ends on a state.
 const LAUNCH_LIMIT_MS = 5 * 60_000;
 const TURN_LIMIT_MS = 2 * 60_000;
 const QUIT_LIMIT_MS = 2 * 60_000;
@@ -114,7 +58,6 @@ if (target === "linux" && process.arch !== "x64") throw new Error("The linux tes
 if (target === "linux-arm64" && process.arch !== "arm64")
   throw new Error("The linux-arm64 test needs an arm64 computer.");
 if (target === "windows" && process.arch !== "x64") throw new Error("The windows test needs an x64 computer.");
-// The installer writes the real per-user install folder and registry entries.
 if (target === "windows" && process.env.GITHUB_ACTIONS !== "true") {
   throw new Error("The Windows test installs OpenBot for this user and runs only on a GitHub Actions runner.");
 }
@@ -141,7 +84,6 @@ interface Report {
   installedVersion?: string;
   oldQuit?: QuitResult;
   newQuit?: QuitResult;
-  /** The calls of the previous release that the seed step used. */
   seedApi?: SeedApi;
   seeded?: Counts;
   afterUpgrade?: Counts;
@@ -169,18 +111,14 @@ interface DatabaseReport {
   integrity: string;
   foreignKeyViolations: number;
   previousForeignKeyViolations: number;
-  /** The tables that have fewer rows after the upgrade, with the counts before and after. */
   tablesWithFewerRows: Record<string, { before: number; after: number }>;
 }
 
 interface QuitResult {
-  /** True when the app exited on the quit request; false when the limit forced a kill. */
   clean: boolean;
   exitCode: number | null;
-  /** The state in the run marker file after the exit. Not read after a forced kill. */
   runMarker?: string | null;
 }
-/** The part of the run marker file that this check reads. */
 const runMarkerFile = z.object({ state: z.string() });
 
 const report: Report = { passed: false, target, arch: process.arch, history, newVersion };
@@ -189,13 +127,8 @@ const userDataPath = join(root, "user-data");
 const homePath = join(root, "home");
 await mkdir(userDataPath);
 await mkdir(homePath);
-// The app puts agent workspaces in `homedir()`/OpenBot/Agents. On Windows `homedir()` reads
-// USERPROFILE, which stays the real one (see `launchEnvironment`), and an earlier step of the job
-// can have made workspaces there. So the check counts only the folders that are new.
 const agentsFolder = join(target === "windows" ? (process.env.USERPROFILE ?? homePath) : homePath, "OpenBot", "Agents");
 const earlierWorkspaces = new Set(await listWorkspaces());
-// The process and the app that run now, so that a failure can stop them. `process` is set at the
-// spawn and `app` when the window is connected.
 const current: { process: LaunchedProcess | null; app: RunningApp | null } = { process: null, app: null };
 
 function check(condition: unknown, message: string): asserts condition {
@@ -212,10 +145,6 @@ function compareVersions(left: string, right: string): number {
   return 0;
 }
 
-/**
- * The newest published, non-prerelease release below the new version. With `ageDays`, the newest one
- * that was published at least that many days ago.
- */
 function previousTag(ageDays?: number): string {
   const listed = z
     .array(z.object({ tagName: z.string(), publishedAt: z.string() }))
@@ -255,7 +184,6 @@ function previousTag(ageDays?: number): string {
   return `v${newest}`;
 }
 
-/** The name of the artifact that a user of this platform installs and updates from. */
 function artifactName(version: string): string {
   if (target === "macos") return `OpenBot-${version}-${process.arch === "arm64" ? "arm64" : "x64"}.zip`;
   if (target === "windows") return `OpenBot-${version}-x64.exe`;
@@ -300,7 +228,6 @@ async function downloadPrevious(tag: string, version: string): Promise<string> {
   return path;
 }
 
-/** The one update artifact of this platform in dist/, as `verify:update-artifacts` finds it. */
 async function newArtifact(): Promise<string> {
   const given = option("new");
   if (given) return resolve(given);
@@ -311,12 +238,9 @@ async function newArtifact(): Promise<string> {
   return join(distRoot, found[0] ?? "");
 }
 
-// --- Install -------------------------------------------------------------------------------------
-
 const macApplications = join(root, "Applications");
 const macBundle = join(macApplications, "OpenBot.app");
 const windowsFolder = join(process.env.LOCALAPPDATA ?? "", "Programs", "OpenBot");
-// The shipped AppArmor profile attaches to this path.
 const linuxAppImage = "/opt/OpenBot/OpenBot.AppImage";
 
 function executablePath(): string {
@@ -343,7 +267,6 @@ function runInstaller(file: string, args: string): Promise<number> {
   });
 }
 
-/** `ditto` keeps the extended attributes and symbolic links that the code signature covers. */
 function extractMacZip(zip: string, destination: string): void {
   execFileSync("ditto", ["-x", "-k", zip, destination], { stdio: ["ignore", "ignore", "inherit"] });
 }
@@ -377,7 +300,6 @@ async function installPrevious(artifact: string): Promise<void> {
 
 async function installNew(artifact: string): Promise<void> {
   if (target === "macos") {
-    // Squirrel.Mac extracts the ZIP beside the app and then replaces the bundle.
     const staging = join(root, "update-staging");
     await mkdir(staging);
     extractMacZip(artifact, staging);
@@ -387,19 +309,15 @@ async function installNew(artifact: string): Promise<void> {
     return;
   }
   if (target === "windows") {
-    // electron-updater runs the new installer with these arguments.
     const exitCode = await runInstaller(artifact, "--updated /S");
     check(exitCode === 0, `The new installer exited with code ${exitCode}.`);
     return;
   }
-  // electron-updater writes the new AppImage beside the old one and renames it over the old one.
   const staging = `${linuxAppImage}.new`;
   await copyFile(artifact, staging);
   await chmod(staging, 0o755);
   await rename(staging, linuxAppImage);
 }
-
-// --- Launch and quit -----------------------------------------------------------------------------
 
 interface LaunchedProcess {
   child: ChildProcess;
@@ -415,10 +333,6 @@ interface RunningApp extends LaunchedProcess {
 function launchEnvironment(): NodeJS.ProcessEnv {
   return {
     ...process.env,
-    // Agent workspaces go to ~/OpenBot, so the home folder is the test's own. Windows keeps the real
-    // USERPROFILE: with an empty one, Windows cannot find the AppData known folder and the start
-    // fails ("Failed to get 'appData' path"). So on Windows the workspaces go to the real profile
-    // (see `agentsFolder`). The runner is discarded after the job.
     HOME: homePath,
     ...(target === "windows" ? {} : { USERPROFILE: homePath }),
     CODEX_HOME: join(userDataPath, "codex-home"),
@@ -459,12 +373,9 @@ async function readDevToolsPort(): Promise<number | null> {
 }
 
 async function launch(): Promise<RunningApp> {
-  // A stale port file from the earlier start would point at a closed port.
   await rm(join(userDataPath, "DevToolsActivePort"), { force: true });
   const args = [`--user-data-dir=${userDataPath}`, "--remote-debugging-port=0"];
   if (target === "macos") args.push("--use-mock-keychain");
-  // On POSIX the app gets its own process group, so that the cleanup also stops the helpers that
-  // outlive a killed app: the crash handler and the fake agent keep the stderr pipe open.
   const child = spawn(executablePath(), args, {
     env: launchEnvironment(),
     stdio: ["ignore", "ignore", "pipe"],
@@ -483,8 +394,6 @@ async function launch(): Promise<RunningApp> {
   current.process = { child, exited, stderr: () => stderr };
 
   const port = await waitFor("the DevTools port", LAUNCH_LIMIT_MS, readDevToolsPort, exited);
-  // Playwright shows only the pages of the browser contexts that exist when it connects, and the
-  // main window has its own session. So it connects only after the window's target is listed.
   let targets: string[] = [];
   await waitFor(
     "the main window target",
@@ -518,7 +427,6 @@ async function launch(): Promise<RunningApp> {
         .find((candidate) => candidate.url().startsWith(MAIN_PAGE_URL)),
     exited,
   );
-  // Main answers the window when its services and the database are ready.
   await waitFor(
     "main to answer the window",
     LAUNCH_LIMIT_MS,
@@ -526,7 +434,6 @@ async function launch(): Promise<RunningApp> {
       try {
         return await page.evaluate(async () => {
           if (typeof window.openbot === "undefined") return null;
-          // The first releases have no agent list; their window reads the app information first.
           if ("agent" in window.openbot && "listAgents" in window.openbot.agent)
             await window.openbot.agent.listAgents();
           else await window.openbot.getAppInfo();
@@ -543,10 +450,6 @@ async function launch(): Promise<RunningApp> {
   return app;
 }
 
-/**
- * Whether the window has called main. The renderer asks main for `getAppInfo` when it mounts, and
- * main records each trusted call in `logs/trace.ndjson`, as `scripts/verify-windows-package.ts` reads.
- */
 async function rendererCalledMain(): Promise<boolean> {
   try {
     return (await readFile(join(userDataPath, "logs", "trace.ndjson"), "utf8")).includes('"kind":"ipc"');
@@ -555,18 +458,8 @@ async function rendererCalledMain(): Promise<boolean> {
   }
 }
 
-/**
- * Asks the app to quit as a user does, and waits for the exit. POSIX sends SIGTERM, which main
- * handles as a quit (`quitFor("signal")`), as a log-out or `kill` does. Windows closes the main
- * window, as the window's close button does: on Windows the app quits when its main window closes.
- * WM_CLOSE from `taskkill` without `/F` did not quit the app on the CI runner.
- *
- * The new build on Linux also closes the main window. That close sends a second quit request while
- * the teardown runs, and the teardown must still end (`runMarker` is then `clean`).
- */
 async function quit(app: RunningApp, byWindowClose = process.platform === "win32"): Promise<QuitResult> {
   if (byWindowClose) {
-    // The timer lets the call return before the page closes.
     await app.page.evaluate(() => {
       setTimeout(() => window.close(), 0);
     });
@@ -578,9 +471,6 @@ async function quit(app: RunningApp, byWindowClose = process.platform === "win32
   current.app = null;
   current.process = null;
   if (outcome !== "limit") {
-    // Chromium deletes its profile lock when it ends, after the database host has stopped. On
-    // Windows the lock is `lockfile`, which Chromium opens with delete-on-close; it has no
-    // `SingletonLock` there.
     const lockName = process.platform === "win32" ? "lockfile" : "SingletonLock";
     await waitFor("the profile lock to be released", QUIT_LIMIT_MS, async () =>
       (await lstat(join(userDataPath, lockName)).then(
@@ -600,7 +490,6 @@ async function quit(app: RunningApp, byWindowClose = process.platform === "win32
   return { clean: false, exitCode };
 }
 
-/** How the run ended, as the next start reads it (`src/main/run-marker.ts`). Null: no readable file. */
 async function readRunMarkerState(): Promise<string | null> {
   try {
     const marker = runMarkerFile.parse(JSON.parse(await readFile(join(userDataPath, RUN_MARKER_FILE), "utf8")));
@@ -615,28 +504,20 @@ function forceKill(child: ChildProcess): void {
   if (process.platform === "win32") {
     try {
       execFileSync("taskkill.exe", ["/pid", String(child.pid), "/t", "/f"], { stdio: "ignore" });
-    } catch {
-      // The app can exit before taskkill reads the process tree.
-    }
+    } catch {}
   } else child.kill("SIGKILL");
 }
 
-/** Stops each process that is left in the app's process group, and closes the stderr pipe. */
 function stopLeftovers(app: LaunchedProcess): void {
   const pid = app.child.pid;
   if (process.platform !== "win32" && pid) {
     try {
       process.kill(-pid, "SIGKILL");
-    } catch {
-      // The group is empty.
-    }
+    } catch {}
   }
   app.child.stderr?.destroy();
 }
 
-// --- Seed and read ---------------------------------------------------------------------------------
-
-// A custom agent that speaks the Agent Client Protocol on stdio and answers each prompt.
 const FAKE_AGENT = `const NL = String.fromCharCode(10);
 let buffer = "";
 const write = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + NL);
@@ -675,7 +556,6 @@ function handle(message) {
 setInterval(() => {}, 1000);
 `;
 
-/** The calls that the previous release has. The first releases have only some of them. */
 interface SeedApi {
   updatePreference: boolean;
   customAgents: boolean;
@@ -720,12 +600,9 @@ async function seed(page: Page): Promise<Seed> {
     channelMessageIds: [],
   };
 
-  // The old app must not download the public latest release while the test runs. The first releases
-  // have no preference: their updater does not download by itself (`autoDownload = false`).
   if (api.updatePreference) {
     await page.evaluate(() => window.openbot.update.setPreference({ autoDownload: false, autoInstall: false }));
   }
-  // The turns need the fake custom agent: with no custom agent, an agent needs a model on the network.
   if (!api.customAgents) return seeded;
 
   const fakeAgentPath = join(root, "fake-acp-agent.mjs");
@@ -739,10 +616,6 @@ async function seed(page: Page): Promise<Seed> {
     { id: CUSTOM_AGENT_ID, command: process.execPath, script: fakeAgentPath, server: LOCAL_SERVER_ID },
   );
 
-  // A saved custom agent restarts the provider. Until the restarted process has listed its models,
-  // the host refuses the model. While the provider is not yet `available`, the refusal says "is not
-  // connected"; after that, "listed no models". Both are the state to wait out (v0.72.0 release run
-  // 43976002755 failed on the first one on Linux x64).
   const createAgent = (name: string) =>
     waitFor(`agent ${name} to be created`, TURN_LIMIT_MS, async () => {
       try {
@@ -834,11 +707,6 @@ async function seed(page: Page): Promise<Seed> {
   return seeded;
 }
 
-/**
- * The seeded messages of one agent chat. The app reads a whole chat only for a signed-in account
- * (`readConversation` needs a reader), and the release runner has no account. The message search
- * reads the same messages without a reader; the prompt and the answer carry the word `upgradecheck`.
- */
 async function searchSeedMessages(page: Page, agentId: string) {
   const found = await page.evaluate(
     (id) => window.openbot.agent.searchConversationMessages({ query: "upgradecheck", agentId: id, limit: 100 }),
@@ -847,7 +715,6 @@ async function searchSeedMessages(page: Page, agentId: string) {
   return found.results.filter((result) => result.agentId === agentId).map((result) => result.message);
 }
 
-/** What the running app shows of the seed. Every count is of seeded items that it still has. */
 async function readSeed(page: Page, seeded: Seed): Promise<Counts> {
   const { api } = seeded;
   const agents = seeded.agentIds.length > 0 ? await page.evaluate(() => window.openbot.agent.listAgents()) : [];
@@ -895,9 +762,6 @@ async function readAppVersion(page: Page): Promise<string> {
   return (await page.evaluate(() => window.openbot.getAppInfo())).version;
 }
 
-// --- Database --------------------------------------------------------------------------------------
-
-/** Opens a copy, so the read never changes the app's files, also when a WAL file is left. */
 async function openDatabaseCopy(name: string): Promise<DatabaseSync> {
   const directory = join(root, name);
   await mkdir(directory);
@@ -932,7 +796,6 @@ function tableColumns(db: DatabaseSync): Map<string, Set<string>> {
   );
 }
 
-/** The row count of each table. */
 function rowCounts(db: DatabaseSync): Map<string, number> {
   return new Map(
     [...tableColumns(db).keys()].map((name) => {
@@ -976,7 +839,6 @@ async function checkDatabase(
         logger.error(`The upgraded database has no column ${table}.${column}.`);
       }
     }
-    // A table that a migration drops has no count after.
     const tablesWithFewerRows: DatabaseReport["tablesWithFewerRows"] = {};
     for (const [table, after] of rowCounts(db)) {
       const before = previousRowCounts.get(table);
@@ -1003,15 +865,11 @@ async function checkDatabase(
   }
 }
 
-// --- Run -------------------------------------------------------------------------------------------
-
 async function printLogs(): Promise<void> {
   const logs = join(userDataPath, "logs");
   if (!existsSync(logs)) return;
-  // Main writes `logs/main/main.log`, the updater `logs/update/update.log`, and so on.
   const names = await readdir(logs, { recursive: true });
   for (const name of names.filter((entry) => entry.endsWith(".log"))) {
-    // The app can still hold a file open; one unreadable file must not hide the others.
     const text = await readFile(join(logs, name), "utf8").catch(
       (error: unknown) => `(not readable: ${error instanceof Error ? error.message : String(error)})`,
     );
@@ -1056,9 +914,6 @@ try {
     report.installedVersion === newVersion,
     `The new build reports version ${report.installedVersion}, not ${newVersion}.`,
   );
-  // A crash (no exit code) or a failed shutdown (a non-zero code) during the quit is a failure too.
-  // An old release can end in a different way on the quit request; the new build must start after
-  // a forced end too, so `--history` only records it.
   const oldQuitClean = report.oldQuit.clean && report.oldQuit.exitCode === 0;
   const oldQuitMessage = `The previous release did not quit cleanly on the quit request (exit code ${report.oldQuit.exitCode}).`;
   if (history && !oldQuitClean) logger.warn(oldQuitMessage);
@@ -1067,7 +922,6 @@ try {
     report.newQuit.clean && report.newQuit.exitCode === 0,
     `The new build did not quit cleanly on the quit request (exit code ${report.newQuit.exitCode}).`,
   );
-  // The exit code is 0 also when Electron ends the process before the teardown is done.
   check(
     report.newQuit.runMarker === "clean",
     `The new build ended before its teardown was done (run marker: ${report.newQuit.runMarker}).`,
@@ -1093,8 +947,6 @@ try {
     database.missingTables === 0 && database.missingColumns === 0,
     `The upgraded database misses ${database.missingTables} tables and ${database.missingColumns} columns of a new database.`,
   );
-  // The new build can delete rows itself after the start, so only `--history`, where the release's
-  // own start data is most of the seed, makes this a failure.
   const fewerRows = JSON.stringify(database.tablesWithFewerRows);
   if (fewerRows !== "{}") {
     const message = `The upgraded database has fewer rows in some tables: ${fewerRows}.`;
@@ -1120,7 +972,6 @@ try {
   }
   await mkdir(OUT, { recursive: true });
   await writeFile(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
-  // The Windows install stays: the runner is discarded after the job.
   await rm(root, { recursive: true, force: true }).catch(() => undefined);
   if (target === "linux" || target === "linux-arm64") await rm(linuxAppImage, { force: true }).catch(() => undefined);
 }

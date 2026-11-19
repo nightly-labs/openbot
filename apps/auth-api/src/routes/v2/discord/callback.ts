@@ -5,8 +5,6 @@ import { DiscordAppError } from "../../../server/discord-app";
 import { runApiResponse } from "../../../server/effect-runtime";
 import { requestDiscordApp } from "../../../server/request-auth";
 
-// Discord returns here after the OpenBot app's install. The sealed grant goes to `/discord/connect`
-// in the URL fragment, which the browser does not send to any server, and that page opens OpenBot.
 export const Route = createFileRoute("/v2/discord/callback")({
   server: {
     handlers: {

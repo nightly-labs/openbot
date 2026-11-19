@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/connector";
 
 export const messages = {
-  // Yerleşik GitHub bağlantısı: cihaz akışı, belirteç yenileme ve saklanan dosya.
   "error.connector.githubUnavailable": "OpenBot'un bu derlemesinde GitHub Uygulaması yok.",
   "error.connector.githubDenied": "GitHub oturum açma isteği reddedildi.",
   "error.connector.githubCodeExpired": "GitHub kodunun süresi doldu. GitHub'a tekrar bağlanın.",

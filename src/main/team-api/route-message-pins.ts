@@ -17,15 +17,6 @@ import {
 const REFUSED_STATUS = { "not-found": 404, limit: 409 } as const;
 const ROUTES: ReadonlySet<string> = new Set(Object.values(MESSAGE_PINS_ROUTES));
 
-/**
- * The pinned messages of all chats of an agent (its own chat and its side threads), and Pin and Unpin
- * on one message, for a member of a joined server. A member who can send the agent a message can use
- * them, and all members of the chat see the same pins. The host records the member as the pinner.
- * The same member can read a side thread around one message, so a pin there opens at its message.
- * The agent id is in the body, so the router's check of the path does not see it, and this module
- * refuses an agent hidden from the caller.
- * Frozen by `message-pins-v1`.
- */
 export async function routeMessagePins(
   context: TeamApiRequestContext,
   agents: Pick<TeamApiAgents, "listPinnedMessages" | "setMessagePinned" | "listAgents">,
@@ -37,7 +28,6 @@ export async function routeMessagePins(
   if (method !== "POST" || !ROUTES.has(path)) return "unmatched";
   if (!capabilities.has(MESSAGE_PINS_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.messagePinsUnsupported"));
-  // `readJson` has already run the body through the message-pins wire codec.
   const body = await readJson(request);
   const agentId = stringField(body, "agentId");
   if (hiddenAgentIds.has(agentId) || !agents.listAgents().some((agent) => agent.id === agentId))
@@ -47,7 +37,6 @@ export async function routeMessagePins(
   if (path === MESSAGE_PINS_ROUTES.readThread) {
     if (!tasks) throw new HttpError(400, sourceText("error.backend.threadRemoteUnsupported"));
     const input = { agentId, taskId: stringField(body, "taskId"), messageId: stringField(body, "messageId") };
-    // A smaller part keeps the message in its middle, so the answer fits one frame.
     for (let limit = typeof body.limit === "number" ? body.limit : 50; ; limit = Math.floor(limit / 2)) {
       const part = tasks.readTaskAround({ ...input, limit }, markerExclusionsForCapabilities(capabilities));
       const answer = { ...part, conversation: conversationSnapshotForCapabilities(part.conversation, capabilities) };
@@ -68,7 +57,6 @@ export async function routeMessagePins(
       ),
     );
   } catch (error) {
-    // A refusal is a sentence for the member. Any other error is a host fault.
     if (error instanceof MessagePinRefusedError) throw new HttpError(REFUSED_STATUS[error.reason], error.message);
     throw error;
   }

@@ -1,12 +1,3 @@
-// Bench: does an agent use the tools it has before it asks the user to connect a service? A user
-// saw agents answer "connect an account" where a Grok agent wrote a script and did the work. Each
-// task names a service that has no connected app in the test profile, but that the agent can reach
-// with its shell or its browser. The test records each step of the turn and the answer. The mail task
-// loads the session of the team's test Google account into the OpenBot browser, as a user who is signed
-// in to Gmail there, and runs only when that session file exists. An agent can also read the developer's
-// own mail, such as Grok with a Gmail MCP server from Cursor settings; the report then holds it, and stays
-// on this computer.
-// `bun run test:provider-live --bench`. Writes .openbot-build/provider-live-bench/<provider>-<task>.json.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -23,12 +14,10 @@ import { readyProvider, waitFor } from "./live-agent";
 import { BENCH_TAG, DEBUGGING_PORT_FILE, type LiveProvider, PROJECT_ROOT, profilePath, RENDERER_HOST } from "./targets";
 
 const OUT = join(PROJECT_ROOT, ".openbot-build", "provider-live-bench");
-/** The saved session of the team's test Google account (AGENTS.md, development data). */
 const GOOGLE_SESSION = join(homedir(), ".config", "openbot", "test-google-account.storage.json");
 const INBOX = "https://mail.google.com/mail/u/0/#inbox";
 const POLL_MS = 1_000;
 const TURN_MS = 360_000;
-/** A turn with an open card, such as a sign-in, waits for the user. The test then stops it. */
 const QUIET_MS = 90_000;
 
 interface Step {
@@ -41,7 +30,6 @@ interface Step {
 
 interface TurnRecord {
   steps: Step[];
-  /** True when the turn waited for the user and the test stopped it. */
   stopped: boolean;
 }
 
@@ -60,14 +48,12 @@ async function readSteps(browser: Browser, agentId: string) {
       })),
     };
   }, agentId);
-  // The report keeps each answer in full, and only the start of tool output.
   return {
     ...read,
     steps: read.steps.map((step) => (isAnswer(step) ? step : { ...step, text: step.text.slice(0, 600) })),
   };
 }
 
-/** Sends `prompt` as the first message of a new agent and waits until its turn ends or waits for the user. */
 async function runTask(
   browser: Browser,
   input: { provider: LiveProvider; model: string; task: string; prompt: string },
@@ -122,14 +108,12 @@ async function runTask(
 interface BenchResult extends TurnRecord {
   provider: string;
   model: string;
-  /** The value that the answer must give, read from the service by the test. */
   expected: string;
   cards: string[];
   answer: string;
   passed: boolean;
 }
 
-/** Saves the result of one task. It passes when `matches` accepts the answer and no connect card shows. */
 function finish(
   input: { provider: string; model: string; task: string; expected: string },
   record: TurnRecord,
@@ -151,7 +135,6 @@ function finish(
   return result;
 }
 
-/** Reads `path` of a JSON answer, such as `["data", "amount"]`. */
 async function readJsonString(url: string, path: string[]): Promise<string> {
   let value: unknown = await (await fetch(url)).json();
   for (const key of path) value = isDynamicRecord(value) ? value[key] : undefined;
@@ -167,7 +150,6 @@ function connectCards(steps: Step[]): string[] {
   );
 }
 
-/** What the agent said to the user: as `isAgentAnswer` of the contracts, and not tool output or a card. */
 function isAnswer(step: Step): boolean {
   return (
     step.author === "assistant" &&
@@ -186,7 +168,6 @@ function answer(steps: Step[]): string {
     .join("\n");
 }
 
-/** The DevTools parameters that the bench sends. */
 interface PageParams {
   cookies?: DynamicRecord[];
   url?: string;
@@ -196,7 +177,6 @@ interface PageParams {
 
 type Send = (method: string, params?: PageParams) => Promise<unknown>;
 
-/** Runs `use` with a DevTools session on one page, then closes the socket. */
 async function onPage<T>(socketUrl: string, use: (send: Send) => Promise<T>): Promise<T> {
   const socket = new WebSocket(socketUrl);
   await new Promise((done, fail) => {
@@ -225,7 +205,6 @@ async function onPage<T>(socketUrl: string, use: (send: Send) => Promise<T>): Pr
   }
 }
 
-/** The page address and DevTools socket of each page of the app, from its DevTools port. */
 async function appPages(provider: LiveProvider): Promise<{ url: string; socket: string }[]> {
   const port = readFileSync(join(profilePath(provider), DEBUGGING_PORT_FILE), "utf8").trim();
   const listed = await (await fetch(`http://${RENDERER_HOST}:${port}/json/list`)).json();
@@ -237,17 +216,12 @@ async function appPages(provider: LiveProvider): Promise<{ url: string; socket: 
   );
 }
 
-/**
- * Signs the OpenBot browser in to the test Google account and returns the subject of the newest
- * email in its inbox. The tab closes again: the agent finds Gmail on its own.
- */
 async function signInToGmail(browser: Browser, provider: LiveProvider): Promise<string> {
   const saved = JSON.parse(readFileSync(GOOGLE_SESSION, "utf8"));
   const cookies = (isDynamicRecord(saved) && Array.isArray(saved.cookies) ? saved.cookies : []).flatMap(
     (cookie: unknown) => {
       if (!isDynamicRecord(cookie)) return [];
       const { expires, ...rest } = cookie;
-      // A session cookie has expires -1; DevTools wants no expires for it.
       return [typeof expires === "number" && expires > 0 ? { ...rest, expires } : rest];
     },
   );
@@ -279,7 +253,6 @@ async function signInToGmail(browser: Browser, provider: LiveProvider): Promise<
             ? { host: value.host, subject: value.subject.trim() }
             : { host: "", subject: "" };
         },
-        // A signed-out session leaves Gmail, such as for accounts.google.com or workspace.google.com.
         (value) => value.subject !== "" || (value.host !== "" && value.host !== "mail.google.com"),
       );
       if (read.host !== "mail.google.com")
@@ -291,7 +264,6 @@ async function signInToGmail(browser: Browser, provider: LiveProvider): Promise<
   }
 }
 
-/** The latest release tag, from the redirect of the release page: the GitHub API has a low limit without a token. */
 async function latestReleaseTag(repo: string): Promise<string> {
   const res = await fetch(`https://github.com/${repo}/releases/latest`, { redirect: "manual" });
   const tag = res.headers.get("location")?.split("/releases/tag/")[1];
@@ -299,7 +271,6 @@ async function latestReleaseTag(repo: string): Promise<string> {
   return decodeURIComponent(tag);
 }
 
-// One test for all tasks: e2e cannot connect again to an app after a failed test.
 test("the agent uses its own tools before it asks for a connection", { tags: [BENCH_TAG] }, async ({
   app,
   browser,
@@ -325,7 +296,6 @@ test("the agent uses its own tools before it asks for a connection", { tags: [BE
   });
   results.push(
     finish({ provider, model, task: "price", expected: String(price) }, priced, (text) =>
-      // The price moves during the turn, and the answer can write it as 98,123.45.
       [...text.replaceAll(",", "").matchAll(/\d+(?:\.\d+)?/g)].some(
         (match) => Math.abs(Number(match[0]) - price) / price < 0.03,
       ),

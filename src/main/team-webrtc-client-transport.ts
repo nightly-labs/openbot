@@ -55,20 +55,12 @@ import { TeamWebRtcFileTransfer } from "./team-webrtc-file-transfer";
 
 export const TEAM_WEBRTC_REMOTE_REQUEST_TIMEOUT_MILLISECONDS = 10 * 60_000 + 30_000;
 
-/** Node clamps a longer `setTimeout` to one millisecond, and says so on stderr. */
 const MAXIMUM_TIMER_DELAY_MILLISECONDS = 2_147_483_647;
 
-/** The wait after a failed attempt, the same steps as the Signal sockets: 500 ms, doubled, to 30 s. */
 const CONNECT_RETRY_START_MILLISECONDS = 500;
 const CONNECT_RETRY_LIMIT_MILLISECONDS = 30_000;
 
-/** An attempt that has the Signal socket must have the connection in this time. */
 const CONNECT_LIMIT_MILLISECONDS = 30_000;
-/**
- * The longest time that Signal holds an attempt for a hosted server that starts. Then the attempt
- * fails with `host_unavailable`, as it did at once before, and the next attempt gets a new ticket.
- * That ticket names the Signal machine of the host now, and its socket is new.
- */
 const HOST_WAIT_LIMIT_MILLISECONDS = 60_000;
 
 interface TeamWebRtcClientTransportEvents {
@@ -77,7 +69,6 @@ interface TeamWebRtcClientTransportEvents {
   event: [hostId: string, event: AgentEvent | TeamRealtimeEvent];
   path: [hostId: string, path: "p2p" | "relay"];
   error: [hostId: string, code: string, message: string];
-  /** An attempt to connect failed, with its failure. A cancelled or replaced attempt does not count. */
   connectFailed: [hostId: string, failure: unknown];
   desktopData: [hostId: string, data: string | ArrayBuffer];
 }
@@ -122,24 +113,9 @@ interface TeamWebRtcClientTransportOptions {
     version: string,
   ) => Effect.Effect<{ bytes: Uint8Array; mimeType: string }, CentralAuthOperationError>;
   transferDirectory: string;
-  /** Times each connection for the local trace. */
   connectTrace?: RemoteConnectTrace;
-  /**
-   * Keeps each host's session between runs. With it, the next start asks only for a ticket, and
-   * `stop` leaves the sessions open for that start instead of ending them.
-   */
   sessionCache?: RemoteSessionCache;
-  /**
-   * Development only (`OPENBOT_DEV_RTT_MS`, 0 in a packaged app): an added network round trip, to
-   * measure a connect on a real network. Each data-channel message waits half of it in each
-   * direction, and each account service read waits all of it. The Signal socket does not wait.
-   */
   developmentRoundTripMs?: number;
-  /**
-   * Development only (`OPENBOT_DEV_DOWNLINK_KBPS`, 0 in a packaged app): the speed of the link from the
-   * host, in kilobits per second, to measure a large download on a real network. A message waits until
-   * the bytes before it and its own bytes have come in at this speed, in order.
-   */
   developmentDownlinkKbps?: number;
 }
 
@@ -149,10 +125,6 @@ type DataListener = (
   data: string | ArrayBuffer,
 ) => void;
 
-/**
- * Development only: delays each message by half the added round trip and, with a speed, by the time
- * that its bytes take on that link after the bytes before it. The order stays.
- */
 function developmentLink(listener: DataListener, halfRoundTripMs: number, downlinkKbps: number): DataListener {
   if (halfRoundTripMs <= 0 && downlinkKbps <= 0) return listener;
   let linkFreeAt = 0;
@@ -171,12 +143,9 @@ interface ActiveHost {
   connected: boolean;
   connecting: Deferred.Deferred<void, RemoteWorkflowError> | null;
   cancelled: boolean;
-  /** Closed by `stop` with its session kept for the next run, so nothing may end that session. */
   released: boolean;
-  /** Fails the wait for authentication, with "cancelled" when no cause is given. */
   cancelConnectionWait: ((cause?: Error) => void) | null;
   expirationTimer: ReturnType<typeof setTimeout> | null;
-  /** The one compatibility read of this connection that learns the host protocol. */
   protocolProbe: Deferred.Deferred<void> | null;
   authentication: {
     ticket: string;
@@ -191,10 +160,6 @@ interface ActiveHost {
   } | null;
 }
 
-/**
- * A session kept after a connect attempt failed. The control plane keeps a session until the client
- * ends it, so the next attempt only needs a ticket for it.
- */
 interface RetainedSession {
   sessionId: string;
   expiresAt: number;
@@ -222,13 +187,8 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
   #stopping: Deferred.Deferred<void, RemoteWorkflowError> | null = null;
   readonly #hostProtocols = new Map<string, number>();
   readonly #active = new Map<string, ActiveHost>();
-  // A failed attempt used to end its session, so each retry against an offline host was a create, a
-  // ticket and an end: three Worker requests and a Signal webhook. Only `disconnect` ends it now.
   readonly #retainedSessions = new Map<string, RetainedSession>();
-  // Each request, typing status and desktop send to an offline host started a new attempt at once,
-  // about one each second. Until the wait ends they get the last failure. `connect` does not wait.
   readonly #connectRetries = new Map<string, { failure: RemoteWorkflowError; failures: number; retryAt: number }>();
-  /** Counts the closes of each host. A failure that ends after a close does not make requests wait. */
   readonly #closes = new Map<string, number>();
   readonly #files: TeamWebRtcFileTransfer;
   readonly #pending = new Map<
@@ -241,15 +201,11 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       profile: RemoteRequestProfile | null;
     }
   >();
-  /** When each host last answered a request, as `performance.now()`. A request deadline counts from it. */
   readonly #lastAnswerAt = new Map<string, number>();
   readonly #lastEventSequence = new Map<string, number>();
   readonly #hostPublicKeys = new Map<string, string>();
-  /** Set while the account directory is read at startup. A host without a pinned key waits for it. */
   #hostKeySync: Deferred.Deferred<void> | null = null;
-  /** The Signal address of the last ticket of this run. */
   #signalUrl: string | null = null;
-  /** Hosted servers that start. Signal holds an attempt for them until the host connects. */
   readonly #waitForHost = new Set<string>();
 
   constructor(options: TeamWebRtcClientTransportOptions) {
@@ -296,11 +252,6 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     return yield* this.#owned(this.#options.listHosts().pipe(toRemoteWorkflowError));
   }).bind(this);
 
-  /**
-   * While a hosted server starts, an attempt waits on Signal for the host, and the host's hello
-   * starts the connection at once. Without it, each retry got a new ticket and failed until the host
-   * was there. An attempt reads the value when it starts.
-   */
   setWaitForHost(hostId: string, wait: boolean): void {
     if (wait) this.#waitForHost.add(hostId);
     else this.#waitForHost.delete(hostId);
@@ -310,11 +261,6 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     this.#hostPublicKeys.set(hostId, publicKey);
   }
 
-  /**
-   * The keys of the account directory are not known yet. Until `endHostKeySync`, a connect to a host
-   * without a pinned key waits instead of failing. A host with a pinned key does not wait: the
-   * directory never replaces a pinned key.
-   */
   beginHostKeySync(): void {
     this.#hostKeySync ??= Deferred.makeUnsafe<void>();
   }
@@ -382,10 +328,6 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     );
   }).bind(this);
 
-  /**
-   * Removes a host that this account owns from the account service. The host can be offline. A host
-   * that the list no longer has is already removed, so a retry after a lost answer succeeds.
-   */
   readonly removeOwnedHost = Effect.fn("TeamWebRtcClient.removeOwnedHost")(function* (
     this: TeamWebRtcClientTransport,
     hostId: string,
@@ -443,16 +385,10 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     );
   }).bind(this);
 
-  /** Starts an attempt also while a failed one makes requests wait: a retry asked for it. */
   connect(hostId: string): Effect.Effect<void, RemoteWorkflowError> {
     return this.#owned(this.#ensureConnected(hostId, true));
   }
 
-  /**
-   * Connects like `connect`, and a host that reads connected must also answer. After a host restart,
-   * the path can stay open while the new host process ignores this peer. Each request then timed out
-   * until the app restarted.
-   */
   retry(hostId: string): Effect.Effect<void, RemoteWorkflowError> {
     return this.#owned(
       Effect.gen({ self: this }, function* () {
@@ -462,8 +398,6 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
           if (Result.isSuccess(answer)) return;
           const timedOut =
             answer.failure.cause instanceof TeamWebRtcRequestError && answer.failure.cause.code === "remote_timeout";
-          // Close the old peer now: a late answer on it would arrive before authentication and fail the
-          // protocol. The session stays.
           if (timedOut && checked.connected && this.#active.get(hostId) === checked) {
             this.#onDisconnected(hostId);
             yield* TeamClientBridge.use((bridge) => bridge.disconnect(hostId)).pipe(Effect.ignore);
@@ -474,11 +408,6 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     );
   }
 
-  /**
-   * Whether the data channel to this host is up and authenticated. `connect` resolves either way,
-   * and only the first of the two announces itself with a `connected` event, so a caller that has
-   * to reconcile its own state with the transport's needs to be able to ask.
-   */
   isConnected(hostId: string): boolean {
     return this.#active.get(hostId)?.connected === true;
   }
@@ -514,7 +443,6 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       agentCreateModel?: boolean | undefined;
       timeoutMs?: number | undefined;
       fileProgress?: RemoteFileProgress | undefined;
-      /** Gets the bytes of a binary body that the host confirmed. */
       uploadProgress?: ((sent: number, total: number) => void) | undefined;
     } = {},
   ): Effect.fn.Return<
@@ -525,7 +453,6 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     },
     RemoteWorkflowError
   > {
-    // Set once the frame exists; `bun run perf:remote` reads it. Null when nothing records.
     let profile: RemoteRequestProfile | null = null;
     return yield* this.#owned(
       Effect.gen({ self: this }, function* () {
@@ -533,11 +460,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         const method = (init.method ?? "GET").toUpperCase();
         const timeoutMs = init.timeoutMs ?? remoteWorkspaceReadTimeout(method, path);
         const startedAt = Date.now();
-        // A new connection forgets the host protocol, and an unknown protocol sends the protocol 6
-        // capability list. A v7 route that needs a v7 capability then refuses a request that the
-        // user sent before the `connected` handler read the compatibility report.
         if (path !== "/v1/compatibility") yield* this.#learnHostProtocol(hostId, timeoutMs);
-        // The protocol read uses part of the request deadline. It does not add to it.
         const remainingMs = timeoutMs === undefined ? undefined : timeoutMs - (Date.now() - startedAt);
         if (remainingMs !== undefined && remainingMs <= 0) {
           return yield* new RemoteWorkflowError({
@@ -583,22 +506,14 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
                         : { preserveSemanticTags: init.preserveSemanticTags }),
                       ...(init.agentCreateModel === undefined ? {} : { agentCreateModel: init.agentCreateModel }),
                     }),
-              // The first compatibility read of a connection sends the bootstrap list. A later one of
-              // protocol 10 sends the protocol 10 lists, so the host answers with its full set.
               ...teamCapabilityLists(capabilityProtocol, teamCapabilitiesForProtocol(capabilityProtocol)),
               ...(bodyTransferId ? { bodyTransferId } : {}),
               ...(init.contentType ? { contentType: init.contentType } : {}),
             },
           }),
         );
-        // A closed channel refuses the frame before any byte leaves, so the host did not get the
-        // request. After the computer sleeps, main can read the host as connected on a connection
-        // that the host closed. Connect again and send the same frame once. An upload stays on the
-        // connection that carried its body. Only the connection that refused the frame is marked
-        // lost: a request that fails late must not drop the connection another request just made.
         profile = startRemoteRequest(method, path, frame);
         const refusedBy = this.#active.get(hostId);
-        // The host sends the file before the answer that names it. A stopped request refuses the file.
         const progress = init.fileProgress;
         const watch = progress ? this.#files.watchIncoming(hostId, progress.size, progress.onProgress) : null;
         const envelope = yield* this.#exchange(hostId, requestId, frame, profile, remainingMs).pipe(
@@ -614,7 +529,6 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
           Effect.onInterrupt(() => watch?.stop ?? Effect.void),
           Effect.onError(() => Effect.sync(() => watch?.end(null))),
         );
-        // The answer names the file of this request. The watch removes the other files that it took.
         watch?.end(
           isDynamicRecord(envelope) && isDynamicRecord(envelope.file) && isString(envelope.file.transferId)
             ? envelope.file.transferId
@@ -628,10 +542,6 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         const fileRecord = isDynamicRecord(envelope.file) ? envelope.file : null;
         const transferId = fileRecord && isString(fileRecord.transferId) ? fileRecord.transferId : null;
         const file = transferId ? yield* this.#files.consume(hostId, transferId) : undefined;
-        // The envelope check above catches a frame that is not shaped like a response. This catches a
-        // well-formed frame whose *body* the released V3 adapter refuses, which is the same kind of
-        // failure and has to carry the same code: a plain error here reads to the caller as an ordinary
-        // request failure, so the host stays healthy and reconnectable while talking nonsense.
         const status = envelope.status;
         const body = file
           ? null
@@ -662,11 +572,9 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
                   }),
               ),
             );
-        // The frozen response codec leaves the skill name of a skill question out; the wire body has it.
         if (this.#sendsSkillSuggestionNames(hostId)) addSkillSuggestionNames(body, envelope.body);
         if (method === "GET" && path === "/v1/compatibility" && status === 200) {
           const support = yield* remoteDecode(() => decodeTeamProtocolSupportExpanded(body));
-          // The highest protocol of both sides: a newer host must not get lists that this app cannot make.
           this.#hostProtocols.set(hostId, Math.min(support.protocol.maximum, LOCAL_TEAM_PROTOCOL.maximum));
         }
         return { status: envelope.status, body, ...(file ? { file } : {}) };
@@ -674,11 +582,6 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     );
   }).bind(this);
 
-  /**
-   * Reads the compatibility report once for each connection when the host protocol is not known.
-   * Requests that arrive during the read wait for it. A failed read is not tried again on the same
-   * connection: the request keeps the protocol 6 list, which every host accepts.
-   */
   readonly #learnHostProtocol = Effect.fn("TeamWebRtcClient.learnHostProtocol")(function* (
     this: TeamWebRtcClientTransport,
     hostId: string,
@@ -689,7 +592,6 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     if (active.protocolProbe) return yield* Deferred.await(active.protocolProbe);
     const probe = Deferred.makeUnsafe<void>();
     active.protocolProbe = probe;
-    // The read must not take longer than the deadline of the request that waits for it.
     const readTimeoutMs = remoteWorkspaceReadTimeout("GET", "/v1/compatibility");
     const timeoutMs =
       requestTimeoutMs === undefined || readTimeoutMs === undefined
@@ -701,7 +603,6 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     );
   }).bind(this);
 
-  /** Sends one request frame and waits for its response. */
   readonly #exchange = Effect.fn("TeamWebRtcClient.exchange")(function* (
     this: TeamWebRtcClientTransport,
     hostId: string,
@@ -737,7 +638,6 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       };
       this.#pending.set(requestId, entry);
     }
-    // The cleanup covers the send too: an interrupted send must not leave the entry and its timer.
     return yield* Effect.gen({ self: this }, function* () {
       const sending = yield* Effect.forkChild(
         Effect.gen({ self: this }, function* () {
@@ -775,15 +675,10 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     return yield* this.#owned(this.#close(hostId, "end"));
   }).bind(this);
 
-  /** Forgets the sessions kept for the next run, such as at sign-out or when another account signs in. */
   forgetStoredSessions(): Effect.Effect<void> {
     return this.#options.sessionCache?.clear() ?? Effect.void;
   }
 
-  /**
-   * Closes the connection to a host. `end` also ends its session, and forgets it for the next run.
-   * `keep` leaves the session open and kept, for the next run of the app.
-   */
   readonly #close = Effect.fn("TeamWebRtcClient.close")(function* (
     this: TeamWebRtcClientTransport,
     hostId: string,
@@ -796,7 +691,6 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       if (session === "keep") active.released = true;
       active.cancelConnectionWait?.();
     }
-    // A request sent before disconnect may have committed. Fail it without replaying the request.
     for (const [requestId, pending] of this.#pending) {
       if (pending.hostId !== hostId) continue;
       clearTimeout(pending.timer);
@@ -816,7 +710,6 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     const disconnected = yield* TeamClientBridge.use((bridge) => bridge.disconnect(hostId)).pipe(Effect.result);
     const disconnectError = Result.isFailure(disconnected) ? disconnected.failure.cause : undefined;
     if (session === "end") {
-      // Before the session ends: a kept session that ended only costs the next start a request.
       if (this.#options.sessionCache) yield* this.#options.sessionCache.delete(hostId);
       if (sessionId)
         yield* this.#options
@@ -850,10 +743,6 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     this.#stopping = done;
     return yield* Effect.gen({ self: this }, function* () {
       const hostIds = new Set([...this.#active.keys(), ...this.#retainedSessions.keys()]);
-      // The app quits. A session that the next run can read stays open for it: the account service
-      // gives this device the same session again in any case, so ending it only costs the next start
-      // a request. Every other session ends, as before: without a cache, with the setting off, or
-      // when the cache does not hold it.
       yield* Effect.forEach(
         [...hostIds],
         (hostId) =>
@@ -869,7 +758,6 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       this.#options.bridge.off("error", this.#onError);
       this.#options.bridge.off("signalReady", this.#onSignalReady);
       this.#options.bridge.off("signalOpen", this.#onSignalOpen);
-      // A connect that waits for host keys is cancelled now, but it ends only after this wait.
       this.endHostKeySync();
       yield* this.#files.stop();
       while (this.#operations.size)
@@ -878,7 +766,6 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     }).pipe(Effect.onExit((exit) => Deferred.done(done, exit)));
   }).bind(this);
 
-  /** Whether a transfer is moving right now, either direction. */
   hasActiveTransfers(): boolean {
     return this.#files.hasActiveTransfers();
   }
@@ -896,7 +783,6 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     let storedSession = false;
     if (!current && sessionCache) {
       const stored = sessionCache.get(principalId, hostId);
-      // A session of the last run. The account service refuses it if it ended; then a new one starts.
       if (stored && stored.expiresAt > Date.now() + 30_000) {
         current = { ...stored, principalId, connected: false, connecting: null };
         storedSession = true;
@@ -915,8 +801,6 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     if (connecting) return yield* Deferred.await(connecting);
     const retry = this.#connectRetries.get(hostId);
     if (retry && !retryNow && Date.now() < retry.retryAt) return yield* retry.failure;
-    // `stop` closes only the attempts that exist when it starts, and it waits for this operation. A
-    // later attempt would open a peer during shutdown, or wait 30 s after `stop` removed the listeners.
     if (this.#stopping)
       return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.connectionCancelled")) });
     const active: ActiveHost = {
@@ -942,8 +826,6 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     return yield* this.#connect(hostId, active, current?.sessionId || null, storedSession).pipe(
       Effect.tapError((failure) =>
         Effect.sync(() => {
-          // A failed attempt leaves `#active` before it closes the bridge. A `disconnect` in that time
-          // cannot cancel it, and a newer attempt can start.
           const newer = this.#active.get(hostId);
           if (active.cancelled || (newer && newer !== active) || (this.#closes.get(hostId) ?? 0) !== closes) return;
           const failures = (this.#connectRetries.get(hostId)?.failures ?? 0) + 1;
@@ -981,15 +863,11 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.connectionCancelled")) });
       hostPublicKey = this.#hostPublicKeys.get(hostId);
     }
-    // The failure has its own code, so the user is not told that the host is down (#11530).
     if (!hostPublicKey)
       return yield* new RemoteWorkflowError({
         cause: new TeamWebRtcConnectError("host_key_missing", sourceText("error.remote.hostKeyMissing")),
       });
     const connectTrace = this.#options.connectTrace;
-    // The hidden window of the bridge loads while the control plane makes the session and the ticket.
-    // `bridge.connect` below waits for the same start. A failure here is not this attempt's failure:
-    // `bridge.connect` starts the window again and reports its own error.
     yield* Effect.forkChild(
       TeamClientBridge.use((bridge) => bridge.start()).pipe(
         Effect.tap(() => Effect.sync(() => connectTrace?.mark(hostId, "bridge"))),
@@ -997,9 +875,6 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       ),
       { startImmediately: true },
     );
-    // The Signal socket opens while the ticket is made, at the address of the last ticket. The hello
-    // with the ticket goes on it only when the ticket names the same address. A failure is ignored:
-    // `bridge.connect` then opens its own socket, as before.
     const preparedSignalUrl = this.#options.sessionCache?.signalUrl(active.principalId) ?? this.#signalUrl;
     const preparingSignal = preparedSignalUrl
       ? yield* Effect.forkChild(
@@ -1035,7 +910,6 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       }).pipe(
         Effect.catch((failure) =>
           Effect.gen({ self: this }, function* () {
-            // Only an ended session is replaced. Other failures keep it for the next ticket request.
             if (!existingSessionId || !isEndedSessionError(failure.cause)) return yield* failure;
             yield* this.#options
               .endSession(existingSessionId)
@@ -1058,9 +932,6 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     }).pipe(
       Effect.catch((failure) =>
         Effect.gen({ self: this }, function* () {
-          // The prepared Signal socket would stay open until its lifetime ends. `disconnect` closes
-          // it. A newer attempt for this host owns the peer, so only the current attempt closes it.
-          // The prepare stops first, so that its command cannot arrive after the disconnect.
           if (preparingSignal) yield* Fiber.interrupt(preparingSignal);
           if (preparingSignal && this.#active.get(hostId) === active)
             yield* TeamClientBridge.use((bridge) => bridge.disconnect(hostId)).pipe(Effect.catch(() => Effect.void));
@@ -1087,7 +958,6 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       );
     let cleanupConnectionWait: () => void = () => undefined;
     const waitForHost = this.#waitForHost.has(hostId);
-    // Subscribe before bridge.connect: a bridge can deliver authentication events before it resolves.
     const connected = Deferred.makeUnsafe<void, RemoteWorkflowError>();
     {
       const bridge = this.#options.bridge;
@@ -1109,12 +979,9 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         cleanup();
         reject(cause);
       };
-      // Signal said ready: both ends are on Signal, and the direct path comes next.
       let signalReady = false;
       const timeOut = () => {
         cleanup();
-        // The code names the step that did not finish (#6873). Only after Signal said ready and before
-        // a data channel opened is it the direct path, which a firewall, VPN or proxy can block.
         const stage = active.authentication?.started ? "auth" : signalReady ? "ice" : "signal";
         reject(
           new TeamWebRtcConnectError(
@@ -1125,9 +992,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       };
       let timer = setTimeout(timeOut, CONNECT_LIMIT_MILLISECONDS);
       let hostWaited = false;
-      // Signal holds the attempt. The manager gets the same error as when Signal refused it at once.
       const onHostWaiting = (waitingHostId: string) => {
-        // A Signal socket that opens again says it again. The first one sets the limit.
         if (waitingHostId !== hostId || hostWaited) return;
         hostWaited = true;
         clearTimeout(timer);
@@ -1136,7 +1001,6 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
           HOST_WAIT_LIMIT_MILLISECONDS,
         );
       };
-      // The host connected to Signal. The connection has the usual time from now.
       const onSignalReady = (readyHostId: string) => {
         if (readyHostId !== hostId) return;
         signalReady = true;
@@ -1181,8 +1045,6 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
           ...(waitForHost ? { waitForHost: true } : {}),
         }),
       ).pipe(
-        // The connect command fails only on this computer: the bridge window did not start or did not
-        // answer. Signal and the host report their failures later, as events with their own codes.
         Effect.mapError(
           () =>
             new RemoteWorkflowError({
@@ -1223,7 +1085,6 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     return cache.get(current.principalId, hostId)?.sessionId === current.sessionId;
   }
 
-  /** Keeps the session of an attempt that failed on its own. A cancelled attempt ends its session. */
   #retainSession(hostId: string, active: ActiveHost, sessionId: string): boolean {
     if (active.cancelled || this.#active.get(hostId) !== active) return false;
     this.#retainedSessions.set(hostId, {
@@ -1275,13 +1136,6 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     if (active.expirationTimer) clearTimeout(active.expirationTimer);
     if (!active.expiresAt) return;
     const remaining = Math.max(0, active.expiresAt - Date.now() - 30_000);
-    // Wait in bounded steps, exactly as the host schedules its half of the same session in
-    // `#scheduleSessionExpiration`. An account session is persistent -- the control plane answers
-    // `startSession` with `PERSISTENT_SESSION_EXPIRES_AT`, the largest date JavaScript has -- so the
-    // delay is a quarter of a million years and overflows Node's signed 32-bit timer range. Node
-    // resolves that by firing in one millisecond, which disconnected the client roughly as fast as
-    // it finished authenticating: the channel closed under the first request, and the caller waited
-    // out the full ten-minute request timeout for a frame that had nowhere to go.
     active.expirationTimer = setTimeout(
       () => {
         active.expirationTimer = null;
@@ -1370,8 +1224,6 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
   readonly #onDisconnected = (hostId: string): void => {
     const active = this.#active.get(hostId);
     if (!active) return;
-    // The handshake started on the channel that closed, and a new channel does not start it again.
-    // Without this, the attempt and each caller that joined it waited for the 30 s timeout.
     if (!active.connected && active.authentication?.started)
       active.cancelConnectionWait?.(
         new TeamWebRtcConnectError("host_disconnected", sourceText("error.remote.hostDisconnected")),
@@ -1569,7 +1421,6 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         return;
       }
       if (decoded.status === "known") {
-        // The frozen event codec leaves the skill name of a skill question out; the wire frame has it.
         if (this.#sendsSkillSuggestionNames(hostId)) addSkillSuggestionNames(decoded.event, frame.payload);
         this.emit("event", hostId, decoded.event);
       }
@@ -1584,7 +1435,6 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     }
   }
 
-  /** A protocol 9 host adds `skillSuggestion` for this client, which advertises skill-learning-v1. */
   #sendsSkillSuggestionNames(hostId: string): boolean {
     return (this.#hostProtocols.get(hostId) ?? 0) >= TEAM_PROTOCOL_V9;
   }
@@ -1630,10 +1480,6 @@ export class TeamWebRtcRequestError extends Schema.TaggedError<TeamWebRtcRequest
   }
 }
 
-/**
- * The connection failed before the host answered. The code is the Signal or the bridge code, or
- * `connect_timeout_<step>` for the step that did not finish in time: `signal`, `ice` or `auth`.
- */
 class TeamWebRtcConnectError extends Schema.TaggedError<TeamWebRtcConnectError>()("TeamWebRtcConnectError", {
   code: Schema.String,
   message: Schema.String,
@@ -1659,10 +1505,6 @@ function binaryBody(value: unknown): Uint8Array | null {
   return null;
 }
 
-/**
- * The bridge refused a frame because the data channel is closed. No byte of the frame left. A host
- * error response is a `TeamWebRtcRequestError` with the host's message, so it never matches.
- */
 function isClosedChannelError(error: unknown): boolean {
   return (
     error instanceof Error &&
@@ -1671,7 +1513,6 @@ function isClosedChannelError(error: unknown): boolean {
   );
 }
 
-/** The account API answers 403 or 404 for a session that ended, expired, or does not exist. */
 function isEndedSessionError(error: unknown): boolean {
   return error instanceof Error && "status" in error && (error.status === 403 || error.status === 404);
 }

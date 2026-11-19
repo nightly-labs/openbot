@@ -1,15 +1,3 @@
-/* The chat background that the user picks for each scheme in Settings › General. `chat-background.ts`
- * sets both colors on the root; the one of the scheme that the window shows replaces the canvas in
- * conversations only, not in the pages of the window. Bubbles, the composer and code blocks keep their
- * own surfaces over it.
- *
- * A color that makes text hard to read is made darker in Dark and lighter in Light. In Dark, an OKLCH
- * lightness of at most 0.30 keeps `--openbot-text-muted` at about 4.5:1; the default canvas is 0.22.
- * In Light, at least 0.95 keeps `--openbot-text-muted` at about 4.5:1; the default canvas is 0.97.
- * The chroma limit keeps each hue at that lightness in sRGB. A color out of sRGB is clipped, and the
- * clip makes it lighter: the most saturated sRGB color at hue 29 gave 3.6:1 in Dark. The presets are
- * under the limit. `readableChatBackground` in `@openbot/brand/chat-colors` applies the same limits on
- * mobile; keep the two the same. */
 :root[data-openbot-color-scheme="dark"][data-openbot-chat-background-dark] {
   --chat-background: oklch(from var(--openbot-chat-background-dark) min(l, 0.3) min(c, 0.05) h);
 }
@@ -26,13 +14,11 @@
   --openbot-bg-canvas-clear: oklch(from var(--chat-background) l c h / 0);
 }
 
-/* The light scroll edge fades into the canvas; the dark one does not use the canvas. */
 :root[data-openbot-color-scheme="light"][data-openbot-chat-background-light]
-:is(.conversation-panel:not(.window-page), .direct-conversation) {
+  :is(.conversation-panel:not(.window-page), .direct-conversation) {
   --openbot-scroll-edge-overlay: oklch(from var(--chat-background) l c h / 0.72);
 }
 
-/* The transparent window keeps its blur: the color is a tint, as the default canvas is there. */
 :root[data-openbot-window-glass][data-openbot-color-scheme="dark"][data-openbot-chat-background-dark]
   .app-window
   :is(.conversation-panel:not(.window-page), .direct-conversation),
@@ -42,9 +28,6 @@
   --openbot-bg-canvas: color-mix(in srgb, var(--chat-background) 25%, transparent);
 }
 
-/* In the window, the pane is transparent over the card that the agent list shares, and its header is
- * in the top row. A layer under the pane paints the card part of the chat, with the card's right
- * corners. A side panel in the chat is on it too, as it uses the chat canvas. */
 @media (min-width: 721px) {
   :root[data-openbot-color-scheme="dark"][data-openbot-chat-background-dark]
     .app-window
