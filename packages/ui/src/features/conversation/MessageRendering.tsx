@@ -56,7 +56,13 @@ import { createSmoothHeightResize } from "./createSmoothHeightResize";
 import { DataTable, type MessageContentBlock, messageContentBlocks, reuseUnchangedBlocks } from "./DataTable";
 import { messageFileReferences } from "./FileReference";
 import { ImageGeneration } from "./ImageGeneration";
-import { ImageGallery, ImageLightbox, type ImageLightboxOpening, isLightboxImage } from "./ImageLightbox";
+import {
+  type ImageCopies,
+  ImageGallery,
+  ImageLightbox,
+  type ImageLightboxOpening,
+  isLightboxImage,
+} from "./ImageLightbox";
 import {
   MarkdownInlineText,
   MarkdownMessageText,
@@ -346,6 +352,8 @@ export function MessageBody(props: {
   onOpenTag?: ((kind: "tab" | "thread", id: string) => void) | undefined;
   onDownload?: ((attachment: AttachmentSummary) => void) | undefined;
   mediaSource?: AttachmentMediaSource | undefined;
+  /** The small copies of a joined server's images, for the gallery and the viewer. */
+  imageCopies?: ImageCopies | undefined;
   /** The download state of attachments from a joined server. */
   downloads?: AttachmentDownloads | undefined;
   /**
@@ -436,6 +444,8 @@ export function MessageBody(props: {
           .map((reference) => reference.attachment.id),
       ),
   );
+  /** The images of a client that gets no `previewUrl`: the small copies when the chat shows them. */
+  const imageSource = createMemo(() => props.imageCopies?.mediaSource ?? props.mediaSource);
   /* The web client gets no `previewUrl`. An image that the host sent shows full size, as on desktop.
      Each loaded image keeps one object, so a load elsewhere does not draw it again. */
   const mediaImages = new Map<string, AttachmentSummary>();
@@ -445,7 +455,7 @@ export function MessageBody(props: {
   const shownAttachments = createMemo<AttachmentSummary[]>((previous = []) =>
     (props.message.attachments ?? []).map((attachment, index) => {
       if (attachment.previewUrl || attachment.previewKind !== "image") return attachment;
-      const url = props.mediaSource?.url(attachment.id);
+      const url = imageSource()?.url(attachment.id);
       if (!url) {
         const sent = sentImages.get(attachment.id);
         if (sent) return sent;
@@ -535,7 +545,7 @@ export function MessageBody(props: {
   const loadLimit = (attachment: AttachmentSummary) =>
     props.message.imageGeneration && props.message.attachments?.[0]?.id === attachment.id ? "generated" : "thumbnail";
   const arrivingImage = (attachment: AttachmentSummary) => {
-    const source = props.mediaSource;
+    const source = imageSource();
     return (
       source !== undefined &&
       attachment.previewKind === "image" &&
@@ -561,7 +571,7 @@ export function MessageBody(props: {
   createEffect(
     () => standaloneImageAttachments().filter((attachment) => !attachment.previewUrl),
     (arriving) => {
-      const source = props.mediaSource;
+      const source = imageSource();
       const unloaded = (attachment: AttachmentSummary) =>
         setUnloadedImages((current) => new Set(current).add(attachment.id));
       for (const attachment of arriving) {
@@ -621,11 +631,15 @@ export function MessageBody(props: {
     if (file) props.onDownloadImageFile?.(file);
     else props.onDownload?.(image);
   };
-  const [lightbox, setLightbox] = createSignal<(ImageLightboxOpening & { markdown?: boolean }) | null>(null);
+  const [lightbox, setLightbox] = createSignal<
+    (ImageLightboxOpening & { markdown?: boolean; copies?: boolean }) | null
+  >(null);
   const lightboxImages = createMemo(() => shownAttachments().filter(isLightboxImage));
   /* An image opens in the viewer with the other images of its message. A quoted message's image
      is not one of them, so it opens alone. Other files open in the preview panel. */
-  const openAttachment = (attachment: AttachmentSummary, origin?: HTMLElement) => {
+  /* The viewer starts from the small copy only when the tile showed one: a gallery tile, or any image
+     of a client that loads copies. A lone desktop image shows its whole file, and so does its viewer. */
+  const openAttachment = (attachment: AttachmentSummary, origin?: HTMLElement, fromGallery = false) => {
     if (isLightboxImage(attachment)) {
       const named = fileImages().some((image) => image.id === attachment.id);
       const siblings = named ? fileImages() : lightboxImages();
@@ -635,6 +649,7 @@ export function MessageBody(props: {
         index: images.findIndex((image) => image.id === attachment.id),
         origin,
         markdown: named,
+        copies: !named && (fromGallery || props.imageCopies?.mediaSource !== undefined),
       });
     } else if (canPreviewAttachment(attachment)) {
       props.onPreview(attachment);
@@ -695,7 +710,12 @@ export function MessageBody(props: {
   const imageBlock = () => (
     <Switch>
       <Match when={standaloneImageAttachments().length > 1}>
-        <ImageGallery images={standaloneImageAttachments()} onOpen={openAttachment} onDownload={props.onDownload} />
+        <ImageGallery
+          images={standaloneImageAttachments()}
+          onOpen={(attachment, origin) => openAttachment(attachment, origin, true)}
+          onDownload={props.onDownload}
+          copies={props.imageCopies}
+        />
       </Match>
       <Match when={standaloneImageAttachments().length === 1}>
         <div class="message-image-attachments">
@@ -731,6 +751,7 @@ export function MessageBody(props: {
               : !opening().markdown && Boolean(props.onDownload)
           }
           macWindowControls={props.macWindowControls}
+          copies={opening().copies ? props.imageCopies : undefined}
           onClose={() => setLightbox(null)}
         />
       )}
@@ -942,7 +963,7 @@ export function MessageBody(props: {
         <div class="message-attachments-group">
           <AttachmentCards
             attachments={standaloneFileAttachments()}
-            mediaSource={props.mediaSource}
+            mediaSource={imageSource()}
             downloads={props.downloads}
             onPreview={openAttachment}
             onAction={props.onAttachmentAction}

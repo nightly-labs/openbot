@@ -55,6 +55,7 @@ import { ContextUsageMeter, type ContextUsageView } from "@openbot/ui/features/c
 import { ApprovalCard } from "@openbot/ui/features/conversation/ConversationPrompts";
 import { dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
 import { CHAT_TIME_GAP_MS, continuesSenderRun } from "@openbot/ui/features/conversation/chat-grouping";
+import type { ImageCopies } from "@openbot/ui/features/conversation/ImageLightbox";
 import {
   preferredMessageScrollBehavior,
   ScrollToLatestButton,
@@ -194,6 +195,8 @@ export interface AgentThreadViewProps {
   onRemoveAttachment?: ((attachment: DraftAttachment) => void) | undefined;
   /** Loads the images of a client that gets no `previewUrl`. */
   mediaSource?: AttachmentMediaSource | undefined;
+  /** The small copies of a joined server's images, for the gallery and the viewer. */
+  imageCopies?: ImageCopies | undefined;
   /** The download state of attachments from a joined server. */
   downloads?: AttachmentDownloads | undefined;
   onDraftChange: (text: string) => void;
@@ -1015,6 +1018,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                           onOpenSharedFile={sharedFileOpener(props.agent.id)}
                           onOpenWorkspaceFile={workspaceFileOpener(props.agent.id)}
                           mediaSource={props.mediaSource}
+                          imageCopies={props.imageCopies}
                           downloads={props.downloads}
                           onDownload={(attachment) => props.onAttachmentAction(attachment, "download")}
                           macWindowControls={props.macWindowControls}

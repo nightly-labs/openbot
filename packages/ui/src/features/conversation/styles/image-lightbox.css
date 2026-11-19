@@ -189,6 +189,8 @@
   place-items: center;
   padding: 0 calc(var(--openbot-space-8) * 2);
   transform: translateX(calc(var(--image-lightbox-slide) * 100%));
+  /* The small copy of an image sizes itself from the slide (`.image-lightbox-image-copy`). */
+  container-type: size;
 }
 
 /* An image smaller than the stage shows one image pixel on each screen pixel (`ImageLightbox.tsx`). */
@@ -201,6 +203,15 @@
   will-change: transform;
   /* A drag moves a zoomed image; the browser must not start a drag of the file. */
   -webkit-user-drag: none;
+}
+
+/* The small copy of a joined server's image takes the box that its full image fills, so the image
+ * does not grow when the full one replaces it (`ImageLightbox.tsx`). */
+.image-lightbox-image-copy {
+  width: min(100cqw, 100cqh * var(--image-lightbox-ratio));
+  max-width: none;
+  max-height: none;
+  aspect-ratio: var(--image-lightbox-ratio);
 }
 
 /* A layer of its own would scale the fitted bitmap, so the zoomed image draws again, sharp. */

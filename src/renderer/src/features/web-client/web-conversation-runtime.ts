@@ -13,6 +13,7 @@ import {
 import { AGENT_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-folders-v1";
 import { AGENT_INSTRUCTIONS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-instructions-v1";
 import { AGENT_MEMORY_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
+import { ATTACHMENT_PREVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-preview-v1";
 import {
   decodeFeedbackWithdrawResult,
   FEEDBACK_WITHDRAW_CAPABILITY,
@@ -182,7 +183,12 @@ export function createWebConversationRuntime(
   const routinePauseReasonsEnabled = () => hasCapability?.(ROUTINE_PAUSE_REASONS_CAPABILITY) === true;
   const webLiveVoice = useWebLiveVoice();
   const listeners = new Set<(event: AttachmentImportEvent) => void>();
-  const attachmentMedia = createWebAttachmentMedia(remote, hostId);
+  const attachmentMedia = createWebAttachmentMedia(
+    remote,
+    hostId,
+    undefined,
+    () => hasCapability?.(ATTACHMENT_PREVIEW_CAPABILITY) === true,
+  );
   const files = createWebAttachmentFiles(remote, hostId, attachmentMedia);
   let importing: { cancelled: boolean; serverId: string } | undefined;
   // A new upload cancels the one in flight (`uploadGeneration` in web-runtime.ts), so one import runs
@@ -498,6 +504,13 @@ export function createWebConversationRuntime(
     },
     previewAttachment: files.preview,
     attachmentMedia,
+    // A tile shows the small copy that `attachmentMedia` loaded; the viewer loads the whole file.
+    imageCopies: {
+      mediaSource: attachmentMedia.withCopies,
+      copyUrl: (image) => attachmentMedia.copyUrl(image.id),
+      fullUrl: (image) => attachmentMedia.url(image.id),
+      loadFull: (image) => attachmentMedia.load(image, "generated"),
+    },
     visualPage: files.visualPage,
     async importFiles(files) {
       if (files.length > 0) await importPick(files);
