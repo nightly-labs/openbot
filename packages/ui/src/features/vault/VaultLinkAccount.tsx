@@ -20,11 +20,9 @@ import { useText } from "../../text";
 
 export interface VaultLinkAccountProps {
   status: LinkAccountStatus;
-  /** Opens Link's sign-in page in the browser. The status changes when the user approves there. */
   onConnect: () => Promise<void>;
   onCancel: () => Promise<void>;
   onDisconnect: () => Promise<void>;
-  /** Where the menu opens, so it stays inside the settings page. */
   menuMount?: HTMLElement | undefined;
 }
 
@@ -34,13 +32,8 @@ interface LinkUi {
   disconnecting: boolean;
 }
 
-/** The word in the Link mark. It is artwork, so it is not translated. */
 const LINK_MARK = "link";
 
-/**
- * The Payment accounts group of the Cards tab: the Link account of this computer. An agent asks the
- * user to approve each payment in Link and gets a one-time card.
- */
 export function VaultLinkAccount(props: VaultLinkAccountProps) {
   const { t, errorMessage, sourceText } = useText();
   const [ui, setUi] = createStore<LinkUi>({ busy: false, failure: null, disconnecting: false });
@@ -68,12 +61,10 @@ export function VaultLinkAccount(props: VaultLinkAccountProps) {
   const detail = () => {
     if (props.status.state === "pending") return t("vault.link.waiting");
     if (props.status.state === "connected") return props.status.email ?? "";
-    // Main sends its error as source text, so it shows in the user's language.
     if (props.status.error) return sourceText(props.status.error);
     return props.status.state === "expired" ? t("error.connector.linkExpired") : "";
   };
   const failed = () => props.status.state !== "pending" && props.status.state !== "connected" && detail() !== "";
-  // A failed or expired sign-in shows its reason in the danger colour.
   const detailClass = () => (failed() ? "vault-truncate vault-link-error" : "vault-truncate");
 
   return (
@@ -119,7 +110,6 @@ export function VaultLinkAccount(props: VaultLinkAccountProps) {
                 {t("vault.link.cancel")}
               </Button>
             </Show>
-            {/* An expired sign-in keeps its file, so Disconnect stays available. */}
             <Show when={props.status.state === "connected" || props.status.state === "expired"}>
               <DropdownMenu.Root placement="bottom-end" gutter={4} modal={false}>
                 <DropdownMenu.Trigger
@@ -178,7 +168,6 @@ export function VaultLinkAccount(props: VaultLinkAccountProps) {
   );
 }
 
-/** The Link mark on the light tile of the card brands, in Link's fixed colours. */
 function LinkLogo() {
   return (
     <span class="vault-logo vault-card-logo vault-link-logo" aria-hidden="true">

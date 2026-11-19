@@ -3,13 +3,6 @@ import { fileURLToPath } from "node:url";
 import { Schema } from "effect";
 import { loadSharedDevelopmentEnvironment } from "./development-environment";
 
-// Calls the OpenPanel MCP server for the openpanel skill. The token is OPENPANEL_MCP_TOKEN, the same
-// root client in apps/auth-api/.env.dev and apps/auth-api/.env.production. It reads analytics and
-// changes dashboards and reports. It is decrypted for each run and is never written to disk or output.
-//
-//   bun scripts/openpanel.ts tools [name]
-//   bun scripts/openpanel.ts call <tool> ['<json arguments>']
-
 const SERVER_URL = "https://analytics.openbot.run/api/mcp";
 
 const McpParams = Schema.Record(Schema.String, Schema.Unknown);
@@ -39,8 +32,6 @@ const decodeToolResult = Schema.decodeUnknownSync(
   }),
 );
 
-// The server is stateless: each request stands alone, so the script sends no initialize request.
-// This keeps each command to one request of the 60 per minute that the server allows.
 function createClient(token: string) {
   return async function request<A>(method: string, params: McpParams, decode: (result: unknown) => A): Promise<A> {
     const response = await fetch(SERVER_URL, {

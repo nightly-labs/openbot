@@ -10,12 +10,10 @@ import { LandingFooter } from "../landing/LandingFooter";
 import { LandingIcon } from "../landing/LandingIcon";
 import { SiteHeader } from "../landing/SiteHeader";
 
-// Browser-only, as on the shared agent page: the Worker renders an empty box and the browser draws it.
 const AgentAvatar = lazy(() =>
   import("@openbot/ui/features/agents/AgentAvatar").then((module) => ({ default: module.AgentAvatar })),
 );
 
-/** The page around every Marketplace screen: the site header and footer, and the catalog of the page's language. */
 export function MarketplaceFrame(props: { lang: string; locale: TranslatedLocale; children: JSX.Element }) {
   return (
     <div class="landing-page plugin-index marketplace-site" lang={props.lang}>
@@ -28,7 +26,6 @@ export function MarketplaceFrame(props: { lang: string; locale: TranslatedLocale
   );
 }
 
-/** The browser draws the avatar after hydration; until then the box keeps its place. It fills its box. */
 export function AgentMark(props: { agent: MarketplaceAgentSummary }) {
   const [mounted, setMounted] = createSignal(false);
   onSettled(() => {
@@ -51,7 +48,6 @@ export function AgentMark(props: { agent: MarketplaceAgentSummary }) {
   );
 }
 
-/** A skill's own square icon, or the blocks glyph when the catalog has none. */
 export function SkillIcon(props: { skill: Pick<MarketplaceSkillSummary, "iconUrl"> }) {
   const glyph = () => <LandingIcon name="blocks" class="marketplace-site-glyph" />;
   return (
@@ -61,7 +57,6 @@ export function SkillIcon(props: { skill: Pick<MarketplaceSkillSummary, "iconUrl
   );
 }
 
-/** The shield after a verified name, as in the app. A screen reader reads ", verified by OpenBot" after the name. */
 export function VerifiedMark(props: { verified: boolean }) {
   const { t } = useText();
   return (
@@ -72,7 +67,6 @@ export function VerifiedMark(props: { verified: boolean }) {
   );
 }
 
-/** A link to one listing's page, with the site's router. */
 export function ListingLink(props: { link: MarketplaceListingLink; class: string; children: JSX.Element }) {
   return (
     <Switch>
@@ -92,10 +86,6 @@ export function ListingLink(props: { link: MarketplaceListingLink; class: string
 
 const COPIED_MS = 1600;
 
-/**
- * The listing's `openbot.run` address. A developer's Worker on this computer gives its own loopback
- * address; any other origin, such as a preview deployment, gives the public one.
- */
 function shareUrl(link: MarketplaceListingLink): string {
   try {
     return createMarketplaceShareUrl(link, window.location.origin);
@@ -112,7 +102,6 @@ export function CopyLinkButton(props: { link: MarketplaceListingLink }) {
     try {
       await navigator.clipboard.writeText(shareUrl(props.link));
     } catch {
-      // The clipboard is not allowed. The address bar holds the same link.
       return;
     }
     setCopied(true);

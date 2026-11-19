@@ -33,27 +33,20 @@ import {
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
+import { SaveError } from "@/shared/components/save-error";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
-/** One model and account the agent can move to, as the backup model controls show it. */
 interface BackupModelOption {
   key: string;
   choice: AgentModelChoice;
   label: string;
-  /** False when the host has no such model now, or the account is not connected. The agent skips it. */
   ready: boolean;
 }
 
 type BackupModelsProps = AgentHostFieldsProps;
 
-/**
- * The backup models of an agent, read from and saved on its host through `agent-backup-models-v1`.
- * Only an owner or admin of a host that serves it reads them; the host checks the role again on every
- * call. The shared host record reads them again on each `agents-changed` event, so a change made on
- * desktop or another phone shows here while the page is open.
- */
 function useAgentBackupModels(props: BackupModelsProps) {
   const workspace = useMobileWorkspaceActions();
   const canManage = useMobileWorkspaceSelector((current) => current.canManageAgentBackupModels(props.agent.serverId));
@@ -77,10 +70,6 @@ function useBackupModelSummary() {
   };
 }
 
-/**
- * Agent info > Brain: the row that opens the backup models page. Hidden for a member and an older host.
- * It shows before the host answers, so the section does not move; the summary shows when it answers.
- */
 export function AgentBackupModelsRow(props: BackupModelsProps) {
   const { t } = useText();
   const summary = useBackupModelSummary();
@@ -132,7 +121,6 @@ function listedModelName(model: AgentModelOption | undefined, fallback: string, 
   return model.provider === "cursor" ? cursorModelSpeedLabel(model.name, model.id, fastLabel) : model.name;
 }
 
-/** A Cursor speed row is the same choice when the saved id still matches that speed. */
 function choiceAlreadyListed(saved: AgentModelChoice, listed: AgentModelChoice): boolean {
   if (sameAgentModelChoice(saved, listed)) return true;
   if (listed.provider !== "cursor" || saved.provider !== "cursor") return false;
@@ -141,7 +129,6 @@ function choiceAlreadyListed(saved: AgentModelChoice, listed: AgentModelChoice):
   return savedAccount === listedAccount && cursorModelSelected(listed.model, saved.model);
 }
 
-/** Builds the options from the host's models and accounts, with the same rules as desktop. */
 function useBackupModelOptions(models: readonly AgentModelOption[] | undefined, accounts: HostProviderAccounts | null) {
   const { t } = useText();
   const accountName = useProviderAccountName();
@@ -163,7 +150,6 @@ function useBackupModelOptions(models: readonly AgentModelOption[] | undefined, 
               account: accountName(account, accountIndex),
             })
           : modelName,
-      // Until the host answers with its models and accounts, a saved entry does not show as skipped.
       ready:
         (models === undefined || model !== undefined) &&
         (providerAccounts !== undefined
@@ -188,10 +174,6 @@ function useBackupModelOptions(models: readonly AgentModelOption[] | undefined, 
   return { option, all };
 }
 
-/**
- * The saved settings, the options and the save of the backup models page and its model picker.
- * Null until the host answers, and for a member or an older host.
- */
 function useBackupModelEditor(props: BackupModelsProps) {
   const { agent, available } = props;
   const workspace = useMobileWorkspaceActions();
@@ -210,7 +192,6 @@ function useBackupModelEditor(props: BackupModelsProps) {
 
   const automatic = current.backupModels?.automatic === true;
   const order = current.backupModels?.order ?? [];
-  // The agent's own model: the one it went back to, while a usage limit holds it on a backup.
   const ownAccount =
     accounts?.agents.find((entry) => entry.agentId === agent.id)?.accountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
   const own: AgentModelChoice | null =
@@ -238,7 +219,6 @@ function useBackupModelEditor(props: BackupModelsProps) {
       enabled,
       models: { pending: models.isPending, failed: models.isError, retry: () => void models.refetch() },
       error,
-      /** Null returns the agent to the default: ask, with no saved order. Resolves true when the host saved it. */
       save: (next: AgentBackupModels) =>
         save(current, { backupModels: next.automatic || next.order.length > 0 ? next : null }),
     },
@@ -257,7 +237,6 @@ function EditorStatus({
   retry: () => void;
 }) {
   const { t } = useText();
-  // An offline host: the screen already says that the agent is not available.
   if (!available) return null;
   if (failed && canManage) {
     return (
@@ -278,15 +257,6 @@ function EditorStatus({
   );
 }
 
-function SaveError({ error }: { error: string | null }) {
-  return error ? (
-    <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
-      {error}
-    </Typography.Paragraph>
-  ) : null;
-}
-
-/** Agent info > Backup models: what the agent does when a usage limit holds a message. */
 export function AgentBackupModelsPage(props: BackupModelsProps) {
   const { agent, available } = props;
   const { t } = useText();
@@ -397,8 +367,6 @@ export function AgentBackupModelsPage(props: BackupModelsProps) {
           </SettingsRow>
         ) : null}
         {order.length < AGENT_BACKUP_MODEL_LIMIT && addable.length > 0 ? (
-          // A page, not a menu: OpenRouter lists hundreds of models, and the Android menu of the app does
-          // not scroll a menu with sub-menus, so it went off the screen and its overlay held every touch.
           <SettingsRow
             disabled={!enabled}
             disclosure={false}
@@ -419,7 +387,6 @@ export function AgentBackupModelsPage(props: BackupModelsProps) {
   );
 }
 
-/** Agent info > Backup models > Add backup model: every ready model, by provider, with a search. */
 export function AgentBackupModelPicker(props: BackupModelsProps) {
   const { available } = props;
   const { t } = useText();
@@ -429,7 +396,6 @@ export function AgentBackupModelPicker(props: BackupModelsProps) {
   if (!editor) return <EditorStatus canManage={canManage} available={available} failed={failed} retry={retry} />;
   const { automatic, order, addable, enabled, error, save } = editor;
   const words = query.trim().toLocaleLowerCase().split(/\s+/u).filter(Boolean);
-  // The search also reads the provider and the model id, as on desktop.
   const matches = addable.filter((candidate) => {
     const text =
       `${candidate.label} ${agentProviderName(candidate.choice.provider)} ${candidate.choice.model}`.toLocaleLowerCase();
@@ -469,7 +435,6 @@ export function AgentBackupModelPicker(props: BackupModelsProps) {
                 leading={<ProviderMark provider={provider} size={20} />}
                 onPress={() => {
                   void save({ automatic, order: [...order, candidate.choice] }).then((saved) => {
-                    // The user can go back during the save. Then the picker must not close the page under it.
                     if (saved && navigation.isFocused()) router.back();
                   });
                 }}

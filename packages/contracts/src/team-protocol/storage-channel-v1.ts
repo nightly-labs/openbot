@@ -1,15 +1,3 @@
-// Frozen optional storage-channel-v1 wire contract: the files of one channel, for the Files pane of
-// the channel side panel (#4135).
-//
-// What it grants, recorded here because freezing it makes it permanent: every member who can see a
-// channel can read the names, sizes and messages of the files sent in that channel's messages. That
-// is no more than `storage-v1` already gives on the host scope, and less: the host refuses a channel
-// that the member cannot see, as `POST /v1/channels/read` does. Rows never carry a path. Deleting a
-// file stays on `POST /v1/storage/delete-file`, for an owner or an admin only.
-//
-// The file row is the `storage-v1` row, written again as literals so this contract does not move with
-// it. Bounds and meaning do not follow IPC changes; widening any of it needs a second capability string.
-
 import type { OptionalRouteCodec } from "./admin-wire";
 import { adminRoute, boolean, count, fields, identifier, list, nullable, oneOf, string } from "./admin-wire";
 

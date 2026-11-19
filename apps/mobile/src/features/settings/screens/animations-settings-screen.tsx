@@ -14,7 +14,6 @@ export function AnimationsSettingsScreen() {
   const { t } = useText();
   const { theme } = useUniwind();
   const preferences = useMotionPreferences();
-  // Reduced motion, from the device or from the Reduced picture, holds the other animations off.
   const reduced = useReducedMotion();
   const [error, setError] = useState<string | null>(null);
   function save(name: MotionPreference, enabled: boolean) {
@@ -24,7 +23,6 @@ export function AnimationsSettingsScreen() {
       void haptics.notification("error");
     });
   }
-  // The compact message field is stored with the animations but shows in Settings > Conversations.
   const animations: {
     name: Exclude<MotionPreference, "allAnimations" | "composerResize">;
     label: string;

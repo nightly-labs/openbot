@@ -1,6 +1,3 @@
-// Routine flows: the canvas of one agent's routines and the handoffs between its agents. This
-// computer's host answers from its own runtime; a joined server answers through `routine-flows-v1`.
-
 import {
   ROUTINE_FLOW_STOP_CAPABILITY,
   ROUTINE_FLOW_STOP_ROUTES,

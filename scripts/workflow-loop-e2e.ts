@@ -1,12 +1,3 @@
-// Checks workflow loops on the real SQLite and the real workflow service, on a temporary profile. The
-// graph is a prompt, two approvals and an output, with a connection from the second approval back to
-// the first. Approvals need no provider, so no model, agent, account or network is started. A save
-// keeps the loop; each approval of the second step starts the next pass with its answer as one more
-// input, and the output runs once for each pass; a rejection ends the loop and stops the run. A run
-// from a node inside the loop starts at that node and takes the earlier answer of the node before it.
-//
-// Run: bun scripts/workflow-loop-e2e.ts
-// Writes .openbot-build/workflow-loop-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -91,7 +82,6 @@ async function close() {
   database.close();
 }
 
-/** Waits until the run has a step that waits for a decision, and gives it. */
 async function waiting(workflows: WorkflowsHandle, runId: string): Promise<WorkflowStep> {
   const deadline = Date.now() + WAIT_MS;
   for (;;) {
@@ -101,7 +91,6 @@ async function waiting(workflows: WorkflowsHandle, runId: string): Promise<Workf
     await new Promise((done) => setImmediate(done));
   }
 }
-/** The input of a step, as the store keeps it; the public step does not show it. */
 const inputOf = (step: WorkflowStep) => new WorkflowRunStore({ database }).step(step.id)?.input;
 const runStatus = async (workflows: WorkflowsHandle, runId: string) =>
   (await runCauseEffect(workflows.run(runId))).run.status;

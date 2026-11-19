@@ -1,17 +1,3 @@
-// Checks that a phone hears about a side thread of an agent, and that a tap opens that thread.
-//
-// A notification and a Live Activity of a side thread opened the agent's own chat, and the end of a
-// turn in a side thread sent no notification unless the thread was the thread of a routine. The host
-// now sends a notification for each side thread turn to a phone that can open the thread
-// (`push-notification-threads-v1`) and that did not turn these notifications off. The links of the
-// Live Activity name the thread of the request that it shows, and the phone opens the channel, the
-// side thread or the agent's chat of that thread.
-//
-// It runs the real phone notification service, its real file, the real Live Activity push service, the
-// shared link code and the phone's own link and thread modules, wired as the host and the app wire
-// them. The host state is synthetic, and a send records its request. It sends nothing.
-// Run it with `bun scripts/thread-notifications-e2e.ts`.
-// Writes .openbot-build/thread-notifications-e2e/report.json.
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { EventEmitter } from "node:events";
@@ -70,7 +56,6 @@ const STEP_DEADLINE_MS = 20_000;
 const MEMBER = "fixture-member";
 const SERVER = "fixture-server";
 const AGENT = "fixture-agent";
-/** The agent's own chat. */
 const MAIN_THREAD = "fixture-main-thread";
 const SIDE_TASK = "fixture-side-task";
 const SIDE_THREAD = "fixture-side-thread";
@@ -79,10 +64,8 @@ const ROUTINE_THREAD = "fixture-routine-thread";
 const CHANNEL = "fixture-channel";
 const CHANNEL_THREAD = "fixture-channel-thread";
 const SIDE_ANSWER = "The side thread is done.";
-/** A turn that runs in the side thread, and a turn that runs in the agent's own chat. */
 const SIDE_WORK_TURN = "fixture-side-work-turn";
 const MAIN_WORK_TURN = "fixture-main-work-turn";
-/** A phone with the app of this change, a phone with an earlier app, and an iPhone with a Live Activity. */
 const NEW_PHONE = "new-phone-session";
 const OLD_PHONE = "old-phone-session";
 const IPHONE = "iphone-session";
@@ -95,12 +78,9 @@ const readOptions = {
 };
 
 const events = new EventEmitter<{ event: [AgentEvent] }>();
-/** The host state that both services read. */
 const state: {
   unread: number;
-  /** The turn of the message that the agent works on, or null when it does no work. */
   workTurn: string | null;
-  /** The failed turn of the agent's own chat, or null. */
   failedTurn: string | null;
   prompt: AgentRuntimeSnapshot["pendingPrompts"][number] | null;
   approval: AgentRuntimeSnapshot["pendingApprovals"][number] | null;
@@ -141,7 +121,6 @@ function snapshot(): AgentRuntimeSnapshot {
         avatarUrl: null,
       },
     ],
-    // The active turns are the turns of the agents' own chats. The work has the side threads too.
     activeTurns:
       state.workTurn === MAIN_WORK_TURN ? [{ agentId: AGENT, threadId: MAIN_THREAD, turnId: MAIN_WORK_TURN }] : [],
     work: state.workTurn
@@ -168,7 +147,6 @@ function snapshot(): AgentRuntimeSnapshot {
   };
 }
 
-/** The conversation of a side thread, as the host reads it for the preview of a notification. */
 function readTask(agentId: string, taskId: string): ConversationSnapshot {
   if (agentId !== AGENT || taskId !== SIDE_TASK) throw new Error("The thread is unknown.");
   return {
@@ -189,7 +167,6 @@ function readTask(agentId: string, taskId: string): ConversationSnapshot {
   };
 }
 
-/** The agent's own chat. It has no answer of a checked turn, so its notification shows the fixed text. */
 function mainPage(): ConversationPage {
   return {
     agentId: AGENT,
@@ -265,7 +242,6 @@ const secretOf = (session: string) => {
   assert.ok(secret, "The phone has no secret.");
   return secret;
 };
-/** The capabilities that a phone with this change sends, and those of a phone from before it. */
 const newCapabilities = new Set<string>(teamCapabilitiesForProtocol(9));
 const oldCapabilities = new Set([...newCapabilities].filter((name) => name !== PUSH_NOTIFICATION_THREADS_CAPABILITY));
 
@@ -295,7 +271,6 @@ function registerAndroid(
   );
 }
 
-/** A send as the phone opens it. */
 function opened(request: NotificationRelayRequest): PushNotificationContent {
   const keys = pushNotificationKeys(secretOf(request.push.sessionId));
   const text = openSealedLiveActivity(
@@ -326,10 +301,6 @@ function waitFor<T>(what: string, read: () => T | null): Promise<T> {
   });
 }
 
-/**
- * The sends from number `from`, as `session kind thread`, once the phone `last` got the prompt
- * `requestId`. Each case sends that prompt last, so a send that must not go would be before it.
- */
 async function sendsUntilPrompt(from: number, last: string, requestId: number): Promise<string[]> {
   const prompts = () =>
     sent.slice(from).filter((request) => request.push.sessionId === last && opened(request).kind === "input").length;
@@ -384,12 +355,10 @@ const prompt = (requestId: number, threadId: string): Extract<AgentEvent, { type
   ],
 });
 
-/** The props of the newest Live Activity update from number `from` that shows `mode`, as the widget opens them. */
 function activityProps(from: number, mode: AgentLiveActivityProps["mode"]): Promise<AgentLiveActivityProps> {
   return activityPropsWith(from, `shows ${mode}`, (props) => props.mode === mode);
 }
 
-/** The props of the newest Live Activity update from number `from` that `wanted` accepts. */
 function activityPropsWith(
   from: number,
   what: string,
@@ -412,7 +381,6 @@ function activityPropsWith(
   });
 }
 
-/** What the phone knows of the threads of the fixture server, and what its host answers. */
 function phoneSources(options: {
   known?: boolean;
   host?: "answers" | "refuses" | "silent";
@@ -455,7 +423,6 @@ try {
     const sends = (capabilities: readonly string[]) => capabilities.includes(PUSH_NOTIFICATION_THREADS_CAPABILITY);
     assert.ok(sends(TEAM_CURRENT_CAPABILITIES));
     assert.ok(TEAM_PROTOCOL_V9_ONLY_CAPABILITIES.has(PUSH_NOTIFICATION_THREADS_CAPABILITY));
-    // A peer below protocol 9 reads a short capability list, so the first request and protocol 8 leave it out.
     assert.ok(!sends(TEAM_BOOTSTRAP_CAPABILITIES));
     assert.ok(!sends(teamCapabilitiesForProtocol(8)));
     assert.ok(sends(teamCapabilitiesForProtocol(9)));
@@ -508,7 +475,6 @@ try {
     events.emit("event", sideTurn("side-turn-2"));
     events.emit("event", routineTurn("routine-turn-2"));
     events.emit("event", turn(MAIN_THREAD, "main-turn-2"));
-    // A question of the side thread waits for the person, so it still comes.
     events.emit("event", prompt(40, SIDE_THREAD));
     await waitFor("side thread question", () =>
       sent.slice(from).some((request) => request.push.sessionId === OLD_PHONE && opened(request).kind === "input")
@@ -537,7 +503,6 @@ try {
     const from = sent.length;
     events.emit("event", sideTurn("side-turn-3"));
     assert.deepEqual(await sendsUntilPrompt(from, OLD_PHONE, 5), []);
-    // The host stops and starts again: it reads the phones from its file.
     await Effect.runPromise(phones.dispose());
     const restarted = new PushNotificationStore(storePath);
     await Effect.runPromise(restarted.load());
@@ -569,7 +534,6 @@ try {
   });
 
   await step("a side thread turn that a phone does not take does not push out an event that it keeps", async () => {
-    // The phone looks on screen, so the host keeps its events, at most 20. It turned thread replies off.
     registerAndroid(NEW_PHONE, newCapabilities, "all", false);
     phones.setThreadReplies(NEW_PHONE, false);
     const from = sent.length;
@@ -577,7 +541,6 @@ try {
     events.emit("event", turn(MAIN_THREAD, "main-turn-kept"));
     for (let index = 0; index < 25; index += 1) events.emit("event", sideTurn(`side-turn-kept-${index}`));
     assert.equal(sent.slice(from).filter((request) => request.push.sessionId === NEW_PHONE).length, 0);
-    // The path of the phone fails, as when iOS suspended the app: the kept reply goes out.
     phones.disconnected(NEW_PHONE);
     const kept = await waitFor("kept reply", () => {
       const request = sent.slice(from).find((candidate) => candidate.push.sessionId === NEW_PHONE);
@@ -631,7 +594,6 @@ try {
     const request = await waitFor("iPhone notification", () => sent[from] ?? null);
     const content = opened(request);
     assert.equal(content.threadId, SIDE_THREAD);
-    // The reply of the agent's own chat is the reply that the activity shows, so it sends no notification.
     const main = sent.length;
     events.emit("event", turn(MAIN_THREAD, "main-turn-3"));
     events.emit("event", sideTurn("side-turn-8"));
@@ -674,7 +636,6 @@ try {
       agentId: AGENT,
       threadId: SIDE_THREAD,
     });
-    // The work of the agent's own chat names no thread, so its link is the link from before.
     const main = activityPushes.length;
     state.workTurn = MAIN_WORK_TURN;
     events.emit("event", { type: "queue-invalidated", agentId: AGENT });
@@ -706,7 +667,6 @@ try {
     const button = readLiveActivityLink(shown.buttons[0]?.url ?? "", keyFor);
     assert.equal(button.type, "action", "The signature of the button does not match.");
     assert.equal(button.type === "action" ? button.threadId : null, SIDE_THREAD);
-    // The thread is outside the signed action: another key still gives the chat list, never an action.
     const forged = readLiveActivityLink(shown.buttons[0]?.url ?? "", () => new Uint8Array(32));
     assert.deepEqual(forged, { type: "list" });
     return { tapUrl: shown.tapUrl };
@@ -717,26 +677,21 @@ try {
     const openedTargets: (OutsideTarget | null)[] = [];
     const chatOpened: boolean[] = [];
     const link = `openbot://live-activity?${new URLSearchParams({ server: SERVER, agent: AGENT, thread: SIDE_THREAD })}`;
-    // The link starts the app: its route is the agent's chat, and the thread opens when the app can navigate.
     assert.equal(liveActivityRoute(link, true), `/chat/${AGENT}`);
     const stop = setLiveActivityNavigator((opened, routeOpenedChat) => {
       openedTargets.push(opened);
       chatOpened.push(routeOpenedChat === true);
     });
     assert.deepEqual(openedTargets, [target(SIDE_THREAD)]);
-    // The route opened the chat, so the navigator must not open the chat a second time.
     assert.deepEqual(chatOpened, [true]);
-    // The app runs: it opens the thread itself and pushes no route.
     assert.equal(liveActivityRoute(link, false), null);
     assert.deepEqual(openedTargets, [target(SIDE_THREAD), target(SIDE_THREAD)]);
     assert.deepEqual(chatOpened, [true, false]);
-    // A link from an earlier host names no thread, and opens the agent's chat as before.
     const plain = `openbot://live-activity?${new URLSearchParams({ server: SERVER, agent: AGENT })}`;
     assert.equal(liveActivityRoute(plain, true), `/chat/${AGENT}`);
     assert.equal(liveActivityRoute(plain, false), null);
     assert.deepEqual(openedTargets.at(-1), target(null));
     assert.equal(openedTargets.length, 3, "A link without a thread opened a thread when the app started.");
-    // A signed button link carries the thread too.
     setLiveActivityLinkKeys((serverId) => keyFor(serverId) ?? new Uint8Array(32));
     const shown = await activityProps(0, "question");
     assert.equal(liveActivityRoute(shown.buttons[0]?.url ?? "", false), null);
@@ -760,7 +715,6 @@ try {
       channelId: CHANNEL,
     });
     assert.deepEqual(await outsideDestination(target(MAIN_THREAD), known), { type: "chat", agentId: AGENT });
-    // A notification from an earlier host, or one that the phone could not open, names no thread.
     assert.deepEqual(await outsideDestination(target(null), known), { type: "chat", agentId: AGENT });
     assert.deepEqual(await outsideDestination({ agentId: AGENT, serverId: null, threadId: SIDE_THREAD }, known), {
       type: "chat",
@@ -781,9 +735,7 @@ try {
       agentId: AGENT,
       taskId: SIDE_TASK,
     });
-    // The thread of the agent's own chat is no side thread, so the chat stays.
     assert.equal(await sideThreadDestination(target(MAIN_THREAD), unread, 1_000), null);
-    // A host without side threads refuses, and a host that does not answer is not waited for.
     assert.equal(await sideThreadDestination(target(SIDE_THREAD), phoneSources({ host: "refuses" }), 1_000), null);
     assert.equal(await sideThreadDestination(target(SIDE_THREAD), phoneSources({ host: "silent" }), 50), null);
     assert.equal(await sideThreadDestination(target(null), unread, 1_000), null);

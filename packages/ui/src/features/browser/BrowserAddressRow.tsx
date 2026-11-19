@@ -57,22 +57,14 @@ function SuggestionIcon(props: { view: BrowserFullViewProps; row: BrowserSuggest
 
 interface AddressState {
   open: boolean;
-  /** The text that the user typed. The suggestions follow it. */
   typed: string;
-  /** The text in the field while it is edited; undefined shows the page address. */
   text: string | undefined;
-  /** The highlighted row, or -1. */
   active: number;
-  /** True when the field shows a completed address after the typed text. */
   completed: boolean;
 }
 
 const CLOSED_ADDRESS: AddressState = { open: false, typed: "", text: undefined, active: -1, completed: false };
 
-/**
- * Back, forward, reload, and the address with its suggestions: open tabs, history, and search hints.
- * The field completes a visited address as you type. Arrow keys move in the rows; Enter opens one.
- */
 export function BrowserAddressRow(props: {
   view: BrowserFullViewProps;
   ref: (input: HTMLInputElement) => void;
@@ -129,7 +121,6 @@ export function BrowserAddressRow(props: {
     input?.blur();
   };
 
-  /** The highlighted row is the selected option, so the list marks it for a screen reader. */
   const activeValue = createMemo(() => {
     const row = rows()[address.active];
     return row ? new Set([row.id]) : new Set<string>();
@@ -141,7 +132,6 @@ export function BrowserAddressRow(props: {
   };
 
   const onKeyDown = (event: KeyboardEvent & { currentTarget: HTMLInputElement }) => {
-    // These keys choose and commit the text of an input method.
     if (event.isComposing || event.keyCode === 229) return;
     const list = rows();
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -198,7 +188,6 @@ export function BrowserAddressRow(props: {
       >
         <BrowserBackIcon />
       </Button>
-      {/* A narrow row keeps Back here; Forward and Reload go in the page menu. */}
       <Show when={!props.narrow}>
         <Button
           variant="ghost"
@@ -282,7 +271,6 @@ export function BrowserAddressRow(props: {
             edit(
               event.currentTarget,
               event.currentTarget.value,
-              // A completion selects text, which ends the text that an input method composes.
               !event.isComposing && event.inputType.startsWith("insert"),
             )
           }
@@ -292,7 +280,6 @@ export function BrowserAddressRow(props: {
             flush();
             event.currentTarget.select();
           }}
-          // A click that focuses the field selects all of it, as in other browsers; a second click places the caret.
           onPointerDown={(event: PointerEvent & { currentTarget: HTMLInputElement }) => {
             selectOnPointerUp = document.activeElement !== event.currentTarget;
           }}
@@ -314,7 +301,6 @@ export function BrowserAddressRow(props: {
             selectionMode="single"
             disallowEmptySelection={true}
             allowDuplicateSelectionEvents={true}
-            // The field keeps the focus; the list is a part of the combobox.
             shouldUseVirtualFocus={true}
             shouldSelectOnPressUp={true}
             value={activeValue()}

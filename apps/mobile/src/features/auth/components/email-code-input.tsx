@@ -29,7 +29,6 @@ interface EmailCodeInputProps {
   onChange: (value: string) => void;
   onComplete: (value: string) => void;
   status: EmailCodeStatus;
-  /** Grows on each rejected code, so the row shakes again for the same message. */
   rejection: number;
   disabled: boolean;
   accessibilityLabel: string;
@@ -38,11 +37,7 @@ interface EmailCodeInputProps {
 }
 
 const GROUP_SIZE = 4;
-// Slots rise in one after another: the last one starts 240 ms after the first.
 const SLOT_STAGGER_MS = 30;
-// The email shows the code as `XXXX-XXXX`. Paste and autofill keep the dash, so the native field
-// accepts one more character than the code. HeroUI `InputOTP` fixes the native length at the code
-// length and cuts the pasted code short, so this field draws its own slots.
 const NATIVE_MAX_LENGTH = ONE_TIME_CODE_LENGTH + 1;
 const CHARACTER_ENTER = new Keyframe({
   0: { opacity: 0, transform: [{ translateY: 6 }, { scale: 0.85 }] },
@@ -51,7 +46,6 @@ const CHARACTER_ENTER = new Keyframe({
 const CHARACTER_EXIT = FadeOut.duration(90);
 const SLOT_POSITIONS = Array.from({ length: ONE_TIME_CODE_LENGTH }, (_, index) => index);
 
-/** Uppercases the text, drops spaces, dashes and characters outside the code alphabet. */
 function normalizeCodeInput(text: string): string {
   return [...text.toUpperCase()]
     .filter((character) => ONE_TIME_CODE_ALPHABET.includes(character))
@@ -79,8 +73,6 @@ export function EmailCodeInput({
 
   useImperativeHandle(ref, () => ({ focus: () => input.current?.focus() }), []);
 
-  // Focus after the frame that mounts the row. The email field leaves in the same change, and a
-  // focus during that change can lose the keyboard.
   useEffect(() => {
     const frame = requestAnimationFrame(() => input.current?.focus());
     return () => cancelAnimationFrame(frame);
@@ -151,8 +143,6 @@ export function EmailCodeInput({
         returnKeyType="done"
         accessibilityLabel={accessibilityLabel}
         accessibilityState={{ disabled, busy: status === "verifying" }}
-        // iOS does not paste into a field with no opacity, so the field is nearly transparent and
-        // hides its own caret. The slots show the position.
         caretHidden={Platform.OS === "ios"}
         selectionColor="transparent"
         className="absolute inset-0 text-transparent"
@@ -215,7 +205,6 @@ function CodeSlot({
             opacity: ring ? 1 : 0,
             transitionProperty: ["opacity", "borderColor"],
             transitionDuration: reduced ? 0 : 160,
-            // A correct code turns the slots green from left to right.
             transitionDelay: status === "verified" && !reduced ? index * SLOT_STAGGER_MS : 0,
             transitionTimingFunction: "ease-out",
           }}

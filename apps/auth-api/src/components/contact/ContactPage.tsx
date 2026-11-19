@@ -9,7 +9,6 @@ import { LandingIcon } from "../landing/LandingIcon";
 import { SiteHeader } from "../landing/SiteHeader";
 import type { ContactPageText } from "./contact-page-text";
 
-/** The channels with a description in the page text. Email follows them, with the address as its description. */
 const CONTACT_CHANNELS = [
   { id: "discord", label: "Discord", href: OPENBOT_LINKS.discord },
   { id: "github", label: "GitHub", href: `${OPENBOT_LINKS.repository}/issues/new/choose` },
@@ -28,7 +27,6 @@ function fieldText(data: FormData, name: string): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-/** The form state: validation, the send to `/v1/contact`, and its result. */
 function createContactForm(errorText: () => ContactPageText["errors"]) {
   const [status, setStatus] = createSignal<ContactStatus>("idle");
   const [errors, setErrors] = createSignal<FieldErrors>({});
@@ -84,10 +82,6 @@ function createContactForm(errorText: () => ContactPageText["errors"]) {
   return { status, errors, sentTo, submit, reset };
 }
 
-/**
- * The label row of a field. An error replaces "Optional" on the right of the label, so the field
- * does not move when the error shows.
- */
 function FieldHead(props: { for: string; label: string; optional?: string | undefined; error?: string | undefined }) {
   return (
     <div class="contact-field-head">
@@ -110,7 +104,6 @@ interface TextFieldProps {
   type: "text" | "email";
   autocomplete: string;
   maxlength?: number | undefined;
-  /** The "Optional" text of an optional field. */
   optional?: string | undefined;
   error?: string | undefined;
 }
@@ -156,7 +149,6 @@ function MessageField(props: { label: string; placeholder: string; error?: strin
   );
 }
 
-/** A failed send replaces the privacy line beside the button, so the form does not grow. */
 function SubmitRow(props: { status: ContactStatus; text: ContactPageText }) {
   const failure = () => (props.status === "limited" ? props.text.limited : props.text.failed);
   return (

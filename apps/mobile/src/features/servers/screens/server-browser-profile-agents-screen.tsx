@@ -16,17 +16,11 @@ import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
-/**
- * Browser profiles > one profile > Add agents: every agent of the server, with a check on the agents
- * that use the profile. A tap gives the agent the profile, or moves it back to the shared profile,
- * and saves at once. The row says which profile the agent uses now.
- */
 export function ServerBrowserProfileAgentsScreen() {
   const { t, errorMessage } = useText();
   const accent = String(useCSSVariable("--openbot-accent"));
   const { serverId, profileId } = useLocalSearchParams<{ serverId: string; profileId: string }>();
   const profiles = useServerBrowserProfiles(serverId);
-  // The selector returns the stored list, so the page does not render again for a new copy.
   const allAgents = useMobileWorkspaceSelector((workspace) => workspace.agents);
   const agents = useMemo(() => allAgents.filter((agent) => agent.serverId === serverId), [allAgents, serverId]);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -48,7 +42,6 @@ export function ServerBrowserProfileAgentsScreen() {
       </SettingsContent>
     );
 
-  /** The profile that an agent uses now: Shared, its own session, or another named profile. */
   const currentName = (agentId: string) => {
     const named = list.find((candidate) => candidate.agentIds.includes(agentId));
     if (named) return named.name;

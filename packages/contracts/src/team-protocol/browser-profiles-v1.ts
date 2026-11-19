@@ -1,15 +1,3 @@
-// Frozen optional browser-profiles-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: an owner or admin of a
-// server can list, create, rename, recolor, clear and delete the named browser profiles of that
-// host, and choose the profile of each agent: the shared profile, a session of the agent's own, or
-// one named profile. The cookies, site data and saved passwords of a profile stay on the host; only
-// the profile name, color, agent ids and tab count go over the wire. A clear closes the tabs of the
-// profile and signs it out of every site. A delete also moves its agents to the shared profile. A
-// change of the agent's profile closes the agent's tabs. Any signed-in member reads the profile name
-// and color of each host tab that the member can already see, and nothing about the other tabs. A
-// member cannot use the other routes; `requireAdmin` on the host is the only gate. Bounds and meaning
-// do not follow IPC changes; widening any of it needs a second capability string.
 import {
   type AdminDecoder,
   adminRoute,
@@ -56,7 +44,6 @@ const choice = variant({
   profile: fields({ kind: oneOf("profile"), profileId }),
 });
 
-/** Exactly one of `profileId` and `agentId`: the named profile, or the agent's own session. */
 const clearTarget: AdminDecoder = (input) => {
   const decoded = fields({}, { profileId, agentId: identifier })(input);
   const keys = decoded && typeof decoded === "object" ? Object.keys(decoded) : [];

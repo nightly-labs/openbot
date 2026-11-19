@@ -11,11 +11,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin } from "./request-helpers";
 
-/**
- * The shape and colour of the plush that this server shows with no logo, changed from a joined
- * server. The change runs as the local one does, so the account service gets a copy. Frozen by
- * `host-appearance-v1`.
- */
 export async function routeHostAppearance(
   context: TeamApiRequestContext,
   admin: TeamApiAdmin | undefined,
@@ -31,7 +26,6 @@ export async function routeHostAppearance(
     await runCauseEffect(identity.updateIdentity({ appearance }));
     return json(200, {});
   } catch (error) {
-    // A signed-out host is a sentence for the admin, not a host fault.
     if (error instanceof Error) throw new HttpError(409, error.message);
     throw error;
   }

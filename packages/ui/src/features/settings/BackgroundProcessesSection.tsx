@@ -18,19 +18,12 @@ import type { AgentDefaultsAgent } from "./SettingsAgentsTab";
 
 export interface BackgroundProcessesSectionProps {
   processes: readonly BackgroundProcess[];
-  /** True when the processes could not be read. */
   loadFailed: boolean;
-  /** The agents on this computer, to name the agent that started each process. */
   agents: readonly AgentDefaultsAgent[];
-  /** The ids of the processes that are stopping now. */
   stopping: readonly string[];
   onStop: (id: string) => void;
 }
 
-/**
- * Server Settings › Storage › Background processes: the programs that agents left running on this computer,
- * such as a dev server, each with the agent, the start time, its ports and Stop.
- */
 export function BackgroundProcessesSection(props: BackgroundProcessesSectionProps) {
   const { t, format } = useText();
   const agentOf = (process: BackgroundProcess) => props.agents.find((agent) => agent.id === process.agentId);

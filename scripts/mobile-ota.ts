@@ -1,36 +1,3 @@
-// Over-the-air updates of the mobile app: a JavaScript bundle that phones with a store binary get
-// from the update server (`apps/mobile-updates`) with no store review.
-// See apps/mobile/README.md#over-the-air-updates.
-//
-//   bun scripts/mobile-ota.ts check [--platform ios|android|all]
-//       shows the runtime version of this checkout and the store builds that can get it; read-only
-//   bun scripts/mobile-ota.ts status [--channel production]
-//       shows what the update server gives the phones of each recorded store build; read-only
-//   bun scripts/mobile-ota.ts dispatch publish --platform <p> --message <text> [--rollout 1-100] [--dry-run]
-//   bun scripts/mobile-ota.ts dispatch rollout --platform <p> --rollout 1-100 [--runtime <version>]
-//   bun scripts/mobile-ota.ts dispatch rollback --platform <p> [--to-embedded] [--runtime <version>]
-//       starts the `Mobile OTA update` workflow for the current branch. A rollout change and a
-//       rollback find the update of the recorded store builds, so the branch can have another runtime
-//       version. `--runtime`, with one platform, names a binary that has no tag or one of two updates.
-//
-// The workflow runs these. They need the signing key and the bucket credentials:
-//   bun scripts/mobile-ota.ts publish --platform <p> --message <text> [--channel <c>] [--rollout 1-100] [--dry-run]
-//   bun scripts/mobile-ota.ts rollout --platform <p> --rollout 1-100 [--channel <c>] [--runtime <version>]
-//   bun scripts/mobile-ota.ts rollback --platform <p> [--to-embedded] [--channel <c>] [--runtime <version>]
-//   bun scripts/mobile-ota.ts runtime-version --platform <p>
-//       prints the runtime version of this checkout, and gives it to the next workflow steps
-//   bun scripts/mobile-ota.ts verify-build --platform <p> --artifact <.ipa or .aab> --runtime <version>
-//       [--channel <c>] stops when a store build has not the update server, channel and certificate of
-//       this checkout, or not the runtime version that `runtime-version` gave before the build (the
-//       release workflows)
-//   bun scripts/mobile-ota.ts record-build --platform <p> --build <number> --runtime <version>
-//       tags the commit of a store build with its runtime version (the release workflows)
-//   bun scripts/mobile-ota.ts compare-runtime --base-dir <checkout>
-//       says if this checkout has another runtime version than the base checkout (CI, on a pull request)
-//
-// Environment of publish, rollout and rollback: MOBILE_OTA_PRIVATE_KEY (PEM text),
-// MOBILE_OTA_R2_ACCESS_KEY_ID, MOBILE_OTA_R2_SECRET_ACCESS_KEY, and MOBILE_OTA_R2_ENDPOINT or
-// CLOUDFLARE_ACCOUNT_ID. MOBILE_OTA_R2_BUCKET replaces the bucket `openbot-mobile-updates`.
 import { execFile } from "node:child_process";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -68,10 +35,8 @@ const MOBILE = join(ROOT, "apps", "mobile");
 const BIN = join(ROOT, "node_modules", ".bin");
 const WORKFLOW = "mobile-ota.yml";
 const DEFAULT_BUCKET = "openbot-mobile-updates";
-/** The publish waits this long for the server to give the new update. The pointer cache is 30 s. */
 const PROBE_TIMEOUT_MS = 120_000;
 const PROBE_INTERVAL_MS = 5_000;
-/** The paths that can change the runtime version, for the message of a refused publish. */
 const RUNTIME_INPUTS = [
   "apps/mobile/app.json",
   "apps/mobile/app.config.js",
@@ -85,7 +50,6 @@ const RUNTIME_INPUTS = [
   "patches",
   "bun.lock",
 ];
-/** The public values that a production bundle must have. Without them the app sends no analytics. */
 const PRODUCTION_PUBLIC_ENV = ["EXPO_PUBLIC_OPENPANEL_CLIENT_ID", "EXPO_PUBLIC_OPENPANEL_CLIENT_SECRET"];
 
 class UsageError extends Error {}
@@ -114,7 +78,6 @@ const FLAG_OPTIONS = new Set(["dry-run", "to-embedded", "allow-unknown-runtime"]
 function parseOptions(args: string[]): Options {
   const options: Options = { values: new Map(), flags: new Set() };
   for (let index = 0; index < args.length; index += 1) {
-    // `bun run <script> -- --flag` can pass the separator too.
     if (args[index] === "--") continue;
     const name = args[index]?.replace(/^--/u, "") ?? "";
     if (FLAG_OPTIONS.has(name)) options.flags.add(name);
@@ -153,9 +116,7 @@ function rolloutOf(options: Options, fallback?: number): number {
 
 interface AppConfig {
   version: string;
-  /** `updates.url`, such as `https://updates.openbot.run/manifest`. */
   updatesUrl: string;
-  /** The origin of `updates.url`. */
   serverUrl: string;
   certificatePath: string | null;
 }
@@ -177,7 +138,6 @@ async function git(...args: string[]): Promise<string> {
 }
 
 async function storeBuilds(): Promise<StoreBuild[]> {
-  // MOBILE_OTA_REMOTE replaces the remote, for the E2E script.
   const remote = process.env.MOBILE_OTA_REMOTE ?? "origin";
   return parseStoreBuilds(await git("ls-remote", "--tags", remote, "refs/tags/mobile-build/*"));
 }
@@ -189,11 +149,8 @@ function buildName(build: StoreBuild): string {
 interface RuntimeCheck {
   platform: UpdatePlatform;
   runtimeVersion: string;
-  /** The store builds whose phones can run a bundle of this checkout. */
   builds: StoreBuild[];
-  /** The newest store build of the platform, when no build has this runtime version. */
   newest: StoreBuild | null;
-  /** The runtime inputs that changed after `newest`. Empty when its commit is not in this clone. */
   changed: string[];
 }
 
@@ -278,7 +235,6 @@ function signingKeys(config: AppConfig): SigningKeys {
   return { privateKeyPem, certificatePem: readFileSync(config.certificatePath, "utf8") };
 }
 
-/** The names in `names` that neither the environment nor an env file of the app gives a value. */
 function missingPublicEnv(names: string[]): string[] {
   const files = [".env.production.local", ".env.local", ".env.production", ".env"]
     .map((name) => join(MOBILE, name))
@@ -306,13 +262,8 @@ async function exportBundle(platform: UpdatePlatform, channel: string, directory
     maxBuffer: 256 * 1024 * 1024,
     env: {
       ...process.env,
-      // The build profiles of eas.json set the same value, and the app reads it to turn analytics on.
       EXPO_PUBLIC_APP_ENV: channel,
       NODE_ENV: "production",
-      // Expo CLI 58 renames each file of a DOM component to its MD5 after it bundles them. With split
-      // bundles the files still name the shared chunk by its first name, and the export stops with
-      // "Asset not found: _expo/static/js/web/__common-<hash>.js". One file for each component has no
-      // shared chunk. Remove this when `expo export` passes without it.
       EXPO_NO_BUNDLE_SPLITTING: "1",
     },
   });
@@ -324,7 +275,6 @@ function summarize(lines: string[]): void {
   if (summary) appendFileSync(summary, `${lines.join("\n")}\n`);
 }
 
-/** Waits until the update server gives the phones of `scope` the update `id`. */
 async function waitForServer(serverUrl: string, scope: UpdateScope, id: string): Promise<boolean> {
   const deadline = Date.now() + PROBE_TIMEOUT_MS;
   for (;;) {
@@ -344,13 +294,10 @@ async function commandPublish(options: Options) {
   const config = appConfig();
   const builds = await storeBuilds();
 
-  // All platforms pass the guard before one of them changes.
   const checks: RuntimeCheck[] = [];
   for (const platform of platformsOf(options)) checks.push(await checkRuntime(platform, builds));
   const refused = checks.filter((check) => check.builds.length === 0);
   for (const check of checks) out(describeCheck(check).join("\n"));
-  // Only production binaries are store builds with a tag. An internal build of another channel has
-  // none, and an update for a runtime version that no binary has reaches no phone.
   if (refused.length > 0 && channel === "production" && !options.flags.has("allow-unknown-runtime")) {
     summarize([
       "## Mobile OTA update refused",
@@ -395,7 +342,6 @@ async function commandPublish(options: Options) {
       lines.push(
         `- ${scopeName(scope)}: update \`${result.update.id}\` for ${rollout}% of ${check.builds.map(buildName).join(", ") || "an unrecorded build"}; ${result.uploaded} new files.`,
       );
-      // With a part rollout, the probe has no install ID and gets the base update.
       if (rollout === 100 && !(await waitForServer(config.serverUrl, scope, result.update.id))) {
         served = false;
         lines.push(`  The server does not give this update yet. Run \`bun run mobile:ota:status\`.`);
@@ -408,10 +354,6 @@ async function commandPublish(options: Options) {
   return served ? 0 : 1;
 }
 
-/**
- * The binaries of a rollout change or a rollback. All of them are found before one of them changes,
- * so an error for one platform leaves the other platform as it was.
- */
 async function liveScopes(options: Options, store: UpdateStore) {
   const runtime = options.values.get("runtime") ?? null;
   if (runtime !== null && !RUNTIME_VERSION_PATTERN.test(runtime)) {
@@ -421,7 +363,6 @@ async function liveScopes(options: Options, store: UpdateStore) {
     channel: channelOf(options),
     platforms: platformsOf(options),
     runtime,
-    // With --runtime, the tags are not necessary.
     builds: runtime === null ? await storeBuilds() : [],
   });
 }
@@ -486,7 +427,6 @@ async function commandStatus(options: Options) {
   return 0;
 }
 
-/** One file of a zip archive, such as an IPA or an AAB. */
 async function zipEntry(archive: string, pattern: RegExp): Promise<Buffer> {
   const names = (await run("unzip", ["-Z1", archive], { maxBuffer: 256 * 1024 * 1024 })).stdout.split("\n");
   const name = names.find((candidate) => pattern.test(candidate));
@@ -495,7 +435,6 @@ async function zipEntry(archive: string, pattern: RegExp): Promise<Buffer> {
   return stdout;
 }
 
-/** The base64 text of a PEM certificate, with no line ends: the native config keeps other line ends. */
 function certificateBody(pem: string): string {
   return pem.replace(/-----[A-Z ]+-----/gu, "").replace(/\s+/gu, "");
 }
@@ -514,7 +453,6 @@ async function iosSettings(archive: string, config: AppConfig, channel: string, 
     const read = async (pattern: RegExp, name: string) => {
       const path = join(directory, name);
       await writeFile(path, await zipEntry(archive, pattern));
-      // A built app has binary property lists. `plutil` is on each macOS runner.
       return JSON.parse((await run("plutil", ["-convert", "json", "-o", "-", path])).stdout);
     };
     const expo = await read(/^Payload\/[^/]+\.app\/Expo\.plist$/u, "Expo.plist");
@@ -534,7 +472,6 @@ async function iosSettings(archive: string, config: AppConfig, channel: string, 
   }
 }
 
-/** The `versionCode` attribute: its name, then field 3 (byte 0x1a), a length, and the text of its value. */
 function manifestVersionCode(manifest: string): string | null {
   const name = "versionCode";
   for (let at = manifest.indexOf(name); at >= 0; at = manifest.indexOf(name, at + 1)) {
@@ -547,12 +484,10 @@ function manifestVersionCode(manifest: string): string | null {
 }
 
 async function androidSettings(archive: string, config: AppConfig, channel: string, certificate: string) {
-  // The manifest of a bundle is a protocol buffer. Its text values are there as plain text.
   const manifest = (await zipEntry(archive, /^base\/manifest\/AndroidManifest\.xml$/u)).toString("latin1");
   const settings: BinarySettings = {
     url: manifest.includes(config.updatesUrl),
     channel: manifest.includes(JSON.stringify({ "expo-channel-name": channel })),
-    // The first line of the certificate. The line ends of the other lines can have another form.
     certificate: manifest.includes(certificate.slice(0, 64)),
     runtimeVersion: (await zipEntry(archive, /^base\/assets\/fingerprint$/u)).toString("utf8").trim(),
     build: manifestVersionCode(manifest),
@@ -560,10 +495,6 @@ async function androidSettings(archive: string, config: AppConfig, channel: stri
   return settings;
 }
 
-/**
- * Stops a release when the binary could not get an over-the-air update: a build with another update
- * server, no channel or another certificate is correct only after the next store build.
- */
 async function commandVerifyBuild(options: Options) {
   const platforms = platformsOf(options);
   const [platform] = platforms;
@@ -578,9 +509,6 @@ async function commandVerifyBuild(options: Options) {
     platform === "ios"
       ? await iosSettings(artifact, config, channel, certificate)
       : await androidSettings(artifact, config, channel, certificate);
-  // The native build on a Linux runner changes the result of a fingerprint of the same checkout:
-  // run 42826070568 gave another value after the build than a clean checkout and the binary have.
-  // So this command does not compute the value. `runtime-version` gives it before the build.
   const expected = options.values.get("runtime");
   if (expected === undefined || !RUNTIME_VERSION_PATTERN.test(expected)) {
     throw new UsageError(
@@ -628,7 +556,6 @@ async function commandRecordBuild(options: Options) {
     },
     body: JSON.stringify({ ref: `refs/tags/${tag}`, sha }),
   });
-  // 422: the tag exists, such as after a second run of the same build.
   if (!response.ok && response.status !== 422) {
     throw new Error(`GitHub answered ${response.status} for the tag ${tag}.`);
   }
@@ -636,7 +563,6 @@ async function commandRecordBuild(options: Options) {
   return 0;
 }
 
-/** The runtime version of a clean checkout, for a workflow step that runs before the native build. */
 async function commandRuntimeVersion(options: Options) {
   const platforms = platformsOf(options);
   const [platform] = platforms;
@@ -678,9 +604,6 @@ async function commandDispatch(action: string | undefined, options: Options) {
   if (platform !== "ios" && platform !== "android" && platform !== "all") {
     throw new UsageError("Give --platform ios, android or all.");
   }
-  // A publish sends the code of the branch, so the remote branch must be this commit. A rollout
-  // change and a rollback use no code of a branch: they find the update from the store build tags.
-  // They always run on `main`, also from another branch or from a checkout that is not up to date.
   let branch = "main";
   if (action === "publish") {
     branch = await git("branch", "--show-current");

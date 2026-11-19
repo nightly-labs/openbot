@@ -1,11 +1,3 @@
-// Renderer work and startup marks for `dev:bench`.
-//
-// Layout and style counts come from CDP `Performance.getMetrics`, so they are counts, not times,
-// and repeat from run to run. Long tasks come from a passive `PerformanceObserver`. Two readings
-// change what they measure, so they are opt-in: `--frames` runs a `requestAnimationFrame` loop that
-// keeps the renderer drawing, and `--call-counts` turns on V8 precise coverage, which slows
-// JavaScript down.
-
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import type { Page } from "playwright-core";
 import type { MetricValues } from "./bench-stats";
@@ -23,11 +15,9 @@ export interface FunctionCallCount {
 
 export interface RenderRecording {
   values: MetricValues;
-  /** The functions called most often while the scenario ran, or null without `--call-counts`. */
   topCalls: FunctionCallCount[] | null;
 }
 
-// CDP metric name, the bench metric name, and the factor to its unit (CDP times are seconds).
 const PERFORMANCE_METRICS: readonly [string, string, number][] = [
   ["LayoutCount", "render.layouts", 1],
   ["RecalcStyleCount", "render.styleRecalcs", 1],
@@ -37,7 +27,6 @@ const PERFORMANCE_METRICS: readonly [string, string, number][] = [
 const TOP_CALLS = 25;
 const PAGE_STATE = "__openbotBenchRender";
 
-/** Installs the observers in the app window. A gap over a second is a hidden window, not a slow frame. */
 function installObservers(frames: boolean): string {
   return `(() => {
     const state = { longTasks: 0, longTaskMs: 0, frames: 0, framesOver17ms: 0, framesOver50ms: 0, running: true };
@@ -78,7 +67,6 @@ function cdpMetrics(result: { metrics: { name: string; value: number }[] }): Map
   return new Map(result.metrics.map((metric) => [metric.name, metric.value]));
 }
 
-/** Starts recording the app window's work. The returned function stops it and gives the readings. */
 export async function startRenderRecording(
   page: Page,
   options: RenderRecordingOptions,
@@ -100,7 +88,6 @@ export async function startRenderRecording(
         const end = after.get(name);
         if (start !== undefined && end !== undefined) values[metric] = Math.round((end - start) * factor);
       }
-      // The page can reload during a scenario, which removes the observers with it.
       const observed = await page.evaluate(STOP_OBSERVERS).catch(() => null);
       if (isDynamicRecord(observed)) {
         for (const [key, value] of Object.entries(observed)) {
@@ -115,7 +102,6 @@ export async function startRenderRecording(
         const calls = new Map<string, number>();
         let total = 0;
         for (const script of coverage.result) {
-          // Only the app's own bundle: extensions and DevTools scripts are not the app's work.
           if (!script.url.startsWith("openbot-app://")) continue;
           const file = script.url.slice(script.url.lastIndexOf("/") + 1);
           for (const fn of script.functions) {
@@ -149,16 +135,11 @@ function markValues(prefix: string, marks: unknown): MetricValues {
     const [name, startTime]: unknown[] = mark;
     if (!isString(name) || !isNumber(startTime)) continue;
     const key = `${prefix}.${name.slice("openbot:".length)}`;
-    // A mark can repeat, such as when the splash shows again. The first one is the startup.
     values[key] ??= Math.round(startTime);
   }
   return values;
 }
 
-/**
- * Reads the startup marks in milliseconds. Main-process marks count from process start; app
- * window marks count from the start of its navigation.
- */
 export async function readStartupMarks(page: Page, inspector: InspectorClient | null): Promise<MetricValues> {
   const main = inspector ? await inspector.evaluate(READ_MARKS).catch(() => null) : null;
   const renderer = await page.evaluate(READ_MARKS).catch(() => null);

@@ -4,15 +4,12 @@ import { useText } from "../../text";
 import { AgentSearchList, AgentStack } from "../marketplace/MarketplaceAgentsDialog";
 import type { MarketplaceAgent } from "../marketplace/marketplace-model";
 
-/** An agent that a Vault item can be for. */
 export type VaultAgentChoice = MarketplaceAgent;
 
-/** The agents of an item: null is every agent, also each agent that is added later. */
 export type VaultAgentScope = readonly string[] | null;
 
 const allows = (scope: VaultAgentScope, agentId: string) => scope === null || scope.includes(agentId);
 
-/** Chooses the agents of one item, with a search. The change waits for Save. */
 function VaultAgentsDialog(props: {
   name: string;
   agents: readonly VaultAgentChoice[];
@@ -27,7 +24,6 @@ function VaultAgentsDialog(props: {
   const unchanged = () => props.agents.every((agent) => checked(agent.id) === allows(props.scope, agent.id));
   const save = () => {
     const on = chosen();
-    // Each agent chosen is every agent, so an agent that is added later can use the item too.
     props.onSave(on.length === props.agents.length ? null : on);
     props.onClose();
   };
@@ -48,7 +44,6 @@ function VaultAgentsDialog(props: {
           ref={(element) => {
             content = element;
           }}
-          // The dialog opens on the agent search, not on Close.
           onOpenAutoFocus={(event) => {
             const search = content?.querySelector<HTMLElement>("input[type=search]");
             if (!search) return;
@@ -104,10 +99,6 @@ function VaultAgentsDialog(props: {
   );
 }
 
-/**
- * The faces and the summary of the agents of one item: "All agents", one agent's name, or "3 of 50".
- * It opens the agents dialog. An id of an agent that the server no longer has does not count.
- */
 export function VaultAgentsButton(props: {
   name: string;
   agents: readonly VaultAgentChoice[];

@@ -21,15 +21,9 @@ import { haptics } from "@/shared/lib/haptics";
 import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 
-/** The page adds this many rows at a time, so a provider with hundreds of models opens at once. */
 const PAGE_SIZE = 100;
-/** The next rows come when the reader is this close to the end. */
 const END_DISTANCE = 600;
 
-/**
- * Agent settings > Model, and Create agent > Model: the models of the chosen provider, with a search.
- * A page, not a menu: a menu does not filter, and OpenRouter lists hundreds of models.
- */
 export function AgentModelPickerScreen() {
   const { t } = useText();
   const accent = String(useCSSVariable("--openbot-accent"));
@@ -38,7 +32,6 @@ export function AgentModelPickerScreen() {
   const request = useAgentModelPicker((state) => state.request);
   const [search, setSearch] = useState("");
   const serverId = request?.serverId ?? "";
-  // The same query as the Model row, so the list shows at once from its cache.
   const models = useQuery({
     queryKey: queryKeys.agentModels(queryScope, serverId),
     queryFn: () => workspace.loadAgentModels(serverId),
@@ -46,7 +39,6 @@ export function AgentModelPickerScreen() {
     retry: false,
   });
   const [limit, setLimit] = useState(PAGE_SIZE);
-  // Only the Model row opens the page. Without its request there is no form to give the pick to.
   useEffect(() => {
     if (!request && router.canGoBack()) router.back();
   }, [request]);
@@ -57,7 +49,6 @@ export function AgentModelPickerScreen() {
   );
   const modelLabel = (id: string, name: string) =>
     request?.provider === "cursor" ? cursorModelSpeedLabel(name, id, t("mobile.agent.runtime.fast")) : name;
-  // The search also reads the model id, as the backup model search does.
   const matches = options.filter((option) => {
     const text = `${option.name} ${option.id}`.toLocaleLowerCase();
     return words.every((word) => text.includes(word));
@@ -79,13 +70,11 @@ export function AgentModelPickerScreen() {
           placeholder={t("mobile.agent.runtime.searchModels")}
           autoCapitalize="none"
           hideWhenScrolling={false}
-          // In a sheet, the header and its back button stay while the search has focus.
           hideNavigationBar={false}
           onChangeText={(event) => changeSearch(event.nativeEvent.text)}
           onCancelButtonPress={() => changeSearch("")}
         />
       ) : (
-        // The Android blur header cannot draw a `Stack.SearchBar`, so the field is in the content.
         <SheetFormField
           label={t("mobile.agent.runtime.searchModels")}
           hideLabel

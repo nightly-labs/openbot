@@ -1,18 +1,3 @@
-/**
- * The stack of member avatars. It takes the agents to look members up in rather than reading the
- * Agents context: the sidebar renders channel rows from the agent list it is already given, and a
- * row that reached for a context of its own would be the one row in the list that cannot render
- * without it.
- *
- * Two layouts: a row of overlapping avatars, and the cluster the sidebar uses, which holds the
- * members in the square one agent avatar occupies. The cluster keeps a channel row the same shape
- * as the agent rows around it, and it counts the members it cannot show.
- *
- * A channel can have its own picture instead: an uploaded image, or an icon on a colour. The
- * picture is square, so a channel does not look like an agent, and it takes the place the faces
- * would take.
- */
-
 import type { AvatarHue, ChannelIcon, ChannelIconName, ChannelMember } from "@openbot/contracts/ipc";
 import { UsersRound } from "@openbot/ui";
 import { avatarHueSwatch } from "@openbot/ui/bloub-avatar";
@@ -33,7 +18,6 @@ interface ChannelAvatarProps {
 }
 
 export function ChannelAvatar(props: ChannelAvatarProps) {
-  /* An image that does not load, such as a file removed by hand, shows the icon or the faces. */
   const [failedUrl, setFailedUrl] = createSignal<string | null>(null);
   const imageUrl = () => (props.imageUrl && props.imageUrl !== failedUrl() ? props.imageUrl : null);
   const icon = () => knownChannelIcon(props.icon);
@@ -60,7 +44,6 @@ export function ChannelAvatar(props: ChannelAvatarProps) {
   );
 }
 
-/** An icon on the channel colour. The editor draws its choices with it too. */
 export function ChannelIconTile(props: { name: ChannelIconName; hue: AvatarHue }) {
   return (
     <span class="channel-picture" style={{ "--channel-picture-hue": avatarHueSwatch(props.hue) }} aria-hidden="true">
@@ -76,16 +59,11 @@ export function ChannelIconTile(props: { name: ChannelIconName; hue: AvatarHue }
 
 function MemberFaces(props: ChannelAvatarProps) {
   const agentFor = (member: ChannelMember) => props.agents.find((agent) => agent.id === member.agentId);
-  // The faces are keyed by agent, and a key must be unique. A member list with an agent twice, such
-  // as one from a host, shows that agent once.
   const members = createMemo(() => {
     const seen = new Set<string>();
     return props.members.filter((member) => !seen.has(member.agentId) && Boolean(seen.add(member.agentId)));
   });
   const cluster = () => props.layout === "cluster";
-  /* The last cell of a full cluster is the count, so a fifth member costs a face rather than
-   * hiding without a trace. Four members still get four faces. A count of two digits is wider than
-   * a cell, so it takes the whole bottom row, under two faces. */
   const shown = () => {
     if (!cluster()) return members().slice(0, ROW_LIMIT);
     if (members().length <= CLUSTER_CELLS) return members();
@@ -96,9 +74,6 @@ function MemberFaces(props: ChannelAvatarProps) {
   return (
     <span class={["channel-avatar", { "channel-avatar-cluster": cluster() }]} aria-hidden="true">
       <Show when={members().length} fallback={<UsersRound />}>
-        {/* Keyed by agent: the members come as new objects on each channel update. With 100 working
-            agents, the header made each face again about 20 times a second, and each new face plays its
-            entry. */}
         <For each={shown()} keyed={(member) => member.agentId}>
           {(member) => {
             const agent = createMemo(() => agentFor(member()));

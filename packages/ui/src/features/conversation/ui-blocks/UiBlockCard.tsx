@@ -17,45 +17,21 @@ import { useText } from "../../../text";
 import { cx } from "../../../utils";
 
 export interface UiBlockCardProps {
-  /** Plain text, or a control such as a link that opens the item. */
   title?: JSX.Element | undefined;
-  /** Plain text, or text with a bold part, such as the site that a code goes to. */
   subtitle?: JSX.Element | undefined;
   status: UiBlockStatus;
-  /** The line a frozen block shows, such as the chosen button. */
   outcome?: string | undefined;
-  /** A logo before the title, such as the key of a form that asks for a secret. */
   icon?: JSX.Element | undefined;
-  /** Draws the card as dangerous. */
   danger?: boolean | undefined;
-  /** An answer is on its way. */
   busy?: boolean | undefined;
-  /**
-   * Shows "Waiting for you" with a turning loader at the end of the header while the block is open.
-   * The footer's "Sending…" takes its place while an answer is on its way.
-   */
   waiting?: boolean | undefined;
-  /** The text of the waiting badge, when the block waits for something more exact than "you". */
   waitingLabel?: string | undefined;
-  /**
-   * Shows the outcome of a frozen block as a badge at the end of the header, in the place of the
-   * waiting badge, and not as a line under the block.
-   */
   outcomeBadge?: boolean | undefined;
-  /** The body already shows the answer, such as the chosen row: an answered block has no outcome line. */
   answerInBody?: boolean | undefined;
-  /** Why the last answer did not go through. Shown while the block is open. */
   error?: string | undefined;
-  /** Closes the open block without an answer. */
   onSkip?: (() => void) | undefined;
-  /** The buttons that answer the open block. The footer shows them at its end, after Skip. */
   actions?: JSX.Element | undefined;
-  /**
-   * Puts the buttons on the title row, for a short block with no body. They go to the next line
-   * when the card is too narrow.
-   */
   inlineActions?: boolean | undefined;
-  /** A small control at the start of the footer, such as a choice that goes with the answer. */
   footerStart?: JSX.Element | undefined;
   class?: string | undefined;
   elementRef?: ((element: HTMLElement) => void) | undefined;
@@ -63,7 +39,6 @@ export interface UiBlockCardProps {
 }
 
 function outcomeText(status: UiBlockStatus, outcome: string | undefined, t: ReturnType<typeof useText>["t"]) {
-  // A blank outcome, such as a form of secret fields, still says that the block was answered.
   if (outcome?.trim()) return outcome;
   if (status === "answered") return t("uiBlock.status.answered");
   if (status === "expired") return t("uiBlock.outcome.expired");
@@ -71,7 +46,6 @@ function outcomeText(status: UiBlockStatus, outcome: string | undefined, t: Retu
   return "";
 }
 
-/** The line under a frozen block: the answer with a check, or why there is none. */
 function UiBlockOutcome(props: { status: UiBlockStatus; outcome?: string | undefined }) {
   const { t } = useText();
   const text = () => outcomeText(props.status, props.outcome, t);
@@ -95,20 +69,13 @@ function UiBlockOutcome(props: { status: UiBlockStatus; outcome?: string | undef
   );
 }
 
-/** Whether resolved JSX has something to show: a control that renders nothing gives no nodes. */
 function filled(nodes: unknown[]): boolean {
   return nodes.some((node) => node !== undefined && node !== null && node !== false && node !== "");
 }
 
-/**
- * The frame of a blocking block, in the style of an agent question: a bubble with the title, the
- * body, and, while the block is open, a footer with Skip and the block's own buttons. Once the
- * block is answered, expired or closed, the outcome line takes the place of the footer.
- */
 export function UiBlockCard(props: UiBlockCardProps) {
   const { t } = useText();
   const titleId = createUniqueId();
-  // Each read of a JSX prop builds its nodes again, so the card resolves each one once.
   const title = children(() => props.title);
   const subtitle = children(() => props.subtitle);
   const icon = children(() => props.icon);
@@ -117,8 +84,6 @@ export function UiBlockCard(props: UiBlockCardProps) {
   const pending = () => props.status === "pending";
   const waiting = () => props.waiting === true && pending() && props.busy !== true;
   const headerOutcome = () => props.outcomeBadge === true && !pending();
-  // A block that was open when it appeared and is now answered or closed. Only this change animates:
-  // a closed block in the history shows at once.
   const openedPending = untrack(() => props.status === "pending");
   const settled = () => openedPending && !pending();
   return (

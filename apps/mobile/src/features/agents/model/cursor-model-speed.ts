@@ -1,9 +1,3 @@
-/**
- * Cursor speed rows, copied from the desktop picker. The phone does not import that picker.
- * A catalog id such as `composer-2.5[context=256k,fast=true]` is the base model plus parameters.
- */
-
-/** A listed Cursor id is the saved id, or the same speed when the saved id also has reasoning. */
 export function cursorModelSelected(listed: string, saved: string): boolean {
   if (listed === saved) return true;
   const left = cursorModelParameters(listed);
@@ -15,10 +9,6 @@ export function cursorModelSelected(listed: string, saved: string): boolean {
   return true;
 }
 
-/**
- * The desktop row text for one listed Cursor id: `Name`, `Name, 256k`, `Name, Fast`, or
- * `Name, 256k · Fast`. `fast=false` adds no word. Effort stays on the effort control.
- */
 export function cursorModelSpeedLabel(name: string, id: string, fastLabel: string): string {
   const display = name.replace(/^[\s:–—-]+/u, "") || id;
   const params = /\[([^\]]*)\]$/u.exec(id)?.[1];

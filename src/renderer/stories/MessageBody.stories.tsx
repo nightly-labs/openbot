@@ -57,11 +57,6 @@ function MessageBodySurface(props: {
 
 export const RichMessage: Story = {};
 
-/**
- * A signed-out provider. The bubble names the state and nothing else: the raw 401 exchange the
- * provider returned is replaced upstream, and the Sign in action lives on the composer notice, so
- * one stale bubble cannot offer a second, competing way in.
- */
 export const AuthError: Story = {
   args: {
     message: {
@@ -103,19 +98,16 @@ const quoted: AgentMessage = {
   time: "09:55",
 };
 
-/** The quote is a button: a click scrolls the chat to the original and flashes it. */
 export const ReplyOpensOriginal: Story = {
   args: { message: reply, referencedMessage: quoted, onOpenReference: fn() },
   render: (storyArgs) => <MessageBodySurface args={storyArgs} author="user" width="360px" />,
 };
 
-/** The original is in older history, which the chat loads before it scrolls. */
 export const ReplyLoadingOriginal: Story = {
   args: { message: reply, referencedMessage: quoted, onOpenReference: fn(), referenceState: "loading" },
   render: (storyArgs) => <MessageBodySurface args={storyArgs} author="user" width="360px" />,
 };
 
-/** The original was deleted. The chat has no text to quote, so only the note shows. */
 export const ReplyOriginalUnavailable: Story = {
   args: { message: reply, referenceState: "unavailable" },
   render: (storyArgs) => <MessageBodySurface args={storyArgs} author="user" width="360px" />,
@@ -128,13 +120,11 @@ const markdownQuoted: AgentMessage = {
   time: "09:55",
 };
 
-/** The quote renders the original's Markdown, cut to four lines. */
 export const ReplyMarkdownOriginal: Story = {
   args: { message: reply, referencedMessage: markdownQuoted, onOpenReference: fn() },
   render: (storyArgs) => <MessageBodySurface args={storyArgs} author="user" width="360px" />,
 };
 
-/** An original that ends in an open code fence. The cut keeps the reply under it intact. */
 export const ReplyMarkdownOpenFence: Story = {
   args: {
     message: reply,
@@ -420,7 +410,6 @@ const NAMED_IMAGES: Record<string, string> = {
 const loadNamedImage: Parameters<typeof MessageBody>[0]["loadImageFile"] = (file) =>
   Promise.resolve(NAMED_IMAGES[file.path] ?? null);
 
-/** An agent names an image file it made. The chat shows it under the text, and a click opens the viewer. */
 export const NamedImageFile: Story = {
   args: {
     message: {
@@ -435,7 +424,6 @@ export const NamedImageFile: Story = {
   render: (storyArgs) => <MessageBodySurface args={storyArgs} variant="ghost" width="460px" />,
 };
 
-/** Two named image files show as a gallery. A file that does not load keeps only its chip. */
 export const NamedImageFiles: Story = {
   args: {
     message: {

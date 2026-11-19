@@ -1,10 +1,5 @@
 import type { ProviderPage } from "./provider-page";
 
-// Every statement about Grok Build here is taken from x.ai and docs.x.ai. Each page
-// used is in `sources`. xAI names its coding agent Grok Build; OpenBot runs its
-// command line, the Grok CLI. Check the sources again, and move `checkedAt`,
-// whenever this file changes.
-
 export const GROK_PROVIDER: ProviderPage = {
   provider: "grok",
   name: "Grok",

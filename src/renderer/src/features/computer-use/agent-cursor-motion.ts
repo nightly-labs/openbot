@@ -1,45 +1,18 @@
-/**
- * How the agent cursor travels from one point to the next.
- *
- * This is the `adaptive` motion style of cua-driver 0.34.0, ported from
- * `libs/cua-driver/rust/crates/cursor-overlay/src/trajectory.rs` (MIT, trycua/cua). OpenBot starts
- * the driver with `--no-overlay` and draws the cursor itself, so the driver's own motion styles
- * never reach the screen; this gives OpenBot's cursor the motion the driver gives its own.
- *
- * `adaptive` picks a move by its distance and its target: a careful approach for a target under
- * 16 points, a wide swoop for a move over 900 points, and a Fitts min-jerk glide otherwise. The tap
- * reads a point and no element, so every target is the driver's own default for a pixel action, a
- * 24-point box, and the careful approach is never picked. It is left out rather than kept unused.
- *
- * A move is planned once, as samples, and played back by time. The units are the overlay's own
- * pixels, which are points on macOS, the unit the driver's thresholds are in.
- */
-
 export interface CursorPoint {
   x: number;
   y: number;
 }
 
-/** One planned position, `t` milliseconds after the move starts. */
 interface CursorSample extends CursorPoint {
   t: number;
 }
 
-/** The samples of one move, the first on the start point and the last on the target. */
 export type CursorMove = readonly CursorSample[];
 
-/** The sample period, 120 Hz, as the driver plans. */
 const SAMPLE_MS = 1000 / 120;
-/** The target the driver assumes for an action that names a point and no element. */
 const TARGET_POINTS = 24;
-/** A move longer than this swoops. */
 const LONG_MOVE_POINTS = 900;
-/** Arc-length table resolution of one path. */
 const PATH_STEPS = 256;
-/**
- * How far the swoop bends, as a share of its length. The driver draws it from 0.25 to 0.35 with a
- * seeded random number; the middle keeps every move the same shape for the same two points.
- */
 const SWOOP_ARC = 0.3;
 
 const distance = (a: CursorPoint, b: CursorPoint) => Math.hypot(b.x - a.x, b.y - a.y);
@@ -51,17 +24,12 @@ function unit(a: CursorPoint, b: CursorPoint): CursorPoint {
   return { x: (b.x - a.x) / d, y: (b.y - a.y) / d };
 }
 
-/** Which side of the chord a path bends to: upward, for a move across the screen. */
 const naturalSide = (a: CursorPoint, b: CursorPoint) => (unit(a, b).x >= 0 ? -1 : 1);
 
 const minJerk = (t: number) => t * t * t * (10 - 15 * t + 6 * t * t);
 
 const inOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 
-/**
- * A curve sampled by arc length, so that an easing profile sets the speed along it rather than
- * the speed of its parameter. The profiles here stay inside 0 to 1, so the ends are not extended.
- */
 function arcLengthPath(curve: (u: number) => CursorPoint): (fraction: number) => CursorPoint {
   const us = [0];
   const lengths = [0];
@@ -91,7 +59,6 @@ function arcLengthPath(curve: (u: number) => CursorPoint): (fraction: number) =>
   };
 }
 
-/** The driver's gentle one-sided bend (`bow_path`). */
 function bowPath(a: CursorPoint, b: CursorPoint, amount: number) {
   const d = distance(a, b);
   const direction = unit(a, b);
@@ -108,7 +75,6 @@ function bowPath(a: CursorPoint, b: CursorPoint, amount: number) {
   });
 }
 
-/** The driver's arc (`cua_path`), with both handles at 0.3 and a flow of 0.2. */
 function swoopPath(a: CursorPoint, b: CursorPoint, arc: number) {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
@@ -147,18 +113,11 @@ function glide(
     const tau = step / steps;
     samples.push({ t: tau * durationMs, ...path(profile(tau)) });
   }
-  // The curve ends on both points already; this keeps rounding from leaving the cursor a hair off.
   samples[0] = { t: 0, ...from };
   samples[steps] = { t: durationMs, ...to };
   return samples;
 }
 
-/**
- * Plans one move of the agent cursor from where it is to where the agent aimed.
- *
- * A move shorter than half a pixel has nothing to show and plans no samples, so the caller places
- * the cursor without playing anything.
- */
 export function planAgentCursorMove(from: CursorPoint, to: CursorPoint): CursorMove {
   const d = distance(from, to);
   if (d < 0.5) return [];
@@ -167,12 +126,10 @@ export function planAgentCursorMove(from: CursorPoint, to: CursorPoint): CursorM
     const durationMs = Math.min(1100, Math.max(450, 350 + 0.35 * d));
     return glide(from, to, swoopPath(from, to, SWOOP_ARC * side), inOutCubic, durationMs);
   }
-  // Fitts' law in its Shannon form, as the driver times a min-jerk glide.
   const durationMs = Math.min(1400, Math.max(180, 50 + 150 * Math.log2(d / TARGET_POINTS + 1)));
   return glide(from, to, bowPath(from, to, 0.02 * side), minJerk, durationMs);
 }
 
-/** Where a planned move holds the cursor `elapsedMs` after it starts. */
 export function agentCursorPointAt(move: CursorMove, elapsedMs: number): CursorPoint | null {
   const first = move[0];
   const last = move[move.length - 1];

@@ -1,7 +1,6 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.host", {
-  // Errors from host setup, publishing, and host maintenance.
   "error.host.iceServersMissing": "Remote Signal has not supplied ICE servers.",
   "error.host.keyRotationUnavailable": "This server cannot change its key without the account service.",
   "error.host.keyRotationRefused":

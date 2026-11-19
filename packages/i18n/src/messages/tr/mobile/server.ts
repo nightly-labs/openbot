@@ -1480,7 +1480,6 @@ export const messages = {
   "mobile.server.audit.roleMemberAdded": "{member}, {role} rolüne eklendi",
   "mobile.server.audit.roleMemberRemoved": "{member}, {role} rolünden çıkarıldı",
   "mobile.server.audit.agentLevel": "{role} için {agent}: {change}",
-  // Server settings › Import agents: Grok Bot and Hermes exports (`agent-import-v1`).
   "mobile.server.settings.importAgents": "Ajanları içe aktar",
   "mobile.server.route.import": "Ajanları içe aktar",
   "mobile.server.import.unsupported": "Ajanları buradan içe aktarmak için bu sunucudaki OpenBot'u güncelleyin.",
@@ -1553,7 +1552,6 @@ export const messages = {
   "mobile.server.import.channel": "Kanal",
   "mobile.server.import.notImportedTitle": "İçe aktarılmadı",
   "mobile.server.import.resultWarnings": "Bazı öğeler taşınmadı",
-  // Server settings › Transfer: the whole server to or from a transfer file (`instance-transfer-v1`).
   "mobile.server.settings.transfer": "Aktarım",
   "mobile.server.route.transfer": "Aktarım",
   "mobile.server.route.transferExport": "Dışa aktar",

@@ -6,13 +6,8 @@ import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 
-/** The past year, the range of the desktop Profile tab. */
 const PROFILE_DAYS = 365;
 
-/**
- * The host report that the desktop Profile tab shows: the past year of the paired desktop
- * (`kind: "local"`). Without a paired desktop there is no report, as on a host without analytics.
- */
 export function useProfileActivity() {
   const queryScope = useQueryScope();
   const { servers, agents, loadHostAnalytics } = useMobileWorkspace();
@@ -23,7 +18,6 @@ export function useProfileActivity() {
     queryKey: queryKeys.profileActivity(queryScope, server?.id ?? "", range),
     queryFn: () => (server ? loadHostAnalytics(range, server.id) : null),
     enabled: online,
-    // The report on screen stays while a later load runs, so the tiles do not empty and fill again.
     placeholderData: keepPreviousData,
     retry: false,
     staleTime: 0,

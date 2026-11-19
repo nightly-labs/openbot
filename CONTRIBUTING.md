@@ -177,7 +177,7 @@ Bun does not resolve a version that is less than 3 days old (`minimumReleaseAge`
 and Dependabot waits the same time. Only `@norbert_bodziony/bloub`, which the maintainer publishes,
 is excluded. Only the packages in `trustedDependencies` in `package.json` can
 run install scripts. If a new dependency needs its install script, add it to that list and give the
-reason in the `bunfig.toml` comment. `bun pm untrusted` shows the blocked scripts.
+reason in the pull request. `bun pm untrusted` shows the blocked scripts.
 
 ## Licensing
 

@@ -8,24 +8,20 @@ import type { MenuAction } from "@/shared/components/menu-view";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 
-/** Opens the page of a step: the trigger page for the trigger. */
 export function openStep(node: WorkflowNode) {
   if (node.kind === "trigger") router.push({ pathname: "/workflow-editor/trigger", params: { nodeId: node.id } });
   else router.push({ pathname: "/workflow-editor/step", params: { nodeId: node.id } });
 }
 
-/** Opens Add a step at a place of a list. */
 export function openAddStep(list: FlowList, index: number) {
   router.push({ pathname: "/workflow-editor/add", params: { list, index: String(index) } });
 }
 
-/** Opens Add a step at a place of a workflow that the outline cannot hold. */
 export function openAddStepAt(place: GraphPlace) {
   router.push({ pathname: "/workflow-editor/add", params: placeParams(place) });
 }
 
-/** Deleting a condition deletes its two paths, so it asks first. */
-function confirmRemove(node: WorkflowNode, draft: WorkflowDraft, remove: (id: string) => void) {
+export function confirmRemove(node: WorkflowNode, draft: WorkflowDraft, remove: (id: string) => void) {
   const text = currentText();
   if (node.kind !== "condition" || !draft.outline) {
     void haptics.selection();
@@ -45,12 +41,6 @@ function confirmRemove(node: WorkflowNode, draft: WorkflowDraft, remove: (id: st
   );
 }
 
-/**
- * The menu of a step in the editor, the same in the list and in the flow: move, duplicate, add after
- * and delete a step of the outline, or connect and delete a step that the trigger does not reach.
- * `structural` is false when the step has no menu: the trigger, or a workflow that the phone does not
- * edit as an outline.
- */
 export function useWorkflowStepMenu(node: WorkflowNode, draft: WorkflowDraft) {
   const { t } = useText();
   const { move, duplicate, remove, connect } = useWorkflowDraft.getState();

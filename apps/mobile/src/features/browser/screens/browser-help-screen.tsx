@@ -14,7 +14,6 @@ import ZoomIn from "lucide-react-native/icons/zoom-in";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { useText } from "@/shared/lib/text";
 
-/** How the live browser takes touch, in the words of the controls the user sees. */
 export function BrowserHelpScreen() {
   const { t } = useText();
   const foreground = String(useThemeColor("foreground"));

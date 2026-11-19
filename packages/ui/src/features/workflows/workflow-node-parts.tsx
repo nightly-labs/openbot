@@ -1,9 +1,3 @@
-/**
- * The parts that the workflow nodes share: the ports, the label row, the toolbar of the selected node
- * with Lock and Delete, the fields that live on the board, the run time, the result field and the
- * results strip. The control blocks share their choice pills, the toolbar menus and the colours.
- */
-
 import type { ProviderLogoVariant } from "@openbot/brand";
 import { isKnownAgentProvider } from "@openbot/contracts/agent-providers";
 import { isAgentProviderRef } from "@openbot/contracts/ipc";
@@ -57,24 +51,16 @@ import {
 } from "./workflow-board";
 import type { WorkflowPlace } from "./workflow-model";
 
-/* ------------------------------------------------------------ Providers */
-
 export type WfProvider = AgentProfile["provider"];
 
-/** The logo of a provider. A provider that this build does not know has the neutral mark. */
 export function wfProviderLogo(provider: WfProvider): ProviderLogoVariant {
   return isKnownAgentProvider(provider) ? provider : "unknown";
 }
 
-/* ---------------------------------------------------------------- Kinds */
-
 export type NoteTone = "yellow" | "orange" | "red" | "pink" | "blue" | "teal" | "green";
-/** "ink" is the text colour, so it reads in the dark and the light theme. */
 export type CanvasColor = "ink" | NoteTone;
 export type ShapeKind = "rectangle" | "circle" | "diamond" | "triangle" | "inverted" | "oval" | "star";
 type BlockKind = "trigger" | "condition" | "output" | "approval" | "note" | "shape";
-
-/* --------------------------------------------------------------- Ports */
 
 export function PortIcon(props: { type: WfnPortType }) {
   return (
@@ -84,10 +70,6 @@ export function PortIcon(props: { type: WfnPortType }) {
   );
 }
 
-/**
- * A port of a node. A condition has two text outputs, so each one has a branch key and its own name.
- * A required input that has no line shows the warning colour.
- */
 export function Port(props: {
   node: string;
   type: WfnPortType;
@@ -108,7 +90,6 @@ export function Port(props: {
   const armed = () => board.armed(props.node, props.side, props.type, props.branch);
   const target = () => board.accepts(props.node, props.side, props.type, props.branch);
   const refused = () => board.refused(props.node, props.side, props.type, props.branch);
-  /** A port is a toggle only while a connection is open: then a press on the armed port closes it. */
   const pressed = () => {
     if (!board.connecting()) return undefined;
     return armed() ? "true" : "false";
@@ -147,12 +128,6 @@ export function Port(props: {
   );
 }
 
-/* --------------------------------------------------------------- Shell */
-
-/**
- * The toolbar of the selected node, above it. When there it covers another node, the canvas puts it
- * under the node, and under the results strip when the node shows one.
- */
 export function Toolbar(props: { id: string; children: JSX.Element }) {
   const board = useBoard();
   const [bar, setBar] = createSignal<{ width: number; height: number }>();
@@ -185,21 +160,14 @@ export function ToolbarSeparator() {
   return <span class="wfn-toolbar-separator" aria-hidden="true" />;
 }
 
-/**
- * A toolbar action: a round icon button in the round toolbar, grey until the pointer or the focus is
- * on it, and red for a delete. Its name and its keys show in a tooltip. An action that cannot run is
- * not shown, so the toolbar has no disabled buttons.
- */
 export function ToolAction(props: {
   text: string;
-  /** The accessible name when the text alone is not enough, such as the name of the node after Delete. */
   label?: string;
   keys?: readonly string[];
   tone?: "danger";
   pressed?: boolean;
   icon: JSX.Element;
   onClick: () => void;
-  /** Runs with true while the pointer or the focus is on the action, and with false when it leaves. */
   onAim?: (aimed: boolean) => void;
 }) {
   return (
@@ -224,7 +192,6 @@ export function ToolAction(props: {
   );
 }
 
-/** Saves a file that the browser can reach, under its own name. */
 export function download(url: string, name: string) {
   const link = document.createElement("a");
   link.href = url;
@@ -232,10 +199,6 @@ export function download(url: string, name: string) {
   link.click();
 }
 
-/**
- * The toolbar of a node, in groups as in the Higgsfield node toolbar: the actions of the kind, then
- * Duplicate, then Lock and Delete.
- */
 export function NodeToolbar(props: {
   id: string;
   name: string;
@@ -297,17 +260,11 @@ export function LockDelete(props: { id: string; name: string; locked: boolean; o
   );
 }
 
-/** The lock of a node lives on the board, so the canvas can stop a drag and unlock every node. */
 export function useLocked(id: () => string): [() => boolean, (locked: boolean) => void] {
   const board = useBoard();
   return [() => board.isLocked(id()), (locked) => board.lock(id(), locked)];
 }
 
-/**
- * A text or style of a node that lives on the board, so copy, paste and undo keep it. `read` takes back
- * a stored value, and gives undefined for a value of the wrong kind. A typed field joins each key stroke
- * of one burst into one undo step.
- */
 export function useField<T extends WfnFieldValue>(
   id: () => string,
   key: string,
@@ -325,7 +282,6 @@ export function useField<T extends WfnFieldValue>(
   ];
 }
 
-/** A field that the user types in. */
 export function useTextField(id: () => string, key: string, initial: string): [() => string, (value: string) => void] {
   return useField(id, key, initial, asString, true);
 }
@@ -334,7 +290,6 @@ export const asString = (value: WfnFieldValue): string | undefined => (typeof va
 export const asBoolean = (value: WfnFieldValue): boolean | undefined =>
   typeof value === "boolean" ? value : undefined;
 
-/** Takes back a stored value only when it is one of `values`. */
 export function oneOf<T extends WfnFieldValue>(values: readonly T[]): (value: WfnFieldValue) => T | undefined {
   return (value) => values.find((item) => item === value);
 }
@@ -342,12 +297,9 @@ export function oneOf<T extends WfnFieldValue>(values: readonly T[]): (value: Wf
 export const asProvider = (value: WfnFieldValue): WfProvider | undefined =>
   isAgentProviderRef(value) ? value : undefined;
 
-/** One input port of a step. */
 export interface WfnInputPort {
   type: WfnPortType;
-  /** The field that holds the source of this port. */
   branch?: string;
-  /** The name on hover. Without it, the name of the type. */
   label?: string;
 }
 
@@ -367,36 +319,20 @@ export interface ShellProps {
     | "approval"
     | "note"
     | "shape";
-  /** The node has no label above its card, as a shape. The lock badge still shows. */
   bare?: boolean;
   inputs?: readonly WfnPortType[];
-  /**
-   * The input ports, when a type has more than one, as the first and the last frame of a video. A
-   * port with a branch puts its source in the field of that name. Without it, one port for each input.
-   */
   inputPorts?: readonly WfnInputPort[] | undefined;
-  /** The step cannot run until a line comes into one of its inputs. */
   requires?: boolean;
   output?: WfnPortType | undefined;
   toolbar: JSX.Element;
   media?: boolean;
-  /** The media has clear pixels: the card has no fill and no ring, so the canvas shows through. */
   clear?: boolean;
-  /** The image of a result in the results strip. A text step has none. */
   thumb?: (result: WfnResult) => string | undefined;
   style?: JSX.CSSProperties;
   children: JSX.Element;
-  /** The run button of the step. It comes after the result and the alerts of the step. */
   action?: JSX.Element;
 }
 
-/**
- * The resize handles: one on each corner, and a band on each side that can change size. Only the
- * bottom-right corner shows an arc, concentric with the card. The arc shows on hover and on the
- * selected node, and not on a locked node. The
- * canvas handles the drag, and a double click restores the default size. The handles are
- * pointer-only, so they are hidden from assistive technology.
- */
 export function ResizeGrip(props: { id: string }) {
   const board = useBoard();
   return (
@@ -421,7 +357,6 @@ export function NodeShell(props: ShellProps) {
   const board = useBoard();
   const { t } = useText();
   const selected = () => board.selected() === props.id;
-  /** A failed step that can run again shows Retry in place of its run button, and a step that runs alone Stop. */
   const action = children(() => props.action);
   const stop = () => stopOf(board, props.id);
   const inputPorts = (): readonly WfnInputPort[] => props.inputPorts ?? (props.inputs ?? []).map((type) => ({ type }));
@@ -534,10 +469,6 @@ export function NodeShell(props: ShellProps) {
   );
 }
 
-/**
- * The time of a step's run, at the end of its label row. It counts while the step runs. When the run
- * ends, it shows the time with a check for a moment. A failed step shows Failed until it runs again.
- */
 function RunTime(props: { id: string }) {
   const board = useBoard();
   const { t, format } = useText();
@@ -605,11 +536,6 @@ function RunTime(props: { id: string }) {
   );
 }
 
-/**
- * The result field of a step. While the step runs, lines that pulse stand for the new result. They
- * cover the last result, which keeps its space, so the card does not change size. A failed run shows
- * why it stopped in place of a result.
- */
 export function ResultField(props: { id: string; running: boolean }) {
   const board = useBoard();
   const { t } = useText();
@@ -640,14 +566,12 @@ export function ResultField(props: { id: string; running: boolean }) {
   );
 }
 
-/** Why the shown result failed: its error, or the error of a newest step that failed with no result. */
 function resultFailure(board: WfnBoard, id: string): string | undefined {
   const shown = board.shown(id);
   if (shown?.failed) return shown.value;
   return shown === undefined && board.status(id) === "failed" ? board.error(id) : undefined;
 }
 
-/** Why a step failed, for a card that has no result field. */
 export function FailureAlert(props: { id: string; running: boolean }) {
   const board = useBoard();
   return (
@@ -676,7 +600,6 @@ export function Field(props: { class?: string; children: JSX.Element }) {
   return <div class={`wfn-field ${props.class ?? ""}`}>{props.children}</div>;
 }
 
-/** The name of a result in a list: its workflow run, or a run of the step alone, and a failure. */
 function resultName(t: AppTranslate, result: WfnResult): string {
   if (result.run === undefined)
     return result.failed ? t("workflow.node.result.stepFailed") : t("workflow.node.result.step");
@@ -685,7 +608,6 @@ function resultName(t: AppTranslate, result: WfnResult): string {
     : t("workflow.node.result.run", { run: result.run });
 }
 
-/** When a result was made: the time for a result of today, else the day and the time. */
 export function resultTime(format: AppFormat, at: string): string {
   const date = new Date(at);
   const today = date.toDateString() === new Date().toDateString();
@@ -697,13 +619,6 @@ export function resultTime(format: AppFormat, at: string): string {
   );
 }
 
-/**
- * The results of a step, oldest first, under the selected node, as on the Higgsfield canvas. An
- * image step shows each image; a text step shows the number of each result. The arrows move to the
- * result before or after the one on view. A step with one result shows nothing. When there are more
- * results than fit, the list scrolls so that the result on view is in the middle, clear of the faded
- * edges. A wheel or a trackpad over the list scrolls it.
- */
 function ResultStrip(props: { id: string; thumb?: ((result: WfnResult) => string | undefined) | undefined }) {
   const board = useBoard();
   const { t, format } = useText();
@@ -728,8 +643,6 @@ function ResultStrip(props: { id: string; thumb?: ((result: WfnResult) => string
       });
     },
   );
-  // A wheel or a trackpad scrolls the row while the row can move that way. At an end of the row, and
-  // for a pinch, the canvas pans or zooms as before.
   const scrollOnWheel = (event: WheelEvent) => {
     if (!items || event.ctrlKey || event.metaKey) return;
     const unit =
@@ -739,11 +652,8 @@ function ResultStrip(props: { id: string; thumb?: ((result: WfnResult) => string
           ? items.clientWidth
           : 1;
     const rightToLeft = getComputedStyle(items).direction === "rtl";
-    // A sideways swipe moves the row as the browser does. A vertical wheel moves it toward the end of
-    // the row, which is on the left in a right-to-left language.
     const sideways = Math.abs(event.deltaX) >= Math.abs(event.deltaY);
     const step = (sideways ? event.deltaX : rightToLeft ? -event.deltaY : event.deltaY) * unit;
-    // In a right-to-left language, scrollLeft goes from 0 at the start to a negative value at the end.
     const end = items.scrollWidth - items.clientWidth;
     const [min, max] = rightToLeft ? [-end, 0] : [0, end];
     if (step === 0 || (step > 0 ? items.scrollLeft >= max - 1 : items.scrollLeft <= min + 1)) return;
@@ -808,10 +718,6 @@ function ResultStrip(props: { id: string; thumb?: ((result: WfnResult) => string
   );
 }
 
-/**
- * The run of one step: the board runs the step alone, and the host records its result. A workflow
- * run sets the same states.
- */
 export function useStepRun(id: string) {
   const board = useBoard();
   return {
@@ -821,7 +727,6 @@ export function useStepRun(id: string) {
   };
 }
 
-/** How to stop a step that runs alone. A workflow run stops from the bar, so its steps have no Stop. */
 export function stopOf(board: WfnBoard, id: string) {
   return board.status(id) === "running" && !board.running() ? board.stopStep : undefined;
 }
@@ -831,7 +736,6 @@ interface Range {
   max: number;
 }
 
-/** The widths a user can give each block, and the height where the block has a free height. */
 export const BLOCK_RESIZE: Record<BlockKind, { width: Range; height?: Range }> = {
   trigger: { width: { min: 240, max: 480 } },
   condition: { width: { min: 260, max: 560 } },
@@ -841,23 +745,17 @@ export const BLOCK_RESIZE: Record<BlockKind, { width: Range; height?: Range }> =
   shape: { width: { min: 48, max: 960 }, height: { min: 48, max: 960 } },
 };
 
-/* ------------------------------------------------------------- Choices */
-
 export interface Choice<T extends string> {
   value: T;
   label: string;
   icon: () => JSX.Element;
 }
 
-/* ------------------------------------------------------------- Colours */
-
-/** A choice whose name is a catalog key. */
 export interface KeyedChoice<T extends string> {
   value: T;
   label: AppTextKey;
 }
 
-/** The colours of a note, from the file colours of the palette. */
 export const TONES: readonly KeyedChoice<NoteTone>[] = [
   { value: "yellow", label: "workflow.color.yellow" },
   { value: "orange", label: "workflow.color.orange" },
@@ -868,22 +766,17 @@ export const TONES: readonly KeyedChoice<NoteTone>[] = [
   { value: "green", label: "workflow.color.green" },
 ];
 
-/** The colours of a line or a shape: the text colour, then the note colours. */
 export const COLORS: readonly KeyedChoice<CanvasColor>[] = [{ value: "ink", label: "workflow.color.ink" }, ...TONES];
 
-/** The choices with their names in the interface language. */
 export const translated = <T extends string>(t: AppTranslate, choices: readonly KeyedChoice<T>[]) =>
   choices.map((choice) => ({ value: choice.value, label: t(choice.label) }));
 
 export const colorVar = (color: CanvasColor) =>
   color === "ink" ? "var(--openbot-text-primary)" : `var(--openbot-file-${color})`;
 
-/** A round colour sample, for a toolbar button or a menu item. */
 export function Swatch(props: { color: CanvasColor }) {
   return <span class="wfn-swatch" style={{ "--wfn-swatch": colorVar(props.color) }} />;
 }
-
-/* --------------------------------------------------------------- Note */
 
 export type TextFont = "sans" | "mono";
 export type TextAlign = "start" | "center" | "end" | "justify";
@@ -912,16 +805,11 @@ export const ALIGN_ICONS: Record<TextAlign, typeof TextAlignStart> = {
   justify: TextAlignJustify,
 };
 
-/**
- * A menu in the toolbar of a note or a shape: the trigger shows the value as its icon, or else as its
- * measure, and the menu lists the choices.
- */
 export function ToolbarChoice<T extends string>(props: {
   name: string;
   value: T;
   choices: readonly { value: T; label: string; meta?: string }[];
   icon?: (value: T) => JSX.Element;
-  /** The mark of a choice in the list, when it is not the trigger icon. */
   tile?: (value: T, index: number) => JSX.Element;
   onChange: (value: T) => void;
 }) {
@@ -957,15 +845,8 @@ export function ToolbarChoice<T extends string>(props: {
   );
 }
 
-/* --------------------------------------------------------------- Places */
-
-/** The key of a place in a choice list. */
 export const placeKey = (connectionId: string, placeId: string) => JSON.stringify([connectionId, placeId]);
 
-/**
- * The place of a node, such as the channel that an output posts to. A new node takes the first place
- * of the catalog. The connection and the place change as one change.
- */
 export function usePlace(
   id: () => string,
   initial: { connectionId?: string | undefined; placeId?: string | undefined },

@@ -18,26 +18,14 @@ import {
 import { chatVisualResponse } from "./chat-visual-protocol";
 import { usesX11Windows } from "./linux-wayland-output";
 
-/**
- * Draws a visual reply page for `html_preview` in a window that is never shown.
- *
- * The window has its own session in memory, so the page cannot read the app's cookies, storage or
- * attachments. The page gets the same sandbox and frame script as in the chat, and it can load files
- * from the network, as it can there. It cannot ask for a permission, download a file, open a window
- * or leave its address.
- */
-
 const PREVIEW_PARTITION = "openbot-visual-preview";
 const PREVIEW_HOST = "preview";
 const PREVIEW_TIMEOUT = "20 seconds";
 const INITIAL_HEIGHT = 600;
 const CONSOLE_LINE_LIMIT = 40;
 const CONSOLE_LINE_LENGTH = 500;
-/** The same bound as a browser screenshot: a larger image costs the model more than it shows it. */
 const MAX_CAPTURE_PIXELS = 4_194_304;
-/** A script in its own world, so the page cannot replace the functions that it calls. */
 const SCRIPT_WORLD = 1_017;
-/** The measure of the frame script in the chat: `scrollHeight` is never less than the window. */
 const SETTLED_HEIGHT_SCRIPT = `new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() =>
   setTimeout(() => resolve(Math.ceil(document.documentElement.getBoundingClientRect().height)), 250))))`;
 const NEXT_FRAME_SCRIPT =
@@ -70,7 +58,6 @@ function boundedPng(image: NativeImage): string {
 
 export class ChatVisualPreviewer implements ChatVisualPreviewHost {
   readonly #pages = new Map<string, { bytes: Uint8Array; appearance: ChatVisualAppearance }>();
-  /** One page at a time: each one is a renderer process. */
   readonly #lock = Semaphore.makeUnsafe(1);
   #session: Session | null = null;
 
@@ -80,8 +67,6 @@ export class ChatVisualPreviewer implements ChatVisualPreviewHost {
     session.protocol.handle("openbot-visual", (request) => {
       const url = new URL(request.url);
       const page = url.hostname === PREVIEW_HOST ? this.#pages.get(url.pathname.slice(1)) : undefined;
-      // The page gets the colour scheme of the theme. A window, unlike a frame, has no chat behind the
-      // page, so in the dark scheme the browser paints a transparent page on a dark canvas.
       return page
         ? chatVisualResponse(page.bytes, { appearance: page.appearance })
         : new Response("Not found", { status: 404 });
@@ -102,12 +87,7 @@ export class ChatVisualPreviewer implements ChatVisualPreviewHost {
         Effect.try({
           try: () => {
             this.#previewSession();
-            // The canvas behind a transparent page: the chat background of the theme.
             const backgroundColor = chatVisualAppTheme(request.appearance)["--background"];
-            // Not `offscreen`: after a resize, its capture loses every canvas that does not draw again,
-            // so a chart comes out empty. On Wayland the compositor gives a window that is not shown no
-            // frames, so the page never draws and the capture fails (#10111). There it is `offscreen`, and the
-            // page loads again after the resize.
             const offscreen = process.platform === "linux" && !usesX11Windows();
             const window = new BrowserWindow({
               show: false,
@@ -150,10 +130,8 @@ export class ChatVisualPreviewer implements ChatVisualPreviewHost {
     const contents = window.webContents;
     const console: string[] = [];
     contents.on("console-message", (event) => {
-      // A development build warns about its own policy on every page; the agent did not write it.
       if (console.length >= CONSOLE_LINE_LIMIT || event.message.startsWith("%cElectron Security Warning")) return;
       const level = CONSOLE_LEVELS[event.level] ?? "log";
-      // The lines go to the provider, so a key that the page logs is removed first.
       console.push(`[${level}] ${redactText(event.message).slice(0, CONSOLE_LINE_LENGTH)}`);
     });
     contents.setWindowOpenHandler(() => ({ action: "deny" }));
@@ -167,9 +145,6 @@ export class ChatVisualPreviewer implements ChatVisualPreviewHost {
           try: () => contents.loadURL(chatVisualFrameUrl(url, theme)),
           catch: () => previewFailure("The page did not load."),
         });
-        // The agent sees the page on the chat canvas, so the capture has the canvas colour. A page has
-        // a transparent canvas, and a window, unlike a frame, has no chat behind it. The user origin
-        // lets a page that sets its own background keep it.
         yield* Effect.tryPromise({
           try: () => contents.insertCSS(`html{background:${theme["--background"]}}`, { cssOrigin: "user" }),
           catch: () => previewFailure("The page did not load."),
@@ -186,8 +161,6 @@ export class ChatVisualPreviewer implements ChatVisualPreviewHost {
       const height = Math.min(Math.max(contentHeight, CHAT_VISUAL_MIN_HEIGHT), CHAT_VISUAL_MAX_HEIGHT);
       window.setContentSize(request.width, height);
       if (contents.isOffscreen()) {
-        // An offscreen window loses each canvas on a resize, so the page draws again at its new size.
-        // The frame script removes the theme fragment, so the same address would only scroll the page.
         console.length = 0;
         yield* load(`${pageUrl}?redraw`);
       } else {

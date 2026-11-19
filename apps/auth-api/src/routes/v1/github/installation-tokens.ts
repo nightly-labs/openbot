@@ -11,12 +11,6 @@ import {
 } from "../../../server/request-auth";
 import { requestSourceIp } from "../../../server/source-ip";
 
-/**
- * Installation tokens of the OpenBot GitHub App, so that GitHub shows an agent's work as
- * `openbotgit[bot]`. The bearer is the GitHub user token of the OpenBot computer, not an OpenBot
- * session: the app works without an OpenBot account. GitHub checks the token, and the answer holds
- * only the repositories where that user can push.
- */
 export const Route = createFileRoute("/v1/github/installation-tokens")({
   server: {
     handlers: {

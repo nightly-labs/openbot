@@ -1,9 +1,3 @@
-// What main answers for a conversation: its pages, search, read state, attachments, queue and file
-// previews.
-//
-// Each decoder checks every field the contract type requires and keeps each optional field it
-// carries, so a value the renderer reads always has the shape its type says.
-
 import {
   type AgentApproval,
   type AgentTask,
@@ -81,7 +75,6 @@ export function decodeAttachmentImportProgress(value: unknown): AttachmentImport
   };
 }
 
-/** The address of a temporary page that main keeps, or null when its page store is full. */
 export function decodeOptionalFilePreviewPageUrl(value: unknown): string | null {
   if (value === null) return null;
   if (!isFilePreviewPageUrl(value)) throw new Error("Invalid file preview page URL response.");

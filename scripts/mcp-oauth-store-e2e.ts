@@ -1,12 +1,3 @@
-// Checks that an MCP sign-in can recover a server whose saved row is unread, without deleting the
-// file and without dropping the rows of other servers. The first cases call the real
-// `McpOAuthStore` directly. The sign-in cases run the real `McpOAuth` and the real SDK flow
-// (discovery, registration, browser, token exchange) against a local OAuth server on the loopback
-// address, so the store sees the writes in the order Connect makes them. The last case signs in to
-// two accounts of one server, with `#account-…` addresses, and checks that each keeps its own row.
-// The cipher is fake, so this does not open Keychain or a browser.
-//
-// `bun scripts/mcp-oauth-store-e2e.ts`. Writes .openbot-build/mcp-oauth-store-e2e/report.json.
 import assert from "node:assert/strict";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -75,7 +66,6 @@ async function writeEnvelope(path: string, rows: Record<string, string>): Promis
   await writeFile(path, `${JSON.stringify({ version: 1, servers: rows })}\n`);
 }
 
-/** Asserts that the file holds exactly `expected`, in any order. */
 async function expectRows(path: string, expected: Record<string, string>): Promise<void> {
   const actual = await servers(path);
   assert.deepEqual(Object.keys(actual).sort(), Object.keys(expected).sort());
@@ -90,9 +80,7 @@ async function expectUnreadable(operation: Effect.Effect<void, { readonly cause:
   });
 }
 
-/** An authorization server and the protected-resource metadata of the MCP server at `/mcp`. */
 async function startAuthorizationServer() {
-  /** Each request line and body, so a case can check what left the computer. */
   const seen: string[] = [];
   const server = createServer(async (request, response) => {
     const url = new URL(request.url ?? "/", base);
@@ -120,7 +108,6 @@ async function startAuthorizationServer() {
         token_endpoint_auth_method: "none",
       });
     if (path === "/token" && request.method === "POST") {
-      // The token names the code, so a case can tell the sign-ins apart.
       const code = new URLSearchParams(body).get("code") ?? "";
       return json(response, 200, {
         access_token: `access-${code}`,
@@ -154,10 +141,6 @@ function json(response: ServerResponse, status: number, value: unknown) {
   response.end(JSON.stringify(value));
 }
 
-/**
- * Runs one Connect on `store`: the browser page opens, and `finish` says whether the user signs in.
- * The server answers `code` with the access token `access-<code>`.
- */
 async function connect(
   store: McpOAuthStore,
   url: string,
@@ -198,7 +181,6 @@ try {
 
   const current = cipher("current");
 
-  // 1. A registration while every row is unread stays in memory; the file keeps every row.
   const lockedPath = join(root, "locked.json");
   const lockedRows = {
     [NOTION]: encryptRecord("previous", tokens("notion")),
@@ -211,12 +193,10 @@ try {
   await runCauseEffect(locked.write(NOTION, registration("notion")));
   assert.equal(locked.read(NOTION)?.client?.client_id, "notion-client");
   await expectRows(lockedPath, lockedRows);
-  // The failed sign-in clears the record, as `invalidateCredentials("all")` does.
   await runCauseEffect(locked.clear(NOTION));
   await expectRows(lockedPath, lockedRows);
   const registrationKeepsRows = { ok: true, servers: Object.keys(lockedRows).sort() };
 
-  // 2. A completed sign-in replaces that unread row and keeps the other ciphertext.
   await runCauseEffect(locked.write(NOTION, registration("notion")));
   await runCauseEffect(locked.write(NOTION, { ...registration("notion"), ...tokens("notion-new") }));
   assert.deepEqual(locked.read(NOTION)?.tokens, tokens("notion-new").tokens);
@@ -231,7 +211,6 @@ try {
   assert.equal(reread.read(VERCEL), null);
   const completedSignInKeepsOthers = { ok: true, readable: [NOTION], unread: [VERCEL] };
 
-  // 3. A later completed sign-in recovers the remaining unread row without dropping the first.
   await runCauseEffect(reread.write(VERCEL, tokens("vercel-new")));
   const both = new McpOAuthStore(lockedPath, current);
   assert.equal(await Effect.runPromise(both.load()), null);
@@ -239,8 +218,6 @@ try {
   assert.deepEqual(both.read(VERCEL)?.tokens, tokens("vercel-new").tokens);
   const secondSignInRecoversRest = { ok: true, readable: [NOTION, VERCEL].sort() };
 
-  // 4. One unread row among readable ones: the readable row stays, a registration for the unread
-  // server keeps its ciphertext, and only a completed sign-in replaces it.
   const mixedPath = join(root, "mixed.json");
   const stripeRow = encryptRecord("previous", tokens("stripe"));
   await writeEnvelope(mixedPath, { [NOTION]: encryptRecord("current", tokens("notion")), [STRIPE]: stripeRow });
@@ -257,7 +234,6 @@ try {
   assert.deepEqual(mixedAfter.read(STRIPE)?.tokens, tokens("stripe-new").tokens);
   const partialDecrypt = { ok: true, kept: NOTION, recovered: STRIPE };
 
-  // 5. An unparseable file is still replaced by a completed sign-in.
   const corruptPath = join(root, "corrupt.json");
   await writeFile(corruptPath, "{not-json");
   const corrupt = new McpOAuthStore(corruptPath, current);
@@ -266,7 +242,6 @@ try {
   assert.deepEqual(corrupt.read(NOTION)?.tokens, tokens("notion").tokens);
   const corruptReplaced = { ok: true };
 
-  // 6. A file the operating system refuses to read is never replaced. Root reads every file.
   let refusedFile: { ok: boolean; skipped?: string } = { ok: true, skipped: "running as root" };
   if (process.getuid?.() !== 0) {
     const refusedPath = join(root, "refused.json");
@@ -281,8 +256,6 @@ try {
     refusedFile = { ok: true };
   }
 
-  // 7. Connect through the real SDK while every row is unread: a cancel keeps every row, and a
-  // completed sign-in recovers that server and keeps the other row.
   const mcpUrl = `${auth.base}/mcp`;
   const resource = normalizeResource(mcpUrl);
   assert.ok(resource);
@@ -305,8 +278,6 @@ try {
   assert.equal((await servers(connectPath))[VERCEL], connectRows[VERCEL]);
   const connectRecovers = { ok: true, cancelKeptRows: 2, recovered: "local", kept: VERCEL };
 
-  // 8. Connect through the real SDK for the unread server of a mixed file: a cancel keeps both
-  // rows, and the sign-in keeps the readable row.
   const mixedConnectPath = join(root, "mixed-connect.json");
   const mixedConnectRows = {
     [NOTION]: encryptRecord("current", tokens("notion")),
@@ -324,8 +295,6 @@ try {
   assert.equal(afterMixedConnect.read(resource)?.tokens?.access_token, "access-signed-in");
   const mixedConnectRecovers = { ok: true, kept: NOTION, recovered: "local" };
 
-  // 9. Two accounts of one server, and the row from before accounts: each sign-in keeps its own row.
-  // A cancel and a removal of one account keep the others, and no address leaves with its fragment.
   const work = mcpAccountUrl(mcpUrl, "work");
   const personal = mcpAccountUrl(mcpUrl, "personal");
   const workKey = mcpOAuthAccountKey(work);
@@ -341,8 +310,6 @@ try {
   await connect(accounts, work, "sign-in", "work");
   await connect(accounts, personal, "sign-in", "personal");
   const signedIn = await servers(accountsPath);
-  // A third account that the user does not finish gets no token, and the other rows do not change.
-  // Its client registration stays, as for any server whose first sign-in was cancelled.
   const third = mcpAccountUrl(mcpUrl, "third");
   await connect(accounts, third, "cancel");
   const afterCancel = await servers(accountsPath);
@@ -355,7 +322,6 @@ try {
   assert.equal(accountsRead.read(resource)?.tokens?.access_token, "access-plain");
   assert.equal(accountsRead.read(workKey)?.tokens?.access_token, "access-work");
   assert.equal(accountsRead.read(personalKey)?.tokens?.access_token, "access-personal");
-  // Removing the Work account forgets only its row, as the gateway does when its server is removed.
   await runCauseEffect(accountsRead.clear(workKey));
   const afterRemove = new McpOAuthStore(accountsPath, current);
   assert.equal(await Effect.runPromise(afterRemove.load()), null);
