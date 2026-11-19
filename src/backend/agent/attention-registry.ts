@@ -59,7 +59,13 @@ import { repairBrowserToolInput } from "../browser-tool-input";
 import { type BrowserToolArguments, parseBrowserToolCall } from "../browser-tools";
 import { causeHelpers } from "../effect-boundary";
 import { LINK_CARD_ID_PREFIX, type LinkWallet } from "../link-wallet";
-import { type PasswordVault, type PasswordVaultError, type VaultLogin, websiteUrl } from "../password-vault";
+import {
+  isWebProtocol,
+  type PasswordVault,
+  type PasswordVaultError,
+  type VaultLogin,
+  websiteUrl,
+} from "../password-vault";
 import {
   type AppServerRequest,
   type DynamicToolCallParams,
@@ -264,7 +270,8 @@ function vaultChange(args: BrowserToolArguments<"save_vault_item">): VaultAgentS
     }
     if (!args.website?.trim() || !args.password?.trim()) return VAULT_LOGIN_ADD_FIELDS;
     const url = websiteUrl(args.website);
-    if (url?.protocol !== "https:" || !url.hostname) return "website must be an HTTPS website, such as example.com.";
+    if (!url || !isWebProtocol(url) || !url.hostname)
+      return "website must be an HTTP or HTTPS website, such as example.com or http://192.168.1.1.";
     return {
       kind: "newLogin",
       login: { origin: url.origin, username: args.username ?? "", password: args.password },
@@ -1236,7 +1243,7 @@ export class AttentionRegistry {
             return;
           }
           pending.secret = secret;
-          pending.request.secret = secret.request;
+          if (websiteUrl(secret.request.origin)?.protocol !== "http:") pending.request.secret = secret.request;
         } else yield* this.#browser.beginTakeover(takeover.tabId).pipe(toAttentionOperationFailed);
       });
       const prepared = yield* Effect.result(prepare);
@@ -1253,6 +1260,13 @@ export class AttentionRegistry {
             pending.resolve(
               browserTakeoverError(
                 `${pending.vaultSkipped ?? "OpenBot did not fill a saved login: no password manager is connected."} Correct the call, or use request_takeover so that the user signs in.`,
+              ),
+            );
+            this.#resolveBrowserTakeover(requestId, pending, "cancel");
+          } else if (pending.secret && websiteUrl(pending.secret.request.origin)?.protocol === "http:") {
+            pending.resolve(
+              browserTakeoverError(
+                `${pending.vaultSkipped ?? "OpenBot did not fill a saved login: no password manager is connected."} On an HTTP page, OpenBot fills only a saved login. Use request_takeover so that the user signs in.`,
               ),
             );
             this.#resolveBrowserTakeover(requestId, pending, "cancel");
