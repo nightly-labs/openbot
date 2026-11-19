@@ -316,7 +316,7 @@ function friend(
  * The first name and the initial of the last name, for example "Marta K.". An account with no name gives
  * an empty name: the app shows its own text. The email never goes to the referrer.
  */
-export function shortName(name: string | null): string {
+function shortName(name: string | null): string {
   const words = (name ?? "").trim().split(/\s+/u).filter(Boolean);
   const first = words[0]?.slice(0, 40) ?? "";
   const last = words.length > 1 ? words[words.length - 1]?.[0] : undefined;
