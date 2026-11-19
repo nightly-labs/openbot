@@ -1079,7 +1079,15 @@ export class TurnLifecycle {
       return false;
     }
     if (running.acted) {
-      this.#noteNoAnswerAfterSteps(agentId, threadId, turnId, source, deliveries, messages, running);
+      this.#noteNoAnswerAfterSteps(
+        agentId,
+        threadId,
+        turnId,
+        source,
+        deliveries,
+        messages,
+        running.workedBesidesReaction,
+      );
       return false;
     }
     // The first message that another agent gave a new agent can ask it to wait. The agent that made
@@ -1116,13 +1124,13 @@ export class TurnLifecycle {
     source: AgentClient,
     deliveries: readonly DeliveryContext[],
     messages: readonly ConversationMessage[],
-    running: { workedBesidesReaction: boolean },
+    workedBesidesReaction: boolean,
   ): void {
     if (
       this.#conversation.isExecutionThread(this.#conversation.publicThreadId(agentId, threadId)) ||
       !deliveries.every(({ delivery, channelId }) => delivery.sender.kind === "user" && channelId === undefined) ||
       messages.some((message) => message.turnId === turnId && showsOutput(message)) ||
-      (!running.workedBesidesReaction &&
+      (!workedBesidesReaction &&
         deliveries.some(
           ({ delivery }) => this.#mailbox.reactionFor(agentId, delivery.id, { kind: "agent", agentId }) !== null,
         ))
@@ -1447,8 +1455,7 @@ export class TurnLifecycle {
         // cannot find then also runs again (#9928).
         if (item.type !== "userMessage" && (notification.method !== "item/completed" || !isEmptyAnswer(item))) {
           const acted = isRepeatedWork(item);
-          this.#markProduced(turnId, acted);
-          if (running && acted && !isUserReactionCall(item)) running.workedBesidesReaction = true;
+          this.#markProduced(turnId, acted, acted, acted && isUserReactionCall(item));
         }
         if (running && item.type === "agentMessage" && item.phase === "commentary") {
           if (
@@ -3035,12 +3042,16 @@ export class TurnLifecycle {
     });
   }, Effect.uninterruptible);
 
-  /** `streamed`: text, thinking or a tool step, which marks when the provider first answered. */
-  #markProduced(turnId: string, acted: boolean, streamed = acted): void {
+  /**
+   * `streamed`: text, thinking or a tool step, which marks when the provider first answered.
+   * `reaction`: the step is the agent's reaction to the user's message, which shows on that message.
+   */
+  #markProduced(turnId: string, acted: boolean, streamed = acted, reaction = false): void {
     const running = this.#runningTurns.get(turnId);
     if (!running) return;
     running.produced = true;
     if (acted) running.acted = true;
+    if (acted && !reaction) running.workedBesidesReaction = true;
     if (streamed) running.firstOutputAt ??= Date.now();
   }
 
