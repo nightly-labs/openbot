@@ -305,7 +305,7 @@ export function customProviderValue(draft: CustomProviderDraft): SaveCustomProvi
         name,
         ...(typeof contextWindow === "number" ? { contextWindow } : {}),
         ...(typeof maxOutput === "number" ? { maxOutput } : {}),
-        ...(reasoningEfforts.length > 0 ? { reasoningEfforts } : {}),
+        ...(model.reasoningEfforts ? { reasoningEfforts } : {}),
         ...(inputs ? { inputs } : {}),
       };
     });
@@ -376,7 +376,7 @@ export function fillFoundValues(
     row.maxOutput = tokenCountText(found.maxOutput, format);
   }
   if (row.inputs === undefined && found.inputs !== undefined) row.inputs = [...found.inputs];
-  if (!row.reasoningEfforts?.length && found.reasoningEfforts !== undefined) {
+  if (row.reasoningEfforts === undefined && found.reasoningEfforts !== undefined) {
     row.reasoningEfforts = [...found.reasoningEfforts];
   }
 }

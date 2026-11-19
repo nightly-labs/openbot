@@ -1938,11 +1938,7 @@ export class ChannelService {
     const skipped = task && current && this.hooks.skipAtLimit?.(task) ? this.#skippedTasks(task) : null;
     if (continueWork) {
       if (!task || !current || skipped) return false;
-      this.store.update(this.store.get(assignment.channelId), {
-        assignments: [{ ...assignment, state: "queued", turnId: null }],
-        tasks: [{ ...task, state: "queued", error: null }],
-      });
-      this.publish(assignment.channelId);
+      this.#keepAssignment(assignment, task);
       return true;
     }
     this.store.update(this.store.get(assignment.channelId), {
@@ -1955,6 +1951,26 @@ export class ChannelService {
     yield* this.#forkEvent(this.#releaseHeldAgents([assignment.agentId]));
     return true;
   });
+
+  keepForRetry(deliveryId: string): Effect.Effect<boolean> {
+    return Effect.sync(() => {
+      const assignment = this.store.assignmentForDelivery(deliveryId);
+      if (!assignment || !activeAssignment(assignment) || assignment.pendingRevision !== null) return false;
+      const task = this.store.tasks(assignment.channelId).find((item) => item.id === assignment.taskId);
+      if (task?.revision !== assignment.taskRevision || (task.state !== "queued" && task.state !== "running"))
+        return false;
+      this.#keepAssignment(assignment, task);
+      return true;
+    });
+  }
+
+  #keepAssignment(assignment: ChannelAssignment, task: ChannelTask): void {
+    this.store.update(this.store.get(assignment.channelId), {
+      assignments: [{ ...assignment, state: "queued", turnId: null }],
+      tasks: [{ ...task, state: "queued", error: null }],
+    });
+    this.publish(assignment.channelId);
+  }
 
   ownsWaitingWork(agentId: string): boolean {
     return this.#waitingWork(agentId).length > 0;
@@ -3154,19 +3170,34 @@ export class ChannelService {
         instruction: `The reply is in the shared chat. End your turn now with no text and do not promise to report back: you continue this task when ${check.target.author.name} has answered.`,
       };
     }
-    if (tool === "channel_remember" || tool === "channel_forget_memory") {
+    if (tool === "channel_forget_memory") {
+      const givenId = isString(args.memoryId) ? args.memoryId.trim() : "";
+      const memoryId = /^\[([^\]\s]+)\]/u.exec(givenId)?.[1] ?? givenId;
+      const text = isString(args.text) ? args.text : givenId.replace(/^\[[^\]\s]+\]\s*/u, "");
+      if (!memoryId && !text.trim()) return yield* channelFailure(new Error("Provide the memoryId of the memory."));
+      const deleted = yield* channelSync(
+        () =>
+          (memoryId !== "" && this.memories.delete(channelId, memoryId)) ||
+          (text.trim() !== "" && this.memories.deleteByText(channelId, text)),
+      );
+      if (!deleted)
+        return {
+          accepted: false,
+          reason: `No channel memory matches that ${memoryId ? "memoryId" : "text"}. Give the memoryId in brackets at the start of its line in the channel memories.`,
+        };
+      this.hooks.memoriesChanged?.(channelId);
+      return { accepted: true };
+    }
+    if (tool === "channel_remember") {
       if (!isString(args.text) || !args.text.trim())
         return yield* channelFailure(new Error("Provide the memory text."));
       const text = args.text;
-      if (tool === "channel_remember" && text.length > INPUT_LIMITS.agentMemoryText)
+      if (text.length > INPUT_LIMITS.agentMemoryText)
         return {
           accepted: false,
           reason: `A channel memory has at most ${INPUT_LIMITS.agentMemoryText} characters, and this text has ${text.length}. Save each fact as its own shorter memory.`,
         };
-      if (tool === "channel_remember")
-        yield* channelSync(() => this.memories.saveFromTool(channelId, text, turnId, `channel-memory:${operationId}`));
-      else if (!(yield* channelSync(() => this.memories.deleteByText(channelId, text))))
-        return { accepted: false, reason: "No memory matches that text." };
+      yield* channelSync(() => this.memories.saveFromTool(channelId, text, turnId, `channel-memory:${operationId}`));
       this.hooks.memoriesChanged?.(channelId);
       return { accepted: true };
     }

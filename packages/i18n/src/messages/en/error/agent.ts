@@ -181,6 +181,10 @@ export const messages = defineMessages("error.agent", {
   "error.agent.mcpServerNotSaved": "The MCP server did not answer, so it was not saved. {error}",
   "error.agent.mcpServerKeysMove":
     "The MCP server {name} holds keys for its current server. Ask the user to change its address, command, arguments or transport in Marketplace, Apps, {name}.",
+  "error.agent.mcpServerHeadersNeedHttp":
+    "The MCP server {name} runs a local command, so it takes no headers. Ask the user to enter its keys in Marketplace, Apps, {name}.",
+  "error.agent.mcpServerHeadersNeedPerson":
+    "Only the user of this OpenBot, in a chat with you, can give the keys of the MCP server {name}. Ask the user to enter them in Marketplace, Apps, {name}.",
   "error.agent.mcpServerBuiltIn":
     "{name} is part of OpenBot, so the MCP tools cannot test, turn on or off, or remove it. The user controls it on the computer that runs OpenBot: the GitHub connection in Marketplace, Apps, GitHub, and Computer Use in Settings, Computer Use.",
   "error.agent.mcpServerUnknown": "No MCP server is named {name}. Call list_mcp_servers for the names.",
@@ -192,6 +196,8 @@ export const messages = defineMessages("error.agent", {
     "The region is not inside one display. Use desktop points inside the bounds of one display from list_capture_sources.",
   "error.agent.screenCapturePermissionMissing":
     "OpenBot does not have the Screen Recording permission. Ask the user to open System Settings > Privacy & Security > Screen & System Audio Recording, turn on OpenBot, then quit and open OpenBot again.",
+  "error.agent.screenCaptureListPermission":
+    "OpenBot does not have the Screen Recording permission yet, so it cannot list the windows. To capture a display, call capture_screen with target screen. The user approves the capture first, and then macOS can ask the user for the permission.",
   "error.agent.screenCaptureEmptyWindows":
     "Windows gave an empty image. Ask the user to unlock the computer and close protected content. A policy of the organization can also stop screen capture.",
   "error.agent.screenCaptureFailed": "The screen capture failed. Try again.",

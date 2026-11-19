@@ -28,7 +28,8 @@ export interface BridgeCommand {
     | "open-egress"
     | "close-egress"
     | "send-egress"
-    | "close";
+    | "close"
+    | "ping";
   peerId: string;
   signalUrl?: string;
   token?: string;

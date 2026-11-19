@@ -118,7 +118,7 @@ function payload(endpoint: CustomProviderConfig): EndpointPayload {
         name: model.name,
         contextWindow,
         maxTokens: customModelOutputLimit(model, contextWindow),
-        ...(model.reasoningEfforts ? { thinkingLevelMap: thinkingLevelMap(model.reasoningEfforts) } : {}),
+        ...(model.reasoningEfforts?.length ? { thinkingLevelMap: thinkingLevelMap(model.reasoningEfforts) } : {}),
         input: model.inputs?.includes("image") ? ["text", "image"] : ["text"],
       };
     }),
