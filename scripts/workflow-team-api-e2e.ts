@@ -1862,8 +1862,8 @@ try {
       assert.ok((await capabilities(TEAM_PROTOCOL_V10)).includes(WORKFLOWS_AGENT_FILES_CAPABILITY));
       assert.ok(!(await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_AGENT_FILES_CAPABILITY));
       const run = async (fileIds: readonly string[]) => {
-        const before = handoffs.length;
-        const workflow = await hostWorkflow(`Agent files ${fileIds.join(" ")}`, {
+        const title = ["Agent files", fileIds.length, ...fileIds].join(" ");
+        const workflow = await hostWorkflow(title, {
           nodes: [
             promptNode,
             ...fileIds.map((fileId, index) => ({
@@ -1895,7 +1895,7 @@ try {
           requestId: requestId(),
         });
         const done = await settled(text(record(started.run, "run").id, "run id"), "agent");
-        return { done, handoff: handoffs[before] };
+        return { done, handoff: handoffs.find((handoff) => handoff.text.includes(`"${title}"`)) };
       };
       const pair = await run(["e2e-person", "e2e-beach"]);
       assert.equal(pair.done.status, "done", JSON.stringify(pair.done.error));
@@ -1905,12 +1905,10 @@ try {
         join(userData, "e2e-files", "e2e-beach"),
       ]);
       assert.ok(pair.handoff.text.includes("Put the person on the beach."));
-      assert.ok(
-        pair.handoff.text.endsWith(
-          "The 2 attached files come from the steps before this one. Use them together as given: keep the subjects, look and details they show, and do not invent a substitute.",
-        ),
-        pair.handoff.text,
-      );
+      const note =
+        "The 2 attached files come from the steps before this one. Use them together as given: keep what they show, and do not invent a substitute.";
+      assert.ok(pair.handoff.text.includes(note), pair.handoff.text);
+      assert.ok(pair.handoff.text.indexOf(note) < pair.handoff.text.indexOf("--- input ---"), pair.handoff.text);
       const one = await run(["e2e-person"]);
       assert.ok(one.handoff?.text.includes("The attached file comes from a step before this one."), one.handoff?.text);
       const none = await run([]);

@@ -495,7 +495,8 @@ does not make them.
 to it. The host attaches each image and file input to the message for the agent, and the message
 tells the agent to use them together, as given, and not to invent a substitute. The capability adds
 no route. A client shows the connected pictures on the Agent card only on a host that advertises it,
-because an older host does not send these files to the agent.
+because a host before v0.72.0 does not send these files to the agent. A v0.72.0 to v0.74.x host sends
+them without the note and does not advertise the capability, so its Agent card shows no pictures.
 
 `workflows-media-catalog-v1` shows all the models of Sunra and Higgsfield that the canvas can run, not
 only the models of `WORKFLOW_MEDIA_MODELS`. The host reads Sunra's `list_models` and Higgsfield's

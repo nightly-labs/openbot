@@ -220,8 +220,8 @@ try {
   check(
     "the agent step text tells the agent to use the attached files together and not invent a substitute",
     viewerHandoff?.text.includes("Describe the pictures.") === true &&
-      viewerHandoff.text.endsWith(
-        "The 2 attached files come from the steps before this one. Use them together as given: keep the subjects, look and details they show, and do not invent a substitute.",
+      viewerHandoff.text.includes(
+        "The 2 attached files come from the steps before this one. Use them together as given: keep what they show, and do not invent a substitute.",
       ),
     viewerHandoff?.text,
   );
