@@ -543,7 +543,7 @@ export_data() {
     cp --preserve=mode,timestamps --dereference "/usr/local/bin/$name" "$MOVED_BIN/$name"
   done < <(sed -n 's/^file=//p' <<<"$commands")
   if [ -s "/var/spool/cron/crontabs/$SERVICE_USER" ]; then
-    install -m 0600 "/var/spool/cron/crontabs/$SERVICE_USER" "$MOVED_CRONTAB"
+    crontab -u "$SERVICE_USER" -l >"$MOVED_CRONTAB"
   fi
 
   local created=0

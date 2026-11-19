@@ -9,6 +9,7 @@ import { HOSTED_PLAN_SIZE, HOSTED_SERVER_SIZE_NAMES } from "@openbot/contracts/h
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { z } from "zod";
+import { hostingCopy, MACHINE_HOSTING, prepareScript, upgradeScript } from "./pool-machine";
 
 const logger = createOpenBotLogger("leaseweb-pool");
 const AUTH_API = resolve(import.meta.dirname, "../../apps/auth-api");
@@ -49,7 +50,6 @@ const AUTH_API_URL = {
   test: "https://openbot-auth-api-test.internal9671.workers.dev",
 };
 const SANDBOX_MOVE = "/root/openbot-move";
-const MACHINE_HOSTING = "/root/openbot-hosting";
 const MACHINE_ARCHIVE = "/root/openbot-move.tar";
 const EXPORT_WAIT_MS = 3 * 60 * 60_000;
 const RESTORE_WAIT_MS = 30 * 60_000;
@@ -858,39 +858,19 @@ class Pool {
     return z.object({ password: z.string().min(1) }).parse(await response.json()).password;
   }
 
-  #hostingCopy() {
-    const archive = execFileSync("tar", ["-czf", "-", "--exclude=*.ts", "-C", resolve(HOSTING, ".."), "hosting"], {
-      maxBuffer: 16 * 1024 * 1024,
-    });
-    return `set -euo pipefail
-rm -rf ${MACHINE_HOSTING}
-install -d -m 0700 ${MACHINE_HOSTING}
-base64 -d <<'OPENBOT_HOSTING' | tar -xz --no-same-owner --strip-components=1 -C ${MACHINE_HOSTING}
-${archive.toString("base64")}
-OPENBOT_HOSTING
-`;
-  }
-
   async #prepareMachine(machine: Vps, release: Release) {
     const keys = this.#operatorKeys();
     const password = this.#machineState(machine) === null ? await this.#rootPassword(machine) : undefined;
     if (password !== undefined)
       logger.info(`VPS ${machine.id} has no key of this computer. Sign in one time with the root password.`);
     const authApi = this.#testDatabase ? AUTH_API_URL.test : AUTH_API_URL.production;
-    const script = `${this.#hostingCopy()}
-bash ${MACHINE_HOSTING}/move-from-boat.sh prepare lsw-${machine.id} 1000 1000 '${release.url}' ${release.sha256} '${authApi}'
-bash ${MACHINE_HOSTING}/leaseweb-bootstrap.sh '${keys}'
-`;
-    this.#remote(machine, "bash -s", { input: script, password });
+    this.#remote(machine, "bash -s", { input: prepareScript(machine.id, release, authApi, keys), password });
     await this.#restartMachine(machine);
   }
 
   #upgradeMachine(machine: Vps, release: Release) {
     const authApi = this.#testDatabase ? AUTH_API_URL.test : AUTH_API_URL.production;
-    const script = `${this.#hostingCopy()}
-bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha256} '${authApi}'
-`;
-    this.#remote(machine, "bash -s", { input: script });
+    this.#remote(machine, "bash -s", { input: upgradeScript(release, authApi) });
   }
 
   async #restartMachine(machine: Vps) {
@@ -943,7 +923,7 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
     );
     if (changes !== 1) throw new Error(`VPS ${machine.id} is not a free machine of the pool any more.`);
     try {
-      this.#remote(machine, "bash -s", { input: this.#hostingCopy() });
+      this.#remote(machine, "bash -s", { input: hostingCopy() });
       this.#remote(machine, `bash ${MACHINE_HOSTING}/move-from-boat.sh offer leaseweb:${machine.id}`, {
         input: `${token}\n`,
       });
@@ -1267,7 +1247,7 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
     const hostname = `lsw-${id}`;
     const claim = install ? await this.#serverClaim(owner) : "";
     const authApi = this.#testDatabase ? ` --auth-api-url '${AUTH_API_URL.test}'` : "";
-    const script = `${this.#hostingCopy()}
+    const script = `${hostingCopy()}
 hostnamectl set-hostname ${hostname}
 ${
   install
@@ -1483,7 +1463,7 @@ exit "$status"`;
       state = this.#machineState(machine);
     } else {
       this.#remote(machine, "bash -s", {
-        input: `${this.#hostingCopy()}\nbash ${MACHINE_HOSTING}/move-from-boat.sh withdraw\n`,
+        input: `${hostingCopy()}\nbash ${MACHINE_HOSTING}/move-from-boat.sh withdraw\n`,
       });
     }
     if (state?.user !== "user" || state.data || state.enabled === "enabled") {

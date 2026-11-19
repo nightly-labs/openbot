@@ -1,0 +1,626 @@
+import { execFileSync } from "node:child_process";
+import { createHash, createHmac, generateKeyPairSync, randomUUID } from "node:crypto";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
+import { createOpenBotLogger } from "@openbot/logging";
+import { z } from "zod";
+import { hostingCopy, MACHINE_HOSTING, prepareScript } from "./pool-machine";
+
+const logger = createOpenBotLogger("pool-archive-e2e");
+const LEASEWEB_API = "https://api.leaseweb.com/publicCloud/v1/vps";
+const LEASEWEB_ACCOUNTS = ["NL", "DE", "US", "AU", "SG"];
+const IMAGE = "UBUNTU_26_04_64BIT";
+const MACHINE_ARCHIVE = "/var/tmp/openbot-e2e-archive.tar";
+const IMPORT_TRACE = "/var/tmp/openbot-e2e-import.trace";
+const AUTH_API = "https://openbot-auth-api-test.internal9671.workers.dev";
+const TEST_REFERENCE = /^pool-test-\d{2}$/u;
+const WAIT_MS = 15 * 60_000;
+const B2_HOST = "s3.eu-central-003.backblazeb2.com";
+const B2_REGION = "eu-central-003";
+const B2_BUCKET = "openbot-pool-archive-eu";
+const PART_BYTES = 100 * 1024 * 1024;
+const UPLOAD_URL_SECONDS = 6 * 60 * 60;
+const DOWNLOAD_URL_SECONDS = 60 * 60;
+const BECH32_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
+const BECH32_GENERATOR = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
+
+const FACTS = `
+set -euo pipefail
+export LC_ALL=C
+cd /
+find home/user srv/openbot-hosted -xdev ! -name '.Xauthority*' ! -path 'home/user/.boat*' -type f -print0 | sort -z | xargs -0 sha256sum | sed 's/^/sha256 /'
+find home/user srv/openbot-hosted -xdev ! -name '.Xauthority*' ! -path 'home/user/.boat*' -printf 'entry %y %m %u:%g %p\\n' | sort
+find home/user srv/openbot-hosted -xdev ! -path 'home/user/.boat*' -type l -printf 'link %p -> %l\\n' | sort
+if command -v crontab >/dev/null; then echo "crontab $(crontab -u user -l 2>/dev/null | sha256sum | cut -c1-64)"; fi
+`;
+
+const SEED = (hostId: string, extraGb: number) => `
+set -euo pipefail
+runuser -u user -- env HOME=/home/user OPENBOT_HOSTED_HOST_ID=${hostId} OPENBOT_HOSTED_CLAIM=e2e_claim_that_is_not_valid \\
+  /opt/OpenBot/hosted/openbot-hosted-env
+systemctl enable --now openbot.service
+for _ in $(seq 1 180); do
+  [ -s /home/user/.config/OpenBot/openbot.db ] && [ -s /srv/openbot-hosted/keyrings/login.keyring ] &&
+    [ -s /home/user/.config/openbot-hosted/keyring-password ] && break
+  sleep 1
+done
+[ -s /home/user/.config/OpenBot/openbot.db ] || { journalctl -u openbot.service -n 30 --no-pager >&2; exit 1; }
+runuser -u user -- bash -c 'set -e; cd ~
+mkdir -p projects/e2e .local/bin
+head -c 1048576 /dev/urandom >projects/e2e/data.bin
+printf "#!/bin/sh\\necho e2e\\n" >.local/bin/e2e-tool
+chmod 0755 .local/bin/e2e-tool
+ln -s projects/e2e/data.bin e2e-link
+if [ ${extraGb} -gt 0 ]; then
+  cp -R /usr/share projects/e2e/share 2>/dev/null || true
+  head -c $((${extraGb} * 1024 * 1024 * 1024)) /dev/urandom >projects/e2e/large.bin
+fi'
+if command -v crontab >/dev/null; then echo '17 3 * * * true # e2e' | crontab -u user -; fi
+echo seeded
+`;
+
+const RUNS = `
+for _ in $(seq 1 120); do
+  if systemctl is-active --quiet openbot.service && pgrep -u user -x openbot >/dev/null; then echo runs; exit 0; fi
+  sleep 1
+done
+echo "does not run: $(systemctl is-active openbot.service)"
+`;
+
+const SERVER_BYTES = `du -sb --one-file-system /home/user /srv/openbot-hosted | awk '{ total += $1 } END { print total }'`;
+
+const ARCHIVE = `
+set -euo pipefail
+recipient=$1 part_bytes=$2
+dir=$(mktemp -d /var/tmp/openbot-archive.XXXXXX)
+trap 'rm -rf "$dir"' EXIT
+cat >"$dir/urls"
+cat >"$dir/part.sh" <<'PART'
+set -euo pipefail
+number=$((10#\${FILE##*.} + 1))
+url=$(sed -n "\${number}p" "$URLS")
+[ -n "$url" ] || { echo "No upload URL for part $number." >&2; exit 3; }
+cat >"$FILE"
+size=$(stat -c %s "$FILE")
+md5=$(md5sum "$FILE" | cut -c1-32)
+etag=$(curl -fsS --retry 5 --retry-all-errors -T "$FILE" -D - -o /dev/null "$url" | tr -d '\\r"' | sed -n 's/^[Ee][Tt][Aa][Gg]: *//p')
+rm -f "$FILE"
+echo "part $number $size $md5 $etag"
+PART
+mkfifo "$dir/sum"
+sha256sum <"$dir/sum" | cut -c1-64 >"$dir/sha256" &
+summer=$!
+export URLS="$dir/urls"
+bash ${MACHINE_HOSTING}/move-from-boat.sh export - | age -r "$recipient" | tee "$dir/sum" |
+  split -b "$part_bytes" -d -a 5 --filter="bash $dir/part.sh" - "$dir/part."
+wait "$summer"
+echo "sha256 $(cat "$dir/sha256")"
+`;
+
+const RESTORE = `
+set -euo pipefail
+recipient=$1 expected=$2
+dir=$(mktemp -d /var/tmp/openbot-restore.XXXXXX)
+trap 'rm -rf "$dir"' EXIT
+IFS= read -r identity
+IFS= read -r url
+(umask 077 && printf '%s\\n' "$identity" >"$dir/key")
+[ "$(age-keygen -y "$dir/key")" = "$recipient" ] || { echo "The key is not the key of the archive." >&2; exit 1; }
+mkfifo "$dir/sum"
+sha256sum <"$dir/sum" | cut -c1-64 >"$dir/sha256" &
+summer=$!
+rm -f ${MACHINE_ARCHIVE}
+(umask 077 && curl -fsS "$url" | tee "$dir/sum" | age -d -i "$dir/key" >${MACHINE_ARCHIVE})
+wait "$summer"
+if [ "$(cat "$dir/sha256")" != "$expected" ]; then
+  rm -f ${MACHINE_ARCHIVE}
+  echo "The download is not the upload." >&2
+  exit 1
+fi
+echo "verified $(stat -c %s ${MACHINE_ARCHIVE})"
+`;
+
+interface Vps {
+  id: string;
+  key: string;
+  reference: string | null;
+  address: string;
+}
+
+interface Step {
+  name: string;
+  seconds: number;
+  bytes?: number;
+  megabytesPerSecond?: number;
+}
+
+interface Check {
+  name: string;
+  pass: boolean;
+  detail: string;
+}
+
+interface B2Key {
+  id: string;
+  secret: string;
+}
+
+interface UploadedPart {
+  number: number;
+  size: number;
+  md5: string;
+  etag: string;
+}
+
+const vpsSchema = z.object({
+  id: z.string(),
+  reference: z.string().nullish(),
+  ips: z.array(z.object({ ip: z.string(), version: z.number(), mainIp: z.boolean().optional() })),
+});
+const releaseSchema = z.object({
+  tag_name: z.string(),
+  assets: z.array(z.object({ name: z.string(), browser_download_url: z.string(), digest: z.string().nullish() })),
+});
+
+function option(name: string) {
+  const prefix = `--${name}=`;
+  return process.argv
+    .slice(2)
+    .find((argument) => argument.startsWith(prefix))
+    ?.slice(prefix.length);
+}
+
+function leaseweb(key: string, path: string, init: RequestInit = {}) {
+  return fetch(`${LEASEWEB_API}${path}`, {
+    ...init,
+    headers: { "X-LSW-Auth": key, "content-type": "application/json" },
+    signal: AbortSignal.timeout(60_000),
+  });
+}
+
+async function findVps(id: string): Promise<Vps> {
+  for (const account of LEASEWEB_ACCOUNTS) {
+    const key = process.env[`LEASEWEB_API_KEY_${account}`];
+    if (!key) continue;
+    const response = await leaseweb(key, `/${id}`);
+    if (response.status === 401 || response.status === 403 || response.status === 404) continue;
+    if (!response.ok) throw new Error(`Leaseweb answered ${response.status} for VPS ${id}.`);
+    const body = vpsSchema.parse(await response.json());
+    const address = body.ips.find((ip) => ip.mainIp && ip.version === 4)?.ip;
+    if (!address) throw new Error(`VPS ${id} has no public IPv4 address.`);
+    return { id, key, reference: body.reference || null, address };
+  }
+  throw new Error(`No Leaseweb key in the environment has VPS ${id}.`);
+}
+
+function sshArgs(password: boolean) {
+  const args = ["-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=20", "-o", "ConnectionAttempts=3"];
+  args.push("-o", "ServerAliveInterval=15");
+  if (password) args.push("-o", "PreferredAuthentications=password", "-o", "PubkeyAuthentication=no");
+  else args.push("-o", "BatchMode=yes");
+  return args;
+}
+
+function remote(machine: Vps, command: string, options: { input?: string; password?: string; quiet?: boolean } = {}) {
+  const env = { ...process.env };
+  let askpass: string | undefined;
+  if (options.password !== undefined) {
+    askpass = mkdtempSync(join(tmpdir(), "openbot-askpass-"));
+    writeFileSync(join(askpass, "password"), options.password, { mode: 0o600 });
+    writeFileSync(join(askpass, "askpass"), `#!/bin/sh\nexec cat '${join(askpass, "password")}'\n`, { mode: 0o700 });
+    Object.assign(env, { SSH_ASKPASS: join(askpass, "askpass"), SSH_ASKPASS_REQUIRE: "force", DISPLAY: "none" });
+  }
+  try {
+    return execFileSync("ssh", [...sshArgs(options.password !== undefined), `root@${machine.address}`, command], {
+      env,
+      input: options.input,
+      encoding: "utf8",
+      maxBuffer: 1024 * 1024 * 1024,
+      stdio: [options.input === undefined ? "ignore" : "pipe", "pipe", options.quiet ? "ignore" : "inherit"],
+    });
+  } finally {
+    if (askpass) rmSync(askpass, { recursive: true, force: true });
+  }
+}
+
+function remoteOrEmpty(machine: Vps, command: string) {
+  try {
+    return remote(machine, command, { quiet: true }).trim();
+  } catch {
+    return "";
+  }
+}
+
+function shellWord(value: string) {
+  return `'${value.replaceAll("'", `'"'"'`)}'`;
+}
+
+function hostKeys(machine: Vps) {
+  try {
+    return execFileSync("ssh-keyscan", ["-T", "10", machine.address], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    })
+      .split("\n")
+      .filter((line) => line !== "" && !line.startsWith("#"))
+      .sort()
+      .join("\n");
+  } catch {
+    return "";
+  }
+}
+
+async function reinstall(machine: Vps) {
+  const before = hostKeys(machine);
+  if (before === "") throw new Error(`VPS ${machine.id} does not answer on SSH.`);
+  const response = await leaseweb(machine.key, `/${machine.id}/reinstall`, {
+    method: "PUT",
+    body: JSON.stringify({ imageId: IMAGE }),
+  });
+  if (!response.ok) throw new Error(`Leaseweb refused the reinstall of VPS ${machine.id}: ${response.status}.`);
+  const deadline = Date.now() + WAIT_MS;
+  while (Date.now() < deadline) {
+    await delay(10_000);
+    const keys = hostKeys(machine);
+    if (keys !== "" && keys !== before) {
+      execFileSync("ssh-keygen", ["-R", machine.address], { stdio: "ignore" });
+      return;
+    }
+  }
+  throw new Error(`VPS ${machine.id} did not finish its reinstall in ${WAIT_MS / 60_000} minutes.`);
+}
+
+async function rootPassword(machine: Vps) {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    const response = await leaseweb(machine.key, `/${machine.id}/credentials/OPERATING_SYSTEM/root`);
+    if (response.ok) return z.object({ password: z.string().min(1) }).parse(await response.json()).password;
+    await delay(10_000);
+  }
+  throw new Error(`Leaseweb gave no root password for VPS ${machine.id}.`);
+}
+
+async function newestRelease() {
+  const body = JSON.parse(
+    execFileSync("gh", ["api", "repos/nightly-labs/openbot/releases/latest"], {
+      encoding: "utf8",
+      maxBuffer: 16 * 1024 * 1024,
+    }),
+  );
+  const release = releaseSchema.parse(body);
+  const version = release.tag_name.replace(/^v/u, "");
+  const asset = release.assets.find((item) => item.name === `OpenBot-${version}-x86_64.AppImage`);
+  const sha256 = asset?.digest?.replace(/^sha256:/u, "") ?? "";
+  if (!asset || !/^[0-9a-f]{64}$/u.test(sha256)) throw new Error(`Release ${version} has no AppImage with a SHA-256.`);
+  return { version, url: asset.browser_download_url, sha256 };
+}
+
+async function restart(machine: Vps) {
+  const bootId = "cat /proc/sys/kernel/random/boot_id";
+  const before = remote(machine, bootId).trim();
+  remote(machine, "systemd-run --quiet --on-active=2 systemctl reboot");
+  const deadline = Date.now() + WAIT_MS;
+  while (Date.now() < deadline) {
+    await delay(5_000);
+    const now = remoteOrEmpty(machine, bootId);
+    if (now !== "" && now !== before) return;
+  }
+  throw new Error(`VPS ${machine.id} did not start again.`);
+}
+
+async function preparePool(machine: Vps, release: { url: string; sha256: string }, keys: string) {
+  await reinstall(machine);
+  const password = await rootPassword(machine);
+  remote(machine, "bash -s", { input: prepareScript(machine.id, release, AUTH_API, keys), password });
+  await restart(machine);
+  remote(machine, "bash -s", { input: hostingCopy() });
+}
+
+function factLines(text: string) {
+  return new Set(text.split("\n").filter((line) => line !== ""));
+}
+
+function bech32Polymod(values: number[]) {
+  let checksum = 1;
+  for (const value of values) {
+    const top = checksum >>> 25;
+    checksum = ((checksum & 0x1ffffff) << 5) ^ value;
+    for (const [bit, generator] of BECH32_GENERATOR.entries()) {
+      if ((top >>> bit) & 1) checksum ^= generator;
+    }
+  }
+  return checksum;
+}
+
+function bech32(prefix: string, data: Buffer) {
+  const words: number[] = [];
+  let accumulator = 0;
+  let bits = 0;
+  for (const byte of data) {
+    accumulator = ((accumulator << 8) | byte) & 0xfff;
+    bits += 8;
+    while (bits >= 5) {
+      bits -= 5;
+      words.push((accumulator >>> bits) & 31);
+    }
+  }
+  if (bits > 0) words.push((accumulator << (5 - bits)) & 31);
+  const codes = [...prefix].map((character) => character.charCodeAt(0));
+  const expanded = [...codes.map((code) => code >>> 5), 0, ...codes.map((code) => code & 31)];
+  const mod = bech32Polymod([...expanded, ...words, 0, 0, 0, 0, 0, 0]) ^ 1;
+  const checksum = Array.from({ length: 6 }, (_, index) => (mod >>> (5 * (5 - index))) & 31);
+  return `${prefix}1${[...words, ...checksum].map((word) => BECH32_CHARSET.charAt(word)).join("")}`;
+}
+
+function newArchiveKey() {
+  const { privateKey, publicKey } = generateKeyPairSync("x25519");
+  const secret = z.object({ d: z.string() }).parse(privateKey.export({ format: "jwk" })).d;
+  const shared = z.object({ x: z.string() }).parse(publicKey.export({ format: "jwk" })).x;
+  return {
+    identity: bech32("age-secret-key-", Buffer.from(secret, "base64url")).toUpperCase(),
+    recipient: bech32("age", Buffer.from(shared, "base64url")),
+  };
+}
+
+function uriPart(value: string) {
+  return encodeURIComponent(value).replace(
+    /[!'()*]/gu,
+    (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+}
+
+function presign(b2: B2Key, method: string, objectKey: string, parameters: Record<string, string>, seconds: number) {
+  const now = new Date().toISOString().replace(/[-:]|\.\d{3}/gu, "");
+  const day = now.slice(0, 8);
+  const scope = `${day}/${B2_REGION}/s3/aws4_request`;
+  const query = Object.entries({
+    ...parameters,
+    "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
+    "X-Amz-Credential": `${b2.id}/${scope}`,
+    "X-Amz-Date": now,
+    "X-Amz-Expires": String(seconds),
+    "X-Amz-SignedHeaders": "host",
+  })
+    .map(([name, value]) => `${uriPart(name)}=${uriPart(value)}`)
+    .sort()
+    .join("&");
+  const path = `/${B2_BUCKET}/${objectKey.split("/").map(uriPart).join("/")}`;
+  const request = [method, path, query, `host:${B2_HOST}`, "", "host", "UNSIGNED-PAYLOAD"].join("\n");
+  const text = ["AWS4-HMAC-SHA256", now, scope, createHash("sha256").update(request).digest("hex")].join("\n");
+  const signingKey = [day, B2_REGION, "s3", "aws4_request"].reduce<Buffer>(
+    (key, part) => createHmac("sha256", key).update(part).digest(),
+    Buffer.from(`AWS4${b2.secret}`),
+  );
+  const signature = createHmac("sha256", signingKey).update(text).digest("hex");
+  return `https://${B2_HOST}${path}?${query}&X-Amz-Signature=${signature}`;
+}
+
+async function b2Request(
+  b2: B2Key,
+  method: string,
+  objectKey: string,
+  parameters: Record<string, string>,
+  body?: string,
+) {
+  const response = await fetch(presign(b2, method, objectKey, parameters, 900), {
+    method,
+    body: body ?? null,
+    signal: AbortSignal.timeout(120_000),
+  });
+  const text = method === "HEAD" ? "" : await response.text();
+  return { status: response.status, headers: response.headers, text };
+}
+
+function slowestCommands(trace: string) {
+  const lines = trace
+    .split("\n")
+    .map((line) => /^\++ (\d+\.\d+) (.*)$/u.exec(line))
+    .filter((match) => match !== null)
+    .map((match) => ({ at: Number(match[1]), command: (match[2] ?? "").slice(0, 160) }));
+  return lines
+    .slice(0, -1)
+    .map((line, index) => ({
+      seconds: Math.round(((lines[index + 1]?.at ?? line.at) - line.at) * 10) / 10,
+      command: line.command,
+    }))
+    .sort((left, right) => right.seconds - left.seconds)
+    .slice(0, 10);
+}
+
+function megabytesPerSecond(bytes: number, seconds: number) {
+  return Math.round((bytes / 1_000_000 / Math.max(seconds, 1)) * 10) / 10;
+}
+
+async function main() {
+  const id = option("vps");
+  const keysFile = option("keys");
+  const extraGb = Number(option("extra-gb") ?? "0");
+  if (!id || !/^\d{1,20}$/u.test(id) || !keysFile || !Number.isInteger(extraGb) || extraGb < 0 || extraGb > 50) {
+    throw new Error(
+      "usage: bun scripts/hosting/pool-archive-e2e.ts --vps=<VPS ID> --keys=<operator keys file> [--extra-gb=<0-50>]",
+    );
+  }
+  const b2Id = process.env.B2_KEY_ID_EU;
+  const b2Secret = process.env.B2_APPLICATION_KEY_EU;
+  if (!b2Id || !b2Secret) throw new Error("B2_KEY_ID_EU and B2_APPLICATION_KEY_EU are not in the environment.");
+  const b2: B2Key = { id: b2Id, secret: b2Secret };
+  const keys = Buffer.from(readFileSync(keysFile, "utf8")).toString("base64");
+  const machine = await findVps(id);
+  if (!TEST_REFERENCE.test(machine.reference ?? "")) {
+    throw new Error(
+      `VPS ${id} has the reference ${machine.reference ?? "(none)"}, not pool-test-<NN>. It is not erased.`,
+    );
+  }
+  const release = await newestRelease();
+  const report = join(process.cwd(), ".openbot-build", `pool-archive-e2e-${extraGb}gb.json`);
+  const steps: Step[] = [];
+  const checks: Check[] = [];
+  const step = async <T>(name: string, run: () => Promise<T> | T) => {
+    const started = Date.now();
+    logger.info(`${name}…`);
+    const result = await run();
+    const done: Step = { name, seconds: Math.round((Date.now() - started) / 1000) };
+    steps.push(done);
+    return { result, done };
+  };
+  const withBytes = (done: Step, bytes: number) => {
+    done.bytes = bytes;
+    done.megabytesPerSecond = megabytesPerSecond(bytes, done.seconds);
+  };
+  const objectKey = `e2e/${randomUUID()}.tar.age`;
+  const archiveKey = newArchiveKey();
+  let uploadId = "";
+  let completed = false;
+  let deleted = false;
+  let versionId = "";
+  let serverBytes = 0;
+  let archiveBytes = 0;
+  let archiveSha256 = "";
+  let importProfile: { seconds: number; command: string }[] = [];
+  try {
+    await step("prepare a pool machine", () => preparePool(machine, release, keys));
+    const age = remoteOrEmpty(machine, "age --version");
+    checks.push({ name: "the bootstrap installed age", pass: age !== "", detail: age || "missing" });
+    await step("run a server with customer files", () =>
+      remote(machine, "bash -s", { input: SEED(randomUUID(), extraGb) }),
+    );
+    const before = (await step("check that OpenBot runs", () => remote(machine, "bash -s", { input: RUNS }).trim()))
+      .result;
+    checks.push({ name: "OpenBot runs before the archive", pass: before === "runs", detail: before });
+    serverBytes = Number(remote(machine, SERVER_BYTES).trim());
+
+    const created = (await step("start the B2 upload", () => b2Request(b2, "POST", objectKey, { uploads: "" }))).result;
+    uploadId = /<UploadId>([^<]+)<\/UploadId>/u.exec(created.text)?.[1] ?? "";
+    if (created.status !== 200 || uploadId === "") throw new Error(`B2 did not start the upload: ${created.status}.`);
+    const partCount = Math.ceil((serverBytes * 1.05 + 256 * 1024 * 1024) / PART_BYTES) + 1;
+    const urls = Array.from({ length: partCount }, (_, index) =>
+      presign(b2, "PUT", objectKey, { partNumber: String(index + 1), uploadId }, UPLOAD_URL_SECONDS),
+    ).join("\n");
+    const archived = await step("export, encrypt and upload to B2 on the machine", () =>
+      remote(machine, `bash -c ${shellWord(ARCHIVE)} archive ${archiveKey.recipient} ${PART_BYTES}`, {
+        input: `${urls}\n`,
+      }),
+    );
+    const parts: UploadedPart[] = archived.result
+      .split("\n")
+      .filter((line) => line.startsWith("part "))
+      .map((line) => {
+        const [, number = "", size = "", md5 = "", etag = ""] = line.split(" ");
+        return { number: Number(number), size: Number(size), md5, etag };
+      });
+    archiveSha256 = /^sha256 ([0-9a-f]{64})$/mu.exec(archived.result)?.[1] ?? "";
+    archiveBytes = parts.reduce((total, part) => total + part.size, 0);
+    withBytes(archived.done, archiveBytes);
+    const exported = factLines(remote(machine, "bash -s", { input: FACTS }));
+    checks.push({
+      name: "each part in B2 has the MD5 of the part that the machine sent",
+      pass: parts.length > 0 && parts.every((part) => part.etag === part.md5),
+      detail: `${parts.length} parts; ${parts.filter((part) => part.etag !== part.md5).length} differ`,
+    });
+
+    await step("complete and verify in B2", async () => {
+      const body = `<CompleteMultipartUpload>${parts
+        .map((part) => `<Part><PartNumber>${part.number}</PartNumber><ETag>"${part.etag}"</ETag></Part>`)
+        .join("")}</CompleteMultipartUpload>`;
+      const done = await b2Request(b2, "POST", objectKey, { uploadId }, body);
+      completed = done.status === 200 && !done.text.includes("<Error>");
+      if (!completed) throw new Error(`B2 did not complete the upload: ${done.status}.`);
+      const head = await b2Request(b2, "HEAD", objectKey, {});
+      versionId = head.headers.get("x-amz-version-id") ?? "";
+      const stored = Number(head.headers.get("content-length") ?? "0");
+      checks.push({
+        name: "B2 has an object of the size that the machine sent",
+        pass: head.status === 200 && stored === archiveBytes && archiveSha256 !== "",
+        detail: `${stored} of ${archiveBytes} bytes, sha256 ${archiveSha256 === "" ? "missing" : "recorded"}`,
+      });
+    });
+
+    await step("reinstall and prepare the machine again", () => preparePool(machine, release, keys));
+    const empty = remote(
+      machine,
+      "test ! -e /home/user/.config/OpenBot && test ! -e /srv/openbot-hosted/keyrings && echo empty || echo data",
+    ).trim();
+    checks.push({ name: "the reinstall erased the server", pass: empty === "empty", detail: empty });
+
+    const restored = await step("download from B2 and decrypt on the machine", () =>
+      remote(machine, `bash -c ${shellWord(RESTORE)} restore ${archiveKey.recipient} ${archiveSha256}`, {
+        input: `${archiveKey.identity}\n${presign(b2, "GET", objectKey, {}, DOWNLOAD_URL_SECONDS)}\n`,
+      }).trim(),
+    );
+    withBytes(restored.done, archiveBytes);
+    checks.push({
+      name: "the download has the SHA-256 of the upload, and the key opens it",
+      pass: restored.result.startsWith("verified "),
+      detail: restored.result,
+    });
+
+    await step("import", () =>
+      remote(
+        machine,
+        `bash -c 'PS4="+ \\$EPOCHREALTIME "; set -x; source "$0" "$@"' ${MACHINE_HOSTING}/move-from-boat.sh import ${MACHINE_ARCHIVE} 2>${IMPORT_TRACE} || { tail -n 20 ${IMPORT_TRACE} >&2; exit 1; }; rm -f ${MACHINE_ARCHIVE}`,
+      ),
+    );
+    importProfile = slowestCommands(remoteOrEmpty(machine, `cat ${IMPORT_TRACE}; rm -f ${IMPORT_TRACE}`));
+    const imported = factLines(remote(machine, "bash -s", { input: FACTS }));
+    const missing = [...exported].filter((line) => !imported.has(line));
+    const added = [...imported].filter((line) => !exported.has(line));
+    checks.push({
+      name: "each file, mode, owner, link and the crontab are the same after the import",
+      pass: missing.length === 0 && added.length === 0,
+      detail: `${exported.size} facts; missing ${JSON.stringify(missing.slice(0, 20))}; added ${JSON.stringify(added.slice(0, 20))}`,
+    });
+
+    await step("start", () => remote(machine, `bash ${MACHINE_HOSTING}/move-from-boat.sh start`));
+    const after = remote(machine, "bash -s", { input: RUNS }).trim();
+    checks.push({ name: "OpenBot runs after the import", pass: after === "runs", detail: after });
+
+    await step("delete the archive in B2", async () => {
+      const answer = await b2Request(b2, "DELETE", objectKey, versionId === "" ? {} : { versionId });
+      const head = await b2Request(b2, "HEAD", objectKey, {});
+      deleted = answer.status === 204 && head.status === 404;
+      checks.push({
+        name: "B2 has no archive after the delete",
+        pass: deleted && versionId !== "",
+        detail: `delete ${answer.status}, then head ${head.status}, version ${versionId === "" ? "missing" : "known"}`,
+      });
+    });
+  } finally {
+    if (uploadId !== "" && !completed) await b2Request(b2, "DELETE", objectKey, { uploadId }).catch(() => undefined);
+    if (completed && !deleted) {
+      await b2Request(b2, "DELETE", objectKey, versionId === "" ? {} : { versionId }).catch(() => undefined);
+    }
+    remoteOrEmpty(machine, `rm -f ${MACHINE_ARCHIVE}`);
+  }
+  const pass = checks.every((check) => check.pass);
+  mkdirSync(resolve(report, ".."), { recursive: true });
+  writeFileSync(
+    report,
+    `${JSON.stringify(
+      {
+        at: new Date().toISOString(),
+        vps: id,
+        release: release.version,
+        extraGb,
+        serverBytes,
+        archiveBytes,
+        partBytes: PART_BYTES,
+        importProfile,
+        steps,
+        checks,
+        pass,
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  for (const item of steps) {
+    const speed = item.megabytesPerSecond === undefined ? "" : ` (${item.megabytesPerSecond} MB/s)`;
+    logger.info(`${item.name}: ${item.seconds} s${speed}`);
+  }
+  for (const check of checks) logger.info(`${check.pass ? "PASS" : "FAIL"} ${check.name}: ${check.detail}`);
+  logger.info(`Report: ${report}`);
+  if (!pass) process.exitCode = 1;
+}
+
+await main();
