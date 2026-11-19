@@ -10,7 +10,6 @@ export interface CompareArticlePageProps {
   page: ComparePage;
 }
 
-/** The page for one entry in /compare, chosen by its kind. */
 export function CompareArticlePage(props: CompareArticlePageProps) {
   const page = props.page;
   switch (page.kind) {

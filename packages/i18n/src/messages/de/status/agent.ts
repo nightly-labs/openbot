@@ -8,11 +8,14 @@ export const messages = {
   "status.agent.instructionsChanged": "Hat seine Anweisungen aktualisiert",
   "status.agent.modelSwitchedForLimit": "Nutzungslimit erreicht. Zu {model} gewechselt.",
   "status.agent.modelReturnedAfterLimit": "Nutzungslimit beendet. Zurück zu {model} gewechselt.",
+  "status.agent.routineSkippedRunOpen": "Übersprungen: Die letzte Ausführung war noch nicht fertig",
+  "status.agent.routineSkippedUsageLimit": "Übersprungen: Nutzungslimit erreicht",
   "status.agent.modelSwitchedForError": "Anbieterfehler. Zu {model} gewechselt.",
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} hat kein Guthaben mehr. Zu {model} gewechselt. Um es wieder zu nutzen, lade Guthaben auf und wähle es dann aus.",
   "status.agent.modelReturnedAfterError": "Nach dem Anbieterfehler zurück zu {model} gewechselt.",
   "status.agent.marketplaceSuggested": "Eine Marketplace-App wurde vorgeschlagen: {app}.",
+  "status.agent.settingShown": "Eine Einstellung wurde gezeigt: {setting}.",
   "status.agent.channelMemberAdded": "{agent} hat {member} zum Kanal hinzugefügt. {person} hat darum gebeten.",
   "status.agent.channelMemberRemoved": "{agent} hat {member} aus dem Kanal entfernt. {person} hat darum gebeten.",
   "status.agent.channelInstructionsChanged":
@@ -33,16 +36,34 @@ export const messages = {
     "Den Bildschirmbereich bei {x}, {y}, {width} × {height} Punkten aufnehmen und das Bild an das Modell des Agenten senden.",
   "status.agent.reportProblem":
     "Daraus wird ein öffentliches GitHub-Issue mit der App-Version und deinem System. Dein Name wird nicht angezeigt.",
+  "status.agent.reportPhoneProblem":
+    "Daraus wird ein öffentliches GitHub-Issue mit der App-Version, deinem System sowie Version, System und Supportprotokoll deines Telefons. Dein Name wird nicht angezeigt.",
   "status.agent.sendIdea": "Daraus wird ein öffentliches GitHub-Issue. Dein Name wird nicht angezeigt.",
   "status.agent.feedbackRecentErrors": "Letzte Fehler im Chat:",
   "status.agent.feedbackSameAs": "Wird zu Issue #{issue} hinzugefügt",
   "status.agent.feedbackSent": "An das OpenBot-Team gesendet: {title}",
+  "status.agent.feedbackWithdrawn": "Von GitHub entfernt: {title}",
+  "status.agent.feedbackWithdrawCommand": "Bericht #{issue} von GitHub entfernen",
+  "status.agent.feedbackWithdrawReason":
+    "Niemand kann diesen Bericht auf GitHub mehr sehen. Das kannst du nicht rückgängig machen. Zum Korrigieren kann der Agent einen korrigierten Bericht senden.",
+  "status.agent.feedbackWithdrawing": "Dein Bericht wird von GitHub entfernt…",
   "status.agent.serverInstallCommand":
     "Einen einmaligen Befehl erstellen, der OpenBot auf einem anderen Computer als Server {name} installiert und bei deinem Konto anmeldet. Der Agent führt ihn dort aus.",
   "status.agent.serverInstallCard": "Installationsbefehl für den Server {name}",
+  "status.agent.browserProfileNamed":
+    "{agents} in das Browser-Profil {profile} verschieben. Sie erhalten seine Anmeldungen und Cookies. Ihre offenen Tabs werden geschlossen.",
+  "status.agent.commitCoAuthorOff": "OpenBot nicht mehr als Mitautor in die Commits aller Agenten eintragen.",
+  "status.agent.commitCoAuthorOn": "OpenBot wieder als Mitautor in die Commits aller Agenten eintragen.",
+  "status.agent.browserProfileNew":
+    "Das neue Browser-Profil {profile} erstellen und {agents} dorthin verschieben. Es hat keine Anmeldungen. Ihre offenen Tabs werden geschlossen.",
+  "status.agent.browserProfileShared":
+    "{agents} in das gemeinsame Browser-Profil verschieben. Sie erhalten seine Anmeldungen und Cookies. Ihre offenen Tabs werden geschlossen.",
+  "status.agent.browserProfileOwn":
+    "{agents} jeweils ein eigenes Browser-Profil geben. Ihre offenen Tabs werden geschlossen.",
   "status.agent.feedbackSending": "Dein Feedback wird an das OpenBot-Team gesendet…",
   "status.agent.workflowDelete":
     "Den Workflow {title} mit seinen Ausführungen und Versionen löschen. Seine offenen Schritte werden beendet.",
+  "status.agent.deleteAgents": "{agents} mit ihren Chats und Dateien löschen. Das lässt sich nicht rückgängig machen.",
   "status.agent.screenCaptureProgress": "Bildschirmaufnahme wird angefragt…",
   "status.agent.screenCaptureReviewing": "Bildschirmaufnahme wird geprüft…",
   "status.agent.browserOpening": "Webseite wird geöffnet…",
@@ -58,6 +79,7 @@ export const messages = {
   },
   "status.agent.memoriesUpdating": "Erinnerungen werden aktualisiert…",
   "status.agent.skillUsing": "Fähigkeit {name} wird verwendet…",
+  "status.agent.backdropSetting": "Hintergrund wird geändert…",
   "status.agent.skillReading": "Fähigkeit wird gelesen…",
   "status.agent.toolStepFailed":
     "Ein Tool-Schritt ist fehlgeschlagen; das Ergebnis wird geprüft und entschieden, was als Nächstes versucht wird…",
@@ -90,10 +112,18 @@ export const messages = {
   "status.agent.memoryChanges": "Erinnerungen: {saved} gespeichert, {updated} aktualisiert, {forgotten} vergessen.",
   "status.agent.memoryChangesWithConflicts":
     "Erinnerungen: {saved} gespeichert, {updated} aktualisiert, {forgotten} vergessen, {notChanged} nicht geändert, weil ein anderer Thread sie zuerst geändert hat.",
+  "status.agent.mcpToolCall": "Das Tool {tool} des MCP-Servers {name} ausführen.",
+  "status.agent.uiBlockClosedByMessage": "Durch neue Nachricht geschlossen",
+  "status.agent.finishCheckContinues":
+    "Die Anfrage ist noch nicht fertig. Der Agent macht weiter ({current} von {limit}).",
   "status.agent.nextStepContinues":
     "Der Agent hat vor dem nächsten Schritt angehalten. Er macht weiter ({current} von {limit}).",
   "status.agent.planContinues": "Der Plan hat offene Schritte. Der Agent macht weiter ({current} von {limit}).",
+  "status.agent.planStopped":
+    "Der Agent hat mit offenen Schritten im Plan aufgehört. Sende eine Nachricht, damit er weitermacht.",
   "status.agent.compactionContinues":
     "Die Verbindung brach ab, während der Agent seinen Kontext komprimierte. Der Agent macht weiter.",
+  "status.agent.providerExitContinues":
+    "Der Agent hat aufgehört, bevor seine Antwort fertig war. Der Agent macht weiter.",
   "status.agent.branchTitle": "Abgezweigter Chat",
 } as const satisfies PartialTranslation<typeof source>;

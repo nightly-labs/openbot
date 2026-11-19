@@ -1,5 +1,4 @@
 import { agentNotificationLevelMap } from "@openbot/contracts/ipc";
-import * as Clipboard from "expo-clipboard";
 import { Link, router } from "expo-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Alert, StyleSheet, View } from "react-native";
@@ -17,8 +16,9 @@ import {
   useMobileWorkspaceReader,
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
-import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
+import { canToggleChatPin } from "@/features/workspace/model/agent-pins";
 import { type MenuAction, type MenuComponentRef, MenuView } from "@/shared/components/menu-view";
+import { copyWithHaptic } from "@/shared/lib/clipboard";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 
@@ -28,11 +28,9 @@ function useAgentMenuActions(agent: MobileAgent) {
   const sectionMenu = useChatSectionMenu(agent.serverId, agent.id);
   const isPinned = useMobileWorkspaceSelector(({ pinnedAgentIds }) => pinnedAgentIds.includes(agent.id));
   const canPin = useMobileWorkspaceSelector(({ pinnedAgentIds, pinnedChannelIds }) =>
-    canToggleAgentPin([...pinnedAgentIds, ...pinnedChannelIds], agent.id),
+    canToggleChatPin(pinnedAgentIds, pinnedChannelIds, agent.id),
   );
   const isUnread = useAgentUnread(agent.id);
-  // The user's own level of the agent, on a host that keeps the levels. "nothing" is a muted agent.
-  // A host that keeps no levels, or that did not answer yet, has no mute item: the item must not fail.
   const levels = useSyncedNotificationLevels((state) => state.servers[agent.serverId]);
   const canMute =
     useMobileWorkspaceSelector(({ canSetAgentNotificationLevel }) => canSetAgentNotificationLevel(agent.serverId)) &&
@@ -64,11 +62,7 @@ function useAgentMenuActions(agent: MobileAgent) {
 
   const handlePin = () => toggleAgentPinAnimated(agent.id);
 
-  const handleCopyId = () => {
-    void Clipboard.setStringAsync(agent.id).then(() => {
-      void haptics.notification();
-    });
-  };
+  const handleCopyId = () => copyWithHaptic(agent.id);
 
   const handleDelete = () => {
     Alert.alert(t("mobile.agent.menu.deleteTitle", { name: agent.name }), t("mobile.agent.menu.deleteBody"), [
@@ -88,7 +82,6 @@ function useAgentMenuActions(agent: MobileAgent) {
     else workspace().markAgentUnread(agent.id);
     void haptics.selection();
   };
-  /** Mutes the agent for the user on all of their devices, or gives it the server level again. */
   const handleMute = () => {
     void haptics.selection();
     workspace()
@@ -185,10 +178,6 @@ function useAgentContextMenu(agent: MobileAgent) {
   );
 }
 
-/**
- * The chat link of an agent on iOS, with its long-press preview and context menu. Android drops both
- * elements from a Link, so it does not build the menu and wraps the link in `AgentAndroidMenu`.
- */
 export function AgentContextMenuLink({
   agent,
   preview,
@@ -208,23 +197,50 @@ export function AgentContextMenuLink({
   );
 }
 
-/**
- * The long-press menu of an agent on Android, with the actions of the iOS context menu. It opens when
- * it mounts and calls `onClose` when it closes, so the parent mounts it only while it shows: a long
- * list would otherwise keep a menu with every item for each row. It covers its parent, so the menu
- * opens at the row, as it did around the row.
- */
 export function AgentAndroidMenu({ agent, onClose }: { agent: MobileAgent; onClose: () => void }) {
+  return <AndroidRowMenu>{(size) => <OpenAgentMenu agent={agent} size={size} onClose={onClose} />}</AndroidRowMenu>;
+}
+
+export function AndroidRowMenu({ children }: { children: (size: { width: number; height: number }) => ReactNode }) {
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   return (
     <View
-      // The open menu draws in a portal. The row under it keeps its touches.
       pointerEvents="none"
       style={StyleSheet.absoluteFill}
       onLayout={({ nativeEvent }) => setSize({ width: nativeEvent.layout.width, height: nativeEvent.layout.height })}
     >
-      {size ? <OpenAgentMenu agent={agent} size={size} onClose={onClose} /> : null}
+      {size ? children(size) : null}
     </View>
+  );
+}
+
+export function OpenRowMenu({
+  actions,
+  size,
+  onClose,
+  onAction,
+}: {
+  actions: MenuAction[];
+  size: { width: number; height: number };
+  onClose: () => void;
+  onAction: (id: string) => void;
+}) {
+  const { theme } = useUniwind();
+  const menu = useRef<MenuComponentRef>(null);
+  useEffect(() => {
+    menu.current?.show();
+  }, []);
+  return (
+    <MenuView
+      ref={menu}
+      colorScheme={theme === "dark" ? "dark" : "light"}
+      shouldOpenOnLongPress
+      actions={actions}
+      onCloseMenu={onClose}
+      onPressAction={({ nativeEvent }) => onAction(nativeEvent.event)}
+    >
+      <View style={size} />
+    </MenuView>
   );
 }
 
@@ -238,11 +254,6 @@ function OpenAgentMenu({
   onClose: () => void;
 }) {
   const { t } = useText();
-  const { theme } = useUniwind();
-  const menu = useRef<MenuComponentRef>(null);
-  useEffect(() => {
-    menu.current?.show();
-  }, []);
   const {
     isPinned,
     isUnread,
@@ -302,19 +313,14 @@ function OpenAgentMenu({
     delete: handleDelete,
   };
   return (
-    <MenuView
-      ref={menu}
-      colorScheme={theme === "dark" ? "dark" : "light"}
-      shouldOpenOnLongPress
+    <OpenRowMenu
       actions={actions}
-      onCloseMenu={onClose}
-      onPressAction={({ nativeEvent }) => {
-        sectionMenu.onAction(nativeEvent.event);
-        handlers[nativeEvent.event]?.();
+      size={size}
+      onClose={onClose}
+      onAction={(id) => {
+        sectionMenu.onAction(id);
+        handlers[id]?.();
       }}
-    >
-      {/* The anchor of the menu: the size of the row it covers. */}
-      <View style={size} />
-    </MenuView>
+    />
   );
 }

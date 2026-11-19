@@ -3,26 +3,19 @@ import { Check, ChevronRight, DropdownMenu, Folder, FolderInput, FolderPlus, X }
 import { useText } from "@openbot/ui/text";
 import { For, Show } from "solid-js";
 
-/** A folder of an agent with its level in the tree: 0 at the top. */
 interface LibraryMoveEntry {
   folder: LibraryFolder;
   depth: number;
 }
 
 interface LibraryMoveItemsProps {
-  /** The folders of the agent that owns the files, parents before the folders in them. */
   folders: readonly LibraryMoveEntry[];
-  /** The folder that holds the file now. It shows a check and cannot be picked. */
   current?: string | undefined;
-  /** A file is in a folder, so the menu can take it out. */
   canRemove: boolean;
-  /** `null` takes the files out of their folder. */
   onMove: (folder: LibraryFolder | null) => void;
-  /** Makes a folder for the files. Without it, the menu offers no new folder. */
   onNewFolder: (() => void) | undefined;
 }
 
-/** The items that move files to a folder. They go in a menu of the caller. */
 export function LibraryMoveItems(props: LibraryMoveItemsProps) {
   const { t } = useText();
   return (
@@ -66,7 +59,6 @@ export function LibraryMoveItems(props: LibraryMoveItemsProps) {
   );
 }
 
-/** "Move to" with its folders, for the menu of one file. */
 export function LibraryMoveSubmenu(props: LibraryMoveItemsProps) {
   const { t } = useText();
   return (

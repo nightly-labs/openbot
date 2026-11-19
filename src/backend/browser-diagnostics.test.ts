@@ -5,7 +5,6 @@ describe("BrowserDiagnostics", () => {
   it("keeps bounded sanitized summaries and recent action outcomes", () => {
     const diagnostics = new BrowserDiagnostics();
     for (let index = 0; index < 120; index++) {
-      // A snapshot leaves out successful requests and plain successes, so console entries fill the window.
       diagnostics.add({ kind: "console", level: index % 10 === 0 ? "error" : "info", message: `GET ${index}` });
       diagnostics.action({ action: "click", target: `ref ${index}`, outcome: index % 2 ? "success" : "error" });
     }

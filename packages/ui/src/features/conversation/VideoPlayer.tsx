@@ -1,32 +1,23 @@
-import { Button, Maximize2, Minimize2, Pause, Play, SeekSlider, Volume2, VolumeX } from "@openbot/ui";
+import { Button, Maximize2, Minimize2, Pause, Play, SeekSlider, Spinner, Volume2, VolumeX } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createStore, onCleanup, Show } from "solid-js";
 import { useText } from "../../text";
 
-/** How far an arrow key moves the position, in seconds. */
 const SEEK_STEP_SECONDS = 0.5;
 
 export interface VideoPlayerProps {
-  /** The address of the file. Without one, Play calls `onLoad`. */
   src: string | undefined;
   label: string;
-  /** The length to show until the video gives its own. */
   durationSeconds?: number | undefined;
   autoplay?: boolean | undefined;
-  /** True while `onLoad` gets the file. */
+  preload?: "none" | "metadata" | undefined;
   loading?: boolean | undefined;
-  /** Gets the file when the user presses Play before there is a `src`, as in the web client. */
   onLoad?: (() => void) | undefined;
   onMetadata?: ((video: HTMLVideoElement) => void) | undefined;
+  onPlay?: (() => void) | undefined;
   onError?: (() => void) | undefined;
   ref?: ((video: HTMLVideoElement) => void) | undefined;
-  /**
-   * Adds a mute button and a full screen button to the bar. Full screen fills the app window, as a
-   * page in the chat does: the player is a manual popover, so it goes to the top layer without a move
-   * in the document and plays on.
-   */
   fullControls?: boolean | undefined;
-  /** Buttons at the end of the bar, such as Download. */
   children?: JSX.Element;
 }
 
@@ -34,13 +25,12 @@ interface VideoPlayerState {
   playing: boolean;
   time: number;
   duration: number;
-  /** Where a drag or a key moved the position, in seconds, until the user releases it. */
   dragged: number | null;
   muted: boolean;
   fullScreen: boolean;
+  buffering: boolean;
 }
 
-/** A video with a play button over the frame, and a bar with the position and the actions at the bottom. */
 export function VideoPlayer(props: VideoPlayerProps) {
   const { t } = useText();
   const [player, setPlayer] = createStore<VideoPlayerState>({
@@ -50,6 +40,7 @@ export function VideoPlayer(props: VideoPlayerProps) {
     dragged: null,
     muted: false,
     fullScreen: false,
+    buffering: false,
   });
   let video: HTMLVideoElement | undefined;
   let frame: HTMLDivElement | undefined;
@@ -63,7 +54,13 @@ export function VideoPlayer(props: VideoPlayerProps) {
   const setPlaying = (playing: boolean) =>
     setPlayer((state) => {
       state.playing = playing;
+      if (!playing) state.buffering = false;
     });
+  const setBuffering = (buffering: boolean) =>
+    setPlayer((state) => {
+      state.buffering = buffering;
+    });
+  const waiting = () => player.playing && player.buffering;
 
   const toggle = () => {
     if (!props.src) {
@@ -83,7 +80,6 @@ export function VideoPlayer(props: VideoPlayerProps) {
     if (frame.matches(":popover-open")) frame.hidePopover();
     else frame.showPopover();
   };
-  // Escape leaves full screen. The window gets the key while the focus is outside the player.
   const onEscape = (event: KeyboardEvent) => {
     if (event.key !== "Escape") return;
     event.preventDefault();
@@ -96,6 +92,7 @@ export function VideoPlayer(props: VideoPlayerProps) {
       ref={frame}
       class="media-generation-player"
       data-playing={player.playing ? "" : undefined}
+      aria-busy={waiting() || props.loading ? "true" : undefined}
       popover={props.fullControls ? "manual" : undefined}
       onToggle={(event) => {
         const open = event.newState === "open";
@@ -115,12 +112,18 @@ export function VideoPlayer(props: VideoPlayerProps) {
             }}
             src={url()}
             playsinline
-            preload="metadata"
+            preload={props.preload ?? "metadata"}
             autoplay={props.autoplay}
             aria-label={props.label}
-            onPlay={() => setPlaying(true)}
+            onPlay={() => {
+              setPlaying(true);
+              props.onPlay?.();
+            }}
             onPause={() => setPlaying(false)}
             onEnded={() => setPlaying(false)}
+            onWaiting={() => setBuffering(true)}
+            onPlaying={() => setBuffering(false)}
+            onCanPlay={() => setBuffering(false)}
             onVolumeChange={(event) => {
               const { muted } = event.currentTarget;
               setPlayer((state) => {
@@ -140,9 +143,11 @@ export function VideoPlayer(props: VideoPlayerProps) {
               });
               props.onMetadata?.(event.currentTarget);
             }}
-            onError={() => props.onError?.()}
+            onError={() => {
+              setBuffering(false);
+              props.onError?.();
+            }}
           >
-            {/* A generated video has no caption track. */}
             <track kind="captions" />
           </video>
         )}
@@ -157,8 +162,15 @@ export function VideoPlayer(props: VideoPlayerProps) {
           disabled={props.loading}
           onClick={toggle}
         >
-          <Play aria-hidden="true" />
+          <Show when={props.loading} fallback={<Play aria-hidden="true" />}>
+            <Spinner />
+          </Show>
         </Button>
+      </Show>
+      <Show when={waiting()}>
+        <span class="media-generation-wait">
+          <Spinner label={t("common.loading")} />
+        </span>
       </Show>
       <div class="media-generation-bar">
         <Button
@@ -200,7 +212,6 @@ export function VideoPlayer(props: VideoPlayerProps) {
             aria-hidden="true"
           />
         </SeekSlider>
-        {/* The slider gives the same position to a screen reader. */}
         <span class="media-generation-time" aria-hidden="true">
           {t("chat.video.time", { elapsed: clock(elapsed()), duration: clock(length()) })}
         </span>

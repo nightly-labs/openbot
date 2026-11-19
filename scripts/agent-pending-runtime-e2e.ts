@@ -1,8 +1,3 @@
-// Checks that a queued provider change survives a store reload, and that a handover that lands
-// clears it. No provider, account or network is started.
-// Run: `bun scripts/agent-pending-runtime-e2e.ts`.
-// Writes .openbot-build/agent-pending-runtime-e2e/report.json.
-
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";

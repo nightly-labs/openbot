@@ -36,6 +36,7 @@ import { ProviderAccountList } from "./ProviderAccountList";
 import { hasKeyAccounts, type ProviderAccountActions, type ProviderPickerAccount } from "./provider-accounts";
 import {
   createProviderRow,
+  customEngineDownloadAction,
   PROVIDER_ACTION_LABEL,
   PROVIDER_ACTION_TEXT,
   type ProviderAction,
@@ -47,37 +48,16 @@ import {
   showProviderInUse,
 } from "./provider-row";
 
-/**
- * What a row's Connect opens: the sign-in in this computer's browser, which the row follows itself,
- * or a dialog that the caller shows (a code, a page or the hand-off to the app).
- */
 export type ProviderConnectKind = "browser" | "dialog";
 
-/**
- * What a row's ⋯ menu offers instead of its Connect: a code, or the address that the browser of a
- * relayed sign-in shows at its end.
- */
 export type ProviderAlternativeSignIn = "code" | "address";
 
-/**
- * How the provider rows sign in. The caller decides each row's ways in from where the user connects;
- * the rows only show and run them, so every surface offers the same ones.
- */
 export interface ProviderConnection {
-  /** What the row's Connect opens, or null when the row has no Connect here. */
   connectKind: (provider: AgentProviderId) => ProviderConnectKind | null;
-  /** The second way in that the row's ⋯ menu offers, or null when it offers none. */
   alternativeKind: (provider: AgentProviderId) => ProviderAlternativeSignIn | null;
-  /** Runs the row's Connect. A rejection is shown on the row. */
   connect: (provider: AgentProviderId) => void | Promise<void>;
-  /** Runs the second way in from the ⋯ menu. */
   alternative: (provider: AgentProviderId) => void;
-  /**
-   * The site of the provider's mainland China accounts that the ⋯ menu signs in with, such as
-   * `kimi.com`, or null when the row offers no such sign-in here. Connect uses the global site.
-   */
   mainlandChinaSite?: (provider: AgentProviderId) => string | null;
-  /** Signs in with an account of `mainlandChinaSite`. A rejection is shown on the row. */
   connectInMainlandChina?: (provider: AgentProviderId) => Promise<void>;
 }
 
@@ -89,51 +69,22 @@ export interface ProviderPickerOption {
   message?: string | null | undefined;
   email?: string | null | undefined;
   connectionState?: "connecting" | undefined;
-  /** False while a connecting row is checked again, with no sign-in that waits for the user. */
   signInPending?: boolean | undefined;
   checkError?: string | null | undefined;
-  /** A restart the user asked for waits for the provider's tasks to stop. */
   restartPending?: boolean | undefined;
   runtimeStatus?: ProviderRuntimeStatus | undefined;
-  /** The CLI that the provider ran last: the one the user installed, or the one OpenBot downloaded. */
   cliSource?: AgentProviderStatus["cliSource"];
-  /** The other CLI the user can run instead: theirs while OpenBot's copy runs, or the newer copy. */
   otherCliVersion?: string | undefined;
-  /**
-   * Whether the provider's key is saved: the optional OpenCode key, a Gemini key in use, or a Claude
-   * key on a host that reads it. Absent while unknown, so the row shows no badge rather than a
-   * wrong one.
-   */
+  incompleteCliVersion?: string | undefined;
   keyStatus?: ProviderApiKeyStatus | undefined;
-  /**
-   * Whether the row runs free models with no account, so a downloaded row needs no Connect.
-   * Onboarding sets it for OpenCode, whose first-run choice needs no key.
-   */
   freeModels?: boolean;
-  /**
-   * A short note drawn beside the row with an arrow pointing at it, like the drag hint of a macOS
-   * installer. It repeats what the row already says, so assistive technology does not read it.
-   */
   callout?: { title: string; detail: string } | null;
-  /** The newer runtime main says exists. The renderer never works this out itself. */
   availableVersion?: string | null;
-  /** The provider's last failure, kept until a model list fetched after it succeeds. */
   lastError?: string | null | undefined;
-  /** What "Copy diagnostics" puts on the clipboard. Offered only while the row has a last error. */
   diagnostics?: string | undefined;
-  /**
-   * The user turned the provider off in OpenBot. OpenBot does not start, check or list it, so the
-   * row shows only "Off" and the switch that turns it on again.
-   */
   off?: boolean | undefined;
-  /** The names of the agents that use the provider. While there is one, the switch does not turn it off. */
   usedBy?: readonly string[] | undefined;
-  /**
-   * The accounts of a provider that can hold more than one, its own sign-in first. With
-   * `accountActions`, a connected row offers Add account, and lists them from the second one on.
-   */
   accounts?: readonly ProviderPickerAccount[] | undefined;
-  /** The pool of `accounts`. Absent while the pool is off. */
   accountPool?: ProviderAccountPool | undefined;
 }
 
@@ -148,80 +99,37 @@ export interface ProviderPickerProps {
   allowUnavailableSelection?: boolean;
   focusFirst?: boolean;
   refreshingProviders?: boolean | undefined;
-  /** How each row signs in. Without it, no row offers Connect or a second way in. */
   connection?: ProviderConnection | undefined;
-  /** Ends the browser sign-in that Connect started, so a closed or stuck page is not a dead end. */
   onCancelProviderSignIn?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onDownloadProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onCancelProviderDownload?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
-  /**
-   * Starts the update the row offers, or asks for one when none is offered yet. Whether that
-   * re-downloads the managed runtime or runs the CLI's own updater is decided by the caller, which
-   * knows who owns the install.
-   */
   onUpdateProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
-  /**
-   * Restarts a connected provider's process after its tasks stop. Only the computer that runs the
-   * provider has it; a row with `restartPending` offers `onCancelProviderRestart` instead.
-   */
   onRestartProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onCancelProviderRestart?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
-  /**
-   * Turns a provider on or off in OpenBot. With it each provider row has a switch. A row whose
-   * `usedBy` names an agent stays on, and a toast tells why, so no agent loses its provider silently.
-   */
   onSetProviderOn?: ((provider: AgentProviderId, on: boolean) => void | Promise<void>) | undefined;
   onInstallProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onSignInProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
-  /** Adds, signs in, names and removes the accounts of a row. Settings has it; onboarding does not. */
   accountActions?: ProviderAccountActions | undefined;
-  /**
-   * The dialog element a row's actions menu portals into. Without it the menu lands beside the
-   * dialog in `body`, where a modal makes it inert and out of reach.
-   */
   menuMount?: HTMLElement | undefined;
   onRefreshProviders?: (() => void | Promise<void>) | undefined;
-  /** Add row gated by OpenCode install; else offers install. */
   onAddCustomProvider?: (() => void) | undefined;
-  /** Named endpoints share one row; endpoint pick is model pick. */
   customProviders?: readonly CustomProviderSummary[] | undefined;
-  /** Custom check suppresses provider check; needs endpoint + handler. */
   customSelected?: boolean;
   onSelectCustomProvider?: (() => void) | undefined;
-  /**
-   * Opens the list of saved endpoints, where they are removed. With it the count is a button beside
-   * Add; without it the count stays a badge inside the label, because a button must not sit inside
-   * a `<label>`: a click there would answer the radio instead.
-   */
   onManageCustomProviders?: (() => void) | undefined;
-  /**
-   * The providers that the list does not show. With one or more, or with `customInMore`, a
-   * "More providers" button below the list opens a dialog that lists them. The caller adds the
-   * provider that the user chooses to `options`, and selects it.
-   */
   moreProviders?: readonly ProviderPickerOption[] | undefined;
-  /** The custom provider row is in the "More providers" dialog, not in the list. */
   customInMore?: boolean;
-  /** The OpenCode option that runs the custom endpoints, when OpenCode is not a row of `options`. */
   customEngine?: ProviderPickerOption | undefined;
-  /**
-   * The installed version goes on the line under the name when the row has no email and no
-   * description, so the badge has the row's last column alone.
-   */
   versionInDetail?: boolean;
-  /** A note beside the "More providers" button, drawn like a row's `callout`. */
   moreCallout?: { title: string; detail: string } | null;
   onChooseMoreProvider?: ((provider: AgentProviderId) => void) | undefined;
   onChooseMoreCustom?: (() => void) | undefined;
-  /** What the host found on this computer, below the list. It is not a row in the radio group. */
   detected?: JSX.Element;
   onChange: (provider: AgentProviderId) => void;
 }
 
 export function ProviderPicker(props: ProviderPickerProps) {
   const { t, format, sourceText, errorMessage } = useText();
-  // Rows are keyed by position, so a row's input can show another provider after the list changes.
-  // The input is found by its current value, not by the provider it was made for.
   const inputs = new Set<HTMLInputElement>();
   const inputFor = (provider: AgentProviderId) =>
     [...inputs].find((input) => input.isConnected && input.value === provider);
@@ -233,19 +141,12 @@ export function ProviderPicker(props: ProviderPickerProps) {
   const customReady = () => servesCustomProvider(openCode());
   const endpointCount = () => props.customProviders?.length ?? 0;
   const endpointCountLabel = () => t("provider.endpointCount", { count: endpointCount() });
-  /** The count answers a click only where the list can be opened. Elsewhere it stays a badge. */
   const countManageable = () => endpointCount() > 0 && Boolean(props.onManageCustomProviders);
-  /** The row is a choice once it has something to run and someone to tell about the choice. */
   const customSelectable = () => Boolean(props.onSelectCustomProvider) && endpointCount() > 0;
-  /** The Custom provider row holds the check mark, so the provider row that serves it does not. */
   const checkedProvider = () => (customSelectable() && props.customSelected ? null : props.value);
   const moreProviders = () => props.moreProviders ?? [];
   const moreOffered = () => moreProviders().length > 0 || Boolean(props.customInMore);
   const [moreOpen, setMoreOpen] = createSignal(false);
-  /**
-   * What the user chose in the dialog. A chosen provider becomes a row, so the focus goes to its
-   * radio and not back to the button. The custom provider opens its own dialog, which takes the focus.
-   */
   let moreChoice: AgentProviderId | "custom" | null = null;
   let focused = false;
   const [useChanges, setUseChanges] = createStore<
@@ -268,7 +169,6 @@ export function ProviderPicker(props: ProviderPickerProps) {
       state[provider] = { pending: false, error: null };
     });
   }
-  /** One custom row; inside group when choosable, after when add-only. */
   const customRow = (engine: () => ProviderPickerOption) => (
     <div
       class={[
@@ -280,7 +180,6 @@ export function ProviderPicker(props: ProviderPickerProps) {
         },
       ]}
     >
-      {/* Label targets radio when choosable, Add button otherwise. */}
       <label
         for={customSelectable() ? customRadioId : customReady() ? addCustomId : undefined}
         class="provider-picker-option-selection"
@@ -302,13 +201,11 @@ export function ProviderPicker(props: ProviderPickerProps) {
           <small class="provider-picker-email">{t("provider.custom.description")}</small>
         </span>
         <span class="provider-picker-state">
-          {/* Count only; endpoint naming is the model picker's job. Moves beside Add when it opens the list. */}
           <Show when={endpointCount() > 0 && !countManageable()}>
             <Badge class="provider-picker-custom-count" variant="secondary">
               {endpointCountLabel()}
             </Badge>
           </Show>
-          {/* Reports OpenCode state in shared words, without naming OpenCode. */}
           <Show when={!customReady()}>
             <Badge
               class={`provider-picker-status provider-picker-status-${engine().state}`}
@@ -320,7 +217,6 @@ export function ProviderPicker(props: ProviderPickerProps) {
         </span>
       </label>
       <div class="provider-picker-actions">
-        {/* Count as action: named for what it opens, not the state it shows. */}
         <Show when={countManageable()}>
           <Button
             type="button"
@@ -348,18 +244,11 @@ export function ProviderPicker(props: ProviderPickerProps) {
             {t("common.add")}
           </Button>
         </Show>
-        {/* Same OpenCode runtime fetch unblocks Add. Once Add shows, the OpenCode row keeps its own Retry. */}
         <Show
           when={(() => {
             if (!props.onDownloadProvider && !props.onCancelProviderDownload) return undefined;
             if (customReady()) return undefined;
-            const engineOption = engine();
-            const runtime = engineOption.runtimeStatus;
-            if (!runtime) return undefined;
-            if (runtime.phase === "not-downloaded") return "download" as const;
-            if (runtime.phase === "downloading") return "cancel" as const;
-            if (runtime.phase === "download-error") return "retry" as const;
-            return undefined;
+            return customEngineDownloadAction(engine());
           })()}
         >
           {(action) => (
@@ -372,9 +261,9 @@ export function ProviderPicker(props: ProviderPickerProps) {
               disabled={props.disabled || (props.refreshingProviders && !runtimeStoreAction(action()))}
               onClick={() => {
                 if (action() === "cancel") {
-                  void props.onCancelProviderDownload?.("opencode");
+                  void props.onCancelProviderDownload?.(engine().id);
                 } else {
-                  void props.onDownloadProvider?.("opencode");
+                  void props.onDownloadProvider?.(engine().id);
                 }
               }}
             >
@@ -386,7 +275,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
           when={
             !engine().runtimeStatus &&
             engine().state === "not-installed" &&
-            agentProviderDescriptor("opencode").installGuideLink !== null &&
+            agentProviderDescriptor(engine().id).installGuideLink !== null &&
             props.onInstallProvider
           }
         >
@@ -397,7 +286,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
             class="provider-picker-install"
             aria-label={t("provider.custom.installLabel")}
             disabled={props.disabled || props.refreshingProviders}
-            onClick={() => void props.onInstallProvider?.("opencode")}
+            onClick={() => void props.onInstallProvider?.(engine().id)}
           >
             {t("provider.action.install")}
           </Button>
@@ -456,7 +345,6 @@ export function ProviderPicker(props: ProviderPickerProps) {
         </div>
       </Show>
       <div class="provider-picker-list">
-        {/* Custom row joins the group once endpoints exist. */}
         <div role="radiogroup" aria-label={props.ariaLabel}>
           <For each={props.options} keyed={false}>
             {(option) => {
@@ -491,6 +379,8 @@ export function ProviderPicker(props: ProviderPickerProps) {
                 accountsOffered,
                 accountError,
                 addAccount,
+                accountCodeOffered,
+                addAccountWithCode,
                 installOffered,
                 signInOffered,
                 apiKeyOffered,
@@ -499,13 +389,12 @@ export function ProviderPicker(props: ProviderPickerProps) {
               const actionsMenu = () =>
                 alternative() !== null ||
                 mainlandChinaSite() !== null ||
+                (accountCodeOffered() && !hasKeyAccounts(option().id)) ||
                 updateOffered() ||
                 restartOffered() ||
                 diagnosticsOffered();
               const inputId = () => `${pickerId}-${option().id}`;
-              /** An off row is not a choice, so it never holds the check. */
               const checked = () => !off() && checkedProvider() === option().id;
-              /** From the second account on, the row counts them and lists each one under it. */
               const listedAccounts = () => {
                 const accounts = option().accounts ?? [];
                 return props.accountActions && accounts.length > 1 && !off() ? accounts : null;
@@ -593,7 +482,6 @@ export function ProviderPicker(props: ProviderPickerProps) {
                         </small>
                       </Show>
                     </span>
-                    {/* Version shares the badge column. */}
                     <span class="provider-picker-state">
                       <Show
                         when={!off()}
@@ -606,7 +494,6 @@ export function ProviderPicker(props: ProviderPickerProps) {
                         <Show when={props.versionInDetail ? null : version()}>
                           {(installed) => <small class="provider-picker-version">{installed()}</small>}
                         </Show>
-                        {/* Free-tier badge only beside runtime badge. */}
                         <Show when={freeKey()}>
                           <Badge class="provider-picker-status provider-picker-key-status" variant="secondary">
                             {t("provider.key.free")}
@@ -623,11 +510,8 @@ export function ProviderPicker(props: ProviderPickerProps) {
                       </Show>
                     </span>
                   </label>
-                  {/* Actions share one grid cell; a sibling button would stretch its own row. */}
                   <div class="provider-picker-actions">
-                    {/* An off provider has no process to act on, so the switch is its only action. */}
                     <Show when={!off()}>
-                      {/* An account that is an API key is added in the provider's settings page. */}
                       <Show when={accountsOffered() && !hasKeyAccounts(option().id)}>
                         <Button
                           type="button"
@@ -744,13 +628,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
                           {t("provider.action.apiKey")}
                         </Button>
                       </Show>
-                      {/* The row's secondary actions: Update on every downloaded runtime, and the code
-                      sign-in for the computer the browser hand-off cannot serve (no browser, a
-                      remote session, or a browser signed in to the wrong account).
 
-                      Behind a menu rather than beside Connect: a second button on every row would
-                      make the rows argue about which one to press, and the "Update available" badge
-                      already points at the offer. */}
                       <Show when={actionsMenu()}>
                         <DropdownMenu.Root placement="bottom-end" gutter={4} modal={false}>
                           <DropdownMenu.Trigger
@@ -811,6 +689,12 @@ export function ProviderPicker(props: ProviderPickerProps) {
                                   </DropdownMenu.Item>
                                 )}
                               </Show>
+                              <Show when={accountCodeOffered() && !hasKeyAccounts(option().id)}>
+                                <DropdownMenu.Item onSelect={addAccountWithCode}>
+                                  <Smartphone aria-hidden="true" />
+                                  {t("provider.account.addWithCode")}
+                                </DropdownMenu.Item>
+                              </Show>
                               <Show when={diagnosticsOffered()}>
                                 <DropdownMenu.Item
                                   onSelect={() => void navigator.clipboard.writeText(option().diagnostics ?? "")}
@@ -845,8 +729,6 @@ export function ProviderPicker(props: ProviderPickerProps) {
                       />
                     </Show>
                   </div>
-                  {/* Outside the label: inside it, the message would be part of the radio's name, and
-                    a click on it would choose the provider. */}
                   <Show when={accountError()}>
                     {(message) => (
                       <small class="provider-picker-check-error provider-picker-used-by" role="alert">
@@ -894,7 +776,6 @@ export function ProviderPicker(props: ProviderPickerProps) {
         when={moreOffered()}
         fallback={<Show when={props.hint}>{(hint) => <p class="provider-picker-hint">{hint()}</p>}</Show>}
       >
-        {/* The button opens a dialog, so it is below the list and not a row in the radio group. */}
         <div class="provider-picker-footer">
           <Show when={props.hint}>{(hint) => <p class="provider-picker-hint">{hint()}</p>}</Show>
           <Button
@@ -910,7 +791,6 @@ export function ProviderPicker(props: ProviderPickerProps) {
             disabled={props.disabled}
             onClick={() => setMoreOpen(true)}
           >
-            {/* Up to two logos, so the user can see that their provider is behind the button. */}
             <Show when={moreProviders().length > 0}>
               <span class="provider-picker-logo-stack" aria-hidden="true">
                 <For each={moreProviders().slice(0, 2)} keyed={false}>
@@ -946,9 +826,6 @@ export function ProviderPicker(props: ProviderPickerProps) {
           onCloseAutoFocus={(event) => {
             const choice = moreChoice;
             moreChoice = null;
-            // The dialog has no trigger, so Kobalte focuses nothing when it closes. With no choice, or a
-            // custom provider that no form opens for (OpenCode is not ready), the focus goes back to
-            // the button. The custom form takes the focus itself.
             event.preventDefault();
             if (!choice || (choice === "custom" && !customReady())) moreButton?.focus();
             else if (choice !== "custom") inputFor(choice)?.focus();
@@ -959,10 +836,6 @@ export function ProviderPicker(props: ProviderPickerProps) {
   );
 }
 
-/**
- * A short note with an arrow, like the drag hint of a macOS installer. It repeats text that is
- * already on the screen, so assistive technology does not read it.
- */
 function ProviderCallout(props: { title: string; detail: string; class?: string }) {
   return (
     <span class={["provider-picker-callout", props.class]} aria-hidden="true">
@@ -977,11 +850,6 @@ function ProviderCallout(props: { title: string; detail: string; class?: string 
   );
 }
 
-/**
- * Connect is the step a row is waiting for, so it takes the accent colour. An outlined Connect read
- * as a disabled button beside a "Ready" badge (issue #643). Reconnect and Restart repeat a step
- * already done, so they stay outlined.
- */
 function providerActionClass(action: ProviderAction) {
   return action === "connect" ? "provider-picker-install provider-picker-connect" : "provider-picker-install";
 }

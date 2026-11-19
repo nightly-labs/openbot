@@ -2,7 +2,7 @@ import { EventEmitter } from "node:events";
 import { constants } from "node:fs";
 import { access, appendFile, mkdir, readdir, readFile, rename, rm, stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import type {
   IdleRestart,
   ScheduledUpdateRestart,
@@ -11,45 +11,30 @@ import type {
   UpdateStatus,
 } from "@openbot/contracts/ipc";
 import { isUpdateBusyPhase } from "@openbot/contracts/ipc";
+import { isNewerRelease } from "@openbot/contracts/release-version";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
-import { Cause, Deferred, Effect, Result, Schema, Scope, Semaphore } from "effect";
+import { Cause, Deferred, Effect, Fiber, Result, Schema, Scope, Semaphore } from "effect";
 import type { ProgressInfo, UpdateInfo } from "electron-updater";
 import type { HostUpdateState } from "../../packages/contracts/src/host-manager";
 import { causeHelpers } from "../backend/effect-boundary";
+import { writeUpdateHandover, writeUpdateInstallRecord } from "./update-install-guard";
 import type { OpenBotSiblingInstance, SiblingScanFailed } from "./update-sibling-instances";
+import { verifyWindowsUpdateSignature } from "./windows-update-signature";
 
 const logger = createOpenBotLogger("update");
 
-/** Only the part of electron-updater's cancellation token this service depends on. */
 export type UpdateCancellationToken = {
   readonly cancelled: boolean;
   cancel: () => void;
 };
 
-/** Only the part of a check result this service depends on. */
 export type UpdateCheckOutcome = {
   readonly isUpdateAvailable: boolean;
   readonly updateInfo: { readonly version: string };
   readonly cancellationToken?: UpdateCancellationToken;
 };
 
-/**
- * The subset of electron-updater this service drives. Four behaviours of the installed version are
- * load bearing here, none of them public API, all verified against 6.8.11. Verify them again when
- * electron-updater changes:
- *
- * 1. `MacUpdater.updateDownloaded` only calls `nativeUpdater.checkForUpdates()` - the call that makes
- *    Squirrel stage the ZIP and eventually emit the native `update-downloaded` - while
- *    `autoInstallOnAppQuit` is true. We keep that off, so nothing here may wait on that event; doing
- *    so is what left macOS stuck on "Preparing update..." in issue #152.
- * 2. `MacUpdater.quitAndInstall` stages on demand when Squirrel has not already done so, which is why
- *    `ready` is a valid state the moment the download completes.
- * 3. `AppUpdater.doCheckForUpdates` mints a `CancellationToken` for every available update and returns
- *    it on the result, so cancellation needs no direct dependency on builder-util-runtime.
- * 4. `BaseUpdater.quitAndInstall` can return without quitting when `install()` fails, so an install
- *    failure has to release the latch or the restart action never becomes available again.
- */
 export type UpdateAdapter = {
   allowPrerelease: boolean;
   autoDownload: boolean;
@@ -63,10 +48,6 @@ export type UpdateAdapter = {
   on(event: "update-downloaded", listener: (info: UpdateInfo) => void): unknown;
   on(event: "error", listener: (error: Error) => void): unknown;
   quitAndInstall: (isSilent?: boolean, isForceRunAfter?: boolean) => void;
-  /**
-   * electron-updater's staged rollout test (docs/RELEASING.md#staged-rollout). An adapter with no
-   * staged rollout, such as the hosted server adapter, does not have it.
-   */
   isUserWithinRollout?: (info: UpdateInfo) => boolean | Promise<boolean>;
 };
 
@@ -82,11 +63,15 @@ export function createDisabledUpdateAdapter(): UpdateAdapter {
   };
 }
 
-/** electron-updater's updater, or `null` when the module does not load. */
 export async function loadElectronUpdater(): Promise<UpdateAdapter | null> {
   try {
     const updaterModule = await import("electron-updater");
     const adapter = updaterModule.autoUpdater ?? updaterModule.default?.autoUpdater ?? updaterModule.default;
+    const NsisUpdater = updaterModule.NsisUpdater ?? updaterModule.default?.NsisUpdater;
+    if (NsisUpdater && adapter instanceof NsisUpdater) {
+      adapter.verifyUpdateCodeSignature = (publisherNames, file) =>
+        Effect.runPromise(verifyWindowsUpdateSignature(publisherNames, file));
+    }
     if (adapter) return adapter;
     logger.warn("OpenBot updates are disabled: electron-updater did not export autoUpdater");
   } catch {
@@ -95,10 +80,6 @@ export async function loadElectronUpdater(): Promise<UpdateAdapter | null> {
   return null;
 }
 
-/**
- * electron-updater's cache directory, named by `updaterCacheDirName` in `app-update.yml`. The base is
- * the cache path of electron-updater 6.8.9 (`getAppCacheDir`), which differs from Electron's.
- */
 export function electronUpdaterCacheDirectory(): string {
   const root =
     process.platform === "win32"
@@ -107,12 +88,6 @@ export function electronUpdaterCacheDirectory(): string {
         ? join(homedir(), "Library", "Caches")
         : process.env.XDG_CACHE_HOME || join(homedir(), ".cache");
   return join(root, "openbot-updater");
-}
-
-export function isValidSemver(version: string): boolean {
-  return /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/u.test(
-    version,
-  );
 }
 
 type UpdateOperation = "check" | "download" | "install";
@@ -128,14 +103,15 @@ interface UpdateServiceOptions {
   autoDownload: boolean;
   beforeInstall: () => Promise<void>;
   checkSiblingInstances?: (() => Effect.Effect<readonly OpenBotSiblingInstance[], SiblingScanFailed>) | undefined;
-  /** The uid of this process. It tells a refusal in this account apart from another account. */
   currentUid?: number | undefined;
   platform?: NodeJS.Platform;
-  /** macOS: the application bundle that Squirrel.Mac replaces. */
   appBundlePath?: string | undefined;
+  appImagePath?: string | undefined;
   logDirectory?: string;
   shipItDirectory?: string | undefined;
-  /** electron-updater's cache directory, named by `updaterCacheDirName` in `app-update.yml`. */
+  handoverPath?: string | undefined;
+  installRecordPath?: string | undefined;
+  notInstalledVersion?: string | null | undefined;
   updaterCacheDirectory?: string | undefined;
   initialCheckDelayMs?: number;
   checkIntervalMs?: number;
@@ -150,49 +126,18 @@ export interface UpdateDiagnosticEvent {
   errorCode: UpdateFailureCode | null;
 }
 
-// One manifest request every four minutes: a small GET while the app sits idle, and a user who
-// leaves OpenBot open picks up a release within minutes instead of hours. The loop skips the request
-// while a download or an install runs, and keeps checking while a downloaded update waits for its
-// restart, because releases ship often enough to supersede it before the user restarts.
 const DEFAULT_CHECK_INTERVAL = 4 * 60 * 1_000;
 const MAX_LOG_BYTES = 1024 * 1024;
 const MAX_DIAGNOSTIC_EVENTS = 20;
 
-/**
- * Shutdown preparation plus the handover to the installer. Generous because on macOS quitAndInstall
- * asks Squirrel to stage the ZIP and only quits when that finishes, which is disk bound on an artifact
- * of a few hundred megabytes. Firing early here would report a failure over a working install.
- */
 export const UPDATE_INSTALL_TIMEOUT_MS = 300_000;
 
-/**
- * Every busy phase needs a deadline, and typing this as a total record over `UpdateBusyPhase` is what
- * enforces it: adding a phase to `UPDATE_BUSY_PHASES` without a timeout here fails to compile. A busy
- * phase with no bound is exactly how "Preparing update..." became a state the UI could never leave.
- */
 const DEFAULT_PHASE_TIMEOUTS: Record<UpdateBusyPhase, number> = {
-  /**
-   * A backstop above builder-util-runtime's own 60s socket timeout, which aborts the request and
-   * rejects the call. Letting that fire first means the library reports the real failure and clears
-   * its outstanding promise, so the next scheduled check issues a fresh request; this only covers a
-   * stall outside the request itself, such as provider resolution.
-   */
   checking: 90_000,
-  /**
-   * Time without a single progress event, not a cap on the whole transfer: release artifacts run to
-   * hundreds of megabytes, so a slow link must stay supported while a dead socket must not.
-   */
   downloading: 120_000,
   installing: UPDATE_INSTALL_TIMEOUT_MS,
 };
 
-/**
- * Whether the installed app can replace itself in place.
- *
- * Linux is conditional: electron-updater can only self-update an AppImage, and the AppImage runtime
- * is the thing that says so, through `APPIMAGE`. An unpacked or repackaged Linux build has nothing
- * to write back to, so it reports no updates rather than failing at install time.
- */
 export function supportsInstalledUpdates(
   platform: NodeJS.Platform,
   environment: NodeJS.ProcessEnv = process.env,
@@ -201,10 +146,6 @@ export function supportsInstalledUpdates(
   return platform === "darwin" || platform === "win32";
 }
 
-/**
- * Whether Nix installed this copy. The Nix store is read-only, and Nix replaces the whole package on
- * an update, so the app must not write a new version over itself.
- */
 export function isNixStoreInstall(executablePath: string = process.execPath): boolean {
   return executablePath.startsWith("/nix/store/");
 }
@@ -221,10 +162,14 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     Pick<
       UpdateServiceOptions,
       | "appBundlePath"
+      | "appImagePath"
       | "beforeInstall"
       | "checkSiblingInstances"
       | "currentUid"
+      | "handoverPath"
+      | "installRecordPath"
       | "logDirectory"
+      | "notInstalledVersion"
       | "shipItDirectory"
       | "updaterCacheDirectory"
     > & {
@@ -234,7 +179,6 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   #checkTimer: ReturnType<typeof setTimeout> | null = null;
   #phaseTimer: ReturnType<typeof setTimeout> | null = null;
   #started = false;
-  /** False for a start that checks only on request, such as the newer-database recovery. */
   #checksScheduled = false;
   #installStarted = false;
   #pendingInstallRequests = 0;
@@ -242,6 +186,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   #operation: UpdateOperation = "check";
   #history: UpdateDiagnosticEvent[] = [];
   readonly #logLock = Semaphore.makeUnsafe(1);
+  readonly #logWrites = new Set<Fiber.Fiber<void, UpdateOperationFailure>>();
   readonly #workScope = Scope.makeUnsafe();
   #autoDownload: boolean;
   #downloadedVersion: string | null = null;
@@ -257,15 +202,10 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   #checkRequest: Deferred.Deferred<UpdateCheckOutcome | null, UpdateOperationFailure> | null = null;
   #downloadInFlight = false;
   #teardownCommitted = false;
-  /**
-   * The release in its staged rollout that a person's check found. The later checks and download
-   * retries of this session also get it. A later release keeps its staged rollout.
-   */
   #requestedVersion: string | null = null;
-  /** The release that the staged rollout left out in the current check request. */
   #rolloutMiss: string | null = null;
-  /** A newer release in its staged rollout that the last check did not offer to this install. */
   #stagedVersion: string | null = null;
+  #requiredVersion: string | null = null;
 
   constructor(updater: UpdateAdapter, options: UpdateServiceOptions) {
     super();
@@ -282,6 +222,8 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
         installing: options.installTimeoutMs ?? DEFAULT_PHASE_TIMEOUTS.installing,
       },
     };
+    if (options.notInstalledVersion)
+      logger.warn(`The last update restart did not install OpenBot ${options.notInstalledVersion}.`);
     this.#status = {
       phase: options.enabled ? "idle" : "unsupported",
       currentVersion: options.currentVersion,
@@ -293,23 +235,24 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     };
     this.on("diagnostic", (event) => {
       const directory = this.#options.logDirectory;
-      if (directory) this.#fork(this.#logLock.withPermit(appendUpdateLog(directory, event)));
+      if (!directory) return;
+      const write = Effect.runFork(this.#logLock.withPermit(appendUpdateLog(directory, event)));
+      this.#logWrites.add(write);
+      write.addObserver(() => this.#logWrites.delete(write));
     });
     this.#recordStatus();
+  }
+
+  flushLog(): Effect.Effect<void> {
+    return Effect.suspend(() => Fiber.awaitAll([...this.#logWrites])).pipe(Effect.asVoid);
   }
 
   start(scheduleChecks = true): void {
     if (this.#started) return;
     this.#started = true;
-    // The automatic download is driven from this service so that both flows share one download path
-    // and one cancellation token. autoInstallOnAppQuit stays off so nothing installs without the
-    // explicit restart action, which is the only path that runs shutdown preparation.
     this.#updater.autoDownload = false;
     this.#updater.autoInstallOnAppQuit = false;
     this.#updater.allowPrerelease = false;
-    // A check that a person asks for gets a release that is still in its staged rollout. A paused
-    // release (0%) stays paused for everyone, because a pause stops a release that is bad.
-    // electron-updater calls this test only for a release that this system supports.
     const stagedRollout = this.#updater.isUserWithinRollout;
     if (stagedRollout) {
       this.#updater.isUserWithinRollout = async (info) => {
@@ -321,10 +264,6 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       };
     }
 
-    // The check lifecycle is driven entirely by checkForUpdates(), whose result is generation
-    // guarded, so there are deliberately no checking-for-update / update-available /
-    // update-not-available listeners: a second, unguarded writer is how a late event from an
-    // abandoned check could overwrite a newer download or ready state.
     this.#updater.on("download-progress", (progress: ProgressInfo) => {
       if (!this.#isDownloadLive()) return;
       this.#setStatus({ phase: "downloading", progress: clampProgress(progress.percent), errorCode: null });
@@ -332,20 +271,10 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     this.#updater.on("update-downloaded", (info: UpdateInfo) => {
       if (!this.#isDownloadLive()) return;
       this.#activeDownload = null;
-      // electron-updater has staged everything it needs by now. On macOS quitAndInstall asks the
-      // native updater for the ZIP on demand, so the restart action is available immediately.
       this.#markReady(info.version);
     });
     this.#updater.on("error", (error: Error) => {
-      // Both awaited calls reject on failure, so this only has to cover errors raised outside them,
-      // and only for an operation still in flight. An abandoned operation reporting late must not
-      // replace the state the user is now looking at.
-      // Before the handover only a check can raise an error, such as the quiet check that runs while
-      // an update is ready. Reading that as an install failure would abandon an install whose
-      // shutdown preparation is already under way.
       if (this.#operation === "install" && this.#installHandedOver && this.#isInstallLive()) {
-        // quitAndInstall can return without quitting. Shutdown preparation has already run by then,
-        // so the app cannot install again; it reports the failure and asks to be relaunched.
         this.#installGeneration += 1;
         this.#activeInstall = null;
         logUpdateFailure("OpenBot update install failed.", error);
@@ -354,7 +283,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       }
       if (this.#operation === "download" && this.#isDownloadLive()) {
         this.#activeDownload = null;
-        this.#setError("download_failed");
+        this.#setError("download_failed", downloadFailureMessage(error));
       }
     });
     if (this.#options.platform === "darwin" && this.#options.shipItDirectory) {
@@ -370,10 +299,8 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     }
   }
 
-  /** Schedules the checks that `stop` cleared, for an app that keeps running after it, such as after a Windows session end that another app cancels. */
   resume(): void {
     if (!this.#started) return;
-    // `stop` cleared the deadline of a busy phase, and a download keeps running after it.
     if (!this.#phaseTimer) this.#armPhaseTimer();
     if (!this.#checksScheduled || !this.#options.enabled || this.#checkTimer) return;
     this.#scheduleCheck(this.#options.initialCheckDelayMs);
@@ -386,19 +313,21 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       status.scheduledRestart = { ...this.#scheduledRestart, waitingFor: [...this.#scheduledRestart.waitingFor] };
     if (this.#idleRestart) status.idleRestart = { ...this.#idleRestart, waitingFor: [...this.#idleRestart.waitingFor] };
     if (this.#stagedVersion && status.phase === "up-to-date") status.stagedVersion = this.#stagedVersion;
+    if (this.#requiredVersion) status.requiredVersion = this.#requiredVersion;
     return status;
   }
 
-  /**
-   * Shows the restart a joined server's admin asked for. `RequestedUpdate` owns the schedule; this
-   * only carries it to the renderer. It is not a phase change, so the phase deadline stays as it is.
-   */
+  setRequiredVersion(version: string | null): void {
+    if (this.#requiredVersion === version) return;
+    this.#requiredVersion = version;
+    this.emit("status", this.getStatus());
+  }
+
   setScheduledRestart(restart: ScheduledUpdateRestart | null): void {
     this.#scheduledRestart = restart ? { ...restart, waitingFor: [...restart.waitingFor] } : null;
     this.emit("status", this.getStatus());
   }
 
-  /** Shows the restart that the user of this computer asked for. `IdleRestart` owns it, as above. */
   setIdleRestart(restart: IdleRestart | null): void {
     this.#idleRestart = restart ? { ...restart, waitingFor: [...restart.waitingFor] } : null;
     this.emit("status", this.getStatus());
@@ -422,22 +351,29 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     }
   });
 
-  /** Host-managed sessions display host state and never invoke the tenant updater. */
   setManagedByHost(managed: boolean): void {
     if (this.#managedByHost === managed) return;
     this.#managedByHost = managed;
-    if (!managed) {
-      this.#downloadedVersion = null;
-      this.#setStatus({
-        phase: this.#options.enabled ? "idle" : "unsupported",
-        availableVersion: null,
-        progress: null,
-        message: null,
-        errorCode: null,
-      });
-      if (this.#options.enabled) this.#scheduleCheck(this.#options.initialCheckDelayMs);
+    if (managed) {
+      this.#checkGeneration += 1;
+      this.#downloadGeneration += 1;
+      this.#activeDownload = null;
+      this.#cancellationToken?.cancel();
+      this.#cancellationToken = null;
+      if (this.#installStarted) {
+        this.#setStatus({});
+        return;
+      }
     }
-    this.#setStatus({});
+    this.#downloadedVersion = null;
+    this.#setStatus({
+      phase: this.#options.enabled ? "idle" : "unsupported",
+      availableVersion: null,
+      progress: null,
+      message: null,
+      errorCode: null,
+    });
+    if (!managed && this.#options.enabled) this.#scheduleCheck(this.#options.initialCheckDelayMs);
   }
 
   setHostState(state: HostUpdateState): void {
@@ -467,14 +403,6 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     });
   }
 
-  /**
-   * The user-facing check. Unlike the periodic loop this one always reports: it moves into
-   * "checking" and settles on a real outcome even when an earlier call is still unsettled, because
-   * an action that answers a press by leaving the same error on screen reads as a dead button.
-   * Each caller is a person: the Settings button, the app menu, a member's request from a joined
-   * server, and the recovery when an older app opens newer data. So a release in its staged rollout
-   * is offered here, and also to the later checks and download retries of this session.
-   */
   checkForUpdates(): Effect.Effect<UpdateStatus, UpdateOperationFailure> {
     return this.#check(true);
   }
@@ -484,19 +412,12 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       if (this.#managedByHost || !this.#options.enabled || this.#teardownCommitted) return this.getStatus();
       if (this.#status.phase === "ready") return yield* this.#checkSupersedingRelease();
       if (["checking", "downloading", "installing"].includes(this.#status.phase)) {
-        // A download ends in "ready" or in a failure, and neither schedules a check, so the periodic
-        // loop has to outlive it here.
         if (this.#status.phase === "downloading" && !joinOutstandingRequest) {
           this.#scheduleCheck(this.#options.checkIntervalMs);
         }
         return this.getStatus();
       }
-      // electron-updater returns the outstanding promise when a check is already running, so issuing
-      // another one here would only re-await the call this service has already given up on. The
-      // periodic loop waits quietly for it rather than spinning the UI once every interval; a user
-      // who asked for an answer joins that call instead, and gets progress and its real outcome.
       if (this.#checkRequest && !joinOutstandingRequest) {
-        // Keep the periodic loop alive, or refusing here would be the last check of the session.
         this.#scheduleCheck(this.#options.checkIntervalMs);
         return this.getStatus();
       }
@@ -521,8 +442,6 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
           this.#markAvailable(result.updateInfo.version);
         } else {
           this.#downloadedVersion = null;
-          // Settings > Updates says that a check that a person asks for gets the release that the
-          // staged rollout left out. A paused release (0%) is not offered to any check, so it is not shown.
           if (this.#rolloutMiss && isNewerRelease(this.#rolloutMiss, this.#status.currentVersion))
             this.#stagedVersion = this.#rolloutMiss;
           this.#setStatus({
@@ -535,33 +454,20 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
           });
         }
       }
-      // downloadUpdate() moves into "downloading" before its first await, so the caller and the
-      // renderer see the download start rather than a stale "available".
       if (this.#autoDownload && this.#status.phase === "available")
         yield* Effect.forkIn(this.downloadUpdate(), this.#workScope, { startImmediately: true });
       return this.getStatus();
     });
   }
 
-  /**
-   * Installing a downloaded update that a newer release has superseded restarts into a version that
-   * is already out of date, and the next launch offers another update: one restart per release
-   * (issue #1192). This check runs without leaving "ready", so the restart action stays available,
-   * and replaces the download only with a newer release. A failed check keeps the download, which is
-   * still a valid update. With automatic downloads off the download stays as well: replacing it
-   * would take away the restart and start a transfer the user did not ask for.
-   */
   #checkSupersedingRelease(): Effect.Effect<UpdateStatus, UpdateOperationFailure> {
     return Effect.gen({ self: this }, function* () {
-      // Scheduled before the request, because a request that never settles must not end the loop.
       this.#scheduleCheck(this.#options.checkIntervalMs);
       if (!this.#autoDownload || this.#checkRequest) return this.getStatus();
       const downloaded = this.#downloadedVersion;
       const checked = yield* Effect.result(this.#issueCheck());
       if (Result.isFailure(checked)) return this.getStatus();
       const result = checked.success;
-      // An install can start, a host can take over, or the preference can change while the request
-      // is out. An install still in its sibling scan counts: it expects the download it was asked for.
       if (
         this.#status.phase !== "ready" ||
         this.#downloadedVersion !== downloaded ||
@@ -588,8 +494,6 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     return Effect.gen({ self: this }, function* () {
       if (this.#managedByHost) return this.getStatus();
       if (!this.#options.enabled || this.#teardownCommitted || !this.#canDownload()) return this.getStatus();
-      // Same deduplication applies to downloads, and starting a second attempt while the abandoned one
-      // is still unsettled is also what would let its buffered events be read as the new attempt's.
       if (this.#downloadInFlight) return this.getStatus();
       this.#downloadInFlight = true;
       const generation = ++this.#downloadGeneration;
@@ -612,7 +516,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
         if (Result.isFailure(result) && this.#downloadGeneration === generation) {
           logUpdateFailure("OpenBot update download failed.", result.failure.cause);
           this.#activeDownload = null;
-          this.#setError("download_failed");
+          this.#setError("download_failed", downloadFailureMessage(result.failure.cause));
         }
       }).pipe(
         Effect.ensuring(
@@ -654,6 +558,16 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
         logger.warn("OpenBot update install refused: the application runs from a read-only volume.");
         return yield* new UpdateOperationFailure({ cause: new Error(sourceText("error.update.readOnlyLocation")) });
       }
+      const appImage = this.#options.platform === "linux" ? this.#options.appImagePath : undefined;
+      const appImageProblem = appImage ? yield* findAppImageInstallProblem(appImage) : null;
+      if (appImageProblem === "missing") {
+        logger.warn("OpenBot update install refused: the AppImage file is missing.");
+        return yield* new UpdateOperationFailure({ cause: new Error(sourceText("error.update.appImageMissing")) });
+      }
+      if (appImageProblem === "readOnly") {
+        logger.warn("OpenBot update install refused: the AppImage folder is not writable.");
+        return yield* new UpdateOperationFailure({ cause: new Error(sourceText("error.update.appImageReadOnly")) });
+      }
       if (this.#managedByHost) return yield* new UpdateOperationFailure({ cause: new Error(MANAGED_HOST_MESSAGE) });
       if (!this.#canInstall() || this.#installStarted)
         return yield* new UpdateOperationFailure({ cause: new Error(sourceText("error.update.notReady")) });
@@ -664,17 +578,32 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       this.#setStatus({ phase: "installing", progress: 100, message: null, errorCode: null });
       const installed = yield* Effect.result(
         Effect.gen({ self: this }, function* () {
-          // Shutdown is irreversible. Keep the latch after failure and never restart a stale attempt.
           this.#teardownCommitted = true;
           yield* updateIO(() => this.#options.beforeInstall());
           if (this.#installGeneration !== generation) return;
           if (this.#checkRequest) yield* Deferred.await(this.#checkRequest).pipe(Effect.catch(() => Effect.void));
           if (this.#installGeneration !== generation) return;
           this.#installHandedOver = true;
-          // Silent, so the assisted Windows installer shows no page and opens the app again: it ignores
-          // the force-run flag in a visible run. Other updaters only relaunch, now from `true` and not
-          // from `autoRunAppAfterInstall`, which is also `true`.
-          yield* updateSync(() => this.#updater.quitAndInstall(true, true));
+          if (this.#options.platform === "darwin" && this.#options.handoverPath) {
+            yield* writeUpdateHandover(this.#options.handoverPath, this.#options.currentVersion, Date.now()).pipe(
+              Effect.catch((error) =>
+                Effect.sync(() => logger.warn("The update handover record was not saved.", toLogValue(error))),
+              ),
+            );
+          }
+          const { installRecordPath } = this.#options;
+          if (this.#options.platform === "darwin" && installRecordPath && this.#downloadedVersion) {
+            yield* writeUpdateInstallRecord(
+              installRecordPath,
+              this.#options.currentVersion,
+              this.#downloadedVersion,
+            ).pipe(
+              Effect.catch((error) =>
+                Effect.sync(() => logger.warn("The update install record was not saved.", toLogValue(error))),
+              ),
+            );
+          }
+          yield* updateSync(() => this.#updater.quitAndInstall(false, true));
           this.#armPhaseTimer();
         }),
       );
@@ -686,12 +615,6 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     }).pipe(Effect.uninterruptible);
   }
 
-  /**
-   * A refusal that says where the blocking session runs. Siblings in this account are usually a second
-   * window of this user, so the message points at it. Anything else is another macOS user, and
-   * the generic message keeps applying. An unknown uid cannot tell them apart, so it also keeps
-   * the generic message.
-   */
   #siblingSessionMessage(siblings: readonly OpenBotSiblingInstance[]): string {
     const currentUid = this.#options.currentUid;
     if (currentUid !== undefined && siblings.every((sibling) => sibling.uid === currentUid)) {
@@ -700,24 +623,14 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     return SIBLING_SESSION_MESSAGE;
   }
 
-  // A download in progress keeps running: a cancelled Windows logoff stops background work and
-  // leaves the app open, and a download or install after that must still work.
   stop(): Effect.Effect<void> {
     return Effect.sync(() => {
       if (this.#checkTimer) clearTimeout(this.#checkTimer);
       this.#checkTimer = null;
-      // An install runs shutdown preparation, which stops background work through this method. The
-      // install deadline has to survive that: it is the only thing that can release a restart which
-      // never happens, and clearing it here would leave the app latched in "installing" forever.
       if (this.#status.phase !== "installing") this.#clearPhaseTimer();
     });
   }
 
-  /**
-   * Issues the one outstanding request every caller shares. The handle is cleared when the call
-   * settles, so `#checkRequest` answers exactly the question the join above asks: is electron-updater
-   * still holding a promise that a fresh call would be answered by?
-   */
   #issueCheck(): Effect.Effect<UpdateCheckOutcome | null, UpdateOperationFailure> {
     return Effect.gen({ self: this }, function* () {
       if (this.#checkRequest) return yield* Deferred.await(this.#checkRequest);
@@ -725,7 +638,6 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       this.#checkRequest = request;
       this.#rolloutMiss = null;
       return yield* updateIO(() => this.#updater.checkForUpdates()).pipe(
-        // Logged once per request, here, because joined callers and the status keep only a message.
         Effect.tapError(({ cause }) => Effect.sync(() => logUpdateFailure("OpenBot update check failed.", cause))),
         Effect.onExit((exit) =>
           Effect.gen({ self: this }, function* () {
@@ -738,10 +650,6 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     });
   }
 
-  /**
-   * A person's check that the staged rollout left out asks again for that release. The second
-   * request also replaces a joined periodic request that ran the staged rollout test.
-   */
   #issueRequestedCheck(
     requested: boolean,
     generation: number,
@@ -756,7 +664,6 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     });
   }
 
-  /** True while the download the service still believes in is the one events are reporting on. */
   #isDownloadLive(): boolean {
     return this.#activeDownload !== null && this.#activeDownload === this.#downloadGeneration;
   }
@@ -774,22 +681,10 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     );
   }
 
-  /**
-   * Installing is one shot per session. beforeInstall is shutdown preparation - it flushes browser
-   * storage, destroys the browser and stops services - and it is not transactional, so once it has
-   * begun there is no state to safely retry from. A failed or timed-out install therefore keeps the
-   * latch and asks the user to relaunch rather than offering an action that would run teardown a
-   * second time, concurrently with the first.
-   */
   #canInstall(): boolean {
     return this.#downloadedVersion !== null && this.#status.phase === "ready";
   }
 
-  /**
-   * A cancellation token is single use, and electron-updater only mints one alongside update
-   * metadata. Re-check quietly when the stored token is missing or spent so that a retry after the
-   * stall watchdog cancelled the last attempt still downloads under a live token.
-   */
   #ensureCancellationToken(): Effect.Effect<UpdateCancellationToken | null, UpdateOperationFailure> {
     return Effect.gen({ self: this }, function* () {
       if (this.#cancellationToken && !this.#cancellationToken.cancelled) return this.#cancellationToken;
@@ -817,7 +712,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       phase: "ready",
       availableVersion: version,
       progress: 100,
-      message: null,
+      message: version !== null && version === this.#options.notInstalledVersion ? NOT_INSTALLED_MESSAGE : null,
       errorCode: null,
     });
   }
@@ -828,14 +723,9 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     this.#checkTimer.unref?.();
   }
 
-  /**
-   * Background work that nobody waits for, kept in this service's scope. A failure that the work
-   * did not record in the status is logged.
-   */
   #fork(work: Effect.Effect<unknown, UpdateOperationFailure>): void {
     Effect.runFork(
       Effect.forkIn(
-        // Logged as an error, as the unhandled rejection it replaces was; a stop is not a failure.
         work.pipe(
           Effect.catchCause((cause) =>
             Cause.hasInterruptsOnly(cause)
@@ -860,11 +750,6 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     this.#phaseTimer = null;
   }
 
-  /**
-   * Every phase that renders as busy is bounded here, so no status the user waits on can outlive its
-   * timeout. Re-armed on each status write, which makes download progress events refresh the stall
-   * deadline for free.
-   */
   #armPhaseTimer(): void {
     this.#clearPhaseTimer();
     const timeoutMs = this.#phaseTimeoutMs();
@@ -885,8 +770,6 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     if (this.#status.phase === "checking") {
       this.#checkGeneration += 1;
       this.#setError("check_failed", CHECK_STALLED_MESSAGE);
-      // The pending call never settles, so its finally block will not run. Without rescheduling
-      // here the app would silently stop checking for updates until it restarts.
       this.#scheduleCheck(this.#options.checkIntervalMs);
       return;
     }
@@ -899,8 +782,6 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       return;
     }
     if (this.#status.phase === "installing") {
-      // The latch deliberately stays set: shutdown preparation may already have torn services down,
-      // so a second attempt would run teardown concurrently with the first.
       this.#installGeneration += 1;
       this.#activeInstall = null;
       this.#setError("install_failed", INSTALL_FAILED_MESSAGE);
@@ -933,18 +814,13 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
 
 const INSTALL_FAILED_MESSAGE = sourceText("error.update.installFailed");
 const MANAGED_HOST_MESSAGE = sourceText("error.update.managedByHost");
+const NOT_INSTALLED_MESSAGE = sourceText("error.update.notInstalled");
 const SIBLING_SESSION_MESSAGE = sourceText("error.update.siblingSession");
 const CHECK_STALLED_MESSAGE = sourceText("error.update.checkStalled");
 const CHECK_OFFLINE_MESSAGE = sourceText("error.update.checkOffline");
 const CHECK_SERVICE_MESSAGE = sourceText("error.update.checkUnavailable");
 const CHECK_NO_RELEASE_MESSAGE = sourceText("error.update.checkNoRelease");
 
-/**
- * Node reports a link that never carried the request through `error.code`. electron-updater wraps
- * its own failures with a code of its own and keeps the original stack in the message, so the raw
- * text is searched as well: a wrapped `ENOTFOUND` is still a connectivity problem to the user, and
- * telling them to check the network is the one instruction that helps.
- */
 const OFFLINE_ERROR_CODES = [
   "EAI_AGAIN",
   "ECONNABORTED",
@@ -960,18 +836,12 @@ const OFFLINE_ERROR_CODES = [
   "ERR_NAME_NOT_RESOLVED",
 ];
 
-/** electron-updater codes that mean the feed answered but carried no release this build can use. */
 const NO_RELEASE_ERROR_CODES = [
   "ERR_UPDATER_CHANNEL_FILE_NOT_FOUND",
   "ERR_UPDATER_NO_PUBLISHED_VERSIONS",
   "ERR_UPDATER_INVALID_RELEASE_FEED",
 ];
 
-/**
- * What the user is told after a failed check. The three recoverable causes need different
- * instructions - a dropped link is theirs to fix, a refusing or unpublished feed is not - and
- * "Try again." on its own tells someone with no network to repeat the action that cannot work.
- */
 function describeCheckFailure(error: unknown) {
   const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "";
   const text = `${code} ${error instanceof Error ? error.message : String(error ?? "")}`;
@@ -980,18 +850,10 @@ function describeCheckFailure(error: unknown) {
   const status =
     typeof error === "object" && error !== null && "statusCode" in error ? Number(error.statusCode) : Number.NaN;
   if (status === 429 || status >= 500) return CHECK_SERVICE_MESSAGE;
-  // ERR_UPDATER_LATEST_VERSION_NOT_FOUND wraps whatever the release lookup threw, so it only lands
-  // here once the causes above have been ruled out of its message.
   if (code === "ERR_UPDATER_LATEST_VERSION_NOT_FOUND") return CHECK_SERVICE_MESSAGE;
   return errorMessage("check_failed");
 }
 
-/**
- * The status and `update.log` keep only a failure code. electron-updater puts its own code and the
- * HTTP status on the error, outside its message, so they are logged apart. The stack is left out:
- * an offline app fails a check each interval, and electron-updater already puts the stack of the
- * cause in the message.
- */
 function logUpdateFailure(text: string, error: unknown): void {
   const fields = typeof error === "object" && error !== null ? error : {};
   logger.warn(
@@ -1004,11 +866,6 @@ function logUpdateFailure(text: string, error: unknown): void {
   );
 }
 
-/**
- * Squirrel.Mac cannot replace an application on a read-only volume, and it finds this only inside
- * `quitAndInstall`, after shutdown preparation. macOS App Translocation runs a quarantined app from
- * such a volume, and so does an app opened from its disk image. Checked first, the app stays open.
- */
 function isOnReadOnlyVolume(bundlePath: string): Effect.Effect<boolean> {
   if (bundlePath.includes("/AppTranslocation/")) return Effect.succeed(true);
   return updateIO(() => access(bundlePath, constants.W_OK)).pipe(
@@ -1017,6 +874,32 @@ function isOnReadOnlyVolume(bundlePath: string): Effect.Effect<boolean> {
       Effect.succeed(typeof cause === "object" && cause !== null && "code" in cause && cause.code === "EROFS"),
     ),
   );
+}
+
+function findAppImageInstallProblem(appImagePath: string): Effect.Effect<"missing" | "readOnly" | null> {
+  return Effect.gen(function* () {
+    const missing = yield* updateIO(() => stat(appImagePath)).pipe(
+      Effect.as(false),
+      Effect.catch(({ cause }) => Effect.succeed(isMissingPathError(cause))),
+    );
+    if (missing) return "missing";
+    const writable = yield* updateIO(() => access(dirname(appImagePath), constants.W_OK)).pipe(
+      Effect.as(true),
+      Effect.catch(() => Effect.succeed(false)),
+    );
+    return writable ? null : "readOnly";
+  });
+}
+
+function isMissingPathError(cause: unknown): boolean {
+  const code = typeof cause === "object" && cause !== null && "code" in cause ? cause.code : undefined;
+  return code === "ENOENT" || code === "ENOTDIR";
+}
+
+/** The download finished, but the Windows signature check did not accept the installer (`NsisUpdater`). */
+function downloadFailureMessage(error: unknown): string | undefined {
+  const code = typeof error === "object" && error !== null && "code" in error ? error.code : undefined;
+  return code === "ERR_UPDATER_INVALID_SIGNATURE" ? sourceText("error.update.signatureNotConfirmed") : undefined;
 }
 
 function errorMessage(code: UpdateFailureCode) {
@@ -1059,50 +942,24 @@ const decodePendingUpdateInfo = Schema.decodeUnknownEffect(
   Schema.fromJsonString(Schema.Struct({ fileName: Schema.String })),
 );
 
-/**
- * electron-updater keeps the download in `pending` after the install, which leaves a full release
- * artifact on disk until the next download (issue #2939). This removes it once the running version
- * has caught up, and keeps a newer download that still waits for its restart. `update.zip` beside it
- * stays: it is the base of the next differential download on macOS.
- */
 function pruneInstalledUpdate(directory: string, currentVersion: string): Effect.Effect<void, never> {
   return Effect.gen(function* () {
     const pending = join(directory, "pending");
     const text = yield* updateIO(() => readFile(join(pending, "update-info.json"), "utf8"));
     const { fileName } = yield* decodePendingUpdateInfo(text);
-    // electron-builder.yml names each artifact `${productName}-${version}-${arch}.${ext}`.
     const version = /-(\d+\.\d+\.\d+)-/u.exec(fileName)?.[1];
     if (version === undefined || isNewerRelease(version, currentVersion)) return;
-    // The marker goes last: when Windows still locks the installer, the next start tries again.
-    // Only these two files go, so a download that this session has started keeps its temp file.
     yield* updateIO(() => rm(join(pending, basename(fileName)), { force: true }));
     yield* updateIO(() => rm(join(pending, "update-info.json"), { force: true }));
   }).pipe(Effect.catch(() => Effect.void));
 }
 
-/**
- * Compares the release numbers only. The feed offers no prereleases (`allowPrerelease` is off), so
- * a candidate with the same numbers is not newer. A stale feed answer that names an older release
- * must not replace a newer download.
- */
-/** The rollout percentage as electron-updater reads it, or null when the release has no stage. */
 function stagingPercentage(value: unknown): number | null {
   if (value === null || value === undefined) return null;
   const percentage = Number.parseInt(String(value), 10);
   return Number.isNaN(percentage) ? null : percentage;
 }
 
-function isNewerRelease(candidate: string, current: string): boolean {
-  const parse = (version: string) => version.split(/[-+]/u, 1)[0]?.split(".").map(Number) ?? [];
-  const [left, right] = [parse(candidate), parse(current)];
-  for (let index = 0; index < 3; index += 1) {
-    const difference = (left[index] ?? 0) - (right[index] ?? 0);
-    if (difference !== 0) return difference > 0;
-  }
-  return false;
-}
-
-/** A percent that is not a number means that the download runs but its progress is not known. */
 function clampProgress(value: number): number | null {
   return Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(value))) : null;
 }

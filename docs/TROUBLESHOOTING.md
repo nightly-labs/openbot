@@ -79,7 +79,8 @@ start stops in its first 30 seconds, OpenBot writes `gpu-crash.json` or `gpu-sta
 `~/.config/OpenBot`. While one of these files is there, OpenBot renders on the CPU. A start that
 stops with no crash, for example a kill or a power loss, gets one more try with the GPU; a second
 stop in a row turns it off. An update with a new Chromium version tries the GPU again. A GPU process restart after a lost GPU context, for example
-after suspend, does not count. A server (`OPENBOT_SERVER=1` or a hosted server) always renders on the
+after suspend, does not count. A GPU process that stops while OpenBot quits or the computer shuts down
+or restarts does not count either. A server (`OPENBOT_SERVER=1` or a hosted server) always renders on the
 CPU, and its browser runs WebGL on the CPU (SwiftShader) for sites such as the Figma editor. A GPU
 process crash on a server writes `gpu-crash.json` and turns off WebGL at the next start. Chromium
 also renders on the CPU when it blocks the GPU driver, for example in a remote desktop.
@@ -210,6 +211,19 @@ On Windows, the same file is at `%APPDATA%\OpenBot\openbot.db`.
 Report the field the message names, together with the details below. The output holds your own file
 paths, so review it before you publish it.
 
+## OpenBot did not open, several times in a row
+
+When one version stops before it opens several times in a row, the next start shows a recovery
+window. Your local data was not reset or overwritten. The window lets you try again, export the
+diagnostics, open the data folder, or download a version.
+
+The window offers the previous version only when that version can open your data. Each version
+keeps a list of the database changes that it knows, and a version cannot open data that a newer
+version changed. OpenBot reads the newest change in your data, without a write, and compares it with
+the last version that opened. When that version cannot open the data, or when OpenBot is not sure,
+the window offers the latest version instead. An older version would only stop again with the
+message below.
+
 ## OpenBot says a newer version saved your data
 
 An older OpenBot started after a newer one opened your data, for example from an old shortcut or a
@@ -219,6 +233,12 @@ it writes anything. Your data is intact.
 Do not follow the reset steps below, and do not move the folder. When in-app updates and automatic
 downloads are on, OpenBot installs the latest version and opens again. Otherwise, or when the
 update fails, install the latest version from [openbot.run/download](https://openbot.run/download).
+
+When the latest version is the one that did not open several times in a row, OpenBot does not install
+it again. It says that the latest OpenBot did not open, and it keeps your data as it is. Install a
+version newer than the one it names when one is available on the
+[releases page](https://github.com/nightly-labs/openbot/releases), and report the problem with the
+details below.
 
 Then remove the older copy. On Windows, look for a second OpenBot in Settings → Apps, and pin the
 new OpenBot again if a taskbar or desktop shortcut opens the old one. Older versions show the
@@ -234,7 +254,7 @@ A routine runs only while the computer is awake and OpenBot is open.
 - After OpenBot was closed, the routine setting "If OpenBot was closed at the scheduled time"
   decides: skip the run, or run it one time when OpenBot opens.
 
-On macOS and Windows, turn on Settings → General → **Keep this computer awake**. While the computer
+On macOS and Windows, turn on Settings → App behavior → **Keep this computer awake**. While the computer
 is connected to power, it then does not sleep when idle. The display can still turn off. A closed
 laptop lid, or a sleep that you select, still sleeps the computer, unless macOS uses an external
 display (closed-display mode). On battery power, the computer sleeps as usual, unless you also turn

@@ -24,8 +24,6 @@ const discordRouteSchema = z.object({
     .max(DISCORD_ROUTE_GUILDS_LIMIT),
 });
 
-// Signal asks this while it starts: it lost the revocations it had in memory, so it accepts from a
-// route ticket only the guilds that D1 still links to that host with the same link.
 export const Route = createFileRoute("/v2/remote/discord-route/validate")({
   server: {
     handlers: {

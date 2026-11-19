@@ -10,29 +10,12 @@ import {
   type ScreenCaptureSources,
 } from "../backend/agent/screen-capture";
 
-/**
- * Captures the desktop for `capture_screen` with Electron's `desktopCapturer`.
- *
- * A display is captured at its own pixels: a thumbnail of the display's size in points times its
- * scale factor. A region is cut from the capture of the one display that holds it, so a region on a
- * secondary display or on a display with another scale factor comes out at that display's pixels.
- *
- * On macOS the Screen Recording grant is read before each capture. Without it macOS gives only the
- * wallpaper, and a capture of the wallpaper must not reach the model as if it were the screen.
- */
-
 const logger = createOpenBotLogger("screen-capture");
 
-/** The same bound as a browser screenshot: a larger image costs the model more than it shows it. */
 const MAX_CAPTURE_PIXELS = 4_194_304;
 const MAX_LISTED_WINDOWS = 100;
-/**
- * The thumbnail box for a window capture. `desktopCapturer` draws every open window at this size to
- * return one, so the box stays small. A window keeps its aspect ratio inside the box.
- */
 const WINDOW_THUMBNAIL_SIZE = { width: 1920, height: 1920 };
 
-/** The part of a `NativeImage` that a capture uses, so a test can pass a double. */
 export interface CaptureImage {
   isEmpty(): boolean;
   getSize(): { width: number; height: number };
@@ -41,16 +24,13 @@ export interface CaptureImage {
   toPNG(): Uint8Array;
 }
 
-/** The part of a `DesktopCapturerSource` that a capture uses. */
 interface CaptureSource {
   id: string;
   name: string;
-  /** The `Display.id` of a screen source, as a string. Empty for a window, and on some Linux desktops. */
   display_id: string;
   thumbnail: CaptureImage;
 }
 
-/** The part of an Electron `Display` that a capture uses. */
 interface CaptureDisplay {
   id: number;
   label: string;
@@ -60,7 +40,6 @@ interface CaptureDisplay {
 
 export interface ScreenCapturerOptions {
   platform: NodeJS.Platform;
-  /** `systemPreferences.getMediaAccessStatus("screen")`. Read on macOS only. */
   screenAccess: () => string;
   displays: () => CaptureDisplay[];
   primaryDisplayId: () => number;
@@ -74,7 +53,6 @@ function failure(reason: string) {
   return new ScreenCaptureFailed({ reason });
 }
 
-/** The cause stays in the log. The agent gets only the safe reason. */
 function captureFailed(operation: string) {
   return (cause: unknown) => {
     logger.warn("A screen capture failed.", { operation, cause: toLogValue(cause) });
@@ -98,7 +76,6 @@ function contains(outer: ScreenCaptureRectangle, inner: ScreenCaptureRectangle):
   );
 }
 
-/** The region in the pixels of the display capture. The scale is read from the image, not assumed. */
 function regionPixels(
   display: CaptureDisplay,
   image: { width: number; height: number },
@@ -161,7 +138,6 @@ export class ScreenCapturer implements ScreenCaptureHost {
     });
   }
 
-  /** True on macOS without the grant, until the first capture of this process asked for it. */
   promptsForPermission(): Effect.Effect<boolean> {
     return Effect.sync(() => {
       if (this.#options.platform !== "darwin" || this.#askedForPermission) return false;
@@ -202,7 +178,6 @@ export class ScreenCapturer implements ScreenCaptureHost {
       );
     }
     const sources = yield* this.#sources(["screen"], nativeSize(display));
-    // Some Linux desktops give no display id. With one display there is only one screen to take.
     const source =
       sources.find(({ display_id }) => display_id === String(display.id)) ??
       (displays.length === 1 && sources.length === 1 ? sources[0] : undefined);
@@ -220,13 +195,6 @@ export class ScreenCapturer implements ScreenCaptureHost {
     );
   });
 
-  /**
-   * macOS asks the user for Screen Recording the first time an app captures, and gives only the
-   * wallpaper until the user grants it. Chromium reads the grant as granted or denied only, so a
-   * grant that was never asked for also reads as denied. The first refusal in this process makes one
-   * capture whose result is thrown away, which shows the macOS prompt when the user was never asked.
-   * Only a capture that the user approved does this: a list of the sources never asks (#9092).
-   */
   readonly #requirePermission = Effect.fn("ScreenCapturer.requirePermission")(function* (
     this: ScreenCapturer,
     ask: boolean,
@@ -254,7 +222,6 @@ export class ScreenCapturer implements ScreenCaptureHost {
     });
   }
 
-  /** An empty image is a capture that the system refused, not a black screen. */
   #nonEmpty(image: CaptureImage): Effect.Effect<CaptureImage, ScreenCaptureFailed> {
     if (!image.isEmpty()) return Effect.succeed(image);
     return Effect.fail(

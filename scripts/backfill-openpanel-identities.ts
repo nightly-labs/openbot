@@ -222,9 +222,7 @@ async function readRecords(path: string, label: string): Promise<unknown[]> {
   try {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) return parsed;
-  } catch {
-    // Fall through to newline-delimited JSON.
-  }
+  } catch {}
   try {
     return raw
       .split(/\r?\n/u)

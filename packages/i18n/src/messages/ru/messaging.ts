@@ -16,4 +16,6 @@ export const messages = {
     "OpenBot не может прочитать сохранённые токены на этом компьютере. Отключите сервер Discord и подключите его снова.",
   "messaging.discordHelp.relay_unavailable":
     "OpenBot не может получать события Discord на этом компьютере. Войдите в аккаунт, задайте компьютеру имя в настройках сервера и не закрывайте OpenBot.",
+  "messaging.discordHelp.not_linked":
+    "Этот сервер Discord не связан с этим сервером OpenBot. Выберите «Переподключить», чтобы связать его.",
 } as const satisfies PartialTranslation<typeof source>;

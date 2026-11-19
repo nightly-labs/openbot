@@ -21,6 +21,13 @@ export const messages = {
   "error.remote.testActive": "בדיקת שולחן עבודה מרוחק פעילה. יש לנסות שוב כשהיא תסתיים.",
   "error.remote.screenRecordingDenied":
     "המארח לא אישר ל-OpenBot להקליט את המסך שלו. יש לאשר הקלטת מסך במארח ולנסות שוב.",
+  "error.remote.windowsSessionDisconnected":
+    "הסשן של Windows במארח מנותק, ולכן אין מסך לשיתוף. יש להיכנס ל-Windows במסך של המארח ולנסות שוב.",
+  "error.remote.macScreenLocked":
+    "ה-Mac נעול, ולכן אינו יכול לשתף את המסך שלו. יש לבטל את נעילת ה-Mac במסך שלו ולנסות שוב.",
+  "error.remote.streamTooSlowLowerQuality":
+    "החיבור למארח איטי מדי בשביל התמונה. יש לנסות שוב: החיבור הבא ישתמש באיכות נמוכה יותר.",
+  "error.remote.streamTooSlow": "החיבור למארח איטי מדי בשביל התמונה. יש להשתמש ברשת מהירה יותר ולנסות שוב.",
   "error.remote.teamSessionExpired": "הסשן של הצוות פג.",
   "error.remote.finishTestBeforeSwitch": "יש לסיים את בדיקת שולחן העבודה המרוחק לפני החלפת תצוגות.",
   "error.remote.displayNotFound": "התצוגה המרוחקת לא נמצאה.",
@@ -77,10 +84,13 @@ export const messages = {
   "error.remote.ownerOnlyRemove": "רק הבעלים יכול להסיר את השרת הזה.",
   "error.remote.requestTimeout": "הבקשה המרוחקת חרגה ממגבלת הזמן.",
   "error.remote.requestFailed": "הבקשה המרוחקת נכשלה.",
-  "error.remote.pinnedKeyMissing": "למארח המרוחק אין מפתח מכשיר מוצמד.",
+  "error.remote.hostKeyMissing":
+    "OpenBot לא יכול לאמת את השרת הזה, כי מפתח האבטחה שלו חסר או השתנה. בקשו מבעל השרת לבדוק את השרת.",
+  "error.remote.connectionNotStarted":
+    "OpenBot לא הצליח להתחיל את החיבור לשרת הזה. אם הבעיה נמשכת, צאו מ-OpenBot ופתחו אותו שוב.",
   "error.remote.hostDidNotConnect": "מארח ה-WebRTC לא התחבר.",
   "error.remote.connectionCancelled": "החיבור המרוחק בוטל.",
-  "error.remote.hostDisconnected": "מארח ה-WebRTC התנתק.",
+  "error.remote.hostDisconnected": "החיבור לשרת נותק. יש לבדוק אם הפעולה הושלמה ואז לנסות שוב.",
   "error.remote.eventGap": "ברצף האירועים של המארח יש פער.",
   "error.remote.malformedKnownEvent": "המארח החזיר אירוע מוכר שגוי.",
   "error.remote.fileTransportIsStopped": "שכבת העברת הקבצים של WebRTC נעצרה.",
@@ -145,6 +155,7 @@ export const messages = {
   "error.remote.attachmentRejected": "המארח דחה את הקובץ המצורף.",
   "error.remote.attachmentTooLarge": "קבצים מצורפים צריכים להיות בגודל 10 MB לכל היותר.",
   "error.remote.attachmentBusy": "יש להמתין לסיום הקובץ המצורף הנוכחי.",
+  "error.remote.attachmentChanged": "הקובץ השתנה או שאינו זמין. יש לבחור אותו שוב.",
   "error.remote.uploadTimeout": "העלאת הקובץ המצורף חרגה ממגבלת הזמן.",
   "error.remote.hostSessionActive": "במארח כבר יש סשן מרוחק פעיל.",
   "error.remote.tooManyConnections": "יותר מדי חיבורים מרוחקים פעילים.",
@@ -173,6 +184,8 @@ export const messages = {
   "error.remote.relayUnavailable": "Signal לא שלח שרתי ממסר לחיבור הזה. יש לנסות שוב מאוחר יותר.",
   "error.remote.iceFailed": "לא ניתן היה ליצור חיבור ישיר למארח. חומת אש, VPN או שרת proxy יכולים לחסום אותו.",
   "error.remote.iceDisconnected": "החיבור הישיר למארח אבד.",
+  "error.remote.webrtcBlocked":
+    "המכשיר הזה חוסם את החיבור ש-OpenBot צריך. אם מצב נעילה מופעל, כבה אותו עבור OpenBot בהגדרות > פרטיות ואבטחה > מצב נעילה.",
   "error.remote.directoryUnreachable": "OpenBot לא הצליח להגיע לשירות OpenBot. יש לבדוק את החיבור.",
   "error.remote.directoryTimeout": "שירות OpenBot לא ענה בזמן. יש לנסות שוב.",
   "error.remote.inviteAlreadyUsed": "ההזמנה הזו כבר נוצלה. יש לבקש הזמנה חדשה.",
@@ -193,7 +206,9 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "יש לעדכן את שרת שולחן העבודה הזה כדי למחוק ערוצים.",
   "error.remote.historyRefreshFailed": "ההודעה נשלחה, אבל לא ניתן היה לרענן את היסטוריית הצ'אט.",
   "error.remote.taskHistoryRefreshFailed": "המשימה שונתה, אבל לא ניתן היה לרענן את היסטוריית הצ'אט.",
-  "error.remote.localServerStartFailed": "השרת במחשב הזה לא הופעל.",
+  "error.remote.serverNotLoaded": "לא ניתן היה לטעון את השרת. יש לנסות שוב.",
+  "error.remote.localServerNotStarted":
+    "השרת במחשב הזה לא הופעל. יש לנסות שוב. אם הוא לא מופעל, יש להפעיל מחדש את OpenBot במחשב הזה.",
   "error.remote.localServerNotFound": "השרת הזה אינו במחשב הזה.",
   "error.remote.localServerAccountRemovalFailed":
     "השרת נמחק במחשב שלו, אבל החשבון עדיין מציג אותו. יש למחוק אותו שוב כדי להסיר אותו מהחשבון.",

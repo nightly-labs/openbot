@@ -155,6 +155,12 @@ about 10 seconds. In Docker, the container must have a restart policy, such as `
 unless-stopped`; without one, the container stays stopped. When the server does not answer, use
 `sudo openbot restart`.
 
+When the start of OpenBot fails again and again, the service stops, and systemd does not start it again
+(see [Start loop](hosted-servers.md#start-loop)). `openbot status` then says so. Read the reason with
+`openbot logs`. Install a newer release with `sudo openbot update`, or try again with
+`sudo openbot restart`. The update timer also starts the service again about each hour, with a
+newer release when one is staged.
+
 Run the account commands with `sudo` or as the service user. Other users cannot open the control
 socket.
 
@@ -165,7 +171,7 @@ A self-hosted server uses the memory guards of a hosted server (see
 again when memory is available. A message from a person starts first. The browser opens no new tab
 and unloads idle pages sooner. By default, a fixed number of turns run at the same time: 2 up to
 5 GiB of memory, 8 up to 10 GiB, and 16 above. An owner or admin can choose another number, 1 to 128, or
-Unlimited, in Server Settings > General > Threads at the same time. Low memory still holds a new turn.
+Unlimited, in Server Settings > Agent defaults > Threads at the same time. Low memory still holds a new turn.
 
 The memory ceiling is the smaller of the machine memory and the limit of `openbot.service`
 (`MemoryMax=90%`). To give OpenBot less memory, lower the limit with
@@ -247,7 +253,7 @@ An image costs `⌈width / 28⌉ × ⌈height / 28⌉` visual tokens on Claude. 
 
 ### Screenshots and clicks
 
-The computer use driver (cua-driver, `cua-driver-rs-v0.41.3`) has two screenshots on Linux:
+The computer use driver (cua-driver, `cua-driver-rs-v0.52.9`) has two screenshots on Linux:
 
 - **One window** (`get_window_state`). The driver makes the image 1.15 megapixels or less, with a long
   edge of 1568 px or less, and changes the x and y of each click back to screen pixels. A 1260x780
@@ -313,7 +319,8 @@ installs the packages in `packages.txt`, copies the release to `/opt/OpenBot/app
 scripts, the AppArmor profile and the units. It writes `self` to `/opt/OpenBot/hosted/mode` and
 links `/usr/local/bin/openbot`.
 
-On Ubuntu 26.04, the install also adds one rule to `/etc/apparmor.d/local/bwrap-userns-restrict`:
+When Ubuntu's `bwrap-userns-restrict` profile is loaded (the default on Ubuntu 26.04), the install
+and each start of OpenBot add one rule to `/etc/apparmor.d/local/bwrap-userns-restrict`:
 `priority=1 allow pix /** -> &bwrap,`. The Ubuntu profile of `/usr/bin/bwrap` removes all
 capabilities from the programs that `bwrap` starts, and the Claude sandbox ("Workspace only") needs
 `CAP_SYS_ADMIN` there. With the rule, those programs keep the profile of `bwrap`, for all users of
@@ -328,12 +335,16 @@ The server has two Xvfb displays, one in each of two nested `xvfb-run` commands 
 authority file. The outer one starts the agent display, at the [display size](#display-size), and
 the script names it in `OPENBOT_AGENT_DISPLAY`. The inner one starts the display that OpenBot shows
 its windows on, at 1280x800. Main gives that display to Computer Use, to remote desktop and to the agent
-processes, so an agent's screenshot and remote desktop do not show the OpenBot window. See
+processes, so an agent's screenshot and remote desktop do not show the OpenBot window. The agent
+display has a window manager (Openbox) and a dark background with the OpenBot logo: windows have
+title bars, and a right-click on the empty screen opens a menu with a terminal and a file manager. See
 [Computer Use and remote desktop](architecture/computer-use.md#agent-display-on-a-server).
 
 Updates work as on a hosted server (see [Updates](hosted-servers.md#updates)): the timer stages a
 new release, and it starts at the next boot, or when an owner, an admin or a permitted member
-installs it in Server Settings > Updates. `sudo openbot update` stages, stops the service, applies
+installs it in Server Settings > Updates. When an owner turns on the automatic update switch (it is
+off by default), the server also installs it when it is idle. A hosted server always does this, and
+also waits until no connected client uses it. `sudo openbot update` stages, stops the service, applies
 and starts the service again. When a step fails or a signal stops it, the command completes an
 interrupted copy, starts the service, and exits with an error.
 

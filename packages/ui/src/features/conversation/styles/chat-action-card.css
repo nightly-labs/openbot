@@ -1,7 +1,3 @@
-/* Chat action card: the shell of a chat record the person can act on. Variants add a body. */
-
-/* Keyboard focus is a muted ring: an accent ring looks like a selection here. The same weight as
- * the accent outline rule in auth.css, which loads earlier. */
 .chat-action-card :is(button, input, textarea):focus-visible {
   outline: 0;
 }
@@ -82,7 +78,6 @@
   line-height: var(--openbot-leading-md);
 }
 
-/* Without a status the footer holds only its empty live region, so it takes no space. */
 .chat-action-card-footer-empty {
   min-height: 0;
   margin-top: calc(-1 * var(--openbot-space-3));
@@ -112,7 +107,6 @@
   text-decoration: line-through;
 }
 
-/* Open points to the end side. */
 :dir(rtl) .chat-action-card-open svg[class~="lucide-chevron-right"] {
   transform: scaleX(-1);
 }

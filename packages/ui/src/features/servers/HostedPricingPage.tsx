@@ -1,4 +1,5 @@
 import { BILLING_PLANS, type BillingCurrency, type BillingPlanId } from "@openbot/contracts/billing";
+import { isWithdrawalConsumer } from "@openbot/contracts/billing-details";
 import type { HostedServerCatalogPlan } from "@openbot/contracts/hosted-servers";
 import { LICENSE_MAX_USERS, type LicenseTier, type PricingOrder } from "@openbot/contracts/license";
 import {
@@ -18,30 +19,22 @@ import {
   TriangleAlert,
 } from "@openbot/ui";
 import type { UserErrorDetails } from "@openbot/user-errors";
-import { type Accessor, createSignal, createUniqueId, Show, untrack } from "solid-js";
+import { type Accessor, createEffect, createSignal, createUniqueId, Show, untrack } from "solid-js";
 import { useText } from "../../text";
+import { type BillingDetailsDraft, BillingDetailsFields, billingDetailsRequest } from "../billing/BillingDetailsFields";
 import { OrderForm, type OrderFormOrder } from "../billing/OrderForm";
 import { PageHeader, type PageHeaderFrame } from "../window/PageHeader";
 import { AddServerOtherOptions } from "./AddServerDialog";
 
-/**
- * Like loot rarity in a game: a bigger order gives a rarer colour to the glow of the form, as on the web pricing
- * page (`apps/auth-api/src/components/pricing/PricingPage.tsx`). The steps are silver, sky, blue, violet, pink and
- * orange.
- */
 const RARITY = ["154, 163, 184", "56, 168, 255", "56, 71, 255", "164, 108, 245", "236, 72, 153", "255, 106, 43"];
 
-/** A license moves the colour: Standard with the Team license is pink, and Pro with it is orange. */
 const LICENSE_RARITY_STEPS: Record<LicenseTier | "none", number> = { none: 0, starter: 1, team: 2 };
 
-/** Yearly billing, the Standard server and the Team license are the default, as on the web page. */
 const FIRST_SERVER: BillingPlanId = "standard";
 const FIRST_LICENSE: LicenseTier = "team";
 
-/** The largest team that the page sells to. A larger team contacts sales. */
 const PRICING_MAX_MEMBERS = Math.max(LICENSE_MAX_USERS, ...BILLING_PLANS.map((plan) => plan.memberLimit));
 
-/** Private-use characters that mark where the two links go in the consent sentence of each language. */
 const CONSENT_POLICY_MARKER = "";
 const CONSENT_TERMS_MARKER = "";
 const CONSENT_MARKERS = new RegExp(`(${CONSENT_POLICY_MARKER}|${CONSENT_TERMS_MARKER})`);
@@ -49,30 +42,21 @@ const CONSENT_MARKERS = new RegExp(`(${CONSENT_POLICY_MARKER}|${CONSENT_TERMS_MA
 export interface HostedPricingPageProps {
   plans: readonly HostedServerCatalogPlan[];
   currency?: BillingCurrency | undefined;
-  /** A Stripe customer pays in one currency, so an account with open subscriptions cannot change it. */
   currencyLocked?: boolean | undefined;
-  /** The people who use the account's servers now. A license must be for at least this many users. */
   used?: number | undefined;
   licenseTrialEnd?: number | undefined;
-  /** False when the account has its own license: the order then starts without one. */
   offerLicense: boolean;
-  /** True in the desktop app, which runs on the user's computer. The web client has no computer of its own. */
   thisComputer: boolean;
-  /** Set when the account has as many hosted servers as it can have. */
   serverLimit?: number | null | undefined;
-  /**
-   * True when the page covers the whole app frame. Without it, the page fills its parent, such as the card of the
-   * app window.
-   */
   overlay?: boolean | undefined;
-  /** In the top row of the app window, the header has no Back button, as on the other pages of the window. */
   headerFrame?: PageHeaderFrame | undefined;
-  /** True while the order goes to the payment page. */
   busy: boolean;
   error: UserErrorDetails | null;
-  /** The title of the error. Without it, the title says that the server could not be created. */
   errorTitle?: string | undefined;
-  onSubmit: (order: PricingOrder) => void;
+  billingDetails?: BillingDetailsDraft | undefined;
+  initialOrder?: PricingOrder | undefined;
+  onBillingDetailsChange?: ((details: BillingDetailsDraft) => void) | undefined;
+  onSubmit: (order: PricingOrder, consent: OrderConsent) => void;
   onClose: () => void;
   onOpenPrivacy: () => void;
   onOpenTerms: () => void;
@@ -83,20 +67,28 @@ export interface HostedPricingPageProps {
   onJoinWithInvite?: (() => void) | undefined;
 }
 
-/**
- * The web pricing page in the app window, with the same layout: the switches, the order form, and Enterprise. The
- * app's page header takes the place of the site header and the big heading. The app is already on the user's computer, so it does not say that personal use is free.
- */
+export interface OrderConsent {
+  earlyStart: boolean;
+}
+
 export function HostedPricingPage(props: HostedPricingPageProps) {
   const { t } = useText();
-  const initialLicense = untrack(() => (props.offerLicense ? FIRST_LICENSE : null));
+  const initialOrder = untrack(() => props.initialOrder);
+  const initialServer = initialOrder ? initialOrder.server : FIRST_SERVER;
+  const initialLicense = untrack(() =>
+    props.offerLicense ? (initialOrder ? (initialOrder.license?.tier ?? null) : FIRST_LICENSE) : null,
+  );
   const [order, setOrder] = createSignal<{ server: BillingPlanId | null; license: LicenseTier | null }>({
-    server: FIRST_SERVER,
+    server: initialServer,
     license: initialLicense,
   });
-  // The tick stays when the buyer changes the order.
   const [accepted, setAccepted] = createSignal(false);
-  /** The switches of the order go in the header, as the filters of the usage page do. */
+  const earlyStartAsked = () =>
+    order().server !== null && props.serverLimit == null && isWithdrawalConsumer(props.billingDetails);
+  const [earlyStart, setEarlyStart] = createSignal(false);
+  createEffect(earlyStartAsked, (asked) => {
+    if (!asked) setEarlyStart(false);
+  });
   const [controlsMount, setControlsMount] = createSignal<HTMLElement>();
 
   const accent = () => {
@@ -110,9 +102,14 @@ export function HostedPricingPage(props: HostedPricingPageProps) {
       order={current}
       accepted={accepted}
       onAccept={setAccepted}
+      earlyStartAsked={earlyStartAsked()}
+      earlyStart={earlyStart}
+      onEarlyStart={setEarlyStart}
       busy={props.busy}
       serverBlocked={props.serverLimit != null}
       thisComputer={props.thisComputer}
+      billingDetails={props.billingDetails}
+      onBillingDetailsChange={props.onBillingDetailsChange}
       onSubmit={props.onSubmit}
       onClose={props.onClose}
       onOpenPrivacy={props.onOpenPrivacy}
@@ -129,7 +126,6 @@ export function HostedPricingPage(props: HostedPricingPageProps) {
       )}
     </Show>
   );
-  // The order goes to the payment page: the page stays open until it is there, as Escape does.
   const back = () => {
     if (!props.busy) props.onClose();
   };
@@ -165,7 +161,6 @@ export function HostedPricingPage(props: HostedPricingPageProps) {
         </Show>
       </PageHeader>
       <div class="hosted-pricing-scroll">
-        {/* The accent colour of the whole page follows the size of the order. */}
         <div class="hosted-pricing-hero" style={{ "--hosted-pricing-accent": accent() }}>
           <Show when={props.serverLimit ?? null}>
             {(limit) => (
@@ -210,8 +205,10 @@ export function HostedPricingPage(props: HostedPricingPageProps) {
             currencyLocked={props.currencyLocked}
             used={props.used}
             licenseTrialEnd={props.licenseTrialEnd}
-            initialServer={FIRST_SERVER}
+            initialServer={initialServer}
             initialLicense={initialLicense}
+            initialInterval={initialOrder?.interval}
+            initialUsers={initialOrder?.license?.users}
             noServerTitle={noServerTitle()}
             controlsMount={controlsMount()}
             action={action}
@@ -239,19 +236,19 @@ export function HostedPricingPage(props: HostedPricingPageProps) {
   );
 }
 
-/**
- * The consent and the buy button of the web page. The buyer accepts the privacy policy, the terms and the right of
- * withdrawal first. Without a server and a license, the button closes the page.
- */
 function OrderAction(props: {
   order: Accessor<OrderFormOrder>;
   accepted: Accessor<boolean>;
   onAccept: (accepted: boolean) => void;
+  earlyStartAsked: boolean;
+  earlyStart: Accessor<boolean>;
+  onEarlyStart: (asked: boolean) => void;
   busy: boolean;
-  /** At the server limit, an order with a server cannot go on. */
   serverBlocked: boolean;
   thisComputer: boolean;
-  onSubmit: (order: PricingOrder) => void;
+  billingDetails: BillingDetailsDraft | undefined;
+  onBillingDetailsChange: ((details: BillingDetailsDraft) => void) | undefined;
+  onSubmit: (order: PricingOrder, consent: OrderConsent) => void;
   onClose: () => void;
   onOpenPrivacy: () => void;
   onOpenTerms: () => void;
@@ -260,7 +257,14 @@ function OrderAction(props: {
   const id = `hosted-pricing-consent-${createUniqueId()}`;
   const buying = () => props.order().server !== null || props.order().license !== null;
   const label = () => (props.order().server === null ? t("billing.order.cta.license") : t("billing.order.cta.server"));
-  const blocked = () => !props.accepted() || props.busy || (props.serverBlocked && props.order().server !== null);
+  const detailsMissing = () =>
+    props.billingDetails !== undefined && billingDetailsRequest(props.billingDetails) === null;
+  const blocked = () =>
+    !props.accepted() ||
+    (props.earlyStartAsked && !props.earlyStart()) ||
+    props.busy ||
+    detailsMissing() ||
+    (props.serverBlocked && props.order().server !== null);
   const keepContent = () =>
     props.thisComputer ? (
       <>
@@ -303,6 +307,15 @@ function OrderAction(props: {
   return (
     <Show when={buying()} fallback={keep()}>
       <div class="hosted-pricing-consent-action">
+        <Show when={props.billingDetails}>
+          {(details) => (
+            <BillingDetailsFields
+              value={details()}
+              disabled={props.busy}
+              onChange={(next) => props.onBillingDetailsChange?.(next)}
+            />
+          )}
+        </Show>
         <div class="hosted-pricing-consent">
           <Checkbox
             id={id}
@@ -314,11 +327,22 @@ function OrderAction(props: {
             {pieces().map(part)}
           </label>
         </div>
+        <Show when={props.earlyStartAsked}>
+          <div class="hosted-pricing-consent">
+            <Checkbox
+              id={`${id}-early-start`}
+              checked={props.earlyStart()}
+              disabled={props.busy}
+              onChange={(event) => props.onEarlyStart(event.currentTarget.checked)}
+            />
+            <label for={`${id}-early-start`}>{t("sitePage.pricing.consent.earlyStart")}</label>
+          </div>
+        </Show>
         <Button
           class="hosted-pricing-pill hosted-pricing-cta"
           disabled={blocked()}
           aria-describedby={`${id}-label`}
-          onClick={() => props.onSubmit(props.order())}
+          onClick={() => props.onSubmit(props.order(), { earlyStart: props.earlyStartAsked && props.earlyStart() })}
         >
           {label()}
           <ArrowRight aria-hidden="true" />

@@ -10,7 +10,6 @@ import {
   requestHostedServerService,
 } from "../../../../../server/request-auth";
 
-/** A hosted server reports its use and its next routine run, with the session from its claim. */
 export const Route = createFileRoute("/v2/hosting/servers/$serverId/activity")({
   server: {
     handlers: {
@@ -19,7 +18,6 @@ export const Route = createFileRoute("/v2/hosting/servers/$serverId/activity")({
           Effect.gen(function* () {
             const token = bearerToken(request);
             if (!token) return apiError(401, "unauthorized", "Sign in is required.");
-            // An older server sends no body.
             const body = request.headers.get("Content-Type")?.startsWith("application/json")
               ? yield* readJsonObject(request)
               : null;

@@ -15,14 +15,6 @@ export interface ThreadSummariesOptions {
   core: DatabaseCore;
 }
 
-/**
- * The compaction summaries of a thread: the text standing in for messages a provider no longer
- * receives, and the message each summary runs through.
- *
- * Owns `projection_thread_summaries` and the `thread.summary-created` events behind it. Summaries
- * are append-only and the latest one wins, so a replay rebuilds them in order with no
- * reconciliation. The class never imports the facade.
- */
 export class ThreadSummaries {
   readonly #core: DatabaseCore;
 

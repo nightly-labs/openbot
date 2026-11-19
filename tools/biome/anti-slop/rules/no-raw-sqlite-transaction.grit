@@ -1,0 +1,13 @@
+language js(typescript)
+
+// scope: global
+
+`$receiver.$method($sql)` as $call where {
+  $method <: or { `exec`, `prepare` },
+  $sql <: r"(?is)^[\"'`]\s*(?:BEGIN|COMMIT|END|ROLLBACK|SAVEPOINT|RELEASE)\b.*",
+  register_diagnostic(
+    span=$call,
+    message="Do not write a SQLite transaction statement by hand. Use withTransaction (or withTransactionAsync) from src/backend/database/sqlite-transaction.ts: it opens BEGIN IMMEDIATE, nests with a savepoint, rolls back only the failed level and never leaves the connection in a transaction. See src/backend/AGENTS.md.",
+    severity="error"
+  )
+}

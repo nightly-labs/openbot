@@ -1,5 +1,3 @@
--- Durable checkout and payment facts. The Worker that runs before this deploy does not read these
--- tables. Fact columns are immutable; delivery_enqueued_at is the only delivery bookkeeping field.
 CREATE TABLE IF NOT EXISTS billing_sales_checkouts (
   session_id TEXT PRIMARY KEY,
   return_token_hash TEXT NOT NULL UNIQUE,
@@ -57,8 +55,6 @@ CREATE INDEX IF NOT EXISTS billing_sales_facts_user
   ON billing_sales_facts(user_id, fact_type, event_timestamp)
   WHERE user_id IS NOT NULL;
 
--- The paid invoice id is the idempotency boundary. Stripe can deliver the same invoice with more
--- than one event id, so this index is required in addition to source_key.
 CREATE UNIQUE INDEX IF NOT EXISTS billing_sales_paid_invoice
   ON billing_sales_facts(invoice_id)
   WHERE fact_type = 'payment_succeeded' AND invoice_id IS NOT NULL;

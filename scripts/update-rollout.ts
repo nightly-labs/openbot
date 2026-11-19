@@ -6,17 +6,6 @@ import { parse } from "yaml";
 import { z } from "zod";
 import { readScriptArguments } from "./script-arguments";
 
-// Sets the share of installed desktop apps that electron-updater offers a release to
-// (docs/RELEASING.md#staged-rollout). electron-updater reads `stagingPercentage` from the update
-// manifest. It compares the value with the per-install ID in `.updaterId` in the user data
-// folder, so the same installs are in the stage at each check and in each release. A manifest with
-// no `stagingPercentage` goes to every install.
-//
-// The release workflow runs this before it publishes, and `release-rollout.yml` runs it on a
-// published release. Each run changes only the `stagingPercentage` line, and stops before a write
-// when any other value is different afterwards: the SHA-512 and the size of each file must stay the
-// same, or each update download fails its check.
-
 const USAGE = `Usage:
   bun scripts/update-rollout.ts --version <x.y.z> --percentage <0-100> <manifest>...
   bun scripts/update-rollout.ts --check --version <x.y.z> --percentage <0-100> <manifest>...
@@ -26,12 +15,10 @@ latest-linux-arm64.yml.
 0 pauses the rollout. 100 removes the field, so the release goes to every install.
 --check changes nothing. It stops when a manifest does not have the percentage.`;
 
-/** The manifests that a release publishes, one for each platform that electron-updater updates. */
 export const UPDATE_MANIFESTS = ["latest.yml", "latest-mac.yml", "latest-linux.yml", "latest-linux-arm64.yml"] as const;
 
 const STAGING_LINE = /^stagingPercentage\s*:/u;
 
-/** Parses a percentage that a person typed: a whole number from 0 to 100, with no sign or zeros before it. */
 export function parseStagingPercentage(value: string): number {
   if (!/^(?:0|[1-9]\d?|100)$/u.test(value)) {
     throw new Error(`The rollout percentage must be a whole number from 0 to 100, not "${value}".`);
@@ -39,13 +26,6 @@ export function parseStagingPercentage(value: string): number {
   return Number(value);
 }
 
-/**
- * The keys of an update manifest that electron-updater checks a download against. `.loose()` keeps
- * the other keys, so that a comparison sees each of them. electron-updater reads
- * `stagingPercentage` with `parseInt` and offers the release to every install when the result is not
- * a number, so a fraction, a string or a value out of range is not valid here: it would not do what
- * it says.
- */
 const updateManifestSchema = z
   .object({
     version: z.string().min(1),
@@ -68,25 +48,16 @@ const updateManifestSchema = z
   .loose();
 export type UpdateManifest = z.infer<typeof updateManifestSchema>;
 
-/**
- * Reads an update manifest. electron-updater reads it with js-yaml, which also reads YAML 1.1 types
- * such as a timestamp, so a comparison reads it with each YAML version.
- */
 export function readUpdateManifest(source: string, version: "1.1" | "1.2" = "1.2"): UpdateManifest {
   const result = updateManifestSchema.safeParse(parse(source, { version }));
   if (!result.success) throw new Error(`The update manifest is not valid: ${z.prettifyError(result.error)}`);
   return result.data;
 }
 
-/** The rollout percentage of a manifest: 100 when it has no `stagingPercentage`. */
 export function readStagingPercentage(manifest: UpdateManifest): number {
   return manifest.stagingPercentage ?? 100;
 }
 
-/**
- * Returns `source` with only its `stagingPercentage` line changed. At 100 the line is removed, so the
- * manifest is the one that every release before the staged rollout published.
- */
 export function setStagingPercentage(source: string, percentage: number): string {
   if (!Number.isInteger(percentage) || percentage < 0 || percentage > 100) {
     throw new Error("The rollout percentage must be a whole number from 0 to 100.");
@@ -98,11 +69,6 @@ export function setStagingPercentage(source: string, percentage: number): string
   return updated;
 }
 
-/**
- * Stops unless `updated` is `original` with only the rollout percentage changed. The text other than
- * the `stagingPercentage` line must be the same, and so must the values that YAML 1.1 and YAML 1.2
- * read from it, which include each SHA-512 and size.
- */
 export function assertOnlyStagingChanged(original: string, updated: string, percentage: number): void {
   if (!isDeepStrictEqual(otherLines(original), otherLines(updated))) {
     throw new Error("The update manifest has changes on lines other than stagingPercentage.");
@@ -127,7 +93,6 @@ function otherLines(text: string): string[] {
     .filter((line) => !STAGING_LINE.test(line));
 }
 
-/** Checks that `paths` are the four manifests of one release, each once. */
 function assertReleaseManifests(paths: readonly string[]): void {
   const names = paths.map((path) => basename(path)).sort();
   if (!isDeepStrictEqual(names, [...UPDATE_MANIFESTS].sort())) {
@@ -154,8 +119,6 @@ if (import.meta.main) {
     }
     const percentage = parseStagingPercentage(values.percentage);
     assertReleaseManifests(positionals);
-    // Each manifest is read and changed in memory first, so a manifest that fails stops the run
-    // before any file is written.
     const changes = await Promise.all(
       positionals.map(async (candidate) => {
         const path = resolve(candidate);
@@ -182,7 +145,6 @@ if (import.meta.main) {
         continue;
       }
       await writeFile(path, updated);
-      // Read the file again, so the check is of the bytes that the upload sends.
       assertOnlyStagingChanged(original, await readFile(path, "utf8"), percentage);
       logger.info(`${basename(path)}: ${values.version} from ${current}% to ${percentage}%.`);
     }

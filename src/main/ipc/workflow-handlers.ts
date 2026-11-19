@@ -1,13 +1,19 @@
-// Workflows: graphs of steps drawn on a canvas. This computer's host answers from its own runtime,
-// and its events service owns webhook secrets. A joined server answers through `workflows-v1`, and
-// its GitHub catalog, options, event history and last-event runs through `workflows-github-v1`, and
-// keeps an uploaded picture through `workflows-media-v1`. It says whether it can use Sunra through
-// `workflows-sunra-v1`.
-
 import {
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKFLOWS_GITHUB_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-github-v1";
+import {
+  WORKFLOWS_HIGGSFIELD_CAPABILITY,
+  WORKFLOWS_HIGGSFIELD_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-higgsfield-v1";
+import {
+  WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
+  WORKFLOWS_MEDIA_CATALOG_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-catalog-v1";
+import {
+  WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
+  WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-service-account-v1";
 import {
   WORKFLOWS_MEDIA_CAPABILITY,
   WORKFLOWS_MEDIA_ROUTES,
@@ -19,12 +25,18 @@ import {
 import { WORKFLOWS_CAPABILITY, WORKFLOWS_ROUTES } from "@openbot/contracts/team-protocol/workflows-v1";
 import { sourceText } from "@openbot/i18n/source";
 import {
+  decodeRemoteHiggsfieldCredits,
+  decodeRemoteHiggsfieldProviders,
+  decodeRemoteMediaServiceAccounts,
+  decodeRemoteMediaServiceCredits,
   decodeRemoteWorkflowDetail,
   decodeRemoteWorkflowGitHubCatalog,
   decodeRemoteWorkflowGitHubHistory,
   decodeRemoteWorkflowGitHubOptions,
   decodeRemoteWorkflowList,
+  decodeRemoteWorkflowMediaCatalog,
   decodeRemoteWorkflowMediaCredits,
+  decodeRemoteWorkflowMediaPrice,
   decodeRemoteWorkflowMediaProviders,
   decodeRemoteWorkflowPicture,
   decodeRemoteWorkflowRunDetail,
@@ -35,6 +47,8 @@ import {
   decodeRemoteWorkflowSummary,
   decodeRemoteWorkflowVersionGraph,
   decodeRemoteWorkflowVersions,
+  workflowMediaCreditsOf,
+  workflowMediaProvidersOf,
 } from "@openbot/team-client/workflow-decoding";
 import type { Effect } from "effect";
 import { runCauseEffect } from "../../backend/effect-boundary";
@@ -58,6 +72,7 @@ import {
   parseWorkflowGitHubLastEvent,
   parseWorkflowGitHubRepository,
   parseWorkflowId,
+  parseWorkflowMediaPrice,
   parseWorkflowRunId,
   parseWorkflowRuns,
   parseWorkflowStepId,
@@ -72,7 +87,10 @@ interface WorkflowRemoteServers {
       | typeof WORKFLOWS_CAPABILITY
       | typeof WORKFLOWS_GITHUB_CAPABILITY
       | typeof WORKFLOWS_MEDIA_CAPABILITY
-      | typeof WORKFLOWS_SUNRA_CAPABILITY,
+      | typeof WORKFLOWS_SUNRA_CAPABILITY
+      | typeof WORKFLOWS_HIGGSFIELD_CAPABILITY
+      | typeof WORKFLOWS_MEDIA_CATALOG_CAPABILITY
+      | typeof WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
   ): boolean;
   request<T>(
     serverId: string,
@@ -85,7 +103,6 @@ interface WorkflowRemoteServers {
 interface WorkflowIpcDependencies {
   workflows: WorkflowsHandle;
   events: Pick<HostEventsService, "rotateWorkflowSecret">;
-  /** This computer's GitHub repositories, labels and people for the editor. The user is the owner. */
   github: WorkflowGitHubDirectory;
   remoteServers: WorkflowRemoteServers;
 }
@@ -101,7 +118,6 @@ export function workflowIpcHandlers({
       throw new Error(sourceText("error.workflow.serverTooOld"));
     return runCauseEffect(remoteServers.request(serverId, path, decoder, { method: "POST", body }));
   }
-  /** A `workflows-github-v1` route of a joined server, which needs `workflows-v1` too. */
   function remoteGitHub<T>(serverId: string, path: string, decoder: ResponseDecoder<T>, body: unknown): Promise<T> {
     if (!remoteServers.supportsCapability(serverId, WORKFLOWS_GITHUB_CAPABILITY))
       throw new Error(sourceText("error.workflow.serverTooOld"));
@@ -217,19 +233,63 @@ export function workflowIpcHandlers({
       }),
       mediaProviders: scopedQueryHandler({
         local: () => workflows.mediaProviders(),
-        // A host without `workflows-sunra-v1` does not run the Sunra models, so it has no Sunra.
-        remote: async (serverId) =>
-          remoteServers.supportsCapability(serverId, WORKFLOWS_SUNRA_CAPABILITY)
-            ? remote(serverId, WORKFLOWS_SUNRA_ROUTES.providers, decodeRemoteWorkflowMediaProviders, {})
-            : { sunra: false },
+        remote: async (serverId) => {
+          if (remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY)) {
+            const accounts = await remote(
+              serverId,
+              WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.accounts,
+              decodeRemoteMediaServiceAccounts,
+              {},
+            );
+            return workflowMediaProvidersOf(accounts);
+          }
+          const [sunra, higgsfield] = await Promise.all([
+            remoteServers.supportsCapability(serverId, WORKFLOWS_SUNRA_CAPABILITY)
+              ? remote(serverId, WORKFLOWS_SUNRA_ROUTES.providers, decodeRemoteWorkflowMediaProviders, {})
+              : { sunra: false },
+            remoteServers.supportsCapability(serverId, WORKFLOWS_HIGGSFIELD_CAPABILITY)
+              ? remote(serverId, WORKFLOWS_HIGGSFIELD_ROUTES.providers, decodeRemoteHiggsfieldProviders, {})
+              : { higgsfield: false },
+          ]);
+          return { ...sunra, ...higgsfield, accounts: null };
+        },
       }),
       mediaCredits: scopedQueryHandler({
         local: () => runCauseEffect(workflows.mediaCredits()),
-        // A host without `workflows-sunra-v1` has no Sunra, so it has no credits to show.
-        remote: async (serverId) =>
-          remoteServers.supportsCapability(serverId, WORKFLOWS_SUNRA_CAPABILITY)
-            ? remote(serverId, WORKFLOWS_SUNRA_ROUTES.credits, decodeRemoteWorkflowMediaCredits, {})
-            : { sunra: null },
+        remote: async (serverId) => {
+          if (remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY)) {
+            const accounts = await remote(
+              serverId,
+              WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.credits,
+              decodeRemoteMediaServiceCredits,
+              {},
+            );
+            return workflowMediaCreditsOf(accounts);
+          }
+          const [sunra, higgsfield] = await Promise.all([
+            remoteServers.supportsCapability(serverId, WORKFLOWS_SUNRA_CAPABILITY)
+              ? remote(serverId, WORKFLOWS_SUNRA_ROUTES.credits, decodeRemoteWorkflowMediaCredits, {})
+              : { sunra: null },
+            remoteServers.supportsCapability(serverId, WORKFLOWS_HIGGSFIELD_CAPABILITY)
+              ? remote(serverId, WORKFLOWS_HIGGSFIELD_ROUTES.credits, decodeRemoteHiggsfieldCredits, {})
+              : { higgsfield: null },
+          ]);
+          return { ...sunra, ...higgsfield, accounts: null };
+        },
+      }),
+      mediaCatalog: scopedQueryHandler({
+        local: () => runCauseEffect(workflows.mediaCatalog()),
+        remote: (serverId) =>
+          remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
+            ? remote(serverId, WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
+            : Promise.resolve({ models: [] }),
+      }),
+      mediaPrice: scopedHandler(parseWorkflowMediaPrice, {
+        local: (input) => runCauseEffect(workflows.mediaPrice(input)),
+        remote: (input, serverId) =>
+          remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
+            ? remote(serverId, WORKFLOWS_MEDIA_CATALOG_ROUTES.price, decodeRemoteWorkflowMediaPrice, input)
+            : Promise.resolve({ credits: null }),
       }),
     },
   };

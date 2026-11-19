@@ -1,7 +1,3 @@
-// Form side of a user-named ACP agent: a command that OpenBot starts on this computer and talks to
-// over the Agent Client Protocol on stdio. The dialog hands the trimmed draft to its host, which
-// turns it into the IPC input with `customAgentInput`.
-
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AcpAgentPreset,
@@ -20,10 +16,6 @@ import { currentText } from "../../text";
 export interface CustomAcpEnvDraft {
   name: string;
   value: string;
-  /**
-   * The saved name whose value main holds. An empty value under this same name keeps that value,
-   * because the value never comes back to the renderer.
-   */
   savedName?: string;
 }
 
@@ -31,10 +23,8 @@ export interface CustomAcpAgentDraft {
   agentId: string;
   displayName: string;
   command: string;
-  /** Separated by spaces, as a user types them in a terminal. */
   args: string;
   env: CustomAcpEnvDraft[];
-  /** The command that asks the agent for its plan usage, such as `/usage`. Empty for none. */
   usagePrompt: string;
 }
 
@@ -46,7 +36,6 @@ export interface CustomAcpAgentErrors {
   envRows: (string | undefined)[];
 }
 
-/** The state of one trial start: OpenBot runs the command, asks it what it is, then stops it. */
 export type AcpAgentCheck =
   | { status: "idle" }
   | { status: "checking" }
@@ -55,9 +44,7 @@ export type AcpAgentCheck =
       agentName: string;
       version?: string;
       protocolVersion: number;
-      /** Capability names as the agent reports them, such as `loadSession` or `image`. */
       capabilities: readonly string[];
-      /** The names of the models that a new session lists. */
       models: readonly string[];
     }
   | { status: "failed"; message: string };
@@ -77,7 +64,6 @@ export function presetAcpAgentDraft(preset: AcpAgentPreset): CustomAcpAgentDraft
   };
 }
 
-/** The form for a saved agent: each saved variable is a row whose empty value keeps the saved one. */
 export function savedAcpAgentDraft(agent: CustomAgentSummary): CustomAcpAgentDraft {
   return {
     agentId: agent.id,
@@ -96,7 +82,6 @@ function blankEnv(row: CustomAcpEnvDraft): boolean {
   return !row.name.trim() && !row.value.trim();
 }
 
-/** A saved variable whose value the user left empty. Main fills it in. */
 function keepsValue(row: CustomAcpEnvDraft): boolean {
   return row.savedName !== undefined && row.name.trim() === row.savedName && row.value === "";
 }
@@ -167,11 +152,6 @@ export function customAcpAgentValue(draft: CustomAcpAgentDraft): CustomAcpAgentD
   };
 }
 
-/**
- * Splits the arguments line with no shell. Quotes keep an argument with spaces as one argument; in
- * double quotes, `\"` and `\\` are one character. A backslash out of quotes stays, so a Windows path
- * needs no escape. Main refuses a line break and more than 32 arguments.
- */
 function draftArgs(text: string): string[] {
   const args: string[] = [];
   let current: string | null = null;
@@ -197,7 +177,6 @@ function draftArgs(text: string): string[] {
   return args;
 }
 
-/** The arguments line that `draftArgs` reads back as the same arguments. */
 export function formatAgentArgs(args: readonly string[]): string {
   return args.map((arg) => (/^[^\s"']+$/.test(arg) ? arg : `"${arg.replace(/["\\]/g, "\\$&")}"`)).join(" ");
 }
@@ -218,7 +197,6 @@ export function customAgentInput(draft: CustomAcpAgentDraft): SaveCustomAgentInp
   };
 }
 
-/** A kept value is read from `savedAgentId`, so a check of an edited agent needs no retyped key. */
 export function customAgentCheckInput(draft: CustomAcpAgentDraft, savedAgentId?: string): CheckCustomAgentInput {
   const value = customAcpAgentValue(draft);
   return {

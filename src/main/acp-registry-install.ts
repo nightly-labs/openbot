@@ -17,6 +17,7 @@ import {
   extractArchive,
   extractZipTree,
   rejectNonRegularFiles,
+  tarExecutable,
 } from "./provider-runtime-archive";
 import { ProviderRuntimeFailure, runtimeIO, runtimeSync, toProviderRuntimeFailure } from "./provider-runtime-effects";
 
@@ -37,7 +38,6 @@ export interface RegistryPrepared {
   env: Record<string, string>;
 }
 
-/** Rejects paths before archive or package metadata can select an executable. */
 function registryRelativePath(value: string): string {
   const path = value.replace(/^\.\//u, "");
   if (
@@ -66,7 +66,6 @@ const packageCommand = Effect.fn("AcpRegistry.packageCommand")(function* (
   yield* runRegistryInstaller(executable, args, cwd, env);
 });
 
-/** Stages in a unique permanent path: uv's virtual environments cannot be moved after installation. */
 export const prepareRegistryAgent = Effect.fn("AcpRegistry.prepare")(function* (
   agent: RegistryAgent,
   distribution: AcpRegistryDistribution,
@@ -90,7 +89,7 @@ export const prepareRegistryAgent = Effect.fn("AcpRegistry.prepare")(function* (
       yield* extractZipTree(archive, payload, "", sourceText("error.provider.nativeArchiveInvalid"));
     else if (pathname.endsWith(".tar.gz") || pathname.endsWith(".tgz")) {
       const listing = yield* runtimeIO((signal) =>
-        execFileAsync("tar", ["-tzf", archive], { signal, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 }),
+        execFileAsync(tarExecutable(), ["-tzf", archive], { signal, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 }),
       );
       const roots = listing.stdout
         .split(/\r?\n/u)

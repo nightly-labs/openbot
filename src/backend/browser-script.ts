@@ -23,7 +23,6 @@ const ERROR_LIMIT_CHARS = 2_000;
 const LOG_LIMIT_ENTRIES = 100;
 const LOG_LIMIT_CHARS = 8_000;
 
-/** The outcome of one step that a `run_script` helper asked for. */
 export type BrowserStepOutcome =
   | { status: "ok"; value?: BrowserJsonValue | BrowserSnapshot }
   | { status: "error"; error: string }
@@ -44,7 +43,6 @@ export interface BrowserScriptResult {
   status: "completed" | "failed" | "timeout" | "step_limit" | "user_control" | "tab_closed" | "page_crashed" | "dialog";
   value?: BrowserJsonValue;
   error?: string;
-  /** The page dialog that a step opened. The script stops, and the agent answers it with `handle_dialog`. */
   dialog?: DialogTabResult["dialog"];
   steps: number;
   log?: string[];
@@ -54,33 +52,20 @@ interface BrowserScriptOptions {
   script: string;
   timeoutMs: number;
   maxSteps: number;
-  /** Runs one step on the tab. A failed step is an outcome, not an error. */
   runStep: (step: BrowserStep) => Effect.Effect<BrowserStepOutcome>;
-  /** The tab's address now, as the result of a script shows it, or undefined when the tab is gone. */
   currentUrl: () => string | undefined;
 }
 
-// The helpers the script awaits. Each one sends a single step through `__step`, which the host runs
-// with every check of the matching tool. They live in the sandbox, so a script can change them only
-// for itself.
 const PRELUDE = `
-// Models often pass timeout, as other browser libraries name it, or the timeout as a bare number.
 const __with = (step, options) => {
-  // A string, such as waitFor(fn, "present"), names no option.
   const { timeout, ...rest } =
     typeof options === "number" ? { timeoutMs: options } : options !== null && typeof options === "object" ? options : {};
   return { ...step, ...(timeout === undefined || rest.timeoutMs !== undefined ? {} : { timeoutMs: timeout }), ...rest };
 };
-// waitFor("text", "Hello") and waitFor("selector", "#done"): the forms that models write by mistake.
 const __waitFields = { text: "text", url: "url", state: "state", selector: "target", css: "target" };
-// waitFor("Results", "load"): a second word that only says to wait on the page.
 const __waitWords = new Set(["page", "load", "domcontentloaded", "networkidle"]);
-// waitFor("#results", "present") waits for the element; waitFor("Results", "appears") for the text.
-// A bare word, such as "table", can be either, so only a selector with #, ., [, : or > is an element.
 const __presenceWords = new Set(["present", "exists", "appear", "appears"]);
 const __selectorLike = (value) => /^(?:[#.[*]|[a-z][\\w-]*(?:[#.[:]|\\s*[>~+]))/.test(value);
-// css("li").nth(2) and css("li").first(), as Playwright writes them. The methods are not enumerable,
-// so the target that a step sends has only its fields.
 const __target = (target) => {
   if (target.nth !== undefined) return target;
   for (const [name, pick] of [["nth", (index) => index], ["first", () => 0]])
@@ -92,18 +77,15 @@ globalThis.css = (selector, options) =>
   __target({ kind: "css", selector, ...(typeof options === "number" ? { nth: options } : __nth(options)) });
 globalThis.role = (role, name, exact) => {
   const nth = { ...__nth(name), ...__nth(exact) };
-  // role("button", { name: "Start", exact: true }), as Playwright writes it.
   if (name !== null && typeof name === "object") {
     exact = name.exact ?? exact;
     name = name.name;
   }
-  // role("textbox", "Username", { exact: true })
   if (exact !== null && typeof exact === "object") exact = exact.exact;
   return __target({ kind: "role", role, ...(name === undefined ? {} : { name }), ...(exact === undefined ? {} : { exact }), ...nth });
 };
 globalThis.text = (text, exact) => {
   const nth = __nth(exact);
-  // text("Delete", { exact: true, nth: 1 })
   if (exact !== null && typeof exact === "object") exact = exact.exact;
   return __target({ kind: "text", text, ...(exact === undefined ? {} : { exact }), ...nth });
 };
@@ -141,10 +123,8 @@ globalThis.clearTimeout = (id) => { __cancelled.add(id); };
 globalThis.waitFor = (condition, options, more) => {
   if (typeof condition === "number") return sleep(condition);
   if (typeof condition === "string" && typeof options === "string") {
-    // waitFor("#done", "visible"): a selector and the state of its element.
     if (__waitFields[condition] === undefined && (options === "visible" || options === "attached"))
       return waitFor({ target: css(condition) }, more);
-    // waitFor("#spinner", "hidden"): the element goes away or stops showing.
     if (__waitFields[condition] === undefined && (options === "hidden" || options === "detached"))
       return __pollPage(
         "() => { const element = document.querySelector(" + JSON.stringify(condition) + ");" +
@@ -154,19 +134,14 @@ globalThis.waitFor = (condition, options, more) => {
     if (__waitFields[condition] === undefined && __presenceWords.has(options.toLowerCase()))
       return waitFor(__selectorLike(condition) ? { target: css(condition) } : condition, more);
     if (__waitFields[condition] === undefined && __waitWords.has(options.toLowerCase())) return waitFor(condition, more);
-    // waitFor("Hello", "text"): the value first, the field second.
     const [name, value] = __waitFields[condition] === undefined ? [options, condition] : [condition, options];
     const field = __waitFields[name];
     if (field === undefined) throw new Error('waitFor takes waitFor("text"), waitFor(selector, "visible" | "hidden"), waitFor({ text | url | target | state }), or waitFor(() => condition).');
     return waitFor(field === "target" ? { target: css(value) } : { [field]: value }, more);
   }
-  // A page function is polled in the page until it returns a truthy value, as one evaluate step.
   if (typeof condition === "function") {
     const { timeoutMs: requested = 10000 } = __with({}, options);
     const timeoutMs = Math.min(requested, 25000);
-    // A function that calls the helpers, such as evaluate, is written for this sandbox, not for the
-    // page: poll it here, once a second, so a 25-second wait takes about 25 steps. The page's own
-    // document.evaluate is an XPath call, not the helper.
     if (/(?<![.\\w$])(?:evaluate|snapshot|step)\\s*\\(/.test(String(condition)))
       return (async () => {
         const end = Date.now() + timeoutMs;
@@ -178,7 +153,6 @@ globalThis.waitFor = (condition, options, more) => {
       })();
     return __pollPage(String(condition), options);
   }
-  // waitFor(role("button", "Start")): a target object is the element to wait for.
   const fields = typeof condition === "string" ? { text: condition }
     : typeof condition?.kind === "string" ? { target: condition } : { ...condition };
   if (fields.selector !== undefined) {
@@ -187,7 +161,6 @@ globalThis.waitFor = (condition, options, more) => {
   }
   return step({ action: "wait_for", ...__with(fields, options) });
 };
-// Polls a page function, given as its source, in the page until it returns a truthy value.
 const __pollPage = (source, options) => {
   const { timeoutMs: requested = 10000 } = __with({}, options);
   const timeoutMs = Math.min(requested, 25000);
@@ -208,8 +181,6 @@ globalThis.snapshot = () => step({ action: "snapshot" });
 globalThis.log = (...values) =>
   __log(values.map((value) => (typeof value === "string" ? value : JSON.stringify(value))).join(" "));
 globalThis.console = { log, info: log, warn: log, error: log };
-// Scripts resolve the links that they read with new URL(href, base). The host parses each URL, and
-// each URL field setter runs on the host, so the results are those of a browser.
 const __parseUrl = (input, base, field, value) => {
   const parsed = __url(String(input), base === undefined ? undefined : String(base), field, value === undefined ? undefined : String(value));
   if (parsed === undefined) throw new TypeError("Invalid URL: " + String(field === undefined ? input : value));
@@ -290,8 +261,6 @@ for (const field of __urlFields) {
     set(value) { __setUrl(this, __parseUrl(this.href, undefined, field, value)); },
   });
 }
-// Scripts read the tab address as location.href, as in the page, to resolve the links that they read.
-// It is read-only: a navigation is a step, so a script calls navigate(url).
 const __readOnlyLocation = () => {
   throw new TypeError("location is read-only in the script: call await navigate(url).");
 };
@@ -310,7 +279,6 @@ Object.defineProperty(globalThis, "location", { get: () => __locationObject, set
 
 let quickJsModule: Promise<QuickJSWASMModule> | undefined;
 
-// The module compiles its WebAssembly once per process; each script gets its own runtime.
 const loadQuickJs = () =>
   browserCall(() => {
     quickJsModule ??= newQuickJSWASMModuleFromVariant(releaseSyncVariant).catch((error: unknown) => {
@@ -326,7 +294,6 @@ type SandboxState =
   | { kind: "step"; request: string; deferred: QuickJSDeferredPromise }
   | { kind: "stuck" };
 
-/** One QuickJS runtime and context with no host access except the `__step`, `__log`, `__url`, and `__location` functions. */
 class BrowserScriptSandbox {
   readonly #runtime: QuickJSRuntime;
   readonly #context: QuickJSContext;
@@ -372,7 +339,6 @@ class BrowserScriptSandbox {
     location.dispose();
   }
 
-  /** Starts the script. Returns the error of a script that does not parse or fails at once. */
   start(script: string): unknown {
     const prelude = this.#context.evalCode(PRELUDE, "prelude.js");
     if (prelude.error) {
@@ -391,7 +357,6 @@ class BrowserScriptSandbox {
     return undefined;
   }
 
-  /** Runs the script until it ends or waits for a step. */
   advance(): SandboxState {
     const jobs = this.#runtime.executePendingJobs();
     if (jobs.error) {
@@ -459,7 +424,6 @@ const URL_FIELDS = [
   "hash",
 ] as const;
 
-/** The fields of a script's URL as JSON, after the setter of `field`, or undefined when the URL is not valid. */
 function scriptUrl(input: string, base: string | undefined, field: string | undefined, value: string | undefined) {
   let url: URL;
   try {
@@ -473,13 +437,11 @@ function scriptUrl(input: string, base: string | undefined, field: string | unde
   return JSON.stringify({ href, origin, protocol, username, password, host, hostname, port, pathname, search, hash });
 }
 
-// The page globals and page objects of other browser libraries, which the script does not have.
 const PAGE_GLOBAL =
   /^ReferenceError: '?(?:document|window|navigator|localStorage|sessionStorage|fetch|page|browser|\$\$?)'? is not defined/u;
 const PAGE_GLOBAL_HINT =
   " The script runs in a sandbox, not in the page: read the page in evaluate(() => ...), and call the helpers, such as click(target), directly.";
 
-// The tool names of the helpers, which a model wrote as script calls, as in wait_for(...).
 const SNAKE_HELPER = /^ReferenceError: '?(?:wait_for|select_option|set_checked)'? is not defined/u;
 const SNAKE_HELPER_HINT = " The script helpers use camelCase: waitFor, selectOption, setChecked.";
 
@@ -492,11 +454,6 @@ function errorText(error: unknown): string {
   return `${text}${hint}`.slice(0, ERROR_LIMIT_CHARS);
 }
 
-/**
- * Runs an agent's script in a QuickJS WebAssembly sandbox. The script has no network, files, modules, or
- * process; it can only ask the host to run browser steps, one at a time. A sleep or setTimeout is a host timer that
- * does not hold the steps after it. Memory, stack, total time, and step count are limited.
- */
 export const runBrowserScript = Effect.fn("BrowserScript.run")(function* (options: BrowserScriptOptions) {
   const module = yield* loadQuickJs();
   const deadline = Date.now() + options.timeoutMs;
@@ -517,8 +474,6 @@ export const runBrowserScript = Effect.fn("BrowserScript.run")(function* (option
         const timedOut = () => result("timeout", { error: "The script ran past its timeout." });
         const startError = sandbox.start(options.script);
         if (startError !== undefined) return result("failed", { error: errorText(startError) });
-        // A sleep, and so a setTimeout, is a timer here and not a step: the steps after it run at once,
-        // as they would next to a timer in a page.
         const timers: { due: number; deferred: QuickJSDeferredPromise }[] = [];
         const fireDueTimers = () => {
           const now = Date.now();

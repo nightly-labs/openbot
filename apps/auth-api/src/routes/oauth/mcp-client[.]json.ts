@@ -2,14 +2,6 @@ import { createFileRoute } from "@tanstack/solid-router";
 
 const CLIENT_ID = "https://openbot.run/oauth/mcp-client.json";
 
-/**
- * OpenBot's OAuth client metadata document (CIMD, SEP-991). An MCP authorization server with no
- * client registration, such as ElevenLabs, reads it when OpenBot sends this URL as its `client_id`.
- * `MCP_CLIENT_METADATA_URL` in `src/backend/mcp-oauth-provider.ts` sends it. The redirect address
- * is the loopback listener of `src/main/mcp-oauth-redirect-server.ts`. Do not add the `openbot://`
- * fallback: ElevenLabs refuses the whole document when one address is not https or loopback http
- * ("Redirect URIs must use https, or http on a loopback address.", #5748).
- */
 function mcpClientMetadataResponse(): Response {
   return Response.json(
     {

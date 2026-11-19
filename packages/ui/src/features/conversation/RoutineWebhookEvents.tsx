@@ -10,7 +10,6 @@ export interface RoutineWebhookEventsProps {
   onFiltersChange: (filters: EventFilterDraft[]) => void;
 }
 
-/** The events that start a webhook routine: one row that opens the event type and the filters. */
 export function RoutineWebhookEvents(props: RoutineWebhookEventsProps) {
   const { t } = useText();
   const [eventsOpen, setEventsOpen] = createSignal(false);
@@ -18,7 +17,6 @@ export function RoutineWebhookEvents(props: RoutineWebhookEventsProps) {
   const eventTypeHintId = createUniqueId();
   let eventTypeInput: HTMLInputElement | undefined;
 
-  // Most webhooks need no filter, so the card hides the events row until the user sets one.
   const filtered = () => props.eventType.trim() !== "" || props.filters.length > 0;
   const eventsSummary = () => {
     const parts = [props.eventType.trim() || t("routine.webhook.eventsAll")];
@@ -43,7 +41,6 @@ export function RoutineWebhookEvents(props: RoutineWebhookEventsProps) {
           class="routine-webhook-filter-link"
           onClick={() => {
             setEventsOpen(true);
-            // The link leaves the page, so focus goes to the first field it opened.
             onSettled(() => eventTypeInput?.focus());
           }}
         >
@@ -84,7 +81,6 @@ export function RoutineWebhookEvents(props: RoutineWebhookEventsProps) {
           </div>
           <div class="settings-field">
             <span>{t("routine.webhook.filters")}</span>
-            {/* Not keyed: each keystroke makes a new row object, and a keyed row would remount and lose focus. */}
             <For each={props.filters} keyed={false}>
               {(filter, index) => {
                 const errorId = createUniqueId();

@@ -1,12 +1,6 @@
 import { OPENBOT_LINKS } from "../../lib/landing-links";
 import { type Comparison, OPENBOT_TEXT } from "./comparison";
 
-// Every statement about Paperclip here is taken from paperclip.ing, its documentation, or
-// its repository (the README, the deployment and Tailscale guides, and the telemetry
-// config and rules in packages/shared), and each page used is in `sources`. Paperclip lists no app
-// for iPhone or Android and no price for Paperclip Cloud, so the text says so. Check them
-// again, and move `checkedAt`, whenever this file changes.
-
 const PAPERCLIP_REPO = "https://github.com/paperclipai/paperclip";
 const PAPERCLIP_DOCS = "https://docs.paperclip.ing";
 

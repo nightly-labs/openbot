@@ -17,14 +17,25 @@ export const messages = {
   "error.workflow.agentMissing": "Escolha um agente para esta etapa.",
   "error.workflow.handoffFailed": "O OpenBot não conseguiu enviar esta etapa ao agente.",
   "error.workflow.agentStepEnded": "A mensagem ao agente foi removida antes da resposta.",
+  "error.workflow.agentStepStopped": "O agente parou antes de responder a esta etapa. Execute a etapa novamente.",
   "error.workflow.conditionUnclear": "O modelo não respondeu sim ou não.",
   "error.workflow.modelFailed": "O modelo não conseguiu responder. Execute a etapa novamente.",
+  "error.workflow.modelTimedOut":
+    "O modelo não respondeu a tempo. Escolha um esforço menor ou um modelo mais rápido para esta etapa e execute-a novamente.",
+  "error.workflow.modelToolUse":
+    "O modelo tentou usar uma ferramenta, mas esta etapa só pode responder com texto. Execute a etapa novamente ou escolha outro modelo para ela.",
+  "error.workflow.modelUnavailable": "O modelo desta etapa não está disponível. Escolha outro modelo para esta etapa.",
+  "error.workflow.providerBusy": "O provedor está ocupado. Aguarde alguns minutos e execute a etapa novamente.",
+  "error.workflow.providerOffline":
+    "O OpenBot não conseguiu acessar o provedor. Verifique a conexão com a internet e execute a etapa novamente.",
   "error.workflow.modelBusy": "Outra solicitação ao modelo está em andamento. Execute a etapa novamente em breve.",
   "error.workflow.mediaFailed": "O modelo não conseguiu criar a imagem ou o vídeo. Execute a etapa novamente.",
   "error.workflow.pictureMissing": "A imagem não está mais no servidor. Envie-a novamente.",
   "error.workflow.pictureType": "Use uma imagem PNG, JPEG ou WebP.",
   "error.workflow.mediaInputMissing":
     "Uma imagem de uma etapa anterior não está disponível. Execute essa etapa novamente.",
+  "error.workflow.mediaEmptyRequest":
+    "Escreva uma descrição ou execute as etapas anteriores para que chegue um texto ou uma imagem.",
   "error.workflow.mediaInputNotImage":
     "Esta etapa aceita apenas imagens, não vídeos. Remova a conexão a partir do vídeo.",
   "error.workflow.stepMissing": "Esta etapa não existe mais.",
@@ -85,4 +96,14 @@ export const messages = {
   "error.workflow.sunraFailed": "O Sunra não conseguiu criar o arquivo: {reason}",
   "error.workflow.sunraTimeout":
     "O Sunra não terminou o arquivo a tempo. Veja o projeto OpenBot em sunra.ai antes de executar a etapa novamente.",
+  "error.workflow.higgsfieldSignIn": "Entre no Higgsfield em Apps para usar os modelos do Higgsfield.",
+  "error.workflow.higgsfieldNoCredits":
+    "Sua conta do Higgsfield não tem créditos suficientes. Adicione créditos em higgsfield.ai/pricing e execute a etapa novamente.",
+  "error.workflow.higgsfieldNeedsPlan":
+    "Este modelo do Higgsfield precisa de um plano do Higgsfield. Escolha um plano em higgsfield.ai/pricing ou selecione outro modelo.",
+  "error.workflow.higgsfieldBlocked":
+    "O Higgsfield não criou o arquivo porque a verificação de conteúdo o bloqueou. Altere o prompt ou as imagens de entrada e execute a etapa novamente.",
+  "error.workflow.higgsfieldFailed": "O Higgsfield não conseguiu criar o arquivo: {reason}",
+  "error.workflow.higgsfieldTimeout":
+    "O Higgsfield não terminou o arquivo a tempo. Veja seu histórico em higgsfield.ai antes de executar a etapa novamente.",
 } as const satisfies PartialTranslation<typeof source>;

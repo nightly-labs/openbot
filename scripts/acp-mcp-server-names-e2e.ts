@@ -1,10 +1,3 @@
-// Runs the real `acp` provider driver over a fake agent that refuses an MCP server name with a
-// character outside `[A-Za-z0-9_-]`, as Antigravity does. A server the user named "My Server" made
-// every Gemini task fail with `invalid params` (#2801). The session must start with each name changed
-// to that form. A changed name that another server has (`computer use` and Computer Use's
-// `computer_use`), one that becomes a name of OpenBot's own tools, and the second of two that become
-// the same name are reported as drops.
-// `bun run test:acp-mcp-names`. Writes .openbot-build/acp-mcp-server-names-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -77,7 +70,6 @@ try {
     server("underscored", "My_Server"),
     server("bridge-like", "openbot browser"),
     server("computer-use-like", "computer use"),
-    // Stands for the built-in Computer Use server, which `McpGateway.enabled` puts after the user's.
     server("computer-use", "computer_use"),
     server("home", "Home Assistant"),
     server("home-dotted", "Home.Assistant"),
@@ -102,7 +94,6 @@ try {
   report.reply = turn.reply;
   assert.equal(turn.reply, "OK", "The turn answers.");
 
-  // The client also opens a session of its own to list models. It carries no servers.
   const requests = await readJsonl<SessionRequest>(log);
   report.requests = requests;
   report.drops = drops;

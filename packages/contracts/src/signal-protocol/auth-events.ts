@@ -1,27 +1,9 @@
-// The signed webhook body that the account server (`apps/auth-api`) posts to Signal
-// (`remote/api`) at `/internal/auth-events`. Signal closes or refreshes the sockets it names.
-// Types only: the account server writes these events, and Signal checks them with its own schema.
-
 export type RemoteAuthEvent =
   | { type: "remote-auth-changed"; hostId: string; authEpoch: number }
   | { type: "remote-session-ended"; hostId: string; sessionId: string }
-  // Addressed to an account rather than to a host: the device that accepted an invitation already
-  // knows, and the user's other devices are the ones with a stale server list. Signal forwards it
-  // to every socket that account holds, and each of them re-reads `/v2/remote/hosts/` once.
   | { type: "account-servers-changed"; userId: string }
-  // Addressed to an account: its other devices re-read the account profile.
   | { type: "account-profile-changed"; userId: string }
-  // A Slack workspace was unlinked from an app or moved to another host. Signal drops that app's route
-  // of the workspace when its link is from `through` (milliseconds) or before, and refuses route
-  // tickets with such a link.
   | { type: "slack-route-revoked"; appId: string; teamId: string; through: number }
-  // A Telegram chat was unlinked from a host or moved to another host. Signal drops the bot's route of
-  // the chat when its link is from `through` (milliseconds) or before, and refuses route tickets with
-  // such a link.
   | { type: "telegram-route-revoked"; botId: string; chatId: string; through: number }
-  // A Discord guild was unlinked or moved to another host. Signal drops its route when its link is
-  // from `through` (milliseconds) or before, and refuses route tickets with such a link.
   | { type: "discord-route-revoked"; guildId: string; through: number }
-  // A generic webhook route was disabled, deleted or moved to another host. Signal drops it at once
-  // and refuses route tickets that still carry its older link.
   | { type: "webhook-route-revoked"; routeId: string; through: number };

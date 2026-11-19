@@ -2,7 +2,6 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { McpServerConfig, McpTestResult, McpTransport } from "@openbot/contracts/ipc";
 import { matchingSourceKeys } from "@openbot/i18n/source";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
 import LogOut from "lucide-react-native/icons/log-out";
 import PlugZap from "lucide-react-native/icons/plug-zap";
@@ -33,8 +32,8 @@ import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { useDiscardGuard } from "@/shared/lib/use-discard-guard";
 
-/** The host answers that the server wants a sign-in. This phone cannot sign in to an MCP server yet. */
 const SIGN_IN_ERRORS = new Set([
   "error.backend.mcpSignInRequired",
   "error.backend.mcpSignInOnHost",
@@ -42,17 +41,12 @@ const SIGN_IN_ERRORS = new Set([
   "error.mcp.signInOnHost",
 ]);
 
-// Code, paths and addresses, the same in each language. The desktop form shows the same examples.
 const COMMAND_PLACEHOLDER = "openai-dev-mcp";
 const WORKING_DIRECTORY_PLACEHOLDER = "~/code";
 const URL_PLACEHOLDER = "https://mcp.example.com/mcp";
 
 type TestState = { status: "testing" } | { status: "done"; result: McpTestResult };
 
-/**
- * Server sheet > MCP servers > one server, or a new one without `mcpServerId`. The header action
- * saves it. A saved server turns on and off at once, and can be tested, signed out and removed.
- */
 export function ServerMcpServerScreen() {
   const { t } = useText();
   const { serverId, mcpServerId } = useLocalSearchParams<{ serverId: string; mcpServerId?: string }>();
@@ -90,14 +84,10 @@ function McpServerForm({
     useMobileWorkspaceActions();
   const { action, perform, setList, setSignIns } = mcp;
   const [draft, setDraft] = useState<McpServerDraft>(() => mcpServerDraft(saved));
-  // A new server keeps its switch in the draft. A saved one turns on and off at once.
   const [newEnabled, setNewEnabled] = useState(true);
   const [test, setTest] = useState<TestState | null>(null);
-  // Each test and each edit makes the result of an older test stale.
   const testRun = useRef(0);
-  // Navigation runs a render later, once the guard below reads `leaving`.
   const [leaving, setLeaving] = useState(false);
-  // The list without a removed server. It is shown after this page goes, so the page does not say "gone".
   const removedList = useRef<McpServerConfig[] | null>(null);
   const showList = useRef(setList);
   showList.current = setList;
@@ -118,27 +108,10 @@ function McpServerForm({
     Boolean(mcp.signIns.data?.some((state) => state.mcpServerId === saved.id && state.signedIn));
   const busy = action.isPending || test?.status === "testing";
 
-  // Discard turns prevention off before it repeats the action, so the hook does not warn.
-  const [discarding, setDiscarding] = useState(false);
-  usePreventRemove(!discarding && (dirty || action.isPending) && !leaving, ({ repeat }) => {
-    if (action.isPending) return;
-    void haptics.notification("warning");
-    Alert.alert(t("mobile.agent.discard.title"), t("mobile.agent.discard.body"), [
-      { text: t("mobile.agent.discard.keepEditing"), style: "cancel" },
-      {
-        text: t("mobile.agent.discard.discard"),
-        style: "destructive",
-        onPress: () => {
-          setDiscarding(true);
-          repeat();
-        },
-      },
-    ]);
-  });
+  useDiscardGuard((dirty || action.isPending) && !leaving, { busy: () => action.isPending, warn: true });
 
   function edit(change: Partial<McpServerDraft>) {
     setDraft((current) => ({ ...current, ...change }));
-    // A result describes the settings that were tested.
     testRun.current += 1;
     setTest(null);
     if (action.error) action.reset();

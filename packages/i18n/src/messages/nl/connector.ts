@@ -358,6 +358,8 @@ export const messages = {
     "WhatsApp heeft deze server uit de gekoppelde apparaten verwijderd. Koppel het nummer opnieuw.",
   "connector.whatsapp.helpError":
     "OpenBot kan WhatsApp op dit nummer niet bereiken. Verbind opnieuw of koppel het nummer los.",
+  "connector.whatsapp.helpKeysUnreadable":
+    "OpenBot kan de opgeslagen sleutels van dit nummer niet lezen. Koppel het nummer opnieuw.",
   "connector.whatsapp.retryAt": "WhatsApp vroeg OpenBot te wachten. Het probeert het opnieuw om {time}.",
   "connector.whatsapp.pause": "Pauzeren",
   "connector.whatsapp.resume": "Hervatten",
@@ -372,10 +374,13 @@ export const messages = {
   "connector.whatsapp.rowAction": "{action}: {name}",
   "connector.whatsapp.ownNumber": "Persoonlijk nummer",
   "connector.whatsapp.ownNumberDescription":
-    "Alleen je chat “Bericht aan jezelf” en de mensen die je toestaat kunnen schrijven. Zet dit uit voor een nummer alleen voor OpenBot.",
+    "Alleen je chat “Bericht aan jezelf” en de mensen die je toestaat kunnen schrijven. Andere mensen krijgen geen antwoord. Als dit uit staat, antwoordt OpenBot onbekende mensen met een code.",
   "connector.whatsapp.workingMessage": "Bericht “Mee bezig…”",
   "connector.whatsapp.workingMessageDescription":
-    "OpenBot stuurt het terwijl de agent werkt en vervangt het daarna door het antwoord. Zet dit uit om alleen het antwoord te sturen.",
+    "OpenBot stuurt het terwijl de agent werkt en vervangt het daarna door het antwoord. Een verzoek dat op een eerder verzoek wacht, krijgt ook een wachtbericht. Zet dit uit om alleen het antwoord te sturen.",
+  "connector.whatsapp.statusReactions": "Statusreacties",
+  "connector.whatsapp.statusReactionsDescription":
+    "OpenBot reageert met 👀 als er een bericht binnenkomt en met ✅ als het antwoord klaar is. Zet dit uit om geen reacties te sturen.",
   "connector.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "connector.whatsapp.orchestratorDescription":
     "Deze agent ontvangt de berichten voor OpenBot van al je gekoppelde nummers. Korte berichten beantwoordt hij zelf, ander werk geeft hij aan de juiste agent, en hij antwoordt in WhatsApp.",
@@ -394,10 +399,10 @@ export const messages = {
   "connector.whatsapp.kindLabel": "Nummer",
   "connector.whatsapp.kindPersonal": "Mijn persoonlijke nummer",
   "connector.whatsapp.kindPersonalDescription":
-    "OpenBot antwoordt alleen in je chat “Bericht aan jezelf” en aan de mensen die je toestaat.",
+    "OpenBot antwoordt alleen in je chat “Bericht aan jezelf” en aan de mensen die je toestaat. Andere mensen krijgen geen antwoord.",
   "connector.whatsapp.kindDedicated": "Een nummer alleen voor OpenBot",
   "connector.whatsapp.kindDedicatedDescription":
-    "Onbekende mensen krijgen een code om aan jou te geven. Je keurt ze hier goed.",
+    "OpenBot antwoordt vanaf dit nummer elke onbekende persoon met een code om aan jou te geven. Je keurt ze hier goed.",
   "connector.whatsapp.methodLabel": "Koppelmethode",
   "connector.whatsapp.methodQr": "QR-code",
   "connector.whatsapp.methodCode": "Koppelcode",
@@ -460,7 +465,8 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "Optioneel. Zonder naam toont de lijst het telefoonnummer.",
   "connector.whatsapp.add": "Toevoegen",
   "connector.whatsapp.groupTitle": "Voeg een groep toe",
-  "connector.whatsapp.groupDescription": "Mensen in deze groep kunnen werk geven aan je agents.",
+  "connector.whatsapp.groupDescription":
+    "Mensen in deze groep kunnen werk geven aan je agents als ze het nummer vermelden of op de berichten ervan reageren.",
   "connector.whatsapp.groupSearch": "Zoek groepen",
   "connector.whatsapp.groupsLoading": "Groepen lezen…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot kon de groepen niet lezen",
@@ -614,9 +620,9 @@ export const messages = {
   "connector.protonPass.expiredDescription":
     "Agents kunnen niet inloggen met je gedeelde logins tot je opnieuw aanmeldt.",
   "connector.protonPass.reconnect": "Opnieuw verbinden",
-  "connector.protonPass.planTitle": "Proton Pass vraagt een betaald abonnement",
+  "connector.protonPass.planTitle": "Proton Pass heeft een abonnement met Pass Plus nodig",
   "connector.protonPass.planDescription":
-    "De Proton Pass CLI werkt alleen met een betaald Proton-abonnement. Wijzig je abonnement en verbind opnieuw.",
+    "De Proton Pass CLI heeft een Proton-abonnement nodig waarin Pass Plus zit. Andere betaalde abonnementen, zoals Mail Plus, bevatten hem niet. Wijzig je abonnement en verbind opnieuw.",
   "connector.protonPass.vaultTitle": "Gedeelde kluis",
   "connector.protonPass.vaultDescription":
     "Agents kunnen inloggen met de logins in deze kluis. Verplaats een login erheen om hem te delen.",

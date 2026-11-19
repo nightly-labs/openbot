@@ -11,6 +11,17 @@ export const messages = {
     "הכלי לא רץ. ב-tool_call, arguments חייב להיות אובייקט JSON ולא טקסט. יש לשלוח את הקריאה שוב עם arguments כאובייקט.",
   "error.agent.toolCallDiscoveryTool":
     "הכלי לא רץ. tool_call לא יכול להריץ את openbot.tool_search או את openbot.tool_describe. יש לקרוא להם ישירות עם אותם ארגומנטים.",
+  "error.agent.toolCallEnvelopeKeys":
+    "הכלי לא רץ. tool_call מקבל רק name ו-arguments. יש לשים את הארגומנטים של הכלי ב-arguments, כאובייקט, ולשלוח את הקריאה שוב.",
+  "error.agent.toolCallMissingName":
+    "הכלי לא רץ. ל-tool_call אין name. יש לשים ב-name את השם המלא ש-tool_search מחזיר, למשל openbot.history_read, ולשלוח את הקריאה שוב.",
+  "error.agent.toolCallUnknownTool":
+    "הכלי לא רץ. tool_call לא מצא כלי בשם הזה. יש להשתמש בשם המלא המדויק ש-tool_search מחזיר, למשל openbot_browser.snapshot.",
+  "error.agent.toolCallUnknownToolSuggest":
+    "הכלי לא רץ. tool_call לא מצא כלי בשם הזה. ייתכן שהשם המלא הוא {name}. אם כן, יש לשלוח את הקריאה שוב עם השם הזה.",
+  "error.agent.toolDescribeUnknownNames":
+    "tool_describe לא מצא כלי OpenBot בשם {names}. הוא מתאר רק את כלי OpenBot והדפדפן ש-openbot.tool_search מציג, ולא כלי MCP.",
+  "error.agent.toolDescribeDiscoveryNames": "קרא ל-{names} ישירות. tool_describe לא מתאר את כלי החיפוש.",
   "error.agent.routineScheduleArgumentsInvalid":
     "לוח הזמנים של השגרה אינו תקין: {detail} יש לתקן את לוח הזמנים ולנסות שוב. openbot.tool_describe מחזיר את הסכמה.",
   "error.agent.approvalWhileDeleting": "אי אפשר לתת אישור בזמן שהסוכן נמחק.",
@@ -48,6 +59,8 @@ export const messages = {
   "error.agent.modelNotListed": 'המודל "{model}" אינו זמין. המודלים הזמינים: {models}.',
   "error.agent.providerNotListed":
     "אין עכשיו מודל זמין של {provider}. אפשר לקרוא ל-list_models כדי לראות את המודלים הזמינים.",
+  "error.agent.creatorModelNotListed":
+    'המודל שלך "{model}" לא נמצא עכשיו ברשימת המודלים, ולכן הסוכן החדש לא יכול להתחיל איתו. אפשר לנסות שוב בעוד כמה שניות, או להגדיר ב-provider וב-model מודל ש-list_models מציג.',
   "error.agent.reasoningEffortUnsupported":
     'המודל "{model}" אינו תומך ברמת החשיבה "{effort}". הרמות הנתמכות: {efforts}.',
   "error.agent.reasoningEffortNotConfigurable": 'למודל "{model}" אין הגדרה של רמת חשיבה, ולכן אי אפשר לשנות אותה.',
@@ -77,10 +90,14 @@ export const messages = {
   "error.agent.endpointRemoved": "נקודת הקצה שהסוכן הזה השתמש בה הוסרה. יש לבחור עבורו מודל אחר.",
   "error.agent.turnStalled":
     "{provider} הפסיק להגיב, ולכן OpenBot סיים את התור הזה. יש לשלוח את ההודעה שוב, או לבחור מודל אחר.",
+  "error.agent.promptCancelled": "{provider} ביטל את ההודעה הזו לפני שהתחילה. יש לשלוח את ההודעה שוב.",
   "error.agent.toolLoopStopped":
     "{provider} חזר על שלב שנכשל פעמים רבות, ולכן OpenBot עצר את התור הזה. שלחו את ההודעה שוב, או בחרו מודל אחר.",
+  "error.agent.answerCutOff": "הסוכן נעצר לפני שסיים את התשובה שלו, ולכן התשובה אינה מלאה. שלחו את ההודעה שוב.",
   "error.agent.compactionConnectionLost":
     "החיבור נפסק בזמן שהסוכן כיווץ את ההקשר שלו, ולכן המשימה נעצרה. יש לבדוק את חיבור האינטרנט ולשלוח הודעה כדי להמשיך.",
+  "error.agent.compactionConnectionLostAddress":
+    "החיבור נפסק בזמן שהסוכן כיווץ את ההקשר שלו, ולכן המשימה נעצרה. יש לבדוק את חיבור האינטרנט. יש לוודא גם ש-{variable} תחת משתנים בהגדרות של {provider} הוא כתובת ה-API של שירות המודלים שלך, ולרוב היא מסתיימת ב-/v1. לאחר מכן יש לשלוח הודעה.",
   "error.agent.compactionLoopStopped":
     "{provider} דחס את ההקשר שוב ושוב, ובכל פעם הוא נשאר מלא מדי כדי להמשיך, ולכן OpenBot עצר את התור הזה. כבה את שרתי ה-MCP או את השימוש במחשב שהסוכן הזה לא צריך, ואז שלח הודעה. אם אתה או הסוכן שיניתם מתי {provider} דוחס, בטל את השינוי.",
   "error.agent.selectedGone": "הסוכן שנבחר כבר לא קיים.",
@@ -96,6 +113,10 @@ export const messages = {
   "error.agent.deletionBusy": "מחיקת הסוכן כבר מתבצעת.",
   "error.agent.stopBeforeDelete": "יש לעצור את הסוכן ולבטל את ההודעות שלו בתור לפני המחיקה.",
   "error.agent.deleteIncomplete": "לא ניתן היה להסיר את נתוני הסוכן לגמרי. יש לנסות למחוק את הסוכן שוב.",
+  "error.agent.deleteFolderInUse":
+    "עבודה של סוכן אחר עדיין משתמשת בתיקייה של הסוכן הזה. יש למחוק את הסוכן שוב כשהעבודה הזו מסתיימת, או אחרי הפעלה מחדש של OpenBot.",
+  "error.agent.deleteWhenFolderFree":
+    "עבודה של סוכן אחר עדיין משתמשת בתיקייה של הסוכן הזה. OpenBot ימחק את הסוכן הזה כשהעבודה הזו תסתיים.",
   "error.agent.duplicationBusy": "הסוכן הזה כבר משוכפל.",
   "error.agent.waitBeforeDuplicate": "יש להמתין שהסוכן יסיים ולרוקן את התור שלו לפני השכפול.",
   "error.agent.saveOtherAgent": "השמירה הזו שייכת לסוכן אחר.",
@@ -131,17 +152,28 @@ export const messages = {
   "error.agent.lowMemoryServer": "בשרת הזה חסר זיכרון. ההודעה שלך ממתינה בתור ותתחיל כשיתפנה זיכרון.",
   "error.agent.workspaceOnlyToolMissing":
     "מצב סביבת עבודה בלבד דורש את {tool}, ש-OpenBot לא מצא. יש להתקין אותו, או לבחור גישה מלאה בהגדרות הסוכן.",
+  "error.agent.codexSandboxUnavailable":
+    "מצב סביבת עבודה בלבד דורש את ארגז החול של Codex, ש-Codex לא מצליח להפעיל במחשב הזה, ולכן הפקודות של הסוכן נכשלות. יש לבחור לשאול קודם או גישה מלאה בהגדרות הסוכן.",
   "error.agent.claudeSandboxUnavailable":
     "מצב סביבת עבודה בלבד דורש את ארגז החול של Claude, ש-Claude לא מצליח להפעיל במחשב הזה: {reason}. יש לבחור גישה מלאה או ספק אחר בהגדרות הסוכן.",
+  "error.agent.claudeNoSandbox":
+    "Claude לא יכול להשתמש בארגז חול במחשב הזה, ולכן מצב סביבת עבודה בלבד לא עובד איתו. יש לבחור גישה מלאה או ספק אחר בהגדרות הסוכן.",
+  "error.agent.claudeSandboxBlocked":
+    "מצב סביבת עבודה בלבד דורש את ארגז החול של Claude, ש-Claude לא מצליח להפעיל במחשב הזה, ולכן הפקודות של הסוכן נכשלות. יש לבחור גישה מלאה או ספק אחר בהגדרות הסוכן.",
   "error.agent.screenCaptureOff": "צילום מסך כבוי עבור הסוכן הזה. המשתמש יכול להפעיל שליטה במחשב בהגדרות הסוכן.",
   "error.agent.screenCaptureUnavailable": "צילום מסך אינו זמין במחשב הזה.",
   "error.agent.screenCaptureShared":
     "צילום מסך לא פועל בשיחה ב-Slack, ב-Discord או ב-Telegram, כי אנשים אחרים מקבלים את הקבצים שלו.",
   "error.agent.screenCaptureDeclined": "המשתמש לא אישר את צילום המסך הזה. דבר לא צולם.",
   "error.agent.mcpServerDeclined": "המשתמש לא אישר את שינוי שרת ה-MCP הזה. דבר לא השתנה.",
+  "error.agent.mcpToolDeclined": "המשתמש לא אישר את הקריאה לכלי MCP הזה. הכלי לא הופעל.",
   "error.agent.mcpServerNotSaved": "שרת ה-MCP לא הגיב, ולכן לא נשמר. {error}",
   "error.agent.mcpServerKeysMove":
-    "שרת ה-MCP {name} מחזיק מפתחות עבור השרת הנוכחי שלו. יש לבקש מהמשתמש לשנות את הכתובת, הפקודה, הארגומנטים או שיטת ההעברה שלו בהגדרות השרת, MCP.",
+    "שרת ה-MCP {name} מחזיק מפתחות עבור השרת הנוכחי שלו. יש לבקש מהמשתמש לשנות את הכתובת, הפקודה, הארגומנטים או שיטת ההעברה שלו בחנות, אפליקציות, {name}.",
+  "error.agent.mcpServerHeadersNeedHttp":
+    "שרת ה-MCP {name} מריץ פקודה מקומית, ולכן אינו מקבל כותרות. בקש מהמשתמש להזין את המפתחות שלו בחנות, אפליקציות, {name}.",
+  "error.agent.mcpServerHeadersNeedPerson":
+    "רק המשתמש של OpenBot זה, בצ'אט איתך, יכול לתת את המפתחות של שרת ה-MCP {name}. בקש מהמשתמש להזין אותם בחנות, אפליקציות, {name}.",
   "error.agent.mcpServerBuiltIn":
     "{name} הוא חלק מ-OpenBot, ולכן כלי ה-MCP לא יכולים לבדוק, להפעיל, לכבות או להסיר אותו. המשתמש שולט בו במחשב שמריץ את OpenBot: חיבור GitHub בחנות, אפליקציות, GitHub, ושליטה במחשב בהגדרות, שליטה במחשב.",
   "error.agent.mcpServerUnknown": "אין שרת MCP בשם {name}. אפשר לקרוא ל-list_mcp_servers כדי לראות את השמות.",

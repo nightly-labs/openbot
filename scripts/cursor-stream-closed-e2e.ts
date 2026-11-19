@@ -1,8 +1,3 @@
-// Runs turns on the real Cursor driver against a fake `cursor-agent acp` that, as Cursor
-// 2026.10.22-27dcf5f does, sends "Error: RetriableError: WritableIterable is closed" as one answer
-// chunk after a turn that succeeded (#3334). Checks that the reply is only the answer and that the
-// turn completes, and that an answer that quotes the error keeps it.
-// `bun run test:cursor-stream-closed`. Writes .openbot-build/cursor-stream-closed-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";

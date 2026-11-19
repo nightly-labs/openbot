@@ -6,15 +6,8 @@ import { type ReactNode, useRef, useState } from "react";
 import { Pressable, type TextInputInstance, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 
-/** The picture beside the name. */
 export const IDENTITY_PICTURE_SIZE = 72;
 
-/**
- * The top of a settings page for a thing with a picture and a name, such as a server or a profile:
- * the picture on the left, the name beside it, and a line under the name. The name field is as wide as
- * the name, so the pencil follows the last letter, and has a soft fill while the name changes. Without
- * `onPicturePress` and `onNameChange` the header only shows.
- */
 export function SettingsIdentityHeader({
   picture,
   pictureLabel,
@@ -65,8 +58,6 @@ export function SettingsIdentityHeader({
       )}
       <View className="min-w-0 flex-1 gap-1">
         {onNameChange ? (
-          // While the name changes, the field takes the full row, so Android does not measure and
-          // draw it again at each key. Then the pencil, after the last letter, is hidden.
           <View className={`-ml-2 max-w-full flex-row items-center gap-1.5 ${editing ? "self-stretch" : "self-start"}`}>
             <Input
               ref={nameInput}
@@ -79,8 +70,6 @@ export function SettingsIdentityHeader({
               editable={!disabled}
               returnKeyType="done"
               variant="primary"
-              // While the name changes, a soft rounded fill shows the size of the field. HeroUI gives an
-              // Android field its own fill and elevation; the style replaces them on both platforms.
               background={null}
               style={{ backgroundColor: editing ? grouped : "transparent", borderRadius: 12, elevation: 0 }}
               className={`min-h-10 min-w-16 ${editing ? "flex-1" : "shrink"} border-0 bg-transparent px-2 font-sans text-title font-semibold shadow-none ios:shadow-none ios:outline-transparent ios:focus:outline-transparent android:border-0 android:focus:border-transparent`}

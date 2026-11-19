@@ -1,7 +1,3 @@
-// Checks numbered-list editing in a running Storybook, which renders the real shared composer.
-// Pass the URL that `bun run storybook` reports:
-// `bun scripts/composer-markdown-lists-e2e.ts --storybook=http://localhost:6006`.
-// Writes .openbot-build/composer-markdown-lists-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";

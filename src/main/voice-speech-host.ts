@@ -1,29 +1,11 @@
-// The process that reads replies aloud with Supertonic 3 through sherpa-onnx.
-//
-// It is separate from the main process because a synthesis cannot be interrupted, and separate from
-// the transcription host so that dictation does not wait behind speech. The main process ends this
-// process when it is idle, when a request times out, and at shutdown.
-//
-// Runtime imports are limited to node:* builtins. The addon is loaded with `process.dlopen` from
-// the path in the request, and the protocol is type-only, so this process cannot load Electron,
-// the application database, or any module of the main bundle.
-
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { VoiceSpeechFailure, VoiceSpeechRequest, VoiceSpeechResponse } from "./voice-speech-protocol";
 
-/**
- * More denoising steps sound cleaner and take longer; 8 still reads about five times real time.
- * The same value as `SUPERTONIC_DENOISING_STEPS` in `@openbot/contracts/speech-models`, which the
- * phone uses. This host imports only `node:*` at runtime, so the number is repeated here.
- */
 const DENOISING_STEPS = 8;
-/** The most ONNX Runtime threads a request can ask for. */
 const MAXIMUM_THREADS = 64;
-/** A settings file is a plain name in the runtime directory; empty is the default settings. */
 const SESSION_CONFIG_PATTERN = /^(?:[a-z0-9-]+\.cfg)?$/u;
 
-/** The part of the sherpa-onnx offline TTS configuration that OpenBot sets. */
 interface TtsConfig {
   model: {
     supertonic: {
@@ -36,7 +18,6 @@ interface TtsConfig {
       voiceStyle: string;
     };
     numThreads: number;
-    /** `cpu`, or `cpu:<file>` with ONNX Runtime session settings. */
     provider: string;
     debug: number;
   };
@@ -46,14 +27,9 @@ interface TtsConfig {
 interface GenerationRequest {
   text: string;
   generationConfig: { sid: number; speed: number; numSteps: number; extra: { lang: string } };
-  /**
-   * Electron's V8 memory cage rejects an external ArrayBuffer, so the addon must copy the samples
-   * into a buffer that V8 owns. With the default, every synthesis fails in Electron and works in Node.
-   */
   enableExternalBuffer: false;
 }
 
-/** The subset of the sherpa-onnx N-API addon that speech uses. */
 interface SherpaOnnxAddon {
   createOfflineTtsAsync(config: TtsConfig): Promise<unknown>;
   offlineTtsGenerateAsyncWithConfig(
@@ -78,7 +54,6 @@ class HostFailure extends Error {
 }
 
 let loading: { key: string; promise: Promise<LoadedTts> } | null = null;
-/** Requests run one at a time; the main process also never sends a second one before a reply. */
 let queue: Promise<void> = Promise.resolve();
 
 function isAddon(value: unknown): value is SherpaOnnxAddon {
@@ -103,11 +78,6 @@ function loadAddon(path: string): SherpaOnnxAddon {
   return module.exports;
 }
 
-/**
- * The provider string. sherpa-onnx opens a settings file with a narrow path and ends the process
- * when the file is missing, so the path is relative to the runtime directory, and a missing file
- * gives the default settings.
- */
 function providerFor(addonPath: string, sessionConfig: string): string {
   if (sessionConfig === "") return "cpu";
   const directory = dirname(addonPath);
@@ -150,7 +120,6 @@ async function createTts(request: VoiceSpeechRequest, key: string): Promise<Load
   }
 }
 
-/** A failed load is not kept, so the next request tries again. */
 function ttsFor(request: VoiceSpeechRequest): Promise<LoadedTts> {
   const key = [request.addonPath, request.modelDirectory, request.numThreads, request.sessionConfig].join("\n");
   if (loading?.key === key) return loading.promise;
@@ -231,10 +200,6 @@ function accept(value: unknown, respond: (response: VoiceSpeechResponse) => void
   });
 }
 
-/**
- * The part of Electron's `process.parentPort` this host uses. It is read through a guard rather than
- * Electron's own type, because this file must not import Electron.
- */
 interface ParentPort {
   on(event: "message", listener: (message: { data: unknown }) => void): void;
   postMessage(value: unknown): void;
@@ -251,8 +216,6 @@ if (parentPort) {
   parentPort.on("message", (message) => accept(message.data, (response) => parentPort.postMessage(response)));
   parentPort.start();
 } else if (process.send) {
-  // Started by `child_process.fork` with `serialization: "advanced"`: plain Node, outside Electron.
-  // This is how the host can be run against the real addon and model without the app.
   const send = process.send.bind(process);
   process.on("message", (message: unknown) => accept(message, (response) => send(response)));
   process.on("disconnect", () => process.exit(0));

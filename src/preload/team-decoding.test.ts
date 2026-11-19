@@ -54,6 +54,7 @@ const hostStatus = {
   serverName: "Studio",
   apiUrl: "https://studio.example.test",
   logoUrl: null,
+  appearance: null,
   apiOnline: true,
   remoteDesktopReady: false,
   remoteDesktopScreenRecordingDenied: false,

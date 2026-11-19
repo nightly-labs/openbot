@@ -17,12 +17,6 @@ export interface AvatarPhoto {
   base64: string;
 }
 
-/**
- * Opens the photo library, then the crop screen at `cropRoute`, and returns a square JPEG avatar,
- * or null when the user cancels. The crop screen shows the avatar's shape: `cornerRatio` is its
- * corner radius as a part of the side, and the default is a circle. `allowsEditing` would open the slow legacy iOS picker, so the
- * app shows its own crop screen.
- */
 export async function pickAvatarPhoto(cropRoute: Href, cornerRatio = 0.5): Promise<AvatarPhoto | null> {
   const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"] });
   if (result.canceled) return null;

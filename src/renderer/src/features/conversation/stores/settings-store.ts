@@ -42,11 +42,9 @@ export interface SettingsStoreDeps {
   setSettingsReasoning: (effort: AgentReasoningEffort) => void;
   setComposerError: (error: string | null, targetOverride?: ConversationTarget) => void;
   viewIsMounted: () => boolean;
-  /** Gives `false` when no agent is open, and rejects when the save is refused. */
   saveAgentPatch: (updates: Omit<UpdateAgentInput, "agentId">, targetAgentId?: string) => Promise<boolean>;
 }
 
-/** The result of a runtime save. `refusal` holds the error of a refused save, for the reason. */
 interface RuntimeSettingsSave {
   saved: boolean;
   refusal?: { error: unknown } | undefined;
@@ -63,8 +61,6 @@ export function createSettingsStore(deps: SettingsStoreDeps) {
     if (!agentId) return { saved: false };
     const serverId = deps.props.server?.id ?? "local";
     const target = { agentId, serverId };
-    // Both maps live on the controller, which outlives one server, so the key
-    // has to say which server the settings belong to.
     const settingsKey = agentConversationKey(serverId, agentId);
     const previousAttempt = deps.runtimeSettingsAttempts.get(settingsKey);
     const generation = (previousAttempt?.generation ?? 0) + 1;
@@ -83,10 +79,6 @@ export function createSettingsStore(deps: SettingsStoreDeps) {
     let abandoned = false;
     try {
       if (previousSave) baseValid = await previousSave;
-      // `agent.updateAgent` is routed by the server main has selected, not by the
-      // agent id in its payload, so a save still queued behind an earlier one when
-      // the user leaves would be applied to whichever server they arrive at. It
-      // belongs to the one it was made on, and that one is gone.
       abandoned = !deps.viewIsMounted();
       const completePatch = isCompleteRuntimeSettingsPatch(updates);
       if (!abandoned && (baseValid || completePatch)) {
@@ -106,8 +98,6 @@ export function createSettingsStore(deps: SettingsStoreDeps) {
     const latestAttempt = deps.runtimeSettingsAttempts.get(settingsKey);
     if (latestAttempt?.generation !== generation) return { saved: true };
     latestAttempt.pending = false;
-    // Nothing left to report to: the pickers, the composer error and the agent
-    // this would roll back to all belonged to the conversation that is gone.
     if (abandoned) return { saved: false };
     if (saved) {
       const activeAgent = deps.props.agent;
@@ -149,7 +139,6 @@ export function createSettingsStore(deps: SettingsStoreDeps) {
       deps.setSettingsReasoning(settings.reasoningEffort);
     }
     const result = await saveRuntimeSettings(settings, updates, null, agentId);
-    // The settings panel shows the reason of a refused save next to the change.
     if (result.refusal) throw result.refusal.error;
     return result.saved;
   }

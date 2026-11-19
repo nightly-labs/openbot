@@ -10,6 +10,7 @@
 @import "./styles/theme-sweep.css";
 @import "@openbot/ui/styles/sliding-tabs.css";
 @import "@openbot/ui/styles/action-menu.css";
+@import "@openbot/ui/styles/confetti.css";
 @import "@openbot/ui/features/dynamic-island/dynamic-island.css";
 @import "@openbot/ui/features/dynamic-island/dynamic-island-surface.css";
 @import "@openbot/ui/features/sidebar/sidebar-mobile-app.css";
@@ -24,6 +25,9 @@
 @import "@openbot/ui/features/sidebar/sidebar-views.css";
 @import "@openbot/ui/features/sidebar/sidebar-working-badge.css";
 @import "@openbot/ui/features/sidebar/sidebar-felt-badges.css";
+@import "@openbot/ui/features/sidebar/sidebar-filter.css";
+@import "@openbot/ui/features/sidebar/sidebar-tooltips.css";
+@import "@openbot/ui/features/sidebar/sidebar-threads.css";
 @import "@openbot/ui/features/agent-dock/agent-dock.css";
 @import "./features/agent-dock/agent-dock.css";
 @import "./features/account/account-update-island.css";
@@ -33,13 +37,14 @@
 @import "@openbot/ui/features/servers/create-local-server-dialog.css";
 @import "@openbot/ui/features/servers/install-server-dialog.css";
 @import "@openbot/ui/features/servers/hosted-server-upsell.css";
-@import "@openbot/ui/features/servers/server-upgrade-dialog.css";
+@import "@openbot/ui/features/billing/storage-tier-dialog.css";
 @import "@openbot/ui/features/servers/restart-server-dialog.css";
 @import "@openbot/ui/features/servers/server-roles.css";
 @import "@openbot/ui/features/servers/server-audit-log.css";
 @import "@openbot/ui/features/servers/server-update-dialog.css";
 @import "@openbot/ui/styles/settings-panel.css";
 @import "@openbot/ui/styles/provider-code-login.css";
+@import "@openbot/ui/styles/scroll-edges.css";
 @import "@openbot/ui/features/conversation/conversation.css";
 @import "@openbot/ui/features/channels/channel-avatar.css";
 @import "./features/channels/channels.css";
@@ -52,6 +57,7 @@
 @import "@openbot/ui/features/usage/usage-machine-meter.css";
 @import "./features/usage/usage.css";
 @import "./features/schedule/schedule.css";
+@import "@openbot/ui/features/agents/agent-picker.css";
 @import "@openbot/ui/features/tasks/tasks.css";
 @import "@openbot/ui/styles/chart.css";
 @import "@openbot/ui/features/files/files.css";
@@ -63,6 +69,7 @@
 @import "@openbot/ui/features/window/page-rail.css";
 @import "./features/window/window.css";
 @import "./features/files/library.css";
+@import "./features/crm/crm-page.css";
 @import "@openbot/ui/features/settings/opencode-key-dialog.css";
 @import "./features/settings/settings-mobile-connect.css";
 @import "@openbot/ui/features/settings/settings-hosted-sites.css";
@@ -93,12 +100,13 @@
 @import "@openbot/ui/features/github-star/github-star-toast.css";
 @import "@openbot/ui/features/social-follow/social-follow-toast.css";
 @import "@openbot/ui/features/updates/whats-new.css";
+@import "@openbot/ui/features/updates/update-required.css";
 @import "@openbot/ui/features/billing/billing.css";
+@import "@openbot/ui/features/referral/referral.css";
+@import "@openbot/ui/features/crm/crm.css";
 @import "@openbot/ui/styles/reference-chip.css";
 @import "@openbot/ui/skill-preview.css";
-/* After the page styles: the transparent window replaces their backgrounds. */
 @import "./styles/window-glass.css";
-/* After the transparent window: the chat background replaces its canvas in conversations. */
 @import "./styles/chat-background.css";
 
 @source "../../../packages/ui/src";

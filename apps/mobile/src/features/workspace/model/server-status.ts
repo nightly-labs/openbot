@@ -16,11 +16,6 @@ const LABELS = {
   error: "mobile.workspace.status.error",
 } as const satisfies Record<MobileServerState, MobileTextKey>;
 
-/**
- * What the screens show: online, also while a return to the app connects again quietly. Actions
- * can use it too, because a request then waits for the connection. Code that needs the live
- * connection itself, such as the outbox or the browser view, reads `state`.
- */
 export function showsOnline(server: Pick<MobileServer, "state" | "resuming"> | undefined): boolean {
   return server?.state === "online" || server?.resuming === true;
 }
@@ -60,7 +55,6 @@ export function applyServerRecovery(
   };
 }
 
-/** True when `next` differs from `server` only in the recovery countdown. */
 export function sameServerRecovery(server: MobileServer, next: MobileServer): boolean {
   const previous = server.recoveryStatus;
   const status = next.recoveryStatus;
@@ -75,15 +69,10 @@ export function sameServerRecovery(server: MobileServer, next: MobileServer): bo
   );
 }
 
-/** A lost connection reports attempt 0 while its first attempt is due; show that attempt. */
 export function recoveryAttempt(status: RemoteRecoveryStatus): number {
   return Math.max(1, status.attempt);
 }
 
-/**
- * Seconds for the reconnect countdown, or null to hide it. Connecting shows the wait that follows a
- * failure. A lost connection reports zero before its first attempt starts, with no wait to show.
- */
 export function recoveryCountdown(status: RemoteRecoveryStatus): number | null {
   return status.remainingSeconds > 0 ? status.remainingSeconds : null;
 }
@@ -92,7 +81,6 @@ export function serverKind(hostId: string, pairedHostId: string | undefined): Mo
   return hostId === pairedHostId ? "local" : "remote";
 }
 
-/** The server of a directory host. A server that is already listed keeps its connection state. */
 export function serverFromHost(
   host: RemoteTeamHost,
   kind: MobileServer["kind"],
@@ -102,6 +90,11 @@ export function serverFromHost(
     id: host.hostId,
     name: host.name,
     logoKey: host.logoKey,
+    ...(previous?.appearance !== undefined && (host.appearance === undefined || previous.state === "online")
+      ? { appearance: previous.appearance }
+      : host.appearance === undefined
+        ? {}
+        : { appearance: host.appearance }),
     kind,
     state: previous?.state ?? "unknown",
     initialConnectionPending: previous?.initialConnectionPending ?? true,
@@ -111,8 +104,6 @@ export function serverFromHost(
     resuming: previous?.resuming,
     address: null,
     accent: serverAccent(host.hostId),
-    // The directory gives the key that this app trusts: the pinned key, or the new key of a signed
-    // handover. A changed key connects again with it.
     publicKey: host.devicePublicKey,
     membershipId: host.membershipId,
     role: host.role,

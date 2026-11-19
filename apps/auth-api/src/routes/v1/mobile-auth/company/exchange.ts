@@ -7,9 +7,6 @@ import { runApiResponse } from "../../../../server/effect-runtime";
 import { readJsonObject } from "../../../../server/json-body";
 import { apiError, companySignInErrorResponse, json, requestCompanySignIn } from "../../../../server/request-auth";
 
-// The phone gives the one-time code from its browser session, the verifier of its challenge and its
-// device. Only this step makes the session a mobile session; `/v1/auth/company/exchange` makes a
-// desktop session.
 export const Route = createFileRoute("/v1/mobile-auth/company/exchange")({
   server: {
     handlers: {

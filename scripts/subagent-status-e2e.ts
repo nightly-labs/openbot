@@ -1,12 +1,3 @@
-// Checks that a running subagent keeps its agent at work, and that a failed subagent alerts. Runs the
-// real agent service on a temporary profile with the fake OpenCode agent of `acp-subagents-e2e.ts`
-// (`provider-fakes/agents/subagents.ts`):
-// 1. The prompt `work` starts two subagents; one fails. The service sends one `subagent-failed` event,
-//    and the desktop notification path turns it into a notice at the "all" level only.
-// 2. The prompt `background` starts a subagent that runs on after its turn. After `turn-completed`, the
-//    runtime snapshot still names the agent in `subagentTurns`. When the subagent ends, a new runtime
-//    snapshot drops it.
-// `bun run test:subagent-status`. Writes .openbot-build/subagent-status-e2e/report.json.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -26,7 +17,6 @@ const userData = join(root, "user-data");
 const home = join(root, "home");
 const fakeOpenCode = join(root, "bin", "opencode");
 
-// Before the service modules load: the provider process and the stores read the home folder.
 process.env.HOME = home;
 process.env.XDG_CONFIG_HOME = join(home, ".config");
 process.env.XDG_DATA_HOME = join(home, ".local/share");
@@ -47,11 +37,8 @@ interface Report {
   failedEvents?: Array<{ title: string; threadIsAgentChat: boolean }>;
   notification?: { all: { title: string; body: string } | null; needsMe: string | null; preview: string | null };
   background?: {
-    /** The `subagentTurns` of the runtime snapshot just after `turn-completed`. */
     afterTurn: string[];
-    /** The `subagentTurns` of the last runtime snapshot event after the subagent ended. */
     afterSubagent: string[];
-    /** Each runtime snapshot event and turn end, in order. */
     timeline: string[];
   };
   error?: string;
@@ -80,7 +67,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -91,7 +77,6 @@ async function waitFor<T>(label: string, read: () => T | null | undefined | fals
   }
 }
 
-// The fake answers `--version` here: the ACP fake serves only the protocol.
 const fakeAgent = resolve(import.meta.dirname, "provider-fakes/agents/subagents.ts");
 await writeFile(
   fakeOpenCode,
@@ -138,7 +123,6 @@ try {
     );
   await waitFor("the first turn to end", () => turnEnds().length === 1);
 
-  // 1. A failed subagent.
   const failed = events.filter(
     (event): event is Extract<AgentEvent, { type: "subagent-failed" }> => event.type === "subagent-failed",
   );
@@ -167,7 +151,6 @@ try {
     preview: notice("all", true)?.body ?? null,
   };
 
-  // 2. A background subagent keeps its agent at work after the turn.
   const timeline: string[] = [];
   const turns = (snapshot: { subagentTurns?: Array<{ agentId: string }> }) =>
     (snapshot.subagentTurns ?? []).filter((turn) => turn.agentId === agent.id).map((turn) => turn.agentId);

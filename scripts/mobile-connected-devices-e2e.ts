@@ -1,12 +1,3 @@
-// Runs the real desktop account client against the real account service on a migrated SQLite database
-// (#2356). The desktop signs in with an email code, a joined server ("contabo-bot") shows a Mobile
-// Connect code, and a phone redeems it. The Connected devices list of the local computer must not show
-// that phone while the local computer is not in the account directory, because the phone cannot open
-// it. The list must show the phone for the joined server and after the local computer is published, and
-// the desktop must still revoke it.
-//
-// Run: bun run test:mobile-connected-devices
-// It writes .openbot-build/mobile-connected-devices-e2e/report.json and exits non-zero on a failure.
 import { type ChildProcess, spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -30,7 +21,6 @@ function check(name: string, passed: boolean, detail?: unknown) {
   checks.push({ name, passed, ...(detail === undefined ? {} : { detail }) });
 }
 
-/** The session IDs of a device list answer. */
 function sessionIdsOf(body: unknown): string[] {
   if (!isDynamicRecord(body) || !Array.isArray(body.devices)) return [];
   return body.devices.flatMap((device) =>
@@ -38,24 +28,20 @@ function sessionIdsOf(body: unknown): string[] {
   );
 }
 
-/** A string field of a JSON object, or an empty string. */
 function stringField(value: unknown, key: string): string {
   if (!isDynamicRecord(value)) return "";
   const field = value[key];
   return isString(field) ? field : "";
 }
 
-/** The error code of an error answer. */
 function errorCodeOf(body: unknown): string | null {
   return isDynamicRecord(body) && isDynamicRecord(body.error) && isString(body.error.code) ? body.error.code : null;
 }
 
-/** A host identity as the desktop keeps it: the fingerprint is the SHA-256 of the device public key. */
 function hostIdentity(deviceKey: string): MobileConnectHostBinding {
   return { hostId: randomUUID(), fingerprint: createHash("sha256").update(deviceKey).digest("base64url") };
 }
 
-/** Adds a host to the account directory, as a publish does: an active owner membership and a key. */
 function publishHost(database: DatabaseSync, input: { hostId: string; deviceKey: string; userId: string }) {
   const now = Date.now();
   database
@@ -74,7 +60,6 @@ function publishHost(database: DatabaseSync, input: { hostId: string; deviceKey:
     .run(randomUUID(), input.hostId, input.userId, now, now);
 }
 
-/** Starts the account service over the database file and resolves with its port. */
 function startAccountServer(databasePath: string): Promise<{ child: ChildProcess; port: number }> {
   const child = spawn(process.execPath, [SERVER, databasePath], { stdio: ["ignore", "pipe", "inherit"] });
   return new Promise((resolvePort, reject) => {
@@ -116,16 +101,12 @@ try {
     if (signedIn.status !== "signed_in") throw new Error("The desktop did not sign in.");
     const userId = signedIn.user.id;
 
-    // The joined server is in the account directory. The local computer has a host identity, but it is
-    // not published, so the phone cannot open it.
     const joinedKey = "joined-device-public-key";
     const localKey = "local-device-public-key";
     const joined = hostIdentity(joinedKey);
     const local = hostIdentity(localKey);
     publishHost(database, { hostId: joined.hostId, deviceKey: joinedKey, userId });
 
-    // The joined server shows a code that is bound to its host key, with the account session of this
-    // account. The phone redeems it as the phone app does.
     const code = await runCauseEffect(desktop.createMobileConnect(joined));
     const ticket = parseMobileConnectUrl(code.qrData)?.ticket;
     if (!ticket) throw new Error("The Mobile Connect code has no ticket.");
@@ -145,7 +126,6 @@ try {
     const ids = async (host: MobileConnectHostBinding | null) =>
       (await runCauseEffect(desktop.listMobileConnectedDevices(host))).map((device) => device.sessionId);
     const accountToken = async () => {
-      // The desktop keeps its token in the session file; the identity encryption above makes it readable.
       const stored = Buffer.from(await readFile(join(root, "session.bin"), "utf8"), "base64").toString();
       return stringField(JSON.parse(stored), "sessionToken");
     };
@@ -159,7 +139,6 @@ try {
     const noIdentity = await ids(null);
     check("a computer with no host identity lists no phones", noIdentity.length === 0, noIdentity);
 
-    // An earlier desktop sends no host and still gets every phone of the account.
     const token = await accountToken();
     const earlier = await fetch(`${apiUrl}/v1/mobile-auth/devices`, { headers: { Authorization: `Bearer ${token}` } });
     const earlierIds = sessionIdsOf(await earlier.json());
@@ -178,7 +157,6 @@ try {
       code: invalidCode,
     });
 
-    // A host with a key but a revoked membership is not in the directory of this account.
     database
       .prepare("UPDATE remote_memberships SET status = 'revoked' WHERE host_id = ? AND user_id = ?")
       .run(joined.hostId, userId);
@@ -188,13 +166,11 @@ try {
       .prepare("UPDATE remote_memberships SET status = 'active' WHERE host_id = ? AND user_id = ?")
       .run(joined.hostId, userId);
 
-    // A registered host with an owner membership but no key is not in the directory yet.
     publishHost(database, { hostId: local.hostId, deviceKey: localKey, userId });
     database.prepare("UPDATE remote_hosts SET device_public_key = NULL WHERE host_id = ?").run(local.hostId);
     const noKey = await ids(local);
     check("a local host with no device key lists no phones", noKey.length === 0, noKey);
 
-    // After the local computer is published, the phone can open it, so the list shows it.
     publishHost(database, { hostId: local.hostId, deviceKey: localKey, userId });
     const published = await ids(local);
     check(
@@ -222,7 +198,6 @@ try {
 } catch (cause) {
   error = cause instanceof Error ? cause.message : String(cause);
 } finally {
-  // Stop only the account server that this script started.
   if (server && server.exitCode === null) {
     const stopped = new Promise((done) => server?.once("exit", done));
     server.kill("SIGTERM");

@@ -4,7 +4,6 @@ import { ReportSitePage } from "../components/report-site/ReportSitePage";
 import { reportSiteText } from "../components/transactional/page-text";
 import { loadPageText } from "../lib/page-text";
 
-// Reached from any hosted site with that site's name in the query, so it is kept out of search.
 export const Route = createFileRoute("/report-site")({
   validateSearch: (value) => ({
     hostname: isDynamicRecord(value) && isString(value.hostname) ? value.hostname : "",

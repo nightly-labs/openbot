@@ -1,7 +1,3 @@
-// Runs `ask_ui` blocks end to end on the real modules: the real `AttentionRegistry` answers each block as
-// the desktop, a team member and a released client do, and the real Team API codecs carry the stored
-// conversation as a host sends it to each kind of client. No provider or account is used.
-// `bun scripts/ui-blocks-e2e.ts`. Writes .openbot-build/ui-blocks-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -23,6 +19,7 @@ import {
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
   withUiBlockAutoAnswers,
 } from "@openbot/contracts/team-protocol/ui-block-auto-answer-v1";
+import { UI_BLOCK_PREVIEW_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/ui-block-preview-edit-v1";
 import {
   addUiBlockVaultRequests,
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
@@ -43,6 +40,8 @@ import {
 import {
   type ConversationUiBlock,
   normalizeUiBlockSpec,
+  UI_CONFIRM_EDIT_ACTION_ID,
+  UI_CONFIRM_PREVIEW_ANSWER_ID,
   type UiBlockResponse,
   type UiBlockSpec,
   type UiBlockValue,
@@ -64,28 +63,25 @@ const OWNER = undefined;
 const MEMBER: PromptResponder = { sender: { id: "member-1", name: "Mia" }, privileged: false };
 const ADMIN: PromptResponder = { sender: { id: "admin-1", name: "Ada" }, privileged: true };
 
-/** The JSON of the `ask_ui` tool result, as `uiBlockPromptResult` writes it. */
 interface AgentAnswer {
   status: string;
   blockId: string;
   actionId?: string;
   values?: Record<string, UiBlockValue>;
   text?: string;
+  preview?: string;
   next?: string;
 }
 
-/** Records what OpenBot answers to the agent. The process never starts: only the answer is read. */
 class RecordingClient extends CodexAppServerClient {
   readonly answers = new Map<RequestId, { success: boolean; value: AgentAnswer | null }>();
   readonly #waiters = new Map<RequestId, () => void>();
 
-  /** Resolves when OpenBot answers the request, so that a host timer is awaited, not slept on. */
   answered(id: RequestId): Promise<void> {
     if (this.answers.has(id)) return Promise.resolve();
     return new Promise((resolve) => this.#waiters.set(id, resolve));
   }
 
-  // A provider that still waits: the registry answers it when the turn ends.
   override get running(): boolean {
     return true;
   }
@@ -131,10 +127,6 @@ const registry = new AttentionRegistry({
 
 let nextRequest = 1;
 
-/**
- * Shows a block as the `ask_ui` router does after its checks, and returns its request id and message.
- * `autoAnswer` is what `acknowledge_request` adds: the host presses that action after the delay.
- */
 function ask(spec: UiBlockSpec, turnId: string, autoAnswer?: { actionId: string; afterMs: number }) {
   const normalized = normalizeUiBlockSpec(spec);
   assert(normalized, "the router would refuse this spec");
@@ -155,7 +147,6 @@ function answer(requestId: number, answers: Record<string, string[]>, responder?
   return runCauseEffect(registry.respondToPrompt({ requestId, answers }, responder));
 }
 
-/** What the person answers on a client that knows the block. */
 const asNewClient = (spec: UiBlockSpec, response: UiBlockResponse) => uiBlockAnswersFromResponse(spec, response);
 
 const steps: Array<{ step: string; result: unknown }> = [];
@@ -180,6 +171,17 @@ const confirmSpec: UiBlockSpec = {
     { id: "cancel", label: "Cancel" },
   ],
 };
+const draftSpec = {
+  type: "confirm",
+  title: "Send the letter to Ann?",
+  fields: [{ label: "To", value: "ann@example.com" }],
+  preview: "Hi Ann, see you on Monday.",
+  actions: [
+    { id: "send", label: "Send", style: "primary" },
+    { id: UI_CONFIRM_EDIT_ACTION_ID, label: "Edit" },
+    { id: "keep", label: "Keep draft" },
+  ],
+} satisfies UiBlockSpec;
 const dangerSpec: UiBlockSpec = {
   type: "confirm",
   title: "Delete the archive?",
@@ -200,13 +202,11 @@ const formSpec: UiBlockSpec = {
   type: "form",
   title: "Connect the service",
   fields: [
-    // A field id that the Team API key swap would rename, if the block went through it.
     { id: "agentId", kind: "text", label: "Agent" },
     { id: "token", kind: "text", label: "Token", secret: true },
   ],
 };
 
-// The plan card that `acknowledge_request` builds.
 const planSpec: UiBlockSpec = {
   type: "confirm",
   title: "On it. This is my plan.",
@@ -224,7 +224,6 @@ const AUTO_START = { actionId: "start", afterMs: 50 };
 
 const hasUiBlock = (json: string) => json.includes('"uiBlock"');
 
-/** A block as `ui-blocks-v1` carries it: the host's auto-answer state stays on the host. */
 function onV1Wire(block: ConversationUiBlock | undefined): ConversationUiBlock | undefined {
   if (!block) return block;
   const { autoAnswer: _autoAnswer, ...state } = block.state;
@@ -266,7 +265,6 @@ try {
     assert.ok(teamCapabilitiesForProtocol(7).includes(TEAM_UI_BLOCKS_CAPABILITY));
   });
 
-  // Answers on the host.
   await step("owner on a new client presses Send with a sender address", async () => {
     const { id, spec, message } = ask(confirmSpec, "turn-1");
     await answer(id, asNewClient(spec, { actionId: "send", values: { from: "ops@example.com" } }), OWNER);
@@ -298,6 +296,57 @@ try {
     });
     assert.deepEqual(message.uiBlock?.state.respondedBy, MEMBER.sender);
     return message.uiBlock?.state;
+  });
+
+  await step("ui-block-preview-edit-v1: a protocol 9 capability only", () => {
+    assert.ok(TEAM_CURRENT_CAPABILITIES.includes(UI_BLOCK_PREVIEW_EDIT_CAPABILITY));
+    assert.ok(!teamCapabilitiesForProtocol(8).includes(UI_BLOCK_PREVIEW_EDIT_CAPABILITY));
+    assert.ok(teamCapabilitiesForProtocol(9).includes(UI_BLOCK_PREVIEW_EDIT_CAPABILITY));
+  });
+
+  await step("an edited draft reaches the agent, and the closed card shows it", async () => {
+    const edited = "Hi Ann, see you on Tuesday.";
+    const { id, spec, message } = ask(draftSpec, "turn-edit");
+    const answers = { ...asNewClient(spec, { actionId: "send" }), [UI_CONFIRM_PREVIEW_ANSWER_ID]: [edited] };
+    await answer(id, answers, OWNER);
+    const sent = client.answers.get(id)?.value;
+    assert.equal(sent?.actionId, "send");
+    assert.equal(sent?.preview, edited);
+    assert.ok(sent?.next);
+    assert.deepEqual(message.uiBlock?.state.response, { actionId: "send" });
+    assert.equal(message.uiBlock?.spec.type === "confirm" && message.uiBlock.spec.preview, edited);
+    assert.ok(message.text.includes(edited) && !message.text.includes("see you on Monday"), message.text);
+    assert.ok(message.questionPrompt?.questions[0]?.question.includes(edited));
+    const resolution = message.questionPrompt?.resolution;
+    assert.deepEqual(Object.keys(resolution?.status === "answered" ? resolution.responses : {}), ["action"]);
+    return { agentGot: sent, stored: message.uiBlock };
+  });
+
+  await step("an unchanged draft adds nothing; a blank one, or an edit with no Edit button, is refused", async () => {
+    const draft = ask(draftSpec, "turn-edit-2");
+    const keep = asNewClient(draft.spec, { actionId: "keep" });
+    await assert.rejects(answer(draft.id, { ...keep, [UI_CONFIRM_PREVIEW_ANSWER_ID]: ["  "] }, OWNER));
+    assert.equal(draft.message.uiBlock?.state.status, "pending");
+    await answer(draft.id, { ...keep, [UI_CONFIRM_PREVIEW_ANSWER_ID]: ["Hi Ann, see you on Monday."] }, OWNER);
+    assert.deepEqual(client.answers.get(draft.id)?.value, {
+      status: "answered",
+      blockId: `block-${draft.id}`,
+      actionId: "keep",
+    });
+    const plain = ask(confirmSpec, "turn-edit-3");
+    const send = asNewClient(plain.spec, { actionId: "cancel" });
+    await assert.rejects(answer(plain.id, { ...send, [UI_CONFIRM_PREVIEW_ANSWER_ID]: ["text"] }, OWNER));
+    await answer(plain.id, send, OWNER);
+    assert.equal(plain.message.uiBlock?.state.status, "answered");
+    const exact = ask(
+      { ...draftSpec, actions: draftSpec.actions.filter((action) => action.id !== UI_CONFIRM_EDIT_ACTION_ID) },
+      "turn-edit-4",
+    );
+    const approve = asNewClient(exact.spec, { actionId: "send" });
+    await assert.rejects(answer(exact.id, { ...approve, [UI_CONFIRM_PREVIEW_ANSWER_ID]: ["Other text"] }, MEMBER));
+    assert.equal(exact.message.uiBlock?.state.status, "pending");
+    await answer(exact.id, approve, MEMBER);
+    assert.equal(client.answers.get(exact.id)?.value?.preview, undefined);
   });
 
   await step("member cannot press a danger action or answer it in words; an admin can", async () => {
@@ -349,6 +398,16 @@ try {
     await answer(id, {}, MEMBER);
     assert.deepEqual(client.answers.get(id)?.value, { status: "skipped", blockId: `block-${id}` });
     assert.equal(message.uiBlock?.state.status, "closed");
+    assert.equal(message.uiBlock?.state.outcome, undefined);
+  });
+
+  await step("a chat message closes the block, and the card says why (#7678)", async () => {
+    const { id, message } = ask(repliesSpec, "turn-11");
+    registry.releaseForUserMessage("agent-1", THREAD, "turn-11");
+    assert.equal(client.answers.get(id)?.value?.status, "skipped");
+    assert.equal(message.uiBlock?.state.status, "closed");
+    assert.equal(message.uiBlock?.state.outcome, "Closed by a new message");
+    return message.uiBlock?.state;
   });
 
   await step("nobody answers a plan card: the host presses Start after its delay", async () => {
@@ -370,7 +429,6 @@ try {
     await answer(id, asNewClient(spec, { actionId: "cancel" }), OWNER);
     assert.equal(client.answers.get(id)?.value?.actionId, "cancel");
     assert.equal(message.uiBlock?.state.autoAnswer?.done, undefined);
-    // A second plan card on a later delay: when the host presses it, the first timer had its turn too.
     const later = ask(planSpec, "turn-10", { actionId: "start", afterMs: AUTO_START.afterMs * 2 });
     await client.answered(later.id);
     assert.equal(client.answers.get(id)?.value?.actionId, "cancel", "the host replaced the person's answer");
@@ -393,7 +451,6 @@ try {
   assert.deepEqual(errors, [], "the registry reported an error");
   await writeFile(resolve(OUT, "conversation.json"), `${JSON.stringify(snapshot, null, 2)}\n`);
 
-  // The stored conversation on the wire.
   const current = page(snapshot.messages, secretMessage ? { "quoted-1": { ...secretMessage, id: "quoted-1" } } : {});
   const released = withoutBlocks(current);
 
@@ -474,7 +531,6 @@ try {
       current,
     );
     assert.ok(!encoded.includes(SECRET));
-    // As the team client reads it: the frozen codec leaves the key out, and the client copies it back.
     const wire = JSON.parse(encoded);
     const decoded = decodeTeamProtocolV7CurrentHttpResponse("GET", PAGE_PATH, 200, wire);
     assert(decoded && typeof decoded === "object" && !Array.isArray(decoded));
@@ -535,7 +591,6 @@ try {
     assert.equal(decodeTeamProtocolV7BaseCurrentEvent(event).kind, "invalid");
   });
 
-  // A form of `request_vault_item` after the user saved a card: the host marks it with `vault`.
   const formMessage = snapshot.messages.find((message) => message.uiBlock?.spec.type === "form");
   assert(formMessage?.uiBlock, "no form block to mark as a Vault request");
   const vault: UiBlockVaultRequest = {
@@ -567,7 +622,6 @@ try {
       vaultPage,
     );
     assert.ok(!encoded.includes(SECRET));
-    // As the team client reads it: the frozen codec leaves the key out, and the client copies it back.
     const wire = JSON.parse(encoded);
     const decoded = decodeTeamProtocolV7CurrentHttpResponse("GET", PAGE_PATH, 200, wire);
     assert(decoded && typeof decoded === "object" && !Array.isArray(decoded));

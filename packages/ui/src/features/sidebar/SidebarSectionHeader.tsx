@@ -1,12 +1,3 @@
-/**
- * A section's header row: the collapse toggle, which doubles as the drag handle, and the section
- * context menu. The menu is inline rather than a component of its own because this is its only
- * caller - both regions that show a section header reach it through here.
- *
- * A folder in a folder names its parent before its own name, in muted text, because folders do not
- * indent. A folder header ends with a folder icon, and with the unread count while it is closed.
- */
-
 import { SIDEBAR_FOLDER_LEVELS } from "@openbot/contracts/ipc";
 import {
   ArrowDown,
@@ -24,7 +15,7 @@ import {
   Pencil,
   Trash2,
 } from "@openbot/ui";
-import { For, Show } from "solid-js";
+import { createMemo, For, Show } from "solid-js";
 import { useText } from "../../text";
 import { SidebarSectionEditor } from "./SidebarSectionEditor";
 import { useSidebarScope } from "./sidebar-scope";
@@ -42,6 +33,7 @@ export function SidebarSectionHeader(headerProps: { sectionId: string; name: str
     pending,
     props,
     sectionCanNest,
+    sectionChatCount,
     sectionChildren,
     sectionIsCollapsed,
     sectionLabel,
@@ -54,6 +46,7 @@ export function SidebarSectionHeader(headerProps: { sectionId: string; name: str
     startSectionDragging,
     stopSidebarDragging,
     visibleSectionIds,
+    layoutDraggable,
   } = useSidebarScope();
   const { t } = useText();
   const editing = () => {
@@ -67,12 +60,11 @@ export function SidebarSectionHeader(headerProps: { sectionId: string; name: str
   const parentId = () => sectionParent(headerProps.sectionId);
   const parentName = () => customSectionById().get(parentId() ?? "")?.name;
   const unread = () => (collapsed() ? sectionUnreadCount(headerProps.sectionId) : 0);
-  /** An open folder that holds nothing shows a closed folder icon. */
+  const hidden = createMemo(() => (collapsed() ? sectionChatCount(headerProps.sectionId) : 0));
   const empty = () =>
     (filteredChatsBySection().get(headerProps.sectionId)?.length ?? 0) === 0 &&
     sectionChildren(headerProps.sectionId).length === 0;
   const canHoldFolder = () => depth() + 1 < SIDEBAR_FOLDER_LEVELS;
-  /** The folders this folder can move into, in list order, without the one it is in now. */
   const destinations = () =>
     visibleSectionIds().filter(
       (sectionId) =>
@@ -95,7 +87,7 @@ export function SidebarSectionHeader(headerProps: { sectionId: string; name: str
               variant: "ghost",
               class: "sidebar-section-toggle sidebar-section-drag-handle",
             })}
-            draggable={!layoutMutable() || props.compact ? "false" : "true"}
+            draggable={!layoutDraggable() || props.compact ? "false" : "true"}
             title={!layoutMutable() ? t("sidebar.section.layoutUnsupported") : undefined}
             aria-expanded={collapsed() ? "false" : "true"}
             aria-controls={`sidebar-section-body-${headerProps.sectionId}`}
@@ -119,30 +111,36 @@ export function SidebarSectionHeader(headerProps: { sectionId: string; name: str
               </Show>
               {headerProps.name}
             </span>
-            <Show
-              when={custom()}
-              fallback={
-                <ChevronDown
-                  class={`sidebar-section-chevron size-4${collapsed() ? " sidebar-section-chevron-collapsed" : ""}`}
-                  aria-hidden="true"
-                />
-              }
-            >
-              <span class="sidebar-folder-end">
-                <Show when={unread() > 0}>
-                  <Badge class="sidebar-folder-unread" variant="primary-light" aria-hidden="true">
-                    {Math.min(unread(), 99)}
-                  </Badge>
-                  <span class="sr-only">{t("sidebar.folder.unread", { count: unread() })}</span>
-                </Show>
+            <Show when={hidden() > 0}>
+              <span class="sidebar-section-count" aria-hidden="true">
+                {t("sidebar.section.count", { count: hidden() })}
+              </span>
+              <span class="sr-only">{t("sidebar.section.chatCount", { count: hidden() })}</span>
+            </Show>
+            <span class="sidebar-folder-end">
+              <Show when={unread() > 0}>
+                <Badge class="sidebar-folder-unread" variant="primary-light" aria-hidden="true">
+                  {Math.min(unread(), 99)}
+                </Badge>
+                <span class="sr-only">{t("sidebar.folder.unread", { count: unread() })}</span>
+              </Show>
+              <Show
+                when={custom()}
+                fallback={
+                  <ChevronDown
+                    class={`sidebar-section-chevron size-4${collapsed() ? " sidebar-section-chevron-collapsed" : ""}`}
+                    aria-hidden="true"
+                  />
+                }
+              >
                 <Show
                   when={collapsed() || empty()}
                   fallback={<FolderOpen class="sidebar-folder-icon size-4" aria-hidden="true" />}
                 >
                   <Folder class="sidebar-folder-icon size-4" aria-hidden="true" />
                 </Show>
-              </span>
-            </Show>
+              </Show>
+            </span>
           </ContextMenu.Trigger>
           <Show when={layoutMutable()}>
             <ContextMenu.Portal>
