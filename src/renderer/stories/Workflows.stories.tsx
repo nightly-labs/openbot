@@ -18,6 +18,7 @@ import {
   AGENT_RESULT,
   competitorWatch,
   githubTriage,
+  higgsfieldVideo,
   LLM_RESULT,
   newCompetitorAlert,
   STORY_CATALOGS,
@@ -81,6 +82,11 @@ export const ExampleWithCollaborators: Story = {
 export const InApp: Story = {
   name: "In app",
   render: () => <WorkflowInAppStory workflows={[competitorWatch(), newCompetitorAlert()]} />,
+};
+
+export const HiggsfieldVideo: Story = {
+  name: "Higgsfield video",
+  render: () => <WorkflowStory workflows={[higgsfieldVideo()]} features={STORY_ALL_FEATURES} />,
 };
 
 export const ExampleAfterRun: Story = {

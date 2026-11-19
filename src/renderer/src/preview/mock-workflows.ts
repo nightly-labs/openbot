@@ -14,6 +14,7 @@ import {
   type WorkflowGraph,
   type WorkflowMediaAccountCredits,
   type WorkflowMediaCatalogModel,
+  type WorkflowMediaOptionValue,
   type WorkflowNode,
   type WorkflowRun,
   type WorkflowRunDetail,
@@ -103,16 +104,79 @@ function mockAnswer(node: WorkflowNode, input: string): string {
   }
 }
 
+const PREVIEW_VIDEO_OPTIONS: Pick<WorkflowMediaCatalogModel, "aspects" | "options" | "inputs"> = {
+  aspects: ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"],
+  options: [{ name: "generate_audio", kind: "switch", values: ["off", "on"], default: "on" }],
+  inputs: ["frames", "references"],
+};
+
+const previewSeconds = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, index) => from + index);
+
+const PREVIEW_SEEDANCE: Pick<WorkflowMediaCatalogModel, "durations" | "resolutions" | "options" | "inputs"> = {
+  durations: previewSeconds(4, 15),
+  resolutions: ["480p", "720p", "1080p", "4K"],
+  options: [
+    { name: "mode", kind: "choice", values: ["std", "fast"], default: "std" },
+    {
+      name: "genre",
+      kind: "choice",
+      values: ["auto", "action", "horror", "comedy", "noir", "drama", "epic"],
+      default: "auto",
+    },
+    { name: "generate_audio", kind: "switch", values: ["off", "on"], default: "on" },
+  ],
+  inputs: ["frames", "references", "videos", "audios"],
+};
+
+const PREVIEW_KLING: Pick<WorkflowMediaCatalogModel, "aspects" | "durations" | "options" | "inputs" | "modes"> = {
+  aspects: ["1:1", "16:9", "9:16", "21:9"],
+  durations: previewSeconds(3, 30),
+  options: [
+    {
+      name: "mode",
+      kind: "choice",
+      values: ["text-to-video", "image-to-video", "reference-to-video"],
+      default: "text-to-video",
+    },
+  ],
+  inputs: ["frames", "references", "videos"],
+  modes: [
+    { value: "text-to-video", inputs: [] },
+    { value: "image-to-video", inputs: ["frames"] },
+    { value: "reference-to-video", inputs: ["references", "videos"] },
+  ],
+};
+
+const PREVIEW_LIVE_MODELS: Readonly<
+  Record<
+    string,
+    Partial<Pick<WorkflowMediaCatalogModel, "aspects" | "durations" | "resolutions" | "options" | "inputs" | "modes">>
+  >
+> = {
+  "higgsfield-seedance_2_0": PREVIEW_SEEDANCE,
+  "higgsfield-kling4_0": PREVIEW_KLING,
+};
+
 const PREVIEW_MEDIA_CATALOG: WorkflowMediaCatalogModel[] = WORKFLOW_MEDIA_MODELS.flatMap((model) => {
-  if (model.provider === "higgsfield") return [workflowFixedCatalogModel(model, model.provider)];
+  if (model.provider === "higgsfield") {
+    const entry = workflowFixedCatalogModel(model, model.provider);
+    if (!model.kinds.includes("video")) return [entry];
+    return [{ ...entry, ...PREVIEW_VIDEO_OPTIONS, ...PREVIEW_LIVE_MODELS[model.id] }];
+  }
   if (model.provider !== "sunra") return [];
   const entry = workflowFixedCatalogModel(model, model.provider);
   return [{ ...entry, resolutions: entry.resolutions.map((value) => value.replace(/K$/u, "k")) }];
 });
 
-function previewQuote(kind: "image" | "video", duration: number, resolution: string | null): number {
+function previewQuote(
+  kind: "image" | "video",
+  duration: number,
+  resolution: string | null,
+  options?: readonly WorkflowMediaOptionValue[],
+): number {
   const scale = resolution?.startsWith("4") || resolution === "1080p" ? 2 : 1;
-  return (kind === "video" ? duration * 2.5 : 1.5) * scale;
+  const sound = options?.some((option) => option.name === "generate_audio" && option.value === "off") ? 1 : 1.5;
+  return (kind === "video" ? duration * 2.5 * sound : 1.5) * scale;
 }
 
 const PREVIEW_MEDIA_ACCOUNTS: readonly WorkflowMediaAccountCredits[] = [
@@ -510,7 +574,9 @@ export function mockWorkflows(
       workflowMediaProvidersOf(accounts.map(({ provider, id, name }) => ({ provider, id, name }))),
     mediaCredits: async () => workflowMediaCreditsOf(structuredClone(accounts)),
     mediaCatalog: async () => ({ models: PREVIEW_MEDIA_CATALOG }),
-    mediaPrice: async (input) => ({ credits: previewQuote(input.kind, input.duration, input.resolution) }),
+    mediaPrice: async (input) => ({
+      credits: previewQuote(input.kind, input.duration, input.resolution, input.options),
+    }),
     githubCatalog: async () => structuredClone(PREVIEW_GITHUB_CATALOG),
     githubOptions: async (input) => {
       if (!PREVIEW_GITHUB_CATALOG.repositories.some((repository) => repository.fullName === input.repository))

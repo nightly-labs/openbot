@@ -859,13 +859,20 @@ export function createBoard(options: BoardOptions) {
         return branch === undefined ? slots.length === 0 : slots.includes(branch);
       }),
     drawsLine: (node, side, type, branch) =>
+      point(node, side, type, branch) !== undefined &&
       state.edges.some((edge) => {
         if (edge.type !== type || options.hides?.(edge)) return false;
-        if (side === "out") return edge.from === node && edge.branch === branch && !outAnchor(edge);
+        if (side === "out") {
+          if (edge.from !== node || edge.branch !== branch || outAnchor(edge)) return false;
+          return targets(edge).some(
+            (slot) => inAnchor(edge, slot) !== undefined || point(edge.to, "in", type, slot) !== undefined,
+          );
+        }
         if (edge.to !== node) return false;
         const slots = slotsOf(edge);
         const slot = branch === undefined ? slots.length === 0 : slots.includes(branch);
-        return slot && !inAnchor(edge, branch);
+        if (!slot || inAnchor(edge, branch)) return false;
+        return outAnchor(edge, branch) !== undefined || point(edge.from, "out", type, edge.branch) !== undefined;
       }),
     armed: (node, side, type, branch) => isArmed({ node, side, type, branch }),
     accepts: (node, side, type, branch) => accepts({ node, side, type, branch }),

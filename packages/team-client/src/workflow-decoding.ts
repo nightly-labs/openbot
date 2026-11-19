@@ -230,6 +230,20 @@ export function decodeRemoteWorkflowMediaCatalog(value: unknown): WorkflowMediaC
       durations: [...model.durations],
       resolutions: [...model.resolutions],
       transparent: model.transparent,
+      ...(model.options?.length
+        ? {
+            options: model.options.map((option) => ({
+              name: option.name,
+              kind: option.kind,
+              values: [...option.values],
+              default: option.default,
+            })),
+          }
+        : {}),
+      ...(model.inputs ? { inputs: [...model.inputs] } : {}),
+      ...(model.modes?.length
+        ? { modes: model.modes.map((mode) => ({ value: mode.value, inputs: [...mode.inputs] })) }
+        : {}),
     })),
   };
 }

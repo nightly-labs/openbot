@@ -169,6 +169,7 @@ function textEdges(
 export interface MediaInput {
   from: string;
   attachmentId: string;
+  file?: true;
 }
 
 export function mediaInputs(
@@ -177,9 +178,11 @@ export function mediaInputs(
   latest: ReadonlyMap<string, StoredWorkflowStep>,
 ): MediaInput[] {
   const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
-  return graph.edges.flatMap((edge) =>
-    edge.to === nodeId && edge.type === "image" ? edgeFile(nodes.get(edge.from), latest) : [],
-  );
+  return graph.edges.flatMap((edge) => {
+    if (edge.to !== nodeId || (edge.type !== "image" && edge.type !== "file")) return [];
+    const files = edgeFile(nodes.get(edge.from), latest);
+    return edge.type === "file" ? files.map((input) => ({ ...input, file: true as const })) : files;
+  });
 }
 
 export function agentFileInputs(
@@ -202,7 +205,8 @@ function edgeFile(node: WorkflowNode | undefined, latest: ReadonlyMap<string, St
   return source?.status === "done" && source.output ? [{ from: node.id, attachmentId: source.output }] : [];
 }
 
-export type MediaImageRole = "first" | "last" | "reference";
+export type MediaImageRole = "first" | "last" | "reference" | "file";
+export type MediaPictureRole = Exclude<MediaImageRole, "file">;
 
 export function mediaImages(
   fields: WorkflowFields,
@@ -213,6 +217,7 @@ export function mediaImages(
   const first = frame("firstFrame");
   const last = frame("lastFrame");
   return inputs.flatMap((input) => {
+    if (input.file) return kind === "video" ? [{ role: "file" as const, attachmentId: input.attachmentId }] : [];
     const roles: MediaImageRole[] = [];
     if (input.from === first) roles.push("first");
     if (input.from === last) roles.push("last");

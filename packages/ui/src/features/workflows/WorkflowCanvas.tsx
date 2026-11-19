@@ -88,6 +88,7 @@ import { ConditionNode } from "./WorkflowConditionNode";
 import { showWorkflowDeleteToast } from "./WorkflowDeleteUndoToast";
 import { ImageNode } from "./WorkflowImageNode";
 import { LlmNode } from "./WorkflowLlmNode";
+import { WorkflowMediaComposer } from "./WorkflowMediaComposer";
 import { minimapLayout, WorkflowMinimap } from "./WorkflowMinimap";
 import { NoteNode } from "./WorkflowNoteNode";
 import { OutputNode } from "./WorkflowOutputNode";
@@ -819,6 +820,10 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     },
   );
   const [deleted, setDeleted] = createSignal(false);
+  const composerId = createMemo(() => {
+    const id = board.selected();
+    return id && !frozen() && !deleted() && !board.isRemoved(id) && kindOf(id) === "image" ? id : null;
+  });
   let closeDelete: (() => void) | undefined;
   let workflowMenu: HTMLButtonElement | undefined;
   const deleteWorkflow = () => {
@@ -2967,6 +2972,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         data-draw={ui.tool === "draw" ? ui.draw : undefined}
         data-hud-hidden={ui.hidden ? "" : undefined}
         data-frame={props.frame}
+        data-composer={composerId() ? "" : undefined}
         aria-label={t("workflow.canvas.label", { name: name() })}
         onPointerDown={(event) => {
           if (deleted()) return;
@@ -3413,6 +3419,15 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
             </ContextMenu.Content>
           </ContextMenu.Portal>
         </ContextMenu.Root>
+        <Show when={composerId()} keyed>
+          {(id) => (
+            <WorkflowMediaComposer
+              id={id}
+              root={() => root}
+              moves={() => [camera.x, camera.y, camera.scale, positions[id]?.x, positions[id]?.y]}
+            />
+          )}
+        </Show>
         <Show when={followedPeer()}>{(peer) => <FollowFrame peer={peer()} />}</Show>
         <Show when={live().length === 0 && !frozen() && allows("trigger")}>
           <div class="wfn-empty">

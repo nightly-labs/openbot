@@ -434,6 +434,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   }
   readonly mcpToolsFixedAtStart = (): boolean => this.#flavor.mcpToolsFixedAtStart === true;
   readonly catalogAsMcpTools = (): boolean => this.#flavor.catalogAsMcpTools === true;
+  readonly imageInput = (): boolean => this.#initialization?.agentCapabilities?.promptCapabilities?.image === true;
   readonly turnContext = true;
   readonly #turnContext = new TurnContext();
   readonly #flavor: AcpFlavor;
