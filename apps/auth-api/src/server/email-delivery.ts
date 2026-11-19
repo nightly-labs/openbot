@@ -35,17 +35,19 @@ export type EmailDeliveryBindings = Pick<
   | "EMAIL_SMTP_USERNAME"
   | "EMAIL_SMTP_PASSWORD"
   | "EMAIL_FROM"
+  | "EMAIL_REPLY_TO"
   | "EMAIL_LICENSE_FROM"
+  | "EMAIL_LICENSE_REPLY_TO"
   | "EMAIL_RELAY"
   | "EMAIL_FALLBACK"
   | "EMAIL_DELIVERY_WEBHOOK_URL"
   | "EMAIL_DELIVERY_WEBHOOK_SECRET"
 >;
 
-/** The SMTP mailbox, and the Cloudflare Email Service binding that sends when the mailbox cannot. */
 interface EmailSenders {
   smtp: SmtpEmailConfig;
   fallback: SendEmail | null;
+  inbox: string;
 }
 
 export function createEmailCodeDelivery(
@@ -96,7 +98,7 @@ export function createContactMessageDelivery(
   const senders = readEmailSenders(bindings);
   return senders
     ? {
-        send: (message) => deliver(analytics, "contact", senders, prepareContactMessage(senders.smtp.from, message)),
+        send: (message) => deliver(analytics, "contact", senders, prepareContactMessage(senders.inbox, message)),
       }
     : null;
 }
@@ -109,31 +111,21 @@ export function createWelcomeEmailDelivery(
   return senders ? { send: (message) => deliver(analytics, "welcome", senders, prepareWelcomeEmail(message)) } : null;
 }
 
-/**
- * License emails go from `EMAIL_LICENSE_FROM` through the same SMTP account, so that account must be
- * allowed to send as it. An empty value uses `EMAIL_FROM`.
- */
 export function createLicenseEmailDelivery(
   bindings: EmailDeliveryBindings,
   analytics: AccountAnalytics,
 ): LicenseEmailDelivery | null {
   const senders = readEmailSenders(bindings);
   if (!senders) return null;
+  const from = bindings.EMAIL_LICENSE_FROM?.trim() || senders.smtp.from;
   const licenseSenders = {
     ...senders,
-    smtp: { ...senders.smtp, from: bindings.EMAIL_LICENSE_FROM?.trim() || senders.smtp.from },
+    smtp: { ...senders.smtp, from },
+    inbox: bindings.EMAIL_LICENSE_REPLY_TO?.trim() || from,
   };
   return { send: (message) => deliver(analytics, "license", licenseSenders, prepareLicenseEmail(message)) };
 }
 
-/**
- * Sends through the SMTP mailbox, and through Cloudflare when SMTP surely did not send the message.
- * When both fail, the SMTP failure is the answer, so a sender limit keeps its countdown, unless the
- * Cloudflare send may have reached the recipient.
- *
- * The fallback uses only the time left in `EMAIL_CODE_DELIVERY_BUDGET_MS`: after it, a replay of the
- * sign-in request takes a code that is still pending as sent.
- */
 const deliver = Effect.fn("EmailDelivery.deliver")(function* (
   analytics: AccountAnalytics,
   kind: EmailKind,
@@ -145,7 +137,7 @@ const deliver = Effect.fn("EmailDelivery.deliver")(function* (
     analytics.track(null, { name: "email_sent", kind, result: "failed" });
     return yield* prepared.failure;
   }
-  const message = prepared.success;
+  const message = withInboxReply(senders, prepared.success);
   const startedAt = Date.now();
   const smtp = yield* Effect.result(tracked(analytics, "email_sent", kind, sendPrivateEmail(senders.smtp, message)));
   if (Result.isSuccess(smtp)) return;
@@ -170,11 +162,6 @@ const deliver = Effect.fn("EmailDelivery.deliver")(function* (
   return yield* AMBIGUOUS_DELIVERY_ERRORS.has(fallback.failure.message) ? fallback.failure : smtp.failure;
 });
 
-// After these SMTP failures the message surely did not leave: a sender limit, a refusal of the
-// sender or the message, or a connection that stopped before `DATA`. An unknown result may have
-// reached the recipient, so a second send could deliver it twice. Invalid input or a refused
-// recipient fails on any sender, and a configuration error must show in the logs, not hide behind
-// the fallback.
 function canFallBack(message: string): boolean {
   return (
     !AMBIGUOUS_DELIVERY_ERRORS.has(message) &&
@@ -184,9 +171,7 @@ function canFallBack(message: string): boolean {
   );
 }
 
-// The binding has no cancel signal. A send that passes this deadline may still reach the recipient.
 const CLOUDFLARE_SEND_TIMEOUT_MS = 10_000;
-// Below this, a send would end as unknown more often than it would succeed.
 const CLOUDFLARE_MIN_SEND_MS = 2_000;
 
 const sendThroughCloudflare = Effect.fn("EmailDelivery.cloudflare")(function* (
@@ -219,18 +204,12 @@ const sendThroughCloudflare = Effect.fn("EmailDelivery.cloudflare")(function* (
   );
 });
 
-// Only an error code goes to the log: the error text can hold the address of the recipient.
 function cloudflareErrorCode(error: unknown): string {
   const code = error instanceof Error && "code" in error ? error.code : undefined;
   if (typeof code === "string" && /^[A-Za-z0-9_.-]{1,64}$/u.test(code)) return code;
   return error instanceof Error ? error.name : typeof error;
 }
 
-/**
- * Sends one analytics event with the result of a send, so a dashboard can show the use of the hourly
- * quota of the mailbox (`email_sent`) and how often Cloudflare sends instead (`email_fallback_sent`).
- * The webhook path does not use the mailbox, so it sends none.
- */
 function tracked<E extends { message: string }>(
   analytics: AccountAnalytics,
   name: "email_sent" | "email_fallback_sent",
@@ -244,7 +223,6 @@ function tracked<E extends { message: string }>(
 
 function sendResult(exit: Exit.Exit<void, { message: string }>): EmailResult {
   if (Exit.isSuccess(exit)) return "accepted";
-  // A stopped send can stop after the server took the message.
   if (Cause.hasInterruptsOnly(exit.cause)) return "unknown";
   const error = Cause.findErrorOption(exit.cause);
   if (Option.isNone(error)) return "failed";
@@ -254,7 +232,14 @@ function sendResult(exit: Exit.Exit<void, { message: string }>): EmailResult {
 
 function readEmailSenders(bindings: EmailDeliveryBindings): EmailSenders | null {
   const smtp = readSmtpConfig(bindings);
-  return smtp ? { smtp, fallback: bindings.EMAIL_FALLBACK ?? null } : null;
+  if (!smtp) return null;
+  const inbox = bindings.EMAIL_REPLY_TO?.trim() || smtp.from;
+  return { smtp, fallback: bindings.EMAIL_FALLBACK ?? null, inbox };
+}
+
+function withInboxReply(senders: EmailSenders, message: PreparedEmailMessage): PreparedEmailMessage {
+  if (message.replyTo || senders.inbox === senders.smtp.from) return message;
+  return { ...message, replyTo: senders.inbox };
 }
 
 function readSmtpConfig(bindings: EmailDeliveryBindings): SmtpEmailConfig | null {

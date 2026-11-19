@@ -4,6 +4,7 @@ import type { messages as source } from "../../en/error/attachment";
 export const messages = {
   "error.attachment.notFound": "Nie znaleziono załącznika.",
   "error.attachment.fileTooLarge": "Plik przekracza limit 100 MB.",
+  "error.attachment.namedFileTooLarge": "{name} przekracza limit 100 MB.",
   "error.attachment.totalTooLarge": "Załączniki przekraczają łączny limit 250 MB.",
   "error.attachment.unavailable": "Ten plik nie jest już dostępny.",
   "error.attachment.tooMany": "Maksymalna liczba plików: {limit}.",

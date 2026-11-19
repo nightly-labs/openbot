@@ -18,9 +18,17 @@ export const messages = {
     "OpenBot konnte die 1Password CLI nicht installieren. Prüfe die Internetverbindung und versuche es erneut.",
   "error.connector.onePasswordCliSignedOut":
     "Die 1Password CLI ist nicht angemeldet. Aktiviere ihre Integration in der 1Password-App und verbinde sie erneut.",
+  "error.connector.onePasswordAppUnreachable":
+    "OpenBot erreicht die 1Password-App nicht. Öffne 1Password und entsperre es. Prüfe unter Einstellungen > Entwickler, dass „In 1Password CLI integrieren“ aktiv ist. Versuche es dann erneut.",
   "error.connector.onePasswordCliFailed": "Die 1Password CLI ist fehlgeschlagen: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "Dein 1Password-Konto erlaubt dir nicht, den geteilten Tresor oder ein Dienstkonto zu erstellen. Bitte einen Inhaber oder Administrator des Kontos um diese Berechtigung, oder bitte ihn um ein Dienstkonto-Token und klicke auf „Token verwenden“.",
   "error.connector.onePasswordUnexpected": "1Password hat eine unerwartete Antwort gesendet: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password hat das Dienstkonto-Token nicht akzeptiert.",
+  "error.connector.onePasswordUnreachable":
+    "OpenBot konnte keine Verbindung zu 1Password herstellen. Prüfe die Internetverbindung und versuche es erneut.",
+  "error.connector.onePasswordRateLimited":
+    "1Password hat zu viele Anfragen erhalten. Warte ein paar Minuten und versuche es erneut.",
   "error.connector.onePasswordNoVault":
     "Das Dienstkonto kann keinen Tresor lesen. Gib ihm Zugriff auf einen Tresor und versuche es erneut.",
   "error.connector.onePasswordFileUnreadable": "Die 1Password-Verbindungsdatei ist nicht lesbar.",
@@ -46,6 +54,8 @@ export const messages = {
     "Die Proton Pass CLI konnte nicht installiert werden. Prüfe die Netzwerkverbindung und verbinde dann erneut.",
   "error.connector.protonPassPlan":
     "Dein Proton-Tarif erlaubt die Proton Pass CLI nicht. Ändere den Tarif und verbinde dann erneut.",
+  "error.connector.protonPassPlanMissing":
+    "Dein Proton-Tarif enthält die Proton Pass CLI nicht. Sie braucht einen Proton-Tarif, der Pass Plus enthält. Ändere den Tarif und verbinde dann erneut.",
   "error.connector.protonPassExpired": "Der Zugriff auf Proton Pass ist abgelaufen. Verbinde erneut.",
   "error.connector.protonPassKeyInvalid": "Gib einen Proton Pass-Zugriffsschlüssel ein, der mit pst_ beginnt.",
   "error.connector.protonPassExtraPassword": "Das zusätzliche Passwort ist nicht korrekt. Gib es erneut ein.",

@@ -1,18 +1,3 @@
-// Frozen optional whatsapp-connector-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: an owner or admin of a joined
-// server links WhatsApp numbers to the host from their own computer, and manages them. The host runs
-// the WhatsApp session and keeps its keys; no route carries a stored key. A link answers the QR code
-// text or the pairing code that the host's session got from WhatsApp, and the client shows it, so the
-// phone links the host as a device. The QR code text holds the one-use secret of that link. The client reads `linkState` while it waits; the QR code changes about
-// every 20 seconds. The other routes read and set the numbers, the contacts and groups that each
-// number allows, the pairing requests that wait, and the WhatsApp Orchestrator, which starts on the
-// host's default provider and model. A member cannot use any route; `requireAdmin` on the host is the
-// only gate. Widening any of it needs a second capability string.
-//
-// `state`, `credentials` and the link `error` are text, so a later host value does not break an older
-// client: a client shows a connection state that it does not know as an error, and a link error that
-// it does not know as `unavailable`.
 import {
   adminRoute,
   boolean,

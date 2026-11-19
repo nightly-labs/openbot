@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/skill";
 
 export const messages = {
-  // Skill package, library, and marketplace errors.
   "error.skill.symlinks": "Les paquets de compétences ne peuvent pas contenir de liens symboliques.",
   "error.skill.expandedTooLarge": "La compétence décompressée doit faire moins de 10 Mo.",
   "error.skill.irregularEntry":

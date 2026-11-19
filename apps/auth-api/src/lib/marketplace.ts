@@ -3,7 +3,6 @@ import { isMarketplaceAgentId, isMarketplaceSkillSlug } from "@openbot/contracts
 import { createServerFn } from "@tanstack/solid-start";
 import { runApiEffect } from "../server/effect-runtime";
 
-/** A routine as a listing page shows it. The instruction stays in the app, which shows it before Add. */
 export type MarketplaceRoutineView = Omit<MarketplaceAgentRoutine, "instruction">;
 
 export interface MarketplaceAgentView extends Omit<MarketplaceAgentDetail, "routines"> {
@@ -12,7 +11,6 @@ export interface MarketplaceAgentView extends Omit<MarketplaceAgentDetail, "rout
 
 export interface MarketplaceAgentListing {
   agent: MarketplaceAgentView;
-  /** The catalog entries of the agent's skills that are listed. A skill that is not gets no link. */
   skills: MarketplaceSkillSummary[];
 }
 
@@ -22,27 +20,16 @@ function isNotFoundError(error: unknown): boolean {
   return error instanceof Error && "status" in error && error.status === 404;
 }
 
-/*
- * The reads run on the Worker, because the pages need D1. Each import is inside its handler, so the
- * browser bundle never holds `cloudflare:workers` (see `agent-templates.ts`).
- */
-
 const catalog = () => import("../server/marketplace-catalog");
 
-/** Every approved agent, featured first. A pending agent is in no list. */
 export const readMarketplaceAgents = createServerFn({ method: "GET" }).handler(async () =>
   (await catalog()).readAgentCatalog(),
 );
 
-/** Every approved skill. */
 export const readMarketplaceSkills = createServerFn({ method: "GET" }).handler(async () =>
   (await catalog()).readSkillCatalog(),
 );
 
-/**
- * One agent for its page: the approved version, or the version that waits for its first review when
- * there is none (`pending`). A rejected, removed or unknown agent, and a malformed id, are null.
- */
 export const readMarketplaceAgentListing = createServerFn({ method: "GET" })
   .validator((id: unknown) => (typeof id === "string" ? id : ""))
   .handler(async ({ data }): Promise<MarketplaceAgentListing | null> => {
@@ -65,7 +52,6 @@ export const readMarketplaceAgentListing = createServerFn({ method: "GET" })
     return { agent, skills: skills.map((skill) => ({ ...skill, category: skillCategory(skill.category) })) };
   });
 
-/** One approved skill for its page, without its instructions and files. Anything else is null. */
 export const readMarketplaceSkill = createServerFn({ method: "GET" })
   .validator((slug: unknown) => (typeof slug === "string" ? slug : ""))
   .handler(async ({ data }): Promise<MarketplaceSkillView | null> => {

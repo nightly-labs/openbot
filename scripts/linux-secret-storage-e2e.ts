@@ -1,21 +1,3 @@
-// Runs the real Electron with the secret storage of `src/main/secret-storage-cipher.ts` and checks
-// that a secret lives through a restart when the Linux keyring loses its key:
-// 1. With no keyring, OpenBot makes its own 0600 key file, and the secret opens after a restart.
-// 2. With a keyring that keeps its key, `safeStorage` keeps the secret and no key file is made.
-// 3. When the next start has a new keyring (one that keeps its items only in memory, or a locked
-//    one that Chromium replaces), the old secret does not open. OpenBot then makes the key file, and
-//    a secret that it writes after that opens after the next restart with yet another keyring.
-// 4. A hosted server (boat): an older release kept the secret in an unlocked login keyring, as
-//    `scripts/hosting/openbot-hosted-server` starts it. The upgrade keeps the keyring and makes no key
-//    file. One start without the keyring (a direct launch) makes the key file; after it, the secret of
-//    the keyring still opens, and new secrets use the key file.
-// No start makes the key file before `ready`, when `safeStorage` has no key yet.
-// Cases 2, 3 and 4 need `dbus-run-session` and `gnome-keyring-daemon`; without them the report marks
-// them as skipped.
-//
-// Run on Linux with a display (xvfb-run): bun scripts/linux-secret-storage-e2e.ts
-// `ELECTRON_OVERRIDE_DIST_PATH`, as the `electron` package reads it, names another Electron folder.
-// It writes .openbot-build/linux-secret-storage-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { closeSync, existsSync, openSync, readFileSync } from "node:fs";
@@ -38,17 +20,11 @@ const electronPath = process.env.ELECTRON_OVERRIDE_DIST_PATH
       "dist",
       readFileSync(join(ROOT, "node_modules", "electron", "path.txt"), "utf8").trim(),
     );
-// A login keyring that the daemon unlocks with no person, as `scripts/hosting/openbot-hosted-server`
-// makes it. `$1` is the keyring folder; the rest is the Electron command.
 const KEYRING_SESSION = [
   'export XDG_DATA_HOME="$1"; shift',
   'mkdir -p "$XDG_DATA_HOME/keyrings"',
   'printf login >"$XDG_DATA_HOME/keyrings/default"',
-  // The `--unlock` output names the control folder; without it, `--start` starts a second daemon
-  // that asks for a password.
   'eval "$(printf e2e-keyring | gnome-keyring-daemon --unlock --components=secrets)"',
-  // The daemon writes a new login keyring in the background. A `--start` before the write ends can
-  // start a second daemon, and that one asks for a password.
   'tries=0; while [ ! -e "$XDG_DATA_HOME/keyrings/login.keyring" ] && [ "$tries" -lt 200 ]; do sleep 0.05; tries=$((tries + 1)); done',
   'eval "$(gnome-keyring-daemon --start --components=secrets)"',
   "unset XDG_DATA_HOME",
@@ -65,10 +41,9 @@ interface Step {
   name: string;
   step: "write" | "read" | "legacy-write";
   value?: string;
-  /** The keyring folder of this start. None: no session bus, so no keyring. */
   keyring?: string;
-  /** Electron switches, such as the `--password-store` of a hosted server. */
   switches?: string[];
+  platform?: "darwin";
 }
 
 interface StepResult extends Step {
@@ -107,7 +82,6 @@ try {
   ]);
   assert.equal(build.status, 0, `bun build failed: ${build.stderr.toString()}`);
 
-  // 1. No keyring.
   {
     const steps = await runCase("no keyring", [
       { name: "first start writes", step: "write", value: "secret-without-keyring" },
@@ -124,8 +98,21 @@ try {
     assert.equal(read?.madeKeyFile, false, "no keyring: a restart uses the same key file");
   }
 
+  {
+    const steps = await runCase("macOS rules: no keyring", [
+      { name: "first start writes", step: "write", value: "secret-without-keychain", platform: "darwin" },
+      { name: "restart reads", step: "read", platform: "darwin" },
+    ]);
+    const [write, read] = steps;
+    assert.equal(write?.keyringAvailable, false, "macOS, no Keychain: safeStorage has no key");
+    assert.equal(write?.keyFileBeforeReady, false, "macOS, before ready: no key file is made");
+    assert.equal(write?.canPersist, true, "macOS, no Keychain: the secret can be kept");
+    assert.equal(write?.format, "obk1", "macOS, no Keychain: the key file encrypts");
+    assert.equal(write?.keyFileMode, "600", "macOS, no Keychain: only the user reads the key file");
+    assert.equal(read?.readValue, "secret-without-keychain", "macOS, no Keychain: the secret opens after a restart");
+  }
+
   if (hasKeyring) {
-    // 2 and 3. One userData folder; the keyring is the same, then new at each start.
     const steps = await runCase("keyring, then a new keyring at each start", [
       { name: "first start writes", step: "write", value: "secret-in-keyring", keyring: "keyring-1" },
       { name: "restart with the same keyring reads", step: "read", keyring: "keyring-1" },
@@ -145,10 +132,8 @@ try {
     assert.equal(newKeyring?.keyFileMode, "600", "new keyring: only the user reads the key file");
     assert.equal(rewrite?.format, "obk1", "after the reset: the key file encrypts");
     assert.equal(anotherKeyring?.readValue, "secret-after-reset", "after the reset: the secret opens after a restart");
-    // The sign-in screen tells of a keyring change only on the start that made the key file.
     assert.equal(anotherKeyring?.madeKeyFile, false, "after the reset: the key file is not made again");
 
-    // 4. A hosted server: its keyring stays from start to start.
     const hosted = { keyring: "hosted-keyring", switches: ["--password-store=gnome-libsecret"] };
     const server = await runCase("hosted server: upgrade, then one start without the keyring", [
       { name: "an older release writes", step: "legacy-write", value: "hosted-session", ...hosted },
@@ -172,6 +157,32 @@ try {
     assert.equal(service?.madeKeyFile, false, "hosted: the service start makes no key file");
     assert.equal(serviceWrite?.format, "obk1", "hosted: new secrets use the key file");
     assert.equal(serviceRead?.readValue, "hosted-new-secret", "hosted: the new secret opens after a restart");
+
+    const mac = await runCase("macOS rules: a secret that does not open", [
+      { name: "first start writes", step: "write", value: "secret-in-keychain", keyring: "mac-1", platform: "darwin" },
+      { name: "restart with another key reads", step: "read", keyring: "mac-2", platform: "darwin" },
+    ]);
+    const [macWrite, macRead] = mac;
+    assert.equal(macWrite?.format, "v11", "macOS: a Keychain that works encrypts");
+    assert.ok(macRead?.error, "macOS: the secret with another key does not open");
+    assert.equal(macRead?.madeKeyFile, false, "macOS: a failed read makes no key file");
+    assert.equal(macRead?.keyFileMode, null, "macOS: still no key file");
+
+    const macBack = await runCase("macOS rules: the Keychain works again", [
+      { name: "a start with no Keychain writes", step: "write", value: "secret-in-file", platform: "darwin" },
+      {
+        name: "the next start writes",
+        step: "write",
+        value: "secret-in-keychain",
+        keyring: "mac-3",
+        platform: "darwin",
+      },
+      { name: "restart reads", step: "read", keyring: "mac-3", platform: "darwin" },
+    ]);
+    const [refused, worksAgain, readAgain] = macBack;
+    assert.equal(refused?.format, "obk1", "macOS, no Keychain: the key file encrypts");
+    assert.equal(worksAgain?.format, "v11", "macOS: a Keychain that works again encrypts new secrets");
+    assert.equal(readAgain?.readValue, "secret-in-keychain", "macOS: the Keychain secret opens after a restart");
   } else {
     skipped.push("keyring cases: dbus-run-session or gnome-keyring-daemon is missing");
   }
@@ -197,8 +208,6 @@ async function runCase(name: string, steps: Step[]): Promise<StepResult[]> {
 async function launch(step: Step, userData: string, blob: string): Promise<StepResult> {
   const index = launches++;
   const base = withoutElectronRuntimeFlags(process.env);
-  // No session bus unless the step has a keyring: the test must not reach a keyring of the computer
-  // that runs it. An unset address is not enough, because GLib then finds $XDG_RUNTIME_DIR/bus.
   base.DBUS_SESSION_BUS_ADDRESS = "unix:path=/nonexistent/openbot-e2e-bus";
   delete base.GNOME_KEYRING_CONTROL;
   base.XDG_CURRENT_DESKTOP = "XFCE";
@@ -210,6 +219,7 @@ async function launch(step: Step, userData: string, blob: string): Promise<StepR
     `--blob=${blob}`,
     `--step=${step.step}`,
     ...(step.switches ?? []),
+    ...(step.platform ? [`--platform=${step.platform}`] : []),
     ...(step.value ? [`--value=${step.value}`] : []),
   ];
   const log = openSync(join(OUT, `electron-${index}.log`), "w");
@@ -230,7 +240,6 @@ async function launch(step: Step, userData: string, blob: string): Promise<StepR
       )
     : spawn(electronPath, electronArguments, { env: base, stdio: ["ignore", log, log] });
   closeSync(log);
-  // The step writes the ready file and then quits, so the exit is the signal.
   const exited = new Promise<void>((done, fail) => {
     child.once("error", fail);
     child.once("exit", () => done());

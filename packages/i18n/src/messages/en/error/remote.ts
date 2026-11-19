@@ -1,15 +1,12 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.remote", {
-  // Errors from remote servers, WebRTC transport, remote desktop, and the team client.
   "error.remote.desktopSetupClientUpdate": "Update the client to use remote desktop setup.",
   "error.remote.desktopSetupUnavailable": "Remote desktop setup is unavailable.",
   "error.remote.desktopTestUnavailable": "Remote desktop testing is unavailable.",
   "error.remote.controlUnavailable": "Remote control is unavailable.",
   "error.remote.controlSessionNotFound": "Remote control session not found.",
-  // The host owner's remote control setting does not include the member's role.
   "error.remote.controlNotAllowed": "The owner of this computer does not let your role control it.",
-  // The person at the host computer chose Deny, or did not answer in 30 seconds.
   "error.remote.controlDeclined": "The person at this computer did not allow remote control.",
   "error.remote.testRuntimeUpdate": "Update the macOS remote desktop runtime to run this test.",
   "error.remote.testOtherSessions": "End other remote desktop sessions before you start a test.",
@@ -25,6 +22,10 @@ export const messages = defineMessages("error.remote", {
     "The host has not allowed OpenBot to record its screen. Grant screen recording on the host, then try again.",
   "error.remote.windowsSessionDisconnected":
     "The Windows session on the host is disconnected, so it has no screen to share. Sign in to Windows at the screen of the host, then try again.",
+  "error.remote.streamTooSlowLowerQuality":
+    "The connection to the host is too slow for the picture. Try again: the next connection uses a lower quality.",
+  "error.remote.streamTooSlow":
+    "The connection to the host is too slow for the picture. Use a faster network, then try again.",
   "error.remote.teamSessionExpired": "The team session has expired.",
   "error.remote.finishTestBeforeSwitch": "Finish the remote desktop test before switching displays.",
   "error.remote.displayNotFound": "Remote display not found.",
@@ -81,10 +82,14 @@ export const messages = defineMessages("error.remote", {
   "error.remote.ownerOnlyRemove": "Only the owner can remove this server.",
   "error.remote.requestTimeout": "The remote request timed out.",
   "error.remote.requestFailed": "The remote request failed.",
-  "error.remote.pinnedKeyMissing": "The remote host does not have a pinned device key.",
+  "error.remote.hostKeyMissing":
+    "OpenBot cannot verify this server because its security key is missing or changed. Ask the server owner to check the server.",
+  "error.remote.connectionNotStarted":
+    "OpenBot could not start the connection to this server. If this continues, quit OpenBot and open it again.",
   "error.remote.hostDidNotConnect": "The WebRTC host did not connect.",
   "error.remote.connectionCancelled": "The remote connection was cancelled.",
-  "error.remote.hostDisconnected": "The WebRTC host disconnected.",
+  "error.remote.hostDisconnected":
+    "The connection to the server was lost. Check whether the action finished, then try again.",
   "error.remote.eventGap": "The host event sequence has a gap.",
   "error.remote.malformedKnownEvent": "The host returned a malformed known event.",
   "error.remote.fileTransportIsStopped": "The WebRTC file transport is stopped.",
@@ -150,6 +155,7 @@ export const messages = defineMessages("error.remote", {
   "error.remote.attachmentRejected": "The host rejected the attachment.",
   "error.remote.attachmentTooLarge": "Attachments must be 10 MB or smaller.",
   "error.remote.attachmentBusy": "Wait for the current attachment to finish.",
+  "error.remote.attachmentChanged": "The file changed or is not available. Select it again.",
   "error.remote.uploadTimeout": "The attachment upload timed out.",
   "error.remote.hostSessionActive": "The host already has an active remote session.",
   "error.remote.tooManyConnections": "Too many active remote connections.",
@@ -168,7 +174,6 @@ export const messages = defineMessages("error.remote", {
   "error.remote.signalFrameUnreadable": "Signal sent a frame this peer cannot read.",
   "error.remote.webRtcCommandFailed": "The WebRTC command failed.",
   "error.remote.dataChannelFailed": "{kind} channel failed.",
-  // Signal refusals, by the code in the Signal error frame. The client maps the code, not the text.
   "error.remote.hostBusy": "The host is busy with another connection. Try again in a moment.",
   "error.remote.signalPermissionDenied": "Your account does not have access to this host. Ask the owner for access.",
   "error.remote.signalRateLimited": "Too many connection attempts. OpenBot tries again in {seconds} seconds.",
@@ -177,10 +182,10 @@ export const messages = defineMessages("error.remote", {
   "error.remote.signalRefused": "Signal refused the connection.",
   "error.remote.signalClosed": "The connection to Signal closed before the host answered.",
   "error.remote.relayUnavailable": "Signal sent no relay servers for this connection. Try again later.",
-  // How a direct (WebRTC) connection ended.
   "error.remote.iceFailed": "A direct connection to the host could not be made. A firewall, VPN or proxy can block it.",
   "error.remote.iceDisconnected": "The direct connection to the host was lost.",
-  // Account service (control plane) refusals, by their error code.
+  "error.remote.webrtcBlocked":
+    "This device blocks the connection that OpenBot needs. If Lockdown Mode is on, turn it off for OpenBot in Settings > Privacy & Security > Lockdown Mode.",
   "error.remote.directoryUnreachable": "OpenBot could not reach the OpenBot service. Check your connection.",
   "error.remote.directoryTimeout": "The OpenBot service did not answer in time. Try again.",
   "error.remote.inviteAlreadyUsed": "This invitation was already used. Ask for a new invitation.",
@@ -196,7 +201,6 @@ export const messages = defineMessages("error.remote", {
   "error.remote.hostOtherAccount": "This host belongs to another account.",
   "error.remote.remoteNotConfigured": "Remote connections are not set up on this OpenBot service.",
   "error.remote.hostRefused": "The host refused the request ({status}).",
-  // Channel actions on mobile.
   "error.remote.formUnavailable": "This form is no longer available.",
   "error.remote.hostedServerRemoval": "Use Billing to delete a hosted server.",
   "error.remote.hostRemoved": "The owner removed this server from the account.",
@@ -204,8 +208,9 @@ export const messages = defineMessages("error.remote", {
   "error.remote.channelDeleteUnsupported": "Update this desktop server to delete channels.",
   "error.remote.historyRefreshFailed": "The message was sent, but chat history could not refresh.",
   "error.remote.taskHistoryRefreshFailed": "The task was changed, but chat history could not refresh.",
-  // Servers that the desktop app starts on this computer.
-  "error.remote.localServerStartFailed": "The server on this computer did not start.",
+  "error.remote.serverNotLoaded": "OpenBot could not load the server. Try again.",
+  "error.remote.localServerNotStarted":
+    "The server on this computer did not start. Try again. If it does not start, restart OpenBot on this computer.",
   "error.remote.localServerNotFound": "This server is not on this computer.",
   "error.remote.localServerAccountRemovalFailed":
     "The server is deleted on its computer, but the account still lists it. Delete it again to remove it from the account.",

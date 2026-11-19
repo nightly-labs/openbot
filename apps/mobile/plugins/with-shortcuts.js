@@ -3,7 +3,7 @@ const path = require("node:path");
 const { IOSConfig, withDangerousMod, withXcodeProject } = require("expo/config-plugins");
 const { buildPage } = require("./with-share-target");
 
-// Adds the shortcuts of the app (List Agents and Send Message) to the iOS app target. The Swift
+// Adds the shortcuts of the app (List Agents, Send Message and Open Agent) to the iOS app target. The Swift
 // files in `shortcuts/` hold the App Intents, their snippets and the `AppShortcutsProvider`. They
 // are in the app target, not in the pod of `modules/shortcuts`: Xcode reads the shortcuts of an app
 // from the app target when it builds.

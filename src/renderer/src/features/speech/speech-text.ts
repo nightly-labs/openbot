@@ -1,61 +1,58 @@
 import { SPEECH_LIMITS } from "@openbot/contracts/ipc";
 
-/**
- * The first part is short, so the first words play soon after the reply ends. It ends at the first
- * sentence that makes it at least the minimum length.
- */
 const FIRST_PART_MINIMUM = 40;
 const FIRST_PART_LENGTH = 80;
-/**
- * A later part is synthesized while the part before it plays. Synthesis runs about six times faster
- * than speech, so a part may be at most three times as long as the part before it.
- */
 const PART_GROWTH = 3;
 const PART_LENGTH = 400;
+const SYNTHESIS_SHARE = 0.8;
 
-/**
- * The text in parts that `speak` takes. Parts end at a sentence where they can, and a sentence that
- * is too long for one part ends at a comma or a space. `speed` is the playback speed, where 1 is
- * normal: a part that plays faster leaves less time to synthesize the next part, so the parts grow
- * more slowly. The first part does not change with the speed.
- */
-export function speechParts(text: string, locale: string, speed = 1): string[] {
-  const segmenter = new Intl.Segmenter(locale, { granularity: "sentence" });
-  const parts: string[] = [];
-  let current = "";
-  const growth = PART_GROWTH / Math.max(1, speed);
-  const limit = () => {
-    const last = parts.at(-1);
-    if (last === undefined) return FIRST_PART_LENGTH;
-    return Math.min(PART_LENGTH, Math.max(FIRST_PART_LENGTH, Math.floor(last.length * growth)));
-  };
-  const flush = () => {
-    if (current.trim()) parts.push(current.trim());
-    current = "";
-  };
-  for (const { segment } of segmenter.segment(text)) {
-    for (const piece of splitLongSentence(segment.trim(), limit())) {
-      if (current && current.length + piece.length + 1 > limit()) flush();
-      current = current ? `${current} ${piece}` : piece;
-      if (current.length >= limit()) flush();
-    }
-    if (parts.length === 0 && current.length >= FIRST_PART_MINIMUM) flush();
+export class SpeechParts {
+  readonly #sentences: string[];
+  readonly #growth: number;
+  #last: string | undefined;
+
+  constructor(text: string, locale: string, speed = 1) {
+    const segmenter = new Intl.Segmenter(locale, { granularity: "sentence" });
+    this.#sentences = Array.from(segmenter.segment(text), ({ segment }) => segment.trim()).filter(Boolean);
+    this.#growth = PART_GROWTH / Math.max(1, speed);
   }
-  flush();
-  return parts.map((part) => part.slice(0, SPEECH_LIMITS.maximumTextLength));
+
+  next(budget = Number.POSITIVE_INFINITY): string | undefined {
+    const last = this.#last;
+    const first = last === undefined;
+    const length = first
+      ? FIRST_PART_LENGTH
+      : Math.min(PART_LENGTH, Math.max(FIRST_PART_LENGTH, Math.floor(last.length * this.#growth)));
+    const limit = Math.min(length, budget);
+    let part = "";
+    for (let sentence = this.#sentences[0]; sentence !== undefined; sentence = this.#sentences[0]) {
+      const piece = sentence.length > length ? firstPiece(sentence, length) : sentence;
+      if (part && part.length + piece.length + 1 > limit) break;
+      part = part ? `${part} ${piece}` : piece;
+      const rest = sentence.slice(piece.length).trim();
+      if (rest) {
+        this.#sentences[0] = rest;
+        break;
+      }
+      this.#sentences.shift();
+      if (part.length >= limit || (first && part.length >= FIRST_PART_MINIMUM)) break;
+    }
+    if (!part) return undefined;
+    this.#last = part;
+    return part.slice(0, SPEECH_LIMITS.maximumTextLength);
+  }
 }
 
-function splitLongSentence(sentence: string, limit: number): string[] {
-  const pieces: string[] = [];
-  let rest = sentence;
-  while (rest.length > limit) {
-    const window = rest.slice(0, limit);
-    const comma = Math.max(window.lastIndexOf(", "), window.lastIndexOf("; "), window.lastIndexOf("、"));
-    const space = window.lastIndexOf(" ");
-    const cut = comma > limit / 2 ? comma + 1 : space > limit / 2 ? space : limit;
-    pieces.push(rest.slice(0, cut).trim());
-    rest = rest.slice(cut).trim();
-  }
-  if (rest) pieces.push(rest);
-  return pieces;
+export function partBudget(part: string, seconds: number, synthesisMs: number, speed: number): number {
+  if (!part || synthesisMs <= 0) return Number.POSITIVE_INFINITY;
+  const playMs = (seconds * 1000) / Math.max(speed, Number.EPSILON);
+  return Math.floor((playMs * SYNTHESIS_SHARE * part.length) / synthesisMs);
+}
+
+function firstPiece(sentence: string, limit: number): string {
+  const window = sentence.slice(0, limit);
+  const comma = Math.max(window.lastIndexOf(", "), window.lastIndexOf("; "), window.lastIndexOf("、"));
+  const space = window.lastIndexOf(" ");
+  const cut = comma > limit / 2 ? comma + 1 : space > limit / 2 ? space : limit;
+  return sentence.slice(0, cut).trim();
 }

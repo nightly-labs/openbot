@@ -82,6 +82,32 @@ export const messages = {
   "mobile.channel.form.deleteBody":
     "Isso para o canal. O histórico continua em Canais excluídos, somente para visualização. Você pode restaurá-lo de lá. Os agentes membros são mantidos.",
   "mobile.channel.form.delete": "Excluir canal",
+  "mobile.channel.newConversation.title": "Nova conversa",
+  "mobile.channel.newConversation.starting": "Iniciando nova conversa…",
+  "mobile.channel.newConversation.footer":
+    "Os membros esquecem as mensagens anteriores. A configuração do canal permanece.",
+  "mobile.channel.newConversation.confirmTitle": "Iniciar uma nova conversa em {name}?",
+  "mobile.channel.newConversation.confirmBody":
+    "Os membros esquecem as mensagens anteriores deste canal. As mensagens continuam visíveis acima de um divisor. Os membros, as instruções, as memórias e as rotinas não mudam.",
+  "mobile.channel.newConversation.confirm": "Iniciar nova conversa",
+  "mobile.channel.newConversation.failed": "Não foi possível iniciar uma nova conversa",
+  "mobile.channel.newConversation.failedBody": "O computador anfitrião não conseguiu iniciar uma nova conversa.",
+  "mobile.channel.compact.title": "Compactar contexto",
+  "mobile.channel.compact.compacting": "Iniciando a compactação…",
+  "mobile.channel.compact.footer": "Os membros mantêm um resumo curto da sessão do canal e usam menos tokens.",
+  "mobile.channel.compact.started": "Compactação iniciada. Os provedores dos membros encurtam o contexto no host.",
+  "mobile.channel.compact.failed": "Não foi possível compactar o contexto do canal",
+  "mobile.channel.compact.failedBody": "O host não conseguiu compactar o contexto.",
+  "mobile.channel.deleteHistory.title": "Excluir histórico",
+  "mobile.channel.deleteHistory.deleting": "Excluindo o histórico…",
+  "mobile.channel.deleteHistory.footer":
+    "As mensagens são excluídas e os membros as esquecem. A configuração do canal continua.",
+  "mobile.channel.deleteHistory.confirmTitle": "Excluir o histórico de {name}?",
+  "mobile.channel.deleteHistory.confirmBody":
+    "Todas as mensagens e arquivos deste canal são excluídos do OpenBot e os membros os esquecem. Não é possível desfazer. Membros, instruções, memórias, rotinas e tarefas não mudam.",
+  "mobile.channel.deleteHistory.confirm": "Excluir histórico",
+  "mobile.channel.deleteHistory.failed": "Não foi possível excluir o histórico",
+  "mobile.channel.deleteHistory.failedBody": "O computador anfitrião não conseguiu excluir o histórico.",
   "mobile.channel.form.unavailable":
     "Conecte-se a um servidor de computador compatível com canais para fazer alterações.",
   "mobile.channel.form.invalidName": "Digite um nome de canal válido.",

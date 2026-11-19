@@ -1,14 +1,3 @@
-// The start of the agent database host does not count against the first statement. Drives the real
-// `AgentDatabaseSupervisor` against the real host, `agent-database-host.ts` run by `node` over stdio:
-// - a host that reports ready after longer than the statement deadline answers the first statement,
-//   and the reported statement time does not include the start;
-// - a host that never reports ready fails the waiting request with the start message and is ended;
-// - a host that exits before ready fails the waiting request and is not started again in a loop;
-// - a prewarmed host answers the first statement with no second start;
-// - through the real `AgentTables`, an agent adds a trigger to its own table in one statement, but
-//   not to a table of another agent, the owner record, or a TEMP trigger, and a trigger that a
-//   foreign-key cascade fires inside OpenBot's own `DROP TABLE` cannot reassign a table's owner.
-// `bun run test:agent-database-host-start`. Writes .openbot-build/agent-database-host-start-e2e/report.json.
 import assert from "node:assert/strict";
 import { type ChildProcess, spawn } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -29,12 +18,12 @@ import { AgentTables } from "../src/backend/agent-data/agent-tables";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/agent-database-host-start-e2e");
 const HOST = resolve(import.meta.dirname, "../src/backend/agent-data/agent-database-host.ts");
-/** Wide for a loaded CI runner: the first statement creates the file and the metadata tables. */
 const STATEMENT_DEADLINE_MS = 1_000;
-/** Longer than the statement deadline: before the fix, this start ended the first statement. */
 const READY_DELAY_MS = 2_000;
 const START_DEADLINE_MS = 3_000;
 const NOT_STARTED = "The database process did not start. Nothing was run. Try the call again.";
+const UNAVAILABLE =
+  "The database process could not start, so shared tables are not available now. Nothing was run. Do not retry now: keep these records in a file in your workspace, and try shared tables again later.";
 
 interface Case {
   ok: boolean;
@@ -56,6 +45,7 @@ interface Report {
   neverReady?: Case & { elapsedMs: number };
   exitBeforeReady?: Case;
   prewarm?: Case;
+  repeatedFailure?: { failures: string[]; starts: number; reasons: string[]; recovered: string[] };
   triggers?: TriggerStep[];
   failure?: string;
 }
@@ -64,7 +54,6 @@ const root = await mkdtemp(join(tmpdir(), "openbot-agent-database-host-start-e2e
 const report: Report = { passed: false };
 const children: ChildProcess[] = [];
 
-/** The test transport: the host's stdio, with an optional hold on its ready message. */
 function stdioHost(args: string[], readyDelayMs = 0): AgentDatabaseHostProcess {
   const child = spawn(process.platform === "win32" ? "node.exe" : "node", args, {
     stdio: ["pipe", "pipe", "inherit"],
@@ -82,7 +71,7 @@ function stdioHost(args: string[], readyDelayMs = 0): AgentDatabaseHostProcess {
   return {
     send: (request) => child.stdin.write(`${JSON.stringify(request)}\n`),
     onMessage: (listener) => listeners.push(listener),
-    onExit: (listener) => child.once("exit", () => listener()),
+    onExit: (listener) => child.once("exit", (code) => listener(code)),
     kill: () => child.kill("SIGKILL"),
   };
 }
@@ -135,7 +124,6 @@ async function run(
     assert.equal(starts, 1, "the prewarm did not start a host");
   }
   const outcome = await select(supervisor);
-  // The start failures end the host themselves; the others are ended here.
   if (options.dispose !== false) supervisor.dispose();
   await waitForExits();
   return {
@@ -178,6 +166,54 @@ try {
   report.prewarm = prewarm;
   assert.equal(prewarm.failure, null);
   assert.equal(prewarm.starts, 1, "the statement after a prewarm started a second host");
+
+  children.length = 0;
+  let failingStarts = 0;
+  const reasons: string[] = [];
+  const failing = new AgentDatabaseSupervisor({
+    spawnHost: () => {
+      failingStarts += 1;
+      return stdioHost(["-e", "process.exit(3)"]);
+    },
+    hostStartDeadlineMs: START_DEADLINE_MS,
+    hostStartRetryDelayMs: 60_000,
+    onHostStartFailed: (failure) => reasons.push(`${failure.reason}; retry after ${failure.retryAfterMs} ms`),
+  });
+  const failures: string[] = [];
+  for (let call = 0; call < 3; call += 1) {
+    const outcome = await select(failing);
+    failures.push(outcome.ok ? "ok" : outcome.failure.message);
+  }
+  failing.prewarm();
+  const startsInDelay = failingStarts;
+  failing.dispose();
+  await waitForExits();
+
+  children.length = 0;
+  const hosts = [
+    ["-e", "process.exit(3)"],
+    ["-e", "process.exit(3)"],
+  ];
+  const recovering = new AgentDatabaseSupervisor({
+    spawnHost: () => stdioHost(hosts.shift() ?? ["--disable-warning=ExperimentalWarning", HOST]),
+    hostStartRetryDelayMs: 0,
+  });
+  const recovered: string[] = [];
+  for (let call = 0; call < 3; call += 1) {
+    const outcome = await select(recovering);
+    recovered.push(outcome.ok ? "ok" : outcome.failure.message);
+  }
+  recovering.dispose();
+  await waitForExits();
+
+  report.repeatedFailure = { failures, starts: startsInDelay, reasons, recovered };
+  assert.deepEqual(failures, [NOT_STARTED, UNAVAILABLE, UNAVAILABLE]);
+  assert.equal(startsInDelay, 2, "a call or a prewarm inside the retry delay started a host");
+  assert.deepEqual(reasons, [
+    "exited with code 3 before it reported ready; retry after 0 ms",
+    "exited with code 3 before it reported ready; retry after 60000 ms",
+  ]);
+  assert.equal(recovered.at(-1), "ok", "the host did not answer after the failed starts");
 
   const steps: TriggerStep[] = [];
   report.triggers = steps;

@@ -2,27 +2,20 @@ import { Effect, Schema } from "effect";
 
 const ECB_HISTORICAL_RATES_URL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.xml";
 const ECB_TIMEOUT_MS = 10_000;
-// The ECB historical document is currently about 8 MiB and grows over time. Keep a bounded
-// margin for it without accepting an unbounded response.
 const ECB_MAX_BYTES = 16 * 1024 * 1024;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 
 export type BillingUsdCurrency = "eur" | "usd" | "pln" | "brl";
 
 const BILLING_USD_CURRENCIES: readonly BillingUsdCurrency[] = ["eur", "usd", "pln", "brl"];
-/** The ECB codes that a conversion needs. The ECB gives each rate per euro. */
 const ECB_CURRENCIES = { USD: "usd", PLN: "pln", BRL: "brl" } as const;
 
 export type BillingUsdResult = {
-  /** The converted amount in whole US cents. */
   amountUsd: number;
-  /** The ECB reference-rate date used for the conversion. */
   fxDate: string;
-  /** USD per unit of the input currency. */
   fxRate: number;
 };
 
-/** A safe conversion failure. It never contains a database, network, or document payload. */
 export class BillingUsdError extends Schema.TaggedError<BillingUsdError>()("BillingUsdError", {
   reason: Schema.Literals([
     "invalid_input",
@@ -43,16 +36,9 @@ type CachedRate = {
   usd_rate: unknown;
 };
 
-/**
- * Converts Stripe's EUR, PLN and BRL amounts to USD cents using dated ECB reference rates.
- *
- * The timestamp is a Unix timestamp in seconds, as used by Stripe events. Millisecond Unix
- * timestamps are accepted too because this service is also used by the history importer.
- */
 export class BillingUsd {
   readonly #database: D1Database;
   readonly #fetch: (input: string, init: RequestInit) => Promise<Response>;
-  // A stored rate never changes, so one instance reads each currency and day once.
   readonly #rates = new Map<string, { fxDate: string; usdRate: number }>();
 
   constructor(options: { database: D1Database; fetch: (input: string, init: RequestInit) => Promise<Response> }) {
@@ -234,7 +220,6 @@ function rateForCurrency(rate: HistoricalRate, currency: Exclude<BillingUsdCurre
     : numberRate(rate.usd) !== null && numberRate(rate[currency]) !== null;
 }
 
-/** Parses the ECB Cube hierarchy without relying on attribute order or line wrapping. */
 function parseHistoricalRates(document: string): ReadonlyMap<string, HistoricalRate> | null {
   const rates = new Map<string, HistoricalRate>();
   const stack: Array<{ day: string | null }> = [];

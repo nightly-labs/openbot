@@ -4,6 +4,7 @@ import type {
   RoutineFields,
   RoutineLimitPolicy,
   RoutineMissedPolicy,
+  RoutinePausedByRun,
   RoutineRunFields,
   RoutineRunPlace,
   RoutineRunSource,
@@ -11,6 +12,7 @@ import type {
   RoutineSchedule,
 } from "@openbot/contracts/ipc";
 import {
+  isRoutinePausedByRun,
   isRoutineSchedule,
   ROUTINE_LIMIT_POLICIES,
   ROUTINE_MISSED_COUNT_LIMIT,
@@ -40,16 +42,6 @@ import type { OpenBotDatabase } from "./openbot-database";
 import { hasWebhookReceipt, insertWebhookReceipt, revokeRoutineWebhooks } from "./webhook-route-store";
 import { parseEventFilters, validateWebhookTrigger, webhookMismatch, webhookRunInstruction } from "./webhook-trigger";
 
-/**
- * Three table names, one owner column and one handle column are the whole difference between an
- * agent's routines and a channel's. Writing the SQL once is also what keeps the two constraints
- * that matter - `UNIQUE(routine_id)` on the trigger and `UNIQUE(trigger_id, scheduled_for)` on the
- * run - identical for both owners: they are what make one fire produce one run.
- *
- * The aggregate names stay per-owner. `database/agent-roster.ts` purges the events of a deleted
- * agent by `aggregate_type IN ('agent-routine', 'routine-run')`, and a channel must not be swept
- * up by that query.
- */
 export interface RoutineTables {
   ownerKind: EventRoutineOwner["kind"];
   routineTable: string;
@@ -64,29 +56,21 @@ export interface RoutineTables {
   eventPrefix: string;
   limit: number;
   limitMessage: string;
-  /** Only agent routines have the `run_in` column. A channel routine runs in its channel. */
   runInColumn: boolean;
 }
 
-/** A routine read back with the owner column it was stored under. */
 export interface OwnedRoutine extends RoutineFields {
   ownerId: string;
 }
 
-/** What starts a run: its trigger, or the source of a manual run. */
 export type RoutineRunStart = "scheduled" | RoutineRunSource;
 
-/**
- * A finished run that a server transfer brought, with the times of the other server. It has no
- * trigger and no handle here: both belonged to the other server.
- */
 export interface ImportedRoutineRun {
   kind: "scheduled" | "manual";
   source?: RoutineRunSource;
   scheduledFor: string;
   routineName: string;
   instruction: string;
-  /** A finished status: the caller maps an open run to one, so nothing starts it again. */
   status: RoutineRunStatus;
   error: string | null;
   missed?: { count: number; until: string | null };
@@ -94,7 +78,6 @@ export interface ImportedRoutineRun {
   updatedAt: string;
 }
 
-/** A run read back with its owner and the handle that names the work it started. */
 export interface OwnedRoutineRun extends RoutineRunFields {
   ownerId: string;
   handleId: string | null;
@@ -138,10 +121,6 @@ interface RoutineWebhookFields {
   updatedAt: string;
 }
 
-/**
- * A routine starts from a schedule trigger row or from a webhook row, never both. The released
- * routine API reads only the schedule kind; `listRecords` and `getRecord` read both.
- */
 type RoutineRecordTrigger =
   | ({ kind: "schedule" } & OwnedRoutine["trigger"])
   | ({ kind: "webhook" } & RoutineWebhookFields);
@@ -157,11 +136,9 @@ export interface RoutineRecordInput {
   timezone: string;
   limitPolicy?: RoutineLimitPolicy;
   missedPolicy?: RoutineMissedPolicy;
-  /** Left out, a save keeps the saved place, and a new routine runs in the chat. */
   runIn?: RoutineRunPlace;
   trigger:
     | { kind: "schedule"; schedule: RoutineSchedule }
-    /** A null secret keeps the stored one. */
     | { kind: "webhook"; eventType: string | null; filters: EventFilter[]; secretCiphertext: string | null };
 }
 
@@ -180,17 +157,11 @@ export type WebhookReceiveResult<Run = OwnedRoutineRun> =
   | { kind: "gone" }
   | { kind: "too-large" };
 
-/** The time from a hold of the routines to the restart that the hold waited for. */
 export interface RoutineHoldWindow {
   since: Date;
   until: Date;
 }
 
-/**
- * Owner-agnostic on purpose: every method takes an `ownerId` and returns `Owned*` rows. The two
- * subclasses re-name the owner and the handle, so `AgentRoutineStore` keeps the public signatures
- * its callers already use.
- */
 export class RoutineStore {
   constructor(
     protected readonly database: OpenBotDatabase,
@@ -198,8 +169,12 @@ export class RoutineStore {
   ) {}
 
   protected get routineColumns(): string {
-    return `routine_id, ${this.tables.ownerColumn}, name, instruction, active, timezone, limit_policy, missed_policy,
-            ${this.tables.runInColumn ? "run_in, " : ""}created_at, updated_at`;
+    const { routineTable, eventPrefix, ownerColumn, runInColumn } = this.tables;
+    return `routine_id, ${ownerColumn}, name, instruction, active, timezone, limit_policy, missed_policy,
+            ${runInColumn ? "run_in, " : ""}created_at, updated_at,
+            (SELECT payload_json FROM orchestration_events
+             WHERE sequence = ${routineTable}.last_event_sequence AND event_type = '${eventPrefix}.paused-by-run')
+              AS paused_by_run`;
   }
 
   protected get runColumns(): string {
@@ -220,7 +195,6 @@ export class RoutineStore {
     ).map((row) => this.#routine(row));
   }
 
-  /** Routines of every trigger kind. */
   listRecords(ownerId: string): OwnedRoutineRecord[] {
     return databaseRows(
       this.database.connection
@@ -244,15 +218,10 @@ export class RoutineStore {
     return isDynamicRecord(row) ? this.#record(row) : null;
   }
 
-  /** The released routine API sees only routines that a schedule starts. */
   get #hasSchedule(): string {
     return `EXISTS (SELECT 1 FROM ${this.tables.triggerTable} WHERE routine_id = ${this.tables.routineTable}.routine_id)`;
   }
 
-  /**
-   * A routine with no trigger row of either kind cannot run, and reading it would fail. Leave it
-   * out, as `#hasSchedule` does for the released API, so that it does not stop the whole list.
-   */
   get #hasTrigger(): string {
     return `(${this.#hasSchedule} OR EXISTS (SELECT 1 FROM ${this.tables.webhookTable}
              WHERE routine_id = ${this.tables.routineTable}.routine_id))`;
@@ -378,10 +347,6 @@ export class RoutineStore {
     );
   }
 
-  /**
-   * Creates or replaces a routine of either trigger kind. A changed trigger kind keeps the routine
-   * ID and its runs. Leaving the webhook kind revokes the public route in the same transaction.
-   */
   saveRecord(
     ownerId: string,
     routineId: string | undefined,
@@ -409,7 +374,6 @@ export class RoutineStore {
       input.missedPolicy ?? current?.missedPolicy ?? (schedule ? defaultMissedPolicy(schedule) : "skip");
     const runIn = this.tables.runInColumn ? (input.runIn ?? current?.runIn ?? "chat") : undefined;
     const timestamp = now.toISOString();
-    // A routine that runs already keeps its schedule; a new run time must still be ahead.
     const running =
       current?.active &&
       current.trigger.kind === "schedule" &&
@@ -526,11 +490,6 @@ export class RoutineStore {
     );
   }
 
-  /**
-   * Records one verified webhook request and, when it matches, creates the run in the same
-   * transaction. The caller starts the run after the commit; a crash before that leaves a run that
-   * `pendingRunRows` resumes. The event stays in the run instruction only, as framed data.
-   */
   protected receiveWebhookRow(ownerId: string, routineId: string, event: ReceivedWebhookEvent): WebhookReceiveResult {
     const routine = this.getRecord(ownerId, routineId);
     if (routine?.trigger.kind !== "webhook") return { kind: "gone" };
@@ -560,7 +519,6 @@ export class RoutineStore {
       receivedAt: event.receivedAt,
       data: event.data,
     });
-    // The run input goes through the message limit. No receipt, so the sender can retry after a change.
     if (instruction.length > INPUT_LIMITS.messageText) return { kind: "too-large" };
     const { commandPrefix, eventPrefix, runAggregate } = this.tables;
     return this.database.dispatch(
@@ -602,7 +560,6 @@ export class RoutineStore {
     );
   }
 
-  /** Skipped-run records only fill the local history, so other readers do not get them by default. */
   protected listRunRows(ownerId: string, routineId: string, limit = 50, withSkipped = false): OwnedRoutineRun[] {
     const safeLimit = Math.max(1, Math.min(INPUT_LIMITS.routineRunsPage, limit));
     return databaseRows(
@@ -617,12 +574,10 @@ export class RoutineStore {
     ).map((row) => this.#run(row));
   }
 
-  /** Runs that were created but never got a handle - the crash window between the two writes. */
   protected pendingRunRows(): OwnedRoutineRun[] {
     return this.#queuedRunRows(`AND ${this.tables.handleColumn} IS NULL`);
   }
 
-  /** Queued runs, including ones whose handle was saved before the command was issued. */
   protected queuedRunRows(): OwnedRoutineRun[] {
     return this.#queuedRunRows("");
   }
@@ -654,10 +609,6 @@ export class RoutineStore {
     ).map((row) => this.#run(row));
   }
 
-  /**
-   * Every unfinished run of one owner, across all of its routines. A channel reconciles by owner,
-   * not by routine: one channel change can settle runs of several routines at once.
-   */
   protected openRunRows(ownerId: string): OwnedRoutineRun[] {
     return databaseRows(
       this.database.connection
@@ -671,11 +622,6 @@ export class RoutineStore {
     ).map((row) => this.#run(row));
   }
 
-  /**
-   * The failed runs of one owner that name one of these handles. A retry restarts the work under
-   * the request the run already holds, so a run a failure settled has to be reconciled again with
-   * it, or the history keeps a failure the reader has answered.
-   */
   protected failedRunRowsForHandles(ownerId: string, handles: readonly string[]): OwnedRoutineRun[] {
     if (!handles.length) return [];
     return databaseRows(
@@ -691,7 +637,6 @@ export class RoutineStore {
     ).map((row) => this.#run(row));
   }
 
-  /** The owners that still have an unfinished run, so a boot reconcile can visit only those. */
   protected ownersWithOpenRuns(): string[] {
     return databaseRows(
       this.database.connection
@@ -767,12 +712,6 @@ export class RoutineStore {
     );
   }
 
-  /**
-   * Missed occurrences are never replayed: a closed app must not wake into a backlog. The ones a
-   * routine drops are recorded on one cancelled run. A routine set to run once keeps its newest
-   * occurrence due, so the scheduler runs it now. A trigger that came due while a restart held the
-   * routines stays due as well, so it runs once now.
-   */
   skipMissed(now = new Date(), held?: RoutineHoldWindow): void {
     for (const routine of this.#allActive()) {
       const { missedPolicy, trigger } = routine;
@@ -790,8 +729,6 @@ export class RoutineStore {
         );
         continue;
       }
-      // A crash after a run was made and before its trigger moved leaves that occurrence due. It ran.
-      // The scheduler can make that run at a later, collapsed occurrence, so the newest run counts.
       const ran = this.#latestScheduledRun(trigger.id, trigger.nextRunAt);
       const first = ran ? nextRoutineOccurrence(trigger.schedule, routine.timezone, new Date(ran)) : new Date(due);
       if (first.getTime() > now.getTime()) {
@@ -809,11 +746,6 @@ export class RoutineStore {
     }
   }
 
-  /**
-   * A one-time routine that came due while OpenBot was closed. A run that a crash left behind
-   * finishes it. Otherwise `run-once` keeps it due, so the scheduler runs it now, and `skip`
-   * records the missed time and finishes it.
-   */
   #settleMissedOnce(routine: OwnedRoutine, now: Date, missedPolicy: RoutineMissedPolicy | undefined): void {
     const { trigger } = routine;
     if (this.#latestScheduledRun(trigger.id, trigger.nextRunAt)) {
@@ -825,10 +757,28 @@ export class RoutineStore {
     this.#recordMissed(routine, { first: at, until: at, count: 1 }, null);
   }
 
-  /**
-   * Pauses a routine whose one-time trigger has run. The trigger keeps its time, so the routine
-   * shows when it ran, and the routine resumes only with a new time.
-   */
+  markPausedByRun(routineId: string, pausedByRun: RoutinePausedByRun): void {
+    const { commandPrefix, eventPrefix, routineAggregate, routineTable } = this.tables;
+    this.database.dispatch(
+      `${commandPrefix}:paused-by-run:${routineId}:${randomUUID()}`,
+      [
+        {
+          aggregateType: routineAggregate,
+          aggregateId: routineId,
+          eventType: `${eventPrefix}.paused-by-run`,
+          payload: { scheduledFor: pausedByRun.scheduledFor },
+        },
+      ],
+      (db, sequences) => {
+        db.prepare(`UPDATE ${routineTable} SET last_event_sequence = ? WHERE routine_id = ? AND active = 0`).run(
+          sequences[0] ?? 0,
+          routineId,
+        );
+        return null;
+      },
+    );
+  }
+
   completeTrigger(routineId: string, triggerId: string, now = new Date()): void {
     const { commandPrefix, eventPrefix, routineAggregate, routineTable } = this.tables;
     this.database.dispatch(
@@ -850,7 +800,6 @@ export class RoutineStore {
     );
   }
 
-  /** The newest scheduled run of the trigger at or after `from`. */
   #latestScheduledRun(triggerId: string, from: string): string | null {
     const row = this.database.connection
       .prepare(
@@ -861,12 +810,6 @@ export class RoutineStore {
     return isDynamicRecord(row) && typeof row.scheduled_for === "string" ? row.scheduled_for : null;
   }
 
-  /**
-   * Records the due occurrences from `due` through `scheduledFor` that the scheduler did not start,
-   * with the reason as source text, and moves the trigger. A skip for the same reason that follows
-   * the last one with no occurrence between them extends that record, so a long run does not fill
-   * the history with one entry for each occurrence.
-   */
   protected skipOccurrenceRow(
     routine: OwnedRoutine,
     due: Date,
@@ -940,12 +883,6 @@ export class RoutineStore {
     );
   }
 
-  /**
-   * Records the skipped occurrences on one cancelled run and moves the trigger in one transaction, so
-   * a crash cannot record them twice. The run is never queued: it only fills the history. A null
-   * `nextRunAt` is a one-time trigger, which keeps its time and pauses the routine instead. `reason`
-   * is why the scheduler skipped them; null means that OpenBot was closed.
-   */
   #recordMissed(
     routine: OwnedRoutine,
     skipped: { first: Date; until: Date; count: number },
@@ -1027,11 +964,6 @@ export class RoutineStore {
     );
   }
 
-  /**
-   * Writes the finished runs of one routine that a server transfer brought, in one transaction.
-   * The run history shows them; the scheduler never reads a finished run. Returns the new run ids,
-   * in the order of `runs`.
-   */
   protected importRunRows(routineId: string, ownerId: string, runs: readonly ImportedRoutineRun[]): string[] {
     if (runs.length === 0) return [];
     const { commandPrefix, eventPrefix, runAggregate, runTable, ownerColumn } = this.tables;
@@ -1208,16 +1140,18 @@ export class RoutineStore {
     const missedPolicy = requiredStringColumn(row, "missed_policy");
     if (!isOneOf(ROUTINE_MISSED_POLICIES, missedPolicy))
       throw new Error("The stored routine missed-run policy is invalid.");
+    const active = requiredNumberColumn(row, "active") === 1;
     return {
       id: requiredStringColumn(row, "routine_id"),
       ownerId: requiredStringColumn(row, this.tables.ownerColumn),
       name: requiredStringColumn(row, "name"),
       instruction: requiredStringColumn(row, "instruction"),
-      active: requiredNumberColumn(row, "active") === 1,
+      active,
       timezone: requiredStringColumn(row, "timezone"),
       limitPolicy,
       missedPolicy,
       ...this.#runIn(row),
+      ...(active ? {} : pausedByRunColumn(row)),
       createdAt: requiredStringColumn(row, "created_at"),
       updatedAt: requiredStringColumn(row, "updated_at"),
     };
@@ -1230,7 +1164,6 @@ export class RoutineStore {
     return { runIn };
   }
 
-  /** The column exists only on the agent table, so it is written apart from the shared insert. */
   #writeRunIn(db: OpenBotDatabase["connection"], routineId: string, runIn: RoutineRunPlace): void {
     if (!this.tables.runInColumn) return;
     db.prepare(`UPDATE ${this.tables.routineTable} SET run_in = ? WHERE routine_id = ?`).run(runIn, routineId);
@@ -1254,7 +1187,6 @@ export class RoutineStore {
     };
   }
 
-  /** The limit counts routines of every trigger kind, but not a routine that the lists leave out. */
   #assertBelowLimit(ownerId: string): void {
     const row = this.database.connection
       .prepare(
@@ -1350,7 +1282,6 @@ export class RoutineStore {
       randomUUID(),
       routineId,
       JSON.stringify(schedule),
-      // A one-time run keeps its time after it passes, so a finished routine still shows when it ran.
       (schedule.kind === "once"
         ? routineOnceInstant(schedule, timezone)
         : nextRoutineOccurrence(schedule, timezone, now)
@@ -1372,7 +1303,6 @@ export class RoutineStore {
     this.#validateSchedule(schedule, timezone, stored);
   }
 
-  /** A new or changed schedule gets the full check; an unchanged one stays editable, as an older version stored it. */
   #validateSchedule(schedule: RoutineSchedule, timezone: string, stored: RoutineSchedule | null): void {
     if (stored && JSON.stringify(stored) === JSON.stringify(schedule))
       validateStoredRoutineSchedule(schedule, timezone);
@@ -1393,27 +1323,18 @@ export class RoutineStore {
 
 type RunSource = Pick<OwnedRoutine, "id" | "ownerId" | "name" | "instruction">;
 
-/** The walk counts at most one past the exact limit, which reads as "more than the limit". */
 const MISSED_WALK_LIMIT = ROUTINE_MISSED_COUNT_LIMIT + 1;
 const HOUR_MS = 3_600_000;
-/** Windows before now that the walk searches, shortest first, once the count passes the limit. */
 const MISSED_WINDOWS_MS = [HOUR_MS, 24 * HOUR_MS, 32 * 24 * HOUR_MS, 400 * 24 * HOUR_MS, Number.POSITIVE_INFINITY];
 
 interface MissedOccurrences {
-  /** Exact up to the limit, then `MISSED_WALK_LIMIT`. */
   count: number;
-  /** The walk stopped at the limit, so `count` is a lower bound. */
   truncated: boolean;
   last: Date;
   previous: Date | null;
   next: Date;
 }
 
-/**
- * The occurrences from `first` through `now`. One step costs tens of microseconds, and a routine
- * every three minutes misses thousands in a week, so the walk stops counting at the limit. It then
- * finds the newest two in the shortest window before `now` that holds two.
- */
 function missedOccurrences(schedule: RoutineSchedule, timezone: string, first: Date, now: Date): MissedOccurrences {
   validateStoredRoutineSchedule(schedule, timezone);
   const step = (after: Date) => nextValidRoutineOccurrence(schedule, timezone, after);
@@ -1443,20 +1364,14 @@ function missedOccurrences(schedule: RoutineSchedule, timezone: string, first: D
   throw new Error("The missed routine occurrences could not be found.");
 }
 
-/** A one-time routine that would run must have its time ahead. */
 function assertOnceAhead(schedule: RoutineSchedule, timezone: string, now: Date): void {
   if (schedule.kind === "once") nextRoutineOccurrence(schedule, timezone, now);
 }
 
-/**
- * A one-time routine always waits for a spent plan: a dropped reminder has no later run that
- * makes up for it.
- */
 function limitPolicyFor(schedule: RoutineSchedule, requested: RoutineLimitPolicy | undefined): RoutineLimitPolicy {
   return schedule.kind === "once" ? "wait" : (requested ?? "wait");
 }
 
-/** A one-time routine that came due while OpenBot was closed runs late by default; it has no next run. */
 function defaultMissedPolicy(schedule: RoutineSchedule): RoutineMissedPolicy {
   return schedule.kind === "once" ? "run-once" : "skip";
 }
@@ -1467,7 +1382,6 @@ function scheduleColumn(row: DynamicRecord): RoutineSchedule {
   return value;
 }
 
-/** The stored kind of a run, and the source of a manual one. */
 function runStartColumns(start: RoutineRunStart): Pick<RoutineRunFields, "kind" | "source"> {
   return start === "scheduled" ? { kind: "scheduled" } : { kind: "manual", source: start };
 }
@@ -1482,4 +1396,15 @@ function isRoutineRunStatus(value: string): value is RoutineRunStatus {
     value === "interrupted" ||
     value === "cancelled"
   );
+}
+
+function pausedByRunColumn(row: DynamicRecord): { pausedByRun?: RoutinePausedByRun } {
+  const payload = row.paused_by_run;
+  if (typeof payload !== "string") return {};
+  try {
+    const value = JSON.parse(payload);
+    return isRoutinePausedByRun(value) ? { pausedByRun: { scheduledFor: value.scheduledFor } } : {};
+  } catch {
+    return {};
+  }
 }

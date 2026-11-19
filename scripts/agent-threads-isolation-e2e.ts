@@ -1,20 +1,3 @@
-// Runs an agent's own chat and two side threads at the same time in this worktree's running dev app,
-// through the preload bridge, agent service and a real provider, and checks that the threads do not
-// change each other's work. It changes the data of the profile: it clears the context of the
-// agent's own chat, and adds memories, routines and workspace files, which it removes at the end.
-// Start the app with
-// `bun run dev` (never `--shared`), and pass an agent whose provider is signed in and runs turns at
-// the same time: `bun scripts/agent-threads-isolation-e2e.ts --allow-mutations --agent=<agent id>`.
-//
-// 1. Each of the three threads saves its own memory, creates its own routine and writes its own file
-//    in the shared workspace, at the same time. All three memories, routines and files are kept; each
-//    routine card shows in the thread that created it; no conversation holds another thread's word.
-// 2. "Clear context" of the agent's own chat works while a side thread runs a turn.
-// 3. A delete of a side thread that races a send to it leaves no message in the agent's own chat.
-// The script does not cover a compaction of one side thread: only the agent's own chat has a manual
-// compact command. It counts the processes below the app before and after the delete, and does not
-// assert the count: a provider can serve all threads from one process.
-// Writes .openbot-build/agent-threads-isolation-e2e/report.json.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, rmSync } from "node:fs";
@@ -117,7 +100,6 @@ const replied = (snapshot: ConversationSnapshot, word: string) =>
   snapshot.activeTurnId === null &&
   snapshot.messages.some((message) => message.author === "assistant" && textOf(message).includes(word));
 
-/** The processes below the app's main process. */
 function processCount() {
   const rows = execFileSync("ps", ["-A", "-o", "pid=,ppid="], { encoding: "utf8" })
     .trim()
@@ -147,7 +129,6 @@ try {
   const [main, sideA, sideB] = lanes;
   assert.ok(main && sideA && sideB);
 
-  // 1. The three threads work at the same time.
   const started = await page.evaluate(
     ({ id, mainText, aText, bText }) =>
       Promise.all([
@@ -194,7 +175,6 @@ try {
       fileWritten:
         existsSync(join(workspacePath, entry.file)) &&
         readFileSync(join(workspacePath, entry.file), "utf8").includes(entry.word),
-      // A word of another thread in this conversation means that a message or a card went here.
       foreignWords: others
         .filter((other) => conversations.get(entry)?.messages.some((message) => textOf(message).includes(other.word)))
         .map((other) => other.label),
@@ -209,7 +189,6 @@ try {
     assert.deepEqual(result.foreignWords, [], `${result.label}: its conversation holds no word of another thread.`);
   }
 
-  // 2. "Clear context" of the agent's own chat does not wait for a side thread.
   const runningId = sideA.taskId;
   assert.ok(runningId);
   await page.evaluate((input) => window.openbot.agent.sendMessage({ ...input, clientMessageId: crypto.randomUUID() }), {
@@ -239,7 +218,6 @@ try {
     tasks.some((task) => task.id === runningId && task.state !== "running"),
   );
 
-  // 3. A delete that races a send: the send goes to the thread or is refused, never to the own chat.
   const raceId = sideB.taskId;
   assert.ok(raceId);
   const raceText = `Race ${run}: reply with the word late.`;
@@ -255,7 +233,6 @@ try {
       })),
     { id: agentId, taskId: raceId, text: raceText },
   );
-  // A send that won the race starts a turn, which refuses the delete. Stop it and delete again.
   if (race.deleted !== "") {
     await page.evaluate((input) => window.openbot.agent.stopTask(input), { agentId, taskId: raceId });
     await waitFor(page, "side B stops", bridge.tasks, (tasks) =>

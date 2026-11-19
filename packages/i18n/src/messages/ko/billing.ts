@@ -198,4 +198,10 @@ export const messages = {
     other:
       "라이선스가 최대치인 사용자 {count}명이에요. 더 큰 라이선스가 필요하면 문의해 주세요. 새로운 사람은 서버에 참여할 수 없어요.",
   },
+  "billing.details.country": "청구 국가",
+  "billing.details.countryPlaceholder": "국가 선택",
+  "billing.details.vatId": "EU VAT ID (선택)",
+  "billing.details.vatIdInvalid": "선택한 국가의 VAT ID가 아니에요.",
+  "billing.details.countryMissing": "청구 국가를 선택해 주세요.",
+  "billing.details.saveFailed": "청구 정보를 저장할 수 없어요",
 } as const satisfies PartialTranslation<typeof source>;

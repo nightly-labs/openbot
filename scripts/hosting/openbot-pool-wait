@@ -1,19 +1,10 @@
 #!/bin/bash
-# openbot-pool-wait.service runs this as root on a prepared machine of the pool that has no server
-# (docs/hosted-servers.md#a-new-server-on-a-pool-machine). The account service cannot reach a machine,
-# so the machine asks: each 10 seconds it sends its ID and its token, and the answer says when a
-# customer bought a server that this machine must run. It then writes the server ID and the claim for
-# OpenBot, enables and starts OpenBot, and stops itself. `move-from-boat.sh offer` installs it.
-#
-# The token and the claim are secrets. They go in files of root, in the body of the request and in the
-# environment of one command, and never on a command line or in the journal.
 set -euo pipefail
 export LC_ALL=C
 umask 077
 
 STATE=/etc/openbot-pool
 INSTALL=/opt/OpenBot/hosted
-# The runtime directory of the unit: on tmpfs, 0700, and removed when the unit stops.
 WORK=${RUNTIME_DIRECTORY:-/run/openbot-pool}
 INTERVAL=10
 
@@ -22,7 +13,6 @@ fail() {
   exit 1
 }
 
-# The offer is over. The unit must not start again at the next boot.
 finish() {
   rm -f "$STATE/token"
   systemctl disable --quiet openbot-pool-wait.service || true
@@ -50,7 +40,6 @@ printf '{"hostId":"%s","token":"%s"}' "$host" "$token" >"$request"
 echo "Machine $host waits for a server."
 while :; do
   : >"$answer"
-  # No answer, a slow answer or an error of the account service: ask again. Only 401 ends the offer.
   status=$(curl --silent --max-time 30 --proto '=https' --header 'content-type: application/json' \
     --data-binary "@$request" --output "$answer" --write-out '%{http_code}' \
     "$url/v2/hosting/pool/assignment" || true)
@@ -66,9 +55,6 @@ while :; do
   sleep "$INTERVAL"
 done
 
-# openbot-hosted-env writes the file that openbot-hosted-server waits for, as the service user. The
-# claim goes in the environment, as on boat. A stop after this line is safe: the token is still here,
-# so the next start of the unit gets the same server and the same claim, and does these steps again.
 OPENBOT_HOSTED_HOST_ID=$server OPENBOT_HOSTED_CLAIM=$claim HOME=$home \
   setpriv --reuid "$user" --regid "$(id -gn "$user")" --init-groups "$INSTALL/openbot-hosted-env"
 unset claim

@@ -34,21 +34,12 @@ export interface AnalyticsModel extends AnalyticsTotals {
   model: string;
   share: number;
 }
-/**
- * The usage row of workflow model and condition steps, beside the agents of a host report. No agent
- * has this id: an agent id starts with `agent-`.
- */
 export const WORKFLOWS_USAGE_ID = "openbot:workflows";
 
 export interface AnalyticsAgent extends AnalyticsTotals {
   agentId: string;
   share: number;
 }
-// One cell of the daily-by-provider grid. The chart reads exactly these measures, so
-// the cell carries them rather than the other fields of AnalyticsTotals: at the
-// 367-day cap a full-totals cell per provider is four times the payload for nothing.
-// The Team API carries a cell on the frozen host-analytics v1 wire, which has no `cachedInput`,
-// so a remote report decodes without it. Null means the provider reported no cache reads.
 export interface AnalyticsProviderDay {
   date: string;
   provider: string;
@@ -56,11 +47,6 @@ export interface AnalyticsProviderDay {
   cachedInput?: number | null;
   estimatedCostUsd: number | null;
 }
-/**
- * The tokens a report shows: processed tokens without cache reads. Each request of an agent
- * turn reads the whole cached conversation again, so cache reads repeat the same context once
- * per request and can be ten times the rest (#2747). Unknown cache reads subtract nothing.
- */
 export function analyticsTokens(row: { processedTokens: number; cachedInput?: number | null }): number {
   return Math.max(0, row.processedTokens - (row.cachedInput ?? 0));
 }
@@ -76,10 +62,6 @@ export interface AgentAnalytics {
   models: AnalyticsModel[];
 }
 
-// One formatter per time zone, not per call. A report walks every usage and activity row
-// through `analyticsDate`, so a host with 100,000 records used to construct 100,000 formatters
-// synchronously in the main process. The zone is validated before it reaches here - a string of
-// at most 100 characters that `Intl` accepts - so the key space is the IANA list, not user text.
 const dateFormatters = new Map<string, Intl.DateTimeFormat>();
 
 function dateFormatter(timeZone: string): Intl.DateTimeFormat {
@@ -235,8 +217,6 @@ export function decodeAnalyticsReport(value: unknown): Omit<AgentAnalytics, "age
   };
 }
 
-// The host report groups by agent beside provider and model, and the renderer joins each
-// row to the agent list it already reads, so only the id crosses the boundary.
 export function decodeAnalyticsAgents(value: unknown): AnalyticsAgent[] {
   if (!Array.isArray(value)) throw new Error("Invalid agent analytics rows.");
   return value.map((agent) => {
@@ -247,9 +227,6 @@ export function decodeAnalyticsAgents(value: unknown): AnalyticsAgent[] {
   });
 }
 
-// The daily grid is host-only for the same reason as the agent split, and it is a
-// separate array rather than a field on each AnalyticsDay because a day carries no
-// provider dimension anywhere else in the report.
 export function decodeAnalyticsProviderDays(value: unknown): AnalyticsProviderDay[] {
   if (!Array.isArray(value)) throw new Error("Invalid provider analytics rows.");
   return value.map((cell) => {

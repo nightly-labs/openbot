@@ -19,7 +19,6 @@ export const CATEGORY_LABELS = {
   other: "marketplace.category.other",
 } as const satisfies Record<SkillCategory, AppTextKey>;
 
-/** The rows the overview asks for each category, so a large catalog still shows every category. */
 const HOME_ROWS_PER_CATEGORY = 6;
 const HOME_PAGE_SIZE = 50;
 const HOME_CACHE_MS = 5 * 60_000;
@@ -42,10 +41,6 @@ function inCategory<T extends CatalogItem>(items: T[], category: SkillCategory):
   return items.filter((item) => (item.category ?? "other") === category);
 }
 
-/**
- * The overview in one request while the whole catalog fits in one page. A larger catalog can leave a
- * category short of rows, so only those categories then ask for their own first rows.
- */
 async function loadHomePage<T extends CatalogItem>(
   list: CatalogList<T>,
   verified?: boolean | undefined,
@@ -57,18 +52,12 @@ async function loadHomePage<T extends CatalogItem>(
   const pages = await Promise.all(
     short.map((category) => list({ ...source, category, sort: "installs", limit: HOME_ROWS_PER_CATEGORY })),
   );
-  /* "Load more" goes on from the first page. A category row that page brings again is dropped as a duplicate. */
   return {
     items: [...page.items, ...pages.flatMap((categoryPage) => categoryPage.items)],
     nextCursor: page.nextCursor,
   };
 }
 
-/**
- * Each account Worker request costs money, and the Marketplace loads the overview again on each open.
- * The overview is one request, and this keeps its answer for a few minutes. The caller owns the
- * cache, so a different source never reads it.
- */
 export class MarketplaceHomeCache<T extends CatalogItem> {
   #entry: { loadedAt: number; page: Promise<CatalogPage<T>> } | null = null;
 
@@ -83,7 +72,6 @@ export class MarketplaceHomeCache<T extends CatalogItem> {
   }
 }
 
-/** Whether an answer's row is the row already on screen, so the list can keep the element it has. */
 function same(a: CatalogItem, b: CatalogItem) {
   return (
     a.id === b.id &&
@@ -96,20 +84,16 @@ function same(a: CatalogItem, b: CatalogItem) {
 }
 
 export interface MarketplaceListing<T> {
-  /** The rows to show: the answer to the current search, or the loaded rows narrowed until it arrives. */
   items: () => T[];
   loading: () => boolean;
   loadingMore: () => boolean;
   error: () => string | null;
-  /** The server has not answered the current search yet, so an empty `items` is not "no match". */
   pending: () => boolean;
-  /** The server holds rows past the loaded ones. */
   hasMore: () => boolean;
   loadMore: () => void;
   retry: () => void;
 }
 
-/** What a listing asks the catalog for, apart from the search. A change loads at once. */
 interface ListingFilter {
   category: SkillCategory | null;
   sort: MarketplaceSkillSort;
@@ -120,19 +104,12 @@ function sameFilter(a: ListingFilter, b: ListingFilter) {
   return a.category === b.category && a.sort === b.sort && a.verified === b.verified;
 }
 
-/**
- * One Marketplace listing: the overview, a category or a search, in pages. The search waits for a
- * pause in typing, and an answer to an older search or filter never replaces a newer one.
- */
 export function createMarketplaceListing<T extends CatalogItem>(options: {
   list: CatalogList<T>;
-  /** Keeps the overview for a few minutes. Omit it for a list that is not a network call. */
   homeCache?: MarketplaceHomeCache<T> | undefined;
   query: () => string;
   category: () => SkillCategory | null;
-  /** The order of the rows. Most installs first when omitted. */
   sort?: (() => MarketplaceSkillSort) | undefined;
-  /** True: only verified skills. False: only the other skills. Omitted or undefined: all. */
   verified?: (() => boolean | undefined) | undefined;
 }): MarketplaceListing<T> {
   const filter = (): ListingFilter => ({
@@ -141,7 +118,6 @@ export function createMarketplaceListing<T extends CatalogItem>(options: {
     verified: options.verified?.(),
   });
   const [state, setState] = createStore<{
-    /** The trimmed query `items` came back for, so a newer keystroke knows it must filter them itself. */
     loadedQuery: string;
     items: T[];
     nextCursor: string | null;
@@ -155,17 +131,11 @@ export function createMarketplaceListing<T extends CatalogItem>(options: {
   async function load({ category, sort, verified }: ListingFilter, query: string, cursor?: string) {
     const version = ++requestVersion;
     const trimmed = query.trim();
-    /* A search keeps the rows it already has and filters them below, so typing never flashes a skeleton. */
     const keepVisible = !cursor && Boolean(trimmed) && state.items.length > 0;
     setState((s) => {
       s.loading = !cursor && !keepVisible;
       s.loadingMore = Boolean(cursor);
       s.error = null;
-      /*
-       * A cursor belongs to the search that produced it. A first page therefore drops it, even when
-       * the rows stay on screen: paging on with the old cursor would append a position from the
-       * former query to the rows of the new one.
-       */
       if (!cursor) {
         s.nextCursor = null;
         if (!keepVisible) s.items = [];
@@ -173,7 +143,6 @@ export function createMarketplaceListing<T extends CatalogItem>(options: {
     });
     try {
       const home = !category && !trimmed && !cursor && sort === "installs";
-      /* The cache holds the overview of the whole catalog only. */
       const cache = verified === undefined ? options.homeCache : undefined;
       const homePage = home ? await (cache ? cache.load(options.list) : loadHomePage(options.list, verified)) : null;
       const page = homePage
@@ -191,11 +160,6 @@ export function createMarketplaceListing<T extends CatalogItem>(options: {
         const allItems = (homePage ?? page)?.items ?? [];
         const items = allItems
           .filter((item, index) => allItems.findIndex((current) => current.id === item.id) === index)
-          /*
-           * An answer arrives as new objects, even for a row that is already on screen. Keeping the
-           * object the row was built from lets the grid keep that row's element instead of building
-           * it again, which is what made every keystroke blink the whole listing.
-           */
           .map((item) => s.items.find((current) => same(current, item)) ?? item);
         s.items = cursor
           ? [...s.items, ...items.filter((item) => !s.items.some((current) => current.id === item.id))]
@@ -218,7 +182,6 @@ export function createMarketplaceListing<T extends CatalogItem>(options: {
     }
   }
 
-  /* A filter change loads at once; typing waits for a pause before it reaches the network. */
   createEffect(
     () => [filter(), options.query()] as const,
     ([current, query], previous) => {
@@ -226,7 +189,6 @@ export function createMarketplaceListing<T extends CatalogItem>(options: {
       if (previous && sameFilter(previous[0], current)) {
         if (previous[1] === query) return;
         requestVersion++;
-        /* Paging stops at the keystroke and starts again from the first page of the new query. */
         setState((s) => {
           s.nextCursor = null;
         });
@@ -241,7 +203,6 @@ export function createMarketplaceListing<T extends CatalogItem>(options: {
     clearTimeout(timer);
   });
 
-  /** True between a keystroke and the answer for it, when `items` still belongs to an older query. */
   const searchPending = () => {
     const query = options.query().trim();
     return Boolean(query) && state.loadedQuery !== query;
@@ -269,7 +230,6 @@ export function createMarketplaceListing<T extends CatalogItem>(options: {
     },
     retry: () => {
       clearTimeout(timer);
-      /* A failed "Load more" keeps its rows and its cursor: ask for that page again. */
       const cursor = state.items.length > 0 ? (state.nextCursor ?? undefined) : undefined;
       void load(filter(), options.query(), cursor);
     },

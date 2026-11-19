@@ -62,6 +62,7 @@ export const messages = {
   "mobile.marketplace.facts.accessSignIn": "Oturum açma",
   "mobile.marketplace.facts.accessLocal": "Bu bilgisayar",
   "mobile.marketplace.facts.accessNone": "Oturum gerekmez",
+  "mobile.marketplace.facts.accessMac": "Yalnızca Mac",
   "mobile.marketplace.permission.admin": "Pazaryerinden yalnızca sahipler ve yöneticiler kurulum yapabilir.",
   "mobile.marketplace.permission.unavailable":
     "Bu sunucu çevrimdışı veya OpenBot sürümü bunun için çok eski. OpenBot'u, sunucuyu çalıştıran bilgisayarda güncelleyin.",
@@ -94,6 +95,7 @@ export const messages = {
   "mobile.marketplace.skill.doc": "SKILL.md",
   "mobile.marketplace.skill.examplePrompt": "Bu beceriyi kullanmama yardım et.",
   "mobile.marketplace.app.add": "Uygulama ekle",
+  "mobile.marketplace.app.addCustom": "Özel ekle",
   "mobile.marketplace.app.connect": "Bağlan",
   "mobile.marketplace.app.connectTitle": "{name} uygulamasını bağla",
   "mobile.marketplace.app.keyIntro":
@@ -113,6 +115,8 @@ export const messages = {
   "mobile.marketplace.app.docs": "Anahtar al",
   "mobile.marketplace.app.local":
     "Bu uygulama OpenBot'un çalıştığı bilgisayarda çalışır. Uygulamayı o bilgisayarda kurun.",
+  "mobile.marketplace.app.needsMac":
+    "Bu uygulama yalnızca OpenBot çalıştıran bir Mac'te çalışır ve bu sunucu bir Mac değil.",
   "mobile.marketplace.app.relayUnsupported":
     "Bu uygulama tarayıcıda oturum açmayı gerektirir. Sunucudaki OpenBot'u güncelleyin veya uygulamayı bilgisayarda bağlayın.",
   "mobile.marketplace.app.waiting": "Oturum açma sayfası bekleniyor…",

@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/host";
 
 export const messages = {
-  // Errors from host setup, publishing, and host maintenance.
   "error.host.iceServersMissing": "Remote Signal 尚未提供 ICE 服务器。",
   "error.host.keyRotationUnavailable": "没有账号服务，该服务器无法更改密钥。",
   "error.host.keyRotationRefused": "账号服务没有接受新的服务器密钥，仍继续使用当前密钥。",

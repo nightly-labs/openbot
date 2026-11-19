@@ -8,6 +8,7 @@ export const messages = {
   "error.update.downloadStalled": "O download da atualização parou de responder. Tente novamente.",
   "error.update.installFailed":
     "Não foi possível instalar a atualização. Encerre e abra o OpenBot novamente, depois tente outra vez.",
+  "error.update.notInstalled": "A última reinicialização não instalou a atualização. Reinicie para tentar outra vez.",
   "error.update.downloadFailed": "Não foi possível baixar a atualização. Tente novamente.",
   "error.update.checkFailed": "Não foi possível verificar se há atualizações. Tente novamente.",
   "error.update.checkStalled": "A verificação de atualizações parou de responder. Tente novamente.",
@@ -28,6 +29,10 @@ export const messages = {
     "Não foi possível verificar outras sessões do OpenBot. Tente novamente antes de instalar.",
   "error.update.readOnlyLocation":
     "O OpenBot não consegue instalar atualizações deste local. Encerre o OpenBot. No Finder, arraste o OpenBot para a pasta Aplicativos (se ele já estiver lá, arraste-o para fora e de volta). Depois, abra o OpenBot e instale a atualização novamente.",
+  "error.update.appImageMissing":
+    "O OpenBot não pode instalar a atualização porque o arquivo AppImage dele foi movido, renomeado ou substituído. Feche o OpenBot e abra o arquivo AppImage novamente.",
+  "error.update.appImageReadOnly":
+    "O OpenBot não pode instalar atualizações na pasta do arquivo AppImage dele. Feche o OpenBot, mova o arquivo AppImage para uma pasta dentro da sua pasta pessoal, abra-o e instale a atualização novamente.",
   "error.update.remoteDisabled":
     "As atualizações feitas por administradores do servidor estão desativadas neste computador.",
   "error.update.restartStarted": "O OpenBot já está reiniciando para instalar a atualização.",

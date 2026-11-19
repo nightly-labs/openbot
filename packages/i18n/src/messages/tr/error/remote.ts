@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/remote";
 
 export const messages = {
-  // Errors from remote servers, WebRTC transport, remote desktop, and the team client.
   "error.remote.desktopSetupClientUpdate": "Uzak masaüstü kurulumunu kullanmak için istemciyi güncelleyin.",
   "error.remote.desktopSetupUnavailable": "Uzak masaüstü kurulumu kullanılamıyor.",
   "error.remote.desktopTestUnavailable": "Uzak masaüstü testi kullanılamıyor.",
@@ -24,6 +23,10 @@ export const messages = {
     "Ana makine OpenBot'un ekranını kaydetmesine izin vermedi. Ana makinede ekran kaydı izni verin, ardından tekrar deneyin.",
   "error.remote.windowsSessionDisconnected":
     "Ana makinedeki Windows oturumunun bağlantısı kesik, bu yüzden paylaşılacak ekran yok. Ana makinenin ekranında Windows'ta oturum açın, ardından tekrar deneyin.",
+  "error.remote.streamTooSlowLowerQuality":
+    "Ana makineyle bağlantı görüntü için çok yavaş. Tekrar deneyin: sonraki bağlantı daha düşük bir kalite kullanır.",
+  "error.remote.streamTooSlow":
+    "Ana makineyle bağlantı görüntü için çok yavaş. Daha hızlı bir ağ kullanın, ardından tekrar deneyin.",
   "error.remote.teamSessionExpired": "Ekip oturumunun süresi doldu.",
   "error.remote.finishTestBeforeSwitch": "Ekranları değiştirmeden önce uzak masaüstü testini tamamlayın.",
   "error.remote.displayNotFound": "Uzak ekran bulunamadı.",
@@ -82,10 +85,14 @@ export const messages = {
   "error.remote.ownerOnlyRemove": "Bu sunucuyu yalnızca sahibi kaldırabilir.",
   "error.remote.requestTimeout": "Uzak istek zaman aşımına uğradı.",
   "error.remote.requestFailed": "Uzak istek başarısız oldu.",
-  "error.remote.pinnedKeyMissing": "Uzak ana makinenin sabitlenmiş bir cihaz anahtarı yok.",
+  "error.remote.hostKeyMissing":
+    "Güvenlik anahtarı eksik olduğu veya değiştiği için OpenBot bu sunucuyu doğrulayamıyor. Sunucu sahibinden sunucuyu kontrol etmesini isteyin.",
+  "error.remote.connectionNotStarted":
+    "OpenBot bu sunucuyla bağlantıyı başlatamadı. Sorun devam ederse OpenBot'tan çıkın ve yeniden açın.",
   "error.remote.hostDidNotConnect": "WebRTC ana makinesi bağlanmadı.",
   "error.remote.connectionCancelled": "Uzak bağlantı iptal edildi.",
-  "error.remote.hostDisconnected": "WebRTC ana makinesinin bağlantısı kesildi.",
+  "error.remote.hostDisconnected":
+    "Sunucuyla bağlantı kesildi. Eylemin tamamlanıp tamamlanmadığını kontrol edin, ardından tekrar deneyin.",
   "error.remote.eventGap": "Ana makine etkinlik dizisinde bir boşluk var.",
   "error.remote.malformedKnownEvent": "Ana makine bozuk biçimli bir bilinen etkinlik döndürdü.",
   "error.remote.fileTransportIsStopped": "WebRTC dosya iletimi durduruldu.",
@@ -151,6 +158,7 @@ export const messages = {
   "error.remote.attachmentRejected": "Ana makine eki reddetti.",
   "error.remote.attachmentTooLarge": "Ekler 10 MB veya daha küçük olmalıdır.",
   "error.remote.attachmentBusy": "Mevcut ekin tamamlanmasını bekleyin.",
+  "error.remote.attachmentChanged": "Dosya değişti veya kullanılamıyor. Yeniden seçin.",
   "error.remote.uploadTimeout": "Ek yükleme zaman aşımına uğradı.",
   "error.remote.hostSessionActive": "Ana makinede zaten etkin bir uzak oturum var.",
   "error.remote.tooManyConnections": "Çok fazla etkin uzak bağlantı.",
@@ -180,6 +188,8 @@ export const messages = {
   "error.remote.iceFailed":
     "Ana makineyle doğrudan bağlantı kurulamadı. Bir güvenlik duvarı, VPN veya proxy bunu engelleyebilir.",
   "error.remote.iceDisconnected": "Ana makineyle doğrudan bağlantı kesildi.",
+  "error.remote.webrtcBlocked":
+    "Bu cihaz OpenBot'un ihtiyaç duyduğu bağlantıyı engelliyor. Kilitlenme Modu açıksa Ayarlar > Gizlilik ve Güvenlik > Kilitlenme Modu'nda OpenBot için kapatın.",
   "error.remote.directoryUnreachable": "OpenBot, OpenBot hizmetine ulaşamadı. Bağlantınızı kontrol edin.",
   "error.remote.directoryTimeout": "OpenBot hizmeti zamanında yanıt vermedi. Tekrar deneyin.",
   "error.remote.inviteAlreadyUsed": "Bu davet zaten kullanıldı. Yeni bir davet isteyin.",
@@ -195,7 +205,6 @@ export const messages = {
   "error.remote.hostOtherAccount": "Bu ana makine başka bir hesaba ait.",
   "error.remote.remoteNotConfigured": "Bu OpenBot hizmetinde uzak bağlantılar ayarlanmamış.",
   "error.remote.hostRefused": "Ana makine isteği reddetti ({status}).",
-  // Channel actions on mobile.
   "error.remote.formUnavailable": "Bu form artık kullanılamıyor.",
   "error.remote.hostedServerRemoval": "Barındırılan bir sunucuyu silmek için Faturalandırma'yı kullanın.",
   "error.remote.hostRemoved": "Sahibi bu sunucuyu hesaptan kaldırdı.",
@@ -203,6 +212,9 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "Kanalları silmek için bu masaüstü sunucusunu güncelleyin.",
   "error.remote.historyRefreshFailed": "Mesaj gönderildi, ancak sohbet geçmişi yenilenemedi.",
   "error.remote.taskHistoryRefreshFailed": "Görev değiştirildi, ancak sohbet geçmişi yenilenemedi.",
+  "error.remote.serverNotLoaded": "OpenBot sunucuyu yükleyemedi. Tekrar deneyin.",
+  "error.remote.localServerNotStarted":
+    "Bu bilgisayardaki sunucu başlamadı. Tekrar deneyin. Başlamazsa OpenBot'u bu bilgisayarda yeniden başlatın.",
   "error.remote.localServerAccountRemovalFailed":
     "Sunucu kendi bilgisayarında silindi ancak hesap onu hâlâ listeliyor. Hesaptan kaldırmak için yeniden silin.",
 } as const satisfies PartialTranslation<typeof source>;

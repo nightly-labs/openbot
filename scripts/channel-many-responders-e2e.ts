@@ -1,18 +1,3 @@
-// Checks that more than one member can answer one channel request, in this worktree's running dev app
-// with real provider turns. Start the app with `bun run dev` (never `--shared`), then run
-// `bun scripts/channel-many-responders-e2e.ts --allow-mutations`. It needs three visible agents whose
-// provider is signed in.
-//
-// 1. A message written in the composer that opens with two mentions gives each mentioned member a
-//    task of its own for the same request, with no routing turn, and each member replies.
-// 2. A request to the whole group goes through the lead, which gives it to more than one member; the
-//    lead posts one dispatch row for each, and each member replies.
-// 3. A plain question that one member can answer still goes to one member only.
-// 4. "Everyone", picked in the composer's mention menu, gives each member a task with no routing turn.
-//    Stop while they work pauses each task, and "continue" continues the same tasks; it starts no
-//    new ones.
-// It makes its own channel and deletes it at the end.
-// Writes .openbot-build/channel-many-responders-e2e/report.json and screenshots.
 import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import { CHANNEL_ROUTING_EVENT_ITEM_TYPE_PREFIX, type ChannelPage, type ChannelTask } from "@openbot/contracts/ipc";
@@ -58,7 +43,6 @@ async function shot(label: string): Promise<void> {
   report.screenshots.push(path);
 }
 
-/** Picks a mention from the composer's menu at the caret. */
 async function mention(agentName: string): Promise<void> {
   await composer().pressSequentially(`@${agentName.slice(0, 3)}`);
   await page
@@ -69,7 +53,6 @@ async function mention(agentName: string): Promise<void> {
 
 const terminal = (task: ChannelTask) => task.state === "completed" || task.state === "failed";
 
-/** Waits until every task of the request ends, and reads who owned them and who replied. */
 async function settle(channelId: string, requestMessageId: string, label: string): Promise<RequestResult> {
   const settled = await waitFor(
     page,
@@ -104,7 +87,6 @@ async function settle(channelId: string, requestMessageId: string, label: string
   };
 }
 
-/** The id of the newest message that the reader wrote with this text. */
 async function requestId(channelId: string, text: string): Promise<string> {
   const current = await waitFor(
     page,
@@ -135,7 +117,6 @@ try {
     .click();
   await composer().waitFor({ timeout: UI_WAIT_MS });
 
-  // 1. Two opening mentions, written in the composer as a reader writes them.
   const mentionText = "reply with the single word ready. Do not use tools.";
   await composer().click();
   await mention(writer.name);
@@ -153,7 +134,6 @@ try {
   assert.deepEqual(new Set(mentions.repliedBy), new Set([writer.id, editor.id]), "Each mentioned member replies.");
   await shot("mentions");
 
-  // 2. A request to the whole group.
   const groupText =
     "Everyone: each of you, give one short sentence of feedback on the product name 'River Notes' from your own role. Do not use tools.";
   await client.send(channel.id, groupText, null);
@@ -165,7 +145,6 @@ try {
   assert.deepEqual(new Set(group.repliedBy), new Set(group.owners), "Each selected member replies.");
   await shot("group");
 
-  // 3. One plain question still goes to one member.
   const singleText = "What is 2 + 2? Reply with the number only. Do not use tools.";
   await client.send(channel.id, singleText, null);
   const single = await settle(channel.id, await requestId(channel.id, singleText), "single");
@@ -173,7 +152,6 @@ try {
   assert.equal(single.owners.length, 1, `A plain question went to ${single.owners.length} members.`);
   await shot("single");
 
-  // 4. Everyone, then Stop, then "continue".
   const everyoneText = "write a numbered list of 30 short facts about mountains, one per line. Do not use tools.";
   await composer().click();
   await composer().pressSequentially("@ev");

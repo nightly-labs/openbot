@@ -19,21 +19,11 @@ import { showsOnline } from "@/features/workspace/model/server-status";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
-/**
- * The card has a 20-point radius and 12 points of padding. The buttons take the difference, 8 points,
- * so their corners follow the corners of the card.
- */
 const BUTTON_SHAPE = "rounded-[8px]";
 const ICON_SIZE = 44;
 
-/** `pending` waits for the state of the app on the server: the card shows Skip, but not Connect yet. */
 type SuggestionState = "available" | "pending" | "connected" | "notAllowed" | "unavailable";
 
-/**
- * A Marketplace app that an agent suggests in the chat, as on desktop: the app, Skip, and Connect.
- * Connect opens the connect step of the app, where its sign-in or key runs. Skip folds the card to one
- * line with Undo, and the phone keeps it. A card for an app that this app version does not know is not drawn.
- */
 export function ChatAppSuggestion({
   serverId,
   messageId,
@@ -48,10 +38,6 @@ export function ChatAppSuggestion({
   return <PluginSuggestion serverId={serverId} messageId={messageId} slug={appId} />;
 }
 
-/**
- * Who reads the card, apart from the permission to act: the permission is also false while the server is
- * offline or when the host lacks the capability, and then the members-only text would be false.
- */
 function useServerAccess(serverId: string) {
   const online = useMobileWorkspaceSelector((workspace) =>
     showsOnline(workspace.servers.find((server) => server.id === serverId)),
@@ -62,7 +48,6 @@ function useServerAccess(serverId: string) {
   return { online, administers };
 }
 
-/** The state when the user cannot act now: offline waits, an owner's host lacks the feature, a member may not. */
 function blockedState(access: { online: boolean; administers: boolean }): SuggestionState {
   if (!access.online) return "pending";
   return access.administers ? "unavailable" : "notAllowed";
@@ -71,7 +56,7 @@ function blockedState(access: { online: boolean; administers: boolean }): Sugges
 function PluginSuggestion({ serverId, messageId, slug }: { serverId: string; messageId: string; slug: string }) {
   const { session } = useMobileSession();
   const canRelay = useMobileWorkspaceSelector((workspace) => workspace.canRelayMcpSignIn(serverId));
-  // A member reads no MCP list, so the app shows as not connected; the card then says who can connect it.
+  const macUnavailable = useMobileWorkspaceSelector((workspace) => workspace.macAppsUnavailable(serverId));
   const { canManage, list: mcpServers } = useMcpServerList(serverId);
   const access = useServerAccess(serverId);
   const apiUrl = session?.apiUrl;
@@ -83,16 +68,19 @@ function PluginSuggestion({ serverId, messageId, slug }: { serverId: string; mes
   const { plugin } = listing;
   const app = plugin.apps[0] ?? null;
   const method = app ? pluginConnectMethod(app, canRelay) : null;
-  const state: SuggestionState = !canManage
-    ? blockedState(access)
-    : mcpServers.data
-      ? pluginInstalled(plugin, mcpServers.data)
-        ? "connected"
-        : "available"
-      : // A failed read cannot tell; Connect opens the listing, which shows the real state.
-        mcpServers.isError
-        ? "available"
-        : "pending";
+  const state: SuggestionState =
+    macUnavailable && plugin.apps.some((entry) => entry.needsMac)
+      ? "unavailable"
+      : !canManage
+        ? blockedState(access)
+        : mcpServers.data
+          ? pluginInstalled(plugin, mcpServers.data)
+            ? "connected"
+            : "available"
+          : // A failed read cannot tell; Connect opens the listing, which shows the real state.
+            mcpServers.isError
+            ? "available"
+            : "pending";
   return (
     <SuggestionCard
       messageId={messageId}
@@ -101,7 +89,6 @@ function PluginSuggestion({ serverId, messageId, slug }: { serverId: string; mes
       icon={<ListingIcon listing={listing} size={ICON_SIZE} />}
       state={state}
       onConnect={() => {
-        // A key or a sign-in has its own page. Any other app goes to its listing, which says how it connects.
         if (method?.kind === "key" || method?.kind === "link")
           router.push({ pathname: "/marketplace-listing/connect", params: { serverId, slug } });
         else
@@ -128,7 +115,6 @@ function ConnectorSuggestion({
   const access = useServerAccess(serverId);
   const rows = useConnectorRowState(serverId);
   const row = rows.rows.find((item) => item.id === connector);
-  // No row and no load in progress: the host cannot run this connector.
   const loading = rows.loading.includes(connector);
   const name = t(CONNECTOR_TITLE_KEYS[connector]);
   const tagline = t(CONNECTOR_TAGLINES[connector]);
@@ -144,7 +130,7 @@ function ConnectorSuggestion({
           ? "unavailable"
           : row.status === "connected"
             ? "connected"
-            : // `attention` needs a new sign-in, and `unknown` failed to read: the connector page shows both.
+            : // `attention` needs a new sign-in, `paused` needs Resume, and `unknown` failed to read: the
               "available";
   return (
     <SuggestionCard
@@ -176,7 +162,6 @@ function SuggestionCard({
   const { t } = useText();
   const muted = useThemeColor("muted");
   const dismissed = useAppSuggestionDismissals((store) => store.ids.includes(messageId));
-  // The card is as wide as the widest chat bubble, as the other cards of the chat.
   const frame = "w-full max-w-[92%] self-start";
 
   if (dismissed && state !== "connected")

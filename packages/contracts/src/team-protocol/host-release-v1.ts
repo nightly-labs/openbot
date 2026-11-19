@@ -1,7 +1,3 @@
-// Optional host-release-v1 contract. All signed-in server members can read release status and check the
-// official stable feed for the host's platform and architecture. This never downloads application
-// files, changes update preferences, or restarts the host. It is available even when remote
-// installation is disabled or a host administrator controls installation. host-update-v1 is unchanged.
 import { adminRoute, empty, fields, nullable, type OptionalRouteCodec, oneOf, string } from "./admin-wire";
 
 export const HOST_RELEASE_CAPABILITY = "host-release-v1";

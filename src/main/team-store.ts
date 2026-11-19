@@ -71,6 +71,8 @@ class TeamStoreFiles extends Context.Service<
 }
 
 const scrypt = promisify(scryptCallback);
+export const TEAM_STORE_FILE = "openbot-team-server-v2.json";
+export const LEGACY_TEAM_STORE_FILE = "openbot-team-server-v1.json";
 const INVITE_TTL_MS = 24 * 60 * 60 * 1_000;
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1_000;
 
@@ -93,7 +95,6 @@ interface StoredInvite {
   expiresAt: string;
   usedAt: string | null;
   email?: string | null;
-  // Optional so files written before permanent links still read. Absent means single-use.
   permanent?: boolean;
   useCount?: number;
 }
@@ -119,18 +120,10 @@ interface StoredTeam {
         mimeType: AvatarImageInput["mimeType"];
       }
     | undefined;
-  /**
-   * The shape and colour that the server shows with no logo. Absent for the automatic look. Read
-   * with `serverAppearanceOrNull`, so a bad value gives the automatic look and the file still loads.
-   */
   serverAppearance?: ServerAppearance | undefined;
   members: StoredMember[];
   invites: StoredInvite[];
   sessions: StoredSession[];
-  /**
-   * A new key that the host signed a handover to, but that the account service has not accepted
-   * yet. The host keeps signing with the current key until the account service accepts it.
-   */
   pendingKeyRotation?: StoredKeyRotation | undefined;
 }
 
@@ -140,26 +133,11 @@ interface StoredKeyRotation {
   handover: HostKeyHandover;
 }
 
-/**
- * The file holds one host per OpenBot account, so switching accounts cannot hand the
- * new account the previous one's server. `hosts` is append-only - a host is never
- * removed when its owner signs out, because this file is user data with no backup.
- */
 interface StoredTeamFile {
   version: 2;
-  /** The account whose host is active, so a restart activates it before the network answers. */
   activeAccountId: string | null;
   hosts: StoredTeam[];
-  /**
-   * The legacy record this file last took in. A build without accounts that has written its
-   * own file since leaves a different fingerprint, which is how its work is noticed.
-   */
   legacyImport?: { fingerprint: string; record: StoredTeam };
-  /**
-   * The one legacy record a reconcile had no baseline for, so it could not be merged without
-   * dropping the work on one side. Never activated; replaced rather than accumulated, since
-   * a merged host needs no copy - the merge is what keeps both sides.
-   */
   replacedHosts?: StoredTeam[];
 }
 
@@ -201,7 +179,6 @@ export interface RemoteDirectoryMember {
   email: string;
   name: string | null;
   avatarUrl: string | null;
-  /** The member's account chat color. Missing: the account service is older and sends none. */
   chatColor?: AvatarColor | null;
   role: TeamRole;
   status: "active" | "revoked";
@@ -210,38 +187,48 @@ export interface RemoteDirectoryMember {
 
 export class TeamStore {
   readonly #path: string;
-  /** Read once and never written: the file a build without this envelope still owns. */
   readonly #legacyPath: string | null;
   readonly #logoRoot: string;
   readonly #legacyLogoRoot: string | null;
   #file: StoredTeamFile = { version: 2, activeAccountId: null, hosts: [] };
-  /** The host of the signed-in account. Every other method reads this one, never `#file.hosts`. */
   #state: StoredTeam | null = null;
   readonly #remoteSessions = new Map<
     string,
     { member: TeamMemberSummary; sessionId: string; createdAt: string; sessionExpiresAt: string }
   >();
   #writeChain: Deferred.Deferred<void> | null = null;
-  /**
-   * The file exists but is neither a v2 envelope nor a v1 record - a file a newer build
-   * wrote, or a damaged one. `#file` is empty only because something else owns this path,
-   * so writing would destroy the user's only copy. Nothing here is backed up.
-   */
   #unreadableFile = false;
+  #readOnly = false;
 
-  /**
-   * `legacyPath` is the single-host file shipped builds read and write. This store never
-   * writes it, so downgrading finds the host it had rather than a file it cannot parse and
-   * would overwrite - there is no backup of any of this.
-   */
   constructor(path: string, legacyPath: string | null = null) {
     this.#path = path;
     this.#legacyPath = legacyPath;
-    // Each file owns its own assets. Sharing one directory would let either build delete a
-    // logo the other's record still points at, leaving it a host it cannot draw.
     this.#logoRoot = join(dirname(path), `${basename(path)}.assets`, "logo");
     this.#legacyLogoRoot = legacyPath ? join(dirname(legacyPath), `${basename(legacyPath)}.assets`, "logo") : null;
   }
+
+  readonly loadReadOnly = Effect.fn("TeamStore.loadReadOnly")(function* (
+    this: TeamStore,
+  ): Effect.fn.Return<void, never, TeamStoreFiles> {
+    this.#readOnly = true;
+    const contents = yield* TeamStoreFiles.use((files) => files.readText(this.#path)).pipe(
+      Effect.orElseSucceed(() => null),
+    );
+    if (contents === null || isEmptyStoredFile(contents)) return;
+    let parsed: StoredTeamFile | null = null;
+    try {
+      parsed = parseStoredJson(this.#path, contents, (value) => (isStoredTeamFile(value) ? value : null));
+    } catch {
+      return;
+    }
+    if (!parsed) return;
+    this.#file = parsed;
+    const activeAccountId = parsed.activeAccountId;
+    this.#state =
+      (activeAccountId === null
+        ? parsed.hosts.find((host) => ownerAccountId(host) === null)
+        : parsed.hosts.find((host) => ownerAccountId(host) === activeAccountId)) ?? null;
+  }, Effect.provide(TeamStoreFiles.layer)).bind(this);
 
   readonly initialize = Effect.fn("TeamStore.initialize")(
     function* (this: TeamStore): Effect.fn.Return<void, RemoteWorkflowError, TeamStoreFiles> {
@@ -249,8 +236,6 @@ export class TeamStore {
       let found = false;
       const attempt0 = yield* Effect.gen({ self: this }, function* () {
         const contents = yield* TeamStoreFiles.use((files) => files.readText(this.#path));
-        // A power loss left the file without content. It holds no host to keep, so the start
-        // continues as if the file were missing.
         if (isEmptyStoredFile(contents)) return yield* TeamStoreFiles.use((files) => files.setAside(this.#path));
         const parsed = yield* remoteDecode(() =>
           parseStoredJson(this.#path, contents, (value) =>
@@ -272,33 +257,22 @@ export class TeamStore {
         if (!(error instanceof Error && "code" in error && error.code === "ENOENT"))
           return yield* new RemoteWorkflowError({ cause: error });
       }
-      // Copied into this store's own file rather than replaced in place. Anything else there
-      // belongs to a build that is not this one, and is left for it.
       const legacy = this.#unreadableFile ? null : yield* this.#readLegacyRecordEffect();
       if (legacy && !found) {
         this.#file = {
           version: 2,
           activeAccountId: ownerAccountId(legacy.record),
           hosts: [legacy.record],
-          // A copy of its own: the host below is edited from here on, and the baseline a later
-          // reconcile compares against has to stay the record as it was imported.
           legacyImport: { fingerprint: legacy.fingerprint, record: structuredClone(legacy.record) },
         };
         migrated = true;
       } else if (legacy && legacy.fingerprint !== this.#file.legacyImport?.fingerprint) {
-        // The older build has been run since it was imported. Neither copy of the host is a
-        // backup of the other - each holds work the other never saw - so they are reconciled
-        // against the record as it was imported rather than one replacing the other.
         const baseline = this.#file.legacyImport?.record;
         const index = this.#file.hosts.findIndex((host) => host.serverId === legacy.record.serverId);
         const mine = index < 0 ? undefined : this.#file.hosts[index];
         if (mine && baseline && baseline.serverId === legacy.record.serverId) {
           this.#file.hosts[index] = reconcileHost(baseline, mine, legacy.record);
         } else if (mine) {
-          // No baseline to reconcile against - an upgrade that never recorded one. Keeping
-          // this build's host and filing the other copy is the only choice that drops
-          // nothing. One record, not a growing pile: every write clones and serializes the
-          // whole file, and the next one to land here comes from the same file this did.
           this.#file.replacedHosts = [legacy.record];
         } else {
           this.#file.hosts.push(legacy.record);
@@ -308,16 +282,11 @@ export class TeamStore {
       }
       const imported = this.#file.legacyImport?.record.serverId;
       const importedHost = imported === undefined ? undefined : this.#file.hosts.find((h) => h.serverId === imported);
-      // Every start, not only the one that took the record in: a copy that failed once would
-      // otherwise leave the host without its logo for good, with the file still sitting there.
       if (importedHost) yield* this.#adoptLegacyLogoEffect(importedHost);
       const activeAccountId = this.#file.activeAccountId;
       this.#state =
         (activeAccountId === null
           ? // A host that predates accounts, or one upgraded from a file where the owner
-            // account was never recorded. Activating it keeps an offline upgrade showing the
-            // host it showed yesterday. A host left behind by a sign-out has an owner account,
-            // so signing out still unbinds it.
             this.#file.hosts.find((host) => ownerAccountId(host) === null)
           : this.#file.hosts.find((host) => ownerAccountId(host) === activeAccountId)) ?? null;
       if (migrated) yield* this.#persistFileEffect();
@@ -327,12 +296,6 @@ export class TeamStore {
     Effect.uninterruptible,
   ).bind(this);
 
-  /**
-   * Binds the store to `user`'s own host, adopting a host whose owner predates account
-   * sign-in. An account with no host leaves the store unconfigured rather than borrowing
-   * another account's.
-   */
-
   readonly activateAccount = Effect.fn("TeamStore.activateAccount")(
     function* (this: TeamStore, user: CentralAuthUser): Effect.fn.Return<void, RemoteWorkflowError, TeamStoreFiles> {
       const email = yield* remoteDecode(() => normalizeEmail(user.email));
@@ -341,25 +304,17 @@ export class TeamStore {
         const owner = hostOwner(host);
         return owner !== undefined && !owner.accountId && !owner.email;
       });
-      // Everything below mutates in memory and is committed by the single write at the end,
-      // so a failed write can put the whole file back rather than leave half a switch applied
-      // with the status naming one account and every write going to another.
       const rollback = structuredClone(this.#file);
       this.#state =
         hosts.find((host) => ownerAccountId(host) === user.id) ??
         hosts.find((host) => {
           const owner = hostOwner(host);
-          // Only a host whose owner predates accounts is matched by address. An email can be
-          // released and taken by somebody else, and it must not hand them a host that is
-          // already bound to the account that made it.
           if (!owner || owner.accountId) return false;
           return owner.email ? normalizeEmail(owner.email) === email : false;
         }) ??
         unbound ??
         null;
       this.#file.activeAccountId = user.id;
-      // A host configured before accounts existed has no owner email to match on next time,
-      // so adopting it has to write the binding rather than rely on `syncAccount`.
       if (this.#state && this.#state === unbound) {
         const owner = hostOwner(this.#state);
         if (owner) {
@@ -376,10 +331,6 @@ export class TeamStore {
       }).pipe(
         Effect.catch(({ cause: error }) =>
           Effect.gen({ self: this }, function* () {
-            // The file keeps what it had, so nothing is lost. Memory does not go back to the
-            // previous account, though: central authentication has already moved on, and leaving
-            // its host answerable is the failure this whole change exists to prevent. Unbound
-            // until an auth event or a restart records the switch.
             this.#file = rollback;
             this.#state = null;
             return yield* new RemoteWorkflowError({ cause: error });
@@ -391,16 +342,9 @@ export class TeamStore {
     Effect.uninterruptible,
   ).bind(this);
 
-  /**
-   * Stops answering for the active host without touching the file. The renderer learns about
-   * a new account before the awaited teardown that follows can finish, so there has to be a
-   * way to stop serving the previous one immediately; `activateAccount` records the switch.
-   */
   unbindActiveHost(): void {
     this.#state = null;
   }
-
-  /** Signing out unbinds the host without removing it - signing back in restores it. */
 
   readonly deactivate = Effect.fn("TeamStore.deactivate")(
     function* (this: TeamStore): Effect.fn.Return<void, RemoteWorkflowError, TeamStoreFiles> {
@@ -424,11 +368,6 @@ export class TeamStore {
     Effect.uninterruptible,
   ).bind(this);
 
-  /**
-   * A file with no host records nothing an activation could change, so there is nothing to
-   * write - which is also what keeps signing in from failing, or from overwriting a file
-   * this store could not read. Configuring a server still refuses that file outright.
-   */
   readonly #recordActiveAccountEffect = Effect.fn("TeamStore.recordActiveAccount")(function* (
     this: TeamStore,
   ): Effect.fn.Return<void, RemoteWorkflowError, TeamStoreFiles> {
@@ -462,8 +401,6 @@ export class TeamStore {
     if (!owner?.email) {
       throw new TeamStoreError(sourceText("error.team.ownerNotLinked"));
     }
-    // The account is the identity once one is recorded; the address is only what an owner
-    // from before accounts can be recognized by, and it can change hands.
     const matches = owner.accountId
       ? owner.accountId === user.id
       : normalizeEmail(user.email) === normalizeEmail(owner.email);
@@ -483,13 +420,6 @@ export class TeamStore {
     if (!this.#state) throw new TeamStoreError(sourceText("error.team.hostNotConfigured"));
     return sign(null, Buffer.from(transcript), this.#state.privateKey).toString("base64url");
   }
-
-  /**
-   * The password path, used by the development connection and by tests. It creates an
-   * owner-less host and deliberately leaves `activeAccountId` alone - no account owns it
-   * yet, and the first one to activate adopts it. `#assertNoHostFor` is what keeps a
-   * second owner-less host from being created beside it.
-   */
 
   readonly configure = Effect.fn("TeamStore.configure")(
     function* (
@@ -512,7 +442,6 @@ export class TeamStore {
         }),
       );
       const credentials = yield* hashPasswordEffect(password);
-      // Hashing yields, so a second request could have configured a host meanwhile.
       if (this.#state)
         return yield* new RemoteWorkflowError({
           cause: new TeamStoreError(sourceText("error.team.alreadyConfigured")),
@@ -570,10 +499,6 @@ export class TeamStore {
       const email = yield* remoteDecode(() => normalizeEmail(user.email));
       yield* remoteDecode(() => this.#assertNoHostFor(user.id, email));
       yield* remoteDecode(() => validateServerName(serverName));
-      // Both `activateAccount` and `deactivate` set this synchronously, so comparing it
-      // after the awaits below is a reliable answer to "is this still the account that
-      // asked?" - a configuration finishing under someone else's session would otherwise
-      // rebind the store to the account that has just signed out.
       const activeAccountBefore = this.#file.activeAccountId;
       const { publicKey, privateKey } = yield* remoteDecode(() =>
         generateKeyPairSync("ed25519", {
@@ -583,9 +508,6 @@ export class TeamStore {
       );
       const serverLogo = logo ? yield* this.#writeLogoEffect(logo) : undefined;
       const attempt5 = yield* Effect.gen({ self: this }, function* () {
-        // `#writeLogo` yields, so two concurrent requests could both have passed the guard
-        // above. Re-checking is what stops one account owning two stored hosts, where a
-        // restart would activate the one the status never showed.
         yield* remoteDecode(() => this.#assertNoHostFor(user.id, email));
         if (this.#file.activeAccountId !== activeAccountBefore) {
           return yield* new RemoteWorkflowError({
@@ -641,9 +563,6 @@ export class TeamStore {
         if (serverLogo) yield* this.#removeLogoEffect(serverLogo).pipe(Effect.catch(() => Effect.void));
         return yield* new RemoteWorkflowError({ cause: error });
       }
-      // Writing the file yields as well. The host stays - it is on disk and it belongs to the
-      // account that asked for it - but the caller must not go on to apply this configuration,
-      // its logo and its remote registration, to whichever host is active now.
       if (this.#state !== created) {
         return yield* new RemoteWorkflowError({
           cause: new TeamStoreError(sourceText("error.team.accountChangedDuringCreate")),
@@ -679,9 +598,6 @@ export class TeamStore {
           : input.logo === null
             ? undefined
             : yield* this.#writeLogoEffect(input.logo);
-      // Writing the logo can outlive this host. `#persist` only requires *some* active host, so
-      // without this the name and image asked for here would land on whichever host became
-      // active meanwhile - and the caller would be handed that other account's identity back.
       if (this.#state !== state) {
         if (nextLogo && nextLogo.version !== previousLogo?.version) {
           yield* this.#removeLogoEffect(nextLogo).pipe(Effect.catch(() => Effect.void));
@@ -711,9 +627,6 @@ export class TeamStore {
       if (previousLogo && previousLogo.version !== nextLogo?.version) {
         yield* this.#removeLogoEffect(previousLogo).pipe(Effect.catch(() => Effect.void));
       }
-      // Writing the file yields as well. The change is on disk and belongs to the account that
-      // asked for it, but the caller must not go on to push it to the remote host under the
-      // authentication - and the owner membership - of whichever account is active now.
       if (this.#state !== state) {
         return yield* new RemoteWorkflowError({ cause: new TeamStoreError(sourceText("error.team.serverNotActive")) });
       }
@@ -723,16 +636,10 @@ export class TeamStore {
     Effect.uninterruptible,
   ).bind(this);
 
-  /** The handover that the account service has not accepted yet, so a restart can send it again. */
   getPendingKeyHandover(): HostKeyHandover | null {
     return this.#state?.pendingKeyRotation?.handover ?? null;
   }
 
-  /**
-   * Makes a new key and a handover that the current key and the new key both sign. The current
-   * key stays in use until `completeKeyRotation`. A rotation that is already pending is returned
-   * again, so a second request cannot make a second key.
-   */
   readonly beginKeyRotation = Effect.fn("TeamStore.beginKeyRotation")(
     function* (this: TeamStore): Effect.fn.Return<HostKeyHandover, RemoteWorkflowError, TeamStoreFiles> {
       const state = yield* remoteDecode(() => this.#requireState());
@@ -767,7 +674,6 @@ export class TeamStore {
     Effect.uninterruptible,
   ).bind(this);
 
-  /** Uses the new key after the account service accepted `handover`. The previous key is deleted. */
   readonly completeKeyRotation = Effect.fn("TeamStore.completeKeyRotation")(
     function* (
       this: TeamStore,
@@ -796,7 +702,6 @@ export class TeamStore {
     Effect.uninterruptible,
   ).bind(this);
 
-  /** Deletes a rotation that the account service refused. The current key stays in use. */
   readonly discardKeyRotation = Effect.fn("TeamStore.discardKeyRotation")(
     function* (
       this: TeamStore,
@@ -816,7 +721,6 @@ export class TeamStore {
     Effect.uninterruptible,
   ).bind(this);
 
-  /** Writes the file only while `state` is still the active host. */
   readonly #persistStateEffect = Effect.fn("TeamStore.persistState")(function* (
     this: TeamStore,
     state: StoredTeam,
@@ -826,7 +730,6 @@ export class TeamStore {
     yield* this.#persistFileEffect();
   });
 
-  /** The record a build without accounts owns, with the fingerprint that dates it. */
   readonly #readLegacyRecordEffect = Effect.fn("TeamStore.readLegacyRecord")(function* (
     this: TeamStore,
   ): Effect.fn.Return<{ record: StoredTeam; fingerprint: string } | null, RemoteWorkflowError, TeamStoreFiles> {
@@ -844,7 +747,6 @@ export class TeamStore {
     return { record: decoded.success, fingerprint: createHash("sha256").update(raw).digest("hex") };
   });
 
-  /** Copied, never moved: the record left behind still points at the older build's own file. */
   readonly #adoptLegacyLogoEffect = Effect.fn("TeamStore.adoptLegacyLogo")(function* (
     this: TeamStore,
     record: StoredTeam,
@@ -854,8 +756,6 @@ export class TeamStore {
     if (!logo || !legacyLogoRoot) return;
     const name = `${logo.version}.${avatarFileExtension(logo.mimeType)}`;
     yield* TeamStoreFiles.use((files) => files.mkdir(this.#logoRoot));
-    // Never over this build's own copy, and a failure is left for the next start to retry
-    // rather than leaving the host pointing at a logo it has no file for.
     yield* TeamStoreFiles.use((files) =>
       files.copyExclusive(join(legacyLogoRoot, name), join(this.#logoRoot, name)),
     ).pipe(Effect.catch(() => Effect.void));
@@ -893,12 +793,6 @@ export class TeamStore {
     );
   });
 
-  /**
-   * `serverId` names the host the caller decided this for. Publishing and unpublishing
-   * both span awaits an account switch can land in, and the launch preference of one
-   * account's host must never be written onto another's.
-   */
-
   readonly setEnabledOnLaunch = Effect.fn("TeamStore.setEnabledOnLaunch")(
     function* (
       this: TeamStore,
@@ -916,18 +810,10 @@ export class TeamStore {
     Effect.uninterruptible,
   ).bind(this);
 
-  /**
-   * The members that this host keeps, with no member of a live session only. Empty before the
-   * host is set up. The audit log compares two of these lists.
-   */
   listStoredMembers(): TeamMemberSummary[] {
     return this.#state?.members.map(publicMember) ?? [];
   }
 
-  /**
-   * The account of each member who has one: the same person has the same account on every server,
-   * and a member id belongs to one server. A server transfer moves a person's choices by it.
-   */
   memberAccounts(): { memberId: string; accountId: string; owner: boolean }[] {
     return this.#requireState().members.flatMap((member) =>
       member.accountId ? [{ memberId: member.id, accountId: member.accountId, owner: member.role === "owner" }] : [],
@@ -945,19 +831,6 @@ export class TeamStore {
     }
     return members;
   }
-
-  /**
-   * `serverId` names the host the caller loaded this directory for. Signing into another
-   * account swaps the active host, so a directory that was already in flight would
-   * otherwise rewrite the new account's owner membership and disable its members.
-   *
-   * The directory is the authority for live sessions too: a session whose membership is gone,
-   * disabled or has another role closes here, and the ids come back so the caller can close the
-   * connections. The account service has already ended those sessions.
-   *
-   * `keepOwner` leaves the owner's row as it is. A server on this computer has a password owner, and
-   * the desktop app logs in to it with that username: the account's email in its place would lock it out.
-   */
 
   readonly syncRemoteDirectory = Effect.fn("TeamStore.syncRemoteDirectory")(
     function* (
@@ -1025,7 +898,6 @@ export class TeamStore {
       const closed: string[] = [];
       for (const [tokenHash, session] of this.#remoteSessions) {
         if (activeRoles.get(session.member.id) === session.member.role) {
-          // A session that opened before its member was known has the account id as its name.
           const stored = state.members.find((member) => member.id === session.member.id);
           if (stored) session.member = { ...publicMember(stored), role: session.member.role, disabled: false };
           continue;
@@ -1074,6 +946,14 @@ export class TeamStore {
     for (const [tokenHash, session] of this.#remoteSessions) {
       if (session.sessionId === sessionId) this.#remoteSessions.delete(tokenHash);
     }
+  }
+
+  isStoredOwnerSession(sessionId: string): boolean {
+    const ownerId = this.getOwnerMemberId();
+    return (
+      ownerId !== null &&
+      (this.#state?.sessions.some((session) => session.id === sessionId && session.memberId === ownerId) ?? false)
+    );
   }
 
   getMember(memberId: string): TeamMemberSummary | null {
@@ -1131,8 +1011,6 @@ export class TeamStore {
         return yield* new RemoteWorkflowError({ cause: new TeamStoreError("Invalid invite role.") });
       const permanent = options?.permanent ?? false;
       const email = emailInput?.trim() ? yield* remoteDecode(() => normalizeEmail(emailInput)) : null;
-      // A permanent link is a shareable URL, never an addressed message: binding it to an
-      // email would promise a restriction the token cannot enforce.
       if (permanent && email)
         return yield* new RemoteWorkflowError({
           cause: new TeamStoreError(sourceText("error.team.permanentInviteEmail")),
@@ -1293,7 +1171,6 @@ export class TeamStore {
       requireJoin();
       const credentials = yield* hashPasswordEffect(password);
       yield* remoteDecode(() => this.#requireUnchangedState(state));
-      // A concurrent join can take the username, the invitation or the last seat during the hash.
       const invite = requireJoin();
       const member: StoredMember = {
         id: randomUUID(),
@@ -1472,12 +1349,9 @@ export class TeamStore {
     Effect.uninterruptible,
   ).bind(this);
 
-  /** The profile half of `syncAccount`, without its write. Reports whether anything moved. */
   #applyAccount(user: CentralAuthUser): boolean {
     const state = this.#requireState();
     const email = normalizeEmail(user.email);
-    // By account first, so changing the address on an account keeps it matched to its own
-    // member rather than locking it out of the host it owns.
     const member =
       state.members.find((candidate) => candidate.accountId === user.id) ??
       state.members.find((candidate) => candidate.email === email || candidate.username === email);
@@ -1529,18 +1403,12 @@ export class TeamStore {
   #findUsableInvite(token: string): StoredInvite | undefined {
     return this.#requireState().invites.find(
       (candidate) =>
-        // A permanent link stays usable after joins; only expiry (never, by construction)
-        // or revocation (deletion) retires it.
         (candidate.permanent === true || candidate.usedAt === null) &&
         Date.parse(candidate.expiresAt) > Date.now() &&
         safeTextEqual(candidate.tokenHash, hashToken(token)),
     );
   }
 
-  /**
-   * Records one join against an invitation. Single-use links burn; permanent links
-   * count the join and stay usable.
-   */
   #consumeInvite(invite: StoredInvite): void {
     if (invite.permanent === true) {
       invite.useCount = (invite.useCount ?? 0) + 1;
@@ -1554,24 +1422,12 @@ export class TeamStore {
     return this.#state;
   }
 
-  /**
-   * The host this request started on, still the one being served. Hashing a password takes
-   * long enough for an account switch to land in the middle of it, and the host captured
-   * before that await is still in the file: mutating it there would commit a change the
-   * caller is about to be told failed.
-   */
   #requireUnchangedState(state: StoredTeam): void {
     if (this.#state !== state) {
       throw new TeamStoreError(sourceText("error.team.accountChangedDuringRequest"));
     }
   }
 
-  /**
-   * Rejects a second host for one account, and a second host beside an owner-less one.
-   * The owner-less check spans every stored host, not just the active one: an inactive
-   * one is exactly what the next `activateAccount` adopts, so letting a second accumulate
-   * would make that adoption a coin toss.
-   */
   #assertNoHostFor(accountId: string, email: string): void {
     const ownerless = this.#file.hosts.some((host) => {
       const owner = hostOwner(host);
@@ -1586,8 +1442,6 @@ export class TeamStore {
     return this.#file.hosts.find((host) => {
       const owner = hostOwner(host);
       if (!owner) return false;
-      // The same rule as `activateAccount`: an owner bound to an account is that account's
-      // alone, so whoever holds its old address is free to configure a host of their own.
       if (owner.accountId) return owner.accountId === accountId;
       return owner.email ? normalizeEmail(owner.email) === email : false;
     });
@@ -1601,7 +1455,6 @@ export class TeamStore {
     yield* this.#persistEffect();
   });
 
-  /** The expiry half of `#prune`, without its write. */
   #dropExpired(host: StoredTeam): void {
     const now = Date.now();
     host.sessions = host.sessions.filter((session) => Date.parse(session.expiresAt) > now);
@@ -1618,7 +1471,7 @@ export class TeamStore {
   readonly #persistFileEffect = Effect.fn("TeamStore.persistFile")(function* (
     this: TeamStore,
   ): Effect.fn.Return<void, RemoteWorkflowError, TeamStoreFiles> {
-    if (this.#unreadableFile) {
+    if (this.#unreadableFile || this.#readOnly) {
       return yield* new RemoteWorkflowError({
         cause: new TeamStoreError(sourceText("error.team.serverFileUnreadable")),
       });
@@ -1678,10 +1531,6 @@ function safeTextEqual(left: string, right: string): boolean {
   return leftBytes.length === rightBytes.length && timingSafeEqual(leftBytes, rightBytes);
 }
 
-/**
- * Copies the account chat color onto a stored member. Null removes it. Undefined keeps the stored
- * value: an account service from before chat colors sends none.
- */
 function applyChatColor(member: StoredMember, chatColor: AvatarColor | null | undefined): void {
   if (chatColor === undefined) return;
   if (isAvatarColor(chatColor)) member.chatColor = chatColor;
@@ -1695,8 +1544,6 @@ function publicMember(member: StoredMember): TeamMemberSummary {
     email: member.email ?? null,
     name: member.name ?? null,
     avatarUrl: member.avatarUrl ?? null,
-    // Optional: a file written before chat colours has none. An invalid value counts as no colour, so the
-    // file still loads and keeps its other data.
     ...(isAvatarColor(member.chatColor) ? { chatColor: member.chatColor } : {}),
     role: member.role,
     createdAt: member.createdAt,
@@ -1763,7 +1610,6 @@ function identityOf(host: StoredTeam): TeamIdentity {
   };
 }
 
-/** A new member needs a stored record and a seat. */
 function requireNewMemberSeat(host: StoredTeam): void {
   if (host.members.length >= INPUT_LIMITS.teamMembers) {
     throw new TeamStoreError(sourceText("error.team.memberLimit", { limit: INPUT_LIMITS.teamMembers }));
@@ -1771,7 +1617,6 @@ function requireNewMemberSeat(host: StoredTeam): void {
   requireMemberSeat(host);
 }
 
-/** Disabled members keep their record but not their seat, so a remote revoke frees one. */
 function requireMemberSeat(host: StoredTeam): void {
   if (host.members.filter((member) => !member.disabled).length >= DEFAULT_TEAM_MEMBER_LIMIT) {
     throw new TeamStoreError(sourceText("error.team.memberLimit", { limit: DEFAULT_TEAM_MEMBER_LIMIT }));
@@ -1786,11 +1631,6 @@ function ownerAccountId(host: StoredTeam): string | null {
   return hostOwner(host)?.accountId ?? null;
 }
 
-/**
- * Merges the two copies of one host against the record both started from: what either side
- * added is kept, what either side removed stays removed, and a field one side changed wins
- * over the value neither touched. Nothing here can drop work the user did in either build.
- */
 function reconcileHost(baseline: StoredTeam, mine: StoredTeam, theirs: StoredTeam): StoredTeam {
   const merged: StoredTeam = {
     ...mine,
@@ -1798,8 +1638,6 @@ function reconcileHost(baseline: StoredTeam, mine: StoredTeam, theirs: StoredTea
     enabledOnLaunch: pickChanged(baseline.enabledOnLaunch, mine.enabledOnLaunch, theirs.enabledOnLaunch),
     members: reconcileMembers(baseline.members, mine.members, theirs.members),
     invites: reconcileEntries(baseline.invites, mine.invites, theirs.invites),
-    // A session missing on either side was signed out there, and `reconcileEntries` keeps
-    // it that way rather than handing back a token the user has already revoked.
     sessions: reconcileEntries(baseline.sessions, mine.sessions, theirs.sessions),
   };
   const serverLogo = pickChanged(baseline.serverLogo, mine.serverLogo, theirs.serverLogo);
@@ -1811,13 +1649,6 @@ function reconcileHost(baseline: StoredTeam, mine: StoredTeam, theirs: StoredTea
   return merged;
 }
 
-/**
- * Members, with one field held back from the merge. The older build binds a member to an
- * account by email alone, so an address that has changed hands makes it write a different
- * account's id onto the same member - and taking that back would hand the host, and the
- * ownership check with it, to whoever holds the address now. An id is only taken from there
- * for a member this build knows no account for.
- */
 function reconcileMembers(baseline: StoredMember[], mine: StoredMember[], theirs: StoredMember[]): StoredMember[] {
   return reconcileEntries(baseline, mine, theirs).map((member) => {
     const ours = mine.find((candidate) => candidate.id === member.id);
@@ -1825,7 +1656,6 @@ function reconcileMembers(baseline: StoredMember[], mine: StoredMember[], theirs
   });
 }
 
-/** The side that moved, or this build's value when the other side stood still. */
 function pickChanged<T>(baseline: T, mine: T, theirs: T): T {
   return sameValue(theirs, baseline) ? mine : theirs;
 }
@@ -1840,21 +1670,16 @@ function reconcileEntries<T extends { id: string }>(baseline: T[], mine: T[], th
     const ours = mine.find((candidate) => candidate.id === entry.id);
     const other = theirs.find((candidate) => candidate.id === entry.id);
     const known = before.get(entry.id);
-    // Known to both and gone from one of them: removed there, so it stays removed.
     if (known && (!ours || !other)) continue;
     if (!ours || !other || !known) {
       merged.push(ours ?? other ?? entry);
       continue;
     }
-    // Both builds have it. Taking the other side's entry whole would undo a field this one
-    // changed - a disabled member handed back their access, say - so each field is decided
-    // on its own.
     merged.push(reconcileFields(known, ours, other));
   }
   return merged;
 }
 
-/** The entry field by field: whichever side moved a field, and this build's when neither did. */
 function reconcileFields<T extends object>(baseline: T, mine: T, theirs: T): T {
   const merged = { ...mine };
   const before = new Map(Object.entries(baseline));
@@ -1863,7 +1688,6 @@ function reconcileFields<T extends object>(baseline: T, mine: T, theirs: T): T {
     Reflect.set(merged, key, sameValue(other, before.get(key)) ? ours.get(key) : other);
   }
   for (const key of ours.keys()) {
-    // Dropped there, and this build never touched it, so it goes.
     if (!(key in theirs) && before.has(key) && sameValue(ours.get(key), before.get(key))) {
       Reflect.deleteProperty(merged, key);
     }

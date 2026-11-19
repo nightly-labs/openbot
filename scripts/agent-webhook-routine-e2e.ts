@@ -1,15 +1,3 @@
-// Checks that an agent creates a webhook routine from its chat with `openbot.create_webhook_routine`.
-// Runs the real agent service, tool router and events service on a temporary profile with a fake
-// Codex app-server. The fake calls the tool through `tool_call`, as a model does, and logs the tool
-// result that it gets. The relay is a fake that gives a URL, or fails while it is "down".
-// The check asserts that the result has the URL and the request format and no signing secret, that
-// the chat records the creation for the card, that the routine lists with the webhook routines, that
-// a duplicate name and a bad filter come back as tool failures, and that a request signed with the
-// secret the card makes starts the routine, that test_routine refuses it with a message that names
-// Routines settings, and that delete_routine deletes it. It also checks Standard Webhooks requests, as
-// Composio sends them: the sender's own secret (raw, and `whsec_` base64), the `v1,` signature, and
-// a filter on `/metadata/trigger_slug`, which matches because the whole body is the event data.
-// `bun scripts/agent-webhook-routine-e2e.ts`. Writes .openbot-build/agent-webhook-routine-e2e/report.json.
 import assert from "node:assert/strict";
 import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -34,7 +22,6 @@ const home = join(root, "home");
 const fakeCodex = join(root, "codex");
 const fakeLog = join(root, "codex.jsonl");
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -45,16 +32,16 @@ const { AgentStore } = await import("../src/backend/agent-store");
 const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
-const { agentWebhookRoutineWriter, HostEventsService } = await import("../src/main/host-events-service");
+const { agentWebhookRoutineWriter, HostEventsService, hostAgentWebhookKeys } = await import(
+  "../src/main/host-events-service"
+);
+const { AgentApiKeys } = await import("../src/backend/agent-api-keys");
+const { VaultService } = await import("../src/main/vault-service");
+const { VaultStore } = await import("../src/main/vault-store");
 
 const RELAY_ORIGIN = "https://signal.example.test";
 const CALL_MARK = "WEBHOOK-CALL";
 
-/**
- * A Codex app-server with the methods that the service calls. A turn whose input has
- * `WEBHOOK-CALL <<ARGS{json}ARGS>>` calls `openbot.create_webhook_routine` with that JSON through
- * `tool_call`, logs the result, and ends. Other turns answer "Done.".
- */
 const FAKE_CODEX = `#!/usr/bin/env node
 const { appendFileSync } = require("node:fs");
 if (process.argv.includes("--version")) {
@@ -66,7 +53,6 @@ const config = { config: { mcp_servers: {} }, layers: [{ name: { type: "user", f
 let buffer = "";
 let threads = 0;
 let turns = 0;
-/** Tool request id -> the turn that waits for its result. */
 const waiting = new Map();
 process.stdout.on("error", (error) => {
   if (error.code === "EPIPE") process.exit(0);
@@ -156,8 +142,6 @@ interface ToolLog {
   error: unknown;
 }
 
-/** The arguments the fake passes to the tool. */
-/** The arguments the fake passes to the tool that `__tool` names (default `create_webhook_routine`). */
 interface WebhookToolArgs {
   __tool?: "create_webhook_routine" | "update_webhook_routine" | "list_routines" | "delete_routine" | "test_routine";
   routineId?: string;
@@ -167,7 +151,6 @@ interface WebhookToolArgs {
   filters?: { pointer: string; value: string }[];
 }
 
-/** The fields of a tool result that the check reads. The router sends them as JSON text. */
 interface WebhookToolBody {
   error?: string;
   deleted?: boolean;
@@ -178,6 +161,7 @@ interface WebhookToolBody {
   url?: string | null;
   urlPending?: string;
   secret?: string;
+  secretKey?: string;
   request?: { headers: Record<string, string>; standardWebhooks?: string };
 }
 
@@ -195,6 +179,15 @@ const report: {
     refusals: { shortSecret: string | null; scheduleRoutine: string | null };
     statuses: Record<string, number>;
     activity: EventActivity[];
+  };
+  agentKey?: {
+    name: string;
+    answer: unknown;
+    statuses: Record<string, number>;
+    channelRefusal: string | null;
+    keyAfterDelete: boolean;
+    pendingKeyGiven: boolean;
+    pendingKeyAfterSchedule: boolean;
   };
   checks: { name: string; passed: boolean }[];
   passed: boolean;
@@ -222,7 +215,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service or the fake's log. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -252,6 +244,15 @@ function pass(name: string, condition: boolean, detail?: string) {
 }
 
 await writeFile(fakeCodex, FAKE_CODEX, { mode: 0o755 });
+const vault = new VaultService({
+  store: new VaultStore(join(root, "openbot-vault.json"), {
+    encrypt: (value: string) => Buffer.from(value, "utf8").reverse(),
+    decrypt: (value: Buffer) => Buffer.from(value).reverse().toString("utf8"),
+  }),
+  canPersist: () => true,
+});
+await Effect.runPromise(vault.load());
+const apiKeys = new AgentApiKeys(join(root, "agent-api-keys"), vault.items);
 const database = new OpenBotDatabase(userData);
 const store = new AgentStore(userData, home, database);
 const mailbox = new MailboxStore(userData, store.sharedRoot, store.database);
@@ -262,12 +263,12 @@ const agents = new AgentService({
   browser,
   preferredProvider: "codex",
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
-  // As in the app: the events service is built after the agent service.
+  agentApiKeys: apiKeys,
   webhookRoutines: () => agentWebhookRoutineWriter(events),
 });
 const events = new HostEventsService({
   routines: agents.routineRecords,
-  // Reversible and visible, so the check can see that the stored value is not the secret.
+  agentKeys: hostAgentWebhookKeys(apiKeys, (agentId) => store.list().find((agent) => agent.id === agentId)?.name),
   cipher: {
     encrypt: (value) => Buffer.from(`sealed:${Buffer.from(value).toString("base64")}`),
     decrypt: (value) => Buffer.from(value.toString().slice("sealed:".length), "base64").toString(),
@@ -289,10 +290,6 @@ const events = new HostEventsService({
 const agentEvents: AgentEvent[] = [];
 agents.on("event", (event) => agentEvents.push(event));
 
-/**
- * Sends a chat message that makes the fake call the tool, and returns the tool result it logged for
- * that message's turn. A webhook run can call a tool at the same time in its own session.
- */
 async function callTool(name: string, agentId: string, args: WebhookToolArgs) {
   const receipt = await runCauseEffect(
     agents.sendMessage({ agentId, text: `${CALL_MARK} <<ARGS${JSON.stringify(args)}ARGS>>` }),
@@ -306,7 +303,6 @@ async function callTool(name: string, agentId: string, args: WebhookToolArgs) {
     return status === "completed" || status === "failed" || status === "interrupted";
   });
   const text = entry.result?.contentItems.map((item) => item.text).join("\n") ?? "";
-  // A JSON-RPC error has no body; the check then fails on `success`.
   const body: WebhookToolBody | null = text ? JSON.parse(text) : null;
   report.calls.push({ name, turnId: entry.turnId, success: entry.result?.success ?? null, body });
   return { entry, text, body };
@@ -330,7 +326,6 @@ try {
   );
   const owner = { kind: "agent", id: agent.id } as const;
 
-  // 1. The relay is up: the routine gets its URL at once.
   const created = await callTool("create", agent.id, {
     name: "Failed builds",
     instruction: "Read the failed build and tell me which test failed.",
@@ -350,6 +345,8 @@ try {
   );
   pass("The result has no signing secret", !created.text.includes("whsec_"));
   pass("The result sends the user to the chat card", result.secret.includes("card in this chat"));
+  const keyName = `WEBHOOK_SECRET_${result.routineId.replaceAll("-", "").toUpperCase()}`;
+  pass("The result names the API key that a given secret goes to", result.secretKey?.includes(keyName) === true);
   pass(
     "The result names Standard Webhooks senders and the sender's secret",
     result.request.standardWebhooks?.includes("Composio") === true &&
@@ -381,7 +378,6 @@ try {
   );
   pass("No secret is in the chat", !JSON.stringify(conversation.messages).includes("whsec_"));
 
-  // 2. The same name again is a failure the model can correct.
   const duplicate = await callTool("duplicate name", agent.id, {
     name: "failed builds",
     instruction: "Again.",
@@ -391,7 +387,6 @@ try {
     duplicate.entry.result?.success === false && duplicate.text.includes("already exists"),
   );
 
-  // 3. A bad filter is a failure the model can correct.
   const badFilter = await callTool("bad filter", agent.id, {
     name: "Bad filter",
     instruction: "Never runs.",
@@ -399,7 +394,6 @@ try {
   });
   pass("A bad filter is a tool failure", badFilter.entry.result?.success === false);
 
-  // 4. The relay is down: the routine saves with no URL yet.
   relayUp = false;
   const pending = await callTool("relay down", agent.id, {
     name: "Deploys",
@@ -411,7 +405,6 @@ try {
     pending.entry.result?.success === true && pending.body?.url === null && Boolean(pending.body.urlPending),
   );
 
-  // 5. A routine run is not a person's request, so it cannot make a public route.
   const before = toolLogs().length;
   const runner = agents.createRoutine({
     agentId: agent.id,
@@ -438,7 +431,6 @@ try {
       !afterRun.some((item) => item.name === "From a run"),
   );
 
-  // 6. The card makes the secret; a request signed with it starts the routine.
   const { secret } = await Effect.runPromise(events.rotateSecret({ owner, id: result.routineId }));
   const routeId = new URL(result.url ?? "").pathname.split("/").at(-1) ?? "";
   const body = new TextEncoder().encode(JSON.stringify({ type: "build.failed", data: { branch: "main" } }));
@@ -450,7 +442,6 @@ try {
   };
   const wrong = await deliver("whsec_not-the-secret");
   const signed = await deliver(secret);
-  // A Standard Webhooks sender such as PostHog signs with the base64 key after `whsec_` (#6638).
   const cardStandardBody = new TextEncoder().encode(JSON.stringify({ type: "build.failed", branch: "main" }));
   const deliverCardStandard = (key: Buffer) => {
     const timestamp = String(Math.floor(Date.now() / 1000));
@@ -468,13 +459,11 @@ try {
     );
   };
   const cardStandard = await deliverCardStandard(Buffer.from(secret.slice("whsec_".length), "base64"));
-  // An older host made the secret in base64url. The sender converts it to base64: the key bytes are the same.
   const legacyKey = randomBytes(32);
   await Effect.runPromise(
     events.setSecret({ owner, id: result.routineId, secret: `whsec_${legacyKey.toString("base64url")}` }),
   );
   const legacyStandard = await deliverCardStandard(legacyKey);
-  // Step 7 checks that the card's secret stays.
   await Effect.runPromise(events.setSecret({ owner, id: result.routineId, secret }));
   const activity = await Effect.runPromise(events.listActivity({ owner, routineId: result.routineId }));
   report.receive = {
@@ -493,7 +482,6 @@ try {
   pass("A Standard Webhooks sender signs with the card's secret", cardStandard.status === 202);
   pass("An older base64url secret signs after the sender converts it", legacyStandard.status === 202);
 
-  // 7. The agent finds the routine and changes its filters. The URL and the secret stay.
   const listedByTool = await callTool("list", agent.id, { __tool: "list_routines" });
   pass(
     "list_routines shows the webhook routine with its filters",
@@ -504,7 +492,6 @@ try {
   const updated = await callTool("update", agent.id, {
     __tool: "update_webhook_routine",
     routineId: result.routineId,
-    // The receiver compares the type exactly, so the spaces must not reach the store.
     eventType: " build.failed ",
     filters: [{ pointer: "/branch", value: "release" }],
   });
@@ -535,8 +522,6 @@ try {
     outside.status === 202 && latest[0]?.status === "ignored" && latest[0]?.reason === "filter",
   );
 
-  // 7b. A Standard Webhooks sender, such as Composio, makes its own secret. The person pastes it; the
-  // agent sets a filter on the sender's metadata, which the whole body carries as the event data.
   const refusal = (secretValue: string, id: string) =>
     Effect.runPromise(events.setSecret({ owner, id, secret: secretValue })).then(
       () => null,
@@ -554,7 +539,6 @@ try {
   });
   pass("The agent sets a filter on the sender's metadata", composio.entry.result?.success === true, composio.text);
   const rawSecret = randomBytes(24).toString("hex");
-  // Spaces from a paste do not become part of the key.
   await Effect.runPromise(events.setSecret({ owner, id: result.routineId, secret: ` ${rawSecret}\n` }));
   const standardBody = (slug: string) =>
     new TextEncoder().encode(
@@ -570,7 +554,6 @@ try {
     const timestamp = String(Math.floor(Date.now() / 1000));
     const deliveryId = `msg_${randomUUID().replaceAll("-", "")}`;
     const digest = createHmac("sha256", key).update(`${deliveryId}.${timestamp}.`).update(payload).digest("base64");
-    // A sender can list several signatures, for example during its own key rotation.
     const signature = `v1,${randomBytes(32).toString("base64")} v1,${digest}`;
     return Effect.runPromise(
       events.receive({ routeId, deliveryId, timestamp, signature, body: payload, format: STANDARD_WEBHOOKS_FORMAT }),
@@ -586,7 +569,6 @@ try {
     events.setSecret({ owner, id: result.routineId, secret: `whsec_${encoded.toString("base64")}` }),
   );
   statuses.whsecKey = (await deliverStandard(encoded, standardBody("GMAIL_NEW_GMAIL_MESSAGE"))).status;
-  // Node skips characters that are not base64: this value decodes to one byte, which is not a key.
   const malformed = "whsec_!!!!!!!!!!!!!!!!AA==";
   await Effect.runPromise(events.setSecret({ owner, id: result.routineId, secret: malformed }));
   statuses.malformedKey = (
@@ -615,8 +597,72 @@ try {
     !JSON.stringify((await runCauseEffect(agents.readConversation(agent.id))).messages).includes(rawSecret),
   );
 
-  // 8. test_routine does not test a webhook routine and names Routines settings. delete_routine
-  // deletes it as Routines settings do (#4509).
+  const ownKey = async () =>
+    (await Effect.runPromise(apiKeys.list(agent.id))).find((key) => key.name === keyName && key.source === undefined);
+  const keyValue = async () => {
+    const key = await ownKey();
+    return key ? readFileSync(key.path, "utf8") : null;
+  };
+  const pendingKey = `WEBHOOK_SECRET_${(pending.body?.routineId ?? "").replaceAll("-", "").toUpperCase()}`;
+  await Effect.runPromise(events.rotateSecret({ owner, id: pending.body?.routineId ?? "" }));
+  pass(
+    "A regenerated secret does not make a key for an agent that was not given one",
+    !(await Effect.runPromise(apiKeys.list(agent.id))).some((key) => key.name === pendingKey),
+  );
+  const answer = await Effect.runPromise(events.giveSecretToAgent({ owner, id: result.routineId }));
+  const givenSecret = await keyValue();
+  const keyStatuses: Record<string, number> = {};
+  keyStatuses.givenKey = givenSecret ? (await deliver(givenSecret)).status : 0;
+  keyStatuses.secretBefore = (await deliver(secret)).status;
+  pass("The answer has only the key name", JSON.stringify(answer) === JSON.stringify({ name: keyName }));
+  pass("The agent has the key for it only", givenSecret?.startsWith("whsec_") === true);
+  pass("A request signed with the key file's value starts the routine", keyStatuses.givenKey === 202);
+  pass("The secret from before stops working", keyStatuses.secretBefore === 401);
+  const regenerated = await Effect.runPromise(events.rotateSecret({ owner, id: result.routineId }));
+  pass("A regenerated secret updates the agent's key", (await keyValue()) === regenerated.secret);
+  const pasted = randomBytes(24).toString("hex");
+  await Effect.runPromise(events.setSecret({ owner, id: result.routineId, secret: pasted }));
+  pass("A sender's secret updates the agent's key", (await keyValue()) === pasted);
+  keyStatuses.pastedKey = (await deliverStandard(pasted, standardBody("GMAIL_NEW_GMAIL_MESSAGE"))).status;
+  pass("The updated key signs as the sender's secret", keyStatuses.pastedKey === 202);
+  const channelRefusal = await Effect.runPromise(
+    events.giveSecretToAgent({ owner: { kind: "channel", id: "channel-1" }, id: result.routineId }),
+  ).then(
+    () => null,
+    (error: unknown) => String(error),
+  );
+  pass("A channel routine has no single agent to give the secret to", channelRefusal !== null);
+  const pendingId = pending.body?.routineId ?? "";
+  const hasPendingKey = async () =>
+    (await Effect.runPromise(apiKeys.list(agent.id))).some((key) => key.name === pendingKey);
+  await Effect.runPromise(events.giveSecretToAgent({ owner, id: pendingId }));
+  const pendingKeyGiven = await hasPendingKey();
+  const pendingRoutine = (await Effect.runPromise(events.listRoutines({ owner }))).find(
+    (item) => item.id === pendingId,
+  );
+  assert.ok(pendingRoutine, "the routine from the relay-down step is gone");
+  await Effect.runPromise(
+    events.saveRoutine({
+      id: pendingId,
+      owner,
+      name: pendingRoutine.name,
+      instruction: pendingRoutine.instruction,
+      active: pendingRoutine.active,
+      timezone: pendingRoutine.timezone,
+      trigger: { kind: "schedule", schedule: { kind: "hourly", minute: 0 } },
+    }),
+  );
+  const pendingKeyAfterSchedule = await hasPendingKey();
+  pass(
+    "A trigger change to a schedule removes the agent's key of the routine",
+    pendingKeyGiven && !pendingKeyAfterSchedule,
+  );
+  const chatAfterKey = JSON.stringify((await runCauseEffect(agents.readConversation(agent.id))).messages);
+  pass(
+    "No given secret is in the chat",
+    givenSecret !== null && !chatAfterKey.includes(givenSecret) && !chatAfterKey.includes(regenerated.secret),
+  );
+
   const refused = await callTool("test_routine", agent.id, { __tool: "test_routine", routineId: result.routineId });
   pass(
     "test_routine refuses the webhook routine and names Routines settings",
@@ -634,6 +680,17 @@ try {
       !afterDelete.some((item) => item.id === result.routineId),
     deleted.text,
   );
+  const keyAfterDelete = (await ownKey()) !== undefined;
+  pass("delete_routine removes the agent's key of the routine", !keyAfterDelete);
+  report.agentKey = {
+    name: keyName,
+    answer,
+    statuses: keyStatuses,
+    channelRefusal,
+    keyAfterDelete,
+    pendingKeyGiven,
+    pendingKeyAfterSchedule,
+  };
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

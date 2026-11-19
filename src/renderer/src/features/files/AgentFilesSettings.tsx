@@ -5,21 +5,14 @@ import type { StorageUsageResource } from "./storage-usage";
 
 export interface AgentFilesOptions {
   serverId: string;
-  /** Owners and admins delete files. A member only reads. */
   canManage: boolean;
-  /** Only on this computer: a remote agent's workspace is a folder on the host. */
   onOpenWorkspace?: (() => void) | undefined;
   onPreviewFile: (file: StoredFileRow) => void;
   onShowMessage: (messageId: string) => void;
   onOpenConversation: (conversationId: string) => void;
-  /** The storage calls of a client without the desktop port. Absent, preload sends them. */
   calls?: FilesPort | undefined;
 }
 
-/**
- * Agent settings > Files. The settings own the storage read, because the Files row shows the same
- * total before this view opens.
- */
 export function AgentFilesSettings(
   props: AgentFilesOptions & {
     agentName: string;
@@ -48,7 +41,6 @@ export function AgentFilesSettings(
       onOpenWorkspace={props.onOpenWorkspace}
       canDelete={props.canManage}
       onOpenConversation={props.onOpenConversation}
-      // A file the preview panel cannot show opens in its app.
       onPreviewFile={(file) =>
         canPreviewAttachment(file) ? props.onPreviewFile(file) : void props.storage.fileAction(file, "open", showInChat)
       }

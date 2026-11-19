@@ -1,10 +1,3 @@
-// Electron side of `scripts/linux-dynamic-island-e2e.ts`. It runs the real Dynamic Island of the app: the
-// window controller, the island window of `main-window.ts`, the Dynamic Island IPC handlers, the preload
-// and the built island renderer. This process plays the main renderer: it publishes the presentations,
-// and its own full-screen window lies under the island and counts the clicks that go through it.
-//
-// It reads one JSON command for each line of stdin and writes one answer line, `@@{...}`, to stdout.
-// The end of stdin quits the app.
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import { extname, join, resolve, sep } from "node:path";
@@ -24,11 +17,9 @@ import { dynamicIslandIpcHandlers } from "../src/main/ipc/dynamic-island-handler
 import { aboveAppsWindowKind, usesX11Windows } from "../src/main/linux-wayland-output";
 import { createDynamicIslandWindow, loadDynamicIslandRenderer } from "../src/main/main-window";
 
-// A closed output must not stop the test app with an error dialog.
 process.stdout.on("error", () => undefined);
 process.stderr.on("error", () => undefined);
 
-// The bundle is `out/linux-dynamic-island-e2e/harness.cjs`: the island window loads `out/preload/index.cjs`.
 const RENDERER_ROOT = resolve(__dirname, "..", "renderer");
 const CONTENT_TYPES: Record<string, string> = {
   ".html": "text/html",
@@ -48,7 +39,6 @@ const interactive: { at: number; interactive: boolean; keyboard: boolean }[] = [
 const rendererErrors: string[] = [];
 const unhandled = new Set<string>();
 
-/** Serves the built renderer as the development server does, so the trusted-origin check applies. */
 function serveRenderer(): Promise<string> {
   const server = createServer((request, response) => {
     const path = decodeURIComponent(new URL(request.url ?? "/", "http://localhost").pathname);
@@ -68,10 +58,6 @@ function serveRenderer(): Promise<string> {
   );
 }
 
-/**
- * The helper renderer also reads the language: the answer that a fresh profile gets. Other calls fail,
- * and the report lists them.
- */
 function registerOtherHandlers(): void {
   ipcMain.handle(IPC_ENDPOINTS.app.getAppLanguagePreference.channel, () => ({ language: "en" }));
 }
@@ -83,7 +69,6 @@ function islandWindow(): BrowserWindow | undefined {
   return BrowserWindow.getAllWindows().find((window) => window !== mainWindow && !window.isDestroyed());
 }
 
-/** The windows of the controller: the island windows of all displays. */
 function aboveAppsWindows(): number {
   return BrowserWindow.getAllWindows().filter((window) => window !== mainWindow && !window.isDestroyed()).length;
 }
@@ -102,7 +87,6 @@ const CommandSchema = Schema.Union([
 type Command = typeof CommandSchema.Type;
 const decodeCommand = Schema.decodeUnknownSync(Schema.fromJsonString(CommandSchema));
 
-/** Answers one command of the driver. */
 async function run(command: Command): Promise<void> {
   switch (command.op) {
     case "island": {
@@ -149,7 +133,6 @@ function answer(id: number, value: unknown): void {
   process.stdout.write(`@@${JSON.stringify({ id, ok: true, value: value ?? null })}\n`);
 }
 
-// No top-level await: Electron does not get ready until the main module has run to its end.
 void app
   .whenReady()
   .then(start)
@@ -162,7 +145,6 @@ async function start(): Promise<void> {
   process.env.ELECTRON_RENDERER_URL = await serveRenderer();
   registerOtherHandlers();
   const primary = screen.getPrimaryDisplay();
-  // The "other app" under the island: it counts the clicks that the island lets through.
   mainWindow = new BrowserWindow({ ...primary.bounds, frame: false, show: false, backgroundColor: "#3b4252" });
   await mainWindow.loadURL(
     `data:text/html,${encodeURIComponent(
@@ -173,7 +155,6 @@ async function start(): Promise<void> {
   );
   mainWindow.showInactive();
   controller = new DynamicIslandWindowController({
-    // `OPENBOT_E2E_SERVER=1` plays a self-hosted or hosted server: no window may open.
     windowKind: aboveAppsWindowKind(process.env.OPENBOT_E2E_SERVER === "1"),
     preferencePath: join(app.getPath("userData"), "dynamic-island-preference.json"),
     defaultPreference: DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
@@ -193,7 +174,6 @@ async function start(): Promise<void> {
     getFocusedWindow: () => BrowserWindow.getFocusedWindow(),
     presentMainWindow: () => undefined,
     performHaptic: () => undefined,
-    // A reply or an answer reaches no agent in this test. The handler records each action.
     performCriticalAction: () => Effect.void,
   });
   const handlers = dynamicIslandIpcHandlers({
@@ -229,6 +209,7 @@ async function start(): Promise<void> {
         controller.setInputRegion(rendererId, rects);
       },
     },
+    chatRendererIds: () => new Set(),
     setXWayland: () => Effect.void,
     keepXWayland: () => Effect.void,
   });

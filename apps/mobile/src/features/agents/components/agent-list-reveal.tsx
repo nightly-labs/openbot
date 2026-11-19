@@ -1,4 +1,5 @@
 import { type PropsWithChildren, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { StyleProp, ViewStyle } from "react-native";
 import Animated, {
   cancelAnimation,
   Easing,
@@ -12,14 +13,17 @@ import Animated, {
 import { scheduleOnRN } from "react-native-worklets";
 import { useReducedMotion } from "@/shared/lib/motion";
 
-const ROW_DURATION = 260;
-const ROW_STAGGER = 32;
-const MAX_DELAY = 160;
+const ROW_DURATION = 240;
+const ROW_STAGGER = 30;
+const ROW_RISE = 10;
+const MAX_DELAY = 300;
 const REDUCED_DURATION = 150;
 const EASE_OUT = Easing.bezierFn(0.23, 1, 0.32, 1);
 
 export interface AgentListRevealState {
   elapsed: SharedValue<number>;
+  elapsedScope: SharedValue<string>;
+  scope: string;
   finished: boolean;
   reducedMotion: boolean;
   onLayout: () => void;
@@ -27,6 +31,7 @@ export interface AgentListRevealState {
 
 export function useAgentListReveal(ready: boolean, scope: string): AgentListRevealState {
   const elapsed = useSharedValue(0);
+  const elapsedScope = useSharedValue("");
   const reducedMotion = useReducedMotion();
   const [finishedScope, setFinishedScope] = useState<string | null>(null);
   const finished = finishedScope === scope;
@@ -35,12 +40,12 @@ export function useAgentListReveal(ready: boolean, scope: string): AgentListReve
 
   useLayoutEffect(() => {
     elapsed.set(0);
+    elapsedScope.set(scope);
     setFinishedScope(null);
     if (!ready) {
       setLaidOutScope(null);
       return;
     }
-    // Start after native layout, so loading and first layout do not consume the reveal.
     if (laidOutScope !== scope) return;
     let active = true;
     const finish = () => {
@@ -56,9 +61,12 @@ export function useAgentListReveal(ready: boolean, scope: string): AgentListReve
       active = false;
       cancelAnimation(elapsed);
     };
-  }, [elapsed, laidOutScope, ready, reducedMotion, scope]);
+  }, [elapsed, elapsedScope, laidOutScope, ready, reducedMotion, scope]);
 
-  return useMemo(() => ({ elapsed, finished, reducedMotion, onLayout }), [elapsed, finished, reducedMotion, onLayout]);
+  return useMemo(
+    () => ({ elapsed, elapsedScope, scope, finished, reducedMotion, onLayout }),
+    [elapsed, elapsedScope, scope, finished, reducedMotion, onLayout],
+  );
 }
 
 export function AgentListRowReveal({
@@ -66,21 +74,20 @@ export function AgentListRowReveal({
   index,
   reveal,
   skip = false,
-}: PropsWithChildren<{ index: number; reveal: AgentListRevealState; skip?: boolean }>) {
-  // Keep a mounted row's place in the reveal when a live update inserts a section.
+  style,
+}: PropsWithChildren<{ index: number; reveal: AgentListRevealState; skip?: boolean; style?: StyleProp<ViewStyle> }>) {
   const initialIndex = useRef(index).current;
-  const { elapsed, finished, reducedMotion } = reveal;
+  const { elapsed, elapsedScope, scope, finished, reducedMotion } = reveal;
   const progress = useDerivedValue(() => {
     if (finished || skip) return 1;
+    if (elapsedScope.get() !== scope) return 0;
     const delay = reducedMotion ? 0 : Math.min(initialIndex * ROW_STAGGER, MAX_DELAY);
     const duration = reducedMotion ? REDUCED_DURATION : ROW_DURATION;
     return EASE_OUT(Math.min(1, Math.max(0, (elapsed.get() - delay) / duration)));
   });
   const contentStyle = useAnimatedStyle(() => ({
     opacity: progress.get(),
-    transform: [{ translateX: reducedMotion ? 0 : -18 * (1 - progress.get()) }],
+    transform: [{ translateY: reducedMotion ? 0 : ROW_RISE * (1 - progress.get()) }],
   }));
-  // After the reveal the row has no animated style. A later render then cannot put back the
-  // first-render opacity of 0 when the animated value has not reached React.
-  return <Animated.View style={finished || skip ? undefined : contentStyle}>{children}</Animated.View>;
+  return <Animated.View style={finished || skip ? style : [style, contentStyle]}>{children}</Animated.View>;
 }

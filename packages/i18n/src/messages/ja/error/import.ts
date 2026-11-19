@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/import";
 
 export const messages = {
-  // Agent import errors and warnings.
   "error.import.manifestNotJson": "{manifest} は有効な JSON ではありません。",
   "error.import.notAgentExport": "{manifest} は OpenBot のエージェントのエクスポートではありません。",
   "error.import.newerExportSkill":
@@ -91,9 +90,11 @@ export const messages = {
   "error.import.transferProviderKey": "{name}: 設定で API キーを入力し直してください。",
   "error.import.transferAgentEnv": "{name}: 設定で {names} の値を入力し直してください。",
   "error.import.transferMcpValues":
-    "{name}: MCP サーバーはオフの状態で追加されます。コマンドを確認し、値と完全なアドレスを入力し直してから、MCP の設定でオンにしてください。",
+    "{name}: MCP サーバーはオフの状態で追加されます。コマンドを確認し、値と完全なアドレスを入力し直してから、マーケットプレイス、アプリでオンにしてください。",
   "error.import.transferValuesCleared":
     "{name}: シークレットを含む可能性のある値が、引数またはアドレスから削除されました。設定で入力し直してください。",
   "error.import.transferSharedKept":
     "共有フォルダー内の {number} 個のファイルはすでにここにあるため、そのまま保持されます。",
+  "error.import.transferPartSkipped":
+    "ファイルの一部をインポートできませんでした。ほかの部分はこのサーバーにあるため、ファイルを再度インポートしないでください。",
 } as const satisfies PartialTranslation<typeof source>;

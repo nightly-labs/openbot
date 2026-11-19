@@ -1,26 +1,15 @@
-// The layout and the hover timing of the workflow picture. No JSX here, for the same reason
-// `landing-content.ts` holds none.
-
 import { LANDING_WORKFLOW_AGENTS, LANDING_WORKFLOW_EDGES, type LandingWorkflowStepId } from "./landing-content";
 
-/** How long a line takes to reach the next step, in milliseconds. */
 export const LANDING_WORKFLOW_EDGE_MS = 240;
 
-/** The trigger fires quickly. The approval waits a moment for the person who clicks. */
 const TRIGGER_MS = 300;
 const APPROVAL_MS = 640;
 
-/**
- * The width of one column and of the gap between columns, in percent of the picture. The
- * stylesheet uses the same gap, so the lines meet the cards.
- */
 const COLUMN = 19;
 const GAP = 8;
 
 interface WorkflowPlace {
-  /** 0 to 3, from the trigger to the approval. */
   column: number;
-  /** 0 or 1 for a step that runs next to another one, null for a step alone in its column. */
   lane: 0 | 1 | null;
 }
 
@@ -31,10 +20,8 @@ function workflowPlace(id: LandingWorkflowStepId): WorkflowPlace {
   return { column: agent?.column ?? 1, lane: agent?.lane ?? null };
 }
 
-/** The middle of a lane across the picture, in percent: lanes at a quarter and at three quarters. */
 const laneMiddle = (lane: 0 | 1 | null) => (lane === null ? 50 : 25 + lane * 50);
 
-/** When each step starts and how long it runs: a step starts when every step before it is done. */
 export interface WorkflowTiming {
   startMs: number;
   runMs: number;
@@ -65,11 +52,8 @@ export function workflowTiming(id: LandingWorkflowStepId): WorkflowTiming {
 
 export interface WorkflowEdge {
   key: string;
-  /** The line leaves when the step before it is done. */
   startMs: number;
-  /** From the right side of a card to the left side of the next one, with the columns side by side. */
   wide: string;
-  /** From the middle of a card to the middle of the next one, with the columns one under the other. */
   tall: string;
 }
 
@@ -83,7 +67,6 @@ function edgePath(from: LandingWorkflowStepId, to: LandingWorkflowStepId): Workf
   const y1 = laneMiddle(source.lane);
   const y2 = laneMiddle(target.lane);
   const middleX = round((x1 + x2) / 2);
-  // With the columns one under the other, each column is a row of a quarter of the height.
   const top = (source.column + 0.5) * 25;
   const bottom = (target.column + 0.5) * 25;
   const middleY = round((top + bottom) / 2);

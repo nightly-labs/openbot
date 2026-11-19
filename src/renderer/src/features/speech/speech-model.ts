@@ -6,11 +6,6 @@ import { voiceServer } from "./voice-server";
 const [status, setStatus] = createSignal<SpeechModelStatus["phase"] | null>(null);
 let following = false;
 
-/**
- * Whether a reply can be read aloud: the speech model is on this computer, or the user's own voice
- * server speaks. The first read starts to follow the model status; the answer is false until main
- * tells it.
- */
 export function speechModelReady(): boolean {
   if (!following) {
     following = true;

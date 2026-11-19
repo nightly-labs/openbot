@@ -9,7 +9,6 @@ export interface RoutineSelectOption {
   label: string;
 }
 
-/** The translator and formats a routine label needs. It defaults to the app's interface language. */
 export type RoutineText = Pick<TextValue, "t" | "format">;
 
 const INTERVAL_SUMMARY = {
@@ -18,13 +17,10 @@ const INTERVAL_SUMMARY = {
   days: "routine.summary.intervalDays",
 } as const satisfies Record<Extract<RoutineSchedule, { kind: "interval" }>["unit"], keyof AppMessages>;
 
-/** A date on the weekday `day` (0 is Sunday), for a weekday name in the interface language. */
 function weekdayDate(day: number): Date {
-  // January 7, 2024 is a Sunday.
   return new Date(2024, 0, 7 + (((day % 7) + 7) % 7));
 }
 
-/** "Sunday", "Sun" or "S". */
 export function routineWeekdayText(
   day: number,
   width: "long" | "short" | "narrow",
@@ -42,7 +38,6 @@ export function routineScheduleSummary(
   switch (schedule.kind) {
     case "once": {
       const [year = 0, month = 1, day = 1] = schedule.date.split("-").map(Number);
-      // UTC noon, so that no zone moves the saved date to another day.
       const date = text.format.date(Date.UTC(year, month - 1, day, 12), {
         weekday: "short",
         month: "short",
@@ -82,7 +77,6 @@ export function routineScheduleSummary(
   }
 }
 
-/** "9:00 AM", or "09:00" where the date locale writes a 24-hour clock. */
 export function formatRoutineClock(value: string, text: RoutineText = currentText()): string {
   const [hourText = "0", minuteText = "0"] = value.split(":");
   const hour = Number(hourText);
@@ -91,9 +85,7 @@ export function formatRoutineClock(value: string, text: RoutineText = currentTex
   return routineClockText(`${hour % 12 || 12}:${String(minute).padStart(2, "0")}`, hour >= 12, text);
 }
 
-/** A wall-clock time on a 24-hour clock, with the separator of the date locale: "16:00", "16.00". */
 function routineClock24Text(hour: number, minute: number, text: RoutineText): string {
-  // UTC, so that no clock change of the local zone moves the time.
   return text.format.date(Date.UTC(2024, 0, 1, hour, minute), {
     hour: "2-digit",
     minute: "2-digit",
@@ -102,7 +94,6 @@ function routineClock24Text(hour: number, minute: number, text: RoutineText): st
   });
 }
 
-/** `time` ("9" or "9:30") with its half of the day. */
 export function routineClockText(time: string, pm: boolean, text: RoutineText = currentText()): string {
   const meridiem = pm ? text.t("routine.clock.pm") : text.t("routine.clock.am");
   return text.t("routine.clock.withMeridiem", { time, meridiem });

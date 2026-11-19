@@ -3,14 +3,12 @@ import type { ProviderModelVisibilityControl } from "@openbot/ui/features/settin
 import { useText } from "@openbot/ui/text";
 import { createEffect, createStore, untrack } from "solid-js";
 
-/** The model list calls of one server's host. The desktop reaches them through main. */
 export type HostModelVisibilityCalls = Pick<
   OpenBotDesktopApi["hostAdmin"],
   "getModelVisibility" | "setModelVisibility"
 >;
 
 export interface HostModelVisibilityOptions {
-  /** The calls of a client with no `window.openbot`, such as the web client. */
   calls?: HostModelVisibilityCalls;
 }
 
@@ -18,14 +16,6 @@ export interface ProviderModelVisibilitySource extends HostModelVisibilityOption
   serverId: string;
 }
 
-/**
- * The Models section of each provider page, for this computer or a joined server
- * (`model-visibility-v1`). The host checks the role again. Undefined while `source` is.
- *
- * A switch shows its change at once. Saves go one at a time, and only the last change is sent.
- * Each new value of `status` reads the list again, as the model picker does: a provider can list
- * its models after the page opens, and another admin can change the list.
- */
 export function createProviderModelVisibility(
   source: () => ProviderModelVisibilitySource | undefined,
   status: () => unknown,
@@ -33,18 +23,14 @@ export function createProviderModelVisibility(
   const { t, errorMessage } = useText();
   const calls = (): HostModelVisibilityCalls => source()?.calls ?? window.openbot.hostAdmin;
 
-  /** Runs when a provider page opens, so its effect ends when the page closes. */
   function open(provider: AgentProviderId): ProviderModelVisibilityControl {
     const [state, setState] = createStore<{ list: ProviderModelVisibility | null; error: string | null }>({
       list: null,
       error: null,
     });
-    /** Bumped for each server, so an answer for an earlier one is dropped. */
     let generation = 0;
-    /** Bumped for each change, so a read that started before it cannot show the list from before it. */
     let reads = 0;
     let saving = false;
-    /** The next list to send; `shown: null` resets the provider. */
     let queued: { shown: AgentModelId[] | null } | null = null;
 
     function load(serverId: string, request: number): void {
@@ -79,7 +65,6 @@ export function createProviderModelVisibility(
 
     let opened = false;
     createEffect(status, () => {
-      // The effect above reads the list when the page opens.
       if (!opened) {
         opened = true;
         return;
@@ -106,7 +91,6 @@ export function createProviderModelVisibility(
             setState((draft) => {
               draft.error = errorMessage(error, t("error.provider.useChangeFailed"));
             });
-            // The switches show the change that failed; the host has the list that is true.
             saving = false;
             load(serverId, request);
             return;
@@ -114,7 +98,6 @@ export function createProviderModelVisibility(
         }
       } finally {
         saving = false;
-        // A change for the next server waited for this save to end.
         const next = source()?.serverId;
         if (queued && request !== generation && next !== undefined) void flush(next, generation);
       }
@@ -144,7 +127,6 @@ export function createProviderModelVisibility(
       onReset: () => {
         const serverId = source()?.serverId;
         if (serverId === undefined || !state.list) return;
-        // The host knows the default; the switches change when it answers.
         setState((draft) => {
           draft.error = null;
         });

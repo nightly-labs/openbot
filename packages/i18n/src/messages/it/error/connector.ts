@@ -18,9 +18,16 @@ export const messages = {
     "OpenBot non è riuscito a installare la CLI di 1Password. Controlla la connessione a internet e riprova.",
   "error.connector.onePasswordCliSignedOut":
     "La CLI di 1Password non ha effettuato l'accesso. Attiva la sua integrazione nell'app 1Password, poi connetti di nuovo.",
+  "error.connector.onePasswordAppUnreachable":
+    "OpenBot non riesce a raggiungere l'app 1Password. Apri 1Password e sbloccalo. In Impostazioni > Sviluppatore, verifica che «Integra con la CLI di 1Password» sia attivo. Poi riprova.",
   "error.connector.onePasswordCliFailed": "La CLI di 1Password è fallita: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "Il tuo account 1Password non ti permette di creare il vault condiviso o un service account. Chiedi questo permesso a un proprietario o a un amministratore dell'account, oppure chiedigli un token del service account e fai clic su «Usa token».",
   "error.connector.onePasswordUnexpected": "1Password ha inviato una risposta inattesa: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password non ha accettato il token del service account.",
+  "error.connector.onePasswordUnreachable":
+    "OpenBot non è riuscito a connettersi a 1Password. Controlla la connessione a internet e riprova.",
+  "error.connector.onePasswordRateLimited": "1Password ha ricevuto troppe richieste. Attendi qualche minuto e riprova.",
   "error.connector.onePasswordNoVault":
     "Il service account non può leggere nessun vault. Dagli accesso a un vault e riprova.",
   "error.connector.onePasswordFileUnreadable": "Il file di connessione a 1Password non è leggibile.",
@@ -46,6 +53,8 @@ export const messages = {
     "Impossibile installare la CLI di Proton Pass. Controlla la connessione di rete, poi connetti di nuovo.",
   "error.connector.protonPassPlan":
     "Il tuo piano Proton non consente la CLI di Proton Pass. Cambia piano, poi connetti di nuovo.",
+  "error.connector.protonPassPlanMissing":
+    "Il tuo piano Proton non include la CLI di Proton Pass. Serve un piano Proton che includa Pass Plus. Cambia piano, poi connetti di nuovo.",
   "error.connector.protonPassExpired": "L’accesso a Proton Pass è terminato. Connetti di nuovo.",
   "error.connector.protonPassKeyInvalid": "Inserisci una chiave di accesso di Proton Pass che inizia con pst_.",
   "error.connector.protonPassExtraPassword": "La password aggiuntiva non è corretta. Inseriscila di nuovo.",

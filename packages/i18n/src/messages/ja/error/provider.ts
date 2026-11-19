@@ -12,6 +12,8 @@ export const messages = {
     "{provider} のサインインが失われたため、OpenBot がそのプロセスを終了しました。メッセージをもう一度送信してください。",
   "error.provider.acpRefusedUntilRestart":
     "{provider} がメッセージを拒否したため、OpenBot がそのプロセスを終了しました。メッセージをもう一度送信してください。",
+  "error.provider.acpServerLost": "{provider} の接続が切れました。メッセージをもう一度送信してください。",
+  "error.provider.acpServerLostEnded": "{provider} の接続が切れたため、OpenBot がそのプロセスを終了しました。",
   "error.provider.acpSettingsTimedOut":
     "{provider} が時間内に応答しませんでした。しばらくしてからもう一度お試しください。",
   "error.provider.acpPlanUsedUp":
@@ -46,6 +48,15 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "アドレスまたはフォルダーが多すぎます。",
   "error.provider.credentialFileUnreadable": "プロバイダーの認証情報ファイルを読み取れません。",
   "error.provider.credentialFileTooLarge": "プロバイダーの認証情報ファイルが大きすぎます。",
+  "error.provider.environmentNameInvalid":
+    "{name} は有効な変数名ではありません。英字、数字、_ を使い、数字で始めないでください。",
+  "error.provider.environmentNameReserved":
+    "OpenBot はこのプロバイダーの {name} を設定します。この変数を削除してください。",
+  "error.provider.environmentNameDuplicate": "{name} がリストに複数あります。",
+  "error.provider.environmentValueTooLong": "{name} の値が長すぎます。",
+  "error.provider.environmentTooMany": "プロバイダーの変数は最大 {limit} 個です。",
+  "error.provider.environmentSecretsTooLarge":
+    "機密の値が合計で長すぎます。短い値にするか、値を減らして保存してください。",
   "error.provider.archiveSpecialFile": "ランタイムのアーカイブにリンクまたは特殊ファイルが含まれています。",
   "error.provider.archiveUnsafePath": "ランタイムのアーカイブに安全でないパスが含まれています。",
   "error.provider.runtimeSpecialFile": "ランタイムにリンクまたは特殊ファイルが含まれています。",
@@ -80,6 +91,8 @@ export const messages = {
   "error.provider.runtimeUpdateIncomplete": "ランタイムの更新が完了しませんでした。",
   "error.provider.downloadHttp": "ランタイムのダウンロードが HTTP {status} で失敗しました。",
   "error.provider.downloadNoData": "ランタイムのダウンロードでデータが返されませんでした。",
+  "error.provider.downloadStalled":
+    "1 分間データが届かなかったため、ダウンロードが停止しました。インターネット接続を確認してから、もう一度お試しください。",
   "error.provider.downloadSize": "ランタイムのダウンロードのサイズが予期しないものです。",
   "error.provider.downloadIntegrity": "ランタイムのダウンロードが整合性チェックに失敗しました。",
   "error.provider.runtimeReplacing": "別のインスタンスがランタイムを置き換えているため、インストールできませんでした。",
@@ -171,12 +184,22 @@ export const messages = {
     "{provider} が時間内に応答しませんでした。コンピューターの負荷が高い可能性があります。OpenBot が再試行します。",
   "error.provider.cliTimedOutRefresh":
     "{provider} が時間内に応答しませんでした。コンピューターの負荷が高い可能性があります。プロバイダーを更新して再試行してください。",
+  "error.provider.stoppedBeforeStart":
+    "このメッセージが始まる前に {provider} が停止しました。メッセージをもう一度送信してください。",
+  "error.provider.sessionStartTimedOut":
+    "{provider} が時間内に新しいチャットを開けなかったため、このメッセージは開始されませんでした。OpenBot を実行しているコンピューターでプロバイダーを開き、{provider} を選択して再起動をクリックしてください。その後、もう一度お試しください。",
+  "error.provider.serviceUnreachable":
+    "{provider} がサービスに接続できません。インターネット接続を確認してください。OpenBot が再試行します。",
+  "error.provider.serviceUnreachableRefresh":
+    "{provider} がサービスに接続できません。インターネット接続を確認してから、プロバイダーを更新してください。",
   "error.provider.acpStartTimedOut":
     "{provider} の起動が {seconds} 秒以内に完了しませんでした。コンピューターの負荷が高い可能性があります。",
   "error.provider.acpModelsTimedOut":
     "{provider} が {seconds} 秒以内にモデルを一覧表示しませんでした。コンピューターの負荷が高い可能性があります。",
   "error.provider.startStopped":
     "{provider} の起動に続けて何度も失敗したため、OpenBot は再試行を停止しました。プロバイダーを更新して再試行してください。",
+  "error.provider.startPaused":
+    "{provider} の起動に続けて何度も失敗しました。OpenBot は次のメッセージまたはルーティンで再試行します。今すぐ試すには、プロバイダーを更新してください。",
   "error.provider.tempDiskSpace":
     "{provider} の起動には 1 GB 以上の空きディスク容量が必要です。空き容量を確保してから、プロバイダーを更新してください。",
   "error.provider.noCodeSignIn": "{provider} にはコードでサインインできません。",
@@ -187,6 +210,8 @@ export const messages = {
   "error.provider.codeLoginRefused": "プロバイダーがコードを受け付けませんでした。サインインをやり直してください。",
   "error.provider.codeLoginUnsupported":
     "このサーバーでは、貼り付けたコードでサインインできません。サーバーのコンピューターのブラウザーでサインインしてください。",
+  "error.provider.claudeLoginNotSaved":
+    "Claude は Mac にサインイン情報を保存できませんでした。OpenBot を実行している Mac を再起動してから、Claude をもう一度接続してください。",
   "error.provider.cliBusyRetry": "{provider} CLI はターンを処理中です。終わるまで待ってから、もう一度お試しください。",
   "error.provider.cliSigningIn":
     "{provider} CLI はサインイン中です。サインインを完了するかキャンセルしてから更新してください。",
@@ -208,14 +233,22 @@ export const messages = {
     "OpenCode はモデルプロバイダー「{provider}」にサインインしていません。「無料」ラベルのモデルを選択するか、プロバイダーを接続してください。OpenCode の設定に OpenCode Go のキーを貼り付けるか、ターミナルで `opencode auth login` を実行します。その後、もう一度お試しください。",
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode はこのモデルのプロバイダーにサインインしていません。「無料」ラベルのモデルを選択するか、プロバイダーを接続してください。OpenCode の設定に OpenCode Go のキーを貼り付けるか、ターミナルで `opencode auth login` を実行します。その後、もう一度お試しください。",
+  "error.provider.opencodeProviderRefused":
+    "モデルのプロバイダー「{provider}」がリクエストを拒否しました。OpenCode にはこのプロバイダーのキーがあるため、ネットワークが原因の可能性があります。一部のプロバイダーは VPN、プロキシ、または一部の国からのアクセスをブロックします。VPN をオフにするか別のネットワークを使用して、もう一度お試しください。エラーが続く場合はキーが正しくない可能性があります。ターミナルで `opencode auth login` を実行し、キーをもう一度入力してください。",
   "error.provider.opencodeFreeModelRefused":
     "OpenCode がこの無料モデルを拒否しました。一部の無料モデルは、国によっては利用できません。「無料」ラベルの別のモデルを選択するか、OpenCode の設定に OpenCode Go のキーを貼り付けて OpenCode Go のモデルを選択してください。",
   "error.provider.customEndpointKeyRefused":
     "エンドポイント「{provider}」が API キーまたはヘッダーを拒否しました。サーバー設定 → プロバイダーでもう一度入力してから、もう一度お試しください。",
+  "error.provider.customEndpointAccessRefused":
+    "エンドポイント「{provider}」がリクエストを拒否しました。API キーまたはヘッダーが正しくないか、アカウントがこのモデルを使用できない可能性があります。サーバー設定 → プロバイダーで確認するか、別のモデルを選んでください。その後、もう一度お試しください。",
   "error.provider.customEndpointKeyMissing":
     "エンドポイント「{provider}」には API キーが必要です。サーバー設定 → プロバイダーでキーを追加してから、もう一度お試しください。",
   "error.provider.opencodeKeyExpired":
     "OpenCode の API キーの有効期限が切れました。OpenCode Console で新しいキーを作成し、OpenCode の設定に貼り付けてから、もう一度お試しください。",
+  "error.provider.opencodeKeyRefused":
+    "OpenCode Go が保存済みの API キーを拒否しました。キーの有効期限が切れている可能性があります。OpenCode Console で新しいキーを作成し、OpenCode の設定に貼り付けてから、もう一度お試しください。",
+  "error.provider.opencodeGoRequestRefused":
+    "OpenCode Go がリクエストを拒否しました。新しい API キーでは解決しません。OpenCode Go のプランが有効でないか、OpenCode Go がお使いのネットワークをブロックしている可能性があります。一部のサービスは VPN、プロキシ、または一部の国をブロックします。OpenCode Console でプランが有効か確認するか、VPN をオフにしてから、もう一度お試しください。別のモデルを選ぶこともできます。",
   "error.provider.opencodeServiceFailure":
     "OpenCode のローカルサービスが失敗したため、このターンを完了できませんでした。もう一度お試しください。エラーが続く場合は、設定で OpenCode を再接続してください。",
   "error.provider.opencodeRateLimited":
@@ -226,16 +259,22 @@ export const messages = {
     "OpenCode のモデルプロバイダーが無効なアップロードリクエストを報告しました。別のモデルを選択して続行してください。ルーティンをもう一度作成する前に、保存済みのルーティンを確認してください。\n{detail}",
   "error.provider.opencodeUnreadableContent":
     "このモデルは、このチャット内のファイルまたは画像を読み取れません。OpenBot はチャット履歴を引き継いだ新しい OpenCode セッションを開始しました。ファイルを外してメッセージをもう一度送信するか、ファイルを読み取れるモデルを選択してください。このモデルをカスタムプロバイダーに追加した場合は、その設定の「入力」で「画像」をオフにしてください。",
+  "error.provider.opencodeOutOfMemory":
+    "モデルサーバーのメモリーがこのチャットには足りません。新しいチャットを開始するか、より小さいコンテキスト長でモデルを読み込み、OpenBot のプロバイダー設定に同じウィンドウを入力してください。",
   "error.provider.opencodeContextTooSmall":
     "このチャットはモデルのコンテキストウィンドウに収まりません。Ollama または LM Studio で、より大きいコンテキスト長でモデルを読み込み、OpenBot のプロバイダー設定に同じウィンドウを入力してください。または、より大きいモデルを選んでください。",
   "error.provider.opencodeFreeLimit":
     "OpenCode の無料モデルが使用量の上限に達しました。この上限はすべての無料モデルで共有されます。続けるには、OpenCode の設定に OpenCode Go のキーを貼り付けるか、別のプロバイダーのモデルを選択してください。",
   "error.provider.opencodeProviderFailed":
     "モデルプロバイダー側で障害が発生しました。お使いの接続は原因ではありません。後でもう一度試すか、別のモデルを選んでください。\n{detail}",
+  "error.provider.opencodeModelUnavailable":
+    "このモデルは利用できません。このエージェントに別のモデルを選んでください。\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "モデルの応答が途中で切れたか、無効でした。メッセージをもう一度送信するか、別のモデルを選んでください。\n{detail}",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode はこの推論の強さでこのモデルの推論を読み取れませんでした。推論の強さを下げるか別のモデルを選んでから、メッセージをもう一度送信してください。",
+  "error.provider.opencodeModelNotServed":
+    "モデルのプロバイダーは現在、このモデルをあなたのアカウントに提供していません。別のモデルを選んでから、メッセージをもう一度送信してください。",
   "error.provider.opencodeNetwork":
     "OpenCode がモデルプロバイダーに接続できませんでした。OpenBot を実行しているコンピューターのネットワーク接続を確認してから、もう一度お試しください。\n{detail}",
   "error.provider.codexStateBusy":
@@ -254,6 +293,9 @@ export const messages = {
     "OpenCode のモデルが、推論のあと回答がないままターンを終了しました。もう一度お試しいただくか、別のモデルを選択してください。",
   "error.provider.acpNoAnswer":
     "{provider} が回答なしでターンを終了しました。メッセージをもう一度送信するか、新しいチャットを開始してください。",
+  "error.provider.noAnswerAfterSteps":
+    "{provider} はいくつかのステップを実行した後、回答せずにターンを終了しました。同じ依頼をもう一度送る前に、エージェントに何をしたか尋ねてください。",
+  "error.provider.acpRefusedNoReason": "{provider} は回答せずに停止しました。メッセージをもう一度送信してください。",
   "error.provider.chatgptPageFailed": "OpenBot は ChatGPT の接続ページを開けませんでした。",
   "error.provider.noneReady": "準備ができているエージェントのプロバイダーがありません。",
   "error.provider.claudeTurnActive": "コンテキストを更新する前に、実行中の Claude のターンが終わるまでお待ちください。",
@@ -281,12 +323,24 @@ export const messages = {
     "Gemini は現在このモデルを使用できません。別のモデルを選んでから、もう一度お試しください。\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Google の Gemini サービスがリクエストを完了しませんでした。数分後にもう一度お試しください。\n{detail}",
+  "error.provider.antigravitySignInRefused":
+    "Google はこのリクエストの Gemini サインインを受け付けませんでした。メッセージをもう一度送信してください。エラーが続く場合は、設定で Gemini を再接続してください。\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini がこのリクエストを拒否しました。別のモデルを選んでから、メッセージをもう一度送信してください。再び失敗する場合は、新しいチャットを始めてください。\n{detail}",
+  "error.provider.antigravityNetwork":
+    "Gemini と Google の接続が切れました。メッセージをもう一度送信してください。({cause})",
+  "error.provider.antigravitySessionRejected":
+    "Gemini がこのリクエストを拒否しましたが、原因は示されていません。エージェントが開いた画像など、チャット履歴内の項目が原因の場合があります。OpenBot はチャット履歴を引き継いだ新しい Gemini セッションを開始しました。もう一度お試しください。エラーが続く場合は、別のモデルを選んでください。",
+  "error.provider.antigravityHistoryUnreadable":
+    "Gemini はこのチャットの保存済みの履歴を読み取れませんでした。OpenBot はチャット履歴を引き継いで新しい Gemini セッションを開始しました。メッセージをもう一度送信してください。",
   "error.provider.antigravityLocationUnsupported":
     "Google は、このエージェントを実行しているコンピューターのネットワーク上の場所からの Gemini の利用を許可していません。別のコンピューターで Gemini を使うか、このエージェントに別のプロバイダーを選んでください。\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini はエージェントとの接続が切れたため停止しました。続けるには、メッセージを送信してください。",
+  "error.provider.grokServiceFailure":
+    "Grok のサービスが混み合っているか、エラーが発生しています。数分後にもう一度お試しいただくか、別のモデルを選んでください。",
+  "error.provider.grokConnectionFailed":
+    "Grok がサービスに接続できません。インターネット接続を確認してから、メッセージをもう一度送信してください。",
   "error.provider.antigravityRemoteWindowsSignIn":
     "Windows ホストでは、Gemini は Google のページをホスト上で開きます。ホストのコンピューターで Gemini を接続してください。",
   "error.provider.cursorArchivePath": "Cursor のアーカイブに予期しないファイルがあります。",
@@ -297,6 +351,8 @@ export const messages = {
   "error.provider.cursorNotStarted": "Cursor エージェントは見つかりましたが、バージョンを読み取れません。",
   "error.provider.cursorVersionUnreadable": "Cursor エージェントのバージョンを読み取れません。",
   "error.provider.cursorSignIn": "Cursor を使うには Cursor でサインインするか、CURSOR_API_KEY を設定してください。",
+  "error.provider.cursorSignInUnusable":
+    "Cursor がサインイン情報でサーバーに接続できませんでした。インターネット接続を確認してから、もう一度 Cursor にサインインしてください。",
   "error.provider.clineArchivePath": "Cline のアーカイブに予期しないパスがあります。",
   "error.provider.clinePackageMismatch": "Cline のパッケージがランタイムカタログと一致しません。",
   "error.provider.clineChecksum": "Cline ランタイムのチェックサムが一致しません。",
@@ -327,9 +383,11 @@ export const messages = {
   "error.provider.hermesSignIn":
     "Hermes を使うには、Nous Portal でサインインするか、ターミナルで `hermes setup` を実行してください。",
   "error.provider.hermesTurnFailed":
-    "Hermes はこのターンを完了できませんでした。返信に理由が書かれている場合は、その指示に従ってください。書かれていない場合は、このエージェントの MCP サーバーが利用できない可能性があります。サーバーの設定 › MCP で確認してから、メッセージをもう一度送信してください。",
+    "Hermes はこのターンを完了できませんでした。返信に理由が書かれている場合は、その指示に従ってください。書かれていない場合は、このエージェントの MCP サーバーが利用できない可能性があります。マーケットプレイス、アプリで確認してから、メッセージをもう一度送信してください。",
   "error.provider.hermesRefused":
     "Hermes は開始前にこのメッセージを拒否しました。もう一度送信してください。Hermes がすべてのメッセージを拒否する場合は、このエージェントを実行しているコンピューターで OpenBot を再起動してください。",
+  "error.provider.hermesConnectionLost":
+    "このメッセージの処理中に Hermes の接続が切れたため、作業が完了したかどうかわかりません。メッセージをもう一度送信する前に、エージェントが行ったことを確認してください。",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot はこのモデルを使用できませんでした。モデルが思考の設定を受け付けませんでした。このエージェントに別のモデルを選択してから、メッセージをもう一度送信してください。",
   "error.provider.usageLimitReached": "アカウントが使用量の上限に達しました。",
@@ -337,14 +395,28 @@ export const messages = {
     "このチャットは Claude には長くなりすぎました。OpenBot はチャット履歴を引き継いだ新しい Claude Code セッションを開始しました。もう一度お試しください。",
   "error.provider.claudeApiKeyNoCredit":
     "Anthropic API キーに API クレジットがありません。Claude のプランは API キーでのリクエストには使われません。Anthropic Console でクレジットを追加するか、設定で Claude にサインインして、エージェントのモデルメニューで Claude アカウントを選択してください。",
+  "error.provider.claudeAccountNoCredit":
+    "Claude アカウントのクレジット残高が不足しています。高速モードなど一部のリクエストは、Claude のプランに使用量が残っていても使用クレジットを使います。Claude アカウントで使用クレジットを追加するか、エージェントのモデルメニューで別のモデルを選択してください。",
+  "error.provider.claudeServiceBlocked":
+    "Claude のサービスがこのリクエストをブロックしました。通常は Claude 側の一時的な問題で、アカウントの問題ではありません。数分後にもう一度メッセージを送信してください。",
   "error.provider.foreignReasoning":
     "別のアカウントまたは API キーが受け取ったため、{provider} はこのチャットの以前の推論を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
+  "error.provider.blankHistoryText":
+    "保存された履歴に空のメッセージがあるため、モデルはこのチャットを受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
+  "error.provider.codexHistoryItemMissing":
+    "保存された履歴の項目が見つからないため、Codex はこのチャットを続行できませんでした。OpenBot はチャット履歴を引き継いだ新しい Codex セッションを開始しました。もう一度お試しください。",
+  "error.provider.codexRequestRefused":
+    "{provider} がこのチャットのリクエストを拒否しましたが、原因は示されていません。画像の多い長いチャットで起こることがあります。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
+  "error.provider.codexAudioRefused":
+    "このモデルは音声を聞けないため、このチャットの音声を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい Codex セッションを開始しました。続けるには、リクエストをもう一度送信し、音声を使わずに作業するようエージェントに頼んでください。音声を確認するには、エージェントのモデルメニューで音声を聞けるモデルを選択してください。",
   "error.provider.imageTooSmall":
     "画像が小さすぎるため、モデルはこのチャットの画像を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
   "error.provider.imageTooLarge":
     "画像が大きすぎるため、モデルはこのチャットの画像を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
   "error.provider.imageCountLimit":
     "画像が多すぎるため、モデルはこのチャットを受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
+  "error.provider.imageUnreadable":
+    "モデルはこのチャット内の画像を読み取れませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。画像を送った場合は、別の画像を送ってください。",
   "error.provider.requestTooLarge":
     "このチャットは大きくなりすぎて、モデルに送信できません。多くの場合、チャット内の画像が原因です。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
   "error.provider.opencodeSessionRejected":
@@ -470,12 +542,18 @@ export const messages = {
   "error.provider.nativeNotStarted": "{provider} CLI を起動できませんでした。",
   "error.provider.nativeVersionUnreadable": "{provider} CLI のバージョンを読み取れませんでした。",
   "error.provider.piSessionBusy": "現在の Pi のターンが終わるまでお待ちください。",
+  "error.provider.acpSessionBusy":
+    "{provider} は停止したターンをまだ終了しています。少し待ってからもう一度お試しください。",
+  "error.provider.acpModelNotOffered":
+    "{provider} は現在 {model} を提供していません。このエージェントに別のモデルを選んでから、もう一度お試しください。",
   "error.provider.piStopped": "Pi が実行されていません。Pi を接続してもう一度お試しください。",
   "error.provider.piSessionMissing": "Pi のセッションファイルがこのコンピューターにありません。",
   "error.provider.piResumeCancelled": "Pi がセッションの再開をキャンセルしました。もう一度お試しください。",
   "error.provider.piSessionIdentity": "Pi が別のセッションを返しました。保存されたセッションは置き換えられていません。",
   "error.provider.piExtensionFailed":
     "拡張機能を読み込めなかったため、Pi が停止しました。この拡張機能を削除または更新してから、もう一度お試しください。{detail}",
+  "error.provider.piThreadStopped":
+    "Pi がこのターンを終える前に予期せず停止しました。続けるにはメッセージを送信してください。",
   "error.provider.piModelInvalid": "プロバイダーを含む Pi のモデルを選択してください。",
   "error.provider.piToolInvalid": "ツールが無効な結果を返しました。",
   "error.provider.piSignIn":

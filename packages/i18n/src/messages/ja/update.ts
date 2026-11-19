@@ -66,4 +66,10 @@ export const messages = {
   "update.whatsNew.changelog": "完全な変更履歴",
   "update.whatsNew.changelogFailed": "OpenBot は変更履歴を開けませんでした。",
   "update.whatsNew.done": "OK",
+  "update.required.title": "アップデートが必要です",
+  "update.required.description":
+    "OpenBot {version} はサポートが終了しました。続けるには {minimum} 以降にアップデートしてください。",
+  "update.required.download": "OpenBot をダウンロード",
+  "update.required.continue": "アップデートせずに続ける",
+  "update.required.failed": "アップデートが完了しませんでした。",
 } as const satisfies PartialTranslation<typeof source>;

@@ -6,20 +6,11 @@ import {
   MP4_ATTACHMENT_EXTENSIONS,
 } from "@openbot/contracts/attachment-files";
 
-/**
- * A path starts at the start of a line, after a space, or after an opening quote, bracket or bold mark,
- * so the path part of a web address does not match. `file://` links and code spans that hold only a
- * path, which can contain spaces, are read separately.
- */
 const ABSOLUTE_PATH = /(?<=^|[\s"'`(<[*])(?:~\/|\/|[A-Za-z]:[\\/])[^\s"'`<>()[\]]+/gu;
 const PATH_CODE_SPAN = /`((?:~\/|\/|[A-Za-z]:[\\/])[^`\n]+)`/gu;
 const FILE_URL = /file:\/\/(\/[^\s"'`<>()[\]]+)/gu;
 const TRAILING_PUNCTUATION = /[.,;:!?*]+$/u;
 
-/**
- * Only the outputs that a person opens: an answer names configuration, logs and source files too, and
- * these can hold secrets. The agent can still attach any supported file with the attach tool.
- */
 const ANSWER_FILE_EXTENSIONS: ReadonlySet<string> = new Set([
   ...IMAGE_ATTACHMENT_EXTENSIONS,
   ...MEDIA_ATTACHMENT_EXTENSIONS,
@@ -41,11 +32,6 @@ const ANSWER_FILE_EXTENSIONS: ReadonlySet<string> = new Set([
   "md",
 ]);
 
-/**
- * The absolute paths of output files that an agent answer names, in order and without repeats. The
- * answer text does not change; the turn end attaches the files that resolve inside the agent's
- * permitted folders.
- */
 export function answerFilePaths(text: string): string[] {
   const paths = new Set<string>();
   const add = (value: string) => {

@@ -1,8 +1,3 @@
-// The Slack, Discord and Telegram connections of the joined server in the browser client
-// (`connectors-v1`). The host opens no page; this browser opens the platform's page that the host
-// names. A Slack or Discord install returns to a page of this origin, which gives the sealed grant
-// back to this tab (`@openbot/contracts/web-messaging-install`). This tab sends it on to the host.
-
 import { type ConnectorMessagingPlatform, messagingPage } from "@openbot/contracts/ipc";
 import {
   decodeWebMessagingInstallGrant,
@@ -38,7 +33,6 @@ import { Effect } from "effect";
 import { actionToast } from "../../action-toast";
 import type { HostMessagingApi } from "../connectors/host-messaging-port";
 
-/** Local storage that is not available holds no mark, and the return page opens `openbot://`. */
 function withStorage(action: (storage: Storage) => void): boolean {
   try {
     action(localStorage);
@@ -48,10 +42,6 @@ function withStorage(action: (storage: Storage) => void): boolean {
   }
 }
 
-/**
- * `request` throws for a server that is not connected. `discordAccessSupported` says whether the host has
- * `discord-access-v1`. Call `dispose` when the client closes.
- */
 export function webHostMessaging(
   request: (serverId: string) => TeamApiRequest,
   discordAccessSupported: () => boolean,
@@ -59,15 +49,12 @@ export function webHostMessaging(
   api: HostMessagingApi;
   dispose: () => void;
 } {
-  /** The installs that this tab opened, by nonce: the server that waits for each grant. */
   const pending = new Map<string, { platform: WebMessagingInstallPlatform; serverId: string; expiresAt: number }>();
   let channel: BroadcastChannel | null = null;
 
-  /** `request` can throw, so it runs inside the Effect and a failure rejects the promise. */
   const run = <T>(serverId: string, call: (target: TeamApiRequest) => Effect.Effect<T, TeamAdminRequestError>) =>
     runTeamEffect(Effect.suspend(() => call(request(serverId))).pipe(Effect.mapError((error) => error.cause)));
 
-  /** An older host does not offer `discord-access-v1`: the page then asks to update it. */
   const access = <T>(serverId: string, call: (target: TeamApiRequest) => Effect.Effect<T, TeamAdminRequestError>) =>
     discordAccessSupported()
       ? run(serverId, call)
@@ -77,7 +64,6 @@ export function webHostMessaging(
     pending.delete(nonce);
     withStorage((storage) => storage.removeItem(webMessagingInstallKey(nonce)));
   };
-  /** Removes the installs and the marks that the host no longer waits for, including other tabs' old ones. */
   const prune = (now: number) => {
     for (const [nonce, install] of pending) if (install.expiresAt <= now) pending.delete(nonce);
     withStorage((storage) => {
@@ -93,7 +79,6 @@ export function webHostMessaging(
     const install = decodeWebMessagingInstallGrant(event.data);
     const waiting = install ? pending.get(install.nonce) : undefined;
     if (!install || waiting?.platform !== install.platform) return;
-    // When this tab no longer reaches that server, it sends no answer, and the return page says to start again.
     let target: TeamApiRequest;
     try {
       target = request(waiting.serverId);
@@ -101,9 +86,7 @@ export function webHostMessaging(
       return;
     }
     forget(install.nonce);
-    // The answer tells the return page that this tab took the grant.
     channel?.postMessage(webMessagingInstallReceipt(install.nonce));
-    // The Connectors page reads the connections again by itself and shows a completed install.
     void runTeamEffect(messagingConnectorComplete(target, install).pipe(Effect.mapError((error) => error.cause))).catch(
       (error: unknown) => {
         const { t, errorMessage } = currentText();
@@ -130,10 +113,6 @@ export function webHostMessaging(
     channel.onmessage = receive;
   };
 
-  /**
-   * A browser blocks a page that the user's click did not open, and the page is known only when the
-   * host answers. So the tab opens empty at the click, with no await before it, and goes to the page after.
-   */
   const withTab = async (
     serverId: string,
     platform: ConnectorMessagingPlatform,
@@ -161,7 +140,6 @@ export function webHostMessaging(
       hostConnect: (input, serverId) =>
         withTab(serverId, input.platform, (target) => messagingConnectorConnect(target, input)),
       hostDisconnect: (input, serverId) => run(serverId, (target) => messagingConnectorDisconnect(target, input)),
-      // A Discord server that removed the bot installs it again, so the host can answer a page.
       hostReconnect: (input, serverId) =>
         withTab(serverId, input.platform, (target) => messagingConnectorReconnect(target, input)),
       hostSetEnabled: (input, serverId) => run(serverId, (target) => messagingConnectorSetEnabled(target, input)),

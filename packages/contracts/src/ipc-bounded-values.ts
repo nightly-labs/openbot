@@ -1,10 +1,3 @@
-// The `INPUT_LIMITS`-aware predicates every IPC domain module needs.
-//
-// These are deliberately not in `runtime-values.ts`: that file is limit-free and is imported by the
-// renderer, the backend and the preload alike, while these know the contract's own bounds. They are
-// also deliberately not in the `./ipc` barrel - nothing outside this package validates a field
-// without also naming the type it belongs to, and the guard that names it lives here.
-
 import { INPUT_LIMITS } from "./input-limits";
 import { isNumber, isString } from "./runtime-values";
 
@@ -24,9 +17,6 @@ export function isRequestId(value: unknown): value is string | number {
   return isNumber(value) || isIdentifier(value);
 }
 
-// `isNumber` alone certifies NaN and the infinities, which reach the usage rings as "NaN% remaining".
-// The released Team v1 validator already rejects them for this very payload, so accepting them here
-// would be the shared guard drifting from the wire one it is supposed to agree with.
 export function isFiniteNumber(value: unknown): value is number {
   return isNumber(value) && Number.isFinite(value);
 }

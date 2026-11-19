@@ -4,7 +4,6 @@ import { isBoolean, isDynamicRecord, isOneOf, isString } from "./runtime-values"
 
 export type RoutineIntervalUnit = "minutes" | "hours" | "days";
 
-/** Minimum polling frequency for interval, advanced-every, and custom routine schedules. */
 export const ROUTINE_MINIMUM_INTERVAL_MINUTES = 3;
 export type RoutineDaySelection =
   | { kind: "every-day" }
@@ -28,12 +27,6 @@ export type RoutineSchedule =
       time: RoutineTimeSelection;
     }
   | { kind: "custom"; expression: string }
-  /**
-   * One run at a date and time in the routine timezone. After that run the host pauses the
-   * routine, and it cannot resume until the date moves to the future. The released Team API routes
-   * do not list it, and they refuse it on a save; a joined host with `routines-once-v1` lists and
-   * saves it on the routes of that capability.
-   */
   | { kind: "once"; date: string; time: string };
 
 export function isRoutineSchedule(value: unknown): value is RoutineSchedule {
@@ -80,16 +73,10 @@ function isRoutineTime(value: unknown): value is string {
 
 export type ReleasedRoutineSchedule = Exclude<RoutineSchedule, { kind: "once" }>;
 
-/**
- * A schedule that the released Team API, channel, event, canvas and template formats can carry.
- * Their frozen decoders reject the whole list for an unknown kind, so a `once` schedule stays off
- * them: a joined host sends it only on the `routines-once-v1` routes.
- */
 export function isReleasedRoutineSchedule(value: unknown): value is ReleasedRoutineSchedule {
   return isRoutineSchedule(value) && value.kind !== "once";
 }
 
-/** A calendar date as "YYYY-MM-DD" that exists, such as 2028-02-29 but not 2027-02-29. */
 export function isRoutineDate(value: unknown): value is string {
   if (!isString(value)) return false;
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
@@ -139,32 +126,23 @@ function isRoutineTrigger(value: unknown): value is RoutineTrigger {
   );
 }
 
-/**
- * What a run does while the provider plan of its agent is spent: `wait` stays in the queue until the
- * reset, `skip` is dropped, for a routine whose result is no use when late.
- */
 export const ROUTINE_LIMIT_POLICIES = ["wait", "skip"] as const;
 export type RoutineLimitPolicy = (typeof ROUTINE_LIMIT_POLICIES)[number];
 
-/**
- * What a routine does with the occurrences that came due while OpenBot was closed: `skip` records
- * them and drops them, `run-once` runs the newest one when OpenBot opens and records the others.
- */
 export const ROUTINE_MISSED_POLICIES = ["skip", "run-once"] as const;
 export type RoutineMissedPolicy = (typeof ROUTINE_MISSED_POLICIES)[number];
 
-/**
- * Where the runs of an agent routine run: `chat` in the agent's own chat, `thread` in the routine's
- * own side thread, beside the chat. A channel routine runs in its channel and has no such place.
- */
 export const ROUTINE_RUN_PLACES = ["chat", "thread"] as const;
 export type RoutineRunPlace = (typeof ROUTINE_RUN_PLACES)[number];
 
-/**
- * The part of a routine that does not name its owner. One store and one settings panel serve both
- * an agent and a channel; `Routine` and `ChannelRoutine` only add the owner id and keep their own
- * shapes exactly.
- */
+export interface RoutinePausedByRun {
+  scheduledFor: string;
+}
+
+export function isRoutinePausedByRun(value: unknown): value is RoutinePausedByRun {
+  return isDynamicRecord(value) && isString(value.scheduledFor) && !Number.isNaN(Date.parse(value.scheduledFor));
+}
+
 export interface RoutineFields {
   id: string;
   name: string;
@@ -172,15 +150,10 @@ export interface RoutineFields {
   active: boolean;
   timezone: string;
   trigger: RoutineTrigger;
-  /** Absent from a host that does not store it: the released Team API projects a fixed key list. */
   limitPolicy?: RoutineLimitPolicy;
-  /** Absent from a host that does not store it, for the same reason as `limitPolicy`. */
   missedPolicy?: RoutineMissedPolicy;
-  /**
-   * Set on an agent routine of this computer's host, and of a remote host with `routine-run-place-v1`.
-   * A channel routine and the released Team API routes leave it out.
-   */
   runIn?: RoutineRunPlace;
+  pausedByRun?: RoutinePausedByRun;
   createdAt: string;
   updatedAt: string;
 }
@@ -201,6 +174,7 @@ export function isRoutineFields(value: unknown): value is RoutineFields {
     (value.limitPolicy === undefined || isOneOf(ROUTINE_LIMIT_POLICIES, value.limitPolicy)) &&
     (value.missedPolicy === undefined || isOneOf(ROUTINE_MISSED_POLICIES, value.missedPolicy)) &&
     (value.runIn === undefined || isOneOf(ROUTINE_RUN_PLACES, value.runIn)) &&
+    (value.pausedByRun === undefined || isRoutinePausedByRun(value.pausedByRun)) &&
     isString(value.createdAt) &&
     isString(value.updatedAt)
   );
@@ -219,40 +193,27 @@ export type RoutineRunStatus =
   | "interrupted"
   | "cancelled";
 
-/** The largest count a missed-run record names exactly. A larger count means "more than this". */
 export const ROUTINE_MISSED_COUNT_LIMIT = 999;
 
-/**
- * The occurrences that one `cancelled` run stands for: they came due while OpenBot was closed, and
- * none of them ran. `until` is the last of them, or null for one occurrence at `scheduledFor`.
- * When the scheduler skipped them for another reason, the run's `error` holds that reason.
- */
 export interface RoutineMissedRuns {
   count: number;
   until: string | null;
 }
 
-/**
- * What started a run with no trigger. A run from before the source was stored has none, and a host
- * that does not store it leaves it out; read both as a test run.
- */
 export const ROUTINE_RUN_SOURCES = ["test", "script", "webhook"] as const;
 export type RoutineRunSource = (typeof ROUTINE_RUN_SOURCES)[number];
 
-/** A run without its owner and without the handle that names the work it started. */
 export interface RoutineRunFields {
   id: string;
   routineId: string;
   triggerId: string | null;
   kind: "scheduled" | "manual";
-  /** Set only on a manual run that records what started it. */
   source?: RoutineRunSource;
   scheduledFor: string;
   routineName: string;
   instruction: string;
   status: RoutineRunStatus;
   error: string | null;
-  /** Set only on a run that records missed occurrences. A host that does not store it leaves it out. */
   missed?: RoutineMissedRuns;
   createdAt: string;
   updatedAt: string;
@@ -310,11 +271,8 @@ export interface CreateRoutineInput {
   active: boolean;
   timezone: string;
   schedule: RoutineSchedule;
-  /** `wait` when absent. */
   limitPolicy?: RoutineLimitPolicy;
-  /** `skip` when absent. */
   missedPolicy?: RoutineMissedPolicy;
-  /** `chat` when absent. */
   runIn?: RoutineRunPlace;
 }
 
@@ -346,7 +304,6 @@ export interface ListRoutineRunsInput {
   limit?: number;
 }
 
-/** A time range of the routine calendar, as two ISO instants. The host limits its length. */
 export interface RoutineCalendarInput {
   from: string;
   to: string;
@@ -354,7 +311,6 @@ export interface RoutineCalendarInput {
 
 export type RoutineCalendarOwner = { kind: "agent"; agentId: string } | { kind: "channel"; channelId: string };
 
-/** One routine of an agent or a channel, with what the calendar needs to place and name it. */
 export interface RoutineCalendarRoutine {
   id: string;
   name: string;
@@ -364,7 +320,6 @@ export interface RoutineCalendarRoutine {
   schedule: RoutineSchedule;
 }
 
-/** `scheduled` is a run the schedule will make. The other values are the status of a run the host made. */
 export type RoutineCalendarRunStatus = RoutineRunStatus | "scheduled";
 
 export interface RoutineCalendarRun {
@@ -374,7 +329,6 @@ export interface RoutineCalendarRun {
   status: RoutineCalendarRunStatus;
 }
 
-/** Every routine of a host, and its runs in the range: past runs from history, later runs from the schedule. */
 export interface RoutineCalendar {
   routines: RoutineCalendarRoutine[];
   runs: RoutineCalendarRun[];
@@ -430,10 +384,6 @@ export function isRoutineCalendar(value: unknown): value is RoutineCalendar {
   );
 }
 
-/**
- * The iCalendar feed of this computer's routines. `url` holds the private token: anyone who has it
- * can read the routine names and times. Null while the feed is off.
- */
 export interface RoutineFeed {
   url: string | null;
 }

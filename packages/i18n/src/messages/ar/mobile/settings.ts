@@ -75,7 +75,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "هل تريد مسح سجل الدعم؟",
   "mobile.settings.support.clearBody": "يزيل هذا كل الأحداث من السجل على هذا الهاتف.",
   "mobile.settings.support.logFooter":
-    "يبقى السجل على هذا الهاتف، ولا يرسله OpenBot. يسجّل خطوات الاتصال والطلبات والأخطاء. لا يسجّل الرسائل أو الملفات، ويُخفي كلمات المرور والرموز المميزة. اقرأ الملف قبل مشاركته.",
+    "يبقى السجل على هذا الهاتف. يرسل OpenBot أسطرًا منه فقط مع بلاغ عن خطأ في تطبيق الهاتف ترسله أنت، وتعرضها بطاقة البلاغ أولًا. يسجّل خطوات الاتصال والطلبات والأخطاء. لا يسجّل الرسائل أو الملفات، ويُخفي كلمات المرور والرموز المميزة. اقرأ الملف قبل مشاركته.",
   "mobile.settings.support.saveFailed": "تعذّر حفظ ملف السجل. أعد المحاولة.",
   "mobile.settings.support.sharingUnavailable": "المشاركة غير متاحة على هذا الهاتف.",
   "mobile.settings.support.newestFirst": "الأحدث أولًا.",
@@ -136,19 +136,65 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "الإضاءة",
   "mobile.settings.appearance.messageColorFooter":
     "مع لون الوكيل، تستخدم رسائلك في دردشة وكيل لون ذلك الوكيل. مع اللون المخصص، تستخدم رسائلك في كل الدردشات اللون الذي تختاره. يتغير لون النص ليبقى سهل القراءة.",
+  "mobile.settings.appearance.bubbleStyle": "نمط الفقاعات",
+  "mobile.settings.appearance.bubbleStyleSolid": "مصمت",
+  "mobile.settings.appearance.bubbleStyleTint": "خفيف",
+  "mobile.settings.appearance.seeThroughBubbles": "فقاعات شفافة",
+  "mobile.settings.appearance.seeThroughBubblesNote":
+    "تُظهر فقاعات الوكيل والفقاعات غير الملوّنة الخلفية من خلالها. بدون خلفية، تبقى الفقاعات مصمتة دائمًا.",
+  "mobile.settings.appearance.tab.colors": "الألوان",
+  "mobile.settings.appearance.tab.chat": "الدردشة",
+  "mobile.settings.appearance.preview.routines": "3 تشغيلات روتينية",
+  "mobile.settings.appearance.preview.thinking": "فكّر لمدة 4 ثوانٍ",
+  "mobile.settings.appearance.preview.memory": "حُفظت ذكرى واحدة",
+  "mobile.settings.appearance.backdrop.title": "الخلفية",
+  "mobile.settings.appearance.backdrop.footer":
+    "تظهر خلف الشاشة الرئيسية ودردشاتك على هذا الهاتف. يمكن لوكيل تعيينها لك، ويعيد «تراجع» في الدردشة الخلفية السابقة.",
+  "mobile.settings.appearance.backdrop.none": "بلا",
+  "mobile.settings.appearance.backdrop.pond": "بركة الكوي",
+  "mobile.settings.appearance.backdrop.jellyfish": "قناديل البحر",
+  "mobile.settings.appearance.backdrop.sunset": "غروب قديم الطراز",
+  "mobile.settings.appearance.backdrop.snowfall": "تساقط الثلج",
+  "mobile.settings.appearance.backdrop.fireflies": "اليراعات",
+  "mobile.settings.appearance.backdrop.agentPage": "صفحة الوكيل",
+  "mobile.settings.appearance.backdrop.agentPageNote": "عيّنها وكيل",
+  "mobile.settings.appearance.backdrop.photo": "صورة",
+  "mobile.settings.appearance.backdrop.photoChoose": "اختر من صورك",
+  "mobile.settings.appearance.backdrop.photoChange": "اضغط مرة أخرى لاختيار صورة أخرى",
+  "mobile.settings.appearance.backdrop.strength": "شدة الخلفية",
+  "mobile.settings.appearance.backdrop.calm": "هادئة",
+  "mobile.settings.appearance.backdrop.vivid": "زاهية",
+  "mobile.settings.appearance.backdrop.strengthFooter":
+    "تُبقي الخلفية الهادئة الردود الطويلة سهلة القراءة. يظهر معظمها في أعلى الشاشة الرئيسية.",
+  "mobile.settings.appearance.backdrop.previewQuestion": "هل يمكنك كتابة ملاحظة الإصدار؟",
+  "mobile.settings.appearance.backdrop.previewAnswer":
+    "إليك مسودة: الخلفية التي يعيّنها الوكيل تظهر الآن على هاتفك أيضًا.",
+  "mobile.settings.appearance.chatBackground": "خلفية الدردشة",
+  "mobile.settings.appearance.chatBackgroundDefault": "الافتراضي",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "يحتفظ كل مظهر بلونه الخاص. يصبح اللون الذي يصعّب قراءة النص أغمق أو أفتح.",
+  "mobile.settings.appearance.chatBackgroundBackdropFooter":
+    "تحل الخلفية محل خلفية الدردشة. لاستخدام لون، اختر «بلا» للخلفية.",
   "mobile.settings.appearance.collapseRoutines": "طي نشاط المهام الدورية",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "تظهر أحداث المهام الدورية المتتالية في الدردشة كصف واحد مطوي. اضغط على الصف لإظهارها.",
+  "mobile.settings.appearance.replyDetails": "تفاصيل الردود",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "أوقف تفصيلًا لإخفاء صفه في الدردشات. يستمر الوكيل في التفكير وتشغيل الوكلاء الفرعيين وحفظ الذكريات.",
+  "mobile.settings.appearance.showThinking": "إظهار تفكير الوكيل",
+  "mobile.settings.appearance.showSubagents": "إظهار الوكلاء الفرعيين",
+  "mobile.settings.appearance.showMemoryChanges": "إظهار الذكريات المحفوظة",
+  "mobile.settings.appearance.fullVisuals": "إظهار المعاينات المرئية كاملة",
+  "mobile.settings.appearance.fullVisualsFooter":
+    "يظهر العرض المرئي من الوكيل في الدردشة بارتفاعه الكامل. عند إيقاف هذا الخيار، يُقص العرض الطويل، ويمكنك النقر عليه لرؤيته كاملًا.",
   "mobile.settings.animations.title": "الحركات",
-  "mobile.settings.animations.footer":
-    "أوقف «الحركات» لتقليل الحركة في التطبيق كله. عند تشغيل «تقليل الحركة» في إعدادات هاتفك، يقلّل التطبيق الحركة أيضًا، وتبقى الحركات أدناه متوقفة.",
-  "mobile.settings.animations.all": "الحركات",
+  "mobile.settings.animations.fullMotion": "حركة كاملة",
+  "mobile.settings.animations.reduced": "مخفّضة",
+  "mobile.settings.animations.motionFooter":
+    "يقلّل خيار «مخفّضة» الحركة في التطبيق كله ويُبقي الرسوم المتحركة أدناه متوقفة. عند تشغيل «تقليل الحركة» في إعدادات هاتفك، يقلّل التطبيق الحركة أيضًا.",
   "mobile.settings.animations.agentFaces": "وجوه الوكلاء المتحركة",
   "mobile.settings.animations.agentFacesFooter":
     "تحرّك الصور الرمزية للوكلاء وجوهها أثناء عمل الوكلاء وراحتهم. عند إيقاف هذا، تبقى الوجوه ثابتة، وتتوقف الشخصيات في شاشة الترحيب والشاشة الرئيسية الفارغة عن الطفو.",
-  "mobile.settings.animations.composerResize": "حقل رسالة مضغوط",
-  "mobile.settings.animations.composerResizeFooter":
-    "يصبح حقل الرسالة شريطًا صغيرًا عندما تكون لوحة المفاتيح مغلقة. عند إيقاف هذا، يبقى الحقل بحجمه الكامل.",
   "mobile.settings.animations.textReveal": "تحريك الردود",
   "mobile.settings.animations.textRevealFooter":
     "يُكتب الرد كلمةً كلمة، وتكبر فقاعته بسلاسة. عند إيقاف هذا، يظهر النص كما يصل.",
@@ -240,6 +286,24 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "تنزيل الملفات الكبيرة تلقائيًا",
   "mobile.settings.conversations.largeFilesFooter":
     "الصور والفيديوهات والملفات الصوتية الأكبر من {small} لا تُنزَّل إلا عند الضغط عليها. فعّل هذا الخيار لتنزيلها مباشرةً حتى {large}. قد يستهلك هذا الكثير من بيانات الجوال.",
+  "mobile.settings.conversations.messageField": "حقل الرسالة",
+  "mobile.settings.conversations.compact": "مضغوط",
+  "mobile.settings.conversations.fullSize": "الحجم الكامل",
+  "mobile.settings.conversations.compactFooter": "يجعل «مضغوط» حقل الرسالة شريطًا صغيرًا عندما تكون لوحة المفاتيح مغلقة.",
+  "mobile.settings.conversations.compactComposerReduced":
+    "الحركة مخفّضة في الرسوم المتحركة أو في إعدادات هاتفك، لذا يبقى حقل الرسالة بحجمه الكامل.",
+  "mobile.settings.conversations.media": "الصور والملفات",
+  "mobile.settings.conversations.swipeLeft": "السحب لليسار في محادثة وكيل",
+  "mobile.settings.conversations.swipeRight": "السحب لليمين في محادثة وكيل",
+  "mobile.settings.conversations.swipeQuestion": "سؤال جانبي",
+  "mobile.settings.conversations.swipeThreads": "السلاسل",
+  "mobile.settings.conversations.swipeBrowser": "المتصفح",
+  "mobile.settings.conversations.swipeOff": "إيقاف",
+  "mobile.settings.conversations.swipeFooter":
+    "السحب عكس اتجاه الرجوع في محادثة وكيل يفتح هذا. السحب نفسه على رسالة يعرض أوقات الرسائل.",
+  "mobile.settings.conversations.pullInfo": "السحب لأعلى للمعلومات",
+  "mobile.settings.conversations.pullInfoFooter":
+    "اسحب لأعلى بعد آخر رسالة في محادثة أو قناة أو سلسلة ثم أفلت لفتح معلوماتها.",
   "mobile.settings.conversations.fullQualityPhotos": "إرسال الصور بالجودة الكاملة",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "عند إيقاف هذا الخيار، يرسل التطبيق نسخة أصغر من كل صورة، حتى 2048 بكسل في الضلع الأطول. تصل أسرع على اتصال بطيء. فعّل هذا الخيار لإرسال الصورة الأصلية.",
@@ -517,6 +581,10 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "تعذّر إيقاف العملية.",
   "mobile.settings.agents.processes.stopTitle": "هل تريد إيقاف هذا البرنامج؟",
   "mobile.settings.agents.processes.stopLabel": "إيقاف العملية {pid}",
+  "mobile.settings.quickActions.title": "قائمة أيقونة التطبيق",
+  "mobile.settings.quickActions.footer": "المس أيقونة OpenBot مطولًا لرؤية هذه الإجراءات. يمكنك تشغيل {count} كحد أقصى.",
+  "mobile.settings.quickActions.latestChat": "آخر محادثة",
+  "mobile.settings.quickActions.secondChat": "المحادثة قبل الأخيرة",
   "mobile.settings.shortcuts.title": "الاختصارات",
   "mobile.settings.shortcuts.agent": "الوكيل",
   "mobile.settings.shortcuts.none": "بلا",
@@ -530,7 +598,8 @@ export const messages = {
   "mobile.settings.shortcuts.card.noAgent.action": "اختيار وكيل",
   "mobile.settings.shortcuts.card.locked.title": "OpenBot مقفل",
   "mobile.settings.shortcuts.card.locked.action": "فتح OpenBot",
-  "mobile.settings.shortcuts.footer": "ترسل Send Message في تطبيق الاختصارات إلى هذا الوكيل. لا يفتح التطبيق.",
+  "mobile.settings.shortcuts.footer":
+    "ترسل Send Message في تطبيق الاختصارات إلى هذا الوكيل. لا يفتح التطبيق. ويفتح Open Agent محادثته.",
   "mobile.settings.shortcuts.send.sent": "تم الإرسال",
   "mobile.settings.shortcuts.send.failed": "تعذّر على OpenBot إرسال هذا.",
   "mobile.settings.shortcuts.send.unconfirmed": "لا رد من الخادم. قد تكون الرسالة في المحادثة.",

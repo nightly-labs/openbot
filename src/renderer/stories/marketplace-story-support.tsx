@@ -8,6 +8,7 @@ import {
   type MarketplaceSkillSummary,
   type McpServerAccess,
   type McpServerConfig,
+  type McpSignInState,
   type SkillCategory,
 } from "@openbot/contracts/ipc";
 import type { McpConnectFlow } from "@openbot/contracts/mcp-connect-flows";
@@ -32,6 +33,9 @@ import { currentText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { createSignal, createStore, onSettled, Show, untrack } from "solid-js";
 import { fn } from "storybook/test";
+import { McpServerControls } from "../src/features/servers/McpServerControls";
+import { McpServerForm } from "../src/features/servers/McpServerForm";
+import type { McpServerTools } from "../src/features/servers/mcp-server-tools";
 import { MARKETPLACE_PLUGINS } from "../src/features/settings/marketplace-plugin-catalog";
 import {
   STORY_AGENT_SUMMARIES,
@@ -47,7 +51,6 @@ import { type ConnectOutcome, connectAs, subjectFor } from "./mcp-connect-stage"
 
 type ConnectFlows = readonly [McpConnectFlow, ...McpConnectFlow[]];
 
-/** The ways into one app, as the connect dialog takes them, or null for an app that asks for nothing. */
 function connectFlows(entry: MarketplacePluginApp): ConnectFlows | null {
   const [first, ...rest] = entry.server.auth ?? [];
   return first ? [first, ...rest] : null;
@@ -68,7 +71,6 @@ function page<T extends { name: string; description: string; category?: string |
   };
 }
 
-/** The skill catalog: filters, sort and pages of `limit`, as the catalog server answers. */
 function skillPage(items: readonly MarketplaceSkillSummary[], query: MarketplaceSkillQuery) {
   const found = page(items, query).items.filter(
     (item) =>
@@ -86,7 +88,6 @@ function skillPage(items: readonly MarketplaceSkillSummary[], query: Marketplace
   return { items: found.slice(start, end), nextCursor: end < found.length ? String(end) : null };
 }
 
-/** More catalog skills, so that a group holds more than the 6 rows that the Skills tab shows. */
 const SKILL_WORDS: readonly (readonly [SkillCategory, readonly string[], readonly string[]])[] = [
   [
     "coding",
@@ -119,7 +120,6 @@ const MORE_SKILLS: readonly MarketplaceSkillSummary[] = SKILL_WORDS.flatMap(([ca
 
 const CATALOG: readonly MarketplaceSkillSummary[] = [...STORY_MARKETPLACE_SKILLS, ...MORE_SKILLS];
 
-/** The 47 agents after the fixture agents: 50 in all, as a user with a large team has. */
 const MORE_AGENTS = [
   "Support Triage|Support lead",
   "Billing|Billing assistant",
@@ -196,7 +196,6 @@ export const MANY_AGENTS: readonly ClientAgentSummary[] = [
   }),
 ];
 
-/** A skill that the user made on this computer: no catalog listing. */
 export const LOCAL_SKILL: InstalledSkill = {
   skillId: "local-weekly-report",
   slug: "weekly-report",
@@ -224,7 +223,6 @@ function installed(skill: MarketplaceSkillSummary, change: Partial<InstalledSkil
   };
 }
 
-/** What the agents have: an update, a skill that is off, one that the user changed, and a local skill. */
 function startSkills(agents: readonly ClientAgentSummary[]): Record<string, InstalledSkill[]> {
   const [releaseNotes, sqlReview, designAudit] = STORY_MARKETPLACE_SKILLS;
   if (!releaseNotes || !sqlReview || !designAudit) return {};
@@ -236,57 +234,36 @@ function startSkills(agents: readonly ClientAgentSummary[]): Record<string, Inst
     ],
     research: [installed(releaseNotes), installed(designAudit, { enabled: false })],
   };
-  // With many agents, the first skill is on 12 of them, so its page has a search.
   for (const agent of agents.slice(3, 13)) skills[agent.id] = [installed(releaseNotes)];
   const third = agents[2];
   if (third) skills[third.id] = [installed(sqlReview, { state: "modified" })];
   return skills;
 }
 
-/** What the host holds for a plugin's apps: a working row, or a row whose sign-in the server refused. */
 type HeldState = "connected" | "signInNeeded";
 
 export interface StoryProps {
-  /** A member of a joined server browses and adds nothing. */
   member?: boolean;
-  /** Why a member cannot connect apps, as the app page says it. */
   blocked?: MarketplaceAppsBlock;
   empty?: boolean;
-  /** What the app's server answers when Connect opens its dialog. */
   outcome?: ConnectOutcome;
-  /** Opens the window on this page, as a link or a click would. */
   start?: (nav: MarketplaceNavigation) => void;
-  /** The plugins the host holds rows for, by slug. By default, only the first plugin is connected. */
   held?: Readonly<Record<string, HeldState>>;
-  /**
-   * The accounts of plugins whose host keeps a sign-in for each, by slug. Each account is a row of
-   * the Connection section, with Add account over them.
-   */
   accounts?: Readonly<Record<string, readonly MarketplaceAppAccount[]>>;
-  /** Every connector app is set up, so its page shows its rows and its Danger zone. */
   connected?: boolean;
-  /** The window runs on a Mac, so the Apple apps listing can ask macOS for access. */
   macOS?: boolean;
-  /** Slugs of real catalog listings to add to the fixture listings. */
   catalog?: readonly string[];
-  /** 50 agents, as a user with a large team has. */
   manyAgents?: boolean;
-  /** No agent has a skill yet. */
   noSkills?: boolean;
-  /** The agents dialog of this skill is open over the window. */
   dialogSkill?: string;
-  /** Listings that the user already has, and the state of each. By default, the second agent is added. */
   agentStates?: Readonly<Record<string, "added" | "update">>;
-  /** More UI over the window, with the window's model and navigation. */
   children?: (context: { model: MarketplaceModel; nav: MarketplaceNavigation }) => JSX.Element;
 }
 
-/** The Apple apps listing, which only a Mac asks macOS about. */
 const APPLE_APPS = MARKETPLACE_PLUGINS.filter((plugin) => plugin.slug === "apple-apps");
 
 const FIRST_HELD: Readonly<Record<string, HeldState>> = { [STORY_MARKETPLACE_PLUGINS[0]?.slug ?? ""]: "connected" };
 
-/** The connection of one app: one row, or a row for each account. */
 function storyConnection(
   name: string,
   held: HeldState | undefined,
@@ -313,7 +290,6 @@ function pluginStatus(held: HeldState | undefined): MarketplaceApp["status"] {
   return held ? "connected" : "idle";
 }
 
-/** The real window on fixtures. Each action changes the fixture state, so the states can be tried. */
 export function MarketplaceStory(props: StoryProps) {
   const {
     member,
@@ -336,7 +312,6 @@ export function MarketplaceStory(props: StoryProps) {
   const skills = empty ? [] : CATALOG;
   const userAgents = manyAgents ? MANY_AGENTS : STORY_AGENT_SUMMARIES;
   const connectors = storyConnectorSet(details);
-  // The story fixes the names once, in the language it opens with.
   const connectorApps = untrack(() =>
     details.map(({ id }): MarketplaceApp => {
       const listing = CONNECTOR_LISTINGS[id];
@@ -400,7 +375,6 @@ export function MarketplaceStory(props: StoryProps) {
   const [access, setAccess] = createSignal<Record<string, McpServerAccess>>({});
   const [open, setOpen] = createSignal(true);
   const [askOnInstall, setAskOnInstall] = createSignal(true);
-  /** The connect dialog on screen, as the Marketplace window opens it for an app's way in. */
   const [pending, setPending] = createSignal<{
     subject: McpConnectSubject;
     flows: ConnectFlows;
@@ -417,13 +391,11 @@ export function MarketplaceStory(props: StoryProps) {
         },
       }),
     );
-  /** The server the dialog talks to. A sign-in waits a moment, as a browser round trip does. */
   const server = (name: string) => connectAs(props.outcome ?? "connects", name);
   const signIn = (name: string) => async (config: McpServerConfig) => {
     await new Promise((resolve) => setTimeout(resolve, 1500));
     return server(name)(config);
   };
-  /** Marks the plugin's apps as held or not, and sets the status that follows from them. */
   const setHeld = (id: string, appIds: readonly string[], on: boolean) =>
     setState((draft) => {
       const app = draft.apps.find((entry) => entry.id === id);
@@ -431,7 +403,6 @@ export function MarketplaceStory(props: StoryProps) {
       for (const appId of appIds) {
         const entry = app.plugin.apps.find((one) => one.id === appId);
         const current = app.connections[appId];
-        // A connect keeps the accounts and clears their refused sign-ins; a disconnect removes them.
         const listed = on ? current?.accounts.map((account) => ({ ...account, signInNeeded: false })) : undefined;
         const kept = current?.multipleAccounts ? listed : undefined;
         app.connections = {
@@ -441,13 +412,11 @@ export function MarketplaceStory(props: StoryProps) {
       }
       settleStatus(app);
     });
-  /** The status that follows from the app's rows. */
   const settleStatus = (app: Extract<MarketplaceApp, { kind: "plugin" }>) => {
     const connections = Object.values(app.connections);
     if (connections.some((connection) => connection.signInNeeded)) app.status = "attention";
     else app.status = connections.some((connection) => connection.held) ? "connected" : "idle";
   };
-  /** Changes the accounts of the app that holds `accountId`, or of `appId` when it is given. */
   const changeAccounts = (
     id: string,
     match: (appId: string, connection: MarketplaceAppConnection) => boolean,
@@ -476,7 +445,6 @@ export function MarketplaceStory(props: StoryProps) {
     });
   };
 
-  /** A catalog skill, or a copy of the skill that another agent has: a local skill has no listing. */
   const skillFor = (skillId: string): InstalledSkill | undefined => {
     const listing = CATALOG.find((entry) => entry.id === skillId);
     if (listing) return installed(listing);
@@ -494,7 +462,6 @@ export function MarketplaceStory(props: StoryProps) {
         if (skill) draft.installed[agentId] = [...(draft.installed[agentId] ?? []), skill];
     });
   };
-  /** A generated listing has no details in the fixtures: its page shows its summary and a short SKILL.md. */
   const skillDetail = (id: string) => {
     const listing = CATALOG.find((entry) => entry.id === id);
     return (
@@ -510,6 +477,49 @@ export function MarketplaceStory(props: StoryProps) {
   const dialogListing = CATALOG.find((entry) => entry.id === dialogSkill);
   const [dialogOpen, setDialogOpen] = createSignal(true);
 
+  const [signIns, setSignIns] = createSignal<Record<string, McpSignInState>>({});
+  const customServers = () => state.apps.flatMap((app) => (app.kind === "custom" ? [app.server] : []));
+  const putServer = (server: McpServerConfig) =>
+    setState((draft) => {
+      const app: MarketplaceApp = {
+        kind: "custom",
+        id: `custom:${server.id}`,
+        name: server.name,
+        tagline: server.transport === "stdio" ? server.command : server.url,
+        status: "connected",
+        server,
+      };
+      const index = draft.apps.findIndex((entry) => entry.id === app.id);
+      if (index === -1) draft.apps.push(app);
+      else draft.apps[index] = app;
+    });
+  const serverTools: McpServerTools = {
+    servers: customServers,
+    signIns,
+    save: async (config) => {
+      const saved = { ...config, id: config.id || `story-${config.name.toLocaleLowerCase().replace(/\W+/g, "-")}` };
+      putServer(saved);
+      return saved;
+    },
+    test: async () => ({ toolCount: 3, error: null }),
+    setEnabled: async (id, enabled) => {
+      const server = customServers().find((candidate) => candidate.id === id);
+      if (server) putServer({ ...server, enabled });
+    },
+    toolRuntimeNote: () => null,
+    signIn: () => ({
+      start: async (config) => {
+        setSignIns((held) => ({ ...held, [config.id]: { mcpServerId: config.id, signedIn: true } }));
+        return { toolCount: 3, error: null };
+      },
+      cancel: async () => {},
+      signOut: async (id) => {
+        setSignIns((held) => ({ ...held, [id]: { mcpServerId: id, signedIn: false } }));
+      },
+    }),
+    signInRequest: () => null,
+    endSignInRequest: () => {},
+  };
   const model: MarketplaceModel = {
     listAgents: async (query) => page<MarketplaceAgentSummary>(agents, query),
     loadAgent: async (id) => STORY_MARKETPLACE_AGENT_DETAILS[id],
@@ -560,7 +570,6 @@ export function MarketplaceStory(props: StoryProps) {
       setBusy(app.id, true);
       for (const entry of app.plugin.apps) {
         const flows = connectFlows(entry);
-        // Closing the dialog is a decision, not a failure: the app stays as it was.
         if (flows && !(await connectStep(subjectFor(entry), flows))) {
           setBusy(app.id, false);
           return false;
@@ -581,7 +590,6 @@ export function MarketplaceStory(props: StoryProps) {
       setBusy(app.id, true);
       const config = await connectStep(subjectFor(entry), flows);
       setBusy(app.id, false);
-      // With no account named, the first account that needs a sign-in, as the controller does.
       const target =
         accountId ?? app.connections[appId]?.accounts.find((account) => account.signInNeeded)?.id ?? undefined;
       if (config && target && app.connections[appId]?.multipleAccounts)
@@ -656,13 +664,17 @@ export function MarketplaceStory(props: StoryProps) {
             return true;
           },
         },
-    addServer: member ? undefined : fn(),
+    servers: member
+      ? undefined
+      : {
+          form: (form) => <McpServerForm tools={serverTools} id={form.id} onClose={form.onClose} />,
+          controls: (controls) => <McpServerControls tools={serverTools} id={controls.id} />,
+        },
     runPrompt: fn(),
     copyLink: fn(),
     copyListingLink: fn(),
     openUrl: fn(),
     connector: (id) => connectors[id],
-    // The preview has no Apple apps, so every app answers as allowed.
     macAutomation: macOS
       ? {
           askOnInstall,
@@ -680,7 +692,6 @@ export function MarketplaceStory(props: StoryProps) {
     notice: () => state.notice,
   };
   const nav = createMarketplaceNavigation();
-  // A write in the component body is refused, so the start page opens once the window is up.
   onSettled(() => start?.(nav));
   return (
     <>

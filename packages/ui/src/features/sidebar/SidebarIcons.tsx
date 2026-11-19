@@ -1,9 +1,3 @@
-/**
- * The sidebar's own SVGs. `EditIcon` and `DeleteIcon` stay hand-written rather than becoming
- * `Pencil` and `Trash2`: swapping them changes the rendered markup, so it belongs to a separate
- * change with a before/after story - the exception `src/renderer/AGENTS.md` asks to be named.
- */
-
 export function SearchIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 size-4 fill-none stroke-current">
@@ -17,15 +11,6 @@ export function PlusIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 20 20" class="ui-glyph-20 size-[18px] fill-none stroke-current">
       <path d="M10 4v12M4 10h12" stroke-linecap="round" />
-    </svg>
-  );
-}
-
-export function SidebarToggleIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" class="sidebar-toggle-icon ui-glyph-20">
-      <rect x="2.75" y="3.25" width="14.5" height="13.5" rx="2.25" />
-      <path d="M7.25 3.75v12.5" />
     </svg>
   );
 }

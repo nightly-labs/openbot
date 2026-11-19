@@ -8,6 +8,8 @@ export const messages = {
   "error.update.downloadStalled": "De download van de update reageert niet meer. Probeer het opnieuw.",
   "error.update.installFailed":
     "Kan de update niet installeren. Stop OpenBot, open het opnieuw en probeer het nog eens.",
+  "error.update.notInstalled":
+    "Bij de laatste herstart is de update niet geïnstalleerd. Start opnieuw om het nog eens te proberen.",
   "error.update.downloadFailed": "Kan de update niet downloaden. Probeer het opnieuw.",
   "error.update.checkFailed": "Kan niet controleren op updates. Probeer het opnieuw.",
   "error.update.checkStalled": "De controle op updates reageert niet meer. Probeer het opnieuw.",
@@ -28,6 +30,10 @@ export const messages = {
     "Kan andere OpenBot-sessies niet controleren. Probeer het opnieuw voordat je installeert.",
   "error.update.readOnlyLocation":
     "OpenBot kan vanaf deze locatie geen updates installeren. Sluit OpenBot af. Sleep OpenBot in de Finder naar de map Apps (staat het er al, sleep het er dan uit en weer in). Open OpenBot daarna en installeer de update opnieuw.",
+  "error.update.appImageMissing":
+    "OpenBot kan de update niet installeren, omdat het AppImage-bestand is verplaatst, hernoemd of vervangen. Sluit OpenBot af en open het AppImage-bestand opnieuw.",
+  "error.update.appImageReadOnly":
+    "OpenBot kan geen updates installeren in de map van het AppImage-bestand. Sluit OpenBot af, verplaats het AppImage-bestand naar een map in je thuismap, open het en installeer de update opnieuw.",
   "error.update.remoteDisabled": "Updates door serverbeheerders staan uit op deze computer.",
   "error.update.restartStarted": "OpenBot herstart al om de update te installeren.",
   "error.update.alreadyRestarting": "OpenBot herstart al.",

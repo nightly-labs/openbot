@@ -1,5 +1,5 @@
 import { INPUT_LIMITS } from "./input-limits";
-import { type AvatarHue, isAvatarHue } from "./ipc-agent-identity";
+import { type AvatarColor, type AvatarHue, isAvatarColor, isAvatarHue } from "./ipc-agent-identity";
 import type { AgentApprovalKind, AgentApprovalPermissions } from "./ipc-approvals";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "./runtime-values";
 
@@ -8,42 +8,23 @@ export interface DynamicIslandPreference {
   hapticsEnabled: boolean;
   idleVisible: boolean;
   additionalDisplaysEnabled: boolean;
-  /** The compact island width, as a percent of its default width. The physical notch never shrinks. */
   widthPercent: number;
-  /** The compact island height, as a percent of its default height. It never gets lower than a notch. */
   heightPercent: number;
-  /**
-   * The user's choice for each server, by server id: false hides the server's items from the island.
-   * A server with no choice uses `newServersVisible`. The choice is local to this computer.
-   */
   serverVisibility: Record<string, boolean>;
-  /** Whether a server with no choice of its own, such as a server the user adds later, shows its items. */
   newServersVisible: boolean;
 }
 
-/** The most server choices that a preference can hold. A user has far fewer servers. */
 export const DYNAMIC_ISLAND_SERVER_CHOICES_LIMIT = 256;
 
-/** Limits keep the island large enough to find and to click, whatever the stored value says. */
 export const DYNAMIC_ISLAND_SIZE_LIMITS = {
   widthPercent: { min: 20, max: 130, step: 5 },
   heightPercent: { min: 75, max: 125, step: 5 },
 } as const;
 
-/**
- * The largest unread or remaining count that a presentation can carry. A sender clamps to it: a
- * larger count is not valid, so main rejects the whole presentation.
- */
 export const DYNAMIC_ISLAND_MAX_COUNT = 10_000;
 
-/** The compact height where a display has no notch to match. */
 export const DYNAMIC_ISLAND_DEFAULT_COMPACT_HEIGHT = 32;
 
-/**
- * Returns the compact island height in display points. The main process sizes the window from it
- * and the renderer draws with it, so the island and its hit area stay the same size. A notch is
- * hardware: the island can grow below it but never gets shorter than it.
- */
 export function dynamicIslandCompactHeight(notchHeight: number | undefined, heightPercent: number): number {
   const scaled = Math.round(((notchHeight ?? DYNAMIC_ISLAND_DEFAULT_COMPACT_HEIGHT) * heightPercent) / 100);
   return notchHeight === undefined ? scaled : Math.max(notchHeight, scaled);
@@ -62,7 +43,6 @@ export const DEFAULT_DYNAMIC_ISLAND_PREFERENCE = {
   newServersVisible: true,
 } as const satisfies DynamicIslandPreference;
 
-/** Returns whether the island shows the items of a server. A muted server is hidden separately. */
 export function isDynamicIslandServerVisible(
   preference: Pick<DynamicIslandPreference, "serverVisibility" | "newServersVisible">,
   serverId: string,
@@ -77,13 +57,13 @@ export interface DynamicIslandAgentIdentity {
   name: string;
   avatarSeed: string;
   avatarHue: AvatarHue | null;
+  avatarColor?: AvatarColor | null;
   avatarUrl: string | null;
 }
 
 export interface DynamicIslandWorkingItem {
   agent: DynamicIslandAgentIdentity;
   task: string;
-  /** The turn that Stop interrupts. It is null while a queued delivery runs before its turn starts. */
   turnId: string | null;
 }
 
@@ -165,15 +145,12 @@ export type DynamicIslandAction =
   | { type: "open-app" }
   | { type: "open-agent"; serverId: string; agentId: string }
   | { type: "open-message"; serverId: string; agentId: string; messageId: string }
-  /**
-   * A short reply typed on the island. The main window stays where it is. A retry of the same draft
-   * keeps its `clientMessageId`, so the agent gets the message once.
-   */
   | { type: "send-message"; serverId: string; agentId: string; text: string; clientMessageId: string }
   | { type: "stop-agent"; serverId: string; agentId: string; turnId: string }
   | { type: "open-failure"; serverId: string; agentId: string; turnId: string }
   | { type: "dismiss-failure"; serverId: string; agentId: string; turnId: string }
   | { type: "review-attention"; serverId: string; agentId: string; requestId: string | number }
+  | ({ type: "open-browser-takeover" } & BrowserTakeoverPage)
   | {
       type: "answer-prompt";
       serverId: string;
@@ -189,9 +166,14 @@ export type DynamicIslandAction =
       decision: "accept" | "decline";
     };
 
+export interface BrowserTakeoverPage {
+  serverId: string;
+  agentId: string;
+  tabId: string;
+}
+
 export interface SetDynamicIslandInteractiveInput {
   interactive: boolean;
-  /** The island needs key input for a text field. Main makes the panel key without activating the app. */
   keyboard?: boolean;
 }
 
@@ -287,11 +269,21 @@ export function isDynamicIslandAction(value: unknown): value is DynamicIslandAct
   if (value.type === "review-attention") {
     return isDynamicIslandRequestId(value.requestId);
   }
+  if (value.type === "open-browser-takeover") return isShortString(value.tabId, 160);
   if (value.type === "respond-approval") {
     return isDynamicIslandRequestId(value.requestId) && (value.decision === "accept" || value.decision === "decline");
   }
   return (
     value.type === "answer-prompt" && isDynamicIslandRequestId(value.requestId) && isDynamicIslandAnswers(value.answers)
+  );
+}
+
+export function isBrowserTakeoverPage(value: unknown): value is BrowserTakeoverPage {
+  return (
+    isDynamicRecord(value) &&
+    isShortString(value.serverId, 160) &&
+    isShortString(value.agentId, 160) &&
+    isShortString(value.tabId, 160)
   );
 }
 
@@ -318,6 +310,7 @@ function isAgentIdentity(value: unknown): value is DynamicIslandAgentIdentity {
     isShortString(value.name, 120) &&
     isShortString(value.avatarSeed, 160) &&
     (value.avatarHue === null || isAvatarHue(value.avatarHue)) &&
+    (value.avatarColor === undefined || value.avatarColor === null || isAvatarColor(value.avatarColor)) &&
     (value.avatarUrl === null || isShortString(value.avatarUrl, 2_048))
   );
 }
@@ -442,7 +435,6 @@ function isDynamicIslandAnswers(value: unknown): value is Record<string, string[
     if (!isShortString(questionId, INPUT_LIMITS.identifier) || !Array.isArray(answers) || answers.length !== 1) {
       return false;
     }
-    // An answer is an option label or the text that the user typed in the island reply field.
     const [answer] = answers;
     if (!isShortString(answer, INPUT_LIMITS.directMessageText)) return false;
     totalLength += answer.length;

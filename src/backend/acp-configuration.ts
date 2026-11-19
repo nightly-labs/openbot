@@ -10,7 +10,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Exit, Fiber, type Scope, Semaphore } from "effect";
 import type { AcpConnection } from "./acp-connection";
-import type { AgentProvider } from "./agent-client";
+import { type AgentProvider, ProviderModelNotOfferedError } from "./agent-client";
 import { isRecord } from "./protocol";
 import {
   type ProviderClientOperationError,
@@ -21,32 +21,12 @@ import {
 import { TimeoutError } from "./with-timeout";
 
 const logger = createOpenBotLogger("provider-runtime");
-/**
- * How long model discovery may spend on asking an agent for each model's reasoning efforts. One
- * OpenCode sweep of 49 models costs about 20ms, so this is not a target: it is the point where an
- * agent that answers slowly stops delaying the catalog the user is waiting for.
- */
 const MODEL_REASONING_PROBE_BUDGET_MS = 5_000;
 
-/**
- * How long one model's probe may take before the sweep goes on without it. An agent that stops
- * answering for one model then costs that model's efforts alone, and not the efforts of every model
- * after it in the catalog.
- */
 const MODEL_REASONING_PROBE_TIMEOUT_MS = 1_000;
 
-/**
- * What the sweep leaves of the discovery deadline for the request that follows it: the restore of the
- * model the session opened on. It is one round trip, and the catalog the caller waits for is already
- * built when it runs. The close or delete of the probe session is not awaited and uses none of it.
- */
 const MODEL_REASONING_CLEANUP_MS = 1_000;
 
-/**
- * What discovery keeps of the caller's timeout to return with. Every request it makes ends by its own
- * deadline, which is this much before the timeout: a catalog that was read in time is worth returning,
- * and one that reaches the timeout is thrown away with the models already in it.
- */
 const MODEL_DISCOVERY_RETURN_MS = 250;
 
 export interface AcpModel {
@@ -55,17 +35,9 @@ export interface AcpModel {
   description: string;
   defaultReasoningEffort: string;
   supportedReasoningEfforts: string[];
-  /**
-   * False when the agent offers no effort setting for the model: `supportedReasoningEfforts` is then
-   * a placeholder, nothing is sent for it, and the agent decides the model's reasoning.
-   */
   reasoningEffortConfigurable: boolean;
   reasoningEffortWireValues: Map<string, string>;
   usesModelReasoningEffort: boolean | null;
-  /**
-   * A model that OpenBot adds and the agent does not list. The agent takes it as the value of its
-   * `model` option after each option in `config` has the value given there.
-   */
   unlisted?: { config: Readonly<Record<string, string>> };
 }
 
@@ -73,9 +45,7 @@ export interface AcpConfigurationState {
   id: string;
   configOptions: SessionConfigOption[];
   currentModelId: string | null;
-  /** The session's own values of the options that an unlisted model changed, set back for a listed one. */
   unlistedOverrides?: Map<string, string>;
-  /** The process of a session that has one of its own (`AcpFlavor.sessionProcesses`). */
   transport?: AcpConnection | null;
 }
 export interface AcpConfigurationOptions {
@@ -85,68 +55,62 @@ export interface AcpConfigurationOptions {
   provider: AgentProvider;
   requestTimeoutMs: number;
   discoveryCwd?: (() => string) | undefined;
-  /** `AcpFlavor.processWideModel`. */
   processWideModel?: boolean;
-  /** `AcpFlavor.setsConfigOnlyOnChange`. */
   setsConfigOnlyOnChange?: boolean;
-  /** `AcpFlavor.modelSetUnsaved`. */
   modelSetUnsaved?: ((error: RequestError) => boolean) | undefined;
-  /** `AcpFlavor.configSetUnsaved`. */
+  modelConfigId?: string | undefined;
   configSetUnsaved?: ((error: RequestError) => boolean) | undefined;
-  /**
-   * `AcpFlavor.closeKeepsSession` with `session/resume`: a closed session keeps its resources until
-   * the process ends, so each discovery resumes the probe session of the process, not a new one.
-   */
   keepProbeSession?: () => boolean;
-  /** `AcpFlavor.probeCloseDelayMs`. */
   probeCloseDelayMs?: number | undefined;
-  /**
-   * Whether the agent answers `session/delete`. OpenCode 2.3.0 keeps a closed session in its history
-   * with one `model-switched` message for each model that the sweep selected (#8816).
-   */
+  effortCategories?: readonly string[] | undefined;
   deletesSessions?: () => boolean;
 }
 
-/** Owns ACP model discovery and setting translation. The client owns sessions and their state. */
+const EFFORT_CATEGORIES: readonly string[] = ["thought_level"];
+
+function isEffortOption(option: SessionConfigOption, categories: readonly string[]): boolean {
+  if (option.type !== "select" || option.category == null || !categories.includes(option.category)) return false;
+  return (
+    option.category === "thought_level" || selectValues(option).every((entry) => normalizeEffort(entry.value) !== null)
+  );
+}
+
 export class AcpConfiguration {
-  /** The model this agent process last took, for an agent whose model belongs to the process. */
   #processModel: { connection: ClientSideConnection; value: string } | null = null;
-  /** Model sets sent and not answered. Sets that overlap can apply in an order their answers do not show. */
   #modelSetsInFlight = 0;
   #modelSetsOverlapped = false;
-  /** A set that timed out or was interrupted can still apply later, so on this connection each set is sent. */
   #modelSetTimedOut: ClientSideConnection | null = null;
-  /**
-   * The options of each session whose last set failed or stopped (`setsConfigOnlyOnChange`). That set
-   * can still apply later, so the option's value is not trusted, and it is sent until a set succeeds.
-   */
   readonly #unconfirmedSets = new WeakMap<AcpConfigurationState, Set<string>>();
-  /** The probe session that discovery resumes on this connection (`keepProbeSession`). */
   #probe: { connection: ClientSideConnection; sessionId: string } | null = null;
-  /** One kept-probe discovery at a time: two at once would each open a probe, and one is kept. */
   readonly #probeLock = Semaphore.makeUnsafe(1);
-  /**
-   * The efforts that each model last answered with on this agent process. A sweep that does not reach
-   * a model, as on a busy process, gives the model these and not the efforts of another model (#8236).
-   */
   #answeredEfforts: {
     connection: ClientSideConnection;
     models: Map<string, ReturnType<typeof reasoningFromConfig>>;
   } | null = null;
-  constructor(private readonly options: AcpConfigurationOptions) {}
+  readonly #effortCategories: readonly string[];
+  constructor(private readonly options: AcpConfigurationOptions) {
+    this.#effortCategories = options.effortCategories ?? EFFORT_CATEGORIES;
+  }
+
+  sessionSettings(options: SessionConfigOption[]): AgentSessionSettingsSnapshot {
+    return sessionSettingsSnapshot(options, this.#effortCategories);
+  }
   readonly discoverModels = Effect.fn("AcpConfiguration.discoverModels")(function* (
     this: AcpConfiguration,
     timeoutMs?: number,
   ): Effect.fn.Return<AcpModel[], ProviderClientOperationError> {
     const requestTimeoutMs = timeoutMs ?? this.options.requestTimeoutMs;
     const connection = yield* providerSync(() => this.options.connection());
-    // One deadline for the whole discovery, read before the session opens and held short of the
-    // caller's own timeout: what the sweep may spend is what a slow `session/new` left of the time
-    // the caller gave `model/list`. A sweep that timed the caller out would return no catalog at all.
     const deadline = Date.now() + requestTimeoutMs - MODEL_DISCOVERY_RETURN_MS;
     const sweep = Effect.acquireUseRelease(
       this.#openProbe(connection),
-      (probe) => this.#modelReasoningEffortsEffect(connection, probe, modelsFromSessionSetup(probe), deadline),
+      (probe) =>
+        this.#modelReasoningEffortsEffect(
+          connection,
+          probe,
+          modelsFromSessionSetup(probe, this.#effortCategories),
+          deadline,
+        ),
       (probe) =>
         this.options.keepProbeSession?.()
           ? Effect.sync(() => {
@@ -180,16 +144,10 @@ export class AcpConfiguration {
     );
   });
 
-  /** The process of the session when it has one of its own, otherwise the agent's. */
   #connection(thread: AcpConfigurationState): ClientSideConnection {
     return thread.transport ? thread.transport.requireConnection() : this.options.connection();
   }
 
-  /**
-   * The end of a probe session that is not kept. The probe got no prompt and is OpenBot's own, so an
-   * agent that can delete it does: a close leaves it in the agent's session history. A failed delete
-   * still closes it.
-   */
   #releaseProbe(connection: ClientSideConnection, sessionId: string): Effect.Effect<void> {
     const close = providerCall(() => connection.closeSession({ sessionId })).pipe(Effect.ignore);
     if (!this.options.deletesSessions?.()) return close;
@@ -199,7 +157,6 @@ export class AcpConfiguration {
     );
   }
 
-  /** A new probe session, or the kept one resumed. A kept session that does not resume is replaced. */
   #openProbe(
     connection: ClientSideConnection,
   ): Effect.Effect<SessionSetupResponse & { sessionId: string }, ProviderClientOperationError> {
@@ -208,7 +165,6 @@ export class AcpConfiguration {
     const kept = this.#probe?.connection === connection ? this.#probe.sessionId : null;
     if (!kept || !this.options.keepProbeSession?.()) return opened;
     this.#probe = null;
-    // A resume that lists no models cannot give the catalog, so a new session gives it.
     return providerCall(() => connection.resumeSession({ sessionId: kept, cwd, mcpServers: [] })).pipe(
       Effect.flatMap((response) => {
         const probe = { ...response, sessionId: kept };
@@ -217,14 +173,6 @@ export class AcpConfiguration {
       Effect.catch(() => opened),
     );
   }
-
-  /**
-   * A discovery request that gives up at `until`, and reports any failure as `null`.
-   *
-   * The request is sent here, and not by the caller: after `until` there is nothing to send. A
-   * request made anyway would still reach the agent and still change the session the sweep is about
-   * to give back, and its own failure would have nobody left to read it.
-   */
 
   readonly #requestBeforeEffect = Effect.fn("AcpConfiguration.requestBefore")(function* <T>(
     this: AcpConfiguration,
@@ -244,26 +192,6 @@ export class AcpConfiguration {
     );
   });
 
-  /**
-   * The reasoning efforts of each model, asked one model at a time on the session that listed them.
-   *
-   * An agent that holds reasoning in a session config option publishes `thought_level` for the model
-   * the session is on, and a new session is on one model. Read as it arrives, every model of the
-   * catalog carries that one model's efforts, and a model the session never selected carries no
-   * efforts at all: OpenCode offers `minimal` to `xhigh` per model, and the Effort menu showed
-   * `Medium` alone for all of them. Selecting the model on the same session makes the agent publish
-   * the options of that model, so the catalog is built from one answer per model.
-   *
-   * Only for a catalog that came from the config option. An agent that describes each model's efforts
-   * in `session/new` has answered already and is not asked again. An agent that groups its listed
-   * models in the option (`groupedModelOption`) is asked: the list says nothing about efforts.
-   *
-   * No probe has to succeed. A model whose probe fails, or that the time does not reach, keeps the
-   * session-wide efforts the catalog held before, and the user can still select them. `deadline` is when the caller's own `model/list`
-   * times out: a sweep that ran past it would leave the user with no models at all, rather than with
-   * imprecise efforts.
-   */
-
   readonly #modelReasoningEffortsEffect = Effect.fn("AcpConfiguration.modelReasoningEfforts")(function* (
     this: AcpConfiguration,
     connection: ClientSideConnection,
@@ -276,22 +204,18 @@ export class AcpConfiguration {
         candidate.category === "model" && candidate.type === "select",
     );
     const grouped = groupedModelOption(probe) !== null;
-    if (!option || (availableModels(probe).length > 0 && !grouped)) return yield* providerSync(() => models);
-    // A grouped option resolves a model to one of its efforts, so the session opened on the exact
-    // model in the list, and goes back to it. The agent takes that model as a value too.
+    const listed = availableModels(probe).length > 0 && !grouped;
+    const withoutEfforts =
+      !!option && listed && !this.options.processWideModel && listsModelsWithoutEfforts(probe, option);
+    if (!option || (listed && !withoutEfforts)) return yield* providerSync(() => models);
     const opening = grouped ? (listedCurrentModel(probe) ?? option.currentValue) : option.currentValue;
-    // The sweep, and each request in it, ends at whichever comes first: its own budget, or the point
-    // where the caller's deadline still holds the cleanup. One agent that never answers then costs
-    // its own model's efforts, and not the whole catalog.
     const sweepEnd = Math.min(Date.now() + MODEL_REASONING_PROBE_BUDGET_MS, deadline - MODEL_REASONING_CLEANUP_MS);
     const startedAt = performance.now();
     const probed: AcpModel[] = [];
     let answered = 0;
     let selected = opening;
-    // A new process can be a new version of the agent, so its models start with no answers.
     if (this.#answeredEfforts?.connection !== connection) this.#answeredEfforts = { connection, models: new Map() };
     const answeredEfforts = this.#answeredEfforts.models;
-    // The sweep selects models on the process too, also while a turn sets its own.
     this.#processModel = null;
     for (const model of models) {
       const response = yield* this.#requestBeforeEffect(
@@ -303,15 +227,14 @@ export class AcpConfiguration {
         selected = model.id;
         answered += 1;
       }
-      const efforts = response ? reasoningFromConfig(response.configOptions) : answeredEfforts.get(model.id);
+      const efforts = response
+        ? reasoningFromConfig(response.configOptions, this.#effortCategories)
+        : answeredEfforts.get(model.id);
       if (response && efforts) answeredEfforts.set(model.id, efforts);
-      // An unanswered model keeps its last answer. With no answer yet, it holds the opening model's
-      // options, which say nothing about this model.
-      probed.push(efforts ? { ...model, ...efforts } : { ...model, reasoningEffortConfigurable: true });
+      probed.push(
+        efforts ? { ...model, ...efforts } : withoutEfforts ? model : { ...model, reasoningEffortConfigurable: true },
+      );
     }
-    // Back to the model the session opened on. The session is closed next, but an agent that keeps a
-    // "last used model" outside the session would otherwise remember the end of this sweep, and the
-    // user's own next CLI session would start on a model they never chose.
     if (selected !== opening) {
       yield* this.#requestBeforeEffect(
         () =>
@@ -341,6 +264,7 @@ export class AcpConfiguration {
     model: string | null,
     effort: string | null,
     models: AcpModel[],
+    requireModel = false,
   ): Effect.fn.Return<void, ProviderClientOperationError> {
     for (const [category, value] of [
       ["model", model],
@@ -364,8 +288,6 @@ export class AcpConfiguration {
         }
       }
       const unlisted = category === "model" ? models.find((candidate) => candidate.id === value)?.unlisted : undefined;
-      // A listed model after an unlisted one runs with the options the session had before: Cline's
-      // `provider` goes back to the one whose models the session listed.
       if (category === "model" && !unlisted && thread.unlistedOverrides) {
         for (const [configId, original] of thread.unlistedOverrides) {
           const response = yield* this.#timed("session/set_config_option", () =>
@@ -377,16 +299,27 @@ export class AcpConfiguration {
       }
       const options = thread.configOptions.filter(
         (candidate): candidate is Extract<SessionConfigOption, { type: "select" }> =>
-          candidate.category === category && candidate.type === "select",
+          category === "thought_level"
+            ? isEffortOption(candidate, this.#effortCategories)
+            : candidate.category === category && candidate.type === "select",
       );
-      // Cline puts a provider option of the model category before its model option. The first option
-      // of the category did not list the model, and the model was never sent. A model OpenBot added
-      // goes to the agent's `model` option, which takes a value it did not list.
       const option =
         (category === "model" &&
           options.find((candidate) => selectValues(candidate).some((entry) => entry.value === value))) ||
         (unlisted && options.find((candidate) => candidate.id === "model")) ||
         options[0];
+      const modelConfigId = category === "model" ? this.options.modelConfigId : undefined;
+      if (modelConfigId) {
+        const configId = option?.id ?? modelConfigId;
+        if ((option?.currentValue ?? thread.currentModelId) !== value) {
+          const response = yield* this.#setConfigOption(thread, configId, value, () =>
+            this.#connection(thread).setSessionConfigOption({ sessionId: thread.id, configId, value }),
+          );
+          thread.configOptions = response.configOptions;
+        }
+        thread.currentModelId = value;
+        continue;
+      }
       if (!option) {
         if (category === "model" && thread.currentModelId !== value) {
           this.#processModel = null;
@@ -409,14 +342,28 @@ export class AcpConfiguration {
         }
         continue;
       }
-      // An effort travels by OpenBot's name, and the agent's own name for it is read from the option
-      // this session published, not from the catalog: the session is the one that has to accept it.
       const values = selectValues(option);
       const wanted = category === "thought_level" ? effortWireValue(values, value) : value;
       const listed = values.some((candidate) => candidate.value === wanted);
       const selected = listed ? wanted : unlisted && option.id === "model" ? value : undefined;
-      if (!selected) continue;
-      // The session's options follow the agent's `config_option_update`, so they hold its value.
+      if (!selected) {
+        if (
+          category === "model" &&
+          requireModel &&
+          !values.some(
+            (candidate) =>
+              value.startsWith(`${candidate.value}-`) && isReasoningEffort(value.slice(candidate.value.length + 1)),
+          )
+        ) {
+          logger.warn("An agent session does not offer the model of the turn.", {
+            provider: this.options.provider,
+            model: value,
+          });
+          const name = models.find((candidate) => candidate.id === value)?.name ?? value;
+          return yield* providerFailure(new ProviderModelNotOfferedError(this.options.label(), name));
+        }
+        continue;
+      }
       if (
         this.options.setsConfigOnlyOnChange &&
         listed &&
@@ -436,9 +383,6 @@ export class AcpConfiguration {
         );
         thread.configOptions = response.configOptions;
       }
-      // The process runs every session on the model it took last, so the set is sent only for a change.
-      // A new process is a new connection. A failed set, or one that another set overlapped, leaves
-      // the model unknown.
       const connection = yield* providerSync(() => this.#connection(thread));
       const processWide = category === "model" && this.options.processWideModel === true;
       if (processWide) {
@@ -498,7 +442,7 @@ export class AcpConfiguration {
     configId: string,
     value: AgentSessionSettingValue,
   ): Effect.fn.Return<AgentSessionSettingsSnapshot, ProviderClientOperationError> {
-    const option = sessionSettingsSnapshot(thread.configOptions).options.find((entry) => entry.id === configId);
+    const option = this.sessionSettings(thread.configOptions).options.find((entry) => entry.id === configId);
     if (!option) return yield* providerFailure(new Error(sourceText("error.provider.sessionSettingUnavailable")));
     if (
       option.type === "boolean"
@@ -513,10 +457,9 @@ export class AcpConfiguration {
         : this.#connection(thread).setSessionConfigOption({ sessionId: thread.id, configId, value }),
     );
     thread.configOptions = response.configOptions;
-    return sessionSettingsSnapshot(thread.configOptions);
+    return this.sessionSettings(thread.configOptions);
   });
 
-  /** A set whose failure or stop makes its option unconfirmed, for an agent with `setsConfigOnlyOnChange`. */
   #confirmingSet<A, E>(thread: AcpConfigurationState, configId: string, set: Effect.Effect<A, E>): Effect.Effect<A, E> {
     if (!this.options.setsConfigOnlyOnChange) return set;
     return set.pipe(
@@ -531,10 +474,6 @@ export class AcpConfiguration {
     );
   }
 
-  /**
-   * A `session/set_config_option`. After a failure that `configSetUnsaved` accepts, the session
-   * already has the value and only its save as the default failed, so the option changes here.
-   */
   #setConfigOption(
     thread: AcpConfigurationState,
     configId: string,
@@ -554,15 +493,10 @@ export class AcpConfiguration {
     );
   }
 
-  /**
-   * A configuration request, which fails at the request timeout. A turn sends these before its
-   * prompt, so without the limit a process that stopped answering held the turn with no end (#3520).
-   */
   #timed<T>(method: string, request: () => Promise<T>): Effect.Effect<T, ProviderClientOperationError> {
     return providerCall(request).pipe(
       Effect.timeoutOrElse({
         duration: this.options.requestTimeoutMs,
-        // The chat shows this text, so the protocol method goes to the log only (#9738).
         orElse: () => {
           logger.warn("An agent did not answer a configuration request in time.", {
             provider: this.options.provider,
@@ -576,12 +510,10 @@ export class AcpConfiguration {
   }
 }
 
-/** `close` after `delayMs`, or at once without a delay. */
 function closeLater<A, E>(close: Effect.Effect<A, E>, delayMs: number | undefined): Effect.Effect<A, E> {
   return delayMs ? Effect.sleep(delayMs).pipe(Effect.andThen(close)) : close;
 }
 
-/** The options with the current value of one option changed, when the value has its type. */
 function withCurrentValue(
   options: readonly SessionConfigOption[],
   configId: string,
@@ -594,8 +526,8 @@ function withCurrentValue(
   });
 }
 
-/** Permission and secret controls stay outside the generic settings path. */
-function isAdditionalSetting(option: SessionConfigOption): boolean {
+function isAdditionalSetting(option: SessionConfigOption, effortCategories: readonly string[]): boolean {
+  if (isEffortOption(option, effortCategories)) return false;
   const category = option.category?.toLowerCase();
   if (
     [category, option.id.toLowerCase()].some(
@@ -622,9 +554,13 @@ function isAdditionalSetting(option: SessionConfigOption): boolean {
   });
 }
 
-export function sessionSettingsSnapshot(options: SessionConfigOption[]): AgentSessionSettingsSnapshot {
+function sessionSettingsSnapshot(
+  options: SessionConfigOption[],
+  effortCategories: readonly string[],
+): AgentSessionSettingsSnapshot {
+  const additional = (option: SessionConfigOption) => isAdditionalSetting(option, effortCategories);
   return {
-    options: options.filter(isAdditionalSetting).map((option): AgentSessionSettingOption => {
+    options: options.filter(additional).map((option): AgentSessionSettingOption => {
       const base = {
         id: option.id,
         name: option.name,
@@ -656,11 +592,14 @@ interface SessionSetupResponse {
   models?: unknown;
 }
 
-export function modelsFromSessionSetup(response: SessionSetupResponse): AcpModel[] {
+export function modelsFromSessionSetup(
+  response: SessionSetupResponse,
+  effortCategories: readonly string[] = EFFORT_CATEGORIES,
+): AcpModel[] {
   const options = sessionConfigOptions(response);
   const discovered = availableModels(response);
-  if (discovered.length === 0 || groupedModelOption(response)) return modelsFromConfig(options);
-  const configReasoning = reasoningFromConfig(options);
+  if (discovered.length === 0 || groupedModelOption(response)) return modelsFromConfig(options, effortCategories);
+  const configReasoning = reasoningFromConfig(options, effortCategories);
   return discovered.map((model) => {
     const supportedReasoningEfforts = model.supportedReasoningEfforts ?? configReasoning.supportedReasoningEfforts;
     const reasoningEffortWireValues = model.reasoningEffortWireValues;
@@ -688,13 +627,13 @@ export function modelsFromSessionSetup(response: SessionSetupResponse): AcpModel
   });
 }
 
-function modelsFromConfig(options: SessionConfigOption[]): AcpModel[] {
+function modelsFromConfig(options: SessionConfigOption[], effortCategories: readonly string[]): AcpModel[] {
   const model = options.find(
     (option): option is Extract<SessionConfigOption, { type: "select" }> =>
       option.category === "model" && option.type === "select",
   );
   if (!model) return [];
-  const reasoning = reasoningFromConfig(options);
+  const reasoning = reasoningFromConfig(options, effortCategories);
   return selectValues(model).map((option) => ({
     id: option.value,
     name: option.name,
@@ -706,11 +645,12 @@ function modelsFromConfig(options: SessionConfigOption[]): AcpModel[] {
 
 function reasoningFromConfig(
   options: SessionConfigOption[],
+  effortCategories: readonly string[],
 ): Pick<
   AcpModel,
   "defaultReasoningEffort" | "supportedReasoningEfforts" | "reasoningEffortConfigurable" | "reasoningEffortWireValues"
 > {
-  const thought = options.find((option) => option.category === "thought_level" && option.type === "select");
+  const thought = options.find((option) => isEffortOption(option, effortCategories));
   const wireValues = reasoningEffortWireValues(
     thought && thought.type === "select" ? selectValues(thought).map((option) => option.value) : ["medium"],
   );
@@ -720,8 +660,6 @@ function reasoningFromConfig(
   return {
     defaultReasoningEffort: supported.includes(currentEffort) ? currentEffort : (supported[0] ?? "medium"),
     supportedReasoningEfforts: supported.length > 0 ? supported : ["medium"],
-    // With no effort option, `medium` only keeps the catalog shape that older clients read. OpenCode
-    // has none for Big Pickle, Kimi or MiMo, and the user reads "Medium" where the agent decides.
     reasoningEffortConfigurable: thought?.type === "select" && supported.length > 0,
     reasoningEffortWireValues: wireValues.size > 0 ? wireValues : new Map([["medium", "medium"]]),
   };
@@ -742,19 +680,6 @@ function listedCurrentModel(response: SessionSetupResponse): string | null {
     : null;
 }
 
-/**
- * The model option of an agent that groups the models it lists in the superseded `models` field.
- *
- * Antigravity 1.3.0 and later list each reasoning effort as a model of its own there
- * (`gemini-3.1-pro-low`, `gemini-3.1-pro-high`), and offer the same models in the option as one
- * `gemini-3.1-pro` value with a `thought_level` option. Read from the list, every effort was a model
- * in the picker, the Effort menu offered the efforts a second time, and a model picked there was not
- * a value of the option, so the session never changed to it.
- *
- * Only when the agent has one model option, the option and the list differ, and the list says nothing
- * about efforts. An agent that lists the option's own models, describes each model's efforts, or has a
- * second model option (Cline has a provider option first) keeps the list.
- */
 function groupedModelOption(response: SessionSetupResponse): Extract<SessionConfigOption, { type: "select" }> | null {
   const options = sessionConfigOptions(response).filter(
     (candidate): candidate is Extract<SessionConfigOption, { type: "select" }> =>
@@ -767,6 +692,19 @@ function groupedModelOption(response: SessionSetupResponse): Extract<SessionConf
   const values = new Set(selectValues(option).map((entry) => entry.value));
   const ids = new Set(listed.map((model) => model.id));
   return values.size === ids.size && [...values].every((value) => ids.has(value)) ? null : option;
+}
+
+function listsModelsWithoutEfforts(
+  response: SessionSetupResponse,
+  option: Extract<SessionConfigOption, { type: "select" }>,
+): boolean {
+  const listed = availableModels(response);
+  if (listed.some((model) => model.supportedReasoningEfforts || model.usesModelReasoningEffort !== null)) return false;
+  const efforts = (candidate: SessionConfigOption) =>
+    candidate.category === "thought_level" && candidate.type === "select";
+  if (sessionConfigOptions(response).some(efforts)) return false;
+  const values = new Set(selectValues(option).map((entry) => entry.value));
+  return listed.every((model) => values.has(model.id));
 }
 
 function availableModels(response: SessionSetupResponse): Array<{
@@ -821,22 +759,12 @@ function selectValues(option: Extract<SessionConfigOption, { type: "select" }>) 
   return option.options.flatMap((entry) => ("options" in entry ? entry.options : [entry]));
 }
 
-/**
- * What OpenBot's effort names are sent as, keyed by the OpenBot name.
- *
- * The exact name wins over an alias, whichever comes first. An agent can offer `off` and `none`
- * for the same level: first value per key would make OpenBot's `none` send `off`. An alias is kept
- * for a key the agent has no exact name for, which is how a model with `off` and no `none` stays
- * reachable.
- */
 function reasoningEffortWireValues(values: string[]): Map<string, string> {
   const result = new Map<string, string>();
   for (const value of values) {
     const normalized = normalizeEffort(value);
     if (!normalized) continue;
     const held = result.get(normalized);
-    // `value.toLowerCase()` and not the normalized form of it: an exact name is the agent's own
-    // spelling of the key, and every key OpenBot has is one word.
     if (held === undefined || (held !== normalized && value.toLowerCase() === normalized)) {
       result.set(normalized, value);
     }
@@ -850,10 +778,6 @@ function effortWireValue(values: { value: string }[], effort: string): string | 
   return listed ? wireValues.get(listed) : undefined;
 }
 
-/**
- * The level to send for a saved effort. `minimal`, `none` and `off` were `low` before OpenBot had a
- * name for them, so an agent saved as `low` on a model without it still sends the lowest level.
- */
 function listedEffort(effort: string, listed: (level: string) => boolean): string | undefined {
   if (listed(effort)) return effort;
   return effort === "low" ? ["minimal", "none"].find(listed) : undefined;
@@ -863,8 +787,6 @@ function normalizeEffort(value: string): string | null {
   const normalized = value.toLowerCase().replaceAll("-", "_");
   if (isReasoningEffort(normalized)) return normalized;
   if (normalized === "off") return "none";
-  // OpenCode offers MiniMax M3 `none` and `thinking` only. Without this the model listed `none` as
-  // its one effort.
   if (normalized === "thinking") return "high";
   if (["extra_high", "very_high"].includes(normalized)) return "xhigh";
   return null;

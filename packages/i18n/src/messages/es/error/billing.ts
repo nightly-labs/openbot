@@ -22,6 +22,14 @@ export const messages = {
   "error.billing.licenseOneUser": "Esta licencia es para 1 usuario. Cámbiala a Team para añadir usuarios.",
   "error.billing.licensePlanChange": "Esta licencia no puede cambiar a ese plan. Cancélala y compra el plan nuevo.",
   "error.billing.noLicense": "Esta cuenta no tiene licencia.",
+  "error.billing.countryRequired":
+    "Indica tu país de facturación antes de pagar. Actualiza OpenBot para hacerlo y vuelve a intentarlo.",
+  "error.billing.detailsInvalid": "Revisa el país y el NIF-IVA. El NIF-IVA debe ser del país elegido.",
+  "error.billing.vatIdInvalid":
+    "El sistema de IVA de la UE no reconoce este NIF-IVA. Revisa el número o continúa sin NIF-IVA.",
+  "error.billing.vatIdUnverified":
+    "El sistema de IVA de la UE no puede comprobar el NIF-IVA ahora. Inténtalo más tarde o continúa sin NIF-IVA.",
+  "error.billing.vatUnavailable": "El pago no está disponible ahora. Inténtalo más tarde.",
   "error.billing.invalidRequest": "La solicitud de facturación no es válida.",
   "error.billing.invalidResponse": "La respuesta de facturación no es válida.",
   "error.billing.notStripePage": "La página de facturación no es una página de Stripe.",

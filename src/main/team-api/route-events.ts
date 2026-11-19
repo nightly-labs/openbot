@@ -5,6 +5,10 @@ import {
   ROUTINE_RECOVERY_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import {
+  WEBHOOK_AGENT_SECRET_CAPABILITY,
+  WEBHOOK_AGENT_SECRET_ROUTES,
+} from "@openbot/contracts/team-protocol/webhook-agent-secret-v1";
+import {
   WEBHOOK_SENDER_SECRET_CAPABILITY,
   WEBHOOK_SENDER_SECRET_ROUTES,
 } from "@openbot/contracts/team-protocol/webhook-sender-secret-v1";
@@ -35,7 +39,6 @@ export async function runEventsEffect<A>(operation: Effect.Effect<A, HostEventsF
   try {
     return await Effect.runPromise(operation);
   } catch (error) {
-    // An internal failure goes to the dispatcher, which logs it and returns a generic 500.
     const message = error instanceof HostEventsFailure ? hostEventsFailureMessage(error) : null;
     if (message !== null) throw new HttpError(400, message);
     throw error;
@@ -62,7 +65,9 @@ export async function routeEvents(
       ? WEBHOOK_TESTS_CAPABILITY
       : path === WEBHOOK_SENDER_SECRET_ROUTES.set
         ? WEBHOOK_SENDER_SECRET_CAPABILITY
-        : EVENTS_CAPABILITY;
+        : path === WEBHOOK_AGENT_SECRET_ROUTES.give
+          ? WEBHOOK_AGENT_SECRET_CAPABILITY
+          : EVENTS_CAPABILITY;
   if ((capability === EVENTS_CAPABILITY && !EVENT_ROUTE_PATHS.has(path)) || method !== "POST") return "unmatched";
   if (!events || !capabilities.has(capability)) {
     throw new HttpError(400, sourceText("error.backend.eventsUnavailable"));
@@ -73,10 +78,8 @@ export async function routeEvents(
   switch (path) {
     case EVENTS_ROUTES.status:
       return json(200, await runEventsEffect(events.getStatus()));
-    // The recovery routes answer as the events routes do; only their wire codecs keep `missedPolicy`.
     case EVENTS_ROUTES.listRoutines:
     case ROUTINE_RECOVERY_ROUTES.listRoutines:
-      // A `once` routine stays on this computer: the events codecs reject its schedule.
       return json(
         200,
         (await runEventsEffect(events.listRoutines(input(parseListEventRoutines)))).filter(
@@ -87,7 +90,6 @@ export async function routeEvents(
     case ROUTINE_RECOVERY_ROUTES.saveRoutine: {
       const routine = input(parseSaveEventRoutine);
       if (routine.trigger.kind === "schedule") requireReleasedSchedule(routine.trigger.schedule);
-      // A `once` routine is not in these lists, so a save cannot change it either.
       if (routine.id !== undefined) {
         const saved = await runEventsEffect(events.listRoutines({ owner: routine.owner }));
         const hidden = saved.some(
@@ -111,6 +113,8 @@ export async function routeEvents(
     case WEBHOOK_SENDER_SECRET_ROUTES.set:
       await runEventsEffect(events.setSecret(input(parseSetWebhookSecret)));
       return json(200, {});
+    case WEBHOOK_AGENT_SECRET_ROUTES.give:
+      return json(200, await runEventsEffect(events.giveSecretToAgent(input(parseEventRoutineRef))));
     case WEBHOOK_TESTS_ROUTES.send:
       return json(200, await runEventsEffect(events.sendTestEvent(input(parseEventRoutineRef))));
     case EVENTS_ROUTES.listActivity:

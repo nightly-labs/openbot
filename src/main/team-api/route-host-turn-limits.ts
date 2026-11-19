@@ -10,11 +10,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin } from "./request-helpers";
 
-/**
- * The turn limits of this computer, read and set from a joined server. They decide how much work the
- * agents put on this computer, so only an owner or admin can read or change them. Frozen by
- * `host-turn-limits-v1`.
- */
 export async function routeHostTurnLimits(
   context: TeamApiRequestContext,
   admin: TeamApiAdmin | undefined,
@@ -29,7 +24,6 @@ export async function routeHostTurnLimits(
   if (!turnLimits || !capabilities.has(HOST_TURN_LIMITS_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.hostTurnLimitsUnsupported"));
   requireAdmin(member);
-  // `readJson` has already run the body through the host-turn-limits wire codec.
   const body = await readJson(request);
   if (url.pathname === HOST_TURN_LIMITS_ROUTES.settings) return json(200, turnLimits.get());
   let input: HostTurnLimitsInput;

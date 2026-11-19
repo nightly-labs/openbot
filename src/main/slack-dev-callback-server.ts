@@ -1,13 +1,3 @@
-/**
- * Development only: where a Slack install returns when `bun run dev:slack` runs.
- *
- * A packaged build gets the install back as an `openbot://slack-workspace` link. On a computer that
- * also has OpenBot installed, the operating system sends that link to the installed app, not to the
- * dev app. So the dev app names this loopback listener as the return address, and a development
- * account API sends the browser here. The waiting connect checks `nonce` the same way, so a request
- * this run did not start does nothing.
- */
-
 import { createServer, type Server } from "node:http";
 import type { Socket } from "node:net";
 import { sourceText } from "@openbot/i18n/source";

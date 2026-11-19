@@ -3,9 +3,12 @@ import { MOBILE_ATTACHMENT_BYTES } from "@openbot/team-client/remote-peer";
 import { requireNativeView, requireOptionalNativeModule } from "expo";
 import type { ReactNode } from "react";
 import type { NativeSyntheticEvent, ViewProps } from "react-native";
-import type { ComposerFile } from "../model/composer-requests";
+import { showFailureAlert } from "@/features/analytics/failure-reports";
+import { haptics } from "@/shared/lib/haptics";
+import { currentText } from "@/shared/lib/text";
+import { type ComposerFile, deleteComposerFiles } from "../model/composer-requests";
+import type { ChatAttachments } from "./use-chat-attachments";
 
-/** Copies of the pasted files, and the count of files that could not be copied. */
 export interface PastedFiles {
   files: ComposerFile[];
   failed: number;
@@ -13,25 +16,69 @@ export interface PastedFiles {
 
 interface NativeProps extends ViewProps {
   extensions: readonly string[];
-  /** Android stops a copy one byte after this, so a large file is refused without a full copy. */
   maxBytes: number;
   onPasteFiles: (event: NativeSyntheticEvent<PastedFiles>) => void;
   onSubmitKey: (event: NativeSyntheticEvent<{ text: string }>) => void;
 }
 
-/**
- * `modules/composer-paste`. A build without it, such as Expo Go, pastes text only, and Return on a
- * hardware keyboard adds a line break.
- */
-const NativePasteTarget = requireOptionalNativeModule("OpenBotComposerPaste")
-  ? requireNativeView<NativeProps>("OpenBotComposerPaste")
+const nativeModule = requireOptionalNativeModule<{ chatDrop?: boolean }>("OpenBotComposerPaste");
+const NativePasteTarget = nativeModule ? requireNativeView<NativeProps>("OpenBotComposerPaste") : null;
+
+interface NativeDropProps extends ViewProps {
+  enabled: boolean;
+  extensions: readonly string[];
+  maxBytes: number;
+  onDropFiles: (event: NativeSyntheticEvent<PastedFiles>) => void;
+}
+
+const NativeDropTarget = nativeModule?.chatDrop
+  ? requireNativeView<NativeDropProps>("OpenBotComposerPaste", "ChatDrop")
   : null;
 
-/**
- * Wraps the composer field, so a paste of photos, videos or other files adds them as attachments.
- * Return on a hardware keyboard, such as on an iPad, sends `onSubmitKey` with the text of the field.
- * Shift+Return adds a line break. It takes the field's place in the layout.
- */
+export function addPastedFiles(attachments: ChatAttachments | undefined, { files, failed }: PastedFiles): void {
+  if (!attachments) {
+    deleteComposerFiles(files);
+    return;
+  }
+  void attachments
+    .addShared("", files, () => {})
+    .finally(() => {
+      deleteComposerFiles(files);
+      if (failed === 0) return;
+      void haptics.notification("error");
+      const { t } = currentText();
+      showFailureAlert(
+        undefined,
+        "turn",
+        t("mobile.chat.attachment.addFailed"),
+        t("mobile.chat.attachment.unavailable"),
+      );
+    });
+}
+
+export function ChatDropTarget({
+  children,
+  enabled,
+  onDropFiles,
+}: {
+  children: ReactNode;
+  enabled: boolean;
+  onDropFiles: (dropped: PastedFiles) => void;
+}) {
+  if (!NativeDropTarget) return children;
+  return (
+    <NativeDropTarget
+      style={{ flex: 1 }}
+      enabled={enabled}
+      extensions={ATTACHMENT_FILE_EXTENSIONS}
+      maxBytes={MOBILE_ATTACHMENT_BYTES}
+      onDropFiles={({ nativeEvent }) => onDropFiles(nativeEvent)}
+    >
+      {children}
+    </NativeDropTarget>
+  );
+}
+
 export function ComposerPasteTarget({
   children,
   onPasteFiles,

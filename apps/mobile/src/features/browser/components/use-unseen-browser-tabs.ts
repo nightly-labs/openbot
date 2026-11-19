@@ -3,13 +3,6 @@ import type { MobileBrowserTab } from "../model/browser-tabs";
 
 const NONE: ReadonlySet<string> = new Set();
 
-/**
- * The agent's tabs that opened behind the tab on screen, such as a link that the page opens in a new
- * tab. A tab stays unseen until the person shows it or it closes.
- *
- * `loaded` is false until the host's first tab list arrives: the tabs of that list are not new.
- * `opening` is true while the phone opens a tab of its own, which it shows next.
- */
 export function useUnseenBrowserTabs(
   tabs: readonly MobileBrowserTab[],
   shownTabId: string | null,

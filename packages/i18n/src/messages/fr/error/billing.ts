@@ -12,7 +12,6 @@ export const messages = {
   "error.billing.storageUnavailable": "Ce stockage n'est pas disponible pour ce serveur.",
   "error.billing.storagePaymentFailed":
     "Le paiement du stockage a échoué. Mettez à jour le moyen de paiement et réessayez.",
-  // Billing errors.
   "error.billing.licenseExists": "Ce compte a déjà une licence. Modifiez plutôt son nombre d'utilisateurs.",
   "error.billing.licenseCurrency": "La licence doit utiliser la devise de vos autres forfaits.",
   "error.billing.planCurrency": "Un nouveau forfait doit utiliser la devise de vos autres forfaits.",
@@ -26,6 +25,15 @@ export const messages = {
   "error.billing.licensePlanChange":
     "Cette licence ne peut pas passer à cette offre. Résiliez-la et achetez la nouvelle offre.",
   "error.billing.noLicense": "Ce compte n'a pas de licence.",
+  "error.billing.countryRequired":
+    "Indiquez votre pays de facturation avant de payer. Mettez à jour OpenBot pour le faire, puis réessayez.",
+  "error.billing.detailsInvalid":
+    "Vérifiez le pays et le numéro de TVA. Le numéro de TVA doit être celui du pays choisi.",
+  "error.billing.vatIdInvalid":
+    "Le système de TVA de l’UE ne connaît pas ce numéro de TVA. Vérifiez le numéro ou continuez sans numéro de TVA.",
+  "error.billing.vatIdUnverified":
+    "Le système de TVA de l’UE ne peut pas vérifier le numéro de TVA pour l’instant. Réessayez plus tard ou continuez sans numéro de TVA.",
+  "error.billing.vatUnavailable": "Le paiement n’est pas disponible pour l’instant. Réessayez plus tard.",
   "error.billing.invalidRequest": "La demande de facturation n’est pas valide.",
   "error.billing.invalidResponse": "La réponse de facturation n’est pas valide.",
   "error.billing.notStripePage": "La page de facturation n’est pas une page Stripe.",

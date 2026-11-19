@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/provider";
 
 export const messages = {
-  // The provider list, shown in Settings and during onboarding.
   "provider.availableHere": "Disponible sur cet ordinateur",
   "provider.availableOnHost": "S’exécute sur {name}",
   "provider.custom.name": "Fournisseur personnalisé",
@@ -20,8 +19,6 @@ export const messages = {
   "provider.refreshingLabel": "Vérification des fournisseurs",
   "provider.refreshing": "Vérification…",
 
-  // What a provider row reports about itself. A percentage while downloading is a number, not a
-  // message, so it has no key.
   "provider.status.connecting": "Connexion",
   "provider.status.updateAvailable": "Mise à jour disponible",
   "provider.status.settingUp": "Configuration",
@@ -40,12 +37,8 @@ export const messages = {
   "provider.status.off": "Désactivé",
   "provider.gemini.hostSignIn":
     "Pour connecter Gemini, ouvrez OpenBot sur l’hôte et sélectionnez « Connecter » dans Réglages du serveur > Fournisseurs. La connexion Google nécessite un navigateur sur cet hôte. La connexion à distance n’est pas prise en charge.",
-  // Which account tier the OpenCode row runs on. It shows only while it adds to the runtime
-  // badge: a saved key leaves the runtime "Connected" to speak for the row.
   "provider.key.free": "Gratuit",
 
-  // The buttons on a provider row, and the name a screen reader reads for each. The name repeats
-  // the provider, because a list of rows all saying "Connect" tells a screen reader user nothing.
   "provider.action.connect": "Connecter",
   "provider.action.reconnect": "Reconnecter",
   "provider.action.restart": "Redémarrer",
@@ -126,9 +119,14 @@ export const messages = {
   "provider.picker.download": "Téléchargement de {name}",
   "provider.picker.search": "Rechercher des modèles",
   "provider.picker.noMatches": "Aucun modèle ne correspond à votre recherche.",
+  "provider.picker.workspaceOnlyUnavailable":
+    "Ces modèles ne fonctionnent pas avec « Espace de travail seul » sous Windows et Linux. Pour les utiliser, modifiez « Accès » dans les réglages de l’agent.",
   "provider.picker.olderModels": "Modèles plus anciens",
   "provider.picker.olderModelsList": "Modèles {name} plus anciens",
   "provider.picker.noModels": "Aucun modèle n’est disponible chez {name}.",
+  "provider.picker.endpointModelsInCustom":
+    "{name} exécute vos points de terminaison personnalisés. Leurs modèles sont dans l’onglet Personnalisé.",
+  "provider.picker.showCustomModels": "Voir les modèles",
   "provider.picker.museNoModels":
     "Muse n’a envoyé aucun modèle pour ce compte. Muse n’est peut-être pas disponible dans le pays où cet agent s’exécute. Choisissez un modèle d’un autre fournisseur.",
   "provider.picker.customEmpty":
@@ -156,6 +154,8 @@ export const messages = {
   "provider.picker.selectEffort": "Choisir l’effort",
   "provider.picker.custom": "Personnalisé",
   "provider.picker.cliReady": "{cli} prêt",
+  "provider.picker.modelSourceProvider": "Utilise {name} depuis vos paramètres {cli}",
+  "provider.picker.modelSourceCatalog": "Utilise une liste de modèles depuis vos paramètres {cli}",
   "provider.status.signInRequired": "Connexion requise",
   "provider.model.free": "Gratuit",
   "provider.model.new": "Nouveau",
@@ -222,6 +222,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "Impossible de se reconnecter.",
   "provider.account.add": "Ajouter un compte",
   "provider.account.addLabel": "Ajouter un autre compte {name}",
+  "provider.account.addWithCode": "Ajouter un compte par code",
   "provider.account.count": { one: "{count} compte", other: "{count} comptes" },
   "provider.account.numbered": "Compte {number}",
   "provider.account.apiKey": "Clé API",
@@ -271,6 +272,8 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · téléchargée par OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Non utilisée : {version} · installée par vous",
   "provider.settings.otherVersionDownloaded": "Non utilisée : {version} · téléchargée par OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "Certains modèles ont besoin d'un élément absent de cette version. Téléchargez la version d'OpenBot pour les utiliser.",
   "provider.settings.useInstalledVersion": "Utiliser l'installée",
   "provider.settings.useDownloadedVersion": "Utiliser celle d'OpenBot",
   "provider.settings.cache": "Cache",
@@ -294,6 +297,29 @@ export const messages = {
   "provider.settings.compactWindowDefault": "Défaut de Claude Code",
   "provider.settings.compactWindowTokens": "{size} jetons",
   "provider.settings.compactWindowLoadFailed": "Impossible de charger la taille de compactage de ce serveur.",
+  "provider.settings.environment": "Environnement",
+  "provider.settings.environmentVariables": "Variables",
+  "provider.settings.environmentDescription":
+    "Clés d’API, URL de base et autres réglages que reçoit chaque processus {name}. Un changement s’applique à la fin des tours en cours.",
+  "provider.settings.environmentCodexHint":
+    "OPENAI_BASE_URL, avec OPENAI_API_KEY comme clé, envoie les requêtes de modèle de ChatGPT à cette adresse.",
+  "provider.settings.environmentShellNote": "Les commandes que lancent les agents peuvent lire ces valeurs.",
+  "provider.settings.environmentAdd": "Ajouter une variable",
+  "provider.settings.environmentNamePlaceholder": "VARIABLE_NAME",
+  "provider.settings.environmentValuePlaceholder": "Valeur",
+  "provider.settings.environmentSaved": "Enregistrée",
+  "provider.settings.environmentSensitive": "Sensible",
+  "provider.settings.environmentNameLabel": "Nom de la variable {index}",
+  "provider.settings.environmentValueLabel": "Valeur de {name}",
+  "provider.settings.environmentSensitiveLabel": "Garder {name} secrète",
+  "provider.settings.environmentRemoveLabel": "Retirer {name}",
+  "provider.settings.environmentUnnamed": "variable {index}",
+  "provider.settings.environmentPending":
+    "L’enregistrement redémarre {name} à la fin de ses tours en cours. Les valeurs sensibles restent sur le serveur.",
+  "provider.settings.environmentDone": "Enregistré. {name} redémarre à la fin de ses tours en cours.",
+  "provider.settings.environmentDiscard": "Annuler",
+  "provider.settings.environmentSave": "Enregistrer",
+  "provider.settings.environmentLoadFailed": "Impossible de charger les variables de {name}.",
   "provider.settings.models": "Modèles",
   "provider.settings.modelsDescription": {
     one: "{shown} modèle sur {count} apparaît dans le sélecteur de modèle.",
