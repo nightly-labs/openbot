@@ -17,6 +17,7 @@ import {
   partCount,
   partUrls,
   presign,
+  SERVER_BYTES,
   shellWord,
   startUpload,
   uploadedParts,
@@ -76,8 +77,6 @@ for _ in $(seq 1 120); do
 done
 echo "does not run: $(systemctl is-active openbot.service)"
 `;
-
-const SERVER_BYTES = `du -sb --one-file-system /home/user /srv/openbot-hosted | awk '{ total += $1 } END { print total }'`;
 
 const RESTORE = `
 set -euo pipefail

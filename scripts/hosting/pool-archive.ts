@@ -6,6 +6,7 @@ const B2_REGION = "eu-central-003";
 export const B2_BUCKET = "openbot-pool-archive-eu";
 export const ARCHIVE_REGION = "eu";
 export const PART_BYTES = 100 * 1024 * 1024;
+export const SERVER_BYTES = `du -sb --one-file-system /home/user /srv/openbot-hosted | awk '{ total += $1 } END { print total }'`;
 export const UPLOAD_URL_SECONDS = 6 * 60 * 60;
 const BECH32_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
 const BECH32_GENERATOR = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];

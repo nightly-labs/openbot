@@ -21,6 +21,7 @@ import {
   PART_BYTES,
   partCount,
   partUrls,
+  SERVER_BYTES,
   shellWord,
   startUpload,
   uploadedParts,
@@ -97,7 +98,6 @@ const SUBSCRIPTION_PATTERN = /^sub_[A-Za-z0-9]{1,250}$/u;
 const OBJECT_KEY_PATTERN = /^[a-z]{2}\/[A-Za-z0-9:_-]{1,128}\/\d{13}\.tar\.age$/u;
 const ARCHIVE_VALUE_PATTERN = /^[A-Za-z0-9._-]{1,512}$/u;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
-const SERVER_BYTES = `du -sb --one-file-system /home/user /srv/openbot-hosted | awk '{ total += $1 } END { print total }'`;
 
 function literal(value: string | number, pattern?: RegExp): string {
   if (typeof value === "number") {
@@ -699,7 +699,12 @@ class Pool {
     const machine = await this.#vps(row.operator_host.replace("leaseweb:", ""));
     logger.info(`${state === "stopped" ? "Stop" : "Start"} OpenBot on VPS ${machine.id} (server ${row.server_id}).`);
     if (!this.#apply) return;
-    this.#remote(machine, `systemctl ${state === "stopped" ? "disable" : "enable"} --now openbot.service`);
+    this.#remote(
+      machine,
+      state === "stopped"
+        ? "systemctl disable --now openbot.service"
+        : "rm -f /run/openbot-pre-stop && systemctl enable --now openbot.service",
+    );
     const changes = this.#write(
       `UPDATE hosted_servers SET observed_state = '${state}', updated_at = ${literal(Date.now())}
        WHERE server_id = ${literal(row.server_id, SERVER_ID_PATTERN)}
