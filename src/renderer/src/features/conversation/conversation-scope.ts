@@ -17,10 +17,12 @@ import { AGENT_FAST_MODE_CAPABILITY } from "@openbot/contracts/team-protocol/age
 import { AGENT_SPEED_CAPABILITY } from "@openbot/contracts/team-protocol/agent-speed-v1";
 import { toast } from "@openbot/ui";
 import type { QuestionPromptComposerAnswer } from "@openbot/ui/components/QuestionPromptBubble";
+import type { AgentMessage } from "@openbot/ui/data";
 import type { QuoteRequest } from "@openbot/ui/features/conversation/ComposerEditor";
 import { currentText } from "@openbot/ui/text";
 import { prefersReducedMotion, usesTouchLayout } from "@openbot/ui/utils";
 import { errorReference } from "@openbot/user-errors";
+import type { VirtualItem } from "@tanstack/virtual-core";
 import {
   createContext,
   createEffect,
@@ -99,6 +101,29 @@ function followConversationBottom(element: HTMLDivElement): void {
   element.scrollTop = element.scrollHeight - element.clientHeight;
 }
 
+function newAnswerAtEnd(
+  rows: readonly AgentMessage[],
+  drawnBefore: ReadonlyMap<VirtualItem["key"], number>,
+  rowKey: (message: AgentMessage) => string,
+): AgentMessage | undefined {
+  let answer: AgentMessage | undefined;
+  for (let index = rows.length - 1; index >= Math.max(0, rows.length - NEW_ROWS_LIMIT); index -= 1) {
+    const row = rows[index];
+    if (!row) return undefined;
+    if (drawnBefore.has(row.id) || drawnBefore.has(rowKey(row))) return answer;
+    if (row.author === "agent" && row.kind === "text") answer = row;
+  }
+  return undefined;
+}
+
+function answerStartOffset(element: HTMLDivElement, messageId: string): number | undefined {
+  const marker = element.querySelector<HTMLElement>(`[data-chat-search-message="${CSS.escape(messageId)}"]`);
+  const row = marker?.closest<HTMLElement>(".virtual-chat-row") ?? marker;
+  if (!row) return undefined;
+  const top = row.getBoundingClientRect().top - element.getBoundingClientRect().top + element.scrollTop;
+  return Math.max(0, top - ANSWER_START_GAP_PX);
+}
+
 const CHAT_GLIDE_TIME_CONSTANT_MS = 70;
 const CHAT_GLIDE_MAX_STEP_MS = 34;
 const CHAT_PUSH_DURATION_MS = 280;
@@ -107,6 +132,8 @@ const CHAT_GLIDE_OPEN_DELAY_MS = 600;
 const MEDIA_SETTLE_MS = 150;
 const MEDIA_LAYOUT_EVENTS = ["load", "error", "loadedmetadata"] as const;
 const SENT_MESSAGE_PIN_MS = 400;
+const NEW_ROWS_LIMIT = 8;
+const ANSWER_START_GAP_PX = 16;
 
 export function createConversationViewScope(props: ConversationProps) {
   const controller = useConversationController();
@@ -1238,12 +1265,14 @@ export function createConversationViewScope(props: ConversationProps) {
   let chatGlideFrame: number | undefined;
   let chatGlideAfter = Number.POSITIVE_INFINITY;
   let sentMessagePinUntil = 0;
+  let answerStartFrame: number | undefined;
   function followSentMessage(): void {
     setStickToLatest(true);
     stopChatGlides();
     sentMessagePinUntil = performance.now() + SENT_MESSAGE_PIN_MS;
   }
   function glideConversationBottom(element: HTMLDivElement): void {
+    if (answerStartFrame !== undefined) return;
     if (performance.now() < sentMessagePinUntil) {
       stopChatGlides();
       followConversationBottom(element);
@@ -1789,6 +1818,49 @@ export function createConversationViewScope(props: ConversationProps) {
       });
     },
   );
+
+  let drawnRows: { identity: string; drawn: ReadonlyMap<VirtualItem["key"], number> } | undefined;
+  createEffect(
+    () => ({
+      identity: `${props.server?.id ?? "local"}:${conversationOwnerId(props) ?? ""}`,
+      loaded: props.loaded,
+      rows: timelineMessages(),
+      drawn: timelineIndexById(),
+    }),
+    ({ identity, loaded, rows, drawn }) => {
+      const before = drawnRows;
+      drawnRows = loaded ? { identity, drawn } : undefined;
+      if (before?.identity !== identity || !stickToLatest || readerLeftLatest || unreadOpening.holding) return;
+      const answer = newAnswerAtEnd(rows, before.drawn, (row) => handedOverRowKeys().get(row.id) ?? row.id);
+      if (answer) showAnswerStart(answer.id);
+    },
+  );
+  function showAnswerStart(messageId: string): void {
+    const revealedAt = performance.now();
+    const readerMoved = () => readerDragging || readerLeftLatest || (readerIntent?.at ?? 0) >= revealedAt;
+    const place = (settle: boolean) => {
+      if (answerStartFrame !== undefined) cancelAnimationFrame(answerStartFrame);
+      answerStartFrame = requestAnimationFrame(() => {
+        answerStartFrame = undefined;
+        const element = scrollElement;
+        if (!element || readerMoved()) return;
+        const start = answerStartOffset(element, messageId);
+        if (settle) {
+          if (!stickToLatest && start !== undefined) element.scrollTop = start;
+        } else if (start !== undefined && start < element.scrollHeight - element.clientHeight) {
+          stopFollowingLatest();
+          element.scrollTop = start;
+          place(true);
+        } else if (stickToLatest) glideConversationBottom(element);
+        updateScrollFade(element);
+        updateUnreadDividerVisibility();
+      });
+    };
+    place(false);
+  }
+  onCleanup(() => {
+    if (answerStartFrame !== undefined) cancelAnimationFrame(answerStartFrame);
+  });
 
   function scrollToUnreadDivider(element: HTMLDivElement): void {
     const divider = unreadMessagesDivider;
