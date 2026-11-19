@@ -269,7 +269,13 @@ function sameLoginEdits(
   if (host === undefined) return [];
   const { username, notes, password, twoStepKey, agents } = input;
   return record.logins
-    .filter((login) => allows(login) && login.username === username && loginHost(login.website) === host)
+    .filter(
+      (login) =>
+        allows(login) &&
+        login.username === username &&
+        loginHost(login.website) === host &&
+        sameScheme(login.website, input.website),
+    )
     .map((login, index) => ({
       kind: "login",
       id: login.id,
