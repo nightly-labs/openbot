@@ -606,6 +606,7 @@ export const messages = {
   "settings.hostedServers.state.planEnded": "Abonnement beëindigd",
   "settings.hostedServers.state.creating": "Wordt gemaakt",
   "settings.hostedServers.state.starting": "Wordt gestart",
+  "settings.hostedServers.state.restoring": "Gegevens herstellen",
   "settings.hostedServers.state.running": "Actief",
   "settings.hostedServers.state.stopping": "Wordt gestopt",
   "settings.hostedServers.state.stopped": "Gestopt",
@@ -616,6 +617,8 @@ export const messages = {
   "settings.hostedServers.paymentDescription": "De installatie begint wanneer Stripe de betaling bevestigt.",
   "settings.hostedServers.planEndedDescription":
     "Het abonnement is beëindigd, dus de server is gestopt. De gegevens blijven bewaard. Verleng het abonnement om hem te starten.",
+  "settings.hostedServers.planEndedKeptUntil":
+    "Het abonnement is beëindigd, dus de server is gestopt. De gegevens blijven bewaard tot {date}. Verleng het abonnement vóór die datum om hem te starten.",
   "settings.hostedServers.pay": "Open betaalpagina",
   "settings.hostedServers.payLabel": "Open betaalpagina voor {name}",
   "settings.hostedServers.renew": "Verleng abonnement",

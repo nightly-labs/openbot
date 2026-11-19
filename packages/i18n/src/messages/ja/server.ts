@@ -165,6 +165,7 @@ export const messages = {
   "server.hosted.detail.create.copy": "OpenBot をマシンにコピーしています",
   "server.hosted.detail.create.key": "一度だけ使えるサインインキーを追加しています",
   "server.hosted.detail.start.boot": "マシンの電源を入れています",
+  "server.hosted.detail.start.restore": "データを復元中",
   "server.hosted.detail.start.app": "OpenBot を起動しています",
   "server.hosted.detail.start.wait": "OpenBot の応答を待っています",
   "server.hosted.detail.connect.signIn": "あなたのアカウントでサインインしています",

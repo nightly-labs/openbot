@@ -490,6 +490,7 @@ function decodeHostedStart(value: unknown): HostedServerStart | null {
   if (value === null) return null;
   const start = decodeRecord(value, "hosted start");
   const { step } = start;
-  if (step !== "machine" && step !== "openbot" && step !== "provider_limit") throw new Error("Invalid hostedStart.");
+  if (step !== "machine" && step !== "restore" && step !== "openbot" && step !== "provider_limit")
+    throw new Error("Invalid hostedStart.");
   return { step, startedAt: requiredNumber(start, "startedAt") };
 }

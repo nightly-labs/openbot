@@ -1,30 +1,38 @@
 import { execFileSync } from "node:child_process";
-import { createHash, createHmac, generateKeyPairSync, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { createOpenBotLogger } from "@openbot/logging";
 import { z } from "zod";
+import {
+  abortUpload,
+  archiveScript,
+  type B2Key,
+  completeUpload,
+  deleteArchive,
+  newArchiveKey,
+  PART_BYTES,
+  partCount,
+  partUrls,
+  presign,
+  SERVER_BYTES,
+  shellWord,
+  startUpload,
+  uploadedParts,
+} from "./pool-archive";
 import { hostingCopy, MACHINE_HOSTING, prepareScript } from "./pool-machine";
 
 const logger = createOpenBotLogger("pool-archive-e2e");
 const LEASEWEB_API = "https://api.leaseweb.com/publicCloud/v1/vps";
 const LEASEWEB_ACCOUNTS = ["NL", "DE", "US", "AU", "SG"];
 const IMAGE = "UBUNTU_26_04_64BIT";
-const MACHINE_ARCHIVE = "/var/tmp/openbot-e2e-archive.tar";
-const IMPORT_TRACE = "/var/tmp/openbot-e2e-import.trace";
 const AUTH_API = "https://openbot-auth-api-test.internal9671.workers.dev";
 const TEST_REFERENCE = /^pool-test-\d{2}$/u;
 const WAIT_MS = 15 * 60_000;
-const B2_HOST = "s3.eu-central-003.backblazeb2.com";
-const B2_REGION = "eu-central-003";
-const B2_BUCKET = "openbot-pool-archive-eu";
-const PART_BYTES = 100 * 1024 * 1024;
-const UPLOAD_URL_SECONDS = 6 * 60 * 60;
 const DOWNLOAD_URL_SECONDS = 60 * 60;
-const BECH32_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
-const BECH32_GENERATOR = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
+const LEFT_BEHIND = "ls -d /var/tmp/openbot-restore.* /run/openbot-restore-key.* 2>/dev/null | wc -l";
 
 const FACTS = `
 set -euo pipefail
@@ -69,59 +77,6 @@ done
 echo "does not run: $(systemctl is-active openbot.service)"
 `;
 
-const SERVER_BYTES = `du -sb --one-file-system /home/user /srv/openbot-hosted | awk '{ total += $1 } END { print total }'`;
-
-const ARCHIVE = `
-set -euo pipefail
-recipient=$1 part_bytes=$2
-dir=$(mktemp -d /var/tmp/openbot-archive.XXXXXX)
-trap 'rm -rf "$dir"' EXIT
-cat >"$dir/urls"
-cat >"$dir/part.sh" <<'PART'
-set -euo pipefail
-number=$((10#\${FILE##*.} + 1))
-url=$(sed -n "\${number}p" "$URLS")
-[ -n "$url" ] || { echo "No upload URL for part $number." >&2; exit 3; }
-cat >"$FILE"
-size=$(stat -c %s "$FILE")
-md5=$(md5sum "$FILE" | cut -c1-32)
-etag=$(curl -fsS --retry 5 --retry-all-errors -T "$FILE" -D - -o /dev/null "$url" | tr -d '\\r"' | sed -n 's/^[Ee][Tt][Aa][Gg]: *//p')
-rm -f "$FILE"
-echo "part $number $size $md5 $etag"
-PART
-mkfifo "$dir/sum"
-sha256sum <"$dir/sum" | cut -c1-64 >"$dir/sha256" &
-summer=$!
-export URLS="$dir/urls"
-bash ${MACHINE_HOSTING}/move-from-boat.sh export - | age -r "$recipient" | tee "$dir/sum" |
-  split -b "$part_bytes" -d -a 5 --filter="bash $dir/part.sh" - "$dir/part."
-wait "$summer"
-echo "sha256 $(cat "$dir/sha256")"
-`;
-
-const RESTORE = `
-set -euo pipefail
-recipient=$1 expected=$2
-dir=$(mktemp -d /var/tmp/openbot-restore.XXXXXX)
-trap 'rm -rf "$dir"' EXIT
-IFS= read -r identity
-IFS= read -r url
-(umask 077 && printf '%s\\n' "$identity" >"$dir/key")
-[ "$(age-keygen -y "$dir/key")" = "$recipient" ] || { echo "The key is not the key of the archive." >&2; exit 1; }
-mkfifo "$dir/sum"
-sha256sum <"$dir/sum" | cut -c1-64 >"$dir/sha256" &
-summer=$!
-rm -f ${MACHINE_ARCHIVE}
-(umask 077 && curl -fsS "$url" | tee "$dir/sum" | age -d -i "$dir/key" >${MACHINE_ARCHIVE})
-wait "$summer"
-if [ "$(cat "$dir/sha256")" != "$expected" ]; then
-  rm -f ${MACHINE_ARCHIVE}
-  echo "The download is not the upload." >&2
-  exit 1
-fi
-echo "verified $(stat -c %s ${MACHINE_ARCHIVE})"
-`;
-
 interface Vps {
   id: string;
   key: string;
@@ -140,18 +95,6 @@ interface Check {
   name: string;
   pass: boolean;
   detail: string;
-}
-
-interface B2Key {
-  id: string;
-  secret: string;
-}
-
-interface UploadedPart {
-  number: number;
-  size: number;
-  md5: string;
-  etag: string;
 }
 
 const vpsSchema = z.object({
@@ -231,10 +174,6 @@ function remoteOrEmpty(machine: Vps, command: string) {
   } catch {
     return "";
   }
-}
-
-function shellWord(value: string) {
-  return `'${value.replaceAll("'", `'"'"'`)}'`;
 }
 
 function hostKeys(machine: Vps) {
@@ -321,113 +260,6 @@ function factLines(text: string) {
   return new Set(text.split("\n").filter((line) => line !== ""));
 }
 
-function bech32Polymod(values: number[]) {
-  let checksum = 1;
-  for (const value of values) {
-    const top = checksum >>> 25;
-    checksum = ((checksum & 0x1ffffff) << 5) ^ value;
-    for (const [bit, generator] of BECH32_GENERATOR.entries()) {
-      if ((top >>> bit) & 1) checksum ^= generator;
-    }
-  }
-  return checksum;
-}
-
-function bech32(prefix: string, data: Buffer) {
-  const words: number[] = [];
-  let accumulator = 0;
-  let bits = 0;
-  for (const byte of data) {
-    accumulator = ((accumulator << 8) | byte) & 0xfff;
-    bits += 8;
-    while (bits >= 5) {
-      bits -= 5;
-      words.push((accumulator >>> bits) & 31);
-    }
-  }
-  if (bits > 0) words.push((accumulator << (5 - bits)) & 31);
-  const codes = [...prefix].map((character) => character.charCodeAt(0));
-  const expanded = [...codes.map((code) => code >>> 5), 0, ...codes.map((code) => code & 31)];
-  const mod = bech32Polymod([...expanded, ...words, 0, 0, 0, 0, 0, 0]) ^ 1;
-  const checksum = Array.from({ length: 6 }, (_, index) => (mod >>> (5 * (5 - index))) & 31);
-  return `${prefix}1${[...words, ...checksum].map((word) => BECH32_CHARSET.charAt(word)).join("")}`;
-}
-
-function newArchiveKey() {
-  const { privateKey, publicKey } = generateKeyPairSync("x25519");
-  const secret = z.object({ d: z.string() }).parse(privateKey.export({ format: "jwk" })).d;
-  const shared = z.object({ x: z.string() }).parse(publicKey.export({ format: "jwk" })).x;
-  return {
-    identity: bech32("age-secret-key-", Buffer.from(secret, "base64url")).toUpperCase(),
-    recipient: bech32("age", Buffer.from(shared, "base64url")),
-  };
-}
-
-function uriPart(value: string) {
-  return encodeURIComponent(value).replace(
-    /[!'()*]/gu,
-    (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
-  );
-}
-
-function presign(b2: B2Key, method: string, objectKey: string, parameters: Record<string, string>, seconds: number) {
-  const now = new Date().toISOString().replace(/[-:]|\.\d{3}/gu, "");
-  const day = now.slice(0, 8);
-  const scope = `${day}/${B2_REGION}/s3/aws4_request`;
-  const query = Object.entries({
-    ...parameters,
-    "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
-    "X-Amz-Credential": `${b2.id}/${scope}`,
-    "X-Amz-Date": now,
-    "X-Amz-Expires": String(seconds),
-    "X-Amz-SignedHeaders": "host",
-  })
-    .map(([name, value]) => `${uriPart(name)}=${uriPart(value)}`)
-    .sort()
-    .join("&");
-  const path = `/${B2_BUCKET}/${objectKey.split("/").map(uriPart).join("/")}`;
-  const request = [method, path, query, `host:${B2_HOST}`, "", "host", "UNSIGNED-PAYLOAD"].join("\n");
-  const text = ["AWS4-HMAC-SHA256", now, scope, createHash("sha256").update(request).digest("hex")].join("\n");
-  const signingKey = [day, B2_REGION, "s3", "aws4_request"].reduce<Buffer>(
-    (key, part) => createHmac("sha256", key).update(part).digest(),
-    Buffer.from(`AWS4${b2.secret}`),
-  );
-  const signature = createHmac("sha256", signingKey).update(text).digest("hex");
-  return `https://${B2_HOST}${path}?${query}&X-Amz-Signature=${signature}`;
-}
-
-async function b2Request(
-  b2: B2Key,
-  method: string,
-  objectKey: string,
-  parameters: Record<string, string>,
-  body?: string,
-) {
-  const response = await fetch(presign(b2, method, objectKey, parameters, 900), {
-    method,
-    body: body ?? null,
-    signal: AbortSignal.timeout(120_000),
-  });
-  const text = method === "HEAD" ? "" : await response.text();
-  return { status: response.status, headers: response.headers, text };
-}
-
-function slowestCommands(trace: string) {
-  const lines = trace
-    .split("\n")
-    .map((line) => /^\++ (\d+\.\d+) (.*)$/u.exec(line))
-    .filter((match) => match !== null)
-    .map((match) => ({ at: Number(match[1]), command: (match[2] ?? "").slice(0, 160) }));
-  return lines
-    .slice(0, -1)
-    .map((line, index) => ({
-      seconds: Math.round(((lines[index + 1]?.at ?? line.at) - line.at) * 10) / 10,
-      command: line.command,
-    }))
-    .sort((left, right) => right.seconds - left.seconds)
-    .slice(0, 10);
-}
-
 function megabytesPerSecond(bytes: number, seconds: number) {
   return Math.round((bytes / 1_000_000 / Math.max(seconds, 1)) * 10) / 10;
 }
@@ -445,6 +277,12 @@ async function main() {
   const b2Secret = process.env.B2_APPLICATION_KEY_EU;
   if (!b2Id || !b2Secret) throw new Error("B2_KEY_ID_EU and B2_APPLICATION_KEY_EU are not in the environment.");
   const b2: B2Key = { id: b2Id, secret: b2Secret };
+  const workerId = process.env.B2_WORKER_KEY_ID_EU;
+  const workerSecret = process.env.B2_WORKER_APPLICATION_KEY_EU;
+  if (!workerId || !workerSecret) {
+    throw new Error("B2_WORKER_KEY_ID_EU and B2_WORKER_APPLICATION_KEY_EU are not in the environment.");
+  }
+  const workerB2: B2Key = { id: workerId, secret: workerSecret };
   const keys = Buffer.from(readFileSync(keysFile, "utf8")).toString("base64");
   const machine = await findVps(id);
   if (!TEST_REFERENCE.test(machine.reference ?? "")) {
@@ -477,7 +315,6 @@ async function main() {
   let serverBytes = 0;
   let archiveBytes = 0;
   let archiveSha256 = "";
-  let importProfile: { seconds: number; command: string }[] = [];
   try {
     await step("prepare a pool machine", () => preparePool(machine, release, keys));
     const age = remoteOrEmpty(machine, "age --version");
@@ -490,27 +327,21 @@ async function main() {
     checks.push({ name: "OpenBot runs before the archive", pass: before === "runs", detail: before });
     serverBytes = Number(remote(machine, SERVER_BYTES).trim());
 
-    const created = (await step("start the B2 upload", () => b2Request(b2, "POST", objectKey, { uploads: "" }))).result;
-    uploadId = /<UploadId>([^<]+)<\/UploadId>/u.exec(created.text)?.[1] ?? "";
-    if (created.status !== 200 || uploadId === "") throw new Error(`B2 did not start the upload: ${created.status}.`);
-    const partCount = Math.ceil((serverBytes * 1.05 + 256 * 1024 * 1024) / PART_BYTES) + 1;
-    const urls = Array.from({ length: partCount }, (_, index) =>
-      presign(b2, "PUT", objectKey, { partNumber: String(index + 1), uploadId }, UPLOAD_URL_SECONDS),
-    ).join("\n");
+    uploadId = (await step("start the B2 upload", () => startUpload(b2, objectKey))).result;
+    const urls = partUrls(b2, objectKey, uploadId, partCount(serverBytes));
     const archived = await step("export, encrypt and upload to B2 on the machine", () =>
-      remote(machine, `bash -c ${shellWord(ARCHIVE)} archive ${archiveKey.recipient} ${PART_BYTES}`, {
-        input: `${urls}\n`,
-      }),
+      remote(
+        machine,
+        `bash -c ${shellWord(archiveScript(MACHINE_HOSTING))} archive ${archiveKey.recipient} ${PART_BYTES}`,
+        {
+          input: `${urls}\n`,
+        },
+      ),
     );
-    const parts: UploadedPart[] = archived.result
-      .split("\n")
-      .filter((line) => line.startsWith("part "))
-      .map((line) => {
-        const [, number = "", size = "", md5 = "", etag = ""] = line.split(" ");
-        return { number: Number(number), size: Number(size), md5, etag };
-      });
-    archiveSha256 = /^sha256 ([0-9a-f]{64})$/mu.exec(archived.result)?.[1] ?? "";
-    archiveBytes = parts.reduce((total, part) => total + part.size, 0);
+    const upload = uploadedParts(archived.result);
+    const parts = upload.parts;
+    archiveSha256 = upload.sha256;
+    archiveBytes = upload.bytes;
     withBytes(archived.done, archiveBytes);
     const exported = factLines(remote(machine, "bash -s", { input: FACTS }));
     checks.push({
@@ -520,15 +351,10 @@ async function main() {
     });
 
     await step("complete and verify in B2", async () => {
-      const body = `<CompleteMultipartUpload>${parts
-        .map((part) => `<Part><PartNumber>${part.number}</PartNumber><ETag>"${part.etag}"</ETag></Part>`)
-        .join("")}</CompleteMultipartUpload>`;
-      const done = await b2Request(b2, "POST", objectKey, { uploadId }, body);
-      completed = done.status === 200 && !done.text.includes("<Error>");
-      if (!completed) throw new Error(`B2 did not complete the upload: ${done.status}.`);
-      const head = await b2Request(b2, "HEAD", objectKey, {});
-      versionId = head.headers.get("x-amz-version-id") ?? "";
-      const stored = Number(head.headers.get("content-length") ?? "0");
+      const head = await completeUpload(b2, objectKey, uploadId, parts);
+      completed = true;
+      versionId = head.versionId;
+      const stored = head.size;
       checks.push({
         name: "B2 has an object of the size that the machine sent",
         pass: head.status === 200 && stored === archiveBytes && archiveSha256 !== "",
@@ -543,25 +369,32 @@ async function main() {
     ).trim();
     checks.push({ name: "the reinstall erased the server", pass: empty === "empty", detail: empty });
 
-    const restored = await step("download from B2 and decrypt on the machine", () =>
-      remote(machine, `bash -c ${shellWord(RESTORE)} restore ${archiveKey.recipient} ${archiveSha256}`, {
-        input: `${archiveKey.identity}\n${presign(b2, "GET", objectKey, {}, DOWNLOAD_URL_SECONDS)}\n`,
-      }).trim(),
-    );
-    withBytes(restored.done, archiveBytes);
+    const download = () =>
+      `${archiveKey.identity}\n${presign(workerB2, "GET", objectKey, { versionId }, DOWNLOAD_URL_SECONDS)}\n`;
+    const wrongSum = archiveSha256.replace(/^./u, (first) => (first === "0" ? "1" : "0"));
+    const refused = remote(
+      machine,
+      `bash ${MACHINE_HOSTING}/move-from-boat.sh restore ${wrongSum} >/dev/null 2>&1 && echo restored || echo refused; test -e /home/user/.config/OpenBot && echo data || echo empty; ${LEFT_BEHIND}`,
+      { input: download() },
+    )
+      .trim()
+      .split("\n");
     checks.push({
-      name: "the download has the SHA-256 of the upload, and the key opens it",
-      pass: restored.result.startsWith("verified "),
-      detail: restored.result,
+      name: "a restore with a wrong checksum stops, imports nothing and leaves no decrypted file or key",
+      pass: refused[0] === "refused" && refused[1] === "empty" && refused[2] === "0",
+      detail: refused.join(", "),
     });
 
-    await step("import", () =>
-      remote(
-        machine,
-        `bash -c 'PS4="+ \\$EPOCHREALTIME "; set -x; source "$0" "$@"' ${MACHINE_HOSTING}/move-from-boat.sh import ${MACHINE_ARCHIVE} 2>${IMPORT_TRACE} || { tail -n 20 ${IMPORT_TRACE} >&2; exit 1; }; rm -f ${MACHINE_ARCHIVE}`,
-      ),
+    const restored = await step("download, decrypt and import with move-from-boat.sh restore", () =>
+      remote(machine, `bash ${MACHINE_HOSTING}/move-from-boat.sh restore ${archiveSha256}`, { input: download() }),
     );
-    importProfile = slowestCommands(remoteOrEmpty(machine, `cat ${IMPORT_TRACE}; rm -f ${IMPORT_TRACE}`));
+    withBytes(restored.done, archiveBytes);
+    const leftBehind = remote(machine, LEFT_BEHIND).trim();
+    checks.push({
+      name: "the restore with the read-only Worker key leaves no decrypted archive or key",
+      pass: leftBehind === "0",
+      detail: `${leftBehind} left`,
+    });
     const imported = factLines(remote(machine, "bash -s", { input: FACTS }));
     const missing = [...exported].filter((line) => !imported.has(line));
     const added = [...imported].filter((line) => !exported.has(line));
@@ -576,21 +409,17 @@ async function main() {
     checks.push({ name: "OpenBot runs after the import", pass: after === "runs", detail: after });
 
     await step("delete the archive in B2", async () => {
-      const answer = await b2Request(b2, "DELETE", objectKey, versionId === "" ? {} : { versionId });
-      const head = await b2Request(b2, "HEAD", objectKey, {});
-      deleted = answer.status === 204 && head.status === 404;
+      const answer = await deleteArchive(b2, objectKey, versionId);
+      deleted = answer.deleted;
       checks.push({
         name: "B2 has no archive after the delete",
         pass: deleted && versionId !== "",
-        detail: `delete ${answer.status}, then head ${head.status}, version ${versionId === "" ? "missing" : "known"}`,
+        detail: `delete ${answer.status}, ${deleted ? "gone" : "still there"}, version ${versionId === "" ? "missing" : "known"}`,
       });
     });
   } finally {
-    if (uploadId !== "" && !completed) await b2Request(b2, "DELETE", objectKey, { uploadId }).catch(() => undefined);
-    if (completed && !deleted) {
-      await b2Request(b2, "DELETE", objectKey, versionId === "" ? {} : { versionId }).catch(() => undefined);
-    }
-    remoteOrEmpty(machine, `rm -f ${MACHINE_ARCHIVE}`);
+    if (uploadId !== "" && !completed) await abortUpload(b2, objectKey, uploadId);
+    if (completed && !deleted) await deleteArchive(b2, objectKey, versionId).catch(() => undefined);
   }
   const pass = checks.every((check) => check.pass);
   mkdirSync(resolve(report, ".."), { recursive: true });
@@ -605,7 +434,6 @@ async function main() {
         serverBytes,
         archiveBytes,
         partBytes: PART_BYTES,
-        importProfile,
         steps,
         checks,
         pass,

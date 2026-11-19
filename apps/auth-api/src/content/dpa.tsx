@@ -335,8 +335,13 @@ export function Dpa() {
         <li>
           The Controller acknowledges and authorises the engagement of Dedale AI, Corp. (operating as Boat) as a
           Sub-processor for the provision of Hosted Server Services. Boat provides the cloud infrastructure used to host
-          OpenBot server environments and store and Process associated Customer Data. Any additions or replacements of
-          Sub-processors shall be subject to the requirements set out in paragraph 4 above.
+          OpenBot server environments and store and Process associated Customer Data. The Controller also acknowledges
+          and authorises the engagement of Backblaze, Inc. as a Sub-processor for the provision of Hosted Server
+          Services. Where a Hosted Server subscription ends without a refund, Backblaze stores an encrypted archive of
+          the associated Customer Data in its European Union region until the archive is deleted in accordance with §
+          11. The archive is encrypted before it is transferred to Backblaze, and Backblaze does not receive the key.
+          Any additions or replacements of Sub-processors shall be subject to the requirements set out in paragraph 4
+          above.
         </li>
       </ol>
 

@@ -68,13 +68,18 @@ const STATE_VARIANTS: Record<
 };
 
 export function SettingsHostedServersTab(props: SettingsHostedServersTabProps) {
-  const { t } = useText();
+  const { t, format } = useText();
   const state = () => props.store.state;
   const servers = () => state().servers.filter((server) => !props.excludedServerIds?.includes(server.serverId));
   const planEnded = (server: HostedServerSummary) => server.error === "plan_ended";
   const description = (server: HostedServerSummary) => {
     if (server.state === "awaiting_payment") return t("settings.hostedServers.paymentDescription");
-    if (planEnded(server)) return t("settings.hostedServers.planEndedDescription");
+    if (planEnded(server))
+      return server.dataKeptUntil
+        ? t("settings.hostedServers.planEndedKeptUntil", {
+            date: format.date(server.dataKeptUntil, { dateStyle: "long" }),
+          })
+        : t("settings.hostedServers.planEndedDescription");
     if (server.state === "error") return t("settings.hostedServers.errorDescription");
     const size = HOSTED_SERVER_SIZES[server.size];
     return t("settings.hostedServers.planSpec", {
@@ -131,7 +136,11 @@ export function SettingsHostedServersTab(props: SettingsHostedServersTabProps) {
                     {server.name}
                     <Show
                       when={planEnded(server)}
-                      fallback={<Badge variant={STATE_VARIANTS[server.state]}>{t(STATE_LABELS[server.state])}</Badge>}
+                      fallback={
+                        <Badge variant={STATE_VARIANTS[server.state]}>
+                          {t(server.restoring ? "settings.hostedServers.state.restoring" : STATE_LABELS[server.state])}
+                        </Badge>
+                      }
                     >
                       <Badge variant="warning-light">{t("settings.hostedServers.state.planEnded")}</Badge>
                     </Show>

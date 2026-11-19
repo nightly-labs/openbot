@@ -594,6 +594,7 @@ export const messages = {
   "settings.hostedServers.state.planEnded": "요금제 종료",
   "settings.hostedServers.state.creating": "생성 중",
   "settings.hostedServers.state.starting": "시작 중",
+  "settings.hostedServers.state.restoring": "데이터 복원 중",
   "settings.hostedServers.state.running": "실행 중",
   "settings.hostedServers.state.stopping": "중지 중",
   "settings.hostedServers.state.stopped": "중지됨",
@@ -604,6 +605,8 @@ export const messages = {
   "settings.hostedServers.paymentDescription": "Stripe에서 결제가 확인되면 설정이 시작돼요.",
   "settings.hostedServers.planEndedDescription":
     "요금제가 종료되어 서버가 중지되었어요. 데이터는 그대로 남아 있어요. 서버를 시작하려면 요금제를 갱신해 주세요.",
+  "settings.hostedServers.planEndedKeptUntil":
+    "요금제가 종료되어 서버가 중지되었어요. 데이터는 {date}까지 남아 있어요. 서버를 시작하려면 그 전에 요금제를 갱신해 주세요.",
   "settings.hostedServers.pay": "결제 페이지 열기",
   "settings.hostedServers.payLabel": "{name}의 결제 페이지 열기",
   "settings.hostedServers.renew": "요금제 갱신",
