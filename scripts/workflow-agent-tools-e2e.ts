@@ -483,8 +483,10 @@ try {
     ops: [{ op: "add", kind: "trigger", fields: { trigger: "telegram" } }],
   });
   check(
-    "a messaging trigger without an event is refused",
-    !noEvent.ok && JSON.stringify(noEvent.value).includes("mention"),
+    "a messaging trigger without an event is refused, and makes no workflow",
+    !noEvent.ok &&
+      JSON.stringify(noEvent.value).includes("mention") &&
+      (await runCauseEffect(workflows.list())).length === libraryBefore,
     noEvent.value,
   );
   const review = await call("event", "edit_workflow", {
@@ -520,7 +522,14 @@ try {
     workflowId: reviewId,
     ops: [{ op: "update", node: prTrigger.id, fields: { filters: "notBot" } }],
   });
-  check("an edit that does not change the event keeps a saved event as it is", otherField.ok, otherField.value);
+  const keptTrigger = (await runCauseEffect(workflows.get(reviewId))).graph.nodes.find(
+    (node) => node.id === prTrigger.id,
+  );
+  check(
+    "an edit that does not change the event keeps a saved event as it is",
+    otherField.ok && keptTrigger?.fields.event === "pull_request.opened" && keptTrigger.fields.filters === "notBot",
+    { result: otherField.value, trigger: keptTrigger },
+  );
 
   const caseInput = "Shipment 4417: review the packet from the supplier in Gdansk.";
   const fromNode = await call("failure-run-from-node", "run_workflow", {

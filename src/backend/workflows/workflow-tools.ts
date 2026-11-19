@@ -23,6 +23,7 @@ import {
   workflowListField,
 } from "@openbot/contracts/ipc";
 
+import { isOneOf } from "@openbot/contracts/runtime-values";
 import { RoutineInputError } from "@openbot/team-client/routine-schedule";
 import { Effect } from "effect";
 import { z } from "zod";
@@ -317,7 +318,7 @@ function withRepositoryList(
   return { ...fields, ...workflowGitHubTriggerRepositoryFields(repositories) };
 }
 
-const TRIGGER_EVENTS: ReadonlyMap<string, readonly string[]> = new Map<string, readonly string[]>([
+const TRIGGER_EVENTS = new Map<string, readonly string[]>([
   ["github", WORKFLOW_GITHUB_EVENTS],
   ["discord", WORKFLOW_DISCORD_EVENTS],
   ["telegram", WORKFLOW_TELEGRAM_EVENTS],
@@ -331,7 +332,7 @@ function changesTriggerEvent(patch: WorkflowOp["fields"]): boolean {
 function checkTriggerEvent(node: WorkflowNode, op: number): void {
   const { trigger, event } = node.fields;
   const events = node.kind === "trigger" && typeof trigger === "string" ? TRIGGER_EVENTS.get(trigger) : undefined;
-  if (!events || events.some((known) => known === event)) return;
+  if (!events || isOneOf(events, event)) return;
   const given = event === undefined ? "has no event" : `has event "${String(event)}", which is unknown`;
   refuse(`Op ${op}: the ${trigger} trigger ${given}. Set event to one of: ${events.join(", ")}.`);
 }
