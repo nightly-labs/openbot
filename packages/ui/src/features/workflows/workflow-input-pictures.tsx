@@ -21,7 +21,8 @@ const ROLE_BADGE = {
 
 export function storedPictureUrl(board: WfnBoard, value: string): string | undefined {
   return (
-    board.catalogs().files.find((file) => file.name === value && file.previewKind === "image")?.previewUrl ?? undefined
+    board.catalogs().files.find((file) => (file.id === value || file.name === value) && file.previewKind === "image")
+      ?.previewUrl ?? undefined
   );
 }
 
