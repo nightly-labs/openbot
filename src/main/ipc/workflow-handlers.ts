@@ -54,6 +54,8 @@ import {
   decodeRemoteWorkflowSummary,
   decodeRemoteWorkflowVersionGraph,
   decodeRemoteWorkflowVersions,
+  workflowMediaCreditsOf,
+  workflowMediaProvidersOf,
 } from "@openbot/team-client/workflow-decoding";
 import type { Effect } from "effect";
 import { runCauseEffect } from "../../backend/effect-boundary";
@@ -241,41 +243,54 @@ export function workflowIpcHandlers({
       mediaProviders: scopedQueryHandler({
         local: () => workflows.mediaProviders(),
         // A host without `workflows-sunra-v1` does not run the Sunra models, so it has no Sunra. The
-        // same is true for Higgsfield and `workflows-higgsfield-v1`. A host without
-        // `workflows-media-service-account-v1` makes each file on the first account, so it lists none.
+        // same is true for Higgsfield and `workflows-higgsfield-v1`. A host with
+        // `workflows-media-service-account-v1` lists the accounts, so one read gives all; a host
+        // without it makes each file on the first account, so it lists none.
         remote: async (serverId) => {
-          const [sunra, higgsfield, accounts] = await Promise.all([
+          if (remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY)) {
+            const accounts = await remote(
+              serverId,
+              WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.accounts,
+              decodeRemoteMediaServiceAccounts,
+              {},
+            );
+            return workflowMediaProvidersOf(accounts);
+          }
+          const [sunra, higgsfield] = await Promise.all([
             remoteServers.supportsCapability(serverId, WORKFLOWS_SUNRA_CAPABILITY)
               ? remote(serverId, WORKFLOWS_SUNRA_ROUTES.providers, decodeRemoteWorkflowMediaProviders, {})
               : { sunra: false },
             remoteServers.supportsCapability(serverId, WORKFLOWS_HIGGSFIELD_CAPABILITY)
               ? remote(serverId, WORKFLOWS_HIGGSFIELD_ROUTES.providers, decodeRemoteHiggsfieldProviders, {})
               : { higgsfield: false },
-            remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY)
-              ? remote(serverId, WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.accounts, decodeRemoteMediaServiceAccounts, {})
-              : null,
           ]);
-          return { ...sunra, ...higgsfield, accounts };
+          return { ...sunra, ...higgsfield, accounts: null };
         },
       }),
       mediaCredits: scopedQueryHandler({
         local: () => runCauseEffect(workflows.mediaCredits()),
         // A host without `workflows-sunra-v1` has no Sunra, so it has no credits to show. The same is
         // true for Higgsfield and `workflows-higgsfield-v1`. A host with
-        // `workflows-media-service-account-v1` also gives the credits of each account.
+        // `workflows-media-service-account-v1` gives the credits of each account, so one read gives all.
         remote: async (serverId) => {
-          const [sunra, higgsfield, accounts] = await Promise.all([
+          if (remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY)) {
+            const accounts = await remote(
+              serverId,
+              WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.credits,
+              decodeRemoteMediaServiceCredits,
+              {},
+            );
+            return workflowMediaCreditsOf(accounts);
+          }
+          const [sunra, higgsfield] = await Promise.all([
             remoteServers.supportsCapability(serverId, WORKFLOWS_SUNRA_CAPABILITY)
               ? remote(serverId, WORKFLOWS_SUNRA_ROUTES.credits, decodeRemoteWorkflowMediaCredits, {})
               : { sunra: null },
             remoteServers.supportsCapability(serverId, WORKFLOWS_HIGGSFIELD_CAPABILITY)
               ? remote(serverId, WORKFLOWS_HIGGSFIELD_ROUTES.credits, decodeRemoteHiggsfieldCredits, {})
               : { higgsfield: null },
-            remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY)
-              ? remote(serverId, WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.credits, decodeRemoteMediaServiceCredits, {})
-              : null,
           ]);
-          return { ...sunra, ...higgsfield, accounts };
+          return { ...sunra, ...higgsfield, accounts: null };
         },
       }),
       mediaCatalog: scopedQueryHandler({

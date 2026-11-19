@@ -36,10 +36,13 @@ import {
   WORKFLOW_STEP_STATUSES,
   WORKFLOW_TRIGGER_TYPES,
   WORKFLOW_VERSION_KINDS,
+  type WorkflowCatalogProvider,
   type WorkflowMediaAccountCredits,
   type WorkflowMediaCatalog,
   type WorkflowMediaCreditBalance,
+  type WorkflowMediaCredits,
   type WorkflowMediaPrice,
+  type WorkflowMediaProviders,
   type WorkflowMediaServiceAccount,
 } from "@openbot/contracts/ipc";
 import { guardedDecoder, guardedListDecoder } from "@openbot/contracts/ipc-decoding";
@@ -224,6 +227,26 @@ export function decodeRemoteMediaServiceCredits(value: unknown): WorkflowMediaAc
     name,
     credits: credits && { available: credits.available, quota: credits.quota },
   }));
+}
+
+/**
+ * The media services of a host that lists its accounts. Such a host has a service when it has an
+ * account of it, so the client does not read the `workflows-sunra-v1` and `workflows-higgsfield-v1`
+ * routes too.
+ */
+export function workflowMediaProvidersOf(accounts: readonly WorkflowMediaServiceAccount[]): WorkflowMediaProviders {
+  return {
+    sunra: accounts.some((account) => account.provider === "sunra"),
+    higgsfield: accounts.some((account) => account.provider === "higgsfield"),
+    accounts,
+  };
+}
+
+/** The credits of a host that lists its accounts: the first account of a service is its default. */
+export function workflowMediaCreditsOf(accounts: readonly WorkflowMediaAccountCredits[]): WorkflowMediaCredits {
+  const first = (provider: WorkflowCatalogProvider) =>
+    accounts.find((account) => account.provider === provider)?.credits ?? null;
+  return { sunra: first("sunra"), higgsfield: first("higgsfield"), accounts };
 }
 
 /**

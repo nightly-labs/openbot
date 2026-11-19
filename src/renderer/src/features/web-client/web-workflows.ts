@@ -82,6 +82,8 @@ import {
   decodeRemoteWorkflowSummary,
   decodeRemoteWorkflowVersionGraph,
   decodeRemoteWorkflowVersions,
+  workflowMediaCreditsOf,
+  workflowMediaProvidersOf,
 } from "@openbot/team-client/workflow-decoding";
 import type { AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
 import { currentText } from "@openbot/ui/text";
@@ -211,35 +213,46 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
         postGitHub(WORKFLOWS_GITHUB_ROUTES.runLastEvent, decodeRemoteWorkflowRunDetail, input),
       keepPicture: (draftId) => postMedia(WORKFLOWS_MEDIA_ROUTES.keepPicture, decodeRemoteWorkflowPicture, { draftId }),
       // A host without `workflows-sunra-v1` does not run the Sunra models, and a host without
-      // `workflows-higgsfield-v1` does not run the Higgsfield models. A host without
-      // `workflows-media-service-account-v1` makes each file on the first account, so it lists none.
+      // `workflows-higgsfield-v1` does not run the Higgsfield models. A host with
+      // `workflows-media-service-account-v1` lists the accounts and their credits, so one read gives
+      // all; a host without it makes each file on the first account, so it lists none.
       mediaProviders: async () => {
-        const [sunra, higgsfield, accounts] = await Promise.all([
+        if (has(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY)) {
+          const accounts = await post(
+            WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.accounts,
+            decodeRemoteMediaServiceAccounts,
+            {},
+          );
+          return workflowMediaProvidersOf(accounts);
+        }
+        const [sunra, higgsfield] = await Promise.all([
           has(WORKFLOWS_SUNRA_CAPABILITY)
             ? post(WORKFLOWS_SUNRA_ROUTES.providers, decodeRemoteWorkflowMediaProviders, {})
             : { sunra: false },
           has(WORKFLOWS_HIGGSFIELD_CAPABILITY)
             ? post(WORKFLOWS_HIGGSFIELD_ROUTES.providers, decodeRemoteHiggsfieldProviders, {})
             : { higgsfield: false },
-          has(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY)
-            ? post(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.accounts, decodeRemoteMediaServiceAccounts, {})
-            : null,
         ]);
-        return { ...sunra, ...higgsfield, accounts };
+        return { ...sunra, ...higgsfield, accounts: null };
       },
       mediaCredits: async () => {
-        const [sunra, higgsfield, accounts] = await Promise.all([
+        if (has(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY)) {
+          const accounts = await post(
+            WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.credits,
+            decodeRemoteMediaServiceCredits,
+            {},
+          );
+          return workflowMediaCreditsOf(accounts);
+        }
+        const [sunra, higgsfield] = await Promise.all([
           has(WORKFLOWS_SUNRA_CAPABILITY)
             ? post(WORKFLOWS_SUNRA_ROUTES.credits, decodeRemoteWorkflowMediaCredits, {})
             : { sunra: null },
           has(WORKFLOWS_HIGGSFIELD_CAPABILITY)
             ? post(WORKFLOWS_HIGGSFIELD_ROUTES.credits, decodeRemoteHiggsfieldCredits, {})
             : { higgsfield: null },
-          has(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY)
-            ? post(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.credits, decodeRemoteMediaServiceCredits, {})
-            : null,
         ]);
-        return { ...sunra, ...higgsfield, accounts };
+        return { ...sunra, ...higgsfield, accounts: null };
       },
       // A host without `workflows-media-catalog-v1` runs only the fixed models and gives no quote.
       mediaCatalog: async () =>

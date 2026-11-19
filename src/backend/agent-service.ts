@@ -369,11 +369,6 @@ const routingLogger = createOpenBotLogger("channel-routing");
 /** Its lines also go to `providers.log`: the screen can show a general sentence in place of the cause (#5222). */
 const errorLogger = createOpenBotLogger("agent-error");
 
-/**
- * Only the application knows which managed CLIs it downloaded, so a caller that says nothing gets
- * none of them. Codex is left out on purpose: it is the one provider that can also ship inside the
- * application, and an unset entry keeps that copy in the search.
- */
 /** The MCP host and the brand name of each media service. */
 const MEDIA_SERVICE_HOSTS: Readonly<Record<WorkflowCatalogProvider, string>> = {
   sunra: SUNRA_MCP_HOST,
@@ -384,6 +379,11 @@ const MEDIA_SERVICE_NAMES: Readonly<Record<WorkflowCatalogProvider, string>> = {
   higgsfield: "Higgsfield",
 };
 
+/**
+ * Only the application knows which managed CLIs it downloaded, so a caller that says nothing gets
+ * none of them. Codex is left out on purpose: it is the one provider that can also ship inside the
+ * application, and an unset entry keeps that copy in the search.
+ */
 const DEFAULT_BUNDLED_EXECUTABLES: BundledProviderExecutables = { claude: null, grok: null };
 
 export type { TestMcpServerOptions } from "./agent/mcp-gateway";
@@ -3214,19 +3214,27 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#mcp.serviceSignIn(MEDIA_SERVICE_HOSTS[provider]);
   }
 
-  /** The signed-in accounts of each media service, in the order of Apps; the first of a service is its default. */
+  /**
+   * The signed-in accounts of each media service, in the order of Apps; the first of a service is its
+   * default. Each service keeps an equal part of the limit, so many accounts of one service never hide
+   * the default account of another.
+   */
   #mediaServiceAccounts() {
+    const perService = Math.floor(WORKFLOW_MEDIA_SERVICE_ACCOUNT_MAX / WORKFLOW_CATALOG_PROVIDERS.length);
     return WORKFLOW_CATALOG_PROVIDERS.flatMap((provider) =>
-      this.#mcp.serviceSignIns(MEDIA_SERVICE_HOSTS[provider]).map((signIn) => ({
-        provider,
-        signIn,
-        account: {
+      this.#mcp
+        .serviceSignIns(MEDIA_SERVICE_HOSTS[provider])
+        .slice(0, perService)
+        .map((signIn) => ({
           provider,
-          id: signIn.id,
-          name: signIn.name?.slice(0, WORKFLOW_MEDIA_SERVICE_ACCOUNT_NAME_MAX) ?? null,
-        },
-      })),
-    ).slice(0, WORKFLOW_MEDIA_SERVICE_ACCOUNT_MAX);
+          signIn,
+          account: {
+            provider,
+            id: signIn.id,
+            name: signIn.name?.slice(0, WORKFLOW_MEDIA_SERVICE_ACCOUNT_NAME_MAX) ?? null,
+          },
+        })),
+    );
   }
 
   /**

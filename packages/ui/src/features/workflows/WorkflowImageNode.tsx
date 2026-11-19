@@ -408,9 +408,14 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
     const { aspect, duration, resolution, transparent } = specs();
     return { model: chosen.id, kind: kind(), aspect, duration, resolution, transparent };
   });
+  /** The price of one run as an object, so that a price of 0 credits also shows. */
+  const quote = () => {
+    const credits = price();
+    return credits === null ? undefined : { credits };
+  };
   const runLabel = () => {
     const credits = price();
-    return !credits ? undefined : t("workflow.node.runPriceLabel", { credits: format.number(credits) });
+    return credits === null ? undefined : t("workflow.node.runPriceLabel", { credits: format.number(credits) });
   };
   /**
    * The shape of the card: the custom size, else the aspect ratio that the model makes. A custom size
@@ -783,7 +788,7 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
                     >
                       {/* A step with a price shows the credits of one run; its label says "Run" for screen readers. */}
                       <Show
-                        when={price()}
+                        when={quote()}
                         fallback={
                           <>
                             <Play aria-hidden="true" />
@@ -791,10 +796,10 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
                           </>
                         }
                       >
-                        {(credits) => (
+                        {(shown) => (
                           <>
                             <Zap class="wfn-run-credits-icon" aria-hidden="true" />
-                            {format.number(credits())}
+                            {format.number(shown().credits)}
                           </>
                         )}
                       </Show>
