@@ -35,6 +35,14 @@ function ThreadRowItem(props: {
 }) {
   const { t } = useText();
   const busy = () => threadBusy(props.thread.status);
+  let menuOpen = false;
+  const menuChange = (open: boolean) => {
+    menuOpen = open;
+    props.onMenuChange?.(open);
+  };
+  onCleanup(() => {
+    if (menuOpen) props.onMenuChange?.(false);
+  });
   const style = () => (props.index === undefined ? undefined : { "--sidebar-thread-index": props.index });
   return (
     <Show
@@ -45,7 +53,7 @@ function ThreadRowItem(props: {
         </li>
       }
     >
-      <ContextMenu.Root modal={false} onOpenChange={(open) => props.onMenuChange?.(open)}>
+      <ContextMenu.Root modal={false} onOpenChange={menuChange}>
         <ContextMenu.Trigger as="li" class={props.class} style={style()}>
           {props.children}
         </ContextMenu.Trigger>
@@ -188,8 +196,14 @@ function ThreadCard(props: {
   const rowMenuChange = (open: boolean) => {
     setRowMenuOpen(open);
     if (open) props.onKeep();
-    else if (!content?.matches(":hover")) props.onLeave();
+    else if (!content?.matches(":hover") && !props.anchor?.matches(":hover")) props.onLeave();
   };
+  createEffect(
+    () => props.open,
+    (open) => {
+      if (!open) setRowMenuOpen(false);
+    },
+  );
   return (
     <Popover.Root
       open={props.open}

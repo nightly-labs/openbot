@@ -6778,7 +6778,7 @@ try {
       capabilities: [AGENT_HIDDEN_CAPABILITY, AGENT_THREADS_CAPABILITY],
     });
     check(
-      "a member deletes a side thread from the sidebar of a joined server: the host deletes that thread of that agent",
+      "the thread delete route with agent-threads-v1 deletes the thread of the agent that the member names",
       deleted.status === 200 && isDeepStrictEqual(callsOf("deleteTask"), [[target]]),
       [summary(deleted), callsOf("deleteTask")],
     );

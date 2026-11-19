@@ -41,7 +41,7 @@ export function sidebarAgentThreads(input: SidebarAgentThreadsInput): SidebarAge
     },
     onOpen: input.openThread,
     onNew: input.onNew,
-    onArchive: editable ? (agentId, threadId) => void tabs.archive(agentId, threadId) : undefined,
+    onArchive: (agentId, threadId) => void tabs.archive(agentId, threadId),
     onDelete: editable ? (agentId, threadId) => void tabs.remove(agentId, threadId) : undefined,
   };
 }
