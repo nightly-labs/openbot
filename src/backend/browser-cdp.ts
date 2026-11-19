@@ -2554,7 +2554,7 @@ export class BrowserCdpEngine {
             const unmodified = (input.modifiers & ~SHIFT_MODIFIER) === 0;
             const character = input.action === "down" && unmodified ? text : undefined;
             const printableCode =
-              unmodified && keyCodes.windowsVirtualKeyCode === undefined
+              (unmodified || input.action === "up") && keyCodes.windowsVirtualKeyCode === undefined
                 ? printableKeyCode(input.key, input.code)
                 : undefined;
             const selectAll =
