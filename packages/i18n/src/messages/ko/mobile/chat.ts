@@ -578,6 +578,8 @@ export const messages = {
   "mobile.chat.threads.menu": "{name}, 스레드",
   "mobile.chat.threads.menuAttention": { other: "{name}, 스레드. {count}건 확인 필요" },
   "mobile.chat.threads.main": "메인 채팅",
+  "mobile.chat.threads.count": { other: "스레드 {count}개" },
+  "mobile.chat.threads.unreadCount": { other: "읽지 않은 스레드 {count}개" },
   "mobile.chat.threads.branchedFrom": "{title}에서 분기됨",
   "mobile.chat.threads.branchedFromDeleted": "삭제된 스레드에서 분기됨",
   "mobile.chat.threads.new": "새 스레드",
