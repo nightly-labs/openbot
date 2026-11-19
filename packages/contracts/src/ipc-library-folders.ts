@@ -1,32 +1,14 @@
-/**
- * Library folders: each agent has folders for its files in the Library, and a folder can hold folders.
- * A file is in one folder of its agent or in none. The folders are a layout over the stored files: a
- * folder change moves, copies and deletes no file.
- *
- * The host keeps one snapshot. Each change is one action, and the answer is the full snapshot. The
- * pure `applyLibraryFolderAction` gives the same result on the host, in the preview mock and in a
- * client that shows a change before the host answers.
- */
-
 import { isIdentifier } from "./ipc-bounded-values";
 import { type DynamicRecord, isDynamicRecord, isNumber, isString } from "./runtime-values";
 
 export const LIBRARY_FOLDER_LIMITS = {
-  /** The folders of all agents of one host. */
   folders: 500,
   name: 80,
-  /** A folder at the top is level 1. */
   levels: 5,
-  /** The files of one host that are in a folder. */
   placements: 20_000,
-  /** The files of one action. */
   files: 2_000,
 } as const;
 
-/**
- * A folder in the library of one agent. A folder with a parent is in that folder. The folders of one
- * parent show in the sequence that they have in the snapshot.
- */
 export interface LibraryFolder {
   id: string;
   agentId: string;
@@ -37,42 +19,24 @@ export interface LibraryFolder {
 export interface LibraryFoldersSnapshot {
   revision: number;
   folders: LibraryFolder[];
-  /** The folder of each file that is in one, by file id. A file with no entry is in no folder. */
   placement: Record<string, string>;
 }
 
-/** A deleted folder with the position that it had in the snapshot. */
 export interface RemovedLibraryFolder {
   index: number;
   folder: LibraryFolder;
 }
 
 export type LibraryFolderAction =
-  /**
-   * The client makes the id, so it can show the folder before the host answers. The folder goes last
-   * in its parent. `fileIds` puts files of the same agent into the new folder.
-   */
   | { type: "create"; id: string; agentId: string; name: string; parentId?: string; fileIds?: string[] }
   | { type: "rename"; folderId: string; name: string }
-  /** Removes the folder and each folder below it. Their files stay with the agent, in no folder. */
   | { type: "delete"; folderId: string }
-  /**
-   * Puts a folder, with the folders in it, in `parentId` (null: the top level of its agent), before
-   * the sibling `beforeFolderId` (null: last).
-   */
   | { type: "move"; folderId: string; parentId: string | null; beforeFolderId: string | null }
-  /** Puts files into a folder of their agent. Null takes them out of their folder. */
   | { type: "place"; fileIds: string[]; folderId: string | null }
-  /**
-   * Puts deleted folders back at their positions, with the files that they held. A folder that exists
-   * is not changed, and a file that got a different folder after the delete stays there.
-   */
   | { type: "restore"; folders: RemovedLibraryFolder[]; placement: Record<string, string> };
 
-/** What the host knows and the snapshot does not hold. */
 export interface LibraryFolderContext {
   agentIds: Pick<ReadonlySet<string>, "has">;
-  /** The agent of a file. Null: the file has no agent. Undefined: the file is unknown. */
   fileAgent(fileId: string): string | null | undefined;
 }
 
@@ -88,7 +52,6 @@ export type LibraryFolderRefusalReason =
   | "taken-id"
   | "into-itself";
 
-/** A change that the rules do not permit. The host gives each reason a localized message. */
 export class LibraryFolderRefusal extends Error {
   readonly reason: LibraryFolderRefusalReason;
 
@@ -105,14 +68,12 @@ function refuse(reason: LibraryFolderRefusalReason): never {
   throw new LibraryFolderRefusal(reason);
 }
 
-/** The name with no space at its ends. An empty or long name is refused. */
 export function libraryFolderName(name: string): string {
   const trimmed = name.trim();
   if (trimmed.length === 0 || trimmed.length > LIBRARY_FOLDER_LIMITS.name) refuse("name");
   return trimmed;
 }
 
-/** A folder and each folder below it. */
 export function libraryFolderBranch(folders: readonly LibraryFolder[], folderId: string): Set<string> {
   const ids = new Set([folderId]);
   for (let grew = true; grew; ) {
@@ -126,7 +87,6 @@ export function libraryFolderBranch(folders: readonly LibraryFolder[], folderId:
   return ids;
 }
 
-/** The folders from the top level down to the folder. Empty for an unknown folder. */
 export function libraryFolderPath(folders: readonly LibraryFolder[], folderId: string | undefined): LibraryFolder[] {
   const byId = new Map(folders.map((folder) => [folder.id, folder]));
   const path: LibraryFolder[] = [];
@@ -138,7 +98,6 @@ export function libraryFolderPath(folders: readonly LibraryFolder[], folderId: s
   return path;
 }
 
-/** Each folder of an agent with its level (0 at the top), in the sequence of the tree. */
 export function libraryFolderTree(
   folders: readonly LibraryFolder[],
   agentId: string,
@@ -151,7 +110,6 @@ export function libraryFolderTree(
     .flatMap((folder) => [{ folder, depth }, ...libraryFolderTree(folders, agentId, folder.id, depth + 1)]);
 }
 
-/** How many levels of folders a folder holds under it: 0 for a folder with no folders in it. */
 export function libraryFolderHeight(
   folders: readonly LibraryFolder[],
   folderId: string,
@@ -166,10 +124,6 @@ export function libraryFolderHeight(
   return height;
 }
 
-/**
- * The folder of a file: its entry in the snapshot, when that folder exists and is a folder of the
- * agent of the file. A file never shows in the folder of a different agent.
- */
 export function libraryFolderOfFile(
   snapshot: Pick<LibraryFoldersSnapshot, "folders" | "placement">,
   file: { id: string; agentId: string | null },
@@ -180,12 +134,6 @@ export function libraryFolderOfFile(
   return folder?.agentId === file.agentId ? folder : undefined;
 }
 
-/**
- * The snapshot with only what the rules permit: one folder for each id, a parent that exists, is a
- * folder of the same agent, makes no loop and is not too deep (else the folder goes to the top
- * level), and placements only in folders that exist. A file that a person or an older version edited
- * loads through this.
- */
 export function normalizeLibraryFolders(snapshot: LibraryFoldersSnapshot): LibraryFoldersSnapshot {
   const byId = new Map<string, LibraryFolder>();
   for (const folder of snapshot.folders) if (!byId.has(folder.id)) byId.set(folder.id, folder);
@@ -196,8 +144,6 @@ export function normalizeLibraryFolders(snapshot: LibraryFoldersSnapshot): Libra
     if (!parent || parent.id === folder.id || parent.agentId !== folder.agentId) tops.push(folder.id);
     else children.set(parent.id, [...(children.get(parent.id) ?? []), folder]);
   }
-  // From the top level down, so the level of a folder does not depend on the sequence of the array.
-  // A folder that this does not reach is in a loop or too deep: it goes to the top level, with its folders.
   const levels = new Map<string, number>();
   const parents = new Map<string, string>();
   const descend = (top: string) => {
@@ -228,12 +174,10 @@ function requireFolder(snapshot: LibraryFoldersSnapshot, folderId: string): Libr
   return snapshot.folders.find((folder) => folder.id === folderId) ?? refuse("unknown-folder");
 }
 
-/** The level of a folder: 1 at the top. */
 function folderLevel(snapshot: LibraryFoldersSnapshot, folderId: string): number {
   return libraryFolderPath(snapshot.folders, folderId).length;
 }
 
-/** The placement with the files in the folder. Each file must be a known file of the agent of the folder. */
 function placed(
   snapshot: LibraryFoldersSnapshot,
   fileIds: readonly string[],
@@ -256,11 +200,6 @@ function samePlacement(left: Record<string, string>, right: Record<string, strin
   return keys.length === Object.keys(right).length && keys.every((fileId) => left[fileId] === right[fileId]);
 }
 
-/**
- * Applies one action. An action that changes nothing answers `current` itself, so the host does not
- * write its file or raise the revision. A change that the rules do not permit throws a
- * `LibraryFolderRefusal`.
- */
 export function applyLibraryFolderAction(
   current: LibraryFoldersSnapshot,
   action: LibraryFolderAction,
@@ -351,7 +290,6 @@ export function applyLibraryFolderAction(
         const folder = { ...entry.folder, name: libraryFolderName(entry.folder.name) };
         folders.splice(Math.min(entry.index, folders.length), 0, folder);
       }
-      // A parent that does not come back, or that the rules do not permit, puts the folder at the top level.
       const restored = normalizeLibraryFolders({ revision, folders, placement: {} }).folders;
       const byId = new Map(restored.map((folder) => [folder.id, folder]));
       const placement = { ...current.placement };
@@ -417,7 +355,6 @@ function decodePlacement(value: unknown): Record<string, string> {
   );
 }
 
-/** Decodes a snapshot from a host or from the stored file. Throws on a value outside the bounds. */
 export function decodeLibraryFoldersSnapshot(value: unknown): LibraryFoldersSnapshot {
   if (!isDynamicRecord(value)) invalid("library folders");
   if (!isNumber(value.revision) || !Number.isSafeInteger(value.revision) || value.revision < 0)
@@ -430,7 +367,6 @@ export function decodeLibraryFoldersSnapshot(value: unknown): LibraryFoldersSnap
   });
 }
 
-/** Null: the host has no Library folders. */
 export function decodeOptionalLibraryFoldersSnapshot(value: unknown): LibraryFoldersSnapshot | null {
   return value === null ? null : decodeLibraryFoldersSnapshot(value);
 }

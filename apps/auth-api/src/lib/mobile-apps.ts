@@ -14,7 +14,6 @@ export interface MobileAppDetails {
   status: "Available";
 }
 
-/** The phone apps on the landing cards. They open a store page, so the links leave the site. */
 export const MOBILE_APPS: Record<MobilePlatform, MobileAppDetails> = {
   ios: {
     id: "ios",
@@ -36,10 +35,6 @@ export const MOBILE_APPS: Record<MobilePlatform, MobileAppDetails> = {
 
 export const MOBILE_APP_ORDER: readonly MobilePlatform[] = ["ios", "android"];
 
-/**
- * The phone app for a visitor on a phone. Android reports Linux and an iPhone reports "like Mac OS X",
- * so check this before the desktop detection. An iPad in desktop mode reports a Mac and stays one.
- */
 export function detectMobilePlatform(source: PlatformNavigator): MobilePlatform | undefined {
   const platform =
     `${source.userAgentData?.platform ?? ""} ${source.platform ?? ""} ${source.userAgent ?? ""}`.toLowerCase();

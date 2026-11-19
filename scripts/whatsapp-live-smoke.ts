@@ -1,16 +1,3 @@
-// A live check of the WhatsApp client against WhatsApp's real servers. It needs the network.
-//
-// Stage 1 (always): a new device opens a socket with OpenBot's Signal code and the vendored Baileys,
-// and WhatsApp sends a QR code. That proves the Noise handshake, X25519 and the check of WhatsApp's
-// server certificate (XEdDSA) against the real servers. No phone is needed and nothing is linked.
-//
-// Stage 2 (manual, with `--link <peer number>`): the QR code shows in the terminal; scan it with a test
-// phone (WhatsApp → Linked devices). The script then waits for a message from the peer phone, answers
-// it, sends an image, closes and opens the session again from its store, and waits for one more
-// message, which proves that the Signal sessions survive a restart. Use test numbers only.
-//
-// `bun scripts/whatsapp-live-smoke.ts [--link 48600100200]`
-// Writes .openbot-build/whatsapp-live-smoke/report.json. The store is deleted at the end.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";

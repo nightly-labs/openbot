@@ -25,32 +25,21 @@ import { queryKeys } from "@/features/workspace/model/query-keys";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
-/**
- * The access and Full access grant of an agent, as its host answers them. Null for a member, for a host
- * without `agent-admin-v1`, and until the host answers. The info page and this page share the read.
- */
 export function useAgentAdminSettings(agent: MobileAgent, server: MobileServer | undefined, available: boolean) {
   const workspace = useMobileWorkspaceActions();
   const queryScope = useQueryScope();
   const canAdminister = canAdministerServer(server?.role);
-  // Under "agent-info", so the host's agent events refresh it with the other agent records.
   const queryKey = queryKeys.agentRecord(queryScope, agent.serverId, agent.id, "admin");
   const settings = useQuery({
     queryKey,
     queryFn: () => workspace.loadAgentAdminSettings(agent.id, agent.serverId),
     enabled: available && canAdminister,
     retry: false,
-    // Another device can change these at any time, so a reopened page reads the host again.
     staleTime: 0,
   });
   return { queryKey, settings: canAdminister ? (settings.data ?? null) : null };
 }
 
-/**
- * The Permissions level of an agent, read from and saved on its host. Only an owner or admin sees
- * it, and only when the host serves `agent-admin-v1`. The host checks the role again on every call.
- * A change saves at once, as on desktop and web, and does not wait for the sheet's Save action.
- */
 export function AgentAccessFields({
   agent,
   server,
@@ -67,10 +56,8 @@ export function AgentAccessFields({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { queryKey, settings } = useAgentAdminSettings(agent, server, available);
-  // A host without the capability answers null. A failed read keeps the controls hidden, as for a member.
   if (!settings) return null;
   const current = agentPermissionLevel(settings);
-  // A released host with Turbo mode on answers every agent as auto-approving, and a change cannot narrow it.
   const locked = settings.autoApproveLocked;
   const enabled = available && !saving;
 

@@ -1,31 +1,5 @@
-// Checks the automatic plan continuation: a turn of the agent's own chat or of a side thread that
-// ends with open steps in the agent's plan runs once more with a short note, up to 8 times for one
-// request. A turn with no open step runs once more, at most 2 times, when its answer only asks whether
-// to continue or is short and ends on a next step that it did not do. Runs the real agent service on a temporary profile with a fake Codex app-server. The
-// current message names its turns in `<<PLAN[...]PLAN>>`: each element is one turn, with its plan
-// steps, its answer, its delay and its OpenBot tool calls. A continuation turn takes the next element
-// of its thread.
-// Checks:
-//   1. A turn with open steps continues once, and the request completes when the plan is done.
-//   2. A request continues at most 8 times.
-//   3. A continuation that does not change the open steps stops the chain.
-//   4. An answer whose last line asks a question does not continue. A question about a named action
-//      does not continue either.
-//   4a. An answer that only asks whether to continue keeps a plan with open steps going. An
-//       approval question ("Proceed?"), a real question before it, or a wait does not continue.
-//   4b. A turn with no plan continues when its answer ends on a next step or asks whether to
-//       continue, at most 2 times for one request. A long report that ends on a next step does not.
-//   5. A turn that opens a wait does not continue.
-//   6. Stop during a continuation ends the chain. The next message works.
-//   7. A message that waits in the queue stops the continuation and runs next.
-//   8. A side thread continues in its own thread only.
-//   9. A routine run does not continue.
-//  10. A restart while a continuation waits completes the request with no new turn.
-// Not checked: a message sent in the short gap before a continuation starts. The drain starts the
-// continuation at once, and a hidden agent refuses new messages. Check 7 covers the same rule.
-// No provider, account or network is used. `bun run test:plan-continuation`.
-// Writes .openbot-build/plan-continuation-e2e/report.json.
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -41,8 +15,8 @@ const home = join(root, "home");
 const fakeCodex = join(root, "codex");
 const fakeLog = join(root, "codex.jsonl");
 const NOTE_MARKER = "OpenBot note, not a message from the user";
+const CHECK_MARKER = "OpenBot finish check";
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -56,15 +30,22 @@ const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
 type StepStatus = "pending" | "inProgress" | "completed";
 
-/** One turn of the fake: its plan, its answer, its delay and its OpenBot tool calls. */
 interface FakeTurn {
   steps: [string, StepStatus][];
   answer?: string;
+  noAnswer?: boolean;
   delayMs?: number;
-  calls?: { tool: string; arguments: Record<string, string> }[];
+  holdUntil?: string;
+  commands?: string[];
+  calls?: { tool: string; arguments: Record<string, string | string[] | boolean> }[];
 }
 
-const plan = (...turns: FakeTurn[]) => `<<PLAN${JSON.stringify(turns)}PLAN>>`;
+const plan = (...turns: FakeTurn[]) =>
+  `<<PLAN${JSON.stringify(turns).replaceAll("<", "\\u003c").replaceAll(">", "\\u003e")}PLAN>>`;
+
+type Verdict = { verdict: "done" | "continue" | "user" | "blocked"; missing?: string; delayMs?: number } | string;
+
+const verdicts = (...answers: Verdict[]) => `<<VERDICT${JSON.stringify(answers)}VERDICT>>`;
 
 const FAKE_CODEX = `#!/usr/bin/env node
 const fs = require("node:fs");
@@ -74,13 +55,13 @@ if (process.argv.includes("--version")) {
 }
 const LOG = ${JSON.stringify(fakeLog)};
 const NOTE = ${JSON.stringify(NOTE_MARKER)};
+const CHECK = ${JSON.stringify(CHECK_MARKER)};
 const config = { config: { mcp_servers: {} }, layers: [{ name: { type: "user", file: "/fake/.codex/config.toml", profile: null }, version: "1", config: { mcp_servers: {} } }] };
 let buffer = "";
 let threads = 0;
 let turns = 0;
 const waiting = new Map();
 const timers = new Map();
-/** The turns that each thread has still to run, from the message that named them. */
 const scripts = new Map();
 process.stdout.on("error", (error) => {
   if (error.code === "EPIPE") process.exit(0);
@@ -92,13 +73,22 @@ const finish = (turn) => {
   timers.delete(turn.turnId);
   const plan = (turn.script.steps || []).map(([step, status]) => ({ step, status }));
   if (plan.length > 0) write({ method: "turn/plan/updated", params: { threadId: turn.threadId, turnId: turn.turnId, plan } });
+  (turn.script.commands || []).forEach((command, index) => {
+    const step = { type: "commandExecution", id: "command-" + turn.turnId + "-" + index, command, cwd: "/tmp", status: "completed", aggregatedOutput: "", exitCode: 0 };
+    write({ method: "item/completed", params: { threadId: turn.threadId, turnId: turn.turnId, item: step } });
+  });
   const item = { type: "agentMessage", id: "message-" + turn.turnId, text: turn.script.answer || "Done.", phase: "final_answer" };
-  write({ method: "item/completed", params: { threadId: turn.threadId, turnId: turn.turnId, item } });
+  if (!turn.script.noAnswer) write({ method: "item/completed", params: { threadId: turn.threadId, turnId: turn.turnId, item } });
   write({ method: "turn/completed", params: { threadId: turn.threadId, turn: { id: turn.turnId, status: "completed" } } });
 };
 const callNext = (turn) => {
   const call = turn.calls.shift();
-  if (!call) return timers.set(turn.turnId, setTimeout(() => finish(turn), turn.script.delayMs || 5));
+  if (!call) {
+    const end = () => timers.set(turn.turnId, setTimeout(() => finish(turn), turn.script.delayMs || 5));
+    const hold = turn.script.holdUntil;
+    const wait = () => (fs.existsSync(hold) ? end() : timers.set(turn.turnId, setTimeout(wait, 25)));
+    return hold ? wait() : end();
+  }
   const id = "tool-" + turn.turnId + "-" + turn.calls.length;
   waiting.set(id, turn);
   write({ id, method: "item/tool/call", params: { threadId: turn.threadId, turnId: turn.turnId, callId: "call-" + id, namespace: "openbot", tool: call.tool, arguments: call.arguments } });
@@ -124,6 +114,20 @@ const answer = (message) => {
       const text = (params.input || []).map((item) => item.text || "").join("\\n");
       write({ id: message.id, result: { turn: { id: turnId, status: "inProgress", items: [] } } });
       write({ method: "turn/started", params: { threadId: params.threadId, turn: { id: turnId } } });
+      if (text.includes(CHECK)) {
+        const named = /<<VERDICT([\\s\\S]*?)VERDICT>>/.exec(text);
+        const key = named ? named[1] : "";
+        const earlier = fs.existsSync(LOG)
+          ? fs.readFileSync(LOG, "utf8").split("\\n").filter(Boolean).map((line) => JSON.parse(line)).filter((entry) => entry.method === "check" && entry.key === key).length
+          : 0;
+        const answers = named ? JSON.parse(named[1]) : [];
+        const chosen = answers[earlier] ?? { verdict: "done" };
+        log({ method: "check", key, text });
+        const { delayMs, ...verdict } = typeof chosen === "string" ? {} : chosen;
+        const answer = typeof chosen === "string" ? chosen : JSON.stringify(verdict);
+        const checked = { threadId: params.threadId, turnId, script: { steps: [], answer } };
+        return delayMs ? timers.set(turnId, setTimeout(() => finish(checked), delayMs)) : finish(checked);
+      }
       const note = text.includes(NOTE);
       if (!note) {
         const named = /<<PLAN([\\s\\S]*?)PLAN>>/.exec(text.split("--- current message ---").at(-1));
@@ -199,7 +203,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service, its database or the fake's log. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -232,6 +235,20 @@ function loggedTurns(): LoggedTurn[] {
     .filter((entry) => entry.method === "turn");
 }
 
+function loggedChecks(): { text: string }[] {
+  let text = "";
+  try {
+    text = readFileSync(fakeLog, "utf8");
+  } catch {
+    return [];
+  }
+  return text
+    .split("\n")
+    .filter(Boolean)
+    .map((line): { method: string; text: string } => JSON.parse(line))
+    .filter((entry) => entry.method === "check");
+}
+
 async function check(name: string, run: () => Promise<unknown>) {
   const detail = await run();
   report.checks.push({ name, passed: true, detail });
@@ -249,6 +266,7 @@ function openService() {
     browser,
     preferredProvider: "codex",
     offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
+    finishCheck: true,
   });
   const events: AgentEvent[] = [];
   service.on("event", (event) => events.push(event));
@@ -277,7 +295,6 @@ async function createAgent(name: string) {
   return agent;
 }
 
-/** Sends a message, to the agent's own chat or to its side thread. Answers its delivery id. */
 async function send(agentId: string, text: string, taskId?: string): Promise<string> {
   const receipt = await runCauseEffect(
     current.service.sendMessage({ agentId, text, attachmentDraftIds: [], ...(taskId ? { taskId } : {}) }),
@@ -287,7 +304,6 @@ async function send(agentId: string, text: string, taskId?: string): Promise<str
   return deliveryId;
 }
 
-/** Waits for the delivery to end, with all of its continuations, and answers its status. */
 function settled(deliveryId: string, timeoutMs?: number) {
   return waitFor(
     `delivery ${deliveryId} to end`,
@@ -299,15 +315,21 @@ function settled(deliveryId: string, timeoutMs?: number) {
   );
 }
 
-/** The messages of the agent's own chat or of one side thread, as the database holds them. */
 function chatMessages(agentId: string, sideThreadId?: string) {
   const threadId = sideThreadId ?? current.store.list().find((agent) => agent.id === agentId)?.threadId ?? null;
   return current.database.readConversation(agentId, threadId).messages;
 }
 
-/** The continuation lines of the agent's own chat or of one side thread, as the database holds them. */
 function continuationLines(agentId: string, sideThreadId?: string) {
-  return chatMessages(agentId, sideThreadId).filter((message) => message.itemType === PLAN_CONTINUATION_ITEM_TYPE);
+  return chatMessages(agentId, sideThreadId).filter(
+    (message) => message.itemType === PLAN_CONTINUATION_ITEM_TYPE && !message.id.endsWith(":plan-stopped"),
+  );
+}
+
+function stopLines(agentId: string) {
+  return chatMessages(agentId).filter(
+    (message) => message.itemType === PLAN_CONTINUATION_ITEM_TYPE && message.id.endsWith(":plan-stopped"),
+  );
 }
 
 function errorsFor(agentId: string, since: number) {
@@ -354,6 +376,7 @@ try {
     assert.ok(!note.includes("Write the code"), "The note does not name the done step.");
     assert.ok(note.includes("Automatic continuation 1 of 8."));
     assert.equal(continuationLines(agent.id).length, 1, "One continuation line shows.");
+    assert.equal(stopLines(agent.id).length, 0, "A plan that is done shows no stop line.");
     assert.equal(errorsFor(agent.id, since).length, 0, "No error shows.");
     const completions = current.events
       .slice(since)
@@ -388,6 +411,7 @@ try {
     const names = ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"];
     const step = (done: number): FakeTurn => ({
       steps: names.map((text, index) => [text, index < done ? "completed" : "pending"]),
+      noAnswer: true,
     });
     const id = await send(agent.id, `Do ten things. ${plan(...names.map((_, done) => step(done)))}`);
     assert.equal(await settled(id), "completed");
@@ -399,6 +423,7 @@ try {
     );
     assert.ok(turns[8]?.text.includes("Automatic continuation 8 of 8."));
     assert.equal(continuationLines(agent.id).length, 8, "Eight continuation lines show.");
+    assert.equal(stopLines(agent.id).length, 1, "The chat says that the agent stopped at the limit.");
     return { turns: turns.length };
   });
 
@@ -410,12 +435,34 @@ try {
         ["Read", "completed"],
         ["Fix", "inProgress"],
       ],
+      noAnswer: true,
     };
     const id = await send(agent.id, `Fix it. ${plan(stuck, stuck, stuck)}`);
     assert.equal(await settled(id), "completed");
     assert.equal(turnsSince(mark).length, 2, "One continuation turn runs.");
     assert.ok(turnsSince(mark)[1]?.text.includes("[in progress] Fix"));
     assert.equal(continuationLines(agent.id).length, 1);
+    const stops = stopLines(agent.id);
+    assert.equal(stops.length, 1, "The chat says that the agent stopped.");
+    assert.equal(stops[0]?.text, "The agent stopped with open steps in its plan. Send a message to continue.");
+    assert.equal(chatMessages(agent.id).at(-1)?.id, stops[0]?.id, "The stop line is the last line of the chat.");
+    return { turns: turnsSince(mark).length };
+  });
+
+  await check("a chain that stops after an answer shows no stop line", async () => {
+    const agent = await createAgent("Answered");
+    const mark = loggedTurns().length;
+    const stuck: FakeTurn = {
+      steps: [
+        ["Read", "completed"],
+        ["Fix", "inProgress"],
+      ],
+      answer: "The fix needs the production key. I do not have it.",
+    };
+    const id = await send(agent.id, `Fix it. ${plan(stuck, stuck, stuck)}`);
+    assert.equal(await settled(id), "completed");
+    assert.equal(turnsSince(mark).length, 2, "One continuation turn runs.");
+    assert.equal(stopLines(agent.id).length, 0, "The answer tells the user where the agent is.");
     return { turns: turnsSince(mark).length };
   });
 
@@ -474,7 +521,6 @@ try {
       "Next, I'll implement it after your confirmation.",
       "Let me check with the team and get back to you.",
     ];
-    // Each request opens a new step, so a step left open by an earlier answer does not hide the plan.
     for (const [index, answer] of answers.slice(0, 6).entries()) {
       const mark = loggedTurns().length;
       const id = await send(
@@ -498,6 +544,31 @@ try {
     }
     const lines = continuationLines(agent.id);
     assert.equal(lines.length, 0);
+    return { answers: answers.length };
+  });
+
+  await check("Portuguese offers, later times, sends and reported problems do not continue", async () => {
+    const agent = await createAgent("Cuidadoso");
+    const answers = [
+      "Vou consultar o conector se você quiser.",
+      "Vou verificar depois da sua confirmação.",
+      "Vou rodar os testes amanhã.",
+      "Vou enviar o e-mail agora.",
+      "I'm running late.",
+      "Vou consultar o conector se quiser.",
+      "Vou rodar os testes depois.",
+      "Vou verificar com o time e te retorno.",
+      "I'm running into a permission error.",
+      "I'm checking with the team.",
+      "Estou vendo um erro de permissão no log.",
+    ];
+    for (const answer of answers) {
+      const mark = loggedTurns().length;
+      const id = await send(agent.id, `Check it again. ${plan({ steps: [], answer })}`);
+      assert.equal(await settled(id), "completed");
+      assert.equal(turnsSince(mark).length, 1, `No next-step turn runs after: ${answer}`);
+    }
+    assert.equal(continuationLines(agent.id).length, 0);
     return { answers: answers.length };
   });
 
@@ -566,6 +637,110 @@ try {
       "The last answer shows.",
     );
     return { turns: turns.length };
+  });
+
+  await check("a Portuguese next step or a status of running work continues", async () => {
+    const agent = await createAgent("Consultor");
+    const answers = [
+      "Vou consultar o conector agora.",
+      "Estou consultando o conector do Drive.",
+      "Consultando o conector…",
+      "I'm checking the connector now.",
+      "Let me query the connector.",
+      "Deixa eu dar uma olhada no conector.",
+    ];
+    for (const answer of answers) {
+      const mark = loggedTurns().length;
+      const id = await send(
+        agent.id,
+        `Read the sheet. ${plan({ steps: [], answer }, { steps: [], answer: "A planilha tem 3 linhas." })}`,
+      );
+      assert.equal(await settled(id), "completed");
+      assert.deepEqual(
+        turnsSince(mark).map((turn) => turn.note),
+        [false, true],
+        `One next-step continuation turn runs after: ${answer}`,
+      );
+    }
+    return { answers: answers.length };
+  });
+
+  await check("a teammate's answer to the agent's request continues on a next step", async () => {
+    const lead = await createAgent("Lead");
+    const reviewer = await createAgent("Reviewer");
+    const mark = loggedTurns().length;
+    const since = current.events.length;
+    const review = plan({
+      steps: [],
+      answer: `Review done: fix the parser. ${plan(
+        { steps: [], answer: "Estou corrigindo agora. De você, nada." },
+        { steps: [], answer: "Corrigi o parser." },
+      )}`,
+    });
+    const id = await send(
+      lead.id,
+      `Ship the parser. ${plan({
+        steps: [],
+        answer: "Pedi a revisão ao Reviewer.",
+        calls: [{ tool: "send_message", arguments: { recipientAgentIds: [reviewer.id], text: review } }],
+      })}`,
+    );
+    assert.equal(await settled(id), "completed");
+    const done = await waitFor("the lead's last answer", () =>
+      chatMessages(lead.id).some((message) => message.text === "Corrigi o parser."),
+    );
+    const leadThread = turnsSince(mark).find((turn) => turn.text.includes("Ship the parser."))?.threadId;
+    const leadTurns = turnsSince(mark).filter((turn) => turn.threadId === leadThread);
+    assert.deepEqual(
+      leadTurns.map((turn) => turn.note),
+      [false, false, true],
+      "The answer turn continues once with the next-step note.",
+    );
+    assert.equal(continuationLines(lead.id).length, 1, "One continuation line shows.");
+    assert.equal(errorsFor(lead.id, since).length, 0, "No error shows.");
+    return { done, turns: leadTurns.length };
+  });
+
+  await check("a teammate's request that ends on a next step does not continue", async () => {
+    const lead = await createAgent("Owner");
+    const asker = await createAgent("Asker");
+    const mark = loggedTurns().length;
+    const request = plan({ steps: [], answer: "Estou corrigindo agora. De você, nada." });
+    const update = plan({
+      steps: [],
+      answer: "Pedi a correção.",
+      calls: [{ tool: "send_message", arguments: { recipientAgentIds: [lead.id], text: request } }],
+    });
+    const id = await send(
+      lead.id,
+      `Tell Asker. ${plan({
+        steps: [],
+        answer: "Avisei o Asker.",
+        calls: [
+          {
+            tool: "send_message",
+            arguments: { recipientAgentIds: [asker.id], text: update, expectsReply: false },
+          },
+        ],
+      })}`,
+    );
+    assert.equal(await settled(id), "completed");
+    await waitFor("the owner's answer to the request", () =>
+      chatMessages(lead.id).some((message) => message.text === "Estou corrigindo agora. De você, nada."),
+    );
+    const leadThread = turnsSince(mark).find((turn) => turn.text.includes("Tell Asker."))?.threadId;
+    await waitFor(
+      "the result for the asker",
+      () => turnsSince(mark).filter((turn) => turn.threadId !== leadThread).length === 2,
+    );
+    const leadTurns = turnsSince(mark).filter((turn) => turn.threadId === leadThread);
+    assert.deepEqual(
+      leadTurns.map((turn) => turn.note),
+      [false, false],
+      "No continuation turn runs.",
+    );
+    assert.equal(continuationLines(lead.id).length, 0, "No continuation line shows.");
+    return { turns: leadTurns.length };
   });
 
   await check("a request with no plan continues at most 2 times for a next step", async () => {
@@ -789,9 +964,252 @@ try {
     return { turns: 1 };
   });
 
+  await check("a continuation in a new session gets the request again before the note", async () => {
+    const agent = await createAgent("Retooled");
+    const mark = loggedTurns().length;
+    const since = current.events.length;
+    const request = "Map the warehouse at dock 7.";
+    const release = join(root, "retooled-first-turn");
+    const id = await send(
+      agent.id,
+      `${request} ${plan({
+        steps: [
+          ["Load the map tool", "completed"],
+          ["Draw the map", "pending"],
+        ],
+        answer: "The map tool is registered.",
+        holdUntil: release,
+      })}`,
+    );
+    const first = await waitFor("the first turn", () => turnsSince(mark)[0]);
+    await rm(join(userData, "provider-toolsets", createHash("sha256").update(first.threadId).digest("hex")));
+    await writeFile(release, "");
+    assert.equal(await settled(id), "completed");
+    const turns = turnsSince(mark);
+    assert.deepEqual(
+      turns.map((turn) => turn.note),
+      [false, true],
+      "One continuation turn runs.",
+    );
+    const continued = turns[1];
+    assert.ok(continued && continued.threadId !== first.threadId, "The continuation runs in a new session.");
+    const [header, newest = ""] = continued.text.split("\n\n--- current message ---\n").slice(-2);
+    assert.ok(
+      header?.endsWith("It is the original request, not a new one, and it is not finished."),
+      "A note names the request.",
+    );
+    assert.ok(newest.startsWith(request), "The new session gets the request again.");
+    assert.ok(newest.includes("[pending] Draw the map"), "The note follows the request.");
+    assert.ok(
+      newest.indexOf(request) < newest.indexOf("Your last turn ended while your plan still had open steps"),
+      "The request comes before the note.",
+    );
+    assert.equal(errorsFor(agent.id, since).length, 0, "No error shows.");
+    return { sessions: [first.threadId, continued.threadId] };
+  });
+
+  await check("a finish check that finds missing work continues the request with the gap in the note", async () => {
+    const agent = await createAgent("Checked");
+    const mark = loggedTurns().length;
+    const checks = loggedChecks().length;
+    const id = await send(
+      agent.id,
+      `Fix the lint errors in a.ts, b.ts and c.ts. ${verdicts(
+        { verdict: "continue", missing: "Fix the lint errors in c.ts, then run the lint again." },
+        { verdict: "done" },
+      )} ${plan(
+        { steps: [], commands: ["biome check a.ts b.ts"], answer: "I fixed a.ts and b.ts." },
+        { steps: [], commands: ["biome check c.ts"], answer: "I fixed c.ts. The lint passes." },
+      )}`,
+    );
+    assert.equal(await settled(id), "completed");
+    const turns = turnsSince(mark);
+    assert.deepEqual(
+      turns.map((turn) => turn.note),
+      [false, true],
+      "One continuation turn runs.",
+    );
+    const note = turns[1]?.text ?? "";
+    assert.ok(note.includes("Fix the lint errors in c.ts, then run the lint again."), "The note names the gap.");
+    assert.ok(note.includes("Automatic continuation 1 of 3."));
+    const ran = loggedChecks().slice(checks);
+    assert.equal(ran.length, 2, "Each turn of the request gets one check.");
+    assert.ok(ran[0]?.text.includes("Fix the lint errors in a.ts, b.ts and c.ts."), "The check reads the request.");
+    assert.ok(ran[0]?.text.includes("biome check a.ts b.ts"), "The check reads the tool steps.");
+    assert.ok(ran[0]?.text.includes("I fixed a.ts and b.ts."), "The check reads the answer.");
+    assert.ok(ran[1]?.text.includes("biome check c.ts"), "The second check reads the steps of its own turn.");
+    const lines = continuationLines(agent.id);
+    assert.deepEqual(
+      lines.map((line) => line.text),
+      ["The request is not finished yet. The agent continues (1 of 3)."],
+      "One finish check line shows.",
+    );
+    assert.ok(
+      !chatMessages(agent.id).some((message) => message.text?.includes(CHECK_MARKER)),
+      "The check does not show in the chat.",
+    );
+    return { turns: turns.length, checks: ran.length };
+  });
+
+  await check("the finish check continues a request at most 3 times", async () => {
+    const agent = await createAgent("Persistent");
+    const mark = loggedTurns().length;
+    const checks = loggedChecks().length;
+    const gap: Verdict = { verdict: "continue", missing: "Fix the next file." };
+    const turn = (index: number): FakeTurn => ({
+      steps: [],
+      commands: [`fix file-${index}.ts`],
+      answer: `I fixed file-${index}.ts.`,
+    });
+    const id = await send(
+      agent.id,
+      `Fix all files. ${verdicts(gap, gap, gap, gap, gap)} ${plan(turn(1), turn(2), turn(3), turn(4), turn(5))}`,
+    );
+    assert.equal(await settled(id), "completed");
+    const turns = turnsSince(mark);
+    assert.deepEqual(
+      turns.map((entry) => entry.note),
+      [false, true, true, true],
+      "Three continuation turns run.",
+    );
+    assert.ok(turns[3]?.text.includes("Automatic continuation 3 of 3."));
+    assert.equal(loggedChecks().length - checks, 3, "No check runs after the last continuation.");
+    assert.equal(continuationLines(agent.id).length, 3);
+    return { turns: turns.length };
+  });
+
+  await check("a Stop or a new message during a slow finish check ends the check at once", async () => {
+    const slow = (missing: string): Verdict => ({ verdict: "continue", missing, delayMs: 20_000 });
+    const quick = 8_000;
+    const stopped = await createAgent("Halted");
+    let mark = loggedTurns().length;
+    let checks = loggedChecks().length;
+    const first = await send(
+      stopped.id,
+      `Fix the stopped files. ${verdicts(slow("Fix the stopped rest."))} ${plan({ steps: [], commands: ["fix a.ts"], answer: "I fixed a.ts." })}`,
+    );
+    await waitFor("the slow check", () => loggedChecks().length > checks);
+    const turnId = turnsSince(mark)[0]?.turnId;
+    assert.ok(turnId, "The request ran a turn.");
+    await runCauseEffect(current.service.interrupt(stopped.id, turnId));
+    assert.ok(ended(await settled(first, quick)), "The Stop ends the request before the check answers.");
+    assert.equal(turnsSince(mark).length, 1, "No continuation turn runs after the Stop.");
+    assert.equal(continuationLines(stopped.id).length, 0);
+
+    const queued = await createAgent("Overtaken");
+    mark = loggedTurns().length;
+    checks = loggedChecks().length;
+    const second = await send(
+      queued.id,
+      `Fix the queued files. ${verdicts(slow("Fix the queued rest."))} ${plan({ steps: [], commands: ["fix b.ts"], answer: "I fixed b.ts." })}`,
+    );
+    await waitFor("the slow check", () => loggedChecks().length > checks);
+    const next = await send(queued.id, "Use tabs.");
+    assert.equal(await settled(second, quick), "completed", "The new message ends the check before it answers.");
+    assert.equal(await settled(next, quick), "completed");
+    const turns = turnsSince(mark);
+    assert.deepEqual(
+      turns.map((turn) => turn.note),
+      [false, false],
+      "No continuation turn runs, and the new message runs next.",
+    );
+    assert.ok(turns[1]?.text.includes("Use tabs."));
+    assert.equal(continuationLines(queued.id).length, 0);
+
+    const sided = await createAgent("Sided");
+    mark = loggedTurns().length;
+    checks = loggedChecks().length;
+    const task = await runCauseEffect(
+      current.service.startTask({
+        agentId: sided.id,
+        text: `Fix the thread files. ${verdicts(slow("Fix the thread rest."))} ${plan({ steps: [], commands: ["fix c.ts"], answer: "I fixed c.ts." })}`,
+      }),
+    );
+    await waitFor("the slow check", () => loggedChecks().length > checks);
+    const taskDelivery = current.service
+      .readTask(sided.id, task.id)
+      .messages.find((message) => message.delivery !== undefined)?.delivery?.id;
+    assert.ok(taskDelivery, "The side thread holds the request's delivery.");
+    await runCauseEffect(current.service.stopTask({ agentId: sided.id, taskId: task.id }));
+    assert.ok(ended(await settled(taskDelivery, quick)), "The Stop ends the request before the check answers.");
+    assert.equal(turnsSince(mark).length, 1, "No continuation turn runs after the Stop.");
+    assert.equal(continuationLines(sided.id, task.threadId).length, 0);
+    return { checks: loggedChecks().length - checks };
+  });
+
+  await check("a done or user verdict, a bad answer, or a turn with no tool ends the request", async () => {
+    const agent = await createAgent("Settled");
+    const cases: { name: string; verdict: Verdict; commands: string[]; checks: number }[] = [
+      { name: "done", verdict: { verdict: "done" }, commands: ["bun test"], checks: 1 },
+      {
+        name: "user",
+        verdict: { verdict: "user", missing: "Ask which account to use." },
+        commands: ["gh auth status"],
+        checks: 1,
+      },
+      { name: "blocked", verdict: { verdict: "blocked" }, commands: ["curl https://example.com"], checks: 1 },
+      { name: "no JSON", verdict: "The request looks finished to me.", commands: ["ls"], checks: 1 },
+      { name: "continue with no gap", verdict: { verdict: "continue" }, commands: ["ls"], checks: 1 },
+      { name: "no tool", verdict: { verdict: "continue", missing: "Do more." }, commands: [], checks: 0 },
+    ];
+    const results = [];
+    for (const item of cases) {
+      const mark = loggedTurns().length;
+      const checks = loggedChecks().length;
+      const lines = continuationLines(agent.id).length;
+      const id = await send(
+        agent.id,
+        `Case ${item.name}. ${verdicts(item.verdict)} ${plan({ steps: [], commands: item.commands, answer: "Here it is." })}`,
+      );
+      assert.equal(await settled(id), "completed");
+      assert.equal(turnsSince(mark).length, 1, `${item.name}: no continuation runs.`);
+      assert.equal(loggedChecks().length - checks, item.checks, `${item.name}: the check count.`);
+      assert.equal(continuationLines(agent.id).length, lines, `${item.name}: no line shows.`);
+      results.push(item.name);
+    }
+    return { cases: results };
+  });
+
+  await check("an offer question continues only on a continue verdict", async () => {
+    const agent = await createAgent("Offering");
+    const offer = "I fixed a.ts. Do you want me to fix b.ts too?";
+    const mark = loggedTurns().length;
+    const id = await send(
+      agent.id,
+      `Fix a.ts and b.ts. ${verdicts({ verdict: "continue", missing: "Fix b.ts: the request asked for it." })} ${plan(
+        { steps: [], commands: ["edit a.ts"], answer: offer },
+        { steps: [], commands: ["edit b.ts"], answer: "I fixed b.ts." },
+      )}`,
+    );
+    assert.equal(await settled(id), "completed");
+    assert.deepEqual(
+      turnsSince(mark).map((turn) => turn.note),
+      [false, true],
+      "The offer of work that the request asked for continues.",
+    );
+    const asked = loggedTurns().length;
+    const question = await send(
+      agent.id,
+      `Clean the cache. ${verdicts({ verdict: "user" })} ${plan({
+        steps: [],
+        commands: ["du -sh cache"],
+        answer: "The cache holds 4 GB. Do you want me to delete it?",
+      })}`,
+    );
+    assert.equal(await settled(question), "completed");
+    assert.equal(turnsSince(asked).length, 1, "A question that needs the user does not continue.");
+    return { offer: 2, question: 1 };
+  });
+
   await check("a restart while a continuation waits completes the request with no new turn", async () => {
     const agent = await createAgent("Restart");
     const mark = loggedTurns().length;
+    let stopping: Promise<void> | null = null;
+    const stopAtContinuation = (event: AgentEvent) => {
+      if (stopping || event.type !== "turn-completed" || event.agentId !== agent.id || !event.continues) return;
+      stopping = runCauseEffect(current.service.stop());
+    };
+    current.service.on("event", stopAtContinuation);
     const id = await send(
       agent.id,
       `Index it. ${plan(
@@ -800,7 +1218,6 @@ try {
             ["Scan", "completed"],
             ["Index", "pending"],
           ],
-          delayMs: 1_500,
         },
         {
           steps: [
@@ -810,21 +1227,19 @@ try {
         },
       )}`,
     );
-    await waitFor("the first turn", () => turnsSince(mark).length === 1);
-    // A hidden agent finishes its turn, and its queue waits: the continuation waits too.
-    await runCauseEffect(current.service.setAgentHidden({ agentId: agent.id, hidden: true }));
-    await waitFor("the continuation to wait", () => continuationLines(agent.id).length === 1);
+    await waitFor("the app to stop at the continuation", () => stopping);
+    await stopping;
+    current.service.off("event", stopAtContinuation);
+    assert.equal(turnsSince(mark).length, 1, "Only the first turn runs before the stop.");
     assert.equal(
       current.mailbox.getDelivery(id)?.planContinuation?.queued,
       true,
       "The request waits for its continuation.",
     );
-    await runCauseEffect(current.service.stop());
     current.database.close();
     current = openService();
-    await runCauseEffect(current.service.initialize());
     const since = current.events.length;
-    await runCauseEffect(current.service.setAgentHidden({ agentId: agent.id, hidden: false }));
+    await runCauseEffect(current.service.initialize());
     assert.equal(await settled(id), "completed", "The request completes.");
     assert.equal(turnsSince(mark).length, 1, "No continuation turn runs after the restart.");
     assert.equal(

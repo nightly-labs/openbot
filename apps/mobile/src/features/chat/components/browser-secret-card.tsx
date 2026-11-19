@@ -1,6 +1,11 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { BrowserTakeoverRequest, RespondToBrowserSecretInput } from "@openbot/contracts/ipc";
+import type {
+  BrowserTakeoverRequest,
+  BrowserVaultSkipReason,
+  RespondToBrowserSecretInput,
+} from "@openbot/contracts/ipc";
 import { markdownInlinePlainText } from "@openbot/contracts/markdown-preview-text";
+import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { GlassView } from "expo-glass-effect";
 import { Button, Spinner, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
@@ -16,10 +21,14 @@ import { haptics } from "@/shared/lib/haptics";
 import { selectionColorProps } from "@/shared/lib/selection-color";
 import { useText } from "@/shared/lib/text";
 
-/**
- * The surface of a browser request above the composer: one opaque gray, as the chat scrolls under
- * it, and the neutral action color for the one main action. Cancel is the close button.
- */
+const VAULT_SKIP_TEXT = {
+  "agent-script": "mobile.chat.browserSecret.vaultSkip.agentScript",
+  "field-kind": "mobile.chat.browserSecret.vaultSkip.fieldKind",
+  "login-choice": "mobile.chat.browserSecret.vaultSkip.loginChoice",
+  "no-secret": "mobile.chat.browserSecret.vaultSkip.noPassword",
+  "vault-unreadable": "mobile.chat.browserSecret.vaultSkip.vaultUnreadable",
+} as const satisfies Record<BrowserVaultSkipReason, MobileTextKey>;
+
 function BrowserRequestCard({
   icon,
   title,
@@ -79,7 +88,6 @@ function BrowserRequestCard({
   );
 }
 
-/** A browser step that the user completes in the browser: Open browser, I'm done, or Cancel. */
 export function BrowserTakeoverCard({
   request,
   respondToTakeover,
@@ -87,7 +95,6 @@ export function BrowserTakeoverCard({
 }: {
   request: BrowserTakeoverRequest;
   respondToTakeover: (decision: "complete" | "cancel") => Promise<void>;
-  /** Shows the tab live on the phone. Absent when the host cannot stream it. */
   openBrowser?: () => void;
 }) {
   const { t } = useText();
@@ -109,11 +116,18 @@ export function BrowserTakeoverCard({
     }
   };
   const reload = request.secret?.requiresReload ? ` ${t("mobile.chat.browserSecret.takeoverReload")}` : "";
+  const signInBlocked = request.reason === "sign-in-blocked";
   return (
     <BrowserRequestCard
       icon={<Globe color={String(muted)} size={14} strokeWidth={2.2} />}
-      title={t("mobile.chat.browserSecret.takeoverTitle")}
-      body={`${t("mobile.chat.browserSecret.takeoverBody")}${reload}`}
+      title={t(
+        signInBlocked ? "mobile.chat.browserSecret.signInBlockedTitle" : "mobile.chat.browserSecret.takeoverTitle",
+      )}
+      body={
+        signInBlocked
+          ? t("mobile.chat.browserSecret.signInBlockedBody")
+          : `${t("mobile.chat.browserSecret.takeoverBody")}${reload}`
+      }
       busy={pending}
       onCancel={() => void finish("cancel")}
     >
@@ -152,20 +166,13 @@ export function BrowserTakeoverCard({
   );
 }
 
-/** The request asks the user to type a secret on the phone, not to complete a step in the browser. */
 export function asksForSecret(request: BrowserTakeoverRequest) {
   return Boolean(request.secret && !request.secret.requiresReload);
 }
 
-// The composer's bar: its inset, its height and its corner, so the secure field takes its place.
 const BAR_INSET = 16;
 const BAR_HEIGHT = 48;
 
-/**
- * Takes the place of the composer while an agent asks for a password or a code, so the screen has
- * one field. The value stays in this component: it does not go to the draft, the queue or the chat,
- * and it is cleared when sent. The composer comes back when the request is answered or cancelled.
- */
 export function BrowserSecretComposer({
   request,
   respond,
@@ -191,6 +198,11 @@ export function BrowserSecretComposer({
     : request.secret?.method === "authenticator"
       ? t("mobile.chat.browserSecret.authenticatorCode")
       : t("mobile.chat.browserSecret.oneTimeCode");
+  const vaultSkip = request.vaultSkip
+    ? request.vaultSkip === "no-secret" && !password
+      ? t("mobile.chat.browserSecret.vaultSkip.noAuthenticatorKey")
+      : t(VAULT_SKIP_TEXT[request.vaultSkip])
+    : null;
   const ready = !pending && (password ? Boolean(value) : value.length === digits);
   const send = async (decision: "submit" | "cancel" | "takeover") => {
     if (pending) return;
@@ -220,6 +232,11 @@ export function BrowserSecretComposer({
         busy={pending}
         onCancel={() => void send("cancel")}
       >
+        {vaultSkip ? (
+          <Typography.Paragraph type="body-xs" className="text-text-secondary">
+            {vaultSkip}
+          </Typography.Paragraph>
+        ) : null}
         <Button
           size="sm"
           variant="ghost"
@@ -267,11 +284,6 @@ interface SecureComposerColors {
   actionForeground: ViewStyle["backgroundColor"];
 }
 
-/**
- * The masked field in the place of the composer, with the composer's inset, height and send button,
- * so the screen has one field. Its value is the caller's: it never goes to the draft, the queue or
- * the chat.
- */
 function SecureComposerBar({
   label,
   placeholder,
@@ -292,7 +304,6 @@ function SecureComposerBar({
   actionForeground,
 }: SecureComposerColors & {
   label: string;
-  /** The text of the empty field, when it is not the label. */
   placeholder?: string | undefined;
   value: string;
   onChangeText: (text: string) => void;
@@ -329,7 +340,6 @@ function SecureComposerBar({
         }}
       >
         <TextInput
-          // The composer's ID: the chat's keyboard gesture follows the one field that is shown.
           nativeID="chat-composer-input"
           accessibilityLabel={label}
           placeholder={placeholder ?? label}
@@ -371,11 +381,6 @@ function SecureComposerBar({
   );
 }
 
-/**
- * Takes the place of the composer while the open question of a form asks for a private answer, such
- * as an API key, a password or a card number. The question card above keeps the title, Skip and
- * Cancel; this is its one field. The value is cleared when it is sent.
- */
 export function QuestionSecretComposer({
   controller,
   ...colors

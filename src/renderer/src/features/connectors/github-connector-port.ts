@@ -1,24 +1,17 @@
 import type { GitHubConnectorStatus, OpenBotDesktopApi } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 
-/** What the GitHub app page reaches: one GitHub connection, of this computer or of a joined server. */
 export type GitHubConnectorPort = Pick<
   OpenBotDesktopApi["githubConnector"],
   "status" | "connect" | "cancel" | "disconnect" | "repositories" | "openVerification" | "openInstall" | "onChanged"
 >;
 
-/** Read on each call: tests and stories replace `window.openbot` per case. */
 export function githubConnectorPort(): GitHubConnectorPort {
   return window.openbot.githubConnector;
 }
 
-/** How often a joined server's connection is read while its sign-in waits for the user on GitHub. */
 const HOST_POLL_MS = 2_000;
 
-/**
- * A port to a joined server's connection (`connectors-v1`). The host sends no event, so `onChanged`
- * reads the status while a sign-in waits for the user, and stops when the sign-in ends or a read fails.
- */
 export function polledGitHubConnectorPort(actions: Omit<GitHubConnectorPort, "onChanged">): GitHubConnectorPort {
   const listeners = new Set<(status: GitHubConnectorStatus) => void>();
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -53,7 +46,6 @@ export function polledGitHubConnectorPort(actions: Omit<GitHubConnectorPort, "on
   };
 }
 
-/** The connection of the joined server that `serverId` names, through main. */
 export function hostGitHubConnectorPort(serverId: () => string | undefined): GitHubConnectorPort {
   const call =
     <T>(method: (api: OpenBotDesktopApi["githubConnector"], serverId: string) => Promise<T>) =>

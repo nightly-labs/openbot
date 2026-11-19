@@ -30,10 +30,13 @@ export const messages = {
   "billing.status.paused": "Pausiert",
   "billing.otherServers": "Andere Server",
   "billing.action.menu": "Tarifaktionen für {server}",
-  "billing.action.change": "Tarif ändern",
+  "billing.action.addStorage": "Speicher hinzufügen",
   "billing.action.cancel": "Tarif kündigen",
   "billing.action.renew": "Tarif verlängern",
   "billing.action.updatePayment": "Zahlungsmethode aktualisieren",
+  "billing.storage.title": "Mehr Speicher für {server}",
+  "billing.storage.add": "{size} hinzufügen",
+  "billing.storage.failed": "Der Speicher konnte nicht hinzugefügt werden.",
   "billing.lifecycle.cancelRenewal": "Verlängerung kündigen",
   "billing.lifecycle.cancelTitle": "Verlängerung für {name} kündigen?",
   "billing.lifecycle.cancelDescription":
@@ -146,7 +149,6 @@ export const messages = {
   "billing.license.cancel.descriptionNow":
     "Die Lizenz endet mit dem bezahlten Zeitraum. Deine Server sind nicht betroffen.",
   "billing.license.cancel.keep": "Lizenz behalten",
-  // The order form: a hosted server and a license in one order. The pricing page and Billing show it.
   "billing.order.billing": "Abrechnungszeitraum",
   "billing.order.currency": "Währung",
   "billing.order.monthly": "Monatlich",
@@ -156,6 +158,7 @@ export const messages = {
   "billing.order.server.summary": "Wir betreiben OpenBot für dein Team.",
   "billing.order.server.none": "Kein Server",
   "billing.order.server.noneDetail": "OpenBot auf deinem eigenen Computer nutzen",
+  "billing.order.server.thisComputer": "Dein Computer",
   "billing.order.server.bestValue": "Preistipp",
   "billing.order.server.bestFor.starter": "Ideal für eine Person",
   "billing.order.server.bestFor.standard": "Ideal für ein kleines Team",
@@ -197,6 +200,7 @@ export const messages = {
   "billing.order.cta.server": "Server erstellen",
   "billing.order.cta.license": "Lizenz kaufen",
   "billing.order.cta.download": "Herunterladen",
+  "billing.order.cta.keepComputer": "Auf diesem Computer bleiben",
   "billing.license.invite.title": "Nutzer zur Lizenz hinzufügen?",
   "billing.license.invite.description": "Diese Einladung fügt deiner Lizenz 1 Nutzer hinzu: {price} mehr pro Monat.",
   "billing.license.invite.confirm": "Hinzufügen und einladen",
@@ -208,4 +212,10 @@ export const messages = {
     other:
       "Deine Lizenz hat {count} Nutzer, das Maximum. Kontaktiere uns für eine größere Lizenz. Neue Personen können deinen Servern nicht beitreten.",
   },
+  "billing.details.country": "Rechnungsland",
+  "billing.details.countryPlaceholder": "Land wählen",
+  "billing.details.vatId": "EU-USt-IdNr. (optional)",
+  "billing.details.vatIdInvalid": "Das ist keine USt-IdNr. des gewählten Landes.",
+  "billing.details.countryMissing": "Wähle dein Rechnungsland.",
+  "billing.details.saveFailed": "Rechnungsdaten konnten nicht gespeichert werden",
 } as const satisfies PartialTranslation<typeof source>;

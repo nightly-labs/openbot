@@ -2,16 +2,11 @@ import { INPUT_LIMITS } from "./input-limits";
 import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
 import { isDynamicRecord } from "./runtime-values";
 
-/** One earlier question of a side question, with the answer the agent gave. */
 export interface SideQuestionTurn {
   question: string;
   answer: string;
 }
 
-/**
- * A question about an agent's chat that does not go into the chat. The host keeps nothing of it, so
- * the request carries the earlier turns.
- */
 export interface AskSideQuestionInput {
   agentId: string;
   question: string;

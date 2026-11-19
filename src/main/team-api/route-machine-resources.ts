@@ -10,7 +10,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin } from "./request-helpers";
 
-/** The machine use of this host and its alert settings, read and set from a joined server. Frozen by `machine-resources-v1`. */
 export async function routeMachineResources(
   context: TeamApiRequestContext,
   machine: TeamApiMachine | undefined,

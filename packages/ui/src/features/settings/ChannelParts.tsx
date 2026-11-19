@@ -1,9 +1,3 @@
-/**
- * The parts that the chat channel pages share: Slack, Discord, Telegram and WhatsApp. Each page
- * connects places where people talk to OpenBot (a workspace, a Discord server, a chat, a number), and
- * one orchestrator agent answers there. The pages differ only in how a place connects and in their own extra sections.
- */
-
 import type {
   AgentModelId,
   AgentProviderId,
@@ -53,16 +47,13 @@ import {
   WizardDialog,
 } from "./IntegrationLayout";
 
-/** An agent as a channel page shows it: its face, its name and its title. */
 export type ChannelAgent = IntegrationAgent & { title: string };
 
-/** The model of the orchestrator that the user picks in the connect dialog. */
 export interface ChannelOrchestratorChoice {
   provider: AgentProviderId;
   model: AgentModelId;
 }
 
-/** The catalog behind the model picker. Absent, the orchestrator starts on a new agent's default. */
 export interface ChannelOrchestratorModels {
   modelOptions: ClientAgentModelOption[];
   agentStatus: AgentStatus;
@@ -71,16 +62,11 @@ export interface ChannelOrchestratorModels {
   customAgents?: readonly CustomAgentSummary[];
 }
 
-/** The seed and hue of an orchestrator's face before the agent exists. */
 export interface ChannelAvatar {
   avatarSeed: string;
   avatarHue: AvatarHue;
 }
 
-/**
- * The catalog keys that the shared parts read. Each platform gives its own. A text with a placeholder
- * that differs between platforms, such as `{workspace}` or `{chat}`, comes from the page as a string.
- */
 export interface ChannelText {
   title: AppTextKey;
   description: AppTextKey;
@@ -88,7 +74,6 @@ export interface ChannelText {
   attentionTitle: `connector.${MessagingPlatform}.attentionTitle`;
   attentionDescription: AppTextKey;
   disconnectAllTitle: AppTextKey;
-  /** Disconnect: one place, or every place in the danger zone. */
   disconnect: AppTextKey;
   reconnect: AppTextKey;
   pause: AppTextKey;
@@ -99,7 +84,6 @@ export interface ChannelText {
   orchestratorDescription: AppTextKey;
   orchestratorNone: AppTextKey;
   orchestratorNoneDescription: AppTextKey;
-  /** The last line of the orchestrator card: how people reach OpenBot. */
   note: AppTextKey;
   connectStepBrowser: AppTextKey;
   connectStepAllow: AppTextKey;
@@ -117,7 +101,6 @@ export interface ChannelText {
   close: AppTextKey;
 }
 
-/** What a connection row can do. */
 export type ChannelRowKind = "live" | "setup" | "paused" | "attention";
 
 export function channelRowKind(connection: MessagingConnection): ChannelRowKind {
@@ -135,36 +118,33 @@ export function channelRowKind(connection: MessagingConnection): ChannelRowKind 
   }
 }
 
-/** The state of a whole channel integration, for the page header and the Marketplace. */
 export interface ChannelState {
   status: IntegrationStatus;
   label: AppTextKey;
   attention: number;
 }
 
-/**
- * The shell of a channel page. Not set up, the header has the only step: Connect. Set up, each section
- * has its own action, and the danger zone disconnects every place.
- */
+export function pausedChannelState(connections: readonly MessagingConnection[]): ChannelState | null {
+  if (connections.length === 0 || connections.some((connection) => channelRowKind(connection) !== "paused"))
+    return null;
+  return { status: "attention", label: "marketplace.app.paused", attention: 0 };
+}
+
 export function ChannelPage(
   props: IntegrationPageSlots & {
     text: ChannelText;
     logo: JSX.Element;
     state: ChannelState;
     connections: readonly MessagingConnection[];
-    /** True when no read of the connections worked. The page then offers no connect. */
     unknown: boolean;
     busy: boolean;
     loadError?: string | null | undefined;
     onRetry?: (() => void) | undefined;
     onConnect: () => void;
-    /** A step that no section holds, in the header after the page is set up. */
     headerAction?: JSX.Element;
     disconnectAllSummary: string;
     onDisconnectAll: () => void;
-    /** The sections of a page that is set up. */
     sections: JSX.Element;
-    /** The dialogs. They show in every state. */
     children: JSX.Element;
   },
 ) {
@@ -224,17 +204,13 @@ export function ChannelPage(
   );
 }
 
-/** One connected place: its logo, its name, what it needs, and its actions. */
 export function ChannelConnectionRow(props: {
   text: ChannelText;
   logo: JSX.Element;
   connection: MessagingConnection;
-  /** What the place does, or what to do to fix it. */
   note: string;
   busy: boolean;
-  /** False when only a new connection brings the place back. */
   canReconnect?: boolean | undefined;
-  /** One more action before Disconnect, such as a new link in place of Reconnect. */
   action?: JSX.Element;
   onReconnect: () => void;
   onSetEnabled: (enabled: boolean) => void;
@@ -281,7 +257,6 @@ export function ChannelConnectionRow(props: {
   );
 }
 
-/** The face of an orchestrator that does not exist yet. */
 function ChannelOrchestratorFace(props: { avatar: ChannelAvatar; size?: "md" | "lg" }) {
   return (
     <span class="integrations-agent-face" data-size={props.size ?? "md"}>
@@ -290,10 +265,6 @@ function ChannelOrchestratorFace(props: { avatar: ChannelAvatar; size?: "md" | "
   );
 }
 
-/**
- * The orchestrators of a channel. With none, the card holds the step that adds one. The last line says
- * how people reach OpenBot.
- */
 export function ChannelOrchestratorSection(props: {
   text: ChannelText;
   avatar: ChannelAvatar;
@@ -344,7 +315,6 @@ export function ChannelOrchestratorSection(props: {
   );
 }
 
-/** The first step of a connect dialog: what happens in the browser, then the wait for it. */
 export function ChannelConnectChecklist(props: { text: ChannelText; waiting: boolean }) {
   const { t } = useText();
   return (
@@ -373,7 +343,6 @@ export function ChannelConnectChecklist(props: { text: ChannelText; waiting: boo
   );
 }
 
-/** The second step of a connect dialog: the orchestrator that it adds, what it does, and its model. */
 export function ChannelOrchestratorStep(props: {
   text: ChannelText;
   avatar: ChannelAvatar;
@@ -441,17 +410,13 @@ export function ChannelOrchestratorStep(props: {
   );
 }
 
-/** Asks before one place disconnects, and says what goes with it. */
 export function ChannelDisconnectDialog(props: {
   text: ChannelText;
   logo: JSX.Element;
-  /** The place; the dialog is open while it is set. */
   connection: MessagingConnection | null;
   title: string;
   description: string;
-  /** What people in the place lose. */
   effect: string;
-  /** No other place uses the orchestrator, so it is deleted too. */
   deletesOrchestrator: boolean;
   onConfirm: (workspaceId: string) => void;
   onClose: () => void;

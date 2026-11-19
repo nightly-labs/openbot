@@ -81,7 +81,6 @@ function RoutinesStory(props: {
   );
 }
 
-/** A routine that a webhook starts, on the preview host. */
 function WebhookRoutineStory() {
   const previousApi = window.openbot;
   const mock = createMockOpenBot({ routines: { chief: [] } });
@@ -108,7 +107,6 @@ function WebhookRoutineStory() {
         await seeded;
         return api.listRoutines(input);
       },
-      // One request that the filter ignored shows in the history.
       listActivity: async () => [
         {
           kind: "received",
@@ -137,21 +135,21 @@ function WebhookRoutineStory() {
 
 function FullSettingsPanelStory() {
   const previousApi = window.openbot;
-  const previousWidth = window.localStorage.getItem("openbot:settings-panel-width");
+  const previousWidth = window.localStorage.getItem("openbot:side-panel-width");
   const mock = createMockOpenBot({ routines: { chief: storyRoutines } });
   window.openbot = mock.api;
   mock.api.agent.listRoutineRuns = async (input) =>
     input.routineId === morningBrief.id ? structuredClone(fullPanelRuns) : [];
-  window.localStorage.setItem("openbot:settings-panel-width", "380");
+  window.localStorage.setItem("openbot:side-panel-width", "380");
 
   onCleanup(() => {
     mock.dispose();
     window.openbot = previousApi;
     if (previousWidth === null) {
-      window.localStorage.removeItem("openbot:settings-panel-width");
+      window.localStorage.removeItem("openbot:side-panel-width");
       return;
     }
-    window.localStorage.setItem("openbot:settings-panel-width", previousWidth);
+    window.localStorage.setItem("openbot:side-panel-width", previousWidth);
   });
 
   return (
@@ -231,11 +229,6 @@ export const RunHistoryStatuses: Story = {
   ),
 };
 
-/**
- * OpenBot was closed for five occurrences of an hourly routine set to run once when OpenBot opens.
- * It ran the newest one late and recorded the four before it as skipped. Yesterday it skipped one.
- * The times are on the hour.
- */
 export const MissedRuns: Story = {
   render: () => (
     <RoutinesStory
@@ -290,10 +283,6 @@ function storyDelivery(
   };
 }
 
-/**
- * Each answer of the morning brief also goes to a Slack channel. One went, one waited a day for its
- * connection, and OpenBot stopped during one. Each run succeeded: the delivery has its own status.
- */
 export const ResultDestination: Story = {
   render: () => (
     <RoutinesStory
@@ -338,7 +327,6 @@ export const FullSidePanel: Story = {
   parameters: { layout: "fullscreen" },
 };
 
-/** Counted back from the start of this hour, so an hourly run in a story falls on its schedule. */
 function hoursAgo(hours: number): string {
   const hour = new Date();
   hour.setMinutes(0, 0, 0);

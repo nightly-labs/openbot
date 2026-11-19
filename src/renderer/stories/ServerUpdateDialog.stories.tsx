@@ -38,16 +38,12 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** A joined server has a new version. The administrator chooses whether the restart waits. */
 export const Offer: Story = { render: () => <DialogStory update={{}} /> };
 
-/** The host downloaded the update already, so the confirm only restarts it. */
 export const OfferDownloaded: Story = { render: () => <DialogStory update={{ download: "done" }} /> };
 
-/** A member can only request an update that waits for idle agents. */
 export const MemberOffer: Story = { render: () => <DialogStory update={{}} canManage={false} /> };
 
-/** The request failed, so the dialog keeps the offer and shows the error. */
 export const StartFailed: Story = {
   render: () => <DialogStory update={{}} error="The host refused the request. Try again in a moment." />,
 };
@@ -66,7 +62,6 @@ export const Downloading: Story = {
   ),
 };
 
-/** The download is ready. The restart waits for agent turns and routine runs. */
 export const WaitingForIdle: Story = {
   render: () => (
     <DialogStory
@@ -93,7 +88,6 @@ export const BackOnline: Story = {
   ),
 };
 
-/** The host came back with its old version. */
 export const NotInstalled: Story = {
   render: () => <DialogStory update={{ stage: "failed", download: "done", failure: "version", elapsedSeconds: 170 }} />,
 };

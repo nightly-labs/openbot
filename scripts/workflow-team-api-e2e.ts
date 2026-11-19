@@ -1,27 +1,19 @@
-// Checks the workflows-v1 Team API grant. A real `TeamApiServer` runs on loopback with the real team,
-// agent, mailbox, sidebar, roles and workflow stores on a temporary profile. The owner sets agent
-// levels; a member signs in as a current desktop client does. Each request and answer goes through the
-// frozen codec. The host must hide a workflow that names a closed agent (but show the owner one whose
-// agent was deleted), refuse a run without the chat level and a change, rename or delete without the
-// manage level, keep the messaging place of an output to an owner or admin, keep the webhook URL and
-// secret from a member, clip step texts, drop the step of an agent that is hidden now and refuse its
-// retry, hide a
-// workflow of a local-only provider, refuse a workflow too large for one frame, and tell the member's
-// event socket about a change. With routine results, the host advertises `workflows-chats-v1` to a
-// protocol 9 peer, and only an owner or admin adds a Telegram trigger or a Slack output. The host
-// advertises `workflows-channels-v1` to a protocol 9 peer, and only an owner or admin adds an output
-// into an OpenBot channel. The codec carries kinds and statuses that this app does not know, and
-// the client shows a workflow with such a node read-only; a member reads the graph of an old version.
-// Agent steps answer through stand-ins, so no provider CLI starts and no model turn is sent.
-// Run: `bun scripts/workflow-team-api-e2e.ts`.
-// Writes .openbot-build/workflow-team-api-e2e/report.json.
-
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import type { AgentAccessChange, WorkflowDetail, WorkflowGraph, WorkflowNode } from "@openbot/contracts/ipc";
+import {
+  type AgentAccessChange,
+  WORKFLOW_GROUP_FIELDS,
+  type WorkflowDetail,
+  type WorkflowGraph,
+  type WorkflowMediaAccountCredits,
+  type WorkflowMediaCatalogModel,
+  type WorkflowMediaPriceRequest,
+  type WorkflowNode,
+  workflowVideoLengthChoices,
+} from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
   TEAM_APP_VERSION_HEADER,
@@ -30,11 +22,40 @@ import {
   TEAM_PROTOCOL_VERSION_HEADER,
 } from "@openbot/contracts/team-protocol";
 import { AGENT_ACCESS_CODECS, AGENT_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/agent-access-v1";
-import { teamCapabilitiesForProtocol } from "@openbot/contracts/team-protocol/current";
+import { teamCapabilitiesForProtocol, teamCapabilityHeaders } from "@openbot/contracts/team-protocol/current";
 import { TEAM_PROTOCOL_V7 } from "@openbot/contracts/team-protocol/v7";
 import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
+import { TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
+import {
+  WORKFLOWS_HIGGSFIELD_CAPABILITY,
+  WORKFLOWS_HIGGSFIELD_CODECS,
+  WORKFLOWS_HIGGSFIELD_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-higgsfield-v1";
+import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-account-v1";
+import {
+  WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
+  WORKFLOWS_MEDIA_CATALOG_CODECS,
+  WORKFLOWS_MEDIA_CATALOG_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-catalog-v1";
+import {
+  WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
+  WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CODECS,
+  WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-service-account-v1";
+import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-size-v1";
+import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-transparent-v1";
+import {
+  WORKFLOWS_MEDIA_CAPABILITY,
+  WORKFLOWS_MEDIA_CODECS,
+  WORKFLOWS_MEDIA_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-v1";
+import {
+  WORKFLOWS_SUNRA_CAPABILITY,
+  WORKFLOWS_SUNRA_CODECS,
+  WORKFLOWS_SUNRA_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-sunra-v1";
 import {
   WORKFLOW_STEP_TEXT_LIMIT,
   WORKFLOWS_CAPABILITY,
@@ -50,6 +71,7 @@ import {
 } from "@openbot/team-client/workflow-decoding";
 import { plugin } from "bun";
 import { Effect } from "effect";
+import { providerLabel } from "../src/backend/agent/thread-items";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 import { AgentService } from "../src/backend/agent-service";
 import { AgentStore } from "../src/backend/agent-store";
@@ -65,6 +87,29 @@ import { createWorkflows, type WorkflowsHandle } from "../src/backend/workflows/
 import type { TeamApiBrowser } from "../src/main/team-api/dependencies";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/workflow-team-api-e2e");
+let sunraSignedIn = false;
+let higgsfieldSignedIn = false;
+let serviceAccounts: WorkflowMediaAccountCredits[] = [];
+const mediaAccounts: (string | null)[] = [];
+const mediaRequests: { transparent: boolean; prompt: string; aspect: string }[] = [];
+const mediaModels: { model: string; catalogId: string }[] = [];
+const mediaDurations: number[] = [];
+const priceRequests: WorkflowMediaPriceRequest[] = [];
+const LIVE_MODEL: WorkflowMediaCatalogModel = {
+  id: "higgsfield-kling3_0_e2e",
+  provider: "higgsfield",
+  providerModel: "kling3_0_e2e",
+  name: "Kling 3.0 e2e",
+  maker: "Kuaishou",
+  kinds: ["video"],
+  aspects: ["16:9", "9:16", "1:1"],
+  durations: Array.from({ length: 13 }, (_, index) => index + 3),
+  resolutions: ["720p", "1080p"],
+  transparent: false,
+};
+const LIVE_PRICE = 22.5;
+const sizeRequests: { attachmentId: string; width: number; height: number }[] = [];
+let sizeFails = false;
 const HOST_VERSION = "0.0.0-e2e";
 const OWNER = { username: "owner-user", password: "owner-password-123" };
 const MEMBER = { username: "member-user", password: "member-password-123" };
@@ -73,7 +118,6 @@ const WEBHOOK_URL = "https://relay.example.test/hooks/e2e";
 const SECRET = "whsec-e2e-not-a-real-secret";
 const LONG_ANSWER = "a".repeat(40_000);
 
-// The main process imports Electron for its windows and IPC. No check here opens a window.
 plugin({
   name: "workflow-team-api-electron-boundary",
   setup(build) {
@@ -123,7 +167,6 @@ const report: { passed: boolean; unverified: string[]; steps: Step[] } = {
   steps: [],
 };
 
-/** Runs one check. `summarize` keeps session tokens out of the report. */
 async function step<T>(
   name: string,
   run: () => Promise<T>,
@@ -132,7 +175,6 @@ async function step<T>(
   process.stdout.write(`- ${name}\n`);
   let deadline: ReturnType<typeof setTimeout> | undefined;
   try {
-    // A bound on failure only: each check waits for its reply or event, and a missing event must fail.
     const value = await Promise.race([
       run(),
       new Promise<never>((_, reject) => {
@@ -149,7 +191,6 @@ async function step<T>(
   }
 }
 
-/** A value that `JSON.parse` gives: the wire body of a response, a frame or a fixture. */
 type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
 type JsonObject = { [key: string]: Json };
 
@@ -205,6 +246,7 @@ const teamBrowser: TeamApiBrowser = {
   stopTeach: () => [],
   releaseUserControl: () => {},
   releaseUserControlHeldBy: () => {},
+  releaseUserControlRefused: () => {},
   close: unused,
   capturePreview: unused,
   setVisible: unused,
@@ -232,10 +274,8 @@ interface Host {
 
 let host: Host | null = null;
 const sockets: WebSocket[] = [];
-/** The agent whose deliveries fail, so its step keeps an error. */
 let failingAgent = "";
 
-/** Starts the host on the profile, as the app does at each launch, with stand-ins for agent turns. */
 async function startHost(): Promise<Host> {
   const database = new OpenBotDatabase(userData);
   const agentStore = new AgentStore(userData, home, database);
@@ -244,7 +284,6 @@ async function startHost(): Promise<Host> {
   const team = new TeamStore(join(userData, "openbot-team-server-v2.json"));
   const access = new AgentAccessStore(join(userData, AGENT_ACCESS_FILE));
   await runCauseEffect(sidebar.initialize());
-  // The stores only: `AgentService.initialize` would start the provider CLIs, which no step needs.
   await runCauseEffect(agentStore.initialize());
   await runCauseEffect(mailbox.initialize());
   await runCauseEffect(team.initialize());
@@ -274,11 +313,50 @@ async function startHost(): Promise<Host> {
         }),
       stopDelivery: () => Effect.void,
       generateText: () => Effect.fail({ message: "No model step runs in this check." }),
+      keepPicture: (draftId, types) =>
+        mailbox.keepDraft(draftId, types).pipe(Effect.map((kept) => (typeof kept === "string" ? kept : kept.id))),
+      sizePicture: (attachmentId, size) => {
+        sizeRequests.push({ attachmentId, ...size });
+        return sizeFails
+          ? Effect.fail({ message: "The e2e crop failed." })
+          : Effect.succeed(`${attachmentId}-${size.width}x${size.height}`);
+      },
+      mediaProviders: () => ({
+        sunra: sunraSignedIn,
+        higgsfield: higgsfieldSignedIn,
+        accounts: serviceAccounts.map(({ provider, id, name }) => ({ provider, id, name })),
+      }),
+      mediaCredits: () =>
+        Effect.succeed({
+          sunra: sunraSignedIn ? { available: 120, quota: 500 } : null,
+          higgsfield: higgsfieldSignedIn ? { available: 42, quota: null } : null,
+          accounts: serviceAccounts,
+        }),
+      mediaCatalog: () => Effect.succeed({ models: higgsfieldSignedIn ? [LIVE_MODEL] : [] }),
+      mediaPrice: (request) =>
+        Effect.sync(() => {
+          priceRequests.push(request);
+          return { credits: higgsfieldSignedIn && request.model === LIVE_MODEL.id ? LIVE_PRICE : null };
+        }),
+      generateMedia: (request) => {
+        mediaAccounts.push(request.account);
+        mediaModels.push({ model: request.model, catalogId: request.catalogId });
+        mediaDurations.push(request.specs.duration);
+        mediaRequests.push({
+          transparent: request.specs.transparent,
+          prompt: request.prompt,
+          aspect: request.specs.aspect,
+        });
+        if (request.account === null) return Effect.succeed("e2e-media-file");
+        return agents.generateWorkflowMedia(request).pipe(
+          Effect.mapError((failure) => ({
+            message: failure.cause instanceof Error ? failure.cause.message : sourceText("error.workflow.mediaFailed"),
+          })),
+        );
+      },
       notify: () => {},
-      // No messaging connection exists here, so an output to a place fails with its sentence.
       connectionOn: () => false,
       post: () => Effect.succeed({ posted: true as const }),
-      // As the app does: an agent event, so the member's socket hears it.
       changed: (workflowId) => agents.notifyWorkflowsChanged(workflowId),
       rearm: () => {},
       timezone: () => "UTC",
@@ -295,7 +373,6 @@ async function startHost(): Promise<Host> {
     agentAccess: access,
     workflows: {
       ...workflows,
-      // The relay gives a webhook trigger its URL; here each one gets a fixed URL.
       get: (workflowId) =>
         workflows.get(workflowId).pipe(
           Effect.map(
@@ -309,7 +386,6 @@ async function startHost(): Promise<Host> {
         ),
       rotateWorkflowSecret: () => Effect.succeed({ secret: SECRET }),
     },
-    // The chats of Telegram and Slack nodes (`workflows-chats-v1`); no messaging driver runs here.
     admin: {
       routineResults: {
         options: () => Effect.succeed([]),
@@ -337,7 +413,6 @@ function current(): Host {
   return host;
 }
 
-/** One request from a desktop client. `capabilities` is what the client advertises. */
 async function call(
   method: string,
   path: string,
@@ -348,7 +423,7 @@ async function call(
     Accept: "application/json",
     [TEAM_PROTOCOL_VERSION_HEADER]: String(protocol),
     [TEAM_APP_VERSION_HEADER]: HOST_VERSION,
-    [TEAM_CAPABILITIES_HEADER]: (input.capabilities ?? teamCapabilitiesForProtocol(protocol)).join(","),
+    ...teamCapabilityHeaders(protocol, input.capabilities ?? teamCapabilitiesForProtocol(protocol)),
   };
   if (input.body !== undefined) headers["Content-Type"] = "application/json";
   if (input.token) headers.Authorization = `Bearer ${input.token}`;
@@ -361,7 +436,6 @@ async function call(
   return { status: response.status, body: body ? JSON.parse(body) : null };
 }
 
-/** A workflows request through the frozen codec, in both directions. */
 async function wire(path: string, token: string, body: unknown): Promise<{ status: number; body: unknown }> {
   const codec = WORKFLOWS_CODECS.get(path);
   assert.ok(codec, `No workflows-v1 codec for ${path}.`);
@@ -370,7 +444,35 @@ async function wire(path: string, token: string, body: unknown): Promise<{ statu
   return { status: response.status, body: codec.response(response.status, response.body) };
 }
 
-/** The refusals that these checks expect. */
+const PNG_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+const GIF_BASE64 = "R0lGODlhAQABAAAAACw=";
+
+async function sendDraft(
+  token: string,
+  name: string,
+  mimeType: string,
+  bytes: Uint8Array<ArrayBuffer>,
+): Promise<string> {
+  const query = `?name=${encodeURIComponent(name)}&mime=${encodeURIComponent(mimeType)}`;
+  const response = await fetch(`http://127.0.0.1:${current().port}${TEAM_API_ROUTES.attachments}${query}`, {
+    method: "POST",
+    headers: { ...v9Headers(token), "Content-Type": "application/octet-stream" },
+    body: bytes,
+  });
+  const body = await response.text();
+  assert.equal(response.status, 201, `The upload of ${name} returned ${response.status}: ${body}`);
+  return text(record(JSON.parse(body), "draft").id, "draft id");
+}
+
+function v9Headers(token: string): Record<string, string> {
+  return {
+    Authorization: `Bearer ${token}`,
+    [TEAM_PROTOCOL_VERSION_HEADER]: String(TEAM_PROTOCOL_V9),
+    [TEAM_APP_VERSION_HEADER]: HOST_VERSION,
+    [TEAM_CAPABILITIES_HEADER]: teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9).join(","),
+  };
+}
+
 type RefusalKey =
   | "error.workflow.missing"
   | "error.workflow.versionMissing"
@@ -381,7 +483,6 @@ type RefusalKey =
   | "error.workflow.runMissing"
   | "error.team.adminRequired";
 
-/** A request that must answer `status` with the sentence of `key`. */
 async function refused(path: string, token: string, body: unknown, status: number, key: RefusalKey) {
   const response = await wire(path, token, body);
   assert.equal(response.status, status, `${path} returned ${response.status}: ${JSON.stringify(response.body)}`);
@@ -389,7 +490,6 @@ async function refused(path: string, token: string, body: unknown, status: numbe
   return response.status;
 }
 
-/** What a client makes of a 200 answer that a host sends: the frozen codec, then `decode`. */
 function answer<T>(path: string, body: unknown, decode: (value: unknown) => T): T {
   const codec = WORKFLOWS_CODECS.get(path);
   assert.ok(codec, `No workflows-v1 codec for ${path}.`);
@@ -409,7 +509,6 @@ async function login(credentials: { username: string; password: string }): Promi
 }
 
 let accessRevision = 0;
-/** Sets the Everyone level of each agent, as the owner does in the roles settings. */
 async function setLevels(ownerToken: string, everyone: AgentAccessChange["everyone"]) {
   const codec = AGENT_ACCESS_CODECS.get(AGENT_ACCESS_ROUTES.set);
   assert.ok(codec);
@@ -420,7 +519,6 @@ async function setLevels(ownerToken: string, everyone: AgentAccessChange["everyo
   accessRevision += 1;
 }
 
-/** Opens a member's event socket that declares workflows-v1, and waits for its first snapshot. */
 async function openEvents(token: string): Promise<WebSocket> {
   const socket = new WebSocket(`ws://127.0.0.1:${current().port}${TEAM_API_ROUTES.events}`, [
     TEAM_PROTOCOL_V1_WEBSOCKET,
@@ -445,7 +543,6 @@ async function openEvents(token: string): Promise<WebSocket> {
   return socket;
 }
 
-/** Waits for the first socket message that `pick` accepts. */
 function nextMessage<T>(socket: WebSocket, pick: (value: unknown) => T | null): Promise<T> {
   return new Promise((resolveMessage, reject) => {
     const onMessage = (event: MessageEvent) => {
@@ -469,7 +566,6 @@ const agentNode = (id: string, agentId: string): WorkflowNode => ({
   fields: { agentId, text: "Say hello." },
 });
 const promptNode: WorkflowNode = { id: "prompt", kind: "prompt", at: at(0), fields: { text: "Start." } };
-/** A prompt into one agent step. */
 const agentGraph = (agentId: string): WorkflowGraph => ({
   nodes: [promptNode, agentNode("agent", agentId)],
   edges: [{ id: "edge", from: "prompt", to: "agent", type: "text" }],
@@ -487,7 +583,6 @@ const withOutput = (graph: WorkflowGraph, output: WorkflowNode): WorkflowGraph =
   edges: [...graph.edges, { id: "edge-output", from: "agent", to: output.id, type: "text" }],
 });
 
-/** Makes a workflow on the host, as the owner does on the computer that runs the server. */
 async function hostWorkflow(title: string, graph: WorkflowGraph): Promise<{ id: string; revision: number }> {
   const { workflows } = current();
   const created = await runCauseEffect(workflows.create({ title }));
@@ -498,7 +593,6 @@ async function hostWorkflow(title: string, graph: WorkflowGraph): Promise<{ id: 
   return { id: created.summary.id, revision: saved.revision };
 }
 
-/** Moves runs until the step of `nodeId` in the run ends. */
 async function settled(runId: string, nodeId: string) {
   const { workflows } = current();
   for (;;) {
@@ -723,7 +817,6 @@ try {
       403,
       "error.team.adminRequired",
     );
-    // The member moves a node; the output and its place stay as they are.
     const kept: WorkflowGraph = {
       ...posting,
       nodes: posting.nodes.map((node) => ({ ...node, at: { x: node.at.x, y: 40 } })),
@@ -820,11 +913,51 @@ try {
     return { denied, owner: 200, capability: WORKFLOWS_CHANNELS_CAPABILITY };
   });
 
+  await step("groups: a member groups a channel output, and its settings still need an owner", async () => {
+    const before = Number((await ok(WORKFLOWS_ROUTES.get, member, { workflowId: ids.open })).revision);
+    const output: WorkflowNode = {
+      id: "chat-channel-output",
+      kind: "output",
+      at: at(600),
+      fields: { target: "chat-channel", channelId: "channel-e2e" },
+    };
+    const group = { [WORKFLOW_GROUP_FIELDS.id]: "group-e2e", [WORKFLOW_GROUP_FIELDS.name]: "Posts" };
+    const grouped = (fields: WorkflowNode["fields"]): WorkflowGraph => {
+      const graph = withOutput(agentGraph(open), { ...output, fields: { ...fields, ...group } });
+      return {
+        ...graph,
+        nodes: graph.nodes.map((node) =>
+          node.kind === "agent" ? { ...node, fields: { ...node.fields, ...group } } : node,
+        ),
+      };
+    };
+    const saved = await ok(WORKFLOWS_ROUTES.saveGraph, member, {
+      workflowId: ids.open,
+      baseRevision: before,
+      graph: grouped(output.fields),
+    });
+    assert.equal(saved.ok, true);
+    const after = await ok(WORKFLOWS_ROUTES.get, member, { workflowId: ids.open });
+    const nodes = JSON.stringify(record(after.graph, "graph").nodes);
+    assert.ok(nodes.includes("group-e2e") && nodes.includes("Posts"), nodes);
+    const denied = await refused(
+      WORKFLOWS_ROUTES.saveGraph,
+      member,
+      {
+        workflowId: ids.open,
+        baseRevision: Number(after.revision),
+        graph: grouped({ ...output.fields, channelId: "other" }),
+      },
+      403,
+      "error.team.adminRequired",
+    );
+    return { grouped: 200, denied };
+  });
+
   await step("restore: a version that names the closed agent answers as missing", async () => {
     const restored = await hostWorkflow("Restore", agentGraph(closed));
     const [version] = await runCauseEffect(current().workflows.versions(restored.id));
     assert.ok(version, "The first save made no version.");
-    // Within five minutes of the version, so the open graph makes no second version.
     const saved = await runCauseEffect(
       current().workflows.saveGraph({
         workflowId: restored.id,
@@ -858,7 +991,6 @@ try {
     const closedWorkflow = await hostWorkflow("Versions closed", agentGraph(closed));
     const [closedVersion] = await runCauseEffect(current().workflows.versions(closedWorkflow.id));
     assert.ok(closedVersion);
-    // The owner takes the closed agent out; its old version still names it.
     const saved = await runCauseEffect(
       current().workflows.saveGraph({
         workflowId: closedWorkflow.id,
@@ -968,7 +1100,6 @@ try {
       decodeRemoteWorkflowRunDetail,
     );
     assert.deepEqual([run.run.source, run.run.status, run.steps[0]?.status], ["manual", "stopped", "stopped"]);
-    // A name that is not a short lowercase id is still malformed.
     assert.throws(() => answer(WORKFLOWS_ROUTES.get, { ...detail, revision: -1 }, decodeRemoteWorkflowDetail));
     assert.throws(() =>
       answer(
@@ -977,7 +1108,6 @@ try {
         decodeRemoteWorkflowRunDetail,
       ),
     );
-    // This host does not know the kind, so its save refuses it after the codec passes it.
     const target = await hostWorkflow("Newer save", { nodes: [promptNode], edges: [], strokes: [] });
     const save = await wire(WORKFLOWS_ROUTES.saveGraph, ownerToken, {
       workflowId: target.id,
@@ -1033,7 +1163,6 @@ try {
     const ended = await settled(run.id, "agent");
     assert.equal(ended.status, "failed");
     assert.ok(ended.error);
-    // The owner takes the agent out of the workflow and then closes it.
     const saved = await runCauseEffect(
       current().workflows.saveGraph({
         workflowId: workflow.id,
@@ -1058,7 +1187,6 @@ try {
     assert.equal(ownerStep.error, ended.error, "The owner lost the step error.");
     const page = await ok(WORKFLOWS_ROUTES.runs, member, { workflowId: workflow.id, limit: 10 });
     assert.deepEqual(nodesOf(record(list(page.runs, "runs")[0], "run")), ["prompt"]);
-    // The current graph has no agent now, but a retry runs the old run's graph and its agent.
     const retry = await refused(
       WORKFLOWS_ROUTES.retryStep,
       member,
@@ -1084,7 +1212,6 @@ try {
       text(record(row, "summary").title, "title"),
     );
     assert.ok(!titles.includes("Local model"), "The member list has a workflow of a local-only provider.");
-    // A local-only provider crosses to no peer, so the owner on another computer gets 404 as well.
     const remoteOwner = await refused(
       WORKFLOWS_ROUTES.get,
       ownerToken,
@@ -1140,6 +1267,583 @@ try {
     );
     return { deleted: 200, after: missing };
   });
+
+  await step(
+    "media: a member keeps an uploaded PNG as a picture of the host; a GIF, a used draft and an old client are refused",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        list(
+          record((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body, "compatibility").capabilities,
+          "capabilities",
+        );
+      assert.ok((await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_MEDIA_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V7)).includes(WORKFLOWS_MEDIA_CAPABILITY));
+      const codec = WORKFLOWS_MEDIA_CODECS.get(WORKFLOWS_MEDIA_ROUTES.keepPicture);
+      assert.ok(codec, "No workflows-media-v1 codec for keep-picture.");
+      const keep = async (draftId: string, capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9)) => {
+        codec.request({ draftId });
+        const response = await call("POST", WORKFLOWS_MEDIA_ROUTES.keepPicture, {
+          token: member,
+          body: { draftId },
+          protocol: TEAM_PROTOCOL_V9,
+          capabilities,
+        });
+        return { status: response.status, body: codec.response(response.status, response.body) };
+      };
+      const png = Uint8Array.from(Buffer.from(PNG_BASE64, "base64"));
+      const pngDraft = await sendDraft(member, "frame.png", "image/png", png);
+      const gifDraft = await sendDraft(
+        member,
+        "frame.gif",
+        "image/gif",
+        Uint8Array.from(Buffer.from(GIF_BASE64, "base64")),
+      );
+
+      const old = await keep(
+        pngDraft,
+        teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9).filter((capability) => capability !== WORKFLOWS_MEDIA_CAPABILITY),
+      );
+      assert.equal(old.status, 400, JSON.stringify(old.body));
+      assert.ok(JSON.stringify(old.body).includes(sourceText("error.workflow.serverTooOld")), JSON.stringify(old.body));
+
+      const gif = await keep(gifDraft);
+      assert.notEqual(gif.status, 200, JSON.stringify(gif.body));
+      assert.ok(JSON.stringify(gif.body).includes(sourceText("error.workflow.pictureType")), JSON.stringify(gif.body));
+
+      const kept = await keep(pngDraft);
+      assert.equal(kept.status, 200, JSON.stringify(kept.body));
+      const fileId = text(record(kept.body, "keep-picture").fileId, "fileId");
+      assert.notEqual(fileId, pngDraft, "The host answered the draft id, not a file id.");
+      const file = await fetch(`http://127.0.0.1:${current().port}${TEAM_API_ROUTES.attachment(fileId)}`, {
+        headers: v9Headers(member),
+      });
+      assert.equal(file.status, 200, `The kept picture returned ${file.status}.`);
+      assert.deepEqual(new Uint8Array(await file.arrayBuffer()), png, "The kept picture has other bytes.");
+
+      const used = await keep(pngDraft);
+      assert.notEqual(used.status, 200, JSON.stringify(used.body));
+      assert.ok(
+        JSON.stringify(used.body).includes(sourceText("error.workflow.pictureMissing")),
+        JSON.stringify(used.body),
+      );
+      return { old: old.status, gif: gif.status, kept: kept.status, file: file.status, used: used.status };
+    },
+  );
+
+  await step(
+    "sunra: a member reads whether the host has a Sunra sign-in and its credits; an old client is refused",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        list(
+          record((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body, "compatibility").capabilities,
+          "capabilities",
+        );
+      assert.ok((await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_SUNRA_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V7)).includes(WORKFLOWS_SUNRA_CAPABILITY));
+      const codec = WORKFLOWS_SUNRA_CODECS.get(WORKFLOWS_SUNRA_ROUTES.providers);
+      assert.ok(codec, "No workflows-sunra-v1 codec for providers.");
+      const read = async (capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9)) => {
+        codec.request({});
+        const response = await call("POST", WORKFLOWS_SUNRA_ROUTES.providers, {
+          token: member,
+          body: {},
+          protocol: TEAM_PROTOCOL_V9,
+          capabilities,
+        });
+        return { status: response.status, body: codec.response(response.status, response.body) };
+      };
+      const creditsCodec = WORKFLOWS_SUNRA_CODECS.get(WORKFLOWS_SUNRA_ROUTES.credits);
+      assert.ok(creditsCodec, "No workflows-sunra-v1 codec for credits.");
+      const credits = async () => {
+        creditsCodec.request({});
+        const response = await call("POST", WORKFLOWS_SUNRA_ROUTES.credits, {
+          token: member,
+          body: {},
+          protocol: TEAM_PROTOCOL_V9,
+          capabilities: teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9),
+        });
+        assert.equal(response.status, 200, JSON.stringify(response.body));
+        return creditsCodec.response(response.status, response.body);
+      };
+      const signedOut = await read();
+      assert.equal(signedOut.status, 200, JSON.stringify(signedOut.body));
+      assert.deepEqual(signedOut.body, { sunra: false });
+      const creditsSignedOut = await credits();
+      assert.deepEqual(creditsSignedOut, { sunra: null });
+      sunraSignedIn = true;
+      const signedIn = await read();
+      assert.equal(signedIn.status, 200, JSON.stringify(signedIn.body));
+      assert.deepEqual(signedIn.body, { sunra: true });
+      const creditsSignedIn = await credits();
+      assert.deepEqual(creditsSignedIn, { sunra: { available: 120, quota: 500 } });
+      const old = await read(
+        teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9).filter((capability) => capability !== WORKFLOWS_SUNRA_CAPABILITY),
+      );
+      assert.equal(old.status, 400, JSON.stringify(old.body));
+      assert.ok(JSON.stringify(old.body).includes(sourceText("error.workflow.serverTooOld")), JSON.stringify(old.body));
+      return {
+        signedOut: signedOut.body,
+        signedIn: signedIn.body,
+        creditsSignedOut,
+        creditsSignedIn,
+        old: old.status,
+      };
+    },
+  );
+
+  await step(
+    "higgsfield: a member reads whether the host has a Higgsfield sign-in and its credits; each media route answers only its own field; an old client is refused",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        list(
+          record((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body, "compatibility").capabilities,
+          "capabilities",
+        );
+      assert.ok((await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_HIGGSFIELD_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V7)).includes(WORKFLOWS_HIGGSFIELD_CAPABILITY));
+      const codec = WORKFLOWS_HIGGSFIELD_CODECS.get(WORKFLOWS_HIGGSFIELD_ROUTES.providers);
+      assert.ok(codec, "No workflows-higgsfield-v1 codec for providers.");
+      const creditsCodec = WORKFLOWS_HIGGSFIELD_CODECS.get(WORKFLOWS_HIGGSFIELD_ROUTES.credits);
+      assert.ok(creditsCodec, "No workflows-higgsfield-v1 codec for credits.");
+      const raw = async (route: string, capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9)) =>
+        call("POST", route, { token: member, body: {}, protocol: TEAM_PROTOCOL_V9, capabilities });
+      const read = async () => {
+        codec.request({});
+        const response = await raw(WORKFLOWS_HIGGSFIELD_ROUTES.providers);
+        assert.equal(response.status, 200, JSON.stringify(response.body));
+        codec.response(response.status, response.body);
+        return response.body;
+      };
+      const credits = async () => {
+        creditsCodec.request({});
+        const response = await raw(WORKFLOWS_HIGGSFIELD_ROUTES.credits);
+        assert.equal(response.status, 200, JSON.stringify(response.body));
+        creditsCodec.response(response.status, response.body);
+        return response.body;
+      };
+      assert.equal(sunraSignedIn, true);
+      higgsfieldSignedIn = false;
+      const signedOut = await read();
+      assert.deepEqual(signedOut, { higgsfield: false });
+      const creditsSignedOut = await credits();
+      assert.deepEqual(creditsSignedOut, { higgsfield: null });
+      higgsfieldSignedIn = true;
+      const signedIn = await read();
+      assert.deepEqual(signedIn, { higgsfield: true });
+      const creditsSignedIn = await credits();
+      assert.deepEqual(creditsSignedIn, { higgsfield: { available: 42, quota: null } });
+      const sunraProviders = await raw(WORKFLOWS_SUNRA_ROUTES.providers);
+      assert.deepEqual(sunraProviders.body, { sunra: true });
+      const sunraCredits = await raw(WORKFLOWS_SUNRA_ROUTES.credits);
+      assert.deepEqual(sunraCredits.body, { sunra: { available: 120, quota: 500 } });
+      const old = await raw(
+        WORKFLOWS_HIGGSFIELD_ROUTES.providers,
+        teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9).filter(
+          (capability) => capability !== WORKFLOWS_HIGGSFIELD_CAPABILITY,
+        ),
+      );
+      assert.equal(old.status, 400, JSON.stringify(old.body));
+      assert.ok(JSON.stringify(old.body).includes(sourceText("error.workflow.serverTooOld")), JSON.stringify(old.body));
+      higgsfieldSignedIn = false;
+      return {
+        signedOut,
+        signedIn,
+        creditsSignedOut,
+        creditsSignedIn,
+        sunraProviders: sunraProviders.body,
+        sunraCredits: sunraCredits.body,
+        old: old.status,
+      };
+    },
+  );
+
+  await step(
+    "media account: the host advertises workflows-media-account-v1; an unknown account fails and never falls back",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        list(
+          record((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body, "compatibility").capabilities,
+          "capabilities",
+        );
+      assert.ok((await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V7)).includes(WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY));
+      const imageGraph = (account: string): WorkflowGraph => ({
+        nodes: [promptNode, { id: "image", kind: "image", at: at(300), fields: { model: "gpt-image", account } }],
+        edges: [{ id: "edge", from: "prompt", to: "image", type: "text" }],
+        strokes: [],
+      });
+      const run = async (account: string) => {
+        const workflow = await hostWorkflow(`Image ${account || "own"}`, imageGraph(account));
+        const detail = await ok(WORKFLOWS_ROUTES.get, ownerToken, { workflowId: workflow.id });
+        const image = list(record(detail.graph, "graph").nodes, "nodes")
+          .map((node) => record(node, "node"))
+          .find((node) => node.id === "image");
+        assert.equal(record(image?.fields, "fields").account, account);
+        const started = await ok(WORKFLOWS_ROUTES.startRun, ownerToken, {
+          workflowId: workflow.id,
+          requestId: requestId(),
+        });
+        return settled(text(record(started.run, "run").id, "run id"), "image");
+      };
+      const missing = await run("acct-not-on-this-host");
+      assert.equal(missing.status, "failed");
+      assert.equal(
+        missing.error,
+        sourceText("error.provider.accountNotFound", { provider: providerLabel("codex") }),
+        JSON.stringify(missing.error),
+      );
+      const own = await run("");
+      assert.equal(own.status, "done", JSON.stringify(own.error));
+      const fallback = await run("default");
+      assert.equal(fallback.status, "done", JSON.stringify(fallback.error));
+      assert.deepEqual(mediaAccounts, ["acct-not-on-this-host", null, null]);
+      return { missing: missing.error, own: own.status, default: fallback.status, accounts: mediaAccounts };
+    },
+  );
+
+  await step(
+    "transparent image: the host advertises workflows-media-transparent-v1; GPT Image and Grok Imagine get a transparent request",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        list(
+          record((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body, "compatibility").capabilities,
+          "capabilities",
+        );
+      assert.ok((await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V7)).includes(WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY));
+      const run = async (fields: WorkflowNode["fields"]) => {
+        const before = mediaRequests.length;
+        const workflow = await hostWorkflow(`Transparent ${String(fields.model)}`, {
+          nodes: [promptNode, { id: "image", kind: "image", at: at(300), fields }],
+          edges: [{ id: "edge", from: "prompt", to: "image", type: "text" }],
+          strokes: [],
+        });
+        const started = await ok(WORKFLOWS_ROUTES.startRun, ownerToken, {
+          workflowId: workflow.id,
+          requestId: requestId(),
+        });
+        const done = await settled(text(record(started.run, "run").id, "run id"), "image");
+        assert.equal(done.status, "done", JSON.stringify(done.error));
+        const request = mediaRequests[before];
+        assert.ok(request, "the step reached the media maker");
+        return request;
+      };
+      const gpt = await run({ model: "gpt-image", background: "transparent" });
+      assert.equal(gpt.transparent, true);
+      assert.match(gpt.prompt, /transparent background/);
+      const grok = await run({ model: "grok-imagine", background: "transparent" });
+      assert.equal(grok.transparent, true);
+      assert.match(grok.prompt, /#00FF00/);
+      const video = await run({ model: "grok-imagine", media: "video", background: "transparent" });
+      assert.equal(video.transparent, false);
+      assert.doesNotMatch(video.prompt, /#00FF00/);
+      const solid = await run({ model: "gpt-image" });
+      assert.equal(solid.transparent, false);
+      assert.doesNotMatch(solid.prompt, /transparent background/);
+      return { gpt: gpt.transparent, grok: grok.transparent, video: video.transparent, solid: solid.transparent };
+    },
+  );
+
+  await step(
+    "custom size, 4:5 and 5:4: the host advertises workflows-media-size-v1; the model gets the nearest aspect and the step keeps the cropped file",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        list(
+          record((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body, "compatibility").capabilities,
+          "capabilities",
+        );
+      assert.ok((await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_MEDIA_SIZE_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V7)).includes(WORKFLOWS_MEDIA_SIZE_CAPABILITY));
+      const run = async (fields: WorkflowNode["fields"]) => {
+        const before = { media: mediaRequests.length, size: sizeRequests.length };
+        const workflow = await hostWorkflow(`Size ${JSON.stringify(fields)}`, {
+          nodes: [promptNode, { id: "image", kind: "image", at: at(300), fields }],
+          edges: [{ id: "edge", from: "prompt", to: "image", type: "text" }],
+          strokes: [],
+        });
+        const started = await ok(WORKFLOWS_ROUTES.startRun, ownerToken, {
+          workflowId: workflow.id,
+          requestId: requestId(),
+        });
+        const done = await settled(text(record(started.run, "run").id, "run id"), "image");
+        assert.equal(done.status, "done", JSON.stringify(done.error));
+        const request = mediaRequests[before.media];
+        assert.ok(request, "the step reached the media maker");
+        return { output: done.output, aspect: request.aspect, sizes: sizeRequests.slice(before.size) };
+      };
+      const wide = await run({ model: "gpt-image", aspect: "custom", width: 1600, height: 900 });
+      assert.equal(wide.aspect, "16:9");
+      assert.deepEqual(wide.sizes, [{ attachmentId: "e2e-media-file", width: 1600, height: 900 }]);
+      assert.equal(wide.output, "e2e-media-file-1600x900");
+      const tall = await run({ model: "grok-imagine", aspect: "custom", width: 700, height: 1300 });
+      assert.equal(tall.aspect, "9:16");
+      assert.equal(tall.output, "e2e-media-file-700x1300");
+      sizeFails = true;
+      const failed = await run({ model: "gpt-image", aspect: "custom", width: 800, height: 800 }).finally(() => {
+        sizeFails = false;
+      });
+      assert.equal(failed.sizes.length, 1);
+      assert.equal(failed.output, "e2e-media-file");
+      const video = await run({ model: "grok-imagine", media: "video", aspect: "custom", width: 1600, height: 900 });
+      assert.deepEqual(video.sizes, []);
+      assert.equal(video.output, "e2e-media-file");
+      const tooLarge = await run({ model: "gpt-image", aspect: "custom", width: 5000, height: 900 });
+      assert.deepEqual(tooLarge.sizes, []);
+      assert.equal(tooLarge.output, "e2e-media-file");
+      const post = await run({ model: "gpt-image", aspect: "4:5" });
+      assert.equal(post.aspect, "4:5");
+      assert.deepEqual(post.sizes, []);
+      const postVideo = await run({ model: "grok-imagine", media: "video", aspect: "4:5" });
+      assert.equal(postVideo.aspect, "1:1");
+      const postSize = await run({ model: "gpt-image", aspect: "custom", width: 1080, height: 1350 });
+      assert.equal(postSize.aspect, "4:5");
+      assert.equal(postSize.output, "e2e-media-file-1080x1350");
+      const print = await run({ model: "grok-imagine", aspect: "5:4" });
+      assert.equal(print.aspect, "5:4");
+      const printVideo = await run({ model: "grok-imagine", media: "video", aspect: "5:4" });
+      assert.equal(printVideo.aspect, "1:1");
+      const printSize = await run({ model: "gpt-image", aspect: "custom", width: 1350, height: 1080 });
+      assert.equal(printSize.aspect, "5:4");
+      assert.equal(printSize.output, "e2e-media-file-1350x1080");
+      return { wide, tall, failed, video, tooLarge, post, postVideo, postSize, print, printVideo, printSize };
+    },
+  );
+
+  await step(
+    "empty media request: a step with no description runs from its input, and fails with no input",
+    async () => {
+      const run = async (title: string, input: string) => {
+        const before = mediaRequests.length;
+        const workflow = await hostWorkflow(title, {
+          nodes: [
+            { ...promptNode, fields: { text: input } },
+            { id: "image", kind: "image", at: at(300), fields: { model: "gpt-image" } },
+          ],
+          edges: [{ id: "edge", from: "prompt", to: "image", type: "text" }],
+          strokes: [],
+        });
+        const started = await ok(WORKFLOWS_ROUTES.startRun, ownerToken, {
+          workflowId: workflow.id,
+          requestId: requestId(),
+        });
+        const done = await settled(text(record(started.run, "run").id, "run id"), "image");
+        return { done, requests: mediaRequests.slice(before) };
+      };
+      const fromInput = await run("No description, text input", "A red kite over a beach.");
+      assert.equal(fromInput.done.status, "done", JSON.stringify(fromInput.done.error));
+      assert.equal(fromInput.requests.length, 1);
+      assert.match(fromInput.requests[0]?.prompt ?? "", /A red kite over a beach\./);
+      const empty = await run("No description, empty input", "");
+      assert.equal(empty.done.status, "failed");
+      assert.equal(empty.done.error, sourceText("error.workflow.mediaEmptyRequest"), JSON.stringify(empty.done.error));
+      assert.equal(empty.requests.length, 0, "an empty request never reaches the media maker");
+      return { fromInput: fromInput.done.status, empty: empty.done.error };
+    },
+  );
+
+  await step(
+    "media catalog: the host advertises workflows-media-catalog-v1; a member reads the live models and a price, and a step runs a model that only the live list has",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        list(
+          record((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body, "compatibility").capabilities,
+          "capabilities",
+        );
+      assert.ok((await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_MEDIA_CATALOG_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V7)).includes(WORKFLOWS_MEDIA_CATALOG_CAPABILITY));
+      const catalogCodec = WORKFLOWS_MEDIA_CATALOG_CODECS.get(WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog);
+      assert.ok(catalogCodec, "No workflows-media-catalog-v1 codec for catalog.");
+      const priceCodec = WORKFLOWS_MEDIA_CATALOG_CODECS.get(WORKFLOWS_MEDIA_CATALOG_ROUTES.price);
+      assert.ok(priceCodec, "No workflows-media-catalog-v1 codec for price.");
+      const raw = async (route: string, body: unknown, capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9)) =>
+        call("POST", route, { token: member, body, protocol: TEAM_PROTOCOL_V9, capabilities });
+      const catalog = async () => {
+        catalogCodec.request({});
+        const response = await raw(WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog, {});
+        assert.equal(response.status, 200, JSON.stringify(response.body));
+        catalogCodec.response(response.status, response.body);
+        return response.body;
+      };
+      const ask: WorkflowMediaPriceRequest = {
+        model: LIVE_MODEL.id,
+        kind: "video",
+        aspect: "16:9",
+        duration: 10,
+        resolution: "1080p",
+        transparent: false,
+      };
+      const price = async (request: WorkflowMediaPriceRequest) => {
+        priceCodec.request(request);
+        const response = await raw(WORKFLOWS_MEDIA_CATALOG_ROUTES.price, request);
+        assert.equal(response.status, 200, JSON.stringify(response.body));
+        priceCodec.response(response.status, response.body);
+        return response.body;
+      };
+      higgsfieldSignedIn = false;
+      const signedOut = await catalog();
+      assert.deepEqual(signedOut, { models: [] });
+      const priceSignedOut = await price(ask);
+      assert.deepEqual(priceSignedOut, { credits: null });
+      higgsfieldSignedIn = true;
+      try {
+        const signedIn = await catalog();
+        assert.deepEqual(signedIn, { models: [LIVE_MODEL] });
+        const before = priceRequests.length;
+        const priceSignedIn = await price(ask);
+        assert.deepEqual(priceSignedIn, { credits: LIVE_PRICE });
+        assert.deepEqual(priceRequests.slice(before), [ask], "the request reached the host's price read unchanged");
+        const badPrice = await raw(WORKFLOWS_MEDIA_CATALOG_ROUTES.price, { ...ask, duration: -1 });
+        assert.equal(badPrice.status, 400, JSON.stringify(badPrice.body));
+        assert.equal(priceRequests.length, before + 1);
+        assert.ok(!workflowVideoLengthChoices(LIVE_MODEL.durations).includes(7), "7 s is a custom length");
+        const beforeModels = mediaModels.length;
+        const workflow = await hostWorkflow("Live Higgsfield model", {
+          nodes: [
+            promptNode,
+            {
+              id: "image",
+              kind: "image",
+              at: at(300),
+              fields: { model: LIVE_MODEL.id, media: "video", aspect: "16:9", duration: 7, resolution: "1080p" },
+            },
+          ],
+          edges: [{ id: "edge", from: "prompt", to: "image", type: "text" }],
+          strokes: [],
+        });
+        const started = await ok(WORKFLOWS_ROUTES.startRun, ownerToken, {
+          workflowId: workflow.id,
+          requestId: requestId(),
+        });
+        const done = await settled(text(record(started.run, "run").id, "run id"), "image");
+        assert.equal(done.status, "done", JSON.stringify(done.error));
+        assert.deepEqual(mediaModels.slice(beforeModels), [
+          { model: LIVE_MODEL.providerModel, catalogId: LIVE_MODEL.id },
+        ]);
+        assert.deepEqual(mediaDurations.slice(beforeModels), [7], "the step asks for the custom length");
+        const old = await raw(
+          WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog,
+          {},
+          teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9).filter(
+            (capability) => capability !== WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
+          ),
+        );
+        assert.equal(old.status, 400, JSON.stringify(old.body));
+        assert.ok(
+          JSON.stringify(old.body).includes(sourceText("error.workflow.serverTooOld")),
+          JSON.stringify(old.body),
+        );
+        return {
+          signedOut,
+          signedIn,
+          priceSignedOut,
+          priceSignedIn,
+          badPrice: badPrice.status,
+          step: done.status,
+          old: old.status,
+        };
+      } finally {
+        higgsfieldSignedIn = false;
+      }
+    },
+  );
+
+  await step(
+    "service accounts: the host advertises workflows-media-service-account-v1 to a protocol 10 peer; a member reads each account and its credits; a step on a missing account fails and never falls back",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        list(
+          record((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body, "compatibility").capabilities,
+          "capabilities",
+        );
+      assert.ok((await capabilities(TEAM_PROTOCOL_V10)).includes(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY));
+      const raw = async (route: string, capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10)) =>
+        call("POST", route, { token: member, body: {}, protocol: TEAM_PROTOCOL_V10, capabilities });
+      const read = async (route: string) => {
+        const codec = WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CODECS.get(route);
+        assert.ok(codec, `No workflows-media-service-account-v1 codec for ${route}.`);
+        codec.request({});
+        const response = await raw(route);
+        assert.equal(response.status, 200, JSON.stringify(response.body));
+        codec.response(response.status, response.body);
+        return response.body;
+      };
+      const imageGraph = (account: string): WorkflowGraph => ({
+        nodes: [
+          promptNode,
+          {
+            id: "image",
+            kind: "image",
+            at: at(300),
+            fields: { model: LIVE_MODEL.id, media: "video", aspect: "16:9", duration: 5, resolution: "720p", account },
+          },
+        ],
+        edges: [{ id: "edge", from: "prompt", to: "image", type: "text" }],
+        strokes: [],
+      });
+      const run = async (account: string) => {
+        const workflow = await hostWorkflow(`Higgsfield ${account || "first"}`, imageGraph(account));
+        const started = await ok(WORKFLOWS_ROUTES.startRun, ownerToken, {
+          workflowId: workflow.id,
+          requestId: requestId(),
+        });
+        return settled(text(record(started.run, "run").id, "run id"), "image");
+      };
+      higgsfieldSignedIn = true;
+      try {
+        serviceAccounts = [];
+        const none = { accounts: await read(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.accounts) };
+        assert.deepEqual(none.accounts, { accounts: [] });
+        serviceAccounts = [
+          { provider: "sunra", id: "sunra-row", name: null, credits: { available: 120, quota: 500 } },
+          { provider: "higgsfield", id: "higgsfield-row", name: null, credits: { available: 42, quota: null } },
+          { provider: "higgsfield", id: "higgsfield-row-2", name: "Higgsfield 2", credits: null },
+        ];
+        const accounts = await read(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.accounts);
+        assert.deepEqual(accounts, {
+          accounts: serviceAccounts.map(({ provider, id, name }) => ({ provider, id, name })),
+        });
+        const credits = await read(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.credits);
+        assert.deepEqual(credits, { accounts: serviceAccounts });
+        const legacy = await raw(WORKFLOWS_HIGGSFIELD_ROUTES.credits);
+        assert.deepEqual(legacy.body, { higgsfield: { available: 42, quota: null } });
+        const old = await raw(
+          WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.accounts,
+          teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10).filter(
+            (capability) => capability !== WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
+          ),
+        );
+        assert.equal(old.status, 400, JSON.stringify(old.body));
+        assert.ok(
+          JSON.stringify(old.body).includes(sourceText("error.workflow.serverTooOld")),
+          JSON.stringify(old.body),
+        );
+        const before = mediaAccounts.length;
+        const missing = await run("higgsfield-row-2");
+        assert.equal(missing.status, "failed");
+        assert.equal(
+          missing.error,
+          sourceText("error.provider.accountNotFound", { provider: "Higgsfield" }),
+          JSON.stringify(missing.error),
+        );
+        const first = await run("");
+        assert.equal(first.status, "done", JSON.stringify(first.error));
+        assert.deepEqual(mediaAccounts.slice(before), ["higgsfield-row-2", null]);
+        return {
+          none: none.accounts,
+          accounts,
+          credits,
+          legacy: legacy.body,
+          old: old.status,
+          missing: missing.error,
+          first: first.status,
+        };
+      } finally {
+        serviceAccounts = [];
+        higgsfieldSignedIn = false;
+      }
+    },
+  );
 
   report.passed = true;
 } finally {

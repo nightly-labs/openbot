@@ -1,9 +1,3 @@
-// How the app starts the voice transcription host.
-//
-// It is an Electron `utilityProcess` for the same reason as the database host: the app ships the
-// `runAsNode: false` fuse, so `process.execPath` cannot be run as Node, and that fuse is part of the
-// trust boundary. The host installs no signal listener, so `kill()` ends it during a decode too.
-
 import { join } from "node:path";
 import { utilityProcess } from "electron";
 import type { VoiceTranscriptionHostProcess, VoiceTranscriptionResponse } from "./voice-transcription-protocol";

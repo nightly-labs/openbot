@@ -40,7 +40,6 @@ export function JoinPage(props: { lang: string; text: JoinPageText }) {
 
   const noApp = () => (mobile() ? props.text.noAppMobile : props.text.noApp);
   const linkHref = (link: JoinLink) => (link === "browser" ? browserUrl() : downloadUrl());
-  // The dialog offers the desktop download, which a phone cannot install. Phones get the note below.
   const armFallback = () => {
     if (!mobile()) fallback.arm();
   };
@@ -54,8 +53,6 @@ export function JoinPage(props: { lang: string; text: JoinPageText }) {
 
       <Show when={!invalid()} fallback={<p class="join-card-error">{props.text.invalid}</p>}>
         <div class="join-card-actions join-card-actions-full">
-          {/* Until the page reads the link, the app cannot open it. The button is then a real
-              disabled button, so it is not a link that goes nowhere. */}
           <Show
             when={openUrl()}
             fallback={

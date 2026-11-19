@@ -1,13 +1,3 @@
-// Checks the browser profile of each agent through the real profile service, agent service, agent store
-// and profile store on a temporary database. The agents move between the shared profile, their own
-// session and named profiles; a profile is deleted; then the stores start again from the database, as
-// the app does at its next launch. A choice of the shared profile, and the delete of a named profile,
-// must leave no profile id on the agent, before and after the restart. The browser is a stub: no tab is
-// open, so a profile change closes nothing.
-// The agent service is not initialized, so no provider CLI starts.
-// Run: `bun scripts/browser-profile-agents-e2e.ts`.
-// Writes .openbot-build/browser-profile-agents-e2e/report.json.
-
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -70,7 +60,6 @@ interface Host {
   profiles: BrowserProfileService;
 }
 
-/** Starts the stores on the profile, as the app does at each launch. */
 async function startHost(): Promise<Host> {
   const database = new OpenBotDatabase(userData);
   const store = new AgentStore(userData, home, database);
@@ -81,7 +70,6 @@ async function startHost(): Promise<Host> {
   const profiles = createBrowserProfileService({
     store: new BrowserProfileStore(store.database),
     proxies: new BrowserProxyStore(store.database),
-    // The script saves no proxy password, so the cipher only has to exist.
     cipher: { canPersist: () => true, encrypt: (value) => Buffer.from(value, "utf8") },
     agents,
     browser: {
@@ -97,7 +85,6 @@ async function startHost(): Promise<Host> {
   return { database, store, agents, profiles };
 }
 
-/** The stored fields that choose the session, as the next launch reads them. */
 function stored(host: Host, agentId: string) {
   const agent = host.store.list().find((candidate) => candidate.id === agentId);
   assert.ok(agent, "An agent is missing.");

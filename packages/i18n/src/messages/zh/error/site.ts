@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/site";
 
 export const messages = {
-  // Hosted site errors.
   "error.site.absolutePath": "请选择站点目录的绝对路径。",
   "error.site.rootSymlink": "托管站点不允许使用符号链接。",
   "error.site.notDirectory": "站点源必须是一个目录。",

@@ -1,7 +1,4 @@
-// Frozen provider-aware schema for protocol 8: the protocol 7 schema, with open provider ids and auth
-// kinds (`OPEN_PROVIDER_ID`) and a `displayName` on each provider status row. A provider added after
-// protocol 8 needs no new protocol version. Versions 1-7 retain their own lists.
-// The schema is in `provider-aware-codec.ts`; this file holds only what protocol 8 accepts.
+import { TEAM_PROTOCOL_CAPABILITY_LIMITS } from "./capability-limits";
 import { createProviderAwareCodec, decodeTeamProtocolSupportProviderAware } from "./provider-aware-codec";
 import { TEAM_REASONING_EFFORTS } from "./reasoning-efforts-v1";
 
@@ -31,17 +28,14 @@ export {
 export const TEAM_PROTOCOL_V8Base = 8;
 export const TEAM_PROTOCOL_V8Base_WEBSOCKET = "openbot-team-v8";
 
-export const decodeTeamProtocolSupportV8Base = (value: unknown) => decodeTeamProtocolSupportProviderAware(value, 128);
+export const decodeTeamProtocolSupportV8Base = (value: unknown) =>
+  decodeTeamProtocolSupportProviderAware(value, TEAM_PROTOCOL_CAPABILITY_LIMITS[8]);
 
 const codec = createProviderAwareCodec({
-  maximumCapabilities: 128,
+  maximumCapabilities: TEAM_PROTOCOL_CAPABILITY_LIMITS[8],
   providers: "open",
   authKinds: "open",
-  // The protocol 7 charset of `isAgentModel`.
   agentModel: /^[A-Za-z0-9][A-Za-z0-9._:/[\],=-]{0,159}$/u,
-  // A host sends `none`, `minimal` and `ultra` only under reasoning-efforts-v1, so a present one is
-  // always kept. To a peer without it, the host sends the nearest of the five levels that protocol 8
-  // shipped with.
   reasoningEfforts: TEAM_REASONING_EFFORTS,
 });
 

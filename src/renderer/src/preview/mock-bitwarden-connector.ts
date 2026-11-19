@@ -4,7 +4,6 @@ import {
   type OpenBotDesktopApi,
 } from "@openbot/contracts/ipc";
 
-/** This computer's connection and one joined server's, which connects at once with any input. */
 export function createMockBitwardenConnector(): OpenBotDesktopApi["bitwardenConnector"] {
   let status: BitwardenConnectorStatus = DISCONNECTED_BITWARDEN_CONNECTOR;
   let host: BitwardenConnectorStatus = DISCONNECTED_BITWARDEN_CONNECTOR;

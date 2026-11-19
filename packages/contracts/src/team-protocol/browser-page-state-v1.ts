@@ -1,11 +1,3 @@
-// Frozen optional browser-page-state wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: a signed-in member stops the
-// load of a host browser tab that the member can see, and learns whether each such tab can go back
-// or forward in its history. Each change sends `browser-page-state-changed` with the state of every
-// tab that the member can see. Both routes answer with that list. A stop of a tab that does not load
-// changes nothing. Bounds and meaning do not follow IPC changes; widening any of it needs a second
-// capability string.
 import { isBoolean, isDynamicRecord, isString } from "../runtime-values";
 import {
   type AdminDecoder,
@@ -50,7 +42,6 @@ function pageStates(input: unknown): BrowserPageState[] {
   );
 }
 
-/** Decodes the answer of both routes. */
 export function decodeBrowserPageStateSnapshot(input: unknown): BrowserPageStateSnapshot {
   return { tabs: pageStates(isDynamicRecord(input) ? input.tabs : undefined) };
 }

@@ -1,12 +1,7 @@
-// The text form of a webhook filter, shared by the desktop and mobile routine editors, so a value
-// that one client saves reads back as the same value in the other.
-
 import { type EventFilter, type EventScalar, isEventFilterPointer } from "./ipc-events";
 
-/** The host never returns a saved secret, so the secret row shows its prefix and a mask. */
 export const MASKED_WEBHOOK_SECRET = "whsec_••••••••••••";
 
-/** A filter row while the user edits it. The value stays text until the routine is saved. */
 export interface EventFilterDraft {
   pointer: string;
   value: string;
@@ -21,7 +16,6 @@ function isScalar(value: unknown): value is EventScalar {
   );
 }
 
-/** The scalar that the text is as JSON, or undefined when the text is not a JSON scalar. */
 function parseScalar(text: string): EventScalar | undefined {
   try {
     const parsed = JSON.parse(text);
@@ -31,13 +25,11 @@ function parseScalar(text: string): EventScalar | undefined {
   }
 }
 
-/** Text that reads back as the same value: a string that is also a JSON scalar gets quotes. */
 function eventFilterValueText(value: EventScalar): string {
   if (typeof value === "string") return parseScalar(value) === undefined ? value : JSON.stringify(value);
   return JSON.stringify(value);
 }
 
-/** A JSON scalar (`42`, `true`, `null`, `"42"`) is that value. Other text is a string. */
 function eventFilterValue(text: string): EventScalar {
   const parsed = parseScalar(text.trim());
   return parsed === undefined ? text : parsed;

@@ -1,0 +1,177 @@
+@property --scroll-edges-fade-start {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --scroll-edges-fade-end {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+.scroll-edges {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+
+.scroll-edges-view {
+  border-radius: inherit;
+  scrollbar-width: none;
+}
+
+.scroll-edges > .scroll-edges-view {
+  --scroll-edges-fade-size: var(--openbot-space-8);
+  --scroll-edges-fade-side: to right;
+
+  mask-image: linear-gradient(
+    var(--scroll-edges-fade-side),
+    transparent,
+    var(--openbot-text-primary) var(--scroll-edges-fade-start),
+    var(--openbot-text-primary) calc(100% - var(--scroll-edges-fade-end)),
+    transparent
+  );
+}
+
+.scroll-edges-view:focus-visible {
+  outline: none;
+}
+
+.scroll-edges:has(> .scroll-edges-view:focus-visible) {
+  outline: 2px solid var(--openbot-border-focus);
+  outline-offset: 2px;
+}
+
+.scroll-edges[data-axis="x"] > .scroll-edges-view {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+.scroll-edges[data-axis="y"] > .scroll-edges-view {
+  --scroll-edges-fade-side: to bottom;
+
+  max-height: inherit;
+  overflow-y: auto;
+}
+
+.scroll-edges[data-axis="x"]:dir(rtl) > .scroll-edges-view {
+  --scroll-edges-fade-side: to left;
+}
+
+.scroll-edges:has(> .scroll-edges-edge[data-edge="start"][data-visible]) > .scroll-edges-view {
+  --scroll-edges-fade-start: var(--scroll-edges-fade-size);
+}
+
+.scroll-edges:has(> .scroll-edges-edge[data-edge="end"][data-visible]) > .scroll-edges-view {
+  --scroll-edges-fade-end: var(--scroll-edges-fade-size);
+}
+
+@supports (animation-timeline: scroll()) {
+  .scroll-edges > .scroll-edges-view {
+    animation:
+      scroll-edges-fade-start linear both,
+      scroll-edges-fade-end linear both;
+    animation-timeline: scroll(self inline), scroll(self inline);
+    animation-range:
+      0 var(--scroll-edges-fade-size),
+      calc(100% - var(--scroll-edges-fade-size)) 100%;
+  }
+
+  .scroll-edges[data-axis="y"] > .scroll-edges-view {
+    animation-timeline: scroll(self block), scroll(self block);
+  }
+}
+
+@keyframes scroll-edges-fade-start {
+  from {
+    --scroll-edges-fade-start: 0px;
+  }
+
+  to {
+    --scroll-edges-fade-start: var(--scroll-edges-fade-size);
+  }
+}
+
+@keyframes scroll-edges-fade-end {
+  from {
+    --scroll-edges-fade-end: var(--scroll-edges-fade-size);
+  }
+
+  to {
+    --scroll-edges-fade-end: 0px;
+  }
+}
+
+.scroll-edges-edge {
+  position: absolute;
+  z-index: 1;
+  display: flex;
+  padding: var(--openbot-space-1-5);
+  pointer-events: none;
+}
+
+.scroll-edges[data-axis="x"] > .scroll-edges-edge {
+  top: var(--scroll-edges-middle, 50%);
+  translate: 0 -50%;
+}
+
+.scroll-edges[data-axis="x"] > .scroll-edges-edge[data-edge="start"] {
+  inset-inline-start: 0;
+}
+
+.scroll-edges[data-axis="x"] > .scroll-edges-edge[data-edge="end"] {
+  inset-inline-end: 0;
+}
+
+.scroll-edges[data-axis="y"] > .scroll-edges-edge {
+  left: 50%;
+  translate: -50% 0;
+}
+
+.scroll-edges[data-axis="y"] > .scroll-edges-edge[data-edge="start"] {
+  top: 0;
+}
+
+.scroll-edges[data-axis="y"] > .scroll-edges-edge[data-edge="end"] {
+  bottom: 0;
+}
+
+.scroll-edges-edge .scroll-edges-arrow {
+  border-radius: var(--openbot-radius-pill);
+  background: color-mix(in srgb, var(--openbot-text-primary) 16%, var(--openbot-bg-surface-raised));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--openbot-text-primary) 28%, transparent);
+  color: var(--openbot-text-primary);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: auto;
+  transition:
+    opacity var(--openbot-duration-fast) ease,
+    visibility 0s linear var(--openbot-duration-fast);
+}
+
+.scroll-edges-edge .scroll-edges-arrow:hover {
+  background: color-mix(in srgb, var(--openbot-text-primary) 26%, var(--openbot-bg-surface-raised));
+}
+
+:root[data-openbot-color-scheme="light"] .scroll-edges-edge .scroll-edges-arrow {
+  background: var(--openbot-bg-surface-raised);
+}
+
+:root[data-openbot-color-scheme="light"] .scroll-edges-edge .scroll-edges-arrow:hover {
+  background: color-mix(in srgb, var(--openbot-text-primary) 8%, var(--openbot-bg-surface-raised));
+}
+
+.scroll-edges:is(:hover, :has(> .scroll-edges-view:focus-visible))
+  > .scroll-edges-edge[data-visible]
+  .scroll-edges-arrow {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-edges-edge .scroll-edges-arrow {
+    transition: none;
+  }
+}

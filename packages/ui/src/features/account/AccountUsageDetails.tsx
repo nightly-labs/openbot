@@ -1,7 +1,9 @@
 import { ProviderLogo } from "@openbot/brand";
+import { usagePaceRemainingPercent } from "@openbot/team-client/plan-limits";
 import { Button, Gauge, RefreshCw } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createSignal, For, onCleanup, Show } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
+import { createScrollFades } from "../../components/createScrollFades";
 import { useText } from "../../text";
 import {
   type AccountUsageProviderRow,
@@ -11,7 +13,6 @@ import {
   formatUsageResetIn,
 } from "./account-usage-view";
 
-/** The reset countdown shows minutes, so a half-minute tick keeps it current. */
 const RESET_CLOCK_MS = 30_000;
 
 export function AccountUsageDetails(props: {
@@ -29,6 +30,12 @@ export function AccountUsageDetails(props: {
   const [now, setNow] = createSignal(Date.now());
   const clock = window.setInterval(() => setNow(Date.now()), RESET_CLOCK_MS);
   onCleanup(() => window.clearInterval(clock));
+  const fades = createScrollFades();
+  onCleanup(() => fades.stop());
+  createEffect(
+    () => props.rows.length,
+    () => fades.remeasure(),
+  );
   return (
     <>
       <header class="account-usage-popover-header">
@@ -66,7 +73,12 @@ export function AccountUsageDetails(props: {
         </p>
       </Show>
       <Show when={props.rows.length > 0}>
-        <ul class="account-usage-providers" aria-label={t("account.usage.providers")}>
+        <ul
+          class={["account-usage-providers", fades.classes()]}
+          aria-label={t("account.usage.providers")}
+          ref={(element) => fades.bind(element)}
+          onScroll={fades.measure}
+        >
           <For each={props.rows} keyed={accountUsageRowKey}>
             {(row) => (
               <li class="account-usage-provider" aria-label={accountUsageRowLabel(row(), text, props.loading)}>
@@ -108,35 +120,50 @@ export function AccountUsageDetails(props: {
   );
 }
 
-/** The limit windows of one account: a bar, the amount left and the time to the reset of each. */
 export function AccountUsageWindowList(props: { windows: readonly AccountUsageWindowRow[]; now: number }) {
   const text = useText();
   const { t } = text;
   return (
     <span class="account-usage-windows">
       <For each={props.windows}>
-        {(usageWindow) => (
-          <span class="account-usage-window" data-usage-tone={usageWindow.tone}>
-            <span class="account-usage-window-label" title={usageWindow.label}>
-              {usageWindow.label}
-            </span>
-            <span class="account-usage-window-bar" aria-hidden="true">
-              <span class="account-usage-window-fill" style={{ "inline-size": `${usageWindow.remainingPercent}%` }} />
-            </span>
-            <strong class="account-usage-window-remaining">
-              {t("account.usage.window.remaining", {
-                percent: text.format.percent(usageWindow.remainingPercent / 100),
-              })}
-            </strong>
-            <span
-              class="account-usage-window-reset"
-              title={
-                usageWindow.resetsAtLabel ? t("account.usage.resetsAt", { time: usageWindow.resetsAtLabel }) : undefined
+        {(usageWindow, index) => (
+          <>
+            <Show
+              when={
+                usageWindow.group && props.windows[index() - 1]?.group?.name !== usageWindow.group.name
+                  ? usageWindow.group.name
+                  : undefined
               }
             >
-              {formatUsageResetIn(usageWindow.resetsAt, props.now, text)}
+              {(groupName) => <span class="account-usage-window-group">{groupName()}</span>}
+            </Show>
+            <span class="account-usage-window" data-usage-tone={usageWindow.tone}>
+              <span class="account-usage-window-label" title={usageWindow.label}>
+                {usageWindow.group?.window ?? usageWindow.label}
+              </span>
+              <span class="account-usage-window-bar" aria-hidden="true">
+                <span class="account-usage-window-fill" style={{ "inline-size": `${usageWindow.remainingPercent}%` }} />
+                <Show when={usagePaceRemainingPercent(usageWindow.durationMins, usageWindow.resetsAt, props.now)}>
+                  {(pace) => <span class="account-usage-window-pace" style={{ "inset-inline-start": `${pace()}%` }} />}
+                </Show>
+              </span>
+              <strong class="account-usage-window-remaining">
+                {t("account.usage.window.remaining", {
+                  percent: text.format.percent(usageWindow.remainingPercent / 100),
+                })}
+              </strong>
+              <span
+                class="account-usage-window-reset"
+                title={
+                  usageWindow.resetsAtLabel
+                    ? t("account.usage.resetsAt", { time: usageWindow.resetsAtLabel })
+                    : undefined
+                }
+              >
+                {formatUsageResetIn(usageWindow.resetsAt, props.now, text)}
+              </span>
             </span>
-          </span>
+          </>
         )}
       </For>
     </span>

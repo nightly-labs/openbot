@@ -11,7 +11,6 @@ function UsageStory(props: {
   state: "ready" | "empty" | "partial" | "loading" | "error" | "unsupported" | "large" | "small" | "long";
   narrow?: boolean;
   agentId?: string;
-  /** The machine use in the header, as an owner or admin sees it. */
   machine?: "normal" | "high";
 }) {
   const previous = window.openbot;
@@ -53,11 +52,8 @@ function UsageStory(props: {
   };
   onCleanup(() => {
     mock.dispose();
-    // Storybook can mount the next render before it disposes this one. Restore only our own mock,
-    // or the next render loses its bridge.
     if (window.openbot === mock.api) window.openbot = previous;
   });
-  // A named function, not a ternary in the prop: Solid reads the prop in a tracked scope.
   const machine = () => {
     const load = props.machine;
     return load && <UsageMachineMeter metrics={machineMetrics(load)} onOpenStorage={fn()} />;
@@ -83,7 +79,6 @@ function UsageStory(props: {
 }
 const GB = 1024 ** 3;
 
-/** A 4 vCPU, 8 GB server. When it is busy, memory is almost full. */
 function machineMetrics(load: "normal" | "high"): MachineMetrics {
   return {
     diskUsedBytes: 31 * GB,
@@ -118,7 +113,6 @@ export const LongModelNames: Story = { args: { state: "long", narrow: true } };
 
 export const SingleAgent: Story = { args: { agentId: "chief" } };
 
-/** CPU and memory before the filters. A click shows the details; the disk row opens Storage. */
 export const Machine: Story = { args: { machine: "normal" } };
 export const MachineHigh: Story = { args: { machine: "high" } };
 export const MachineNarrow: Story = { args: { machine: "normal", narrow: true } };

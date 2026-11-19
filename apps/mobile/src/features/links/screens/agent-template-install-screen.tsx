@@ -36,10 +36,6 @@ export function AgentTemplateInstallScreen() {
   return <AgentTemplateInstall key={request ?? "invalid"} request={request} />;
 }
 
-/**
- * The preview an agent link opens. It installs only when the user presses Add agent, on a server
- * where the user is an owner or admin and whose host advertises `agent-install-v1`.
- */
 function AgentTemplateInstall({ request }: { request?: string }) {
   const { t, errorMessage } = useText();
   const { session } = useMobileSession();
@@ -57,18 +53,12 @@ function AgentTemplateInstall({ request }: { request?: string }) {
       return loadAgentTemplate(apiUrl, templateId, signal);
     },
     enabled: apiUrl !== null && templateId !== null,
-    // Not cached: after an unpublish no copy may still show the instructions.
     gcTime: 0,
     retry: false,
   });
-  // Owners and admins see each of their servers from the start. A server that is still connecting,
-  // offline, or too old stays in the list as a disabled row, so the sheet does not change its layout.
   const managed = workspace.servers.filter((server) => canAdministerServer(server.role));
   const eligible = managed.filter((server) => showsOnline(server) && workspace.canInstallAgentTemplate(server.id));
   const [chosenServerId, setChosenServerId] = useState<string | null>(null);
-  // The default applies only until the user selects a server. After that, the choice stays: a
-  // selected server that disconnects keeps its check mark and disables Add agent, so the agent never
-  // goes to a server the user did not select.
   const selectedServerId =
     chosenServerId ?? eligible.find((server) => server.id === workspace.activeServer.id)?.id ?? eligible[0]?.id ?? null;
   const serverId = eligible.some((server) => server.id === selectedServerId) ? selectedServerId : null;
@@ -76,10 +66,7 @@ function AgentTemplateInstall({ request }: { request?: string }) {
   const [finished, setFinished] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const lock = useRef(false);
-  // Only while the request runs: after a success the sheet must close itself.
-  usePreventRemove(installing && !finished, () => {
-    // The host may already add the agent. Keep this sheet until the request settles.
-  });
+  usePreventRemove(installing && !finished, () => {});
   useEffect(() => {
     if (finished) router.dismissTo("/connected");
   }, [finished]);
@@ -106,7 +93,6 @@ function AgentTemplateInstall({ request }: { request?: string }) {
         ),
       );
       workspace.selectServer(target);
-      // The agent list shows the new agent; a failed refresh does not make the install fail.
       void workspace.refreshServer(target).catch(() => undefined);
       setFinished(true);
       setInstalling(false);
@@ -191,7 +177,6 @@ function AgentTemplateInstall({ request }: { request?: string }) {
           </Cascade>
         </View>
       ) : null}
-      {/* Over the content, so its exit does not move the preview that comes in under it. */}
       <View pointerEvents="none" className="absolute inset-x-0 top-0">
         <BlurReveal value={templateId !== null && template.isPending ? t("mobile.link.template.loading") : null}>
           {(label) => <TemplateLoading label={label} />}
@@ -209,10 +194,6 @@ function AgentTemplateInstall({ request }: { request?: string }) {
 const CASCADE_START_MS = 140;
 const CASCADE_STEP_MS = 70;
 
-/**
- * One part of the preview. The parts come into focus from a blur one after another, from the top
- * down, after the loading label has gone.
- */
 function Cascade({ step, children }: PropsWithChildren<{ step: number }>) {
   return (
     <BlurReveal value={step} interactive enterDuration={360} enterDelay={CASCADE_START_MS + step * CASCADE_STEP_MS}>
@@ -221,7 +202,6 @@ function Cascade({ step, children }: PropsWithChildren<{ step: number }>) {
   );
 }
 
-/** The label shines as the agent's thinking text does, while the account service answers. */
 function TemplateLoading({ label }: { label: string }) {
   const [foreground, muted] = useThemeColor(["foreground", "muted"]);
   return (
@@ -242,7 +222,6 @@ function TemplateMessage({ title, description }: { title: string; description: s
 
 function TemplatePreview({ detail, apiUrl }: { detail: AgentTemplateDetail; apiUrl: string | null }) {
   const { t } = useText();
-  // The account service sends the avatar as a path on its own origin.
   const avatarUrl = detail.avatarUrl && apiUrl ? new URL(detail.avatarUrl, apiUrl).toString() : null;
   return (
     <>
@@ -320,7 +299,6 @@ function TemplatePreview({ detail, apiUrl }: { detail: AgentTemplateDetail; apiU
   );
 }
 
-/** A local skill opens to show the `SKILL.md` text it installs, as on desktop. */
 function EmbeddedSkill({ name, markdown }: { name: string; markdown: string }) {
   const { t } = useText();
   const [open, setOpen] = useState(false);

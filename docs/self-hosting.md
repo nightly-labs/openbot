@@ -69,7 +69,9 @@ Keep the private JWK secret. With it, a person can open each host that uses your
    - `r2_buckets`: set the bucket names, if you used other names.
    - `vars`:
      - `EMAIL_SMTP_HOST`, `EMAIL_SMTP_PORT`, `EMAIL_SMTP_USERNAME`, `EMAIL_FROM`: your SMTP account.
+     - `EMAIL_REPLY_TO`: the inbox for replies and contact form messages, or empty to use `EMAIL_FROM`.
      - `EMAIL_LICENSE_FROM`: the sender of license emails, or empty to use `EMAIL_FROM`.
+     - `EMAIL_LICENSE_REPLY_TO`: the address for replies to license emails, or empty to use their sender.
      - `REMOTE_TICKET_KEY_ID`: the key ID from step 1.
      - `REMOTE_SIGNAL_URL`: `wss://signal.example.com/v1/signal`.
      - `REMOTE_AUTH_WEBHOOK_URL`: `https://signal.example.com/internal/auth-events`.

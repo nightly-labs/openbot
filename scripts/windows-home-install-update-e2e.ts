@@ -1,20 +1,3 @@
-// Drives the real Windows installers on a Windows computer that has no OpenBot, such as a CI
-// runner. It removes every OpenBot installation, %USERPROFILE%\OpenBot and the OpenBot registry
-// entries of this user, so do not run it on a computer that you use.
-//
-// An installation in %USERPROFILE%\OpenBot shares its folder with the agent workspaces. An update
-// runs the earlier uninstaller, which moves each file of the folder to a temporary folder and
-// deletes it. The cases:
-//   1. A normal update from the default folder keeps working, and it does not touch the workspaces.
-//   2. The earlier uninstaller, run as an update runs it, stops with exit code 2 when a workspace
-//      file has a path that fits in the folder but not in the temporary folder.
-//   3. Without such a file, the same uninstaller deletes the workspaces.
-//   4. The new installer updates the installation in %USERPROFILE%\OpenBot: it installs in the
-//      default folder, keeps the workspaces, and removes only the earlier app.
-//   5. An installation in the default folder that lost its registry entry and was installed again
-//      in an OpenBot subfolder: the new installer removes the earlier, incomplete app from the
-//      default folder, keeps the other files there, and points the login item at the new copy.
-// Usage: bun scripts/windows-home-install-update-e2e.ts <earlier installer> <new installer>
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -26,7 +9,6 @@ import { createOpenBotLogger } from "@openbot/logging";
 const logger = createOpenBotLogger("windows-home-install-update-e2e");
 
 if (process.platform !== "win32") throw new Error("This test drives the Windows installers and must run on Windows.");
-// It deletes %USERPROFILE%\OpenBot, so it runs only on a GitHub Actions runner.
 if (process.env.GITHUB_ACTIONS !== "true") {
   throw new Error("This test deletes %USERPROFILE%\\OpenBot and runs only on a GitHub Actions runner.");
 }
@@ -43,15 +25,11 @@ if (!localAppData) throw new Error("LOCALAPPDATA is not set.");
 const homeFolder = join(homedir(), "OpenBot");
 const defaultFolder = join(localAppData, "Programs", "OpenBot");
 const nestedFolder = join(defaultFolder, "OpenBot");
-// Missing on a computer where no program was installed for this user.
 const uninstallKey = "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
 const runKey = "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 const loginItemName = "app.openbot.desktop";
 const reportPath = resolve(".openbot-build/windows-home-install-update-e2e.json");
-// An installer that waits for a dialog in a silent run does not exit. This limit makes that a failure.
 const installerLimitMs = 5 * 60_000;
-// Below MAX_PATH (260) in the folder, above it in %TEMP%\nsXXXX.tmp\old-install, where the earlier
-// uninstaller moves it.
 const longPathLength = 250;
 
 const workspaceFiles = [
@@ -87,6 +65,8 @@ const cases: {
   earlierUninstallerDeletesWorkspaces?: CaseResult;
   newInstallerMovesTheInstallation?: CaseResult;
   newInstallerRemovesTheCopyAbove?: CaseResult;
+  visibleUpdate?: CaseResult;
+  visibleUpdateMovesTheInstallation?: CaseResult;
 } = {};
 const report: {
   earlierInstaller: string;
@@ -108,8 +88,6 @@ function powershell(script: string): string {
   }).trim();
 }
 
-// NSIS reads /D= and _?= only as the last argument and only without quotes, so the arguments are
-// written as they are. The paths of a CI runner have no spaces.
 function runInstaller(file: string, args: string): Promise<number> {
   return new Promise((resolvePromise, reject) => {
     const child = spawn(file, [args], { windowsVerbatimArguments: true, stdio: "ignore" });
@@ -175,7 +153,6 @@ function removeRegistration(): void {
       Get-ChildItem ${uninstallKey} | Get-ItemProperty |
         Where-Object { $_.DisplayName -like 'OpenBot*' } | ForEach-Object { $_.PSChildName }
     }`);
-  // A key or value that is already gone still makes `$?` false, so each cleanup ends with exit 0.
   for (const key of keys.split(/\r?\n/u).filter(Boolean)) {
     powershell(`Remove-Item -LiteralPath "${uninstallKey}\\${key}" -Recurse -Force -ErrorAction SilentlyContinue
       Remove-Item -LiteralPath "HKCU:\\Software\\${key}" -Recurse -Force -ErrorAction SilentlyContinue
@@ -183,7 +160,6 @@ function removeRegistration(): void {
   }
 }
 
-// Node writes paths longer than MAX_PATH; NSIS cannot move them to a longer path.
 async function makeWorkspaces(options: { longPath: boolean }): Promise<string | null> {
   for (const file of workspaceFiles) {
     await mkdir(dirname(join(homeFolder, file)), { recursive: true });
@@ -215,8 +191,6 @@ function presentAppFiles(folder: string): string[] {
   return appFiles.filter((file) => existsSync(join(folder, file)));
 }
 
-// The earlier uninstaller as `uninstallOldVersion` in electron-builder 26 runs it during an update:
-// copied out of the folder, silent, in update mode.
 async function runEarlierUninstallerAsUpdate(): Promise<number> {
   const copyFolder = await mkdtemp(join(tmpdir(), "openbot-old-uninstaller-"));
   const copy = join(copyFolder, "old-uninstaller.exe");
@@ -279,11 +253,11 @@ async function earlierUninstallerDeletesWorkspaces(): Promise<void> {
   check(result.missingWorkspaceFiles.length === workspaceFiles.length, "The earlier uninstaller kept the workspaces.");
 }
 
-async function newInstallerMovesTheInstallation(): Promise<void> {
+async function newInstallerMovesTheInstallation(visible = false): Promise<void> {
   await installEarlierInHomeFolder();
   const longPathFile = await makeWorkspaces({ longPath: true });
   setLoginItem(join(homeFolder, "OpenBot.exe"));
-  const exitCode = await runInstaller(newInstaller, "--updated /S");
+  const exitCode = await runInstaller(newInstaller, visible ? "--updated" : "--updated /S");
   const result = {
     exitCode,
     registration: registration(),
@@ -292,7 +266,7 @@ async function newInstallerMovesTheInstallation(): Promise<void> {
     appFilesInHomeFolder: presentAppFiles(homeFolder),
     missingWorkspaceFiles: await workspacesIntact(longPathFile),
   };
-  cases.newInstallerMovesTheInstallation = result;
+  cases[visible ? "visibleUpdateMovesTheInstallation" : "newInstallerMovesTheInstallation"] = result;
   check(exitCode === 0, `The new installer exited with ${exitCode}.`);
   check(result.missingWorkspaceFiles.length === 0, `Workspace files are missing: ${result.missingWorkspaceFiles}`);
   check(result.appFilesInDefaultFolder.includes("OpenBot.exe"), "The new installer did not use the default folder.");
@@ -312,7 +286,6 @@ async function newInstallerRemovesTheCopyAbove(): Promise<void> {
   check((await runInstaller(earlierInstaller, `/S /D=${nestedFolder}`)) === 0, "The earlier installer failed again.");
   check(existsSync(join(defaultFolder, "OpenBot.exe")), "The earlier copy is not in the folder above.");
   check(existsSync(join(nestedFolder, "OpenBot.exe")), "The earlier installer did not use the subfolder.");
-  // The reported copy has files missing.
   await rm(join(defaultFolder, "ffmpeg.dll"));
   const otherFile = join(defaultFolder, "notes.txt");
   await writeFile(otherFile, "not an app file\n");
@@ -336,14 +309,34 @@ async function newInstallerRemovesTheCopyAbove(): Promise<void> {
   check(result.loginItem === `"${join(nestedFolder, "OpenBot.exe")}"`, "The login item does not name the new copy.");
 }
 
+async function visibleUpdate(): Promise<void> {
+  await removeEverything();
+  check((await runInstaller(earlierInstaller, "/S")) === 0, "The earlier installer failed.");
+  await makeWorkspaces({ longPath: false });
+  const exitCode = await runInstaller(newInstaller, "--updated");
+  const result = {
+    exitCode,
+    registration: registration(),
+    appFilesInDefaultFolder: presentAppFiles(defaultFolder),
+    missingWorkspaceFiles: await workspacesIntact(null),
+  };
+  cases.visibleUpdate = result;
+  check(exitCode === 0, `The visible update exited with ${exitCode}.`);
+  check(result.registration.installLocation === defaultFolder, "The visible update moved the installation.");
+  check(result.appFilesInDefaultFolder.includes("OpenBot.exe"), "The visible update did not install OpenBot.exe.");
+  check(result.missingWorkspaceFiles.length === 0, "The visible update changed the workspaces.");
+}
+
 let failure: unknown = null;
 try {
   for (const step of [
     normalUpdate,
     earlierUninstallerStops,
     earlierUninstallerDeletesWorkspaces,
-    newInstallerMovesTheInstallation,
+    () => newInstallerMovesTheInstallation(),
     newInstallerRemovesTheCopyAbove,
+    visibleUpdate,
+    () => newInstallerMovesTheInstallation(true),
   ]) {
     await step();
   }

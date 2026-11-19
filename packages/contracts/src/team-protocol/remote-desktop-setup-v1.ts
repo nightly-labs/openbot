@@ -1,5 +1,3 @@
-// Frozen payloads for the remote-desktop-setup capability. Keep these fields and
-// bounds independent of the current IPC model.
 import { isDynamicRecord, isOneOf } from "../runtime-values";
 import type { TeamProtocolV4BaseJsonObject } from "./v4-base";
 

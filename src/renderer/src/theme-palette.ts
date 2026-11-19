@@ -1,6 +1,5 @@
 import type { AppThemePalette } from "@openbot/contracts/app-appearance";
 
-/** `color-mix` of one palette color into transparency, as the base palettes use translucent ink. */
 function clear(color: string, percent: number): string {
   return `color-mix(in srgb, ${color} ${percent}%, transparent)`;
 }
@@ -9,17 +8,6 @@ function mix(color: string, other: string, percent: number): string {
   return `color-mix(in srgb, ${color}, ${other} ${percent}%)`;
 }
 
-/**
- * The tokens that a palette sets, over the light or dark palette that its scheme names. A palette
- * gives twelve colors; the other tokens of each family come from them, as the base palettes make
- * their hover, soft and strong steps from one color. Tokens not listed here keep the base value:
- * illustrations, provider logos, charts and the file colors stay as they are in each scheme.
- *
- * Cards, sheets and controls are a step above the canvas: lighter than it in both base palettes. A
- * dark palette gives that step as `surface`. A light theme has no color lighter than its background
- * (Catppuccin Latte's `surface` is darker), so a light palette makes the step from its canvas and
- * white, as the base light palette is white over a grey canvas, and uses `surface` for the tab bar.
- */
 function paletteTokens({ scheme, colors }: AppThemePalette): Record<string, string> {
   const raised = scheme === "light" ? mix(colors.canvas, "#ffffff", 70) : colors.surface;
   const tabsBar = scheme === "light" ? mix(colors.canvas, colors.surface, 30) : colors.surface;
@@ -60,8 +48,6 @@ function paletteTokens({ scheme, colors }: AppThemePalette): Record<string, stri
     "--openbot-text-grouped-secondary": colors.textMuted,
     "--openbot-settings-text-muted": colors.textMuted,
 
-    // The inverted element (the default button, a checked switch, the user's bubble) is the text
-    // color on the canvas, as it is in both base palettes.
     "--openbot-surface-light": colors.text,
     "--openbot-text-on-light": colors.canvas,
     "--openbot-text-muted-on-light": clear(colors.canvas, 64),
@@ -94,11 +80,6 @@ function paletteTokens({ scheme, colors }: AppThemePalette): Record<string, stri
 
 let applied: string[] = [];
 
-/**
- * Sets the palette tokens on the root element, or removes them for null. Inline properties on the
- * root win over `tokens.css` and `tokens-light.css`, so the base palette shows again once they go.
- * The preload let only hex colors through, so each value is a color or a `color-mix` of colors.
- */
 export function applyThemePalette(palette: AppThemePalette | null): void {
   const style = document.documentElement.style;
   for (const name of applied) style.removeProperty(name);
