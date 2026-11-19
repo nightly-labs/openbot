@@ -272,6 +272,9 @@ export function classifyFailure(error: unknown): CauseCode {
   if (
     /\b(?:model[ _]not[ _]found|unknown model|no such model|not a valid model|no endpoints found|model\b[^.,;:\n]{0,60}\b(?:not found|does not exist|is not supported))\b/iu.test(
       message,
+    ) ||
+    /\bmodels\/\S+ is not found\b|\bmodel\b(?:\s+\S+)?\s+(?:(?:was|is|has been) retired|is no longer (?:available|supported))\b/iu.test(
+      message,
     )
   )
     return "model_not_found";
@@ -293,6 +296,7 @@ export function httpStatusCause(status: number): CauseCode | null {
   if (status === 404) return "not_found";
   if (status === 408 || status === 504) return "timeout";
   if (status === 409) return "conflict";
+  if (status === 410) return "model_not_found";
   if (status === 413) return "context_too_long";
   if (status === 429) return "rate_limit";
   return status >= 500 && status <= 599 ? "provider_unavailable" : null;
