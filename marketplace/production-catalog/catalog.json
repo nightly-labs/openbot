@@ -240,6 +240,36 @@
       "category": "automation",
       "source": "openbot",
       "featured": false
+    },
+    {
+      "slug": "design-a-grok-bot",
+      "category": "automation",
+      "source": "openbot",
+      "featured": false
+    },
+    {
+      "slug": "getting-started",
+      "category": "automation",
+      "source": "openbot",
+      "featured": false
+    },
+    {
+      "slug": "routine-healthcheck-v2",
+      "category": "automation",
+      "source": "openbot",
+      "featured": false
+    },
+    {
+      "slug": "transcript-healthcheck",
+      "category": "automation",
+      "source": "openbot",
+      "featured": false
+    },
+    {
+      "slug": "working-with-teammate-agents-v2",
+      "category": "automation",
+      "source": "openbot",
+      "featured": false
     }
   ],
   "packs": [
@@ -643,6 +673,44 @@
         {
           "name": "routine-healthcheck",
           "instruction": "Audits fleet routines for token waste; reports fixes; stays quiet when nothing is worth proposing.\n\nRun the Routine Healthcheck skill. Call list_agents, then list_routines for each agent. Scan every agent's scheduled and webhook routines for token waste (too frequent, recurring on a long chat, noisy empty runs, dead or duplicate). Report a short list: agent, routine, flag, suggested fix. When there is nothing worth proposing, call routine_no_update and send no message; do not send filler like \"(no change.)\". Do not edit another agent's routines unless the user says to.",
+          "active": false,
+          "schedule": {
+            "kind": "weekly",
+            "weekday": 1,
+            "time": "08:49"
+          }
+        }
+      ],
+      "featured": false
+    },
+    {
+      "slug": "dr-eggbot-v2",
+      "name": "dr eggbot v2",
+      "title": "Grok Bot designer",
+      "category": "automation",
+      "description": "Designs tight, single-job Grok Bots. Bring a job you want off your plate and it interviews you for the goal and process, then builds a bot that runs it on its own.\n\nYou design high-quality Grok Bots. Ask a few preference questions, then create the bot. Coding bots get the poteto-mode bar (one job, unslopped, verified). Non-coding bots get one job, one voice, and explicit anti-jobs. Casual, a little mad-scientist, short lowercase. Bias to act once the job is clear.\n\nUse the Design a Grok Bot skill when the user asks you to design a bot. Run the Getting started skill on the first conversation after import. Two standing healthchecks (transcript-healthcheck, routine-healthcheck) use the skills of the same name and stay quiet when there is nothing to propose.",
+      "avatarHue": 55,
+      "skills": [
+        "design-a-grok-bot",
+        "pstack",
+        "routine-healthcheck-v2",
+        "transcript-healthcheck",
+        "working-with-teammate-agents-v2",
+        "getting-started"
+      ],
+      "routines": [
+        {
+          "name": "transcript-healthcheck",
+          "instruction": "Run the transcript-healthcheck skill. Window: since the last successful run, or the last 24 hours if unknown. Fan out parallel miners across agent transcripts under /home/box/agent-data/agent-transcripts, skipping sand-subagent- folders. Report friction and proposals tagged skill, bot, or routine. Stay quiet when there is nothing worth proposing. Do not create skills, bots, or routines from the report alone; wait for the user to pick.",
+          "active": false,
+          "schedule": {
+            "kind": "weekdays",
+            "time": "08:44"
+          }
+        },
+        {
+          "name": "routine-healthcheck",
+          "instruction": "Run the routine-healthcheck skill. Scan every bot's scheduled and event routines for token waste: too frequent, recurring on a long chat, noisy empty runs, dead or duplicate. Report a short list of bot, routine, flag, and suggested fix. Stay quiet when there is nothing worth proposing. Do not edit another bot's routines unless the user says to.",
           "active": false,
           "schedule": {
             "kind": "weekly",

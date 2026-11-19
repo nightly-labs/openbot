@@ -1,8 +1,8 @@
 # OpenBot team launch catalog
 
-Version v4 contains 41 Skills and 27 Agents. The `pstack` Skill installs 52 skills `pstack-<name>` with it. Four Skills and four Agents are featured on first publication. All entries show the public OpenBot logo as their creator badge, use the publisher **OpenBot**, and start with zero installs. An Agent's `routines` in `catalog.json` use the Marketplace routine shape, and the build checks them as the account service does. The schedules use the installer's timezone.
+Version v4 contains 46 Skills and 28 Agents. The `pstack` Skill installs 52 skills `pstack-<name>` with it. Four Skills and four Agents are featured on first publication. All entries show the public OpenBot logo as their creator badge, use the publisher **OpenBot**, and start with zero installs. An Agent's `routines` in `catalog.json` use the Marketplace routine shape, and the build checks them as the account service does. The schedules use the installer's timezone.
 
-Each Agent has one job and a named result, in its title. Its instructions name two input paths (a tool such as the browser, an installed plugin or the repository; else pasted or uploaded material), one approval gate, the evidence each claim needs, a fixed rubric for judgment work, and the adjacent work that belongs to another Agent. Agents with a routine install it active. A routine first reads its saved setup. With no setup, the first run sends one short setup request and later runs stay quiet; a run with nothing new calls `routine_no_update` and sends no message. Dr. Eggbot's two healthchecks still install paused. State that an Agent keeps, such as a saved site address or a care log, goes in a shared data table named for what it holds, on the user's computer.
+Each Agent has one job and a named result, in its title. Its instructions name two input paths (a tool such as the browser, an installed plugin or the repository; else pasted or uploaded material), one approval gate, the evidence each claim needs, a fixed rubric for judgment work, and the adjacent work that belongs to another Agent. Agents with a routine install it active. A routine first reads its saved setup. With no setup, the first run sends one short setup request and later runs stay quiet; a run with nothing new calls `routine_no_update` and sends no message. The two healthchecks of Dr. Eggbot and of dr eggbot v2 still install paused. State that an Agent keeps, such as a saved site address or a care log, goes in a shared data table named for what it holds, on the user's computer.
 
 The Skills work from supplied material and available tools; they do not assume a connected inbox, CRM, ad account, or phone service. The `pstack` Skill is the exception: it is the upstream text, unchanged in substance, and some of its skills use MCP servers, connectors or web links when the agent has them.
 
@@ -78,6 +78,7 @@ Do not use the separate `skills:seed`, `agents:seed`, or `dev:seed` demo scripts
 | Home Care Log | `home-care-log` | other | A private care log for plants, pets and filters, with a weekend due list | `care-log` | Saturdays 09:00 |
 | Bill Tracker | `bill-tracker` | other | Recurring charges, price changes and renewals from your statements, with the statement lines | `recurring-charges` | Mondays 09:15 |
 | Dr. Eggbot | `dr-eggbot` | automation | Designs focused agents, skills and routines | `agent-designer`, `eggbot-getting-started`, `routine-healthcheck`, `agent-chat-healthcheck`, `working-with-teammate-agents`, `pstack` | weekdays 08:44 (paused); Mondays 08:49 (paused) |
+| dr eggbot v2 | `dr-eggbot-v2` | automation | Grok Bot designer | `design-a-grok-bot`, `pstack`, `routine-healthcheck-v2`, `transcript-healthcheck`, `working-with-teammate-agents-v2`, `getting-started` | weekdays 08:44 (paused); Mondays 08:49 (paused) |
 
 ## Skills
 
@@ -123,12 +124,17 @@ Do not use the separate `skills:seed`, `agents:seed`, or `dev:seed` demo scripts
 | [routine-healthcheck](skills/routine-healthcheck/SKILL.md) | automation | openbot |
 | [agent-chat-healthcheck](skills/agent-chat-healthcheck/SKILL.md) | automation | openbot |
 | [working-with-teammate-agents](skills/working-with-teammate-agents/SKILL.md) | automation | openbot |
+| [design-a-grok-bot](skills/design-a-grok-bot/SKILL.md) | automation | openbot |
+| [getting-started](skills/getting-started/SKILL.md) | automation | openbot |
+| [routine-healthcheck-v2](skills/routine-healthcheck-v2/SKILL.md) | automation | openbot |
+| [transcript-healthcheck](skills/transcript-healthcheck/SKILL.md) | automation | openbot |
+| [working-with-teammate-agents-v2](skills/working-with-teammate-agents-v2/SKILL.md) | automation | openbot |
 | `pstack`, with the 52 skills `pstack-<name>` of [bundles/pstack/skills](bundles/pstack/skills) | coding | cursor |
 
 ★ Featured on first publication. Existing Featured settings are preserved on reruns.
 
 ## Attribution
 
-The 35 original OpenBot team Skills use the repository PolyForm Noncommercial 1.0.0 license. The five existing adapted Skills retain their pinned OpenAI or Anthropic source attribution and Apache-2.0 license. Each generated bundle contains the applicable LICENSE.txt and NOTICE.txt; the build also produces UPSTREAM_NOTICES.md.
+The 40 original OpenBot team Skills use the repository PolyForm Noncommercial 1.0.0 license. The five existing adapted Skills retain their pinned OpenAI or Anthropic source attribution and Apache-2.0 license. Each generated bundle contains the applicable LICENSE.txt and NOTICE.txt; the build also produces UPSTREAM_NOTICES.md.
 
 `bundles/pstack/` is an unchanged copy of the `skills/` and `agents/` of the pstack plugin by Lauren Tan from the pinned `cursor/plugins` commit, under the MIT License. It is a pack in `catalog.json`: the build publishes it as the one Skill `pstack`. Its archive holds an index `SKILL.md`, the `LICENSE`, a `NOTICE.md`, and each folder of `skills/` as `skills/pstack-<folder>/`. The app installs each of those as a skill folder of its own, beside `pstack`, under one lock entry: one download and one install receipt. In Markdown, the build renames links, `/<name>` commands and `<name>` mentions of other pstack skills to `pstack-<name>`, removes `disable-model-invocation` so `$pstack-<name>` works with every provider, copies `agents/` into each skill that names a subagent, and adds a closing `pstack in OpenBot` section. Links to files that no skill installs go to the pinned commit. To update it, copy the new upstream `skills/` and `agents/`, update the pinned commit in `catalog.json` and `NOTICE.md`, and increase `catalogVersion`.
