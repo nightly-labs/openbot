@@ -4,7 +4,6 @@ import type { JSX } from "@solidjs/web";
 import { For } from "solid-js";
 import { type TalkKeyBinding, type TalkKeySymbol, talkKeyParts } from "./talk-key";
 
-/** The macOS symbols as icons, which sit in the middle of the cap; the ⌃ character sits high in each font. */
 const SYMBOL_ICONS: Record<TalkKeySymbol, (props: { class?: string }) => JSX.Element> = {
   ctrl: ChevronUp,
   alt: Option,
@@ -13,10 +12,6 @@ const SYMBOL_ICONS: Record<TalkKeySymbol, (props: { class?: string }) => JSX.Ele
   enter: CornerDownLeft,
 };
 
-/**
- * The push to talk chord, one key cap for each key: ⌃⌥⇧⌘ on a Mac, words elsewhere. Screen readers get
- * the chord from the control that shows it.
- */
 export function TalkKeyCaps(props: { binding: TalkKeyBinding; class?: string | undefined }) {
   const { t } = useText();
   return (

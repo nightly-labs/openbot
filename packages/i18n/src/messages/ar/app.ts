@@ -55,6 +55,8 @@ export const messages = {
   "app.rail.workflows": "مسارات العمل",
   "app.rail.usage": "الاستخدام",
   "app.rail.library": "المكتبة",
+  "app.rail.providers": "المزوّدون",
+  "app.rail.crm": "CRM",
   "app.rail.marketplace": "المتجر",
   "app.rail.settings": "الإعدادات",
   "app.rail.settingsNotice": "الإعدادات. {notice}",
@@ -113,6 +115,7 @@ export const messages = {
   "app.settingsPage.searchPlaceholder": "ابحث في الإعدادات…",
   "app.settingsPage.results": "نتائج البحث في الإعدادات",
   "app.settingsPage.noResults": "لا إعدادات مطابقة.",
+  "app.settingsPage.marketplaceApps": "الموصلات وخوادم MCP",
   "app.settingsPage.resultCount": {
     zero: "لا إعدادات مطابقة.",
     one: "إعداد واحد مطابق.",

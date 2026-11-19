@@ -39,7 +39,6 @@ export const buttonVariants = cva("ui-button", {
 
 export type ButtonSize = NonNullable<VariantProps<typeof buttonVariants>["size"]>;
 
-/** Cue markers that a caller can set in place of the default tap. */
 const OTHER_CUE_MARKERS = [
   "data-cuelume-select",
   "data-cuelume-toggle",
@@ -60,10 +59,8 @@ export type ButtonProps<T extends ValidComponent = "button"> = PolymorphicProps<
   OpenBotButtonProps &
   Partial<Pick<ComponentProps<T>, "class">>;
 
-/** Variants for minor actions. With sound feedback on, they play a softer tap than a main action. */
 const quietVariants = new Set<string>(["outline", "secondary", "ghost", "destructive-ghost", "link"]);
 
-/** Keys that activate a focused button. */
 const ACTIVATION_KEYS = new Set(["Enter", " "]);
 
 export function Button<T extends ValidComponent = "button">(props: ButtonProps<T>): JSX.Element {
@@ -81,26 +78,15 @@ export function Button<T extends ValidComponent = "button">(props: ButtonProps<T
       "disabled",
       "ref",
     );
-  // A Kobalte trigger with `as={Button}` gives Button that `as` prop too, and the root would then
-  // render Button again without end. In development the prop is a hot-reload wrapper, not Button, so
-  // Button drops a component in `as`. Those trigger props are a merged proxy: the spread below would
-  // read its sources through `omit` and get the omitted props back. A function source hides them.
   const asComponent = typeof untrack(() => props.as) === "function";
   const rootPropsSource = asComponent ? merge(() => others(["as"])) : others([]);
   // biome-ignore lint/nursery/noUnsafeTypeAssertion: Solid 2's omit cannot preserve Kobalte's generic polymorphic props.
   const rootProps = rootPropsSource as PolymorphicProps<T, ButtonRootProps<T>>;
-  // From the `as` prop, not from the element: the ref runs inside the spread that reads this value.
-  // A component in `as` is dropped above, so the root is then a native button.
   const isNative = () => {
     const as = props.as;
     return typeof as !== "string" || as === "button" || as === "input";
   };
 
-  /*
-   * A loading button is not natively disabled, so it keeps keyboard focus. These capture listeners
-   * stop the activation before the handlers of the caller get it. A stopped click also stops the
-   * form submit, and Enter in a field submits through a click on the default button.
-   */
   function guardLoading(target: HTMLElement): void {
     const block = (event: Event): void => {
       if (!props.loading) return;
@@ -128,15 +114,11 @@ export function Button<T extends ValidComponent = "button">(props: ButtonProps<T
       data-slot="button"
       data-variant={props.variant ?? "default"}
       data-size={props.size ?? "default"}
-      // bind() reads tap before the other markers, so drop the tap when a caller sets another one.
-      // A loading button gets no tap either: before, it was disabled and got no click.
       data-cuelume-tap={
         props.loading || OTHER_CUE_MARKERS.some((marker) => props[marker] !== undefined) ? undefined : ""
       }
       data-cuelume-emphasis={quietVariants.has(props.variant ?? "default") ? "subtle" : undefined}
       disabled={Boolean(props.disabled)}
-      // Kobalte sets these two from `disabled` only. A loading button keeps the disabled look and
-      // tells assistive technology that it does not accept activation.
       data-disabled={props.disabled || props.loading ? "" : undefined}
       aria-disabled={props.loading || (props.disabled && !isNative()) ? "true" : undefined}
       aria-busy={props.loading ? "true" : undefined}
@@ -152,7 +134,6 @@ export function Button<T extends ValidComponent = "button">(props: ButtonProps<T
 
 export type IconButtonSize = Extract<ButtonSize, "icon" | "icon-xs" | "icon-sm" | "icon-lg">;
 
-/** The handlers that the tooltip trigger chains. Kobalte types them with no `undefined`. */
 interface TooltipTriggerHandlers {
   onPointerEnter?: JSX.EventHandlerUnion<HTMLButtonElement, PointerEvent>;
   onPointerLeave?: JSX.EventHandlerUnion<HTMLButtonElement, PointerEvent>;
@@ -171,7 +152,6 @@ export interface IconButtonProps
   size?: IconButtonSize;
 }
 
-/** A button that shows only an icon. The label names it for a screen reader and in its tooltip. */
 export function IconButton(props: IconButtonProps): JSX.Element {
   const others = omit(props, "label", "tooltip", "children", "class", "size");
   return (
@@ -194,7 +174,6 @@ export interface CopyButtonProps extends Omit<ButtonProps, "children" | "onClick
   label?: string;
   copiedLabel?: string;
   iconOnly?: boolean;
-  /** Called after the value is on the clipboard. */
   onCopy?: () => void;
   onCopyError?: (error: unknown) => void;
 }
@@ -280,11 +259,6 @@ export function CopyButton(props: CopyButtonProps): JSX.Element {
   );
 }
 
-/**
- * A label that swaps between texts without a change in width: every text takes the same grid cell,
- * and only the active one is visible. A button that says "Copied" after a click does not push the
- * text beside it to a new line.
- */
 export function StableLabel(props: { labels: readonly string[]; active: number; live?: boolean }): JSX.Element {
   return (
     <span class="ui-stable-label">

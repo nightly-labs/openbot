@@ -9,7 +9,6 @@ import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { STORY_AGENT } from "./fixtures";
 
 const QUIET = new Array(24).fill(0);
-/** A few words and a short pause, as the waveform shows them. */
 const SPEECH = [
   0, 0, 0.05, 0.3, 0.55, 0.4, 0.7, 0.5, 0.2, 0.05, 0, 0, 0.1, 0.45, 0.8, 0.6, 0.35, 0.6, 0.9, 0.5, 0.25, 0.4, 0.65, 0.5,
 ];
@@ -36,9 +35,6 @@ const meta = {
     speed: 1,
     onCycleSpeed: fn(),
   },
-  // Mute, the way to talk, the press, speed and the open pill are local here; in the app the voice
-  // conversation and the saved preferences hold them. End sends the pill back into the top edge, and
-  // Start brings it out again.
   render: (args) => {
     const { t } = useText();
     const [muted, setMuted] = createSignal(untrack(() => args.muted));
@@ -116,18 +112,14 @@ type Story = StoryObj<typeof meta>;
 
 export const Starting: Story = { args: { phase: "starting" } };
 
-/** Push to talk, the default: the pad says how to talk, and the microphone is off until a press. */
 export const PushToTalk: Story = { args: { muted: true } };
 
-/** The user holds the pad or the talk key: it takes the accent and shows the voice. */
 export const Talking: Story = { args: { talking: true, levels: SPEECH } };
 
-/** Windows and Linux show the key names; the default there is Ctrl and the Windows key. */
 export const PushToTalkWindows: Story = {
   args: { muted: true, talkKey: { key: defaultTalkKey("win32"), platform: "win32" } },
 };
 
-/** A chosen key with a letter shows the letter of the user's keyboard layout. */
 export const PushToTalkCustomKey: Story = {
   args: {
     muted: true,
@@ -145,7 +137,6 @@ export const Thinking: Story = { args: { phase: "thinking" } };
 
 export const Speaking: Story = { args: { phase: "speaking", levels: SPEECH } };
 
-/** Codex live voice speaks at the speed of the realtime model, so it has no speed button. */
 export const LiveVoice: Story = { args: { onCycleSpeed: undefined } };
 
 export const MicrophoneBlocked: Story = {

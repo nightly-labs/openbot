@@ -1,5 +1,3 @@
-/* The push to talk key setting: the key caps in an outline button, and a reset beside it. */
-
 .talk-key-recorder {
   display: flex;
   align-items: center;

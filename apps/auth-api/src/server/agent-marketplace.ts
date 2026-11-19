@@ -48,14 +48,12 @@ interface AgentRow {
   avatar_seed: string;
   avatar_hue: number | null;
   avatar_key: string | null;
-  /** Absent from the rows of a submission and of the catalog list. */
   card_key?: string | null;
   skills_json: string;
   routines_json: string;
   creator_name: string | null;
   installs: number;
   featured: number;
-  /** Absent from the rows of a submission, which shows no catalog state. */
   verified?: number;
   updated_at: number;
   created_at: number;
@@ -104,9 +102,6 @@ export class AgentMarketplace {
         if (input.verified !== undefined) clauses.push(`agents.verified = ${input.verified ? 1 : 0}`);
         const sort: MarketplaceSort = input.sort === "installs" ? "installs" : "updated";
         const cursor = decodeMarketplaceCursor(input.cursor, sort);
-        // A v0 cursor holds only a timestamp. The order also leads with featured and ends with id, so a
-        // timestamp cannot say where that page stopped. It adds no clause. The first page comes again
-        // and its v1 cursor then pages the rest, which costs one request and loses no agent.
         if (cursor && !("legacyUpdatedAt" in cursor)) {
           const primary = sort === "installs" ? "agents.installs" : "agents.featured";
           clauses.push(
@@ -163,11 +158,6 @@ export class AgentMarketplace {
     )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
   }
 
-  /**
-   * The agent a shared link names: the approved version, or, before the first review, the newest
-   * version that waits for it, marked `pending`. A pending agent is in no list; only its link finds
-   * it, as a shared agent template. A rejected agent with no approved version stays not found.
-   */
   getListing(agentId: string) {
     return Effect.fn("AgentMarketplace.getListing")(() =>
       Effect.gen({ self: this }, function* () {
@@ -404,7 +394,6 @@ export class AgentMarketplace {
     )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
   }
 
-  /** The share card of the version the agent's page shows. Public, like the page. */
   card(agentId: string, conditions?: Headers) {
     return Effect.fn("AgentMarketplace.card")(() =>
       Effect.gen({ self: this }, function* () {
@@ -428,7 +417,6 @@ export class AgentMarketplace {
     )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
   }
 
-  /** Stores the share card the reviewer's script drew for an approved version. */
   setCard(versionId: string, card: Uint8Array) {
     return Effect.fn("AgentMarketplace.setCard")(() =>
       Effect.gen({ self: this }, function* () {
@@ -467,7 +455,6 @@ export class AgentMarketplace {
       Effect.gen({ self: this }, function* () {
         const bindings = yield* MarketplaceStorage;
 
-        // A pending agent can be added from its shared link, as a shared agent template can.
         const listed = (yield* this.approvedRowEffect(agentId)) ?? (yield* this.firstPendingRowEffect(agentId));
         if (!listed)
           return yield* Effect.fail(
@@ -531,7 +518,6 @@ export class AgentMarketplace {
             ),
           );
         const now = Date.now();
-        // The status guard and RETURNING make a second, concurrent review lose instead of overwriting.
         const reviewed = yield* marketplaceCall(() =>
           bindings.DB.prepare(
             "UPDATE marketplace_agent_versions SET status = ?, rejection_note = ?, reviewed_at = ? WHERE id = ? AND status = 'pending' RETURNING id",
@@ -581,7 +567,6 @@ export class AgentMarketplace {
         const bindings = yield* MarketplaceStorage;
 
         const result = yield* marketplaceCall(() =>
-          // A check is not a change of the agent, so "Recently updated" keeps its order.
           bindings.DB.prepare(
             "UPDATE marketplace_agents SET verified = ? WHERE id = ? AND approved_version_id IS NOT NULL",
           )
@@ -693,8 +678,6 @@ export class AgentMarketplace {
 
 function validateSnapshot(value: unknown): AgentPublicationPreview {
   if (!isDynamicRecord(value)) throw new AgentMarketplaceError(400, "invalid_agent", "Invalid agent snapshot.");
-  // Desktop builds before the bot-to-agent rename send `botId`; newer ones send `agentId`. A Worker
-  // deploy can land either side of a desktop release, so both spellings stay readable.
   const publishedAgentId = value.agentId ?? value.botId;
   const name = text(value.name, "name", INPUT_LIMITS.agentName, true);
   const title = text(value.title, "title", INPUT_LIMITS.agentTitle, false);
@@ -808,11 +791,6 @@ function publicDetail(row: AgentRow): MarketplaceAgentDetail {
   };
 }
 
-/**
- * The submission body a deployed desktop reads spells the marketplace listing `agentId`; in-app that
- * name now means the local agent, so the contract calls it `listingId`. The wire keeps its spelling:
- * a Worker deploy can land either side of a desktop release.
- */
 type AgentSubmissionWire = Omit<AgentSubmission, "listingId"> & { agentId: string };
 
 function submission(row: AgentRow): AgentSubmissionWire {

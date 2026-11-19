@@ -9,7 +9,6 @@ import { NOTIFICATION_LEVEL_KEYS } from "./server-notification-settings";
 
 const LEVELS = ["all", "needs-me", "nothing"] as const satisfies readonly ServerNotificationLevel[];
 
-/** The corner radius of a selected or inherited level and of a server chip, in points. */
 export const SELECTION_RADIUS = 12;
 
 const SHORT_KEYS = {
@@ -18,12 +17,6 @@ const SHORT_KEYS = {
   nothing: "mobile.settings.notifications.levelShort.nothing",
 } as const satisfies Record<ServerNotificationLevel, MobileTextKey>;
 
-/**
- * The three levels of one row of the notification settings, in a compact segmented control. A filled
- * segment is the row's own level. A dashed outline is the level that the row takes from its server.
- * HeroUI tabs always select one value and do not report a tap on the selected value, so they cannot
- * show a level that the row takes from the server, or clear the row's own level.
- */
 export function NotificationLevelSegments({
   label,
   value,
@@ -31,11 +24,8 @@ export function NotificationLevelSegments({
   disabled,
   onSelect,
 }: {
-  /** The name of the row, for screen readers. */
   label: string;
-  /** The row's own level, or `null` when it has none. */
   value: ServerNotificationLevel | null;
-  /** The level that the row takes from its server when it has no level of its own. */
   inherited?: ServerNotificationLevel | null;
   disabled: boolean;
   onSelect: (level: ServerNotificationLevel) => void;
@@ -67,8 +57,6 @@ export function NotificationLevelSegments({
             }}
             className={`min-h-8 justify-center px-2.5 ${selected ? "bg-control-active" : ""}`}
             style={({ pressed }) => ({
-              // Between the 8 pt of a small control and the 16 pt of the card, whose radius on a box
-              // this low would make a pill. The selection then reads as part of the card.
               borderRadius: SELECTION_RADIUS,
               borderWidth: 1,
               borderStyle: fromServer ? "dashed" : "solid",

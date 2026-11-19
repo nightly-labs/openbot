@@ -1,28 +1,18 @@
 import type { CentralAuthUser, ServerSummary } from "@openbot/contracts/ipc";
-import { Button, ChevronRight, IconButton, Input, Search, UserAvatar, UserRound, X } from "@openbot/ui";
+import { Button, ChevronRight, Input, Search, UserAvatar, UserRound, X } from "@openbot/ui";
 import { ServerMark } from "@openbot/ui/features/servers/ServerRail";
 import type { SettingsPagePlacement } from "@openbot/ui/features/settings/SettingsDialogShell";
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { flush, onSettled, Show } from "solid-js";
 
-/**
- * The frame of a settings page, on desktop and on the web: the heading and the section list at the
- * width of the sidebar, the path to an open detail page in the top row, and the panel. The settings
- * panel shows its nav, path and content in the mounts that `onMounts` gets. The footer, below the
- * section list, holds the row that opens the other settings page. The Close button at the end of the
- * top row is the visible way out of the page.
- */
 export function SettingsPageFrame(props: {
   heading: JSX.Element;
-  /** Content between the heading and the section list, such as a search. */
   children?: JSX.Element;
   sectionsHidden?: boolean;
   footer?: JSX.Element;
   onMounts: (mounts: SettingsPagePlacement | undefined) => void;
-  /** Escape outside a popup or a text field of the window. */
   onEscape: () => void;
-  /** The Close button. It closes the page, also while a search has text. */
   onClose: () => void;
 }) {
   const { t } = useText();
@@ -33,13 +23,9 @@ export function SettingsPageFrame(props: {
 
   onSettled(() => {
     props.onMounts({ nav, content, path });
-    // As on the usage and schedule pages, the heading takes the focus, so a screen reader reads the
-    // page that opened. The settings shell puts the focus back on the opener when the page closes.
-    root.querySelector<HTMLElement>(".settings-page-title")?.focus({ preventScroll: true });
-    // Escape closes the page, as it closed the settings dialog. On the document and after the
-    // delegated handlers, so a control that handles Escape keeps it. A click can put the focus back on
-    // the rail or the server menu, so a target outside the page also counts, except an open popup or a
-    // text field.
+    if (!content.contains(document.activeElement)) {
+      root.querySelector<HTMLElement>(".settings-page-title")?.focus({ preventScroll: true });
+    }
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.defaultPrevented) return;
       const target = event.target instanceof Element ? event.target : null;
@@ -64,22 +50,21 @@ export function SettingsPageFrame(props: {
         <div class="settings-page-footer">{props.footer}</div>
       </div>
       <div class="settings-page-path-row" ref={path} />
-      <IconButton
-        variant="secondary"
+      <Button
+        variant="ghost"
         size="icon-sm"
         class="settings-page-close"
-        label={t("common.close")}
+        aria-label={t("common.close")}
         data-cuelume-tap="close"
         onClick={() => props.onClose()}
       >
         <X aria-hidden="true" />
-      </IconButton>
+      </Button>
       <div class="settings-page-content" ref={content} />
     </div>
   );
 }
 
-/** The search field above the section list of a settings page. Enter with a query calls `onEnter`. */
 export function SettingsSearchField(props: { value: string; onInput: (value: string) => void; onEnter: () => void }) {
   const { t } = useText();
   return (
@@ -102,19 +87,13 @@ export function SettingsSearchField(props: { value: string; onInput: (value: str
   );
 }
 
-/**
- * Asks the server settings to open the first section that the search finds, then moves the focus to that
- * section. The server settings clear the search when they open a section; with no match, nothing changes.
- */
 export function openFirstSettingsSection(nav: HTMLElement | undefined, request: () => void, query: () => string) {
   request();
-  // The section opens, and the tabs move their focus key to it, before the focus moves.
   flush();
   if (query()) return;
   nav?.querySelector<HTMLElement>(".settings-modal-nav-item[data-selected]")?.focus();
 }
 
-/** The heading of a server settings page: the server mark and name, as the server menu shows them. */
 export function ServerSettingsPageTitle(props: { server: ServerSummary }) {
   return (
     <h1 class="settings-page-title settings-page-server" tabindex={-1}>
@@ -126,10 +105,6 @@ export function ServerSettingsPageTitle(props: { server: ServerSummary }) {
   );
 }
 
-/**
- * The row of the user settings page that opens the settings of the server in the top row. It names the
- * server, so the user sees that this page is not its settings.
- */
 export function ServerSettingsLink(props: { server: ServerSummary; onOpen: () => void }) {
   const { t } = useText();
   return (
@@ -150,10 +125,6 @@ export function ServerSettingsLink(props: { server: ServerSummary; onOpen: () =>
   );
 }
 
-/**
- * The row of a server settings page that opens the user settings. It shows the account photo; without a
- * photo, it shows a person icon, as initials are not legible at the size of an icon.
- */
 export function PersonalSettingsLink(props: {
   account: Pick<CentralAuthUser, "name" | "email" | "avatarUrl"> | null;
   onOpen: () => void;

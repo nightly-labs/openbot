@@ -1,10 +1,10 @@
 {
-  "version": "0.71.0",
+  "version": "0.73.0",
   "highlights": [
-    "Update your joined servers to this version too, so that routine Stop, files with no text in outside chats and API keys at their old path work there.",
-    "Stop a routine run from the Routines canvas, and pinch on a touchpad to zoom in the app.",
-    "Scripts and tools that read Vault API keys from their files work again after the 0.70.0 update.",
-    "A Claude agent keeps the model in its profile, and moves to its backup model at the monthly spend limit.",
-    "Buy a Starter hosted server again: €30 a month with 25 GB of storage."
+    "Update your joined servers to this version too, so that custom image sizes and the Sunra and Higgsfield models work there.",
+    "See the side threads of each agent in the sidebar, and filter the sidebar by agents, channels, unread chats or folders.",
+    "Edit one workflow together with other people at the same time.",
+    "OpenBot uses much less CPU while many agents work, and its database uses much less space.",
+    "Agents finish a checkout when the bank asks for a 3-D Secure code that they can read in your email or SMS."
   ]
 }

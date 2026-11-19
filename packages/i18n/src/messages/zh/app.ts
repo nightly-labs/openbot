@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/app";
 
 export const messages = {
-  // The app shell, shared state, and shared controls without a feature of their own.
   "app.loading": "正在加载 OpenBot",
   "app.leftPanel.resize": "调整左侧栏宽度",
   "app.host.thisMac": "这台 Mac",
@@ -48,7 +47,6 @@ export const messages = {
   "app.questionnaire.empty": "没有问题",
   "app.standingApproval.title": "始终允许 {name}？",
   "app.standingApproval.titleUnnamed": "始终允许该助手？",
-  // The page rail and the settings page of the desktop window.
   "app.rail.label": "页面",
   "app.rail.website": "OpenBot 网站",
   "app.rail.agents": "助手",
@@ -57,6 +55,8 @@ export const messages = {
   "app.rail.workflows": "工作流",
   "app.rail.usage": "用量",
   "app.rail.library": "资料库",
+  "app.rail.providers": "服务商",
+  "app.rail.crm": "CRM",
   "app.rail.marketplace": "市场",
   "app.rail.settings": "设置",
   "app.rail.settingsNotice": "设置。{notice}",
@@ -108,6 +108,7 @@ export const messages = {
   "app.settingsPage.searchPlaceholder": "搜索设置…",
   "app.settingsPage.results": "设置搜索结果",
   "app.settingsPage.noResults": "没有匹配的设置。",
+  "app.settingsPage.marketplaceApps": "连接器和 MCP 服务器",
   "app.settingsPage.resultCount": {
     one: "{count} 项匹配设置。",
     other: "{count} 项匹配设置。",

@@ -220,7 +220,6 @@ export function parseSetServerMuted(value: unknown): SetServerMutedInput {
   if (!isObject(value) || !isBoolean(value.muted)) throw new Error("Invalid server mute setting.");
   const serverId = requireString(value.serverId, "serverId", INPUT_LIMITS.identifier);
   if (value.durationMs === undefined) return { serverId, muted: value.muted };
-  // Only a mute has an end, and only the menu's durations are accepted.
   if (!value.muted || !isOneOf(SERVER_MUTE_DURATIONS_MS, value.durationMs)) {
     throw new Error("Invalid server mute duration.");
   }

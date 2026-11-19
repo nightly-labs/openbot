@@ -1,15 +1,7 @@
-/**
- * The DOM-free rule for the push to talk key. Shared UI owns this rule; the renderer owns
- * persistence and the device platform, and passes the key down through typed props.
- */
 import type { AppTextKey } from "@openbot/i18n";
 
 export type TalkKeyPlatform = "darwin" | "win32" | "linux";
 
-/**
- * The keys that the user holds to talk. `code` is a `KeyboardEvent.code`, or null when the
- * modifiers alone are the chord.
- */
 export interface TalkKey {
   readonly ctrl: boolean;
   readonly alt: boolean;
@@ -18,10 +10,8 @@ export interface TalkKey {
   readonly code: string | null;
 }
 
-/** The character of a key code on the user's keyboard layout, where the browser knows it. */
 export type KeyLayout = (code: string) => string | undefined;
 
-/** The key, and what its label needs: the device with the keyboard, and its layout. */
 export interface TalkKeyBinding {
   readonly key: TalkKey;
   readonly platform: TalkKeyPlatform;
@@ -51,7 +41,6 @@ const MODIFIER_CODES: Record<string, Modifier> = {
   MetaRight: "meta",
 };
 
-/** The key caps of a US layout. A layout map from the browser replaces them where it has the key. */
 const PUNCTUATION: Record<string, string> = {
   Backquote: "`",
   Minus: "-",
@@ -67,10 +56,6 @@ const PUNCTUATION: Record<string, string> = {
   IntlBackslash: "§",
 };
 
-/**
- * Windows and Linux spell the modifiers, Ctrl first. macOS shows them as symbols in the order ⌃⌥⇧⌘,
- * which `talkKeyParts` gives as symbol parts.
- */
 const MODIFIER_LABELS: Record<Exclude<TalkKeyPlatform, "darwin">, Record<Modifier, AppTextKey>> = {
   win32: {
     ctrl: "conversation.voice.key.ctrl",
@@ -88,7 +73,6 @@ const MODIFIER_LABELS: Record<Exclude<TalkKeyPlatform, "darwin">, Record<Modifie
 
 const ARIA_MODIFIERS: Record<Modifier, string> = { ctrl: "Control", alt: "Alt", shift: "Shift", meta: "Meta" };
 
-/** Control and Option on a Mac; Control and the Windows key (Super on Linux) elsewhere. */
 export function defaultTalkKey(platform: TalkKeyPlatform): TalkKey {
   return platform === "darwin"
     ? { ctrl: true, alt: true, shift: false, meta: false, code: null }
@@ -99,7 +83,6 @@ export function isModifierCode(code: string): boolean {
   return code in MODIFIER_CODES;
 }
 
-/** Letters, digits, function keys, punctuation, Space and Enter. Escape stops a recording, and Tab moves the focus. */
 export function isTalkKeyCode(code: string): boolean {
   return (
     /^Key[A-Z]$/.test(code) ||
@@ -115,12 +98,10 @@ function modifierCount(key: TalkKey): number {
   return MODIFIERS.filter((modifier) => key[modifier]).length;
 }
 
-/** Modifiers alone need two of them, so that one modifier of a usual shortcut does not open the microphone. */
 export function isValidTalkKey(key: TalkKey): boolean {
   return key.code === null ? modifierCount(key) >= 2 : isTalkKeyCode(key.code);
 }
 
-/** The saved value, or null when it is absent or not a valid key. */
 export function parseTalkKey(value: string | null): TalkKey | null {
   if (!value) return null;
   let parsed: unknown;
@@ -156,7 +137,6 @@ export function sameTalkKey(left: TalkKey, right: TalkKey): boolean {
   );
 }
 
-/** The modifiers that the event holds, and its key when that key can be part of a chord. */
 export function talkKeyOfEvent(event: TalkKeyEvent): TalkKey {
   return {
     ctrl: event.ctrlKey,
@@ -167,42 +147,29 @@ export function talkKeyOfEvent(event: TalkKeyEvent): TalkKey {
   };
 }
 
-/** The keydown completes the chord: exactly its modifiers, and its key when it has one. */
 export function completesTalkKey(event: TalkKeyEvent, key: TalkKey): boolean {
   if (event.ctrlKey !== key.ctrl || event.altKey !== key.alt) return false;
   if (event.shiftKey !== key.shift || event.metaKey !== key.meta) return false;
   return key.code === null ? isModifierCode(event.code) : event.code === key.code;
 }
 
-/** The key is one of the chord, so its keydown repeats the hold and its keyup ends it. */
 export function isTalkKeyPart(code: string, key: TalkKey): boolean {
   const modifier = MODIFIER_CODES[code];
   return modifier ? key[modifier] : code === key.code;
 }
 
-/** Plain keys and Shift with a key type text, so they talk only outside a text field. */
 export function talkKeyTypes(key: TalkKey): boolean {
   return key.code !== null && !key.ctrl && !key.alt && !key.meta && !/^F\d+$/.test(key.code);
 }
 
-/** Space and Enter press a focused button, so a chord of only that key does not talk on one. */
 export function talkKeyPresses(key: TalkKey): boolean {
   return (key.code === "Space" || key.code === "Enter") && !key.ctrl && !key.alt && !key.meta;
 }
 
-/** A key that macOS shows as a symbol: ⌃ ⌥ ⇧ ⌘ and ↩. */
 export type TalkKeySymbol = Modifier | "enter";
 
-/**
- * A part of the label: a catalog key, the cap of a key, which is the same in each language, or a macOS
- * symbol. A symbol is not text, because the font puts ⌃ above the middle of the line.
- */
 export type TalkKeyPart = { readonly text: AppTextKey } | { readonly cap: string } | { readonly symbol: TalkKeySymbol };
 
-/**
- * The label of the chord, one part for each key. A letter shows the cap of the user's layout, such as "A"
- * for `KeyQ` on a French keyboard.
- */
 export function talkKeyParts({ key, platform, layout }: TalkKeyBinding): readonly TalkKeyPart[] {
   const parts: TalkKeyPart[] = MODIFIERS.filter((modifier) => key[modifier]).map((modifier) =>
     platform === "darwin" ? { symbol: modifier } : { text: MODIFIER_LABELS[platform][modifier] },
@@ -216,7 +183,6 @@ export function talkKeyParts({ key, platform, layout }: TalkKeyBinding): readonl
   return parts;
 }
 
-/** A key cap shows a capital letter, unless the capital is longer, as "ß" is. */
 function upperCap(cap: string): string {
   const upper = cap.toUpperCase();
   return upper.length === cap.length ? upper : cap;
@@ -228,7 +194,6 @@ function keyCap(code: string): string {
   return PUNCTUATION[code] ?? code;
 }
 
-/** The `aria-keyshortcuts` value of the chord. */
 export function talkKeyAria(key: TalkKey): string {
   const names = MODIFIERS.filter((modifier) => key[modifier]).map((modifier) => ARIA_MODIFIERS[modifier]);
   if (key.code !== null) names.push(key.code === "Space" ? "Space" : key.code === "Enter" ? "Enter" : keyCap(key.code));

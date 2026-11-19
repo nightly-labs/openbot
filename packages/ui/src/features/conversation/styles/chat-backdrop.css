@@ -1,0 +1,32 @@
+.chat-backdrop {
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.chat-backdrop > canvas {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.chat-backdrop-custom {
+  background-color: var(--openbot-bg-canvas);
+}
+
+.chat-backdrop-media {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.chat-backdrop-custom::after {
+  position: absolute;
+  inset: 0;
+  background-color: color-mix(in srgb, var(--openbot-bg-canvas) 35%, transparent);
+  content: "";
+}

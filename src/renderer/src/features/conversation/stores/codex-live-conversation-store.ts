@@ -5,17 +5,13 @@ import { createStore, onCleanup } from "solid-js";
 import { SPEECH_LEVEL_COUNT } from "../../speech/speech-playback";
 import { voiceCaptureError } from "../voice-status";
 
-/** How often the loudness of the microphone and of the reply is read, for the face. */
 const LEVEL_INTERVAL_MS = 80;
-/** The loudness range of the face, in dB: below the floor is silence, at the top is full. */
 const LEVEL_FLOOR_DB = -60;
 const LEVEL_RANGE_DB = 50;
-/** The data channel that the realtime model sends its events on, and takes commands from. */
 const EVENTS_CHANNEL = "oai-events";
 
 export type CodexLivePort = Pick<OpenBotDesktopApi["voice"], "startLive" | "stopLive" | "onLiveEvent">;
 
-/** Read on each call: tests and stories replace `window.openbot` per case. */
 function codexLivePort(): CodexLivePort {
   return window.openbot.voice;
 }
@@ -25,7 +21,6 @@ type LiveStep = "starting" | "listening" | "thinking" | "speaking";
 interface LiveState {
   step: LiveStep;
   muted: boolean;
-  /** Push to talk: the user holds the talk button or Space now. */
   talking: boolean;
   error: string | null;
   levels: number[];
@@ -35,7 +30,6 @@ function quietLevels(): number[] {
   return new Array(SPEECH_LEVEL_COUNT).fill(0);
 }
 
-/** The loudness of one reading, from 0 to 1. */
 function loudness(analyser: AnalyserNode, samples: Float32Array<ArrayBuffer>): number {
   analyser.getFloatTimeDomainData(samples);
   let sum = 0;
@@ -45,12 +39,6 @@ function loudness(analyser: AnalyserNode, samples: Float32Array<ArrayBuffer>): n
   return Math.min(1, Math.max(0, (db - LEVEL_FLOOR_DB) / LEVEL_RANGE_DB));
 }
 
-/**
- * A voice conversation with a Codex agent through Codex live voice. The microphone and the reply go
- * over WebRTC between this window and OpenAI; the Codex App Server of the agent's server opens the
- * call with that server's Codex sign-in and runs the agent's turns in its chat. It has the same shape as the conversation
- * that transcribes on this computer, so the same pane shows it. It ends with its owner.
- */
 export function createCodexLiveConversation(deps: { agentId: string; serverId: string; port?: CodexLivePort }) {
   const port = deps.port ?? codexLivePort();
   const [state, setState] = createStore<LiveState>({
@@ -63,7 +51,6 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
   let disposed = false;
   let failed = false;
   let sessionId: string | null = null;
-  // Sessions that ended before `startLive` returned their id: the end event can arrive first.
   let starting = false;
   const endedEarly = new Map<string, string | null>();
   let peer: RTCPeerConnection | undefined;
@@ -75,13 +62,10 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
   let meterTimer: ReturnType<typeof setInterval> | undefined;
   const reply = new Audio();
   reply.autoplay = true;
-  // The copies that the logic reads: a store read shows a write only after the next flush.
   let step: LiveStep = "starting";
   let muted = false;
-  /** The microphone is on only while the user holds the talk button. */
   let pushToTalk = false;
   let talking = false;
-  // Realtime v3 has no command that stops a reply: an interrupted reply plays on mute until its turn ends.
   let currentReply: unknown = null;
   let silencedTurn: unknown = null;
   let silenceNextReply = false;
@@ -124,7 +108,6 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
     }
   });
 
-  /** The realtime v3 turns give the phase: who speaks, and when the model thinks. */
   function onModelEvent(data: unknown): void {
     if (typeof data !== "string") return;
     let event: unknown;
@@ -137,7 +120,6 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
     const turn = event.turn;
     if (typeof turn !== "object" || turn === null || !("id" in turn) || !("role" in turn)) return;
     if (event.type === "turn.created" && turn.role === "user") {
-      // The next reply answers this turn, so an interrupt of the reply before it does not silence it.
       silenceNextReply = false;
       if (silencedTurn === null) reply.muted = false;
       setStep("listening");
@@ -188,7 +170,6 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
     reply.muted = false;
     try {
       microphone = await navigator.mediaDevices.getUserMedia({
-        // The reply plays while the microphone listens: the echo canceller removes it.
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
         video: false,
       });
@@ -200,7 +181,6 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
       release();
       return;
     }
-    // The user can mute while the microphone opens.
     for (const track of microphone.getAudioTracks()) track.enabled = !muted;
     try {
       context = new AudioContext();
@@ -244,7 +224,6 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
     }
   }
 
-  /** Ends the call and frees the microphone. The session in main ends with its own stop. */
   function release(): void {
     if (meterTimer) clearInterval(meterTimer);
     meterTimer = undefined;
@@ -267,10 +246,6 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
     applyMute(!muted);
   }
 
-  /**
-   * Push to talk: the microphone is off until the user holds the talk button or Space. The realtime
-   * model hears silence when they let go, so it ends the turn as at a pause.
-   */
   function setTalkMode(mode: VoiceTalkMode): void {
     const push = mode === "push";
     if (push === pushToTalk) return;
@@ -279,7 +254,6 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
     if (push !== muted) applyMute(push);
   }
 
-  /** Push to talk: the user presses. A reply stops, and the microphone opens. */
   function startTalking(): void {
     if (!pushToTalk || talking) return;
     setTalking(true);
@@ -287,14 +261,12 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
     if (muted) applyMute(false);
   }
 
-  /** Push to talk: the user lets go, and the microphone closes. */
   function stopTalking(): void {
     if (!pushToTalk || !talking) return;
     setTalking(false);
     if (!muted) applyMute(true);
   }
 
-  /** Push to talk: the user pressed another key with the talk key. Live voice hears the voice as it comes, so only the microphone closes. */
   function cancelTalking(): void {
     stopTalking();
   }
@@ -306,14 +278,12 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
     });
   }
 
-  /** The microphone stays open while it is muted, so unmuting does not start a new call. */
   function applyMute(next: boolean): void {
     muted = next;
     for (const track of microphone?.getAudioTracks() ?? []) track.enabled = !muted;
     setState((draft) => {
       draft.muted = muted;
     });
-    // A call that failed starts again on unmute. A call that still starts keeps its start.
     if (!muted && failed && !disposed) {
       failed = false;
       setState((draft) => {
@@ -324,7 +294,6 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
     }
   }
 
-  /** Silences the reply that plays now, or the next one. The model and the agent's turn in the chat go on. */
   function interrupt(): void {
     if (step !== "speaking" && step !== "thinking") return;
     if (step === "speaking") silencedTurn = currentReply;

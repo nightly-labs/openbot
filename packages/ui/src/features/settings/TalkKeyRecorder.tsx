@@ -15,7 +15,6 @@ import {
 
 export interface TalkKeyRecorderProps {
   binding: TalkKeyBinding;
-  /** The new key, or null for the default key of the platform. */
   onChange: (key: TalkKey | null) => void;
 }
 
@@ -23,11 +22,6 @@ function keyCount(key: TalkKey): number {
   return [key.ctrl, key.alt, key.shift, key.meta, key.code !== null].filter(Boolean).length;
 }
 
-/**
- * The push to talk key row control. A click records: the user holds the new keys and lets go, and the
- * largest chord that they held is the key. Escape, a click outside or a switch to another window stops
- * the recording and keeps the key. One modifier alone is not a key, so the recording goes on.
- */
 export function TalkKeyRecorder(props: TalkKeyRecorderProps): JSX.Element {
   const { t } = useText();
   const [recording, setRecording] = createSignal(false);
@@ -36,7 +30,6 @@ export function TalkKeyRecorder(props: TalkKeyRecorderProps): JSX.Element {
   let root!: HTMLDivElement;
   const isDefault = () => sameTalkKey(props.binding.key, defaultTalkKey(props.binding.platform));
 
-  // The capture listeners of the window come first, so the keys do not close the dialog or reach the app.
   const swallow = (event: KeyboardEvent) => {
     event.preventDefault();
     event.stopImmediatePropagation();
@@ -54,7 +47,6 @@ export function TalkKeyRecorder(props: TalkKeyRecorderProps): JSX.Element {
   };
   const up = (event: KeyboardEvent) => {
     swallow(event);
-    // macOS sends no key-up for a key let go while ⌘ is held, so the chord ends when no modifier is held.
     if (event.ctrlKey || event.altKey || event.shiftKey || event.metaKey) return;
     const chord = held();
     setHeld(null);
@@ -66,7 +58,6 @@ export function TalkKeyRecorder(props: TalkKeyRecorderProps): JSX.Element {
     stop();
     if (!sameTalkKey(chord, props.binding.key)) props.onChange(chord);
   };
-  // Safari does not focus a clicked button, so its blur does not come: a press outside stops the recording.
   const pressOutside = (event: PointerEvent) => {
     if (!(event.target instanceof Node && root.contains(event.target))) stop();
   };

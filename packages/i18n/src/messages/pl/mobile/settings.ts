@@ -71,7 +71,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "Wyczyścić dziennik pomocy?",
   "mobile.settings.support.clearBody": "Usuwa to wszystkie zdarzenia z dziennika na tym telefonie.",
   "mobile.settings.support.logFooter":
-    "Dziennik pozostaje na tym telefonie, a OpenBot go nie wysyła. Zapisuje kroki połączenia, żądania i błędy. Nie zapisuje wiadomości ani plików i maskuje hasła oraz tokeny. Przeczytaj plik, zanim go udostępnisz.",
+    "Dziennik pozostaje na tym telefonie. OpenBot wysyła jego wiersze tylko ze zgłoszeniem błędu aplikacji na telefon, które wysyłasz, a karta zgłoszenia najpierw je pokazuje. Zapisuje kroki połączenia, żądania i błędy. Nie zapisuje wiadomości ani plików i maskuje hasła oraz tokeny. Przeczytaj plik, zanim go udostępnisz.",
   "mobile.settings.support.saveFailed": "Nie udało się zapisać pliku dziennika. Spróbuj ponownie.",
   "mobile.settings.support.sharingUnavailable": "Udostępnianie jest niedostępne na tym telefonie.",
   "mobile.settings.support.newestFirst": "Od najnowszych.",
@@ -133,19 +133,65 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Jasność",
   "mobile.settings.appearance.messageColorFooter":
     "Z kolorem agenta Twoje wiadomości w czacie z agentem mają kolor tego agenta. Z własnym kolorem Twoje wiadomości we wszystkich czatach mają wybrany kolor. Kolor tekstu zmienia się, aby tekst był czytelny.",
+  "mobile.settings.appearance.bubbleStyle": "Styl dymków",
+  "mobile.settings.appearance.bubbleStyleSolid": "Pełny",
+  "mobile.settings.appearance.bubbleStyleTint": "Odcień",
+  "mobile.settings.appearance.seeThroughBubbles": "Przezroczyste dymki",
+  "mobile.settings.appearance.seeThroughBubblesNote":
+    "Przez dymki agenta i dymki bez koloru widać tło. Bez tła dymki są zawsze nieprzezroczyste.",
+  "mobile.settings.appearance.tab.colors": "Kolory",
+  "mobile.settings.appearance.tab.chat": "Czat",
+  "mobile.settings.appearance.preview.routines": "3 uruchomienia rutyny",
+  "mobile.settings.appearance.preview.thinking": "Myślał przez 4 sekundy",
+  "mobile.settings.appearance.preview.memory": "Zapisano 1 wspomnienie",
+  "mobile.settings.appearance.backdrop.title": "Tło",
+  "mobile.settings.appearance.backdrop.footer":
+    "Widać je za ekranem głównym i czatami na tym telefonie. Agent może je dla ciebie ustawić; Cofnij w czacie przywraca poprzednie.",
+  "mobile.settings.appearance.backdrop.none": "Brak",
+  "mobile.settings.appearance.backdrop.pond": "Staw z karpiami koi",
+  "mobile.settings.appearance.backdrop.jellyfish": "Meduzy",
+  "mobile.settings.appearance.backdrop.sunset": "Retro zachód słońca",
+  "mobile.settings.appearance.backdrop.snowfall": "Opady śniegu",
+  "mobile.settings.appearance.backdrop.fireflies": "Świetliki",
+  "mobile.settings.appearance.backdrop.agentPage": "Strona agenta",
+  "mobile.settings.appearance.backdrop.agentPageNote": "Ustawione przez agenta",
+  "mobile.settings.appearance.backdrop.photo": "Zdjęcie",
+  "mobile.settings.appearance.backdrop.photoChoose": "Wybierz ze zdjęć",
+  "mobile.settings.appearance.backdrop.photoChange": "Stuknij ponownie, aby wybrać inne zdjęcie",
+  "mobile.settings.appearance.backdrop.strength": "Intensywność tła",
+  "mobile.settings.appearance.backdrop.calm": "Spokojne",
+  "mobile.settings.appearance.backdrop.vivid": "Żywe",
+  "mobile.settings.appearance.backdrop.strengthFooter":
+    "Spokojne tło ułatwia czytanie długich odpowiedzi. Najwięcej widać je u góry ekranu głównego.",
+  "mobile.settings.appearance.backdrop.previewQuestion": "Napiszesz informację o wydaniu?",
+  "mobile.settings.appearance.backdrop.previewAnswer":
+    "Oto szkic: tło ustawione przez agenta widać teraz także na telefonie.",
+  "mobile.settings.appearance.chatBackground": "Tło czatu",
+  "mobile.settings.appearance.chatBackgroundDefault": "Domyślne",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "Każdy motyw ma własny kolor. Kolor, przy którym tekst trudno czytać, staje się ciemniejszy lub jaśniejszy.",
+  "mobile.settings.appearance.chatBackgroundBackdropFooter":
+    "Tło zastępuje tło czatu. Aby użyć koloru, wybierz Brak jako tło.",
   "mobile.settings.appearance.collapseRoutines": "Zwijaj aktywność rutyn",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Kolejne zdarzenia rutyn w czacie są widoczne jako jeden zwinięty wiersz. Stuknij wiersz, aby je pokazać.",
+  "mobile.settings.appearance.replyDetails": "Szczegóły odpowiedzi",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "Wyłącz szczegół, aby ukryć jego wiersz w czatach. Agent nadal rozumuje, uruchamia subagentów i zapisuje wspomnienia.",
+  "mobile.settings.appearance.showThinking": "Pokazuj myślenie agenta",
+  "mobile.settings.appearance.showSubagents": "Pokazuj subagentów",
+  "mobile.settings.appearance.showMemoryChanges": "Pokazuj zapisane wspomnienia",
+  "mobile.settings.appearance.fullVisuals": "Pokazuj pełne podglądy wizualne",
+  "mobile.settings.appearance.fullVisualsFooter":
+    "Wizualizacja od agenta ma w czacie pełną wysokość. Gdy to jest wyłączone, wysoka wizualizacja jest przycięta. Dotknij jej, aby zobaczyć całość.",
   "mobile.settings.animations.title": "Animacje",
-  "mobile.settings.animations.footer":
-    "Wyłącz animacje, aby ograniczyć ruch w całej aplikacji. Gdy w ustawieniach telefonu jest włączona opcja Ogranicz ruch, aplikacja także ogranicza ruch. Poniższe animacje pozostają wtedy wyłączone.",
-  "mobile.settings.animations.all": "Animacje",
+  "mobile.settings.animations.fullMotion": "Pełny ruch",
+  "mobile.settings.animations.reduced": "Ograniczony",
+  "mobile.settings.animations.motionFooter":
+    "Ograniczony zmniejsza ruch w całej aplikacji i wyłącza animacje poniżej. Gdy w ustawieniach telefonu włączone jest Ogranicz ruch, aplikacja też ogranicza ruch.",
   "mobile.settings.animations.agentFaces": "Animowane twarze agentów",
   "mobile.settings.animations.agentFacesFooter":
     "Awatary agentów poruszają twarzami, gdy agenci pracują i odpoczywają. Gdy to jest wyłączone, twarze są nieruchome, a postacie na ekranie powitalnym i pustym ekranie głównym przestają się unosić.",
-  "mobile.settings.animations.composerResize": "Kompaktowe pole wiadomości",
-  "mobile.settings.animations.composerResizeFooter":
-    "Pole wiadomości zmienia się w mały pasek, gdy klawiatura jest zamknięta. Gdy to jest wyłączone, pole ma pełny rozmiar.",
   "mobile.settings.animations.textReveal": "Animuj odpowiedzi",
   "mobile.settings.animations.textRevealFooter":
     "Odpowiedź pojawia się słowo po słowie, a jej dymek płynnie rośnie. Gdy to jest wyłączone, tekst pojawia się w miarę napływania.",
@@ -239,6 +285,25 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Automatycznie pobieraj duże pliki",
   "mobile.settings.conversations.largeFilesFooter":
     "Obrazy, filmy i dźwięki większe niż {small} pobierają się dopiero po stuknięciu. Włącz, aby pobierać je od razu, do {large}. Może to zużyć dużo danych komórkowych.",
+  "mobile.settings.conversations.messageField": "Pole wiadomości",
+  "mobile.settings.conversations.compact": "Kompaktowe",
+  "mobile.settings.conversations.fullSize": "Pełny rozmiar",
+  "mobile.settings.conversations.compactFooter":
+    "Kompaktowe zmienia pole wiadomości w mały pasek, gdy klawiatura jest zamknięta.",
+  "mobile.settings.conversations.compactComposerReduced":
+    "Ruch jest ograniczony w Animacjach lub w ustawieniach telefonu, więc pole wiadomości zostaje w pełnym rozmiarze.",
+  "mobile.settings.conversations.media": "Zdjęcia i pliki",
+  "mobile.settings.conversations.swipeLeft": "Przesunięcie w lewo w czacie agenta",
+  "mobile.settings.conversations.swipeRight": "Przesunięcie w prawo w czacie agenta",
+  "mobile.settings.conversations.swipeQuestion": "Pytanie poboczne",
+  "mobile.settings.conversations.swipeThreads": "Wątki",
+  "mobile.settings.conversations.swipeBrowser": "Przeglądarka",
+  "mobile.settings.conversations.swipeOff": "Wyłączone",
+  "mobile.settings.conversations.swipeFooter":
+    "Przesunięcie w stronę przeciwną do Wstecz w czacie agenta otwiera to. To samo przesunięcie na wiadomości pokazuje godziny wiadomości.",
+  "mobile.settings.conversations.pullInfo": "Pociągnięcie w górę: informacje",
+  "mobile.settings.conversations.pullInfoFooter":
+    "Pociągnij w górę za ostatnią wiadomość w czacie, kanale lub wątku i puść, aby otworzyć informacje.",
   "mobile.settings.conversations.fullQualityPhotos": "Wysyłaj zdjęcia w pełnej jakości",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "Gdy to jest wyłączone, aplikacja wysyła mniejszą kopię każdego zdjęcia, do 2048 pikseli na dłuższym boku. Dociera szybciej przy wolnym połączeniu. Włącz, aby wysyłać oryginalne zdjęcie.",
@@ -517,6 +582,11 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "Nie udało się zatrzymać procesu.",
   "mobile.settings.agents.processes.stopTitle": "Zatrzymać ten program?",
   "mobile.settings.agents.processes.stopLabel": "Zatrzymaj proces {pid}",
+  "mobile.settings.quickActions.title": "Menu ikony aplikacji",
+  "mobile.settings.quickActions.footer":
+    "Przytrzymaj ikonę OpenBot, aby zobaczyć te akcje. Możesz włączyć maksymalnie {count}.",
+  "mobile.settings.quickActions.latestChat": "Ostatni czat",
+  "mobile.settings.quickActions.secondChat": "Przedostatni czat",
   "mobile.settings.shortcuts.title": "Skróty",
   "mobile.settings.shortcuts.agent": "Agent",
   "mobile.settings.shortcuts.none": "Brak",
@@ -531,7 +601,7 @@ export const messages = {
   "mobile.settings.shortcuts.card.locked.title": "OpenBot jest zablokowany",
   "mobile.settings.shortcuts.card.locked.action": "Otwórz OpenBot",
   "mobile.settings.shortcuts.footer":
-    "Send Message w aplikacji Skróty wysyła do tego agenta. Aplikacja się nie otwiera.",
+    "Send Message w aplikacji Skróty wysyła do tego agenta. Aplikacja się nie otwiera. Open Agent otwiera jego czat.",
   "mobile.settings.shortcuts.send.sent": "Wysłano",
   "mobile.settings.shortcuts.send.failed": "OpenBot nie mógł tego wysłać.",
   "mobile.settings.shortcuts.send.unconfirmed": "Brak odpowiedzi serwera. Wiadomość może być w czacie.",

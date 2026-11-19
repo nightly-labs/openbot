@@ -27,10 +27,8 @@ import { createMemo, createSignal, createUniqueId, For, Show } from "solid-js";
 import { MACHINE_METRIC_ICONS, MACHINE_METRIC_LABELS, useMachineMetricDetail } from "./machine-metric";
 
 export interface MachineResourcesProps {
-  /** Null until the first reading arrives. */
   metrics: MachineMetrics | null;
   error?: string | null;
-  /** Null while the settings load, or for a viewer who cannot change them. */
   alerts: MachineAlertSettings | null;
   members: readonly TeamMemberSummary[];
   onChangeAlerts: (settings: MachineAlertSettings) => Promise<void>;
@@ -48,17 +46,10 @@ const LEVEL_FIELDS = {
   cpu: "cpuPercent",
 } as const satisfies Record<MachineMetric, keyof MachineAlertSettings>;
 
-/**
- * The machine part of Server settings > Storage: disk, memory and CPU use of the computer that runs
- * the host, the level at which each one alerts, and the owner or admin who gets the alert.
- */
 export function MachineResources(props: MachineResourcesProps) {
   const { t, format } = useText();
   const metricDetail = useMachineMetricDetail();
   const headingId = `machine-${createUniqueId()}`;
-  // A slider moves with the pointer, and its level saves when the user lets go. The record is replaced
-  // whole on each move, so the slider reads the new level at once. The sliders stay enabled while a
-  // level saves, so keyboard focus stays on the slider.
   const [draftLevels, setDraftLevels] = createSignal<Partial<Record<MachineMetric, number>>>({});
   const level = (metric: MachineMetric): number | null =>
     draftLevels()[metric] ?? (props.alerts ? machineAlertLevel(props.alerts, metric) : null);
@@ -83,15 +74,11 @@ export function MachineResources(props: MachineResourcesProps) {
   async function save(change: Partial<MachineAlertSettings>): Promise<void> {
     const saved = props.alerts;
     if (!saved) return;
-    // A member who left or is no longer an admin cannot get the alert, and the host refuses the
-    // settings while they name one. The owner gets it then, as the picker shows.
     const stored = saved.responsibleMemberId;
     const stale = stored !== null && props.members.length > 0 && !recipients().some((member) => member.id === stored);
-    // The caller shows the new settings at once, so a second change in a row builds on this one.
     await props.onChangeAlerts({ ...saved, ...(stale ? { responsibleMemberId: null } : {}), ...change });
   }
 
-  /** The slider shows its saved level again; another slider that the user still drags keeps its value. */
   const clearDraft = (metric: MachineMetric) =>
     setDraftLevels((levels) => {
       const { [metric]: _, ...rest } = levels;
@@ -133,7 +120,6 @@ export function MachineResources(props: MachineResourcesProps) {
                       <span class="machine-resources-title">{t(MACHINE_METRIC_LABELS[metric])}</span>
                       <span class="machine-resources-meta">{metricDetail(metrics(), metric)}</span>
                     </span>
-                    {/* 0% is a reading too, so the test is for null, not for a falsy value. */}
                     <Show
                       when={percent() !== null}
                       fallback={<span class="machine-resources-meta">{t("files.machine.unknown")}</span>}

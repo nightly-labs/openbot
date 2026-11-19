@@ -23,46 +23,31 @@ import { ServerTurnLimitsSetting } from "./ServerTurnLimitsSetting";
 import { serverCanAdminister, serverHasAgentDefaults } from "./server-capabilities";
 import type { ServerSettingsSectionHost } from "./server-settings-section";
 
-/** The agent default calls of one server's host. The desktop reaches them through main. */
 export type HostAgentDefaultsCalls = Pick<
   OpenBotDesktopApi["agent"],
   "getAgentDefaultsOverview" | "updateAgentDefaultsOverview" | "setAgentDefaultChoice"
 >;
 
 export interface ServerAgentDefaultsOptions {
-  /** The calls of a client with no `window.openbot`, such as the web client. */
   calls?: HostAgentDefaultsCalls;
-  /** The agents of this dialog's server, for their names and faces. */
   listAgents: () => Promise<readonly RoleAgent[]>;
-  /**
-   * Calls `listener` with the server id on each `agents-changed` event of a host, for a client with no
-   * `window.openbot`. Returns the unsubscribe function.
-   */
   onAgentsChanged?: (listener: (serverId: string) => void) => () => void;
 }
 
 interface AgentsState {
-  /** The host answer, or null before it loads. */
   overview: AgentDefaultsOverview | null;
-  /** The agents of the server, for their names and faces. */
   profiles: readonly RoleAgent[];
   loadFailed: boolean;
   setting: AgentDefaultSetting | null;
 }
 
 export interface ServerAgentsSection {
-  /**
-   * True when this account changes the agent defaults, the timezone or the thread limits of this server:
-   * the Agent defaults section shows then.
-   */
   available: () => boolean;
   Panel: () => JSX.Element;
-  /** The setting page, for the dialog header `Agents › Local scripts`. */
   crumb: () => { title: string; back: () => void } | null;
   resetForServer(): void;
 }
 
-/** The own values of one agent as the Agents tab reads them. Null (follow the default) becomes absent. */
 function ownValues(values: AgentDefaultsAgentValues): Omit<AgentDefaultsAgent, keyof RoleAgent> {
   return {
     ...(values.allowAutomation === null ? {} : { allowAutomation: values.allowAutomation }),
@@ -80,12 +65,6 @@ function showSaveFailure(error: unknown): void {
   });
 }
 
-/**
- * Server Settings > Agent defaults: the timezone and thread limits of the host (`host-timezone-v1`,
- * `host-turn-limits-v1`), and the agent defaults of this computer or of a joined server
- * (`agent-defaults-v1`) with each agent's own value. An owner or admin of a joined server changes them.
- * Each part shows only when the host has its capability, so an older host shows the parts it supports.
- */
 export function createServerAgentsSection(
   host: ServerSettingsSectionHost,
   visible: () => boolean,
@@ -99,13 +78,9 @@ export function createServerAgentsSection(
     loadFailed: false,
     setting: null,
   });
-  /** Bumped for each read, so an answer for an earlier server or read is dropped. */
   let generation = 0;
-  /** Bumped for each change, so only the answer of the last change is applied. */
   let writeGeneration = 0;
-  /** The changes in flight. A read that ends during a change can be older than the change, so it is dropped. */
   let writes = 0;
-  /** A change failed while another was in flight: read again when the last one ends. */
   let reloadAfterWrites = false;
 
   const defaultsAvailable = () => Boolean(props.agentDefaults) && serverHasAgentDefaults(props.server);
@@ -145,8 +120,6 @@ export function createServerAgentsSection(
 
   const shown = () => props.open && visible() && defaultsAvailable();
 
-  // The host sends `agents-changed` after a change from another device, such as a phone, so the open
-  // section reads again.
   onSettled(() => {
     const listener = (serverId: string) => {
       if (serverId === props.server.id && shown()) load(serverId);
@@ -159,7 +132,6 @@ export function createServerAgentsSection(
     });
   });
 
-  // Read again each time the section shows, so changes from another device appear.
   createEffect(
     () => (shown() ? props.server.id : null),
     (serverId) => {
@@ -168,7 +140,6 @@ export function createServerAgentsSection(
     },
   );
 
-  /** The agents of the server that the host lists, with their own values. */
   const agents = (): AgentDefaultsAgent[] => {
     const overview = state.overview;
     if (!overview) return [];
@@ -179,7 +150,6 @@ export function createServerAgentsSection(
     });
   };
 
-  /** Sends one change. The answer replaces the overview; a failure shows a toast and reads again. */
   function save(
     serverId: string,
     change: (draft: AgentDefaultsOverview) => void,
@@ -205,8 +175,6 @@ export function createServerAgentsSection(
       )
       .finally(() => {
         writes--;
-        // The host has the true values after a failure. A read while other changes run is dropped,
-        // so it starts when the last change ends.
         if (writes > 0 || !reloadAfterWrites) return;
         reloadAfterWrites = false;
         if (serverId === props.server.id) load(serverId);
@@ -238,7 +206,6 @@ export function createServerAgentsSection(
     );
   }
 
-  /** Where the agents run, for the text of the local script limit. */
   const scope = () => (local() ? "computer" : "server");
 
   function Panel() {

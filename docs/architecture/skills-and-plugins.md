@@ -95,12 +95,14 @@ site (id, title, username), and `AttentionRegistry` answers a `submit_secret` pa
 authenticator request for a saved login by filling it through the same `prepareSecret` path as the
 secure card, with no card. While agent code from `evaluate` can still run in the page,
 `BrowserHost` reports `agentScriptedOrigin` and the card opens instead, because that code could read
-the filled fields. The mark is per document, and it stays until a main-frame navigation or a close.
+the filled fields. The mark is per document, and it stays until a main-frame navigation, a close, or an idle unload.
 A script can also write Cache Storage that a service worker serves as page code, also to a page that
 the worker claims after it loaded, so the origin stays tainted in that session. Thus, while a scripted
 page is open, no page of its origin in the same session fills. When it ends, a same-origin page of a
 connected popup or opener keeps that mark, each other open page of the origin must navigate before
-its own fill, and OpenBot clears the origin's Cache Storage and service workers. A fill waits for that purge, and runs it again when no other page of
+its own fill, and OpenBot clears the origin's Cache Storage and service workers. It deletes the service workers when
+no page of the origin loads, after at most 10 seconds, because a deleted worker fails the requests of a page that loads
+(#9981). A fill waits for the Cache Storage purge, and clears both again when no other page of
 the origin is open. A page whose navigation a service worker handled must reload once with `navigate direction=reload`.
 That reload uses `reloadIgnoringCache`, which skips the service worker, also when the page registered it
 again after the purge (#8017). A normal reload, a reload from `evaluate`, or opening the address again

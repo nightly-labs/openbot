@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/app";
 
 export const messages = {
-  // The app shell, shared state, and shared controls without a feature of their own.
   "app.loading": "OpenBot を読み込んでいます",
   "app.leftPanel.resize": "左サイドバーのサイズを変更",
   "app.host.thisMac": "この Mac",
@@ -56,6 +55,8 @@ export const messages = {
   "app.rail.workflows": "ワークフロー",
   "app.rail.usage": "使用量",
   "app.rail.library": "ライブラリ",
+  "app.rail.providers": "プロバイダー",
+  "app.rail.crm": "CRM",
   "app.rail.marketplace": "マーケットプレイス",
   "app.rail.settings": "設定",
   "app.rail.settingsNotice": "設定。{notice}",
@@ -107,6 +108,7 @@ export const messages = {
   "app.settingsPage.searchPlaceholder": "設定を検索…",
   "app.settingsPage.results": "設定の検索結果",
   "app.settingsPage.noResults": "一致する設定はありません。",
+  "app.settingsPage.marketplaceApps": "コネクタと MCP サーバー",
   "app.settingsPage.resultCount": {
     other: "一致する設定：{count} 件。",
   },

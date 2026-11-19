@@ -134,9 +134,13 @@ export const messages = {
   "provider.picker.download": "Pobieranie {name}",
   "provider.picker.search": "Szukaj modeli",
   "provider.picker.noMatches": "Żaden model nie pasuje do wyszukiwania.",
+  "provider.picker.workspaceOnlyUnavailable":
+    "Te modele nie działają z opcją „Tylko obszar roboczy” w systemach Windows i Linux. Aby ich użyć, zmień „Dostęp” w ustawieniach agenta.",
   "provider.picker.olderModels": "Starsze modele",
   "provider.picker.olderModelsList": "Starsze modele {name}",
   "provider.picker.noModels": "Brak dostępnych modeli od: {name}.",
+  "provider.picker.endpointModelsInCustom": "{name} obsługuje Twoje własne endpointy. Ich modele są na karcie Własny.",
+  "provider.picker.showCustomModels": "Pokaż modele",
   "provider.picker.museNoModels":
     "Muse nie wysłał żadnych modeli dla tego konta. Muse może być niedostępny w kraju, w którym działa ten agent. Wybierz model innego dostawcy.",
   "provider.picker.customEmpty":
@@ -164,6 +168,8 @@ export const messages = {
   "provider.picker.selectEffort": "Wybierz wysiłek",
   "provider.picker.custom": "Własny",
   "provider.picker.cliReady": "{cli} gotowy",
+  "provider.picker.modelSourceProvider": "Używa {name} z ustawień {cli}",
+  "provider.picker.modelSourceCatalog": "Używa listy modeli z ustawień {cli}",
   "provider.status.signInRequired": "Wymagane logowanie",
   "provider.model.free": "Darmowy",
   "provider.model.new": "Nowy",
@@ -229,6 +235,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "Nie udało się połączyć ponownie.",
   "provider.account.add": "Dodaj konto",
   "provider.account.addLabel": "Dodaj kolejne konto {name}",
+  "provider.account.addWithCode": "Dodaj konto kodem",
   "provider.account.count": {
     one: "{count} konto",
     few: "{count} konta",
@@ -285,6 +292,8 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · pobrana przez OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Nieużywana: {version} · zainstalowana przez Ciebie",
   "provider.settings.otherVersionDownloaded": "Nieużywana: {version} · pobrana przez OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "Niektóre modele potrzebują części, której brakuje w tej wersji. Pobierz wersję OpenBot, aby ich używać.",
   "provider.settings.useInstalledVersion": "Użyj zainstalowanej",
   "provider.settings.useDownloadedVersion": "Użyj wersji OpenBot",
   "provider.settings.cache": "Pamięć podręczna",
@@ -308,6 +317,29 @@ export const messages = {
   "provider.settings.compactWindowDefault": "Domyślne Claude Code",
   "provider.settings.compactWindowTokens": "{size} tokenów",
   "provider.settings.compactWindowLoadFailed": "Nie udało się wczytać rozmiaru kompaktowania tego serwera.",
+  "provider.settings.environment": "Środowisko",
+  "provider.settings.environmentVariables": "Zmienne",
+  "provider.settings.environmentDescription":
+    "Klucze API, bazowe adresy URL i inne ustawienia, które dostaje każdy proces {name}. Zmiana działa po zakończeniu bieżących tur.",
+  "provider.settings.environmentCodexHint":
+    "OPENAI_BASE_URL z kluczem OPENAI_API_KEY wysyła zapytania ChatGPT do modeli pod ten adres.",
+  "provider.settings.environmentShellNote": "Polecenia uruchamiane przez agentów mogą odczytać te wartości.",
+  "provider.settings.environmentAdd": "Dodaj zmienną",
+  "provider.settings.environmentNamePlaceholder": "VARIABLE_NAME",
+  "provider.settings.environmentValuePlaceholder": "Wartość",
+  "provider.settings.environmentSaved": "Zapisana",
+  "provider.settings.environmentSensitive": "Poufna",
+  "provider.settings.environmentNameLabel": "Nazwa zmiennej {index}",
+  "provider.settings.environmentValueLabel": "Wartość {name}",
+  "provider.settings.environmentSensitiveLabel": "Zachowaj {name} w tajemnicy",
+  "provider.settings.environmentRemoveLabel": "Usuń {name}",
+  "provider.settings.environmentUnnamed": "zmienna {index}",
+  "provider.settings.environmentPending":
+    "Zapis uruchomi ponownie {name} po zakończeniu bieżących tur. Poufne wartości zostają na serwerze.",
+  "provider.settings.environmentDone": "Zapisano. {name} uruchomi się ponownie po zakończeniu bieżących tur.",
+  "provider.settings.environmentDiscard": "Odrzuć",
+  "provider.settings.environmentSave": "Zapisz",
+  "provider.settings.environmentLoadFailed": "Nie udało się wczytać zmiennych {name}.",
   "provider.settings.models": "Modele",
   "provider.settings.modelsDescription": {
     one: "{shown} z {count} modelu jest w wyborze modelu.",

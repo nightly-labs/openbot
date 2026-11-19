@@ -6,14 +6,9 @@ type ReplyQuoteProps = Pick<RichMessageTextProps, "body" | "agents" | "skills" |
   id?: string | undefined;
 };
 
-/**
- * The message that a reply quotes, as Markdown cut to four lines. The quote is a preview only: it
- * is inert, so nothing under the cut can take focus, and the reply's own controls act on it.
- */
 export function ReplyQuote(props: ReplyQuoteProps) {
   let quote: HTMLDivElement | undefined;
   let content: HTMLDivElement | undefined;
-  // Only a quote that the cut shortens fades out, so a short quote does not look cut.
   const [clipped, setClipped] = createSignal(false);
   onSettled(() => {
     const measure = () => setClipped(quote !== undefined && quote.scrollHeight > quote.clientHeight);

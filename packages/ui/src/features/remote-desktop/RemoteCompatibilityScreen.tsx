@@ -3,13 +3,6 @@ import { Alert, AlertContent, AlertDescription, Button } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { For, Show } from "solid-js";
 
-/**
- * What the workspace shows instead of a conversation when the active server is
- * a remote one this build cannot talk to. It takes the server and the retry as
- * props rather than reading `useServers()`: the shell already holds the server
- * in a keyed `<Show>` so that a different blocked server remounts this screen,
- * and a context read here would quietly re-derive what that key already decided.
- */
 export function RemoteCompatibilityScreen(props: { server: ServerSummary; onRetry: () => Promise<void> }) {
   const { t, sourceText } = useText();
   const title = () => {
@@ -18,6 +11,9 @@ export function RemoteCompatibilityScreen(props: { server: ServerSummary; onRetr
       return t("server.compatibility.updateHostTitle", { name: props.server.name });
     }
     if (props.server.issue?.code === "protocol_error") return t("server.compatibility.unsafeDataTitle");
+    if (props.server.issue?.code === "server_safe_mode") {
+      return t("server.compatibility.safeModeTitle", { name: props.server.name });
+    }
     return t("server.compatibility.cannotConnectTitle", { name: props.server.name });
   };
   const description = () => {

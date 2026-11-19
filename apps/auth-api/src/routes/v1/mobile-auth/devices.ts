@@ -12,11 +12,9 @@ export const Route = createFileRoute("/v1/mobile-auth/devices")({
             const token = bearerToken(request);
             if (!token) return apiError(401, "unauthorized", "Sign in is required.");
             const query = new URL(request.url).searchParams;
-            // Additive opt-in: existing clients continue receiving only mobile devices.
             if (query.get("includeDesktop") === "true") {
               return json({ sessions: yield* requestAuthService().listAccountSessions(token) });
             }
-            // Additive opt-in: with `host`, only the phones that can open that host. Without it, every phone.
             return json({ devices: yield* requestAuthService().listMobileAuthDevices(token, query.get("host")) });
           }),
           authErrorResponse,

@@ -15,6 +15,7 @@ export const messages = {
     "{previous} ficou sem créditos. Trocado para {model}. Para usá-lo de novo, adicione créditos e depois selecione-o.",
   "status.agent.modelReturnedAfterError": "Após o erro do provedor, o modelo voltou para {model}.",
   "status.agent.marketplaceSuggested": "App da loja sugerido: {app}.",
+  "status.agent.settingShown": "Configuração mostrada: {setting}.",
   "status.agent.channelMemberAdded": "{agent} adicionou {member} ao canal. {person} pediu.",
   "status.agent.channelMemberRemoved": "{agent} removeu {member} do canal. {person} pediu.",
   "status.agent.channelInstructionsChanged": "{agent} mudou as instruções do canal. {person} pediu.",
@@ -25,21 +26,32 @@ export const messages = {
   "status.agent.screenCaptureScreen": "Capturar a tela principal e enviar a imagem ao modelo do agente.",
   "status.agent.screenCaptureChannel":
     "A imagem aparece no canal {channel}, e cada membro deste servidor que lê o canal pode vê-la.",
+  "status.agent.screenCapturePermissionNext":
+    "Depois, o macOS pode pedir que você permita a Gravação de Tela para o OpenBot.",
   "status.agent.screenCaptureDisplay": "Capturar o monitor {name} e enviar a imagem ao modelo do agente.",
   "status.agent.screenCaptureWindow": "Capturar a janela {name} e enviar a imagem ao modelo do agente.",
   "status.agent.screenCaptureRegion":
     "Capturar a área da tela em {x}, {y}, {width} × {height} pontos e enviar a imagem ao modelo do agente.",
   "status.agent.reportProblem":
     "Isto será uma issue pública no GitHub, com a versão do app e o seu sistema. O seu nome não aparece.",
+  "status.agent.reportPhoneProblem":
+    "Isto será uma issue pública no GitHub, com a versão do app, o seu sistema e a versão, o sistema e o registro de suporte do seu celular. O seu nome não aparece.",
   "status.agent.sendIdea": "Isto vira uma issue pública no GitHub. Seu nome não aparece.",
   "status.agent.feedbackRecentErrors": "Erros recentes no chat:",
   "status.agent.feedbackSameAs": "Adiciona à issue #{issue}",
   "status.agent.feedbackSent": "Enviado para a equipe do OpenBot: {title}",
+  "status.agent.feedbackWithdrawn": "Removido do GitHub: {title}",
+  "status.agent.feedbackWithdrawCommand": "Remover o relato #{issue} do GitHub",
+  "status.agent.feedbackWithdrawReason":
+    "Ninguém mais poderá ver este relato no GitHub. Não é possível desfazer. Para corrigi-lo, o agente pode enviar um relato corrigido.",
+  "status.agent.feedbackWithdrawing": "Removendo seu relato do GitHub…",
   "status.agent.serverInstallCommand":
     "Criar um comando de uso único que instala o OpenBot em outro computador como o servidor {name} e o conecta à sua conta. O agente o executa lá.",
   "status.agent.serverInstallCard": "Comando de instalação para o servidor {name}",
   "status.agent.browserProfileNamed":
     "Mover {agents} para o perfil do navegador {profile}. Eles recebem os logins e cookies dele. As abas abertas deles fecham.",
+  "status.agent.commitCoAuthorOff": "Parar de adicionar o OpenBot como coautor nos commits de todos os agentes.",
+  "status.agent.commitCoAuthorOn": "Voltar a adicionar o OpenBot como coautor nos commits de todos os agentes.",
   "status.agent.browserProfileNew":
     "Criar o novo perfil do navegador {profile} e mover {agents} para ele. Ele não tem logins. As abas abertas deles fecham.",
   "status.agent.browserProfileShared":
@@ -49,6 +61,7 @@ export const messages = {
   "status.agent.feedbackSending": "Enviando seu feedback para a equipe do OpenBot…",
   "status.agent.workflowDelete":
     "Excluir o fluxo de trabalho {title} com suas execuções e versões. Suas etapas abertas param.",
+  "status.agent.deleteAgents": "Excluir {agents} com seus chats e arquivos. Não é possível desfazer.",
   "status.agent.screenCaptureProgress": "Pedindo para capturar a tela…",
   "status.agent.screenCaptureReviewing": "Analisando a captura de tela…",
   "status.agent.browserOpening": "Abrindo uma página da web…",
@@ -64,6 +77,7 @@ export const messages = {
   },
   "status.agent.memoriesUpdating": "Atualizando suas memórias…",
   "status.agent.skillUsing": "Usando a habilidade {name}…",
+  "status.agent.backdropSetting": "Mudando o fundo…",
   "status.agent.skillReading": "Lendo uma habilidade…",
   "status.agent.toolStepFailed":
     "Uma etapa da ferramenta falhou; revisando o resultado e decidindo o que tentar em seguida…",
@@ -96,8 +110,13 @@ export const messages = {
   "status.agent.memoryChanges": "Memórias: {saved} salvas, {updated} atualizadas, {forgotten} esquecidas.",
   "status.agent.memoryChangesWithConflicts":
     "Memórias: {saved} salvas, {updated} atualizadas, {forgotten} esquecidas, {notChanged} não alteradas porque outro tópico as alterou antes.",
+  "status.agent.mcpToolCall": "Executar a ferramenta {tool} do servidor MCP {name}.",
+  "status.agent.uiBlockClosedByMessage": "Fechado por uma nova mensagem",
+  "status.agent.finishCheckContinues": "O pedido ainda não está concluído. O agente continua ({current} de {limit}).",
   "status.agent.nextStepContinues": "O agente parou antes da próxima etapa. Ele continua ({current} de {limit}).",
   "status.agent.planContinues": "O plano tem etapas abertas. O agente continua ({current} de {limit}).",
+  "status.agent.planStopped": "O agente parou com etapas abertas no plano. Envie uma mensagem para continuar.",
   "status.agent.compactionContinues": "A conexão parou enquanto o agente compactava o contexto. O agente continua.",
+  "status.agent.providerExitContinues": "O agente parou antes de terminar a resposta. O agente continua.",
   "status.agent.branchTitle": "Chat ramificado",
 } as const satisfies PartialTranslation<typeof source>;

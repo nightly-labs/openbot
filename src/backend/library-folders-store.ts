@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rename } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import {
   applyLibraryFolderAction,
@@ -14,28 +14,26 @@ import {
   type LibraryFoldersSnapshot,
   libraryFolderName,
 } from "@openbot/contracts/ipc";
-import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { Effect, Result, Semaphore } from "effect";
+import { Effect, Semaphore } from "effect";
 import { writeFileAtomically } from "./atomic-json-file";
-import { isMissingFileError } from "./file-errors";
 import { StoredStateFailure, storedIO, storedSync } from "./stored-state-effects";
+import { readVersionedJsonFile, type VersionedJsonFormat } from "./versioned-json-store";
 
-/** The name of the file in the user data directory. */
 export const LIBRARY_FOLDERS_FILE = "openbot-library-folders-v1.json";
 
 const STORED_VERSION = 1;
 
-/** The folders that a path named, from the top level down, and whether the store made one of them. */
+const LIBRARY_FOLDERS_FORMAT: VersionedJsonFormat<LibraryFoldersSnapshot> = {
+  current: STORED_VERSION,
+  releases: { 1: decodeLibraryFoldersSnapshot },
+};
+
 export interface PlacedInLibraryPath {
   path: LibraryFolder[];
   created: boolean;
 }
 
-/**
- * A change that the rules do not permit, with the message that a person reads. The Team API route
- * answers it as a client error; an unknown failure stays a server error.
- */
 export class LibraryFolderChangeRefused extends Error {
   readonly reason: LibraryFolderRefusalReason;
 
@@ -46,7 +44,6 @@ export class LibraryFolderChangeRefused extends Error {
   }
 }
 
-/** The message that a person reads for a refused change. */
 function refusalText(reason: LibraryFolderRefusalReason): string {
   switch (reason) {
     case "name":
@@ -67,7 +64,6 @@ function refusalText(reason: LibraryFolderRefusalReason): string {
       return sourceText("error.backend.libraryFolderOtherAgent");
     case "into-itself":
       return sourceText("error.backend.libraryFolderMoveInvalid");
-    // Only a client that sends the id of a folder a second time can cause this.
     case "taken-id":
       return "Invalid library folder.";
   }
@@ -86,50 +82,27 @@ function apply(
   }
 }
 
-/**
- * The Library folders of one host, in one JSON file beside the sidebar layout. The folders are a
- * layout over the stored files, so the file holds only folder records and file ids.
- */
 export class LibraryFoldersStore {
   readonly #path: string;
+  #writePath: string;
   #snapshot = structuredClone(EMPTY_LIBRARY_FOLDERS);
   readonly #operationQueue = Semaphore.makeUnsafe(1);
   readonly #listeners = new Set<() => void>();
 
   constructor(path: string) {
     this.#path = path;
+    this.#writePath = path;
   }
 
   initialize() {
     return Effect.gen({ self: this }, function* () {
       yield* storedIO(() => mkdir(dirname(this.#path), { recursive: true, mode: 0o700 }));
-      const loaded = yield* Effect.result(
-        Effect.gen({ self: this }, function* () {
-          const contents = yield* storedIO(() => readFile(this.#path, "utf8"));
-          return yield* storedSync(() => {
-            const parsed = JSON.parse(contents);
-            if (!isDynamicRecord(parsed) || parsed.version !== STORED_VERSION)
-              throw new Error("Invalid library folders state.");
-            return decodeLibraryFoldersSnapshot(parsed);
-          });
-        }),
-      );
-      if (Result.isSuccess(loaded)) {
-        this.#snapshot = loaded.success;
-        return;
-      }
-      if (isMissingFileError(loaded.failure.cause)) return;
-      // The stored files are not in this file: a file that cannot be read loses only the folders.
-      const backupPath = `${this.#path}.corrupt-${Date.now()}`;
-      yield* storedIO(() => rename(this.#path, backupPath)).pipe(Effect.catch(() => Effect.void));
-      this.#snapshot = structuredClone(EMPTY_LIBRARY_FOLDERS);
+      const loaded = yield* readVersionedJsonFile(this.#path, LIBRARY_FOLDERS_FORMAT);
+      this.#writePath = loaded.writePath;
+      this.#snapshot = loaded.value ?? structuredClone(EMPTY_LIBRARY_FOLDERS);
     });
   }
 
-  /**
-   * Calls `listener` after each saved change, from any source: a member, an agent tool, or the removal
-   * of the folders of deleted agents and files. Returns the call that stops it.
-   */
   onChanged(listener: () => void): () => void {
     this.#listeners.add(listener);
     return () => {
@@ -154,11 +127,6 @@ export class LibraryFoldersStore {
     );
   }
 
-  /**
-   * Puts files of an agent into the folder that a path names, such as `["Autumn campaign", "Images"]`.
-   * A name matches a folder with no regard to letter case. The store makes each folder that the path
-   * names and the agent does not have. One write holds the new folders and the files.
-   */
   placeInPath(
     agentId: string,
     names: readonly string[],
@@ -207,7 +175,6 @@ export class LibraryFoldersStore {
     );
   }
 
-  /** Removes the folders of a deleted agent and the entries of its files. */
   removeAgent(agentId: string): Effect.Effect<LibraryFoldersSnapshot, StoredStateFailure> {
     return this.#enqueue(
       Effect.gen({ self: this }, function* () {
@@ -227,10 +194,6 @@ export class LibraryFoldersStore {
     );
   }
 
-  /**
-   * Removes the folders of agents that the host no longer has, at the start of the app. An agent can
-   * go on a path that does not call `removeAgent`, such as the delete of a disconnected integration.
-   */
   reconcileAgents(agentIds: Pick<ReadonlySet<string>, "has">): Effect.Effect<void, StoredStateFailure> {
     return Effect.gen({ self: this }, function* () {
       const gone = new Set(
@@ -240,17 +203,11 @@ export class LibraryFoldersStore {
     });
   }
 
-  /** Removes the entries of deleted files. */
   removeFiles(fileIds: Iterable<string>): Effect.Effect<LibraryFoldersSnapshot, StoredStateFailure> {
     const deleted = new Set(fileIds);
     return this.#keepFiles((fileId) => !deleted.has(fileId));
   }
 
-  /**
-   * Removes the entries of files that the host no longer has, at the start of the app. A file can go
-   * on a path that does not call `removeFiles`, such as the delete of a message or a chat, and each
-   * entry counts toward the file limit of the folders.
-   */
   reconcileFiles(fileIds: Pick<ReadonlySet<string>, "has">): Effect.Effect<LibraryFoldersSnapshot, StoredStateFailure> {
     return this.#keepFiles((fileId) => fileIds.has(fileId));
   }
@@ -276,22 +233,18 @@ export class LibraryFoldersStore {
   }
 
   #commit = Effect.fn("LibraryFolders.commit")(function* (this: LibraryFoldersStore, next: LibraryFoldersSnapshot) {
-    yield* writeFileAtomically(this.#path, `${JSON.stringify({ version: STORED_VERSION, ...next })}\n`).pipe(
+    yield* writeFileAtomically(this.#writePath, `${JSON.stringify({ version: STORED_VERSION, ...next })}\n`).pipe(
       Effect.mapError(({ cause }) => new StoredStateFailure({ cause })),
     );
     this.#snapshot = next;
-    // The change is saved: a listener that fails must not report it as failed.
     for (const listener of this.#listeners) {
       try {
         listener();
-      } catch {
-        // The next change or read brings the client up to date.
-      }
+      } catch {}
     }
   });
 }
 
-/** The trimmed name, or the localized refusal for a name that is empty or too long. */
 function libraryFolderNameOrRefusal(name: string): string {
   try {
     return libraryFolderName(name);

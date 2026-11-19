@@ -55,6 +55,18 @@ function readBrowserPipBounds(): BrowserBounds | null {
   return values.length === 4 && [x, y, width, height].every(Number.isFinite) ? { x, y, width, height } : null;
 }
 
+export interface FeedbackFix {
+  number: number;
+  before: string;
+  request: string;
+}
+
+function draftWithoutFix(text: string, fix: FeedbackFix): string {
+  if (text.startsWith(fix.before)) return fix.before;
+  const start = text.indexOf(fix.request);
+  return start === -1 ? text : text.slice(0, start).trimEnd();
+}
+
 interface ConversationResources {
   agentActivityLabels: Map<string, { activityId: string; label: AgentActivityLabel }>;
   turnRuntimes: Map<string, TurnRuntime>;
@@ -77,15 +89,11 @@ interface ConversationResources {
   voiceRecordingTimer: ReturnType<typeof setTimeout> | undefined;
   voiceElapsedTimer: ReturnType<typeof setInterval> | undefined;
   voiceChunks: Blob[];
-  /** The live transcription in flight, so the final pass waits for it instead of racing it. */
   voiceLiveRequest: Promise<void> | undefined;
-  /** The ElevenLabs stream of the recording, when the selected model streams. */
   voiceCloudStream: VoiceCloudStream | undefined;
-  /** Stops the microphone level meter that draws the recording waveform. */
   voiceMeterStop: (() => void) | undefined;
   voiceAgentId: string | undefined;
   voiceServerId: string | undefined;
-  /** The thread sends its draft when the recording's text is in it. */
   voiceThreadSend: boolean;
   voiceSubmitRequest:
     | {
@@ -113,39 +121,22 @@ interface ConversationResources {
   >;
 }
 
-/**
- * The half of the conversation surface that outlives one server.
- *
- * Everything here is either work the user started and has not finished - a
- * composer draft, a queued-message edit, a pasted attachment - or an async call
- * already in flight against a named server. Discarding any of it on a server
- * switch would throw away typing the user still expects to find, so this owner
- * sits above the keyed scope in `app-providers.tsx` and lives as long as the app.
- *
- * Every signal here is keyed by `serverId:agentId` (`composerDraftKey`), by a
- * channel UUID, or carries its server in the value, which is what makes the shared
- * lifetime safe.
- */
 export function createStableConversationState(
   props: Pick<ConversationProps, "onTypingChange">,
   persistDrafts = true,
   storedDrafts: StoredComposerDrafts | null = null,
 ) {
   const restoredEdit = persistDrafts ? readStoredQueueEdit() : null;
-  // A restored queue edit wins over the composer draft stored for the same agent.
   const [drafts, setDrafts] = createSignal<Record<string, ComposerDraft>>({
     ...storedDrafts?.agents,
     ...(restoredEdit ? { [composerDraftKey(restoredEdit)]: restoredEdit.draft } : {}),
   });
-  /** Keyed by channel id. A channel id is a UUID, so it does not need its server in the key. */
   const [channelDrafts, setChannelDrafts] = createSignal<Record<string, ComposerDraft>>(storedDrafts?.channels ?? {});
   const restoredThreadEdit = persistDrafts ? readStoredThreadQueueEdit() : null;
-  /** The message box of each side thread, keyed by `threadDraftKey`. A restored queue edit wins, as above. */
   const [threadDrafts, setThreadDrafts] = createSignal<Record<string, ComposerDraft>>({
     ...storedDrafts?.threads,
     ...(restoredThreadEdit ? { [restoredThreadEdit.draftKey]: restoredThreadEdit.draft } : {}),
   });
-  /** The queue edit in the message box of a side thread. Its draft is the thread's draft. */
   const [threadQueueEdit, setThreadQueueEdit] = createSignal<Omit<StoredThreadQueueEdit, "draft"> | null>(
     restoredThreadEdit,
   );
@@ -161,16 +152,22 @@ export function createStableConversationState(
     restoredEdit?.pendingSave ?? null,
   );
   const [composerFocusRequest, setComposerFocusRequest] = createSignal(0);
-  // A send in flight belongs to the server it was sent to, so it outlives a server switch.
+  const [feedbackFixes, setFeedbackFixes] = createSignal<Record<string, FeedbackFix>>({});
+  createEffect(
+    () => {
+      const current = drafts();
+      return Object.keys(feedbackFixes()).filter((key) => !current[key]?.text.trim());
+    },
+    (ended) => {
+      if (ended.length === 0) return;
+      setFeedbackFixes((current) =>
+        Object.fromEntries(Object.entries(current).filter(([key]) => !ended.includes(key))),
+      );
+    },
+  );
   const pendingSends = createPendingSendStore();
-  // A file import belongs to the chat it was started in, so it outlives a server switch, as a send does.
   const attachmentUploads = createAttachmentUploadStore();
   const [conversationErrors, setConversationErrors] = createSignal<Record<string, string>>({});
-  /**
-   * The provider and model of the run behind each conversation error, the page that fixes the
-   * account (#2419), and the provider's text behind a general sentence (#6410), keyed like
-   * `conversationErrors`.
-   */
   const [conversationErrorRuns, setConversationErrorRuns] = createSignal<
     Record<string, { message: string; run: string | null; link?: string; details?: string }>
   >({});
@@ -196,8 +193,6 @@ export function createStableConversationState(
     (edit) => {
       if (!edit || !persistDrafts) return;
       const persist = () => {
-        // Read fresh state: a pending Save set after this effect ran must not be
-        // overwritten by the previous snapshot without it.
         const agentId = editingAgentId();
         const serverId = editingServerId();
         const deliveryId = editingDeliveryId();
@@ -229,7 +224,6 @@ export function createStableConversationState(
       };
     },
   );
-  // The thread edit is stored with its draft, so a restart can save or cancel the edit that the host holds.
   createEffect(
     () => {
       const edit = threadQueueEdit();
@@ -238,8 +232,6 @@ export function createStableConversationState(
     (edit) => {
       if (!edit || !persistDrafts) return;
       const persist = () => {
-        // A newer edit, or the end of this one, owns the record. Read fresh state: a pending Save set
-        // after this effect ran must not be overwritten by the previous snapshot without it.
         const current = threadQueueEdit();
         if (current?.editId !== edit.editId) return;
         try {
@@ -270,7 +262,6 @@ export function createStableConversationState(
       unsentTexts: pendingSends.unsentTexts,
     });
   const [composerErrors, setComposerErrors] = createSignal<Record<string, string>>({});
-  /** The code of each composer error that came from a failure, keyed like `composerErrors`. */
   const [composerErrorReferences, setComposerErrorReferences] = createSignal<Record<string, UserErrorDetails>>({});
   const [voicePhase, setVoicePhase] = createSignal<"idle" | "preparing" | "requesting" | "recording" | "transcribing">(
     "idle",
@@ -278,13 +269,10 @@ export function createStableConversationState(
   const [voiceModelProgress, setVoiceModelProgress] = createSignal<number | null>(null);
   const [voiceElapsedSeconds, setVoiceElapsedSeconds] = createSignal(0);
   const [voiceLiveTranscript, setVoiceLiveTranscript] = createSignal<VoiceLiveTranscript | null>(null);
-  /** The side thread draft that the last recording was started for. Undefined for the agent's own chat. */
   const [voiceThreadKey, setVoiceThreadKey] = createSignal<string | undefined>(undefined);
   const [voiceLevels, setVoiceLevels] = createSignal<number[]>([]);
-  /** The conversation whose last recording stopped at the time limit. */
   const [voiceLimitReached, setVoiceLimitReached] = createSignal<ConversationTarget | null>(null);
   const [browserPipBounds, setBrowserPipBounds] = createSignal<BrowserBounds | null>(readBrowserPipBounds());
-  /** The width of the docked side panel. All its panes share it, so a change to another tab does not resize it. */
   const [sidePanelWidth, setSidePanelWidth] = createSignal(readSidePanelWidth());
   const resources: ConversationResources = {
     agentActivityLabels: new Map(),
@@ -313,16 +301,6 @@ export function createStableConversationState(
     runtimeSettingsAttempts: new Map(),
   };
 
-  /**
-   * "The user is not composing to that agent any more."
-   *
-   * It lives on the controller rather than in the view because three owners with
-   * three different lifetimes have to be able to say it: the view, on the
-   * transitions that unmount it; this controller, when the app goes away; and
-   * `server-selection.tsx`, which has to say it *before* `servers.select()` so
-   * the message reaches the server the user was typing on rather than the one
-   * they are arriving at.
-   */
   function stopComposerTyping(): void {
     if (resources.typingIdleTimer) clearTimeout(resources.typingIdleTimer);
     resources.typingIdleTimer = undefined;
@@ -360,7 +338,29 @@ export function createStableConversationState(
       setDrafts((current) => ({ ...current, [key]: appendDraftText(current[key] ?? EMPTY_DRAFT, prompt) }));
       setComposerFocusRequest((value) => value + 1);
     },
-    /** Puts a message from another chat into a channel's composer. The user reads it and sends it. */
+    startFeedbackFix(target: { serverId: string; agentId: string }, number: number, prompt: string) {
+      const key = composerDraftKey(target);
+      const draft = drafts()[key] ?? EMPTY_DRAFT;
+      const next = appendDraftText(draft, prompt);
+      setDrafts((current) => ({ ...current, [key]: next }));
+      setFeedbackFixes((current) => ({
+        ...current,
+        [key]: { number, before: draft.text, request: prompt.trim() },
+      }));
+      setComposerFocusRequest((value) => value + 1);
+    },
+    cancelFeedbackFix(target: { serverId: string; agentId: string }) {
+      const key = composerDraftKey(target);
+      const fix = feedbackFixes()[key];
+      if (!fix) return;
+      setDrafts((current) => {
+        const draft = current[key] ?? EMPTY_DRAFT;
+        return { ...current, [key]: { ...draft, text: draftWithoutFix(draft.text, fix) } };
+      });
+      setFeedbackFixes(({ [key]: _cancelled, ...rest }) => rest);
+      setComposerFocusRequest((value) => value + 1);
+    },
+    feedbackFixes,
     appendChannelText(target: { serverId: string; channelId: string }, text: string) {
       const key = composerDraftKey({ serverId: target.serverId, agentId: target.channelId });
       setChannelDrafts((current) => ({ ...current, [key]: appendDraftText(current[key] ?? EMPTY_DRAFT, text) }));
@@ -424,45 +424,25 @@ export function createStableConversationState(
   };
 }
 
-/**
- * The half of the conversation surface that belongs to one server.
- *
- * These describe the workspace the user is looking at - which right panel is
- * open, what the browser address bar says, which message has its reaction picker
- * out, what the in-chat search found. `rightPanels` is the reason the split
- * exists: it is keyed by agent id alone, and agent ids repeat across servers, so a
- * shared owner would carry "the computer panel is open for chief" from one
- * server to the next and open the wrong panel on arrival.
- *
- * `submitting` is here for the same reason by a different route: it carries no
- * key at all. It describes the composer on screen right now - "a send is in
- * flight" - so a shared owner would disable the arriving server's composer for
- * the length of the server it was left on. `importingDrafts` is keyed by chat,
- * but it stays with `submitting`, as the busy flag that it replaces did. What has to outlive the conversation goes in
- * `conversationErrors` and `composerErrors` instead, which are keyed by
- * chat/conversation and sit in the stable half so one chat's banner never
- * leaks into another chat on the same server.
- *
- * Created inside the keyed scope in `app-providers.tsx`, so a server switch
- * discards all of it by unmounting rather than by a list of setters.
- */
 export function createServerConversationState() {
   const [showComposerActions, setShowComposerActions] = createSignal(false);
-  // The draft keys of the chats that wait for a file import. Other chats send as normal.
   const [importingDrafts, setImportingDrafts] = createSignal<ReadonlySet<string>>(new Set());
   const [pastePreviews, setPastePreviews] = createSignal<readonly PastePreview[]>([]);
   const [submitting, setSubmitting] = createSignal(false);
   const [markingRead, setMarkingRead] = createSignal(false);
   const [dropActive, setDropActive] = createSignal(false);
   const [rightPanels, setRightPanels] = createSignal<Record<string, RightPanelMode>>({});
+  const [browserTakeoverPageRequest, setBrowserTakeoverPageRequest] = createSignal<{
+    agentId: string;
+    tabId: string;
+  } | null>(null);
   const [sidePanels, setSidePanels] = createStore<SidePanelsState>({ side: {}, subagents: {}, threads: {} });
+  const [sidePanelShown, setSidePanelShown] = createSignal(false);
   const [settingsProvider, setSettingsProvider] = createSignal<AgentProviderId>("codex");
   const [settingsModel, setSettingsModel] = createSignal<AgentModelId>("gpt-6-luna");
   const [settingsReasoning, setSettingsReasoning] = createSignal<AgentReasoningEffort>("medium");
   const [browserAddress, setBrowserAddress] = createSignal("https://www.google.com");
   const [sidebarFilePreview, writeSidebarFilePreview] = createSignal<SidebarFilePreview | null>(null);
-  // The accepted preview outlives its lazy view. Keep its page with the server-owned state,
-  // including when it changes twice before Solid settles or the user visits another conversation.
   let previewPageUrl: string | undefined;
   const setSidebarFilePreview = (preview: SidebarFilePreview | null) => {
     const nextPageUrl = preview?.preview?.pageUrl;
@@ -480,11 +460,8 @@ export function createServerConversationState() {
   const [activeChatSearchIndex, setActiveChatSearchIndex] = createSignal(-1);
   const [chatSearchMessageIds, setChatSearchMessageIds] = createSignal<string[]>([]);
   const [chatSearchTotal, setChatSearchTotal] = createSignal(0);
-  // The rows of the waiting block that the person closed. Row ids name the question message.
   const [hiddenAwaitingReplyIds, setHiddenAwaitingReplyIds] = createSignal<ReadonlySet<string>>(new Set());
-  // Keyed by agent id, as `rightPanels` is: a side question lives as long as its pane, not its view.
   const [sideQuestions, setSideQuestions] = createStore<Record<string, SideQuestionState>>({});
-  // A voice conversation lives until End, not as long as its view.
   const voiceSessions = createVoiceSessions();
 
   return {
@@ -502,8 +479,12 @@ export function createServerConversationState() {
     setDropActive,
     rightPanels,
     setRightPanels,
+    browserTakeoverPageRequest,
+    setBrowserTakeoverPageRequest,
     sidePanels,
     setSidePanels,
+    sidePanelShown,
+    setSidePanelShown,
     settingsProvider,
     setSettingsProvider,
     settingsModel,
@@ -540,11 +521,6 @@ export function createServerConversationState() {
   };
 }
 
-/**
- * Both halves under one owner, which is what a single-server caller wants:
- * `Conversation.stories.tsx` and the HMR test have no scope boundary to split
- * across, and `ConversationView` reads one flat object either way.
- */
 export function createConversationController(props: Pick<ConversationProps, "onTypingChange">, persistDrafts = true) {
   return { ...createStableConversationState(props, persistDrafts), ...createServerConversationState() };
 }

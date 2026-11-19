@@ -1,67 +1,3 @@
-// The operator side of the pool of Leaseweb machines for hosted servers
-// (docs/hosted-servers.md#reuse-a-pool-machine). The Worker writes what each server must do
-// (`desired_state`), and deletes a server 30 days after its plan ends. This script does the rest, on the
-// machines and in D1:
-//
-//   bun scripts/hosting/leaseweb-pool.ts status
-//       Read only. The machines of each location and product, how many are free and how many are ready
-//       for a new server, each free machine that is not ready, and the work that `sync` does.
-//   bun scripts/hosting/leaseweb-pool.ts boat
-//       Read only. Each server that is still on boat and has a paid plan that does not end: `move` it.
-//       Also the number of servers on boat whose plan ends, is past due, or ended. A customer who takes
-//       back a cancel, or pays a past-due plan, comes back on this list.
-//   bun scripts/hosting/leaseweb-pool.ts free
-//       Read only. Each VPS with no reference on the four Leaseweb accounts, such as a VPS just bought.
-//   bun scripts/hosting/leaseweb-pool.ts add <VPS ID>... [--apply]
-//       Adds machines to the pool, with the location and the product from the Leaseweb API. A machine
-//       with no reference gets `pool`. The reference does not say whether a server has the machine: D1 does.
-//   bun scripts/hosting/leaseweb-pool.ts remove <VPS ID>... [--apply]
-//       Takes free machines out of the pool, before their Leaseweb contract ends. It also ends the
-//       offer of the machine for a new server.
-//   bun scripts/hosting/leaseweb-pool.ts sync [--apply]
-//       Stops OpenBot on each machine whose plan ended, starts it on each renewed one, and reinstalls each
-//       machine whose server is deleted. Then it writes the result in D1. A reinstall erases the disk.
-//       It also sets the reference of each machine that got the server of a new customer, and gives each
-//       free machine the reference `pool`.
-//   bun scripts/hosting/leaseweb-pool.ts prepare <VPS ID>... --keys=<file> [--reinstall] [--apply]
-//       Installs the newest release, disabled, on free machines of the pool, and runs
-//       leaseweb-bootstrap.sh with the public keys of the operators in <file>. Then it restarts each
-//       machine. A new or reinstalled machine has no key: the script then signs in one time with the
-//       root password of the Leaseweb API. Last, it offers the machine: the machine gets a token and
-//       asks the account service for the server of a new customer
-//       (docs/hosted-servers.md#a-new-server-on-a-pool-machine). A free machine that has the data of a
-//       server (a first start that failed, or a move that went back) is not changed; with
-//       `--reinstall`, the script erases its disk first.
-//   bun scripts/hosting/leaseweb-pool.ts move <server ID> <VPS ID | auto> [--keys=<file>] [--units=<unit>,...] [--docker] [--folders=<folder>,...] [--apply]
-//       Moves one server from its boat sandbox to a free machine of the pool, as
-//       docs/hosted-servers.md#move-a-server-from-boat says. The machine takes no new server from then
-//       on. `auto` selects the machine when the move starts: a free machine of the plan, in the order of the
-//       account service for a new server. When a new customer gets that machine first, it takes the next one. It prepares the machine when it is not prepared (then `--keys` is necessary). It needs `BOAT_API_KEY`. The move does not copy the
-//       systemd units of the customer, so it stops when the sandbox has one. `--units` names the units
-//       that an operator moves by hand, and the move then continues. It refuses a sandbox whose stop at
-//       boat is failing, and stops before the downtime when the sandbox has Docker containers. `--docker`
-//       says that an operator moves the containers by hand (stopped before the move, so the boat stop can
-//       save the sandbox), and the move then continues. It also stops when files of the customer are in
-//       folders outside the home that the move does not copy, such as `/srv/vaults`. `--folders` names
-//       the folders that the move then copies too: `/srv/<name>`, `/mnt/<name>`, `/media/<name>` or a
-//       new top-level folder, which the machine must not have. A server with another such folder stays on boat.
-//   bun scripts/hosting/leaseweb-pool.ts custom <VPS ID> --owner=<email> --customer=<word> \
-//       --name=<server name> --keys=<file> [--apply]
-//       Sets up a VPS with no reference as the server of one customer, not in the pool
-//       (docs/hosted-servers.md#leaseweb-vps): the next `custom-<NN>` reference, the hostname, OpenBot
-//       signed in with a server claim for the owner, the bootstrap, a restart, and the checks. It needs
-//       `SERVER_CLAIMS_ADMIN_TOKEN` and the key of each Leaseweb account. A second run continues a run
-//       that stopped.
-//
-// With no `--apply`, the script only shows what it would do. `--env=test` uses the D1 of the test Worker.
-// Each Leaseweb account has its own key; the script tries each `LEASEWEB_API_KEY_<ACCOUNT>` of the
-// environment. D1 goes through Wrangler, with `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` or a
-// `wrangler login`. On a computer of the operator:
-//
-//   bunx dotenvx run -f apps/auth-api/.env.production -fk <root>/.env.keys -- \
-//     bun scripts/hosting/leaseweb-pool.ts status
-//
-// The output has machine and server IDs only: no email and no key.
 import { execFileSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -77,73 +13,64 @@ import { z } from "zod";
 const logger = createOpenBotLogger("leaseweb-pool");
 const AUTH_API = resolve(import.meta.dirname, "../../apps/auth-api");
 const LEASEWEB_API = "https://api.leaseweb.com/publicCloud/v1/vps";
-/**
- * The reference of each VPS of the pool. It does not say whether the VPS is free: a purchase gives a machine
- * to a server in D1 and does not change the reference. D1 alone (`operator_host`) tells it.
- */
 const POOL_REFERENCE = "pool";
-/** The reference of a free VPS of the pool before 2026-11-13. `sync` changes it to `pool`. */
 const LEGACY_POOL_REFERENCE = "pool-free";
 const isPoolReference = (reference: string | null) =>
   reference === POOL_REFERENCE || reference === LEGACY_POOL_REFERENCE;
-/** The reference that `move` and `sync` give to a pool machine with a server: `<owner email> <8 characters>`. */
 const isOwnerReference = (reference: string) => {
   const [email, server, ...rest] = reference.split(" ");
   return rest.length === 0 && EMAIL_PATTERN.test((email ?? "").toLowerCase()) && /^[0-9a-f]{8}$/u.test(server ?? "");
 };
 const IMAGE = "UBUNTU_26_04_64BIT";
+const OPERATOR_KEYS_HOST_PATTERN = /^[A-Za-z0-9_][A-Za-z0-9._-]*@[A-Za-z0-9][A-Za-z0-9.-]*$/u;
+const OPERATOR_KEY_PATTERN =
+  /^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(256|384|521)|sk-ssh-ed25519@openssh\.com|sk-ecdsa-sha2-nistp256@openssh\.com) [A-Za-z0-9+/]+=*( .*)?$/u;
+const keyLines = (text: string) =>
+  text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line !== "" && !line.startsWith("#"));
+const keyBlob = (line: string) => line.split(/\s+/u)[1] ?? "";
 const REINSTALL_WAIT_MS = 15 * 60_000;
 const VPS_ID_PATTERN = /^\d{1,20}$/u;
 const HOST_ID_PATTERN = /^leaseweb:\d{1,20}$/u;
-/** The pattern of `HostedServerService`: `billing-service.ts`. */
 const SERVER_ID_PATTERN = /^[A-Za-z0-9:_-]{1,128}$/u;
 const LOCATION_PATTERN = /^[A-Z]{3}-\d{2}$/u;
 const PRODUCT_PATTERN = /^VPS\d{2}$/u;
 const HOSTING = resolve(import.meta.dirname);
 const BOAT_API = "https://boat.dev/api/v1";
-// The states in which the sandbox runs, as `isUsable` in apps/auth-api/src/server/hosted-server-service.ts.
-// `idle` is a machine that runs no command of the API; `running` is one that does.
 const SANDBOX_USABLE = new Set(["ready", "idle", "running"]);
 const SANDBOX_PATTERN = /^bx_[a-z0-9]{4,40}$/u;
 const STATE_PATTERN = /^[a-z_]{1,32}$/u;
 const VERSION_PATTERN = /^\d+\.\d+\.\d+$/u;
-/** The machine of each plan that moves. */
 const PRODUCT_OF_PLAN: Record<BillingPlanId, string> = { starter: "VPS01", standard: "VPS02", pro: "VPS03" };
 const AUTH_API_URL = {
   production: "https://api.openbot.run",
   test: "https://openbot-auth-api-test.internal9671.workers.dev",
 };
-/** The directory of the move in the sandbox, of root. It holds the key to the machine for the export. */
 const SANDBOX_MOVE = "/root/openbot-move";
-/** The copy of scripts/hosting on the machine. */
 const MACHINE_HOSTING = "/root/openbot-hosting";
 const MACHINE_ARCHIVE = "/root/openbot-move.tar";
 const EXPORT_WAIT_MS = 3 * 60 * 60_000;
-// boat restores the disk of an archived sandbox after the resume. Seen on 2026-11-12: some minutes.
 const RESTORE_WAIT_MS = 30 * 60_000;
-/** Each Leaseweb account. `custom` reads all of them, so that a `custom-<NN>` number is never used again. */
-const LEASEWEB_ACCOUNTS = ["NL", "DE", "US", "AU"];
+const LEASEWEB_ACCOUNTS = ["NL", "DE", "US", "AU", "SG"];
 const CUSTOM_NUMBER_PATTERN = /^custom-(\d{2,}) /u;
 const CUSTOMER_PATTERN = /^[a-z0-9]{1,32}$/u;
-// No quote and no space, so that the email can go in a D1 literal and in a reference.
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
+const TRAFFIC_CONCURRENCY = 6;
 const EMAIL_PATTERN = /^[a-z0-9._%+-]{1,64}@[a-z0-9-]{1,63}(\.[a-z0-9-]{1,63})+$/u;
-// The server name of `openbot name`: 6 to 32 characters. Only characters that need no shell quote.
 const SERVER_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9 ._-]{4,30}[A-Za-z0-9.]$/u;
 const CLAIM_PATTERN = /^[A-Za-z0-9_-]{16,512}$/u;
 const ACCOUNT_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 const REMOTE_HOST_PATTERN = /^[A-Za-z0-9-]{8,64}$/u;
 const ONLINE_WAIT_MS = 5 * 60_000;
-// `POOL_SEEN_WITHIN_MS` and `POOL_FIRST_START_SQL` of apps/auth-api/src/server/hosted-server-service.ts.
 const POOL_SEEN_WITHIN_MS = 150_000;
-/** A new server on a pool machine, before OpenBot signed in. The Worker owns it: `sync` does not touch it. */
 const POOL_FIRST_START_SQL = `(operator_host IS NOT NULL AND observed_state = 'starting' AND last_wake_reason = 'create'
   AND provider_template IS NULL AND retired_sandbox_id IS NULL AND claim_redeemed_at IS NULL)`;
-/** The base64url SHA-256 of a machine token, as `sha256` of the Worker makes it. */
 const TOKEN_HASH_PATTERN = /^[A-Za-z0-9_-]{43}$/u;
 const OFFER_WAIT_MS = 2 * 60_000;
 const ROOT = resolve(HOSTING, "../..");
 
-/** A SQL literal of a checked value. Wrangler takes no bound values, so each text must match a pattern. */
 function literal(value: string | number, pattern?: RegExp): string {
   if (typeof value === "number") {
     if (!Number.isSafeInteger(value)) throw new Error("A number for D1 is not an integer.");
@@ -157,12 +84,10 @@ const statementSchema = z.array(
   z.object({ results: z.array(z.record(z.string(), z.unknown())), meta: z.object({ changes: z.number() }).partial() }),
 );
 
-/** With `--json`, Wrangler writes a failed query as this object on its output. */
 const wranglerErrorSchema = z.object({
   error: z.object({ text: z.string(), notes: z.array(z.object({ text: z.string() })).default([]) }),
 });
 
-/** Runs one statement on the D1 of the Worker. */
 function d1Statement(sql: string, testDatabase: boolean) {
   let output: string;
   try {
@@ -218,8 +143,6 @@ interface Release {
   url: string;
   sha256: string;
 }
-// boat answers with the sandbox, or with `{ sandbox }` (apps/auth-api/src/server/boat-client.ts).
-// `stop` is the last stop request. A stop that boat cannot save is `failing`, and the state stays `idle`.
 const sandboxValueSchema = z.object({
   state: z.string(),
   stop: z.object({ status: z.string() }).nullish(),
@@ -230,16 +153,11 @@ const sandboxSchema = z.union([
 ]);
 type Sandbox = z.infer<typeof sandboxValueSchema>;
 const commandSchema = z.object({
-  // null when the command did not end in its time.
   exitCode: z.number().nullable(),
   stdout: z.string().nullish(),
   stderr: z.string().nullish(),
 });
 
-/**
- * The state of a machine, from `MACHINE_STATE`. `user` is the service user of an install of OpenBot,
- * and `data` tells if the machine has the data of a server.
- */
 interface MachineState {
   version: string;
   user: string;
@@ -256,11 +174,6 @@ echo "enabled=$(systemctl is-enabled openbot.service 2>/dev/null || true)"
 if [ -e /home/user/.config/OpenBot ] || [ -e /home/user/.config/openbot-hosted ] || [ -e /srv/openbot-hosted/keyrings ]; then echo data=yes; else echo data=no; fi
 echo "hostkey=$(cut -d' ' -f1,2 /etc/ssh/ssh_host_ed25519_key.pub)"`;
 
-/**
- * The state of a custom server, for `bash -s`. `account` is the `Account:` line of `openbot status`,
- * and `hosts` the OpenBot server IDs of the team server state. The output has the email of the
- * owner: never write it in a log.
- */
 const CUSTOM_STATE = `export LC_ALL=C
 echo "hostname=$(hostname)"
 if [ -s /etc/ssh/openbot-operator-keys/root ]; then echo bootstrap=yes; else echo bootstrap=no; fi
@@ -279,7 +192,6 @@ interface CustomState {
   hostname: string;
   bootstrapped: boolean;
   version: string;
-  /** The email of the signed-in account, in small letters, or "" when no account is signed in. */
   account: string;
   online: boolean;
   hosts: string[];
@@ -298,7 +210,6 @@ function toCustomState(output: string): CustomState {
     bootstrapped: values.get("bootstrap") === "yes",
     version: values.get("version") ?? "",
     account: account.includes("@") ? account.toLowerCase() : "",
-    // `Server: <name> (online)`, or `Server: online` with no name.
     online: /(^| \()online\)?$/u.test(values.get("server") ?? ""),
     hosts: (values.get("hosts") ?? "").split(",").filter((host) => REMOTE_HOST_PATTERN.test(host)),
   };
@@ -310,12 +221,9 @@ interface CustomOptions {
   name: string;
 }
 
-/** The ssh of the sandbox to the machine, with the key of the move. `$d` is the move directory. */
 const SANDBOX_SSH = `ssh -i "$d/key" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes \\
   -o UserKnownHostsFile="$d/known-hosts" -o ConnectTimeout=20 -o ServerAliveInterval=15`;
 
-/** Runs in the sandbox as root. Sends the archive to the machine; the key of the move can only write it there. */
-/** True for a folder that `--folders` can name: the same rule as `movable_folder` of move-from-boat.sh. */
 function movableFolder(folder: string) {
   return (
     /^\/(?:srv\/|mnt\/|media\/)?[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*$/u.test(folder) &&
@@ -342,7 +250,6 @@ function keyValues(output: string) {
   return values;
 }
 
-/** True when version `a` is older than version `b`. */
 function isOlder(a: string, b: string) {
   const left = a.split(".").map(Number);
   const right = b.split(".").map(Number);
@@ -352,14 +259,50 @@ function isOlder(a: string, b: string) {
   return false;
 }
 
-/** A shell text that writes `content` to `path`, with no quote problem. */
 function writeFileCommand(path: string, content: string) {
   return `base64 -d >'${path}' <<'OPENBOT_FILE'\n${Buffer.from(content).toString("base64")}\nOPENBOT_FILE\n`;
+}
+
+function scriptOutput(stdout: string, marker: string, sandbox: string) {
+  const start = stdout.indexOf(`${marker}\n`);
+  if (start === -1) throw new Error(`The output of a command in sandbox ${sandbox} has no start.`);
+  const from = start + marker.length + 1;
+  const end = stdout.lastIndexOf(`\n${marker}`);
+  return end < from - 1 ? stdout.slice(from) : stdout.slice(from, end);
 }
 
 function seconds(milliseconds: number) {
   return Math.round(milliseconds / 1000);
 }
+
+function referenceLabel(reference: string) {
+  if (reference === "") return "no reference";
+  if (isOwnerReference(reference)) return "server";
+  return reference
+    .split(" ")
+    .filter((word) => !word.includes("@"))
+    .join(" ");
+}
+
+const gigabytes = (bytes: number) => `${(bytes / 1e9).toFixed(1)} GB`;
+
+function packBytes(pack: { value: number; unit: string } | null | undefined) {
+  const scale = { GB: 1e9, TB: 1e12 }[pack?.unit ?? ""];
+  return pack && scale ? pack.value * scale : null;
+}
+
+const trafficTotalSchema = z.object({ total: z.number().nonnegative() }).optional();
+const contractSchema = z.object({
+  contract: z
+    .object({ dataTraffic: z.object({ value: z.number(), unit: z.string() }).nullable().optional() })
+    .nullable()
+    .optional(),
+});
+const trafficSchema = z.object({
+  _metadata: z.object({
+    summary: z.object({ downPublic: trafficTotalSchema, upPublic: trafficTotalSchema }).optional(),
+  }),
+});
 
 const ipSchema = z.object({ ip: z.string(), version: z.number(), mainIp: z.boolean() });
 const vpsSchema = z.object({
@@ -400,6 +343,8 @@ class Pool {
   readonly #keys: { name: string; key: string }[];
   readonly #found = new Map<string, Vps>();
   readonly #operatorKeysFile: string | undefined;
+  readonly #operatorKeysHost: string | undefined;
+  #operatorKeysBase64: string | undefined;
   readonly #boatKey: string | undefined;
   readonly #claimsToken: string | undefined;
 
@@ -412,6 +357,7 @@ class Pool {
     this.#apply = apply;
     this.#testDatabase = testDatabase;
     this.#operatorKeysFile = operatorKeysFile;
+    this.#operatorKeysHost = environment.OPERATOR_KEYS_HOST || undefined;
     this.#boatKey = environment.BOAT_API_KEY || undefined;
     this.#claimsToken = environment.SERVER_CLAIMS_ADMIN_TOKEN || undefined;
     this.#keys = Object.entries(environment).flatMap(([name, key]) =>
@@ -423,7 +369,6 @@ class Pool {
     return z.array(schema).parse(d1Statement(sql, this.#testDatabase).results);
   }
 
-  /** The number of rows that a write changed: 0 when another writer changed the row first. */
   #write(sql: string): number {
     const { changes } = d1Statement(sql, this.#testDatabase).meta;
     if (changes === undefined) throw new Error("Wrangler gave no D1 write result.");
@@ -438,7 +383,6 @@ class Pool {
     });
   }
 
-  /** The machine now, from the Leaseweb account that has it. */
   async #vps(id: string): Promise<Vps> {
     if (!VPS_ID_PATTERN.test(id)) throw new Error(`Not a VPS ID: ${id}`);
     const known = this.#found.get(id);
@@ -449,12 +393,10 @@ class Pool {
       try {
         response = await this.#leaseweb(account.key, `/${id}`, {}, 60_000);
       } catch (error) {
-        // The API of one account can be slow (2026-11-12): the VPS can be on another account.
         if (!(error instanceof Error && error.name === "TimeoutError")) throw error;
         slow.push(account.name);
         continue;
       }
-      // A key that Leaseweb refuses (401) must not stop the work on the machines of the other accounts.
       if (response.status === 401 || response.status === 403 || response.status === 404) continue;
       if (!response.ok) throw new Error(`Leaseweb answered ${response.status} for VPS ${id} (${account.name}).`);
       const machine = toVps(await response.json(), account.key);
@@ -490,7 +432,6 @@ class Pool {
     };
   }
 
-  /** SQL: the machine `p` has a token and asked the account service a short time ago. */
   #readySql() {
     return `(p.assign_token_hash IS NOT NULL AND COALESCE(p.seen_at, 0) > ${literal(Date.now() - POOL_SEEN_WITHIN_MS)})`;
   }
@@ -571,7 +512,6 @@ class Pool {
       if (!this.#apply) continue;
       if (machine.reference === null) {
         await this.#setReference(machine, POOL_REFERENCE);
-        // `custom` can take the same VPS at the same time: the reference read again tells who has it.
         if ((await this.#vps(id)).reference !== POOL_REFERENCE) {
           logger.warn(`Another operator took VPS ${id}. It stays out of the pool.`);
           continue;
@@ -615,7 +555,6 @@ class Pool {
 
   async sync() {
     const work = this.#work();
-    // One machine that does not answer must not stop the work on the other machines.
     let failed = 0;
     const each = async (row: WorkRow, task: (row: WorkRow) => Promise<void>) => {
       try {
@@ -638,12 +577,6 @@ class Pool {
     if (failed > 0) throw new Error(`${failed} machines failed. Run sync again.`);
   }
 
-  /**
-   * A server that started on a pool machine at its purchase runs on a machine that still has the reference
-   * `pool`. This sets the reference to the owner, for the Leaseweb panel, as a move does. The email is
-   * not in the log. It also gives `pool` to each free machine with another reference, such as the old
-   * `pool-free`.
-   */
   async #nameMachines() {
     const rows = this.#rows(
       `SELECT h.server_id, h.operator_host, u.email FROM hosted_servers h JOIN users u ON u.id = h.owner_user_id
@@ -667,9 +600,6 @@ class Pool {
       if (!this.#apply) continue;
       await this.#setReference(await this.#vps(id), `${row.email} ${row.server_id.slice(0, 8)}`);
     }
-    // A pool machine leaves the pool only with `remove`, so the reference of a free one is `pool`. A move that
-    // went back after its end leaves the owner reference on its machine. Only the old `pool-free` and an owner
-    // reference change: another reference can belong to a VPS that this D1 does not know as used.
     for (const { host_id: host } of free) {
       const id = host.replace("leaseweb:", "");
       const reference = references.get(id);
@@ -681,12 +611,10 @@ class Pool {
       }
       logger.info(`Set the reference of free VPS ${id} to ${POOL_REFERENCE}.`);
       if (!this.#apply) continue;
-      // A new server can get the machine in this moment. `pool` is then correct too.
       await this.#setReference(await this.#vps(id), POOL_REFERENCE);
     }
   }
 
-  /** Stops or starts OpenBot on the machine, then records the state that the Worker asked for. */
   async #runService(row: WorkRow, state: "stopped" | "running") {
     const machine = await this.#vps(row.operator_host.replace("leaseweb:", ""));
     logger.info(`${state === "stopped" ? "Stop" : "Start"} OpenBot on VPS ${machine.id} (server ${row.server_id}).`);
@@ -697,13 +625,11 @@ class Pool {
        WHERE server_id = ${literal(row.server_id, SERVER_ID_PATTERN)}
          AND operator_host = ${literal(row.operator_host, HOST_ID_PATTERN)} AND desired_state = '${state}'`,
     );
-    // The owner changed the plan during the SSH command. The next sync does the new work.
     if (changes === 0) logger.warn(`Server ${row.server_id} changed. Run sync again.`);
   }
 
   async #reinstall(row: WorkRow) {
     const host = literal(row.operator_host, HOST_ID_PATTERN);
-    // Only a machine of the pool is erased: a mistyped row must not reinstall another machine.
     const inPool = this.#rows(
       `SELECT host_id FROM operator_hosts WHERE host_id = ${host} AND removed_at IS NULL`,
       z.object({ host_id: z.string() }),
@@ -715,7 +641,6 @@ class Pool {
     const machine = await this.#vps(row.operator_host.replace("leaseweb:", ""));
     logger.info(`Reinstall VPS ${machine.id}: server ${row.server_id} is deleted.`);
     if (!this.#apply) return;
-    // A server that was deleted during its first start left the token of the machine in D1.
     this.#write(`UPDATE operator_hosts SET assign_token_hash = NULL, seen_at = NULL WHERE host_id = ${host}`);
     await this.#erase(machine);
     await this.#setReference(machine, POOL_REFERENCE);
@@ -731,9 +656,7 @@ class Pool {
     );
   }
 
-  /** Erases the disk of the machine with a new system. The caller made sure that no server needs the data. */
   async #erase(machine: Vps) {
-    // Without the keys before the reinstall, the wait cannot tell the new system from the old one.
     const oldKeys = this.#hostKeys(machine);
     if (oldKeys === "") throw new Error(`VPS ${machine.id} does not answer on SSH, so it is not reinstalled.`);
     const response = await this.#leaseweb(machine.key, `/${machine.id}/reinstall`, {
@@ -745,11 +668,6 @@ class Pool {
     this.#forgetHostKeys(machine);
   }
 
-  /**
-   * Leaseweb shows `RUNNING` for the whole reinstall (smoke of 2026-11-11), so the state does not tell when
-   * it ends. The new system makes new SSH host keys: the reinstall is done when the machine shows keys that
-   * differ from the keys before it.
-   */
   async #waitForReinstall(machine: Vps, oldKeys: string) {
     const deadline = Date.now() + REINSTALL_WAIT_MS;
     while (Date.now() < deadline) {
@@ -759,16 +677,12 @@ class Pool {
     }
     throw new Error(`VPS ${machine.id} did not finish its reinstall in ${REINSTALL_WAIT_MS / 60_000} minutes.`);
   }
-  /** Removes the old host keys of the machine from `known_hosts`, so that the next `#ssh` accepts the new ones. */
   #forgetHostKeys(machine: Vps) {
     if (!machine.address) return;
     try {
       execFileSync("ssh-keygen", ["-R", machine.address], { stdio: "ignore" });
-    } catch {
-      // No `known_hosts` file: there is no old key to remove.
-    }
+    } catch {}
   }
-  /** The SSH host keys of the machine, or an empty text when SSH does not answer. */
   #hostKeys(machine: Vps) {
     if (!machine.address) return "";
     try {
@@ -787,18 +701,12 @@ class Pool {
     }
   }
 
-  /**
-   * Runs a command on the machine as root. With `password`, ssh signs in with the root password through
-   * SSH_ASKPASS: the password goes in a file of this user for the time of the command, never on a
-   * command line. `quiet` hides the messages of ssh, for a wait.
-   */
   #remote(
     machine: Vps,
     command: string,
     options: { input?: string; capture?: boolean; quiet?: boolean; password?: string | undefined } = {},
   ) {
     if (!machine.address) throw new Error(`VPS ${machine.id} has no public IPv4 address.`);
-    // A connection to a VPS sometimes times out once. ssh then tries again; the command runs only one time.
     const args = ["-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=20", "-o", "ConnectionAttempts=3"];
     args.push("-o", "ServerAliveInterval=15");
     const env = { ...process.env };
@@ -830,7 +738,6 @@ class Pool {
     }
   }
 
-  /** The machine as root with a key, or null when no key of this computer signs in. */
   #machineState(machine: Vps): MachineState | null {
     let output: string;
     try {
@@ -849,7 +756,6 @@ class Pool {
     };
   }
 
-  /** A machine of the pool that no server has in D1, with a pool reference, and of `product` when given. */
   async #freeMachine(id: string, product?: string) {
     const host = literal(`leaseweb:${id}`, HOST_ID_PATTERN);
     const inPool = this.#rows(
@@ -871,9 +777,7 @@ class Pool {
     return machine;
   }
 
-  /** The newest release of OpenBot, with the SHA-256 that GitHub calculated for its AppImage. */
   async #release(): Promise<Release> {
-    // GitHub refuses many calls with no sign-in from one address, so `gh` signs the call when it can.
     let body: unknown;
     try {
       body = JSON.parse(
@@ -904,51 +808,56 @@ class Pool {
     return { version, url: asset.browser_download_url, sha256 };
   }
 
-  /**
-   * The public keys of the operators, as the base64 argument of leaseweb-bootstrap.sh. One key of this
-   * computer must be in the list: the bootstrap turns off the password, and the script then signs in
-   * with a key.
-   */
   #operatorKeys() {
-    if (!this.#operatorKeysFile) throw new Error("Give the public keys of the operators with --keys=<file>.");
-    const text = readFileSync(this.#operatorKeysFile, "utf8");
-    const blobs = (lines: string) =>
-      lines
-        .split("\n")
-        .map((line) => line.trim().split(/\s+/u)[1] ?? "")
-        .filter((blob) => blob !== "");
-    const listed = blobs(text);
-    if (listed.length === 0) throw new Error(`${this.#operatorKeysFile} has no public key.`);
+    this.#operatorKeysBase64 ??= this.#readOperatorKeys();
+    return this.#operatorKeysBase64;
+  }
+
+  #readOperatorKeys() {
+    const host = this.#operatorKeysHost;
+    if (!host) throw new Error("OPERATOR_KEYS_HOST is not in the environment.");
+    if (!OPERATOR_KEYS_HOST_PATTERN.test(host)) throw new Error("OPERATOR_KEYS_HOST is not <user>@<host>.");
+    const fromCore = execFileSync(
+      "ssh",
+      ["-o", "BatchMode=yes", "-o", "ConnectTimeout=20", host, "cat /root/.ssh/authorized_keys"],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] },
+    );
+    const coreLines = keyLines(fromCore);
+    if (coreLines.length === 0) throw new Error("The core server of the operators has no public key.");
+    const fileLines = this.#operatorKeysFile ? keyLines(readFileSync(this.#operatorKeysFile, "utf8")) : [];
+    const lines: string[] = [];
+    for (const line of [...coreLines, ...fileLines]) {
+      if (!OPERATOR_KEY_PATTERN.test(line)) {
+        throw new Error(`Operator key ${lines.length + 1} is not a public key with no options.`);
+      }
+      if (!lines.some((listed) => keyBlob(listed) === keyBlob(line))) lines.push(line);
+    }
     let own = "";
     try {
       own += execFileSync("ssh-add", ["-L"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
-    } catch {
-      // No agent, or an agent with no key.
-    }
+    } catch {}
     const home = process.env.HOME ?? "";
     for (const name of ["id_ed25519.pub", "id_ecdsa.pub", "id_rsa.pub"]) {
       try {
         own += `\n${readFileSync(join(home, ".ssh", name), "utf8")}`;
-      } catch {
-        // This computer has no key of this type.
-      }
+      } catch {}
     }
-    if (!blobs(own).some((blob) => listed.includes(blob))) {
+    const ownBlobs = keyLines(own).map(keyBlob);
+    if (!lines.some((line) => ownBlobs.includes(keyBlob(line)))) {
       throw new Error(
-        `${this.#operatorKeysFile} has no key of this computer, so the script could not sign in after the bootstrap.`,
+        "The operator keys have no key of this computer, so the script could not sign in after the bootstrap.",
       );
     }
-    return Buffer.from(text).toString("base64");
+    logger.info(`The bootstrap installs ${lines.length} operator keys.`);
+    return Buffer.from(`${lines.join("\n")}\n`).toString("base64");
   }
 
-  /** The root password of a new or reinstalled machine, which has no key of an operator. */
   async #rootPassword(machine: Vps) {
     const response = await this.#leaseweb(machine.key, `/${machine.id}/credentials/OPERATING_SYSTEM/root`);
     if (!response.ok) throw new Error(`Leaseweb gave no root password for VPS ${machine.id}: ${response.status}.`);
     return z.object({ password: z.string().min(1) }).parse(await response.json()).password;
   }
 
-  /** A shell text that puts the current scripts/hosting in MACHINE_HOSTING. The files have no secret. */
   #hostingCopy() {
     const archive = execFileSync("tar", ["-czf", "-", "--exclude=*.ts", "-C", resolve(HOSTING, ".."), "hosting"], {
       maxBuffer: 16 * 1024 * 1024,
@@ -962,11 +871,6 @@ OPENBOT_HOSTING
 `;
   }
 
-  /**
-   * Installs `release` on a free machine, disabled, runs the bootstrap with the operator keys, and
-   * restarts the machine. The service user gets the IDs 1000:1000 of the boat image; `move` compares
-   * them with the sandbox before it changes the row.
-   */
   async #prepareMachine(machine: Vps, release: Release) {
     const keys = this.#operatorKeys();
     const password = this.#machineState(machine) === null ? await this.#rootPassword(machine) : undefined;
@@ -981,7 +885,6 @@ bash ${MACHINE_HOSTING}/leaseweb-bootstrap.sh '${keys}'
     await this.#restartMachine(machine);
   }
 
-  /** Installs a newer release on a prepared machine with no data. A disabled OpenBot does not update. */
   #upgradeMachine(machine: Vps, release: Release) {
     const authApi = this.#testDatabase ? AUTH_API_URL.test : AUTH_API_URL.production;
     const script = `${this.#hostingCopy()}
@@ -990,7 +893,6 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
     this.#remote(machine, "bash -s", { input: script });
   }
 
-  /** Restarts the machine one time after the bootstrap, as the docs say, and waits for the new boot. */
   async #restartMachine(machine: Vps) {
     const bootId = "cat /proc/sys/kernel/random/boot_id";
     const before = this.#remote(machine, bootId, { capture: true }).trim();
@@ -1001,14 +903,11 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
       try {
         const now = this.#remote(machine, bootId, { capture: true, quiet: true }).trim();
         if (now !== "" && now !== before) return;
-      } catch {
-        // The machine restarts.
-      }
+      } catch {}
     }
     throw new Error(`VPS ${machine.id} did not start again in ${REINSTALL_WAIT_MS / 60_000} minutes.`);
   }
 
-  /** True when the machine is free and the account service can give it the server of a new customer now. */
   #isReady(id: string) {
     const host = literal(`leaseweb:${id}`, HOST_ID_PATTERN);
     return (
@@ -1020,11 +919,6 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
     );
   }
 
-  /**
-   * Takes the machine out of the automatic assignment, before an operator changes it: with no token hash,
-   * the account service gives it no new server. It throws when a new server got the machine first, and
-   * then changes nothing.
-   */
   #withdrawOffer(id: string) {
     const host = literal(`leaseweb:${id}`, HOST_ID_PATTERN);
     this.#write(
@@ -1038,16 +932,10 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
     if (used[0]) throw new Error(`The new server ${used[0].server_id} got VPS ${id} first. It is not free.`);
   }
 
-  /**
-   * Offers a prepared machine with no data for the server of a new customer: a new token, its hash in D1,
-   * and the token on the machine, which then asks the account service (openbot-pool-wait). The token goes
-   * to the machine on standard input and is in no log.
-   */
   async #offer(machine: Vps) {
     const host = literal(`leaseweb:${machine.id}`, HOST_ID_PATTERN);
     const token = randomBytes(32).toString("base64url");
     const hash = literal(createHash("sha256").update(token).digest("base64url"), TOKEN_HASH_PATTERN);
-    // The hash first: a machine that asks with a token that the account service does not know stops its wait.
     const changes = this.#write(
       `UPDATE operator_hosts SET assign_token_hash = ${hash}, seen_at = NULL
        WHERE host_id = ${host} AND removed_at IS NULL
@@ -1112,7 +1000,6 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
     if (!this.#apply) logger.info("Nothing changed. Run again with --apply.");
   }
 
-  /** True when the hosted pool has the VPS. A pool machine is never a custom server. */
   #inPool(id: string) {
     const host = literal(`leaseweb:${id}`, HOST_ID_PATTERN);
     return (
@@ -1123,11 +1010,6 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
     );
   }
 
-  /**
-   * The references of all VPS on all Leaseweb accounts. Each account must answer: a missing account
-   * could hide the highest `custom-<NN>`, and a number must never be used again. With `eachAccount` false,
-   * the list has only the accounts of the environment.
-   */
   async #allReferences(eachAccount = true) {
     const missing = LEASEWEB_ACCOUNTS.filter(
       (account) => !this.#keys.some(({ name }) => name === `LEASEWEB_API_KEY_${account}`),
@@ -1155,10 +1037,10 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
       location: string;
       product: string;
       address: string;
+      key: string;
     }[] = [];
     for (const account of this.#keys) {
       for (let offset = 0; ; offset += 50) {
-        // The list of the US and AU accounts can take more than 30 seconds (2026-11-12).
         const response = await this.#leaseweb(account.key, `?limit=50&offset=${offset}`, {}, 90_000);
         if (!response.ok) throw new Error(`Leaseweb answered ${response.status} for the VPS of ${account.name}.`);
         const page = pageSchema.parse(await response.json());
@@ -1171,6 +1053,7 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
             location: vps.datacenter,
             product: vps.pack,
             address: vps.ips.find((ip) => ip.version === 4 && ip.mainIp)?.ip ?? "",
+            key: account.key,
           });
         if (page.vps.length === 0 || offset + page.vps.length >= page._metadata.totalCount) break;
       }
@@ -1178,17 +1061,74 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
     return references;
   }
 
-  /** Read only. Each VPS with no reference on all accounts: a new VPS that an operator can take. */
   async free() {
     const free = (await this.#allReferences()).filter(({ reference }) => reference === "");
-    if (free.length === 0) logger.info("No VPS on the four Leaseweb accounts is without a reference.");
+    if (free.length === 0) logger.info("No VPS on the five Leaseweb accounts is without a reference.");
     for (const vps of free)
       logger.info(
         `VPS ${vps.id} has no reference: account ${vps.account}, ${vps.location}, ${vps.product}, ${vps.state}, address ${vps.address || "none"}.`,
       );
   }
 
-  /** The next `custom-<NN>`: one more than the highest number on all accounts. */
+  async traffic(from: string | undefined, to: string | undefined) {
+    const today = new Date().toISOString().slice(0, 10);
+    const start = from ?? `${today.slice(0, 8)}01`;
+    const end = to ?? today;
+    const isDay = (day: string) =>
+      DATE_PATTERN.test(day) && !Number.isNaN(Date.parse(day)) && new Date(day).toISOString().startsWith(day);
+    if (!isDay(start) || !isDay(end) || start > end)
+      throw new Error("--from and --to must be days as YYYY-MM-DD, and --from must not be after --to.");
+    const missing = LEASEWEB_ACCOUNTS.filter(
+      (account) => !this.#keys.some(({ name }) => name === `LEASEWEB_API_KEY_${account}`),
+    );
+    if (missing.length > 0)
+      logger.warn(`No key for the account ${missing.join(", ")}: its VPS are not in the traffic.`);
+    const machines = await this.#allReferences(false);
+    const rows: { vps: (typeof machines)[number]; down: number; up: number; pack: number | null }[] = [];
+    let next = 0;
+    let failed = false;
+    const work = async () => {
+      for (let index = next++; index < machines.length && !failed; index = next++) {
+        const vps = machines[index];
+        if (!vps) continue;
+        const [detail, response] = await Promise.all([
+          this.#leaseweb(vps.key, `/${vps.id}`, {}, 60_000),
+          this.#leaseweb(
+            vps.key,
+            `/${vps.id}/metrics/datatraffic?from=${start}&to=${end}&granularity=DAY&aggregation=SUM`,
+            {},
+            60_000,
+          ),
+        ]).catch((error: unknown) => {
+          failed = true;
+          throw error;
+        });
+        if (!detail.ok || !response.ok) {
+          failed = true;
+          throw new Error(`Leaseweb answered ${detail.status} and ${response.status} for VPS ${vps.id}.`);
+        }
+        const pack = packBytes(contractSchema.parse(await detail.json()).contract?.dataTraffic);
+        const summary = trafficSchema.parse(await response.json())._metadata.summary;
+        rows.push({ vps, down: summary?.downPublic?.total ?? 0, up: summary?.upPublic?.total ?? 0, pack });
+      }
+    };
+    await Promise.all(Array.from({ length: TRAFFIC_CONCURRENCY }, work));
+    rows.sort((a, b) => b.down + b.up - (a.down + a.up) || a.vps.id.localeCompare(b.vps.id));
+    logger.info(`Public traffic from ${start} to ${end} (UTC days), the most first:`);
+    for (const { vps, down, up, pack: packSize } of rows) {
+      const pack = packSize ? `, out is ${Math.round((up / packSize) * 100)}% of the ${packSize / 1e12} TB pack` : "";
+      logger.info(
+        `VPS ${vps.id} (${vps.account}, ${vps.location}, ${referenceLabel(vps.reference)}): in ${gigabytes(down)}, out ${gigabytes(up)}${pack}.`,
+      );
+    }
+    for (const account of new Set(rows.map(({ vps }) => vps.account))) {
+      const own = rows.filter(({ vps }) => vps.account === account);
+      const down = own.reduce((sum, row) => sum + row.down, 0);
+      const up = own.reduce((sum, row) => sum + row.up, 0);
+      logger.info(`Account ${account}: ${own.length} VPS, in ${gigabytes(down)}, out ${gigabytes(up)}.`);
+    }
+  }
+
   async #nextCustomNumber() {
     let highest = 0;
     for (const { reference } of await this.#allReferences()) {
@@ -1198,7 +1138,6 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
     return String(highest + 1).padStart(2, "0");
   }
 
-  /** The state of a custom server, with a key of this computer, else with `password`. Null when neither signs in. */
   #customState(machine: Vps, password?: string): CustomState | null {
     try {
       return toCustomState(
@@ -1209,7 +1148,6 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
     }
   }
 
-  /** A one-time claim for `owner` (docs/self-hosted-server.md#sign-in-with-a-server-claim). It works for 15 minutes. */
   async #serverClaim(owner: string) {
     if (!this.#claimsToken) throw new Error("SERVER_CLAIMS_ADMIN_TOKEN is not in the environment.");
     const authApi = this.#testDatabase ? AUTH_API_URL.test : AUTH_API_URL.production;
@@ -1224,7 +1162,6 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
     return claim;
   }
 
-  /** Checks in D1 that `owner` owns one OpenBot server of the machine, with an active owner membership. */
   #checkOwner(owner: string, hosts: string[]) {
     const [user] = this.#rows(
       `SELECT id FROM users WHERE email = ${literal(owner, EMAIL_PATTERN)}`,
@@ -1248,7 +1185,6 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
     throw new Error("D1 shows no OpenBot server of this machine that the owner owns.");
   }
 
-  /** Waits until `openbot status` shows the server online. */
   async #waitOnline(machine: Vps) {
     const deadline = Date.now() + ONLINE_WAIT_MS;
     for (;;) {
@@ -1259,11 +1195,6 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
     }
   }
 
-  /**
-   * Sets up a VPS with no reference as a custom server of one customer, as
-   * docs/hosted-servers.md#leaseweb-vps says. The customer is the owner: the server signs in with a
-   * server claim for the owner's email. A second run continues the work of a run that stopped.
-   */
   async custom(id: string, options: CustomOptions) {
     const owner = options.owner.toLowerCase();
     if (!EMAIL_PATTERN.test(owner)) throw new Error("Give the owner's email with --owner=<email>.");
@@ -1280,7 +1211,6 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
     let machine = await this.#vps(id);
     if (machine.state !== "RUNNING") throw new Error(`VPS ${id} is ${machine.state}, not RUNNING.`);
     const suffix = ` ${options.customer} ${owner}`;
-    // A reference that this command set: the run continues the work of a run that stopped.
     const resumed = machine.reference !== null && CUSTOM_NUMBER_PATTERN.test(machine.reference);
     if (machine.reference !== null && !(resumed && machine.reference.endsWith(suffix))) {
       throw new Error(`VPS ${id} has a reference. Take only a VPS with no reference.`);
@@ -1310,12 +1240,10 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
         await this.#setReference(machine, "");
         throw new Error(`VPS ${twins[0]?.id} took custom-${number} at the same time. Run the command again.`);
       }
-      // `add` can take the same VPS at the same time: it reads the reference again before its D1 row.
       if (this.#inPool(id)) {
         throw new Error(`VPS ${id} went in the hosted pool at the same time. Check its reference by hand.`);
       }
       logger.info(`VPS ${id} has the reference ${label} <owner>.`);
-      // A new VPS can have the address of a deleted one, with other host keys.
       this.#forgetHostKeys(machine);
     }
 
@@ -1357,9 +1285,6 @@ bash ${MACHINE_HOSTING}/leaseweb-bootstrap.sh '${keys}'
     );
     this.#remote(machine, "bash -s", { input: script, password });
 
-    // `openbot login` and `openbot status` show the email, so the install output goes through sed, and
-    // pipefail keeps the exit code of the install.
-    // A new bootstrap writes GRUB again, and a new hostname needs a new start of OpenBot.
     const restart = install || !before.bootstrapped || before.hostname !== hostname;
     logger.info(`VPS ${id}: check the bootstrap${restart ? " and restart the machine" : ""}.`);
     execFileSync(
@@ -1380,7 +1305,6 @@ bash ${MACHINE_HOSTING}/leaseweb-bootstrap.sh '${keys}'
     );
   }
 
-  /** Shows the state of a custom server with a key of this computer, with no email. */
   #showCustomState(machine: Vps, owner: string) {
     const state = this.#customState(machine);
     if (state === null) {
@@ -1414,7 +1338,6 @@ bash ${MACHINE_HOSTING}/leaseweb-bootstrap.sh '${keys}'
     return sandboxSchema.parse(await this.#boat("GET", `/sandboxes/${sandbox}`));
   }
 
-  /** Waits until `done` accepts the sandbox. */
   async #waitForSandbox(sandbox: string, done: (value: Sandbox) => boolean, what: string) {
     const deadline = Date.now() + 10 * 60_000;
     while (Date.now() < deadline) {
@@ -1425,14 +1348,13 @@ bash ${MACHINE_HOSTING}/leaseweb-bootstrap.sh '${keys}'
     throw new Error(`Sandbox ${sandbox} did not ${what} in 10 minutes.`);
   }
 
-  /**
-   * Runs a script as root in the sandbox and returns its output. The script goes in a file first, so it
-   * does not read the standard input of the command.
-   */
   async #sandboxRun(sandbox: string, script: string, timeoutSeconds = 120) {
+    const marker = `OPENBOT_OUTPUT_${randomBytes(12).toString("hex")}`;
     const command = `f=$(mktemp)
-${writeFileCommand("$f", script).replace("'$f'", '"$f"')}sudo -n bash "$f"
+${writeFileCommand("$f", script).replace("'$f'", '"$f"')}printf '%s\\n' '${marker}'
+sudo -n bash "$f"
 status=$?
+printf '\\n%s\\n' '${marker}'
 rm -f "$f"
 exit "$status"`;
     const result = commandSchema.parse(
@@ -1448,14 +1370,9 @@ exit "$status"`;
         `A command in sandbox ${sandbox} failed with ${result.exitCode}: ${(result.stderr ?? "").slice(-2000)}`,
       );
     }
-    return result.stdout ?? "";
+    return scriptOutput(result.stdout ?? "", marker, sandbox);
   }
 
-  /**
-   * The free machines of `product` for a move to `auto`: first the machines that are ready (prepared, with no
-   * data), each in the order in which the account service gives machines to a new server (`poolLocations`
-   * of apps/auth-api/src/server/hosted-server-service.ts).
-   */
   #moveCandidates(product: string, currency: string | null) {
     const locations: [string, ...string[]] =
       currency === "usd" || currency === "brl" ? ["WDC-02", "AMS-01"] : ["AMS-01"];
@@ -1470,7 +1387,6 @@ exit "$status"`;
     ).map(({ host_id }) => host_id.replace("leaseweb:", ""));
   }
 
-  /** The first of `ids` that is a free machine of `product` with an address. With `named`, the error of the one ID. */
   async #firstFreeMachine(ids: readonly string[], product: string, named = false) {
     for (const id of ids) {
       try {
@@ -1493,7 +1409,6 @@ exit "$status"`;
     foldersToCopy: readonly string[] = [],
   ) {
     if (!SERVER_ID_PATTERN.test(serverId)) throw new Error(`Not a server ID: ${serverId}`);
-    // The same check as `movable_folder` of move-from-boat.sh. The names also go into shell commands.
     for (const folder of foldersToCopy) {
       if (!movableFolder(folder)) throw new Error(`The move cannot copy ${folder}, so this server stays on boat.`);
     }
@@ -1524,16 +1439,12 @@ exit "$status"`;
     if (row.operator_host !== null) throw new Error(`Server ${serverId} is on ${row.operator_host} already.`);
     const sandbox = row.provider_sandbox_id;
     if (!sandbox || !SANDBOX_PATTERN.test(sandbox)) throw new Error(`Server ${serverId} has no boat sandbox.`);
-    // A list of planned machines goes out of date: a new customer can get a machine at each moment.
     const candidates = vpsArg === "auto" ? this.#moveCandidates(product, row.currency) : [vpsArg];
     let machine = await this.#firstFreeMachine(candidates, product, vpsArg !== "auto");
     let vpsId = machine.id;
     const release = await this.#release();
     let state = this.#machineState(machine);
     const before = await this.#sandbox(sandbox);
-    // boat tries a failing stop again every few minutes. Each try stops OpenBot in the sandbox, and a try
-    // during the downtime looks like a stop that ended. On 2026-11-13 a move then started OpenBot on the
-    // machine while boat cancelled the stop, and the sandbox started OpenBot again.
     if (before.stop?.status === "failing") {
       throw new Error(
         `boat cannot stop sandbox ${sandbox}: its stop is failing. Read stop.error of GET /sandboxes/${sandbox}, ` +
@@ -1548,10 +1459,7 @@ exit "$status"`;
       logger.info("Nothing changed. Run again with --apply.");
       return;
     }
-    // First: the account service must not give the machine to a new customer during the move. With `auto`,
-    // a machine that a new customer got since the selection is skipped.
     for (;;) {
-      // A machine that is not prepared needs the operator keys. Stop before its offer goes away.
       if (!state?.user) this.#operatorKeys();
       try {
         this.#withdrawOffer(vpsId);
@@ -1566,7 +1474,6 @@ exit "$status"`;
       }
     }
 
-    // 1. The machine, while the customer still uses the sandbox.
     if (!state?.user) {
       await this.#prepareMachine(machine, release);
       state = this.#machineState(machine);
@@ -1587,8 +1494,6 @@ exit "$status"`;
     const machineState = state;
     lap("Machine prepared");
 
-    // 2. The row. From here the Worker sends no call to boat for the server. The size becomes the plan's
-    // machine: a Starter sandbox is `default` (HOSTED_BOAT_PLAN_SIZE), and its VPS 1 is `small`.
     const host = literal(`leaseweb:${vpsId}`, HOST_ID_PATTERN);
     const server = literal(serverId, SERVER_ID_PATTERN);
     const changes = this.#write(
@@ -1602,7 +1507,6 @@ exit "$status"`;
     if (changes !== 1) throw new Error(`The row of server ${serverId} changed. Nothing moved.`);
     lap("Row written");
 
-    // 3. Before the downtime: the sandbox runs, the move files are in it, and the machine has its packages.
     let packages: string[];
     try {
       const sandboxState = (await this.#sandbox(sandbox)).state;
@@ -1611,14 +1515,9 @@ exit "$status"`;
         await this.#boat("POST", `/sandboxes/${sandbox}/resume`, { ttlSeconds: 7200 }, 120_000);
         await this.#waitForSandbox(sandbox, (value) => SANDBOX_USABLE.has(value.state), "start");
       } else {
-        // The Worker does not extend the lease any more. boat would stop the sandbox at its end.
         await this.#boat("PATCH", `/sandboxes/${sandbox}`, { ttlSeconds: 7200 });
       }
-      // While boat restores the disk, a directory can show no files, and the export refuses to start.
       const restoreDeadline = Date.now() + RESTORE_WAIT_MS;
-      // `hydration-done` comes before boat has made each entry local. tar reads a directory that boat then
-      // makes local, and fails with "file changed as we read it" (seen on 2026-11-12). So walk the home, and
-      // wait until boat has no work and makes no more entries local.
       const restoring = `l=/var/lib/ascii-lazy
 [ -e "$l/status.json" ] || exit 0
 if [ -e "$l/active" ] && [ ! -e "$l/hydration-done" ]; then echo restoring; exit 0; fi
@@ -1659,13 +1558,10 @@ if ids=$(docker ps -aq 2>/dev/null); then
   echo "docker_restart=$restart"
 fi
 bash "$d/move-from-boat.sh" packages`,
-        // `packages` searches the disk outside the home for files of the customer.
         600,
       );
       const values = keyValues(output);
       packages = output.split("\n").filter((line) => /^apt=[a-z0-9][a-z0-9+.-]+$/u.test(line));
-      // The move does not copy systemd units. A server with units of the customer stays on boat, unless
-      // `--units` names each of them: an operator then moves them by hand.
       const units = output
         .split("\n")
         .flatMap((line) => /^unit=([\w@.:-]+)$/u.exec(line)?.[1] ?? [])
@@ -1675,9 +1571,6 @@ bash "$d/move-from-boat.sh" packages`,
           `The sandbox has systemd units of the customer that the move does not copy: ${units.join(", ")}.`,
         );
       }
-      // The move copies only the home and the directories that `added_trees` finds. A server with files of
-      // the customer in other folders, such as vaults in /srv, stays on boat unless `--folders` names each:
-      // the move then copies them.
       const folders = output
         .split("\n")
         .flatMap((line) => /^folder=(\/\S.*)$/u.exec(line)?.[1] ?? [])
@@ -1690,7 +1583,6 @@ bash "$d/move-from-boat.sh" packages`,
         );
       }
       if (foldersToCopy.length > 0) {
-        // The import makes each folder new. Check the machine before the downtime, not during it.
         const present = this.#remote(
           machine,
           `for f in ${folderArgs}; do if [ -e "$f" ] || [ -L "$f" ]; then echo "$f"; fi; done`,
@@ -1699,8 +1591,6 @@ bash "$d/move-from-boat.sh" packages`,
         if (present !== "")
           throw new Error(`The machine has these folders already: ${present.split("\n").join(", ")}.`);
       }
-      // The VPS has no Docker, and the move does not copy containers or images. A container that restarts
-      // also makes the stop at boat fail. So a server with a container stays on boat.
       const containers = Number(values.get("containers") ?? "");
       if (!Number.isInteger(containers)) throw new Error("The sandbox did not count its Docker containers.");
       if (containers > 0 && !dockerMovedByHand) {
@@ -1709,9 +1599,6 @@ bash "$d/move-from-boat.sh" packages`,
         );
       }
       if (containers > 0) {
-        // The operator stops each container and sets its restart policy to `no` first. A container that runs
-        // or restarts makes the boat stop fail during the downtime. When the Docker daemon does not answer,
-        // no container runs or restarts.
         const running = Number(values.get("docker_running") ?? "0");
         const restarting = Number(values.get("docker_restart") ?? "0");
         if (!Number.isInteger(running) || !Number.isInteger(restarting)) {
@@ -1744,13 +1631,11 @@ bash "$d/move-from-boat.sh" packages`,
         });
         lap("Packages installed");
       }
-      // The key of the sandbox can only write the archive, and goes away after the export.
       this.#remote(
         machine,
         "install -d -m 0700 /root/.ssh && touch /root/.ssh/authorized_keys && sed -i '/ openbot-move$/d' /root/.ssh/authorized_keys && cat >>/root/.ssh/authorized_keys",
         { input: `restrict,command="umask 077; cat >${MACHINE_ARCHIVE}" ${key}\n` },
       );
-      // An ssh that fails after the export starts makes a downtime. This one writes an empty archive.
       await this.#sandboxRun(sandbox, `d=${SANDBOX_MOVE}\n${SANDBOX_SSH} "root@${machine.address}" </dev/null`);
       lap("SSH from the sandbox to the machine");
     } catch (error) {
@@ -1758,7 +1643,6 @@ bash "$d/move-from-boat.sh" packages`,
       throw error;
     }
 
-    // 4. The downtime: export from the sandbox, straight to the machine.
     const downtime = Date.now();
     try {
       await this.#sandboxRun(
@@ -1773,8 +1657,6 @@ systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/ru
       let failures = 0;
       while (status === "" && Date.now() < deadline) {
         await delay(5_000);
-        // The lease of 2 hours is shorter than the longest export. boat would stop the sandbox at its end.
-        // A failed call does not stop the export, so try again; stop only after 2 minutes of failures.
         try {
           if (Date.now() - leased > 30 * 60_000) {
             await this.#boat("PATCH", `/sandboxes/${sandbox}`, { ttlSeconds: 7200 });
@@ -1790,7 +1672,6 @@ systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/ru
         }
         if (status === "" && Date.now() - shown > 30_000) {
           shown = Date.now();
-          // Only a progress line: a failed read must not stop the move.
           try {
             const size = this.#remote(machine, `stat -c %s ${MACHINE_ARCHIVE} 2>/dev/null || echo 0`, {
               capture: true,
@@ -1810,9 +1691,6 @@ systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/ru
       await this.#sandboxRun(sandbox, `rm -rf ${SANDBOX_MOVE}`);
       lap("Export and copy");
 
-      // 5. The sandbox stops while the machine imports. OpenBot starts here only when boat saved and stopped
-      // the sandbox. `archiving` is not enough: boat can cancel the stop after it, and the sandbox then runs
-      // and starts OpenBot again.
       await this.#boat("POST", `/sandboxes/${sandbox}/stop`, {});
       this.#remote(machine, `bash ${MACHINE_HOSTING}/move-from-boat.sh import ${MACHINE_ARCHIVE} ${folderArgs}`);
       lap("Import");
@@ -1835,7 +1713,6 @@ systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/ru
       if (active !== "active") throw new Error(`openbot.service is ${active} on VPS ${vpsId} after 60 s.`);
       lap("OpenBot started");
     } catch (error) {
-      // The key of the sandbox must not write to the machine after a failure. An agent can get root there.
       try {
         this.#remote(machine, "sed -i '/ openbot-move$/d' /root/.ssh/authorized_keys 2>/dev/null || true", {
           quiet: true,
@@ -1851,14 +1728,12 @@ systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/ru
       throw error;
     }
     logger.info(`Downtime: ${seconds(Date.now() - downtime)} s.`);
-    // The reference names the owner, for the Leaseweb panel. It is not in the log.
     await this.#setReference(machine, `${row.email} ${serverId.slice(0, 8)}`);
     logger.info(
       `Server ${serverId} runs on VPS ${vpsId}. Check in a client that the server is online and that an agent answers.`,
     );
   }
 
-  /** Gives the row back to the sandbox after a failure before the export. The sandbox still has the data. */
   async #undoRow(serverId: string, vpsId: string, sandbox: string, row: z.infer<typeof moveRowSchema>, machine: Vps) {
     try {
       this.#remote(machine, "sed -i '/ openbot-move$/d' /root/.ssh/authorized_keys 2>/dev/null || true", {
@@ -1887,7 +1762,7 @@ systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/ru
 }
 
 const USAGE =
-  "Usage: leaseweb-pool.ts status | boat | free | add <VPS ID>... | remove <VPS ID>... | sync | prepare <VPS ID>... --keys=<file> [--reinstall] | move <server ID> <VPS ID | auto> [--keys=<file>] [--units=<unit>,...] [--docker] [--folders=<folder>,...] | custom <VPS ID> --owner=<email> --customer=<word> --name=<server name> --keys=<file> [--apply] [--env=test]";
+  "Usage: leaseweb-pool.ts status | boat | free | traffic [--from=<YYYY-MM-DD>] [--to=<YYYY-MM-DD>] | add <VPS ID>... | remove <VPS ID>... | sync | prepare <VPS ID>... [--keys=<file>] [--reinstall] | move <server ID> <VPS ID | auto> [--keys=<file>] [--units=<unit>,...] [--docker] [--folders=<folder>,...] | custom <VPS ID> --owner=<email> --customer=<word> --name=<server name> [--keys=<file>] [--apply] [--env=test]";
 
 async function main(args: string[]) {
   const [command, ...operands] = args.filter((arg) => !arg.startsWith("--"));
@@ -1897,6 +1772,7 @@ async function main(args: string[]) {
   if (command === "status") pool.status();
   else if (command === "boat") pool.boat();
   else if (command === "free") await pool.free();
+  else if (command === "traffic") await pool.traffic(option("from"), option("to"));
   else if (command === "add" && operands.length > 0) await pool.add(operands);
   else if (command === "remove" && operands.length > 0) pool.remove(operands);
   else if (command === "sync") await pool.sync();

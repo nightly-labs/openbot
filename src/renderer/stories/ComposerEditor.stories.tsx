@@ -105,7 +105,6 @@ const longDescriptionSkill: InstalledSkill = {
     "Collects the timeline, the alerts and the chat around an incident, then writes the review the team reads the next morning, with the contributing causes, the repair work and the owner of each follow-up item.",
 };
 
-/** The agent's open browser tabs. One title is long, so the row cuts it off. */
 const browserTabs: ComposerBrowserTab[] = [
   { id: "browser-tab-docs", title: "OpenBot documentation", url: "https://openbot.run/docs" },
   { id: "browser-tab-linear", title: "Plans and pricing – Linear", url: "https://linear.app/pricing" },
@@ -116,7 +115,6 @@ const browserTabs: ComposerBrowserTab[] = [
   },
 ];
 
-/** The agent's side threads, newest first, in each state the badge shows. */
 const threads: ComposerThread[] = [
   {
     id: "task-pricing",
@@ -152,14 +150,8 @@ const threads: ComposerThread[] = [
   },
 ];
 
-/**
- * The picker grows out of the top edge of the composer, so a picker story keeps empty room above
- * the composer. A compact composer holds the editor in the middle grid column, and the picker
- * stretches back out to the edges of the composer.
- */
 function composerFrame(storyArgs: Parameters<typeof ComposerEditor>[0], options: { width: string; compact?: boolean }) {
   const [value, setValue] = createSignal(storyArgs.value);
-  // The picker hangs off the composer inside `.composer-wrap`, the way the conversation renders it.
   return (
     <div
       class="composer-wrap"
@@ -245,7 +237,6 @@ export const SkillPickerLongDescription: Story = {
   render: (storyArgs) => composerFrame(storyArgs, { width: "480px" }),
 };
 
-/** A workspace copy and a marketplace copy share a name, so each row shows its slug. */
 export const SkillPickerDuplicateNames: Story = {
   args: {
     skills: [
@@ -316,13 +307,11 @@ export const LongFileReference: Story = {
   ),
 };
 
-/** The `@` list with a section for agents, browser tabs and threads. Type to filter it. */
 export const TabAndThreadPicker: Story = {
   args: { browserTabs, threads, onOpenTag: fn() },
   render: (storyArgs) => composerFrame(storyArgs, { width: "480px" }),
 };
 
-/** A tab and a thread as chips in a draft, next to a tab and a thread that are gone. */
 export const WithTabAndThreadTags: Story = {
   args: {
     browserTabs,

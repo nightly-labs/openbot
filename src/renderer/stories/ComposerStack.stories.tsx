@@ -53,7 +53,6 @@ const QUEUE: QueueDelivery[] = [
   queued("send", 3, "Then send the plan to Sales Outbound."),
 ];
 
-/** A fixed moment, so the times read the same on every run. */
 const USAGE_RESETS_AT = Date.UTC(2026, 8, 21, 9, 0) / 1_000;
 const WAITS: OpenWaitItem[] = [
   {
@@ -72,7 +71,6 @@ const WAITS: OpenWaitItem[] = [
   },
 ];
 
-/** The cards that the mock app cannot open by itself. Each one is the product component. */
 const CASES = [
   "Error with a title and an action",
   "Error with a reference",
@@ -156,11 +154,6 @@ function CaseCard(props: { name: Case; onClose: () => void }): JSX.Element {
   }
 }
 
-/**
- * The real app, with buttons that are not part of it. Queue and Error use the app itself. Each other
- * button puts one product card into the app's card stack, so each card can open and close with the
- * others. The `@` list opens over the cards, and a reply to a message opens the reply card.
- */
 function ComposerStackPlayground() {
   let root: HTMLDivElement | undefined;
   let mock: MockOpenBotControls | undefined;

@@ -25,6 +25,10 @@ lxterminal
 pcmanfm
 hsetroot
 fonts-dejavu-core
+# The emoji of the pages that the agent browser opens. Without an emoji font, each emoji is an empty box.
+fonts-noto-color-emoji
+# The Thai text of these pages. DejaVu has no Thai letters, so without this font each one is a box.
+fonts-tlwg-loma-otf
 # The Codex sandbox. Without it on PATH, Codex uses its bundled copy and reports an error.
 bubblewrap
 # The Claude sandbox needs bubblewrap and socat. Without socat, each turn of a Claude agent with

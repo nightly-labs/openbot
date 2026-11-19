@@ -5,15 +5,14 @@ import {
   type RoutineCalendarRoutine,
   type RoutineCalendarRun,
 } from "@openbot/ui/features/conversation/RoutineCalendar";
+import type {
+  RoutineCalendarCreate,
+  RoutineCreateFields,
+} from "@openbot/ui/features/conversation/RoutineCalendarCreateCard";
+import { type ComponentProps, createSignal } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { STORY_AGENTS } from "./fixtures";
-
-/*
- * Issue #1242: one place that shows when every routine runs, across all agents. The host expands
- * each schedule into runs; the calendar only places them. Runs before `now` carry their outcome,
- * runs after it carry the routine state. All times are wall-clock times in the viewer's zone.
- */
 
 const WARSAW = "Europe/Warsaw";
 const [chief, research, sales] = STORY_AGENTS;
@@ -21,7 +20,6 @@ const AGENTS: RoutineCalendarAgent[] = STORY_AGENTS;
 
 interface StoryRoutine extends RoutineCalendarRoutine {
   paused?: boolean;
-  /** Days on which the run failed, as "2026-10-13". */
   failedOn?: string[];
 }
 
@@ -68,9 +66,7 @@ const ROUTINES: StoryRoutine[] = [
   routine("pipeline-report", "Pipeline report", [sales, chief], { kind: "weekly", weekday: 4, time: "17:30" }),
 ];
 
-/** Wednesday, October 14, 2026, 10:30 in Warsaw. */
 const NOW = new Date("2026-10-14T08:30:00.000Z");
-/** Wednesday, October 21, 2026. The clocks in Warsaw go back on Sunday, October 25. */
 const NOW_BEFORE_CLOCK_CHANGE = new Date("2026-10-21T08:30:00.000Z");
 
 function runsFor(routines: StoryRoutine[], now: Date, timeZone: string): RoutineCalendarRun[] {
@@ -94,7 +90,6 @@ function runsFor(routines: StoryRoutine[], now: Date, timeZone: string): Routine
   return runs;
 }
 
-/** The story schedules only: one wall-clock time on the days the schedule picks. */
 function runTime(schedule: RoutineSchedule, day: string): string | null {
   const date = new Date(`${day}T12:00:00.000Z`);
   const weekday = date.getUTCDay();
@@ -107,6 +102,8 @@ function runTime(schedule: RoutineSchedule, day: string): string | null {
       return weekday === schedule.weekday ? schedule.time : null;
     case "monthly":
       return date.getUTCDate() === schedule.day ? schedule.time : null;
+    case "once":
+      return schedule.date === day ? schedule.time : null;
     default:
       return null;
   }
@@ -118,7 +115,6 @@ function addDays(day: string, amount: number): string {
   return date.toISOString().slice(0, 10);
 }
 
-/** The instant at which the wall clock in `timeZone` shows `time` on `day`. */
 function zonedInstant(day: string, time: string, timeZone: string): Date {
   const guess = Date.parse(`${day}T${time}:00.000Z`);
   const offset = (instant: number) => {
@@ -138,7 +134,6 @@ function zonedInstant(day: string, time: string, timeZone: string): Date {
   return new Date(guess - offset(first));
 }
 
-/** Forty routines spread over the working day, so a week cell has more runs than it shows. */
 const MANY_ROUTINES: StoryRoutine[] = Array.from({ length: 40 }, (_, index) => {
   const hour = 7 + (index % 11);
   const minute = (index * 15) % 60;
@@ -186,27 +181,18 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Past runs show their outcome. Weekly planning is paused, so its Friday run is a dashed ghost. */
 export const Week: Story = {};
 
-/** One day by the hour. Each run opens its routine; each avatar opens its agent. */
 export const Day: Story = { args: { initialView: "day" } };
 
-/** October in whole weeks. The days of September and November only fill the first and last rows. */
 export const Month: Story = { args: { initialView: "month" } };
 
-/**
- * The clocks in Warsaw go back on Sunday. The morning brief stays at 7:00 AM on both sides of
- * the change, although its UTC time moves by one hour.
- */
 export const ClockChangeWeek: Story = {
   args: { now: NOW_BEFORE_CLOCK_CHANGE, runs: runsFor(ROUTINES, NOW_BEFORE_CLOCK_CHANGE, WARSAW) },
 };
 
-/** A viewer in New York sees the Warsaw routines at New York times, on New York days. */
 export const OtherTimeZone: Story = { args: { timeZone: "America/New_York" } };
 
-/** Forty routines: a day shows four runs and a count; the count opens the day view. */
 export const ManyRoutines: Story = {
   args: { routines: MANY_ROUTINES, runs: runsFor(MANY_ROUTINES, NOW, WARSAW) },
 };
@@ -215,25 +201,20 @@ export const ManyRoutinesDay: Story = {
   args: { ...ManyRoutines.args, initialView: "day" },
 };
 
-/** A month day shows three runs and a count. */
 export const ManyRoutinesMonth: Story = {
   args: { ...ManyRoutines.args, initialView: "month" },
 };
 
-/** Routines exist, but none of them runs in this range. */
 export const NoRunsThisWeek: Story = { args: { runs: [] } };
 
-/** No routine yet: sample runs land on a faint month and write what they did. Create Routine asks for the agent. */
 export const Empty: Story = { args: { routines: [], runs: [] } };
 
-/** With one agent, Create Routine opens that agent at once. */
 export const EmptyOneAgent: Story = { args: { routines: [], runs: [], agents: STORY_AGENTS.slice(0, 1) } };
 
 export const Loading: Story = { args: { state: "loading" } };
 
 export const LoadError: Story = { args: { state: "error" } };
 
-/** A phone or a side panel: the week becomes a list of days, and the next runs move below it. */
 export const Narrow: Story = {
   render: (args) => (
     <main style={{ width: "390px", padding: "var(--openbot-space-4)" }}>
@@ -242,8 +223,46 @@ export const Narrow: Story = {
   ),
 };
 
-/** The month becomes a list of its own days. */
 export const NarrowMonth: Story = { ...Narrow, args: { initialView: "month" } };
 
-/** The pitch comes first; the sample runs land in rows below it. */
 export const EmptyNarrow: Story = { ...Narrow, args: { routines: [], runs: [] } };
+
+const ALL_FIELDS: RoutineCreateFields = { onceSchedule: true, limitPolicy: true, missedPolicy: true, runIn: true };
+
+function CreatingCalendar(props: ComponentProps<typeof RoutineCalendar> & { fields: RoutineCreateFields }) {
+  const [routines, setRoutines] = createSignal<StoryRoutine[]>(ROUTINES);
+  const create: RoutineCalendarCreate = {
+    fields: props.fields,
+    save: async (routine) => {
+      setRoutines((items) => [
+        ...items,
+        { id: `new-${items.length}`, name: routine.name, agentIds: [routine.agentId], schedule: routine.schedule },
+      ]);
+    },
+  };
+  return (
+    <main style={{ width: "min(1400px, 100vw)", padding: "var(--openbot-space-6)" }}>
+      <RoutineCalendar
+        {...props}
+        routines={routines()}
+        runs={runsFor(routines(), props.now, props.timeZone)}
+        create={create}
+      />
+    </main>
+  );
+}
+
+export const CreateFromDay: Story = {
+  render: (args) => <CreatingCalendar {...args} fields={ALL_FIELDS} />,
+};
+
+export const CreateFromHour: Story = { ...CreateFromDay, args: { initialView: "day" } };
+
+export const CreateOnOlderHost: Story = {
+  render: (args) => (
+    <CreatingCalendar
+      {...args}
+      fields={{ onceSchedule: false, limitPolicy: false, missedPolicy: false, runIn: false }}
+    />
+  ),
+};

@@ -1,9 +1,3 @@
-/**
- * The update snapshot of a host (`host-update-v1`), as the desktop main process, the preload and the
- * browser client read it. On the wire the route codec has already checked its fields; this gives
- * them their IPC types and fails closed on anything else.
- */
-
 import {
   type HostUpdateStatus,
   REMOTE_UPDATES_STATES,

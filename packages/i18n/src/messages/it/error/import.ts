@@ -93,9 +93,11 @@ export const messages = {
   "error.import.transferProviderKey": "{name}: inserisci di nuovo la sua chiave API nelle Impostazioni.",
   "error.import.transferAgentEnv": "{name}: inserisci di nuovo i valori di {names} nelle Impostazioni.",
   "error.import.transferMcpValues":
-    "{name}: il server MCP viene aggiunto disattivato. Controlla il comando, inserisci di nuovo i valori e l'indirizzo completo, poi attivalo nelle impostazioni MCP.",
+    "{name}: il server MCP viene aggiunto disattivato. Controlla il comando, inserisci di nuovo i valori e l'indirizzo completo, poi attivalo in Marketplace, App.",
   "error.import.transferValuesCleared":
     "{name}: i valori che possono contenere un segreto sono stati rimossi dagli argomenti o dall'indirizzo. Inseriscili di nuovo nelle Impostazioni.",
   "error.import.transferSharedKept":
     "{number} file della cartella condivisa sono già presenti qui, quindi restano come sono.",
+  "error.import.transferPartSkipped":
+    "Alcune parti del file non sono state importate. Le altre parti sono su questo server, quindi non importare di nuovo il file.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -1,6 +1,3 @@
-// The installation tokens of the OpenBot GitHub App that the OpenBot API gives this computer, so
-// that GitHub shows an agent's work as the app and not as the signed-in user.
-
 import { createOpenBotLogger, registerSecretValue, toLogValue } from "@openbot/logging";
 import { Effect } from "effect";
 import { z } from "zod";
@@ -9,9 +6,7 @@ import { GitHubOperationError, githubCall, githubDecode } from "./github-effects
 
 const logger = createOpenBotLogger("github-bot-tokens");
 
-/** An installation token lasts one hour. It is replaced when less than this is left. */
 const RENEW_MARGIN_MS = 10 * 60_000;
-/** After a failure, an API with no app key, or an answer with no token, the next request waits this long. */
 const RETRY_MS = 15 * 60_000;
 const REQUEST_TIMEOUT_MS = 30_000;
 
@@ -33,29 +28,17 @@ export interface GitHubBotToken {
 }
 
 export interface GitHubBotTokensOptions {
-  /** The origin of the OpenBot API, such as `https://api.openbot.run`. */
   apiUrl: string;
   fetch: GitHubFetch;
   now: () => number;
 }
 
-/**
- * The bot token for each repository where the signed-in user can push. A repository with no bot
- * token uses the user token: the API gives a bot token only where the user can already write, so
- * the bot never reaches more than the user.
- *
- * The API gets the user token as its bearer and keeps nothing. When it has no app key, or cannot be
- * reached, agents keep working as the user.
- */
 export class GitHubBotTokens {
   readonly #apiUrl: string;
   readonly #fetch: GitHubFetch;
   readonly #now: () => number;
-  /** `owner/name` in lower case, as GitHub compares it. */
   #byRepository = new Map<string, GitHubBotToken>();
-  /** When the next request is due. */
   #nextAt = 0;
-  /** Increased by `clear`, so that an answer for the account before it is not kept. */
   #epoch = 0;
   #failureLogged = false;
 
@@ -65,13 +48,11 @@ export class GitHubBotTokens {
     this.#now = options.now;
   }
 
-  /** The bot token for `owner/name`, or null when the user token applies. */
   forRepository(owner: string, name: string): string | null {
     const entry = this.#byRepository.get(`${owner}/${name}`.toLowerCase());
     return entry && entry.expiresAt > this.#now() ? entry.token : null;
   }
 
-  /** Each repository with a valid bot token, for the file that the git credential helper reads. */
   entries(): Array<[repository: string, token: string]> {
     const now = this.#now();
     return [...this.#byRepository]
@@ -79,12 +60,10 @@ export class GitHubBotTokens {
       .map(([repository, entry]) => [repository, entry.token]);
   }
 
-  /** Whether a request is due: a token is near its end, or the last failure was long enough ago. */
   due(): boolean {
     return this.#now() >= this.#nextAt;
   }
 
-  /** Asks for a new set at the next check, as after an install that added repositories. */
   invalidate(): void {
     this.#nextAt = 0;
   }
@@ -94,12 +73,6 @@ export class GitHubBotTokens {
     this.#nextAt = 0;
     this.#epoch += 1;
   }
-
-  /**
-   * Replaces the set with the API's answer. A failure keeps the tokens that are still valid and
-   * does not reject. An answer that arrives after `clear` is discarded. True when GitHub refused
-   * `userToken`: the API then answers 401.
-   */
 
   readonly renew = Effect.fn("GitHubBotTokens.renew")(function* (
     this: GitHubBotTokens,
@@ -120,7 +93,6 @@ export class GitHubBotTokens {
       );
       if (epoch !== this.#epoch) return;
       if (response.status === 503) {
-        // This API has no app key: agents act as the user until it does.
         this.#byRepository = new Map();
         this.#nextAt = this.#now() + RETRY_MS;
         return;
@@ -150,7 +122,6 @@ export class GitHubBotTokens {
       Effect.catch(({ cause: error }) =>
         Effect.sync(() => {
           if (signal?.aborted || epoch !== this.#epoch) return;
-          // Due again when the first token ends, so that the caller removes it from its files.
           const now = this.#now();
           const expiries = [...this.#byRepository.values()].map((entry) => entry.expiresAt).filter((at) => at > now);
           this.#nextAt = Math.min(now + RETRY_MS, ...expiries);

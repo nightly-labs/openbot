@@ -23,6 +23,13 @@ export const messages = {
   "settings.codeFont.title": "Carattere del codice",
   "settings.codeFont.description": "Il carattere di codice, terminali e percorsi dei file.",
   "settings.codeFont.default": "Predefinito",
+  "settings.motion.title": "Movimento",
+  "settings.backgroundBlur.title": "Sfocatura dello sfondo",
+  "settings.backgroundBlur.description":
+    "Sfocatura dietro menu e finestre di dialogo. All’inizio è spenta su un computer senza GPU.",
+  "settings.movingFaces.title": "Volti degli agenti animati",
+  "settings.movingFaces.description":
+    "I volti degli agenti sbattono le palpebre e si muovono. All’inizio sono fermi su un computer senza GPU.",
   "settings.logoColor.title": "Colore del logo",
   "settings.logoColor.description": "Mostrato nel Dock, nella barra delle applicazioni e nella Dynamic Island.",
   "settings.logoColor.buildNote":
@@ -43,6 +50,19 @@ export const messages = {
   "settings.chatBackground.light": "Sfondo della chat nel tema Chiaro",
   "settings.chatBackground.dark": "Sfondo della chat nel tema Scuro",
   "settings.chatBackground.default": "Predefinito",
+  "settings.chatBackdrop.title": "Sfondo della finestra",
+  "settings.chatBackdrop.description":
+    "Una scena, un’immagine o una GIF dietro tutta la finestra su questo dispositivo. Chiedi una scena a un agente, poi scegli «Usa come sfondo» nella sua risposta.",
+  "settings.chatBackdrop.none": "Nessuno",
+  "settings.chatBackdrop.pond": "Laghetto koi",
+  "settings.chatBackdrop.jellyfish": "Meduse",
+  "settings.chatBackdrop.sunset": "Tramonto rétro",
+  "settings.chatBackdrop.snowfall": "Nevicata",
+  "settings.chatBackdrop.fireflies": "Lucciole",
+  "settings.chatBackdrop.upload": "Carica immagine…",
+  "settings.chatBackdrop.uploadRefused": "Usa un’immagine PNG, JPEG, GIF, WebP o AVIF di 20 MB al massimo.",
+  "settings.chatBackdrop.saveFailed": "Lo sfondo non è stato salvato.",
+  "settings.chatBackdrop.removeFailed": "Lo sfondo non è stato rimosso.",
   "settings.chatColor.title": "Colore della chat",
   "settings.chatColor.description": "Colora le bolle dei tuoi messaggi. Anche le persone sui tuoi server lo vedono.",
   "settings.chatColor.yours": "Il tuo colore della chat",
@@ -105,7 +125,7 @@ export const messages = {
   "settings.sendShortcut.title": "Scorciatoia di invio",
   "settings.sendShortcut.description": "Scegli i tasti che inviano un messaggio su questo dispositivo e browser.",
   "settings.chatOrder.description":
-    "Scegli dove la barra laterale mostra le chat non lette su questo dispositivo. Manuale disattiva il gruppo Non lette.",
+    "Scegli come la barra laterale ordina le chat su questo dispositivo. Manuale e Attività recente disattivano il gruppo Non lette.",
   "settings.sendShortcut.enter": "Invio per inviare",
   "settings.sendShortcut.modEnterMac": "⌘Invio per inviare",
   "settings.sendShortcut.modEnterWin": "Ctrl+Invio per inviare",
@@ -456,7 +476,6 @@ export const messages = {
   "settings.profile.share.copyFailed": "Impossibile copiare l'immagine.",
   "settings.profile.share.createFailed": "Impossibile creare l'immagine.",
   "settings.profile.share.fileName": "openbot-activity.png",
-  // The text in the image to share.
   "settings.profile.share.caption": "I miei ultimi sei mesi con OpenBot",
   "settings.profile.activity.title": "Attività su questo computer",
   "settings.profile.activity.activeDays": {
@@ -466,7 +485,6 @@ export const messages = {
   "settings.profile.activity.empty": "Ancora nessuna attività",
   "settings.profile.activity.loading": "Caricamento attività…",
   "settings.profile.activity.loadFailed": "Impossibile caricare la tua attività.",
-  // {tokens} is a short number, such as 1.2M.
   "settings.profile.activity.heatmapLabel": {
     one: "{tokens} token in {count} giorno attivo nell'ultimo anno",
     other: "{tokens} token in {count} giorni attivi nell'ultimo anno",
@@ -667,6 +685,10 @@ export const messages = {
   "settings.voice.language.parakeetUnifiedEnglishOnly":
     "Parakeet Unified riconosce solo l'inglese. Per impostare una lingua, usa Whisper, Cohere o ElevenLabs.",
   "settings.voice.language.automatic": "Automatica",
+  "settings.voice.pause.title": "Pausa prima dell’invio",
+  "settings.voice.pause.description":
+    "In una conversazione vocale, OpenBot invia le tue parole quando smetti di parlare per questo tempo. Scegli una pausa più lunga se parli lentamente o ti fermi a pensare. La voce dal vivo di Codex trova la fine da sola.",
+  "settings.voice.pause.seconds": "{seconds} s",
   "settings.voice.loadFailed": "Impossibile leggere i modelli vocali.",
   "settings.voice.saveFailed": "Impossibile salvare l'impostazione vocale. Riprova.",
   "settings.voice.downloadFailed": "Impossibile avviare il download. Riprova.",
@@ -767,6 +789,13 @@ export const messages = {
   "settings.transfer.import.lede": "Scegli il file che hai esportato dall'altro server. Termina con .zip.",
   "settings.transfer.import.choose": "Scegli file…",
   "settings.transfer.import.reading": "Lettura del file…",
+  "settings.transfer.upload.label": "Caricamento sul server",
+  "settings.transfer.upload.sending": "Invio del file…",
+  "settings.transfer.upload.sent": "{sent} di {total} inviati",
+  "settings.transfer.upload.serverReading": "Il server legge il file…",
+  "settings.transfer.upload.etaSoon": "Meno di un minuto rimanente",
+  "settings.transfer.upload.etaMinutes": "Circa {minutes} min rimanenti",
+  "settings.transfer.upload.etaHours": "Circa {hours} h {minutes} min rimanenti",
   "settings.transfer.import.openFailed": "Impossibile aprire il file",
   "settings.transfer.import.contains": "Questo file contiene",
   "settings.transfer.import.source": "OpenBot {version} · esportato il {date}",
@@ -803,8 +832,12 @@ export const messages = {
   "settings.transfer.copy.noAgents": "Questo server non ha agenti.",
   "settings.transfer.copy.new": "Nuovo",
   "settings.transfer.copy.notCopied":
-    "Vengono copiati anche i loro canali e la cartella condivisa. Chiavi API, accessi, connettori e cronologia delle chat non vengono copiati. Configurali di nuovo sull'altro server.",
+    "Vengono copiati anche i loro canali, i flussi di routine, i flussi di lavoro e la cartella condivisa. Chiavi API, accessi, connettori e cronologia delle chat non vengono copiati. Configurali di nuovo sull'altro server.",
   "settings.transfer.copy.submit": { one: "Copia {count} agente", other: "Copia {count} agenti" },
+  "settings.transfer.copy.duplicatesTitle": "Copiare gli agenti duplicati?",
+  "settings.transfer.copy.duplicatesDescription":
+    "{server} ha già agenti con questi nomi: {names}. La copia aggiunge un secondo agente per ciascuno. Ogni copia è un agente separato, con le sue chat, i suoi file e le sue memorie.",
+  "settings.transfer.copy.duplicatesConfirm": "Copia i duplicati",
   "settings.transfer.copy.copying": "Copia in corso…",
   "settings.transfer.copy.done": {
     one: "{count} agente copiato su {server}.",

@@ -1,16 +1,3 @@
-// Checks that a search result opens the thread that has the message, in this worktree's running dev
-// app, through the real UI, preload bridge, agent service and provider. It changes the data of the
-// profile, so start the app with `bun run dev` (never `--shared`), and pass an agent whose provider is
-// signed in: `bun scripts/agent-threads-routing-e2e.ts --allow-mutations --agent=<agent id>`.
-//
-// 1. A side thread gets a message with a word that no other message has.
-// 2. The search on this computer finds the word only when it includes side threads, and the result
-//    names the side thread.
-// 3. In the search dialog, the result opens the thread's tab, also when the agent's own chat is open.
-// 4. An archived thread is not in the results.
-// The script does not cover a notification click: only the main process sends it, and the dev app has
-// no main-process inspector. The app has no link to one message, so there is no link to check.
-// Writes .openbot-build/agent-threads-routing-e2e/report.json and a screenshot.
 import assert from "node:assert/strict";
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
@@ -85,7 +72,6 @@ const agent = await page.evaluate(async (id) => {
 try {
   await page.bringToFront();
 
-  // 1. A side thread with the word.
   const task = await page.evaluate(
     (input) => window.openbot.agent.startTask({ ...input, clientMessageId: crypto.randomUUID() }),
     { agentId, text: `Reply with the single word ready. Do not use tools. Reference ${word}.` },
@@ -94,7 +80,6 @@ try {
   report.taskId = task.id;
   await waitFor(page, "the side thread's turn ends", readTask, (current) => current?.state === "idle");
 
-  // 2. The bridge search.
   const without = await search(false);
   const withSide = await waitFor(
     page,
@@ -110,8 +95,6 @@ try {
   assert.equal(without.results.length, 0, "A search without side threads finds a side-thread message.");
   assert.equal(report.bridgeSearch.taskId, task.id, "The result does not name its side thread.");
 
-  // 3. The search dialog opens the thread's tab from the agent's own chat. "What's new" shows after
-  //    a version change and covers the window.
   const whatsNew = page.getByRole("dialog", { name: english("update.whatsNew.title") });
   if (await whatsNew.isVisible()) {
     await whatsNew.getByRole("button", { name: english("update.whatsNew.done") }).click();
@@ -147,7 +130,6 @@ try {
   assert.ok(tabSelected, "The search result does not select the thread's tab.");
   await page.screenshot({ path: resolve(OUT, "3-search-opened-thread.png") });
 
-  // 4. An archived thread is not in the results.
   await page.evaluate((input) => window.openbot.agent.closeTask(input), { agentId, taskId: task.id });
   await waitFor(page, "the archive", readTask, (archived) => archived?.state === "closed");
   report.archived = { withSideThreads: (await search(true)).results.length };

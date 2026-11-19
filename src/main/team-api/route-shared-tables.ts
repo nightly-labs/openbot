@@ -7,10 +7,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin } from "./request-helpers";
 
-/**
- * The tables the agents on this computer share, listed and deleted from a joined server. No row
- * crosses the wire. Frozen by `shared-tables-v1`.
- */
 export async function routeSharedTables(
   context: TeamApiRequestContext,
   admin: TeamApiAdmin | undefined,
@@ -29,7 +25,6 @@ export async function routeSharedTables(
   try {
     await runCauseEffect(tables.deleteTable({ name: body.name }));
   } catch (error) {
-    // A missing table or an unavailable database is a sentence for the admin, not a host fault.
     if (error instanceof Error) throw new HttpError(409, error.message);
     throw error;
   }

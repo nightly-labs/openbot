@@ -6,13 +6,9 @@ import { create } from "zustand";
 import { mobileAnalytics } from "./mobile-analytics";
 
 const key = "openbot.mobile.analytics.v1";
-/** A choice of this phone that the account has not saved yet: JSON `{ enabled, at }`, `at` in ms. */
 const accountPendingKey = "openbot.mobile.analytics.account-pending.v1";
-/** "true" or "false". Missing: an app from before the account kept answers saved the choice. */
 const keepOffKey = "openbot.mobile.analytics.keep-off.v1";
-/** JSON `{ id, createdAt }`: the random ID of events while tracking is off. It changes after 13 months. */
 const installIdKey = "openbot.mobile.analytics.install-id.v1";
-// The longest wait for the opt-out event before tracking stops. The opt-out must not wait for a slow network.
 const OPT_OUT_EVENT_LIMIT_MS = 2_000;
 export const useAnalyticsPreference = create<{ enabled: boolean; ready: boolean; saving: boolean }>(() => ({
   enabled: false,
@@ -21,10 +17,6 @@ export const useAnalyticsPreference = create<{ enabled: boolean; ready: boolean;
 }));
 let loading: Promise<void> | null = null;
 
-/**
- * The saved install ID, or a new one when it is missing, damaged or 13 months old. Null when the
- * keychain cannot be read or written: an ID that changes at each start would count one phone as many.
- */
 async function readInstallId(): Promise<string | null> {
   const now = Date.now();
   let stored: string | null;
@@ -36,9 +28,7 @@ async function readInstallId(): Promise<string | null> {
   try {
     const current = currentAnalyticsInstallId(JSON.parse(stored ?? "null"), now);
     if (current) return current.id;
-  } catch {
-    // A damaged value gets a new ID.
-  }
+  } catch {}
   const created = newAnalyticsInstallId(randomUUID(), now);
   try {
     await SecureStore.setItemAsync(installIdKey, JSON.stringify(created));
@@ -58,7 +48,6 @@ export function loadAnalyticsPreference(): Promise<void> {
       useAnalyticsPreference.setState({ enabled, ready: true });
     })
     .catch(() => {
-      // An unreadable preference must not turn tracking on.
       mobileAnalytics.setEnabled(false);
       useAnalyticsPreference.setState({ enabled: false, ready: true });
     });
@@ -71,8 +60,6 @@ export async function saveAnalyticsPreference(enabled: boolean): Promise<void> {
   useAnalyticsPreference.setState({ saving: true });
   if (!enabled) {
     useAnalyticsPreference.setState({ enabled: false });
-    // The opt-out event goes out with the account before the client stops. After the choice, events
-    // go with the install ID only.
     if (wasEnabled) {
       await mobileAnalytics.sendLast("analytics_preference_changed", { enabled: false }, OPT_OUT_EVENT_LIMIT_MS);
     }
@@ -88,11 +75,6 @@ export async function saveAnalyticsPreference(enabled: boolean): Promise<void> {
   }
 }
 
-/**
- * True when this phone keeps an "off" that it saved before the account kept answers. An account
- * answer of "on" does not replace it; only a choice on this phone does. A keychain that cannot be
- * read keeps "off".
- */
 async function keepsOff(): Promise<boolean> {
   try {
     return (
@@ -103,16 +85,11 @@ async function keepsOff(): Promise<boolean> {
   }
 }
 
-/**
- * `keepOff` is the mark before this write: a kept "off" stays kept until this phone turns analytics
- * on. The value goes first: when the mark write fails, an "off" without its mark reads as kept.
- */
 async function savePreference(enabled: boolean, keepOff: boolean): Promise<void> {
   await SecureStore.setItemAsync(key, String(enabled));
   await SecureStore.setItemAsync(keepOffKey, String(!enabled && keepOff));
 }
 
-/** Sends a choice to the account with its age in ms, and returns the account's answer. */
 export type SendAnalyticsChoice = (enabled: boolean, ageMs: number) => Promise<boolean | null>;
 
 async function readUnsentChoice(): Promise<{ enabled: boolean; at: number } | null> {
@@ -130,7 +107,6 @@ async function followAnswer(answer: boolean): Promise<void> {
   const state = useAnalyticsPreference.getState();
   if (state.saving || answer === state.enabled) return;
   const keepOff = await keepsOff();
-  // A choice that the user made during the read comes first.
   if ((answer && keepOff) || useAnalyticsPreference.getState().saving) return;
   await savePreference(answer, keepOff);
   mobileAnalytics.setEnabled(answer);
@@ -139,14 +115,7 @@ async function followAnswer(answer: boolean): Promise<void> {
 
 let sending = false;
 
-/**
- * Sends the choice that the account does not have yet, also a newer one that the user makes during
- * the send. The account keeps a newer answer from another device, and this phone follows it,
- * except for an "on" over a kept "off". A failed send stays marked; the next profile refresh,
- * start, or choice sends it again.
- */
 export async function sendAnalyticsChoice(send: SendAnalyticsChoice): Promise<void> {
-  // The send in progress reads the latest choice when it ends.
   if (sending) return;
   sending = true;
   try {
@@ -161,10 +130,6 @@ export async function sendAnalyticsChoice(send: SendAnalyticsChoice): Promise<vo
   }
 }
 
-/**
- * Keeps this phone and the account on the user's latest analytics answer. A choice that the account
- * does not have yet goes to it with `send`; otherwise this phone follows the account's answer.
- */
 export async function followAccountAnalytics(
   answer: boolean | null | undefined,
   send: SendAnalyticsChoice,

@@ -40,6 +40,7 @@ import {
   type HostedSiteScope,
   type HostedSiteSlots,
   hostedSiteSlots,
+  idleNewSiteUploadsSql,
   resolveHostedSiteBucket,
   scopeServerId,
 } from "./hosted-site-server";
@@ -64,8 +65,6 @@ export class HostedSiteService {
     private readonly localSiteOrigin?: string,
   ) {}
 
-  /** The sites of the scope, with the limit and slot count of the server that new sites go to. */
-
   readonly list = Effect.fn("HostedSites.list")(
     { self: this },
     function* (scope: HostedSiteScope) {
@@ -89,7 +88,6 @@ export class HostedSiteService {
       const bucket = yield* resolveHostedSiteBucket(database, scope.userId, serverId, now);
       const { limit, used, reason } = yield* hostedSiteSlots(database, scope.userId, bucket, now);
       const sites = rows.results.map((row) => mapSite(row, this.localSiteOrigin));
-      // `limitReason` is optional: released desktops read only `sites`, `limit` and `used`.
       return reason === null ? { sites, limit, used } : { sites, limit, used, limitReason: reason };
     },
     (operation) => operation.pipe(Effect.provide(HostedSiteStorage.layer(this.database, this.bucket))),
@@ -115,7 +113,8 @@ export class HostedSiteService {
           .bind(userId, now)
           .first<{ count: number }>(),
       );
-      if ((concurrent?.count ?? 0) >= HOSTED_SITE_LIMITS.concurrentUploads) {
+      const uploads = concurrent?.count ?? 0;
+      if (uploads >= HOSTED_SITE_LIMITS.concurrentUploads && !request.siteId) {
         return yield* new HostedSiteInputError(
           429,
           "upload_session_limit",
@@ -130,6 +129,14 @@ export class HostedSiteService {
         const site = yield* this.requireOwnedSiteEffect(userId, request.siteId);
         yield* siteDecode(() => requireSiteInBucket(site, serverId));
         if (!site.expires_at || site.expires_at <= now) return yield* inactiveSiteError("expired");
+        const needed = uploads - HOSTED_SITE_LIMITS.concurrentUploads + 1;
+        if (needed > 0 && (yield* this.abandonSupersededUploadsEffect(userId, site.id, now, needed)) < needed) {
+          return yield* new HostedSiteInputError(
+            429,
+            "upload_session_limit",
+            "Finish or wait for an existing upload first.",
+          );
+        }
         const spaFallback = request.spaFallback ?? site.spa_fallback === 1;
         const operation1 = yield* Effect.gen({ self: this }, function* () {
           return yield* siteCall(() =>
@@ -198,6 +205,9 @@ export class HostedSiteService {
 
       yield* this.enforceCreationRateEffect(userId, now);
       const bucket = yield* resolveHostedSiteBucket(database, userId, serverId, now);
+      if (!(yield* this.bucketHasRoomEffect(userId, bucket, null, now))) {
+        yield* this.abandonIdleNewSiteUploadsEffect(userId, bucket, now);
+      }
       const room = bucketHasRoomSql(bucket, userId, null, now);
       const siteId = crypto.randomUUID();
       const hostname = yield* this.uniqueHostnameEffect(`${request.title} ${request.description}`);
@@ -946,7 +956,6 @@ export class HostedSiteService {
       const { database } = yield* HostedSiteStorage;
 
       const previousDeployment = deployment.base_deployment_id;
-      // The site keeps the server it was created for, so the activation counts against that server's bucket.
       const bucket = yield* resolveHostedSiteBucket(database, userId, site.server_id, now);
       const room = bucketHasRoomSql(bucket, userId, site.id, now);
       const results = yield* siteCall(() =>
@@ -1190,7 +1199,6 @@ export class HostedSiteService {
     },
   );
 
-  /** True when the bucket has a free slot for one more site, not counting `excludeSiteId`. */
   private readonly bucketHasRoomEffect = Effect.fn("HostedSites.bucketHasRoom")(
     { self: this },
     function* (
@@ -1648,6 +1656,81 @@ export class HostedSiteService {
     },
   );
 
+  private readonly abandonSupersededUploadsEffect = Effect.fn("HostedSites.abandonSupersededUploads")(
+    { self: this },
+    function* (
+      userId: string,
+      siteId: string,
+      now: number,
+      count: number,
+    ): Effect.fn.Return<number, HostedSiteFailure, HostedSiteStorage> {
+      const { database } = yield* HostedSiteStorage;
+
+      const idle = yield* siteCall(() =>
+        database
+          .prepare(
+            `SELECT id FROM site_deployments
+         WHERE user_id = ? AND site_id = ? AND status = 'uploading' AND upload_expires_at > ? AND in_flight_uploads = 0
+           AND base_deployment_id IS NOT NULL
+         ORDER BY created_at LIMIT ?`,
+          )
+          .bind(userId, siteId, now, count)
+          .all<{ id: string }>(),
+      );
+      let freed = 0;
+      for (const upload of idle.results) {
+        const claim = yield* siteCall(() =>
+          database
+            .prepare(
+              `UPDATE site_deployments SET status = 'abandoned'
+           WHERE id = ? AND user_id = ? AND status = 'uploading' AND in_flight_uploads = 0`,
+            )
+            .bind(upload.id, userId)
+            .run(),
+        );
+        if (claim.meta.changes !== 1) continue;
+        freed += 1;
+        yield* this.deleteDeploymentEffect(siteId, upload.id);
+      }
+      return freed;
+    },
+  );
+
+  private readonly abandonIdleNewSiteUploadsEffect = Effect.fn("HostedSites.abandonIdleNewSiteUploads")(
+    { self: this },
+    function* (
+      userId: string,
+      siteBucket: HostedSiteBucket,
+      now: number,
+    ): Effect.fn.Return<void, HostedSiteFailure, HostedSiteStorage> {
+      const { database } = yield* HostedSiteStorage;
+
+      const idleBefore = now - HOSTED_SITE_LIMITS.idleUploadMs;
+      const idle = idleNewSiteUploadsSql(siteBucket, userId, now, idleBefore, 1);
+      const uploads = yield* siteCall(() =>
+        database
+          .prepare(idle.sql)
+          .bind(...idle.binds)
+          .all<{ id: string; site_id: string }>(),
+      );
+      for (const upload of uploads.results) {
+        const claim = yield* siteCall(() =>
+          database
+            .prepare(
+              `UPDATE site_deployments SET status = 'abandoned'
+           WHERE id = ? AND user_id = ? AND status = 'uploading' AND in_flight_uploads = 0
+             AND NOT EXISTS (
+               SELECT 1 FROM site_upload_files f WHERE f.deployment_id = site_deployments.id AND f.uploaded_at > ?
+             )`,
+            )
+            .bind(upload.id, userId, idleBefore)
+            .run(),
+        );
+        if (claim.meta.changes === 1) yield* this.deleteDeploymentEffect(upload.site_id, upload.id);
+      }
+    },
+  );
+
   private readonly deleteDeploymentEffect = Effect.fn("HostedSites.deleteDeployment")(
     { self: this },
     function* (siteId: string, deploymentId: string): Effect.fn.Return<void, HostedSiteFailure, HostedSiteStorage> {
@@ -1750,7 +1833,6 @@ export class HostedSiteService {
   );
 }
 
-/** A request changes only the sites of its own server, or unlinked sites when it proved no server. */
 function requireSiteInBucket(site: SiteRow, serverId: string | null): void {
   if ((site.server_id ?? null) === serverId) return;
   throw new HostedSiteInputError(409, "site_other_server", "This site belongs to another server.");

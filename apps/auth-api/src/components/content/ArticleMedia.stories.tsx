@@ -1,10 +1,6 @@
 import { AppLogo } from "@openbot/brand";
 import type { JSX } from "@solidjs/web";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-// The site's stylesheet, not the desktop app's. It is imported here rather than in
-// .storybook/preview.tsx because it carries `html`, `body` and `a` rules of its
-// own: loaded for every story it would restyle the whole of Storybook, and loaded
-// here it arrives only once this story is opened.
 import "../../styles.css";
 import "./ArticleMedia.stories.css";
 import aChannel from "../../content/guides/media/openbot-101/a-channel.webp";
@@ -17,9 +13,6 @@ import { Button } from "../ui/button";
 import { ArticleGradient } from "./ArticleGradient";
 import { ArticleImage } from "./ArticleMedia";
 
-// The string the mount's colours are drawn from. A real article passes its own
-// title, so a mounted picture matches the artwork on the card the reader arrived
-// from; here it is a control, so the colour families can be compared.
 const ARTICLE_TITLE = "How to Use OpenBot: Set Up Your First AI Agent";
 const GUIDE = GUIDES_COLLECTION.articles.find((article) => article.slug === "openbot-101");
 if (!GUIDE) throw new Error("The openbot-101 guide must be in the guides registry.");
@@ -68,11 +61,6 @@ function ProseColumn(props: { children: JSX.Element }) {
   );
 }
 
-/**
- * A screenshot on the article card's own gradient, the way a product shot sits on a
- * coloured field. The gradient is live here so the motion is the first thing you
- * see; rest is not required.
- */
 export const ProductShot: Story = {
   render: () => (
     <div class="story-product-shot">
@@ -88,11 +76,6 @@ export const ProductShot: Story = {
   ),
 };
 
-/**
- * How a mounted screenshot reads on a real article page: the same header, title,
- * hero artwork and column as /guides/openbot-101, with the article gradient moving
- * around the pictures.
- */
 export const InTheArticle: Story = {
   render: () => (
     <div class="landing-page post-article">
@@ -175,10 +158,6 @@ export const InTheArticle: Story = {
   ),
 };
 
-/**
- * A tall picture on a mount. The padding is proportional to the column rather than
- * to the picture, so a portrait screenshot keeps the same border as a wide one.
- */
 export const TallPicture: Story = {
   render: () => (
     <ProseColumn>
@@ -194,10 +173,6 @@ export const TallPicture: Story = {
   ),
 };
 
-/**
- * The same wide screenshot with no mount, then both pads. Leave `mountOn` out for
- * a bare picture. Rest a pointer on a mount: the gradient is the article's own.
- */
 export const MountPad: Story = {
   render: () => (
     <ProseColumn>
@@ -230,10 +205,6 @@ export const MountPad: Story = {
   ),
 };
 
-/**
- * Four titles, four colour families. Every mount in one article agrees with every
- * other, and two articles rarely land on the same band.
- */
 export const ColourFamilies: Story = {
   render: () => (
     <ProseColumn>

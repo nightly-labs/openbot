@@ -69,8 +69,10 @@ when a server is idle or boat stops a sandbox; and `error` and `deleted`. The Wo
    renews on the same day as the server ([Commercial license](architecture/servers.md#commercial-license)).
    While the license promotion (`LICENSE_TRIAL_END`) runs, the page has the server line only, and the
    license starts with a free trial until the promotion ends.
-   Refunds are by email only: email licenses@openbot.run within 24 hours of the first payment for a
-   refund less a €3 / $3.60 / 13.20 zł fee, once per account. There are no refunds for later changes.
+   Refunds are by email only (Terms: Consumer Right of Withdrawal): email hello@openbot.run within
+   2 hours of the purchase for a 90% refund, or use the statutory withdrawal. An operator makes the
+   refund in the Stripe Dashboard and cancels the subscription now. A refunded and cancelled server plan
+   deletes the server and its data at once (step 7).
    The desktop main process opens the URL only when it is an `https://checkout.stripe.com` URL; the
    renderer never gets it. The web client goes to the page in the same tab, and Stripe returns to
    `/app?hosting=checkout&hosted_server=<id>` (`&cancelled=1` when the user went back).
@@ -205,7 +207,10 @@ when a server is idle or boat stops a sandbox; and `error` and `deleted`. The Wo
    **Check at a start.** `PRAGMA quick_check` reads every page of `openbot.db`: on a 15.7 GB file
    it stopped the main thread for 77 seconds to about 4 minutes. A clean close removes
    `openbot.db-wal`. Thus OpenBot runs the check at a start only when that file is there (a crash,
-   a kill, or a save while OpenBot ran) or when a migration ran.
+   a kill, or a save while OpenBot ran) or when a migration ran. After a stop that did not close the
+   file, the check runs in a separate database host process, so the main thread stays free. When that
+   process cannot start or run the check, the main thread runs it as before. The check after a
+   migration still runs on the main thread.
 6. **Start after a failure.** A client that cannot reach the host first calls
    `GET /v2/hosting/servers/:id/status` (owner or member; 404 for a host that is not a hosted
    server). It returns `{serverId, state, error, sleeping}` and writes nothing, so it does not count
@@ -264,20 +269,23 @@ when a server is idle or boat stops a sandbox; and `error` and `deleted`. The Wo
    runs with no payment. A cancel at the period end (`cancel_at_period_end` or `cancel_at`)
    shows the end date and keeps the server running until then.
 
-   Refunds and disputes. A full refund (`refund.created` or `refund.updated` with `succeeded`) of
-   the invoice that paid the current period cancels the plan now: the account paid nothing for that
-   period. That invoice is the subscription's `latest_invoice`, made for a new plan or a renewal
-   (`billing_reason` `subscription_create` or `subscription_cycle`). Partial refunds that add up to
-   the full amount count as a full refund (the charge is `refunded`). A partial refund, or a refund of
-   an earlier invoice or of a plan change, keeps the plan and the server. After a plan change in the
-   period, `latest_invoice` is the plan change invoice, so a refund of the renewal keeps the plan too.
-   To end the plan in these cases, cancel the subscription in the Stripe Dashboard. A dispute
-   (`charge.dispute.created`, an inquiry too) cancels the plan of the disputed invoice now, so Stripe
-   does not charge that card again. In both cases
-   the server stops with `plan_ended` and keeps its disk. The Worker finds the plan through the
-   invoice of the PaymentIntent (`GET /v1/invoice_payments`). A refund or dispute of a payment that
-   is not an OpenBot plan invoice changes nothing. A refund that fails after it succeeded does not
-   start the plan again.
+   Refunds and disputes. A refund alone (`refund.created` or `refund.updated` with `succeeded`) changes
+   no plan, so an operator can give back part of a payment and keep the server. To end a plan with a
+   refund, the operator cancels the subscription now in the Stripe Dashboard and refunds the payment,
+   in either order. When the subscription is `canceled`, the server is deleted with its data at once,
+   with no 14-day retention (Terms: Hosted Server Subscription Termination):
+   - a refund of any amount of a cancelled plan deletes its server;
+   - at `customer.subscription.deleted`, a refund of the subscription's `latest_invoice` deletes the
+     server (`StripeClient.isInvoiceRefunded`).
+
+   The webhook deletes the server as the owner does (`HostedServerService.deleteForRefund`). An open
+   plan of the server, such as a renewal paid just now, keeps it. A cancel at the period end after a
+   refund of that period also deletes the server when the period ends. A refund that fails after it
+   succeeded does not bring the server back. A dispute (`charge.dispute.created`, an inquiry too)
+   cancels the plan of the disputed invoice now, so Stripe does not charge that card again. After a
+   dispute the server stops with `plan_ended` and keeps its disk. The Worker finds the plan through
+   the invoice of the PaymentIntent (`GET /v1/invoice_payments`). A refund or dispute of a payment
+   that is not an OpenBot plan invoice changes nothing.
 8. **Plan change.** The Customer Portal has no plan change (`subscription_update` is off), so only an
    operator changes a plan, in the Stripe Dashboard. A portal request with `flow: "update"` from an
    older app opens the Portal home. The owner of a server on a VPS can buy more storage: see
@@ -565,8 +573,10 @@ the same `HostedUpdateAdapter` with folders that the host mounts in `/var/lib/op
 The Linux build contains `scripts/hosting/` (without the TypeScript files) in `resources/hosting`.
 On a server, root runs `openbot-hosted-update`:
 
-1. `openbot-update.timer` runs `stage` 5 to 10 minutes after each start of the timer and then
-   about each 6 hours. It reads the `latest-linux.yml` (`latest-linux-arm64.yml` on arm64) of the
+1. `openbot-update.timer` runs `check` 5 to 10 minutes after each start of the timer and then
+   about each hour. `check` runs `stage` when no `stage` of `check` succeeded in the last 6 hours
+   (`/run/openbot-update.staged`, so the first `check` after a boot stages), and then the step that
+   [Start loop](#start-loop) describes. `stage` reads the `latest-linux.yml` (`latest-linux-arm64.yml` on arm64) of the
    latest GitHub release, the manifest that the Linux desktop updater reads. When that version is newer than the installed one, it downloads the
    AppImage, checks its SHA-512 against the manifest, unpacks it in `/var/tmp`, checks that it has
    all hosting files, installs the packages in the `packages.txt` of that release, and copies it
@@ -580,7 +590,8 @@ On a server, root runs `openbot-hosted-update`:
    a complete disk, or when `.applying` shows an interrupted copy. `openbot.service` does not
    require it, so it starts after a failure too: with the old release, or with a partial copy after
    a failed copy, until the next start. On a self-installed server, the new release starts at the
-   next boot. A hosted server installs it itself: when the release is staged, OpenBot asks root to
+   next boot, or when idle if the automatic update switch is on (it is off by default). A hosted
+   server installs it itself: when the release is staged, OpenBot asks root to
    install it when idle, and when no connected client changed data or typed for 5 minutes and the
    start was 5 minutes ago. Reading is not use. Server Settings shows this wait as "other work",
    because `host-update-v1` has no reason for it. The automatic update switch of a hosted server
@@ -612,6 +623,53 @@ migrated. `stage` stops when it cannot read the installed version, and `provisio
 installed version is newer. A staged release that is no longer the latest one, for example a
 withdrawn release, is removed at the next `stage` run. A server that starts before that run applies
 it. A release without all of its `resources/hosting` files cannot update a server.
+
+#### Start loop
+
+A server has no window for the recovery window of the desktop. A server whose start
+failed started again each 10 seconds, without an end, in earlier releases. Now main stops the loop
+(`src/main/server-start-halt.ts`):
+
+- at the first failure when the database is from a newer OpenBot (`newer_database`): a restart
+  cannot help;
+- for all other failures, at the third failed start in a row of the same version (`start_failed`).
+  A failed migration rolls back and counts as a failed start, because its cause can be temporary
+  (a full disk, a lock). A start that fails with an error stops the loop at once; after a crash,
+  the next start stops it. This is the count of the desktop recovery window (`start-attempts.ts`).
+
+Main then writes `openbot-start-halt-v1.json` in its user data folder. The file has the reason
+word, the app version and a time only. The journal shows the reason. Then main runs its safe mode
+(`src/main/server-safe-mode.ts`): it keeps a minimal Team API up, so each member's app shows why
+the server does not start and which version it runs. The safe mode opens no database and changes
+no user data. It writes the empty file `/run/openbot/server-safe-mode` while it runs. See
+[Team API](architecture/team-api.md#server-safe-mode).
+
+When the safe mode cannot start (no team, or no host credential), main exits with 78 as before.
+`openbot.service` has `RestartPreventExitStatus=78`, so systemd does not start it again.
+
+The next start reads and removes the file, logs the reason, and tries once more. A failure of that
+start stops the loop again. These start OpenBot again:
+
+- a restart or a resume of the server, or `sudo openbot restart` or `start`;
+- `sudo openbot update`;
+- `check` of `openbot-update.timer`, about each hour: when `openbot.service` is stopped with
+  status 78, or runs its safe mode, it runs `stage`, stops the safe mode, and starts the service
+  again, after `apply` when a newer release is staged. A hosted
+  owner has no shell, and a failure can be temporary (a full disk, no network), so each run tries
+  once more. It reads only the state of the unit (`ActiveState`, `ExecMainStatus`) and the
+  existence of the empty safe-mode file, never the content of a file of the service user.
+
+When OpenBot is not running or runs its safe mode, `openbot` commands that need the control socket
+say that the start loop stopped it, and name `openbot logs`, `sudo openbot update` and
+`sudo openbot restart`. The safe mode has no control socket.
+
+A Docker container has no systemd and no `openbot-update.timer`. There the safe mode ends after one
+hour with exit 78, and the restart policy starts the container again, with the backoff of Docker.
+Each second start after a halt tries again.
+
+There is no install or rollback action in the safe mode: a newer release is the fix, through the
+update paths above. `copy_release` of `openbot-hosted-update` still removes the old copy before it
+copies (`rm -rf`, then `cp -a`); see plan 011 item 3.
 
 A server that has no updater, such as one made from a template before 0.26.0, needs one upgrade by
 hand. With a boat key that has command and file access: upload `scripts/hosting/` to
@@ -694,8 +752,8 @@ do not all pass the check before their processes grow. A start that fails counts
 
 | Level | When | What happens |
 | --- | --- | --- |
-| `ok` | Other times. After `low`, only at 256 MB above the `low` limit. | Turns start. |
-| `low` | Free memory is less than 512 MB or 12% of the total. | No new turn starts; the message stays queued. The agent shows one notice in each low period. The browser opens no new tab. At each sample, a Claude thread whose background tasks sent nothing for 30 minutes closes; with normal memory, background tasks keep their thread open. |
+| `ok` | Other times. After `low`, only at 256 MB above the `low` limit (10% of the total when that is less). | Turns start. |
+| `low` | Free memory is less than 512 MB or 12% of the total. Below 2.5 GB of total memory, 20% of the total replaces 512 MB, so a small server does not stay `low`. It is always at least 64 MB above the `critical` limit. | No new turn starts; the message stays queued. The agent shows one notice in each low period. The browser opens no new tab. At each sample, a Claude thread whose background tasks sent nothing for 30 minutes closes; with normal memory, background tasks keep their thread open. |
 | `critical` | Free memory is less than 256 MB or 6% of the total. | As `low`. Also, the provider threads with no turn close one time. They open again from their session at the next turn. Leftover agent processes stop (see below). |
 
 Agent processes (`AgentProcesses` in `src/main/server-memory.ts`):
@@ -907,22 +965,21 @@ with the account of an operator. One command does all the steps below.
 Before you start, you need:
 
 - The root `.env.keys` with `DOTENV_PRIVATE_KEY_PRODUCTION`. `apps/auth-api/.env.production` then
-  gives the four Leaseweb keys, `SERVER_CLAIMS_ADMIN_TOKEN` and the Cloudflare token for D1.
+  gives the five Leaseweb keys, `SERVER_CLAIMS_ADMIN_TOKEN`, the Cloudflare token for D1 and
+  `OPERATOR_KEYS_HOST`, the SSH address of the core server of the operators.
 - An SSH key of your computer in `/root/.ssh/authorized_keys` of the core server of the operators.
 - The VPS ID, the owner's email, one short word for the customer (`a-z`, `0-9`), and the server name
   that the customer sees (6 to 32 characters).
 
 ```sh
 env="bunx @dotenvx/dotenvx@2.38.2 run --quiet -f apps/auth-api/.env.production -fk <root>/.env.keys --"
-# 1. Find the VPS just bought: each VPS with no reference on the four accounts.
+# 1. Find the VPS just bought: each VPS with no reference on the five accounts.
 $env bun scripts/hosting/leaseweb-pool.ts free
-# 2. The public keys of the operators, which the bootstrap installs.
-ssh <core server> cat /root/.ssh/authorized_keys >operator-keys
-# 3. See the plan, then do it.
+# 2. See the plan, then do it.
 $env bun scripts/hosting/leaseweb-pool.ts custom <VPS ID> --owner=<email> --customer=<word> \
-  --name="<server name>" --keys=operator-keys
+  --name="<server name>"
 $env bun scripts/hosting/leaseweb-pool.ts custom <VPS ID> --owner=<email> --customer=<word> \
-  --name="<server name>" --keys=operator-keys --apply
+  --name="<server name>" --apply
 ```
 
 When it ends, the owner sees the server in the app, and can invite the other members.
@@ -934,9 +991,9 @@ When it ends, the owner sees the server in the app, and can invite the other mem
   `custom` take the same VPS at the same time, each one reads the reference again, and the one that
   lost stops.
 - It sets the reference `custom-<NN> <customer> <email>` first, with the next number after the
-  highest on all four accounts, and reads it again (see [Leaseweb references](#leaseweb-references)).
+  highest on all five accounts, and reads it again (see [Leaseweb references](#leaseweb-references)).
 - It signs in with the root password of the Leaseweb API one time. After the bootstrap, only the
-  operator keys sign in, so `--keys` must have a key of this computer.
+  operator keys sign in, so one operator key must be a key of this computer.
 - It makes the claim just before the install, because a claim works for 15 minutes.
 - At the end it runs `leaseweb-bootstrap-e2e.ts`, which restarts the server, and then checks that
   OpenBot is online and that D1 shows the owner as the active owner of the server.
@@ -996,7 +1053,7 @@ restarts.
 
 #### Leaseweb references
 
-The reference tells each operator and each agent which VPS has an owner. All VPS on all four
+The reference tells each operator and each agent which VPS has an owner. All VPS on all five
 Leaseweb accounts use one scheme:
 
 | Reference | Use | Example |
@@ -1008,10 +1065,16 @@ Leaseweb accounts use one scheme:
 | `openbot-signal-<home>` | A Signal machine (see `docs/remote-session-deployment.md`). | `openbot-signal-us` |
 | `pool-test-<NN>` | A test machine of the operator. | `pool-test-01` |
 
+`leaseweb-pool.ts traffic [--from=YYYY-MM-DD] [--to=YYYY-MM-DD]` is read only. It shows the public
+traffic in and out of each VPS on the five accounts, from the first day of this month (UTC) to today,
+and the part of the traffic pack of its contract that the outgoing traffic used. Leaseweb counts only
+the outgoing traffic of a VPS against the pack. The output has the reference with no email, and
+`server` for a hosted server.
+
 To take a VPS:
 
-1. List the VPS of each account (`LEASEWEB_API_KEY_NL`, `_DE`, `_US`, `_AU`) and select one with no
-   reference in the location you need.
+1. List the VPS of each account (`LEASEWEB_API_KEY_NL`, `_DE`, `_US`, `_AU`, `_SG`) and select one
+   with no reference in the location you need.
 2. Set its reference at once, before any other work on it. Then read the VPS again: when the
    reference is not yours, another operator took it, and you select another one.
 3. Never take a VPS that has a reference, also `pool`. A pool VPS leaves the pool only with
@@ -1035,8 +1098,11 @@ A pool VPS and a custom VPS also use these names:
 The operator keys are a file with one public key for each operator, in the format of
 `authorized_keys`, with no options. The fixed place of the list is `/root/.ssh/authorized_keys` of
 the core server of the operators: read it at each run, as the command above does, so that the same
-persons have access to each server. The list is not in this repository, which is public, and not in
-the bootstrap, which each release has. Only public keys go on a server: each operator keeps the
+persons have access to each server. `leaseweb-pool.ts` reads it at each run from `OPERATOR_KEYS_HOST`,
+so each bootstrap that it runs installs all the operator keys. `--keys=<file>` only adds keys to that
+list. The bootstrap replaces the list on the server: a file with one key once left 106 machines with
+the key of only one operator. The list is not in this repository, which is public, and not in the
+bootstrap, which each release has. Only public keys go on a server: each operator keeps the
 private key.
 
 - The list replaces the list of the last run. To remove an operator, run the bootstrap with the
@@ -1063,7 +1129,8 @@ bunx dotenvx run -f apps/auth-api/.env.production -fk <root>/.env.keys -- \
 One Leaseweb account is for one sales organization, and an API key sees only the servers of its
 account: the key of the German account does not list a server in Amsterdam. The key of the German
 account, which has the test VPS in Frankfurt, is `LEASEWEB_API_KEY_DE` in the same file. The keys of
-the accounts that have the Signal machines are `LEASEWEB_API_KEY_US` and `LEASEWEB_API_KEY_AU`.
+the accounts that have the Signal machines are `LEASEWEB_API_KEY_US`, `LEASEWEB_API_KEY_AU` and
+`LEASEWEB_API_KEY_SG`.
 
 ### A new server on a pool machine
 
@@ -1073,7 +1140,7 @@ sandbox when none is. A server that starts on boat moves to a VPS later
 
 The Worker cannot connect to a machine, and it has no Leaseweb key. So the machine asks:
 
-1. `leaseweb-pool.ts prepare <VPS ID>... --keys=<file> --apply` installs the newest OpenBot, disabled,
+1. `leaseweb-pool.ts prepare <VPS ID>... --apply` installs the newest OpenBot, disabled,
    on each free machine, as for a move. Then it offers the machine: it makes a random token, stores the
    SHA-256 of the token in `operator_hosts.assign_token_hash` (migration 0055), and runs
    `move-from-boat.sh offer leaseweb:<VPS ID>` on the machine with the token on standard input. `offer`
@@ -1175,7 +1242,7 @@ writes `observed_state`:
 | The plan changes | Sets `size` at once. | Nothing: each pool server has the same size. |
 | The plan ends | Sets `desired_state = 'stopped'`, `observed_error = 'plan_ended'` and `plan_ended_at`. A start request gets `402 plan_required`. | Stop `openbot.service`, then write `observed_state = 'stopped'`. Until then the server still runs. |
 | The owner renews | Sets `desired_state = 'running'` and clears the error. `plan_ended_at` stays. | Start `openbot.service`, then write `observed_state = 'running'`. |
-| 30 days after the plan ended, with no open subscription | Reads the subscription at Stripe, then deletes the server as the owner does. | As for a delete. |
+| 14 days after the plan ended, with no open subscription | Reads the subscription at Stripe, then deletes the server as the owner does. | As for a delete. |
 | The owner or an admin restarts the server | Refuses with `409 hosted_server_restart_unavailable`. | Restart `openbot.service` on a request to support. |
 | The owner deletes the server | Cancels the plan, deletes the sandbox in `retired_sandbox_id`, removes the Remote host, ends the session, and sets `observed_state = 'deleted'`. `operator_host` stays. | Reinstall the VPS, set its reference to `pool`, then set `operator_host = NULL`. |
 | boat sends an event for the old sandbox | Finds no row for it. | Nothing. |
@@ -1206,7 +1273,7 @@ hand. It needs `BOAT_API_KEY` in the environment, from `apps/auth-api/.env.dev`:
 
 ```bash
 bunx dotenvx run -f apps/auth-api/.env.production -f apps/auth-api/.env.dev -fk <root>/.env.keys -- \
-  bun scripts/hosting/leaseweb-pool.ts move <server ID> auto --keys=<operator keys> --apply
+  bun scripts/hosting/leaseweb-pool.ts move <server ID> auto --apply
 ```
 
 Tested on 2026-11-12 with the test Worker: one Standard server from a boat sandbox to a VPS 2 in
@@ -1229,7 +1296,7 @@ still uses the sandbox. The downtime is the export, the copy, the import and the
    The IDs are those of `id user` in the sandbox (1000 and 1000 in the boat image). The release is the
    one that the sandbox has, or a newer one. The command sets the hostname, makes the user `user`
    with the home `/home/user`, runs `provision.sh`, and disables `openbot.service`, so a restart does
-   not start OpenBot with no data. `leaseweb-pool.ts prepare <VPS ID>... --keys=<file> --apply` does
+   not start OpenBot with no data. `leaseweb-pool.ts prepare <VPS ID>... --apply` does
    steps 2 and 3 on free machines before a move, with the newest release.
 3. Run `leaseweb-bootstrap.sh` with the operator keys. Restart the VPS one time. A new or reinstalled
    VPS has no key of an operator: `leaseweb-pool.ts` then signs in one time with the root password of
@@ -1454,7 +1521,9 @@ When the export failed before the import, the sandbox still runs with OpenBot st
 in the sandbox. Delete `/root/openbot-move.tar` on the VPS. Then give the row back with the statement
 below, but with `desired_state` and `observed_state` of before the move. On 2026-11-12 an export of
 24 GB took 9 minutes; a restart timer of boat started OpenBot during it, and tar stopped the export.
-The export now stops that timer.
+The export now stops that timer. On 2026-11-19 the `.bash_logout` of a sandbox wrote `\e[3J` after
+each boat command, and `move` read it as the status of an export that had not ended. `move` now
+reads only the output between two markers that the command writes.
 
 `move` sets `size` to `HOSTED_PLAN_SIZE` (`small` for Starter), so the statement writes the boat type of
 the sandbox again: the `type` that boat shows for the sandbox (`default` for a Starter sandbox from
@@ -1656,12 +1725,13 @@ system and goes back to the pool for the next new server or the next move. The W
 
 1. The plan ends. The Worker sets `desired_state = 'stopped'` and `plan_ended_at`. `sync` stops
    OpenBot on the machine. The data stays, so the owner can renew.
-2. 30 days after `plan_ended_at`, the cron of the Worker deletes the server when its newest
+2. 14 days after `plan_ended_at`, the cron of the Worker deletes the server when its newest
    subscription is not open and Stripe reports it `canceled`. The delete is the one of the owner: the
    old sandbox, the Remote host and the session go, and `observed_state = 'deleted'`. A subscription
    that Stripe still retries (`past_due`, `unpaid`, `paused`) keeps the server, with no limit: the
-   operator decides. A renewal before the 30 days keeps the server. The 30 days are
-   `OPERATOR_HOST_DATA_KEPT_MS` in `hosted-server-service.ts`.
+   operator decides. A renewal before the 14 days keeps the server. The 14 days are
+   `OPERATOR_HOST_DATA_KEPT_MS` in `hosted-server-service.ts`. A refunded and cancelled plan deletes the
+   server at once (step 7 of the plan flow).
 3. `sync` reinstalls the machine with `UBUNTU_26_04_64BIT`, which erases the disk, sets its reference
    to `pool`, and sets `operator_host = NULL` on the deleted row. The machine is free.
    Leaseweb shows the state `RUNNING` for the whole reinstall, so `sync` waits until SSH shows new
@@ -1670,7 +1740,11 @@ system and goes back to the pool for the next new server or the next move. The W
    ([A new server on a pool machine](#a-new-server-on-a-pool-machine)).
 
 A server that ended before migration 0053 gets `plan_ended_at` at the first cron run after the deploy,
-so its 30 days start then.
+so its 14 days start then.
+
+Before the Terms of 2026-11-19, the data was kept for 30 days. The maintainer decided on 2026-11-19
+that the 14 days also apply to a plan that ended before that date, with no 30-day grace. The first cron
+run after the deploy deletes each server whose plan ended 14 to 30 days before.
 
 Tested on 2026-11-12 with the test Worker, its D1 and one VPS in `AMS-01`: `add`, `status`, `sync`
 stop and start, the cron delete of a server whose plan ended 31 days before with a `canceled` Stripe
@@ -1706,12 +1780,12 @@ bunx dotenvx run -f apps/auth-api/.env.production -fk <root>/.env.keys -- \
 | `add <VPS ID>...` | Adds bought machines. It reads the location and the product from Leaseweb, and sets the reference `pool` when the machine has none. It refuses a machine with another reference. |
 | `remove <VPS ID>...` | Takes a free machine out of the pool, for example before its contract ends. It refuses a machine that a server has. |
 | `sync` | Stops OpenBot where a plan ended, starts it where the owner renewed, and reinstalls each machine of a deleted server. It reinstalls only a machine of the pool. It also sets the reference of each machine on which a new server started, and `pool` on each free machine with the old `pool-free` or an owner reference. It changes no other reference. |
-| `prepare <VPS ID>... --keys=<file> [--reinstall]` | Installs the newest release, disabled, on free machines, runs the bootstrap with the operator keys in `<file>`, restarts each machine, and offers it for a new server. A prepared machine with no server data and an older OpenBot gets the newest release (`move-from-boat.sh upgrade`); `move` does the same. A disabled OpenBot does not update itself, so run `prepare` again after each release. A free machine that has the data of a server (a start that failed) is skipped; `--reinstall` erases it first. |
+| `prepare <VPS ID>... [--keys=<file>] [--reinstall]` | Installs the newest release, disabled, on free machines, runs the bootstrap with the operator keys of the core server and of `<file>`, restarts each machine, and offers it for a new server. A prepared machine with no server data and an older OpenBot gets the newest release (`move-from-boat.sh upgrade`); `move` does the same. A disabled OpenBot does not update itself, so run `prepare` again after each release. A free machine that has the data of a server (a start that failed) is skipped; `--reinstall` erases it first. |
 | `move <server ID> <VPS ID \| auto> [--keys=<file>]` | Moves one server from boat to a free machine. See [Move a server from boat](#move-a-server-from-boat). It prepares the machine when necessary. The machine takes no new server from then on. `auto` selects the machine when the move starts, and takes the next one when a new customer gets it first. |
 
 `sync` connects as root over SSH with the key of the operator. Not confirmed: SSH from a server of the
-operator. One key of the computer that runs `prepare` or `move` must be in `--keys`: the bootstrap
-turns off the password, and the script refuses a list without such a key.
+operator. One key of the computer that runs `prepare` or `move` must be in the operator keys: the
+bootstrap turns off the password, and the script refuses a list without such a key.
 
 The OpenPanel dashboard "Server pool" (project `openbot`) shows the pool. Each 5 minutes, the
 production Worker sends one `hosted_pool_snapshot` event for each location and product and one with
@@ -1725,12 +1799,12 @@ A longer interval adds up more than one snapshot. The snapshot counts each machi
 | --- | --- |
 | `free` | No server. Ready for a move. `ready` counts the free machines that a new server can get now. |
 | `to_reinstall` | Its server is deleted. Free after the next `sync`. |
-| `plan_ended` | Its plan ended. Free 30 days after `plan_ended_at`, unless the owner renews. |
+| `plan_ended` | Its plan ended. Free 14 days after `plan_ended_at`, unless the owner renews. |
 | `cancel_scheduled` | The owner cancelled the plan at the period end, or scheduled a delete. |
 | `in_use` | Each other server. |
 
 `free_in_7d` and `free_in_30d` count the machines that are free in that time when no owner renews.
-A machine whose plan ends at the period end is free 30 days after that end. A plan that ended with a
+A machine whose plan ends at the period end is free 14 days after that end. A plan that ended with a
 subscription that Stripe still retries, or with no subscription, has no date: the cron does not delete
 that server. A server that names a machine that is not in the
 pool is in the group `unknown`: add the machine. When `ready` is 0 for a product, the next customer of
@@ -1740,17 +1814,72 @@ delete, the snapshot and its event on the real service with a fake Stripe and a 
 #### Pool alerts
 
 With the Worker secret `HOSTED_POOL_ALERT_WEBHOOK_URL` (a Discord webhook, HTTPS only), the Worker
-sends the operator one message:
+sends the operator one message for each event below.
+
+Each message is one line: an emoji and a bold word for the event, then the parts after a middle dot
+(` · `). An amount has the currency symbol and no cents when it is whole. The amount of one period adds
+`/mo` or `/yr`, such as `€30/mo` or `PLN 480/yr`. An amount that Stripe does not give shows as
+`amount not known (<currency>)`.
 
 | Event | Message | Action |
 | --- | --- | --- |
-| A purchase takes a machine and leaves 0 or 1 free machines of that product in that location | `Pool <location> <product>: <n> free machines left.` | Buy and `prepare` machines. |
-| A server starts on boat: no ready machine, the pool query failed, or its pool machine did not start it | `A <plan> server (<currency>, <server ID prefix>) starts on boat: <reason>.` | `move` it when a machine is ready. `leaseweb-pool.ts boat` lists it. |
-| A pool start is lost (no sign-in in 4 minutes) | `A <plan> server (<server ID prefix>) did not start on pool machine <host ID>. Prepare the machine again.` | `prepare --reinstall` the machine. |
+| A purchase takes a machine and leaves 0 or 1 free machines of that product in that location | `🔴 **Pool** <location> <product> · 0 free left` (`🟠` for 1) | Buy and `prepare` machines. |
+| A server starts on boat: no ready machine, the pool query failed, or its pool machine did not start it | `⛵ **Boat start** · <plan> server · <currency> · <server ID prefix> · <reason>` | `move` it when a machine is ready. `leaseweb-pool.ts boat` lists it. |
+| A pool start is lost (no sign-in in 4 minutes) | `🛠️ **Pool start lost** · <plan> server · <server ID prefix> · machine <host ID> · prepare it again` | `prepare --reinstall` the machine. |
+| A server plan starts (a new subscription) | ``🆕 **New** server · `<email>` · <plan> · <amount>`` | None. |
+| A license starts (a new subscription) | ``🆕 **New** license · `<email>` · <tier> · <n> users · <amount>`` | None. |
+| A subscription starts with a free trial | ``🧪 **Trial** <server or license> · `<email>` · ...`` | None. |
+| The owner cancels the renewal of a server plan or a license | ``🚪 **Cancelled** <server or license> · `<email>` · ... · ends <date>`` | None. |
+| The owner resumes that renewal | ``🔄 **Resumed** <server or license> · `<email>` · ...`` | None. |
+| A server plan or a license ends | ``⛔ **Ended** <server or license> · `<email>` · ... · <cancelled or not paid>`` | None. |
+| A paid Checkout page has a billing address in another country than the saved billing country | `🧾 **VAT check** · Checkout page <session ID> took the VAT of <country> (<treatment>), but its billing address is in <country>. ...` | Check the VAT of its invoice. |
+| Paid sales to consumers in other EU countries reach EUR 9,000 (net) in a calendar year, once a year | `🧾 **VAT limit** · in <year>, sales to consumers in other EU countries reached <amount> (net). ...` | Register for the EU One Stop Shop and charge the VAT of the buyer's country before EUR 10,000. |
 
-A message has no account, email or name. The boat message goes out only after the Worker stores the
-boat start, so a lost race, a retry of a boat attempt, or a pool change whose answer was lost sends
-nothing. A failed send logs one line and is not sent again. Without the secret there are no messages.
+A purchase message (the 6 rows with an email) and a payment message (below) have the email of the
+account, on a developer decision, so keep the webhook in a private channel. A pool message has no
+account, email or name. A VAT message is the text of its log line with the emoji; the log line stays
+plain.
+
+The same webhook also gets one payment message for each invoice line of a server plan or a license
+that is paid or that fails, and for each refund and dispute:
+
+| Event | Message |
+| --- | --- |
+| A paid renewal | ``💵 **Renewed** <server or license> · `<email>` · <product> · <amount>`` |
+| A paid adjustment | ``💵 **Paid** <server or license> · `<email>` · <product> · <amount> · adjustment`` |
+| A failed payment | ``⚠️ **Payment failed** <server or license> · `<email>` · <product> · <amount> · <Stripe reason>`` |
+| A refund | ``↩️ **Refunded** <server or license> · `<email>` · <product> · <amount>`` |
+| A refund that failed after it was counted | ``❗ **Refund failed** <server or license> · `<email>` · ...`` |
+| A dispute, and a lost dispute | ``🚨 **Disputed** ...``, ``🚨 **Dispute lost** ...`` |
+
+The product of a server plan is its plan, and of a license its number of users, such as `5 users`. The
+amount is the amount of the payment, the refund or the dispute. Only a renewal and a failed renewal have
+the period (`/mo` or `/yr`): the other amounts are not the amount of one period. An adjustment is a plan change or a
+manual invoice. The sales ledger sends the message (`BillingSales.processPending`, in the cron of each
+5 minutes), in the run that puts the fact in the OpenPanel ledger, so the message comes at most some
+minutes after the payment and one time. It needs `OPENPANEL_CLIENT_ID` and `OPENPANEL_CLIENT_SECRET`
+too. A first purchase sends no payment message: the start of its subscription already sent the `New`
+message. An imported payment, a $0 paid invoice (a trial start or a $0 proration) and a checkout step
+send no message either. An account that is gone shows as `unknown account`.
+`bun run test:billing-sale-alert` checks the messages.
+
+The amount of a purchase message is the list amount of one period, before a discount. A license at the
+bundle price adds `bundle`. A claim in `billing_webhook_events` stops a second message for one change:
+`openbot_purchase:<subscription ID>` for the start, `openbot_purchase_end:<subscription ID>` for the
+end, and `openbot_purchase_cancel:<subscription ID>:<canceled_at>` for a cancel. Two Stripe events can
+see one cancel at the same time; only the event that adds the claim sends. Stripe sets `canceled_at` to
+the time of each cancel request, so a later cancel of the same subscription has a new claim and sends
+again. A resume has no claim. A cancel or resume message goes out with the sync that stores the change, so a
+repeated event sends nothing. A cancel date that Stripe has for the subscription (`cancel_at`) is the
+date of the cancel message. One sync sends one message: a cancel that Stripe stores together with a
+change of plan or users sends no cancel message. A change of plan or users sends no purchase message.
+A server order with a license sends two messages, one for each subscription. A subscription that ends
+after its owner cancelled the renewal sends the cancel message and, later, the end message. A deleted
+server and a dispute end the plan at once. The reason is `not paid` when the last
+payment of the plan had failed, and `cancelled` in each other case. The boat message goes out only
+after the Worker stores the boat start, so a lost race, a retry of a boat attempt, or a pool change
+whose answer was lost sends nothing. A failed send logs one line and is not sent again. Without the
+secret there are no messages.
 The encrypted `apps/auth-api/.env.production` holds the URL, and `bun run api:deploy` sets it. The CI
 deploy keeps the value that the Worker has. To set only the secret:
 
@@ -1758,7 +1887,8 @@ deploy keeps the value that the Worker has. To set only the secret:
 cd apps/auth-api && bunx wrangler secret put HOSTED_POOL_ALERT_WEBHOOK_URL
 ```
 
-`bun run test:hosted-pool-assignment` checks the messages.
+`bun run test:hosted-pool-assignment` checks the pool messages, and `bun run test:purchase-alert` checks
+the purchase messages.
 
 ## Not confirmed
 
