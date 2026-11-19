@@ -365,6 +365,10 @@ function isConversationDelivery(value: unknown): boolean {
 
 export const ROUTINE_QUIET_ANSWER_ITEM_TYPE = "routine_quiet_answer";
 
+export function routineQuietStepsItemId(turnId: string): string {
+  return `${turnId}:quiet-steps`;
+}
+
 export const AGENT_WELCOME_ITEM_TYPE = "agent_welcome";
 
 export const CHANNEL_RESUME_ITEM_TYPE = "channel_resume";

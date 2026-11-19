@@ -30,6 +30,7 @@ import {
   expandRoutineRunGroups,
   groupRoutineRunMarkers,
   placeRoutineRunTurns,
+  quietRunStepsRow,
   type RoutineRunOpenState,
   routineRunToggleKey,
   routineRunTurnMessages,
@@ -153,7 +154,9 @@ export function createScrollStore(deps: ScrollStoreDeps) {
       if (message.kind === "thinking") {
         const rows = progressUpdates ? progressRows(message) : [];
         const showsSteps =
-          message.turnId && !thinkingRowHiddenTurns().has(message.turnId) && message.items?.some((item) => item.trim());
+          message.turnId &&
+          !thinkingRowHiddenTurns().has(message.turnId) &&
+          (message.items?.some((item) => item.trim()) || quietRunStepsRow(message));
         const turnRows = showsSteps ? [...rows, message] : rows;
         turnRowsList.push(turnRows);
         return deps.props.channel ? [] : turnRows;

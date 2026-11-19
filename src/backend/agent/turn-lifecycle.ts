@@ -93,6 +93,7 @@ import type { ProviderRuntime } from "./provider-runtime";
 import {
   answeredRequestId,
   isNoUpdateAnswer,
+  quietRunStepsMessage,
   quietTeammateDelivery,
   quietTeammateTurnDelivery,
   settleQuietChannelTurn,
@@ -2218,6 +2219,15 @@ export class TurnLifecycle {
         const paths = answerFilePaths(latestAssistant.text);
         if (paths.length > 0) yield* this.#hooks.attachAnswerFiles(agentId, snapshot, latestAssistant, paths);
       }
+      const quietRunSteps =
+        trace &&
+        quiet &&
+        quietTurn &&
+        deliveries.some(({ delivery }) => delivery.sender.kind === "routine") &&
+        traceMessage(snapshot.messages, turnId) === undefined
+          ? quietRunStepsMessage(turnId, trace)
+          : null;
+      if (quietRunSteps) snapshot.messages.push(quietRunSteps);
       if (trace) this.#attachTrace(snapshot.messages, agentId, turnId, trace);
       const memoryLine = memoryChangesMessage(turnId, memoryChanges, (text) => this.#hooks.redactMcp(text));
       if (memoryLine) snapshot.messages.push(memoryLine);
