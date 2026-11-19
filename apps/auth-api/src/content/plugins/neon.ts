@@ -1,9 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Neon here is taken from neon.com and from the tool list that
-// mcp.neon.tech publishes. Each page used is in `sources`. Check the sources again, and
-// move `checkedAt`, whenever this file changes.
-
 export const NEON_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

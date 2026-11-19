@@ -1,21 +1,14 @@
-/** A SwiftUI-style spring: `response` is the period in seconds, `dampingFraction` is from 0 to 1. */
 export interface Spring {
   response: number;
   dampingFraction: number;
 }
 
-/**
- * The island springs, as the product island, the voice morph and the Library pill use them: the island
- * opens with a small overshoot and closes with none. The content comes and goes on its own, shorter spring.
- */
 export const ISLAND_OPEN: Spring = { response: 0.5, dampingFraction: 0.8 };
 export const ISLAND_CLOSE: Spring = { response: 0.45, dampingFraction: 1 };
 export const ISLAND_CONTENT: Spring = { response: 0.34, dampingFraction: 0.88 };
 
-/** The ease-out curve for content that leaves the island. */
 export const EASE_OUT = "cubic-bezier(0.23, 1, 0.32, 1)";
 
-/** The progress of a spring from 0 to 1 at `time` seconds. A damping fraction of 1 does not overshoot. */
 export function springProgress(time: number, spring: Spring): number {
   const angularFrequency = (2 * Math.PI) / spring.response;
   const damping = spring.dampingFraction;
@@ -30,10 +23,6 @@ export function springProgress(time: number, spring: Spring): number {
   return 1 - envelope * (Math.cos(phase) + (damping * Math.sin(phase)) / Math.sqrt(1 - damping * damping));
 }
 
-/**
- * Samples one `response` of the spring into keyframes for a linear animation of that duration.
- * The progress is scaled so that the last sample is exactly 1.
- */
 export function springKeyframes(spring: Spring, frame: (progress: number) => Keyframe, sampleCount = 32): Keyframe[] {
   const finalProgress = springProgress(spring.response, spring);
   return Array.from({ length: sampleCount + 1 }, (_, index) => {
@@ -44,7 +33,6 @@ export function springKeyframes(spring: Spring, frame: (progress: number) => Key
   });
 }
 
-/** The x scale of a computed `transform`: `none` or `matrix(...)`. Other values give 1. */
 export function computedScale(transform: string): number {
   if (!transform || transform === "none") return 1;
   const match = transform.match(/^matrix\(([^,]+)/);
@@ -52,7 +40,6 @@ export function computedScale(transform: string): number {
   return Number.isFinite(scale) ? scale : 1;
 }
 
-/** The radius in pixels of the `blur()` in a computed `filter`, or 0 when it has none. */
 export function computedBlur(filter: string): number {
   if (!filter || filter === "none") return 0;
   const match = filter.match(/blur\(([-\d.]+)px\)/);

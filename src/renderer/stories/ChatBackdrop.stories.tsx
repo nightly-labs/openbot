@@ -28,7 +28,6 @@ const AGENT_MESSAGE: AgentMessage = {
   kind: "text",
 };
 
-/** Two chat rows over the backdrop, as the chat shows them. */
 function ChatRows() {
   const [agent] = STORY_AGENTS;
   return (
@@ -68,7 +67,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The built-in scenes behind the window. Each follows the Light or Dark theme of the story. */
 export const Pond = sceneStory("pond");
 export const Jellyfish = sceneStory("jellyfish");
 export const Sunset = sceneStory("sunset");
@@ -81,10 +79,6 @@ const AGENT_PAGE = withChatBackdropBubbles(
   AGENT_BUBBLES,
 );
 
-/**
- * A scene that an agent set with `set_backdrop`, with the bubble colors it gave. The reader's and the
- * agent's bubbles take them while that scene shows.
- */
 export const AgentSceneWithBubbles: Story = {
   render: () => (
     <>
@@ -96,7 +90,6 @@ export const AgentSceneWithBubbles: Story = {
   ),
 };
 
-/** The "Backdrop" control of Settings, with a backdrop that the user added and one that an agent set. */
 export const Setting: Story = {
   parameters: { layout: "padded" },
   render: () => {

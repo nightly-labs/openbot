@@ -15,18 +15,11 @@ import Svg, { Circle } from "react-native-svg";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
 
-// Between two reported percents the value glides for this long, so it never ticks.
 const GLIDE = 180;
 const EASE_OUT = cubicBezier(0.23, 1, 0.32, 1);
-/** How long a finished upload needs to settle. `useUploadReveal` keeps the upload view this long. */
 const UPLOAD_SETTLE_MS = GLIDE + 220;
-/** How far the blurred copy is blurred. Enough to hide detail, not so much that the shape goes. */
 export const UPLOAD_BLUR_RADIUS = 24;
 
-/**
- * The sent fraction of an upload, gliding between reports on the UI thread. The host reports
- * bytes that have left the phone, so the value is measured, not guessed.
- */
 export function useGlidingProgress(progress: number) {
   const reducedMotion = useReducedMotion();
   const value = useSharedValue(progress);
@@ -36,21 +29,11 @@ export function useGlidingProgress(progress: number) {
   return value;
 }
 
-/**
- * The style of the sharp image over its blurred copy. It is as opaque as the upload is complete,
- * so the photo comes into focus as it leaves the phone. Only opacity moves: the blur itself is a
- * static layer, and redrawing a blur every frame is what makes a phone stutter.
- */
 function useUploadRevealStyle(progress: number) {
   const value = useGlidingProgress(progress);
   return useAnimatedStyle(() => ({ opacity: value.get() }));
 }
 
-/**
- * The upload view of an image: the progress it shows, and the style of its sharp copy. The send
- * can finish before the view has settled, so a finished upload shows as complete for that long,
- * and the photo finishes coming into focus instead of jumping to sharp in one frame.
- */
 export function useUploadReveal(upload: number | undefined) {
   const [lingering, setLingering] = useState(false);
   useEffect(() => {
@@ -76,7 +59,6 @@ const CROSSFADE: CSSTransitionProperties = {
   transitionTimingFunction: EASE_OUT,
 };
 
-/** A small circle beside a file that fills as it uploads, and becomes a check when it is done. */
 export function UploadProgressCircle({ progress }: { progress: number }) {
   const { t } = useText();
   const [accent, track] = useThemeColor(["accent", "border"]);
@@ -84,7 +66,6 @@ export function UploadProgressCircle({ progress }: { progress: number }) {
   const done = progress >= 1;
   const arcProps = useAnimatedProps(() => ({
     strokeDashoffset: CIRCLE_LENGTH * (1 - value.get()),
-    // A round cap draws a dot even for an empty arc, so the arc waits for the first byte.
     strokeOpacity: value.get() > 0.002 ? 1 : 0,
   }));
   return (
@@ -99,7 +80,6 @@ export function UploadProgressCircle({ progress }: { progress: number }) {
       <Animated.View
         style={{ position: "absolute", opacity: done ? 0 : 1, transform: [{ scale: done ? 0.9 : 1 }], ...CROSSFADE }}
       >
-        {/* Turned a quarter, so the arc starts at the top and runs clockwise. */}
         <Svg width={CIRCLE_SIZE} height={CIRCLE_SIZE} style={{ transform: [{ rotate: "-90deg" }] }}>
           <Circle
             cx={CIRCLE_SIZE / 2}

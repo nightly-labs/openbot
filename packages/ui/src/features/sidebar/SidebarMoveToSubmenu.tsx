@@ -1,13 +1,3 @@
-/**
- * The "Move to" submenu, shared by the agent and the channel menus. `currentSectionId` is the
- * menu's own answer - null when the chat sits in no custom section, which is what draws the tick
- * beside "Unassigned". The scope's `assignedSectionId` answers a different question for the drag
- * measurements, and falls back to the unassigned section instead of null.
- *
- * This is the keyboard route to what dragging a row does with the pointer, so it has to reach every
- * kind of row a section can hold.
- */
-
 import { Check, ChevronRight, ContextMenu, Folder, FolderInput, FolderPlus } from "@openbot/ui";
 import { For, Show } from "solid-js";
 import { useText } from "../../text";
@@ -23,7 +13,6 @@ export function SidebarMoveToSubmenu(menuProps: { chatId: string }) {
     startCreateSection,
     visibleSectionIds,
   } = useSidebarScope();
-  /** The folders in list order, so a folder in a folder follows its parent. */
   const folderIds = () => visibleSectionIds().filter((sectionId) => customSectionById().has(sectionId));
   const { t } = useText();
   const currentSectionId = () =>

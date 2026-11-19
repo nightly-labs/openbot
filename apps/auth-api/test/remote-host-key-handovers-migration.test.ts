@@ -33,7 +33,6 @@ describe("remote host key handover migration", () => {
     database.exec(migration("0039_remote_host_key_handovers.sql"));
 
     expect(snapshot(database)).toEqual(before);
-    // The old Worker's host registration and Mobile Connect writes still run.
     database.exec(`
       UPDATE remote_hosts SET device_public_key = 'key-b', auth_epoch = auth_epoch + 1, updated_at = 2
        WHERE host_id = 'host-1' AND owner_user_id = 'owner';
@@ -49,7 +48,6 @@ describe("remote host key handover migration", () => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     insert.run("h-1", "host-1", 10, "key-b", "key-c", "sig-b", "sig-c", 3);
-    // A step to the same key, a repeated step, and a step for a host that does not exist are refused.
     expect(() => insert.run("h-2", "host-1", 11, "key-c", "key-c", "sig-c", "sig-c2", 4)).toThrow();
     expect(() => insert.run("h-3", "host-1", 12, "key-b", "key-c", "sig-b2", "sig-c", 4)).toThrow();
     expect(() => insert.run("h-4", "missing", 12, "key-c", "key-d", "sig-c", "sig-d", 4)).toThrow();
@@ -61,7 +59,6 @@ describe("remote host key handover migration", () => {
         .all("host-1"),
     ).toEqual([{ handover_id: "h-1" }]);
 
-    // A host that the old Worker deletes takes its handovers with it, and an account takes its hosts.
     database.exec("DELETE FROM remote_hosts WHERE host_id = 'host-2'");
     expect(database.prepare("SELECT handover_id FROM remote_host_key_handovers").all()).toEqual([
       { handover_id: "h-1" },

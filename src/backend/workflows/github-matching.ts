@@ -1,12 +1,3 @@
-/**
- * GitHub events as GitHub triggers read them, without the database: which trigger events one App
- * event is, whether the filters of a trigger let it through, and the text that the trigger gives the
- * next steps.
- *
- * The body comes from Signal, which checked the App's signature, but it is still read as untrusted
- * data: a value of the wrong shape makes the event match nothing.
- */
-
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   isGitHubRepositoryName,
@@ -29,47 +20,25 @@ import {
 } from "@openbot/contracts/runtime-values";
 import { EXTERNAL_EVENT_END, EXTERNAL_EVENT_START } from "../webhook-trigger";
 
-/** The parts of one GitHub event that the triggers, the loop guard and the run text read. */
 export interface GitHubEventFacts {
-  /** `owner/name`, as GitHub spells it. */
   repository: string;
-  /** The trigger events that this one event is. A comment that mentions the bot is two. */
   events: WorkflowGitHubEvent[];
   item: WorkflowGitHubItem;
-  /** The login that caused the event. */
   actor: string;
-  /** Whether the actor is a bot account. */
   actorIsBot: boolean;
-  /**
-   * Whether the author is a bot account. For a comment or a review, it is their author; for every other
-   * event, the item's author. A check suite names no author, so it is false there.
-   */
   authorIsBot: boolean;
-  /** Whether the actor is the OpenBot GitHub App's own bot. */
   causedByBot: boolean;
-  /** GitHub's `author_association` of the comment, review or item. */
   association: string | null;
-  /** The labels that the item has now. */
   labels: string[];
-  /** The label that `issue.labeled` added. */
   label: string | null;
-  /** The base branch of a pull request. */
   baseBranch: string | null;
-  /** What the event changed, as a GitHub output records it (`githubObjectKey`), for the loop guard. */
   objectKey: string | null;
-  /** The data that the run text carries. Bounded; no GitHub token or header is in it. */
   data: DynamicRecord;
 }
 
-/** The text of an item or a comment that the run text keeps. A longer one is cut. */
 const BODY_LIMIT = 16_000;
-/** The length of each string when the whole event does not fit the run payload. */
 const SHORT_TEXT_LIMIT = 1_000;
 
-/**
- * The key that a GitHub output keeps for what it changed, and that the event of that change carries.
- * The two must agree, so the loop guard can tell that an event came from a step of the same workflow.
- */
 export function githubObjectKey(
   change:
     | { kind: "comment" | "review"; id: number }
@@ -95,11 +64,6 @@ export function githubObjectKey(
   }
 }
 
-/**
- * The facts of one App event, or null when no trigger can start on it, such as `ping`, an action that
- * no trigger event names, or a body of the wrong shape. `bot` is the App's slug; its bot's login is
- * `<slug>[bot]`.
- */
 export function githubEventFacts(name: string, body: unknown, bot: string | null): GitHubEventFacts | null {
   if (!isDynamicRecord(body)) return null;
   const repository = record(body.repository);
@@ -246,7 +210,6 @@ export function githubEventFacts(name: string, body: unknown, bot: string | null
     const suite = record(body.check_suite);
     const conclusion = text(suite?.conclusion);
     if (action !== "completed" || !suite || !isOneOf(FAILED_CHECKS, conclusion)) return null;
-    // A check suite names its pull requests without their titles; the first one is the item.
     const pull = Array.isArray(suite.pull_requests) ? record(suite.pull_requests[0]) : null;
     const number = pull?.number;
     if (!pull || !isPositiveInteger(number)) return null;
@@ -274,19 +237,16 @@ export function githubEventFacts(name: string, body: unknown, bot: string | null
   return null;
 }
 
-/** Whether the filters of a trigger refuse the event. */
 export function githubFilterRefuses(node: WorkflowNode, facts: GitHubEventFacts): boolean {
   const event = node.fields.event;
   const filters = new Set(workflowListField(node.fields.filters));
   const labels = workflowListField(node.fields.labels).map((label) => label.toLowerCase());
-  // A bot that acts on a person's item is refused too, so that two bots cannot start runs on each other.
   if (filters.has("notBot") && (facts.actorIsBot || facts.authorIsBot)) return true;
   if (filters.has("firstTime") && !isOneOf(FIRST_TIME_ASSOCIATIONS, facts.association)) return true;
   if (filters.has("title")) {
     const wanted = (isString(node.fields.titleText) ? node.fields.titleText : "").trim().toLowerCase();
     if (wanted && !facts.item.title.toLowerCase().includes(wanted)) return true;
   }
-  // The base branch is a filter of pull request events only.
   if (
     filters.has("branch") &&
     isOneOf(WORKFLOW_GITHUB_EVENTS, event) &&
@@ -296,24 +256,17 @@ export function githubFilterRefuses(node: WorkflowNode, facts: GitHubEventFacts)
     if (wanted && facts.baseBranch !== wanted) return true;
   }
   if (labels.length > 0) {
-    // On "Issue labeled", the list is the labels that start a run. On other events, the item must have one.
     if (event === "issue.labeled") return !facts.label || !labels.includes(facts.label.toLowerCase());
     if (!facts.labels.some((label) => labels.includes(label.toLowerCase()))) return true;
   }
   return false;
 }
 
-/** The repositories of a GitHub trigger, in its order; empty when it has none or is not one. */
 export function githubTriggerRepositories(node: WorkflowNode): string[] {
   if (node.kind !== "trigger" || node.fields.trigger !== "github") return [];
   return workflowGitHubTriggerRepositories(node.fields);
 }
 
-/**
- * The graph without a repository list that an older client left behind: one that changed `repository` and
- * kept `repositories`. The host removes it on each save, so a later change back to its first name does not
- * watch the old list again.
- */
 export function withoutStaleGitHubRepositories(graph: WorkflowGraph): WorkflowGraph {
   const stale = (node: WorkflowNode) =>
     node.kind === "trigger" &&
@@ -331,7 +284,6 @@ export function withoutStaleGitHubRepositories(graph: WorkflowGraph): WorkflowGr
   };
 }
 
-/** Whether a GitHub trigger starts on this event of one of its repositories. */
 export function githubTriggerMatches(node: WorkflowNode, facts: GitHubEventFacts): boolean {
   const repository = facts.repository.toLowerCase();
   return (
@@ -341,10 +293,6 @@ export function githubTriggerMatches(node: WorkflowNode, facts: GitHubEventFacts
   );
 }
 
-/**
- * The output of a GitHub trigger: the event as framed data, as a webhook trigger's, so the steps after
- * it read it as data and not as instructions.
- */
 export function workflowGitHubPayload(
   nodeId: string,
   deliveryId: string,
@@ -354,7 +302,6 @@ export function workflowGitHubPayload(
 ): string {
   const full = framedPayload(nodeId, deliveryId, event, facts, facts.data, receivedAt);
   if (full.length <= INPUT_LIMITS.workflowWebhookPayload) return full;
-  // Text that JSON escapes a lot can pass the limit; each string is then cut shorter.
   return framedPayload(nodeId, deliveryId, event, facts, shortened(facts.data), receivedAt);
 }
 
@@ -393,7 +340,6 @@ function mentionPattern(bot: string): RegExp {
   return new RegExp(`(^|[^A-Za-z0-9_/-])@${escaped}(?![A-Za-z0-9_-])`, "iu");
 }
 
-/** The data with each string cut to a length that keeps the payload under the limit. */
 function shortened(data: DynamicRecord): DynamicRecord {
   return Object.fromEntries(Object.entries(data).map(([key, entry]) => [key, shortEntry(entry)]));
 }

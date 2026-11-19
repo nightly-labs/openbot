@@ -2,7 +2,6 @@ import { articleGradient, articleGradientCss, articleGradientUniforms } from "@o
 import type { ShaderMount } from "@paper-design/shaders";
 import { createEffect } from "solid-js";
 
-/** Uses the same stable mesh profile as the public article artwork. */
 export function SkillGradient(props: { name: string }) {
   let host: HTMLDivElement | undefined;
   createEffect(

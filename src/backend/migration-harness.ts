@@ -1,14 +1,3 @@
-// The shared migration test harness. Tests only: no product code imports it.
-//
-// It builds a database at any shipped schema, puts representative rows in every table, upgrades it, and
-// says what the upgrade must keep. `released-schema-upgrade-migration.test.ts` runs it from every shipped
-// release; `openbot-database-schema-parity.test.ts` and `scripts/migration-large-db-e2e.ts` use its parts.
-//
-// The released schemas come from the release tags (`scripts/released-schema-fixtures.ts` writes
-// `released-schemas/releases.json`), not from this build. A migration that changes rows adds a function
-// to `ROW_CHANGES` below that makes the same change on the rows that the test reads before the upgrade.
-// See "Database migrations" in `src/backend/AGENTS.md`.
-
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { DatabaseSync, type SQLInputValue, type SQLOutputValue } from "node:sqlite";
@@ -17,11 +6,8 @@ import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-
 import { Schema } from "effect";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
-/** The applied time of every harness migration, so that two runs make the same rows. */
 export const HARNESS_APPLIED_AT = "2026-11-01T09:00:00.000Z";
 
-// Each list is a change of the same list in the entry before: `[start, end]` stands for its items
-// `start` to `end - 1` (`scripts/released-schema-fixtures.ts`).
 const Changes = <Item extends Schema.Constraint>(item: Item) =>
   Schema.Array(Schema.Union([item, Schema.Tuple([Schema.Number, Schema.Number])]));
 const ReleasedSchema = Schema.Struct({ migrations: Changes(Schema.Number), objects: Changes(Schema.String) });
@@ -41,18 +27,11 @@ function applyChanges<Item extends number | string>(
 }
 
 export interface ReleasedDatabaseCase {
-  /** For example "v0.3.0 new install (schema 10)". */
   readonly name: string;
-  /** The `schema_migrations` versions that the release wrote. */
   readonly migrations: readonly number[];
-  /** The statements that make the schema, in the order that SQLite stores them. */
   readonly statements: readonly string[];
 }
 
-/**
- * Two databases for each release that changed them: the database of a new install, and the database of
- * an install that upgraded through every release from v0.1.12.
- */
 export function releasedDatabaseCases(): readonly ReleasedDatabaseCase[] {
   const file = Schema.decodeUnknownSync(ReleasedSchemas)(
     JSON.parse(readFileSync(join(import.meta.dirname, "released-schemas", "releases.json"), "utf8")),
@@ -87,7 +66,6 @@ export function releasedDatabaseCases(): readonly ReleasedDatabaseCase[] {
   });
 }
 
-/** Opens a database with the settings of `database-core.ts` that a migration can see. */
 export function openHarnessDatabase(path = ":memory:"): DatabaseSync {
   const db = new DatabaseSync(path);
   if (path !== ":memory:") db.exec("PRAGMA journal_mode = WAL");
@@ -97,7 +75,6 @@ export function openHarnessDatabase(path = ":memory:"): DatabaseSync {
   return db;
 }
 
-/** Makes the database that a release made, with no rows except its `schema_migrations` versions. */
 export function buildReleasedDatabase(db: DatabaseSync, released: ReleasedDatabaseCase): void {
   for (const sql of released.statements) db.exec(sql);
   const hasAppliedAt = query(db, "PRAGMA table_info(schema_migrations)").some((row) => row.name === "applied_at");
@@ -112,10 +89,6 @@ export function buildReleasedDatabase(db: DatabaseSync, released: ReleasedDataba
   }
 }
 
-/**
- * Makes an upgraded database at `version` with the migrations of this build. A real database at that
- * version has the same schema, because a shipped migration does not change (the history test).
- */
 export function buildDatabaseAtVersion(db: DatabaseSync, version: number): void {
   db.exec("CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)");
   migrateOpenBotDatabase(db, { appliedAt: HARNESS_APPLIED_AT, throughVersion: version });
@@ -125,20 +98,9 @@ export function latestAppliedVersion(db: DatabaseSync): number {
   return readAppliedVersions(db).at(-1) ?? 0;
 }
 
-// ---------------------------------------------------------------------------------------------------
-// Rows
-
-/** Each user table, with its columns and rows in storage order. */
 export type TableRows = Map<string, { readonly columns: readonly string[]; rows: Record<string, SQLOutputValue>[] }>;
 
-/**
- * Values that make a migration do its work. Each one sets only columns that the table has. The other
- * columns get generic values: an enum value from the CHECK list, JSON for a JSON column, a time for a
- * `*_at` column, the parent row's key for a foreign key, NULL in the first row for a nullable column.
- */
 const ROW_VALUES: Record<string, { readonly count: number; readonly values: (row: number) => DynamicRecord }> = {
-  // Migration 39 deletes event 0, because event 1 of the same thread repeats it. Migration 8 keeps the
-  // last snapshot of each thread and the last mailbox event.
   orchestration_events: {
     count: 4,
     values: (row) => {
@@ -152,21 +114,16 @@ const ROW_VALUES: Record<string, { readonly count: number; readonly values: (row
       return { aggregate_type: "thread", aggregate_id: "thread_id-0", ...events[row] };
     },
   },
-  // A receipt for each event's command, so that only the receipt of a deleted event is an orphan.
   orchestration_command_receipts: {
     count: 4,
     values: (row) => ({ first_sequence: row + 1, last_sequence: row + 1 }),
   },
-  // The activity of event 0, which migration 39 deletes with it.
   projection_thread_activities: {
     count: 2,
     values: (row) => (row === 0 ? { activity_type: "conversation.mailbox-reconciled", last_event_sequence: 1 } : {}),
   },
-  // Migrations 9, 10, 11 and 14 end each active provider session.
   projection_provider_sessions: { count: 2, values: (row) => (row === 0 ? { state: "active" } : {}) },
-  // Migration 21 renames a server that has the name of Computer Use.
   projection_mcp_servers: { count: 2, values: (row) => (row === 0 ? { name: "Computer_Use" } : {}) },
-  // One proxy of each kind; a CHECK ties each kind to its columns.
   browser_proxies: {
     count: 2,
     values: (row) =>
@@ -174,17 +131,13 @@ const ROW_VALUES: Record<string, { readonly count: number; readonly values: (row
         ? { kind: "address", scheme: "socks5", host: "proxy.example", port: 1080, member_id: null }
         : { kind: "computer", scheme: null, host: null, port: null, username: null, password: null },
   },
-  // An edge joins two nodes of one workflow, so both nodes are in the first workflow.
   workflow_nodes: { count: 2, values: () => ({ workflow_id: "workflow_id-0" }) },
-  // Each kind has one source, and Stripe is the only kind.
   crm_sources: { count: 1, values: () => ({}) },
 };
 
-/** Puts rows in every user table. Throws with the table name when a table takes no row. */
 export function seedEveryTable(db: DatabaseSync): void {
   const tables = userTables(db);
   for (const table of foreignKeyOrder(db, tables)) {
-    // A trigger can fill a table (a memory adds its selection). Those rows are representative already.
     if (count(query(db, `SELECT COUNT(*) AS n FROM ${quote(table)}`)[0] ?? {}, "n") > 0) continue;
     seedTable(db, table);
   }
@@ -202,7 +155,6 @@ function seedTable(db: DatabaseSync, table: string): void {
     .map((row) => ({
       name: text(row, "name"),
       type: text(row, "type").toUpperCase(),
-      // SQLite lets a TEXT primary key hold NULL; a key column gets a value, as it does in the app.
       notNull: count(row, "notnull") === 1 || count(row, "pk") > 0,
     }));
   const constraints = readColumnConstraints(tableSql(db, table));
@@ -223,7 +175,6 @@ function seedTable(db: DatabaseSync, table: string): void {
           const useNull = !column.notNull && (nulls === "always" || (nulls === "first row" && row === 0));
           values[column.name] = useNull ? null : genericValue(column, row, enumShift, constraints.get(column.name));
         }
-        // Two keys to the same table (an edge from one node to another) take different parent rows.
         const seen = new Map<string, number>();
         const filled = new Set<string>();
         for (const foreignKey of foreignKeys) {
@@ -262,9 +213,6 @@ interface ColumnConstraint {
 const IDENTIFIER = String.raw`["\x60[]?(\w+)["\x60\]]?`;
 const LITERAL = String.raw`(?:'(?:[^']|'')*'|-?\d+)`;
 
-// Reads the CHECK rules that a generic value must meet. The patterns cover the rules of every shipped
-// schema; a new rule that they miss makes `seedTable` throw, and the fix is a pattern here or a value
-// in ROW_VALUES.
 function readColumnConstraints(sql: string): Map<string, ColumnConstraint> {
   const constraints = new Map<string, ColumnConstraint>();
   const of = (name: string): ColumnConstraint => {
@@ -331,7 +279,6 @@ function genericValue(
   return base;
 }
 
-// Keeps the row number, so that each row stays unique.
 function fitLength(name: string, row: number, length: number, exact: boolean): string {
   const suffix = `-${row}`;
   const value = `${name.slice(0, Math.max(0, length - suffix.length))}${suffix}`.slice(-length);
@@ -365,13 +312,11 @@ function fillForeignKey(
   row: number,
   filled: ReadonlySet<string>,
 ): void {
-  // A row with a NULL in a key column refers to nothing.
   if (foreignKey.from.some((column) => values[column] === null)) return;
   const parentColumns = foreignKey.to.some((column) => column === null)
     ? primaryKeyColumns(db, foreignKey.parent)
     : foreignKey.to.filter(isString);
   if (foreignKey.parent === table) {
-    // A row can refer to itself; NULL is the plain case where the column takes it.
     const nullable = foreignKey.from.every((column) => !columns.find((info) => info.name === column)?.notNull);
     foreignKey.from.forEach((column, index) => {
       values[column] = nullable ? null : (values[parentColumns[index] ?? ""] ?? null);
@@ -382,7 +327,6 @@ function fillForeignKey(
     db,
     `SELECT ${parentColumns.map(quote).join(", ")} FROM ${quote(foreignKey.parent)} ORDER BY rowid`,
   );
-  // A column that an earlier key set (the workflow of both nodes of an edge) limits the parent rows.
   const matching = parents.filter((candidate) =>
     foreignKey.from.every(
       (column, index) => !filled.has(column) || candidate[parentColumns[index] ?? ""] === values[column],
@@ -417,7 +361,6 @@ function foreignKeyOrder(db: DatabaseSync, tables: readonly string[]): readonly 
   return ordered;
 }
 
-/** The tables that hold user data: not `schema_migrations`, not a full-text index or its shadow tables. */
 function userTables(db: DatabaseSync): readonly string[] {
   return query(
     db,
@@ -434,7 +377,6 @@ function tableSql(db: DatabaseSync, table: string): string {
   return row ? text(row, "sql") : "";
 }
 
-/** Every row of every user table, in storage order. */
 export function readTableRows(db: DatabaseSync): TableRows {
   const tables: TableRows = new Map();
   for (const table of userTables(db)) {
@@ -453,12 +395,8 @@ function readRows(db: DatabaseSync, table: string, columns: readonly string[]): 
     .map((row) => Object.fromEntries(columns.map((column) => [column, row[column] ?? null])));
 }
 
-// ---------------------------------------------------------------------------------------------------
-// What an upgrade must do to the rows
-
 interface RowChangeContext {
   readonly appliedAt: string;
-  /** Tables whose rows the migration changes in a way that this harness does not model. */
   readonly unchecked: Set<string>;
 }
 
@@ -479,14 +417,7 @@ function deleteOrphanReceipts(tables: TableRows): void {
   receipts.rows = receipts.rows.filter((row) => commands.has(row.command_id));
 }
 
-/**
- * The change that each migration makes to existing rows, written from what the migration promises. A
- * migration that only adds tables, columns or indexes needs no entry: the harness checks that every row
- * and value stays.
- */
 const ROW_CHANGES: Record<number, RowChange> = {
-  // The baseline compacts the event history and fills the read state. `pre-registry-schema-migration.test.ts`
-  // checks those rows; here they are not compared. Old reactions become reactions of the user.
   8: (tables, { unchecked }) => {
     for (const table of [
       "orchestration_events",
@@ -521,8 +452,6 @@ const ROW_CHANGES: Record<number, RowChange> = {
       })),
     });
   },
-  // Renames generated `bot-` agent ids in every text column. The seeds have no such id, so no row changes;
-  // `agent-workspace-root-migration.test.ts` covers the rename.
   13: (tables) => {
     const generated = tables.get("projection_agents")?.rows.filter((row) => String(row.agent_id).startsWith("bot-"));
     if (generated?.length) throw new Error("The harness does not model migration 13 for `bot-` agent ids.");
@@ -539,7 +468,6 @@ const ROW_CHANGES: Record<number, RowChange> = {
       row.name = name;
     }
   },
-  // Deletes a reconcile event that the next event of its thread repeats, its activity and its receipt.
   39: (tables) => {
     const events = tables.get("orchestration_events");
     if (!events) return;
@@ -566,7 +494,6 @@ const ROW_CHANGES: Record<number, RowChange> = {
     }
     deleteOrphanReceipts(tables);
   },
-  // Each task whose thread exists becomes an archived side thread; the task table goes.
   47: (tables) => {
     const tasks = tables.get("projection_agent_tasks");
     tables.delete("projection_agent_tasks");
@@ -609,11 +536,9 @@ const ROW_CHANGES: Record<number, RowChange> = {
 export interface ExpectedRows {
   readonly tables: TableRows;
   readonly unchecked: ReadonlySet<string>;
-  /** Tables that the upgrade must remove. */
   readonly dropped: readonly string[];
 }
 
-/** The rows that an upgrade from `fromVersion` to `toVersion` must leave, from the rows before it. */
 export function expectedRowsAfterUpgrade(
   before: TableRows,
   fromVersion: number,
@@ -624,17 +549,12 @@ export function expectedRowsAfterUpgrade(
     [...before].map(([table, { columns, rows }]) => [table, { columns, rows: rows.map((row) => ({ ...row })) }]),
   );
   const context: RowChangeContext = { appliedAt, unchecked: new Set() };
-  // A database from before the registry (versions 3 to 6) runs the baseline, version 8.
   for (let version = Math.max(fromVersion + 1, 8); version <= toVersion; version += 1) {
     ROW_CHANGES[version]?.(tables, context);
   }
   return { tables, unchecked: context.unchecked, dropped: [...before.keys()].filter((table) => !tables.has(table)) };
 }
 
-/**
- * The rows of each checked table, sorted, read from `db` with the columns of `expected`. A test compares
- * it with `sortedRows(expected)`: the same value means every row and value is there.
- */
 export function actualRows(db: DatabaseSync, expected: ExpectedRows): Record<string, readonly string[]> {
   const present = new Set(userTables(db));
   return Object.fromEntries(
@@ -668,10 +588,6 @@ function sortRows(rows: readonly Record<string, SQLOutputValue>[], columns: read
     .sort();
 }
 
-// ---------------------------------------------------------------------------------------------------
-// Health and schema
-
-/** The problems that `integrity_check`, `foreign_key_check` and the full-text index check find. */
 export function healthProblems(db: DatabaseSync): readonly string[] {
   const problems = query(db, "PRAGMA integrity_check")
     .map((row) => text(row, "integrity_check"))
@@ -763,10 +679,6 @@ export interface Declaration {
   readonly sql: readonly string[];
 }
 
-// The PRAGMAs above cannot express a partial index's WHERE clause or a CHECK
-// constraint, so the declarations are compared too - normalized, because a
-// migration that rewrites a table leaves SQLite's own rendering of the DDL
-// behind rather than the text the schema was written with.
 export function readNormalizedDeclarations(database: DatabaseSync): readonly Declaration[] {
   return query(
     database,
@@ -781,17 +693,6 @@ export function readNormalizedDeclarations(database: DatabaseSync): readonly Dec
   }));
 }
 
-// SQLite stores a CREATE statement close to how it was written, so this text is
-// as much a record of the author's formatting as of the schema. A new install of an
-// older release declared a table from a different piece of source (its separate latest
-// schema) than the migration that produced it, so comparing the text would go red on a
-// space before a comma, `TEXT` against `text`, `x > 0` against `x>0` or a comment
-// only one side carries, none of which any caller can observe. Comparing the
-// token sequence instead drops formatting entirely and keeps what a caller can
-// observe: the identifiers, keywords, operators and literals, in order.
-//
-// A string literal keeps its case, because a DEFAULT 'grok' is data rather than
-// syntax, and IF NOT EXISTS is dropped because only one path writes it.
 function tokenizeSql(sql: string): readonly string[] {
   const tokens: string[] = [];
   let index = 0;
@@ -859,8 +760,6 @@ function withoutIfNotExists(tokens: readonly string[]): readonly string[] {
   return kept;
 }
 
-// A quoted run ends at its closing delimiter, which a doubled delimiter escapes.
-// Returns the offset just past it.
 function closingQuote(sql: string, start: number, closing: string): number {
   let index = start + 1;
   while (index < sql.length) {
@@ -878,10 +777,6 @@ export function readAppliedVersions(database: DatabaseSync): readonly number[] {
   return query(database, "SELECT version FROM schema_migrations ORDER BY version").map((row) => count(row, "version"));
 }
 
-// `schema_migrations` is excluded from the comparisons: the upgraded fixture has
-// to create that table itself to reach the migration path, so its declaration is
-// the fixture's rather than the product's. Its contents are asserted instead,
-// which an older release wrote for a new install without running the migrations.
 function readTableNames(database: DatabaseSync): readonly string[] {
   return query(
     database,

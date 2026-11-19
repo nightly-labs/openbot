@@ -40,10 +40,6 @@ const METHOD_TEXT = {
 
 const EXPIRY_FORMAT = { month: "short", day: "numeric", hour: "numeric", minute: "numeric" } as const;
 
-/**
- * Server sheet > Members > Invite people: an email invitation, a one-time link or a permanent link.
- * The header action sends or creates it. The links that still work are below, and a tap revokes one.
- */
 export function ServerInviteScreen() {
   const { t, format, errorMessage } = useText();
   const { theme } = useUniwind();
@@ -259,7 +255,6 @@ export function ServerInviteScreen() {
             disclosure={false}
             disabled={inviteUsed}
             onPress={() =>
-              // The share sheet is the user's own action: closing it is not a failure.
               void Share.share(isIOS ? { url: created.inviteUrl } : { message: created.inviteUrl }).catch(
                 () => undefined,
               )

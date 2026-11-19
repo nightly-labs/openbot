@@ -40,7 +40,6 @@ export const messages = {
   "update.scheduled.cancel": "Güncellemeyi iptal et",
   "update.scheduled.cancelFailed": "Güncelleme iptal edilemedi.",
 
-  // Bu bilgisayarın kullanıcısının istediği yeniden başlatma. Hiçbir çalışma kalmayana kadar bekler.
   "update.idleRestart.relaunchTitle": "Ajanlar boştayken OpenBot yeniden başlatılır",
   "update.idleRestart.updateTitle": "Ajanlar boştayken OpenBot güncellemeyi yükler",
   "update.idleRestart.description": "Yeni rutin çalıştırmaları yeniden başlatmaya kadar bekler.",

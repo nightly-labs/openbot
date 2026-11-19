@@ -20,8 +20,6 @@ export function PrivacySettingsScreen() {
     setRetryValue(null);
     void saveAnalyticsPreference(enabled).then(
       () => {
-        // The account keeps the answer for the user's other devices. A failed send stays marked,
-        // and the next profile refresh or start sends it again.
         if (session) void sendAnalyticsChoice().catch(() => undefined);
       },
       () => {

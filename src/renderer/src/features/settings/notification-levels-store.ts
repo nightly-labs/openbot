@@ -14,37 +14,27 @@ import { createEffect, createMemo, createStore, onSettled } from "solid-js";
 import { serverSupportsCapability } from "../servers/server-capabilities";
 import { settingsPort } from "./settings-port";
 
-/** What the Notifications tab read from one server. */
 interface ServerLevelsEntry {
   status: "loading" | "failed" | "ready";
   agents: ClientAgentSummary[];
   levels: AgentNotificationLevelsSnapshot | null;
 }
 
-/** A joined server must be online to answer. The server of this computer always answers. */
 function serverOffline(server: ServerSummary): boolean {
   return server.kind === "remote" && server.state !== "online";
 }
 
-/** The server keeps the levels of the user for all devices: this computer, or a host with the capability. */
 function serverKeepsLevels(server: ServerSummary): boolean {
   return serverSupportsCapability(server, AGENT_NOTIFICATION_LEVELS_CAPABILITY);
 }
 
-/**
- * The agents and the user's own levels of each server, for Settings › Notifications. The tab reads
- * them each time it shows, because another device of the user can change them, and reads a server
- * again when it comes online.
- */
 export function createNotificationLevelsStore(options: {
   visible: () => boolean;
   servers: () => readonly ServerSummary[];
 }) {
   const [entries, setEntries] = createStore<Record<string, ServerLevelsEntry>>({});
-  /** Bumped for each read of a server, so an answer of an earlier read is dropped. */
   const generations = new Map<string, number>();
 
-  // A change on another device of the user, such as the phone, shows at once.
   onSettled(() =>
     settingsPort().agent.onScopedEvent((scoped) => {
       if (scoped.event.type !== "agent-notification-levels-changed") return;
@@ -81,8 +71,6 @@ export function createNotificationLevelsStore(options: {
     }
   }
 
-  // The online servers while the tab shows. A server that joins the list is read; closing the tab
-  // empties the list, so the next opening reads every server again.
   const onlineServerIds = createMemo(() =>
     options.visible()
       ? options
@@ -113,7 +101,6 @@ export function createNotificationLevelsStore(options: {
       agents: entry.agents.map((agent) => ({
         id: agent.id,
         name: agent.name,
-        // Only the short title: a long description would change the height of the row.
         detail: agent.title,
         avatarSeed: agent.avatarSeed,
         avatarHue: agent.avatarHue,
@@ -123,7 +110,6 @@ export function createNotificationLevelsStore(options: {
     };
   }
 
-  /** The rows of the matrix, in the order of the server rail: this computer first. */
   const matrixServers = createMemo((): NotificationMatrixServer[] =>
     [
       ...options.servers().filter((server) => server.kind === "local"),
@@ -141,11 +127,6 @@ export function createNotificationLevelsStore(options: {
     })),
   );
 
-  /**
-   * Writes the level of the user for one agent. An agent that a member turned off for every member,
-   * with the agent switch of earlier versions, stays silent at each level, and no control shows that
-   * switch now. So a level of its own also turns the agent on again. The host keeps that switch.
-   */
   async function setAgentLevel(
     serverId: string,
     agentId: string,

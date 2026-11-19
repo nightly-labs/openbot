@@ -28,22 +28,14 @@ export interface AgentMemoriesViewProps {
   ownerNoun: "agent" | "channel";
   ownerLabel: string;
   memories: readonly MemoryEntry[];
-  /**
-   * How each memory reaches the prompt. Absent for a channel, or before it loads: the list then has
-   * no groups and a memory has no switch.
-   */
   inclusion?: ReadonlyMap<string, Inclusion> | undefined;
-  /** The memories whose use the user set. The agent does not move them until the user gives control back. */
   userControlled?: ReadonlySet<string> | undefined;
   loading: boolean;
   error: string | null;
-  /** The cap the owner reached, or null. */
   reachedLimit: number | null;
-  /** `new`, `clear`, or the id of the memory that a call changes now. */
   savingId: string | null;
   onBack: () => void;
   onClose: () => void;
-  /** Resolves true when the memory is saved, so the editor closes. */
   onCreate: (text: string) => Promise<boolean>;
   onUpdate: (memory: MemoryEntry, text: string) => Promise<boolean>;
   onDelete: (memory: MemoryEntry) => void;
@@ -52,12 +44,7 @@ export interface AgentMemoriesViewProps {
   onClearAll: () => void;
 }
 
-/**
- * A memory as a short title and the rest. A short label before a colon is the title ("Away mode"),
- * else the first sentence. A memory of one sentence is only a title.
- */
 function splitMemory(text: string): { title: string; body: string } {
-  // A label colon has a space after it, so a time such as "7:00" stays in the sentence.
   const label = /^([^:.!?\n]{2,40}?):\s+(.+)$/s.exec(text);
   if (label?.[1] && label[2]) {
     return { title: label[1], body: label[2] };
@@ -67,11 +54,6 @@ function splitMemory(text: string): { title: string; body: string } {
   return { title: text, body: "" };
 }
 
-/**
- * Agent settings > Memories, and the same page of a channel. It covers the settings in the pane like
- * Files and Routines. The list shows a title for each memory; a title opens the memory on its own
- * page, where the user reads, edits, or deletes it.
- */
 export function AgentMemoriesView(props: AgentMemoriesViewProps) {
   const { t, format } = useText();
   const [openId, setOpenId] = createSignal<string | null>(null);
@@ -83,7 +65,6 @@ export function AgentMemoriesView(props: AgentMemoriesViewProps) {
   const [query, setQuery] = createSignal("");
   const searching = () => query().trim() !== "";
 
-  /** The memories that have each word of the search in their text or site, in any case. */
   const matches = createMemo(() => {
     const words = query().toLocaleLowerCase().split(/\s+/).filter(Boolean);
     if (words.length === 0) return props.memories;
@@ -105,7 +86,6 @@ export function AgentMemoriesView(props: AgentMemoriesViewProps) {
   const title = () => {
     const memory = current();
     if (!memory) return t("memory.title");
-    // A memory with no label and one sentence has no short title: the title would repeat the text below.
     const { title, body } = splitMemory(memory.text);
     return body ? title : t("memory.single");
   };
@@ -117,7 +97,6 @@ export function AgentMemoriesView(props: AgentMemoriesViewProps) {
     setOpenId(memory.id);
   }
 
-  /** Back from a memory goes to the list, and focus goes to the row of that memory. */
   function back(): void {
     const id = openId();
     if (current() === undefined || id === null) {
@@ -131,7 +110,6 @@ export function AgentMemoriesView(props: AgentMemoriesViewProps) {
   }
 
   function startAdding(): void {
-    // A search would hide the new memory, and the field is gone when the list is empty.
     setQuery("");
     setOpenId(null);
     setAdding(true);
@@ -174,7 +152,6 @@ export function AgentMemoriesView(props: AgentMemoriesViewProps) {
               </p>
             )}
           </Show>
-          {/* Not keyed: a reload gives a new object for the same memory, and the open editor keeps its draft. */}
           <Show
             when={current()}
             fallback={
@@ -207,7 +184,6 @@ export function AgentMemoriesView(props: AgentMemoriesViewProps) {
                         onValueChange={setQuery}
                         onKeyDown={(event: KeyboardEvent) => {
                           if (event.key !== "Escape" || !query()) return;
-                          // Escape clears the search first; the next one goes to the pane.
                           event.preventDefault();
                           event.stopPropagation();
                           setQuery("");
@@ -218,7 +194,6 @@ export function AgentMemoriesView(props: AgentMemoriesViewProps) {
                   <Show
                     when={adding()}
                     fallback={
-                      // At the cap, the limit note above takes the place of the row.
                       <Show when={props.reachedLimit === null}>
                         <SettingsLinkGroup inset>
                           <SettingsLinkRow
@@ -252,7 +227,6 @@ export function AgentMemoriesView(props: AgentMemoriesViewProps) {
                           {(memory) => (
                             <SettingsLinkRow
                               ref={(element) => {
-                                // The id is the key of the row, so it never changes.
                                 rows.set(untrack(memory).id, element);
                               }}
                               label={splitMemory(memory().text).title}
@@ -269,7 +243,6 @@ export function AgentMemoriesView(props: AgentMemoriesViewProps) {
                       {t("memory.noMatches")}
                     </p>
                   </Show>
-                  {/* Clear all removes every memory, not only the matches, so it waits for the search to end. */}
                   <Show when={props.memories.length > 0 && !searching()}>
                     <div class="agent-memories-clear">
                       <Button
@@ -364,7 +337,6 @@ export function AgentMemoriesView(props: AgentMemoriesViewProps) {
   }
 }
 
-/** A field that grows with its text, with Cancel and Save. Cmd+Enter saves; Escape cancels. */
 function MemoryEditor(props: {
   initial: string;
   label: string;

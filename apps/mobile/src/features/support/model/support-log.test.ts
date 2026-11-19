@@ -91,9 +91,7 @@ describe("support log", () => {
     expect(excerpt).not.toContain("8a2e");
     expect(excerpt).not.toContain("fe80");
     expect(excerpt).not.toContain("198.18");
-    // The kind of an address stays: it tells a private network from the internet.
     expect(excerpt).toContain("peer candidate: [public-ip] and [private-ip] and [ipv6] and [ipv6]");
-    // The warnings and the connection events are in it. A request that got an answer is not.
     expect(excerpt.split("\n")).toHaveLength(3);
     expect(excerpt).toContain("offline (ice_failed)");
     expect(excerpt).toContain("https://turn2.openbot.run/");
@@ -123,9 +121,7 @@ describe("support log", () => {
     const excerpt = supportLogExcerpt(log.entries(), 6_000);
     for (const text of [server, other, "Kowalska", "kowalska", "chat text", "4d2a9c1e7b3f5a6088c1d2e3f4a5b6c7"])
       expect(excerpt).not.toContain(text);
-    // A console line is not in the report: a library can write any value there.
     expect(excerpt).not.toContain("console");
-    // Two servers stay different, without their IDs. The capability list is cut.
     expect(excerpt).toContain("server-1 host OpenBot 1.9.0, protocol 3-9");
     expect(excerpt).not.toContain("capabilities");
     expect(excerpt).toContain("server-1 peer route: host/udp -> relay/udp");

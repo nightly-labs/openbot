@@ -1,10 +1,3 @@
-/**
- * A new agent, asked for where the user right-clicked: its face, its name, what it does and the
- * model it runs on. Enter creates it; Escape, Cancel or a press outside it drops it. The face is
- * picked at random, as on the first agent form; the agent's settings can change it later. Without a
- * model catalog, the host picks the model.
- */
-
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentModelId,
@@ -25,7 +18,6 @@ import { InstructionsLimit, instructionsTooLong } from "../agents/InstructionsLi
 export type DiagramNewAgentDraft = Pick<FirstAgentDraft, "name" | "purpose" | "avatarSeed" | "avatarHue"> &
   Partial<Pick<FirstAgentDraft, "provider" | "model">>;
 
-/** What the model picker of a new agent offers, and the model it starts on. */
 export interface DiagramModelChoice {
   options: ClientAgentModelOption[];
   status: AgentStatus;
@@ -35,7 +27,6 @@ export interface DiagramModelChoice {
 }
 
 export function DiagramNewAgentCard(props: {
-  /** Where the card opens, in pixels from the canvas's top left corner. */
   at: { x: number; y: number };
   models?: DiagramModelChoice | undefined;
   onCreate: (draft: DiagramNewAgentDraft) => Promise<void>;
@@ -52,8 +43,6 @@ export function DiagramNewAgentCard(props: {
   let form: HTMLFormElement | undefined;
   onSettled(() => {
     nameInput?.focus();
-    // A press anywhere else drops the card, as a click outside a menu closes it. The model list
-    // opens in a layer of its own, so a press there keeps it.
     const dismiss = (event: PointerEvent) => {
       const target = event.target;
       if (busy() || !(target instanceof Element)) return;
@@ -61,8 +50,6 @@ export function DiagramNewAgentCard(props: {
       props.onCancel();
     };
     document.addEventListener("pointerdown", dismiss);
-    // The card stays inside the canvas at the height it has now. The count and the error under the
-    // purpose field make it taller.
     const resize = new ResizeObserver(() => setHeight(form?.offsetHeight ?? null));
     if (form) resize.observe(form);
     return () => {

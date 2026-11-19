@@ -30,7 +30,6 @@ const REVEAL_DURATION = 720;
 const FRAME_RADIUS = 22;
 const REVEAL_EASING = Easing.bezier(0.23, 1, 0.32, 1);
 
-/** The same mapping as desktop: a streaming message is still generating its image. */
 export function imageGenerationStatus(streaming: boolean, status: string | undefined): ImageGenerationStatus {
   if (streaming || status === "streaming") return "generating";
   if (status === "failed") return "failed";
@@ -44,7 +43,6 @@ function requestedRatio(aspectRatio: ImageGenerationAspectRatio) {
   return 1;
 }
 
-/** The frame holds the requested shape until the image reports its own, so it does not jump. */
 function generationFrame(ratio: number, maxWidth: number) {
   const width = Math.min(maxWidth, MAX_HEIGHT * ratio);
   return { width: Math.round(width), height: Math.round(width / ratio) };
@@ -67,8 +65,6 @@ export function ChatImageGeneration({
   const [previewError, setPreviewError] = useState(false);
   const [loaded, setLoaded] = useState<ImageDimensions | null>(null);
   const [revealed, setRevealed] = useState(false);
-  // Only an image the user watched being generated is revealed. History that scrolls back into
-  // view shows its image at once: the reveal is news, and old news should not repeat.
   const [watched, setWatched] = useState(status === "generating");
   if (status === "generating" && !watched) setWatched(true);
   const file = useAttachmentFile(serverId, attachment ?? PLACEHOLDER, status === "completed" && Boolean(attachment));
@@ -76,13 +72,10 @@ export function ChatImageGeneration({
   const downloadFailed = Boolean(file.query.error) || previewError;
   const failed = status === "failed" || status === "interrupted" || unavailable || downloadFailed;
   const ready = status === "completed" && Boolean(file.uri) && !downloadFailed;
-  // The conversation's viewer measures the frame and hides the image on the UI thread while it holds the picture.
   const source = useChatImageSource(
     ready && attachment && isViewableImage(attachment) ? attachment.id : null,
     FRAME_RADIUS,
   );
-  // The host reads the size of the file, so the frame has its shape before the file arrives. An older
-  // row has the size that the model was asked for, which can disagree with its frame.
   const hostSize = status === "completed" ? imagePixelSize(generation.resolution) : null;
   const dimensions =
     file.dimensions ??
@@ -163,7 +156,6 @@ export function ChatImageGeneration({
           </View>
         ) : null}
         {!revealed && !failed ? (
-          // Inside the frame, so the caption below keeps its height when the image lands.
           <View className="absolute bottom-2.5 left-2.5 rounded-full bg-background/70 px-2.5 py-1" pointerEvents="none">
             <Typography.Paragraph type="body-xs" className="font-semibold text-foreground">
               {label}
@@ -235,10 +227,6 @@ const PLACEHOLDER: AttachmentSummary = {
   previewUrl: null,
 };
 
-/**
- * The image arrives through a feathered circle that grows from the centre of the canvas, where the
- * ripples started. Android masks in software, so it fades in instead, as does reduced motion.
- */
 function GeneratedImageReveal({
   uri,
   width,
@@ -256,7 +244,6 @@ function GeneratedImageReveal({
   height: number;
   prompt: string | undefined;
   animate: boolean;
-  /** Hides this copy while the viewer holds the image. */
   hiddenStyle: ReturnType<typeof useChatImageSource>["hiddenStyle"];
   onLoad: (size: ImageDimensions) => void;
   onRevealed: () => void;
@@ -288,7 +275,6 @@ function GeneratedImageReveal({
   useEffect(() => {
     if (revealed) onRevealed();
   }, [revealed, onRevealed]);
-  // The mask circle spans the frame's diagonal at full size, so its feathered edge clears the corners.
   const diameter = Math.hypot(width, height) * 1.25;
   const maskStyle = useAnimatedStyle(() => ({
     transform: [{ scale: 0.04 + progress.get() * 0.96 }],
@@ -298,8 +284,6 @@ function GeneratedImageReveal({
     transform: [{ scale: 1.03 - progress.get() * 0.03 }],
   }));
   const image = (
-    // A plain pressable: a HeroUI button keeps its own side padding, which pushed the image off
-    // the frame's right edge.
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={t("mobile.chat.imageGeneration.preview")}

@@ -87,7 +87,6 @@ export async function installCodexRuntime(
   return "installed";
 }
 
-/** The `target` the Codex package manifest carries for each runtime target OpenBot ships. */
 const CODEX_MANIFEST_TARGETS = {
   "darwin-arm64": "aarch64-apple-darwin",
   "darwin-x64": "x86_64-apple-darwin",
@@ -171,9 +170,7 @@ async function writeMetadata(root: string, lock: AgentRuntimeLock, fetchImpl: ty
   let currentLicense: string | null = null;
   try {
     currentLicense = sha256(await readFile(licensePath));
-  } catch {
-    // Download the pinned license below.
-  }
+  } catch {}
   if (currentLicense !== lock.codex.licenseSha256) {
     const bytes = await download(
       fetchImpl,
