@@ -317,6 +317,7 @@ function googleRefusedMcpTools(log: string, folder: string): string[] {
 
 export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   ownMcpServerNames: antigravityOwnMcpServerNames,
+  relayStdioMcpServers: true,
   mcpToolCallLimitMs: 180_000,
   sessionMeta: { antigravity: { disabledTools: ["schedule", "run_workflow"] } },
   approvedEditSweep: /^\s*Tool call was approved but never executed\.?\s*$/u,

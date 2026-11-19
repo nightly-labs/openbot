@@ -954,6 +954,13 @@ The CLI runs confined; `antigravityStatePaths` gives it the app data folder, `ar
 `config/projects` in the Gemini home, and protects its settings files. Migration 22 adds `antigravity`
 to `projection_provider_sessions`.
 
+A Workspace only CLI runs in a sandbox that its MCP servers would inherit. A stdio server that writes
+outside the workspace then does not start, and the CLI reports no error: `uvx` cannot write its cache
+in `~/.cache/uv`, and a server cannot write its own state folder. OpenBot starts each stdio server
+itself (`mcp-stdio-relay.ts`, `relayStdioMcpServers`) and gives the CLI a Streamable HTTP URL on
+127.0.0.1 with a bearer token, as it does for Pi. The Access setting does not limit MCP servers, as
+for Claude and Codex (#6191).
+
 The CLI keeps the token, `settings.json` (which names the sign-in method) and its conversations in the
 app data folder. Its own log there (`log/`) contains the Google account email (`applyAuthResult`).
 OpenBot does not read that folder into its log or a diagnostics export. In the 1.5.4 tests the CLI wrote
