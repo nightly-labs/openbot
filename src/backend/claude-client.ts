@@ -713,6 +713,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const query = runtime.query;
     yield* Effect.forkIn(
       providerCall(() => query.mcpServerStatus?.() ?? null).pipe(
+        Effect.timeout("2 seconds"),
         Effect.orElseSucceed(() => null),
         Effect.flatMap((rows) =>
           Effect.sync(() => {
