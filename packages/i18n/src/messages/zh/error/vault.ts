@@ -7,7 +7,7 @@ export const messages = {
   "error.vault.tooLarge": "保险库已满。请删除一些项目，然后重试。",
   "error.vault.itemMissing": "该项目已不在保险库中。",
   "error.vault.valueTooLong": "某个值过长。",
-  "error.vault.websiteInvalid": "请填写 HTTPS 网站地址。",
+  "error.vault.websiteInvalid": "请填写 HTTP/HTTPS 网站地址。",
   "error.vault.passwordRequired": "请填写密码。",
   "error.vault.twoStepKeyInvalid": "这不是两步验证密钥。请填写该网站的设置密钥或 otpauth:// 链接。",
   "error.vault.cardNumberInvalid": "请填写有效的卡号。",

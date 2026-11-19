@@ -10747,7 +10747,8 @@ try {
     const csv = [
       "url,username,password",
       `https://mail.example.com,ada,${csvPassword}`,
-      `http://old.example.com,ada,${csvPassword}`,
+      `http://router.example.com,ada,${csvPassword}`,
+      `ftp://old.example.com,ada,${csvPassword}`,
     ].join("\n");
     const unsupported = await importCall(adaToken, { csv }, [VAULT_CAPABILITY]);
     const member = await importCall(bobToken, { csv });
@@ -10762,12 +10763,11 @@ try {
     const imported = await importCall(adaToken, { csv });
     const logins = vault.state().items.filter((item) => item.kind === "login");
     check(
-      "an admin imports a CSV export: the HTTPS login is added, the other row skipped, and only the counts answer",
+      "an admin imports a CSV export: the HTTPS and HTTP logins are added, the FTP row skipped, and only the counts answer",
       imported.status === 200 &&
-        isDeepStrictEqual(imported.body, { imported: 1, skipped: 1 }) &&
-        logins.length === 1 &&
-        logins[0] !== undefined &&
-        vault.reveal({ id: logins[0].id, field: "password" }) === csvPassword &&
+        isDeepStrictEqual(imported.body, { imported: 2, skipped: 1 }) &&
+        logins.length === 2 &&
+        logins.every((login) => vault.reveal({ id: login.id, field: "password" }) === csvPassword) &&
         !imported.text.includes(csvPassword) &&
         !logged.slice(loggedBefore).some((line) => line.includes(csvPassword)),
       summary(imported),

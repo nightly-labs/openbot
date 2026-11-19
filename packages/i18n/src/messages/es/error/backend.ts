@@ -421,7 +421,7 @@ export const messages = {
     "No se pudo cargar la ventana emergente. Intenta iniciar sesión de nuevo desde la página original.",
   "error.backend.browserTabNotFound": "No se encontró la pestaña del navegador.",
   "error.backend.authActive": "La autenticación ya está activa.",
-  "error.backend.authHttpsRequired": "La autenticación segura requiere HTTPS.",
+  "error.backend.authWebPageRequired": "La autenticación segura requiere HTTP/HTTPS.",
   "error.backend.authDigitsRange": "Los códigos de autenticación requieren entre 4 y 12 dígitos.",
   "error.backend.authExpired": "La solicitud de autenticación caducó.",
   "error.backend.authDigitsRequired": "Introduce el número de dígitos solicitado.",

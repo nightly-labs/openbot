@@ -421,7 +421,7 @@ export const messages = {
   "error.backend.popupLoadFailed": "ポップアップを読み込めませんでした。元のページからもう一度サインインしてください。",
   "error.backend.browserTabNotFound": "ブラウザーのタブが見つかりません。",
   "error.backend.authActive": "認証はすでに有効です。",
-  "error.backend.authHttpsRequired": "安全な認証には HTTPS が必要です。",
+  "error.backend.authWebPageRequired": "安全な認証には HTTP/HTTPS が必要です。",
   "error.backend.authDigitsRange": "認証コードは 4〜12 桁である必要があります。",
   "error.backend.authExpired": "認証要求の有効期限が切れました。",
   "error.backend.authDigitsRequired": "指定された桁数の数字を入力してください。",
