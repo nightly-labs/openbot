@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import type { WorkflowGraph, WorkflowStep } from "@openbot/contracts/ipc";
+import { WORKFLOW_MEDIA_MODELS, type WorkflowGraph, type WorkflowStep } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
@@ -16,6 +16,7 @@ import { createWorkflows, type WorkflowsHandle } from "../src/backend/workflows/
 const OUT = resolve(import.meta.dirname, "../.openbot-build/workflow-step-settings-e2e");
 const WAIT_MS = 5_000;
 const PHOTO = "0123456789abcdef0123456789abcdef";
+const PICTURE = "fedcba9876543210fedcba9876543210";
 
 interface Recorded {
   nodeId: string;
@@ -44,6 +45,8 @@ function graph(prompt: string): WorkflowGraph {
     nodes: [
       { id: "brief", kind: "prompt", at: { x: 0, y: 0 }, fields: { text: 'Spring sale 界"\\' } },
       { id: "photo", kind: "asset", at: { x: 0, y: 200 }, fields: { fileId: PHOTO } },
+      { id: "tagline", kind: "llm", at: { x: 300, y: 300 }, fields: { prompt: "Write a tagline" } },
+      { id: "poster", kind: "image", at: { x: 600, y: 0 }, fields: { media: "image", prompt: "A red bicycle" } },
       {
         id: "title",
         kind: "llm",
@@ -82,6 +85,13 @@ async function open() {
           ? Effect.fail({ message: "The model failed." })
           : Effect.succeed(`Title from ${request.model}`);
       },
+      chooseTextModel: (request) =>
+        Effect.succeed({
+          provider: request.provider ?? "codex",
+          model: request.model ?? "gpt-5.5",
+          effort: request.effort ?? "medium",
+        }),
+      generateMedia: () => Effect.succeed(PICTURE),
       notify: () => {},
       connectionOn: () => false,
       post: () => Effect.die(new Error("No post runs in this test.")),
@@ -187,6 +197,26 @@ try {
       JSON.stringify(photo.settings) === JSON.stringify({ fileId: PHOTO }) &&
       brief.sources?.length === 0,
     { brief: brief.settings, photo: photo.settings },
+  );
+
+  const tagline = remember("run tagline", await ended(stepOf(first.steps, "tagline")));
+  check(
+    "a step with no model keeps the provider, model and effort that answered",
+    tagline.status === "done" &&
+      JSON.stringify(tagline.settings) ===
+        JSON.stringify({ prompt: "Write a tagline", provider: "codex", model: "gpt-5.5", effort: "medium" }),
+    tagline.settings,
+  );
+  const poster = remember("run poster", await ended(stepOf(first.steps, "poster")));
+  check(
+    "an image step with no model keeps the model, aspect and background that made it",
+    poster.status === "done" &&
+      poster.output === PICTURE &&
+      poster.settings?.model === WORKFLOW_MEDIA_MODELS.find((model) => model.kinds.includes("image"))?.id &&
+      poster.settings?.aspect === "1:1" &&
+      poster.settings?.background === "solid" &&
+      poster.settings?.prompt === "A red bicycle",
+    poster.settings,
   );
 
   revision = await save(workflows, workflowId, revision, "Write a title v2");

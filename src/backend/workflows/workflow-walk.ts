@@ -216,6 +216,20 @@ export function stepRecord(
   return { settings: runtimeFields(node), sources };
 }
 
+export function usedMediaSettings(
+  kind: WorkflowMediaKind,
+  model: WorkflowMediaModel,
+  specs: WorkflowMediaSpecs,
+): WorkflowFields {
+  return {
+    model: model.id,
+    ...(specs.size ? {} : { aspect: specs.aspect }),
+    ...(kind === "image" && model.transparent ? { background: specs.transparent ? "transparent" : "solid" } : {}),
+    ...(specs.resolution ? { resolution: specs.resolution } : {}),
+    ...(kind === "video" ? { duration: specs.duration } : {}),
+  };
+}
+
 function edgeFile(node: WorkflowNode | undefined, latest: ReadonlyMap<string, StoredWorkflowStep>): MediaInput[] {
   if (node?.kind === "asset") {
     const attachmentId = fieldText(node, "fileId");

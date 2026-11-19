@@ -351,6 +351,14 @@ export class WorkflowRunStore {
     });
   }
 
+  recordUsedSettings(stepId: string, used: WorkflowFields): void {
+    const settings = this.step(stepId)?.settings;
+    if (!settings) return;
+    this.#database.connection
+      .prepare("UPDATE workflow_steps SET settings_json = ? WHERE step_id = ?")
+      .run(JSON.stringify({ ...settings, ...used }), stepId);
+  }
+
   attachDelivery(stepId: string, deliveryId: string, now = new Date()): void {
     this.#database.connection
       .prepare("UPDATE workflow_steps SET delivery_id = ?, updated_at = ? WHERE step_id = ? AND delivery_id IS NULL")

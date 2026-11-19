@@ -150,6 +150,7 @@ import {
   soloInputs,
   stepRecord,
   unsupportedNode,
+  usedMediaSettings,
 } from "./workflow-walk";
 
 const logger = createOpenBotLogger("workflows");
@@ -184,6 +185,12 @@ interface WorkflowTextRequest {
 }
 
 const MODEL_IMAGE_TYPES: ReadonlySet<string> = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
+
+interface WorkflowTextChoice {
+  provider: AgentProvider;
+  model: string;
+  effort: AgentReasoningEffort;
+}
 
 interface WorkflowMediaRequest {
   kind: WorkflowMediaKind;
@@ -230,6 +237,9 @@ export interface WorkflowsDependencies {
   filePath?: (attachmentId: string) => Effect.Effect<string | null, { readonly cause: unknown }>;
   stopDelivery(agentId: string, deliveryId: string): Effect.Effect<void, { readonly cause: unknown }>;
   generateText(request: WorkflowTextRequest): Effect.Effect<string, { readonly message: string }>;
+  chooseTextModel?: (
+    request: Omit<WorkflowTextRequest, "prompt">,
+  ) => Effect.Effect<WorkflowTextChoice, { readonly message: string }>;
   generateMedia?: (request: WorkflowMediaRequest) => Effect.Effect<string, { readonly message: string }>;
   sizePicture?: (attachmentId: string, size: WorkflowMediaSize) => Effect.Effect<string, { readonly message: string }>;
   keepPicture?: (
@@ -498,7 +508,17 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                 : modelStepPrompt(fieldText(node, "system"), fieldText(node, "prompt"), step.input),
               images: images.success,
             };
-            const result = yield* generationLock.withPermit(dependencies.generateText(request)).pipe(Effect.result);
+            const choice = dependencies.chooseTextModel
+              ? yield* dependencies.chooseTextModel(request).pipe(Effect.result)
+              : null;
+            if (choice && Result.isFailure(choice)) {
+              settle(step, { status: "failed", error: choice.failure.message });
+              return yield* requestSweep();
+            }
+            if (choice) runs.recordUsedSettings(step.id, { ...choice.success });
+            const result = yield* generationLock
+              .withPermit(dependencies.generateText(choice ? { ...request, ...choice.success } : request))
+              .pipe(Effect.result);
             if (Result.isFailure(result)) {
               settle(step, { status: "failed", error: result.failure.message });
             } else if (!condition) {
@@ -553,6 +573,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               : [];
             const model = workflowMediaModel(node.fields, live);
             const specs = workflowMediaSpecs(node.fields, kind, model);
+            if (model && !empty) runs.recordUsedSettings(step.id, usedMediaSettings(kind, model, specs));
             const result = empty
               ? Result.fail({ message: sourceText("error.workflow.mediaEmptyRequest") })
               : !generateMedia || !model
