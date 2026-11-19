@@ -211,7 +211,13 @@ export function createProviderDetectionStore(options: ProviderDetectionStoreOpti
     });
     writes = writes.then(async () => {
       try {
-        const saved = await group.setSettings(payload());
+        const value = payload();
+        const saved = await group.setSettings({
+          enabled: value.enabled,
+          addresses: [...value.addresses],
+          folders: [...value.folders],
+          hiddenIds: [...value.hiddenIds],
+        });
         lastSaved = saved;
         if (listsChanged && saveTimer === undefined) {
           setState((draft) => {
