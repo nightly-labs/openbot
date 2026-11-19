@@ -21,12 +21,14 @@ import { existsSync } from "node:fs";
 import { rm, writeFile } from "node:fs/promises";
 import { createConnection } from "node:net";
 import { endianness } from "node:os";
-import { isAbsolute, join } from "node:path";
+import { dirname, isAbsolute, join } from "node:path";
 import type { AboveAppsSupport } from "@openbot/contracts/ipc";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Effect, Option, Schema } from "effect";
 import { app } from "electron";
+import { runsFromOwnMount } from "./linux-appimage-crashpad";
 import { relaunchApp } from "./linux-appimage-relaunch";
+import { xwaylandRestartCommand } from "./xwayland-restart-command";
 
 const logger = createOpenBotLogger("main");
 
@@ -153,14 +155,38 @@ function startOnX11(
   environment: NodeJS.ProcessEnv,
   reason: XWaylandRestartReason,
 ): Effect.Effect<void, WaylandProbeFailure> {
+  const restart = (file: string) =>
+    xwaylandRestartCommand({
+      file,
+      environment,
+      argv: process.argv,
+      x11Argument: X11_ARGUMENT,
+      marker: RESTART_MARKER,
+      reason,
+    });
+  // This process becomes the new one, where Node can. A launcher that ends its children with itself, such
+  // as an AppImage runner in a bubblewrap sandbox on NixOS, ended a separate new process as soon as this
+  // one exited, so the app opened only now and then. The PID stays, so the AppImage mount of this launch
+  // stays too, and the executable in it starts again. The AppImage file would mount itself again, which
+  // fails in such a sandbox (`fusermount3` is setuid). `execve` returns only when it fails.
+  if (process.execve) {
+    const command = restart(process.execPath);
+    try {
+      process.execve(command.file, command.argv, command.env);
+    } catch (error) {
+      logger.warn("Could not start OpenBot again in place on XWayland; it starts a new process:", toLogValue(error));
+    }
+  }
+  // A new process: the AppImage mount of this launch goes away with it, so a mounted AppImage starts
+  // from its file. An extracted AppImage (`appimage-run`, `--appimage-extract-and-run`) stays in place.
+  const appImage = environment.APPIMAGE?.trim();
+  const command = restart(appImage && runsFromOwnMount(dirname(process.execPath)) ? appImage : process.execPath);
   return Effect.callback<void, WaylandProbeFailure>((resume) => {
-    // An AppImage mounts itself for each start, and the mount of this process goes away with it.
-    const executable = environment.APPIMAGE || process.execPath;
     // A terminal start keeps the output. The desktop app does not read its input.
-    const child = spawn(executable, [...process.argv.slice(1), X11_ARGUMENT], {
+    const child = spawn(command.file, command.argv.slice(1), {
       detached: true,
       stdio: ["ignore", "inherit", "inherit"],
-      env: { ...environment, [RESTART_MARKER]: reason },
+      env: command.env,
     });
     child.once("error", (cause) => resume(Effect.fail(new WaylandProbeFailure({ cause }))));
     child.once("spawn", () => {
