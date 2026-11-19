@@ -25,24 +25,37 @@ interface ServerCopyState {
   error: string | null;
 }
 
+interface RunningCopy {
+  fromId: string;
+  toId: string;
+  result: Promise<InstanceTransferResult>;
+}
+
+const runningCopies = new Map<string, RunningCopy>();
+
 export function createServerCopyStore(
   serverId: string,
   servers: () => readonly CopyAgentsServer[],
   calls: ServerCopyCalls,
 ) {
+  const running = runningCopies.get(serverId);
   const [state, setState] = createStore<ServerCopyState>({
-    fromId: serverId,
-    toId: untrack(servers).find((server) => server.id !== serverId)?.id ?? null,
+    fromId: running?.fromId ?? serverId,
+    toId: running?.toId ?? untrack(servers).find((server) => server.id !== serverId)?.id ?? null,
     fromAgents: null,
     toAgents: null,
     fromError: null,
     toError: null,
-    phase: "idle",
+    phase: running ? "copying" : "idle",
     progress: null,
     result: null,
     error: null,
   });
-  let copyingTo: string | null = null;
+  let copyingTo: string | null = running?.toId ?? null;
+  let disposed = false;
+  onCleanup(() => {
+    disposed = true;
+  });
 
   const stopProgress = calls.onUploadProgress?.(({ serverId: target, sent, total }) => {
     if (target !== copyingTo || state.phase !== "copying") return;
@@ -116,27 +129,25 @@ export function createServerCopyStore(
 
   const loadError = () => state.fromError ?? state.toError;
 
-  function copy(agentIds: string[]): void {
-    const toId = state.toId;
-    if (!toId || agentIds.length === 0) return;
-    copyingTo = toId;
-    setState((draft) => {
-      draft.phase = "copying";
-      draft.progress = null;
-      draft.error = null;
-    });
-    void calls
-      .copy({ fromServerId: state.fromId, agentIds }, toId)
-      .then((result) => {
+  function followCopy(copying: RunningCopy): void {
+    const settled = () => {
+      if (disposed) return false;
+      if (runningCopies.get(serverId) === copying) runningCopies.delete(serverId);
+      return true;
+    };
+    void copying.result.then(
+      (result) => {
+        if (!settled()) return;
         desktopAnalytics.track("server_transfer_action", { action: "copy", result: "succeeded" });
         setState((draft) => {
           draft.phase = "done";
           draft.progress = null;
           draft.result = result;
         });
-        load("to", toId);
-      })
-      .catch((error: unknown) => {
+        load("to", copying.toId);
+      },
+      (error: unknown) => {
+        if (!settled()) return;
         desktopAnalytics.track("server_transfer_action", {
           action: "copy",
           result: "failed",
@@ -147,7 +158,24 @@ export function createServerCopyStore(
           draft.progress = null;
           draft.error = message(error, "settings.transfer.copy.failed");
         });
-      });
+      },
+    );
+  }
+
+  if (running) followCopy(running);
+
+  function copy(agentIds: string[]): void {
+    const toId = state.toId;
+    if (!toId || agentIds.length === 0) return;
+    copyingTo = toId;
+    setState((draft) => {
+      draft.phase = "copying";
+      draft.progress = null;
+      draft.error = null;
+    });
+    const copying = { fromId: state.fromId, toId, result: calls.copy({ fromServerId: state.fromId, agentIds }, toId) };
+    runningCopies.set(serverId, copying);
+    followCopy(copying);
   }
 
   return { state, loadError, setFrom, setTo, copy };

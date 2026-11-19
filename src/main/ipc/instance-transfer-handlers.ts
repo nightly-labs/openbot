@@ -143,13 +143,29 @@ export function instanceTransferIpcHandlers({
     return stageRemoteFile(serverId, path);
   };
 
-  const stageRemoteFile = async (serverId: string, path: string): Promise<InstanceTransferPreview> => {
-    if (inParts(serverId))
-      return runCauseEffect(
+  const runningUploads = new Map<string, { path: string; preview: Promise<InstanceTransferPreview> }>();
+
+  const uploadOnce = (serverId: string, path: string): Promise<InstanceTransferPreview> => {
+    const running = runningUploads.get(serverId);
+    if (running?.path === path) return running.preview;
+    const upload = {
+      path,
+      preview: runCauseEffect(
         uploadTransferInParts(remoteServers, serverId, path, (sent, total) =>
           reportUploadProgress({ serverId, sent, total }),
         ),
-      );
+      ),
+    };
+    runningUploads.set(serverId, upload);
+    const release = () => {
+      if (runningUploads.get(serverId) === upload) runningUploads.delete(serverId);
+    };
+    void upload.preview.then(release, release);
+    return upload.preview;
+  };
+
+  const stageRemoteFile = async (serverId: string, path: string): Promise<InstanceTransferPreview> => {
+    if (inParts(serverId)) return uploadOnce(serverId, path);
     const info = await stat(path);
     if (!info.isFile() || info.size === 0) throw new Error(sourceText("error.import.chooseZip"));
     if (info.size > INSTANCE_TRANSFER_REMOTE_BYTES) throw new Error(sourceText("error.import.transferRemoteTooLarge"));
@@ -239,6 +255,21 @@ export function instanceTransferIpcHandlers({
     }
   };
 
+  const runningCopies = new Map<string, Promise<InstanceTransferResult>>();
+
+  const copyOnce = (input: CopyInstanceAgentsInput, serverId: string): Promise<InstanceTransferResult> => {
+    const key = JSON.stringify([serverId, input.fromServerId, [...input.agentIds].sort()]);
+    const running = runningCopies.get(key);
+    if (running) return running;
+    const result = copy(input, serverId);
+    runningCopies.set(key, result);
+    const release = () => {
+      if (runningCopies.get(key) === result) runningCopies.delete(key);
+    };
+    void result.then(release, release);
+    return result;
+  };
+
   return {
     instanceTransfer: {
       summary: scopedQueryHandler({
@@ -281,7 +312,7 @@ export function instanceTransferIpcHandlers({
         },
       }),
       copy: payloadHandler(agentRequest(parseCopyInstanceAgentsInput), ({ serverId, payload }) =>
-        copy(payload, serverId),
+        copyOnce(payload, serverId),
       ),
     },
   };

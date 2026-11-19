@@ -8,7 +8,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { INSTANCE_TRANSFER_CHUNK_BYTES } from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
 import { sourceText } from "@openbot/i18n/source";
-import { Effect } from "effect";
+import { Deferred, Effect } from "effect";
 import { diskSpace } from "../backend/storage-usage";
 import { type ArchiveOperationError, archiveCall, archiveFailure } from "./archive-effects";
 
@@ -34,6 +34,12 @@ interface Upload {
   received: Set<number>;
   writing: number;
   timer: NodeJS.Timeout;
+}
+
+interface Finish {
+  owner: string;
+  size: number;
+  result: Deferred.Deferred<InstanceTransferPreview, ArchiveOperationError>;
 }
 
 interface Export {
@@ -117,6 +123,7 @@ export async function writeFully(handle: FileHandle, bytes: Uint8Array, position
 
 export class InstanceTransferChunks {
   readonly #uploads = new Map<string, Upload>();
+  readonly #finishes = new Map<string, Finish>();
   readonly #exports = new Map<string, Export>();
 
   constructor(private readonly files: InstanceTransferChunkFiles) {}
@@ -165,6 +172,11 @@ export class InstanceTransferChunks {
     read: (limit: number) => Promise<Uint8Array>,
     owner: string,
   ): Effect.fn.Return<{ receivedBytes: number }, ArchiveOperationError> {
+    const finishedSize = this.#finishedSize(input.uploadId, owner);
+    if (finishedSize !== null) {
+      yield* archiveCall(() => read(INSTANCE_TRANSFER_CHUNK_BYTES));
+      return { receivedBytes: finishedSize };
+    }
     const upload = yield* this.#ownUpload(input.uploadId, owner);
     if (!Number.isSafeInteger(input.index) || input.index < 0 || input.index >= partCount(upload.size))
       return yield* invalidPart();
@@ -172,7 +184,10 @@ export class InstanceTransferChunks {
     const bytes = yield* archiveCall(() => read(INSTANCE_TRANSFER_CHUNK_BYTES));
     if (bytes.length !== partLength(upload.size, input.index) || sha256Hex(bytes) !== input.sha256)
       return yield* invalidPart();
-    if (this.#uploads.get(upload.id) !== upload) return yield* closed();
+    if (this.#uploads.get(upload.id) !== upload) {
+      const size = this.#finishedSize(upload.id, owner);
+      return size === null ? yield* closed() : { receivedBytes: size };
+    }
     upload.writing++;
     yield* archiveCall(async () => {
       const handle = await open(upload.path, "r+");
@@ -194,10 +209,14 @@ export class InstanceTransferChunks {
     uploadId: string,
     owner: string,
   ): Effect.fn.Return<InstanceTransferPreview, ArchiveOperationError> {
+    const finished = this.#finishes.get(uploadId);
+    if (finished) return finished.owner === owner ? yield* Deferred.await(finished.result) : yield* closed();
     const upload = yield* this.#ownUpload(uploadId, owner);
     if (upload.writing > 0 || upload.received.size !== partCount(upload.size)) return yield* invalidPart();
     this.#uploads.delete(upload.id);
     clearTimeout(upload.timer);
+    const finish: Finish = { owner, size: upload.size, result: Deferred.makeUnsafe() };
+    this.#finishes.set(upload.id, finish);
     const zip = upload.path.replace(/\.part$/u, ".zip");
     return yield* Effect.gen({ self: this }, function* () {
       const info = yield* archiveCall(() => stat(upload.path));
@@ -211,6 +230,14 @@ export class InstanceTransferChunks {
           archiveCall(() => rm(upload.path, { force: true })),
           archiveCall(() => rm(zip, { force: true })),
         ]).pipe(Effect.ignore),
+      ),
+      Effect.onExit((exit) =>
+        Effect.sync(() => {
+          Deferred.doneUnsafe(finish.result, exit);
+          setTimeout(() => {
+            if (this.#finishes.get(upload.id) === finish) this.#finishes.delete(upload.id);
+          }, IDLE_TTL_MS).unref();
+        }),
       ),
     );
   }).bind(this);
@@ -290,6 +317,11 @@ export class InstanceTransferChunks {
       chunkBytes: INSTANCE_TRANSFER_CHUNK_BYTES,
       received: [...upload.received].sort((a, b) => a - b),
     };
+  }
+
+  #finishedSize(uploadId: string, owner: string): number | null {
+    const finished = this.#finishes.get(uploadId);
+    return finished && finished.owner === owner ? finished.size : null;
   }
 
   #ownUpload(uploadId: string, owner: string): Effect.Effect<Upload, ArchiveOperationError> {

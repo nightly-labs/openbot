@@ -50,8 +50,17 @@ const INITIAL: ServerTransferState = {
   importError: null,
 };
 
+const runningImports = new Map<string, Promise<InstanceTransferPreview | null>>();
+
 export function createServerTransferStore(serverId: string, calls: ServerTransferCalls) {
-  const [state, setState] = createStore<ServerTransferState>({ ...INITIAL });
+  const runningImport = runningImports.get(serverId);
+  const [state, setState] = createStore<ServerTransferState>(
+    runningImport ? { ...INITIAL, screen: "import", importPhase: "reading" } : { ...INITIAL },
+  );
+  let disposed = false;
+  onCleanup(() => {
+    disposed = true;
+  });
 
   const stopProgress = calls.onUploadProgress?.(({ serverId: target, sent, total }) => {
     if (target !== serverId || state.importPhase !== "reading") return;
@@ -134,28 +143,39 @@ export function createServerTransferStore(serverId: string, calls: ServerTransfe
     });
   }
 
+  function followImport(pending: Promise<InstanceTransferPreview | null>): void {
+    const settle = (change: (draft: ServerTransferState) => void) => {
+      if (disposed) return;
+      if (runningImports.get(serverId) === pending) runningImports.delete(serverId);
+      setState(change);
+    };
+    void pending.then(
+      (preview) =>
+        settle((draft) => {
+          if (preview) draft.preview = preview;
+          draft.importPhase = draft.preview ? "review" : "idle";
+          draft.importProgress = null;
+        }),
+      (error: unknown) =>
+        settle((draft) => {
+          draft.importPhase = draft.preview ? "review" : "idle";
+          draft.importProgress = null;
+          draft.importError = message(error, "settings.transfer.import.openFailed");
+        }),
+    );
+  }
+
+  if (runningImport) followImport(runningImport);
+
   function choose(): void {
     setState((draft) => {
       draft.importPhase = "reading";
       draft.importProgress = null;
       draft.importError = null;
     });
-    void calls
-      .choose(serverId)
-      .then((preview) =>
-        setState((draft) => {
-          if (preview) draft.preview = preview;
-          draft.importPhase = draft.preview ? "review" : "idle";
-          draft.importProgress = null;
-        }),
-      )
-      .catch((error: unknown) =>
-        setState((draft) => {
-          draft.importPhase = draft.preview ? "review" : "idle";
-          draft.importProgress = null;
-          draft.importError = message(error, "settings.transfer.import.openFailed");
-        }),
-      );
+    const pending = calls.choose(serverId);
+    runningImports.set(serverId, pending);
+    followImport(pending);
   }
 
   function importFile(keys: string[], includeSettings: boolean, includeServerPreferences = false): void {

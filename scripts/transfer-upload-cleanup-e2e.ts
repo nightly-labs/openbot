@@ -195,6 +195,29 @@ async function checkChunks(root: string): Promise<void> {
   assert.deepEqual(await names(directory), []);
 }
 
+async function checkOverlappingUploads(root: string): Promise<void> {
+  const directory = join(root, "overlapping", "instance-transfer-uploads");
+  const current = service(directory);
+  const part = (uploadId: string) => ({ uploadId, index: 0, sha256 });
+  const first = await run(current.chunks.beginUpload({ size: bytes.length, sha256 }, "alice"));
+  const second = await run(current.chunks.beginUpload({ size: bytes.length, sha256 }, "alice"));
+  assert.equal(second.uploadId, first.uploadId);
+  await run(current.chunks.writePart(part(first.uploadId), async () => bytes, "alice"));
+  const [preview, joined] = await Promise.all([
+    run(current.chunks.finishUpload(first.uploadId, "alice")),
+    run(current.chunks.finishUpload(second.uploadId, "alice")),
+  ]);
+  assert.equal(joined.token, preview.token);
+  const late = await run(current.chunks.writePart(part(second.uploadId), async () => bytes, "alice"));
+  assert.equal(late.receivedBytes, bytes.length);
+  assert.equal((await run(current.chunks.finishUpload(second.uploadId, "alice"))).token, preview.token);
+  await assert.rejects(run(current.chunks.writePart(part(first.uploadId), async () => bytes, "bob")));
+  await assert.rejects(run(current.chunks.finishUpload(first.uploadId, "bob")));
+  await verifyArchives(directory, 1);
+  await run(current.apply({ token: preview.token, keys: [], includeSettings: false }, "alice"));
+  assert.deepEqual(await names(directory), []);
+}
+
 interface Report {
   status: "running" | "passed" | "failed";
   checks: Array<{ name: string; status: "passed" | "failed" }>;
@@ -218,6 +241,7 @@ if (process.argv[2] === "--seed") {
       ["preparation-retry", () => checkRetry(root)],
       ["local-file-and-invalid-upload", () => checkLocal(root)],
       ["parts-restart-and-owner", () => checkChunks(root)],
+      ["overlapping-uploads", () => checkOverlappingUploads(root)],
     ];
     for (const [name, check] of checks) {
       activeCheck = name;
