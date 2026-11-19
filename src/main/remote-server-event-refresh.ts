@@ -38,6 +38,7 @@ export interface RemoteEventRefreshOptions {
   request: RemoteRequestFn;
   hasServer: (serverId: string) => boolean;
   emit: (serverId: string, event: AgentEvent, bufferedLive?: boolean) => void;
+  onReceivedRuntimeSnapshot?: (serverId: string, snapshot: AgentRuntimeSnapshot) => void;
   onMemberChatColors?: (serverId: string) => void;
   hasUsageLimits?: (serverId: string) => boolean;
   hasModelSources?: (serverId: string) => boolean;
@@ -47,6 +48,7 @@ export class RemoteEventRefresh {
   readonly #request: RemoteRequestFn;
   readonly #hasServer: (serverId: string) => boolean;
   readonly #emit: (serverId: string, event: AgentEvent, bufferedLive?: boolean) => void;
+  readonly #onReceivedRuntimeSnapshot: (serverId: string, snapshot: AgentRuntimeSnapshot) => void;
   readonly #onMemberChatColors: (serverId: string) => void;
   readonly #hasUsageLimits: (serverId: string) => boolean;
   readonly #hasModelSources: (serverId: string) => boolean;
@@ -72,6 +74,7 @@ export class RemoteEventRefresh {
     this.#request = options.request;
     this.#hasServer = options.hasServer;
     this.#emit = options.emit;
+    this.#onReceivedRuntimeSnapshot = options.onReceivedRuntimeSnapshot ?? (() => undefined);
     this.#onMemberChatColors = options.onMemberChatColors ?? (() => undefined);
     this.#hasUsageLimits = options.hasUsageLimits ?? (() => false);
     this.#hasModelSources = options.hasModelSources ?? (() => false);
@@ -84,6 +87,7 @@ export class RemoteEventRefresh {
     bufferedLive = false,
   ) {
     this.#advance(serverId);
+    if (event.type === "runtime-snapshot") this.#onReceivedRuntimeSnapshot(serverId, event.snapshot);
     if (event.type === "agents-changed") this.#rosterLoads.delete(serverId);
     if (event.type === "conversation-invalidated") {
       yield* this.#refreshConversationPage(serverId, event.agentId, event.revision);

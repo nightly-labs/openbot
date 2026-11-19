@@ -111,6 +111,7 @@ import {
 } from "./telegram-matching";
 import { REPEATABLE_GITHUB_ACTIONS, type WorkflowGitHubApi } from "./workflow-github-api";
 import type { WaitingGitHubDelivery, WorkflowGitHubStore } from "./workflow-github-store";
+import { nodeTimezone } from "./workflow-graph";
 import {
   isOpenStep,
   publicRun,
@@ -122,7 +123,12 @@ import {
   type WorkflowStepEnd,
 } from "./workflow-run-store";
 import { type WorkflowStore, WorkflowStoreError } from "./workflow-store";
-import { prepareWorkflowSchedules, type ScheduledWorkflowStart, workflowWebhookPayload } from "./workflow-triggers";
+import {
+  prepareWorkflowSchedules,
+  type ScheduledWorkflowStart,
+  workflowScheduleOutput,
+  workflowWebhookPayload,
+} from "./workflow-triggers";
 import {
   agentFileInputs,
   agentHandoffText,
@@ -943,6 +949,15 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           return runs.step(step.id)?.status !== "running";
         });
 
+        const triggerOutput = (node: WorkflowNode, run: StoredWorkflowRun | null): string => {
+          if (run?.payload) return run.payload;
+          if (!run || node.fields.trigger !== "schedule") return "";
+          return workflowScheduleOutput(
+            run.scheduledFor ?? run.startedAt,
+            nodeTimezone(node) ?? dependencies.timezone(),
+          );
+        };
+
         const execute = Effect.fn("Workflows.execute")(function* (
           step: StoredWorkflowStep,
           node: WorkflowNode,
@@ -954,7 +969,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           }
           switch (node.kind) {
             case "trigger":
-              settle(step, { status: "done", output: run?.payload ?? "" });
+              settle(step, { status: "done", output: triggerOutput(node, run) });
               return;
             case "prompt":
               settle(step, { status: "done", output: fieldText(node, "text") });
