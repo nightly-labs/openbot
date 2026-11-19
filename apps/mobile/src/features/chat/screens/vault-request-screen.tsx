@@ -4,6 +4,7 @@ import { vaultRequestHandoff } from "@/features/chat/model/vault-request";
 import { useServerVault } from "@/features/servers/model/use-server-vault";
 import { VaultItemForm } from "@/features/servers/screens/server-vault-item-screen";
 import { SettingsContent, SettingsNote } from "@/features/settings/components/settings-content";
+import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetCloseAction } from "@/shared/components/sheet-close-action";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
@@ -13,6 +14,9 @@ export function VaultRequestScreen() {
   const { requestId } = useLocalSearchParams<{ requestId: string }>();
   const [handoff] = useState(() => vaultRequestHandoff(requestId));
   const vault = useServerVault(handoff?.serverId ?? "");
+  const canSave = useMobileWorkspaceSelector((workspace) =>
+    handoff ? workspace.canSaveVaultRequest(handoff.serverId) : false,
+  );
   const close = () => {
     void haptics.impact("soft");
     router.back();
@@ -20,7 +24,7 @@ export function VaultRequestScreen() {
   return (
     <>
       <SheetCloseAction onPress={close} />
-      {handoff && vault.server && vault.canManage ? (
+      {handoff && vault.server && canSave ? (
         <VaultItemForm
           serverId={handoff.serverId}
           host={vault.server.name}

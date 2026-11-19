@@ -226,6 +226,25 @@ const US_KEYS: ReadonlyMap<string, UsKey> = new Map<string, UsKey>([
   ),
 ]);
 
+const PHYSICAL_KEY_CODES: ReadonlyMap<string, number> = new Map<string, number>([
+  ...[...US_KEYS.values()].map((usKey): [string, number] => [usKey.code, usKey.keyCode]),
+  ...[..."0123456789"].map((digit): [string, number] => [`Numpad${digit}`, 96 + Number(digit)]),
+  ["NumpadMultiply", 106],
+  ["NumpadAdd", 107],
+  ["NumpadSubtract", 109],
+  ["NumpadDecimal", 110],
+  ["NumpadDivide", 111],
+]);
+
+const ASCII_LETTER = /^[a-z]$/iu;
+
+export function printableKeyCode(key: string, code: string): number | undefined {
+  if ([...key].length !== 1) return undefined;
+  const usKey = US_KEYS.get(key);
+  if (ASCII_LETTER.test(key)) return usKey?.keyCode;
+  return PHYSICAL_KEY_CODES.get(code) ?? (usKey?.shift === false ? usKey.keyCode : undefined);
+}
+
 const MAX_KEYED_TEXT = 128;
 
 const EDITOR_COMPLETED_TEXT = /[\n\r([{'"`<]/;

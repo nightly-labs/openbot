@@ -51,7 +51,6 @@ import {
   promptRequestId,
   readBinary,
   readJson,
-  requireAdmin,
   requireAgentLevel,
   stringField,
 } from "./request-helpers";
@@ -340,7 +339,6 @@ export async function routeAgents(
       throw new HttpError(400, sourceText("error.team.secureAuthUnsupported"));
     if (!capabilities.has(BROWSER_SECRET_VAULT_CAPABILITY))
       throw new HttpError(400, sourceText("error.team.vaultUnsupported"));
-    requireAdmin(member);
     const input = parseBrowserSecretResponse({ ...(await readJson(request)), decision: "submit" });
     requireRequestAgent(input.agentId);
     await runCauseEffect(agents.respondToBrowserSecret({ ...input, saveToVault: true }));
