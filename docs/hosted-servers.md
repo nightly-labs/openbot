@@ -1743,8 +1743,9 @@ system and goes back to the pool for the next new server or the next move. The W
 
 A machine does not wait 14 days with the data of an ended plan. `sync` moves the data into an encrypted
 archive in Backblaze B2 and gives the machine back to the pool ([plan 012](../plans/012-pool-server-archive.md)).
-Do not run `sync --apply` with an archive before the restore (plan 012 item 4) is live: until then, a
-renewal of an archived server gets a new, empty server.
+A renewal before the archive is deleted restores the server on a free pool machine (plan 012 item 4,
+live since 2026-11-19). Run `sync --apply` each day, so that each ended plan frees its machine and each
+restored or due archive is deleted.
 
 1. `sync` finds each server on a machine with `desired_state = 'stopped'`, `plan_ended`, no open
    subscription and no live archive. It reads the newest subscription at Stripe. It archives only a
