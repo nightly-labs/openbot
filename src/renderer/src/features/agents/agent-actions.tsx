@@ -4,6 +4,7 @@ import { classifyFailure } from "@openbot/telemetry";
 import { toast } from "@openbot/ui";
 import type { AgentProfile } from "@openbot/ui/data";
 import {
+  AGENT_DELETE_UNDO_MS,
   AgentDeleteUndoToast,
   startUndoCountdown,
   type UndoCountdown,
@@ -17,6 +18,7 @@ import { desktopAnalytics } from "../../analytics";
 import { toAgentProfile, withoutAgent } from "../../app-message-projection";
 import { createStoredProfile } from "../../app-stored-values";
 import { useNavigation } from "../../navigation";
+import { usePlatform } from "../../platform";
 import { createScopeGuard } from "../../scope-lifetime";
 import { createSimpleContext } from "../../simple-context";
 import { useTurns } from "../../turns";
@@ -223,16 +225,23 @@ const AgentActions = createSimpleContext({
       for (const commit of [...pendingDeletes.values()]) commit();
     });
 
-    let pendingDeletesResumed = false;
+    let pendingDeletesResumed = Boolean(usePlatform().chatWindow);
     createEffect(
       () => (!pendingDeletesResumed && agentListSettled() ? agentList().map((agent) => agent.id) : null),
       (listedIds) => {
         if (!listedIds || pendingDeletesResumed) return;
         pendingDeletesResumed = true;
         const serverId = untrack(activeServerId);
-        for (const agentId of readPendingAgentDeletes(serverId)) {
-          if (listedIds.includes(agentId)) queueMicrotask(() => void deleteAgent(agentId, true));
-          else forgetPendingAgentDelete(serverId, agentId);
+        for (const [agentId, savedAt] of Object.entries(readPendingAgentDeletes(serverId))) {
+          if (!listedIds.includes(agentId)) {
+            forgetPendingAgentDelete(serverId, agentId);
+            continue;
+          }
+          const resume = () => {
+            if (scopeIsCurrent() && readPendingAgentDeletes(serverId)[agentId] === savedAt)
+              void deleteAgent(agentId, true);
+          };
+          window.setTimeout(resume, Math.max(0, savedAt + AGENT_DELETE_UNDO_MS - Date.now()));
         }
       },
     );
