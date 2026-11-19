@@ -1,9 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Context7 here is taken from context7.com and Upstash's context7
-// repository. Each page used is in `sources`. Check the sources again, and move `checkedAt`,
-// whenever this file changes.
-
 export const CONTEXT7_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

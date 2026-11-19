@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/import";
 
 export const messages = {
-  // Agent import errors and warnings.
   "error.import.manifestNotJson": "{manifest} 不是有效的 JSON。",
   "error.import.notAgentExport": "{manifest} 不是 OpenBot 助手导出文件。",
   "error.import.newerExportSkill": "该导出由更新版本的导出技能生成，请更新 OpenBot 后重试。",
@@ -47,7 +46,6 @@ export const messages = {
     "此服务器只接受不超过 100 MB 的导出文件。请更新服务器上的 OpenBot，以导入更大的导出文件。",
   "error.import.skillKept": "{name}：服务器已有技能“{skill}”，因该助手会使用该技能。请联系管理员更新它。",
   "error.import.skillRenamed": "{name}：技能“{skill}”的名称与另一个技能的名称过于相似，因此保存为“{renamed}”。",
-  // Hermes Agent import from a folder on this computer.
   "error.import.hermesNoProfiles": "该文件夹中没有 Hermes 配置。请选择包含 config.yaml 或 SOUL.md 的 Hermes 文件夹。",
   "error.import.hermesClosed": "这些 Hermes 配置已不再打开，请重新读取。",
   "error.import.hermesProfileMissing": "所选内容指向一个未被读取的 Hermes 配置。",
@@ -56,7 +54,6 @@ export const messages = {
   "error.import.hermesSkillSkipped": "{name}：已跳过技能“{skill}”。{reason}",
   "error.import.hermesSkillCodeAdded": "它含有读取这些配置时还没有的代码。请重新读取以允许它。",
   "error.import.hermesLinkNotSaved": "{name}：OpenBot 无法保存哪个助手来自该配置，因此下次导入会把它作为新助手添加。",
-  // Instance transfer between two OpenBot computers.
   "error.import.transferRemoteTooLarge":
     "已加入服务器的迁移文件必须小于 100 MB。请关闭工作区文件，或减少导出的助手数量。",
   "error.import.transferNotFile": "该文件不是 OpenBot 迁移文件。",
@@ -93,4 +90,5 @@ export const messages = {
     "{name}：MCP 服务器以关闭状态添加。请检查其命令，重新输入其取值和完整地址，然后在 市场、应用 中开启。",
   "error.import.transferValuesCleared": "{name}：可能包含密钥的取值已从其参数或地址中移除，请在设置中重新输入。",
   "error.import.transferSharedKept": "共享文件夹中已有 {number} 个同名文件，因此保持原样。",
+  "error.import.transferPartSkipped": "文件的部分内容无法导入。其他部分已在此服务器上，请不要再次导入该文件。",
 } as const satisfies PartialTranslation<typeof source>;

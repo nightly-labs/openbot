@@ -1,12 +1,10 @@
-// Checks saved accounts through the real runtime, account store, and provider adapters with local CLI fixtures.
-// Run: bun scripts/provider-account-reload-e2e.ts
-// Report: .openbot-build/provider-update-busy-e2e/account-reload-report.json
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import type { ProviderAccountState, ProviderAccountStatus } from "@openbot/contracts/ipc";
+import { agentProviderName, type ProviderAccountState, type ProviderAccountStatus } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { ConversationRuntime } from "../src/backend/agent/conversation-runtime";
 import { ProviderAccountStore } from "../src/backend/agent/provider-account-store";
@@ -30,7 +28,6 @@ export async function checkProviderAccountReload(): Promise<void> {
     OPENBOT_CLAUDE_PATH: process.env.OPENBOT_CLAUDE_PATH,
   };
 
-  // Account status comes from a file in the selected account folder, never from a real sign-in.
   const FAKE_CLI = `#!${process.execPath}
 const fs = require("node:fs");
 const path = require("node:path");
@@ -255,8 +252,6 @@ require("node:readline").createInterface({ input: process.stdin }).on("line", (l
       runtime = undefined;
     }
 
-    // An account that lost its login after its check: the start of an agent on it must say so and
-    // change the row, which stayed "connected" (#8277).
     const lostLogin = new ProviderAccountStore(accountsPath, accountsRoot);
     await runCauseEffect(lostLogin.load());
     runtime = createRuntime(lostLogin);
@@ -281,7 +276,34 @@ require("node:readline").createInterface({ input: process.stdin }).on("line", (l
     await stop(runtime);
     runtime = undefined;
 
-    // A provider that reports no account must finish its check without removing the saved account.
+    const turnLostLogin = new ProviderAccountStore(accountsPath, accountsRoot);
+    await runCauseEffect(turnLostLogin.load());
+    runtime = createRuntime(turnLostLogin);
+    await runCauseEffect(runtime.start());
+    await waitForAccounts(runtime, "connected");
+    for (const provider of providersToCheck) {
+      const accountId = turnLostLogin.list(provider)[0]?.id;
+      assert.ok(accountId);
+      const client = await runCauseEffect(
+        runtime.ensureAgentClient({ ...agent, provider, providerAccountId: accountId }),
+      );
+      assert.ok(client instanceof EventEmitter);
+      const turnFailed = (message: string) =>
+        client.emit("notification", { method: "error", params: { threadId: "thread", turnId: "turn", message } });
+      turnFailed("API Error: 403 Forbidden");
+      const row = () =>
+        runtime
+          ?.status()
+          .providers?.find((status) => status.id === provider)
+          ?.accounts?.find((a) => a.id === accountId);
+      assert.equal(row()?.state, "connected");
+      turnFailed(sourceText("error.provider.signInExpired", { provider: agentProviderName(provider) }));
+      assert.equal(row()?.state, "signed-out");
+    }
+    results.push({ name: "a turn that finds no login marks the account signed out", passed: true });
+    await stop(runtime);
+    runtime = undefined;
+
     const signedOut = new ProviderAccountStore(accountsPath, accountsRoot);
     await runCauseEffect(signedOut.load());
     for (const account of signedOut.list()) await saveAccount(signedOut.home(account), null);

@@ -197,6 +197,8 @@ export const messages = {
   "agentSettings.fullAccess.confirm": "Volledige toegang toestaan",
   "agentSettings.fullAccess.askConfirm": "Eerst vragen gebruiken",
   "agentSettings.links.usage": "Gebruik",
+  "agentSettings.links.apps": "Apps",
+  "agentSettings.links.appsScope": "Alle agents",
   "agentSettings.links.memories": "Herinneringen",
   "agentSettings.links.memoriesCount": { one: "{count} opgeslagen", other: "{count} opgeslagen" },
   "agentSettings.links.skills": "Vaardigheden",

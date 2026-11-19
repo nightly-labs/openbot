@@ -216,6 +216,13 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.webhook.rotateBody": "The current secret stops working. The host rejects requests that use it.",
   "mobile.agent.webhook.rotateConfirm": "Regenerate",
   "mobile.agent.webhook.rotateFailed": "Could not regenerate the secret. Try again.",
+  "mobile.agent.webhook.giveToAgent": "Give the signing secret to {name}",
+  "mobile.agent.webhook.giveTitle": "Give a new signing secret to {name}?",
+  "mobile.agent.webhook.giveBody":
+    "The current secret stops working. {name} saves the new secret as an API key and can add it to the sender.",
+  "mobile.agent.webhook.giveConfirm": "Give secret",
+  "mobile.agent.webhook.giveFailed": "Could not give the signing secret to the agent. Try again.",
+  "mobile.agent.webhook.given": "{name} has the new signing secret.",
   "mobile.agent.webhook.activity": "Activity",
   "mobile.agent.webhook.activityFailed": "Could not load the activity. Try again.",
   "mobile.agent.webhook.activity.ignored": "Ignored",

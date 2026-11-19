@@ -1,9 +1,3 @@
-// The one list of provider pages: what OpenBot does with each coding agent it runs.
-// Like the comparisons, the sitemap, the feed, the head tags and the build-time
-// image generator read it, and the page is drawn from the data in src/content/providers.
-//
-// No JSX here, for the same reason `content-collection.ts` holds none.
-
 import { type ContentCollection, publishedFirst } from "./content-collection";
 import { NEWS_AUTHOR } from "./news";
 

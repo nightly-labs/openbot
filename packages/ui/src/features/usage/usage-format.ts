@@ -5,7 +5,6 @@ import { currentText, type TextValue } from "../../text";
 
 type UsageText = Pick<TextValue, "t" | "format">;
 
-// The header filters keep these ids in memory only. The labels come from the maps below.
 export const usageMetrics = ["cost", "tokens"] as const;
 export type UsageMetric = (typeof usageMetrics)[number];
 export const usageMetricLabels = {
@@ -20,17 +19,12 @@ export const usagePeriodLabels = {
   "90d": "usage.period.days90",
   "1y": "usage.period.year",
 } as const satisfies Record<UsagePeriod, AppTextKey>;
-// A label is not a number of days once "1 year" is an option, and the host rejects a
-// range wider than 367 days, so a year is the 365 the calendar names rather than 366.
 export const usagePeriodDays: Record<UsagePeriod, number> = {
   "7d": 7,
   "30d": 30,
   "90d": 90,
   "1y": 365,
 };
-// A report row names an agent by id, and the provider is empty when the agent is not in
-// the list the panel read, because UsageProviderMark already draws nothing for a string
-// it does not recognize.
 export interface UsageAgentLabel {
   name: string;
   provider: string;
@@ -58,11 +52,6 @@ export function usageExactCost(value: number | null, text: UsageText = currentTe
     ? text.t("usage.unavailable")
     : text.t("usage.exactCost", { amount: text.format.number(value, { maximumFractionDigits: 12 }) });
 }
-/**
- * Usage rows name the tool rather than the account: a cost line is about what ran, not about who
- * paid. A provider this build does not know is shown as the raw id, because usage history outlives
- * the provider list.
- */
 export function usageProviderName(provider: string): string {
   return isAgentProvider(provider) ? agentProviderCliName(provider) : provider;
 }
@@ -77,9 +66,6 @@ export function usageProviders(models: AnalyticsModel[]) {
   return [...providers.values()];
 }
 
-// A series wears its provider's colour, never the colour of its rank: the provider list
-// re-sorts when the metric changes, and a legend dot that repainted with it would say a
-// different area belongs to the row.
 const seriesColors: Readonly<Record<string, string>> = {
   codex: "var(--openbot-chart-series-codex)",
   claude: "var(--openbot-chart-series-claude)",

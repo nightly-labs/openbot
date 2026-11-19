@@ -20,11 +20,9 @@ const LABELS = {
   schedule: "mobile.app.route.schedule",
   search: "mobile.app.quickAction.search",
   share: "mobile.app.quickAction.share",
-  // The same title as the icon menu, so the user finds the item that they saw there.
   support: "mobile.app.quickAction.support",
 } as const satisfies Record<QuickActionKind, MobileTextKey>;
 
-/** Settings > App Icon Menu: the quick actions that the phone shows when the user holds the app icon. */
 export function QuickActionsSettingsScreen() {
   const { t } = useText();
   const { theme } = useUniwind();
@@ -50,7 +48,6 @@ export function QuickActionsSettingsScreen() {
             <SettingsRow key={kind}>
               <SettingsSwitch
                 value={on}
-                // At the limit, the user turns an item off before another one goes on.
                 disabled={!kinds || (!on && full)}
                 label={t(LABELS[kind])}
                 dark={theme === "dark"}

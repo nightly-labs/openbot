@@ -8,7 +8,6 @@ afterEach(() => {
   for (const database of databases.splice(0)) database.close();
 });
 
-// The column list of the Worker before `0024`. CI applies the migration before it deploys the new Worker.
 const insertSiteAsOldWorker = (database: DatabaseSync, id: string, status: string) =>
   database
     .prepare(

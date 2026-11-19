@@ -1,7 +1,6 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.marketplace", {
-  // Agent marketplace and agent link errors.
   "error.marketplace.timezoneInvalid": "The local timezone is invalid.",
   "error.marketplace.installedAgentMissing": "The installed agent no longer exists.",
   "error.marketplace.differentListing": "This local agent was installed from a different marketplace agent.",
@@ -39,7 +38,6 @@ export const messages = defineMessages("error.marketplace", {
     one: 'The routine "{name}" needs a name of up to {count} characters and an instruction.',
     other: 'The routine "{name}" needs a name of up to {count} characters and an instruction.',
   },
-  // Fills `{name}` above when the routine has no name.
   "error.marketplace.templateRoutineNoName": "without a name",
   "error.marketplace.templateTooLarge":
     "This agent is too large to publish. Shorten its instructions, skills or routines.",

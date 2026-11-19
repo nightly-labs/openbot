@@ -49,7 +49,6 @@ const quietRoutineDelivery: DeliveryContext = {
 
 const FAILED_DELIVERY_ID = "failed-routine-delivery";
 const FAILED_ANSWER = "The server is not reachable.";
-/** A scheduled run whose agent called `routine_report_failure`: its delivery completed with the reason. */
 const failedRoutineDelivery: DeliveryContext = {
   ...quietRoutineDelivery,
   delivery: {
@@ -63,7 +62,6 @@ const failedRoutineDelivery: DeliveryContext = {
 
 const REQUEST_DELIVERY_ID = "teammate-request-delivery";
 const REQUEST_ANSWER = "READY went to the teammate.";
-/** A teammate's request that the agent answered with its own reply (#7465). */
 const teammateRequestDelivery: DeliveryContext = {
   ...quietRoutineDelivery,
   delivery: {
@@ -78,7 +76,6 @@ const teammateRequestDelivery: DeliveryContext = {
 
 const QUESTION_DELIVERY_ID = "teammate-question-delivery";
 const QUESTION_ANSWER = "I sent the result and asked you which file to keep.";
-/** An answered teammate request whose turn also asked the user a question: the turn stays shown. */
 const teammateQuestionDelivery: DeliveryContext = {
   ...teammateRequestDelivery,
   delivery: {
@@ -103,11 +100,6 @@ interface Report {
   acceptance: Record<string, boolean>;
 }
 
-/**
- * Imports the same provider history more than once into a real database, as each start does, and
- * records that only new or changed turns are written again. It also records that an imported Codex
- * or Claude turn keeps only item hashes, and that a changed turn imports only from full items.
- */
 async function runProviderHistoryReimportCheck(outputPath: string): Promise<Report> {
   const databaseRoot = await mkdtemp(join(tmpdir(), "openbot-provider-history-reimport-"));
   const homeRoot = await mkdtemp(join(tmpdir(), "openbot-provider-history-reimport-home-"));
@@ -195,7 +187,6 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
 
     const first = await runImport("codex-session", "codex", codexHistory);
     const messagesAfterFirst = messageTexts();
-    // Three imported turns of two items each keep only hashes. The records-only turn stays in full.
     const compactedAfterFirst = compactedRows("codex-session");
     const recordsOnlyKeptFull =
       stagedRows("codex-session", "codex-records-only") === 2 &&
@@ -212,7 +203,6 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
     const repeatWroteNoEvent = events() === eventsBeforeRepeat;
     const repeatKeptMessages = JSON.stringify(messageTexts()) === JSON.stringify(messagesAfterFirst);
 
-    // A start that stops after it staged unchanged turns must not move the time of the last full read.
     database.connection
       .prepare("UPDATE provider_history_imports SET updated_at = ? WHERE session_id = ?")
       .run(SENTINEL_TIME, "codex-session");
@@ -237,7 +227,6 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
     const claudeFirst = await runImport("claude-session", "claude", claudeHistory);
     const claudeRepeat = await runImport("claude-session", "claude", claudeHistory);
 
-    // A turn in two fragments: a change in the first one must still import the turn.
     const splitFirst = await runImport("split-session", "codex", splitTurn("split-turn", 8));
     const splitRepeat = await runImport("split-session", "codex", splitTurn("split-turn", 8));
     const splitEdited = await runImport("split-session", "codex", splitTurn("split-turn", 8, "edited"));
@@ -245,13 +234,9 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
 
     const claudeCompacted = compactedRows("claude-session") === 4;
 
-    // ACP transcripts are user data: their items stay in full after import.
     const grokFirst = await runImport("grok-session", "grok", [{ ...turn("grok-turn-1", 20), recordsOnly: true }]);
     const grokKeptFull = stagedRows("grok-session") === 2 && compactedRows("grok-session") === 0;
 
-    // A turn in two fragments whose second fragment changes. The first read writes the second fragment
-    // in full but must not import: the first fragment holds only a hash. The next read writes the first
-    // fragment in full, then imports the whole turn.
     const lateTurnId = "late-split-turn";
     const lateFirst = await runImport("late-split-session", "codex", splitTurn(lateTurnId, 13));
     const lateCompacted = compactedRows("late-split-session") === 2;
@@ -277,8 +262,6 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
       !lateTexts.includes("Part B 13") &&
       compactedRows("late-split-session") === 2;
 
-    // The provider drops an item and changes another. The dropped item's hash is deleted after the
-    // full read, so the turn imports in the same read and does not wait for an item that never comes.
     const staleTurnId = "stale-turn";
     const staleFull: ProviderHistoryFragment = {
       ...turn(staleTurnId, 14),
@@ -296,13 +279,9 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
       stagedRows("stale-session") === 2 &&
       compactedRows("stale-session") === 2;
 
-    // A retired session whose compacted turn changed in its second fragment. Each start reads a retired
-    // session only while `retiredSessionNeedsHistoryRead` (the rule of `boot-recovery.ts`) says so. The
-    // first changed read must not end the import, or no later start reads the session again.
     const retiredSessionId = "retired-session";
     const retiredTurnId = "retired-split-turn";
     const retiredFirst = await runImport(retiredSessionId, "codex", splitTurn(retiredTurnId, 21));
-    // The provider changed the turn after the last complete read, then the session was retired.
     const retiredAt = "2001-01-01T00:00:00.000Z";
     database.connection
       .prepare("UPDATE provider_history_imports SET updated_at = ? WHERE session_id = ?")
@@ -328,8 +307,6 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
       !retiredTexts.includes("Part B 21") &&
       compactedRows(retiredSessionId) === 2;
 
-    // A database from before compaction: imported Codex rows in full, a Codex turn that is not
-    // imported, and Grok rows. Only the imported Codex rows are compacted, in small batches.
     const legacyHistory = [turn("legacy-turn-1", 15), turn("legacy-turn-2", 16)];
     const legacyFirst = await runImport("legacy-session", "codex", legacyHistory);
     const restoreFull = database.connection.prepare(
@@ -342,8 +319,6 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
       fragment: { ...turn("legacy-running-turn", 17), complete: false },
     });
     const legacyFullBefore = stagedRows("legacy-session") === 6 && compactedRows("legacy-session") === 0;
-    // Without the schema 64 marker, an older release can open the file, so nothing is compacted: not
-    // the existing rows, and not a turn that an import writes.
     const marker = database.connection.prepare("SELECT applied_at FROM schema_migrations WHERE version = 64").get();
     database.connection.prepare("DELETE FROM schema_migrations WHERE version = 64").run();
     const belowMarkerRows = await Effect.runPromise(compactImportedProviderHistory(database, Duration.zero));
@@ -371,7 +346,6 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
     const legacyRepeatWroteNothing =
       legacyRepeat.turns === 0 && stagingRewritten() === 0 && events() === eventsBeforeLegacyRepeat;
 
-    // A quiet routine run that a Claude agent answered live, and that the next start imports.
     const quietTurnId = "claude-quiet-turn";
     database.persistConversationChanges({
       agentId,
@@ -395,7 +369,6 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
       .readConversation(agentId, threadId)
       .messages.filter((message) => message.turnId === quietTurnId && message.author === "assistant");
 
-    // A run that reported a failure is never quiet, also after a no-update call.
     const failedTurnId = "claude-failed-turn";
     const claudeFailed = await runImport("claude-failed-session", "claude", [
       quietRoutineTurn(failedTurnId, 10, FAILED_DELIVERY_ID, FAILED_ANSWER),
@@ -404,8 +377,6 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
       .readConversation(agentId, threadId)
       .messages.filter((message) => message.turnId === failedTurnId && message.author === "assistant");
 
-    // An answered teammate request whose agent wrote text and did not call the no-update tool: the
-    // turn completion made the text quiet, so the import does too (#7465).
     const requestTurnId = "claude-request-turn";
     const claudeRequest = await runImport("claude-request-session", "claude", [
       {
@@ -424,8 +395,6 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
       .readConversation(agentId, threadId)
       .messages.filter((message) => message.turnId === requestTurnId && message.author === "assistant");
 
-    // The same, but the turn also asked the user a question. OpenBot stored the question in the chat,
-    // and the provider history does not hold it, so the import reads it there and keeps the turn shown.
     const questionTurnId = "claude-question-turn";
     database.persistConversationChanges({
       agentId,
@@ -461,7 +430,6 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
       .readConversation(agentId, threadId)
       .messages.find((message) => message.turnId === questionTurnId && message.text === QUESTION_ANSWER);
 
-    // A turn that an import did not finish keeps `imported = 0` and is imported at the next start.
     database.connection
       .prepare("UPDATE provider_history_turns SET imported = 0 WHERE session_id = ? AND turn_id = ?")
       .run("codex-session", "codex-turn-3");
@@ -546,9 +514,6 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
         retiredSessionWaitingTurnImportsOnNextStart: retiredWaitingTurnImports,
         existingRowsWereFull: legacyFirst.turns === 2 && legacyFullBefore,
         noCompactionBelowSchema64: belowMarkerKeptFull,
-        // Four legacy rows, the two rows of the turn imported below schema 64, and the two rows of the
-        // records-only Codex turn above: only ACP and Pi send records-only turns
-        // (`provider-history-persistence.ts`), so a real Codex session has none.
         existingImportedRowsCompacted:
           existingRows.rows === 8 && legacyCompacted && compactedRows("below-marker-session") === 2,
         existingRowCompactionRunsOnce: repeatCompaction.rows === 0,
@@ -581,7 +546,6 @@ function turn(turnId: string, startedAt: number, suffix?: string): ProviderHisto
   };
 }
 
-/** A scheduled run that called the no-update tool and wrote a short answer, as Claude stores it. */
 function quietRoutineTurn(
   turnId: string,
   startedAt: number,

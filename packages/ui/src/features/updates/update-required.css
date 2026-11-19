@@ -1,6 +1,3 @@
-/* "Update required" uses the sign-in layout (`auth.css`). These rules add only its failure line,
-   its progress and its secondary action. */
-
 .update-required-progress {
   display: flex;
   flex-direction: column;
@@ -34,7 +31,6 @@
   line-height: 18px;
 }
 
-/* A failure uses the place and the size of the note. Only the icon has the danger colour. */
 .update-required-error {
   color: var(--openbot-text-primary);
   text-wrap: balance;

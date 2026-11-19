@@ -15,6 +15,8 @@ export const messages = {
     "{provider} kann keine Verbindung zum Modellanbieter herstellen. Neuer Versuch: {attempt}.",
   "status.provider.modelRetryServerError":
     "Der Modellanbieter ist ausgelastet oder hat einen Fehler. {provider} versucht es erneut: Versuch {attempt}.",
+  "status.provider.modelRetryOutOfMemory":
+    "Dem Modellserver ist für diesen Chat der Speicher ausgegangen. {provider} versucht es erneut: Versuch {attempt}. Ein neuer Chat braucht weniger Speicher.",
   "status.provider.modelRetryRecovered": "Der Modellanbieter antwortet wieder.",
   "status.provider.retryRecovered": "{provider} erhält wieder Antworten von seinem Server.",
   "status.provider.claudeFastModeNeedsUsageCredits":

@@ -1,4 +1,3 @@
-/** Bytes per `String.fromCharCode` call. One call per byte is slow for a file; a small chunk stays under engine argument limits. */
 const BINARY_CHUNK = 0x2000;
 
 export function bytesToBase64(bytes: Uint8Array): string {

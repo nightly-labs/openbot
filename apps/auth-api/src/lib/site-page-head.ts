@@ -2,11 +2,8 @@ import { SITE_OPEN_GRAPH_LOCALES } from "./site-locale";
 import { OPENBOT_X_HANDLE, type PageSocialImage, pageSocialImageMeta } from "./site-metadata";
 import { type EnglishPagePath, pagePaths, SITE_LOCALES, type SiteLocale, siteHreflang } from "./site-paths";
 
-/** The head of a page that has localized copies, in one language. */
 export interface SitePageHead {
-  /** The English address of the page. */
   page: EnglishPagePath;
-  /** The address of this route: the English address, or a localized one. */
   path: string;
   locale: SiteLocale;
   title: string;
@@ -14,11 +11,6 @@ export interface SitePageHead {
   image: PageSocialImage;
 }
 
-/**
- * The head tags of a page with localized copies. The English address shows the language of the
- * request, so its canonical address stays the English address. The `hreflang` links name the English
- * address for English and as `x-default`, and the localized address for each other language.
- */
 export function sitePageHead(siteUrl: string, head: SitePageHead) {
   const url = new URL(head.path, siteUrl).toString();
   const image = pageSocialImageMeta(head.image, siteUrl);

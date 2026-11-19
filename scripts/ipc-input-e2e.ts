@@ -1,8 +1,3 @@
-// Sends malformed requests from the window of a running dev app through `window.openbot`, and checks
-// that the main process refuses each one with the message of its input decoder. A compromised
-// renderer reaches main through these same channels, so the decoders in `src/main/ipc` are the
-// boundary. Writes .openbot-build/ipc-input-e2e/report.json. Needs `--allow-mutations`: each request
-// is one that a broken decoder would let change the app.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -14,7 +9,6 @@ import type { Page } from "playwright-core";
 import { assertMutationAllowed, connectToDevApp } from "./dev-automation/cdp-client";
 import { readDevInstanceRecords } from "./dev-automation/instance-registry";
 
-// The page functions below run in the app window, where the preload bridge sets this.
 declare global {
   interface Window {
     openbot: OpenBotDesktopApi;
@@ -26,10 +20,8 @@ const TOO_LONG_ID = "x".repeat(INPUT_LIMITS.identifier + 1);
 
 interface Check {
   name: string;
-  /** The method on `window.openbot`, as a property path. */
   method: readonly string[];
   args: readonly unknown[];
-  /** Text that the refusal must contain. */
   refusal: string;
 }
 
@@ -96,10 +88,6 @@ const CHECKS: readonly Check[] = [
   },
 ];
 
-/**
- * Calls the method in the app window and returns its refusal, or null when it succeeded. The call is
- * page source, because the arguments are malformed on purpose and no TypeScript signature takes them.
- */
 async function refusal(page: Page, check: Check): Promise<string | null> {
   const call = `window.openbot.${check.method.join(".")}(${check.args.map((arg) => JSON.stringify(arg)).join(", ")})`;
   const result = await page.evaluate(`(async () => {

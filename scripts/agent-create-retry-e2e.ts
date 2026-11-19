@@ -1,17 +1,3 @@
-// Sends the same create of an agent again, as a client does when the answer to the first create got
-// lost, and checks that the host makes one agent and sends one initial message (agent-create-operation-v1).
-// A real `TeamApiServer` runs on loopback with the real team, agent and mailbox stores on a temporary
-// profile, and each turn goes to a fake Codex app-server, so no real provider CLI starts.
-// 1. The host advertises agent-create-operation-v1, and the protocol 9 client and host codecs keep the field.
-// 2. Two creates at the same time and a third after them, with one operationId, give one agent and one turn.
-// 3. The same operationId from a different member makes that member's own agent.
-// 4. After the agent is deleted, the same operationId makes a new agent.
-// 5. After a restart, the same operationId gives the agent of step 4: the key is persisted.
-// 6. An operationId that is not a UUID v4 is refused and makes no agent.
-// 7. Creates without operationId each make an agent, as the released route does.
-// Run: `bun run test:agent-create-retry`.
-// Writes .openbot-build/agent-create-retry-e2e/report.json.
-
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -34,6 +20,7 @@ import {
   decodeTeamProtocolV9WebRtcHttpRequest,
   encodeTeamProtocolV9WebRtcHttpRequest,
 } from "@openbot/contracts/team-protocol/v9-webrtc-adapter";
+import { retryOperationIds } from "@openbot/team-client/retry-operation-id";
 import { plugin } from "bun";
 import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
@@ -54,13 +41,11 @@ const home = join(root, "home");
 const fakeCodex = join(root, "codex");
 const fakeLog = join(root, "codex.jsonl");
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
 mkdirSync(home, { recursive: true });
 
-/** A Codex app-server with the methods that the service calls. Each turn is logged and answers "Done.". */
 const FAKE_CODEX = `#!/usr/bin/env node
 const { appendFileSync } = require("node:fs");
 if (process.argv.includes("--version")) {
@@ -94,7 +79,6 @@ const answer = (message) => {
     case "thread/items/list": return write({ id: message.id, result: { data: [], nextCursor: null } });
     case "thread/read": return write({ id: message.id, result: { thread: { id: params.threadId, turns: [] } } });
     case "turn/start": {
-      // The process id tells the turns of one host from those of the host before a restart.
       const turnId = "turn-" + process.pid + "-" + (++turns);
       const text = (params.input || []).map((item) => item.text || "").join("\\n");
       appendFileSync(LOG, JSON.stringify({ turnId, text }) + "\\n");
@@ -138,7 +122,6 @@ const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 const { SidebarLayoutStore } = await import("../src/backend/sidebar-layout-store");
 
-// The main process imports Electron for its windows and IPC. No check here opens a window.
 plugin({
   name: "agent-create-retry-electron-boundary",
   setup(build) {
@@ -187,7 +170,6 @@ const report: { passed: boolean; unverified: string[]; steps: Step[] } = {
   steps: [],
 };
 
-/** Runs one check. `summarize` keeps session tokens out of the report. */
 async function step<T>(
   name: string,
   run: () => Promise<T>,
@@ -196,7 +178,6 @@ async function step<T>(
   process.stdout.write(`- ${name}\n`);
   let deadline: ReturnType<typeof setTimeout> | undefined;
   try {
-    // A bound on failure only: each check waits for its reply or event, and a missing event must fail.
     const value = await Promise.race([
       run(),
       new Promise<never>((_, reject) => {
@@ -246,6 +227,7 @@ const teamBrowser: TeamApiBrowser = {
   stopTeach: () => [],
   releaseUserControl: () => {},
   releaseUserControlHeldBy: () => {},
+  releaseUserControlRefused: () => {},
   close: unused,
   capturePreview: unused,
   setVisible: unused,
@@ -265,13 +247,11 @@ interface Host {
   server: InstanceType<typeof TeamApiServer>;
   team: InstanceType<typeof TeamStore>;
   port: number;
-  /** The agent service events since the host started. */
   events: AgentEvent[];
 }
 
 let host: Host | null = null;
 
-/** Starts the host on the profile, as the app does. The stores keep their files. */
 async function startHost(): Promise<Host> {
   const database = new OpenBotDatabase(userData);
   const agentStore = new AgentStore(userData, home, database);
@@ -320,7 +300,6 @@ function current(): Host {
   return host;
 }
 
-/** The turns that the fake provider started. */
 function turns(): { turnId: string; text: string }[] {
   let log = "";
   try {
@@ -334,7 +313,6 @@ function turns(): { turnId: string; text: string }[] {
     .map((line) => JSON.parse(line));
 }
 
-/** Waits for a state of the service. The step deadline bounds a state that never comes. */
 async function waitFor<T>(read: () => T | null | undefined | false | Promise<T | null>): Promise<T> {
   for (;;) {
     const value = await read();
@@ -343,7 +321,6 @@ async function waitFor<T>(read: () => T | null | undefined | false | Promise<T |
   }
 }
 
-/** One request from a current protocol 9 client. */
 async function call(
   method: string,
   path: string,
@@ -373,7 +350,6 @@ async function login(credentials: { username: string; password: string }): Promi
   return response.body.sessionToken;
 }
 
-/** Creates an agent through `POST /v1/agents`. `marker` is in its initial message. */
 async function create(
   token: string,
   marker: string,
@@ -400,7 +376,6 @@ function agentIds(): string[] {
     .map((agent) => agent.id);
 }
 
-/** Waits until the agent answered its initial message and has no more work. */
 async function settled(agentId: string) {
   const { agents } = current();
   return waitFor(async () => {
@@ -412,7 +387,6 @@ async function settled(agentId: string) {
   });
 }
 
-/** The user messages and the provider turns that have `marker`. */
 async function sentFor(agentId: string, marker: string): Promise<{ messages: number; turns: number }> {
   const conversation = await settled(agentId);
   return {
@@ -460,7 +434,6 @@ try {
     const hostFrame = decodeTeamProtocolV9WebRtcHttpRequest("POST", "/v1/agents", frame, options);
     for (const value of [http, hostHttp, frame, hostFrame])
       assert.ok(isRecord(value) && value.operationId === id, "A protocol 9 codec dropped operationId.");
-    // Protocol 8 is frozen: it never carries the field.
     const v8 = teamHttpCodec(TEAM_PROTOCOL_V8).decodeRequest(
       "POST",
       "/v1/agents",
@@ -473,6 +446,29 @@ try {
       "A malformed operationId did not fail closed.",
     );
     return { kept: 4, protocol8: "dropped" };
+  });
+
+  await step("a client keeps an operation id only for the next retry, for 10 minutes", async () => {
+    const ids = retryOperationIds(() => crypto.randomUUID());
+    const write = ["server", "agent"];
+    const first = ids(write);
+    first.failed();
+    assert.equal(ids(write).id, first.id, "A retry after a failure got a new id.");
+    assert.notEqual(ids(write).id, first.id, "A write after a successful retry kept the old id.");
+    const failed = ids(write);
+    failed.failed();
+    ids(["server", "other agent"]);
+    assert.notEqual(ids(write).id, failed.id, "A retry after another write kept the old id.");
+    const late = ids(write);
+    late.failed();
+    const now = Date.now;
+    Date.now = () => now() + 10 * 60_000;
+    try {
+      assert.notEqual(ids(write).id, late.id, "A retry after 10 minutes kept the old id.");
+    } finally {
+      Date.now = now;
+    }
+    return { retry: "same id", afterSuccess: "new id", afterOtherWrite: "new id", after10Minutes: "new id" };
   });
 
   const operationId = crypto.randomUUID();

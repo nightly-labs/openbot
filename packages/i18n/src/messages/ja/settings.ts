@@ -23,6 +23,13 @@ export const messages = {
   "settings.codeFont.title": "コードのフォント",
   "settings.codeFont.description": "コード、ターミナル、ファイルパスのフォントです。",
   "settings.codeFont.default": "デフォルト",
+  "settings.motion.title": "モーション",
+  "settings.backgroundBlur.title": "背景のぼかし",
+  "settings.backgroundBlur.description":
+    "メニューとダイアログの背後のぼかしです。GPU のないコンピュータでは最初はオフです。",
+  "settings.movingFaces.title": "動くエージェントの顔",
+  "settings.movingFaces.description":
+    "エージェントの顔がまばたきして動きます。GPU のないコンピュータでは最初は止まっています。",
   "settings.logoColor.title": "ロゴの色",
   "settings.logoColor.description": "Dock、タスクバー、Dynamic Island に表示されます。",
   "settings.logoColor.buildNote": "このビルドは独自のロゴの色を使います。選択はリリース版のアプリに適用されます。",
@@ -465,7 +472,6 @@ export const messages = {
   "settings.profile.share.copyFailed": "画像をコピーできませんでした。",
   "settings.profile.share.createFailed": "画像を作成できませんでした。",
   "settings.profile.share.fileName": "openbot-activity.png",
-  // The text in the image to share.
   "settings.profile.share.caption": "OpenBot と過ごした直近 6 か月",
   "settings.profile.activity.title": "このコンピューターでのアクティビティ",
   "settings.profile.activity.activeDays": {
@@ -474,7 +480,6 @@ export const messages = {
   "settings.profile.activity.empty": "まだアクティビティはありません",
   "settings.profile.activity.loading": "アクティビティを読み込んでいます…",
   "settings.profile.activity.loadFailed": "アクティビティを読み込めませんでした。",
-  // {tokens} is a short number, such as 1.2M.
   "settings.profile.activity.heatmapLabel": {
     other: "過去 1 年間に {count} 日アクティブ、{tokens} トークン",
   },
@@ -646,7 +651,6 @@ export const messages = {
   "settings.hostedServers.plan.standard.summary": "毎日のルーティンがある小さなチーム向け。",
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "多数のエージェントとブラウザーの多用向け。",
-  // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "音声入力",
   "settings.voice.model.parakeet.description": "高速です。ヨーロッパの 25 言語で、話している言語を自動で判別します。",
   "settings.voice.model.parakeetUnified.description":
@@ -816,8 +820,12 @@ export const messages = {
   "settings.transfer.copy.noAgents": "このサーバーにはエージェントがありません。",
   "settings.transfer.copy.new": "新規",
   "settings.transfer.copy.notCopied":
-    "エージェントのチャンネルと共有フォルダーもコピーされます。API キー、サインイン、コネクタ、チャット履歴はコピーされません。別のサーバーで設定し直してください。",
+    "エージェントのチャンネル、ルーティンフロー、ワークフロー、共有フォルダーもコピーされます。API キー、サインイン、コネクタ、チャット履歴はコピーされません。別のサーバーで設定し直してください。",
   "settings.transfer.copy.submit": { other: "エージェント {count} 件をコピー" },
+  "settings.transfer.copy.duplicatesTitle": "重複するエージェントをコピーしますか？",
+  "settings.transfer.copy.duplicatesDescription":
+    "{server} には次の名前のエージェントがすでにあります: {names}。コピーすると、それぞれ 2 つ目のエージェントが追加されます。各コピーは別のエージェントで、チャット、ファイル、メモリーはそれぞれ独立しています。",
+  "settings.transfer.copy.duplicatesConfirm": "重複をコピー",
   "settings.transfer.copy.copying": "コピー中…",
   "settings.transfer.copy.done": { other: "エージェント {count} 件を {server} にコピーしました。" },
   "settings.transfer.copy.open": "{server} を開く",

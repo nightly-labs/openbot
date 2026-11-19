@@ -259,6 +259,8 @@ export const messages = {
     "Ten agent może używać tylko ograniczonej liczby serwerów MCP. Aby użyć tego serwera, wyłącz serwer MCP, którego agent nie potrzebuje.",
   "error.backend.mcpRegistrationRefused":
     "Serwer logowania nie akceptuje jeszcze OpenBot jako aplikacji. Przyczyną nie jest twoje konto. Połącz się w inny sposób, na przykład przez lokalny serwer MCP.",
+  "error.backend.mcpRegistrationUnavailable":
+    "Serwer logowania nie może zarejestrować OpenBot jako aplikacji. Przyczyną nie jest twoje konto. Aby się połączyć, zapisz ten serwer w Marketplace, Aplikacje, a potem dodaj do niego aplikację logowania.",
   "error.backend.mcpSignInAbandonedGeneric": "Logowanie zostało porzucone.",
   "error.backend.mcpSignInForgotten": "Logowanie MCP zostało zapomniane w trakcie działania.",
   "error.backend.mcpSignInAbandoned": "Logowanie MCP zostało porzucone.",
@@ -271,6 +273,7 @@ export const messages = {
     "Ten serwer wymaga zalogowania, a OpenBot loguje się tylko przez https. Zmień URL na {url}.",
   "error.backend.mcpSignInCancelled": "Logowanie zostało anulowane.",
   "error.backend.mcpSignInTimedOut": "Logowanie nie zostało ukończone w przeglądarce.",
+  "error.backend.mcpSignInRefused": "Strona logowania odmówiła dostępu. Zaloguj się ponownie.",
   "error.backend.mcpSignInResponseTimedOut": "Odpowiedź logowania nie dotarła na czas.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot nie mógł odczytać informacji o logowaniu tego serwera. Sprawdź adres serwera i spróbuj ponownie.",
@@ -282,6 +285,7 @@ export const messages = {
   "error.backend.mcpServerFailedToStart": "Serwer się nie uruchomił: {reason}",
   "error.backend.mcpServerStartAbandoned":
     "{provider} przestał czekać, zanim serwer się uruchomił, więc jego agenci nie dostają narzędzi tego serwera.",
+  "error.backend.mcpServerStoppedDuringCall": "Serwer MCP zatrzymał się, zanim odpowiedział na to wywołanie.",
   "error.backend.mcpToolSchemaRefused":
     "Jego narzędzie {tool} ma format danych wejściowych, którego ten dostawca nie umie odczytać. Agenci u innych dostawców nadal dostają serwer.",
   "error.backend.mcpServerSignInForProvider":

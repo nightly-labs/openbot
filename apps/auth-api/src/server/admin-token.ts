@@ -1,7 +1,6 @@
 import { Effect } from "effect";
 import { AuthOperationError } from "./auth-service";
 
-/** Compares SHA-256 digests in constant time, so the answer time does not tell how much of the token matched. */
 export const adminTokenMatches = Effect.fn("Auth.adminTokenMatches")(function* (
   expected: string | undefined,
   provided: string | null,

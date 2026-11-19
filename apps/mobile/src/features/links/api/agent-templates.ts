@@ -4,14 +4,12 @@ import { currentText } from "@/shared/lib/text";
 
 const AGENT_TEMPLATE_REQUEST_TIMEOUT_MS = 10_000;
 
-/** The account service has no template with this id: it was never published, or it was unpublished. */
 export class AgentTemplateNotFoundError extends Error {
   constructor() {
     super(currentText().t("mobile.link.template.notFound.description"));
   }
 }
 
-/** A public read: the template page shows the same data without sign-in, so no credential is sent. */
 export async function loadAgentTemplate(
   apiUrl: string,
   templateId: string,

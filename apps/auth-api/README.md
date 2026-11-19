@@ -84,6 +84,12 @@ repository root:
 bun scripts/stripe-flows-e2e.ts --api http://127.0.0.1:<port> [scenario ...]
 ```
 
+The `promotion-link` scenario makes a coupon with two promotion codes in the sandbox and checks the
+Checkout pages of a discount link (`?promo=CODE`): an active code is applied, and a code that does not
+fit the order or does not exist gives the code field. A copy of the Brazil partner code (BRL server plans only)
+gives a discount on a BRL server page and the code field on a EUR server page and a license page. It deletes the
+coupons and turns off the codes at the end.
+
 The `portal` scenario prints a Customer Portal cancel page and waits until you use it. Then it checks
 that the plan change flow of an old app opens the Portal home, and that the Portal has no plan change. The report goes to `.openbot-build/stripe-flows-e2e.json`.
 

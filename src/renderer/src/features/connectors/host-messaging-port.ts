@@ -2,10 +2,6 @@ import type { MessagingDesktopApi } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import type { MessagingApi } from "./messaging-connector";
 
-/**
- * The `connectors-v1` messaging requests to a joined server: main's, or the browser client's. The
- * Discord access requests need `discord-access-v1`.
- */
 export type HostMessagingApi = Pick<
   MessagingDesktopApi,
   | "hostOverview"
@@ -19,11 +15,6 @@ export type HostMessagingApi = Pick<
   | "hostSetDiscordAccess"
 >;
 
-/**
- * The connections of the joined server that `serverId` names (`connectors-v1`), through main or the
- * browser client's `host`. Each opens the connect page in this computer's browser. The orchestrator
- * starts on the host's default provider and model, so a choice is not sent.
- */
 export function hostMessagingApi(
   serverId: () => string | undefined,
   host: () => HostMessagingApi = () => window.openbot.messaging,

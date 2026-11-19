@@ -2,11 +2,6 @@ import type { AgentMessage, ChatActionMarkerModel } from "@openbot/ui/data";
 
 type HostedSiteMarker = Extract<ChatActionMarkerModel, { kind: "hosted-site" }>;
 
-/**
- * Keeps one row for each hosted site change: the row of its latest status. The host stores each
- * status as a message of its own, so a finished deploy also has its "running" message. A final
- * status replaces "running" even when it sorts first. The stored messages stay unchanged.
- */
 export function summarizeHostedSiteMessages(messages: readonly AgentMessage[]): AgentMessage[] {
   const latestByOperation = new Map<string, { id: string; marker: HostedSiteMarker }>();
   for (const message of messages) {

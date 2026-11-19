@@ -45,25 +45,12 @@ export interface SheetColumn<R> {
   label: string;
   icon: CrmIcon;
   width: number;
-  /** Tabular figures, so the digits of the rows line up. */
   numeric?: boolean;
-  /**
-   * What agents do not see when the column is private: a text field, or a part that more columns show,
-   * such as "amounts". A column without it cannot be hidden from agents.
-   */
   field?: CrmPrivateField;
-  /** The value to sort on. null goes to the end in both orders. */
   sort?: { kind: SortKind; value: (row: R) => SortValue };
   cell: (row: R) => JSX.Element;
-  /** The cell as plain text, for the CSV export. */
   text: (row: R) => string;
-  /** The value in the bottom row, such as the sum of a money column: one line for each currency. */
   total?: (rows: readonly R[]) => { label: string; lines: string[] } | null;
-  /**
-   * The filter of the column in the filter row. "text", the default, keeps the rows whose cell text
-   * contains what the user typed. A range keeps the rows whose value is from a minimum to a maximum,
-   * in the units that the user types, such as euros, not cents. "none" has no filter.
-   */
   filter?: "text" | "none" | { range: (row: R) => number | null };
 }
 
@@ -79,7 +66,6 @@ export interface SheetPick<R> {
   onChange: (ids: string[]) => void;
 }
 
-/** The width of the row number column. */
 const INDEX_WIDTH = 40;
 
 export function sortRows<R>(
@@ -102,7 +88,6 @@ export function sortRows<R>(
   });
 }
 
-/** The test of the filter row for one column, or null when its filter is empty. */
 function columnTest<R>(
   column: SheetColumn<R>,
   find: Record<string, string>,
@@ -123,7 +108,6 @@ function columnTest<R>(
   };
 }
 
-/** The number of columns that the filter row filters. A hidden column does not filter. */
 export function filterCount<R>(
   columns: readonly SheetColumn<R>[],
   find: Record<string, string>,
@@ -132,7 +116,6 @@ export function filterCount<R>(
   return columns.filter((column) => columnTest(column, find, range) !== null).length;
 }
 
-/** The rows that fit the filter row of the shown columns. */
 export function filterRows<R>(
   rows: readonly R[],
   columns: readonly SheetColumn<R>[],
@@ -147,7 +130,6 @@ export function visibleColumns<R>(columns: readonly SheetColumn<R>[], hidden: re
   return columns.filter((column, index) => index === 0 || !hidden.includes(column.id));
 }
 
-/** The columns in the order that the user set. A column that is not in the order keeps its default place at the end. */
 export function orderColumns<C extends { id: string }>(columns: readonly C[], order: readonly string[]): C[] {
   if (order.length === 0) return [...columns];
   const rank = (column: C) => {
@@ -157,10 +139,6 @@ export function orderColumns<C extends { id: string }>(columns: readonly C[], or
   return [...columns].sort((a, b) => rank(a) - rank(b));
 }
 
-/**
- * Moves a column one place past the next shown column at its left or right. Hidden columns do not
- * count, so each move changes the sheet. The first column stays first.
- */
 export function moveColumn(all: readonly string[], shown: readonly string[], id: string, step: -1 | 1): string[] {
   const at = shown.indexOf(id);
   const target = shown[at + step];
@@ -171,7 +149,6 @@ export function moveColumn(all: readonly string[], shown: readonly string[], id:
   return next;
 }
 
-/** Puts a column before or after another column. No column goes before the first column. */
 export function placeColumn(all: readonly string[], id: string, target: string, after: boolean): string[] {
   const next = all.filter((item) => item !== id);
   const at = next.indexOf(target);
@@ -180,28 +157,21 @@ export function placeColumn(all: readonly string[], id: string, target: string, 
   return next;
 }
 
-/** A column that the user drags by its header, and the place where it goes when the user releases it. */
 interface ColumnDrag {
   id: string;
-  /** How far the header moved from where the drag started, in pixels. */
   offset: number;
   target: string | null;
   after: boolean;
-  /** Where the line that marks the drop place is, from the left of the sheet; null when there is no target. */
   line: number | null;
 }
 
-/** A drag starts only after the pointer moves this far, so a click still opens the column menu. */
 const DRAG_START = 4;
-/** In this band at the left and right edge of the sheet, a drag scrolls the sheet. */
 const DRAG_EDGE = 48;
 const DRAG_MAX_SPEED = 24;
 
-/** Saves the shown columns of `rows` as a CSV file. */
 export function useCsvExport() {
   const { t } = useText();
   return <R,>(name: string, columns: readonly SheetColumn<R>[], rows: readonly R[]) => {
-    // A spreadsheet runs a cell that starts with a formula sign, and agents can write the values.
     const safe = (value: string) => (/^[=+@\t\r]|^-(?!\d)/u.test(value) ? `'${value}` : value);
     const cell = (raw: string) => {
       const value = safe(raw);
@@ -221,7 +191,6 @@ export function useCsvExport() {
   };
 }
 
-/** The check of a menu item, as in the app menus. */
 export function MenuMark(props: { on: boolean }) {
   return (
     <span class="ui-menu-check" data-checked={props.on ? "" : undefined}>
@@ -242,21 +211,15 @@ function SheetHead<R>(props: {
   onSort: (sort: SheetSort | null) => void;
   onHide: (id: string) => void;
   onMove: (step: -1 | 1) => void;
-  /** null sets the default width again. */
   onWidth: (width: number | null) => void;
-  /** The user drags the right edge of the header, or stopped. */
   onResizing: (on: boolean) => void;
-  /** Agents do not see the values of this column. */
   private: boolean;
   onPrivate: ((on: boolean) => void) | undefined;
-  /** A mouse press on the header. It becomes a drag when the pointer moves, or a click when it does not. */
   onPress: (event: PointerEvent, click: () => void) => void;
-  /** How far the header moved in a drag; null when the column is not dragged. */
   offset: number | null;
 }) {
   const { t } = useText();
   const id = createUniqueId();
-  // A right click on the header opens the same menu as a click.
   const [menu, setMenu] = createSignal(false);
   const active = () => props.sort?.column === props.column.id;
   const order = () => {
@@ -275,8 +238,6 @@ function SheetHead<R>(props: {
       data-dragging={props.offset === null ? undefined : ""}
       style={{ transform: transform() }}
       ref={(element: HTMLTableCellElement) => {
-        // The menu opens on a mouse press. The header takes the press first, so a drag does not open
-        // the menu. The first column stays first and does not move.
         element.addEventListener(
           "pointerdown",
           (event) => {
@@ -339,7 +300,6 @@ function SheetHead<R>(props: {
               <Show when={props.column.sort}>
                 <DropdownMenu.Separator />
               </Show>
-              {/* The first column stays first, so the second column does not move left. */}
               <DropdownMenu.Item disabled={props.second} onSelect={() => props.onMove(-1)}>
                 <ArrowLeft aria-hidden="true" />
                 {t("crm.sheet.moveLeft")}
@@ -369,7 +329,6 @@ function SheetHead<R>(props: {
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
-      {/* Drag the right edge to change the width; a double click sets the default width again. */}
       <PanelResizer
         class="crm-sheet-resizer"
         label={t("crm.sheet.columnWidth", { column: props.column.label })}
@@ -393,7 +352,6 @@ function SheetHead<R>(props: {
   );
 }
 
-/** The text filter of a column: it filters while the user types. Escape clears it. */
 function FindCell(props: { label: string; value: string; onChange: (text: string) => void }) {
   const { t } = useText();
   return (
@@ -415,7 +373,6 @@ function FindCell(props: { label: string; value: string; onChange: (text: string
   );
 }
 
-/** The range filter of a column: a minimum and a maximum in a popover. It filters while the user types. */
 function RangeCell(props: {
   label: string;
   value: SheetRange | undefined;
@@ -436,7 +393,6 @@ function RangeCell(props: {
     if (high !== null) return t("crm.sheet.filter.atMost", { max: format.number(high) });
     return null;
   };
-  // A signal read in the same tick as its write gives the old value, so the new text comes in.
   const update = (lowText: string, highText: string) => {
     const low = parseNumber(lowText);
     const high = parseNumber(highText);
@@ -514,11 +470,6 @@ function RangeCell(props: {
   );
 }
 
-/**
- * A table like a spreadsheet: row numbers, grid lines, a filter row, and a bottom row with totals.
- * It scrolls in its own box, with a scroll bar under the totals. The header, the filter row and the
- * totals stay at the top and the bottom; the row numbers and the first column stay at the left.
- */
 export function Sheet<R>(props: {
   label: string;
   columns: readonly SheetColumn<R>[];
@@ -529,23 +480,17 @@ export function Sheet<R>(props: {
   onSort: (sort: SheetSort | null) => void;
   onHide: (id: string) => void;
   onMove: (id: string, step: -1 | 1) => void;
-  /** The user dragged the column to a place before or after the target column. */
   onPlace: (id: string, target: string, after: boolean) => void;
-  /** null sets the default width again. */
   onWidth: (id: string, width: number | null) => void;
   onOpen: (id: string) => void;
-  /** The rows of the record that is open in the panel. */
   current: (row: R) => boolean;
   isPrivate: (field: CrmPrivateField) => boolean;
   onPrivate: (field: CrmPrivateField, on: boolean) => void;
-  /** The filter row: the text of each text filter and the limits of each range filter, by column id. */
   find: Record<string, string>;
   range: Record<string, SheetRange>;
   onFind: (id: string, text: string) => void;
   onRange: (id: string, range: SheetRange | null) => void;
-  /** Clears the filter row. */
   onClearFilters: () => void;
-  /** Shows over the sheet when there are no rows. */
   empty: JSX.Element;
   pick?: SheetPick<R> | undefined;
   action?: SheetAction<R> | undefined;
@@ -576,13 +521,11 @@ export function Sheet<R>(props: {
   let track: HTMLDivElement | undefined;
   let thumb: HTMLDivElement | undefined;
 
-  /** The line down the sheet at the right edge of the column whose width the user drags. */
   const edge = () => {
     const id = resizing();
     const at = props.columns.findIndex((column) => column.id === id);
     if (at === -1 || !scroller) return null;
     const right = props.columns.slice(0, at + 1).reduce((sum, column) => sum + columnWidth(column), INDEX_WIDTH);
-    // The first column stays at the left, so its edge moves with the scroll.
     const left = right - 1 + (at === 0 ? scroller.scrollLeft : 0);
     return { left: `${left}px`, top: `${scroller.scrollTop}px`, height: `${scroller.clientHeight}px` };
   };
@@ -593,16 +536,11 @@ export function Sheet<R>(props: {
     }
     if (resizing() === id) return;
     setResizing(id);
-    // A drag that the browser cancels does not end the resize, so the next release removes the line.
     const stop = () => setResizing(null);
     window.addEventListener("pointerup", stop, { capture: true, once: true });
     window.addEventListener("pointercancel", stop, { capture: true, once: true });
   };
 
-  /**
-   * The scroll bar under the totals: drag the thumb, or press the track to move the thumb there and
-   * drag on. The wheel on the bar scrolls the sheet to the side.
-   */
   const pressBar = (event: PointerEvent) => {
     const box = scroller;
     const bar = track;
@@ -632,7 +570,6 @@ export function Sheet<R>(props: {
     bar.addEventListener("pointercancel", end);
   };
 
-  /** Drags a column by its header. Near the edges the sheet scrolls; Escape stops the drag. */
   const press = (id: string, event: PointerEvent, click: () => void) => {
     const box = scroller;
     if (!box) return;
@@ -644,7 +581,6 @@ export function Sheet<R>(props: {
     const heads = () => [...box.querySelectorAll<HTMLElement>("thead th[data-column]")];
     const update = () => {
       const offset = x - startX + box.scrollLeft - startScroll;
-      // The dragged header follows the pointer, so it is measured at its first place.
       const place = (head: HTMLElement) => {
         const rect = head.getBoundingClientRect();
         const shift = head.dataset.column === id ? new DOMMatrixReadOnly(getComputedStyle(head).transform).m41 : 0;
@@ -680,7 +616,6 @@ export function Sheet<R>(props: {
     };
     const tick = () => {
       const rect = box.getBoundingClientRect();
-      // The first column stays at the left, so the scroll band starts at its right edge.
       const left = heads()[0]?.getBoundingClientRect().right ?? rect.left;
       let speed = 0;
       if (x < left + DRAG_EDGE) speed = -Math.min(DRAG_MAX_SPEED, Math.ceil((left + DRAG_EDGE - x) / 4));
@@ -765,8 +700,6 @@ export function Sheet<R>(props: {
           style={{ width: `${width()}px` }}
           ref={(element) => {
             fades.watch(element);
-            // A click on the row opens the record, as a click on its name does. A click on a control in
-            // the row does only what the control does.
             element.addEventListener("click", (event) => {
               const target = event.target instanceof Element ? event.target : null;
               if (!target || target.closest("button, input, a, .ui-checkbox")) return;
@@ -900,7 +833,6 @@ export function Sheet<R>(props: {
               )}
             </For>
           </tbody>
-          {/* Takes the free height of a short list, so the totals stay at the bottom of the box. */}
           <tbody class="crm-sheet-fill" aria-hidden="true">
             <tr>
               <td class="crm-sheet-index" />
@@ -939,7 +871,6 @@ export function Sheet<R>(props: {
       <Show when={props.rows.length === 0}>
         <div class="crm-sheet-empty">{props.empty}</div>
       </Show>
-      {/* The sheet scrolls with the keyboard and the wheel too, so a screen reader skips the bar. */}
       <div class="crm-sheet-bar" aria-hidden="true">
         <div
           class="crm-sheet-track"
@@ -965,11 +896,9 @@ export function Sheet<R>(props: {
   );
 }
 
-/** Shows and hides columns, in the order of the sheet. The first column always shows. */
 export function ColumnsMenu<R>(props: {
   columns: readonly SheetColumn<R>[];
   hidden: readonly string[];
-  /** The user moved a column. */
   moved: boolean;
   onChange: (hidden: string[]) => void;
   onReset: () => void;
@@ -1022,17 +951,9 @@ export function ColumnsMenu<R>(props: {
   );
 }
 
-/** Pixels around the middle-click point where autoscroll does not move. */
 const AUTOSCROLL_DEAD_ZONE = 10;
-/** Pixels per second of scroll for each pixel past the dead zone. */
 const AUTOSCROLL_SPEED = 8;
 
-/**
- * Middle-click autoscroll, as in browsers on Windows and Linux: press the middle button, then move
- * away from that point to scroll that way, faster the farther the pointer goes. A middle click
- * keeps it on until the next click, Escape, the wheel or a window change; a middle press that drags
- * stops when the button comes up.
- */
 export function createAutoScroll() {
   let element: HTMLElement | undefined;
   let state: {
@@ -1077,7 +998,6 @@ export function createAutoScroll() {
   const onUp = (event: PointerEvent) => {
     if (event.button === 1 && state?.dragged) stop();
   };
-  // The click that ends autoscroll does nothing else.
   const swallowClick = (event: MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
@@ -1110,7 +1030,6 @@ export function createAutoScroll() {
 
   const start = (event: PointerEvent) => {
     if (event.button !== 1 || event.pointerType !== "mouse" || state || !element) return;
-    // Without this, Linux pastes the selection and Windows starts its own autoscroll.
     event.preventDefault();
     const scrollsX = element.scrollWidth > element.clientWidth;
     const scrollsY = element.scrollHeight > element.clientHeight;
@@ -1142,7 +1061,6 @@ export function createAutoScroll() {
     window.addEventListener("wheel", stop, true);
     window.addEventListener("blur", stop);
   };
-  // A middle click does not open a link or a new tab.
   const onAuxClick = (event: MouseEvent) => {
     if (event.button === 1) event.preventDefault();
   };
@@ -1154,7 +1072,6 @@ export function createAutoScroll() {
   });
 
   return {
-    /** The `ref` of the element that scrolls. */
     bind: (next: HTMLElement) => {
       element?.removeEventListener("pointerdown", start);
       element?.removeEventListener("auxclick", onAuxClick);
@@ -1165,14 +1082,8 @@ export function createAutoScroll() {
   };
 }
 
-/** The smallest width of the scroll bar thumb, so a wide sheet still has a thumb to grab. */
 const THUMB_MIN = 40;
 
-/**
- * Fades each edge of the sheet that has more rows or columns behind it, and places the thumb of the
- * scroll bar under the totals. The sheet shows no browser scroll bars. The header, the totals and the
- * fixed columns stay sharp: each fade starts where they end.
- */
 function createSheetFades() {
   let element: HTMLElement | undefined;
   let frame: HTMLElement | undefined;
@@ -1187,7 +1098,6 @@ function createSheetFades() {
     const foot = table?.tFoot?.offsetHeight ?? 0;
     const start = (cells[0]?.offsetWidth ?? 0) + (cells[1]?.offsetWidth ?? 0);
     const end = last?.classList.contains("crm-sheet-action") ? last.offsetWidth : 0;
-    // The scroll bar runs under the columns that scroll, between the fixed columns.
     const track = Math.max(0, clientWidth - start - end);
     const range = scrollWidth - clientWidth;
     const thumb = range > 0 ? Math.max(THUMB_MIN, (track * track) / (track + range)) : track;
@@ -1209,16 +1119,13 @@ function createSheetFades() {
   };
   onCleanup(() => observer.disconnect());
   return {
-    /** The `ref` of the box around the sheet and its scroll bar, which holds the sizes. */
     frame: (next: HTMLElement) => {
       frame = next;
     },
-    /** The `ref` of the element that scrolls. */
     bind: (next: HTMLElement) => {
       element = next;
       observer.observe(next);
     },
-    /** The `ref` of the table: a new row or a wider column changes the edges. */
     watch: (table: HTMLElement) => observer.observe(table),
     measure,
   };

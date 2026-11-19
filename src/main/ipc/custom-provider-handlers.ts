@@ -1,6 +1,3 @@
-// The user's own model endpoints: list, add, edit, remove. Edit is local only. `custom-provider-changes.ts` owns the order of
-// the writes; the `providers-v1` host routes use the same instance.
-
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { CustomProviderChanges } from "../custom-provider-changes";
 import {

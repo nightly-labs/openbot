@@ -1,5 +1,44 @@
 [
   {
+    "version": "0.73.0",
+    "date": "2026-11-18",
+    "notices": [
+      "After you install this version, you cannot go back to an older OpenBot version on this computer or server. This version makes the database smaller, and an older version cannot open it.",
+      "Update each joined server to this version too. On a server, custom image sizes, the Sunra and Higgsfield models and prices, and the faster load of many agents work only when the server has this version."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "See the side threads of each agent in the sidebar. Select the arrow at the end of an agent row, or keep the pointer on the row to see all of its threads.",
+          "Filter the sidebar with the filter button at the end of the search field. Show only agents or channels, only unread chats or agents at work, or only the chats in the folders that you select.",
+          "Give an image step on the workflow canvas a custom size in pixels, or use the 4:5 or 5:4 aspect ratio.",
+          "The workflow canvas shows all the image and video models of Sunra and Higgsfield, and the Run button shows the price in credits.",
+          "Turn off Background blur and Moving agent faces in Settings > Appearance > Motion to make OpenBot faster on a slow computer."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Several people can edit one workflow at the same time. The canvas adds the changes of the other people as they save.",
+          "OpenBot uses much less CPU while many agents work, and you can type without delays.",
+          "Agents finish a checkout when the bank asks for a 3-D Secure code. When the code is in an email or SMS that the agent can read, the agent types it.",
+          "Server settings > Transfer > Copy to another server now also copies the workflows and routine flows of the agents."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "The OpenBot database uses much less space. After the update, OpenBot removes old copies of chat messages in small steps.",
+          "On Windows, an update shows its progress again.",
+          "A joined server with many agents, and a large channel, open faster.",
+          "Gemini chats with many images or a long history no longer stop working, and Gemini no longer asks you to sign in again when a new chat starts.",
+          "The desktop app connects again to a server on OpenBot v0.34.1 or older."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.72.0",
     "date": "2026-11-16",
     "notices": [

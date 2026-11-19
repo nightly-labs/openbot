@@ -24,12 +24,6 @@ import { PluginIcon } from "./PluginIcon";
 import { PluginLogo } from "./PluginLogo";
 import { PluginOpenButtons } from "./PluginOpenButtons";
 
-/**
- * A counted heading over the rows it names, which is the shape the desktop app's plugin detail
- * uses. The count is part of the heading's text rather than a mark beside it: "Apps" and "Apps 2"
- * are different amounts of information, and a reader who hears the page rather than sees it is
- * owed the same number.
- */
 function PluginSection(props: { id: string; title: string; count: number; children: JSX.Element }) {
   return (
     <section class="plugin-section" aria-labelledby={props.id}>
@@ -42,11 +36,6 @@ function PluginSection(props: { id: string; title: string; count: number; childr
   );
 }
 
-/**
- * One row of a listed thing: its icon, its name, and one line about it. The icon is the listing's
- * own, served from this origin by `src/server/plugin-icon.ts`; the glyph stands in for a thing the
- * catalog gives no icon, which is every skill and any app that has not published one.
- */
 function PluginRow(props: { icon: LandingIconName; title: string; description: string; media?: JSX.Element }) {
   return (
     <li class="plugin-row">
@@ -59,7 +48,6 @@ function PluginRow(props: { icon: LandingIconName; title: string; description: s
   );
 }
 
-/** A section of written text, under the same heading as the listing's own sections, with no count. */
 function PluginTextSection(props: { id: string; title: string; children: JSX.Element }) {
   return (
     <section class="plugin-section" aria-labelledby={props.id}>
@@ -71,7 +59,6 @@ function PluginTextSection(props: { id: string; title: string; children: JSX.Ele
   );
 }
 
-/** The vendor page a key or local step links to, under the label the catalog gives it. */
 function PluginConnectDocsLink(props: { href: string | null; label: string | null }) {
   return (
     <Show when={props.href}>
@@ -87,7 +74,6 @@ function PluginConnectDocsLink(props: { href: string | null; label: string | nul
   );
 }
 
-/** The step an app's sign-in adds, in the words the app's own sign-in uses. */
 function PluginConnectStep(props: { step: SitePluginConnectStep; appCount: number }) {
   const prefix = () => (props.appCount > 1 ? `${props.step.app}: ` : "");
   return (
@@ -149,19 +135,6 @@ export interface PluginPageProps {
   plugin: SitePlugin;
 }
 
-/**
- * One listing, as a reader sees it.
- *
- * Built from the article page's parts rather than its own: the column, the back link, the title and
- * the standfirst are /news and /guides', and the artwork under them is the picture the card a reader
- * pressed already opened on. That is the whole reason the page is laid out in this order - copy,
- * artwork, then the text that answers what the artwork made them curious about - and it is why the
- * three blocks carry the article's three entry steps.
- *
- * Two things the app shows are deliberately absent, as `docs/plugin-distribution.md` asks: the
- * install count, and the MCP server address. The address is the load-bearing one - printing it here
- * would teach a reader to add the server by hand and skip the checks the app makes on the way in.
- */
 export function PluginPage(props: PluginPageProps) {
   onSettled(() => landingAnalytics.start(document, window.location.hostname, pluginPath(props.plugin.slug)));
 
@@ -186,16 +159,8 @@ export function PluginPage(props: PluginPageProps) {
             <Link class="post-article-back" to={MARKETPLACE_APPS_ROUTE}>
               All plugins
             </Link>
-            {/* The name of the listing and the only thing on the page a reader acts on, on one
-                line: the button is opposite the title rather than further down, so it is found at
-                the moment the title answers what this page is. */}
             <div class="plugin-hero-row">
               <div class="plugin-hero-heading">
-                {/* The mark as an icon, in the square a reader looks for when they are about to
-                    install something, and the listing's own icon wherever the catalog holds one:
-                    that is the picture the app's Apps tab shows, already drawn as a square. A
-                    listing without one falls back to the gradient this page's artwork carries, with
-                    the drawn mark on it, so the tile is never empty. */}
                 <div class="plugin-hero-mark">
                   <PluginIcon
                     slug={props.plugin.slug}
@@ -222,9 +187,6 @@ export function PluginPage(props: PluginPageProps) {
             </div>
           </header>
 
-          {/* The colours are hashed from the name, so this is the picture the reader's card carried.
-              No `art`, because the build bakes a still for an article and a plugin has none; the
-              component draws its CSS approximation and the shader takes over on mount. */}
           <div class="post-article-art" data-enter="post-art">
             <ArticleGradient title={props.plugin.name} mode="live" />
             <PluginLogo slug={props.plugin.slug} name={props.plugin.name} class="plugin-hero-logo" />
@@ -250,8 +212,6 @@ export function PluginPage(props: PluginPageProps) {
               )}
             </Show>
 
-            {/* Built from the catalog's sign-in entries only, so it says what the install will ask.
-                The server address stays out, for the reason the comment on this component gives. */}
             <PluginTextSection id="plugin-connect-title" title={`How to connect ${props.plugin.name} to OpenBot`}>
               <ol class="provider-steps plugin-connect">
                 <li class="provider-step">
@@ -278,9 +238,6 @@ export function PluginPage(props: PluginPageProps) {
 
             <Show when={props.plugin.prompts.length > 0}>
               <PluginSection id="plugin-prompts-title" title="Example prompts" count={props.plugin.prompts.length}>
-                {/* The app puts its prompts on the plugin's own artwork, and that artwork is
-                    already on this page: the same colour returns behind the requests. Text, and
-                    nothing more - the site cannot run a prompt, so nothing here is a button. */}
                 <div class="plugin-prompts-card">
                   <ArticleGradient title={props.plugin.name} mode="live" />
                   <ul class="plugin-prompts">
@@ -343,7 +300,6 @@ export function PluginPage(props: PluginPageProps) {
               </PluginSection>
             </Show>
 
-            {/* Three rows the catalog always carries, and one for each link it holds. */}
             <PluginSection id="plugin-information-title" title="Information" count={3 + links().length}>
               <dl class="plugin-facts">
                 <div class="plugin-fact">

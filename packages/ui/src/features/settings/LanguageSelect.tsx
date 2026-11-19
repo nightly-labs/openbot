@@ -8,28 +8,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { JSX } from "@solidjs/web";
 import { useText } from "../../text";
 
-/** Kobalte takes a mutable array. The exported catalog stays read-only, so copy it once here. */
 const options: AppLanguageOption[] = [...APP_LANGUAGE_OPTIONS];
 
 export interface LanguageSelectProps {
   value: AppLanguage;
   onChange: (value: AppLanguage) => void;
   disabled?: boolean | undefined;
-  /** The dialog element the popover portals into, as the other Settings selects receive it. */
   mount?: HTMLElement | undefined;
 }
 
-/**
- * The language row control. It is a plain `Select`, the same shape as the external-link row beside
- * it, because a settings list that mixes control styles reads as two different screens.
- */
 export function LanguageSelect(props: LanguageSelectProps): JSX.Element {
   const { t } = useText();
-  /**
-   * Every row but the first is a language's own name for itself, which is the same word in any
-   * interface language. The system row names a setting rather than a language, so it is the one
-   * that follows the interface.
-   */
   const label = (option: AppLanguageOption) => (option.id === "system" ? t("settings.language.system") : option.label);
 
   return (

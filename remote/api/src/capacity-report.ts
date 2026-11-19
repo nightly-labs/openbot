@@ -1,23 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { Effect, Schedule, Schema } from "effect";
 
-// Sends OpenPanel one `signal_capacity` event every 5 minutes: the TURN allocations from the coturn
-// metrics, and the Signal sockets and peer connections. Counts only, with no account,
-// address or session. It runs on the host network beside coturn, whose metrics listen on the host
-// loopback address only. On 2026-10-30 coturn refused every allocation at its total quota, and nothing
-// showed how near the quota it was. Without the OpenPanel server client it sends nothing.
-//
-// Generation 2 adds the generic webhook answers of the interval, by status, and the time Signal waited
-// for the hosts. Signal counts from its start, so the first sample of this process sets the base and
-// sends no webhook values; a lower count than the last sample means that Signal restarted.
-//
-// Generation 3 adds the public network traffic of the interval: the bytes in and out of the interface of
-// the default route, from the kernel counters. The provider bills this traffic (the AU machine has a
-// 5 TB pack), and its own metrics give only days. The first sample sets the base. A sample that is not
-// sent, or that could not read the counters, keeps the base, so the next one has its traffic too. When
-// OpenPanel keeps an event but answers after the timeout, the next event counts that traffic again: a
-// small count that is too high is better than a lost interval for a traffic cap.
-
 const SCHEMA_VERSION = 3;
 const SAMPLE_INTERVAL_MILLISECONDS = 5 * 60 * 1_000;
 const FETCH_TIMEOUT_MILLISECONDS = 5_000;
@@ -45,7 +28,6 @@ interface Sample {
 
 const label = (labels: string, name: string) => new RegExp(`(?:^|,)${name}="([^"]*)"`, "u").exec(labels)?.[1] ?? "";
 
-/** Each sample of `name` in a Prometheus text page, with its `type` and `status` labels when it has them. */
 function samples(page: string, name: string): Sample[] {
   const result: Sample[] = [];
   for (const line of page.split("\n")) {
@@ -59,7 +41,6 @@ function samples(page: string, name: string): Sample[] {
   return result;
 }
 
-/** The webhook counters of one Signal metrics page, by property name. */
 function webhookCounters(page: string): Map<string, number> {
   const counters = new Map<string, number>();
   for (const status of WEBHOOK_ANSWER_STATUSES) counters.set(`webhook_answers_${status}`, 0);
@@ -71,10 +52,6 @@ function webhookCounters(page: string): Map<string, number> {
   return counters;
 }
 
-/**
- * The webhook values of one interval: each counter less its last sample. A Signal that has no webhook
- * counters, such as an older one, sends none.
- */
 function webhookInterval(page: string, previous: Map<string, number>, current: Map<string, number>) {
   if (!page.includes("openbot_remote_webhook_answers_total")) return {};
   const restarted = [...current].some(([key, value]) => value < (previous.get(key) ?? 0));
@@ -95,7 +72,6 @@ interface NetworkSample {
   sent: number;
 }
 
-/** The interface of the default IPv4 route in `/proc/net/route`: the public one, not a Docker bridge. */
 function defaultInterface(routes: string) {
   for (const line of routes.split("\n").slice(1)) {
     const [name, destination, , , , , , mask] = line.trim().split(/\s+/u);
@@ -104,7 +80,6 @@ function defaultInterface(routes: string) {
   return null;
 }
 
-/** The received and sent bytes of the interface `name` in `/proc/net/dev`. */
 function interfaceBytes(page: string, name: string): NetworkSample | null {
   for (const line of page.split("\n")) {
     const separator = line.indexOf(":");
@@ -114,7 +89,6 @@ function interfaceBytes(page: string, name: string): NetworkSample | null {
       .trim()
       .split(/\s+/u)
       .map(Number);
-    // Receive has 8 fields (bytes first), then transmit (bytes first).
     const [received, sent] = [fields[0], fields[8]];
     if (received === undefined || sent === undefined) return null;
     if (!(Number.isSafeInteger(received) && Number.isSafeInteger(sent) && received >= 0 && sent >= 0)) return null;
@@ -123,17 +97,12 @@ function interfaceBytes(page: string, name: string): NetworkSample | null {
   return null;
 }
 
-/** The byte counters of the public interface now. Null when the host has no such files or no default route. */
 const readNetwork = (config: ReporterConfig) =>
   Effect.tryPromise(async () => {
     const name = defaultInterface(await readFile(config.networkRoutePath, "utf8"));
     return name ? interfaceBytes(await readFile(config.networkDevicePath, "utf8"), name) : null;
   }).pipe(Effect.catch(() => Effect.succeed(null)));
 
-/**
- * The traffic since `previous`. None for the first sample or after a change of the interface. Lower
- * counters mean that the interface started again: the counters are then the traffic of the interval.
- */
 function networkInterval(previous: NetworkSample | null, current: NetworkSample | null) {
   if (!previous || !current || previous.name !== current.name) return {};
   const reset = current.received < previous.received || current.sent < previous.sent;
@@ -181,7 +150,6 @@ function readConfig(environment: Record<string, string | undefined>): ReporterCo
   const turnHost = environment.TURN_DOMAIN?.trim();
   if (!clientId || !clientSecret || !signalMetricsToken || !turnHost) return null;
   return {
-    // `scripts/signal-capacity-report-smoke.ts` points it at a local capture server.
     trackUrl: environment.OPENPANEL_TRACK_URL ?? "https://analytics.openbot.run/api/track",
     clientId,
     clientSecret,
@@ -189,10 +157,7 @@ function readConfig(environment: Record<string, string | undefined>): ReporterCo
     signalMetricsUrl: environment.SIGNAL_METRICS_URL ?? "http://127.0.0.1:9642/metrics",
     signalMetricsToken,
     turnHost,
-    // The smoke test sets a short interval, so that it sees a second sample.
     intervalMilliseconds: Number(environment.CAPACITY_REPORT_INTERVAL_MS) || SAMPLE_INTERVAL_MILLISECONDS,
-    // The host network namespace (`network_mode: host`) gives the counters of the host. The smoke test
-    // points them at its own files.
     networkRoutePath: environment.NETWORK_ROUTE_PATH ?? "/proc/net/route",
     networkDevicePath: environment.NETWORK_DEVICE_PATH ?? "/proc/net/dev",
   };
@@ -226,7 +191,6 @@ const report = Effect.fn("CapacityReport.report")(function* (
   base.webhook = counters;
   if (previous) Object.assign(properties, webhookInterval(signal, previous, counters));
   Object.assign(properties, networkInterval(base.network, network));
-  // coturn writes a type only after its first allocation; send 0 so that the charts have no gaps.
   for (const type of ALLOCATION_TYPES.values()) properties[`turn_allocations_${type}`] = 0;
   for (const sample of samples(turn, "turn_total_allocations")) {
     const type = ALLOCATION_TYPES.get(sample.type);
@@ -257,7 +221,6 @@ const main = Effect.gen(function* () {
     network: null,
   };
   yield* Effect.suspend(() => report(config, base)).pipe(
-    // A failed sample is skipped; the next one comes at the next interval.
     Effect.catch((error) => Effect.sync(() => console.warn("Capacity report failed.", { source: error.source }))),
     Effect.repeat(Schedule.spaced(config.intervalMilliseconds)),
   );

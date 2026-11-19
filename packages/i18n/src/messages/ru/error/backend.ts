@@ -259,6 +259,8 @@ export const messages = {
     "Этот агент может использовать только ограниченное число серверов MCP. Чтобы использовать этот сервер, выключите сервер MCP, который агенту не нужен.",
   "error.backend.mcpRegistrationRefused":
     "Сервер входа пока не принимает OpenBot как приложение. Дело не в вашем аккаунте. Подключитесь другим способом, например через локальный сервер MCP.",
+  "error.backend.mcpRegistrationUnavailable":
+    "Сервер входа не может зарегистрировать OpenBot как приложение. Дело не в вашем аккаунте. Чтобы подключиться, сохраните этот сервер в разделе Каталог, Приложения, затем добавьте к нему приложение входа.",
   "error.backend.mcpSignInAbandonedGeneric": "Вход прерван.",
   "error.backend.mcpSignInForgotten": "Вход в MCP был забыт, пока выполнялся.",
   "error.backend.mcpSignInAbandoned": "Вход в MCP прерван.",
@@ -270,6 +272,7 @@ export const messages = {
     "Этот сервер просит войти, а OpenBot входит только по https. Измените URL на {url}.",
   "error.backend.mcpSignInCancelled": "Вход отменён.",
   "error.backend.mcpSignInTimedOut": "Вход в браузере не был завершён.",
+  "error.backend.mcpSignInRefused": "Страница входа отказала в доступе. Войдите снова.",
   "error.backend.mcpSignInResponseTimedOut": "Ответ на вход не пришёл вовремя.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot не удалось прочитать сведения о входе для этого сервера. Проверьте адрес сервера и повторите попытку.",
@@ -281,6 +284,7 @@ export const messages = {
   "error.backend.mcpServerFailedToStart": "Сервер не запустился: {reason}",
   "error.backend.mcpServerStartAbandoned":
     "{provider} перестал ждать до запуска сервера, поэтому его агенты не получают инструменты этого сервера.",
+  "error.backend.mcpServerStoppedDuringCall": "MCP-сервер остановился, не ответив на этот вызов.",
   "error.backend.mcpToolSchemaRefused":
     "Его инструмент {tool} использует формат входных данных, который этот провайдер не может прочитать. Агенты других провайдеров по-прежнему получают сервер.",
   "error.backend.mcpServerSignInForProvider":

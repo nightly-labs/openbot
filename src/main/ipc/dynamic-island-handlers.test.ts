@@ -10,8 +10,6 @@ import { Effect } from "effect";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { dynamicIslandIpcHandlers } from "./dynamic-island-handlers";
 
-// Same reason as define-ipc-group.test.ts: electron cannot be imported outside an Electron process, so
-// registrations are captured.
 const { registrations } = vi.hoisted(() => ({
   registrations: new Map<string, (event: unknown, payload?: unknown) => unknown>(),
 }));

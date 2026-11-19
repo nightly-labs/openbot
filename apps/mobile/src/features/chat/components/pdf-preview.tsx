@@ -3,11 +3,6 @@ import { useText } from "@/shared/lib/text";
 import { DOM_OPTIONS, type DocumentPreviewProps, PreviewMessage, useFileBase64 } from "./file-document-preview";
 import PdfPages from "./pdf-pages.dom";
 
-/**
- * A PDF file. The Android web view cannot draw a PDF, so pdf.js draws its pages. iOS uses
- * `pdf-preview.ios.tsx`. This file does not import react-native-webview: an Android build from before
- * Android linked it has no native module, and the module throws when it loads without it.
- */
 export function PdfPreview({ uri, title, insets }: DocumentPreviewProps) {
   const { t } = useText();
   const [background, muted] = useThemeColor(["background", "muted"]);

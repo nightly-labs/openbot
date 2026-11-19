@@ -1,8 +1,3 @@
-// The file changes of each mobile release step, and the pull request that carries them. The menu
-// `bun run mobile:release` (scripts/mobile-release.ts) and `bun run mobile:release:published`
-// (scripts/publish-mobile-release.ts) use them. Each step reads the files, returns the new text of
-// each one, and writes nothing, so a step that cannot finish changes nothing.
-
 import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
@@ -29,7 +24,6 @@ export const MOBILE_FEATURES_CONFIG_FILE = "apps/auth-api/src/server/mobile-feat
 export interface FileChange {
   path: string;
   text: string;
-  /** One line for the summary, such as "1.4.7: 2026-11-06 (iOS)". */
   summary: string;
 }
 
@@ -37,7 +31,6 @@ export function readText(path: string): string {
   return readFileSync(path, "utf8");
 }
 
-/** The version in `source`, the text of an `app.json`. `name` is the file or the commit that has it. */
 export function appJsonVersion(source: string, name: string = MOBILE_VERSION_FILES[0]): string {
   const appJson = JSON.parse(source);
   const version = isDynamicRecord(appJson) && isDynamicRecord(appJson.expo) ? appJson.expo.version : undefined;
@@ -55,9 +48,7 @@ export function today(): string {
 
 const headingPrefix = (version: string) => `## [${version}] - `;
 
-/** The heading state of the store version `version`, and the line it is on. */
 export function versionState(changelog: string, version: string): { index: number; dates: StoreDates } {
-  // No store step applies to an OTA section: no store reviews it, and it is not a newest store version.
   if (otaVersion(version) !== undefined) {
     throw new Error(`${version} is an OTA update, not a store version. Name the store version.`);
   }
@@ -72,7 +63,6 @@ export function versionState(changelog: string, version: string): { index: numbe
   return { index, dates };
 }
 
-/** `changelog` with the state of `stores` in the heading of `version` replaced. */
 function withStoreState(
   changelog: string,
   version: string,
@@ -89,12 +79,10 @@ function withStoreState(
   return lines.join("\n");
 }
 
-/** The versions older than `version` that `store` still reviews. A newer build replaces them. */
 export function olderInReview(changelog: string, version: string, store: MobileStore): string[] {
   return changelog.split("\n").flatMap((line) => {
     const [, candidate = "", text = ""] = /^## \[([^\]]+)\] - (.+)$/.exec(line) ?? [];
     const dates = parseStoreDates(text);
-    // An OTA section names only the platforms that get the update. No store reviews it.
     return dates !== undefined &&
       dates[store] === undefined &&
       otaVersion(candidate) === undefined &&
@@ -107,13 +95,7 @@ export function olderInReview(changelog: string, version: string, store: MobileS
 const QUOTED_VERSION = (store: MobileStore) => new RegExp(`(\\n\\s+${store}: \\{ upTo: ")([^"]+)(")`, "g");
 const LATEST_VERSION = (store: MobileStore) => new RegExp(`(\\n\\s+${store}: ")([^"]+)(")`, "g");
 
-/**
- * The feature config with the `upTo` of each feature and the newest version of `store` raised to
- * `version`. A version that is not newer leaves the file as it is, and so does "0", which turns a
- * feature off for every version. `except` lists stay.
- */
 export function withStoreFeatures(source: string, store: MobileStore, version: string): string {
-  // The newest version is a store version. With an OTA version, each phone would show a store update that no store has.
   if (otaVersion(version) !== undefined) throw new Error(`${version} is an OTA update, not a store version.`);
   const raise = (_match: string, start: string, current: string, end: string) =>
     `${start}${current !== "0" && isNewerMobileVersion(version, current) ? version : current}${end}`;
@@ -130,16 +112,10 @@ export function withStoreFeatures(source: string, store: MobileStore, version: s
 
 export interface PublishPlan {
   changes: FileChange[];
-  /** The older versions that the step marks as skipped on each store. */
   skipped: { version: string; store: MobileStore }[];
-  /** What stops the Discord post. The step works, but the merge cannot post until the file is ready. */
   announcementProblems: string[];
 }
 
-/**
- * Marks `version` as available on `stores` today, raises their flags and newest version, and, with
- * `skipOlder`, marks the older versions that those stores still review as skipped.
- */
 export function publishPlan(version: string, stores: readonly MobileStore[], skipOlder: boolean): PublishPlan {
   let changelog = readText(MOBILE_CHANGELOG);
   const { dates } = versionState(changelog, version);
@@ -190,7 +166,6 @@ export function publishPlan(version: string, stores: readonly MobileStore[], ski
   };
 }
 
-/** Marks `version` as skipped on `store`, or, with `undo`, as in review again. */
 export function skipPlan(version: string, store: MobileStore, undo: boolean): FileChange[] {
   const changelog = readText(MOBILE_CHANGELOG);
   const { dates } = versionState(changelog, version);
@@ -209,15 +184,11 @@ export function skipPlan(version: string, store: MobileStore, undo: boolean): Fi
   ];
 }
 
-/** The release notes that wait in apps/mobile/changelog.d for the next version. */
 export function pendingFragments(): number {
   return readdirSync(MOBILE_FRAGMENT_DIR, { recursive: true }).filter(
     (name) => String(name).endsWith(".md") && String(name) !== "README.md",
   ).length;
 }
-
-// ---------------------------------------------------------------------------------------------
-// The pull request.
 
 export function run(command: string, args: readonly string[], options: { quiet?: boolean } = {}): string {
   return execFileSync(command, args, {
@@ -226,14 +197,12 @@ export function run(command: string, args: readonly string[], options: { quiet?:
   }).trim();
 }
 
-/** Stops when the working tree has changes, because the step switches branches. */
 export function assertCleanTree(): void {
   if (run("git", ["status", "--porcelain"]) !== "") {
     throw new Error("The working tree has changes. Commit or move them first: the release step switches branches.");
   }
 }
 
-/** A branch from the main of GitHub, so the step never carries local commits. */
 export function startBranch(name: string): string {
   run("git", ["fetch", "origin", "main"]);
   const taken = (branch: string) => {
@@ -257,10 +226,8 @@ export interface PullRequest {
   autoMerge: boolean;
 }
 
-/** Commits `paths`, pushes the branch and opens the pull request. Returns its URL. */
 export function openPullRequest({ title, body, paths, autoMerge }: PullRequest): string {
   run("git", ["add", "--", ...paths]);
-  // The pre-commit hook runs here, with its checks.
   execFileSync("git", ["commit", "--quiet", "-m", title], { stdio: "inherit" });
   run("git", ["push", "--quiet", "-u", "origin", "HEAD"]);
   const url = run("gh", ["pr", "create", "--base", "main", "--title", title, "--body", body]);
@@ -276,7 +243,6 @@ export interface PullRequestBody {
   next?: string;
 }
 
-/** The body of a release pull request, in the shape of .github/PULL_REQUEST_TEMPLATE.md. */
 export function pullRequestBody({ linked, changed, surfaces, verification, next }: PullRequestBody): string {
   return [
     "## Linked issue",

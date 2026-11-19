@@ -5,10 +5,6 @@ import { MessagePinRefused } from "../backend/message-pins";
 
 type MessagePinRefusal = MessagePinRefused["reason"];
 
-/**
- * A pin of one message that the host refused, as the sentence the user reads. The IPC handlers send
- * it to the renderer as it is; the Team API route gives it the status of its `reason`.
- */
 export class MessagePinRefusedError extends Error {
   readonly reason: MessagePinRefusal;
 
@@ -20,10 +16,6 @@ export class MessagePinRefusedError extends Error {
   }
 }
 
-/**
- * Runs a pin change at a Promise boundary. A refusal rejects with `MessagePinRefusedError`; any
- * other failure rejects with the original failure that its typed error wraps, as `runCauseEffect` does.
- */
 export async function runMessagePin(
   operation: Effect.Effect<PinnedMessagesSnapshot, MessagePinRefused | { readonly cause: unknown }>,
 ): Promise<PinnedMessagesSnapshot> {

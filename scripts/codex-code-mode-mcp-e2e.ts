@@ -1,17 +1,3 @@
-// Runs issues #2897 and #4468 end to end on the real `codex app-server`: a code-mode-only model, as
-// Codex describes GPT-6, and an OpenBot MCP server. Codex defers such a model's MCP tools into its
-// `exec` cell. #2897 made each MCP namespace direct-only, so each request carried the schema of every
-// MCP tool. Since #4468 only Computer Use stays direct; the model finds another server's tools in
-// `ALL_TOOLS` inside `exec`, as the developer instructions tell it. The payload is the one
-// `codexDisabledServers`, `codexMcpServers`, `codexThreadMcpServers` and `codexDirectMcpNamespaces`
-// build for a thread. A local server that speaks the Responses API stands in for the model: it records
-// the top-level namespaces, calls a direct MCP tool when Codex offers it, and otherwise calls the tool
-// from `exec`, so no account or key is used. A thread started with every MCP namespace direct keeps
-// them on `thread/resume`.
-// Issue #3265: a direct call gives the model the result's `structuredContent` alone when the server
-// sends it, and drops each image of `content`. A result without it keeps its images. The image steps
-// record this Codex behavior, so a Codex update that changes it fails here.
-// `bun scripts/codex-code-mode-mcp-e2e.ts`. Writes .openbot-build/codex-code-mode-mcp-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server as HttpServer } from "node:http";
@@ -41,15 +27,12 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/codex-code-mode-mcp-
 const NL = String.fromCharCode(10);
 const DEADLINE_MS = 60_000;
 const MODEL = "code-mode-model";
-// A model that is not code-mode-only: Codex defers its MCP tools behind `tool_search`.
 const SEARCH_MODEL = "tool-search-model";
 const TOOL = "list_calendars";
 const RESULT = "calendar_fixture_result";
 const STRUCTURED = "calendar_fixture_structured";
-// A 1 × 1 PNG.
 const PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
-// The fields Codex reads to route tools, as its model cache has them for GPT-6.
 const CODE_MODE_MODEL = {
   slug: MODEL,
   display_name: "Code mode model",
@@ -112,31 +95,20 @@ interface ModelEvent {
 }
 
 interface Offer {
-  /** The top-level tool names, namespaces included. */
   names: string[];
-  /** Whether the request names the MCP tool anywhere, the `exec` description included. */
   mentionsTool: boolean;
-  /** The description of Codex's `tool_search`, which names the sources of deferred tools. */
   search: string;
-  /** Whether the request carries the MCP tool's result back. */
   hasResult: boolean;
-  /** Whether the tool output carries the result's `structuredContent`. */
   hasStructured: boolean;
-  /** Whether the tool output carries an image. */
   hasImage: boolean;
 }
 
-// What a model writes in `exec` when the MCP tool is not direct: it finds the tool in `ALL_TOOLS`.
 const EXEC_CALL = [
   `const tool = ALL_TOOLS.find((t) => t.name.startsWith("mcp__") && t.name.endsWith("__${TOOL}"));`,
   "const result = await tools[tool.name]({});",
   "text(JSON.stringify(result));",
 ].join(NL);
 
-/**
- * Calls the MCP tool once, directly when a top-level namespace offers it and from `exec` otherwise,
- * then answers with a short text. Records what each request offered.
- */
 async function startFakeModel() {
   const offers: Offer[] = [];
   const server = createServer((request, response) => {
@@ -147,7 +119,6 @@ async function startFakeModel() {
     request.on("end", () => {
       const parsed: ModelRequest = JSON.parse(body || "{}");
       const input = parsed.input ?? [];
-      // A Responses Lite request sends its tools in an `input` item.
       const tools = parsed.tools ?? input.find((item) => item.tools)?.tools ?? [];
       const output = JSON.stringify(
         input.filter((item) => item.type === "function_call_output" || item.type === "custom_tool_call_output"),
@@ -192,10 +163,6 @@ async function startFakeModel() {
   return { offers, ...(await listen(server)) };
 }
 
-/**
- * A stateless SDK Streamable HTTP MCP server with one tool, which records each call. The path chooses
- * the result: `/mcp` sends text, `/image` adds a PNG, and `/structured-image` also adds `structuredContent`.
- */
 async function startHttpMcp() {
   const calls: string[] = [];
   const server = createServer(async (request, response) => {
@@ -240,7 +207,6 @@ async function listen(server: HttpServer) {
   };
 }
 
-/** The SDK transport, with its optional members spelled the way `exactOptionalPropertyTypes` wants. */
 function asTransport(inner: StreamableHTTPServerTransport): Transport {
   const transport: Transport = {
     start: () => {
@@ -272,19 +238,15 @@ function row(name: string, fields: Partial<McpServerConfig> = {}): McpServerConf
   };
 }
 
-/** A server under Computer Use's id and name, which stays direct. */
 function computerUse(url = httpUrl): McpServerConfig {
   return row(COMPUTER_USE_MCP_SERVER_NAME, { id: COMPUTER_USE_MCP_SERVER_ID, url });
 }
 
 interface Case {
   name: string;
-  /** The user's own entries, as TOML. */
   user?: string;
   rows: McpServerConfig[];
-  /** The model slug; the code-mode-only model when omitted. */
   model?: string;
-  /** True starts the thread with the list of #2897, every MCP namespace direct, then resumes it in a new app-server. */
   resume?: boolean;
 }
 
@@ -300,7 +262,6 @@ interface Outcome {
   imageReturned: boolean;
 }
 
-/** One app-server for the case's `CODEX_HOME`, initialized, and a way to run a turn to its end. */
 async function open(home: string) {
   const client = new CodexAppServerClient(cli.executable, 30_000, { CODEX_HOME: home, FAKE_KEY: "e2e" });
   let turnDone = () => {};
@@ -368,7 +329,6 @@ async function run(test: Case): Promise<Outcome> {
     const servers = keyed(own.transports);
     const openbot = visibleDynamicTools("codex").map((namespace) => namespace.name);
     const current = [...openbot, ...codexDirectMcpNamespaces(servers)];
-    // The list from #2897 to #4468: Codex's name for each server key.
     const everyServer = [
       ...openbot,
       ...Object.keys(servers).map((key) => `mcp__${key.replace(/[^A-Za-z0-9_]/gu, "_")}`),
@@ -469,7 +429,6 @@ try {
   await step(
     "a thread started with every MCP namespace direct keeps them on resume",
     { name: "resumed", rows: [row("composio")], resume: true },
-    // The call is in the first turn; the history holds it, so the fake model does not call again.
     (o) => assert.deepEqual(o.offered, ["mcp__openbot_composio"]),
   );
   await step(
@@ -523,7 +482,6 @@ try {
     (o) => {
       assert.deepEqual(o.calls, [TOOL]);
       assert.equal(o.structuredReturned, true, "the model did not get structuredContent");
-      // A failure below means Codex now sends `content` too, which closes #3265 upstream.
       assert.equal(o.resultReturned, false, "the model got the text of content");
       assert.equal(o.imageReturned, false, "the model got the image of content");
     },

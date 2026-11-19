@@ -3,27 +3,19 @@ import type { SharedValue } from "react-native-reanimated";
 import type { LiveConversationPhase } from "../model/live-conversation";
 import type { LiveConversation } from "./use-live-conversation";
 
-/** What the round voice button draws: a spinner, bars that follow the voice, or a microphone. */
 type VoiceGlyph = "spinner" | "level" | "mic" | "micOff";
 
-/**
- * A live conversation as the composer draws it: the composer turns into a call bar, and the chat above
- * it stays in view.
- */
 export interface ComposerVoice {
   available: boolean;
   open: boolean;
   exit: "send" | "cancel" | null;
   level: SharedValue<number>;
   presence: SharedValue<number>;
-  /** The mic of the composer opens the voice mode. */
   start: () => void;
-  /** The name of the mic of the composer. */
   startLabel: string;
   center: { label: string; glyph: VoiceGlyph; pressable: boolean; busy: boolean; onPress: () => void };
   leading: { label: string; onPress: () => void };
   trailing: { label: string; icon: "send" | "interrupt"; enabled: boolean; onPress: () => void };
-  /** The call bar of a live conversation: who speaks or what it does, and the words heard or read. */
   bar: { title: string; caption: string };
 }
 
@@ -36,7 +28,6 @@ const LIVE_PHASES = {
   offline: "mobile.chat.liveVoice.phase.offline",
 } as const satisfies Record<LiveConversationPhase, MobileTextKey>;
 
-/** What the call bar reads of a live conversation. */
 export type LiveVoiceSource = Pick<
   LiveConversation,
   | "available"
@@ -55,12 +46,7 @@ export type LiveVoiceSource = Pick<
   | "caption"
 >;
 
-/**
- * A live conversation, as the voice pane on desktop, drawn as the call bar: Mute mutes and unmutes the
- * microphone, End closes the conversation, and Interrupt stops the agent's reply or the wait for it.
- */
 export function liveVoice(live: LiveVoiceSource, name: string, t: MobileTranslate): ComposerVoice {
-  // "Speak now" only once the recognizer hears: while the microphone opens, words would be lost.
   const opening = live.phase === "listening" && !live.muted && !live.micOpen;
   const hearing = live.phase === "listening" && !live.muted && !live.exit && live.micOpen;
   const replying = live.phase === "thinking" || live.phase === "speaking";
@@ -103,7 +89,6 @@ export function liveVoice(live: LiveVoiceSource, name: string, t: MobileTranslat
               : LIVE_PHASES[live.phase],
         ),
       }),
-      // An error says why the conversation waits; otherwise the words heard, or the part read.
       caption: live.error ?? (live.caption || (hearing ? t("mobile.chat.liveVoice.speakNow") : "")),
     },
   };

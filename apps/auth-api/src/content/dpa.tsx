@@ -1,6 +1,3 @@
-// The text of the data processing addendum. Legal wording: change it only from the approved source text,
-// and move `DPA_UPDATED_AT` with it.
-
 import { Link } from "@tanstack/solid-router";
 
 export function Dpa() {

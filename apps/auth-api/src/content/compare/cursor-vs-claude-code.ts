@@ -1,12 +1,5 @@
 import { BENCHMARK_SOURCES, type MatchupComparison } from "./comparison";
 
-// Every statement about Cursor here is taken from cursor.com, the Cursor documentation
-// and help center, and Cursor's terms. Every statement about Claude Code is taken from
-// code.claude.com, claude.com and the Claude help center. Each page used is in
-// `sources`. The Artificial Analysis Coding Agent Index does not test Cursor, so this
-// page has no benchmark chart. Where the sources state nothing, the text says so.
-// Check them again, and move `checkedAt`, whenever this file changes. SpaceX acquired Cursor on 14 August 2026.
-
 const CURSOR_DOCS = "https://cursor.com/docs";
 const CLAUDE_CODE_DOCS = "https://code.claude.com/docs/en";
 

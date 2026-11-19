@@ -3,14 +3,8 @@ import { createEffect, createMemo, Show } from "solid-js";
 import type { McpServerTools } from "./mcp-server-tools";
 import type { McpServerConfig } from "./mcp-servers";
 
-/**
- * The dialog of a relayed sign-in that waits (`sign-in-relay-v1`), for the form and the connection
- * card. A page that only the joined server can reach shows instead in the host's own tab, through the
- * live view. When the dialog leaves with its sign-in, `returnFocus` gets the focus one frame later.
- */
 export function McpRelaySignIn(props: {
   tools: McpServerTools;
-  /** The config of the sign-in that waits for the browser, if any. */
   pending: McpServerConfig | null | undefined;
   onCancel: (url: string) => void;
   returnFocus: () => HTMLElement | undefined;
@@ -55,7 +49,6 @@ export function McpRelaySignIn(props: {
     },
   );
 
-  // Keyed by the page, so each sign-in opens a dialog of its own and a Cancel does not carry over.
   return (
     <>
       <Show when={hostPage()} keyed>

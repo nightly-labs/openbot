@@ -17,6 +17,8 @@ export const messages = {
   "error.workflow.agentMissing": "このステップのエージェントを選択してください。",
   "error.workflow.handoffFailed": "OpenBot はこのステップをエージェントに送信できませんでした。",
   "error.workflow.agentStepEnded": "エージェントが回答する前に、このステップのメッセージが削除されました。",
+  "error.workflow.agentStepStopped":
+    "エージェントはこのステップに回答する前に停止しました。ステップをもう一度実行してください。",
   "error.workflow.conditionUnclear": "モデルが「はい」か「いいえ」で回答しませんでした。",
   "error.workflow.modelFailed": "モデルが回答できませんでした。ステップをもう一度実行してください。",
   "error.workflow.modelTimedOut":

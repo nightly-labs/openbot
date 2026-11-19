@@ -4,14 +4,16 @@ import { INSTANCE_TRANSFER_REMOTE_BYTES } from "@openbot/contracts/team-protocol
 import { sourceText } from "@openbot/i18n/source";
 import { useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import {
   agentContents,
+  confirmDuplicateNames,
   exportDate,
   IncludeRow,
   NotesSection,
   toggledKeys,
   transferContents,
+  useReleaseOnClose,
 } from "@/features/servers/components/import-parts";
 import { pickZipUpload } from "@/features/servers/model/transfer-file";
 import {
@@ -27,11 +29,6 @@ import { useText } from "@/shared/lib/text";
 
 type Phase = "idle" | "reading" | "review" | "importing" | "done";
 
-/**
- * Server settings › Transfer › Import. The chosen transfer file goes to the host, which keeps it under a
- * token: the review shows what is in it before anything changes. A token left open when the page
- * closes is released.
- */
 export function ServerTransferImportScreen() {
   const { t, errorMessage } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
@@ -43,18 +40,7 @@ export function ServerTransferImportScreen() {
   const [preview, setPreview] = useState<InstanceTransferPreview | null>(null);
   const [result, setResult] = useState<RemoteInstanceTransferResult | null>(null);
 
-  // The open token, for the release when the page closes. A token that comes back after that is
-  // released when it arrives.
-  const token = useRef<string | null>(null);
-  token.current = preview?.token ?? null;
-  const closed = useRef(false);
-  useEffect(() => {
-    closed.current = false;
-    return () => {
-      closed.current = true;
-      if (token.current) void discardInstanceTransfer(token.current, serverId).catch(() => undefined);
-    };
-  }, [discardInstanceTransfer, serverId]);
+  const closed = useReleaseOnClose(preview?.token ?? null, discardInstanceTransfer, serverId);
 
   if (!canTransferServer(serverId))
     return (
@@ -105,7 +91,6 @@ export function ServerTransferImportScreen() {
       setPhase("done");
       void haptics.notification("success");
     } catch (caught) {
-      // The token is spent once the host starts, so the file must be chosen again.
       setPreview(null);
       setPhase("idle");
       setError(errorMessage(caught, t("mobile.server.transfer.importFailed")));
@@ -190,6 +175,12 @@ function TransferReview({
     selected.length > 0
       ? t("mobile.server.transfer.submit", { count: selected.length })
       : t("mobile.server.transfer.submitSettings");
+  const start = () =>
+    onImport(
+      selected.map((agent) => agent.key),
+      settings,
+    );
+  const confirmAndStart = () => confirmDuplicateNames(t, selected, start);
 
   return (
     <SettingsContent>
@@ -199,12 +190,7 @@ function TransferReview({
         pending={importing}
         label={label}
         pendingLabel={t("mobile.server.transfer.importing")}
-        onSave={() =>
-          onImport(
-            selected.map((agent) => agent.key),
-            settings,
-          )
-        }
+        onSave={confirmAndStart}
       />
       <SettingsSection title={t("mobile.server.transfer.contains")} footer={error ?? label}>
         <SettingsRow disclosure={false} supportingText={contents}>
@@ -253,7 +239,6 @@ function TransferReview({
   );
 }
 
-/** The agents that an import or a copy added, and what the user must do next. */
 export function TransferResult({
   result,
   title,

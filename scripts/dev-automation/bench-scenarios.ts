@@ -1,12 +1,3 @@
-// The `dev:bench` scenarios: what one run does between "the app is ready" and
-// "collect garbage and read the settled state". Each drives the app the way a
-// user does: the preload API a click would call, a click on the sidebar, a
-// scroll of the chat, or the main-process window call the close button makes.
-//
-// Turn scenarios use the real claude, opencode and grok CLIs, so they spend
-// the developer's model quota. They never start the real Codex: the scale
-// scenario runs a fake Codex (`bench-fake-codex.ts`) that streams fixed text.
-
 import { readFile, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { join } from "node:path";
@@ -31,10 +22,8 @@ export interface ScenarioContext {
   page: Page;
   inspector: InspectorClient | null;
   logger: Logger;
-  // Evaluates an expression in the app window and returns its value.
   evaluate: <T = unknown>(expression: string) => Promise<T>;
   wait: (milliseconds: number) => Promise<void>;
-  // Values the scenario measured itself. They go into the settled reading.
   record: (values: MetricValues) => void;
 }
 
@@ -43,30 +32,20 @@ export interface Scenario {
   description: string;
   seed: SeedPlan;
   act: (context: ScenarioContext) => Promise<void>;
-  // Idle time after the garbage collection, before the settled reading.
   settleMs?: number;
-  // Heap snapshots of main and the app window after the first run.
   snapshots?: boolean;
-  // Runs before the app starts, in a directory that only this scenario uses. Returns extra
-  // environment for the app, such as a fake provider CLI.
   prepare?: (directory: string) => Promise<Record<string, string>>;
 }
 
 type BenchProvider = "claude" | "opencode" | "grok" | "codex";
 
-// The model each provider runs in a turn scenario, when the CLI lists it.
-// Otherwise the first model the CLI lists.
 const PREFERRED_MODELS: Record<BenchProvider, string> = {
   claude: "claude-sonnet-5",
   opencode: "opencode-go/muse-spark-1.3-contributor",
   grok: "grok-4.6",
-  // The model that the fake Codex lists.
   codex: "gpt-5.5",
 };
 
-// A long streamed reply with code blocks and a table, the Markdown the renderer
-// works hardest on, and no tool call, so the numbers measure the stream and not
-// what a tool did.
 const LONG_REPLY_PROMPT =
   "Write a detailed Markdown guide of about 1,500 words on building a small HTTP server in Rust with axum. " +
   "Include six fenced code blocks and one table. Answer from memory only. " +
@@ -100,8 +79,6 @@ async function poll(what: string, timeoutMs: number, everyMs: number, probe: () 
   }
 }
 
-// --- agents and turns --------------------------------------------------------
-
 interface ListedModel {
   provider: string;
   id: string;
@@ -109,11 +86,8 @@ interface ListedModel {
   supportedReasoningEfforts: string[];
 }
 
-/** Model discovery ends some seconds after launch, once every provider CLI has answered. */
 const MODEL_DISCOVERY_TIMEOUT_MS = 2 * MINUTE;
 
-// `requiredModel` waits for that model: before the CLI lists its own models, the app lists the ones
-// it knows, and a fake CLI does not run them.
 async function useProvider(
   context: ScenarioContext,
   agentIds: string[],
@@ -145,8 +119,6 @@ async function openAgent(context: ScenarioContext, agentId: string): Promise<voi
   await context.page.locator('main[aria-label="Conversation"] .conversation-scroll').waitFor();
 }
 
-// A chat with unread messages sits in the "Unread" group, whose rows have no `data-chat-id`, so the
-// channel is found by the start of its accessible name, which every group gives it.
 async function openChannel(context: ScenarioContext, name: string): Promise<void> {
   const escaped = name.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&");
   await context.page
@@ -161,13 +133,6 @@ interface SentDelivery {
   id: string;
 }
 
-/**
- * True when every one of these turns has ended. Waiting on the ids from the send
- * receipt, not on the agent looking idle, because a delivery can take seconds to
- * start its turn, and in that gap the agent has no active turn yet. A completed
- * delivery also needs its reply: a build without the boot-recovery fix settles a
- * turn that starts during provider startup while the reply is still coming.
- */
 async function turnsEnded(context: ScenarioContext, deliveries: SentDelivery[]): Promise<boolean> {
   return context.evaluate<boolean>(`(async (sent) => {
     for (const { agentId, id } of sent) {
@@ -198,11 +163,6 @@ async function lastReply(context: ScenarioContext, agentId: string): Promise<Tur
     })`);
 }
 
-/**
- * Sends one message to each agent at once and waits until every one is idle.
- * Records how many replies failed, so a run that measured an error is visible
- * in the report and not read as a cheap turn.
- */
 async function runTurns(context: ScenarioContext, agentIds: string[], text: string): Promise<void> {
   const started = Date.now();
   const sent: SentDelivery[] = [];
@@ -224,9 +184,6 @@ async function runTurns(context: ScenarioContext, agentIds: string[], text: stri
   context.record({ "turns.failed": failed, "turns.characters": characters, "turns.ms": Date.now() - started });
 }
 
-// --- windows -----------------------------------------------------------------
-
-// The app window in the main process: not a Dynamic Island or overlay surface.
 const MAIN_WINDOW = `require("electron").BrowserWindow.getAllWindows().find((window) => {
   const url = window.webContents.getURL();
   return url.startsWith("openbot-app://app/index.html") && !url.includes("surface=");
@@ -243,15 +200,8 @@ async function mainWindowCall(context: ScenarioContext, call: "close" | "minimiz
   if (done !== true) throw new Error(`No app window to ${call}.`);
 }
 
-// --- chat scrolling ------------------------------------------------------------
-
 const CHAT_SCROLL = 'main[aria-label="Conversation"] .conversation-scroll';
 
-/**
- * Scrolls to the top until no older page loads, then back to the bottom. Each
- * step at the top loads one older page of 50 messages, so a 2,000-message chat
- * takes about 40 steps.
- */
 async function scrollThroughHistory(context: ScenarioContext) {
   let steps = 0;
   let unchanged = 0;
@@ -276,10 +226,6 @@ async function scrollThroughHistory(context: ScenarioContext) {
   return steps;
 }
 
-// --- browser tabs ----------------------------------------------------------------
-
-// A page with the weight of an ordinary article: a few thousand nodes, styles,
-// and a timer that repaints once a second.
 function articlePage(index: number): string {
   const paragraphs = Array.from(
     { length: 300 },
@@ -325,8 +271,6 @@ async function openTabs(context: ScenarioContext, count: number): Promise<void> 
   }
 }
 
-// --- scenarios -----------------------------------------------------------------
-
 function idle(milliseconds: number): Scenario["act"] {
   return async ({ wait }) => wait(milliseconds);
 }
@@ -360,10 +304,6 @@ function parallel(provider: BenchProvider, count: number): Scenario {
   };
 }
 
-// --- many agents at once ---------------------------------------------------------
-
-// Starts the readings of the main process: its CPU time and the delay of its event loop, which is
-// how long a click, an IPC call or a provider message waits.
 const MAIN_WINDOW_START = `(() => {
   const { monitorEventLoopDelay } = require("node:perf_hooks");
   const histogram = monitorEventLoopDelay({ resolution: 10 });
@@ -386,7 +326,6 @@ const MAIN_WINDOW_STOP = `(() => {
   };
 })()`;
 
-// The app window's timer lag: a 50 ms timer that fires late shows that a click would wait as long.
 const WINDOW_LAG_START = `(() => {
   const lags = [];
   let last = performance.now();
@@ -429,7 +368,6 @@ function mainWindowReading(value: unknown): MainWindowReading {
   };
 }
 
-/** The fake Codex log lines of ended turns. */
 async function loggedCount(logPath: string, key: string): Promise<number> {
   const text = await readFile(logPath, "utf8").catch(() => "");
   return text.split("\n").filter((line) => line.includes(`"${key}"`)).length;
@@ -447,25 +385,12 @@ async function unknownCodexMethods(logPath: string): Promise<string[]> {
   return [...methods];
 }
 
-// One reply: 600 pieces of text, one each 50 ms, so each agent streams for 30 s, about 20 pieces a
-// second, as a fast model does.
 const SCALE_DELTA_MS = 50;
 const SCALE_DELTAS = 600;
 
-// chief, research, builder and launch, which `seed-dev-state.ts` always makes.
 const SEED_AGENT_COUNT = 4;
 
-/**
- * The scale agents of a host with `total` agents stream at the same time. `channelMembers` of them are
- * the members of an open channel with a long history. A channel runs `CHANNEL_PARALLEL_LIMIT` tasks at
- * once and queues the rest, so only that many members get a task there: more tasks would add queue
- * time, not load. All other agents answer in their own chat. The readings cover only the time from the
- * first send to the last ended turn. With `OPENBOT_BENCH_PROFILE_STREAM=1`, the first
- * run also writes CPU profiles of the main process and the app window for that time, which slow the
- * app: compare readings only between runs without it.
- */
 function manyAgents(total: number, channelMembers: number): Scenario {
-  // The seed always has its own agents, and a host has at most 100, so `total` counts them too.
   const count = total - SEED_AGENT_COUNT;
   const agents = Array.from({ length: count }, (_, index) => scaleAgent(index + 1));
   const members = agents.slice(count - channelMembers);
@@ -510,14 +435,11 @@ function manyAgents(total: number, channelMembers: number): Scenario {
           name: channel.name,
           title: channel.title,
           instructions: channel.instructions,
-          // Only agents on the fake: the lead also writes the channel's summaries, and an agent of the
-          // seed would send them to a real provider.
           members: members.map((agentId) => ({ agentId })),
           leadAgentId: members[0],
         },
       };
       await context.evaluate(`window.openbot.agent.channelCommand(${json(save)}).then(() => null)`);
-      // A channel opens in the conversation view, as an agent does.
       await openChannel(context, channel.name);
       await context.wait(5 * SECOND);
 
@@ -561,7 +483,6 @@ function manyAgents(total: number, channelMembers: number): Scenario {
         await context.evaluate(`window.openbot.agent.channelCommand(${json(command)}).then(() => null)`);
       }
       const sendMs = Date.now() - started;
-      // The fake writes each ended turn to its log, so this wait sends nothing to the app.
       await poll(
         `${streaming} streamed turns to end`,
         SCALE_DELTA_MS * SCALE_DELTAS + 5 * MINUTE,
@@ -585,7 +506,6 @@ function manyAgents(total: number, channelMembers: number): Scenario {
       await rendererSession.detach().catch(() => undefined);
       const rendererSeconds = (name: string) => (rendererAfter[name] ?? 0) - (rendererBefore[name] ?? 0);
 
-      // The app settles each turn after the provider ends it: wait for the queues too.
       await poll("the direct turns to settle", 2 * MINUTE, 2 * SECOND, () => turnsEnded(context, sent));
       await poll("the channel tasks to settle", 2 * MINUTE, 2 * SECOND, async () => {
         const active = await context.evaluate<number>(
@@ -610,7 +530,6 @@ function manyAgents(total: number, channelMembers: number): Scenario {
         "stream.main.loopMaxMs": main.loopMaxMs,
         "stream.window.taskPercent": (rendererSeconds("TaskDuration") * 1000 * 100) / streamMs,
         "stream.window.scriptPercent": (rendererSeconds("ScriptDuration") * 1000 * 100) / streamMs,
-        // Beside script, these tell where the time of the window goes.
         "stream.window.stylePercent": (rendererSeconds("RecalcStyleDuration") * 1000 * 100) / streamMs,
         "stream.window.layoutPercent": (rendererSeconds("LayoutDuration") * 1000 * 100) / streamMs,
         "stream.window.lagP99Ms": lag.p99,

@@ -1,8 +1,3 @@
-// Skills from a public GitHub repository. The host reads them with no GitHub account: two REST calls
-// (the commit and its file tree) for each read, one (the tree) for each skill download, and the
-// files from raw.githubusercontent.com. The read pins the commit, and an install downloads the files
-// of that commit only, so the agent gets what the user read.
-
 import { createHash } from "node:crypto";
 import {
   GITHUB_SKILL_ID_MAX_LENGTH,
@@ -35,14 +30,10 @@ import {
 
 const API = "https://api.github.com";
 const RAW = "https://raw.githubusercontent.com";
-/** The same limit as a skill package. */
 const MAX_FILES = 200;
 const CONCURRENCY = 8;
-/** A branch or tag can have slashes, so a link can split at several places. Each try is one REST call. */
 const REF_TRIES = 4;
-/** The `github-skills-v1` answer takes a folder path of this length at most. */
 const MAX_PATH_LENGTH = 1024;
-/** The commit of an id never changes, so a download serves each agent of one add. */
 const DOWNLOADS_KEPT = 8;
 
 export class GithubSkillFailure extends Schema.TaggedError<GithubSkillFailure>()("GithubSkillFailure", {
@@ -55,16 +46,13 @@ function failure(message: string): GithubSkillFailure {
   return new GithubSkillFailure({ cause: new Error(message) });
 }
 
-/** A link that the user pasted: the repository, and the place in it, still with the ref. */
 interface GithubLink {
   owner: string;
   repo: string;
-  /** `tree` and `blob` links name a ref, then a path. */
   kind: "repository" | "tree" | "blob";
   rest: string[];
 }
 
-/** Reads `https://github.com/<owner>/<repo>[/tree|blob/<ref>/<path>]`, with or without the scheme. */
 function parseGithubLink(text: string): GithubLink | null {
   const trimmed = text.trim();
   let url: URL;
@@ -94,13 +82,10 @@ function parseGithubLink(text: string): GithubLink | null {
 interface TreeEntry {
   path: string;
   size: number;
-  /** A symbolic link. raw.githubusercontent.com gives its target as the file text. */
   link: boolean;
-  /** Git mode `100755`: the install keeps the file executable. */
   executable: boolean;
 }
 
-/** The files of a commit. `truncated` when GitHub did not list all of them. */
 interface Tree {
   files: TreeEntry[];
   truncated: boolean;
@@ -116,7 +101,6 @@ export function githubSkillSource(fetchImpl: GitHubFetch) {
       }),
     ).pipe(Effect.mapError(() => failure(sourceText("error.skill.githubUnavailable"))));
 
-  /** A REST call. Null on 404 and 422, which GitHub sends for a missing repository or ref. */
   const api = Effect.fn("GithubSkillSource.api")(function* (path: string) {
     const response = yield* request(`${API}${path}`);
     if (response.status === 404 || response.status === 422) return null;
@@ -152,7 +136,6 @@ export function githubSkillSource(fetchImpl: GitHubFetch) {
     return { sha: body.sha, committedAt: isString(date) ? date : new Date(0).toISOString() };
   });
 
-  /** The files of the commit. A read shows the skills of a tree that GitHub cuts off; a download refuses it. */
   const tree = Effect.fn("GithubSkillSource.tree")(function* (address: Omit<GithubSkillAddress, "path">) {
     const body = yield* api(`/repos/${address.owner}/${address.repo}/git/trees/${address.commit}?recursive=1`);
     if (!isDynamicRecord(body) || !Array.isArray(body.tree))
@@ -170,7 +153,6 @@ export function githubSkillSource(fetchImpl: GitHubFetch) {
     return result;
   });
 
-  /** The files under `folder`, with names relative to it. */
   function filesIn(files: TreeEntry[], folder: string): TreeEntry[] {
     if (!folder) return files;
     const prefix = `${folder}/`;
@@ -179,12 +161,10 @@ export function githubSkillSource(fetchImpl: GitHubFetch) {
       .map((file) => ({ ...file, path: file.path.slice(prefix.length) }));
   }
 
-  /** The files of a skill folder that a download takes. A file that a skill package must not carry stays on GitHub. */
   function packageFiles(files: TreeEntry[], folder: string): TreeEntry[] {
     return filesIn(files, folder).filter((file) => !isUnsafeArchivePath(file.path));
   }
 
-  /** Why a download refuses these files, or null. The read checks it too, so it does not offer a skill that cannot be added (#9908). */
   function packageProblem(own: TreeEntry[]): string | null {
     if (own.some((file) => file.link)) return sourceText("error.skill.symlinks");
     if (own.length > MAX_FILES) return sourceText("error.skill.tooManyFiles", { limit: MAX_FILES });
@@ -205,7 +185,6 @@ export function githubSkillSource(fetchImpl: GitHubFetch) {
       const found = yield* commit(link.owner, link.repo, link.rest.slice(0, split).join("/"));
       if (!found) continue;
       const after = link.rest.slice(split);
-      // A blob link names a file: the skill is its folder.
       const path = (link.kind === "blob" ? after.slice(0, -1) : after).join("/");
       if (!isGithubSkillPath(path) || path.length > MAX_PATH_LENGTH)
         return yield* failure(sourceText("error.skill.githubLinkInvalid"));
@@ -234,7 +213,6 @@ export function githubSkillSource(fetchImpl: GitHubFetch) {
       name: metadata.success.name,
       description: metadata.success.description,
       instructions: text.slice(text.match(SKILL_FRONTMATTER)?.[0].length ?? 0).trim(),
-      // The answer lists as many files as a skill package can hold; a download refuses a longer list.
       files: own
         .map((file) => file.path)
         .sort()
@@ -244,7 +222,6 @@ export function githubSkillSource(fetchImpl: GitHubFetch) {
   });
 
   return {
-    /** The skill folders under a link: the folders with a `SKILL.md` that no other skill folder holds. */
     read: Effect.fn("GithubSkillSource.read")(function* (text: string) {
       const link = parseGithubLink(text);
       if (!link) return yield* failure(sourceText("error.skill.githubLinkInvalid"));
@@ -274,7 +251,6 @@ export function githubSkillSource(fetchImpl: GitHubFetch) {
             folder: [`${link.owner}/${link.repo}`, resolved.path].filter(Boolean).join("/"),
           }),
         );
-      // When no skill here can be added, say why now, not after the user chose the agents.
       const problems = found.map((skill) => packageProblem(packageFiles(files, skill.path)));
       const problem = problems.find((text) => text !== null);
       if (problem && problems.every(Boolean)) return yield* failure(problem);
@@ -289,7 +265,6 @@ export function githubSkillSource(fetchImpl: GitHubFetch) {
       return source;
     }),
 
-    /** The files of one skill folder at the pinned commit, as a skill package, and its detail. */
     download: Effect.fn("GithubSkillSource.download")(function* (address: GithubSkillAddress) {
       const id = githubSkillId(address);
       const kept = downloads.get(id);

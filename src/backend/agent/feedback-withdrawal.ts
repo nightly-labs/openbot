@@ -17,29 +17,21 @@ export interface FeedbackWithdrawalOptions {
   feedback: AgentFeedback | null;
 }
 
-/** A thank-you card in the agent's own chat: its thread and the message. */
 interface CardTarget {
   threadId: string;
   message: ConversationMessage;
 }
 
-/** A withdrawal result, or `notFound` when the message is not a thank-you card of this host. */
 export type FeedbackCardWithdrawResult = FeedbackWithdrawResult | { readonly status: "notFound" };
 
 const FEEDBACK_WITHDRAWN_EVENT = "feedback.withdrawn";
 const logger = createOpenBotLogger("feedback-withdrawal");
 
-/** The title of a thank-you card, from the English text that the card was posted with. */
 function cardTitle(text: string): string {
   const prefix = sourceText("status.agent.feedbackSent", { title: "" });
   return text.startsWith(prefix) ? text.slice(prefix.length) : text;
 }
 
-/**
- * Takes a report that the user sent off GitHub, from its thank-you card or from the agent's
- * `withdraw_feedback`, and marks the cards of that report in the chat as removed. The account service
- * decides who sent the report; this host keeps nothing more than the card.
- */
 export class FeedbackWithdrawal {
   readonly #store: AgentStore;
   readonly #conversation: ConversationRuntime;
@@ -53,7 +45,6 @@ export class FeedbackWithdrawal {
     this.#feedback = options.feedback;
   }
 
-  /** The card's Remove action. A card whose report is removed already answers `withdrawn` again. */
   readonly withdrawCard = Effect.fn("FeedbackWithdrawal.withdrawCard")(function* (
     this: FeedbackWithdrawal,
     input: WithdrawFeedbackInput,
@@ -65,10 +56,6 @@ export class FeedbackWithdrawal {
     return yield* this.withdraw(input.agentId, target.threadId, issue.number, target);
   });
 
-  /**
-   * Takes issue `number` off GitHub, then marks its cards in thread `threadId` of the agent as removed.
-   * The issue is off GitHub also when the card write fails, so that failure is only logged.
-   */
   readonly withdraw = Effect.fn("FeedbackWithdrawal.withdraw")(function* (
     this: FeedbackWithdrawal,
     agentId: string,
@@ -99,16 +86,10 @@ export class FeedbackWithdrawal {
     return message ? { threadId, message } : null;
   }
 
-  /**
-   * Changes each thank-you card of the issue in the thread to a removed card, also an older one that
-   * is not loaded, and publishes the chat or the task. `card` is the card that the user removed.
-   */
   #markWithdrawn(agentId: string, threadId: string, number: number, card?: CardTarget): void {
-    // The agent's `withdraw_feedback` names only its thread, which can be the thread of a side task.
     const taskId =
       this.#tasks.openTaskIds(agentId).find((candidate) => this.#tasks.threadId(candidate) === threadId) ?? null;
     const current = taskId ? this.#tasks.read(agentId, taskId) : this.#conversation.ensureSnapshot(agentId, threadId);
-    // The agent can be on another chat now. Then the stored row of this thread gives the active turn.
     const loaded = current.threadId === threadId;
     const snapshot = structuredClone(current);
     const removed = (message: ConversationMessage): ConversationMessage => ({
@@ -144,7 +125,6 @@ export class FeedbackWithdrawal {
       eventType: FEEDBACK_WITHDRAWN_EVENT,
       detail: {},
     });
-    // `setSnapshot` keeps a task thread in its own cache, so the open task panel gets the change too.
     if (loaded) {
       snapshot.revision = revision;
       this.#conversation.setSnapshot(agentId, snapshot);

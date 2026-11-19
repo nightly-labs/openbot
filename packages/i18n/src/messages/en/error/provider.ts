@@ -1,7 +1,6 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.provider", {
-  // Provider, provider runtime and custom endpoint errors.
   "error.provider.mcpConfig":
     "OpenBot could not register MCP servers in the Codex configuration. Check that your Codex config.toml is valid and writable, then restart OpenBot.",
   "error.provider.computerUseConfig":
@@ -86,6 +85,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.runtimeUpdateIncomplete": "The runtime update did not complete.",
   "error.provider.downloadHttp": "Runtime download failed with HTTP {status}.",
   "error.provider.downloadNoData": "Runtime download returned no data.",
+  "error.provider.downloadStalled":
+    "The download stopped because no data arrived for one minute. Check the internet connection, then try again.",
   "error.provider.downloadSize": "The runtime download has an unexpected size.",
   "error.provider.downloadIntegrity": "The runtime download failed its integrity check.",
   "error.provider.runtimeReplacing": "The runtime could not be installed because another instance is replacing it.",
@@ -170,6 +171,9 @@ export const messages = defineMessages("error.provider", {
   "error.provider.cliTimedOut": "{provider} did not answer in time. The computer may be busy. OpenBot will try again.",
   "error.provider.cliTimedOutRefresh":
     "{provider} did not answer in time. The computer may be busy. Refresh the providers to try again.",
+  "error.provider.stoppedBeforeStart": "{provider} stopped before this message started. Send the message again.",
+  "error.provider.sessionStartTimedOut":
+    "{provider} did not open a new chat in time, so this message did not start. On the computer that runs OpenBot, open Providers, select {provider} and click Restart. Then try again.",
   "error.provider.serviceUnreachable":
     "{provider} cannot connect to its service. Check your internet connection. OpenBot will try again.",
   "error.provider.serviceUnreachableRefresh":
@@ -179,6 +183,8 @@ export const messages = defineMessages("error.provider", {
     "{provider} did not list its models within {seconds} s. The computer may be busy.",
   "error.provider.startStopped":
     "{provider} did not start several times in a row, so OpenBot stopped trying. Refresh the providers to try again.",
+  "error.provider.startPaused":
+    "{provider} did not start several times in a row. OpenBot tries again with the next message or routine. To try now, refresh the providers.",
   "error.provider.tempDiskSpace":
     "{provider} needs at least 1 GB of free disk space to start. Free up space, then refresh the providers.",
   "error.provider.noCodeSignIn": "{provider} cannot be signed in with a code.",
@@ -216,12 +222,16 @@ export const messages = defineMessages("error.provider", {
     "OpenCode refused this free model. Some free models are not available in every country. Choose a different model with the Free label, or paste an OpenCode Go key in the OpenCode settings and choose an OpenCode Go model.",
   "error.provider.customEndpointKeyRefused":
     'The endpoint "{provider}" refused its API key or headers. Enter them again in Server settings → Providers, then try again.',
+  "error.provider.customEndpointAccessRefused":
+    'The endpoint "{provider}" refused the request. Its API key or headers can be wrong, or its account cannot use this model. Check them in Server settings → Providers, or choose another model. Then try again.',
   "error.provider.customEndpointKeyMissing":
     'The endpoint "{provider}" needs an API key. Add the key in Server settings → Providers, then try again.',
   "error.provider.opencodeKeyExpired":
     "Your OpenCode API key expired. Create a new key in OpenCode Console, paste it in the OpenCode settings, then try again.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go refused your saved API key. The key may have expired. Create a new key in OpenCode Console, paste it in the OpenCode settings, then try again.",
+  "error.provider.opencodeGoRequestRefused":
+    "OpenCode Go refused the request. A new API key does not fix this. Your OpenCode Go plan may not be active, or OpenCode Go may block your network: some services block VPNs, proxies or some countries. Make sure that your plan is active in OpenCode Console, or turn off the VPN, then try again. You can also choose a different model.",
   "error.provider.opencodeServiceFailure":
     "OpenCode could not complete this turn because its local service failed. Try again. If the error continues, reconnect OpenCode in Settings.",
   "error.provider.opencodeRateLimited":
@@ -232,6 +242,8 @@ export const messages = defineMessages("error.provider", {
     "OpenCode's model provider reported an invalid upload request. Choose another model and continue. Check saved routines before you create them again.\n{detail}",
   "error.provider.opencodeUnreadableContent":
     "This model cannot read a file or image in this chat. OpenBot started a new OpenCode session with the chat history. Send your message again without the file, or choose a model that can read files. If you added this model to a custom provider, clear Images at Accepts in its settings.",
+  "error.provider.opencodeOutOfMemory":
+    "The model server ran out of memory for this chat. Start a new chat, or load the model with a smaller context length and enter the same window in its OpenBot provider settings.",
   "error.provider.opencodeContextTooSmall":
     "This chat does not fit in the model's context window. In Ollama or LM Studio, load the model with a larger context length, and enter the same window in its OpenBot provider settings. Or choose a larger model.",
   "error.provider.opencodeFreeLimit":
@@ -244,6 +256,8 @@ export const messages = defineMessages("error.provider", {
     "The model's reply was cut off or was not valid. Send your message again, or choose another model.\n{detail}",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode could not read the reasoning of this model at this effort. Select a lower effort or another model, then send your message again.",
+  "error.provider.opencodeModelNotServed":
+    "The model provider does not offer this model to your account now. Choose another model, then send your message again.",
   "error.provider.opencodeNetwork":
     "OpenCode could not connect to the model provider. Check the network connection of the computer that runs OpenBot, then try again.\n{detail}",
   "error.provider.codexStateBusy":
@@ -261,6 +275,9 @@ export const messages = defineMessages("error.provider", {
     "The OpenCode model ended the turn after its reasoning, with no answer. Try again, or choose another model.",
   "error.provider.acpNoAnswer":
     "{provider} ended the turn with no answer. Send the message again, or start a new chat.",
+  "error.provider.noAnswerAfterSteps":
+    "{provider} did some steps, then ended the turn with no answer. Ask the agent what it did before you send the same request again.",
+  "error.provider.acpRefusedNoReason": "{provider} stopped without an answer. Send the message again.",
   "error.provider.chatgptPageFailed": "OpenBot could not open the ChatGPT connection page.",
   "error.provider.noneReady": "No agent provider is ready.",
   "error.provider.claudeTurnActive": "Wait for the active Claude turn before refreshing its context.",
@@ -290,6 +307,7 @@ export const messages = defineMessages("error.provider", {
     "Google did not accept the Gemini sign-in for this request. Send your message again. If the error continues, reconnect Gemini in Settings.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini refused this request. Choose another model, then send your message again. If it fails again, start a new chat.\n{detail}",
+  "error.provider.antigravityNetwork": "Gemini lost its connection to Google. Send your message again. ({cause})",
   "error.provider.antigravitySessionRejected":
     "Gemini refused this request and did not give the cause. An item in the chat history can cause this, such as an image that the agent opened. OpenBot started a new Gemini session with the chat history. Try again. If the error continues, choose another model.",
   "error.provider.antigravityHistoryUnreadable":
@@ -311,6 +329,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.cursorNotStarted": "The Cursor agent was found, but its version cannot be read.",
   "error.provider.cursorVersionUnreadable": "Unable to read the Cursor agent version.",
   "error.provider.cursorSignIn": "Sign in with Cursor or set CURSOR_API_KEY to use Cursor.",
+  "error.provider.cursorSignInUnusable":
+    "Cursor could not connect to its server with your sign-in. Check your internet connection, then sign in to Cursor again.",
   "error.provider.clineArchivePath": "The Cline archive has an unexpected path.",
   "error.provider.clinePackageMismatch": "The Cline package does not match the runtime catalog.",
   "error.provider.clineChecksum": "Cline runtime checksum mismatch.",
@@ -348,16 +368,20 @@ export const messages = defineMessages("error.provider", {
     "This chat became too long for Claude. OpenBot started a new Claude Code session with the chat history. Try again.",
   "error.provider.claudeApiKeyNoCredit":
     "The credit balance of the Anthropic API key is too low. A Claude plan does not pay for requests with an API key. Add credit in the Anthropic Console, or sign in to Claude in Settings and select the Claude account in the agent's model menu.",
+  "error.provider.claudeAccountNoCredit":
+    "Your Claude account's credit balance is too low. Some requests, such as fast mode, use usage credits also when your Claude plan has usage left. Add usage credits in your Claude account, or select a different model in the agent's model menu.",
   "error.provider.claudeServiceBlocked":
     "Claude's service blocked this request. This is usually a short problem on Claude's side, not a problem with your account. Send the message again in a few minutes.",
   "error.provider.foreignReasoning":
     "{provider} did not accept the earlier reasoning in this chat, because a different account or API key received it. OpenBot started a new {provider} session with the chat history. Try again.",
+  "error.provider.blankHistoryText":
+    "The model did not accept this chat, because its saved history has an empty message. OpenBot started a new {provider} session with the chat history. Try again.",
   "error.provider.codexHistoryItemMissing":
     "Codex could not continue this chat, because an item in its saved history is missing. OpenBot started a new Codex session with the chat history. Try again.",
   "error.provider.codexRequestRefused":
     "{provider} refused the request for this chat and did not give the cause. This can occur in a long chat with many images. OpenBot started a new {provider} session with the chat history. Try again.",
   "error.provider.codexAudioRefused":
-    "The model did not accept audio in this chat. OpenBot started a new Codex session with the chat history. Try again.",
+    "This model cannot listen to audio, so it did not accept the sound in this chat. OpenBot started a new Codex session with the chat history. To continue, send your request again and ask the agent to work without the sound. To check sound, select a model that can listen to audio in the agent's model menu.",
   "error.provider.imageTooSmall":
     "The model did not accept an image in this chat because the image is too small. OpenBot started a new {provider} session with the chat history. Try again.",
   "error.provider.imageTooLarge":
@@ -481,6 +505,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.nativeVersionUnreadable": "The {provider} CLI version could not be read.",
   "error.provider.piSessionBusy": "Wait for the current Pi turn to finish.",
   "error.provider.acpSessionBusy": "{provider} still finishes a stopped turn. Try again in a moment.",
+  "error.provider.acpModelNotOffered":
+    "{provider} does not offer {model} now. Choose another model for this agent, then try again.",
   "error.provider.piStopped": "Pi is not running. Connect Pi and try again.",
   "error.provider.piSessionMissing": "The Pi session file is not available on this computer.",
   "error.provider.piResumeCancelled": "Pi cancelled the session resume. Try again.",

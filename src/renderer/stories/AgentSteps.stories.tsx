@@ -4,12 +4,6 @@ import { createSignal, onSettled } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { STORY_AGENTS } from "./fixtures";
 
-/*
- * The steps of an agent's turn (#2537, #2884): its thoughts, the host's progress lines and the
- * memory changes it committed. While the turn runs, a chevron on the activity line opens them;
- * after it, a closed row above the answer holds them.
- */
-
 const STEPS: AgentStep[] = [
   {
     id: "t1",
@@ -65,7 +59,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** A running turn with its steps open. One more step arrives each second. */
 export const Running: Story = {
   render: () => {
     const [shown, setShown] = createSignal(1);
@@ -87,7 +80,6 @@ export const Running: Story = {
   },
 };
 
-/** A running turn with the steps closed, as the setting leaves them. */
 export const RunningClosed: Story = {
   render: () => (
     <div style={{ width: "640px" }}>
@@ -101,7 +93,6 @@ export const RunningClosed: Story = {
   ),
 };
 
-/** A finished turn: the closed row above its answer, with the time of the turn and its failed steps. */
 export const Finished: Story = {
   render: () => (
     <div style={{ width: "640px" }}>
@@ -114,7 +105,6 @@ export const Finished: Story = {
   ),
 };
 
-/** A finished turn with "Show agent steps" on. */
 export const FinishedOpen: Story = {
   render: () => (
     <div style={{ width: "640px" }}>
@@ -123,7 +113,6 @@ export const FinishedOpen: Story = {
   ),
 };
 
-/** A turn from a Team API host: the host sends the memory count only. */
 export const MemoryCountOnly: Story = {
   render: () => (
     <div style={{ width: "640px" }}>
@@ -135,7 +124,6 @@ export const MemoryCountOnly: Story = {
   ),
 };
 
-/** A finished turn with two failed tool steps (#4041). Each failed line opens the error that the host sent. */
 export const FailedSteps: Story = {
   render: () => (
     <div style={{ width: "640px" }}>

@@ -1,12 +1,8 @@
-/* Marketplace > Apps > Slack, Discord, Telegram and WhatsApp: the channel pages (ChannelParts.tsx). */
-
 .channel-stack {
   display: grid;
   gap: var(--openbot-space-0-5);
   justify-items: start;
 }
-
-/* ------------------------------------------------ connect dialog */
 
 .channel-checklist {
   display: grid;
@@ -62,8 +58,6 @@
   gap: var(--openbot-space-1);
 }
 
-/* ------------------------------------------------ Discord roles dialog */
-
 .discord-roles {
   display: grid;
   max-height: 40vh;
@@ -96,9 +90,6 @@
   white-space: nowrap;
 }
 
-/* ------------------------------------------------ WhatsApp link dialog */
-
-/* What the number is and how the phone links: cards with a radio dot, as in the mobile route choice. */
 .whatsapp-choice {
   display: grid;
   gap: var(--openbot-space-2);
@@ -145,7 +136,6 @@
   box-shadow: var(--openbot-focus-ring);
 }
 
-/* A ring, filled when the option is selected. */
 .whatsapp-choice-dot {
   display: grid;
   flex: 0 0 auto;
@@ -193,7 +183,6 @@
   font-size: var(--openbot-text-sm);
 }
 
-/* The QR code above the steps on the phone. */
 .whatsapp-link-qr {
   display: grid;
   gap: var(--openbot-space-3);
@@ -216,7 +205,6 @@
   font-size: var(--openbot-text-sm);
 }
 
-/* The pairing code, large enough to type on the phone from this screen. */
 .whatsapp-pairing-code {
   display: flex;
   gap: var(--openbot-space-3);
@@ -234,8 +222,6 @@
   font-weight: var(--openbot-weight-semibold);
   letter-spacing: var(--openbot-tracking-wide);
 }
-
-/* ------------------------------------------------ WhatsApp group dialog */
 
 .whatsapp-groups {
   display: grid;

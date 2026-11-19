@@ -1,12 +1,6 @@
 import { OPENBOT_LINKS } from "../../lib/landing-links";
 import { type Comparison, OPENBOT_TEXT } from "./comparison";
 
-// Every statement about OpenClaw here is taken from the OpenClaw documentation, its
-// repository or openclaw.ai, and each page used is in `sources`. Where they state
-// nothing, the text says so. Check them again, and move `checkedAt`, whenever this file
-// changes. Statements about OpenBot follow its privacy notes and the remote connection
-// that `remote/README.md` describes.
-
 const OPENCLAW_DOCS = "https://docs.openclaw.ai";
 
 export const OPENCLAW_COMPARISON: Comparison = {

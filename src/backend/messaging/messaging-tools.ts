@@ -14,7 +14,6 @@ const HISTORY_LIMIT = 100;
 const HISTORY_MESSAGE_CHARACTERS = 2_000;
 const HISTORY_CHARACTERS = 24_000;
 const HISTORY_QUERY_CHARACTERS = 200;
-/** The adapters split a longer answer into posts; this keeps one call to a few of them. */
 const POST_CHARACTERS = 8_000;
 
 const rememberShape = {
@@ -28,7 +27,6 @@ const historyShape = {
   query: z.string().trim().min(1).max(HISTORY_QUERY_CHARACTERS).optional(),
   before: z.iso.datetime({ offset: true }).optional(),
 };
-// The read of a named place, from a turn that answers no external chat. It has no conversation.
 const placeHistoryShape = {
   connection: z.string().min(1).max(INPUT_LIMITS.identifier),
   place: z.string().min(1).max(INPUT_LIMITS.identifier),
@@ -40,7 +38,6 @@ const placeHistoryShape = {
 const listPlacesShape = { connection: z.string().min(1).max(INPUT_LIMITS.identifier).optional() };
 const embedUrl = z.url({ protocol: /^https?$/u }).max(DISCORD_EMBED_LIMITS.url);
 const embedText = (max: number) => z.string().trim().min(1).max(max);
-// Discord's own embed object, so Signal sends it as it is. Signal checks it again.
 const embedSchema = z
   .strictObject({
     title: embedText(DISCORD_EMBED_LIMITS.title).optional(),
@@ -84,7 +81,6 @@ const embedSchema = z
       ),
     "An embed needs a title, description, author, footer, image, thumbnail or field.",
   );
-// An empty list is no embeds: a model can fill each optional argument.
 const embedsSchema = z
   .array(embedSchema)
   .max(DISCORD_EMBEDS_LIMIT)
@@ -92,8 +88,6 @@ const embedsSchema = z
     (embeds) => discordEmbedTextLength(embeds) <= DISCORD_EMBED_TEXT_LIMIT,
     `The text of all embeds is longer than ${DISCORD_EMBED_TEXT_LIMIT} characters.`,
   ) satisfies z.ZodType<DiscordEmbed[]>;
-// The tool shows an embed as any object: models know Discord's embed object, and its full schema
-// would add a kilobyte to each catalog answer. `postSchema` decodes the call with the full one.
 const postShape = {
   connection: z.string().min(1).max(INPUT_LIMITS.identifier),
   place: z.string().min(1).max(INPUT_LIMITS.identifier),
@@ -109,25 +103,14 @@ const postSchema = z
     "Give text, files, embeds, or more than one.",
   );
 
-/** The tools that post on the agent's own initiative. They work in any turn, and they name the place. */
 const MESSAGING_OUTBOUND_TOOLS = new Set(["messaging_list_places", "messaging_post"]);
 
-/**
- * True for a call that works in any turn because its arguments name the connection and the place:
- * an outbound tool, or a `messaging_history` read of a named place.
- */
 export function isMessagingOutboundCall(tool: string, args: unknown): boolean {
   if (MESSAGING_OUTBOUND_TOOLS.has(tool)) return true;
   if (tool !== "messaging_history" || typeof args !== "object" || args === null) return false;
-  // A provider can send null for an optional argument that it does not use.
   return ("connection" in args && args.connection != null) || ("place" in args && args.place != null);
 }
 
-/**
- * Tools of a turn that answers a Slack, Discord, Telegram or WhatsApp conversation. Each acts on that
- * conversation's own connection and place only, so no argument names a channel or a workspace.
- * The `MESSAGING_OUTBOUND_TOOLS` are the exception.
- */
 export const MESSAGING_TOOL_DEFINITIONS: readonly { name: string; description: string; shape: z.ZodRawShape }[] = [
   {
     name: "messaging_remember",
@@ -176,13 +159,11 @@ export type MessagingOutboundToolCall =
       connection: string;
       place: string;
       replyTo: string | null;
-      /** Empty when the post has only embeds or only files. */
       text: string;
       files: string[];
       embeds: DiscordEmbed[];
     };
 
-/** The arguments of one outbound tool call, or the reason they are wrong. */
 export function parseMessagingOutboundTool(tool: string, args: unknown): MessagingOutboundToolCall | { error: string } {
   switch (tool) {
     case "messaging_list_places": {
@@ -223,7 +204,6 @@ export function parseMessagingOutboundTool(tool: string, args: unknown): Messagi
   }
 }
 
-/** The arguments of one messaging tool call, or the reason they are wrong. */
 export function parseMessagingTool(tool: string, args: unknown): MessagingToolCall | { error: string } {
   switch (tool) {
     case "messaging_remember": {
@@ -236,7 +216,6 @@ export function parseMessagingTool(tool: string, args: unknown): MessagingToolCa
     }
     case "messaging_history": {
       const parsed = z
-        // A provider can send null for an optional argument that it does not use.
         .strictObject({ ...historyShape, connection: z.null().optional(), place: z.null().optional() })
         .safeParse(args ?? {});
       return parsed.success
@@ -253,7 +232,6 @@ export function parseMessagingTool(tool: string, args: unknown): MessagingToolCa
   }
 }
 
-/** The filter of a history read, with `before` as UTC so that it compares with the saved times. */
 function historyFilter(data: { query?: string | undefined; before?: string | undefined }): HistoryFilter {
   return {
     ...(data.query ? { query: data.query } : {}),
@@ -262,16 +240,13 @@ function historyFilter(data: { query?: string | undefined; before?: string | und
 }
 
 interface HistoryMessage {
-  /** The platform's message id, which `messaging_post` takes as `replyTo`. */
   id: string;
   author: string;
   sentAt: string;
   text: string;
-  /** A copy on this computer has a path; a file without one is only named. */
   files?: { name: string; path?: string }[];
 }
 
-/** The newest messages that fit the tool's answer, each one cut to a fixed length. */
 export function boundedHistory(messages: readonly ContextEntry[]): HistoryMessage[] {
   const kept: HistoryMessage[] = [];
   let characters = 0;

@@ -72,33 +72,21 @@ import { fieldDirectionStyle } from "@/shared/lib/text-direction";
 import { typeScale } from "@/shared/lib/type-scale";
 import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";
 
-/**
- * Opens an agent chat from the search. In the chat list pane, the chat takes the place of the open
- * one.
- */
 function openSearchedChat(pane: ReturnType<typeof useChatListPane>, agentId: string): void {
   const open = () => router.push({ pathname: "/chat/[agentId]", params: { agentId } });
   if (pane) openChatFromPane(pane, agentId, open);
   else open();
 }
 
-/** The height of the search field at the bottom of home. */
 export const HOME_SEARCH_HEIGHT = GLASS_CAPSULE_HEIGHT;
-/** The space between the field and the keyboard. */
 const KEYBOARD_GAP = 8;
 const CSS_EASE_OUT = cubicBezier(0.23, 1, 0.32, 1);
-// The iOS sheet curve: it starts softer than the strong ease-out and settles for longer, so the
-// layers of the search glide into each other and do not snap.
 const EASE_SMOOTH = Easing.bezier(0.32, 0.72, 0, 1);
 const CSS_EASE_SMOOTH = cubicBezier(0.32, 0.72, 0, 1);
-// The list goes back as the results come in over it. The results come in with the keyboard; they go
-// back a little slower, so the list has time to settle.
 const OPEN = { duration: 340, easing: EASE_SMOOTH };
 const CLOSE = { duration: 360, easing: EASE_SMOOTH };
 const FIELD_LAYOUT = LinearTransition.duration(340).easing(EASE_SMOOTH);
-/** How long the field shows the result of a task start before it returns. */
 const RESULT_DURATION = 2_000;
-/** The result and the field cross: the one that leaves goes first and faster. */
 const RESULT_IN = 380;
 const RESULT_OUT = 280;
 const RESULT_STAGGER = 40;
@@ -108,11 +96,6 @@ const PRESS_SCALE = {
   transitionTimingFunction: CSS_EASE_OUT,
 } as const;
 
-/**
- * The close button grows a little from the field's edge as it comes in. Glass does not render under
- * a parent with opacity 0, so the glass appears with its own native animation and this wrapper only
- * scales.
- */
 const closeButtonGrow: EntryExitAnimationFunction = () => {
   "worklet";
   return {
@@ -120,7 +103,6 @@ const closeButtonGrow: EntryExitAnimationFunction = () => {
     animations: { transform: [{ scale: withTiming(1, OPEN) }] },
   };
 };
-/** The clear button and the agent chip: no glass, so they fade too. */
 const closeButtonEnter: EntryExitAnimationFunction = () => {
   "worklet";
   return {
@@ -142,7 +124,6 @@ const closeButtonExit: EntryExitAnimationFunction = () => {
   };
 };
 
-/** What happened to the last task start. A failure keeps the agent and the text for a new try. */
 interface TaskStartResult {
   id: number;
   agent: MobileAgent;
@@ -152,47 +133,31 @@ interface TaskStartResult {
 
 export interface HomeSearch {
   open: boolean;
-  /** True while the results show or leave. */
   mounted: boolean;
-  /** True when a touch on the field mounted the hidden results before the field takes focus. */
   prepared: boolean;
-  /** True when the results finished coming in, so they rest with no animated style. */
   settled: boolean;
   query: string;
   setQuery: (query: string) => void;
-  /** Mounts the hidden results on touch down, so their first render is done when search opens. */
   prepare: () => void;
   openSearch: () => void;
   closeSearch: () => void;
-  /** Closes the search for a result that opens another screen. */
   leave: () => void;
   input: RefObject<TextInputInstance | null>;
   progress: SharedValue<number>;
-  /** 1 while the results leave. Opening and closing move differently. */
   closing: SharedValue<number>;
-  /** False when the server cannot start tasks: then `@` is plain search text. */
   canUseTasks: boolean;
-  /** The agent that the next Return gives the typed text to. */
   target: MobileAgent | null;
-  /** Opens the task editor for the agent. `text` fills the field, else the text kept from before. */
   chooseTarget: (agent: MobileAgent, text?: string) => void;
-  /** Back to choosing an agent: the field shows `@`, and the task text waits for the next agent. */
   clearTarget: () => void;
-  /** Puts a task text in the field, such as an idea. */
   fillTask: (text: string) => void;
-  /** The agents that match an `@name` query, or null when the query is not one. */
   targetMatches: MobileAgent[] | null;
   startTask: (agent: MobileAgent, text: string) => void;
-  /** Return in the field: chooses the first `@name` match, or starts the task. */
   submit: () => void;
   sending: boolean;
-  /** The result of the last task start, which the field shows for a short time. */
   result: TaskStartResult | null;
-  /** Ends the result early. After a failure, the task opens again with its agent and text. */
   dismissResult: () => void;
 }
 
-/** The agents whose name or title starts with the text after `@`. */
 function matchTargets(agents: readonly MobileAgent[], query: string): MobileAgent[] | null {
   const trimmed = query.trimStart();
   if (!trimmed.startsWith("@")) return null;
@@ -205,7 +170,6 @@ function matchTargets(agents: readonly MobileAgent[], query: string): MobileAgen
   );
 }
 
-/** The state of the search field at the bottom of home and of the results it opens over the list. */
 export function useHomeSearch(): HomeSearch {
   const { setOpeningBlocked } = useAppDrawer();
   const workspace = useMobileWorkspaceReader();
@@ -221,26 +185,20 @@ export function useHomeSearch(): HomeSearch {
   const [target, setTarget] = useState<MobileAgent | null>(null);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<TaskStartResult | null>(null);
-  // The task text while the person chooses another agent.
   const draft = useRef("");
   const progress = useSharedValue(0);
   const closing = useSharedValue(0);
   const targetMatches = canUseTasks && !target ? matchTargets(agents, query) : null;
 
-  // `open` at once, for the end of a close animation that comes before the next render.
   const openNow = useRef(false);
   const prepare = useCallback(() => setPrepared(true), []);
   const openSearch = useCallback(() => {
     openNow.current = true;
     setOpen(true);
     setMounted(true);
-    // The results take the screen, so a swipe right must not open the drawer under them.
     setOpeningBlocked(true);
     setSettled(false);
   }, [setOpeningBlocked]);
-  // The results come in after they mount, not when the field asks: the first render of the results
-  // takes time on the JS thread, and an animation that started before it would be nearly over when
-  // they show.
   useEffect(() => {
     if (!open) return;
     closing.set(0);
@@ -250,7 +208,6 @@ export function useHomeSearch(): HomeSearch {
       }),
     );
   }, [open, progress, closing]);
-  // A reopen can come after the close animation ends and before its callback runs: then the results stay.
   const finishClose = useCallback(() => {
     if (openNow.current) return;
     setMounted(false);
@@ -300,7 +257,6 @@ export function useHomeSearch(): HomeSearch {
       setSending(true);
       const attempt = taskStartId(agent.serverId, agent.id, task);
       workspace()
-        // The agent's own server: the person can change server while the task starts.
         .startAgentTask({ agentId: agent.id, text: task, clientMessageId: attempt.id }, agent.serverId)
         .then(
           () => {
@@ -310,7 +266,6 @@ export function useHomeSearch(): HomeSearch {
           },
           (error: unknown) => {
             attempt.failed();
-            // The field says that the task failed, so the failure is reported without an alert.
             reportMobileNotification(error, "agent", "banner");
             void haptics.notification("error");
             closeSearch();
@@ -331,11 +286,9 @@ export function useHomeSearch(): HomeSearch {
   }, [targetMatches, target, query, chooseTarget, startTask]);
 
   useEffect(() => () => setOpeningBlocked(false), [setOpeningBlocked]);
-  /** The field returns. After a failure it holds the task again; `reopen` also opens it for editing. */
   const finishResult = useCallback(
     (ended: TaskStartResult, reopen: boolean) => {
       setResult((current) => (current?.id === ended.id ? null : current));
-      // A failed task comes back only on its own server: another server has other agents.
       if (ended.ok || ended.agent.serverId !== serverId) return;
       setTarget(ended.agent);
       setQuery(ended.text);
@@ -349,7 +302,6 @@ export function useHomeSearch(): HomeSearch {
   const dismissResult = useCallback(() => {
     if (result) finishResult(result, true);
   }, [result, finishResult]);
-  // The result goes after a short read. VoiceOver and TalkBack read it when it shows.
   useEffect(() => {
     if (!result) return;
     const { t } = currentText();
@@ -361,12 +313,9 @@ export function useHomeSearch(): HomeSearch {
     const timer = setTimeout(() => finishResult(result, false), RESULT_DURATION);
     return () => clearTimeout(timer);
   }, [result, finishResult]);
-  // A task names an agent of the open server, so another server starts without one.
   useEffect(() => {
     if (serverId) setTarget(null);
   }, [serverId]);
-  // Android Back closes the results before it leaves the app. Only while home has focus: a chat that
-  // a notification opens over the search keeps its own Back.
   useFocusEffect(
     useCallback(() => {
       if (!open) return;
@@ -406,30 +355,20 @@ export function useHomeSearch(): HomeSearch {
   };
 }
 
-/** The room between the status bar and the first result. */
 const RESULTS_TOP_GAP = 8;
 
-/**
- * The home list under the search. It goes back and fades as the results come in over it, and comes
- * forward again as they leave, so the results read as a layer in front of the list. The search has
- * no bar, so the list also moves up by the bar's height with the results, as the content of an iOS
- * search does when its bar goes.
- */
 export function HomeSearchList({
   search,
   barHeight,
   children,
 }: PropsWithChildren<{
   search: HomeSearch;
-  /** The height of the home bar under the status bar. */
   barHeight: number;
 }>) {
   const reduced = useReducedMotion();
   const { progress, closing } = search;
   const style = useAnimatedStyle(() => {
     const value = progress.get();
-    // Opening: the list is gone before the results are fully in, and moves up with the bar.
-    // Closing: the list comes forward in place as the results fade over it.
     const leaving = closing.get() === 1;
     return {
       opacity: interpolate(value, [0, leaving ? 0.7 : 0.5], [1, 0], Extrapolation.CLAMP),
@@ -438,7 +377,6 @@ export function HomeSearchList({
         : [{ translateY: leaving ? 0 : -value * barHeight }, { scale: interpolate(value, [0, 1], [1, 0.98]) }],
     };
   });
-  // At rest the list has no animated style: the opaque results cover it while they are open.
   return (
     <Animated.View className="flex-1" style={search.mounted && !search.settled ? style : undefined}>
       {children}
@@ -446,33 +384,18 @@ export function HomeSearchList({
   );
 }
 
-/**
- * The results over the home list. The bar hides its buttons while they show, so they start under the
- * status bar, not under the bar. They come in from the bar's height below, where the list content
- * starts, and move up with the list, so the content does not jump when the bar goes.
- */
-export function HomeSearchResults({
-  search,
-  barHeight,
-}: {
-  search: HomeSearch;
-  /** The height of the home bar under the status bar. */
-  barHeight: number;
-}) {
+export function HomeSearchResults({ search, barHeight }: { search: HomeSearch; barHeight: number }) {
   const insets = useSafeAreaInsets();
   const reduced = useReducedMotion();
   const { progress, closing } = search;
   const style = useAnimatedStyle(() => {
     const value = progress.get();
-    // Opening: the fade starts at once and ends well before the movement, so the rows are readable
-    // while they settle. Closing: the results fade and drop only a little, over the list.
     const leaving = closing.get() === 1;
     return {
       opacity: interpolate(value, leaving ? [0.15, 0.9] : [0, 0.6], [0, 1], Extrapolation.CLAMP),
       transform: [{ translateY: reduced ? 0 : (1 - value) * (leaving ? 12 : barHeight) }],
     };
   });
-  // Prepared results are hidden: the animated opacity is 0 until search opens.
   if (!search.mounted && !search.prepared) return null;
   return (
     <Animated.View
@@ -480,8 +403,6 @@ export function HomeSearchResults({
       pointerEvents={search.open ? "auto" : "none"}
       accessibilityElementsHidden={!search.open}
       importantForAccessibility={search.open ? "auto" : "no-hide-descendants"}
-      // At rest the results have no animated style. A render while the user types then cannot put
-      // back the first-render opacity of 0 when the animated value has not reached React.
       style={search.settled ? undefined : style}
     >
       <KeyboardAwareScrollView
@@ -501,17 +422,11 @@ export function HomeSearchResults({
       >
         <HomeSearchBody search={search} />
       </KeyboardAwareScrollView>
-      {/* Results scroll up under the status bar with the edge of the other screens. It ends at the
-          status bar, so the first heading is clear of the blur when the list is at the top. */}
       <SheetScrollEdgeEffect style={{ position: "absolute", top: 0, left: 0, right: 0, height: insets.top }} />
     </Animated.View>
   );
 }
 
-/**
- * What the results show: the agents for `@name`, the task that Return starts, the agents that can
- * take the typed text, and the search results of the text.
- */
 function HomeSearchBody({ search }: { search: HomeSearch }) {
   const { t } = useText();
   const motion = useTransitionMode("searchTransitions");
@@ -551,7 +466,6 @@ function HomeSearchBody({ search }: { search: HomeSearch }) {
             </>
           ) : null}
           {!target && text && search.canUseTasks ? <SearchTasks query={text} onLeave={search.leave} /> : null}
-          {/* Text to an agent is a task, not a search. */}
           {target ? null : (
             <MobileSearchResults query={search.query} active={search.open} idle={idle} onLeave={search.leave} />
           )}
@@ -569,7 +483,6 @@ function SearchHint({ text }: { text: string }) {
   );
 }
 
-/** An agent that an `@name` query matches. */
 function TaskTargetRow({ agent, onPress }: { agent: MobileAgent; onPress: () => void }) {
   return (
     <Pressable
@@ -602,19 +515,10 @@ function TaskTargetRow({ agent, onPress }: { agent: MobileAgent; onPress: () => 
   );
 }
 
-/** The field at the bottom of home. It rides on the keyboard, and a close button comes in beside it. */
 export function HomeSearchBar({ search }: { search: HomeSearch }) {
   const { t } = useText();
   const { input } = search;
-  // Touch down mounts the hidden results, and focus opens them: a drag that starts on the field
-  // does not focus it, so it does not open the search. The ref keeps the soft tap to a search that a
-  // touch on the field opens. A drag leaves it set, so each focus that no touch on the field caused
-  // clears it first.
   const touched = useRef(false);
-  // A quick action of the app icon opens the search with the keyboard. The field registers it, so a
-  // request that comes while the list loads waits until the field and its input are mounted. A request
-  // that closes the screens over home comes before home shows again, and a hidden field takes no
-  // focus, so the field waits for home to have focus.
   const navigation = useNavigation();
   useEffect(() => {
     let removeFocusListener: (() => void) | null = null;
@@ -651,19 +555,15 @@ export function HomeSearchBar({ search }: { search: HomeSearch }) {
     "background",
   ]);
   const danger = String(useCSSVariable("--openbot-danger-text"));
-  // The last result stays in the field while it fades out, so its text and color do not change then.
   const [shownResult, setShownResult] = useState(search.result);
   if (search.result && search.result !== shownResult) setShownResult(search.result);
   const showsResult = search.result !== null;
   const resultColor = shownResult?.ok
     ? avatarHeadColor(shownResult.agent.avatarSeed, shownResult.agent.avatarHue, shownResult.agent.avatarColor)
     : danger;
-  // As the prototype: the color at 18% over the field, so the text in the same color stays readable.
   const resultTint = `${resultColor}2e`;
   const { height: fieldHeight, bottomGap } = useBottomFieldMetrics();
   const { height: keyboardHeight } = useReanimatedKeyboardAnimation();
-  // The field rises only when the keyboard reaches it, and then stays 8 pt above it. Android can
-  // report an open keyboard with no height (a hardware or floating keyboard); the field stays.
   const barStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: -Math.max(0, Math.abs(keyboardHeight.get()) - (bottomGap - KEYBOARD_GAP)) }],
   }));
@@ -696,9 +596,6 @@ export function HomeSearchBar({ search }: { search: HomeSearch }) {
       style={[{ bottom: bottomGap, left: insets.left + 16, right: insets.right + 16 }, barStyle]}
     >
       {search.mounted ? (
-        // While the results leave, the button is out of the layout, so the field grows under it as its
-        // glass dissolves. Glass does not render under a parent with opacity below 1, so only the
-        // solid capsule fades as a whole.
         <Animated.View
           entering={reduced ? undefined : closeButtonGrow}
           pointerEvents={search.open ? "auto" : "none"}
@@ -757,8 +654,6 @@ export function HomeSearchBar({ search }: { search: HomeSearch }) {
           tint={resultTint}
           tintShown={showsResult}
         >
-          {/* The field stays mounted under the result, so "Try again" can focus it at once. The field
-              fades out first; the result then fades in from 97% as the tint comes in. */}
           <Animated.View
             className="flex-1"
             pointerEvents={showsResult ? "none" : "auto"}
@@ -772,7 +667,6 @@ export function HomeSearchBar({ search }: { search: HomeSearch }) {
               transitionTimingFunction: CSS_EASE_SMOOTH,
             }}
           >
-            {/* The field is shorter than the capsule, so a tap anywhere on the capsule focuses it. */}
             <Pressable
               accessible={false}
               className="flex-1 flex-row items-center gap-2 pr-2 pl-4"
@@ -809,11 +703,8 @@ export function HomeSearchBar({ search }: { search: HomeSearch }) {
                 onChangeText={search.setQuery}
                 onSubmitEditing={search.submit}
                 onKeyPress={({ nativeEvent }) => {
-                  // Backspace in an empty field removes the agent, as in a mail address field.
                   if (nativeEvent.key === "Backspace" && !search.query && target) search.clearTarget();
                 }}
-                // The results mount on touch down: the field takes focus, and the keyboard starts, only
-                // when the finger lifts.
                 onPressIn={prepareFromTouch}
                 onFocus={openFromFocus}
               />
@@ -833,7 +724,6 @@ export function HomeSearchBar({ search }: { search: HomeSearch }) {
                   </Pressable>
                 </Animated.View>
               ) : null}
-              {/* Search updates as you type; only a task has a send button. */}
               {target ? (
                 <Pressable
                   accessibilityRole="button"
@@ -859,7 +749,6 @@ export function HomeSearchBar({ search }: { search: HomeSearch }) {
               ) : null}
             </Pressable>
           </Animated.View>
-          {/* Mounted before the first result, so the result comes in with a transition. */}
           <Animated.View
             className="absolute inset-0"
             pointerEvents={showsResult ? "auto" : "none"}
@@ -879,7 +768,6 @@ export function HomeSearchBar({ search }: { search: HomeSearch }) {
                 result={shownResult}
                 color={resultColor}
                 onPress={() => {
-                  // The result has its own tap; "Try again" then focuses the field.
                   touched.current = false;
                   search.dismissResult();
                 }}
@@ -892,10 +780,6 @@ export function HomeSearchBar({ search }: { search: HomeSearch }) {
   );
 }
 
-/**
- * The result of a task start in the field: the agent, what happened, and a check, or "Try again"
- * after a failure. A tap ends it early; after a failure it opens the task again.
- */
 function TaskResultContent({
   result,
   color,
@@ -949,13 +833,8 @@ function TaskResultContent({
   );
 }
 
-/** The widest name in the agent chip of the search field. */
 const TARGET_NAME_WIDTH = 80;
 
-/**
- * The agent that gets the task: its avatar and name in its own color. A tap chooses another agent,
- * as Backspace in the empty field does; it has no remove mark, so the text field keeps the width.
- */
 function TargetChip({ agent, onPress }: { agent: MobileAgent; onPress: () => void }) {
   const { t } = useText();
   const color = avatarHeadColor(agent.avatarSeed, agent.avatarHue, agent.avatarColor);
@@ -964,8 +843,6 @@ function TargetChip({ agent, onPress }: { agent: MobileAgent; onPress: () => voi
       accessibilityRole="button"
       accessibilityLabel={t("mobile.search.thread.changeAgent")}
       className="-ml-2.5 h-10 flex-row items-center gap-1 rounded-full pr-2.5 pl-1"
-      // 40 pt in the 52 pt field: the same 6 pt inset above, below and at the left edge.
-      // The agent color at 18% opacity, so the avatar in the same color stays visible on it.
       style={{ backgroundColor: `${color}2e` }}
       onPress={onPress}
     >
@@ -978,7 +855,6 @@ function TargetChip({ agent, onPress }: { agent: MobileAgent; onPress: () => voi
         size={28}
         animateIdle={false}
       />
-      {/* A long name ends in an ellipsis, so the text field keeps most of the width. */}
       <Typography.Paragraph
         className="font-semibold"
         numberOfLines={1}
@@ -997,7 +873,6 @@ interface Shortcut {
   href: Href;
 }
 
-/** Before the user types: the pages to go to, and the agents of the server. */
 function HomeSearchIdle({ onLeave, canUseTasks }: { onLeave: () => void; canUseTasks: boolean }) {
   const { t } = useText();
   const pane = useChatListPane();
@@ -1094,16 +969,9 @@ function HomeSearchIdle({ onLeave, canUseTasks }: { onLeave: () => void; canUseT
   );
 }
 
-/** The most ideas that the task editor shows. */
 const IDEA_LIMIT = 4;
-/** Marks the place of the agent name in a translated line, so the name can have its own weight. */
 const NAME_MARK = "\u2063";
 
-/**
- * The page above the field while it holds a task: no cards. Who gets the task, one line on what a
- * task is with a way to message the agent instead, earlier tasks to run again, and the agent's open
- * tasks. A tap on an idea fills the field.
- */
 function TaskEditorPage({ agent, search }: { agent: MobileAgent; search: HomeSearch }) {
   const { t } = useText();
   const pane = useChatListPane();
@@ -1121,7 +989,6 @@ function TaskEditorPage({ agent, search }: { agent: MobileAgent; search: HomeSea
     openSearchedChat(pane, agent.id);
   };
   return (
-    // The spacing of the prototype: 4 pt above the page, 8 pt beside the avatar, 10 pt above the line.
     <View className="pb-2">
       <View className="gap-2.5 px-5 pt-1">
         <View className="flex-row items-center gap-2">
@@ -1209,13 +1076,8 @@ function TaskEditorPage({ agent, search }: { agent: MobileAgent; search: HomeSea
   );
 }
 
-/** The most tasks that a search section shows. */
 const SEARCH_TASK_LIMIT = 5;
 
-/**
- * Tasks in the search: with a query, the tasks whose title has it; without one, the tasks that
- * need the person. Nothing when no task fits.
- */
 function SearchTasks({ query, onLeave }: { query?: string; onLeave: () => void }) {
   const { t } = useText();
   const serverId = useMobileWorkspaceSelector((current) => current.activeServer.id);

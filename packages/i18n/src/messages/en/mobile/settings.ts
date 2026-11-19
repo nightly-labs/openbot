@@ -122,10 +122,45 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.appearance.messageColorLightness": "Lightness",
   "mobile.settings.appearance.messageColorFooter":
     "With Agent color, your messages in an agent chat use the color of that agent. With Custom color, your messages in all chats use the color that you select. The text color changes so that it stays readable.",
+  "mobile.settings.appearance.bubbleStyle": "Bubble style",
+  "mobile.settings.appearance.bubbleStyleSolid": "Solid",
+  "mobile.settings.appearance.bubbleStyleTint": "Tint",
+  "mobile.settings.appearance.seeThroughBubbles": "See-through bubbles",
+  "mobile.settings.appearance.seeThroughBubblesNote":
+    "Agent bubbles and bubbles with no color let the backdrop show through. With no backdrop, bubbles are always solid.",
+  "mobile.settings.appearance.tab.colors": "Colors",
+  "mobile.settings.appearance.tab.chat": "Chat",
+  "mobile.settings.appearance.preview.routines": "3 routine runs",
+  "mobile.settings.appearance.preview.thinking": "Thought for 4 seconds",
+  "mobile.settings.appearance.preview.memory": "Saved 1 memory",
+  "mobile.settings.appearance.backdrop.title": "Backdrop",
+  "mobile.settings.appearance.backdrop.footer":
+    "Shows behind Home and your chats on this phone. An agent can set one for you; Undo in the chat puts the old one back.",
+  "mobile.settings.appearance.backdrop.none": "None",
+  "mobile.settings.appearance.backdrop.pond": "Koi pond",
+  "mobile.settings.appearance.backdrop.jellyfish": "Jellyfish",
+  "mobile.settings.appearance.backdrop.sunset": "Old-style sunset",
+  "mobile.settings.appearance.backdrop.snowfall": "Snowfall",
+  "mobile.settings.appearance.backdrop.fireflies": "Fireflies",
+  "mobile.settings.appearance.backdrop.agentPage": "Agent page",
+  "mobile.settings.appearance.backdrop.agentPageNote": "Set by an agent",
+  "mobile.settings.appearance.backdrop.photo": "Photo",
+  "mobile.settings.appearance.backdrop.photoChoose": "Choose from your photos",
+  "mobile.settings.appearance.backdrop.photoChange": "Tap again to choose another photo",
+  "mobile.settings.appearance.backdrop.strength": "Backdrop strength",
+  "mobile.settings.appearance.backdrop.calm": "Calm",
+  "mobile.settings.appearance.backdrop.vivid": "Vivid",
+  "mobile.settings.appearance.backdrop.strengthFooter":
+    "A calm backdrop keeps long replies easy to read. The top of Home shows the most of it.",
+  "mobile.settings.appearance.backdrop.previewQuestion": "Can you write the release note?",
+  "mobile.settings.appearance.backdrop.previewAnswer":
+    "Here is a draft: the backdrop that an agent sets now shows on your phone too.",
   "mobile.settings.appearance.chatBackground": "Chat background",
   "mobile.settings.appearance.chatBackgroundDefault": "Default",
   "mobile.settings.appearance.chatBackgroundFooter":
     "Each theme keeps its own color. A color that makes text hard to read becomes darker or lighter.",
+  "mobile.settings.appearance.chatBackgroundBackdropFooter":
+    "The backdrop replaces the chat background. Select None as the backdrop to use a color.",
   "mobile.settings.appearance.collapseRoutines": "Collapse routine activity",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Consecutive routine events in a chat show as one closed row. Tap the row to show them.",
@@ -248,6 +283,7 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.conversations.media": "Photos and files",
   "mobile.settings.conversations.swipeLeft": "Swipe left in an agent chat",
   "mobile.settings.conversations.swipeRight": "Swipe right in an agent chat",
+  "mobile.settings.conversations.swipeQuestion": "Side question",
   "mobile.settings.conversations.swipeThreads": "Threads",
   "mobile.settings.conversations.swipeBrowser": "Browser",
   "mobile.settings.conversations.swipeOff": "Off",
@@ -466,7 +502,6 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.voice.elevenLabs.model.v3": "Expressive · slow",
   "mobile.settings.voice.elevenLabs.model.v4Turbo": "90+ languages · fast",
   "mobile.settings.voice.elevenLabs.model.v4": "Best quality · 90+ languages · slow",
-  // Settings > Agents: the agent defaults of a server where the reader is an owner or admin.
   "mobile.settings.agents.title": "Agents",
   "mobile.settings.agents.serversFooter":
     "Choose a server. Only the servers where you are an owner or admin show here.",
@@ -536,7 +571,8 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.shortcuts.card.noAgent.action": "Choose agent",
   "mobile.settings.shortcuts.card.locked.title": "OpenBot is locked",
   "mobile.settings.shortcuts.card.locked.action": "Open OpenBot",
-  "mobile.settings.shortcuts.footer": "Send Message in the Shortcuts app sends to this agent. The app does not open.",
+  "mobile.settings.shortcuts.footer":
+    "Send Message in the Shortcuts app sends to this agent. The app does not open. Open Agent opens its chat.",
   "mobile.settings.shortcuts.send.sent": "Sent",
   "mobile.settings.shortcuts.send.failed": "OpenBot could not send this.",
   "mobile.settings.shortcuts.send.unconfirmed": "No answer from the server. The message can be in the chat.",

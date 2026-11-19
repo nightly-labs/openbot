@@ -1,13 +1,3 @@
-// Runs the real account server billing (`createHostedBilling`) on a migrated SQLite database with a fake
-// Stripe API and a fake operator webhook. Signed Stripe events go through `BillingService.handleWebhook`.
-// A new server plan and a new license each send one operator message with the account email, the
-// product, the amount, the currency and the period. A cancelled renewal, a resumed renewal and the end of
-// a subscription each send one message too. A repeated event, a second event of the same state, two
-// events at the same time of one cancel, and a renewal send none, and a deployment with no webhook URL
-// sends none.
-//
-// Run: bun run test:purchase-alert
-// It writes .openbot-build/purchase-alert-e2e/report.json and exits non-zero on a failure.
 import { createHmac } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -44,7 +34,6 @@ function migratedDatabase(): DatabaseSync {
   return database;
 }
 
-/** The subscriptions that the fake Stripe API gives. */
 function subscriptions(periodEnd: number) {
   return new Map<string, object>(
     Object.entries({
@@ -105,7 +94,6 @@ async function run(alertUrl: string | undefined) {
   const stored = subscriptions(Math.floor(clock.now / 1000) + 30 * 24 * 3600);
   const alerts: string[] = [];
   const work: Promise<void>[] = [];
-  /** While set, each subscription read waits until this many reads wait, so the events read the same state. */
   const gate: { reads: number; waiting: (() => void)[] } = { reads: 0, waiting: [] };
   const { billing } = createHostedBilling(
     {
@@ -156,12 +144,10 @@ async function run(alertUrl: string | undefined) {
     await Effect.runPromise(billing.handleWebhook(payload, `t=${created},v1=${signature}`));
     await Promise.all(work.splice(0));
   };
-  /** Changes a subscription in the fake Stripe API, as a cancel in the Customer Portal does. */
   const change = (
     id: string,
     patch: { cancel_at_period_end?: boolean; cancel_at?: number; canceled_at?: number; status?: string },
   ) => stored.set(id, { ...stored.get(id), ...patch });
-  /** Delivers events at the same time, after each one read the subscription from Stripe. */
   const deliverTogether = (events: Parameters<typeof deliver>[]) => {
     gate.reads = events.length;
     return Promise.all(events.map((event) => deliver(...event)));
@@ -169,7 +155,6 @@ async function run(alertUrl: string | undefined) {
   return { database, alerts, deliver, deliverTogether, change };
 }
 
-/** The `canceled_at` times of the cancel requests, in seconds. */
 const FIRST_CANCEL = 1_790_000_000;
 const SECOND_CANCEL = 1_790_000_100;
 const LICENSE_CANCEL = 1_790_000_200;
@@ -209,9 +194,7 @@ async function purchasesAlertTheOperator() {
   check("a second event of the license sends no message", alerts.length === 2, alerts);
 
   const serverTerms = `server · \`${SERVER_BUYER.email}\` · standard · $35/mo`;
-  // Stripe sets `canceled_at` to the time of each cancel request and keeps it after a resume.
   change("sub_server", { cancel_at_period_end: true, canceled_at: FIRST_CANCEL });
-  // Stripe can send two events of one cancel at the same time, and each one can see the old state.
   await deliverTogether([
     ["customer.subscription.updated", { id: "sub_server" }],
     ["customer.subscription.updated", { id: "sub_server" }],
@@ -254,7 +237,6 @@ async function purchasesAlertTheOperator() {
   );
 
   const licenseTerms = `license · \`${LICENSE_BUYER.email}\` · team · 7 users · ${amount}/yr`;
-  // A cancel date from the Dashboard is not the end of the paid period.
   change("sub_license", { cancel_at: Date.UTC(2027, 0, 31) / 1000, canceled_at: LICENSE_CANCEL });
   await deliver("customer.subscription.updated", { id: "sub_license" });
   change("sub_license", { status: "past_due" });

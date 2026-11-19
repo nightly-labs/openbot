@@ -41,7 +41,6 @@ const ROUTINE_MARKER_ICONS: Record<RoutineMarkerEvent, LucideIcon> = {
   cancelled: CirclePause,
 };
 
-/** The open motion of the chat task list: the open is slower than the close, and rows settle in one after another. */
 const OPEN_MS = 280;
 const CLOSE_MS = 200;
 const STAGGER_MS = 24;
@@ -49,43 +48,28 @@ const STAGGER_ROWS = 8;
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const EASE_CLOSE = Easing.bezier(0.32, 0.08, 0.24, 1);
 
-/**
- * Whether routine groups start closed, and the state of each group that the chat has drawn: open or
- * closed, and the measured height of its markers. The list renders only the rows near the view, so
- * a group that scrolls out and back in comes back in the same state and at the same size.
- */
 export interface RoutineGroupsState {
   collapse: boolean;
-  /** `toggled`: the reader opened or closed the group. */
   groups: Map<string, { open: boolean; height: number; toggled: boolean }>;
 }
 
 export const RoutineGroupsContext = createContext<RoutineGroupsState>({ collapse: true, groups: new Map() });
 
-/** Whether the group row with `id` is open: as the reader left it, else as Settings sets. */
 function routineGroupOpen({ collapse, groups }: RoutineGroupsState, id: string): boolean {
   return groups.get(id)?.open ?? !collapse;
 }
 
-/**
- * The kind of a group row for the size averages of the chat list. A group that keeps its first state
- * has the kind of all groups in that state: one line when closed, and a kind per count when open.
- * A group that the reader toggled has a kind of its own from the first toggle, so the sizes of its
- * animation do not change the average that the list uses for the groups it has not measured yet.
- */
 export function routineGroupKind(state: RoutineGroupsState, group: RoutineRunGroup): string {
   if (state.groups.get(group.id)?.toggled) return `routine-run-group:toggled:${group.id}`;
   return routineGroupOpen(state, group.id) ? `routine-run-group:${group.runs.length}` : "routine-run-group";
 }
 
-/** The kind color, or the state color while a routine runs or after it fails. */
 function markerColor(event: RoutineMarkerEvent, colors: ActivityColors) {
   if (event === "running") return colors.running;
   if (event === "failed" || event === "needs-attention") return colors.danger;
   return colors.muted;
 }
 
-/** The marker icon. A running routine turns, as running subagents do. */
 function MarkerIcon({ event, colors }: { event: RoutineMarkerEvent; colors: ActivityColors }) {
   if (event === "running") return <Spinner color={colors.running} size={ACTIVITY_ICON_SIZE} />;
   const Icon = ROUTINE_MARKER_ICONS[event];
@@ -105,7 +89,6 @@ export function RoutineMarkerRow({ message }: { message: RoutineMarker }) {
   );
 }
 
-/** One marker of an open group. It follows the panel: each row starts a little after the one above it. */
 function GroupedMarker({
   message,
   index,
@@ -130,17 +113,6 @@ function GroupedMarker({
   );
 }
 
-/**
- * Consecutive routine markers, drawn as one row with a count. The row opens to show each marker. It
- * starts closed unless Settings turns off the collapse. A failed run gives the row its icon, so a
- * failure does not hide in a closed group.
- *
- * The panel animates its real height, as the task list does, so the chat list lays out the row on
- * each frame and the messages below move with it. A closed panel has no height and mounts its
- * markers on the first open. They are then out of the panel's flow, so they measure at their own
- * height while the panel is still closed. A panel that starts open keeps its markers in flow until
- * they are measured. So a chat opens with each group at its final size.
- */
 export function RoutineRunGroupRow({ group }: { group: RoutineRunGroup }) {
   const { t, format } = useText();
   const colors = useActivityColors();
@@ -150,7 +122,6 @@ export function RoutineRunGroupRow({ group }: { group: RoutineRunGroup }) {
   const [saved] = useState(() => groups.get(group.id));
   const [open, setOpen] = useState(() => routineGroupOpen(groupsState, group.id));
   const [mounted, setMounted] = useState(open);
-  // -1 while a panel that starts open has not measured its markers: it keeps its natural height.
   const [initialHeight] = useState(saved?.height ?? (open ? -1 : 0));
   const [floating, setFloating] = useState(initialHeight >= 0);
   const openOnLayout = useRef(false);
@@ -188,7 +159,6 @@ export function RoutineRunGroupRow({ group }: { group: RoutineRunGroup }) {
           .filter(Boolean)
           .join(", ")}
         onPress={() => {
-          // The first open waits for the markers to measure, so the panel grows to their height.
           if (!mounted) {
             openOnLayout.current = true;
             setMounted(true);
@@ -230,7 +200,6 @@ export function RoutineRunGroupRow({ group }: { group: RoutineRunGroup }) {
       >
         {mounted ? (
           <View
-            // The runs sit under the group text, so the group reads as one block.
             className={floating ? "absolute inset-x-0 top-0 ps-5" : "ps-5"}
             onLayout={(event) => {
               const { height } = event.nativeEvent.layout;

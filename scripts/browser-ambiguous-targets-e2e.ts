@@ -9,7 +9,6 @@ import { withoutElectronRuntimeFlags } from "./electron-spawn-env";
 
 class FixtureProcessTimeout extends Error {}
 
-/** The case count of `browser-ambiguous-targets-electron.ts`. A case that stops running fails the check. */
 const AMBIGUOUS_TARGET_CASES = 11;
 
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -19,8 +18,6 @@ const runId = randomUUID();
 let sourceSha: string | undefined;
 try {
   await mkdir(dirname(reportPath), { recursive: true });
-  // run_script loads the QuickJS WebAssembly from node_modules, so the entry sits in the project to
-  // resolve it.
   const entry = join(dirname(reportPath), "browser-ambiguous-targets.mjs");
   await run(process.execPath, [
     "build",
@@ -56,7 +53,6 @@ try {
       sourceSha: z.literal(sourceSha),
     })
     .parse(JSON.parse(await readFile(reportPath, "utf8")));
-  // Machine-readable summary of the completed case count.
   process.stdout.write(
     `${JSON.stringify({ status: report.status, cases: report.cases.length, report: reportPath })}\n`,
   );
@@ -69,9 +65,7 @@ try {
       .parse(JSON.parse(await readFile(reportPath, "utf8")));
     completedCases = current.cases ?? [];
     nativeFailure = current.status === "failed";
-  } catch {
-    // This invocation owns no valid report yet. An earlier report cannot supply its result.
-  }
+  } catch {}
   if (error instanceof FixtureProcessTimeout) {
     await writeFile(
       reportPath,

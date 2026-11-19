@@ -268,6 +268,8 @@ export const messages = {
     "Este agente só pode usar um número limitado de servidores MCP. Para usar este servidor, desative um servidor MCP de que o agente não precisa.",
   "error.backend.mcpRegistrationRefused":
     "O servidor de login ainda não aceita o OpenBot como aplicativo. Sua conta não é a causa. Use outra forma de conexão, como um servidor MCP local.",
+  "error.backend.mcpRegistrationUnavailable":
+    "O servidor de login não consegue registrar o OpenBot como aplicativo. Sua conta não é a causa. Para conectar, salve este servidor na Loja, Apps, e depois adicione um app de login a ele.",
   "error.backend.mcpSignInAbandonedGeneric": "O login foi abandonado.",
   "error.backend.mcpSignInForgotten": "O login MCP foi esquecido enquanto estava em andamento.",
   "error.backend.mcpSignInAbandoned": "O login MCP foi abandonado.",
@@ -280,6 +282,7 @@ export const messages = {
     "Este servidor pede login, e o OpenBot só faz login por https. Altere a URL para {url}.",
   "error.backend.mcpSignInCancelled": "O login foi cancelado.",
   "error.backend.mcpSignInTimedOut": "O login não foi concluído no navegador.",
+  "error.backend.mcpSignInRefused": "A página de login recusou o acesso. Entre novamente.",
   "error.backend.mcpSignInResponseTimedOut": "A resposta do login não chegou a tempo.",
   "error.backend.mcpSignInMetadataUnreadable":
     "O OpenBot não conseguiu ler as informações de login deste servidor. Verifique o endereço do servidor e tente novamente.",
@@ -291,6 +294,7 @@ export const messages = {
   "error.backend.mcpServerFailedToStart": "O servidor não iniciou: {reason}",
   "error.backend.mcpServerStartAbandoned":
     "{provider} parou de esperar antes de o servidor iniciar, por isso os agentes dele não recebem as ferramentas deste servidor.",
+  "error.backend.mcpServerStoppedDuringCall": "O servidor MCP parou antes de responder a esta chamada.",
   "error.backend.mcpToolSchemaRefused":
     "A ferramenta {tool} dele tem um formato de entrada que este provedor não consegue ler. Agentes de outros provedores continuam recebendo o servidor.",
   "error.backend.mcpServerSignInForProvider":

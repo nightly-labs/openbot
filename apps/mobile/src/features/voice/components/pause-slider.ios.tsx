@@ -5,7 +5,6 @@ import { useRef } from "react";
 import { useCSSVariable, useUniwind } from "uniwind";
 import type { PauseSliderProps } from "./pause-slider.types";
 
-/** iOS: the native SwiftUI slider, with the system material of the iOS version. */
 export function PauseSlider({
   value,
   minimum,
@@ -18,7 +17,6 @@ export function PauseSlider({
 }: PauseSliderProps) {
   const { theme } = useUniwind();
   const accent = String(useCSSVariable("--openbot-accent"));
-  // The end of a drag reports no value, so it saves the last value of the drag.
   const latest = useRef(value);
   latest.current = value;
   return (

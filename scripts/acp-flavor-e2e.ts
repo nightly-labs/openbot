@@ -1,9 +1,3 @@
-// Runs the real `acp` provider driver over one fake agent, installed as `omp` and as `other-agent`, to
-// check the missing-session rules of the custom agent flavors (`src/backend/acp-flavor.ts`). After a
-// restart, `session/load` fails. The exact omp error for this session and the protocol's `-32002`
-// error, with the session in `data.uri` or `data.sessionId`, must replace the session for both
-// commands. An internal error, and an error for another session, must keep it.
-// `bun run test:acp-flavors`. Writes .openbot-build/acp-flavor-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -18,7 +12,6 @@ import { installFakeAgent, readJsonl, startThread, stopClients, xorCipher } from
 const OUT = resolve(import.meta.dirname, "../.openbot-build/acp-flavor-e2e");
 
 const COMMANDS = ["omp", "other-agent"] as const;
-/** Each `session/load` error, and whether it names a missing session. */
 const LOAD_ERRORS = [
   ["unsupported", true],
   ["unsupported-other", false],
@@ -100,7 +93,6 @@ try {
     return client;
   };
 
-  // One session for each agent, then a new process for each agent that must load its session again.
   let client = open();
   const threads = new Map<string, string>();
   for (const agent of agents) {

@@ -5,7 +5,6 @@ import { Show } from "solid-js";
 import { BrowserShortcutHint } from "./BrowserTabIcon";
 import type { BrowserFullViewProps } from "./browser-full-view-types";
 
-/** The actions of a tab, on a right click, as other browsers have them. Rows that would do nothing stay out. */
 export function BrowserTabMenu(props: {
   view: BrowserFullViewProps;
   tab: BrowserTab;

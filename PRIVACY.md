@@ -252,7 +252,14 @@ It saves no referrer, IP address or identifier. A later visit does not change it
 after 90 days. When you sign in on the web, or open the page after a desktop checkout in the same
 browser, the browser sends it to the account service. The account service keeps the first one that
 it gets on your account and sends it to OpenPanel with your account ID. To remove it from a
-browser, clear the site data of openbot.run. When you choose a language on the website, it saves
+browser, clear the site data of openbot.run. When you open a discount link (an openbot.run address
+with `?promo=CODE`), the website saves the code and the time in its `localStorage` for 30 days. When
+you pay on the web, the web client sends the code to the account service, which gives it to Stripe
+for that Checkout page. It is not sent to analytics. When you open an invite link (an openbot.run
+address with `?ref=CODE`), the website saves the code and the time in its `localStorage` for 30 days.
+When you sign in on the web, the web client sends the code to the account service and removes it from
+`localStorage`. On the desktop, on the web and on the phone, you can also type an invite link or code
+on the sign-in screen; the app sends only the code. The account service uses a code only for a new account. It is not sent to analytics. When you choose a language on the website, it saves
 the language code, and nothing else, in the `openbot_lang` cookie for one year, so that the next
 pages open in that language. The browser sends this cookie only to openbot.run. OpenPanel can also derive
 session, device, browser, operating-system, network, and approximate geographic metadata from a
@@ -442,6 +449,17 @@ The service stores:
 - for the EU VAT limit: for each paid invoice of a consumer in an EU country other than Poland, the
   Stripe invoice ID, the year, the country and the net amount in euro, with no account ID. The service
   deletes them after the end of the next year.
+- invite links: the invite code of each account that opened Invite friends, and for each account that
+  signed up with an invite link or an invite code, the account that invited
+  it and the time. When an invited account pays, the service compares the Stripe card fingerprints of
+  the two accounts. It does not keep them; when they match, it keeps only the time when it ended the
+  invite. For each paid
+  invoice of an invited account, the service keeps the Stripe invoice ID, the two account IDs, the
+  amount without tax, the credit that it gave in Stripe and the Stripe balance transaction ID, and
+  for a refund or a lost dispute, the credit that it took back. The account that invited sees the
+  first name and the initial of the last name of each invited account, the day it joined, whether
+  it pays now, has no plan or stopped paying, and the credit that the invited account gave it, which is
+  10% of what the invited account paid. It never sees an email or a plan of an invited account. Deleting either account removes these rows.
 - hosted sites: the hostname, title, description, framework, state, owner account ID, lifecycle
   times, and for each deployment the file list, sizes and content types. The published site files
   are in R2. Anyone can read a published site. Deleting a site removes its files.
@@ -1173,7 +1191,11 @@ Network traffic can also occur when:
   OpenBot version and the title `<agent name> (OpenBot)`, so the server can show which agent made a
   change. Nothing else about the user's agents, conversations or files is sent in those requests. The
   registration names OpenBot's logo at `openbot.run`; an authorization service that shows it on its
-  sign-in page can make the browser load it from `openbot.run`;
+  sign-in page can make the browser load it from `openbot.run`. Meta Ads takes no loopback address,
+  so its sign-in page sends the browser to `https://openbot.run/oauth/mcp-callback` with the grant
+  and the sign-in's random state. The account service keeps nothing and sends the browser on at once
+  to `127.0.0.1` on the same computer. The grant cannot be used without a code that only OpenBot on
+  that computer holds;
 - an owner or admin pastes a GitHub link into the Marketplace Skills search. The computer that runs
   OpenBot, or the joined server, reads that public repository from `api.github.com` and
   `raw.githubusercontent.com` without a GitHub account, with `User-Agent: OpenBot`. It reads the
@@ -1838,8 +1860,8 @@ Gemini agents stay on this computer: OpenBot does not show them to team members.
 To show the remaining Gemini quota in Usage, OpenBot reads the access token from the server's token file
 and asks Google's Code Assist service (`cloudcode-pa.googleapis.com` and
 `daily-cloudcode-pa.googleapis.com`) for the account's project and quota, as the Antigravity app does.
-The requests carry that token and a User-Agent with the Antigravity desktop app's version, your
-operating system and processor type. They contain no conversation, file, or model data. With an API key
+The requests carry that token and a User-Agent with the Antigravity desktop app's client name, version
+and build number, your operating system and processor type. They contain no conversation, file, or model data. With an API key
 sign-in, or an expired token, OpenBot sends nothing and shows no Gemini usage. OpenBot does not send that
 usage to its maintainer.
 
@@ -2019,7 +2041,13 @@ server is only listed; OpenBot saves nothing until you select Add.
 
 When you add or edit an endpoint, Load models sends the key and headers you typed to that address.
 For a saved endpoint, OpenBot sends the stored key and headers only to the same origin as the saved
-address. Local detection can be turned off in Settings. Its switch, addresses, folders and hidden
+address. For each saved endpoint that OpenCode runs, with an address that ends in `/v1` and a model
+with no saved efforts, OpenBot asks that origin if it is an Ollama server: `GET <origin>/api/version`
+when OpenBot starts and when you save an endpoint. At a start, it asks again at most 3 times in the
+first 90 seconds while the server does not answer. When the server is Ollama, OpenBot sends
+`POST <origin>/api/show` with the model ID for each such model, to learn if the model can reason.
+These requests contain the stored key and headers and no conversation or file data. OpenBot does not
+follow a redirect and does not save the answers. Local detection can be turned off in Settings. Its switch, addresses, folders and hidden
 rows are in `openbot-provider-detection-v1.json` in the app profile.
 
 ### Provider variables
