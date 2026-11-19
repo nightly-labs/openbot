@@ -179,6 +179,7 @@ import { ContextResetBusyError } from "@openbot/contracts/team-protocol/context-
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
+import { workflowMediaCreditsOf, workflowMediaProvidersOf } from "@openbot/team-client/workflow-decoding";
 import { type CauseCode, classifyFailure, isCauseCode } from "@openbot/telemetry";
 import { Cause, Deferred, Effect, Exit, Fiber, Result, Schema, Scope, Semaphore } from "effect";
 import { AgentMemories } from "./agent/agent-memories";
@@ -3294,12 +3295,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   /** The media services beyond the agent providers that a workflow step can use now. */
   workflowMediaProviders(): WorkflowMediaProviders {
-    const accounts = this.#mediaServiceAccounts();
-    return {
-      sunra: accounts.some((account) => account.provider === "sunra"),
-      higgsfield: accounts.some((account) => account.provider === "higgsfield"),
-      accounts: accounts.map(({ account }) => account),
-    };
+    return workflowMediaProvidersOf(this.#mediaServiceAccounts().map(({ account }) => account));
   }
 
   /**
@@ -3330,13 +3326,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       { concurrency: "unbounded" },
     );
     const listed = accounts.map(({ account }, index) => ({ ...account, credits: credits[index] ?? null }));
-    const first = (provider: WorkflowCatalogProvider) =>
-      listed.find((account) => account.provider === provider)?.credits ?? null;
-    return {
-      sunra: first("sunra"),
-      higgsfield: first("higgsfield"),
-      accounts: only ? null : listed,
-    } satisfies WorkflowMediaCredits;
+    return { ...workflowMediaCreditsOf(listed), accounts: only ? null : listed } satisfies WorkflowMediaCredits;
   }).bind(this);
 
   /**
