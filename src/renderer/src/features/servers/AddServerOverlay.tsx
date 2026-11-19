@@ -4,6 +4,7 @@ import {
   type BillingPlanId,
   isOpenBillingStatus,
 } from "@openbot/contracts/billing";
+import { type BillingDetails, isEuConsumer } from "@openbot/contracts/billing-details";
 import type {
   HostedServerCatalog,
   HostedServerCatalogPlan,
@@ -14,11 +15,18 @@ import type {
 import type { HostedServersDesktopApi, LicenseDesktopApi, ServerSummary } from "@openbot/contracts/ipc";
 import type { LicenseOrder, LicenseState, PricingOrder } from "@openbot/contracts/license";
 import { classifyFailure } from "@openbot/telemetry";
+import {
+  type BillingDetailsCalls,
+  type BillingDetailsDraft,
+  billingDetailsDraft,
+  saveBillingDetails,
+} from "@openbot/ui/features/billing/BillingDetailsFields";
 import type {
   CreatedHostedServer,
   CreateHostedServerInput,
   HostedServerSetupStatus,
 } from "@openbot/ui/features/servers/AddServerDialog";
+import type { OrderConsent } from "@openbot/ui/features/servers/HostedPricingPage";
 import {
   guessHostedCurrency,
   HOSTED_BILLING_CURRENCY,
@@ -61,6 +69,8 @@ interface AddServerRead {
   catalog: HostedServerCatalog;
   list: HostedServerList;
   licenseState: LicenseState | null;
+  /** Null when the read failed, or without `billingDetails`. */
+  details: BillingDetails | null;
 }
 
 /** A server that the user created before the dialog opened, such as on a return from the payment page. */
@@ -90,6 +100,11 @@ interface AddServerOverlayProps {
    * a license alone goes to its own payment page.
    */
   license?: Pick<LicenseDesktopApi, "getState" | "openCheckout"> | undefined;
+  /**
+   * The billing country and EU VAT ID, which decide the VAT. The pricing page asks for them and saves them before
+   * the payment page.
+   */
+  billingDetails?: BillingDetailsCalls | undefined;
   /** True in the desktop app, which runs on the user's computer. The pricing page then names this computer. */
   thisComputer?: boolean | undefined;
   /**
@@ -127,6 +142,11 @@ interface AddServerState {
   currency: HostedCurrency | null;
   /** The pricing page order, as the dialog's choices. */
   order: CreateHostedServerInput | null;
+  /**
+   * The web pricing page order that the pricing page starts with, when the account must give its country first, or
+   * when a consumer in the EU must ask for the early start of the server.
+   */
+  pageOrder: PricingOrder | null;
   /** The plans with their prices, for the order form of the pricing page. */
   catalog: HostedServerCatalogPlan[];
   /** True when the account has an open license. A server order then buys the server alone. */
@@ -138,6 +158,12 @@ interface AddServerState {
   orderError: UserErrorDetails | null;
   /** The title of `orderError`: an order of only a license makes no server. */
   orderErrorTitle: string;
+  /** The saved billing details. Null until they load. */
+  details: BillingDetails | null;
+  /** The billing details of the pricing page form. */
+  detailsDraft: BillingDetailsDraft;
+  /** True after the buyer changed the form, so a new read does not replace it. */
+  detailsEdited: boolean;
 }
 
 /** The license offer of an account with no open license. A failed read offers no license. */
@@ -249,12 +275,16 @@ function AddServerSession(
     licenseOffer: null,
     currency: null,
     order: null,
+    pageOrder: null,
     catalog: [],
     ownLicense: false,
     ordering: false,
     orderedFromPage: false,
     orderError: null,
     orderErrorTitle: "",
+    details: null,
+    detailsDraft: billingDetailsDraft(null),
+    detailsEdited: false,
   };
   if (lastRead) {
     applyRead(initial, lastRead);
@@ -265,7 +295,7 @@ function AddServerSession(
   const loaded = load();
 
   function applyRead(draft: AddServerState, read: AddServerRead): void {
-    const { catalog, list, licenseState } = read;
+    const { catalog, list, licenseState, details } = read;
     draft.plans = hostedServerPlansFromCatalog(catalog);
     draft.serverCount = list.servers.length;
     draft.paidCount = paidCount(list);
@@ -278,21 +308,31 @@ function AddServerSession(
         );
     draft.server = resumed ?? null;
     draft.paid = resume?.paid ?? false;
-    draft.order = resume ? null : dialogOrderOf(untrack(() => props.order) ?? null, licenseState);
+    // An order with no billing country cannot pay, so the pricing page asks for the country first. A consumer in the
+    // EU must ask on the pricing page that the server begin before the withdrawal period ends; the dialog cannot ask.
+    const needsCountry = untrack(() => props.billingDetails) !== undefined && !details?.country;
+    const order = resume ? null : (untrack(() => props.order) ?? null);
+    const needsPage = needsCountry || (isEuConsumer(details) && order?.server != null);
+    draft.order = needsPage ? null : dialogOrderOf(order, licenseState);
+    draft.pageOrder = needsPage ? order : null;
     draft.licenseOffer = licenseOfferOf(licenseState);
     draft.currency =
       HOSTED_CURRENCIES.find((currency) => HOSTED_BILLING_CURRENCY[currency] === licenseState?.currency) ?? null;
     draft.catalog = [...catalog.plans];
     draft.ownLicense = licenseState?.license ? isOpenBillingStatus(licenseState.license.status) : false;
+    draft.details = details;
+    if (!draft.detailsEdited) draft.detailsDraft = billingDetailsDraft(details);
   }
 
   async function load(): Promise<boolean> {
     try {
       const license = untrack(() => props.license);
-      const [catalog, list, licenseState] = await Promise.all([
+      const billingDetails = untrack(() => props.billingDetails);
+      const [catalog, list, licenseState, details] = await Promise.all([
         props.calls.plans(),
         props.calls.list(),
         license ? license.getState().catch(() => null) : Promise.resolve(null),
+        billingDetails ? billingDetails.getDetails().catch(() => null) : Promise.resolve(null),
       ]);
       for (const [choice, key] of requestIds) {
         const unpaid = list.servers.some(
@@ -301,7 +341,7 @@ function AddServerSession(
         if (key.serverId && !unpaid) requestIds.delete(choice);
       }
       props.onPendingResume(null);
-      const read = { catalog, list, licenseState };
+      const read = { catalog, list, licenseState, details };
       props.onRead(read);
       setState((draft) => applyRead(draft, read));
       if (!lastRead) trackPlans("viewed");
@@ -424,7 +464,7 @@ function AddServerSession(
 
   function create(input: CreateHostedServerInput): Promise<CreatedHostedServer> {
     const interval: BillingInterval = input.billing === "yearly" ? "year" : "month";
-    return createPlan(input.plan, interval, HOSTED_BILLING_CURRENCY[input.currency], input.license ?? null);
+    return createPlan(input.plan, interval, HOSTED_BILLING_CURRENCY[input.currency], input.license ?? null, false);
   }
 
   async function createPlan(
@@ -432,6 +472,8 @@ function AddServerSession(
     interval: BillingInterval,
     currency: BillingCurrency,
     license: LicenseOrder | null,
+    /** The early start request of a consumer in the EU, from the pricing page. */
+    earlyStart: boolean,
   ): Promise<CreatedHostedServer> {
     const choice = license
       ? `${plan}:${interval}:${currency}:${license.tier}:${license.users}`
@@ -448,6 +490,7 @@ function AddServerSession(
         requestId: key.requestId,
         ...(entryPoint ? { entryPoint } : {}),
         ...(license ? { license } : {}),
+        ...(earlyStart ? { earlyStart: true } : {}),
       })
       .catch(async (error: unknown) => {
         await refreshCount();
@@ -466,10 +509,34 @@ function AddServerSession(
   }
 
   /**
+   * Saves the billing details of the form before the payment page. A failure, such as a VAT ID that the EU VAT
+   * system does not know, stays on the page. Returns false then.
+   */
+  async function saveDetails(): Promise<boolean> {
+    const calls = props.billingDetails;
+    if (!calls) return true;
+    try {
+      const saved = await saveBillingDetails(calls, state.details, state.detailsDraft);
+      setState((draft) => {
+        draft.details = saved;
+      });
+      return true;
+    } catch (error) {
+      setState((draft) => {
+        const title = t("billing.details.saveFailed");
+        draft.orderError = errorDetails(error, title);
+        draft.orderErrorTitle = title;
+        draft.orderedFromPage = false;
+      });
+      return false;
+    }
+  }
+
+  /**
    * The order of the pricing page. A server goes to the payment page, and the dialog then shows its setup. A license
    * alone goes to the payment page of the license.
    */
-  async function submitOrder(order: PricingOrder): Promise<void> {
+  async function submitOrder(order: PricingOrder, consent: OrderConsent): Promise<void> {
     if (state.ordering) return;
     setState((draft) => {
       draft.ordering = true;
@@ -487,8 +554,15 @@ function AddServerSession(
         });
         return;
       }
+      if (!(await saveDetails())) return;
       if (order.server) {
-        await createPlan(order.server, order.interval, order.currency, state.ownLicense ? null : order.license);
+        await createPlan(
+          order.server,
+          order.interval,
+          order.currency,
+          state.ownLicense ? null : order.license,
+          consent.earlyStart,
+        );
       } else if (order.license) {
         const license = props.license;
         if (!license) return;
@@ -525,14 +599,16 @@ function AddServerSession(
    */
   const pageShown = () => pageOpen() || state.orderedFromPage;
   const pageCurrency = (plans: HostedServerPlan[]) =>
-    HOSTED_BILLING_CURRENCY[state.currency ?? guessHostedCurrency(hostedCurrencies(plans))];
+    state.currency
+      ? HOSTED_BILLING_CURRENCY[state.currency]
+      : (state.pageOrder?.currency ?? HOSTED_BILLING_CURRENCY[guessHostedCurrency(hostedCurrencies(plans))]);
   const offerLicense = () => !state.ownLicense && props.license !== undefined;
   /**
    * The page reads its first choices once. When the new read changes them, after the page showed the last answers,
    * the page starts again with the new ones.
    */
   const pageKey = (plans: HostedServerPlan[]) =>
-    `${pageCurrency(plans)}:${state.currency !== null}:${offerLicense()}:${state.licenseOffer?.used ?? ""}`;
+    `${pageCurrency(plans)}:${state.currency !== null}:${offerLicense()}:${state.licenseOffer?.used ?? ""}:${state.pageOrder !== null}`;
   /** The web client has no window page, so the page covers the app frame there. */
   const overlayMount = () => document.querySelector(".app-window > .app-frame") ?? document.body;
   const headerFrame = createPageHeaderFrame();
@@ -622,7 +698,15 @@ function AddServerSession(
                   busy={state.ordering}
                   error={state.orderError}
                   errorTitle={state.orderErrorTitle}
-                  onSubmit={(order) => void submitOrder(order)}
+                  billingDetails={props.billingDetails ? state.detailsDraft : undefined}
+                  initialOrder={state.pageOrder ?? undefined}
+                  onBillingDetailsChange={(next) =>
+                    setState((draft) => {
+                      draft.detailsDraft = next;
+                      draft.detailsEdited = true;
+                    })
+                  }
+                  onSubmit={(order, consent) => void submitOrder(order, consent)}
                   onClose={close}
                   onOpenPrivacy={() => props.onOpenUrl(PRIVACY_URL)}
                   onOpenTerms={() => props.onOpenUrl(TERMS_URL)}

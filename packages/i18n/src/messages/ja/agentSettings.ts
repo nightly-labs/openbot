@@ -199,6 +199,8 @@ export const messages = {
   "agentSettings.fullAccess.askConfirm": "事前に確認を使用",
 
   "agentSettings.links.usage": "使用状況",
+  "agentSettings.links.apps": "アプリ",
+  "agentSettings.links.appsScope": "すべてのエージェント",
   "agentSettings.links.memories": "メモリー",
   "agentSettings.links.memoriesCount": { other: "{count} 件保存済み" },
   "agentSettings.links.skills": "スキル",

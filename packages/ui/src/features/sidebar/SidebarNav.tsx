@@ -4,7 +4,7 @@
  * the scroll fades in that order.
  */
 
-import { Bot, CheckCheck, ContextMenu, FolderPlus, Hash } from "@openbot/ui";
+import { Bot, Button, CheckCheck, ContextMenu, FolderPlus, Hash } from "@openbot/ui";
 import { For, Show } from "solid-js";
 import { useText } from "../../text";
 import { SidebarChannelRow } from "./SidebarChannelRow";
@@ -14,6 +14,7 @@ import { SidebarHiddenGroup } from "./SidebarHiddenGroup";
 import { SidebarPinnedGroup } from "./SidebarPinnedGroup";
 import { SidebarSectionList } from "./SidebarSectionList";
 import { SidebarUnreadGroup, SidebarWaitingGroup } from "./SidebarWaitingGroup";
+import { SIDEBAR_NO_LIST_FILTER } from "./sidebar-list-filter";
 import { useSidebarScope } from "./sidebar-scope";
 
 export function SidebarNav() {
@@ -24,12 +25,15 @@ export function SidebarNav() {
     orderedPeople,
     handleListDragLeave,
     layoutMutable,
+    listFiltered,
     pending,
     props,
     reorderAnnouncement,
     resolvedPinnedItems,
     scrollFades,
     setAgentListElement,
+    setListFilter,
+    shownPeople,
     startCreateSection,
     unreadChats,
     updateSidebarNativeDrag,
@@ -37,6 +41,11 @@ export function SidebarNav() {
     waitingChats,
   } = useSidebarScope();
   const { t } = useText();
+  const noChatShows = () =>
+    resolvedPinnedItems().length === 0 &&
+    waitingChats().length === 0 &&
+    unreadChats().length === 0 &&
+    filteredChats().length === 0;
   return (
     <nav
       ref={setAgentListElement}
@@ -50,12 +59,18 @@ export function SidebarNav() {
       onScroll={scrollFades.measure}
     >
       <div ref={scrollFades.watch} class="agent-list-content">
+        <Show when={listFiltered() && noChatShows() && (props.showPeople === false || shownPeople().length === 0)}>
+          <div class="sidebar-filter-empty">
+            <p class="empty-search">{t("sidebar.filter.noMatch")}</p>
+            <Button variant="secondary" size="sm" onClick={() => setListFilter(SIDEBAR_NO_LIST_FILTER)}>
+              {t("sidebar.filter.clear")}
+            </Button>
+          </div>
+        </Show>
         <Show
           when={
-            resolvedPinnedItems().length === 0 &&
-            waitingChats().length === 0 &&
-            unreadChats().length === 0 &&
-            filteredChats().length === 0 &&
+            !listFiltered() &&
+            noChatShows() &&
             userHiddenAgentList().length === 0 &&
             (props.showPeople === false || orderedPeople().length === 0) &&
             pending.sectionEditor?.target.kind !== "create"

@@ -3,7 +3,6 @@ import { router } from "expo-router";
 import { Typography } from "heroui-native";
 import { Pressable, View, type ViewStyle } from "react-native";
 import { lowestPlanLimitsFirst, planLimitName, planLimitWindowLabel } from "@/features/servers/model/plan-limits";
-import { ChromeGlassSheen } from "@/shared/components/chrome-glass-sheen";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
@@ -106,7 +105,6 @@ export function PlanLimitsHeaderButton({
     >
       {isAndroid ? (
         <View className="overflow-hidden rounded-full" style={androidGlass}>
-          <ChromeGlassSheen />
           {content}
         </View>
       ) : (

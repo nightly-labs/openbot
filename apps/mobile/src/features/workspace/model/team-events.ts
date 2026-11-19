@@ -108,6 +108,15 @@ export function syncEventQueries(
       predicate: (query) => query.queryKey.at(-1) === "session-settings",
     });
   }
+  if (event.type === "library-folders-changed") {
+    // A folder change on the desktop, on another phone, or by an agent that saved a file into a folder.
+    void queryClient.invalidateQueries({ queryKey: queryKeys.serverLibraryFolders(scope, serverId) });
+  }
+  if (event.type === "usage-credits-changed") {
+    // The usage event does not say whether an account works on credits, so the plan limits read again.
+    void queryClient.invalidateQueries({ queryKey: queryKeys.planLimits(scope, serverId) });
+    return;
+  }
   if (event.type === "browser-profiles-changed") {
     // A change on the desktop or another phone: the profiles, their proxies and each agent's choice read again.
     void queryClient.invalidateQueries({ queryKey: queryKeys.serverBrowserProfiles(scope, serverId) });
@@ -119,7 +128,8 @@ export function syncEventQueries(
   }
   if (event.type === "status") {
     // The host sends a status event after a change to its providers, the models that its picker
-    // shows, the prompt cache time or the Claude compaction size, such as one on the desktop app.
+    // shows, the prompt cache time, the Claude compaction size or a provider's variables, such as one
+    // on the desktop app.
     // Open provider pages read again.
     for (const queryKey of [
       queryKeys.providerStatus(scope, serverId),
@@ -129,6 +139,8 @@ export function syncEventQueries(
       queryKeys.agentModels(scope, serverId),
     ])
       void queryClient.invalidateQueries({ queryKey });
+    // Each provider has its own variables; the prefix reads every open one again.
+    void queryClient.invalidateQueries({ queryKey: queryKeys.providerEnvironment(scope, serverId, "").slice(0, -1) });
   }
   if (event.type === "message-pins-changed") {
     // A pin of the agent changed on another device, by the agent, or by a deleted message: read the list again.

@@ -16,6 +16,28 @@ export function assertBeforeDeadline(deadline: number | undefined): void {
   if (deadline !== undefined && Date.now() >= deadline) throw new Error("Browser wait condition timed out.");
 }
 
+/** Chromium's answer to a command for a frame session that ended, as when the page removed the frame. */
+export function isSessionGone(failure: BrowserOperationError): boolean {
+  return failure.cause instanceof Error && failure.cause.message.includes("Session with given id not found");
+}
+
+/** Chromium's answer for a frame that went away: its session ended, or the page removed the frame. */
+export function isFrameGone(failure: BrowserOperationError): boolean {
+  return (
+    isSessionGone(failure) ||
+    (failure.cause instanceof Error && failure.cause.message.includes("Frame with the given frameId is not found"))
+  );
+}
+
+/**
+ * A read of a frame in another process gives `fallback` when that frame went away during the read: a
+ * loading page adds and removes frames. A failure of the page's own session still fails (#10701).
+ */
+export const skipGoneFrame =
+  <B>(sessionId: string | undefined, fallback: B) =>
+  <A, R>(read: Effect.Effect<A, BrowserOperationError, R>): Effect.Effect<A | B, BrowserOperationError, R> =>
+    sessionId === undefined ? read : read.pipe(Effect.catchIf(isFrameGone, () => Effect.succeed(fallback)));
+
 export const automationContextId = Effect.fn("Browser.automationContextId")(function* (
   send: SendCommand,
   sessionId?: string,

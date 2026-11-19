@@ -15,6 +15,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
 import { databaseRow, databaseRows } from "../database/database-rows";
+import { withTransaction } from "../database/sqlite-transaction";
 import type { OpenBotDatabase } from "../openbot-database";
 
 /** A delivery the runtime can send: its place and the text, which a quiet run never has. */
@@ -37,6 +38,8 @@ export interface RoutineResultPendingRun {
   agentId: string;
   routineName: string;
   deliveryId: string | null;
+  /** When the run ended: a result that waits for a teammate's answer waits from then. */
+  endedAt: string;
   destination: RoutineResultDestination;
 }
 
@@ -84,19 +87,13 @@ export class RoutineResultStore {
   ): RoutineResultDestination | null {
     const db = this.#database.connection;
     if (!destination) {
-      db.exec("BEGIN IMMEDIATE");
-      try {
+      withTransaction(db, () => {
         db.prepare("DELETE FROM routine_result_destinations WHERE routine_id = ?").run(routineId);
         db.prepare(
           `UPDATE routine_result_deliveries SET status = 'failed', reason = 'stopped', next_attempt_at = NULL,
              updated_at = ? WHERE routine_id = ? AND status = 'pending'`,
         ).run(now, routineId);
-        db.exec("COMMIT");
-      } catch (error) {
-        // SQLite may have rolled back already, and a second ROLLBACK would replace the error that did it.
-        if (db.isTransaction) db.exec("ROLLBACK");
-        throw error;
-      }
+      });
       return null;
     }
     db.prepare(
@@ -131,7 +128,7 @@ export class RoutineResultStore {
     return databaseRows(
       this.#database.connection
         .prepare(
-          `SELECT run.run_id, run.routine_id, run.agent_id, run.routine_name, run.delivery_id, destination.*
+          `SELECT run.run_id, run.routine_id, run.agent_id, run.routine_name, run.delivery_id, run.updated_at AS run_updated_at, destination.*
            FROM projection_routine_runs AS run
            JOIN routine_result_destinations AS destination ON destination.routine_id = run.routine_id
            WHERE (run.status = 'succeeded'
@@ -148,6 +145,7 @@ export class RoutineResultStore {
       agentId: String(row.agent_id),
       routineName: String(row.routine_name),
       deliveryId: nullableString(row.delivery_id),
+      endedAt: String(row.run_updated_at),
       destination: toDestination(row),
     }));
   }

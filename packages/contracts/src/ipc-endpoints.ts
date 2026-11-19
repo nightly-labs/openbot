@@ -11,6 +11,7 @@ import type {
   SetAgentSessionSettingInput,
 } from "./ipc-agent-session-settings";
 import type { ServerAuditLog } from "./ipc-server-audit";
+import type { AgentActiveQueues } from "./team-protocol/agent-active-queues-v1";
 // The one channel list. Each endpoint holds its wire value, the group it belongs to, and whether it
 // is a request the renderer invokes or an event the main process sends. That is what lets a
 // registrar bind its handlers as an object keyed by endpoint, so a channel with no handler, and a
@@ -32,7 +33,8 @@ import type { AppAppearancePreference, SetAppAppearancePreferenceInput } from ".
 import type { AppInterfaceSizePreference, SetAppInterfaceSizePreferenceInput } from "./app-interface-size";
 import type { AppLanguagePreference, SetAppLanguagePreferenceInput } from "./app-language";
 import type { AppLogoColorPreference, SetAppLogoColorPreferenceInput } from "./app-logo-color";
-import type { BillingPortalRequest, BillingState } from "./billing";
+import type { BillingPortalRequest, BillingState, BillingStorageRequest } from "./billing";
+import type { BillingDetails, BillingDetailsRequest } from "./billing-details";
 import type {
   CreateHostedServerInput,
   DeleteHostedServerInput,
@@ -116,8 +118,11 @@ import type {
   AgentProviderId,
   AgentStatus,
   ConnectProviderAccountInput,
+  ConnectProviderAccountKeyInput,
   HostProviderAccounts,
   PasteProviderRelaySignInInput,
+  ProviderAccountCodeLoginStart,
+  ProviderAccountCodeLoginStatus,
   ProviderApiKeyState,
   ProviderCodeLoginStart,
   ProviderHostSignInStatus,
@@ -129,6 +134,7 @@ import type {
   ResetProviderUsageInput,
   SetProviderAccountPoolInput,
   SetProviderApiKeyInput,
+  SubmitProviderAccountCodeLoginInput,
   SubmitProviderCodeLoginInput,
 } from "./ipc-agent-status";
 import type {
@@ -201,7 +207,9 @@ import type {
 } from "./ipc-app-auth";
 import type { AppBehaviorPreference, AppBehaviorPreferenceChange } from "./ipc-app-behavior";
 import type {
+  AgentApproval,
   ApprovalAutomationPreference,
+  ReadPendingApprovalInput,
   RespondToApprovalInput,
   RespondToBrowserTakeoverInput,
 } from "./ipc-approvals";
@@ -304,7 +312,23 @@ import type {
   SearchConversationMessagesInput,
   SendMessageInput,
   SetMessageReactionInput,
+  WithdrawFeedbackInput,
+  WithdrawFeedbackResult,
 } from "./ipc-conversations";
+import type {
+  CrmActivityPage,
+  CrmActivityPageInput,
+  CrmApplyResult,
+  CrmChange,
+  CrmCustomerPage,
+  CrmCustomerPageInput,
+  CrmOverview,
+  CrmPaymentPage,
+  CrmPaymentPageInput,
+  CrmSettings,
+  CrmSourceConnectInput,
+  CrmSourceInput,
+} from "./ipc-crm";
 import type {
   CheckCustomAgentInput,
   CustomAgentCheckResult,
@@ -323,6 +347,7 @@ import type {
   UpdateCustomProviderInput,
 } from "./ipc-custom-providers";
 import type {
+  BrowserTakeoverPage,
   DynamicIslandAction,
   DynamicIslandGeometry,
   DynamicIslandPreference,
@@ -331,6 +356,7 @@ import type {
   SetDynamicIslandPreferenceInput,
 } from "./ipc-dynamic-island";
 import type {
+  AgentWebhookSecret,
   EventActivity,
   EventRoutine,
   EventRoutineRef,
@@ -375,6 +401,7 @@ import type {
   InstanceTransferPreview,
   InstanceTransferResult,
   InstanceTransferSummary,
+  InstanceTransferUploadProgress,
 } from "./ipc-instance-transfer";
 import type { LibraryFolderAction, LibraryFoldersSnapshot } from "./ipc-library-folders";
 import type { LinkAccountStatus } from "./ipc-link-account";
@@ -433,6 +460,7 @@ import type {
   SetSlackEnabledInput,
   SetTelegramEnabledInput,
   SetWhatsAppOwnNumberInput,
+  SetWhatsAppStatusReactionsInput,
   SetWhatsAppWorkingMessageInput,
   SlackOverview,
   SlackWorkspaceInput,
@@ -464,6 +492,11 @@ import type {
   ProviderDetectionSettings,
 } from "./ipc-provider-detection";
 import type {
+  ProviderEnvironment,
+  ProviderEnvironmentProvider,
+  ProviderEnvironmentUpdate,
+} from "./ipc-provider-environment";
+import type {
   AcknowledgeFailedTurnInput,
   BusyMessageModePreference,
   CancelQueuedMessageInput,
@@ -493,6 +526,7 @@ import type {
   RoutineFlowCanvas,
   RoutineFlowLink,
   SaveRoutineFlowPositionInput,
+  StopRoutineFlowRunInput,
   UpdateRoutineFlowLinkInput,
 } from "./ipc-routine-flows";
 import type {
@@ -627,7 +661,10 @@ import type {
   StartWorkflowRunInput,
   WorkflowDetail,
   WorkflowGraph,
+  WorkflowMediaCatalog,
   WorkflowMediaCredits,
+  WorkflowMediaPrice,
+  WorkflowMediaPriceRequest,
   WorkflowMediaProviders,
   WorkflowRunDetail,
   WorkflowRunPage,
@@ -901,6 +938,13 @@ export const IPC_ENDPOINTS = {
      * `connecting` account cancels its sign-in.
      */
     connectProviderAccount: request<ConnectProviderAccountInput, AgentStatus>()("app:connect-provider-account"),
+    /**
+     * Adds one more account of a provider from an API key, or gives an account a new key. It answers
+     * when the provider accepted the key, and fails with the reason when it did not.
+     */
+    connectProviderAccountKey: request<ConnectProviderAccountKeyInput, AgentStatus>()(
+      "app:connect-provider-account-key",
+    ),
     /** Stops a `connecting` account's sign-in: a new account goes, another one shows as signed out. */
     cancelProviderAccountSignIn: request<RemoveProviderAccountInput, AgentStatus>()(
       "app:cancel-provider-account-sign-in",
@@ -1023,6 +1067,8 @@ export const IPC_ENDPOINTS = {
     performAction: request<DynamicIslandAction, void>()("dynamic-island:perform-action"),
     performHaptic: request<undefined, void>()("dynamic-island:perform-haptic"),
     action: event<DynamicIslandAction>()("dynamic-island:action"),
+    /** Only a chat window: it has no browser, so main brings up the main window on the takeover page. */
+    openBrowserTakeover: request<BrowserTakeoverPage, void>()("dynamic-island:open-browser-takeover"),
     setInteractive: request<SetDynamicIslandInteractiveInput, void>()("dynamic-island:set-interactive"),
     /** X11: the parts of the island window that take the pointer and show, as for the agent dock. */
     setInputRegion: request<AgentDockInputRect[], void>()("dynamic-island:set-input-region"),
@@ -1187,6 +1233,27 @@ export const IPC_ENDPOINTS = {
       "provider-admin:account-sign-in-status",
     ),
     cancelAccountSignIn: scopedRequest<AgentProviderId, void, "required">()("provider-admin:cancel-account-sign-in"),
+    // An account of a joined server's host that is an API key (`provider-account-keys-v1`).
+    connectAccountKey: scopedRequest<ConnectProviderAccountKeyInput, void, "required">()(
+      "provider-admin:connect-account-key",
+    ),
+    // A code sign-in of an account: the provider's CLI gives a page and a code, and the person opens
+    // the page on any device. This computer runs it for its own accounts; a joined server's host
+    // needs `provider-account-code-v1`. `start` adds an account when `accountId` is null and answers
+    // with its id. `submitAccountCodeLogin` sends the code of a `paste` sign-in.
+    // `accountCodeLoginStatus` tells how the sign-in ended.
+    startAccountCodeLogin: scopedRequest<ConnectProviderAccountInput, ProviderAccountCodeLoginStart, "required">()(
+      "provider-admin:start-account-code-login",
+    ),
+    submitAccountCodeLogin: scopedRequest<SubmitProviderAccountCodeLoginInput, void, "required">()(
+      "provider-admin:submit-account-code-login",
+    ),
+    accountCodeLoginStatus: scopedRequest<RemoveProviderAccountInput, ProviderAccountCodeLoginStatus, "required">()(
+      "provider-admin:account-code-login-status",
+    ),
+    cancelAccountCodeLogin: scopedRequest<RemoveProviderAccountInput, void, "required">()(
+      "provider-admin:cancel-account-code-login",
+    ),
     // The provider that a new agent of a joined server's host starts on (`provider-default-v1`).
     // This computer's own is `app.saveSetup`.
     hostDefaultProvider: scopedQuery<HostDefaultProvider, "required">()("provider-admin:host-default-provider"),
@@ -1310,6 +1377,9 @@ export const IPC_ENDPOINTS = {
     setWhatsAppWorkingMessage: request<SetWhatsAppWorkingMessageInput, void>()(
       "messaging:set-whatsapp-working-message",
     ),
+    setWhatsAppStatusReactions: request<SetWhatsAppStatusReactionsInput, void>()(
+      "messaging:set-whatsapp-status-reactions",
+    ),
     // The same for a joined server with `connectors-v1`, which an owner or admin manages from here.
     // The host opens no page: main opens it in this computer's browser. A Slack or Discord install
     // returns to this computer's `openbot://` link, and main sends the sealed grant on to the host.
@@ -1368,6 +1438,10 @@ export const IPC_ENDPOINTS = {
     // A joined server needs `whatsapp-working-message-v1`. Its numbers carry `workingMessage` only then.
     hostSetWhatsAppWorkingMessage: scopedRequest<SetWhatsAppWorkingMessageInput, void, "required">()(
       "messaging:host-set-whatsapp-working-message",
+    ),
+    // A joined server needs `whatsapp-status-reactions-v1`. Its numbers carry `statusReactions` only then.
+    hostSetWhatsAppStatusReactions: scopedRequest<SetWhatsAppStatusReactionsInput, void, "required">()(
+      "messaging:host-set-whatsapp-status-reactions",
     ),
   },
   // The server name, logo, timezone, agent memory limit and app update of one server's host. `host.updateIdentity` and `update`
@@ -1440,6 +1514,14 @@ export const IPC_ENDPOINTS = {
     ),
     setClaudeCompactWindow: scopedRequest<number | null, ClaudeCompactWindowSetting, "required">()(
       "host-admin:set-claude-compact-window",
+    ),
+    // The environment variables that each process of one provider of the server starts with
+    // (`provider-environment-v1`). A sensitive value goes to the host only. An owner or admin sets them.
+    getProviderEnvironment: scopedRequest<ProviderEnvironmentProvider, ProviderEnvironment, "required">()(
+      "host-admin:get-provider-environment",
+    ),
+    setProviderEnvironment: scopedRequest<ProviderEnvironmentUpdate, ProviderEnvironment, "required">()(
+      "host-admin:set-provider-environment",
     ),
     // The models that the model picker of the server shows for one provider. An owner or admin sets them.
     getModelVisibility: scopedRequest<AgentProviderRef, ProviderModelVisibility, "required">()(
@@ -1586,6 +1668,10 @@ export const IPC_ENDPOINTS = {
   billing: {
     getState: request<undefined, BillingState>()("billing:get-state"),
     openPortal: request<BillingPortalRequest, void>()("billing:open-portal"),
+    buyStorage: request<BillingStorageRequest, BillingState>()("billing:buy-storage"),
+    // The billing country and EU VAT ID that decide the VAT of the next plan or license.
+    getDetails: request<undefined, BillingDetails>()("billing:get-details"),
+    setDetails: request<BillingDetailsRequest, BillingDetails>()("billing:set-details"),
   },
   // The commercial license of the account. Main opens the Checkout page; the renderer never sends a URL.
   license: {
@@ -1791,7 +1877,12 @@ export const IPC_ENDPOINTS = {
     deleteConversationMessage: scopedRequest<DeleteConversationMessageInput, void>()(
       "agent:delete-conversation-message",
     ),
+    // A joined server takes it through `feedback-withdraw-v1`, for its owner only.
+    withdrawFeedback: scopedRequest<WithdrawFeedbackInput, WithdrawFeedbackResult>()("agent:withdraw-feedback"),
     listQueue: scopedRequest<string, QueueSnapshot>()("agent:list-queue"),
+    // The open work of the queues of many agents, for the agent rows. A joined server takes it through
+    // `agent-active-queues-v1`; null when the host does not have it, and the caller reads each queue.
+    listActiveQueues: scopedRequest<string[], AgentActiveQueues | null>()("agent:list-active-queues"),
     listWaits: scopedRequest<string, AgentWaitsSnapshot>()("agent:list-waits"),
     cancelWait: scopedRequest<CancelAgentWaitInput, void>()("agent:cancel-wait"),
     // The pins of all chats of an agent. A joined server takes both through `message-pins-v1`.
@@ -1831,6 +1922,9 @@ export const IPC_ENDPOINTS = {
     compactTaskContext: scopedRequest<AgentTaskInput, void>()("agent:tasks:compact-context"),
     respondToPrompt: scopedRequest<RespondToPromptInput, void>()("agent:respond-to-prompt"),
     respondToApproval: scopedRequest<RespondToApprovalInput, void>()("agent:respond-to-approval"),
+    // The whole copy of an approval that a runtime snapshot cut, or null when the server cannot send it.
+    // A joined server takes it through `pending-approval-v1`.
+    readPendingApproval: scopedRequest<ReadPendingApprovalInput, AgentApproval | null>()("agent:read-pending-approval"),
     respondToBrowserSecret: scopedRequest<LocalBrowserSecretResponse, void>()("agent:respond-to-browser-secret"),
     respondToBrowserTakeover: scopedRequest<RespondToBrowserTakeoverInput, void>()("agent:respond-to-browser-takeover"),
     scopedEvent: event<ScopedAgentEvent>()("agent:event"),
@@ -1893,6 +1987,8 @@ export const IPC_ENDPOINTS = {
     connect: scopedRequest<ConnectRoutineFlowInput, RoutineFlowLink>()("routine-flows:connect"),
     disconnect: scopedRequest<DisconnectRoutineFlowInput, void>()("routine-flows:disconnect"),
     updateLink: scopedRequest<UpdateRoutineFlowLinkInput, RoutineFlowLink>()("routine-flows:update-link"),
+    /** Stops a run that has not ended. A joined server answers through `routine-flow-stop-v1`. */
+    stopRun: scopedRequest<StopRoutineFlowRunInput, void>()("routine-flows:stop-run"),
   },
   /**
    * Workflows: graphs of steps drawn on a canvas, their versions and their runs. The agent event
@@ -1948,6 +2044,35 @@ export const IPC_ENDPOINTS = {
      * `workflows-sunra-v1`; an older one has none.
      */
     mediaCredits: scopedQuery<WorkflowMediaCredits>()("workflows:media-credits"),
+    /**
+     * The live models of the host's signed-in Sunra and Higgsfield accounts. A joined server answers
+     * through `workflows-media-catalog-v1`; an older one answers no models, and the client shows the
+     * fixed models of `WORKFLOW_MEDIA_MODELS`.
+     */
+    mediaCatalog: scopedQuery<WorkflowMediaCatalog>()("workflows:media-catalog"),
+    /**
+     * What one file of a catalog model costs with the choices of a step, as the service quotes it.
+     * A joined server answers through `workflows-media-catalog-v1`; an older one gives no quote.
+     */
+    mediaPrice: scopedRequest<WorkflowMediaPriceRequest, WorkflowMediaPrice>()("workflows:media-price"),
+  },
+  /**
+   * CRM: leads and customers, their plans and payments, and the changes that agents propose. Only an
+   * owner or admin reads it. The agent event `crm-changed` says that it changed. A joined server
+   * answers through `crm-v1` when it supports it.
+   */
+  crm: {
+    overview: scopedQuery<CrmOverview>()("crm:overview"),
+    customers: scopedRequest<CrmCustomerPageInput, CrmCustomerPage>()("crm:customers"),
+    payments: scopedRequest<CrmPaymentPageInput, CrmPaymentPage>()("crm:payments"),
+    activity: scopedRequest<CrmActivityPageInput, CrmActivityPage>()("crm:activity"),
+    apply: scopedRequest<CrmChange, CrmApplyResult>()("crm:apply"),
+    sourceConnect: scopedRequest<CrmSourceConnectInput, CrmApplyResult>()("crm:source-connect"),
+    sourceDisconnect: scopedRequest<CrmSourceInput, CrmApplyResult>()("crm:source-disconnect"),
+    sourceSync: scopedRequest<CrmSourceInput, CrmApplyResult>()("crm:source-sync"),
+    /** The CRM switch of Server Settings > Experimental. The answer of `settings` comes before the CRM is on. */
+    settings: scopedQuery<CrmSettings>()("crm:settings"),
+    setSettings: scopedRequest<CrmSettings, CrmSettings>()("crm:set-settings"),
   },
   /**
    * Routine results: an agent routine's answer sent on to a messaging place. Only this computer's host
@@ -1984,6 +2109,12 @@ export const IPC_ENDPOINTS = {
     previewWorkspaceFile: scopedRequest<PreviewWorkspaceFileInput, FilePreview>()("agent:preview-workspace-file"),
     /** Releases only this client's temporary HTML bytes, never a file on a host. */
     releaseFilePreview: request<string, void>()("agent:release-file-preview"),
+    /**
+     * Keeps HTML that the renderer already holds, such as a backdrop page saved on this device, as a
+     * temporary page on this client. The answer is its `openbot-visual://preview/...` address, or null
+     * when the page store is full. `releaseFilePreview` releases it.
+     */
+    addPreviewPage: request<string, string | null>()("agent:add-preview-page"),
     listWorkspaceDirectory: scopedRequest<OpenWorkspaceFileInput, WorkspaceDirectory>()(
       "agent:list-workspace-directory",
     ),
@@ -2216,6 +2347,9 @@ export const IPC_ENDPOINTS = {
       "servers:mcp:complete-sign-in-relay",
     ),
     cancelMcpSignIn: scopedRequest<CancelMcpSignInInput, void, "required">()("servers:mcp:cancel-sign-in"),
+    // A browser can start and show nothing. Main copies the page of the sign-in that waits on this
+    // computer, so the user can open it in another browser; the window never holds the address.
+    copyMcpSignInLink: scopedRequest<CancelMcpSignInInput, void, "required">()("servers:mcp:copy-sign-in-link"),
     signOutMcpServer: scopedRequest<SignOutMcpServerInput, McpSignInState[], "required">()("servers:mcp:sign-out"),
     listMcpSignIns: scopedQuery<McpSignInState[], "required">()("servers:mcp:list-sign-ins"),
     // The OAuth app an administrator registered for a saved http row, and the exact callback address.
@@ -2285,6 +2419,8 @@ export const IPC_ENDPOINTS = {
     apply: scopedRequest<ApplyInstanceTransferInput, InstanceTransferResult, "required">()("instance-transfer:apply"),
     discard: scopedRequest<string, void, "required">()("instance-transfer:discard"),
     copy: scopedRequest<CopyInstanceAgentsInput, InstanceTransferResult, "required">()("instance-transfer:copy"),
+    // The bytes of a file that `choose` or `copy` sends to a joined server, while it sends them.
+    uploadProgress: event<InstanceTransferUploadProgress>()("instance-transfer:upload-progress"),
   },
   // The plugin deep link, its own group because its registrar holds the pending link rather than a
   // service. `takePendingListing` is what a window that finished loading after the link arrived
@@ -2340,6 +2476,8 @@ export const IPC_ENDPOINTS = {
     testRoutine: scopedRequest<EventRoutineRef, void, "required">()("events:test-routine"),
     rotateSecret: scopedRequest<EventRoutineRef, WebhookSecret, "required">()("events:rotate-secret"),
     setSecret: scopedRequest<SetWebhookSecretInput, void, "required">()("events:set-secret"),
+    /** Gives the agent of the routine a new signing secret as an API key. The result has only the key name. */
+    giveSecretToAgent: scopedRequest<EventRoutineRef, AgentWebhookSecret, "required">()("events:give-secret-to-agent"),
     sendTestEvent: scopedRequest<EventRoutineRef, WebhookTestResult, "required">()("events:send-test-event"),
     listActivity: scopedRequest<ListEventActivityInput, EventActivity[], "required">()("events:list-activity"),
     listRoutineRuns: scopedRequest<ListEventRoutineRunsInput, EventRoutineRun[], "required">()(
@@ -2398,6 +2536,7 @@ export const IPC_GROUP_PATHS = {
   routineFeed: "routineFeed",
   routineFlows: "routineFlows",
   workflows: "workflows",
+  crm: "crm",
   routineResults: "routineResults",
   billing: "billing",
   license: "license",

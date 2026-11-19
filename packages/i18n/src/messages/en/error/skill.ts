@@ -51,6 +51,8 @@ export const messages = defineMessages("error.skill", {
   "error.skill.localNotFound": "This local skill does not exist. Check its ID in the list of local skills.",
   "error.skill.localRevisionNotFound": "This local skill has no revision {revision}. Its latest revision is {latest}.",
   "error.skill.localNameTaken": "A local skill with this name already exists. Revise it instead.",
+  "error.skill.localNameClash":
+    'This name and the local skill "{name}" both become "{slug}". To change that skill, revise it. To add a new skill, change the Latin letters or digits in this name.',
   "error.skill.localKeepName": "Keep the skill name unchanged when revising it.",
   "error.skill.localRelativeFolder": "Use a relative skill folder inside the current agent workspace.",
   "error.skill.localSourceOutside": "Skill source must be inside the agent workspace.",

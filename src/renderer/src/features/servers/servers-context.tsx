@@ -82,7 +82,12 @@ const Servers = createSimpleContext({
     const [hostedServerIds, setHostedServerIds] = createSignal<ReadonlySet<string>>(new Set());
     /** True after the hosted servers were read once. Until then, an owned server can be a hosted one. */
     const [hostedServersLoaded, setHostedServersLoaded] = createSignal(false);
-    const [serverLoadRequest, setServerLoadRequest] = createSignal<{ serverId: string; nonce: number } | null>(null);
+    const [serverLoadRequest, setServerLoadRequest] = createSignal<{
+      serverId: string;
+      nonce: number;
+      /** Set unless the user asked for a retry. The scope's own load of that connection answers the request. */
+      connectionSequence?: number;
+    } | null>(null);
     /**
      * The user's choice to hide the server on this computer. The server menus show the server again
      * while it is open or while no other server exists; `localServerHidden` keeps only the choice.
@@ -266,7 +271,12 @@ const Servers = createSimpleContext({
       if (loadTarget) {
         pendingCompatibilityRetryServerId = null;
         loadRequestNonce += 1;
-        setServerLoadRequest({ serverId: loadTarget.id, nonce: loadRequestNonce });
+        const connectionSequence = retryTarget ? undefined : loadTarget.connectionSequence;
+        setServerLoadRequest({
+          serverId: loadTarget.id,
+          nonce: loadRequestNonce,
+          ...(connectionSequence === undefined ? {} : { connectionSequence }),
+        });
       }
     }
 
@@ -439,7 +449,13 @@ const Servers = createSimpleContext({
       try {
         setServers(await serversPort().servers.reorder({ serverIds }));
       } catch (error) {
-        setServers(previous);
+        // The connection state can have changed during the call. The copy from before the call
+        // is the fallback only.
+        setServers(
+          await serversPort()
+            .servers.list()
+            .catch(() => previous),
+        );
         throw error;
       }
     }

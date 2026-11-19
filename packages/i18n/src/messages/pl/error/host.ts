@@ -18,6 +18,7 @@ export const messages = {
   "error.host.publishFailed": "Nie udało się opublikować tego OpenBot.",
   "error.host.mobileConnectPublishFailed": "Nie udało się opublikować tego OpenBot dla Mobile Connect.",
   "error.host.mobileConnectHostChanged": "Host Mobile Connect się zmienił. Spróbuj ponownie.",
+  "error.host.mobileConnectHostMismatch": "Twoje konto ma inny klucz dla tego serwera. Spróbuj ponownie.",
   "error.host.noServer": "Ten komputer nie ma serwera do zmiany.",
   "error.host.identityLocalOnly": "Nazwę i logo serwera można zmienić tylko na komputerze, na którym działa.",
   "error.host.timezoneInvalid": "Ta strefa czasowa jest nieznana.",

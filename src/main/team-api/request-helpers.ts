@@ -13,6 +13,7 @@ import {
   AGENT_WELCOME_ITEM_TYPE,
   type AgentAccessLevel,
   agentAccessRank,
+  CHANNEL_RESUME_ITEM_TYPE,
   type ConversationMessage,
   type ConversationMessageSender,
   type ConversationPageAnchor,
@@ -34,19 +35,24 @@ import {
   ROUTINE_EVENT_ITEM_TYPE_PREFIX,
   ROUTINE_QUIET_ANSWER_ITEM_TYPE,
   ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX,
+  SETTING_LINK_ITEM_TYPE_PREFIX,
   type TeamMemberSummary,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { teamProtocolCapabilityLimit } from "@openbot/contracts/team-protocol/capability-limits";
 import {
   CHANNEL_BROWSER_CAPABILITY,
   CHANNEL_ISOLATION_CAPABILITY,
   CHANNEL_PICTURE_CAPABILITY,
+  expandTeamCapabilitiesV10,
   isTeamCurrentCapability,
   supportsTeamSemanticTags,
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { teamHttpCodec } from "@openbot/contracts/team-protocol/http-codecs";
+import { ROUTINE_QUIET_ANSWERS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-quiet-answers-v1";
+import { SETTING_LINK_MARKERS_CAPABILITY } from "@openbot/contracts/team-protocol/setting-link-markers-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import {
   TEAM_CAPABILITIES_HEADER,
@@ -54,7 +60,13 @@ import {
   TEAM_PROTOCOL_VERSION_HEADER,
 } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V2_MAX_JSON_FRAME_BYTES } from "@openbot/contracts/team-protocol/v2";
-import { TEAM_PROTOCOL_V9, TEAM_PROTOCOL_V9_CAPABILITY_LIMIT } from "@openbot/contracts/team-protocol/v9";
+import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
+import {
+  readTeamCapabilitiesV10,
+  TEAM_ABSENT_CAPABILITIES_HEADER,
+  TEAM_PROTOCOL_V10,
+  type TeamCapabilitiesV10,
+} from "@openbot/contracts/team-protocol/v10";
 import { sourceText } from "@openbot/i18n/source";
 import { readBodyWithin } from "../http-body";
 import { HttpError } from "./http-error";
@@ -130,17 +142,35 @@ function isLowSurrogate(code: number): boolean {
 }
 
 export function requestCapabilities(request: IncomingMessage): Set<string> {
+  const protocol = requestProtocol(request);
+  if (protocol >= TEAM_PROTOCOL_V10) {
+    // `#protocolIssue` refuses a malformed list; a route above it reads none.
+    const lists = requestCapabilityListsV10(request);
+    return new Set(lists ? expandTeamCapabilitiesV10(lists).filter(isTeamCurrentCapability) : []);
+  }
   const header = request.headers[TEAM_CAPABILITIES_HEADER.toLowerCase()];
   const value = Array.isArray(header) ? header.join(",") : header;
-  const protocol = requestProtocol(request);
   // Protocol 9 lists up to 256 capabilities, which can pass 4 KB.
   if (!value || value.length > (protocol >= TEAM_PROTOCOL_V9 ? 8_192 : 4_096)) return new Set();
   const capabilities = value.split(",").map((capability) => capability.trim());
-  if (
-    capabilities.length > (protocol >= TEAM_PROTOCOL_V9 ? TEAM_PROTOCOL_V9_CAPABILITY_LIMIT : protocol >= 7 ? 128 : 64)
-  )
-    return new Set();
+  if (capabilities.length > teamProtocolCapabilityLimit(protocol)) return new Set();
   return new Set(capabilities.filter(isTeamCurrentCapability));
+}
+
+/** The two lists of a protocol 10 request (`v10.ts`), or null when one is malformed. A missing header is an empty list. */
+export function requestCapabilityListsV10(request: IncomingMessage): TeamCapabilitiesV10 | null {
+  return readTeamCapabilitiesV10(
+    headerCapabilityList(request, TEAM_CAPABILITIES_HEADER),
+    headerCapabilityList(request, TEAM_ABSENT_CAPABILITIES_HEADER),
+  );
+}
+
+function headerCapabilityList(request: IncomingMessage, name: string): string[] | null {
+  const header = request.headers[name.toLowerCase()];
+  const value = Array.isArray(header) ? header.join(",") : header;
+  if (!value) return [];
+  if (value.length > 8_192) return null;
+  return value.split(",").map((capability) => capability.trim());
 }
 
 export function conversationSnapshotForCapabilities(
@@ -192,22 +222,27 @@ export function markerExclusionsForCapabilities(capabilities: ReadonlySet<string
   excludeRoutineRunEvents: boolean;
   excludeHostedSiteEvents: boolean;
   excludeRoutineQuietAnswers: boolean;
+  excludeSettingLinks?: boolean;
 } {
   return {
     excludeRoutineEvents: !capabilities.has("routine-event-markers"),
     excludeRoutineRunEvents: !capabilities.has("routine-run-event-markers"),
     excludeHostedSiteEvents: !capabilities.has("hosted-site-event-markers"),
-    excludeRoutineQuietAnswers: true,
+    excludeRoutineQuietAnswers: !capabilities.has(ROUTINE_QUIET_ANSWERS_CAPABILITY),
+    excludeSettingLinks: !capabilities.has(SETTING_LINK_MARKERS_CAPABILITY),
   };
 }
 
 /**
- * Whether a client can show a message of this kind. No client can collapse a quiet routine answer
- * into its run, so a quiet answer goes to none: it would show as a new answer to every client. A new
- * agent's setup message (`agent-welcome-v1`) is for the agent only, so it goes to none either.
+ * Whether a client can show a message of this kind. A quiet routine answer goes only to a client that
+ * folds it into its run (`routine-quiet-answers-v1`): another client would show it as a new answer,
+ * and before it, a user on a server could never read a report that the agent ended quiet (#11174). A
+ * new agent's setup message (`agent-welcome-v1`) and the continuation of a channel request are for the
+ * agent only, so they go to none.
  */
-function markerSupported(itemType: string | undefined, capabilities: ReadonlySet<string>): boolean {
-  if (itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE || itemType === AGENT_WELCOME_ITEM_TYPE) return false;
+export function markerSupported(itemType: string | undefined, capabilities: ReadonlySet<string>): boolean {
+  if (itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE) return capabilities.has(ROUTINE_QUIET_ANSWERS_CAPABILITY);
+  if (itemType === AGENT_WELCOME_ITEM_TYPE || itemType === CHANNEL_RESUME_ITEM_TYPE) return false;
   if (itemType?.startsWith(ROUTINE_EVENT_ITEM_TYPE_PREFIX)) return capabilities.has("routine-event-markers");
   // Paged history drops suggestions with routine events, so live events drop them the same way.
   if (itemType?.startsWith(MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX)) return capabilities.has("routine-event-markers");
@@ -217,6 +252,7 @@ function markerSupported(itemType: string | undefined, capabilities: ReadonlySet
   if (itemType?.startsWith(HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX)) {
     return capabilities.has("hosted-site-event-markers");
   }
+  if (itemType?.startsWith(SETTING_LINK_ITEM_TYPE_PREFIX)) return capabilities.has(SETTING_LINK_MARKERS_CAPABILITY);
   return true;
 }
 
@@ -533,6 +569,8 @@ export function agentCreate(value: DynamicRecord): CreateAgentInput {
     ...(value.provider === undefined ? {} : { provider: value.provider }),
     ...(value.model === undefined ? {} : { model: value.model }),
     ...(value.reasoningEffort === undefined ? {} : { reasoningEffort: value.reasoningEffort }),
+    // `agent-create-operation-v1`: the protocol 9 codec already checked it. A released client does not send it.
+    ...(isString(value.operationId) ? { operationId: value.operationId } : {}),
   };
 }
 

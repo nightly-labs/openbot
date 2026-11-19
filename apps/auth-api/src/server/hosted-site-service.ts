@@ -40,6 +40,7 @@ import {
   type HostedSiteScope,
   type HostedSiteSlots,
   hostedSiteSlots,
+  idleNewSiteUploadsSql,
   resolveHostedSiteBucket,
   scopeServerId,
 } from "./hosted-site-server";
@@ -115,7 +116,9 @@ export class HostedSiteService {
           .bind(userId, now)
           .first<{ count: number }>(),
       );
-      if ((concurrent?.count ?? 0) >= HOSTED_SITE_LIMITS.concurrentUploads) {
+      const uploads = concurrent?.count ?? 0;
+      // A replace of a full account can free the idle replaces of its site, after the site checks below.
+      if (uploads >= HOSTED_SITE_LIMITS.concurrentUploads && !request.siteId) {
         return yield* new HostedSiteInputError(
           429,
           "upload_session_limit",
@@ -130,6 +133,15 @@ export class HostedSiteService {
         const site = yield* this.requireOwnedSiteEffect(userId, request.siteId);
         yield* siteDecode(() => requireSiteInBucket(site, serverId));
         if (!site.expires_at || site.expires_at <= now) return yield* inactiveSiteError("expired");
+        // Only a full account frees idle replaces of this site: with a free slot, they stay for a retry.
+        const needed = uploads - HOSTED_SITE_LIMITS.concurrentUploads + 1;
+        if (needed > 0 && (yield* this.abandonSupersededUploadsEffect(userId, site.id, now, needed)) < needed) {
+          return yield* new HostedSiteInputError(
+            429,
+            "upload_session_limit",
+            "Finish or wait for an existing upload first.",
+          );
+        }
         const spaFallback = request.spaFallback ?? site.spa_fallback === 1;
         const operation1 = yield* Effect.gen({ self: this }, function* () {
           return yield* siteCall(() =>
@@ -198,6 +210,9 @@ export class HostedSiteService {
 
       yield* this.enforceCreationRateEffect(userId, now);
       const bucket = yield* resolveHostedSiteBucket(database, userId, serverId, now);
+      if (!(yield* this.bucketHasRoomEffect(userId, bucket, null, now))) {
+        yield* this.abandonIdleNewSiteUploadsEffect(userId, bucket, now);
+      }
       const room = bucketHasRoomSql(bucket, userId, null, now);
       const siteId = crypto.randomUUID();
       const hostname = yield* this.uniqueHostnameEffect(`${request.title} ${request.description}`);
@@ -1645,6 +1660,93 @@ export class HostedSiteService {
           .bind(userId)
           .run(),
       );
+    },
+  );
+
+  /**
+   * A failed upload keeps its slot until it expires. Two replaces of one site cannot both publish: the first
+   * activation makes the other one stale. So a new replace of a full account frees up to `count` older replaces of
+   * the same site that no file upload uses now, the oldest first. The first upload of a new site has no base
+   * deployment and stays. Returns the number of slots freed.
+   */
+  private readonly abandonSupersededUploadsEffect = Effect.fn("HostedSites.abandonSupersededUploads")(
+    { self: this },
+    function* (
+      userId: string,
+      siteId: string,
+      now: number,
+      count: number,
+    ): Effect.fn.Return<number, HostedSiteFailure, HostedSiteStorage> {
+      const { database } = yield* HostedSiteStorage;
+
+      const idle = yield* siteCall(() =>
+        database
+          .prepare(
+            `SELECT id FROM site_deployments
+         WHERE user_id = ? AND site_id = ? AND status = 'uploading' AND upload_expires_at > ? AND in_flight_uploads = 0
+           AND base_deployment_id IS NOT NULL
+         ORDER BY created_at LIMIT ?`,
+          )
+          .bind(userId, siteId, now, count)
+          .all<{ id: string }>(),
+      );
+      let freed = 0;
+      for (const upload of idle.results) {
+        const claim = yield* siteCall(() =>
+          database
+            .prepare(
+              `UPDATE site_deployments SET status = 'abandoned'
+           WHERE id = ? AND user_id = ? AND status = 'uploading' AND in_flight_uploads = 0`,
+            )
+            .bind(upload.id, userId)
+            .run(),
+        );
+        if (claim.meta.changes !== 1) continue;
+        freed += 1;
+        yield* this.deleteDeploymentEffect(siteId, upload.id);
+      }
+      return freed;
+    },
+  );
+
+  /**
+   * A new site whose first upload failed or stopped keeps its slot until the upload expires, and the list does not
+   * show it. So a new site of a full bucket stops the oldest idle first upload of a new site in that bucket. A new
+   * site needs one slot. A later file upload of the stopped session gets `upload_expired`.
+   */
+  private readonly abandonIdleNewSiteUploadsEffect = Effect.fn("HostedSites.abandonIdleNewSiteUploads")(
+    { self: this },
+    function* (
+      userId: string,
+      siteBucket: HostedSiteBucket,
+      now: number,
+    ): Effect.fn.Return<void, HostedSiteFailure, HostedSiteStorage> {
+      const { database } = yield* HostedSiteStorage;
+
+      const idleBefore = now - HOSTED_SITE_LIMITS.idleUploadMs;
+      const idle = idleNewSiteUploadsSql(siteBucket, userId, now, idleBefore, 1);
+      const uploads = yield* siteCall(() =>
+        database
+          .prepare(idle.sql)
+          .bind(...idle.binds)
+          .all<{ id: string; site_id: string }>(),
+      );
+      for (const upload of uploads.results) {
+        // A file upload that started or finished after the select keeps the session.
+        const claim = yield* siteCall(() =>
+          database
+            .prepare(
+              `UPDATE site_deployments SET status = 'abandoned'
+           WHERE id = ? AND user_id = ? AND status = 'uploading' AND in_flight_uploads = 0
+             AND NOT EXISTS (
+               SELECT 1 FROM site_upload_files f WHERE f.deployment_id = site_deployments.id AND f.uploaded_at > ?
+             )`,
+            )
+            .bind(upload.id, userId, idleBefore)
+            .run(),
+        );
+        if (claim.meta.changes === 1) yield* this.deleteDeploymentEffect(upload.site_id, upload.id);
+      }
     },
   );
 

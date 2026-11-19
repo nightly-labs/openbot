@@ -116,6 +116,8 @@ export const messages = defineMessages("marketplace", {
   "marketplace.app.partialTitle": "{name} is not complete",
   "marketplace.app.partialDescription": "Some of its apps or skills are not installed. Reconnect installs them.",
   "marketplace.app.notConnected": "Not connected",
+  // The status of a messaging app whose places are all paused: agents cannot use it until Resume.
+  "marketplace.app.paused": "Paused",
   "marketplace.app.custom": "MCP server",
   "marketplace.app.githubTagline": "Repositories, issues and pull requests",
   "marketplace.app.onePasswordTagline": "Sign in to sites with logins you share",
@@ -141,6 +143,11 @@ export const messages = defineMessages("marketplace", {
   "marketplace.app.remove.action": "Remove",
   "marketplace.app.remove.confirmTitle": "Remove {name}?",
   "marketplace.app.remove.keep": "Keep",
+  // Connect meets a server with the app's server name that is not the app. {server} is that name, {name} the app.
+  "marketplace.app.replace.title": "Replace {server}?",
+  "marketplace.app.replace.description":
+    "You already have a server named {server}, but it is not {name}. Replace it with {name}? Its address and saved keys are deleted.",
+  "marketplace.app.replace.action": "Replace",
   // The plugin page section with one row for each app, and the row text by how the app connects.
   // {name} is the app name, {field} the label of its key field, {host} "this computer" or a server name.
   "marketplace.app.connection": "Connection",
@@ -161,6 +168,7 @@ export const messages = defineMessages("marketplace", {
     "{host} runs an older OpenBot version that cannot connect apps. Update OpenBot on {host}, or ask its owner to update it.",
   "marketplace.app.blocked.member":
     "Only an owner or admin of {host} can connect apps there. Ask one of them to connect {name}, or to update OpenBot on {host} so that members can connect apps.",
+  "marketplace.app.blocked.mac": "{name} works only on a Mac that runs OpenBot.",
   "marketplace.app.connectAgain": "Connect again",
   "marketplace.app.automation.askOnInstall": "Ask macOS for access at install",
   "marketplace.app.automation.title": "Access to Apple apps",
@@ -410,8 +418,7 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.obsidian.prompt.recall": "What do my notes say about the decisions on this project?",
   "marketplace.plugin.obsidian.prompt.save": "Save this decision as a new note in my vault.",
   "marketplace.plugin.obsidian.prompt.log": "Add a summary of today's work to my Work log note.",
-  "marketplace.plugin.obsidian.hint.apiKey":
-    'In Obsidian, open Settings > Local REST API. Copy the API key and turn on "Enable non-encrypted (HTTP) server".',
+  "marketplace.plugin.obsidian.hint.apiKey": "In Obsidian, open Settings > Local REST API and copy the API key.",
   "marketplace.plugin.resend.tagline": "Transactional email",
   "marketplace.plugin.resend.description":
     "Resend lets agents send transactional email and check delivery through one API. An API key from the Resend dashboard is passed to the local server as one environment variable.",
@@ -421,15 +428,16 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.resend.prompt.template": "Draft a password-reset email for the new flow.",
   "marketplace.plugin.omnisend.tagline": "Email and SMS marketing",
   "marketplace.plugin.omnisend.description":
-    "Omnisend lets agents read campaign and form reports, find contacts and segments, and create and edit campaigns, automations, email templates, forms and products. Each user signs in to their own Omnisend account through the browser and selects the access level on the consent screen. With write access, agents can also send campaigns and delete data. Select read-only access when agents only need reports.",
+    "Omnisend lets agents read campaign and form reports, find contacts and segments, and create and edit campaigns, automations, email templates, forms and products. Each user connects with an API key from their own Omnisend account. Agents can do what the key allows, which can include sending campaigns and deleting data.",
   "marketplace.plugin.omnisend.app":
-    "Campaigns, automations, contacts, segments, forms and reports, over Omnisend's MCP server with browser sign-in.",
+    "Campaigns, automations, contacts, segments, forms and reports, over Omnisend's MCP server with an API key.",
   "marketplace.plugin.omnisend.prompt.lastCampaign":
     "How did last week's campaigns perform compared to the week before?",
   "marketplace.plugin.omnisend.prompt.segment":
     "How many contacts are in the VIP segment, and how did it change this month?",
   "marketplace.plugin.omnisend.prompt.draftCampaign": "Draft a campaign for the new collection, but do not send it.",
   "marketplace.plugin.postiz.tagline": "Social media scheduling",
+  "marketplace.plugin.omnisend.hint.apiKey": "In Omnisend, open Store settings > API keys and create a key.",
   "marketplace.plugin.postiz.description":
     "Postiz lets agents list your social media channels, and draft, schedule and publish posts on more than 30 networks, such as X, LinkedIn, Instagram and TikTok. Agents can also upload media and make AI images and videos. Sign in to your Postiz account through the browser, or paste the API key from Settings › Developers in Postiz. All Postiz cloud plans include API access. Agents can publish a post immediately, so review each post before you approve it.",
   "marketplace.plugin.postiz.app":

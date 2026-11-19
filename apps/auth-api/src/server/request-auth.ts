@@ -1,4 +1,5 @@
 import { env, waitUntil } from "cloudflare:workers";
+import { FEEDBACK_REPOSITORY } from "@openbot/contracts/feedback";
 import { HOSTING_DEVELOPER_KEY_HEADER } from "@openbot/contracts/hosted-servers";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
@@ -22,6 +23,7 @@ import {
   FEEDBACK_DAILY_LIMIT,
   UNCOUNT_FEEDBACK,
 } from "./feedback-daily-counts";
+import { feedbackOwner } from "./feedback-owner";
 import { GitHubInstallationTokens, GitHubInstallationTokensError } from "./github-installation-tokens";
 import { createHostedBilling } from "./hosted-billing";
 import { type HostedServerService, HostedServerServiceError } from "./hosted-server-service";
@@ -223,6 +225,42 @@ export const enforceFeedbackSearchRateLimit = Effect.fn("GitHub.enforceFeedbackS
   });
   if (!result.success) {
     return yield* new GitHubInstallationTokensError(429, "rate_limited", "Too many searches. Try again later.");
+  }
+});
+
+/** The marks that prove which reports one account sent. See `feedbackOwner`. */
+export function requestFeedbackOwner(userId: string) {
+  const privateKey = requireWorkerBindings(env).GITHUB_APP_PRIVATE_KEY?.trim();
+  if (!privateKey)
+    return Effect.fail(
+      new GitHubInstallationTokensError(503, "github_app_unavailable", "The OpenBot GitHub App is not configured."),
+    );
+  return feedbackOwner(privateKey, userId);
+}
+
+/** The private repository for withdrawn feedback issues, or null when this Worker has none. */
+export function requestFeedbackWithdrawnRepository(): string | null {
+  const repository = requireWorkerBindings(env).FEEDBACK_WITHDRAWN_REPOSITORY?.trim();
+  if (!repository || !/^[\w.-]+\/[\w.-]+$/u.test(repository)) return null;
+  // The installation token for a move covers repositories of one owner only.
+  const owner = (name: string) => name.split("/")[0]?.toLowerCase();
+  return owner(repository) === owner(FEEDBACK_REPOSITORY) ? repository : null;
+}
+
+/** A few withdrawals for each account and minute. Each one reads GitHub with the one app installation. */
+export const enforceFeedbackWithdrawRateLimit = Effect.fn("GitHub.enforceFeedbackWithdrawRateLimit")(function* (
+  userId: string,
+) {
+  const limiter = requireWorkerBindings(env).FEEDBACK_RATE_LIMITER;
+  const unavailable = () =>
+    new GitHubInstallationTokensError(503, "feedback_unavailable", "Feedback is not available.");
+  if (!limiter) return yield* unavailable();
+  const result = yield* Effect.tryPromise({
+    try: () => limiter.limit({ key: `withdraw:${userId}` }),
+    catch: unavailable,
+  });
+  if (!result.success) {
+    return yield* new GitHubInstallationTokensError(429, "rate_limited", "Too many requests. Try again later.");
   }
 });
 

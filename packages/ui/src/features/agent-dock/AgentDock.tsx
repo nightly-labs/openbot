@@ -39,6 +39,19 @@ import type { AvatarMood } from "../../bloub-avatar";
 import { createMenuSearch } from "../../components/createMenuSearch";
 import { createScrollFades } from "../../components/createScrollFades";
 import type { ComposerAgent } from "../../data";
+import {
+  createMotion,
+  GooFilter,
+  LIQUID_CLOSE,
+  LIQUID_OPEN,
+  LIQUID_PAD,
+  SLIDE_END,
+  SNAPPY,
+  SOFT,
+  type Spring,
+  stagedCurve,
+  WOBBLY,
+} from "../../liquid";
 import { useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
 import { AgentAvatar } from "../agents/AgentAvatar";
@@ -48,14 +61,15 @@ import { SidebarAgentIndicator, SidebarPinnedAvatar } from "../sidebar/SidebarAg
 import type { SidebarAgentState } from "../sidebar/sidebar-types";
 import {
   AgentDockChat,
+  type AgentDockChatAnswers,
   type AgentDockChatModel,
   type AgentDockChatVoice,
   type AgentDockPendingMessage,
+  pendingMessageDelivered,
 } from "./AgentDockChat";
 import { AgentDockShelf, type AgentDockShelfResult } from "./AgentDockShelf";
 import {
   addCenterY,
-  createMotion,
   DOCK_LEFT,
   DOCK_PAD,
   DOCK_WIDTH,
@@ -65,24 +79,18 @@ import {
   dockPath,
   HANDLE_STROKE,
   LIQUID_HEIGHT,
-  LIQUID_PAD,
   LIQUID_WIDTH,
   MAX_STRETCH,
+  neckCenterInBand,
   neckPath,
-  PANEL_CLOSE,
   PANEL_GAP,
   PANEL_HEIGHT,
-  PANEL_OPEN,
   PANEL_RADIUS,
   PANEL_WIDTH,
   SEAT,
   SEAT_CENTER_X,
   SEAT_PITCH,
   SEAT_VIEW_INSET,
-  SLIDE_END,
-  SNAPPY,
-  SOFT,
-  type Spring,
   STAGE_WIDTH,
   STRETCH_FOLLOW,
   STRETCH_PER_SPEED,
@@ -90,13 +98,11 @@ import {
   seatsHeight,
   seatView,
   seatViewTop,
-  stagedCurve,
   TUCK,
   TUCK_DISTANCE,
-  WOBBLY,
 } from "./agent-dock-motion";
 
-export type { AgentDockChatModel } from "./AgentDockChat";
+export type { AgentDockChatAnswers, AgentDockChatModel } from "./AgentDockChat";
 export type { AgentDockShelfResult } from "./AgentDockShelf";
 
 /** A seat of the dock: an agent or a channel. The ids of the two kinds can be equal. */
@@ -227,6 +233,11 @@ export interface AgentDockProps {
   agents: ComposerAgent[];
   onSelectAgent?: ((agentId: string) => void) | undefined;
   onOpenLink?: ((url: string) => void) | undefined;
+  /**
+   * How the chats answer the requests that the agents wait for. Without it, a chat shows the wait bar,
+   * which opens the main window.
+   */
+  answers?: AgentDockChatAnswers | undefined;
   /** Opens the dock settings. The add menu shows the item only when it is set. */
   onOpenSettings?: (() => void) | undefined;
   /** Turns the dock off. The right-click menus of the dock show the item only when it is set. */
@@ -236,8 +247,14 @@ export interface AgentDockProps {
    * drags a seat to a new place. When the promise fails, the seats go back to the order of `seats`.
    */
   onMove?: ((seat: AgentDockSeatRef, before: AgentDockSeatRef | null) => Promise<void> | void) | undefined;
-  /** A change closes the chat, for example when the dock window loses the focus. */
+  /** A change closes the chat, for example when the dock on another display opens a chat. */
   closeRequest?: number | undefined;
+  /**
+   * A change closes the chat when the user did not pin it, for example when the dock window loses the
+   * focus. When it is set, the chat header shows "Keep open", so a clipboard overlay or another window
+   * on top does not close the chat.
+   */
+  blurRequest?: number | undefined;
   /** The window edge that holds the dock. The dock and the panel are mirrored on the left edge. */
   side?: "left" | "right" | undefined;
   /** The dock slides into the window edge. */
@@ -269,6 +286,11 @@ interface DockState {
   sending: Record<string, boolean>;
   /** Raised by one to put the caret in the composer. */
   focus: number;
+  /**
+   * The user keeps the panel open when the dock window loses the focus. The pin belongs to the panel, so
+   * it stays when the user opens the chat of another seat; a close clears it.
+   */
+  pinned: boolean;
 }
 
 let pendingKey = 0;
@@ -304,6 +326,7 @@ export function AgentDock(props: AgentDockProps) {
     errors: {},
     sending: {},
     focus: 0,
+    pinned: false,
   });
   /* The last props of each seat, so a seat that leaves keeps its face while it shrinks away. */
   const seatProps = createMemo((previous?: Map<string, AgentDockSeat>) => {
@@ -358,7 +381,7 @@ export function AgentDock(props: AgentDockProps) {
    */
   const listH = motion.spring(SEAT_VIEW_INSET + seatsHeight(initialCount), SOFT);
   /** Open progress: 0 is the seat, 1 is the full panel. Width leads height for a liquid stretch. */
-  const panelOpen = motion.spring(0, PANEL_OPEN);
+  const panelOpen = motion.spring(0, LIQUID_OPEN);
   // 0 while the panel opens, 1 while it closes: a close goes back as a drop, not as a tall bar.
   const closing = motion.spring(0, SOFT);
   const neckY = motion.spring(PANEL_HEIGHT / 2, WOBBLY);
@@ -514,7 +537,8 @@ export function AgentDock(props: AgentDockProps) {
     panelContent.style.transform = `scale(${0.96 + 0.04 * reveal})`;
 
     // While the blob is over the dock, it joins the dock itself; the neck grows once it is clear.
-    neck.setAttribute("d", neckPath(neckY.value, Math.max(0, Math.min(neckSize.value, free))));
+    const neckOpen = Math.max(0, Math.min(neckSize.value, free));
+    neck.setAttribute("d", neckPath(neckCenterInBand(neckY.value, neckOpen, height, pull), neckOpen));
 
     const r = Math.max(0, dropR.value);
     drop.style.transform = `translate(${dropX.value}px, ${dropY.value}px) translate(-50%, -50%) scale(${r / (SEAT / 2)})`;
@@ -732,7 +756,7 @@ export function AgentDock(props: AgentDockProps) {
       // From rest the path changes at once; during a close it blends, so the shape does not jump.
       if (panelOpen.value < 0.02) closing.jump(0);
       else closing.to(0);
-      panelOpen.to(1, undefined, PANEL_OPEN);
+      panelOpen.to(1, undefined, LIQUID_OPEN);
     }
     motion.kick();
   }
@@ -815,10 +839,11 @@ export function AgentDock(props: AgentDockProps) {
     if (panelOpen.value > 0.98) closing.jump(1);
     else closing.to(1);
     // The neck holds the blob until it is back in the dock, so no gap opens on the way in.
-    panelOpen.to(0, () => neckSize.jump(0), PANEL_CLOSE);
+    panelOpen.to(0, () => neckSize.jump(0), LIQUID_CLOSE);
     motion.kick();
     setState((draft) => {
       draft.open = null;
+      draft.pinned = false;
     });
     props.onOpenChange?.(null);
     if (returnFocus) seatElements.get(id)?.querySelector("button")?.focus({ preventScroll: true });
@@ -1098,6 +1123,30 @@ export function AgentDock(props: AgentDockProps) {
 
   const shownSeat = () => (state.shown ? seatFor(state.shown) : undefined);
 
+  /* A message that the host stored leaves `pending` once its host copy is in the open chat. The chat
+     has only the newest messages, so a copy that newer messages pushed out showed the message again
+     at the bottom (#11783). A closed chat shows no pending message, and the dock window gets no
+     messages for it, so its stored messages leave at once. */
+  createEffect(
+    () =>
+      Object.entries(state.pending).flatMap(([id, messages]) => {
+        const stored = messages.filter((message) => message.messageId !== null);
+        if (stored.length === 0) return [];
+        if (id !== state.open) return stored.map((message) => message.key);
+        const loaded = props.chat(refOfKey(id)).messages;
+        return stored.filter((message) => pendingMessageDelivered(message, loaded)).map((message) => message.key);
+      }),
+    (keys) => {
+      if (keys.length === 0) return;
+      const settled = new Set(keys);
+      setState((draft) => {
+        for (const [id, messages] of Object.entries(draft.pending))
+          if (messages.some((message) => settled.has(message.key)))
+            draft.pending[id] = messages.filter((message) => !settled.has(message.key));
+      });
+    },
+  );
+
   /** Escape in the chat or on a seat closes the chat. A menu that is open handles Escape first. */
   const closeOnEscape = (event: KeyboardEvent) => {
     if (event.key !== "Escape" || !state.open || event.defaultPrevented) return;
@@ -1109,6 +1158,14 @@ export function AgentDock(props: AgentDockProps) {
     () => props.closeRequest,
     (request, previous) => {
       if (request !== previous && previous !== undefined) untrack(() => closeChat(false));
+    },
+  );
+
+  createEffect(
+    () => props.blurRequest,
+    (request, previous) => {
+      if (request !== previous && previous !== undefined && !untrack(() => state.pinned))
+        untrack(() => closeChat(false));
     },
   );
 
@@ -1156,12 +1213,7 @@ export function AgentDock(props: AgentDockProps) {
       }}
     >
       <AmbientMotion when={ambientMotion()}>
-        <svg class="agent-dock-filter" aria-hidden="true" width="0" height="0">
-          <filter id={filterId} x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="9" result="blur" />
-            <feColorMatrix in="blur" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 24 -11" />
-          </filter>
-        </svg>
+        <GooFilter id={filterId} class="agent-dock-filter" />
 
         {/* The liquid: the dock, the neck, the panel and the drop under the goo filter. */}
         <div
@@ -1390,7 +1442,9 @@ export function AgentDock(props: AgentDockProps) {
                         onScroll={addFades.measure}
                       >
                         <Show when={addEmpty()}>
-                          <DropdownMenu.Item disabled>{addEmptyText()}</DropdownMenu.Item>
+                          <DropdownMenu.Item class="agent-dock-add-empty" disabled>
+                            {addEmptyText()}
+                          </DropdownMenu.Item>
                         </Show>
                         <For each={addMatches()}>
                           {(agent) => (
@@ -1491,6 +1545,15 @@ export function AgentDock(props: AgentDockProps) {
                     }
                     onSend={() => void send()}
                     onClose={() => closeChat()}
+                    pinned={state.pinned}
+                    onPinChange={
+                      props.blurRequest === undefined
+                        ? undefined
+                        : (pinned) =>
+                            setState((draft) => {
+                              draft.pinned = pinned;
+                            })
+                    }
                     onRemove={() => props.onRemove(refOfKey(id))}
                     onAdd={() => props.onAdd(refOfKey(id))}
                     onOpenInMain={() => {
@@ -1505,6 +1568,7 @@ export function AgentDock(props: AgentDockProps) {
                       props.onSelectAgent?.(agentId);
                     }}
                     onOpenLink={(url) => props.onOpenLink?.(url)}
+                    answers={props.answers}
                   />
                 )}
               </Show>

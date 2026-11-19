@@ -3,7 +3,9 @@ import { DEFAULT_AGENT_ACCESS } from "@openbot/contracts/ipc";
 import { ConfirmDialog } from "@openbot/ui";
 import { AgentFolderDropOverlay, createAgentFolders } from "@openbot/ui/features/conversation/AgentFolders";
 import { MessageSelectionActions } from "@openbot/ui/features/conversation/SelectionActions";
+import { CoveredVoiceRecording } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
 import { useText } from "@openbot/ui/text";
+import { Portal } from "@solidjs/web";
 import { createEffect, Show } from "solid-js";
 import { deviceQuoteShortcut } from "../../send-shortcut-preference";
 import { agentFolderCalls } from "./agent-folders-port";
@@ -25,12 +27,10 @@ export function ConversationView(props: ConversationProps) {
   const scope = createConversationViewScope(props);
   const {
     agentReady,
-    browserPanelWidth,
     browserSidebarOpen,
     dropActive,
     filePreviewOpen,
     activeRightPanel,
-    settingsOpen,
     sidePanel,
     sidePanelOpen,
     handleChatSearchShortcut,
@@ -38,20 +38,28 @@ export function ConversationView(props: ConversationProps) {
     quoteSelection,
     setConversationPanelElement,
     setDropActive,
-    settingsPanelWidth,
+    sidePanelWidth,
     submitting,
     sideThreadOpen,
     fastModeConfirmationOpen,
     confirmFastMode,
     cancelFastModeConfirmation,
+    voicePhase,
+    voiceLevels,
+    voiceElapsedSeconds,
+    stopVoiceRecording,
+    cancelVoiceRecording,
   } = scope;
   const { t } = useText();
-  /** Each view of the side panel has the width of the browser panel, except Agent settings, which has its own. */
+  /**
+   * Each view of the docked side panel makes the same room at the end of the chat, so a change to another tab
+   * does not move the chat.
+   */
   const sidePanelUsesBrowserWidth = () => {
     const mode = activeRightPanel();
     if (mode === "browser") return browserSidebarOpen();
     if (mode === "file-preview") return filePreviewOpen();
-    return sidePanelOpen() && mode !== "settings";
+    return sidePanelOpen();
   };
   const folderCalls = agentFolderCalls();
   /**
@@ -95,7 +103,7 @@ export function ConversationView(props: ConversationProps) {
             "side-panel-maximized": sidePanelOpen() && sidePanel().maximized,
           },
         ]}
-        style={`--settings-panel-width: ${settingsPanelWidth()}px; --browser-panel-width: ${browserPanelWidth()}px; --side-panel-width: ${settingsOpen() ? settingsPanelWidth() : browserPanelWidth()}px`}
+        style={`--settings-panel-width: ${sidePanelWidth()}px; --browser-panel-width: ${sidePanelWidth()}px; --side-panel-width: ${sidePanelWidth()}px`}
         onDragEnter={(event) => {
           if (!props.globalOverlayOpen && event.dataTransfer?.types.includes("Files")) setDropActive(true);
         }}
@@ -143,6 +151,17 @@ export function ConversationView(props: ConversationProps) {
         </Show>
 
         <ConversationPanels onOpenUsage={props.onOpenUsage} />
+        {/* A page such as Usage covers the chat, and its recording goes on: the bar stays in sight over the page. */}
+        <Show when={props.workspaceCovered && voicePhase() === "recording"}>
+          <Portal>
+            <CoveredVoiceRecording
+              levels={voiceLevels()}
+              elapsedSeconds={voiceElapsedSeconds()}
+              onCancel={cancelVoiceRecording}
+              onFinish={stopVoiceRecording}
+            />
+          </Portal>
+        </Show>
         <ConfirmDialog
           open={fastModeConfirmationOpen()}
           tone="default"

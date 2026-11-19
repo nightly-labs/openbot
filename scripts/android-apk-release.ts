@@ -83,18 +83,23 @@ async function apkIdentity(apk: string): Promise<ApkIdentity> {
 }
 
 /**
- * The SHA-256 of the certificate that signed the APK. `apksigner verify` stops when the signature
+ * The SHA-256 of each certificate that signed the APK. `apksigner verify` stops when the signature
  * is not valid. Google Play also adds a source stamp, which is not the app signing key.
+ *
+ * `apksigner` can print one certificate more than one time: a line for each signature scheme, or
+ * for each range of Android versions. Thus the same value on two lines is one certificate. Two
+ * values are the old and the new key of an app whose signing key Google Play changed.
  */
-async function signingCertificate(apk: string): Promise<string> {
+async function signingCertificates(apk: string): Promise<string[]> {
   const { stdout } = await run(buildTool("apksigner"), ["verify", "--print-certs", apk]);
-  const digests = stdout.split("\n").flatMap((line) => {
-    const digest = /^(?!Source Stamp).*certificate SHA-256 digest: ([0-9a-f]{64})\s*$/u.exec(line)?.[1];
-    return digest ? [digest] : [];
-  });
-  const [digest] = digests;
-  if (!digest || digests.length !== 1) throw new Error("The APK must have one signing certificate.");
-  return digest;
+  const lines = stdout
+    .split("\n")
+    .filter((line) => line.includes("certificate SHA-256 digest: ") && !line.startsWith("Source Stamp"));
+  // In the job log, so that a refused file shows what `apksigner` gave. A certificate is public.
+  for (const line of lines) out(line);
+  const digests = lines.flatMap((line) => /([0-9a-f]{64})\s*$/iu.exec(line)?.[1]?.toLowerCase() ?? []);
+  if (digests.length === 0) throw new Error(`apksigner gave no signing certificate:\n${stdout.trim()}`);
+  return [...new Set(digests)];
 }
 
 function fileSha256(path: string): Promise<string> {
@@ -182,7 +187,7 @@ async function commandStage(args: readonly string[]) {
   }
   const version = identity.versionName;
   const release = androidApkRelease(version);
-  const certificate = await signingCertificate(apk);
+  const certificate = (await signingCertificates(apk)).join("`, `");
   const sha256 = await fileSha256(apk);
   const lines = [
     `## Android APK ${version} (build ${versionCode})`,

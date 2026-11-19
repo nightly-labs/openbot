@@ -97,6 +97,7 @@ export const messages = {
   "marketplace.app.partialTitle": "{name} 未完成安装",
   "marketplace.app.partialDescription": "部分应用或技能尚未安装。重新连接即可安装。",
   "marketplace.app.notConnected": "未连接",
+  "marketplace.app.paused": "已暂停",
   "marketplace.app.custom": "MCP 服务器",
   "marketplace.app.githubTagline": "仓库、Issue 与拉取请求",
   "marketplace.app.onePasswordTagline": "用你共享的登录信息登录网站",
@@ -121,6 +122,10 @@ export const messages = {
   "marketplace.app.remove.action": "移除",
   "marketplace.app.remove.confirmTitle": "移除 {name}？",
   "marketplace.app.remove.keep": "保留",
+  "marketplace.app.replace.title": "替换 {server}?",
+  "marketplace.app.replace.description":
+    "你已有一个名为 {server} 的服务器,但它不是 {name}。要用 {name} 替换它吗?它的地址和已保存的密钥将被删除。",
+  "marketplace.app.replace.action": "替换",
   "marketplace.app.connection": "连接",
   "marketplace.app.access.use": "可使用",
   "marketplace.app.access.noAgents": "无助手",
@@ -138,6 +143,7 @@ export const messages = {
     "{host} 运行的 OpenBot 版本较旧，无法连接应用。请更新 {host} 上的 OpenBot，或请其所有者更新。",
   "marketplace.app.blocked.member":
     "只有 {host} 的所有者或管理员可以在那里连接应用。请他们连接 {name}，或更新 {host} 上的 OpenBot，以便成员也能连接应用。",
+  "marketplace.app.blocked.mac": "{name} 仅在运行 OpenBot 的 Mac 上可用。",
   "marketplace.app.connectAgain": "再次连接",
   "marketplace.app.automation.askOnInstall": "安装时向 macOS 请求访问权限",
   "marketplace.app.automation.title": "Apple 应用访问权限",
@@ -353,8 +359,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.recall": "我的笔记里关于这个项目的决定是怎么写的？",
   "marketplace.plugin.obsidian.prompt.save": "把这个决定作为新笔记保存到我的仓库。",
   "marketplace.plugin.obsidian.prompt.log": "把今天工作的总结添加到我的“工作日志”笔记中。",
-  "marketplace.plugin.obsidian.hint.apiKey":
-    '在 Obsidian 中打开 Settings > Local REST API。复制 API 密钥并开启 "Enable non-encrypted (HTTP) server"。',
+  "marketplace.plugin.obsidian.hint.apiKey": "在 Obsidian 中打开 Settings > Local REST API，然后复制 API 密钥。",
   "marketplace.plugin.resend.tagline": "事务性邮件",
   "marketplace.plugin.resend.description":
     "Resend 让助手通过一个 API 发送事务性邮件并检查投递情况。把 Resend 控制台中的 API 密钥作为一个环境变量传给本地服务器即可。",
@@ -364,13 +369,14 @@ export const messages = {
   "marketplace.plugin.resend.prompt.template": "为新流程起草一封密码重置邮件。",
   "marketplace.plugin.omnisend.tagline": "邮件和短信营销",
   "marketplace.plugin.omnisend.description":
-    "Omnisend 让智能体读取活动和表单报告，查找联系人和细分，并创建和编辑活动、自动化流程、邮件模板、表单和商品。每个用户在浏览器中登录自己的 Omnisend 账户，并在授权页面选择访问级别。拥有写入权限时，智能体还可以发送活动和删除数据。如果智能体只需要报告，请选择只读权限。",
+    "Omnisend 让智能体读取活动和表单报告，查找联系人和细分，并创建和编辑活动、自动化流程、邮件模板、表单和商品。每位用户使用自己 Omnisend 账号中的 API 密钥连接。智能体可以执行该密钥允许的操作，可能包括发送活动和删除数据。",
   "marketplace.plugin.omnisend.app":
-    "活动、自动化流程、联系人、细分、表单和报告，通过 Omnisend 的 MCP 服务器并在浏览器中登录。",
+    "活动、自动化流程、联系人、细分、表单和报告，通过 Omnisend 的 MCP 服务器并使用 API 密钥。",
   "marketplace.plugin.omnisend.prompt.lastCampaign": "上周的活动与前一周相比效果如何？",
   "marketplace.plugin.omnisend.prompt.segment": "VIP 细分中有多少联系人，本月有什么变化？",
   "marketplace.plugin.omnisend.prompt.draftCampaign": "为新系列起草一个活动，但不要发送。",
   "marketplace.plugin.postiz.tagline": "社交媒体排程",
+  "marketplace.plugin.omnisend.hint.apiKey": "在 Omnisend 中打开 Store settings > API keys，然后创建一个密钥。",
   "marketplace.plugin.postiz.description":
     "Postiz 让智能体列出你的社交媒体频道，并在 X、LinkedIn、Instagram、TikTok 等 30 多个平台上起草、排程和发布帖子。智能体还可以上传媒体，并用 AI 生成图片和视频。在浏览器中登录你的 Postiz 账户，或粘贴 Postiz 中 Settings › Developers 里的 API 密钥。所有 Postiz 云端方案都包含 API 访问权限。智能体可以立即发布帖子，因此请在批准前检查每个帖子。",
   "marketplace.plugin.postiz.app":

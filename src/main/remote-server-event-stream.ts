@@ -1,3 +1,4 @@
+import type { HostAppearanceEvent } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import type { HostRestartEvent } from "@openbot/contracts/team-protocol/host-update-v1";
 import type { LiveVoiceEvent } from "@openbot/contracts/team-protocol/live-voice-v1";
 import type { MachineAlertEvent } from "@openbot/contracts/team-protocol/machine-resources-v1";
@@ -38,7 +39,11 @@ import type {
 import { decodeRecord } from "@openbot/contracts/ipc-decoding";
 import { isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
-import { type TeamCurrentCapability, teamCapabilitiesForProtocol } from "@openbot/contracts/team-protocol/current";
+import {
+  supportsTeamCapability,
+  type TeamCurrentCapability,
+  teamCapabilitiesForProtocol,
+} from "@openbot/contracts/team-protocol/current";
 import { TEAM_PROTOCOL_V1_WEBSOCKET } from "@openbot/contracts/team-protocol/v1";
 import {
   encodeTeamProtocolV1CurrentClientEvent,
@@ -120,6 +125,7 @@ export interface RemoteEventStreamOptions {
   onDirectMessage: (serverId: string, event: DirectMessageRealtimeEvent) => void;
   onDirectTyping: (serverId: string, event: DirectTypingRealtimeEvent) => void;
   onHostRestart: (serverId: string, event: HostRestartEvent) => void;
+  onHostAppearance: (serverId: string, event: HostAppearanceEvent) => void;
   onMachineAlert: (serverId: string, event: MachineAlertEvent) => void;
   onLiveVoice: (serverId: string, event: LiveVoiceEvent) => void;
   onOffline: (serverId: string) => void;
@@ -140,6 +146,7 @@ export class RemoteEventStream {
   readonly #onDirectMessage: RemoteEventStreamOptions["onDirectMessage"];
   readonly #onDirectTyping: RemoteEventStreamOptions["onDirectTyping"];
   readonly #onHostRestart: RemoteEventStreamOptions["onHostRestart"];
+  readonly #onHostAppearance: RemoteEventStreamOptions["onHostAppearance"];
   readonly #onMachineAlert: RemoteEventStreamOptions["onMachineAlert"];
   readonly #onLiveVoice: RemoteEventStreamOptions["onLiveVoice"];
   readonly #onOffline: RemoteEventStreamOptions["onOffline"];
@@ -175,6 +182,7 @@ export class RemoteEventStream {
     this.#onDirectMessage = options.onDirectMessage;
     this.#onDirectTyping = options.onDirectTyping;
     this.#onHostRestart = options.onHostRestart;
+    this.#onHostAppearance = options.onHostAppearance;
     this.#onMachineAlert = options.onMachineAlert;
     this.#onLiveVoice = options.onLiveVoice;
     this.#onOffline = options.onOffline;
@@ -636,6 +644,8 @@ export class RemoteEventStream {
               this.#onDirectTyping(serverId, event);
             } else if (event.type === "host-restart") {
               this.#onHostRestart(serverId, event);
+            } else if (event.type === "host-appearance") {
+              this.#onHostAppearance(serverId, event);
             } else if (event.type === "machine-alert") {
               this.#onMachineAlert(serverId, event);
             } else if (event.type === "live-voice") {
@@ -782,13 +792,16 @@ export class RemoteEventStream {
   /** Whether the `agent-event-scope` message of this server names `capability`. */
   #advertises(serverId: string, capability: TeamCurrentCapability): boolean {
     if (!this.#appVersion) return false;
-    return teamCapabilitiesForProtocol(this.#connections.compatibilityFor(serverId)?.negotiatedProtocol).includes(
+    return supportsTeamCapability(
+      teamCapabilitiesForProtocol(this.#connections.compatibilityFor(serverId)?.negotiatedProtocol),
       capability,
     );
   }
 
+  /** Whether the host serves `capability`. A protocol 10 host's compatibility is already expanded. */
   #supportsCapability(serverId: string, capability: TeamCurrentCapability): boolean {
-    return this.#connections.compatibilityFor(serverId)?.capabilities.includes(capability) ?? false;
+    const capabilities = this.#connections.compatibilityFor(serverId)?.capabilities;
+    return capabilities ? supportsTeamCapability(capabilities, capability) : false;
   }
 
   // The pre-`appVersion` hosts predate capability negotiation, so the subprotocol they accepted is

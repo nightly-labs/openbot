@@ -101,9 +101,10 @@ export type WorkflowFieldValue = string | number | boolean;
  *   task starts.
  * - prompt: `text`.
  * - image: `media` (a `WorkflowMediaKind`, "image" when absent), `prompt`, `aspect` (one of
- *   `WORKFLOW_MEDIA_ASPECTS`), `model` (an id of `WORKFLOW_MEDIA_MODELS`), `account` (the id of the
+ *   `WORKFLOW_MEDIA_ASPECTS`, or `WORKFLOW_MEDIA_CUSTOM_ASPECT` for an image with `width` and `height`
+ *   in pixels; see `workflowMediaSize`), `model` (an id of `WORKFLOW_MEDIA_MODELS`), `account` (the id of the
  *   account of the model's provider that pays for the file; empty or absent is the provider's own
- *   sign-in, and Sunra ignores it), `resolution` (one of the
+ *   sign-in, and Sunra and Higgsfield ignore it), `resolution` (one of the
  *   model's resolutions, such as "720p" or "2K"), and for a video `duration` (seconds), `firstFrame`
  *   and `lastFrame` (the id of an image node that an
  *   `image` edge connects, whose picture is the first or the last frame) and `voice` (an id of
@@ -115,17 +116,47 @@ export type WorkflowFieldValue = string | number | boolean;
  */
 export type WorkflowFields = Record<string, WorkflowFieldValue>;
 
+/**
+ * The view-state fields that put a node in a group of the canvas: the id of the group, its name, and whether
+ * the group is collapsed. A run does not read them.
+ */
+export const WORKFLOW_GROUP_FIELDS = { id: "group", name: "groupName", folded: "groupFolded" } as const;
+
 export const WORKFLOW_MEDIA_KINDS = ["image", "video"] as const;
 export type WorkflowMediaKind = (typeof WORKFLOW_MEDIA_KINDS)[number];
 
-export const WORKFLOW_MEDIA_ASPECTS = ["1:1", "4:3", "16:9", "9:16"] as const;
+/**
+ * Every aspect ratio of a step. A host reads "4:5" and "5:4" only with `workflows-media-size-v1`; an
+ * older host reads them as the first aspect ratio of the model.
+ */
+export const WORKFLOW_MEDIA_ASPECTS = ["1:1", "4:3", "16:9", "9:16", "4:5", "5:4"] as const;
 export type WorkflowMediaAspect = (typeof WORKFLOW_MEDIA_ASPECTS)[number];
+/** The aspect ratios of a video model without `aspects`: no 4:5 or 5:4, which the video models do not make. */
+const WORKFLOW_VIDEO_ASPECTS: readonly WorkflowMediaAspect[] = ["1:1", "4:3", "16:9", "9:16"];
+/** The aspect ratios that a host without `workflows-media-size-v1` reads. */
+export const WORKFLOW_MEDIA_LEGACY_ASPECTS: readonly WorkflowMediaAspect[] = WORKFLOW_VIDEO_ASPECTS;
 
 /**
- * The service that makes the file: the subscription of an agent provider (`codex`, `grok`), or Sunra,
- * whose MCP server the user connects in Apps and whose credits pay for the file.
+ * The `aspect` of an image node with a size of its own in pixels, its `width` and `height`. The model
+ * makes the nearest aspect ratio, and the host crops and scales the picture to that size
+ * (`workflows-media-size-v1`). A video has no custom size.
  */
-export type WorkflowMediaProvider = "codex" | "grok" | "sunra";
+export const WORKFLOW_MEDIA_CUSTOM_ASPECT = "custom";
+/** The smallest and the largest side of a custom size, in pixels. */
+export const WORKFLOW_MEDIA_SIZE_MIN = 64;
+export const WORKFLOW_MEDIA_SIZE_MAX = 4096;
+
+/** The size in pixels of an image with a custom size. */
+export interface WorkflowMediaSize {
+  width: number;
+  height: number;
+}
+
+/**
+ * The service that makes the file: the subscription of an agent provider (`codex`, `grok`), or Sunra or
+ * Higgsfield, whose MCP server the user connects in Apps and whose credits pay for the file.
+ */
+export type WorkflowMediaProvider = "codex" | "grok" | "sunra" | "higgsfield";
 
 /** A model that makes the image or the video of an `image` node, with the subscription of its provider. */
 export interface WorkflowMediaModel {
@@ -142,7 +173,7 @@ export interface WorkflowMediaModel {
   kinds: readonly WorkflowMediaKind[];
   /** Whether a video can speak in a preset voice of `WORKFLOW_VIDEO_VOICES`. */
   voices: boolean;
-  /** The aspect ratios that it makes. All of `WORKFLOW_MEDIA_ASPECTS` when absent. */
+  /** The aspect ratios that it makes. When absent, an image has each one and a video has no 4:5 or 5:4. */
   aspects?: readonly WorkflowMediaAspect[];
   /** The lengths of a video in seconds. `WORKFLOW_VIDEO_DURATIONS` when absent. */
   durations?: readonly number[];
@@ -173,6 +204,35 @@ function sunraModel(
     name,
     maker,
     subscription: "Sunra",
+    credits: true,
+    kinds: [kind],
+    voices: false,
+    ...specs,
+  };
+}
+
+/**
+ * The Higgsfield models, from Higgsfield's `models_explore` (2026-11-16). The resolutions are the
+ * canvas names; the host sends them in lower case, as Higgsfield names them ("2k").
+ */
+const HIGGSFIELD_IMAGE_RESOLUTIONS = ["1K", "2K", "4K"] as const;
+const HIGGSFIELD_VIDEO_RESOLUTIONS = ["720p", "1080p"] as const;
+const HIGGSFIELD_VIDEO_DURATIONS = [5, 10, 15] as const;
+
+function higgsfieldModel(
+  id: string,
+  name: string,
+  maker: string,
+  kind: WorkflowMediaKind,
+  specs: Pick<WorkflowMediaModel, "aspects" | "durations" | "resolutions" | "transparent">,
+): WorkflowMediaModel {
+  return {
+    id: `higgsfield-${id}`,
+    provider: "higgsfield",
+    providerModel: id,
+    name,
+    maker,
+    subscription: "Higgsfield",
     credits: true,
     kinds: [kind],
     voices: false,
@@ -219,6 +279,33 @@ export const WORKFLOW_MEDIA_MODELS: readonly WorkflowMediaModel[] = [
     durations: [4, 6, 8],
     resolutions: SUNRA_VIDEO_RESOLUTIONS,
   }),
+  higgsfieldModel("gpt_image_2_6", "GPT Image 2.6", "OpenAI", "image", {
+    resolutions: HIGGSFIELD_IMAGE_RESOLUTIONS,
+    transparent: true,
+  }),
+  higgsfieldModel("nano_banana_pro", "Nano Banana Pro", "Google", "image", {
+    resolutions: HIGGSFIELD_IMAGE_RESOLUTIONS,
+  }),
+  higgsfieldModel("seedream_v5_pro", "Seedream 5.0 Pro", "ByteDance", "image", {
+    resolutions: ["2K", "1K"],
+    transparent: true,
+  }),
+  higgsfieldModel("flux_3_image", "FLUX 3", "Black Forest Labs", "image", {
+    resolutions: HIGGSFIELD_IMAGE_RESOLUTIONS,
+  }),
+  higgsfieldModel("seedance_2_0", "Seedance 2.0", "ByteDance", "video", {
+    durations: HIGGSFIELD_VIDEO_DURATIONS,
+    resolutions: HIGGSFIELD_VIDEO_RESOLUTIONS,
+  }),
+  higgsfieldModel("kling4_0", "Kling 4.0", "Kuaishou", "video", {
+    aspects: ["1:1", "16:9", "9:16"],
+    durations: HIGGSFIELD_VIDEO_DURATIONS,
+    resolutions: HIGGSFIELD_VIDEO_RESOLUTIONS,
+  }),
+  higgsfieldModel("wan2_7", "Wan 2.7", "Alibaba", "video", {
+    durations: HIGGSFIELD_VIDEO_DURATIONS,
+    resolutions: HIGGSFIELD_VIDEO_RESOLUTIONS,
+  }),
 ];
 
 /** The picture types that an asset step keeps and that image and video steps take as input. */
@@ -244,12 +331,32 @@ export function workflowMediaKind(fields: WorkflowFields): WorkflowMediaKind {
 /** The choices of a model, or of every model when it is not known. */
 type WorkflowMediaRange = Pick<WorkflowMediaModel, "aspects" | "durations" | "resolutions" | "transparent">;
 
-export function workflowMediaAspects(model: WorkflowMediaRange | null | undefined): readonly WorkflowMediaAspect[] {
-  return model?.aspects ?? WORKFLOW_MEDIA_ASPECTS;
+export function workflowMediaAspects(
+  model: WorkflowMediaRange | null | undefined,
+  kind: WorkflowMediaKind,
+): readonly WorkflowMediaAspect[] {
+  return model?.aspects ?? (kind === "video" ? WORKFLOW_VIDEO_ASPECTS : WORKFLOW_MEDIA_ASPECTS);
 }
 
 export function workflowVideoDurations(model: WorkflowMediaRange | null | undefined): readonly number[] {
   return model?.durations ?? WORKFLOW_VIDEO_DURATIONS;
+}
+
+/** The most lengths that a catalog model has: the limit of `workflows-media-catalog-v1`. */
+export const WORKFLOW_MEDIA_CATALOG_DURATIONS_MAX = 64;
+/** A model with more lengths than this lists only some of them; see `workflowVideoLengthChoices`. */
+const WORKFLOW_VIDEO_LENGTH_CHOICES = 5;
+
+/**
+ * The lengths that a short list shows, in ascending order. A model with many lengths (3 to 30
+ * seconds) shows its shortest and longest length and each multiple of 5 between them.
+ */
+export function workflowVideoLengthChoices(durations: readonly number[]): number[] {
+  const sorted = [...new Set(durations)].sort((left, right) => left - right);
+  if (sorted.length <= WORKFLOW_VIDEO_LENGTH_CHOICES) return sorted;
+  const first = sorted[0];
+  const last = sorted[sorted.length - 1];
+  return sorted.filter((value) => value === first || value === last || value % 5 === 0);
 }
 
 /** The resolutions of a model for a kind. An image of a model without them has none. */
@@ -260,14 +367,68 @@ export function workflowMediaResolutions(
   return model?.resolutions ?? (kind === "video" ? WORKFLOW_VIDEO_RESOLUTIONS : []);
 }
 
+/** True for a whole number of pixels that a side of a custom size can have. */
+export function isWorkflowMediaSide(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= WORKFLOW_MEDIA_SIZE_MIN &&
+    value <= WORKFLOW_MEDIA_SIZE_MAX
+  );
+}
+
+/**
+ * The custom size of an image node, or null when it has none: its `aspect` is not
+ * `WORKFLOW_MEDIA_CUSTOM_ASPECT`, it is a video, or a side is out of range.
+ */
+export function workflowMediaSize(fields: WorkflowFields, kind: WorkflowMediaKind): WorkflowMediaSize | null {
+  if (kind !== "image" || fields.aspect !== WORKFLOW_MEDIA_CUSTOM_ASPECT) return null;
+  const { width, height } = fields;
+  return isWorkflowMediaSide(width) && isWorkflowMediaSide(height) ? { width, height } : null;
+}
+
+/** The aspect ratio of the list that is nearest to the shape of `size`. */
+function nearestAspect(aspects: readonly WorkflowMediaAspect[], size: WorkflowMediaSize): WorkflowMediaAspect {
+  const wanted = Math.log(size.width / size.height);
+  const distance = (aspect: WorkflowMediaAspect) => {
+    const [width = 1, height = 1] = aspect.split(":").map(Number);
+    return Math.abs(Math.log(width / height) - wanted);
+  };
+  return aspects.reduce((best, aspect) => (distance(aspect) < distance(best) ? aspect : best), aspects[0] ?? "1:1");
+}
+
+/** The pixels of the longer side of an image resolution such as "2K", or null for another name. */
+function resolutionPixels(resolution: string): number | null {
+  const match = /^(\d+)K$/i.exec(resolution);
+  return match ? Number(match[1]) * 1024 : null;
+}
+
+/**
+ * The resolution that a custom size asks for: the smallest that is at least as large as the longer
+ * side, else the largest. A model whose resolutions are not sizes such as "2K" keeps its default.
+ */
+function resolutionForSize(resolutions: readonly string[], size: WorkflowMediaSize): string | null {
+  const long = Math.max(size.width, size.height);
+  const sized = resolutions.flatMap((value) => {
+    const pixels = resolutionPixels(value);
+    return pixels === null ? [] : [{ value, pixels }];
+  });
+  if (sized.length === 0) return resolutions[0] ?? null;
+  sized.sort((left, right) => left.pixels - right.pixels);
+  return (sized.find((entry) => entry.pixels >= long) ?? sized[sized.length - 1])?.value ?? null;
+}
+
 /** The frame, the length and the resolution that an `image` node asks its model for. */
 export interface WorkflowMediaSpecs {
+  /** The aspect ratio that the model makes. With `size`, the nearest one to it. */
   aspect: WorkflowMediaAspect;
   /** Seconds. Only a video uses it. */
   duration: number;
   resolution: string | null;
   /** An image with a transparent background. Only an image of a model with `transparent` has one. */
   transparent: boolean;
+  /** The size in pixels that the host crops and scales the image to, or null for the model's own size. */
+  size: WorkflowMediaSize | null;
 }
 
 /**
@@ -280,8 +441,11 @@ export function workflowMediaSpecs(
   kind: WorkflowMediaKind,
   model: WorkflowMediaRange | null | undefined,
 ): WorkflowMediaSpecs {
-  const aspects = workflowMediaAspects(model);
-  const aspect = aspects.find((value) => value === fields.aspect) ?? aspects[0] ?? "1:1";
+  const aspects = workflowMediaAspects(model, kind);
+  const size = workflowMediaSize(fields, kind);
+  const aspect = size
+    ? nearestAspect(aspects, size)
+    : (aspects.find((value) => value === fields.aspect) ?? aspects[0] ?? "1:1");
   const durations = workflowVideoDurations(model);
   const asked = typeof fields.duration === "number" ? fields.duration : WORKFLOW_VIDEO_DURATIONS[0];
   const duration = durations.reduce(
@@ -290,16 +454,27 @@ export function workflowMediaSpecs(
   );
   const resolutions = workflowMediaResolutions(model, kind);
   const preferred = typeof fields.resolution === "string" ? fields.resolution : "720p";
-  const resolution = resolutions.includes(preferred) ? preferred : (resolutions[0] ?? null);
+  const resolution = size
+    ? resolutionForSize(resolutions, size)
+    : resolutions.includes(preferred)
+      ? preferred
+      : (resolutions[0] ?? null);
   const transparent = kind === "image" && model?.transparent === true && fields.background === "transparent";
-  return { aspect, duration, resolution, transparent };
+  return { aspect, duration, resolution, transparent, size };
 }
 
-/** The model of an `image` node, or null when the node names a model the host does not know. */
-export function workflowMediaModel(fields: WorkflowFields): WorkflowMediaModel | null {
+/**
+ * The model of an `image` node, or null when the node names a model the host does not know. A model
+ * of `catalog`, the live models of the media services, comes before a fixed model with the same id.
+ */
+export function workflowMediaModel(
+  fields: WorkflowFields,
+  catalog: readonly WorkflowMediaModel[] = [],
+): WorkflowMediaModel | null {
   const kind = workflowMediaKind(fields);
   const id = typeof fields.model === "string" && fields.model !== "" ? fields.model : null;
-  return WORKFLOW_MEDIA_MODELS.find((model) => (id === null || model.id === id) && model.kinds.includes(kind)) ?? null;
+  const fits = (model: WorkflowMediaModel) => (id === null || model.id === id) && model.kinds.includes(kind);
+  return (id === null ? null : catalog.find(fits)) ?? WORKFLOW_MEDIA_MODELS.find(fits) ?? null;
 }
 
 export interface WorkflowPoint {
@@ -937,13 +1112,15 @@ export function isWorkflowWebhookSecret(value: unknown): value is WorkflowWebhoo
 /**
  * The media services that the host can use now, beyond the agent providers. `sunra`: an enabled Sunra
  * row in the host's Apps is signed in, so the Sunra models of `WORKFLOW_MEDIA_MODELS` can run.
+ * `higgsfield`: the same for a Higgsfield row and the Higgsfield models.
  */
 export interface WorkflowMediaProviders {
   sunra: boolean;
+  higgsfield: boolean;
 }
 
 export function isWorkflowMediaProviders(value: unknown): value is WorkflowMediaProviders {
-  return isDynamicRecord(value) && isBoolean(value.sunra);
+  return isDynamicRecord(value) && isBoolean(value.sunra) && isBoolean(value.higgsfield);
 }
 
 /**
@@ -956,20 +1133,165 @@ export interface WorkflowMediaCreditBalance {
   quota: number | null;
 }
 
-/** The credits of each media service beyond the agent providers. `sunra`: null when the host cannot read them. */
+/** The credits of each media service beyond the agent providers. Null when the host cannot read them. */
 export interface WorkflowMediaCredits {
   sunra: WorkflowMediaCreditBalance | null;
+  higgsfield: WorkflowMediaCreditBalance | null;
 }
 
 const isCreditCount = (value: unknown): value is number =>
   typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 
-function isWorkflowMediaCreditBalance(value: unknown): value is WorkflowMediaCreditBalance {
+export function isWorkflowMediaCreditBalance(value: unknown): value is WorkflowMediaCreditBalance {
   return (
     isDynamicRecord(value) && isCreditCount(value.available) && (value.quota === null || isCreditCount(value.quota))
   );
 }
 
 export function isWorkflowMediaCredits(value: unknown): value is WorkflowMediaCredits {
-  return isDynamicRecord(value) && (value.sunra === null || isWorkflowMediaCreditBalance(value.sunra));
+  return (
+    isDynamicRecord(value) &&
+    (value.sunra === null || isWorkflowMediaCreditBalance(value.sunra)) &&
+    (value.higgsfield === null || isWorkflowMediaCreditBalance(value.higgsfield))
+  );
+}
+
+/** A media service whose model list the host reads live (`workflows-media-catalog-v1`). */
+export type WorkflowCatalogProvider = "sunra" | "higgsfield";
+export const WORKFLOW_CATALOG_PROVIDERS: readonly WorkflowCatalogProvider[] = ["sunra", "higgsfield"];
+export const WORKFLOW_MEDIA_CATALOG_MAX = 1000;
+
+/** The service of a catalog model id: its ids start with "sunra-" or "higgsfield-". */
+export const workflowCatalogProvider = (id: string): WorkflowCatalogProvider | null =>
+  id.startsWith("sunra-") ? "sunra" : id.startsWith("higgsfield-") ? "higgsfield" : null;
+const WORKFLOW_MEDIA_NAME_MAX = 160;
+const WORKFLOW_MEDIA_MAKER_MAX = 120;
+const WORKFLOW_MEDIA_RESOLUTION_MAX = 16;
+
+/**
+ * A model from the live model list of a media service. `durations` is empty for an image, and
+ * `resolutions` (the default first) is empty for a model with no resolution choice.
+ */
+export interface WorkflowMediaCatalogModel {
+  id: string;
+  provider: WorkflowCatalogProvider;
+  providerModel: string;
+  name: string;
+  maker: string;
+  kinds: readonly WorkflowMediaKind[];
+  aspects: readonly WorkflowMediaAspect[];
+  durations: readonly number[];
+  resolutions: readonly string[];
+  transparent: boolean;
+}
+
+/** The models of the signed-in media services. A service that did not answer gives its fixed models. */
+export interface WorkflowMediaCatalog {
+  models: readonly WorkflowMediaCatalogModel[];
+}
+
+const isListOf = <T>(value: unknown, max: number, item: (entry: unknown) => entry is T): value is readonly T[] =>
+  Array.isArray(value) && value.length <= max && value.every(item);
+
+export function isWorkflowMediaCatalogModel(value: unknown): value is WorkflowMediaCatalogModel {
+  return (
+    isDynamicRecord(value) &&
+    isIdentifier(value.id) &&
+    isOneOf(WORKFLOW_CATALOG_PROVIDERS, value.provider) &&
+    isIdentifier(value.providerModel) &&
+    isBoundedString(value.name, WORKFLOW_MEDIA_NAME_MAX) &&
+    isBoundedString(value.maker, WORKFLOW_MEDIA_MAKER_MAX) &&
+    isListOf(value.kinds, 2, (entry): entry is WorkflowMediaKind => isOneOf(WORKFLOW_MEDIA_KINDS, entry)) &&
+    isListOf(value.aspects, 6, (entry): entry is WorkflowMediaAspect => isOneOf(WORKFLOW_MEDIA_ASPECTS, entry)) &&
+    isListOf(value.durations, WORKFLOW_MEDIA_CATALOG_DURATIONS_MAX, isCreditCount) &&
+    isListOf(value.resolutions, 16, (entry): entry is string =>
+      isBoundedString(entry, WORKFLOW_MEDIA_RESOLUTION_MAX),
+    ) &&
+    isBoolean(value.transparent)
+  );
+}
+
+export function isWorkflowMediaCatalog(value: unknown): value is WorkflowMediaCatalog {
+  return isDynamicRecord(value) && isListOf(value.models, WORKFLOW_MEDIA_CATALOG_MAX, isWorkflowMediaCatalogModel);
+}
+
+/** The canvas model of a catalog entry. A model with no aspect ratio or no kind has no canvas model. */
+export function workflowCatalogMediaModel(entry: WorkflowMediaCatalogModel): WorkflowMediaModel | null {
+  const kind = entry.kinds[0];
+  if (kind === undefined || entry.aspects.length === 0) return null;
+  if (kind === "video" && entry.durations.length === 0) return null;
+  return {
+    id: entry.id,
+    provider: entry.provider,
+    providerModel: entry.providerModel,
+    name: entry.name,
+    maker: entry.maker,
+    subscription: entry.provider === "sunra" ? "Sunra" : "Higgsfield",
+    credits: true,
+    kinds: [kind],
+    voices: false,
+    aspects: entry.aspects,
+    ...(kind === "video" ? { durations: entry.durations } : {}),
+    resolutions: entry.resolutions,
+    transparent: kind === "image" && entry.transparent,
+  };
+}
+
+/** The catalog model of a fixed model of `WORKFLOW_MEDIA_MODELS`, with the choices that it has. */
+export function workflowFixedCatalogModel(
+  model: WorkflowMediaModel,
+  provider: WorkflowCatalogProvider,
+): WorkflowMediaCatalogModel {
+  const kind = model.kinds[0] ?? "image";
+  return {
+    id: model.id,
+    provider,
+    providerModel: model.providerModel ?? model.id,
+    name: model.name,
+    maker: model.maker,
+    kinds: [kind],
+    aspects: workflowMediaAspects(model, kind),
+    durations: kind === "video" ? workflowVideoDurations(model) : [],
+    resolutions: workflowMediaResolutions(model, kind),
+    transparent: kind === "image" && model.transparent === true,
+  };
+}
+
+/** The choices of a step whose price the host asks the media service for. */
+export interface WorkflowMediaPriceRequest {
+  /** The `id` of a catalog model. */
+  model: string;
+  kind: WorkflowMediaKind;
+  aspect: WorkflowMediaAspect;
+  /** Seconds. Only a video uses it. */
+  duration: number;
+  resolution: string | null;
+  transparent: boolean;
+}
+
+/** What one file costs, in the credits of the service, or null when the service gives no quote. */
+export interface WorkflowMediaPrice {
+  credits: number | null;
+}
+
+export const WORKFLOW_MEDIA_PRICE_MAX = 1_000_000_000;
+
+export function isWorkflowMediaPriceRequest(value: unknown): value is WorkflowMediaPriceRequest {
+  return (
+    isDynamicRecord(value) &&
+    isIdentifier(value.model) &&
+    isOneOf(WORKFLOW_MEDIA_KINDS, value.kind) &&
+    isOneOf(WORKFLOW_MEDIA_ASPECTS, value.aspect) &&
+    isCreditCount(value.duration) &&
+    (value.resolution === null || isBoundedString(value.resolution, WORKFLOW_MEDIA_RESOLUTION_MAX)) &&
+    isBoolean(value.transparent)
+  );
+}
+
+export function isWorkflowMediaPrice(value: unknown): value is WorkflowMediaPrice {
+  return (
+    isDynamicRecord(value) &&
+    (value.credits === null ||
+      (isFiniteNumber(value.credits) && value.credits >= 0 && value.credits <= WORKFLOW_MEDIA_PRICE_MAX))
+  );
 }

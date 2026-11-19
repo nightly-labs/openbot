@@ -45,6 +45,8 @@ interface VoiceSpeechServiceOptions {
   /** The keys of the cloud models. The ElevenLabs key is the store of ElevenLabs dictation. */
   apiKeys: { elevenlabs: VoiceApiKeyStore; xai: VoiceApiKeyStore };
   fetch?: SpeechFetch;
+  /** The download of the Supertonic model. Without it, `fetch`. */
+  modelFetch?: SpeechFetch;
 }
 
 /** A failure the host reported. Only its category is known; the addon's own message stays there. */
@@ -85,10 +87,11 @@ export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
     this.#spawnHost = options.spawnHost;
     this.#apiKeys = options.apiKeys;
     this.#fetch = options.fetch ?? fetch;
+    const modelFetch = options.modelFetch ?? options.fetch;
     this.#model = new VoiceModelService({
       modelId: SPEECH_MODEL_ID,
       directory: options.modelDirectory,
-      ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
+      ...(modelFetch === undefined ? {} : { fetch: modelFetch }),
     });
     // The status event is the status of the model in the settings.
     this.#model.on("status", (status) => {

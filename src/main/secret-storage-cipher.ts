@@ -3,7 +3,11 @@
 // stored is then lost, the account session too, so the user must sign in after each restart.
 // After the first such failure on this computer, OpenBot encrypts its secrets with its own key in a
 // 0600 file in userData. That is file-permission protection, as on a self-hosted server. A keyring
-// that works keeps the secrets. macOS and Windows always use `safeStorage`.
+// that works keeps the secrets.
+// macOS: a Keychain that refuses OpenBot (a "Deny" at its prompt, or no usable login keychain) gives
+// `safeStorage` no key, so no secret could be saved (#10281). OpenBot then makes the same key file.
+// A Keychain that works keeps the new secrets, also after a refusal made the key file. A value that does not decrypt does not make the key file
+// on macOS: there, that is not a keyring that changed its key. Windows always uses `safeStorage`.
 import { createCipheriv, createDecipheriv, randomBytes, randomUUID } from "node:crypto";
 import {
   chmodSync,
@@ -53,7 +57,10 @@ function isExistingFile(error: unknown): boolean {
  * the same time.
  */
 export function createSecretStorage(options: { keyPath: string; platform?: NodeJS.Platform }): SecretStorage {
-  const linux = (options.platform ?? process.platform) === "linux";
+  const platform = options.platform ?? process.platform;
+  const linux = platform === "linux";
+  /** Where the key file can stand in for a keyring that cannot encrypt. */
+  const keyFileFallback = linux || platform === "darwin";
   let madeKeyFile = false;
 
   /**
@@ -115,9 +122,11 @@ export function createSecretStorage(options: { keyPath: string; platform?: NodeJ
     return created;
   }
 
-  /** The key file on Linux when the keyring cannot encrypt. Null when the keyring keeps the secrets. */
+  /** The key file when the keyring cannot encrypt. Null when the keyring keeps the secrets. */
   function keyForWrite(): Buffer | null {
-    if (!linux) return null;
+    if (!keyFileFallback) return null;
+    // macOS: a Keychain that refused once (still locked, a prompt) keeps the secrets when it works again.
+    if (!linux && safeStorage.isEncryptionAvailable()) return null;
     const existing = readKey();
     if (existing) return existing;
     // Before `ready`, `safeStorage` has no key on Linux even when the keyring works.
@@ -157,7 +166,7 @@ export function createSecretStorage(options: { keyPath: string; platform?: NodeJ
   };
 
   const decrypt = (value: Buffer): string => {
-    if (linux && value.subarray(0, KEY_FILE_FORMAT.length).equals(KEY_FILE_FORMAT)) {
+    if (keyFileFallback && value.subarray(0, KEY_FILE_FORMAT.length).equals(KEY_FILE_FORMAT)) {
       const fileKey = readKey();
       if (!fileKey) throw new Error("The secret storage key file is missing.");
       const body = value.subarray(KEY_FILE_FORMAT.length);

@@ -182,7 +182,8 @@ export async function runProviderHistoryReport(options: Options): Promise<Report
         database,
         readHistory,
         sessionId,
-        provider: "codex",
+        // Grok items stay in full after import, so the paged reads below read every staged item.
+        provider: "grok",
         externalSessionId: "provider-history-report-external-session",
         agentId,
         publicThreadId: threadId,
@@ -205,7 +206,8 @@ export async function runProviderHistoryReport(options: Options): Promise<Report
         database,
         readHistory: retryReadHistory,
         sessionId,
-        provider: "codex",
+        // Grok items stay in full after import, so the paged reads below read every staged item.
+        provider: "grok",
         externalSessionId: "provider-history-report-external-session",
         agentId,
         publicThreadId: threadId,

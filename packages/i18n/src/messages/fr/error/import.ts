@@ -96,9 +96,11 @@ export const messages = {
   "error.import.transferProviderKey": "{name} : saisissez de nouveau sa clé API dans les réglages.",
   "error.import.transferAgentEnv": "{name} : saisissez de nouveau les valeurs de {names} dans les réglages.",
   "error.import.transferMcpValues":
-    "{name} : le serveur MCP est ajouté désactivé. Vérifiez sa commande, saisissez de nouveau ses valeurs et son adresse complète, puis activez-le dans les réglages MCP.",
+    "{name} : le serveur MCP est ajouté désactivé. Vérifiez sa commande, saisissez de nouveau ses valeurs et son adresse complète, puis activez-le dans Marketplace, Apps.",
   "error.import.transferValuesCleared":
     "{name} : les valeurs qui peuvent contenir un secret ont été retirées de ses arguments ou de son adresse. Saisissez-les de nouveau dans les réglages.",
   "error.import.transferSharedKept":
     "{number} fichiers du dossier partagé sont déjà présents ici. Ils restent tels quels.",
+  "error.import.transferPartSkipped":
+    "Certaines parties du fichier n’ont pas pu être importées. Les autres parties sont sur ce serveur : n’importez pas le fichier une deuxième fois.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -48,6 +48,8 @@ export const messages = {
   "error.skill.localNotFound": "هذه المهارة المحلية غير موجودة. تحقّق من معرّفها في قائمة المهارات المحلية.",
   "error.skill.localRevisionNotFound": "لا توجد للمهارة المحلية المراجعة {revision}. أحدث مراجعة لها هي {latest}.",
   "error.skill.localNameTaken": "توجد مهارة محلية بهذا الاسم بالفعل. راجعها بدلًا من ذلك.",
+  "error.skill.localNameClash":
+    "يصبح هذا الاسم واسم المهارة المحلية «{name}» كلاهما «{slug}». لتغيير تلك المهارة، راجعها. لإضافة مهارة جديدة، غيّر الحروف اللاتينية أو الأرقام في هذا الاسم.",
   "error.skill.localKeepName": "أبقِ اسم المهارة دون تغيير عند مراجعتها.",
   "error.skill.localRelativeFolder": "استخدم مجلد مهارة نسبيًا داخل مساحة العمل للوكيل الحالي.",
   "error.skill.localSourceOutside": "يجب أن يكون مصدر المهارة داخل مساحة العمل للوكيل.",

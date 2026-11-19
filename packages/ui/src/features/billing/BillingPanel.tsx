@@ -19,6 +19,7 @@ import {
   CreditCard,
   DropdownMenu,
   Ellipsis,
+  HardDrive,
   Item,
   ItemActions,
   ItemContent,
@@ -30,17 +31,17 @@ import {
   PlushLoader,
   RotateCcw,
   ServerPlushLogo,
-  SlidersHorizontal,
   Spinner,
   Text,
   TriangleAlert,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { For, Match, Show, Switch } from "solid-js";
+import { createSignal, For, Match, Show, Switch } from "solid-js";
 import { useText } from "../../text";
 import { SettingsHostedServersTab } from "../settings/SettingsHostedServersTab";
 import type { SettingsHostedServersStore } from "../settings/stores/hosted-servers-store";
 import { BillingManagedServer } from "./BillingManagedServer";
+import { BillingStorageDialog } from "./BillingStorageDialog";
 import { type BillingStore, billingActionKey } from "./billing-store";
 
 const PLAN_NAME = {
@@ -80,8 +81,8 @@ export interface BillingPanelProps {
 
 /**
  * The Billing content of the desktop Settings tab and the web dialog: the plan of each server that
- * the account pays for, with the Stripe Customer Portal for plan changes, the payment method and
- * the invoices. The plan of a new server is chosen where the server is made, not here.
+ * the account pays for, with "Add storage", and the Stripe Customer Portal for the payment method
+ * and the invoices. The plan of a new server is chosen where the server is made, not here.
  */
 export function BillingPanel(props: BillingPanelProps): JSX.Element {
   const { t } = useText();
@@ -295,14 +296,10 @@ function BillingServerRow(props: { server: BillingServerPlan; store: BillingStor
     const date = format.date(end, { dateStyle: "long" });
     return props.server.cancelAtPeriodEnd ? t("billing.server.ends", { date }) : t("billing.server.renews", { date });
   };
-  const opening = () => {
-    const pending = props.store.state.pending;
-    return (
-      pending === billingActionKey({ flow: "update", subscriptionId: props.server.subscriptionId }) ||
-      pending === billingActionKey({ flow: "cancel", subscriptionId: props.server.subscriptionId })
-    );
-  };
+  const opening = () =>
+    props.store.state.pending === billingActionKey({ flow: "cancel", subscriptionId: props.server.subscriptionId });
   const open = (request: BillingPortalRequest) => void props.store.openPortal(request);
+  const [addingStorage, setAddingStorage] = createSignal(false);
 
   return (
     <Item class="billing-server" role="listitem">
@@ -339,10 +336,12 @@ function BillingServerRow(props: { server: BillingServerPlan; store: BillingStor
           </DropdownMenu.Trigger>
           <DropdownMenu.Portal>
             <DropdownMenu.Content>
-              <DropdownMenu.Item onSelect={() => open({ flow: "update", subscriptionId: props.server.subscriptionId })}>
-                <SlidersHorizontal aria-hidden="true" />
-                {t("billing.action.change")}
-              </DropdownMenu.Item>
+              <Show when={(props.server.storageUpgrades?.length ?? 0) > 0}>
+                <DropdownMenu.Item onSelect={() => setAddingStorage(true)}>
+                  <HardDrive aria-hidden="true" />
+                  {t("billing.action.addStorage")}
+                </DropdownMenu.Item>
+              </Show>
               <Show when={paymentFailed(props.server)}>
                 <DropdownMenu.Item onSelect={() => open({ flow: "manage" })}>
                   <CreditCard aria-hidden="true" />
@@ -372,6 +371,14 @@ function BillingServerRow(props: { server: BillingServerPlan; store: BillingStor
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
       </ItemActions>
+      <Show when={addingStorage()}>
+        <BillingStorageDialog
+          plan={props.server}
+          serverName={name()}
+          store={props.store}
+          onClose={() => setAddingStorage(false)}
+        />
+      </Show>
     </Item>
   );
 }

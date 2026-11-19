@@ -1,7 +1,8 @@
 // The workflow group of the preview: workflows, graphs, versions and runs in memory, and a fixed
 // GitHub connection. A save checks the revision as the host does; the graph rules stay the host's. A
 // run walks the graph as the host does: each step ends after `STEP_MS` with a fixed answer, a
-// condition answers yes, an approval waits for `decide`, and a node with the field `mockFail` fails.
+// condition answers yes, an approval waits for `decide`, and a node with the field `mockFail` fails. A
+// Sunra or Higgsfield step that ends spends the credits of its quote.
 
 import {
   isWorkflowStepKind,
@@ -10,12 +11,14 @@ import {
   type StartWorkflowRunInput,
   WORKFLOW_AUTO_VERSION_INTERVAL_MS,
   WORKFLOW_MAX_VERSIONS,
+  WORKFLOW_MEDIA_MODELS,
   type WorkflowDetail,
   type WorkflowGitHubCatalog,
   type WorkflowGitHubDelivery,
   type WorkflowGitHubItem,
   type WorkflowGitHubRepositoryOptions,
   type WorkflowGraph,
+  type WorkflowMediaCatalogModel,
   type WorkflowNode,
   type WorkflowRun,
   type WorkflowRunDetail,
@@ -24,6 +27,8 @@ import {
   type WorkflowSummary,
   type WorkflowTriggerState,
   type WorkflowVersion,
+  workflowCatalogProvider,
+  workflowFixedCatalogModel,
   workflowGitHubTriggerRepositories,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
@@ -110,6 +115,23 @@ function mockAnswer(node: WorkflowNode, input: string): string {
   }
 }
 
+/**
+ * The preview catalog: the fixed Sunra and Higgsfield models, as a host with a live catalog sends them.
+ * Sunra writes its image resolutions in lower case, such as "2k".
+ */
+const PREVIEW_MEDIA_CATALOG: WorkflowMediaCatalogModel[] = WORKFLOW_MEDIA_MODELS.flatMap((model) => {
+  if (model.provider === "higgsfield") return [workflowFixedCatalogModel(model, model.provider)];
+  if (model.provider !== "sunra") return [];
+  const entry = workflowFixedCatalogModel(model, model.provider);
+  return [{ ...entry, resolutions: entry.resolutions.map((value) => value.replace(/K$/u, "k")) }];
+});
+
+/** A fixed quote: a video costs per second, and a larger resolution costs more. */
+function previewQuote(kind: "image" | "video", duration: number, resolution: string | null): number {
+  const scale = resolution?.startsWith("4") || resolution === "1080p" ? 2 : 1;
+  return (kind === "video" ? duration * 2.5 : 1.5) * scale;
+}
+
 /** `emit` sends the agent event `workflows-changed` for one workflow that changed. */
 export function mockWorkflows(
   seeds: readonly MockWorkflowSeed[],
@@ -164,6 +186,20 @@ export function mockWorkflows(
   };
   for (const seed of seeds) put(seed.id, seed.title, seed.graph, 0, seed.updatedAt);
 
+  const credits: Record<"sunra" | "higgsfield", { available: number; quota: number | null }> = {
+    sunra: { available: 1240, quota: 2000 },
+    higgsfield: { available: 860, quota: null },
+  };
+  /** A Sunra or Higgsfield step spends its quote when it ends. */
+  const spend = (node: WorkflowNode) => {
+    const provider = typeof node.fields.model === "string" ? workflowCatalogProvider(node.fields.model) : null;
+    if (node.kind !== "image" || !provider) return;
+    const kind = node.fields.media === "video" ? "video" : "image";
+    const duration = typeof node.fields.duration === "number" ? node.fields.duration : 5;
+    const resolution = typeof node.fields.resolution === "string" ? node.fields.resolution : null;
+    const account = credits[provider];
+    account.available = Math.max(0, account.available - previewQuote(kind, duration, resolution));
+  };
   const runs = new Map<string, { run: WorkflowRun; graph: WorkflowGraph; scope: Set<string> }>();
   const steps = new Map<string, WorkflowStep>();
   const timers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -220,7 +256,10 @@ export function mockWorkflows(
         if (node.fields.mockFail === true)
           end(step, { status: "failed", error: sourceText("error.workflow.modelFailed") });
         else if (node.kind === "condition") end(step, { status: "done", output: input, branch: "yes" });
-        else end(step, { status: "done", output: mockAnswer(node, input) });
+        else {
+          end(step, { status: "done", output: mockAnswer(node, input) });
+          spend(node);
+        }
         if (runId) advance(runId);
         emit(workflowId);
       }, STEP_MS),
@@ -488,8 +527,10 @@ export function mockWorkflows(
     },
     // The preview keeps no files: the draft id names the kept picture.
     keepPicture: async (draftId) => draftId,
-    mediaProviders: async () => ({ sunra: true }),
-    mediaCredits: async () => ({ sunra: { available: 1240, quota: 2000 } }),
+    mediaProviders: async () => ({ sunra: true, higgsfield: true }),
+    mediaCredits: async () => structuredClone(credits),
+    mediaCatalog: async () => ({ models: PREVIEW_MEDIA_CATALOG }),
+    mediaPrice: async (input) => ({ credits: previewQuote(input.kind, input.duration, input.resolution) }),
     githubCatalog: async () => structuredClone(PREVIEW_GITHUB_CATALOG),
     githubOptions: async (input) => {
       if (!PREVIEW_GITHUB_CATALOG.repositories.some((repository) => repository.fullName === input.repository))

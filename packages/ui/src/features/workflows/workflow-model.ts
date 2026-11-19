@@ -15,6 +15,8 @@ import {
   WORKFLOW_NODE_KINDS,
   type WorkflowMediaAspect,
   type WorkflowMediaKind,
+  type WorkflowMediaPrice,
+  type WorkflowMediaPriceRequest,
   type WorkflowNodeKind,
   type WorkflowOutputTarget,
   type WorkflowTriggerType,
@@ -138,13 +140,31 @@ export interface WorkflowCatalogs {
   /** The open OpenBot channels of the host. Only this computer gives them. */
   channels?: readonly WorkflowChannel[] | undefined;
   imageModels: readonly WorkflowImageModel[];
+  /**
+   * What one file of a Sunra or Higgsfield model costs with the choices of a step, as the service
+   * quotes it (`workflows-media-catalog-v1`). Without it, a step shows no price.
+   */
+  mediaPrice?: ((request: WorkflowMediaPriceRequest) => Promise<WorkflowMediaPrice>) | undefined;
+  /**
+   * Whether an image step can have a custom size in pixels, which the host crops and scales the picture
+   * of the model to, or the aspect ratios 4:5 and 5:4 (`workflows-media-size-v1`). An older host reads
+   * them as the first aspect ratio of the model.
+   */
+  mediaSize?: boolean | undefined;
   /** The workspace files that an asset node can take, and the images that image steps made. */
   files: readonly StoredFileRow[];
   /**
    * The address of an image or a video that a media step made, from the attachment id of its result.
-   * A host without it shows the results that `files` names.
+   * A host without it shows the results that `files` names. Undefined while it loads, and null when
+   * it cannot show here: a card then shows its icon, not a loading pulse.
    */
-  media?: ((attachmentId: string, kind: WorkflowMediaKind) => string | undefined) | undefined;
+  media?: ((attachmentId: string, kind: WorkflowMediaKind) => string | null | undefined) | undefined;
+  /**
+   * The address of a small copy of a picture, from its attachment id, for a card, a strip or a
+   * thumbnail. Undefined while it loads, null as for `media`. The viewer and a download read `media`.
+   * Without it, the cards show `media` and the `previewUrl` of `files`.
+   */
+  mediaPreview?: ((attachmentId: string) => string | null | undefined) | undefined;
   /**
    * Sends a picture from the computer to the host and answers it as a Library file. The host shows
    * why it refused one. Without it, a file from the computer stays in the page.

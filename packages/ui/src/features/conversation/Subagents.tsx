@@ -27,6 +27,7 @@ import { useText } from "@openbot/ui/text";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, createUniqueId, For, Match, Show, Switch } from "solid-js";
+import { ActivityShine } from "./ActivityShine";
 
 const STATE_LABEL = {
   running: "chat.subagents.state.running",
@@ -149,6 +150,9 @@ function LiveLine(props: { subagent: ConversationSubagent }) {
       <Show when={shown()}>{(step) => <StepGlyph kind={step().kind} class="subagents-live-glyph" />}</Show>
       <span class={["subagents-live-text", { "agent-activity-label": props.subagent.status === "running" }]}>
         {text()}
+        <Show when={props.subagent.status === "running"}>
+          <ActivityShine text={text()} />
+        </Show>
       </span>
     </span>
   );
@@ -386,6 +390,8 @@ export interface SubagentPanelProps {
   /** The agent that started the subagent. */
   agentName: string;
   onClosePanel: () => void;
+  /** The handle on the start edge that sets the width of the side panel. */
+  resizer?: JSX.Element;
 }
 
 /** The side panel pane of one subagent: its task, its state, and all of its steps. */
@@ -394,7 +400,12 @@ export function SubagentPanel(props: SubagentPanelProps) {
   const duration = useDuration();
   const now = createClock(() => props.subagent?.status === "running");
   return (
-    <aside class="browser-panel subagents-panel" aria-label={t("conversation.sidePanel.pane.subagent")}>
+    <aside
+      id="subagent-panel"
+      class="browser-panel subagents-panel"
+      aria-label={t("conversation.sidePanel.pane.subagent")}
+    >
+      {props.resizer}
       <header class="file-preview-header side-panel-pane-header">
         <h2 class="side-panel-pane-title">{t("conversation.sidePanel.pane.subagent")}</h2>
         <Button
@@ -448,6 +459,9 @@ export function SubagentPanel(props: SubagentPanelProps) {
                           dir={step().kind === "command" ? "ltr" : "auto"}
                         >
                           {step().text}
+                          <Show when={live()}>
+                            <ActivityShine text={step().text} />
+                          </Show>
                         </span>
                       </li>
                     );

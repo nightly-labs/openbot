@@ -1,6 +1,6 @@
 import type { AgentApproval, AgentEvent, AgentRuntimeSnapshot } from "@openbot/contracts/ipc";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
-import { reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
+import { keepWholeApprovals, reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
 import type { AgentMessage } from "@openbot/ui/data";
 import { createStoredMessage } from "../../app-stored-values";
 import { promptRequestKey } from "../conversation/conversation-keys";
@@ -110,7 +110,63 @@ export function reconcileAttentionPrompts(
   for (const request of snapshot.pendingBrowserTakeovers) {
     next[attentionKey(request.agentId, request.threadId)] = { type: "browser-takeover-requested", request };
   }
-  return next;
+  return keepEqualRecord(current, next);
+}
+
+/**
+ * Whether two plain data values hold the same data. A value it cannot tell, such as NaN, counts as
+ * changed, so the caller only writes again.
+ */
+export function sameData(left: unknown, right: unknown): boolean {
+  if (left === right) return true;
+  if (typeof left !== "object" || typeof right !== "object" || left === null || right === null) return false;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+    return left.every((item, index) => sameData(item, right[index]));
+  }
+  const leftEntries = Object.entries(left);
+  const rightEntries = Object.entries(right);
+  return (
+    leftEntries.length === rightEntries.length &&
+    leftEntries.every(([key, value], index) => {
+      const other = rightEntries[index];
+      return other !== undefined && other[0] === key && sameData(value, other[1]);
+    })
+  );
+}
+
+/**
+ * `next`, or `current` when it holds the same keys in the same order and the same data. A runtime
+ * snapshot comes many times a second while agents work, and a new record runs each reader of every
+ * agent again. In a changed record, each entry that did not change keeps its object.
+ */
+export function keepEqualRecord<Value>(
+  current: Record<string, Value>,
+  next: Record<string, Value>,
+): Record<string, Value> {
+  const currentKeys = Object.keys(current);
+  const nextKeys = Object.keys(next);
+  let changed = currentKeys.length !== nextKeys.length;
+  for (const [index, key] of nextKeys.entries()) {
+    const previous = current[key];
+    if (Object.hasOwn(current, key) && sameData(previous, next[key])) {
+      if (previous !== undefined) next[key] = previous;
+      if (currentKeys[index] !== key) changed = true;
+    } else changed = true;
+  }
+  return changed ? next : current;
+}
+
+/** `next`, or `current` when each item holds the same data. An item that did not change keeps its object. */
+export function keepEqualList<Item>(current: Item[], next: Item[]): Item[] {
+  let changed = current.length !== next.length;
+  for (const [index, item] of next.entries()) {
+    const previous = current[index];
+    if (index < current.length && sameData(previous, item)) {
+      if (previous !== undefined) next[index] = previous;
+    } else changed = true;
+  }
+  return changed ? next : current;
 }
 
 /**
@@ -154,7 +210,12 @@ export function reconcileAttentionApprovals(
   current: readonly AgentApproval[],
   snapshot: Pick<AgentRuntimeSnapshot, "attentionComplete" | "pendingApprovals">,
 ): AgentApproval[] {
-  return reconcilePendingRequests(current, snapshot.pendingApprovals, snapshot.attentionComplete);
+  // The snapshot cuts long texts. A whole copy from an `approval` event or a read stays in its place.
+  return reconcilePendingRequests(
+    current,
+    keepWholeApprovals(current, snapshot.pendingApprovals),
+    snapshot.attentionComplete,
+  );
 }
 
 /**

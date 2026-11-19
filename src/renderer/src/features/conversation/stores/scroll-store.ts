@@ -22,7 +22,7 @@ import { currentText } from "@openbot/ui/text";
 import type { VirtualItem } from "@tanstack/virtual-core";
 import { createEffect, createMemo, createSignal, onCleanup, untrack } from "solid-js";
 import { formatMessageTime } from "../../../app-message-projection";
-import { groupAgentMessageMarkers, markOpenAgentMessages, teammateUpdateAnswers } from "../agent-message-timeline";
+import { groupAgentMessageMarkers, markOpenAgentMessages, teammateTurnAnswers } from "../agent-message-timeline";
 import type { ConversationProps, ConversationTarget } from "../conversation-types";
 import { summarizeHostedSiteMessages } from "../hosted-site-timeline";
 import { narrationRows, placeTurnRowsByTime, placeUpdatesAfterSteers } from "../narration-rows";
@@ -38,6 +38,9 @@ import {
 import { groupSkillInstallMarkers } from "../skill-install-timeline";
 import { isTurnAnswer } from "../turn-steps";
 import { conversationOwnerId } from "./composer-store";
+
+/** How long a message sent while a question card is open waits for the host to close the card. */
+const PROMPT_SEND_HOLD_MS = 2000;
 
 interface ScrollElements {
   scrollElement: () => HTMLDivElement | undefined;
@@ -131,15 +134,47 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   /** The agents that write in the channel now. Their text that still arrives waits until it is complete. */
   const channelWriters = createMemo(() => new Set(deps.props.channel?.workers().map((worker) => worker.id) ?? []));
   /*
+   * An agent chat can keep an answer "streaming" after its turn ends, as when a joined server misses
+   * a refresh (#5847). The chat shows that text a short time after its turn ends. A joined server
+   * sends the final copy after the turn ends, so the final copy usually comes first. Each ended turn
+   * waits on its own timer, so a next turn that starts at once does not end the wait early.
+   */
+  const [endingTurnIds, setEndingTurnIds] = createSignal<ReadonlySet<string>>(new Set<string>());
+  const endingTimers = new Set<ReturnType<typeof setTimeout>>();
+  let lastTurnId = untrack(() => deps.props.activeTurnId) ?? undefined;
+  createEffect(
+    () => deps.props.activeTurnId,
+    (turnId) => {
+      const ended = lastTurnId;
+      lastTurnId = turnId ?? undefined;
+      if (!ended || ended === turnId) return;
+      setEndingTurnIds((ids) => new Set(ids).add(ended));
+      const timer = setTimeout(() => {
+        endingTimers.delete(timer);
+        setEndingTurnIds((ids) => new Set([...ids].filter((id) => id !== ended)));
+      }, STALE_STREAM_MS);
+      endingTimers.add(timer);
+    },
+  );
+  onCleanup(() => {
+    for (const timer of endingTimers) clearTimeout(timer);
+  });
+  /*
    * Only the text of a member that works waits. A view keeps the copy of an older message that it
    * loaded, so a copy loaded while it streamed can stay "streaming" after its task ends (#4846), and
-   * it must not stay hidden.
+   * it must not stay hidden. In an agent chat, only the text of the turn that runs now, or that just
+   * ended, waits: an older answer that kept its "streaming" mark showed and hid at each turn (#10092).
+   * Text with no turn waits while any turn runs or ends, as before.
    */
   const held = (message: AgentMessage): boolean =>
     heldWhileWritten(message) &&
-    (!deps.props.channel || (message.senderAgentId !== undefined && channelWriters().has(message.senderAgentId)));
-  /* The quiet answers of a teammate update show under its marker, so they have no row of their own. */
-  const updateAnswers = createMemo(() => teammateUpdateAnswers(deps.props.messages));
+    (deps.props.channel
+      ? message.senderAgentId !== undefined && channelWriters().has(message.senderAgentId)
+      : message.turnId === undefined
+        ? Boolean(deps.props.activeTurnId) || endingTurnIds().size > 0
+        : message.turnId === deps.props.activeTurnId || endingTurnIds().has(message.turnId));
+  /* The quiet answers of a teammate update or request show under its marker, so they have no row of their own. */
+  const updateAnswers = createMemo(() => teammateTurnAnswers(deps.props.messages));
   const foldedAnswerIds = createMemo(
     () => new Set([...updateAnswers().values()].flatMap((answers) => answers.map((answer) => answer.id))),
   );
@@ -170,11 +205,90 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     return summarizeHostedSiteMessages(withQuestionContext(complete, deps.props.messages, questionTurnId));
   });
   const routineRunTurns = createMemo(() => routineRunTurnMessages(deps.props.messages, shownMessages()));
+  /*
+   * A message that the user sends while a question card is open shows when the question's row has
+   * its outcome, under that row. The card is drawn under all rows, so until the host closed it, the
+   * message showed above the question; and the host closes the card a moment before the row says
+   * "cancelled", so the message then stood where the card was. A question of the running turn closes
+   * for a message (`releaseForUserMessage`). A detached question closes too, but holds nothing: its
+   * row is older than the message, and a subagent's question, which has the same mark, stays. One
+   * that stays all the same, such as an MCP sign-in, lets the message show after `PROMPT_SEND_HOLD_MS`.
+   * Each time is when this view first had the row while a question waited, so a message from before
+   * the question is not held, and the host's clock does not count.
+   */
+  const userRowSeenAt = new Map<string, number>();
+  let waitingQuestion:
+    | { key: string; owner: string; turnId: string; requestId: string; at: number; closedAt: number | undefined }
+    | undefined;
+  const [promptHoldClock, setPromptHoldClock] = createSignal(0);
+  const promptHold = createMemo(() => {
+    promptHoldClock();
+    const held = new Set<string>();
+    let revealAt: number | undefined;
+    const now = Date.now();
+    const owner = `${deps.props.server?.id ?? "local"}:${conversationOwnerId(deps.props) ?? ""}`;
+    const prompt = deps.props.channel ? undefined : deps.props.prompt;
+    const closesForMessage = prompt !== undefined && !prompt.detached && prompt.turnId === deps.props.activeTurnId;
+    if (waitingQuestion?.owner !== owner) waitingQuestion = undefined;
+    if (prompt && closesForMessage) {
+      const key = JSON.stringify([prompt.turnId, String(prompt.requestId)]);
+      if (waitingQuestion?.key !== key)
+        waitingQuestion = {
+          key,
+          owner,
+          turnId: prompt.turnId,
+          requestId: String(prompt.requestId),
+          at: now,
+          closedAt: undefined,
+        };
+    } else if (prompt) waitingQuestion = undefined;
+    else if (waitingQuestion) waitingQuestion.closedAt ??= now;
+    const waiting = waitingQuestion;
+    if (!waiting) {
+      userRowSeenAt.clear();
+      return { held, revealAt };
+    }
+    // The chat has the question's row only once it has its outcome.
+    const question = deps.props.messages.find(
+      (message) => message.turnId === waiting.turnId && String(message.questionPrompt?.requestId) === waiting.requestId,
+    );
+    const rowDone = Boolean(question?.questionPrompt?.resolution);
+    const closedLongAgo = waiting.closedAt !== undefined && now - waiting.closedAt >= PROMPT_SEND_HOLD_MS;
+    if (!prompt && (rowDone || closedLongAgo)) {
+      waitingQuestion = undefined;
+      userRowSeenAt.clear();
+      return { held, revealAt };
+    }
+    const rows = [...shownMessages(), ...deps.pendingMessages()].filter((message) => message.author === "you");
+    for (const message of rows) {
+      if (!userRowSeenAt.has(message.id)) userRowSeenAt.set(message.id, now);
+      const seenAt = userRowSeenAt.get(message.id) ?? now;
+      const until = seenAt + PROMPT_SEND_HOLD_MS;
+      const beforeQuestion =
+        question?.createdAt !== undefined && message.createdAt !== undefined && message.createdAt <= question.createdAt;
+      if (beforeQuestion || seenAt <= waiting.at || until <= now) continue;
+      held.add(message.id);
+      revealAt = Math.min(revealAt ?? until, until);
+    }
+    return { held, revealAt };
+  });
+  createEffect(
+    () => promptHold().revealAt,
+    (revealAt) => {
+      if (revealAt === undefined) return;
+      const timer = setTimeout(() => setPromptHoldClock((tick) => tick + 1), Math.max(0, revealAt - Date.now()));
+      return () => clearTimeout(timer);
+    },
+  );
   /* The messages of a routine run follow its row and open and close with it. */
-  const drawnMessages = createMemo(() => [
-    ...placeRoutineRunTurns(summarizeRoutineRunMessages(shownMessages()), routineRunTurns(), openRoutineRuns()),
-    ...deps.pendingMessages(),
-  ]);
+  const drawnMessages = createMemo(() => {
+    const { held } = promptHold();
+    const drawn = [
+      ...placeRoutineRunTurns(summarizeRoutineRunMessages(shownMessages()), routineRunTurns(), openRoutineRuns()),
+      ...deps.pendingMessages(),
+    ];
+    return held.size === 0 ? drawn : drawn.filter((message) => !held.has(message.id));
+  });
   function toggleRoutineRun(marker: RoutineRunToggleMarkerModel): void {
     const key = routineRunToggleKey(marker);
     setOpenRoutineRuns((open) => new Map(open).set(key, marker.expanded !== true));
@@ -297,7 +411,12 @@ export function createScrollStore(deps: ScrollStoreDeps) {
       !deps.props.loadingOlder &&
       !deps.props.olderError,
     (needsOlderPage) => {
-      if (needsOlderPage) deps.props.onLoadOlder?.();
+      if (!needsOlderPage) return;
+      // Rows that just arrived, as when a chat opens, have not measured the boundary again: it still
+      // holds the value of the chat before them. Measure before asking for a page. A signal read in
+      // this callback still gives the value from before the write, so use the measured value.
+      if (untrack(() => timelineMessages().length) > 0 && !updateHistoryBoundary()) return;
+      deps.props.onLoadOlder?.();
     },
   );
 
@@ -329,8 +448,28 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   });
 
   /* One writer for the boundary: the row the virtualizer renders first, read where the reader is. */
-  function updateHistoryBoundary(element = deps.elements.scrollElement()): void {
-    setAtHistoryBoundary(chatHistoryBoundaryReached(element, firstRenderedIndex));
+  function updateHistoryBoundary(element = deps.elements.scrollElement()): boolean {
+    const followsLatest = deps.sticky.getStickToLatest();
+    const reached =
+      chatHistoryBoundaryReached(element, firstRenderedIndex, followsLatest) &&
+      (!followsLatest || currentRowsRendered(element));
+    setAtHistoryBoundary(reached);
+    return reached;
+  }
+
+  /**
+   * Rows that arrive lay out a frame or more after the messages change. Until then the transcript
+   * shows the rows from before, such as the chat that is opening, and its height says nothing about
+   * the new rows. The last row on screen tells which chat the transcript shows. Some rows have no
+   * message mark, such as a question that waits for its answer, so the last mark can be a row above it.
+   */
+  function currentRowsRendered(element: HTMLElement | undefined): boolean {
+    const messages = untrack(timelineMessages);
+    if (!element || messages.length === 0) return true;
+    const marks = element.querySelectorAll("[data-chat-search-message]");
+    const lastId = marks[marks.length - 1]?.getAttribute("data-chat-search-message");
+    if (!lastId) return element.querySelector(".virtual-chat-row") !== null;
+    return messages.findLastIndex((message) => message.id === lastId) !== -1;
   }
 
   function updateScrollFade(element = deps.elements.scrollElement()) {
@@ -456,6 +595,9 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     jumpToLatestMessage,
   };
 }
+
+/** How long an agent chat waits after a turn ends before it shows text that is still marked "streaming". */
+const STALE_STREAM_MS = 3_000;
 
 /** Agent text that the host still writes. A plan, the subagents, a card and an image show while they run. */
 function heldWhileWritten(message: AgentMessage): boolean {

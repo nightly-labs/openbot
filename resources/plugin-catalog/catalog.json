@@ -28,9 +28,9 @@
     },
     {
       "slug": "obsidian",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "featured": false,
-      "detailSha256": "37e15fe89d36e955c2b289f421b3a987a88841a3525281a0eb2b4f82974087ca"
+      "detailSha256": "3869f8c6df24d2ea40bdc12fe627eedc27c2fc6886b486c30dcb26a48ef1b079"
     },
     {
       "slug": "atlassian",
@@ -117,6 +117,12 @@
       "detailSha256": "414a33dd79f7318638bc68e56ecaeb81c77762666a9bd6f11a0e228c0323fcf1"
     },
     {
+      "slug": "appsignal",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "06ac0cae59af375996995d2ba631b0cae72c22031e74ba20f6e1d1d393e27a1f"
+    },
+    {
       "slug": "gitlab",
       "version": "1.0.0",
       "featured": false,
@@ -169,6 +175,12 @@
       "version": "1.0.0",
       "featured": false,
       "detailSha256": "6f49588f09b44f27f82958b558efd0d8521a5784e35f55c755337ed4b07e4b42"
+    },
+    {
+      "slug": "cloud66",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "a587a713c4a697281b8169d1067ee7d4ed02ca534d9e9264bbcc7a6e6868c7cd"
     },
     {
       "slug": "context7",
@@ -226,9 +238,9 @@
     },
     {
       "slug": "omnisend",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "featured": false,
-      "detailSha256": "73cd8cb3312090709f3c048b6c4b912c8dff27f96eb530cf36fcaf461eae7d80"
+      "detailSha256": "8697d90f79d5d0c84198497d55424078f81339fe9881d4124d6fba61cbe6df74"
     },
     {
       "slug": "postiz",
@@ -283,6 +295,12 @@
       "version": "1.0.0",
       "featured": false,
       "detailSha256": "b3240d4ee6c9aea1eaad99aecd02e92773657b48918776f07a9cb25d0ab76e8b"
+    },
+    {
+      "slug": "adobe-analytics",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "152f37abfb2a3b385ad46fc03ba0405cd48cc9230f8c513b5c11b9b8dc526943"
     },
     {
       "slug": "adspirer",
@@ -784,9 +802,9 @@
     },
     {
       "slug": "highlevel",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "featured": false,
-      "detailSha256": "4cbf826e4921fafe5120059c745fea2ea94710916141687b6209372d9fbc24b7"
+      "detailSha256": "50bf58de77f174276da93bfeec699f2883dc646f3a16cfcb0727fe0e2a051eac"
     },
     {
       "slug": "hospitable",
@@ -799,6 +817,12 @@
       "version": "1.0.0",
       "featured": false,
       "detailSha256": "c54e87442750f3536c4ec39dbf6deba4638fa6943528ba5371190ee06e3819aa"
+    },
+    {
+      "slug": "hubspot",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "efb708a2f13a17c7dc7f7879b190f9e550949b7ac95737d04d589f21fbaefbb1"
     },
     {
       "slug": "ibkr",
@@ -1009,12 +1033,6 @@
       "version": "1.0.0",
       "featured": false,
       "detailSha256": "d2aece992ac04b73ed82f7ad8bf318a30b4ff1829d835987dce81af836f6ec6f"
-    },
-    {
-      "slug": "mongodb",
-      "version": "1.0.0",
-      "featured": false,
-      "detailSha256": "cc895db953c8ace5f3fd438a5d4b7ff9365c142ef84ce2621d6b37afc3670587"
     },
     {
       "slug": "moomoo",
@@ -1348,9 +1366,9 @@
     },
     {
       "slug": "tessie",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "featured": false,
-      "detailSha256": "e72121c06335698e56fd223daf677a2742eac0e28a1fd05cc7c53d2d7fd9024b"
+      "detailSha256": "a91a28e7f52f0283d427f6891850a694a3a24881b2a25e430f778756ac30c0ab"
     },
     {
       "slug": "tinyfish",

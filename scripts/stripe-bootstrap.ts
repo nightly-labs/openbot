@@ -3,13 +3,19 @@ import {
   BILLING_INTERVALS,
   BILLING_OPTIONAL_CURRENCIES,
   BILLING_PLAN_IDS,
+  BILLING_STORAGE_UPGRADE_TIERS,
   type BillingCurrency,
   type BillingInterval,
   type BillingOptionalCurrency,
   type BillingPlanId,
+  type BillingStorageUpgradeTier,
   billingListPrices,
   billingLookupKey,
+  storageTierListPrices,
+  storageTierLookupKey,
+  storageTierPriceMetadata,
 } from "@openbot/contracts/billing";
+import { VAT_TAX_RATE } from "@openbot/contracts/billing-details";
 import {
   LICENSE_LOOKUP_KEYS,
   LICENSE_METADATA,
@@ -27,9 +33,14 @@ import { z } from "zod";
 
 /**
  * Creates the Stripe catalog that the account server reads: one Product for each plan, and one Price
- * for each plan and interval with the lookup key `openbot_{plan}_{interval}`. It also creates the
- * license Product and one Price for each license plan (`LICENSE_PLANS`), and sets the Customer Portal
- * features. Run it again at any time: it changes only what differs.
+ * for each plan and interval with the lookup key `openbot_{plan}_{interval}`. Each plan also has a
+ * storage Product, with one add-on Price for each storage tier and interval
+ * (`openbot_storage_{plan}_{tier}_{interval}`). It also creates the license Product and one Price for each
+ * license plan (`LICENSE_PLANS`), and sets the Customer Portal features: the Portal does not change a
+ * plan, and the account server sells storage tiers itself. Each Price excludes VAT
+ * (`tax_behavior: exclusive`). It also makes the Tax Rate of Polish VAT, which Checkout adds on top of the
+ * Price when the account server decides that the buyer pays VAT (`apps/auth-api/src/server/billing-tax.ts`).
+ * Run it again at any time: it changes only what differs.
  *
  *   STRIPE_SECRET_KEY=sk_test_... bun scripts/stripe-bootstrap.ts [--live] [--brl] [--webhook-url <url>]
  *
@@ -74,12 +85,44 @@ const priceSchema = z.object({
   currency: z.string(),
   unit_amount: z.number().int().nullable(),
   recurring: z.object({ interval: z.string() }).nullable(),
-  currency_options: z.record(z.string(), z.object({ unit_amount: z.number().int().nullable() })).optional(),
+  currency_options: z
+    .record(
+      z.string(),
+      z.object({ unit_amount: z.number().int().nullable(), tax_behavior: z.string().nullable().optional() }),
+    )
+    .optional(),
   metadata: z.record(z.string(), z.string()).optional(),
   active: z.boolean().optional(),
+  tax_behavior: z.string().nullable().optional(),
 });
 type Price = z.infer<typeof priceSchema>;
+const priceTierSchema = z.object({
+  up_to: z.number().int().nullable(),
+  flat_amount: z.number().int().nullable(),
+  unit_amount: z.number().int().nullable(),
+});
+/** One Price with the amounts of each currency, which Stripe needs again to change a currency's tax behavior. */
+const priceAmountsSchema = z.object({
+  currency_options: z.record(
+    z.string(),
+    z.object({
+      unit_amount: z.number().int().nullable(),
+      tax_behavior: z.string().nullable().optional(),
+      tiers: z.array(priceTierSchema).optional(),
+    }),
+  ),
+});
 const priceListSchema = z.object({ data: z.array(priceSchema) });
+const taxRateListSchema = z.object({
+  data: z.array(
+    z.object({
+      id: z.string(),
+      percentage: z.number(),
+      inclusive: z.boolean(),
+      metadata: z.record(z.string(), z.string()),
+    }),
+  ),
+});
 const portalConfigurationListSchema = z.object({ data: z.array(z.object({ id: z.string() })) });
 const webhookEndpointSchema = z.object({ id: z.string(), url: z.string(), secret: z.string().optional() });
 const webhookEndpointListSchema = z.object({ data: z.array(webhookEndpointSchema), has_more: z.boolean() });
@@ -124,8 +167,135 @@ class StripeAdmin {
   }
 }
 
+/**
+ * VAT goes on top of each Price, in each currency: the subscription adds the Tax Rate of Polish VAT.
+ * Stripe lets a Price or a currency with no tax behavior take one later, one time, so a kept Price gets
+ * it in place and keeps its subscriptions. A Price that includes VAT in a currency cannot change, so it
+ * does not match and a new Price replaces it.
+ */
+function includesTax(price: Price): boolean {
+  return (
+    price.tax_behavior === "inclusive" ||
+    Object.values(price.currency_options ?? {}).some((option) => option.tax_behavior === "inclusive")
+  );
+}
+
+/** Makes a new Price add VAT on top in EUR and in each currency option of `body`. */
+function withExclusiveTax(body: URLSearchParams): URLSearchParams {
+  body.set("tax_behavior", "exclusive");
+  const currencies = new Set([...body.keys()].flatMap((key) => key.match(/^currency_options\[(\w+)\]/)?.[1] ?? []));
+  for (const currency of currencies) body.set(`currency_options[${currency}][tax_behavior]`, "exclusive");
+  return body;
+}
+
+async function ensureExclusiveTax(stripe: StripeAdmin, price: Price): Promise<void> {
+  const pending = Object.entries(price.currency_options ?? {}).filter(
+    ([currency, option]) => currency !== price.currency && option.tax_behavior !== "exclusive",
+  );
+  if (price.tax_behavior === "exclusive" && pending.length === 0) return;
+  const body = new URLSearchParams({ tax_behavior: "exclusive" });
+  if (pending.length > 0) {
+    const query = new URLSearchParams({ "expand[]": "currency_options" });
+    for (const [currency] of pending) query.append("expand[]", `currency_options.${currency}.tiers`);
+    const amounts = await stripe.request("GET", `/v1/prices/${price.id}?${query}`, null, priceAmountsSchema);
+    for (const [currency] of pending) {
+      const option = amounts.currency_options[currency];
+      if (!option) throw new Error(`Price ${price.id} has no ${currency} amount.`);
+      const prefix = `currency_options[${currency}]`;
+      body.set(`${prefix}[tax_behavior]`, "exclusive");
+      if (!option.tiers?.length) {
+        if (option.unit_amount === null) throw new Error(`Price ${price.id} has no ${currency} amount.`);
+        body.set(`${prefix}[unit_amount]`, String(option.unit_amount));
+        continue;
+      }
+      option.tiers.forEach((tier, index) => {
+        body.set(`${prefix}[tiers][${index}][up_to]`, tier.up_to === null ? "inf" : String(tier.up_to));
+        if (tier.flat_amount !== null) body.set(`${prefix}[tiers][${index}][flat_amount]`, String(tier.flat_amount));
+        if (tier.unit_amount !== null) body.set(`${prefix}[tiers][${index}][unit_amount]`, String(tier.unit_amount));
+      });
+    }
+  }
+  await stripe.request("POST", `/v1/prices/${price.id}`, body, priceSchema);
+  logger.info(`Price ${price.lookup_key ?? price.id} now adds VAT on top.`);
+}
+
 function productId(plan: BillingPlanId): string {
   return `openbot_${plan}`;
+}
+
+function storageProductId(plan: BillingPlanId): string {
+  return `openbot_storage_${plan}`;
+}
+
+/** The storage Product of a plan. Its Prices are add-on items on the subscription of the plan. */
+async function ensureStorageProduct(stripe: StripeAdmin, plan: BillingPlanId): Promise<void> {
+  const id = storageProductId(plan);
+  const body = new URLSearchParams({
+    name: `OpenBot ${PLAN_NAME[plan]} storage`,
+    active: "true",
+    "metadata[openbot_kind]": "storage",
+    "metadata[openbot_plan]": plan,
+  });
+  if (await stripe.findProduct(id)) {
+    await stripe.request("POST", `/v1/products/${id}`, body, productSchema);
+    logger.info(`Product ${id} is up to date.`);
+    return;
+  }
+  body.set("id", id);
+  await stripe.request("POST", "/v1/products", body, productSchema);
+  logger.info(`Created product ${id}.`);
+}
+
+/**
+ * The add-on Price of one storage tier. As for a plan, a changed amount makes a new Price and moves the
+ * lookup key to it, and current subscriptions keep the old Price. The metadata names the tier, so the
+ * account server still knows the old Price.
+ */
+async function ensureStoragePrice(
+  stripe: StripeAdmin,
+  existing: readonly Price[],
+  plan: BillingPlanId,
+  tier: BillingStorageUpgradeTier,
+  interval: BillingInterval,
+  optional: readonly BillingOptionalCurrency[],
+): Promise<string> {
+  const lookupKey = storageTierLookupKey(plan, tier, interval);
+  const amounts = storageTierListPrices(plan, tier, interval);
+  const metadata = storageTierPriceMetadata(plan, tier, interval);
+  const current = existing.find((price) => price.lookup_key === lookupKey);
+  const currencies = optionalCurrenciesOf(current, optional);
+  if (
+    current &&
+    current.active !== false &&
+    !includesTax(current) &&
+    current.product === storageProductId(plan) &&
+    current.currency === "eur" &&
+    current.unit_amount === amounts.eur &&
+    current.recurring?.interval === interval &&
+    current.currency_options?.usd?.unit_amount === amounts.usd &&
+    current.currency_options?.pln?.unit_amount === amounts.pln &&
+    currencies.every((currency) => current.currency_options?.[currency]?.unit_amount === amounts[currency]) &&
+    Object.entries(metadata).every(([key, value]) => current.metadata?.[key] === value)
+  ) {
+    await ensureExclusiveTax(stripe, current);
+    logger.info(`Price ${lookupKey} is up to date.`);
+    return current.id;
+  }
+  const body = new URLSearchParams({
+    product: storageProductId(plan),
+    currency: "eur",
+    unit_amount: String(amounts.eur),
+    "recurring[interval]": interval,
+    lookup_key: lookupKey,
+    transfer_lookup_key: "true",
+    "currency_options[usd][unit_amount]": String(amounts.usd),
+    "currency_options[pln][unit_amount]": String(amounts.pln),
+  });
+  for (const [key, value] of Object.entries(metadata)) body.set(`metadata[${key}]`, value);
+  for (const currency of currencies) body.set(`currency_options[${currency}][unit_amount]`, String(amounts[currency]));
+  const created = await stripe.request("POST", "/v1/prices", withExclusiveTax(body), priceSchema);
+  logger.info(`${current ? "Replaced" : "Created"} price ${lookupKey}.`);
+  return created.id;
 }
 
 async function ensureProduct(stripe: StripeAdmin, plan: BillingPlanId): Promise<void> {
@@ -167,6 +337,7 @@ function priceMatches(
   optional: readonly BillingOptionalCurrency[],
 ): boolean {
   return (
+    !includesTax(price) &&
     price.product === productId(plan) &&
     price.currency === "eur" &&
     price.unit_amount === amounts.eur &&
@@ -193,6 +364,7 @@ async function ensurePrice(
   const current = existing.find((price) => price.lookup_key === lookupKey);
   const currencies = optionalCurrenciesOf(current, optional);
   if (current && priceMatches(current, plan, interval, amounts, currencies)) {
+    await ensureExclusiveTax(stripe, current);
     logger.info(`Price ${lookupKey} is up to date.`);
     return current.id;
   }
@@ -209,7 +381,7 @@ async function ensurePrice(
     "metadata[openbot_interval]": interval,
   });
   for (const currency of currencies) body.set(`currency_options[${currency}][unit_amount]`, String(amounts[currency]));
-  const created = await stripe.request("POST", "/v1/prices", body, priceSchema);
+  const created = await stripe.request("POST", "/v1/prices", withExclusiveTax(body), priceSchema);
   logger.info(`${current ? "Replaced" : "Created"} price ${lookupKey}.`);
   return created.id;
 }
@@ -265,6 +437,7 @@ async function ensureLicensePrice(
   if (
     current &&
     current.active !== false &&
+    !includesTax(current) &&
     current.product === LICENSE_PRODUCT_ID &&
     current.currency === "eur" &&
     current.recurring?.interval === plan.interval &&
@@ -273,6 +446,7 @@ async function ensureLicensePrice(
     current.metadata?.[LICENSE_METADATA.interval] === plan.interval &&
     current.metadata?.[LICENSE_METADATA.bundle] === bundle
   ) {
+    await ensureExclusiveTax(stripe, current);
     logger.info(`Price ${lookupKey} is up to date.`);
     return current.id;
   }
@@ -304,8 +478,47 @@ async function ensureLicensePrice(
     body.set(`${prefix}[1][up_to]`, "inf");
     body.set(`${prefix}[1][unit_amount]`, String(price.extraUser));
   }
-  const created = await stripe.request("POST", "/v1/prices", body, priceSchema);
+  const created = await stripe.request("POST", "/v1/prices", withExclusiveTax(body), priceSchema);
   logger.info(`${current ? "Replaced" : "Created"} price ${lookupKey}.`);
+  return created.id;
+}
+
+/**
+ * The seller is in Poland and is not in the EU One Stop Shop, so every buyer that pays VAT pays Polish VAT
+ * at 23%, on top of the Price. Stripe cannot change the percentage of a Tax Rate, so a rate with another
+ * percentage is archived and a new one replaces it. An archived rate stays on the subscriptions that use it.
+ */
+async function ensureVatTaxRate(stripe: StripeAdmin): Promise<string> {
+  const rates = (await stripe.request("GET", "/v1/tax_rates?active=true&limit=100", null, taxRateListSchema)).data;
+  const current = rates.filter((rate) => rate.metadata[VAT_TAX_RATE.metadataKey] === VAT_TAX_RATE.metadataValue);
+  const kept = current.find((rate) => rate.percentage === VAT_TAX_RATE.percentage && !rate.inclusive);
+  for (const rate of current) {
+    if (rate === kept) continue;
+    await stripe.request(
+      "POST",
+      `/v1/tax_rates/${rate.id}`,
+      new URLSearchParams({ active: "false" }),
+      z.object({ id: z.string() }),
+    );
+    logger.info(`Archived tax rate ${rate.id}.`);
+  }
+  if (kept) return kept.id;
+  const created = await stripe.request(
+    "POST",
+    "/v1/tax_rates",
+    new URLSearchParams({
+      display_name: "VAT",
+      description: "Polish VAT",
+      percentage: String(VAT_TAX_RATE.percentage),
+      inclusive: "false",
+      country: "PL",
+      jurisdiction: "PL",
+      tax_type: "vat",
+      [`metadata[${VAT_TAX_RATE.metadataKey}]`]: VAT_TAX_RATE.metadataValue,
+    }),
+    z.object({ id: z.string() }),
+  );
+  logger.info(`Created tax rate ${created.id} (Polish VAT, ${VAT_TAX_RATE.percentage}%).`);
   return created.id;
 }
 
@@ -347,26 +560,19 @@ async function defaultPortalConfiguration(stripe: StripeAdmin): Promise<string> 
   return created;
 }
 
-async function updatePortalConfiguration(stripe: StripeAdmin, prices: Record<BillingPlanId, string[]>): Promise<void> {
+/**
+ * The Portal shows the invoices, changes the payment method and cancels a plan at the end of its period.
+ * It does not change a plan: a plan change would keep the storage add-on of the old plan, and the
+ * account server sells storage tiers itself (`POST /v1/me/billing/storage`).
+ */
+async function updatePortalConfiguration(stripe: StripeAdmin): Promise<void> {
   const configuration = { id: await defaultPortalConfiguration(stripe) };
   const body = new URLSearchParams({
     "features[invoice_history][enabled]": "true",
     "features[payment_method_update][enabled]": "true",
     "features[subscription_cancel][enabled]": "true",
     "features[subscription_cancel][mode]": "at_period_end",
-    "features[subscription_update][enabled]": "true",
-    // An upgrade gives the larger server now, so it is charged now. A downgrade or a shorter interval
-    // starts at the next period, which the user already paid for.
-    "features[subscription_update][proration_behavior]": "always_invoice",
-    "features[subscription_update][schedule_at_period_end][conditions][0][type]": "decreasing_item_amount",
-    "features[subscription_update][schedule_at_period_end][conditions][1][type]": "shortening_interval",
-  });
-  body.append("features[subscription_update][default_allowed_updates][]", "price");
-  BILLING_PLAN_IDS.forEach((plan, index) => {
-    body.set(`features[subscription_update][products][${index}][product]`, productId(plan));
-    // One subscription pays for one server, so the quantity stays 1.
-    body.set(`features[subscription_update][products][${index}][adjustable_quantity][enabled]`, "false");
-    for (const price of prices[plan]) body.append(`features[subscription_update][products][${index}][prices][]`, price);
+    "features[subscription_update][enabled]": "false",
   });
   await stripe.request(
     "POST",
@@ -447,6 +653,11 @@ export async function bootstrapStripe(options: StripeBootstrapOptions): Promise<
 
   const lookupKeys = [
     ...BILLING_PLAN_IDS.flatMap((plan) => BILLING_INTERVALS.map((interval) => billingLookupKey(plan, interval))),
+    ...BILLING_PLAN_IDS.flatMap((plan) =>
+      BILLING_STORAGE_UPGRADE_TIERS.flatMap((tier) =>
+        BILLING_INTERVALS.map((interval) => storageTierLookupKey(plan, tier, interval)),
+      ),
+    ),
     ...LICENSE_LOOKUP_KEYS,
   ];
   const existing: Price[] = [];
@@ -467,12 +678,23 @@ export async function bootstrapStripe(options: StripeBootstrapOptions): Promise<
 
   for (const plan of BILLING_PLAN_IDS) logger.info(`Prices ${productId(plan)}: ${prices[plan].join(", ")}`);
 
+  for (const plan of BILLING_PLAN_IDS) {
+    await ensureStorageProduct(stripe, plan);
+    const storagePrices: string[] = [];
+    for (const tier of BILLING_STORAGE_UPGRADE_TIERS) {
+      for (const interval of BILLING_INTERVALS)
+        storagePrices.push(await ensureStoragePrice(stripe, existing, plan, tier, interval, optional));
+    }
+    logger.info(`Prices ${storageProductId(plan)}: ${storagePrices.join(", ")}`);
+  }
+
   // The license is not in the Portal product list, so the Portal cannot change its users or price.
   await ensureLicenseProduct(stripe);
   for (const plan of LICENSE_PLANS)
     logger.info(`Price ${licenseLookupKey(plan)}: ${await ensureLicensePrice(stripe, existing, plan, optional)}`);
 
-  await updatePortalConfiguration(stripe, prices);
+  logger.info(`Tax rate of Polish VAT: ${await ensureVatTaxRate(stripe)}`);
+  await updatePortalConfiguration(stripe);
   return webhookUrl ? await ensureWebhookEndpoint(stripe, webhookUrl, options.replaceWebhook ?? false) : null;
 }
 

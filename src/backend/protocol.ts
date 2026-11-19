@@ -70,10 +70,38 @@ export interface AppServerRequest {
    * as an MCP client whose tool call timed out. An answer after that reaches nobody.
    */
   signal?: AbortSignal;
+  /**
+   * In process only, never on the wire. The provider stops waiting for the answer after a fixed time
+   * that OpenBot cannot extend, such as an MCP client that asked for no progress notifications. A
+   * question that waits longer than this answers the call first and stays open (#6230).
+   */
+  detachAfterMs?: number;
+  /**
+   * In process only, never on the wire. A Codex subagent or an OpenCode subagent sent it, and OpenBot
+   * runs it in the chat and turn of the parent agent. Its call still waits in the subagent's own turn
+   * (#9727), or in OpenCode's background subagent after the parent's turn ends (#10657).
+   */
+  subagent?: true;
+  /**
+   * In process only, never on the wire. The provider stops the call after a fixed time, also when
+   * OpenBot sends progress, so OpenBot must answer before this time: Antigravity 1.5.9 stops each MCP
+   * tool call after 180 s. A call of the running turn also gets `detachAfterMs` here when it is smaller
+   * (#10577). A question detaches as with `detachAfterMs`. A browser takeover answers
+   * that the user has not finished, keeps its card, and the next call for the same tab waits on it
+   * again (#9689).
+   */
+  answerBeforeMs?: number;
 }
 
 /** The account type of Claude's own sign-in when it runs on the saved key, with no claude.ai account. */
 export const CLAUDE_API_KEY_ACCOUNT_TYPE = "claude-api-key";
+
+/**
+ * The account type of a Claude sign-in when the CLI uses an Anthropic API key that OpenBot did not give
+ * it: an `apiKeyHelper`, or a key in the user's environment or Claude settings. Anthropic bills the key,
+ * not the Claude plan, so the account row says so (#10192).
+ */
+export const CLAUDE_CLI_API_KEY_ACCOUNT_TYPE = "claude-cli-api-key";
 
 /**
  * The account of a Codex whose selected model provider does not use an OpenAI login
@@ -159,6 +187,11 @@ export interface AccountRateLimitResult {
   normalModelSlug?: string | null | undefined;
   primary?: AccountRateLimitWindowResult | null | undefined;
   secondary?: AccountRateLimitWindowResult | null | undefined;
+  /**
+   * Codex only: whether the account can work on credits when its plan windows are spent. Null when
+   * Codex sends no credit state, as for a model's own quota, or a push that leaves it unchanged.
+   */
+  credits?: { available: boolean } | null | undefined;
 }
 
 /** One named quota of the plan and the model names it covers. Antigravity only. */
@@ -222,6 +255,8 @@ export type ResponseDecoder<T> = (value: unknown) => T;
 
 export interface ModelListResponse {
   nextCursor?: string;
+  /** ACP: the agent takes a message in its running turn (`_session/steering`), for each of its models. */
+  steersTurns?: boolean;
   data: Array<{
     model?: string;
     displayName?: string;
@@ -233,19 +268,24 @@ export interface ModelListResponse {
     serviceTiers?: Array<{ id: string; name?: string }>;
     /** Codex: the older, deprecated form of `serviceTiers`, such as `["fast"]`. */
     additionalSpeedTiers?: string[];
+    /** A custom ACP agent: the agent that serves this model takes a message in its running turn. */
+    steersTurns?: boolean;
   }>;
 }
 
 export function decodeModelListResponse(value: unknown): ModelListResponse {
   const data = getArray(value, "data");
   const nextCursor = getString(value, "nextCursor");
+  const steersTurns = isRecord(value) && value.steersTurns === true;
   return {
     ...(nextCursor ? { nextCursor } : {}),
+    ...(steersTurns ? { steersTurns } : {}),
     data: data.filter(isRecord).map((item) => ({
       ...(isString(item.model) ? { model: item.model } : {}),
       ...(isString(item.displayName) ? { displayName: item.displayName } : {}),
       ...(isString(item.defaultReasoningEffort) ? { defaultReasoningEffort: item.defaultReasoningEffort } : {}),
       ...(isBoolean(item.hidden) ? { hidden: item.hidden } : {}),
+      ...(item.steersTurns === true ? { steersTurns: true } : {}),
       ...(isBoolean(item.reasoningEffortConfigurable)
         ? { reasoningEffortConfigurable: item.reasoningEffortConfigurable }
         : {}),
@@ -469,13 +509,26 @@ function decodeRateLimit(value: unknown): AccountRateLimitResult | null | undefi
   const normalModelSlug = optionalString(record, "normalModelSlug");
   const primary = decodeRateLimitWindow(record.primary);
   const secondary = decodeRateLimitWindow(record.secondary);
+  const credits = decodeRateLimitCredits(record.credits);
   return {
     ...(limitId === undefined ? {} : { limitId }),
     ...(limitName === undefined ? {} : { limitName }),
     ...(normalModelSlug === undefined ? {} : { normalModelSlug }),
     ...(primary === undefined ? {} : { primary }),
     ...(secondary === undefined ? {} : { secondary }),
+    ...(credits === undefined ? {} : { credits }),
   };
+}
+
+/**
+ * Codex's `{ hasCredits, unlimited, balance }`. Only whether credits remain: OpenBot does not show the
+ * balance. A state it cannot read is unknown, so the usage reading that carries it still decodes.
+ */
+function decodeRateLimitCredits(value: unknown): AccountRateLimitResult["credits"] {
+  if (value === undefined) return value;
+  if (!isDynamicRecord(value) || typeof value.hasCredits !== "boolean" || typeof value.unlimited !== "boolean")
+    return null;
+  return { available: value.hasCredits || value.unlimited };
 }
 
 function decodeRateLimitGroups(value: unknown): AccountRateLimitGroupResult[] | undefined {
@@ -576,7 +629,19 @@ export function bridgedToolName(item: ThreadItem): string | null {
   const tool = getString(item, "tool") ?? getString(item, "name");
   if (tool !== "tool_call" && tool !== "mcp__openbot__tool_call") return null;
   const args = getRecord(item, "arguments");
-  return getString(args, "name") ?? getString(args, "tool");
+  const name = getString(args, "name") ?? getString(args, "tool");
+  return name === null ? null : qualifiedToolName(name);
+}
+
+/**
+ * The qualified name `<namespace>.<tool>` of a name that an agent sends to tool_call. An agent also sends
+ * the MCP name that it sees for the tool, `<namespace>__<tool>` or `mcp__<namespace>__<tool>`, and
+ * tool_call runs it (#7955), so the readers of its items read the same tool.
+ */
+export function qualifiedToolName(name: string): string {
+  const trimmed = name.trim();
+  const mcp = /^(?:mcp__)?([A-Za-z0-9_-]+?)__([A-Za-z0-9_-]+)$/.exec(trimmed);
+  return mcp ? `${mcp[1]}.${mcp[2]}` : trimmed;
 }
 
 export function getArray(record: unknown, key: string): unknown[] {

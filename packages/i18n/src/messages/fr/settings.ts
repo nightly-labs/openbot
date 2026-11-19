@@ -22,9 +22,17 @@ export const messages = {
   "settings.interfaceFont.title": "Police de l’interface",
   "settings.interfaceFont.description": "La police des menus, des discussions et des réglages.",
   "settings.interfaceFont.default": "Par défaut (Inter)",
+  "settings.interfaceFont.defaultSystem": "Police système",
   "settings.codeFont.title": "Police du code",
   "settings.codeFont.description": "La police du code, des terminaux et des chemins de fichier.",
   "settings.codeFont.default": "Par défaut",
+  "settings.motion.title": "Mouvement",
+  "settings.backgroundBlur.title": "Flou d’arrière-plan",
+  "settings.backgroundBlur.description":
+    "Flou derrière les menus et les dialogues. Désactivé au départ sur un ordinateur sans GPU.",
+  "settings.movingFaces.title": "Visages d’agents animés",
+  "settings.movingFaces.description":
+    "Les visages des agents clignent et bougent. Immobiles au départ sur un ordinateur sans GPU.",
   "settings.logoColor.title": "Couleur du logo",
   "settings.logoColor.description": "Affichée dans le Dock, la barre des tâches et l’îlot dynamique.",
   "settings.logoColor.buildNote":
@@ -45,6 +53,19 @@ export const messages = {
   "settings.chatBackground.light": "Arrière-plan du chat en thème Clair",
   "settings.chatBackground.dark": "Arrière-plan du chat en thème Sombre",
   "settings.chatBackground.default": "Par défaut",
+  "settings.chatBackdrop.title": "Arrière-plan de la fenêtre",
+  "settings.chatBackdrop.description":
+    "Une scène, une image ou un GIF derrière toute la fenêtre sur cet appareil. Demandez une scène à un agent, puis choisissez « Utiliser comme arrière-plan » sur sa réponse.",
+  "settings.chatBackdrop.none": "Aucun",
+  "settings.chatBackdrop.pond": "Bassin à koïs",
+  "settings.chatBackdrop.jellyfish": "Méduses",
+  "settings.chatBackdrop.sunset": "Coucher de soleil rétro",
+  "settings.chatBackdrop.snowfall": "Chute de neige",
+  "settings.chatBackdrop.fireflies": "Lucioles",
+  "settings.chatBackdrop.upload": "Importer une image…",
+  "settings.chatBackdrop.uploadRefused": "Utilisez une image PNG, JPEG, GIF, WebP ou AVIF de 20 Mo au plus.",
+  "settings.chatBackdrop.saveFailed": "L’arrière-plan n’a pas été enregistré.",
+  "settings.chatBackdrop.removeFailed": "L’arrière-plan n’a pas été supprimé.",
   "settings.chatColor.title": "Couleur du chat",
   "settings.chatColor.description": "Teinte les bulles de vos messages. Les personnes de vos serveurs la voient aussi.",
   "settings.chatColor.yours": "Votre couleur de chat",
@@ -64,6 +85,12 @@ export const messages = {
   "settings.chatColor.red": "Rouge",
   "settings.chatColor.green": "Vert",
   "settings.chatColor.blue": "Bleu",
+  "settings.bubbleStyle.title": "Vos bulles",
+  "settings.bubbleStyle.description":
+    "Dans une discussion avec un agent, vos bulles prennent la couleur de l'agent. Vous seul la voyez.",
+  "settings.bubbleStyle.solid": "Plein",
+  "settings.bubbleStyle.tint": "Teinte",
+  "settings.bubbleStyle.classic": "Classique",
   // The Settings window, General tab.
   "settings.appBehavior.title": "Comportement de l’application",
   "settings.conversations.title": "Conversations",
@@ -105,7 +132,7 @@ export const messages = {
   "settings.sendShortcut.description":
     "Choisissez les touches qui envoient un message sur cet appareil et dans ce navigateur.",
   "settings.chatOrder.description":
-    "Choisissez où la barre latérale affiche les discussions non lues sur cet appareil. Manuel désactive le groupe Non lues.",
+    "Choisissez comment la barre latérale trie les discussions sur cet appareil. Manuel et Activité récente désactivent le groupe Non lues.",
   "settings.sendShortcut.enter": "Entrée pour envoyer",
   "settings.sendShortcut.modEnterMac": "⌘Entrée pour envoyer",
   "settings.sendShortcut.modEnterWin": "Ctrl+Entrée pour envoyer",
@@ -296,7 +323,7 @@ export const messages = {
     "Activé : les métadonnées d’utilisation et de fiabilité sont envoyées aux services analytiques auto-hébergés d’OpenBot avec l’identifiant et l’e-mail de votre compte. Désactivé : les mêmes métadonnées sont envoyées avec un identifiant d’installation aléatoire uniquement. Les conversations, fichiers et prompts ne sont jamais envoyés. Ce réglage s’applique à ce navigateur.",
   // The Settings window shell: its tab list, headers and save bar.
   "settings.tab.general.title": "Général",
-  "settings.tab.general.description": "Contrôler le comportement d’OpenBot sur cet ordinateur.",
+  "settings.tab.general.description": "Choisir le fonctionnement des discussions et ce qu’OpenBot partage.",
   "settings.tab.agents.title": "Agents",
   "settings.tab.agents.description":
     "Choisir ce que les agents de cet ordinateur peuvent faire quand vous ne le réglez pas pour un agent.",
@@ -323,6 +350,14 @@ export const messages = {
   "settings.tab.hostedServers.title": "Serveurs hébergés",
   "settings.tab.hostedServers.description":
     "Créer des serveurs OpenBot qui fonctionnent quand cet ordinateur est éteint.",
+  "settings.tab.appearance.description": "Choisir le thème, les couleurs, la langue et les polices.",
+  "settings.tab.appBehavior.description": "Choisir comment OpenBot démarre et fonctionne sur cet ordinateur.",
+  "settings.appearance.colorsTitle": "Couleurs",
+  "settings.appearance.textTitle": "Langue et texte",
+  "settings.appBehavior.startTitle": "Démarrage et sortie",
+  "settings.appBehavior.backgroundTitle": "Arrière-plan",
+  "settings.sections.group.account": "Compte",
+  "settings.sections.group.thisComputer": "Cet ordinateur",
   "settings.sections.label": "Sections des réglages",
   "settings.panel.resize": "Redimensionner le panneau de droite",
   "settings.preferences.loadFailed": "Impossible de charger vos réglages.",
@@ -670,6 +705,10 @@ export const messages = {
   "settings.voice.language.parakeetUnifiedEnglishOnly":
     "Parakeet Unified reconnaît uniquement l’anglais. Pour fixer une langue, utilisez Whisper, Cohere ou ElevenLabs.",
   "settings.voice.language.automatic": "Automatique",
+  "settings.voice.pause.title": "Pause avant l’envoi",
+  "settings.voice.pause.description":
+    "Dans une conversation vocale, OpenBot envoie vos mots quand vous arrêtez de parler pendant cette durée. Choisissez une pause plus longue si vous parlez lentement ou vous arrêtez pour réfléchir. La voix en direct Codex détecte la fin elle-même.",
+  "settings.voice.pause.seconds": "{seconds} s",
   "settings.voice.loadFailed": "Impossible de lire les modèles vocaux.",
   "settings.voice.saveFailed": "Impossible d’enregistrer le réglage vocal. Réessayez.",
   "settings.voice.downloadFailed": "Impossible de lancer le téléchargement. Réessayez.",
@@ -764,6 +803,13 @@ export const messages = {
   "settings.transfer.import.lede": "Choisissez le fichier exporté depuis l’autre serveur. Son nom se termine par .zip.",
   "settings.transfer.import.choose": "Choisir un fichier…",
   "settings.transfer.import.reading": "Lecture du fichier…",
+  "settings.transfer.upload.label": "Envoi vers le serveur",
+  "settings.transfer.upload.sending": "Envoi du fichier…",
+  "settings.transfer.upload.sent": "{sent} sur {total} envoyés",
+  "settings.transfer.upload.serverReading": "Le serveur lit le fichier…",
+  "settings.transfer.upload.etaSoon": "Moins d’une minute restante",
+  "settings.transfer.upload.etaMinutes": "Environ {minutes} min restantes",
+  "settings.transfer.upload.etaHours": "Environ {hours} h {minutes} min restantes",
   "settings.transfer.import.openFailed": "Impossible d’ouvrir le fichier",
   "settings.transfer.import.contains": "Ce fichier contient",
   "settings.transfer.import.source": "OpenBot {version} · exporté le {date}",
@@ -801,8 +847,12 @@ export const messages = {
   "settings.transfer.copy.noAgents": "Ce serveur n’a aucun agent.",
   "settings.transfer.copy.new": "Nouveau",
   "settings.transfer.copy.notCopied":
-    "Leurs canaux et le dossier partagé sont aussi copiés. Les clés d’API, les connexions, les connecteurs et l’historique des chats ne sont pas copiés. Configurez-les à nouveau sur l’autre serveur.",
+    "Leurs canaux, flux de routines, workflows et le dossier partagé sont aussi copiés. Les clés d’API, les connexions, les connecteurs et l’historique des chats ne sont pas copiés. Configurez-les à nouveau sur l’autre serveur.",
   "settings.transfer.copy.submit": { one: "Copier {count} agent", other: "Copier {count} agents" },
+  "settings.transfer.copy.duplicatesTitle": "Copier des agents en double ?",
+  "settings.transfer.copy.duplicatesDescription":
+    "{server} a déjà des agents avec ces noms : {names}. La copie ajoute un deuxième agent pour chacun. Chaque copie est un agent distinct, avec ses propres discussions, fichiers et souvenirs.",
+  "settings.transfer.copy.duplicatesConfirm": "Copier les doublons",
   "settings.transfer.copy.copying": "Copie…",
   "settings.transfer.copy.done": {
     one: "{count} agent copié vers {server}.",

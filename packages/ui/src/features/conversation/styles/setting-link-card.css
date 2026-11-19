@@ -1,0 +1,36 @@
+/* Setting card: an agent shows where a setting is, and Open goes to its row. */
+
+.setting-link-card .setting-link-icon {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: var(--openbot-control-lg);
+  height: var(--openbot-control-lg);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-control-active);
+  color: var(--openbot-text-primary);
+}
+
+.setting-link-card .setting-link-icon > svg {
+  width: 16px;
+  height: 16px;
+}
+
+.setting-link-card .setting-link-path {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.setting-link-card .setting-link-path-chevron {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  color: var(--openbot-text-tertiary);
+}
+
+.setting-link-card .setting-link-note {
+  margin: 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}

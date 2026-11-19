@@ -1,0 +1,135 @@
+name: Release upgrade history
+
+# Once a week, and on demand, checks that the newest public release starts on the data of two old
+# releases: the oldest public release with a database (v0.1.14) and the newest release that is at
+# least 60 days old. No copy of openbot.db is made before an upgrade, so an install that skipped many
+# releases must still upgrade. The release workflow tests only the release before it; these runs take
+# time that a release must not wait for, so they are here.
+#
+# Each run checks out the newest release tag, so that `scripts/release-upgrade-e2e.ts` and its
+# migrations are the ones of the build that it installs, and runs the signed macOS ARM64 ZIPs from
+# GitHub Releases: v0.1.14 shipped only that artifact. `--history` seeds only what the old release
+# has (`scripts/release-upgrade-e2e.ts` says what). The script must have `--history` at that tag, so
+# the first run that can pass is on the first release that has it.
+#
+# The `large-database` job upgrades a generated database shaped like the largest user database
+# (`scripts/migration-large-db-e2e.ts`) from the source of the default branch, and uploads the time,
+# disk and memory of each migration. The full 17 GB size needs about 85 GB of free disk, which a
+# hosted runner does not have.
+on:
+  schedule:
+    - cron: "41 5 * * 1"
+  workflow_dispatch:
+    inputs:
+      oldest:
+        description: The tag of the oldest release to start from
+        default: v0.1.14
+      age_days:
+        description: Also start from the newest release that is at least this many days old
+        default: "60"
+      size_gb:
+        description: The size of the generated large database, in GB
+        default: "1.5"
+
+permissions: {}
+
+concurrency:
+  group: release-upgrade-history
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    name: Upgrade from ${{ matrix.label }}
+    if: github.repository == 'nightly-labs/openbot'
+    runs-on: macos-15
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: the oldest release
+            previous: --previous=${{ inputs.oldest || 'v0.1.14' }}
+          - label: a release ${{ inputs.age_days || '60' }} days old
+            previous: --previous-age-days=${{ inputs.age_days || '60' }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PREVIOUS: ${{ matrix.previous }}
+    steps:
+      - name: Read the newest published release
+        id: latest
+        run: |
+          tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "The newest release has the tag '$tag', not vX.Y.Z." >&2
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Check out the newest release
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.latest.outputs.tag }}
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+
+      - name: Download the newest release
+        id: download
+        env:
+          TAG: ${{ steps.latest.outputs.tag }}
+        run: |
+          name="OpenBot-${TAG#v}-arm64.zip"
+          directory="$RUNNER_TEMP/newest"
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir "$directory" \
+            --pattern "$name" --pattern SHA256SUMS.txt
+          (cd "$directory" && grep -E "^[0-9a-f]{64} [ *]?${name//./\\.}\$" SHA256SUMS.txt | shasum -a 256 -c -)
+          echo "zip=$directory/$name" >> "$GITHUB_OUTPUT"
+
+      - name: Upgrade from the old release
+        env:
+          NEW_ZIP: ${{ steps.download.outputs.zip }}
+        run: bun scripts/release-upgrade-e2e.ts macos --history "--new=$NEW_ZIP" "$PREVIOUS"
+
+      # Versions and counts only, no user text.
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-upgrade-history-${{ strategy.job-index }}
+          path: .openbot-build/release-upgrade-e2e/report.json
+          if-no-files-found: ignore
+
+  large-database:
+    name: Upgrade a large database
+    if: github.repository == 'nightly-labs/openbot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install: ignore-scripts
+
+      - name: Upgrade the generated database
+        env:
+          SIZE_GB: ${{ inputs.size_gb || '1.5' }}
+        run: bun scripts/migration-large-db-e2e.ts "--size-gb=$SIZE_GB"
+
+      # Generated rows only, no user data.
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: migration-large-db
+          path: .openbot-build/migration-large-db/report.json
+          if-no-files-found: ignore

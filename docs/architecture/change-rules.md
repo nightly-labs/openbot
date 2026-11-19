@@ -68,7 +68,7 @@ safe to replay. Keep domain retry and recovery rules at their existing owners.
    domains it renders and nothing else; `WorkspaceShell` reads only what decides *which* pane
    renders, and passes a value down as a prop when two of them would otherwise derive it twice. A
    component that assembles another one's props is how the god controller grew back last time.
-9. Do not add temporary compatibility paths without a removal condition and a test for that condition. Released Team API protocol adapters are permanent by default and follow the policy below.
+9. Do not add temporary compatibility paths without a removal condition and a test for that condition. Team API protocol adapters stay while a release in the support window speaks their protocol (root `AGENTS.md`, `packages/contracts/AGENTS.md`).
 10. Log through `@openbot/logging` (`ts-log` Logger), never bare `console.*` - Biome's `noConsole`
     enforces this in `src`, `scripts` and `packages`. The remote-desktop build recipe scripts that the
     `noConsole` override in `biome.json` excludes are exempt. The `Require a recipe version bump` step
@@ -119,8 +119,8 @@ safe to replay. Keep domain retry and recovery rules at their existing owners.
     snapshot document only through `describeTarget`.
 
 SQLite migration history starts at the frozen version 8 compatibility baseline. Keep the baseline
-schema unchanged, append every later migration in numeric order, and update the separate latest
-schema used for new databases. Never remove or rewrite a migration that may have shipped.
+schema unchanged and append every later migration in numeric order. A new database runs the same
+migrations from the baseline. Never remove or rewrite a migration that may have shipped.
 
 At startup, chat recovery reads all saved provider sessions for each thread, including inactive
 sessions from an upgrade or a provider change. It uses each session's provider and merges the

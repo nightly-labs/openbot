@@ -14,6 +14,7 @@ export type WindowPage =
   | "workflows"
   | "usage"
   | "library"
+  | "crm"
   | "marketplace"
   | "settings"
   | "server-settings"
@@ -217,6 +218,11 @@ const context = createSimpleContext({
         leavePricing();
         const serverId = activeServerId();
         if (serverId) usage.openLibrary(serverId, source);
+      },
+      openCrm(source: HTMLElement | null, connectors = false) {
+        leavePricing();
+        const serverId = activeServerId();
+        if (serverId) usage.openCrm(serverId, source, connectors);
       },
       openSettings(source: HTMLElement | null) {
         leavePricing();

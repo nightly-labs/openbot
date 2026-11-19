@@ -6,13 +6,17 @@
 // key; that with no stored key the config names no key, so the user's own sign-in stays in use;
 // that a custom endpoint saved as `opencode-go` keeps its URL when a key is stored; that the stored
 // key reaches neither the free tier nor `OPENCODE_API_KEY`, so a refused key cannot fail the free
-// models (#7550); and that a model whose provider has no sign-in names that provider and its fix
-// (#2746).
+// models (#7550); that a model whose provider has no sign-in names that provider and its fix
+// (#2746); that OpenCode 2's `-32000` for a refused saved key names the saved key, not a missing
+// sign-in (#9095), and a 403 that OpenCode 2 stored for the turn names the plan or the network, not the key
+// (#12281); and that a `-32000` for a provider with a key in OpenCode 2's own database says
+// that the provider refused the request, as a firewall's 403 does, not that a sign-in is missing (#10166).
 // `bun run test:opencode-expired-key`. Writes .openbot-build/opencode-expired-key-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { sourceText } from "@openbot/i18n/source";
 import type { AgentClient } from "../src/backend/agent-client";
 import type { AgentCliInfo } from "../src/backend/cli";
@@ -40,6 +44,8 @@ interface Report {
   noStoredKey?: { configKey: string | null; key: string | null };
   endpoint?: { baseURL: string | null; zenKey: string | null };
   authRequired?: { error: string };
+  refusedV2?: { saved: string; notSaved: string; refused401: string | null; refused403: string | null };
+  providerRefused?: { error: string };
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-opencode-expired-key-e2e-"));
@@ -51,6 +57,11 @@ let endpoints: CustomProviderConfig[] = [];
 process.env.FAKE_LOG = log;
 // `FAKE_AUTH_KEY` stands for the key in OpenCode's own `auth.json`.
 process.env.FAKE_AUTH_KEY = "expired";
+// OpenBot reads OpenCode's own key store here, never the developer's.
+const openCodeData = join(root, "data", "opencode");
+process.env.XDG_DATA_HOME = join(root, "data");
+delete process.env.OPENCODE_AUTH_CONTENT;
+delete process.env.OPENCODE_DB;
 
 /** A new process, as the provider runtime starts after a key change. The key is read at spawn. */
 function open(cli: AgentCliInfo): AgentClient {
@@ -152,6 +163,86 @@ try {
     "A provider with no sign-in names itself and its fix.",
   );
   report.authRequired = { error: authError };
+
+  // 6. OpenCode 2.2.5 sends a refused OpenCode Go key as `-32000` with no reason. With a saved key the
+  // error names that key and its fix. With no saved key OpenBot cannot tell a refused key from a
+  // missing one, so the error stays the missing sign-in.
+  delete process.env.FAKE_PROVIDER_AUTH;
+  storedKey = "expired-v2";
+  const sixth = open(cli);
+  const { error: saved } = await runTurn(sixth, await startThread(sixth, { cwd: workspace }));
+  assert.equal(saved, sourceText("error.provider.opencodeKeyRefused"), "A refused saved key names its fix.");
+  // OpenCode 2.2.5 keeps the status of the refusal in the newest message row of the session. A 401 is
+  // the key, so the key text stays. A 403 refuses a valid key, such as a plan that is not active, so a
+  // new key cannot help and the error must not ask for one (#12281).
+  await mkdir(openCodeData, { recursive: true });
+  const sessions = new DatabaseSync(join(openCodeData, "opencode.db"));
+  sessions.exec(
+    "CREATE TABLE session_message (id TEXT PRIMARY KEY, session_id TEXT, type TEXT, seq INTEGER, data TEXT)",
+  );
+  const refusal = async (status: number) => {
+    const session = await startThread(sixth, { cwd: workspace });
+    const error = { type: "provider.auth", message: "refused", status, response: { body: "{}" } };
+    const insert = sessions.prepare(
+      "INSERT INTO session_message (id, session_id, type, seq, data) VALUES (?, ?, ?, ?, ?)",
+    );
+    insert.run(`${session}-1`, session, "user", 1, JSON.stringify({ text: "Say hi" }));
+    insert.run(`${session}-2`, session, "idle", 2, JSON.stringify({ outcome: "failed", error }));
+    return (await runTurn(sixth, session)).error;
+  };
+  let refused401: string | null;
+  let refused403: string | null;
+  try {
+    refused401 = await refusal(401);
+    assert.equal(refused401, sourceText("error.provider.opencodeKeyRefused"), "A 401 names the refused key.");
+    refused403 = await refusal(403);
+    assert.equal(
+      refused403,
+      sourceText("error.provider.opencodeGoRequestRefused"),
+      "A 403 with a saved key does not ask for a new key.",
+    );
+  } finally {
+    sessions.close();
+  }
+  await runCauseEffect(sixth.stop());
+  storedKey = null;
+  process.env.FAKE_AUTH_KEY = "expired-v2";
+  // The Go key in OpenCode's own `auth.json` keeps the Go text, which names OpenBot's settings (#10166).
+  await mkdir(openCodeData, { recursive: true });
+  await writeFile(
+    join(openCodeData, "auth.json"),
+    JSON.stringify({ "opencode-go": { type: "api", key: "expired-v2" } }),
+  );
+  const seventh = open(cli);
+  const { error: notSaved } = await runTurn(seventh, await startThread(seventh, { cwd: workspace }));
+  assert.equal(
+    notSaved,
+    sourceText("error.provider.opencodeAuthRequired", { provider: "opencode-go" }),
+    "With no saved key, the error stays the missing sign-in.",
+  );
+  report.refusedV2 = { saved, notSaved, refused401, refused403 };
+  await runCauseEffect(seventh.stop());
+
+  // 8. OpenCode 2.3.0 sends each 403 of a provider as `-32000`, also a firewall's block of a VPN
+  // address. With a key for that provider in OpenCode's own database, the provider refused the
+  // request: the error must not say that a sign-in is missing.
+  const database = new DatabaseSync(join(openCodeData, "opencode.db"));
+  database.exec(
+    "CREATE TABLE credential (id TEXT PRIMARY KEY, integration_id TEXT, label TEXT NOT NULL, value TEXT NOT NULL, active INTEGER)",
+  );
+  database
+    .prepare("INSERT INTO credential (id, integration_id, label, value, active) VALUES (?, ?, ?, ?, ?)")
+    .run("cred_1", "anthropic", "API key", JSON.stringify({ type: "key", key: "valid" }), 1);
+  database.close();
+  process.env.FAKE_PROVIDER_AUTH = "1";
+  const eighth = open(cli);
+  const { error: refused } = await runTurn(eighth, await startThread(eighth, { cwd: workspace }));
+  assert.equal(
+    refused,
+    sourceText("error.provider.opencodeProviderRefused", { provider: "anthropic" }),
+    "A provider with a stored key reads as a refused request, not a missing sign-in.",
+  );
+  report.providerRefused = { error: refused };
   report.passed = true;
 } finally {
   await stopClients(clients);

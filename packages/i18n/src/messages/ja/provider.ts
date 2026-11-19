@@ -120,9 +120,14 @@ export const messages = {
   "provider.picker.download": "{name} のダウンロード",
   "provider.picker.search": "モデルを検索",
   "provider.picker.noMatches": "検索に一致するモデルはありません。",
+  "provider.picker.workspaceOnlyUnavailable":
+    "これらのモデルは、Windows と Linux では「ワークスペースのみ」で動作しません。使うには、エージェントの設定で「権限」を変更してください。",
   "provider.picker.olderModels": "以前のモデル",
   "provider.picker.olderModelsList": "{name} の以前のモデル",
   "provider.picker.noModels": "{name} で利用できるモデルはありません。",
+  "provider.picker.endpointModelsInCustom":
+    "{name} はカスタムエンドポイントを実行しています。そのモデルは「カスタム」タブにあります。",
+  "provider.picker.showCustomModels": "モデルを表示",
   "provider.picker.museNoModels":
     "Muse はこのアカウントにモデルを返しませんでした。このエージェントが動作している国では Muse を利用できない可能性があります。別のプロバイダーのモデルを選択してください。",
   "provider.picker.customEmpty":
@@ -150,6 +155,8 @@ export const messages = {
   "provider.picker.selectEffort": "推論の強さを選択",
   "provider.picker.custom": "カスタム",
   "provider.picker.cliReady": "{cli} 準備完了",
+  "provider.picker.modelSourceProvider": "{cli} の設定にある {name} を使用",
+  "provider.picker.modelSourceCatalog": "{cli} の設定にあるモデル一覧を使用",
   "provider.status.signInRequired": "サインインが必要",
   "provider.model.free": "無料",
   "provider.model.new": "新着",
@@ -175,6 +182,12 @@ export const messages = {
   "provider.claudeKey.description":
     "ホストに Anthropic API キーを保存します。Anthropic は各リクエストをキーの API クレジットに請求し、Claude のプランには請求しません。エージェントで使うには、エージェントのモデルメニューで「APIキー」アカウントを選択します。Claude にサインインしていない場合、すべてのエージェントがキーを使います。",
   "provider.claudeKey.label": "Anthropic API キー",
+  "provider.cursorKey.title": "Cursor API キー",
+  "provider.cursorKey.description":
+    "2 つ目以降の Cursor アカウントは API キーを使います。Cursor ダッシュボードの Integrations でキーを作成し、ここに貼り付けてください。キーはこのコンピューターに保存されます。",
+  "provider.cursorKey.descriptionHost":
+    "2 つ目以降の Cursor アカウントは API キーを使います。Cursor ダッシュボードの Integrations でキーを作成し、ここに貼り付けてください。キーはホストに保存されます。",
+  "provider.cursorKey.label": "Cursor API キー",
   "provider.inceptionKey.title": "Inception API キー",
   "provider.inceptionKey.description":
     "Mercury モデルを使うには、このコンピューターに Inception API キーを保存します。OpenBot はダウンロードした Pi CLI でモデルを実行します。",
@@ -208,6 +221,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "再接続できませんでした。",
   "provider.account.add": "アカウントを追加",
   "provider.account.addLabel": "別の {name} アカウントを追加",
+  "provider.account.addWithCode": "コードでアカウントを追加",
   "provider.account.count": { other: "アカウント {count} 件" },
   "provider.account.numbered": "アカウント {number}",
   "provider.account.apiKey": "APIキー",
@@ -257,6 +271,8 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · OpenBot がダウンロード",
   "provider.settings.otherVersionInstalledByUser": "未使用：{version} · 自分でインストール",
   "provider.settings.otherVersionDownloaded": "未使用：{version} · OpenBot がダウンロード",
+  "provider.settings.installedVersionIncomplete":
+    "一部のモデルには、このバージョンにない部品が必要です。使うには OpenBot のバージョンをダウンロードしてください。",
   "provider.settings.useInstalledVersion": "インストール版を使う",
   "provider.settings.useDownloadedVersion": "OpenBot 版を使う",
   "provider.settings.cache": "キャッシュ",
@@ -280,6 +296,29 @@ export const messages = {
   "provider.settings.compactWindowDefault": "Claude Code の既定",
   "provider.settings.compactWindowTokens": "{size} トークン",
   "provider.settings.compactWindowLoadFailed": "このサーバーの圧縮サイズを読み込めませんでした。",
+  "provider.settings.environment": "環境",
+  "provider.settings.environmentVariables": "変数",
+  "provider.settings.environmentDescription":
+    "{name} の各プロセスが受け取る API キー、ベース URL などの設定です。変更は進行中のターンが終わると適用されます。",
+  "provider.settings.environmentCodexHint":
+    "OPENAI_BASE_URL と、そのキーとしての OPENAI_API_KEY で、ChatGPT のモデルへのリクエストをそのアドレスに送ります。",
+  "provider.settings.environmentShellNote": "エージェントが実行するコマンドはこれらの値を読めます。",
+  "provider.settings.environmentAdd": "変数を追加",
+  "provider.settings.environmentNamePlaceholder": "VARIABLE_NAME",
+  "provider.settings.environmentValuePlaceholder": "値",
+  "provider.settings.environmentSaved": "保存済み",
+  "provider.settings.environmentSensitive": "機密",
+  "provider.settings.environmentNameLabel": "変数名 {index}",
+  "provider.settings.environmentValueLabel": "{name} の値",
+  "provider.settings.environmentSensitiveLabel": "{name} を秘密にする",
+  "provider.settings.environmentRemoveLabel": "{name} を削除",
+  "provider.settings.environmentUnnamed": "変数 {index}",
+  "provider.settings.environmentPending":
+    "保存すると、進行中のターンが終わってから {name} が再起動します。機密の値はサーバーに残ります。",
+  "provider.settings.environmentDone": "保存しました。進行中のターンが終わると {name} が再起動します。",
+  "provider.settings.environmentDiscard": "破棄",
+  "provider.settings.environmentSave": "保存",
+  "provider.settings.environmentLoadFailed": "{name} の変数を読み込めませんでした。",
   "provider.settings.models": "モデル",
   "provider.settings.modelsDescription": { other: "{count} 件中 {shown} 件のモデルがモデル選択に表示されます。" },
   "provider.settings.modelsSearch": "モデルを検索",

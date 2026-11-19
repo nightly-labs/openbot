@@ -27,7 +27,7 @@ import {
 } from "./admin-wire";
 import { toCurrentAgentKeys, toWireAgentKeys } from "./current-agent-keys";
 import { isProviderAwareConversationSearch, projectProviderAwareConversationSearch } from "./provider-aware-codec";
-import type { TeamProtocolV2Json } from "./v2";
+import type { TeamProtocolV2Json } from "./webrtc-framing";
 
 export const THREAD_MESSAGE_SEARCH_CAPABILITY = "thread-message-search-v1";
 

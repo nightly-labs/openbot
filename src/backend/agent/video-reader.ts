@@ -59,9 +59,10 @@ export class VideoReadFailed extends Schema.TaggedError<VideoReadFailed>()("Vide
 }) {}
 
 /**
- * Reads an online video for `read_video`: it downloads the video to a temporary folder on this
- * computer, transcribes its sound and takes frames. The main process owns the downloader, the
- * decoder window and the speech model; nothing stays on disk after the call.
+ * Reads an online video for `read_video`: it gets the site's captions, or transcribes the sound,
+ * and takes frames. The video downloads to a temporary folder on this computer when frames or the
+ * sound are needed. The main process owns the downloader, the decoder window and the speech model;
+ * nothing stays on disk after the call.
  */
 export interface VideoReaderHost {
   read(request: VideoReadRequest): Effect.Effect<VideoReading, VideoReadFailed>;

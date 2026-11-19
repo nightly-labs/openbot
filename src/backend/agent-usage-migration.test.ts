@@ -23,7 +23,7 @@ describe("agent usage migration", () => {
       expect(db.prepare("SELECT value FROM preservation").get()).toMatchObject({ value: "keep" });
       // A host-wide report constrains the date alone, so it can only seek on an index that
       // leads with `occurred_at`. Without these a report scans all retained history, and
-      // the parity check cannot notice: it compares the two build paths to each other.
+      // the parity check cannot notice: it checks that the schema does not change, not what it holds.
       expect(
         db
           .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE '%_occurred' ORDER BY name")

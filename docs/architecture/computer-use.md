@@ -79,12 +79,43 @@ window's top-left corner plus the point times the window width divided by that s
 as the driver computes it. A click that OpenBot cannot place (no `window_id`, a point in a `zoom`
 image, or no screenshot width yet) removes the cursor. A window that is not in `list_windows` gets
 no cursor.
+The driver tells agents to act through `run_steps`, which runs its steps inside the daemon, so the
+tap reads the steps of that call in order, each as its own call. A step without a window gets the
+window of the batch or of the last step that named one, as in the driver. A step that names its
+window only by `app` or `window` title removes the cursor, because only the driver resolves it.
+The driver skips the reads between the steps of a batch and does one read at the end. The tap keeps
+the `screenshot_width` of that end read (`observation.state` in the answer) as of a direct read.
 
 ### Agent display on a server
 
 A self-hosted server and the container start two Xvfb displays, and name the agent display in
 `OPENBOT_AGENT_DISPLAY`. The agent display has a white root (Xvfb `-wr`), because remote desktop
-shows a black root as if no video came. A boat hosted server names its desktop `:0`, and OpenBot
+shows a black root as if no video came. `xsetroot` gives it an arrow pointer, because the default
+"×" of an empty display looks like an error, and `-noreset` keeps the arrow.
+
+`scripts/hosting/openbot-desktop` starts Openbox on the agent display, with the configuration and
+the flat light theme in `scripts/hosting/desktop/`. Before Openbox starts, `hsetroot` draws the
+background: the dark color of the app (`#1a1a1a`) with the OpenBot logo (`desktop/openbot-logo.png`,
+the lilac logo with a light name from `@openbot/brand`) in the center, at each display size. Without
+`hsetroot`, the white root stays, because a dark screen with no logo looks like no video.
+
+Windows get title bars, and a click focuses and raises a window. A right-click on the empty screen or
+on a title bar opens a menu: Terminal (`lxterminal`), Files (`pcmanfm`) and the open windows. A
+maximized window thus does not hide the menu. Openbox takes only Alt+Tab, Alt+Shift+Tab and Alt+F4;
+all other keys and mouse actions go to the window, so Computer Use input arrives as before. The
+configuration has one desktop and no iconify action, so nothing moves the windows of an agent out of
+view. The script starts Openbox again when it stops, and exits when the display stops or when
+Openbox fails 5 times in a row. When the `openbox` package is missing, it does nothing, so a server
+with the old package list keeps the bare display.
+
+Programs from the menu run as the service user, as the agents do, so the Terminal item gives a shell
+as that user. Remote control of a computer gives this control on a desktop host too, and only the
+roles that the owner permits in Server settings › Remote desktop can use input on the display.
+Openbox and the menu programs get the OOM value (500) and the nice value (10) of agent processes, so
+a build in that terminal does not take memory or CPU from main. The menu labels are in the Openbox
+configuration and are not translated.
+
+A boat hosted server names its desktop `:0`, and OpenBot
 runs on an Xvfb display. Electron keeps its own `DISPLAY`: the built-in browser draws its tabs in
 the OpenBot window, and under Xvfb a hidden view gives no capture and no clicks, so OpenBot cannot
 only hide its window. On Linux, `agent-display.ts` sets `DISPLAY` to the agent display for the
@@ -146,6 +177,23 @@ released with no key between would open the host's Start menu or Activities. Aft
 script presses V. Text that the host
 already has from an earlier paste is not sent again, so a copy made on the host stays on its
 clipboard. A host with no clipboard writer serves neither route.
+
+The same script watches the stream. Moonlight's viewer says "connected" when the video track
+arrives, before a frame, and neither Moonlight Web nor Sunshine can lower the rate during a stream.
+On a connection slower than the stream, each lost frame makes the streamer wait for a full frame,
+which the connection loses again, so the picture stays black or frozen (#11271). The script counts
+the frames that the browser decodes (`framesDecoded` of Moonlight's peer connection). Sunshine
+sends at least half the frame rate, also for a still screen, so no frame for 20 s is a stall, or
+60 s before the first frame, as the viewer's own stream check waits. The script judges only while
+the page shows, a peer connection is up, and the browser reports video. It then reports `error`
+with a text that says the connection is too slow, and `connected` again when frames come back.
+When Moonlight already reported its own error, such as for a host that stopped, the script stays
+quiet, so that text stays and the quality does not change. In the desktop app and the browser, a
+stall also sets Moonlight's `bitrate` and `fps` to the phone app's Data saver values (3 Mbit/s,
+30 fps) for the streams of that server in the next 24 hours, so Retry shows a picture. The key holds
+the server ID, because one viewer origin shows all joined servers. The phone app keeps the quality
+from its menu. The host serves this script also when it has no clipboard writer, but then without
+the paste part.
 
 On Linux, the gateway accepts only an X11 session (`DISPLAY` set, no `WAYLAND_DISPLAY`, and
 `XDG_SESSION_TYPE` not `wayland`). Sunshine then runs with X11 capture and software encoding, and

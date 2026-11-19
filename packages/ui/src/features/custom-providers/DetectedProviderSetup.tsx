@@ -126,7 +126,8 @@ export function DetectedProviderSetup(props: DetectedProviderSetupProps) {
         takenProviderIds={taken(props.takenProviderIds)}
         providerIdLocked={Boolean(models()?.added)}
         apiKeyKept={Boolean(models()?.added && models()?.keyStored)}
-        contextWindows
+        // The model limits are of this computer: the Team API has none.
+        contextWindows={!props.host}
         harnesses={props.harnesses}
         onDownloadHarness={props.onDownloadHarness}
         harnessError={props.harnessError}

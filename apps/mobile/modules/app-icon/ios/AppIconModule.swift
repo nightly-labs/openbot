@@ -1,7 +1,7 @@
 import ExpoModulesCore
 import UIKit
 
-final class AppIconChangeException: GenericException<String> {
+final class AppIconChangeException: GenericException<String>, @unchecked Sendable {
   override var reason: String { "The app icon did not change: \(param)" }
 }
 

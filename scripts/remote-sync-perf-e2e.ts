@@ -73,6 +73,8 @@ const allowMutations = process.argv.includes("--allow-mutations");
 const latencyMs = Number(argument("latency") ?? "0");
 assert.ok(Number.isInteger(latencyMs) && latencyMs >= 0, "--latency takes a whole number of milliseconds.");
 const FRAME_KEY_PREFIX = "openbot:remote-frame:";
+const TIMEZONE_CHECK_KEY_PREFIX = "openbot:routine-timezone-checked:";
+const TIMEZONE_CHECK_WAIT_MS = 30_000;
 
 type Client = "web" | "web-warm" | "desktop-cold" | "desktop-reload" | "desktop-start";
 type StorageState = Awaited<ReturnType<BrowserContext["storageState"]>>;
@@ -606,6 +608,16 @@ async function webRuns(): Promise<Run[]> {
         const seen = (await readMarks(page)).map((mark) => mark.name).join(", ") || "none";
         throw new Error(`The web client did not reach panels-ready. Marks: ${seen}.`, { cause: error });
       });
+    // A user who comes back also has the saved routine time-zone check, so a warm start does not read
+    // the routines of each agent again. A client that does not save the check, or that shows the
+    // time-zone question, has no key: the warm runs then read the routines again.
+    await page
+      .waitForFunction(
+        (prefix) => Object.keys(localStorage).some((key) => key.startsWith(prefix)),
+        TIMEZONE_CHECK_KEY_PREFIX,
+        { timeout: TIMEZONE_CHECK_WAIT_MS, polling: POLL_MS },
+      )
+      .catch(() => logger.warn("The web client saved no routine time-zone check. Warm runs read the routines again."));
     // The session stays in memory: the state holds the sign-in cookie, so it is not written to disk.
     const warm = await first.storageState();
     await first.close();

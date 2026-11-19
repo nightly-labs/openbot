@@ -1,7 +1,7 @@
 import type { RespondToPromptInput } from "@openbot/contracts/ipc";
 import * as Crypto from "expo-crypto";
-import { useLocalSearchParams } from "expo-router";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChatView } from "@/features/chat/components/chat-view";
 import { useLeaveChat } from "@/features/chat/components/use-leave-chat";
 import { useMessageDelete } from "@/features/chat/components/use-message-delete";
@@ -9,13 +9,20 @@ import { useQuestionPrompt } from "@/features/chat/components/use-question-promp
 import { projectChannelMessages } from "@/features/chat/model/chat-messages";
 import { type TurnStepsSummary, unansweredChannelTurnSummaries } from "@/features/chat/model/turn-thinking";
 import { useProgressUpdates } from "@/features/chat/model/use-progress-updates";
-import { useApprovalRequests, useBrowserRequests } from "@/features/workspace/components/use-live-workspace";
+import { useChatPullPreference } from "@/features/settings/model/chat-swipe";
+import {
+  useApprovalRequests,
+  useBrowserRequests,
+  useThreadWaits,
+} from "@/features/workspace/components/use-live-workspace";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileAgentActivity, MobileAgentWaitReason } from "@/features/workspace/model/agent-activity";
+import { sameAgentsApartFromMessage } from "@/features/workspace/model/directory-agents";
 import { showsOnline } from "@/features/workspace/model/server-status";
 import { useText } from "@/shared/lib/text";
-import { useChannels } from "../components/use-channels";
+import { useChannel } from "../components/use-channels";
 import { channelTaskActivities, channelTasksNeedingAction } from "../model/channel-task-actions";
+import { firstUnreadChannelMessageId } from "../model/channel-unread";
 
 export function ChannelChatScreen() {
   const { channelId, serverId } = useLocalSearchParams<{ channelId: string; serverId: string }>();
@@ -25,13 +32,16 @@ export function ChannelChatScreen() {
 function ChannelChat({ channelId, serverId }: { channelId: string; serverId: string }) {
   const { t } = useText();
   const leaveChat = useLeaveChat();
-  const agents = useMobileWorkspaceSelector((current) => current.agents);
+  // The chat does not show the latest message of each agent, so a new message keeps the same list and
+  // the messages do not render again.
+  const agents = useMobileWorkspaceSelector((current) => current.agents, sameAgentsApartFromMessage);
   const server = useMobileWorkspaceSelector((current) => current.servers.find((item) => item.id === serverId));
   // A sheet removes focus, but the chat remains mounted behind it. Release history
   // only when this route unmounts; the workspace pauses network reads in the background.
-  const state = useChannels(serverId, channelId);
-  const page = state.pages.get(channelId);
-  const summary = state.channels.find((item) => item.id === channelId);
+  // Only this channel: a change to another channel of the server does not render the chat again.
+  const state = useChannel(serverId, channelId);
+  const page = state.page;
+  const summary = state.summary;
   const channel = summary ?? page?.channel;
   const online = server?.state === "online";
   const archived = Boolean(channel?.archived);
@@ -42,14 +52,52 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
   );
   const progressUpdates = useProgressUpdates(serverId, serverAgents);
   const messages = useMemo(
-    () => projectChannelMessages(page?.messages ?? [], server?.membershipId ?? null, progressUpdates),
-    [page?.messages, server?.membershipId, progressUpdates],
+    () =>
+      projectChannelMessages(page?.messages ?? [], page?.tasks ?? [], server?.membershipId ?? null, progressUpdates),
+    [page?.messages, page?.tasks, server?.membershipId, progressUpdates],
   );
   // A host with channel-attention-v1 names the thread of each member in this channel. A request on
   // one of them belongs here, and not in the agent's own chat.
   const threadIds = useMemo(
     () => (summary?.threads?.length ? new Set(summary.threads.map((thread) => thread.threadId)) : null),
     [summary?.threads],
+  );
+  // A question of a member's thread here that the page has no row for, as the question of a turn that
+  // the provider started with no task: that turn copies no rows to the channel. Its card comes from
+  // the host's request, so "Waiting for you" leads to a question that the person can answer (#10178).
+  // A saved row is matched by its turn too: a custom agent counts its request ids again after a restart.
+  // The card waits for the page, which the answer needs.
+  const threadWaits = useThreadWaits(serverId);
+  const liveQuestions = useMemo(() => {
+    if (!online || archived || !threadIds || !page) return [];
+    const key = (agentId: string, turnId: string | undefined, requestId: string | number) =>
+      `${agentId}\n${turnId ?? ""}\n${String(requestId)}`;
+    const saved = new Set(
+      page.messages.flatMap((entry) =>
+        entry.message.questionPrompt
+          ? [key(entry.author.id, entry.message.turnId, entry.message.questionPrompt.requestId)]
+          : [],
+      ),
+    );
+    return threadWaits.flatMap(({ reason, questions, agentId, requestId, threadId, turnId }) =>
+      reason === "question" && questions && threadIds.has(threadId) && !saved.has(key(agentId, turnId, requestId))
+        ? [
+            {
+              agentId,
+              message: {
+                id: `question-prompt:${turnId}:${String(requestId)}`,
+                kind: "question" as const,
+                turnId,
+                prompt: { requestId, questions, resolution: null },
+              },
+            },
+          ]
+        : [],
+    );
+  }, [online, archived, threadIds, page, threadWaits]);
+  const shownMessages = useMemo(
+    () => (liveQuestions.length > 0 ? [...messages, ...liveQuestions.map((question) => question.message)] : messages),
+    [messages, liveQuestions],
   );
   const serverApprovals = useApprovalRequests(serverId);
   const approvals = useMemo(() => {
@@ -79,6 +127,7 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
         !entry.message.questionPrompt.resolution
       )
         waits.set(entry.author.id, "question");
+    for (const question of liveQuestions) waits.set(question.agentId, "question");
     if (waits.size === 0) return working;
     const waiting = (activity: MobileAgentActivity, reason: MobileAgentWaitReason): MobileAgentActivity => ({
       ...activity,
@@ -94,8 +143,29 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
       if (!next.some((activity) => activity.agentId === agentId))
         next.push(waiting({ agentId, turnId: null, phase: "working", detail: null }, reason));
     return next;
-  }, [archived, channel?.leadAgentId, page?.tasks, page?.messages, approvals, serverBrowserRequests, threadIds]);
+  }, [
+    archived,
+    channel?.leadAgentId,
+    page?.tasks,
+    page?.messages,
+    approvals,
+    serverBrowserRequests,
+    threadIds,
+    liveQuestions,
+  ]);
   const activities = useMemo(() => (online ? memberWork : []), [online, memberWork]);
+  // The host says why a request does not start (channel-task-waits-v1); an older host says nothing.
+  const statusNotes = useMemo(() => {
+    if (archived || !online) return [];
+    const notes = (page?.waits ?? []).flatMap((wait) => {
+      const name = serverAgents.find((agent) => agent.id === wait.agentId)?.name;
+      if (!name) return [];
+      return wait.reason === "agent-busy"
+        ? [t("mobile.channel.chat.waitBusy", { name, channel: wait.channelName })]
+        : [t("mobile.channel.chat.waitFull", { name })];
+    });
+    return [...new Set(notes)];
+  }, [archived, online, page?.waits, serverAgents, t]);
   // A finished turn of a member with no answer, such as a stopped one, shows its steps in its own row.
   // A member's running turn shows them in its activity row. An activity with no turn is the member's latest turn.
   const lastTurnSummaries = useRef<ReadonlyMap<string, TurnStepsSummary> | undefined>(undefined);
@@ -114,11 +184,57 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
     );
     return lastTurnSummaries.current;
   }, [page?.messages, memberWork]);
+  // The NEW line of this visit, as in an agent chat. The chat reads itself at once and the unread
+  // count goes to zero, so the line keeps the first unread message that the channel had when it
+  // opened. A page that the phone kept can be older than the count, so the line waits for the
+  // page that the host sends for this visit.
+  const [unreadLine, setUnreadLine] = useState<{ messageId: string | null } | null>(null);
+  const [freshPage, setFreshPage] = useState<"waiting" | "loaded" | "failed">("waiting");
+  const hasUnread = (summary?.unreadCount ?? 0) > 0;
+  const store = state.store;
+  const readsPage = online && hasUnread && unreadLine === null;
+  useEffect(() => {
+    if (!readsPage) return;
+    let active = true;
+    void store.refreshHistory(serverId, channelId).then(
+      () => active && setFreshPage("loaded"),
+      () => active && setFreshPage("failed"),
+    );
+    return () => {
+      active = false;
+    };
+  }, [readsPage, store, serverId, channelId]);
+  // The count that the phone kept can be old, so the line also waits for the host's channel list,
+  // or for its failure, as the store's own wait does.
+  if (
+    unreadLine === null &&
+    (state.listed || state.error) &&
+    page &&
+    summary &&
+    (!hasUnread || freshPage !== "waiting")
+  )
+    setUnreadLine({
+      messageId:
+        freshPage === "failed"
+          ? null
+          : firstUnreadChannelMessageId(page.messages, summary.unreadCount, server?.membershipId ?? null),
+    });
+  const unreadLineMessageId = unreadLine?.messageId ?? null;
+  // The line shows above the first of these messages that has a row.
+  const unreadLineMessageIds = useMemo(() => {
+    const entries = page?.messages ?? [];
+    const start = unreadLineMessageId ? entries.findIndex((entry) => entry.id === unreadLineMessageId) : -1;
+    return start < 0 ? null : new Set(entries.slice(start).map((entry) => entry.id));
+  }, [unreadLineMessageId, page?.messages]);
+  // The chat opens at the NEW line once, as on desktop. A chat that showed before the line, such as
+  // while the server connected, does not move to it later, under the reader.
+  const [unreadOpening, setUnreadOpening] = useState<"pending" | "done">("pending");
+  const placeUnreadLine = useCallback(() => setUnreadOpening("done"), []);
+  const opensAtUnread = unreadOpening === "pending" && online && (readsPage || unreadLineMessageIds !== null);
   const [olderLoading, setOlderLoading] = useState(false);
   const [olderError, setOlderError] = useState(false);
   const readThrough = useRef(0);
   const throughSequence = page?.throughSequence ?? 0;
-  const store = state.store;
   const markRead = useCallback(() => {
     if (throughSequence <= readThrough.current) return;
     readThrough.current = throughSequence;
@@ -144,15 +260,20 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
   const canSend = Boolean(channel) && !archived;
   const messageDelete = useMessageDelete(serverId, { kind: "channel", channelId });
   const [selectedPromptId, selectPrompt] = useState<string | null>(null);
-  const pendingPrompts = messages.filter((message) => message.kind === "question" && !message.prompt.resolution);
+  const pendingPrompts = shownMessages.filter((message) => message.kind === "question" && !message.prompt.resolution);
   const activePrompt = pendingPrompts.find((message) => message.id === selectedPromptId) ?? pendingPrompts[0];
-  const promptAuthor = page?.messages.find((message) => message.id === activePrompt?.id)?.author;
+  const savedAuthor = page?.messages.find((message) => message.id === activePrompt?.id)?.author;
+  const promptAgentId = savedAuthor
+    ? savedAuthor.kind === "agent"
+      ? savedAuthor.id
+      : ""
+    : (liveQuestions.find((question) => question.message.id === activePrompt?.id)?.agentId ?? "");
   const respondToPrompt = useCallback(
     (agentId: string, input: RespondToPromptInput) => store.respondToPrompt(serverId, channelId, agentId, input),
     [store, serverId, channelId],
   );
   const questionForm = useQuestionPrompt(
-    promptAuthor?.kind === "agent" ? promptAuthor.id : "",
+    promptAgentId,
     activePrompt?.kind === "question" ? activePrompt : undefined,
     showsOnline(server) && canSend,
     respondToPrompt,
@@ -176,12 +297,19 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
     }),
     [channelId, serverId, name, members, channel?.icon, channel?.imageUrl],
   );
+  // A pull past the latest message opens the channel's info sheet on top of this chat, unless
+  // Settings turns the pull off.
+  const pullOn = useChatPullPreference((state) => state.enabled);
+  const openInfo = useCallback(
+    () => router.push({ pathname: "/channel-info/[channelId]", params: { channelId, serverId } }),
+    [channelId, serverId],
+  );
   return (
     <ChatView
       target={target}
       agents={serverAgents}
       mentionAgents={members}
-      projectedMessages={messages}
+      projectedMessages={shownMessages}
       referenceMessages={messages}
       ready={Boolean(page)}
       historyLoadFailed={Boolean(state.error) || (!state.loading && !channel)}
@@ -190,6 +318,7 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
       deleteMessage={messageDelete.deleteMessage}
       deletesAnyMessage={messageDelete.deletesAny}
       notice={archived ? t("mobile.channel.chat.deletedNotice") : null}
+      statusNotes={statusNotes}
       activities={activities}
       activeTurnId={null}
       liveChannel={liveChannel}
@@ -197,6 +326,11 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
       onSelectQuestion={selectPrompt}
       approvals={approvals}
       channelThreadIds={threadIds}
+      unreadLineMessageIds={unreadLineMessageIds}
+      focusMessageId={opensAtUnread && unreadLineMessageIds ? unreadLineMessageId : null}
+      focusUnread
+      holdOpening={opensAtUnread}
+      onFocusPlaced={placeUnreadLine}
       readBoundary={throughSequence ? String(throughSequence) : null}
       markRead={markRead}
       fetchHistory={fetchHistory}
@@ -208,6 +342,7 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
       channelLeadAgentId={channel?.leadAgentId ?? null}
       channelTurnSummaries={turnSummaries}
       onLeave={leaveChat}
+      onPullPastEnd={pullOn ? openInfo : null}
     />
   );
 }

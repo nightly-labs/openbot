@@ -165,3 +165,56 @@ index 5da11964f5932cb44e1131c44a2480803c0a62b5..a04b4678830bb5ea16984486072eacad
  
  - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
      shouldBeRequiredToFailByGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer
+diff --git a/ios/RNSScreenStackHeaderConfig.mm b/ios/RNSScreenStackHeaderConfig.mm
+index e217b2411d20c85db3ec84bb87765c1e9407fd3b..84b6467ec36b080eb2e30eea48682f4418e59d50 100644
+--- a/ios/RNSScreenStackHeaderConfig.mm
++++ b/ios/RNSScreenStackHeaderConfig.mm
+@@ -96,7 +96,10 @@ RNS_IGNORE_SUPER_CALL_BEGIN
+ 
+ - (NSArray<UIView *> *)reactSubviews
+ {
+-  return _reactSubviews;
++  // OpenBot patch: return a copy. A shadow state update in a loop over these subviews can commit at once
++  // (`unstable_Immediate`) and mount or unmount a header subview, which changes `_reactSubviews`. The loop
++  // then throws "Collection was mutated while being enumerated" and the app stops.
++  return [_reactSubviews copy];
+ }
+ RNS_IGNORE_SUPER_CALL_END
+ 
+@@ -563,12 +566,17 @@ RNS_IGNORE_SUPER_CALL_END
+       config.largeTitle ? UINavigationItemLargeTitleDisplayModeAlways : UINavigationItemLargeTitleDisplayModeNever;
+ 
+ #if RNS_IPHONE_OS_VERSION_AVAILABLE(27_0)
++  // Early iOS 27 betas report iOS 27 but do not have `navigationBarMinimization` yet. Setting it there throws
++  // "unrecognized selector" and crashes the app at launch.
+   if (@available(iOS 27.0, *)) {
+-    // Due to native limitations related to opaque header and minimization behavior, we disable it for opaque headers.
+-    UIBarMinimization *minimization = [UIBarMinimization new];
+-    minimization.minimizationBehavior =
+-        config.translucent ? UIBarMinimizationBehaviorAutomatic : UIBarMinimizationBehaviorNever;
+-    navitem.navigationBarMinimization = minimization;
++    if ([navitem respondsToSelector:@selector(setNavigationBarMinimization:)]) {
++      // Due to native limitations related to opaque header and minimization behavior, we disable it for opaque
++      // headers.
++      UIBarMinimization *minimization = [UIBarMinimization new];
++      minimization.minimizationBehavior =
++          config.translucent ? UIBarMinimizationBehaviorAutomatic : UIBarMinimizationBehaviorNever;
++      navitem.navigationBarMinimization = minimization;
++    }
+   }
+ #endif // RNS_IPHONE_OS_VERSION_AVAILABLE(27_0)
+ #endif
+diff --git a/ios/RNSScreenStackHeaderSubview.mm b/ios/RNSScreenStackHeaderSubview.mm
+index 882761cf37bb1f6ee451297e124831efe0efae55..db88ae11a641700dade1957af68f0f7fcffc84c0 100644
+--- a/ios/RNSScreenStackHeaderSubview.mm
++++ b/ios/RNSScreenStackHeaderSubview.mm
+@@ -288,7 +288,8 @@ RNS_IGNORE_SUPER_CALL_END
+ // supported value is `standard`, which is already the default.
+ #if RNS_IPHONE_OS_VERSION_AVAILABLE(27_0) && !TARGET_OS_TV && !TARGET_OS_VISION
+   if (@available(iOS 27.0, *)) {
+-    if (_barButtonItem != nil) {
++    // Early iOS 27 betas do not have `visibilityPriority`.
++    if (_barButtonItem != nil && [_barButtonItem respondsToSelector:@selector(setVisibilityPriority:)]) {
+       _barButtonItem.visibilityPriority =
+           [RNSConvert UIBarButtonItemVisibilityPriorityFromCppEquivalent:_visibilityPriority];
+     }

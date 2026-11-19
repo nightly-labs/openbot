@@ -22,6 +22,8 @@ import Eye from "lucide-react-native/icons/eye";
 import EyeOff from "lucide-react-native/icons/eye-off";
 import File from "lucide-react-native/icons/file";
 import Folder from "lucide-react-native/icons/folder";
+import FolderPlus from "lucide-react-native/icons/folder-plus";
+import GitBranch from "lucide-react-native/icons/git-branch";
 import Globe from "lucide-react-native/icons/globe";
 import Info from "lucide-react-native/icons/info";
 import LayoutGrid from "lucide-react-native/icons/layout-grid";
@@ -70,6 +72,7 @@ const ICONS: Partial<Record<string, LucideIcon>> = {
   archivebox: Archive,
   "arrow.clockwise": RotateCw,
   "arrow.down": ArrowDown,
+  "arrow.triangle.branch": GitBranch,
   "arrow.up": ArrowUp,
   "arrow.up.arrow.down": ArrowUpDown,
   bell: Bell,
@@ -93,6 +96,7 @@ const ICONS: Partial<Record<string, LucideIcon>> = {
   eye: Eye,
   "eye.slash": EyeOff,
   folder: Folder,
+  "folder.badge.plus": FolderPlus,
   globe: Globe,
   gearshape: Settings,
   "info.circle": Info,

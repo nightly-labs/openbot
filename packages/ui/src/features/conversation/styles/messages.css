@@ -19,7 +19,8 @@
    little shorter than a one-line bubble, so it reads at the size of the sidebar faces. */
 .message-entry-with-author,
 .message-author-gutter,
-.chat-visual-with-author {
+.chat-visual-with-author,
+.question-prompt-with-author {
   --message-author-face-size: var(--openbot-space-8);
   --message-author-column: calc(var(--message-author-face-size) + var(--openbot-space-1));
 }
@@ -341,7 +342,9 @@
   --message-bubble-base: var(--openbot-bg-surface-raised);
 }
 
-.message-entry-agent .ui-bubble-variant-muted.message-bubble-colored {
+/* The agent dock draws an agent's bubble with no message row around it. */
+.message-entry-agent .ui-bubble-variant-muted.message-bubble-colored,
+.agent-dock-bubble.ui-bubble-variant-muted.message-bubble-colored {
   --message-bubble-base: var(--openbot-bg-surface);
 }
 
@@ -361,7 +364,8 @@
  * border.
  */
 .message-entry-user .ui-bubble.message-bubble-colored > .ui-bubble-content,
-.message-entry-agent .ui-bubble-variant-muted.message-bubble-colored > .ui-bubble-content {
+.message-entry-agent .ui-bubble-variant-muted.message-bubble-colored > .ui-bubble-content,
+.agent-dock-bubble.ui-bubble-variant-muted.message-bubble-colored > .ui-bubble-content {
   --message-surface-lift: 5%;
   --openbot-bg-canvas: color-mix(
     in srgb,
@@ -414,6 +418,51 @@
   );
 }
 
+/*
+ * A solid bubble: the reader's own bubble in an agent chat, filled with the agent's face color (the
+ * Solid bubble style). The color is the whole bubble, in both themes. The text is light, or dark on a
+ * light color, and the blocks in the bubble lift from it with more of the text color than on a tint.
+ */
+:root .ui-bubble.message-bubble-colored.message-bubble-solid {
+  --message-bubble-tint-amount: 100%;
+  --message-solid-text: var(--openbot-text-on-accent);
+  --message-plain-text-primary: var(--openbot-text-primary);
+  --message-plain-text-secondary: var(--openbot-text-secondary);
+  --message-plain-text-muted: var(--openbot-text-muted);
+  --message-plain-text-dim: var(--openbot-text-dim);
+  --message-plain-accent: var(--openbot-accent);
+  --message-plain-accent-text: var(--openbot-accent-text);
+  --message-plain-accent-soft: var(--openbot-accent-soft);
+  --message-plain-accent-strong: var(--openbot-accent-strong);
+  --message-plain-success: var(--openbot-success);
+  --message-plain-warning: var(--openbot-warning);
+  --message-plain-danger: var(--openbot-danger);
+}
+
+:root .ui-bubble.message-bubble-colored.message-bubble-solid.message-bubble-solid-dark-text {
+  --message-solid-text: var(--openbot-paper-text);
+}
+
+.ui-bubble.message-bubble-colored.message-bubble-solid > .ui-bubble-content {
+  --message-surface-lift: 14%;
+  --openbot-text-primary: var(--message-solid-text);
+  --openbot-text-secondary: color-mix(in srgb, var(--message-solid-text) 86%, transparent);
+  --openbot-text-muted: color-mix(in srgb, var(--message-solid-text) 72%, transparent);
+  /*
+   * Links, code tokens, marks and states take the text color: an accent or a status color can be
+   * the bubble color itself, and then it does not show.
+   */
+  --openbot-text-dim: color-mix(in srgb, var(--message-solid-text) 60%, transparent);
+  --openbot-accent: var(--message-solid-text);
+  --openbot-accent-text: var(--message-solid-text);
+  --openbot-accent-soft: color-mix(in srgb, var(--message-solid-text) 16%, transparent);
+  --openbot-accent-strong: color-mix(in srgb, var(--message-solid-text) 34%, transparent);
+  --openbot-success: var(--message-solid-text);
+  --openbot-warning: var(--message-solid-text);
+  --openbot-danger: var(--message-solid-text);
+  color: var(--message-solid-text);
+}
+
 /* A menu, a tooltip or a popover that opens in a bubble with a chat color covers the chat, so it stays plain. */
 .ui-bubble.message-bubble-colored
 :is([data-popper-positioner], [role="dialog"], [role="menu"], [role="listbox"], [role="tooltip"]) {
@@ -426,6 +475,22 @@
   --openbot-bg-control-active: var(--message-plain-control-active);
 }
 
+.ui-bubble.message-bubble-solid
+  :is([data-popper-positioner], [role="dialog"], [role="menu"], [role="listbox"], [role="tooltip"]) {
+  --openbot-text-primary: var(--message-plain-text-primary);
+  --openbot-text-secondary: var(--message-plain-text-secondary);
+  --openbot-text-muted: var(--message-plain-text-muted);
+  --openbot-text-dim: var(--message-plain-text-dim);
+  --openbot-accent: var(--message-plain-accent);
+  --openbot-accent-text: var(--message-plain-accent-text);
+  --openbot-accent-soft: var(--message-plain-accent-soft);
+  --openbot-accent-strong: var(--message-plain-accent-strong);
+  --openbot-success: var(--message-plain-success);
+  --openbot-warning: var(--message-plain-warning);
+  --openbot-danger: var(--message-plain-danger);
+  color: var(--openbot-text-primary);
+}
+
 /*
  * A file icon tile is a clear tint of the file colour. On a chat color that tint would mix with the
  * chat color, so the tile lays it on the plain control and keeps its own colour. An audio or video
@@ -433,7 +498,8 @@
  */
 :is(
   .message-entry-user .ui-bubble.message-bubble-colored > .ui-bubble-content,
-  .message-entry-agent .ui-bubble-variant-muted.message-bubble-colored > .ui-bubble-content
+  .message-entry-agent .ui-bubble-variant-muted.message-bubble-colored > .ui-bubble-content,
+  .agent-dock-bubble.ui-bubble-variant-muted.message-bubble-colored > .ui-bubble-content
 ) :is(.attachment-file-visual, .attachment-reference-visual):not(.message-attachment[data-media] *) {
   background: linear-gradient(var(--file-reference-soft) 0 0), var(--message-plain-control);
 }
@@ -726,61 +792,134 @@
 }
 
 .agent-activity-label {
+  position: relative;
   display: -webkit-box;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
-  background: linear-gradient(
-    90deg,
-    var(--openbot-text-primary) 0%,
-    var(--openbot-text-primary) 30%,
-    var(--openbot-text-muted) 45%,
-    var(--openbot-text-muted) 55%,
-    var(--openbot-text-primary) 70%,
-    var(--openbot-text-primary) 100%
-  );
-  background-size: 300% 100%;
-  background-clip: text;
-  color: transparent;
   font-size: var(--openbot-text-sm);
   line-height: 20px;
   overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: image-generation-shine 2.25s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+  -webkit-text-fill-color: var(--openbot-text-primary);
+}
+
+/* The light over a working label (`ActivityShine`): a copy of the text in the colour of the light,
+   seen through a window that is the old moving gradient. The window moves right and the copy moves
+   left by the same amount, so the copy stays on the label. Both are transforms on the compositor;
+   the old `background-position` shine repainted the label on the main thread each frame.
+   The window is three labels wide and starts two labels to the left, as the gradient did at 300%. */
+.agent-activity-shine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -200%;
+  width: 300%;
+  pointer-events: none;
+  user-select: none;
+  -webkit-line-clamp: inherit;
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent 30%,
+    var(--openbot-text-primary) 45%,
+    var(--openbot-text-primary) 55%,
+    transparent 70%
+  );
+  mask-image: linear-gradient(
+    90deg,
+    transparent 30%,
+    var(--openbot-text-primary) 45%,
+    var(--openbot-text-primary) 55%,
+    transparent 70%
+  );
+  animation: agent-activity-shine-window 2.25s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+}
+
+/* The copy wraps and clamps as the label does, so each letter is on its letter. */
+.agent-activity-shine-text {
+  display: -webkit-box;
+  width: calc(100% / 3);
+  margin-left: calc(200% / 3);
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: inherit;
+  -webkit-text-fill-color: var(--openbot-text-muted);
+  animation: agent-activity-shine-text 2.25s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+}
+
+/* The same pauses as `image-generation-shine`, which the label used before. */
+@keyframes agent-activity-shine-window {
+  0%,
+  18% {
+    transform: translateX(0);
+  }
+  82%,
+  100% {
+    transform: translateX(calc(200% / 3));
+  }
+}
+
+@keyframes agent-activity-shine-text {
+  0%,
+  18% {
+    transform: translateX(0);
+  }
+  82%,
+  100% {
+    transform: translateX(-200%);
+  }
 }
 
 /* A wait for the provider is not work, so its label does not shine. */
 .agent-activity-entry[data-waiting="true"] .agent-activity-label {
-  animation: none;
-  background: none;
   color: var(--openbot-text-secondary);
   -webkit-text-fill-color: currentColor;
 }
 
-/* The plain line draws a label as Grok Bot does: each new step label rises 5px into place in 350ms,
-   with no exit, and a soft light runs over it in 60 steps. */
-.agent-activity-entry[data-plain="true"]:not([data-waiting="true"]) .agent-activity-label {
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--openbot-text-primary) 40%, transparent) 0%,
-    color-mix(in srgb, var(--openbot-text-primary) 40%, transparent) 25%,
-    var(--openbot-text-primary) 60%,
-    color-mix(in srgb, var(--openbot-text-primary) 40%, transparent) 75%,
-    color-mix(in srgb, var(--openbot-text-primary) 40%, transparent) 100%
-  );
-  background-size: 200% 100%;
-  background-clip: text;
-  -webkit-background-clip: text;
-  animation:
-    agent-activity-label-enter 350ms cubic-bezier(0.2, 0.8, 0.3, 1) backwards,
-    agent-activity-label-shine 2.2s steps(60, end) infinite;
+.agent-activity-entry[data-waiting="true"] .agent-activity-shine {
+  display: none;
 }
 
-.agent-activity-entry[data-plain="true"][data-waiting="true"] .agent-activity-label {
+/* The plain line draws a label as Grok Bot does: each new step label rises 5px into place in 350ms,
+   with no exit, and a soft light runs over it in 60 steps. */
+.agent-activity-entry[data-plain="true"] .agent-activity-label {
   animation: agent-activity-label-enter 350ms cubic-bezier(0.2, 0.8, 0.3, 1) backwards;
+}
+
+.agent-activity-entry[data-plain="true"]:not([data-waiting="true"]) .agent-activity-label {
+  -webkit-text-fill-color: color-mix(in srgb, var(--openbot-text-primary) 40%, transparent);
+}
+
+/* The old light was a 200% gradient that repeated and moved four labels in 2.2s. One repeat is a window
+   two labels wide that moves two labels in 1.1s, from just before the label to just past it. The start
+   one thirtieth of a label to the right and the delay of 22 of the 30 steps put the light where the old
+   one was at each step, also on the first frame of a new label. */
+.agent-activity-entry[data-plain="true"] .agent-activity-shine {
+  left: calc(-150% + 100% / 30);
+  width: 200%;
+  -webkit-mask-image: linear-gradient(90deg, transparent 25%, var(--openbot-text-primary) 60%, transparent 75%);
+  mask-image: linear-gradient(90deg, transparent 25%, var(--openbot-text-primary) 60%, transparent 75%);
+  animation: agent-activity-plain-shine-window 1.1s steps(30, end) -0.8125s infinite;
+}
+
+.agent-activity-entry[data-plain="true"] .agent-activity-shine-text {
+  width: 50%;
+  margin-left: calc(75% - 100% / 60);
+  -webkit-text-fill-color: var(--openbot-text-primary);
+  animation: agent-activity-plain-shine-text 1.1s steps(30, end) -0.8125s infinite;
+}
+
+@keyframes agent-activity-plain-shine-window {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes agent-activity-plain-shine-text {
+  to {
+    transform: translateX(-200%);
+  }
 }
 
 @keyframes agent-activity-label-enter {
@@ -790,25 +929,25 @@
   }
 }
 
-@keyframes agent-activity-label-shine {
-  from {
-    background-position: 200% 0;
-  }
-  to {
-    background-position: -200% 0;
-  }
-}
-
 @keyframes agent-activity-label-fade {
   from {
     opacity: 0;
   }
 }
 
+/* Reduced motion has no light, so a plain label shows its text in full colour, not dimmed. */
 @media (prefers-reduced-motion: reduce) {
+  .agent-activity-shine {
+    display: none;
+  }
+
   .agent-activity-entry[data-plain="true"] .agent-activity-label,
   .agent-activity-entry[data-plain="true"]:not([data-waiting="true"]) .agent-activity-label {
     animation: agent-activity-label-fade 120ms ease-out backwards;
+  }
+
+  .agent-activity-entry[data-plain="true"]:not([data-waiting="true"]) .agent-activity-label {
+    -webkit-text-fill-color: var(--openbot-text-primary);
   }
 }
 
@@ -1218,6 +1357,18 @@ button.chat-action-target:active,
   color: var(--openbot-text-primary);
 }
 
+/* Why a routine run failed, under its centred marker, in the marker's muted text. A provider error
+   has no length limit, so the chat shows 3 lines; the title and the run history have all of it. */
+.chat-action-marker-reason {
+  display: -webkit-box;
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
 /* The open text of an agent message reads as a chat message under its centred marker. */
 .chat-action-message-text {
   align-self: stretch;
@@ -1383,9 +1534,7 @@ button.chat-action-target:active,
 }
 
 .message-entry-agent
-  .ui-bubble-variant-ghost:has(
-    :is(.image-generation, .media-generation, .image-gallery, .message-code-block, .message-data-table-scroll)
-  )
+  .ui-bubble-variant-ghost:has(:is(.image-generation, .media-generation, .image-gallery))
   > .ui-bubble-content {
   width: 100%;
 }
@@ -1715,6 +1864,8 @@ button.chat-action-target:active,
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-media-control-surface);
   color: var(--openbot-media-control-text);
+  /* Frosted: the frame behind the button is blurred, so the button reads on a busy picture. */
+  backdrop-filter: blur(12px);
   transition: background-color var(--openbot-duration-hover) ease;
 }
 
@@ -1728,6 +1879,39 @@ button.chat-action-target:active,
   height: 22px;
   margin-inline-start: 2px;
   fill: currentColor;
+}
+
+/* The video plays but has no data yet. The sign takes the place of the play button, after a short
+   time: a seek in a loaded video waits for less than that. */
+.media-generation-wait {
+  display: grid;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 52px;
+  height: 52px;
+  translate: -50% -50%;
+  place-items: center;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-media-control-surface);
+  color: var(--openbot-media-control-text);
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+  animation: media-generation-wait-in var(--openbot-duration-hover) ease 250ms both;
+}
+
+.media-generation-player .ui-spinner {
+  width: 22px;
+  height: 22px;
+  border-width: 2px;
+  border-color: var(--openbot-media-control-track);
+  border-top-color: currentColor;
+}
+
+@keyframes media-generation-wait-in {
+  from {
+    opacity: 0;
+  }
 }
 
 .media-generation-bar {
@@ -1745,7 +1929,8 @@ button.chat-action-target:active,
   transition: opacity var(--openbot-duration-hover) ease;
 }
 
-.media-generation-player:is(:hover, :focus-within, :not([data-playing])) .media-generation-bar {
+/* The controls show only with the pointer or the keyboard on the video. A paused video keeps its play button. */
+.media-generation-player:is(:hover, :focus-within) .media-generation-bar {
   opacity: 1;
 }
 
@@ -1998,4 +2183,53 @@ button.chat-action-target:active,
   > .ui-bubble:last-child
   > .ui-bubble-content {
   border-end-end-radius: var(--openbot-radius-sm);
+}
+
+/* The details of a video show on hover as a title line at the top of its frame: the same scrim,
+   text and timing as the controls at the bottom. */
+.media-stage-details {
+  display: flex;
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  left: 0;
+  align-items: baseline;
+  background: linear-gradient(to bottom, var(--openbot-media-control-scrim), var(--openbot-transparent));
+  padding: 10px 14px 28px;
+  color: var(--openbot-media-control-muted);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--openbot-duration-hover) ease;
+  white-space: nowrap;
+}
+
+.media-stage-details:empty {
+  display: none;
+}
+
+.media-generation-stage:is(:hover, :focus-within) > .media-stage-details {
+  opacity: 1;
+}
+
+.media-stage-details .image-generation-spec {
+  flex: none;
+}
+
+/* The name is at the start and is the part that gets shorter. The values are at the end. */
+.media-stage-details .image-generation-spec:first-child {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  margin-inline-end: 12px;
+  color: var(--openbot-media-control-text);
+  font-weight: 560;
+  text-overflow: ellipsis;
+}
+
+.media-stage-details .image-generation-spec:nth-child(2)::before {
+  content: none;
 }

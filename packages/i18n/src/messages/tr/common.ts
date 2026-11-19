@@ -27,4 +27,8 @@ export const messages = {
   "common.download": "İndir",
   "common.removing": "Kaldırılıyor…",
   "common.sending": "Gönderiliyor…",
+  "common.scrollLeft": "Sola kaydır",
+  "common.scrollRight": "Sağa kaydır",
+  "common.scrollUp": "Yukarı kaydır",
+  "common.scrollDown": "Aşağı kaydır",
 } as const satisfies PartialTranslation<typeof source>;

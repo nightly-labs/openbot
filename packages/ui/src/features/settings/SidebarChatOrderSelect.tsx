@@ -14,7 +14,7 @@ export interface SidebarChatOrderSelectProps {
 
 /**
  * The "Sort chats" row control in Settings. It sets the same order as "Sort chats" in the sidebar
- * menu, and "Manual" turns off the "Unread" group.
+ * menu. "Manual" and "Recent activity" turn off the "Unread" group.
  */
 export function SidebarChatOrderSelect(props: SidebarChatOrderSelectProps): JSX.Element {
   const { t } = useText();

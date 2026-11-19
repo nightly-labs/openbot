@@ -8,6 +8,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import * as Crypto from "expo-crypto";
 import { create } from "zustand";
+import { type GraphPlace, insertAtPlace } from "./workflow-graph-edit";
 import {
   type AddableKind,
   connectStep,
@@ -112,6 +113,11 @@ interface DraftStore {
   setSchedule: (nodeId: string, schedule: RoutineSchedule | undefined) => void;
   /** Adds a step at `index` of `list` and answers its id. */
   add: (kind: AddableKind, list: FlowList, index: number) => string | null;
+  /**
+   * Adds a step at a place of a workflow that the outline cannot hold, and answers its id. The other
+   * edges stay as they are.
+   */
+  addAt: (kind: AddableKind, place: GraphPlace) => string | null;
   /** Puts a loose step at the end of the steps that run. */
   connect: (nodeId: string) => void;
   remove: (nodeId: string) => void;
@@ -197,6 +203,15 @@ export const useWorkflowDraft = create<DraftStore>((set, get) => {
         return { ...next, branch: list === "no" ? "no" : list === "yes" ? "yes" : draft.branch };
       });
       return added ? node.id : null;
+    },
+    addAt: (kind, place) => {
+      const draft = get().draft;
+      if (draft?.mode !== "fields") return null;
+      const node = newNode(kind, NEW_FIELDS[kind]);
+      const graph = insertAtPlace(draft.graph, place, kind, node, () => `edge-${Crypto.randomUUID()}`);
+      if (!graph) return null;
+      set({ draft: { ...draft, graph } });
+      return node.id;
     },
     connect: (nodeId) => {
       changeOutline((draft, outline) => connectStep(draft.graph, outline, nodeId));

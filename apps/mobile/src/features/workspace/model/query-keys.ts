@@ -165,6 +165,8 @@ export const queryKeys = {
   ],
   serverUpdate: (scope: QueryScope, serverId: string) => ["server-update", ...scope, serverId],
   serverStorage: (scope: QueryScope, serverId: string) => ["server-storage", ...scope, serverId],
+  /** The Library folders of a host. `library-folders-changed` reads them again. */
+  serverLibraryFolders: (scope: QueryScope, serverId: string) => ["server-library-folders", ...scope, serverId],
   serverDisk: (scope: QueryScope, serverId: string) => ["server-disk", ...scope, serverId],
   serverSites: (scope: QueryScope, serverId: string) => ["server-sites", ...scope, serverId],
   serverVault: (scope: QueryScope, serverId: string) => ["server-vault", ...scope, serverId],
@@ -194,6 +196,13 @@ export const queryKeys = {
   providerPromptCache: (scope: QueryScope, serverId: string) => ["provider-prompt-cache", ...scope, serverId],
   /** The size at which Claude Code compacts the chats of a host's agents (`claude-compact-window-v1`). */
   providerCompactWindow: (scope: QueryScope, serverId: string) => ["provider-compact-window", ...scope, serverId],
+  /** The environment variables of one provider of a host (`provider-environment-v1`). */
+  providerEnvironment: (scope: QueryScope, serverId: string, provider: string) => [
+    "provider-environment",
+    ...scope,
+    serverId,
+    provider,
+  ],
   /** The usage reset credits of each account of one provider of a host (`provider-usage-reset-v1`). */
   providerUsageResets: (scope: QueryScope, serverId: string, provider: string) => [
     "provider-usage-resets",

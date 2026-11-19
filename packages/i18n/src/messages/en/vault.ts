@@ -4,9 +4,9 @@ import { defineMessages } from "../../message";
 export const messages = defineMessages("vault", {
   "vault.items.title": "Saved items",
   "vault.items.description":
-    "Every agent on this server can use these items. OpenBot types passwords, card numbers and security codes into the page, so agents never see them. Agents read API keys from a private file, not from the chat.",
+    "Every agent on this server can use these items. OpenBot types passwords, card numbers and security codes into the page, so agents never see them. Agents read API keys from a file, not from the chat.",
   "vault.items.scopedDescription":
-    "Each item is for the agents that you choose. OpenBot types passwords, card numbers and security codes into the page, so agents never see them. Agents read API keys from a file, not from the chat.",
+    "Each item is for the agents that you choose. OpenBot types passwords, card numbers and security codes into the page, so agents never see them. Agents read API keys from a file, not from the chat. All agents run as the same system user, so an agent can also read an API key file that is for other agents.",
   "vault.agents.label": "Agents",
   "vault.agents.all": "All agents",
   "vault.agents.some": "{chosen} of {total}",

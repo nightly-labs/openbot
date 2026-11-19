@@ -23,6 +23,21 @@ const DEFAULT_NOTCH_HEIGHT = 32;
 const SHAPED_WINDOW = currentDevicePlatform() === "linux";
 /** The parts of the island that take the pointer while it is not in use. */
 const SHAPE_PARTS = ".dynamic-island-shell, .dynamic-island-hover-zone";
+/** The shell content at the size where a resize of the shell stops, centered on the shell. */
+const SHAPE_TARGET = ".dynamic-island-shell .dynamic-island-size-target";
+/** Room around a motion: the hover spring goes a little past its end. */
+const MOTION_ROOM = 2;
+
+type ShapeBox = { x: number; y: number; width: number; height: number };
+
+/** The smallest box that holds all of `boxes`. */
+function boxAround(boxes: readonly ShapeBox[]): ShapeBox {
+  const left = Math.min(...boxes.map((box) => box.x));
+  const top = Math.min(...boxes.map((box) => box.y));
+  const right = Math.max(...boxes.map((box) => box.x + box.width));
+  const bottom = Math.max(...boxes.map((box) => box.y + box.height));
+  return { x: left, y: top, width: right - left, height: bottom - top };
+}
 
 export function DynamicIslandSurface() {
   const { t } = useText();
@@ -59,7 +74,11 @@ export function DynamicIslandSurface() {
   let queuedPresentation: DynamicIslandPresentation | undefined;
   let anchor: HTMLFieldSetElement | undefined;
   let sentShape: string | undefined;
-  let shapeFrame: number | undefined;
+  // While a part moves: the box of all the places of the motion that the shape covered.
+  let motionBox: ShapeBox | undefined;
+  const followedMotions = new WeakSet<Animation>();
+  // The surface is gone: the end of a motion that it followed sends nothing.
+  let shapeStopped = false;
   // The island motion writes each new size and state to the DOM, and each write gives the window its
   // new shape. A ResizeObserver is not used: the motion resizes the shell in its own observer callback,
   // and the browser then reports an observer loop error. No timer runs.
@@ -67,28 +86,53 @@ export function DynamicIslandSurface() {
   const visible = () => presentation().mode !== "idle" || preference().idleVisible;
 
   /** Linux: tells main the parts of the window that take the pointer. Only a change is sent. */
-  function syncShape(): Element[] {
-    const parts = visible() && anchor?.isConnected ? [...anchor.querySelectorAll(SHAPE_PARTS)] : [];
-    const shape = windowShape(parts.map((part) => part.getBoundingClientRect()));
+  function sendShape(parts: readonly ShapeBox[]): void {
+    const shape = windowShape(parts);
     const key = JSON.stringify(shape);
-    if (key !== sentShape) {
-      sentShape = key;
-      void dynamicIslandPort()
-        .dynamicIsland.setInputRegion(shape)
-        .catch(() => undefined);
-    }
-    return parts;
+    if (key === sentShape) return;
+    sentShape = key;
+    void dynamicIslandPort()
+      .dynamicIsland.setInputRegion(shape)
+      .catch(() => undefined);
   }
 
-  /** Sends the shape, and again on each frame while a part moves. The frames stop with the motion. */
+  /**
+   * Sends the shape. While a part moves, one shape covers the place where the motion starts and the
+   * place where it stops, and the shape at rest follows when the motion ends. A new X11 shape at each
+   * frame can stop the main process (#11666).
+   */
   function followShape(): void {
-    if (!shapeObserver || shapeFrame !== undefined) return;
-    const parts = syncShape();
-    if (!parts.some((part) => part.getAnimations().some((motion) => motion.playState === "running"))) return;
-    shapeFrame = requestAnimationFrame(() => {
-      shapeFrame = undefined;
-      followShape();
-    });
+    if (!shapeObserver || shapeStopped) return;
+    const parts = visible() && anchor?.isConnected ? [...anchor.querySelectorAll(SHAPE_PARTS)] : [];
+    const still: ShapeBox[] = [];
+    const moving: ShapeBox[] = [];
+    for (const part of parts) {
+      const motions = part.getAnimations().filter((motion) => motion.playState === "running");
+      (motions.length > 0 ? moving : still).push(part.getBoundingClientRect());
+      for (const motion of motions) {
+        if (followedMotions.has(motion)) continue;
+        followedMotions.add(motion);
+        // A motion that a new one replaces is cancelled, and its promise rejects.
+        motion.finished.then(followShape, followShape);
+      }
+    }
+    if (moving.length === 0) {
+      motionBox = undefined;
+      sendShape(still);
+      return;
+    }
+    // The shell already has the size where its motion stops: `.dynamic-island-size-target` has it.
+    const target = anchor?.querySelector(SHAPE_TARGET)?.getBoundingClientRect();
+    motionBox = boxAround([...(motionBox ? [motionBox] : []), ...moving, ...(target ? [target] : [])]);
+    sendShape([
+      ...still,
+      {
+        x: motionBox.x - MOTION_ROOM,
+        y: motionBox.y - MOTION_ROOM,
+        width: motionBox.width + MOTION_ROOM * 2,
+        height: motionBox.height + MOTION_ROOM * 2,
+      },
+    ]);
   }
 
   function observeShape(element: HTMLFieldSetElement): void {
@@ -274,7 +318,7 @@ export function DynamicIslandSurface() {
       stopGeometry();
       window.removeEventListener("blur", close);
       window.removeEventListener("resize", followShape);
-      if (shapeFrame !== undefined) cancelAnimationFrame(shapeFrame);
+      shapeStopped = true;
       shapeObserver?.disconnect();
     };
   });
@@ -305,6 +349,7 @@ export function DynamicIslandSurface() {
             widthPercent={preference().widthPercent}
             heightPercent={preference().heightPercent}
             extendedHoverArea
+            idleInsideNotch
             inlineReply
             onStateChange={changeViewState}
             onAction={perform}

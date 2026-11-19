@@ -21,6 +21,7 @@ import { ChatVaultRequest } from "@/features/chat/components/chat-vault-request"
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { promptAnswerLabel } from "@/features/chat/model/question-prompt";
 import { vaultRequestOf } from "@/features/chat/model/vault-request";
+import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
@@ -42,6 +43,7 @@ export function ChatQuestionPrompt({
 }) {
   const { t } = useText();
   const muted = useThemeColor("muted");
+  const canEditPreview = useMobileWorkspaceSelector((workspace) => workspace.canEditUiBlockPreview(serverId));
   const vaultRequest = vaultRequestOf(uiBlock);
   if (vaultRequest && uiBlock)
     return (
@@ -120,7 +122,16 @@ export function ChatQuestionPrompt({
   }
 
   if (!controller?.question) return null;
-  if (confirm) return <ChatConfirmPrompt spec={confirm} uiBlock={uiBlock} controller={controller} canSend={canSend} />;
+  if (confirm)
+    return (
+      <ChatConfirmPrompt
+        spec={confirm}
+        uiBlock={uiBlock}
+        controller={controller}
+        canSend={canSend}
+        canEditPreview={canEditPreview}
+      />
+    );
   if (choice) return <ChatChoicePrompt spec={choice} controller={controller} canSend={canSend} />;
   const { question, index, disabled, setIndex, answer, submit, replyInChat, setReplyInChat } = controller;
 

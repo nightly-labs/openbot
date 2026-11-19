@@ -5,8 +5,10 @@ import {
   type DynamicIslandPreference,
   type ExternalLinkTarget,
   LOCAL_SERVER_ID,
+  type McpSignInState,
 } from "@openbot/contracts/ipc";
 import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
+import type { AppTextKey } from "@openbot/i18n";
 import { DEFAULT_GENERAL_SETTINGS, type GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createSignal, flush, onSettled } from "solid-js";
@@ -25,9 +27,18 @@ import { readSendShortcutMode, setSendShortcutMode, useSendShortcutMode } from "
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
 import { useSetup } from "../onboarding/onboarding-context";
+import { mcpSignInRecord } from "../servers/mcp-servers";
+import { desktopMarketplaceCalls } from "./marketplace-calls";
 import { settingsPort } from "./settings-port";
 import { isOpenSettingsShortcut } from "./settings-shortcut";
 import type { SettingsTab } from "./settings-tabs";
+
+/** A row of the app settings that a setting card asked for. `anchor` is the row's `data-settings-row`. */
+interface AppSettingRowRequest {
+  tab: SettingsTab;
+  anchor: AppTextKey;
+  nonce: number;
+}
 
 const ANALYTICS_APP_VERSION_STORAGE_KEY = "openbot:analytics-app-version";
 
@@ -117,6 +128,29 @@ const Settings = createSimpleContext({
      */
     const [pendingPluginConnect, setPendingPluginConnect] = createSignal(false);
     /**
+     * The MCP row whose sign-in the person asked for on an agent's card, held as the plugin slug is.
+     * The Marketplace opens the row's page and signs in, then clears it.
+     */
+    const [pendingMcpSignIn, setPendingMcpSignIn] = createSignal<string | null>(null);
+    /** The sign-in state of the MCP rows of one server, as the Marketplace last read them. The cards show it. */
+    const [mcpSignIns, setMcpSignIns] = createSignal<{
+      serverId: string;
+      states: Readonly<Record<string, McpSignInState>>;
+    } | null>(null);
+    /**
+     * Reads `mcpSignIns` again for the server whose states it holds. Each new Sign in card in a chat
+     * calls it: a read from before the agent's test can still say that a refused sign-in is current (#6661).
+     */
+    function refreshMcpSignIns(serverId: string | undefined): void {
+      if (!serverId || mcpSignIns()?.serverId !== serverId) return;
+      void desktopMarketplaceCalls()
+        .mcp.listMcpSignIns(serverId)
+        .then(mcpSignInRecord, () => null)
+        .then((states) => {
+          if (states && mcpSignIns()?.serverId === serverId) setMcpSignIns({ serverId, states });
+        });
+    }
+    /**
      * The agent or skill that a Marketplace link named, held as the plugin slug is. It is a kind and
      * an id, never a listing: the page loads the listing, and only Add on that page adds it.
      */
@@ -137,9 +171,14 @@ const Settings = createSimpleContext({
       nonce: number;
     } | null>(null);
     let notificationFocusNonce = 0;
+    /** A row that a setting card in a chat asked for. The settings page moves to it once for each nonce. */
+    const [appSettingRowRequest, setAppSettingRowRequest] = createSignal<AppSettingRowRequest | null>(null);
+    let appSettingRowNonce = 0;
     // A request moves the tab once. A later opening of the settings shows the tab from the top.
     createEffect(appSettingsOpen, (open) => {
-      if (!open) setNotificationFocusRequest(null);
+      if (open) return;
+      setNotificationFocusRequest(null);
+      setAppSettingRowRequest(null);
     });
     /** A hosted server that the server menu asked to delete. The nonce repeats a request for the same server. */
     const [hostedServerDeleteRequest, setHostedServerDeleteRequest] = createSignal<{
@@ -484,6 +523,15 @@ const Settings = createSimpleContext({
       openAppSettings(trigger, "notifications");
     }
 
+    /** Opens the settings at one row of a tab, and marks the row, as the settings search does. */
+    function openAppSettingRow(tab: SettingsTab, anchor: AppTextKey, trigger?: HTMLElement | null): void {
+      setAppSettingRowRequest({ tab, anchor, nonce: ++appSettingRowNonce });
+      // The modal applies a tab when the requested tab changes, so a repeated request clears it first.
+      setAppSettingsTab(undefined);
+      flush();
+      openAppSettings(trigger, tab);
+    }
+
     /** Opens the Hosted servers tab with the delete confirmation of one server. */
     function openHostedServerDelete(serverId: string, trigger?: HTMLElement | null): void {
       setHostedServerDeleteRequest({ serverId, nonce: ++hostedServerDeleteNonce });
@@ -741,6 +789,8 @@ const Settings = createSimpleContext({
       openAppSettings,
       notificationFocusRequest,
       openNotificationLevels,
+      appSettingRowRequest,
+      openAppSettingRow,
       hostedServerDeleteRequest,
       openHostedServerDelete,
       skillsMarketplaceOpen,
@@ -749,6 +799,11 @@ const Settings = createSimpleContext({
       setPendingPluginSlug,
       pendingPluginConnect,
       setPendingPluginConnect,
+      pendingMcpSignIn,
+      setPendingMcpSignIn,
+      mcpSignIns,
+      setMcpSignIns,
+      refreshMcpSignIns,
       pendingMarketplaceListing,
       setPendingMarketplaceListing,
       pendingAgentTemplateId,
