@@ -22,6 +22,12 @@
 // records a GPU process crash and then turns off hardware acceleration, as a desktop does. It writes
 // no start file: a server is often stopped soon after a start. `OPENBOT_DISABLE_GPU=1` turns off
 // hardware acceleration on a server; `OPENBOT_DISABLE_GPU=0` does not change a server.
+// Software rendering has no GPU mode left to fall back to. Chromium then ends the whole app after three
+// recent GPU process exits ("GPU process isn't usable. Goodbye."), also when Linux kills the GPU process
+// for memory (#12520). A start with software rendering turns that limit off, so Chromium starts the GPU
+// process again each time. Many exits in a short time are a GPU process that cannot start: OpenBot then
+// quits through its normal teardown, rather than restart the GPU process forever.
+// A start with hardware acceleration keeps the limit: it makes Chromium fall back to software rendering.
 // The renderer sandbox stays on in all cases.
 
 import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -46,6 +52,9 @@ const GPU_FAILURE_REASONS: ReadonlySet<Details["reason"]> = new Set([
 // context is lost (for example after suspend and resume), and Chromium starts it again. On Linux,
 // `exitCode` is the raw `waitpid` status (#12262): an exit with code 34 is `34 << 8`.
 const GPU_EXIT_ON_CONTEXT_LOST = 34 << 8;
+/** With software rendering, this many GPU process exits in `GPU_RESTART_LOOP_WINDOW_MS` quit OpenBot. */
+const GPU_RESTART_LOOP_LIMIT = 10;
+const GPU_RESTART_LOOP_WINDOW_MS = 60_000;
 
 const logger = createOpenBotLogger("linux-gpu");
 
@@ -142,6 +151,8 @@ export function configureLinuxGpu(options: ConfigureLinuxGpuOptions): LinuxGpuMo
   if (mode.reason === "not-linux") return mode;
   if (!mode.hardwareAcceleration) {
     app.disableHardwareAcceleration();
+    app.commandLine.appendSwitch("disable-gpu-process-crash-limit");
+    if (options.ownsInstance) quitOnGpuRestartLoop();
     // A second instance can read the start file of a first instance that is still new.
     if (options.ownsInstance && (mode.reason === "gpu-process-crash" || mode.reason === "unfinished-start")) {
       logger.warn(
@@ -177,6 +188,35 @@ export function configureLinuxGpu(options: ConfigureLinuxGpuOptions): LinuxGpuMo
     writeGpuFailure(crashPath, chromiumMajor);
   });
   return mode;
+}
+
+/**
+ * Without the crash limit, Chromium starts a GPU process that cannot start again and again, and the
+ * main process does nothing else. This listener does little per exit, so that such a loop cannot hold
+ * the main process (a Linux patch of Claude Desktop shows the risk). It writes no crash file: the
+ * start already uses software rendering.
+ */
+function quitOnGpuRestartLoop(): void {
+  const exits: number[] = [];
+  let quitting = false;
+  app.once("before-quit", () => {
+    quitting = true;
+  });
+  app.on("child-process-gone", (_event, details) => {
+    if (quitting || details.type !== "GPU" || details.reason === "clean-exit") return;
+    const now = Date.now();
+    while (exits.length > 0 && now - (exits[0] ?? now) >= GPU_RESTART_LOOP_WINDOW_MS) exits.shift();
+    exits.push(now);
+    if (exits.length < GPU_RESTART_LOOP_LIMIT) {
+      logger.warn(`The GPU process stopped (${details.reason}, exit code ${details.exitCode}). It starts again.`);
+      return;
+    }
+    quitting = true;
+    logger.error(
+      `The GPU process stopped ${GPU_RESTART_LOOP_LIMIT} times in ${GPU_RESTART_LOOP_WINDOW_MS / 1000} s, so OpenBot quits.`,
+    );
+    app.quit();
+  });
 }
 
 function chromiumMajorVersion(): string {
