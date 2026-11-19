@@ -4,12 +4,13 @@ import { type AttachmentSummary, type FilePreview, filePreviewKindForFile } from
 import { base64ToBytes } from "@openbot/team-client/base64";
 import { currentText } from "@openbot/ui/text";
 import type { WebAttachmentMedia } from "./web-attachment-media";
+import { createDownloadLimit, type DownloadLimit } from "./web-download-limit";
 import { createWebFileSaver } from "./web-file-download";
 import type { WebFile, WebWorkspaceRuntime } from "./web-runtime";
 
 const VISUAL_PAGE_CACHE = 8;
 const VISUAL_PAGE_READS = 4;
-const visualPageReads = new WeakMap<VisualPageRemote, ReturnType<typeof createReadQueue>>();
+const visualPageReads = new WeakMap<VisualPageRemote, DownloadLimit>();
 
 type VisualPageRemote = Pick<WebWorkspaceRuntime, "download">;
 
@@ -78,25 +79,9 @@ export function createWebAttachmentFiles(
 function visualPageQueue(remote: VisualPageRemote) {
   const shared = visualPageReads.get(remote);
   if (shared) return shared;
-  const queue = createReadQueue(VISUAL_PAGE_READS);
+  const queue = createDownloadLimit(VISUAL_PAGE_READS);
   visualPageReads.set(remote, queue);
   return queue;
-}
-
-function createReadQueue(limit: number) {
-  let active = 0;
-  const waiting: Array<() => void> = [];
-  return async function read<T>(task: () => Promise<T>): Promise<T> {
-    if (active < limit) active += 1;
-    else await new Promise<void>((start) => waiting.push(start));
-    try {
-      return await task();
-    } finally {
-      const next = waiting.shift();
-      if (next) next();
-      else active -= 1;
-    }
-  };
 }
 
 async function readVisualPage(
