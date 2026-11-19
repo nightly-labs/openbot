@@ -58,7 +58,6 @@ export interface Publication {
   catalogVersion: string;
   skills: PublishedSkill[];
   agents: PublishedAgent[];
-  /** Agent slugs that this catalog no longer lists. */
   retiredAgents: string[];
 }
 
@@ -73,8 +72,6 @@ export function createPublicationSql(publication: Publication, publishedAt: numb
     statements.push(
       `INSERT INTO marketplace_skills(id, slug, owner_user_id, approved_version_id, installs, featured, show_creator_avatar, created_at, updated_at) VALUES (${sql(skill.id)}, ${sql(skill.slug)}, ${sql(owner.id)}, NULL, 0, ${skill.featured ? 1 : 0}, 1, ${publishedAt}, ${publishedAt}) ON CONFLICT(id) DO UPDATE SET slug = excluded.slug, owner_user_id = excluded.owner_user_id, show_creator_avatar = excluded.show_creator_avatar, updated_at = excluded.updated_at;`,
       `INSERT INTO marketplace_skill_versions(id, skill_id, version, name, description, category, status, rejection_note, bundle_key, bundle_sha256, files_json, icon_key, created_at, reviewed_at) VALUES (${sql(skill.versionId)}, ${sql(skill.id)}, ${skill.version}, ${sql(skill.name)}, ${sql(skill.description)}, ${sql(skill.category)}, 'approved', NULL, ${sql(bundleKey)}, ${sql(skill.bundleSha256)}, ${sql(JSON.stringify(skill.files))}, ${sql(remoteIconKey(skill))}, ${publishedAt}, ${publishedAt}) ON CONFLICT(id) DO NOTHING;`,
-      /* The version row is immutable except for its artwork, which a release before the catalog
-         carried icons left empty. Only that column is repaired here. */
       `UPDATE marketplace_skill_versions SET icon_key = ${sql(remoteIconKey(skill))} WHERE id = ${sql(skill.versionId)};`,
       `UPDATE marketplace_skills SET approved_version_id = ${sql(skill.versionId)}, updated_at = ${publishedAt} WHERE id = ${sql(skill.id)} AND NOT EXISTS (SELECT 1 FROM marketplace_skill_versions current WHERE current.id = marketplace_skills.approved_version_id AND current.version > ${skill.version});`,
     );
@@ -88,8 +85,6 @@ export function createPublicationSql(publication: Publication, publishedAt: numb
     );
   }
 
-  /* A retired agent loses its listing only. Its versions and bundles stay, so installed copies keep
-     their snapshot, and a later catalog that lists the slug again approves a new version. */
   for (const slug of publication.retiredAgents) {
     statements.push(
       `UPDATE marketplace_agents SET approved_version_id = NULL, featured = 0, updated_at = ${publishedAt} WHERE id = ${sql(`openbot-curated-agent-${slug}`)} AND owner_user_id = ${sql(owner.id)};`,
@@ -282,8 +277,6 @@ function remoteBundleKey(skill: PublishedSkill): string {
   return `skills/${skill.id}/versions/${skill.versionId}.zip`;
 }
 
-/* The key a submission through the app would use, so the icon endpoint serves a catalog Skill the
-   same way it serves a community one. */
 function remoteIconKey(skill: PublishedSkill): string {
   return `skills/${skill.id}/versions/${skill.versionId}.icon`;
 }

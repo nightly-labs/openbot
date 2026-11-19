@@ -1,11 +1,7 @@
-import { Effect, Schema } from "effect";
-// Team API requests that the web client and the mobile app send in the same way.
-//
-// Each client has its own transport and its own error text for most responses, so only the requests
-// whose path, body and decoding are the same in both are here. A request that differs in one of them
-// stays at its call site.
-
+import { sha256 } from "@noble/hashes/sha2.js";
+import type { FeedbackPhone } from "@openbot/contracts/feedback";
 import {
+  type AgentApproval,
   type AgentImportPreview,
   type AgentMemory,
   type AgentMemorySelectionState,
@@ -38,6 +34,7 @@ import {
   decodeRemoteInstanceTransferResult,
   decodeRemoteInstanceTransferSummary,
   type ExportInstanceInput,
+  INSTANCE_TRANSFER_LIMITS,
   type InstalledSkill,
   type InstanceTransferPreview,
   type InstanceTransferSummary,
@@ -54,10 +51,12 @@ import {
   isRoutine,
   isRoutineFlowCanvas,
   isRoutineFlowLink,
+  isRoutinePausedByRun,
   isRoutineRun,
   type LocalBrowserSecretResponse,
   type MarkAgentTaskReadInput,
   type OpenBotDesktopApi,
+  type PinnedMessagesSnapshot,
   type QueuedMessageReceipt,
   type ReadAgentTaskAroundInput,
   type ReadAgentTaskPageInput,
@@ -71,6 +70,7 @@ import {
   type RoutineRunPlace,
   remoteBrowserSecretResponse,
   type SetAgentMemoryInclusionInput,
+  type SetMessagePinnedInput,
   type StartAgentTaskInput,
   type SteerQueuedMessageInput,
   type UpdateQueuedMessageInput,
@@ -106,6 +106,11 @@ import { BROWSER_SECRET_VAULT_ROUTES } from "@openbot/contracts/team-protocol/br
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CONTEXT_RESET_ROUTES } from "@openbot/contracts/team-protocol/context-reset-v1";
 import {
+  INSTANCE_TRANSFER_CHUNK_BYTES,
+  INSTANCE_TRANSFER_CHUNKS_ROUTES,
+} from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
+import { INSTANCE_TRANSFER_FULL_COPY_ROUTES } from "@openbot/contracts/team-protocol/instance-transfer-full-copy-v1";
+import {
   INSTANCE_TRANSFER_REMOTE_BYTES,
   INSTANCE_TRANSFER_ROUTES,
 } from "@openbot/contracts/team-protocol/instance-transfer-v1";
@@ -115,8 +120,19 @@ import {
   type LiveVoiceSessionResponse,
   type LiveVoiceStartRequest,
 } from "@openbot/contracts/team-protocol/live-voice-v1";
-import { MESSAGE_PINS_ROUTES } from "@openbot/contracts/team-protocol/message-pins-v1";
+import { decodeMessagePinsResponse, MESSAGE_PINS_ROUTES } from "@openbot/contracts/team-protocol/message-pins-v1";
+import {
+  decodePendingApprovalResponse,
+  PENDING_APPROVAL_ROUTES,
+} from "@openbot/contracts/team-protocol/pending-approval-v1";
+import { PHONE_FEEDBACK_ROUTES } from "@openbot/contracts/team-protocol/phone-feedback-v1";
+import { ROUTINE_FLOW_STOP_ROUTES } from "@openbot/contracts/team-protocol/routine-flow-stop-v1";
 import { ROUTINE_FLOWS_ROUTES } from "@openbot/contracts/team-protocol/routine-flows-v1";
+import {
+  decodeRoutinePauseReasons,
+  ROUTINE_PAUSE_REASONS_ROUTES,
+  type RoutinePauseReasonEntry,
+} from "@openbot/contracts/team-protocol/routine-pause-reasons-v1";
 import {
   decodeRoutineRunPlace,
   decodeRoutineRunPlaces,
@@ -124,7 +140,10 @@ import {
   type RoutineRunPlaceEntry,
 } from "@openbot/contracts/team-protocol/routine-run-place-v1";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
+import { Effect, Schema } from "effect";
+import { base64ToBytes, bytesToBase64 } from "./base64";
 import type { RemoteFileUpload } from "./file-upload";
+import { copyTransfer } from "./instance-transfer-copy";
 import {
   createOnceAgentRoutine,
   createOnceChannelRoutine,
@@ -141,7 +160,6 @@ export class TeamRequestError extends Schema.TaggedError<TeamRequestError>()("Te
   cause: Schema.Defect(),
 }) {}
 
-/** One request to the selected host. It rejects when the host fails or `decode` rejects the body. */
 export type TeamApiRequest = <T>(
   method: string,
   path: string,
@@ -163,7 +181,6 @@ function decodeAttachment(value: unknown): AttachmentSummary {
   return value;
 }
 
-/** Sends a file as an attachment draft. The host keeps it until a message uses it or it is discarded. */
 export const uploadAttachmentDraft = Effect.fn("TeamClient.uploadAttachmentDraft")(function* (
   request: TeamApiRequest,
   upload: RemoteFileUpload,
@@ -223,7 +240,6 @@ export const reorderQueue = Effect.fn("TeamClient.reorderQueue")(function* (
   );
 });
 
-/** Starts a new chat with the agent. Send it only to a host that serves `context-reset-v1`. */
 export const clearAgentContext = Effect.fn("TeamClient.clearAgentContext")(function* (
   request: TeamApiRequest,
   agentId: string,
@@ -231,10 +247,6 @@ export const clearAgentContext = Effect.fn("TeamClient.clearAgentContext")(funct
   return yield* teamCall(() => request("POST", CONTEXT_RESET_ROUTES.clear, ignoreResponse, { agentId }));
 });
 
-/**
- * Starts GPT live voice in the chat of `agentId` with the WebRTC offer of the client's peer, and
- * answers the session id and the answer of OpenAI. Send it only to a host that serves `live-voice-v1`.
- */
 export const startLiveVoice = Effect.fn("TeamClient.startLiveVoice")(function* (
   request: TeamApiRequest,
   input: LiveVoiceStartRequest,
@@ -242,7 +254,6 @@ export const startLiveVoice = Effect.fn("TeamClient.startLiveVoice")(function* (
   return yield* teamCall(() => request("POST", LIVE_VOICE_ROUTES.start, decodeLiveVoiceSessionResponse, { ...input }));
 });
 
-/** Ends a GPT live voice session. The host then sends its `live-voice` end event. */
 export const stopLiveVoice = Effect.fn("TeamClient.stopLiveVoice")(function* (
   request: TeamApiRequest,
   sessionId: string,
@@ -257,10 +268,6 @@ const decodeTaskPage = guardedDecoder(isAgentTaskPage, "thread page response");
 const decodeTaskWindow = guardedDecoder(isAgentTaskWindow, "thread part response");
 const decodeTaskReceipt = guardedDecoder(isQueuedMessageReceipt, "task message receipt");
 
-/**
- * The tasks of one agent. Send them only to a host that serves `agent-tasks-v1`. A start and a
- * message carry text only: the caller refuses attachments before it calls them.
- */
 export const listAgentTasks = Effect.fn("TeamClient.listAgentTasks")(function* (
   request: TeamApiRequest,
   agentId: string,
@@ -275,7 +282,6 @@ export const readAgentTask = Effect.fn("TeamClient.readAgentTask")(function* (
   return yield* teamCall(() => request("POST", AGENT_TASKS_ROUTES.read, decodeTaskConversation, { agentId, taskId }));
 });
 
-/** Older messages of a task, before a message that the client holds. Send it only to a host with `agent-thread-pages-v1`. */
 export const readAgentThreadPage = Effect.fn("TeamClient.readAgentThreadPage")(function* (
   request: TeamApiRequest,
   { agentId, taskId, beforeMessageId, limit }: ReadAgentTaskPageInput,
@@ -285,7 +291,6 @@ export const readAgentThreadPage = Effect.fn("TeamClient.readAgentThreadPage")(f
   );
 });
 
-/** The messages of a task around one of its messages. Send it only to a host with `message-pins-v1`. */
 export const readAgentThreadAround = Effect.fn("TeamClient.readAgentThreadAround")(function* (
   request: TeamApiRequest,
   { agentId, taskId, messageId, limit }: ReadAgentTaskAroundInput,
@@ -295,10 +300,27 @@ export const readAgentThreadAround = Effect.fn("TeamClient.readAgentThreadAround
   );
 });
 
-/**
- * Starts a task. With files it uses `agent-thread-files-v1`, so send files only to a host that serves
- * it; `agent-tasks-v1` carries text only.
- */
+export const listMessagePins = Effect.fn("TeamClient.listMessagePins")(function* (
+  request: TeamApiRequest,
+  agentId: string,
+): Effect.fn.Return<PinnedMessagesSnapshot, TeamRequestError> {
+  return yield* teamCall(() => request("POST", MESSAGE_PINS_ROUTES.list, decodeMessagePinsResponse, { agentId }));
+});
+
+export const setMessagePinned = Effect.fn("TeamClient.setMessagePinned")(function* (
+  request: TeamApiRequest,
+  { agentId, taskId, messageId, pinned }: SetMessagePinnedInput,
+): Effect.fn.Return<PinnedMessagesSnapshot, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", MESSAGE_PINS_ROUTES.set, decodeMessagePinsResponse, {
+      agentId,
+      taskId: taskId ?? null,
+      messageId,
+      pinned,
+    }),
+  );
+});
+
 export const startAgentTask = Effect.fn("TeamClient.startAgentTask")(function* (
   request: TeamApiRequest,
   { agentId, text, attachmentDraftIds, clientMessageId }: StartAgentTaskInput,
@@ -319,7 +341,6 @@ export const startAgentTask = Effect.fn("TeamClient.startAgentTask")(function* (
   );
 });
 
-/** Moves a queued message of the agent's own chat into a new task. Send it only to a host with `agent-queue-task-v1`. */
 export const runQueuedMessageAsAgentTask = Effect.fn("TeamClient.runQueuedMessageAsAgentTask")(function* (
   request: TeamApiRequest,
   { agentId, deliveryId }: { agentId: string; deliveryId: string },
@@ -327,10 +348,6 @@ export const runQueuedMessageAsAgentTask = Effect.fn("TeamClient.runQueuedMessag
   return yield* teamCall(() => request("POST", AGENT_QUEUE_TASK_ROUTES.run, decodeAgentTask, { agentId, deliveryId }));
 });
 
-/**
- * Sends to a task. With files it uses `agent-thread-files-v1`, as `startAgentTask` does. A reply uses
- * `agent-thread-replies-v1`, so send a reply only to a host that serves it.
- */
 export const sendAgentTaskMessage = Effect.fn("TeamClient.sendAgentTaskMessage")(function* (
   request: TeamApiRequest,
   {
@@ -374,7 +391,6 @@ export const sendAgentTaskMessage = Effect.fn("TeamClient.sendAgentTaskMessage")
   );
 });
 
-/** Stops the running turn of a task, closes the task, or reopens it. */
 export const agentTaskControl = Effect.fn("TeamClient.agentTaskControl")(function* (
   request: TeamApiRequest,
   action: "stop" | "close" | "reopen",
@@ -383,7 +399,6 @@ export const agentTaskControl = Effect.fn("TeamClient.agentTaskControl")(functio
   return yield* teamCall(() => request("POST", AGENT_TASKS_ROUTES[action], ignoreResponse, { agentId, taskId }));
 });
 
-/** Renames a side thread. Send it only to a host that serves `agent-threads-v1`. */
 export const renameAgentThread = Effect.fn("TeamClient.renameAgentThread")(function* (
   request: TeamApiRequest,
   { agentId, taskId, title }: RenameAgentTaskInput,
@@ -393,7 +408,6 @@ export const renameAgentThread = Effect.fn("TeamClient.renameAgentThread")(funct
   );
 });
 
-/** Deletes a side thread for good. Send it only to a host that serves `agent-threads-v1`. */
 export const deleteAgentThread = Effect.fn("TeamClient.deleteAgentThread")(function* (
   request: TeamApiRequest,
   { agentId, taskId }: AgentTaskInput,
@@ -408,7 +422,6 @@ const decodeThreadReads = guardedDecoder(
   "thread read states",
 );
 
-/** The person's read mark of each open side thread. Send it only to a host that serves `agent-thread-reads-v1`. */
 export const listAgentThreadReads = Effect.fn("TeamClient.listAgentThreadReads")(function* (
   request: TeamApiRequest,
   agentId: string,
@@ -417,7 +430,6 @@ export const listAgentThreadReads = Effect.fn("TeamClient.listAgentThreadReads")
   return answer.reads;
 });
 
-/** Moves the person's read mark of a side thread. Send it only to a host that serves `agent-thread-reads-v1`. */
 export const markAgentThreadRead = Effect.fn("TeamClient.markAgentThreadRead")(function* (
   request: TeamApiRequest,
   { agentId, taskId, throughMessageId }: MarkAgentTaskReadInput,
@@ -429,10 +441,6 @@ export const markAgentThreadRead = Effect.fn("TeamClient.markAgentThreadRead")(f
 
 const decodeThreadBranches = guardedDecoder(isAgentThreadBranchLinks, "thread branches");
 
-/**
- * Branches a conversation of the agent into a new side thread, and answers the task with its link.
- * Send it only to a host that serves `agent-thread-branches-v1`.
- */
 export const branchAgentThread = Effect.fn("TeamClient.branchAgentThread")(function* (
   request: TeamApiRequest,
   { agentId, taskId, messageId, requestId }: BranchAgentTaskInput,
@@ -442,7 +450,6 @@ export const branchAgentThread = Effect.fn("TeamClient.branchAgentThread")(funct
   );
 });
 
-/** The link of each branch among the listed tasks. Send it only to a host that serves `agent-thread-branches-v1`. */
 export const listAgentThreadBranches = Effect.fn("TeamClient.listAgentThreadBranches")(function* (
   request: TeamApiRequest,
   agentId: string,
@@ -453,7 +460,6 @@ export const listAgentThreadBranches = Effect.fn("TeamClient.listAgentThreadBran
   return answer.branches;
 });
 
-/** Sends a Grok Bot export to the host. Send it only to a host that serves `agent-import-v1`. */
 export const stageAgentImport = Effect.fn("TeamClient.stageAgentImport")(function* (
   request: TeamApiRequest,
   upload: RemoteFileUpload,
@@ -471,18 +477,12 @@ function decodeUploadId(value: unknown): string {
   return value.uploadId;
 }
 
-/** An export that is read one part at a time. */
 export interface AgentExportParts {
   name: string;
   size: number;
-  /** Up to `length` bytes from `offset`, as Base64. */
   readPart: (offset: number, length: number) => Promise<string>;
 }
 
-/**
- * Sends a Grok Bot export of any size to the host in parts, and answers its preview. Send it only to
- * a host that serves `agent-import-v2`; `apply` and `discard` stay the v1 calls.
- */
 export const stageAgentImportInParts = Effect.fn("TeamClient.stageAgentImportInParts")(function* (
   request: TeamApiRequest,
   file: AgentExportParts,
@@ -519,7 +519,6 @@ export const discardAgentImport = Effect.fn("TeamClient.discardAgentImport")(fun
   return yield* teamCall(() => request("POST", AGENT_IMPORT_ROUTES.discard, ignoreResponse, { token }));
 });
 
-/** The host's agents with their counts. Send it only to a host that serves `instance-transfer-v1`. */
 export const loadInstanceTransferSummary = Effect.fn("TeamClient.loadInstanceTransferSummary")(function* (
   request: TeamApiRequest,
 ): Effect.fn.Return<InstanceTransferSummary, TeamRequestError> {
@@ -534,10 +533,6 @@ const decodeTransferFile = guardedDecoder(
   "transfer file",
 );
 
-/**
- * The host's transfer file, as Base64. The transport must let one file of up to
- * `INSTANCE_TRANSFER_REMOTE_BYTES` answer this request.
- */
 export const downloadInstanceTransfer = Effect.fn("TeamClient.downloadInstanceTransfer")(function* (
   request: TeamApiRequest,
   input: ExportInstanceInput,
@@ -551,7 +546,171 @@ export const downloadInstanceTransfer = Effect.fn("TeamClient.downloadInstanceTr
   );
 });
 
-/** Sends an OpenBot transfer file to the host. Send it only to a host that serves `instance-transfer-v1`. */
+export function copiedTransferUpload(upload: RemoteFileUpload): RemoteFileUpload | null {
+  const { base64 } = upload;
+  const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
+  const read = (offset: number, length: number) => {
+    const first = Math.floor(offset / 3);
+    const bytes = base64ToBytes(base64.slice(first * 4, Math.ceil((offset + length) / 3) * 4));
+    return bytes.subarray(offset - first * 3, offset - first * 3 + length);
+  };
+  const copy = copyTransfer({ size: Math.floor((base64.length * 3) / 4) - padding, read });
+  if (!copy) return null;
+  const kept = Math.floor(copy.offset / 3);
+  const rest = read(kept * 3, copy.offset - kept * 3);
+  const changed = new Uint8Array(rest.length + copy.tail.length);
+  changed.set(rest);
+  changed.set(copy.tail, rest.length);
+  return { ...upload, base64: base64.slice(0, kept * 4) + bytesToBase64(changed) };
+}
+
+export interface InstanceTransferExportState {
+  exportId: string;
+  size: number;
+  sha256: string;
+  chunkBytes: number;
+  chunks: string[];
+  warnings: string[];
+}
+
+const SHA256 = /^[0-9a-f]{64}$/u;
+
+const isPartBytes = (value: unknown): value is number =>
+  typeof value === "number" && Number.isSafeInteger(value) && value > 0 && value <= INSTANCE_TRANSFER_REMOTE_BYTES;
+
+export function fullCopyExportBody(input: ExportInstanceInput) {
+  const includeHistory = input.includeHistory === true;
+  return {
+    agentIds: input.agentIds,
+    includeFiles: input.includeFiles,
+    includeSettings: input.includeSettings,
+    includeHistory,
+    includeChannelMessages: input.includeChannelMessages ?? includeHistory,
+    includeServerPreferences: input.includeServerPreferences === true,
+  };
+}
+
+export function decodeInstanceTransferExportState(value: unknown): InstanceTransferExportState {
+  if (
+    !isDynamicRecord(value) ||
+    !isString(value.exportId) ||
+    typeof value.size !== "number" ||
+    !Number.isSafeInteger(value.size) ||
+    value.size <= 0 ||
+    value.size > INSTANCE_TRANSFER_LIMITS.archiveBytes ||
+    !isString(value.sha256) ||
+    !SHA256.test(value.sha256) ||
+    !isPartBytes(value.chunkBytes) ||
+    !Array.isArray(value.chunks) ||
+    value.chunks.length !== Math.ceil(value.size / value.chunkBytes) ||
+    !value.chunks.every((chunk) => isString(chunk) && SHA256.test(chunk)) ||
+    !Array.isArray(value.warnings) ||
+    !value.warnings.every(isString)
+  )
+    throw new Error("The host returned an invalid transfer export.");
+  return {
+    exportId: value.exportId,
+    size: value.size,
+    sha256: value.sha256,
+    chunkBytes: value.chunkBytes,
+    chunks: value.chunks,
+    warnings: value.warnings,
+  };
+}
+
+export const beginInstanceTransferFullCopy = Effect.fn("TeamClient.beginInstanceTransferFullCopy")(function* (
+  request: TeamApiRequest,
+  input: ExportInstanceInput,
+): Effect.fn.Return<InstanceTransferExportState, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", INSTANCE_TRANSFER_FULL_COPY_ROUTES.exportBegin, decodeInstanceTransferExportState, {
+      ...fullCopyExportBody(input),
+    }),
+  );
+});
+
+export const readInstanceTransferExportPart = Effect.fn("TeamClient.readInstanceTransferExportPart")(function* (
+  request: TeamApiRequest,
+  part: { exportId: string; index: number },
+): Effect.fn.Return<RemoteFileUpload, TeamRequestError> {
+  return yield* teamCall(() => request("POST", INSTANCE_TRANSFER_CHUNKS_ROUTES.exportChunk, decodeTransferFile, part));
+});
+
+export const finishInstanceTransferExport = Effect.fn("TeamClient.finishInstanceTransferExport")(function* (
+  request: TeamApiRequest,
+  exportId: string,
+): Effect.fn.Return<void, TeamRequestError> {
+  yield* teamCall(() => request("POST", INSTANCE_TRANSFER_CHUNKS_ROUTES.exportDone, ignoreResponse, { exportId }));
+});
+
+export interface TransferFileParts {
+  name: string;
+  size: number;
+  readBytes(offset: number, length: number): Promise<Uint8Array>;
+}
+
+const decodeUploadState = (value: unknown): { uploadId: string; chunkBytes: number; received: number[] } => {
+  if (
+    !isDynamicRecord(value) ||
+    !isString(value.uploadId) ||
+    !isPartBytes(value.chunkBytes) ||
+    !Array.isArray(value.received) ||
+    !value.received.every((index) => typeof index === "number" && Number.isSafeInteger(index) && index >= 0)
+  )
+    throw new Error("The host returned an invalid transfer upload.");
+  return { uploadId: value.uploadId, chunkBytes: value.chunkBytes, received: value.received };
+};
+
+const hex = (bytes: Uint8Array) => [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+
+export function sha256Hex(bytes: Uint8Array): string {
+  return hex(sha256(bytes));
+}
+
+export const stageInstanceTransferInParts = Effect.fn("TeamClient.stageInstanceTransferInParts")(function* (
+  request: TeamApiRequest,
+  file: TransferFileParts,
+  onProgress?: (sent: number, total: number) => void,
+): Effect.fn.Return<InstanceTransferPreview, TeamRequestError> {
+  const whole = sha256.create();
+  for (let offset = 0; offset < file.size; offset += INSTANCE_TRANSFER_CHUNK_BYTES)
+    whole.update(
+      yield* teamCall(() => file.readBytes(offset, Math.min(INSTANCE_TRANSFER_CHUNK_BYTES, file.size - offset))),
+    );
+  const upload = yield* teamCall(() =>
+    request("POST", INSTANCE_TRANSFER_CHUNKS_ROUTES.uploadBegin, decodeUploadState, {
+      size: file.size,
+      sha256: hex(whole.digest()),
+    }),
+  );
+  const received = new Set(upload.received);
+  const partLength = (index: number) => Math.min(upload.chunkBytes, file.size - index * upload.chunkBytes);
+  let sent = 0;
+  for (const index of received) if (index * upload.chunkBytes < file.size) sent += partLength(index);
+  onProgress?.(sent, file.size);
+  for (let index = 0; index * upload.chunkBytes < file.size; index++) {
+    if (received.has(index)) continue;
+    const offset = index * upload.chunkBytes;
+    const bytes = yield* teamCall(() => file.readBytes(offset, partLength(index)));
+    const query = new URLSearchParams({ uploadId: upload.uploadId, index: String(index), sha256: sha256Hex(bytes) });
+    yield* teamCall(() =>
+      request("POST", `${INSTANCE_TRANSFER_CHUNKS_ROUTES.uploadChunk}?${query}`, ignoreResponse, undefined, {
+        name: file.name,
+        mimeType: "application/octet-stream",
+        base64: bytesToBase64(bytes),
+        maxBytes: upload.chunkBytes,
+      }),
+    );
+    sent += bytes.length;
+    onProgress?.(sent, file.size);
+  }
+  return yield* teamCall(() =>
+    request("POST", INSTANCE_TRANSFER_CHUNKS_ROUTES.uploadFinish, decodeRemoteInstanceTransferPreview, {
+      uploadId: upload.uploadId,
+    }),
+  );
+});
+
 export const stageInstanceTransfer = Effect.fn("TeamClient.stageInstanceTransfer")(function* (
   request: TeamApiRequest,
   upload: RemoteFileUpload,
@@ -560,6 +719,22 @@ export const stageInstanceTransfer = Effect.fn("TeamClient.stageInstanceTransfer
     request("POST", INSTANCE_TRANSFER_ROUTES.stage, decodeRemoteInstanceTransferPreview, undefined, {
       ...upload,
       maxBytes: INSTANCE_TRANSFER_REMOTE_BYTES,
+    }),
+  );
+});
+
+export const applyInstanceTransferFullCopy = Effect.fn("TeamClient.applyInstanceTransferFullCopy")(function* (
+  request: TeamApiRequest,
+  input: ApplyInstanceTransferInput,
+  timezone: string,
+): Effect.fn.Return<RemoteInstanceTransferResult, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", INSTANCE_TRANSFER_FULL_COPY_ROUTES.apply, decodeRemoteInstanceTransferResult, {
+      token: input.token,
+      keys: input.keys,
+      includeSettings: input.includeSettings,
+      includeServerPreferences: input.includeServerPreferences === true,
+      timezone,
     }),
   );
 });
@@ -586,7 +761,6 @@ export const discardInstanceTransfer = Effect.fn("TeamClient.discardInstanceTran
   return yield* teamCall(() => request("POST", INSTANCE_TRANSFER_ROUTES.discard, ignoreResponse, { token }));
 });
 
-/** The agent's skills that a message can tag. Send it only to a host that serves `installed-skills`. */
 export const listInstalledSkills = Effect.fn("TeamClient.listInstalledSkills")(function* (
   request: TeamApiRequest,
   agentId: string,
@@ -608,6 +782,27 @@ export const respondToApproval = Effect.fn("TeamClient.respondToApproval")(funct
   return yield* teamCall(() => request("POST", TEAM_API_ROUTES.respond.approval, ignoreResponse, { ...input }));
 });
 
+export const readPendingApproval = Effect.fn("TeamClient.readPendingApproval")(function* (
+  request: TeamApiRequest,
+  input: { agentId: string; requestId: string | number },
+): Effect.fn.Return<AgentApproval, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", PENDING_APPROVAL_ROUTES.read, decodePendingApprovalResponse, { ...input }),
+  );
+});
+
+export const sendPhoneFeedback = Effect.fn("TeamClient.sendPhoneFeedback")(function* (
+  request: TeamApiRequest,
+  input: { requestId: string | number; phone: FeedbackPhone },
+): Effect.fn.Return<void, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", PHONE_FEEDBACK_ROUTES.send, ignoreResponse, {
+      requestId: input.requestId,
+      phone: { ...input.phone },
+    }),
+  );
+});
+
 export const respondToBrowserTakeover = Effect.fn("TeamClient.respondToBrowserTakeover")(function* (
   request: TeamApiRequest,
   input: RespondToBrowserTakeoverInput,
@@ -619,8 +814,6 @@ export const respondToBrowserSecret = Effect.fn("TeamClient.respondToBrowserSecr
   request: TeamApiRequest,
   input: LocalBrowserSecretResponse,
 ): Effect.fn.Return<void, TeamRequestError> {
-  // The released route carries only the released fields. A save goes on `browser-secret-vault-v1`, which
-  // the caller offers only to an owner or admin of a host that serves it.
   const path =
     input.decision === "submit" && input.saveToVault
       ? BROWSER_SECRET_VAULT_ROUTES.respond
@@ -628,7 +821,6 @@ export const respondToBrowserSecret = Effect.fn("TeamClient.respondToBrowserSecr
   return yield* teamCall(() => request("POST", path, ignoreResponse, { ...remoteBrowserSecretResponse(input) }));
 });
 
-/** The channel calls of the desktop IPC surface, which a remote desktop sends to the host the same way. */
 export type TeamChannelsApi = Pick<
   OpenBotDesktopApi["agent"],
   | "listChannels"
@@ -647,20 +839,10 @@ export type TeamChannelsApi = Pick<
   | "listChannelRoutineRuns"
 >;
 
-/**
- * A host with channel-picture-v1 names a channel image by its `openbot-avatar:` URL, which a browser
- * cannot open. Without it, the channel shows its icon or its member faces.
- */
 function withoutHostImage<T extends { imageUrl?: string | null }>(channel: T): T {
   return channel.imageUrl ? { ...channel, imageUrl: null } : channel;
 }
 
-/**
- * Every channel route is a POST with the channel in the body, except the list. With `once`, for a host
- * with `routines-once-v1`, the routine list adds the `once` routines and every routine update goes to
- * its routes. With `keepHostImage`, a channel keeps the host's image URL, for a caller that reads the
- * image through the `channel-picture-v1` image route.
- */
 export function teamChannelsApi(
   request: TeamApiRequest,
   once: () => boolean = () => false,
@@ -712,13 +894,11 @@ const decodeRoutineRun = guardedDecoder(isRoutineRun, "routine run");
 const decodeRoutines = guardedListDecoder(isRoutine, "routine list");
 const decodeRoutineRuns = guardedListDecoder(isRoutineRun, "routine run list");
 
-/** The agent routine calls of the desktop IPC surface, which a remote desktop sends to the host the same way. */
 export type TeamAgentRoutinesApi = Pick<
   OpenBotDesktopApi["agent"],
   "listRoutines" | "createRoutine" | "updateRoutine" | "deleteRoutine" | "testRoutine" | "listRoutineRuns"
 >;
 
-/** Gives each routine the place where the host runs it, from the `routine-run-place-v1` list. */
 export function withRoutineRunPlaces<R extends { id: string; runIn?: RoutineRunPlace }>(
   routines: readonly R[],
   places: readonly RoutineRunPlaceEntry[],
@@ -730,20 +910,29 @@ export function withRoutineRunPlaces<R extends { id: string; runIn?: RoutineRunP
   });
 }
 
-/**
- * The frozen v1 agent routine routes. Every host serves them. They leave out where a routine runs, so
- * with `runPlaces`, for a host with `routine-run-place-v1`, the place goes on its own routes. They
- * also leave out the `once` routines, so with `once`, for a host with `routines-once-v1`, the list
- * adds them and every routine update goes to their routes, which save the place too.
- */
+export function withRoutinePauseReasons<R extends { id: string; active: boolean }>(
+  routines: readonly R[],
+  reasons: readonly RoutinePauseReasonEntry[],
+): R[] {
+  if (reasons.length === 0) return [...routines];
+  const reasonOf = new Map(reasons.map((reason) => [reason.routineId, reason.scheduledFor]));
+  return routines.map((routine) => {
+    const pausedByRun = routine.active ? undefined : { scheduledFor: reasonOf.get(routine.id) };
+    return isRoutinePausedByRun(pausedByRun) ? { ...routine, pausedByRun } : routine;
+  });
+}
+
+export function listRoutinePauseReasons(request: TeamApiRequest, agentId: string): Promise<RoutinePauseReasonEntry[]> {
+  return request("POST", ROUTINE_PAUSE_REASONS_ROUTES.list, decodeRoutinePauseReasons, { agentId });
+}
+
 export function teamAgentRoutinesApi(
   request: TeamApiRequest,
   runPlaces: () => boolean = () => false,
   once: () => boolean = () => false,
+  pauseReasons: () => boolean = () => false,
 ): TeamAgentRoutinesApi {
   const send: RoutinesOncePost = (path, decode, body) => request("POST", path, decode, body);
-  // The new routine exists, so a failed place does not fail a create: the routine runs in the chat,
-  // and a second save does not make a second routine.
   const withRunPlace = async (
     routine: Routine,
     runIn: RoutineRunPlace | undefined,
@@ -760,18 +949,15 @@ export function teamAgentRoutinesApi(
   };
   return {
     listRoutines: async (agentId) => {
-      const routines = request("GET", TEAM_API_ROUTES.agent.routines(agentId), decodeRoutines);
-      const onceRoutines = once() ? listOnceAgentRoutines(send, agentId) : Promise.resolve([]);
-      if (!runPlaces()) {
-        const [released, extra] = await Promise.all([routines, onceRoutines]);
-        return [...released, ...extra];
-      }
-      const [list, places, extra] = await Promise.all([
-        routines,
-        request("POST", ROUTINE_RUN_PLACE_ROUTES.list, decodeRoutineRunPlaces, { agentId }),
-        onceRoutines,
+      const [list, places, reasons, extra] = await Promise.all([
+        request("GET", TEAM_API_ROUTES.agent.routines(agentId), decodeRoutines),
+        runPlaces()
+          ? request("POST", ROUTINE_RUN_PLACE_ROUTES.list, decodeRoutineRunPlaces, { agentId })
+          : Promise.resolve([]),
+        pauseReasons() ? listRoutinePauseReasons(request, agentId) : Promise.resolve([]),
+        once() ? listOnceAgentRoutines(send, agentId) : Promise.resolve([]),
       ]);
-      return [...withRoutineRunPlaces(list, places), ...extra];
+      return [...withRoutinePauseReasons(withRoutineRunPlaces(list, places), reasons), ...extra];
     },
     createRoutine: async ({ runIn, ...input }) => {
       if (isOnceSchedule(input.schedule)) {
@@ -811,13 +997,11 @@ export function teamAgentRoutinesApi(
   };
 }
 
-/** The routine canvas calls of the desktop IPC surface. Send them only to a host that serves `routine-flows-v1`. */
 export type TeamRoutineFlowsApi = OpenBotDesktopApi["routineFlows"];
 
 const decodeRoutineFlowCanvas = guardedDecoder(isRoutineFlowCanvas, "routine flow canvas");
 const decodeRoutineFlowLink = guardedDecoder(isRoutineFlowLink, "routine flow link");
 
-/** Every routine flow route is a POST with its input in the body. */
 export function teamRoutineFlowsApi(request: TeamApiRequest): TeamRoutineFlowsApi {
   const post = <T>(path: string, decode: (value: unknown) => T, body: unknown) =>
     request("POST", path, decode, decodeTeamProtocolV2Json(body));
@@ -828,9 +1012,9 @@ export function teamRoutineFlowsApi(request: TeamApiRequest): TeamRoutineFlowsAp
     connect: (input) => post(ROUTINE_FLOWS_ROUTES.connect, decodeRoutineFlowLink, input),
     disconnect: (input) => post(ROUTINE_FLOWS_ROUTES.disconnect, ignoreResponse, input),
     updateLink: (input) => post(ROUTINE_FLOWS_ROUTES.updateLink, decodeRoutineFlowLink, input),
+    stopRun: (input) => post(ROUTINE_FLOW_STOP_ROUTES.stopRun, ignoreResponse, input),
   };
 }
-/** An Effect request lets the desktop reuse its managed request lifetime. */
 export type AgentMemoriesRequest<E> = <T>(
   method: string,
   path: string,
@@ -838,7 +1022,6 @@ export type AgentMemoriesRequest<E> = <T>(
   body?: TeamProtocolV2Json,
 ) => Effect.Effect<T, E>;
 
-/** Old hosts keep their full-list route; new hosts send bounded pages in stable id order. */
 export const readAgentMemories = Effect.fn("TeamClient.readAgentMemories")(function* <E>(
   request: AgentMemoriesRequest<E>,
   agentId: string,
@@ -876,7 +1059,6 @@ export const readAgentMemories = Effect.fn("TeamClient.readAgentMemories")(funct
     memories.push(...page.memories);
     after = page.nextCursor;
   } while (after !== null);
-  // Match the local store's updated_at DESC, memory_id order after collecting stable pages.
   return memories.sort((left, right) =>
     left.updatedAt !== right.updatedAt
       ? left.updatedAt > right.updatedAt
@@ -890,7 +1072,6 @@ export const readAgentMemories = Effect.fn("TeamClient.readAgentMemories")(funct
   );
 });
 
-/** Selection pages name their owner and use strictly increasing memory IDs. */
 export const readAgentMemorySelection = Effect.fn("TeamClient.readAgentMemorySelection")(function* <E>(
   request: AgentMemoriesRequest<E>,
   agentId: string,

@@ -3,7 +3,7 @@ import type { messages as source } from "../../en/status/messaging";
 
 export const messages = {
   "status.messaging.working": "Trabajando en ello…",
-  "status.messaging.queued": "En espera: OpenBot está trabajando en otra solicitud. La respuesta llegará aquí.",
+  "status.messaging.queued": "En espera hasta que termine una solicitud anterior. La respuesta llegará aquí.",
   "status.messaging.busy": "Hay demasiadas solicitudes en espera. Inténtalo más tarde.",
   "status.messaging.failed": "OpenBot no pudo completar esta solicitud. El host de OpenBot tiene los detalles.",
   "status.messaging.noAnswer": "OpenBot terminó sin una respuesta escrita.",
@@ -12,6 +12,7 @@ export const messages = {
   "status.messaging.stopped": "Detenido.",
   "status.messaging.stop": "Detener",
   "status.messaging.approvalTitle": "OpenBot pide aprobación para continuar.",
+  "status.messaging.approvalTitleTeammate": "El compañero {agent} pide aprobación para continuar.",
   "status.messaging.approvalCommand": "Ejecutar un comando",
   "status.messaging.approvalFileChange": "Cambiar archivos",
   "status.messaging.approvalPermissions": "Obtener más permisos",
@@ -51,6 +52,10 @@ export const messages = {
     "👋 *OpenBot está conectado*\n\nEscribe aquí para preguntar a tus agentes. El WhatsApp Orchestrator responde o pasa el trabajo al agente adecuado.\n\nEnvía *stop* para detener una solicitud.",
   "status.messaging.whatsappWelcomeDedicated":
     "👋 *OpenBot está conectado*\n\nLas personas que permitas en OpenBot ya pueden escribir a este número. Una persona nueva recibe un código: apruébalo en OpenBot, en Solicitudes.\n\nEnvía *stop* para detener una solicitud.",
+  "status.messaging.whatsappOtherOpenBot":
+    "Otro OpenBot está vinculado a este número de WhatsApp, así que puedes recibir dos respuestas. Para solucionarlo, abre Dispositivos vinculados en WhatsApp en tu teléfono y cierra la sesión del OpenBot que no usas.",
+  "status.messaging.whatsappPaused":
+    "OpenBot dejó de responder aquí durante 10 minutos: llegaron demasiados mensajes en poco tiempo. Si otro OpenBot está vinculado a este número, abre Dispositivos vinculados en WhatsApp en tu teléfono y cierra la sesión del OpenBot que no usas.",
   "status.messaging.whatsappOrchestratorName": "Orquestador de WhatsApp",
   "status.messaging.whatsappOrchestratorTitle": "Responde en WhatsApp y consulta al equipo",
 } as const satisfies PartialTranslation<typeof source>;

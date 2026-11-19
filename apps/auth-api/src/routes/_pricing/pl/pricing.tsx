@@ -5,11 +5,9 @@ import { loadSitePage } from "../../../lib/site-locale";
 import { sitePageHead } from "../../../lib/site-page-head";
 import { LOCALIZED_PAGE_PATHS } from "../../../lib/site-paths";
 
-// The pricing page in Polish, whatever the language of the request.
 export const Route = createFileRoute("/_pricing/pl/pricing")({
   loader: async () => {
     const page = await loadSitePage("pl", pricingPageText);
-    // The order form reads the catalog in the browser too, so `getRouter` loads this one before hydration.
     return { ...page, textCatalog: page.locale };
   },
   head: ({ match, loaderData }) => {

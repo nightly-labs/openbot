@@ -110,7 +110,6 @@ describe("remote Signal homes migration", () => {
     const database = migratedTo("0044");
     seed(database);
     database.exec(migration);
-    // The deployed Worker names neither new column in its inserts, updates and deletes.
     database.exec(`
       INSERT INTO remote_hosts(host_id, owner_user_id, name, created_at, updated_at)
         VALUES ('old-worker', 'owner', 'New host', 70, 70);

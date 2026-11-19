@@ -25,10 +25,8 @@ import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
-/** A phone number with its country code. */
 const PHONE_PLACEHOLDER = "+44 7700 900123";
 
-/** How often the page reads the link while it waits for the phone, as on the desktop. */
 const LINK_POLL_MS = 1_000;
 
 const LINK_ERROR = {
@@ -38,14 +36,6 @@ const LINK_ERROR = {
   unavailable: "mobile.server.connectors.whatsapp.failedUnavailable",
 } as const satisfies Record<NonNullable<WhatsAppLinkState["error"]>, MobileTextKey>;
 
-/**
- * Marketplace › Apps › WhatsApp › Link: links a number to the host. The user selects what
- * the number is and types its phone number. The host's session gets a pairing code from WhatsApp, and
- * the user types it in WhatsApp › Linked devices. A phone links only by pairing code: the WhatsApp app
- * on the same phone cannot scan a QR code on its own screen. The page reads the link every second
- * while it waits, and leaving the page before `linked` cancels the link on the host, so nobody can use
- * its code. After the link, the page adds the WhatsApp Orchestrator when no orchestrator exists.
- */
 export function ServerWhatsAppLinkScreen() {
   const { t, errorMessage } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
@@ -57,16 +47,12 @@ export function ServerWhatsAppLinkScreen() {
   const [ownNumber, setOwnNumber] = useState(true);
   const [phone, setPhone] = useState("");
   const [invalid, setInvalid] = useState(false);
-  /** The link that this page started; null while the user chooses. */
   const [link, setLink] = useState<WhatsAppLinkState | null>(null);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
-  /** True after this page added the orchestrator, until the agent list shows it. */
   const [added, setAdded] = useState(false);
 
-  /** Each start replaces the one before it, so a slow answer never overwrites a newer link. */
   const links = useRef(0);
-  /** True from a start until the link ends in `linked` or the page cancels it. */
   const started = useRef(false);
   const mounted = useRef(true);
   const cancel = useRef<() => void>(() => undefined);
@@ -75,7 +61,6 @@ export function ServerWhatsAppLinkScreen() {
     started.current = false;
     void cancelWhatsAppLink(serverId).catch(() => undefined);
   };
-  // A link that did not end in `linked` is cancelled when the page goes away.
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -104,7 +89,6 @@ export function ServerWhatsAppLinkScreen() {
     if (!waiting) return;
     const current = links.current;
     const timer = setInterval(() => {
-      // A failed read is tried again at the next tick; the link ends on its own when it times out.
       loadWhatsAppLinkState(serverId).then(
         (next) => followRef.current(next, current),
         () => undefined,
@@ -134,7 +118,6 @@ export function ServerWhatsAppLinkScreen() {
     startWhatsAppLink({ method: "code", phoneNumber, ownNumber }, serverId)
       .then(
         (state) => {
-          // The page went away while the start was on its way: the link stops there too.
           if (!mounted.current) {
             if (state.status !== "linked") void cancelWhatsAppLink(serverId).catch(() => undefined);
             return;
@@ -187,7 +170,6 @@ export function ServerWhatsAppLinkScreen() {
             <SettingsRow
               disclosure={false}
               disabled={action.busy}
-              // The host starts it on its default provider and model.
               onPress={() =>
                 void action
                   .perform(async () => {
@@ -273,7 +255,6 @@ export function ServerWhatsAppLinkScreen() {
             <SettingsSection>
               <SettingsRow
                 disclosure={false}
-                // Read one character at a time: the user types it in WhatsApp.
                 accessibilityLabel={t("mobile.server.connectors.whatsapp.codeLabel", {
                   code: code.split("").join(" "),
                 })}
@@ -307,7 +288,6 @@ export function ServerWhatsAppLinkScreen() {
               {t(code ? "mobile.server.connectors.whatsapp.codeWaiting" : "mobile.server.connectors.whatsapp.starting")}
             </Typography.Paragraph>
           </SettingsRow>
-          {/* Leaving the page cancels the link on the host. */}
           <SettingsRow disclosure={false} onPress={close}>
             <Typography.Paragraph className="text-danger-text">{t("common.cancel")}</Typography.Paragraph>
           </SettingsRow>
@@ -375,7 +355,6 @@ export function ServerWhatsAppLinkScreen() {
   );
 }
 
-/** The steps in WhatsApp, in the order that the user does them. */
 function LinkSteps({ steps }: { steps: readonly string[] }) {
   return (
     <View className="gap-3 px-4 py-3">

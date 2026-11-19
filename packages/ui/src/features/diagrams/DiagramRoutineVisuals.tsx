@@ -1,9 +1,3 @@
-/**
- * What a routine does over time, at a glance: the week ahead as seven day columns with a tick at
- * each time it fires, and its last runs as a row of status dots. The card and the run panel show
- * the same two pictures at two sizes.
- */
-
 import { For, Show } from "solid-js";
 import { useText } from "../../text";
 import type { DiagramRoutineRun, DiagramRunStatus, DiagramStepStatus } from "./diagram-model";
@@ -12,7 +6,6 @@ import { DIAGRAM_RUN_STATUS_KEY } from "./diagram-text";
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEK_DAYS = 7;
 
-/** A routine run reuses the step icons: a cancelled run reads as a skipped step. */
 export function diagramRunStepStatus(status: DiagramRunStatus): DiagramStepStatus {
   return status === "cancelled" ? "skipped" : status;
 }
@@ -69,7 +62,6 @@ export function DiagramRoutineWeek(props: { upcomingRuns: string[]; now: Date; s
 
 export function DiagramRoutineRunDots(props: { runs: DiagramRoutineRun[]; limit: number }) {
   const { t, format } = useText();
-  // Oldest on the left, so the row reads forward in time to the newest run.
   const runs = () => props.runs.slice(0, props.limit).reverse();
   return (
     <Show when={runs().length > 0}>

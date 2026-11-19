@@ -12,12 +12,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin, stringField } from "./request-helpers";
 
-/**
- * The programs that the host's agents left running, and Stop on one of them, from a joined server.
- * Only an owner or admin can use them. The command line is redacted where the list is made, as for
- * Settings > Agents on this computer. An agent that this peer cannot see is not named. Frozen by
- * `background-processes-v1`.
- */
 export async function routeBackgroundProcesses(
   context: TeamApiRequestContext,
   processes: TeamApiBackgroundProcesses | undefined,
@@ -30,7 +24,6 @@ export async function routeBackgroundProcesses(
   if (!processes || !capabilities.has(BACKGROUND_PROCESSES_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.backgroundProcessesUnsupported"));
   requireAdmin(member);
-  // `readJson` has already run the body through the background-processes wire codec.
   const body = await readJson(request);
   if (path === BACKGROUND_PROCESSES_ROUTES.list) {
     const listed = await runCauseEffect(processes.list());

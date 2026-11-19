@@ -1,9 +1,3 @@
-// The logo files of the /brand page, as SVG text. The page shows them, the Worker serves each one at
-// `/brand/<file>.svg`, and the browser draws the PNG files and the zip from the same text.
-//
-// The shapes come from `@openbot/brand`, and the layout of the logo with its name from the Figma
-// "Logo" board. No JSX and no DOM here: the Worker imports this module.
-
 import { APP_LOGO_CORNER, APP_LOGO_EYE_POINTS, APP_LOGO_SIZE } from "@openbot/brand/app-logo-shape";
 import { WORDMARK_PATHS, WORDMARK_WIDTH } from "@openbot/brand/wordmark-shape";
 import { BRAND_ROUTE } from "./brand-page";
@@ -15,25 +9,20 @@ type IconShape = "rounded" | "square";
 type Ink = "dark" | "light";
 export type BrandSpace = "tight" | "safe";
 
-// The colors of the brand tokens in `@openbot/brand/tokens.css`. A file must not depend on a page's CSS.
 const FILL: Record<IconColor, string> = { lilac: "#d6adf2", white: "#ffffff", black: "#040007" };
 const EYE: Record<IconColor, string> = { lilac: "#040007", white: "#040007", black: "#ffffff" };
 const INK: Record<Ink, string> = { dark: "#040007", light: "#ffffff" };
 const COLOR_NAME: Record<IconColor, string> = { lilac: "Lilac", white: "White", black: "Black" };
 
 export interface BrandAsset {
-  /** The file name without its extension. */
   readonly file: string;
   readonly label: string;
   readonly svg: string;
   readonly width: number;
   readonly height: number;
-  /** The background the file is drawn for. */
   readonly surface: "dark" | "light";
 }
 
-// Measured on the Figma board: the name starts a little more than a third of a mark after the mark,
-// and its baseline is at 195 of the mark's 240. Clear space is half a mark on each side.
 const LOCKUP_GAP = 84;
 const LOCKUP_BASELINE = 195;
 const CLEAR_SPACE = APP_LOGO_SIZE / 2;
@@ -90,7 +79,6 @@ function lockupAsset(color: IconColor, ink: Ink, space: BrandSpace): BrandAsset 
   };
 }
 
-/** The app icon: the header logo menu copies it. */
 export const BRAND_ICON = iconAsset("lilac", "rounded");
 
 export const BRAND_ICONS: readonly BrandAsset[] = [
@@ -105,7 +93,6 @@ export const BRAND_SQUARES: readonly BrandAsset[] = [
   iconAsset("black", "square"),
 ];
 
-/** The four logos with the name on the Figma board, in its order. */
 const LOCKUP_STYLES: readonly (readonly [IconColor, Ink])[] = [
   ["lilac", "dark"],
   ["lilac", "light"],
@@ -118,7 +105,6 @@ export const BRAND_LOCKUPS: Record<BrandSpace, readonly BrandAsset[]> = {
   safe: LOCKUP_STYLES.map(([color, ink]) => lockupAsset(color, ink, "safe")),
 };
 
-/** The logo with its name, for a light page: the header logo menu copies it. */
 export const BRAND_LOCKUP = lockupAsset("lilac", "dark", "tight");
 
 export const BRAND_ASSETS: readonly BrandAsset[] = [
@@ -128,7 +114,6 @@ export const BRAND_ASSETS: readonly BrandAsset[] = [
   ...BRAND_LOCKUPS.safe,
 ];
 
-/** The served address of a file. */
 export function brandAssetPath(asset: BrandAsset): `${typeof BRAND_ROUTE}/${string}.svg` {
   return `${BRAND_ROUTE}/${asset.file}.svg`;
 }
@@ -137,7 +122,6 @@ export function findBrandAsset(fileName: string): BrandAsset | undefined {
   return BRAND_ASSETS.find((asset) => `${asset.file}.svg` === fileName);
 }
 
-/** A square file is drawn 1024 pixels wide as PNG, and a logo with its name 2048. */
 export function brandPngWidth(asset: BrandAsset): 1024 | 2048 {
   return asset.width === asset.height ? 1024 : 2048;
 }

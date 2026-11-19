@@ -1,3 +1,4 @@
+import { hostedPlanDisk } from "@openbot/contracts/hosted-servers";
 import {
   CLEARABLE_STORAGE_CATEGORIES,
   type ClearableStorageCategory,
@@ -17,7 +18,7 @@ import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { StorageRing } from "@/features/servers/components/storage-ring";
 import { TrailingValue } from "@/features/servers/components/trailing-value";
-import { useServerStorage } from "@/features/servers/model/use-server-storage";
+import { useServerDisk, useServerStorage } from "@/features/servers/model/use-server-storage";
 import {
   SettingsContent,
   SettingsNote,
@@ -30,7 +31,6 @@ import { haptics } from "@/shared/lib/haptics";
 import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { currentText, useText } from "@/shared/lib/text";
 
-/** The groups and the colors of the desktop storage bar, in its fixed order, so a group keeps its color. */
 const GROUPS = ["workspaces", "files", "chats", "downloads", "runtimes", "app"] as const;
 type StorageGroup = (typeof GROUPS)[number];
 const GROUP_OF: Record<StorageCategory, StorageGroup> = {
@@ -61,11 +61,6 @@ const CLEAR_CONFIRM: Record<ClearableStorageCategory, { title: MobileTextKey; bo
 };
 const LARGEST_CHATS = 5;
 
-/**
- * Server sheet > Storage: how much space OpenBot takes on the host, which agents and chats take it,
- * and every stored file, like Server Settings > Storage on desktop. Every member reads it; an owner
- * or admin also clears caches and logs. Chats and workspaces are never cleared from here.
- */
 export function ServerStorageScreen() {
   const { t, format, errorMessage } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
@@ -73,6 +68,8 @@ export function ServerStorageScreen() {
   const { clearServerStorage } = useMobileWorkspaceActions();
   const server = servers.find((item) => item.id === serverId);
   const { available, query, rescan } = useServerStorage(serverId);
+  const planGb = server?.hosted === true ? (server.storageGb ?? null) : null;
+  const disk = useServerDisk(serverId, available && planGb !== null);
   const groupColor = useStorageGroupColors();
   const [selectedGroup, setSelectedGroup] = useState<StorageGroup | null>(null);
   const [measuring, setMeasuring] = useState(false);
@@ -162,7 +159,6 @@ export function ServerStorageScreen() {
       .filter((entry) => GROUP_OF[entry.category] === group)
       .reduce((sum, entry) => sum + entry.bytes, 0),
   })).filter((group) => group.bytes > 0);
-  // A group that a new measurement leaves empty is no longer selected.
   const selected = groups.find((group) => group.key === selectedGroup);
   const agentRows = [...usage.agents].sort((left, right) => right.bytes - left.bytes);
   const chats = [...usage.conversations].sort((left, right) => right.bytes - left.bytes).slice(0, LARGEST_CHATS);
@@ -175,6 +171,7 @@ export function ServerStorageScreen() {
       )
     : [];
   const removableBytes = removable.reduce((sum, entry) => sum + entry.bytes, 0);
+  const freeBytes = planGb !== null && disk.data ? hostedPlanDisk(disk.data, planGb).freeBytes : usage.freeBytes;
 
   return (
     <SettingsContent>
@@ -184,8 +181,8 @@ export function ServerStorageScreen() {
         footer={
           query.isError
             ? errorMessage(query.error, t("mobile.server.storage.loadFailed"))
-            : usage.freeBytes !== null
-              ? t("mobile.server.storage.free", { size: format.fileSize(usage.freeBytes) })
+            : freeBytes !== null
+              ? t("mobile.server.storage.free", { size: format.fileSize(freeBytes) })
               : undefined
         }
       >
@@ -315,14 +312,12 @@ function useStorageGroupColors(): Record<StorageGroup, string> {
   };
 }
 
-/** The share of the total as a percent, as on desktop: a share above 0 never rounds to 0. */
 function sharePercent(bytes: number, total: number): number {
   if (total <= 0 || bytes <= 0) return 0;
   const percent = (bytes / total) * 100;
   return percent < 1 ? Math.max(0.1, Math.round(percent * 10) / 10) : Math.round(percent);
 }
 
-/** "Measure again" in the header: the native toolbar on iOS. The host caches a scan; this one is new. */
 function MeasureAction({ disabled, onPress }: { disabled: boolean; onPress: () => void }) {
   const { t } = useText();
   const label = t(disabled ? "mobile.server.storage.measuring" : "mobile.server.storage.measureAgain");
@@ -354,7 +349,6 @@ function MeasureAction({ disabled, onPress }: { disabled: boolean; onPress: () =
   );
 }
 
-/** Server sheet > Storage > All files: every file sent in a chat or made by an agent on the host. */
 export function ServerStorageFilesScreen() {
   const { t, errorMessage } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();

@@ -1,7 +1,6 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("app", {
-  // The app shell, shared state, and shared controls without a feature of their own.
   "app.loading": "Loading OpenBot",
   "app.leftPanel.resize": "Resize left sidebar",
   "app.host.thisMac": "This Mac",
@@ -10,7 +9,6 @@ export const messages = defineMessages("app", {
   "app.action.unavailable": "Action unavailable",
   "app.error.actionFailed": "The action could not be completed. Try again.",
   "app.errorStatus.queueLoad": "Could not load queued messages",
-  "app.errorStatus.waitsLoad": "Could not load open waits",
   "app.errorStatus.answer": "Could not send your answer",
   "app.errorStatus.approval": "Could not send your decision",
   "app.errorStatus.browserTakeover": "Could not end the browser takeover",
@@ -48,7 +46,6 @@ export const messages = defineMessages("app", {
   "app.questionnaire.empty": "No questions",
   "app.standingApproval.title": "Always allow {name}?",
   "app.standingApproval.titleUnnamed": "Always allow this agent?",
-  // The page rail and the settings page of the desktop window.
   "app.rail.label": "Pages",
   "app.rail.website": "OpenBot website",
   "app.rail.agents": "Agents",
@@ -57,6 +54,8 @@ export const messages = defineMessages("app", {
   "app.rail.workflows": "Workflows",
   "app.rail.usage": "Usage",
   "app.rail.library": "Library",
+  "app.rail.providers": "Providers",
+  "app.rail.crm": "CRM",
   "app.rail.marketplace": "Marketplace",
   "app.rail.settings": "Settings",
   "app.rail.settingsNotice": "Settings. {notice}",
@@ -96,12 +95,19 @@ export const messages = defineMessages("app", {
   "app.socialFollow.redditTitle": "How I use OpenBot",
   "app.rail.usageRings": "{name} usage: {windows}. Open usage",
   "app.rail.customAgentUsage": "{name} usage. Open usage",
+  "app.rail.moreUsage": { one: "{count} more account. Open usage", other: "{count} more accounts. Open usage" },
+  "app.rail.moreUsageCount": "+{count}",
+  "app.rail.mediaCredits": "{name}: {credits} credits left. Open {name}",
+  "app.rail.mediaCreditsQuota": "{name}: {credits} of your {quota} team credits left. Open {name}",
+  "app.rail.mediaCreditsMeta": "Credits",
+  "app.rail.mediaCreditsWindow": "{credits} of {quota} team credits",
   "app.settingsPage.title": "Your settings",
   "app.settingsPage.serverSettings": "{server} server settings",
   "app.settingsPage.search": "Search settings",
   "app.settingsPage.searchPlaceholder": "Search settings…",
   "app.settingsPage.results": "Settings search results",
   "app.settingsPage.noResults": "No matching settings.",
+  "app.settingsPage.marketplaceApps": "Connectors and MCP servers",
   "app.settingsPage.resultCount": {
     one: "{count} matching setting.",
     other: "{count} matching settings.",

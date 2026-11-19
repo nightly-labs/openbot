@@ -1,48 +1,25 @@
-// Starts the real `ProviderRuntimeManager` over a store with downloaded provider CLIs, as main does,
-// with no network (#3321). Checks that the downloaded CLI of a provider that is off is removed with
-// its partial downloads and verification records, and reads as not downloaded after; that a provider
-// that is on, whose CLI path the user set, or Pi while a key-only provider that runs on it is on, is
-// refused; that a version a program holds stays whole and the removal reports it; that this
-// instance does not stamp a provider that is off; and that a version another
-// instance stamped after this one is kept. A verified version keeps no older one: the older version
-// goes once no instance stamped it within the window, and is not stamped again. The Storage page
-// removes the downloads of providers that are off in one step, and never one that is on: one that a
-// program holds fails and is named, and the others still go. A provider that runs the CLI the user
-// installed runs nothing from the store, so its download can go. The real resolver picks that CLI
-// over OpenBot's copy when it is as new, and an update still starts the copy it downloaded.
-// `bun scripts/provider-runtime-remove-e2e.ts`.
-// Writes .openbot-build/provider-runtime-remove-e2e/report.json.
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { chmod, mkdir, mkdtemp, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import type { AgentProviderId, ManagedProviderId } from "@openbot/contracts/agent-providers";
-import { resolveCodexCli, resolveInstalledFirst } from "../src/backend/cli";
+import { chooseInstalledFirst, resolveCodexCli } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { INSTALL_RECORD } from "../src/main/provider-runtime-descriptors";
 import { ProviderRuntimeManager } from "../src/main/provider-runtime-manager";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/provider-runtime-remove-e2e");
 const DAY_MS = 24 * 60 * 60 * 1000;
-/** Off since long ago, with two versions, a partial download and a verification record. */
 const OFF: ManagedProviderId = "cursor";
-/** On: its download is not removed. */
 const ON: ManagedProviderId = "opencode";
-/** Off, but a sibling instance stamped its version a moment ago. */
 const SIBLING: ManagedProviderId = "cline";
-/** On at the start, then turned off: this instance's own stamp does not keep it. */
 const TURNED_OFF: ManagedProviderId = "grok";
-/** On at the start, then turned off; a sibling stamped it after this instance did. */
 const SHARED: ManagedProviderId = "antigravity";
-/** Off, and the user pointed OpenBot at a CLI of their own. */
 const CONFIGURED: ManagedProviderId = "claude";
 const CONFIGURED_ENV = `OPENBOT_${CONFIGURED.toUpperCase()}_PATH`;
-/** Off, but DeepSeek, which is on, runs on its CLI. */
 const PI: ManagedProviderId = "pi";
-/** Off, but its versions cannot be moved: a program holds them, as Windows does with an open CLI. */
 const HELD: ManagedProviderId = "muse";
-/** On, with a verified version newer than the pin. */
 const READY: ManagedProviderId = "codex";
 const READY_VERSION = "999.0.0";
 
@@ -77,7 +54,8 @@ interface Report {
   installedListed?: ManagedProviderId[];
   installedGoneMeasured?: number;
   installedRemoved?: { phase: string; gone: boolean };
-  choice?: Record<string, { source: string; version: string }>;
+  chosenCopyOffer?: string | null;
+  choice?: Record<string, { source: string; version: string; passedOver: string | null }>;
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-provider-runtime-remove-e2e-"));
@@ -97,14 +75,12 @@ const manager = new ProviderRuntimeManager({
   },
 });
 
-/** The directory that holds the versions of one provider CLI for this computer's target. */
 function targetRoot(provider: ManagedProviderId): string {
   const pinned = manager.executablePath(provider);
   assert.ok(pinned, "this platform has managed runtimes");
   return dirname(dirname(dirname(pinned)));
 }
 
-/** Puts a version with an executable in the store, last stamped at `stampedAt`. */
 async function install(provider: ManagedProviderId, version: string, stampedAt: Date): Promise<string> {
   const pinned = manager.executablePath(provider);
   assert.ok(pinned);
@@ -116,7 +92,6 @@ async function install(provider: ManagedProviderId, version: string, stampedAt: 
   return path;
 }
 
-/** Puts a version in the store as an update writes one: an install record and a CLI that answers its version. */
 async function installVerified(provider: ManagedProviderId, version: string): Promise<string> {
   const pinned = manager.executablePath(provider);
   assert.ok(pinned);
@@ -145,7 +120,6 @@ async function exists(path: string): Promise<boolean> {
   );
 }
 
-/** Waits until `path` is removed. False when it is still there after 10 s. */
 async function gone(path: string): Promise<boolean> {
   const deadline = Date.now() + 10_000;
   while (await exists(path)) {
@@ -182,22 +156,18 @@ try {
   const configuredVersion = await install(CONFIGURED, "0.0.1", old);
   const piVersion = await install(PI, "0.0.1", old);
   const heldVersion = await install(HELD, "0.0.1", old);
-  // The version that the verified one replaced, last run long ago.
   const readyBackup = await install(READY, "0.0.1", old);
   const readyPath = await installVerified(READY, READY_VERSION);
 
   await runCauseEffect(manager.initialize());
-  // A provider that is on is stamped at start: the one older version is its working fallback.
   assert.ok((await stat(onVersion)).mtimeMs > old.getTime(), "a provider that is on is stamped at start");
   report.offStampedAtStart = (await stat(offVersions[1] ?? "")).mtimeMs > old.getTime();
   assert.equal(report.offStampedAtStart, false, "a provider that is off is not stamped");
   report.readyPhase = manager.getStatus().providers[READY].phase;
   assert.equal(report.readyPhase, "ready", "the verified version is what the provider runs");
-  // The start does not wait for the removal, so the window is not held by it.
   report.readyBackupCollected = await gone(readyBackup);
   assert.ok(report.readyBackupCollected, "a verified version keeps no older one to fall back on");
 
-  // A version run within the window stays, and this instance does not stamp it again.
   const recent = new Date(Date.now() - DAY_MS / 2);
   const readyRecent = await install(READY, "0.0.2", recent);
   await runCauseEffect(manager.removeOldVersions());
@@ -253,7 +223,6 @@ try {
   report.piKept = await exists(piVersion);
   assert.ok(report.piKept, "the Pi CLI that DeepSeek runs on stays");
 
-  // A directory that refuses the move stays whole, and the removal says that it did not finish.
   await chmod(targetRoot(HELD), 0o555);
   try {
     report.heldRefused = await refusal(HELD);
@@ -269,7 +238,6 @@ try {
   report.siblingKept = await exists(siblingVersion);
   assert.ok(report.siblingKept, "a version a sibling stamped recently stays");
 
-  // Turned off after this instance stamped both at start. A sibling stamps one of them later.
   off.add(TURNED_OFF);
   off.add(SHARED);
   const sharedStamp = new Date((await stat(sharedVersion)).mtimeMs + 5000);
@@ -284,7 +252,6 @@ try {
   report.readyMeasured = await measure(READY);
   assert.equal(report.readyMeasured, 0, "a verified provider that is on offers nothing to remove");
 
-  // The Storage page: the held Muse version and a new Cursor version are the downloads that can go.
   const offLater = await install(OFF, "0.0.3", old);
   report.storageBefore = await runCauseEffect(manager.removableRuntimes());
   assert.deepEqual(
@@ -323,7 +290,6 @@ try {
     "the page keeps every provider that is on, and what the provider page refuses",
   );
 
-  // The provider now runs the CLI the user installed, so no agent runs OpenBot's copy.
   manager.setSystemVersion(ON, "9.9.9");
   report.installedMeasured = await measure(ON);
   assert.ok(report.installedMeasured >= 4096, "the copy of a provider that runs the user's CLI counts");
@@ -337,7 +303,11 @@ try {
   report.installedRemoved = { phase: installedSnapshot.providers[ON].phase, gone: !(await exists(onVersion)) };
   assert.deepEqual(report.installedRemoved, { phase: "not-downloaded", gone: true }, "the copy is removed");
 
-  // The real Codex resolver, with a CLI on PATH and OpenBot's copy that answer their versions.
+  manager.setSystemVersion(READY, "0.0.1");
+  report.chosenCopyOffer = manager.getStatus().providers[READY].availableVersion ?? null;
+  assert.equal(report.chosenCopyOffer, null, "the copy is newer than the release, so nothing is offered");
+  manager.setSystemVersion(READY, null);
+
   const fakeCodex = async (name: string, version: string) => {
     const path = join(root, "choice", name, "codex");
     await mkdir(dirname(path), { recursive: true });
@@ -348,17 +318,23 @@ try {
     installed: string | null,
     copy: string,
     preferInstalled = true,
-  ): Promise<{ source: string; version: string }> => {
+    installedChosen = false,
+  ): Promise<{ source: string; version: string; passedOver: string | null }> => {
     const system = installed ? await fakeCodex(`system-${installed}`, installed) : join(root, "choice", "none");
     const managed = await fakeCodex(`managed-${copy}`, copy);
-    const cli = await runCauseEffect(
-      resolveInstalledFirst(
+    const { cli, passedOver } = await runCauseEffect(
+      chooseInstalledFirst(
         (input) => resolveCodexCli({ ...input, systemCandidates: [system] }),
         managed,
         preferInstalled,
+        installedChosen,
       ),
     );
-    return { source: cli.source, version: cli.version };
+    return {
+      source: cli.source,
+      version: cli.version,
+      passedOver: passedOver ? `${passedOver.source} ${passedOver.version}` : null,
+    };
   };
   report.choice = {
     same: await choose("0.200.0", "0.200.0"),
@@ -366,17 +342,23 @@ try {
     copyNewer: await choose("0.200.0", "0.201.0"),
     update: await choose("0.201.0", "0.200.0", false),
     noInstalled: await choose(null, "0.200.0"),
+    chosenCopyNewer: await choose("0.200.0", "0.201.0", true, true),
+    chosenUpdate: await choose("0.200.0", "0.201.0", false, true),
+    chosenNoInstalled: await choose(null, "0.201.0", true, true),
   };
   assert.deepEqual(
     report.choice,
     {
-      same: { source: "system", version: "0.200.0" },
-      installedNewer: { source: "system", version: "0.201.0" },
-      copyNewer: { source: "managed", version: "0.201.0" },
-      update: { source: "managed", version: "0.200.0" },
-      noInstalled: { source: "managed", version: "0.200.0" },
+      same: { source: "system", version: "0.200.0", passedOver: null },
+      installedNewer: { source: "system", version: "0.201.0", passedOver: null },
+      copyNewer: { source: "managed", version: "0.201.0", passedOver: "system 0.200.0" },
+      update: { source: "managed", version: "0.200.0", passedOver: "system 0.201.0" },
+      noInstalled: { source: "managed", version: "0.200.0", passedOver: null },
+      chosenCopyNewer: { source: "system", version: "0.200.0", passedOver: "managed 0.201.0" },
+      chosenUpdate: { source: "managed", version: "0.201.0", passedOver: "system 0.200.0" },
+      chosenNoInstalled: { source: "managed", version: "0.201.0", passedOver: null },
     },
-    "the user's CLI wins when it is as new, and an update starts OpenBot's copy",
+    "the user's CLI wins when it is as new or chosen, an update starts OpenBot's copy, and the other CLI is named",
   );
 
   report.passed = true;

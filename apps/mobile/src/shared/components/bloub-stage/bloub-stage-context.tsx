@@ -15,9 +15,7 @@ import { type BloubStageRequest, type BloubStageStore, createBloubStageStore } f
 
 interface BloubStageContextValue {
   store: BloubStageStore;
-  /** Points the header moves up by, such as to keep a field above the keyboard. A worklet may set it. */
   lift: SharedValue<number>;
-  /** Where the eyes look, in points of the eye box. Set it with `look`. */
   gazeX: SharedValue<number>;
   gazeY: SharedValue<number>;
 }
@@ -42,7 +40,6 @@ export function useBloubStage(): BloubStageContextValue & { look: (x: number, y:
   return useMemo(
     () => ({
       ...value,
-      // A screen sets the gaze when its state changes, never per frame.
       look: (x: number, y: number) => {
         gazeX.set(withTiming(x, GAZE));
         gazeY.set(withTiming(y, GAZE));
@@ -52,16 +49,10 @@ export function useBloubStage(): BloubStageContextValue & { look: (x: number, y:
   );
 }
 
-/**
- * Asks the stage to show `request` while this component is mounted. `null` withdraws it. Returns
- * true while the stage shows this request.
- */
 export function useBloubStageRequest(request: BloubStageRequest | null, priority: number): boolean {
   const { store } = useBloubStage();
   const id = useId();
-  // Only a change of this request's own state renders the requester again.
   const active = useSyncExternalStore(store.subscribe, () => store.active()?.id === id);
-  // The store compares the request, so a render that changes nothing on the stage costs nothing.
   useLayoutEffect(() => {
     if (request) store.set(id, priority, request);
     else store.remove(id);

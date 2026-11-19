@@ -29,14 +29,10 @@
 .channel-empty p {
   margin: 0;
 }
-/* The title is the one line that names what the channel is; the instructions read as body text. */
 .channel-empty .channel-empty-title {
   color: var(--openbot-text-primary);
 }
 
-/* The editor stacks the same fields the agent panel stacks, so it adds no spacing of its own: the
-   shared field carries its own bottom margin, and a gap here would add to it and set the whole
-   channel form further apart than the agent form. */
 .channel-editor {
   display: block;
 }
@@ -62,8 +58,7 @@
 .channel-members-title {
   font-weight: var(--openbot-weight-regular);
 }
-/* Members read as a list, not as a card: the shared group gives up its frame and its dividers, so
-   the hover highlight is the only box drawn and each member stays one plain line. */
+
 .channel-member-list:is(.ui-item-group) {
   border: 0;
   overflow: visible;
@@ -80,19 +75,12 @@
   padding-block: var(--openbot-space-1);
   padding-inline: var(--openbot-space-2);
 }
-/* The trigger is a shared ghost button, whose own hover is written with two `:not()`s and so
-   outweighs a plain class. It is matched here, or the last row of the list lights up differently
-   from every row above it. */
+
 .channel-member:hover,
 .channel-member-add:hover:not(:disabled) {
   background: var(--openbot-hover);
 }
-/* The avatar sets the floor of a one-line row, the same size the create dialog uses. A menu row
-   is the same row before it is a member, so it takes the same avatar: at its own 32px the bloub
-   fills the whole menu item and paints past it, because it is drawn at 128% of its box.
-   That same 128% is why the lift is needed: the drawn shape lands 14% of the avatar below the
-   middle of its box, so without it the bloub reads low beside the name. Every 24px avatar in the
-   channel surfaces takes this one value, and the New channel dialog reads it from here. */
+
 .channel-member .agent-avatar,
 .channel-member-menu .agent-avatar {
   --agent-avatar-optical-offset: -3.25px;
@@ -103,9 +91,7 @@
 .channel-member .ui-item-title {
   font-weight: var(--openbot-weight-regular);
 }
-/* Adding a member belongs in the list, under the last member, where the eye already is. The ghost
-   button already gives it the transparent frame and the muted text; what it does not give is a row,
-   so the width, the leading edge and the line height are set here. */
+
 .channel-member-add {
   width: 100%;
   justify-content: flex-start;
@@ -118,24 +104,19 @@
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
   flex: 0 0 auto;
-  /* The plus stands where an avatar stands, so both rows share one text edge. */
   margin-inline: calc((var(--openbot-space-6) - var(--openbot-icon-md)) / 2);
 }
 .channel-member-add:disabled {
   cursor: default;
   opacity: 0.42;
 }
-/* The menu of the rest of the agents is the list continued, so it keeps the list's measurements:
-   its own padding is taken back off the leading edge, and every avatar in it stands in the same
-   column as the avatars and the plus above it. It is also given room to the right of the longest
-   name, which `min-width: 160px` on the shared menu does not leave. */
+
 .channel-member-menu {
   display: flex;
   flex-direction: column;
   gap: var(--openbot-space-1);
   min-width: 220px;
-  /* A team can have more agents than the window has rows: the menu stops at the room the window
-     leaves on its side of the trigger, and the list inside it scrolls. */
+
   max-height: min(
     calc(var(--openbot-space-8) * 11),
     calc(100dvh - var(--openbot-space-4)),
@@ -153,10 +134,9 @@
   min-height: 0;
   overflow-y: auto;
   outline: 0;
-  scrollbar-width: thin;
+  scrollbar-width: none;
 }
-/* The rows of the shared action menu, for options rather than menu items. Only the pointer and the
-   keyboard paint a row: nothing is highlighted the moment the menu opens. */
+
 .channel-member-option {
   display: flex;
   min-height: var(--openbot-control-md);
@@ -175,8 +155,7 @@
 .channel-member-option:is(:hover, :focus-visible) {
   background: var(--ui-menu-item-hover);
 }
-/* The pointer does not move the keyboard focus here, so while a row has it, that row is the only
-   one painted: Enter picks it, not the row under a resting pointer. */
+
 .channel-member-options:has(:focus-visible) .channel-member-option:hover:not(:focus-visible) {
   background: transparent;
 }
@@ -187,8 +166,7 @@
   font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-sm);
 }
-/* A row action reads as state until it is asked for: the crown stays on the lead, and Remove waits
-   for the pointer or the keyboard. Hover is the condition, so a touch screen keeps both visible. */
+
 @media (hover: hover) and (pointer: fine) {
   .channel-member-remove,
   .channel-lead-toggle[aria-pressed="false"] {
@@ -209,7 +187,6 @@
 .channel-picker legend {
   margin-bottom: var(--openbot-space-2);
 }
-/* The fade at the edges says there is more to read, so the scrollbar has nothing left to add. */
 .channel-picker-list {
   margin-top: var(--openbot-space-2);
   max-height: calc(var(--openbot-space-8) * 7);
@@ -264,7 +241,6 @@
   padding: var(--openbot-space-6);
 }
 .channel-create-dialog {
-  /* One inset for the header, the fields, every row and the footer. */
   --channel-dialog-inset: var(--openbot-space-4);
   position: relative;
   display: flex;
@@ -294,7 +270,6 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  /* No gap: the chips row collapses to zero height, and a gap would leave a strip behind it. */
   gap: 0;
 }
 .channel-create-form .channel-picker legend {
@@ -304,11 +279,7 @@
   font-weight: var(--openbot-weight-medium);
   line-height: var(--openbot-leading-sm);
 }
-/*
- * The shared `.search-field` row from `app-shell.css`: it carries the borderless input and the calm
- * focus treatment (a dim border, and the focus ring only for keyboard focus). Only the size is local,
- * to match the name field above it.
- */
+
 .channel-create-form .channel-member-search {
   height: var(--openbot-control-lg);
   margin-inline: var(--channel-dialog-inset);
@@ -321,7 +292,6 @@
 }
 .channel-create-form .channel-picker-list {
   min-height: 0;
-  /* Taller than the settings picker: picking several agents is the whole job of this dialog. */
   max-height: calc(var(--openbot-space-8) * 11);
   margin-top: var(--openbot-space-2);
   padding: 0;
@@ -330,16 +300,14 @@
   display: flex;
   flex-direction: column;
 }
-/* Rows run edge to edge: the selected and hover surfaces read as one list, not as cards. The row
-   inside is the shared member row, so the label around it only paints the surface. */
+
 .channel-create-form .channel-picker-entry {
   display: block;
   padding: var(--openbot-space-2) var(--channel-dialog-inset);
   border-radius: 0;
   transition: background-color var(--openbot-duration-normal) var(--openbot-ease-out);
 }
-/* Here the label is the row and paints the hover, so the shared member row must not paint a second,
-   inset one inside it. In Channel settings the member row is the row, and keeps its own hover. */
+
 .channel-create-form .channel-picker-entry .channel-member:is(.ui-item) {
   min-height: 0;
   padding: 0;
@@ -356,10 +324,7 @@
 .channel-create-form .channel-picker-entry:has(.ui-checkbox-input:checked) {
   background: var(--openbot-accent-soft);
 }
-/*
- * One line per agent - name, then the description beside it - so a row costs the height of a
- * single line and more of the list is on screen while several agents are being selected.
- */
+
 .channel-create-form .channel-picker-entry .ui-item-content {
   display: flex;
   align-items: baseline;
@@ -381,14 +346,10 @@
   padding: var(--channel-dialog-inset);
 }
 
-/* The header title is the agent chat's `.conversation-title`, so the member stack has to be the
-   avatar that title draws: 18px, and lifted by the same optical offset, because the bloub is drawn
-   at 128% of its box and sits low in it without one. */
 .channel-title .channel-avatar {
   min-width: 18px;
   height: 18px;
 }
-/* A square picture looks smaller than a round face of the same box, so it takes 20px. */
 .channel-title .channel-avatar-picture {
   --channel-avatar-size: 20px;
 }
@@ -401,14 +362,12 @@
 .channel-title .channel-avatar .agent-avatar + .agent-avatar {
   margin-inline-start: -8px;
 }
-/* The faces overlap, and each outline cuts the face below it in the colour of the page. The framed
-   window puts the title on the top row instead (window.css). */
+
 .channel-title,
 .channel-empty {
   --agent-avatar-outline: var(--openbot-bg-canvas);
 }
 @media (hover: hover) and (pointer: fine) and (min-width: 601px) {
-  /* The title is a ghost button, so its hover fill is under the faces. */
   .conversation-header .channel-title:hover:not(:disabled) {
     --agent-avatar-outline: var(--openbot-bg-control-hover);
   }
@@ -445,4 +404,16 @@
   font-size: var(--openbot-text-sm);
   line-height: var(--openbot-leading-sm);
   text-align: center;
+}
+
+.channel-wait-note {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0 var(--openbot-space-4) var(--openbot-space-2);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+.channel-wait-note + .channel-paused-tasks {
+  margin-top: 0;
 }

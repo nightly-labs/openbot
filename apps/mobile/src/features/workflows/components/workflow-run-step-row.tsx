@@ -3,6 +3,7 @@ import { Button, Typography } from "heroui-native";
 import { useState } from "react";
 import { Pressable, View } from "react-native";
 import { WorkflowKindTile } from "@/features/workflows/components/workflow-kind-tile";
+import { rowIndent } from "@/features/workflows/components/workflow-steps-list";
 import { STEP_STATUS_LABEL, stepLabel, stepText, triggerType } from "@/features/workflows/model/workflow-steps";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { haptics } from "@/shared/lib/haptics";
@@ -18,10 +19,6 @@ const STATUS_CLASS: Record<WorkflowStep["status"], string> = {
   skipped: "text-text-secondary",
 };
 
-/**
- * One step of a run, or a step that ran alone: its status and output. The person approves or declines
- * a step that waits, retries a step that failed, and stops a step that runs.
- */
 export function WorkflowRunStepRow({
   node,
   step,
@@ -30,6 +27,7 @@ export function WorkflowRunStepRow({
   onDecide,
   onRetry,
   onStop,
+  depth,
 }: {
   node: WorkflowNode;
   step: WorkflowStep | undefined;
@@ -38,13 +36,17 @@ export function WorkflowRunStepRow({
   onDecide: (step: WorkflowStep, approved: boolean) => void;
   onRetry: (step: WorkflowStep) => void;
   onStop: (step: WorkflowStep) => void;
+  depth?: number;
 }) {
   const { t } = useText();
   const [open, setOpen] = useState(false);
   const status = step?.status;
-  const output = step?.output?.trim() ? step.output : null;
+  const output = node.kind !== "image" && step?.output?.trim() ? step.output : null;
   return (
-    <View className={`flex-row gap-3 px-4 py-3 ${status === "skipped" || !status ? "opacity-60" : ""}`}>
+    <View
+      className={`flex-row gap-3 py-3 pr-4 ${depth === undefined ? "pl-4" : ""} ${status === "skipped" || !status ? "opacity-60" : ""}`}
+      style={depth === undefined ? undefined : { paddingLeft: rowIndent(depth) }}
+    >
       <WorkflowKindTile kind={node.kind} trigger={node.kind === "trigger" ? triggerType(node) : undefined} size={30} />
       <View className="min-w-0 flex-1 gap-1">
         <View className="flex-row items-center justify-between gap-2">

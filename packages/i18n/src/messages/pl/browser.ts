@@ -39,7 +39,7 @@ export const messages = {
   "browser.tab.closeNamed": "Zamknij: {name}",
   "browser.tab.closeUnnamed": "Zamknij kartę przeglądarki",
   "browser.newTab": "Nowa karta przeglądarki",
-  "browser.hide": "Ukryj przeglądarkę",
+  "browser.backToChat": "Wróć do czatu",
   "browser.goBack": "Wstecz",
   "browser.goForward": "Dalej",
   "browser.reload": "Odśwież stronę",
@@ -69,6 +69,7 @@ export const messages = {
   "browser.liveView.pasteTooLong": "Ten tekst jest za długi do wklejenia. Wklej mniej niż 100 000 znaków.",
   "browser.liveView.copyTooLarge": "Zaznaczenie jest za długie do skopiowania. Zaznacz mniej tekstu.",
   "browser.liveView.copyFailed": "Nie udało się skopiować tekstu. Kliknij stronę i spróbuj ponownie.",
+  "browser.liveView.pageCopied": "Strona skopiowała tekst. Wybierz Kopiuj, aby umieścić go w schowku.",
   "browser.previews.label": "Podglądy przeglądarki",
   "browser.previews.resize": "Zmień rozmiar prawego panelu",
   "browser.previews.empty": "Brak kart przeglądarki",
@@ -93,6 +94,18 @@ export const messages = {
   "browser.secret.submitting": "Wysyłanie…",
   "browser.secret.takeOver": "Przejmij",
   "browser.secret.failed": "Nie udało się wykonać żądania. Sprawdź połączenie i spróbuj ponownie.",
+  "browser.secret.vaultSkip.agentScript":
+    "OpenBot nie użył Twoich zapisanych danych logowania, ponieważ agent uruchomił skrypt na tej stronie. Aby ich użyć, poproś agenta o ponowne załadowanie strony i ponowną próbę.",
+  "browser.secret.vaultSkip.fieldKind":
+    "OpenBot nie użył Twoich zapisanych danych logowania, ponieważ agent wybrał niewłaściwe pole na stronie.",
+  "browser.secret.vaultSkip.loginChoice":
+    "OpenBot nie użył zapisanych danych logowania, ponieważ agent nie wybrał żadnych z danych logowania zapisanych dla tej witryny. Powiedz agentowi, którego konta ma użyć.",
+  "browser.secret.vaultSkip.noPassword":
+    "OpenBot nie użył Twoich zapisanych danych logowania, ponieważ nie zawierają hasła do tej witryny.",
+  "browser.secret.vaultSkip.noAuthenticatorKey":
+    "OpenBot nie użył Twoich zapisanych danych logowania, ponieważ nie zawierają klucza aplikacji uwierzytelniającej.",
+  "browser.secret.vaultSkip.vaultUnreadable":
+    "OpenBot nie użył zapisanych danych logowania, ponieważ nie mógł odczytać Twojego menedżera haseł.",
   "browser.error.openAddress": "Nie udało się otworzyć adresu w tej karcie.",
   "browser.error.channelNoBrowserMember": "Żaden członek nie może otworzyć nowej karty w tym kanale.",
   "browser.error.closeTab": "Nie udało się zamknąć karty przeglądarki.",

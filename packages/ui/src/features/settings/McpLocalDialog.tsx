@@ -1,12 +1,3 @@
-/**
- * The way in that another app on this computer holds: a desktop app runs its own MCP server, and
- * the user turns it on there. Nothing is typed and nothing is signed in to, so the dialog is the
- * listing's steps, what the server can do, and one button that connects to see that it answers.
- *
- * The steps stay on screen after a failure. A server that did not answer is almost always one that
- * is not on yet, and the steps are what turns it on.
- */
-
 import type { McpLocalFlow } from "@openbot/contracts/mcp-connect-flows";
 import { Alert, AlertContent, AlertDescription, AlertIcon, Button, ExternalLink, Info, Text } from "@openbot/ui";
 import { createMemo, For, onSettled, Show } from "solid-js";
@@ -14,9 +5,7 @@ import { useText } from "../../text";
 import { createConnectRun, type McpConnectBaseProps, McpConnectShell } from "./McpConnectShell";
 
 export interface McpLocalDialogProps extends McpConnectBaseProps {
-  /** The steps that turn the server on, as the listing declares them. */
   flow: McpLocalFlow;
-  /** Opens the app's own setup page. Without it the dialog shows no link. */
   onOpenUrl?: ((url: string) => void) | undefined;
 }
 
@@ -24,7 +13,6 @@ export function McpLocalDialog(props: McpLocalDialogProps) {
   const { t } = useText();
   const { state, busy, attempt } = createConnectRun(props);
   const connect = () => void attempt(async () => props.subject.config);
-  // A server that is already on connects at once; one that is not keeps its steps on screen.
   onSettled(() => {
     if (props.connectOnOpen) connect();
   });

@@ -6,15 +6,9 @@ import type { FilesPort } from "./files-port";
 
 export interface ServerBackgroundProcessesTarget {
   serverId: string;
-  /** False for a member, for this computer, and for a host without `background-processes-v1`. */
   shown: boolean;
 }
 
-/**
- * The programs that agents left running on a joined server, with Stop, for an owner or admin. This
- * computer shows its own programs in Settings > Agents. `processes` is null while the list is not
- * shown, and on a Windows host, which does not list its programs.
- */
 export function createServerBackgroundProcesses(target: () => ServerBackgroundProcessesTarget, calls: () => FilesPort) {
   const [state, setState] = createStore<{
     processes: BackgroundProcess[] | null;
@@ -46,8 +40,6 @@ export function createServerBackgroundProcesses(target: () => ServerBackgroundPr
       });
   }
 
-  // Keyed on the server and on whether it is shown: `target` makes a new object on each read, and a
-  // new object would empty the list and read it again with no change.
   const shownServerId = () => {
     const { serverId, shown } = target();
     return shown ? serverId : undefined;
@@ -71,7 +63,6 @@ export function createServerBackgroundProcesses(target: () => ServerBackgroundPr
             draft.agents = agents;
           });
       })
-      // Without names, each row shows "No agent" and still has Stop.
       .catch(() => undefined);
     return () => {
       current = false;

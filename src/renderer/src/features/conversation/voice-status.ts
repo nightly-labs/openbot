@@ -6,6 +6,9 @@ export function voiceCaptureError(error: unknown) {
     return t("composer.voice.blocked");
   }
   if (error instanceof DOMException && error.name === "NotFoundError") return t("composer.voice.noMicrophone");
+  if (error instanceof DOMException && (error.name === "NotReadableError" || error.name === "AbortError")) {
+    return t("composer.voice.microphoneUnavailable");
+  }
   return t("composer.voice.startFailed");
 }
 

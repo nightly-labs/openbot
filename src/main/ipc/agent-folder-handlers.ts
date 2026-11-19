@@ -1,7 +1,3 @@
-// The folders an agent can change besides its workspace and the shared folder. For an agent on a
-// joined server the host answers through `agent-folders-v1`, for an owner or admin. The native
-// pickers show only this computer, so they stay local.
-
 import { join } from "node:path";
 import {
   type AgentExclusionChange,
@@ -60,10 +56,8 @@ export function agentFolderIpcHandlers({
     return runCauseEffect(remoteServers.request(serverId, path, decoder, { method: "POST", body }));
   }
 
-  /** A second press on + while the picker is open does not open another one. */
   let picking = false;
 
-  /** The picked folder, or undefined when the user cancels or a picker is already open. */
   async function pick(options: OpenDialogOptions): Promise<string | undefined> {
     if (picking) return undefined;
     picking = true;
@@ -99,7 +93,6 @@ export function agentFolderIpcHandlers({
       }),
       chooseAgentExclusion: payloadHandler(parseAgentId, async (agentId): Promise<AgentExclusionChange> => {
         const agent = folders.requireAgent(agentId);
-        // The picker opens in the first added folder, else in the workspace.
         const picked = await pick({
           title: translate("dialog.chooseAgentExclusion", { agent: agent.name }),
           properties: ["openDirectory"],
@@ -124,7 +117,6 @@ export function agentFolderIpcHandlers({
           remote(serverId, AGENT_FOLDERS_ROUTES.remove, decodeRemoteAgentFolderChange, input),
       }),
       browseAgentFolders: scopedHandler(parseBrowseAgentFoldersInput, {
-        // Only a joined server needs this list: this computer has the native folder picker.
         local: () => {
           throw new Error(sourceText("error.team.folderUnavailable"));
         },

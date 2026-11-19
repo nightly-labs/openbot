@@ -11,8 +11,6 @@ import { Effect } from "effect";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { agentDockIpcHandlers } from "./agent-dock-handlers";
 
-// Same reason as define-ipc-group.test.ts: electron cannot be imported outside an Electron process, so
-// registrations are captured.
 const { registrations } = vi.hoisted(() => ({
   registrations: new Map<string, (event: unknown, payload?: unknown) => unknown>(),
 }));
@@ -49,11 +47,12 @@ const PRESENTATION: AgentDockPresentation = {
   sizePercent: 120,
   offsets: [{ displayId: 1, offset: 0.25 }],
   seats: [
-    { kind: "agent", agent: AGENT, mood: "working", state: { kind: "working" } },
+    { kind: "agent", agent: AGENT, mood: "working", state: { kind: "working" }, temporary: false },
     {
       kind: "channel",
       channel: { id: "channel-1", name: "Launch", title: "", members: ["agent-1"], icon: null, imageUrl: null },
       state: { kind: "unread", count: 1 },
+      temporary: false,
     },
   ],
   available: [],
@@ -75,6 +74,10 @@ const PRESENTATION: AgentDockPresentation = {
       ],
       working: true,
       wait: null,
+      approval: null,
+      prompt: null,
+      takeover: null,
+      usageLimit: null,
     },
   ],
   results: [],

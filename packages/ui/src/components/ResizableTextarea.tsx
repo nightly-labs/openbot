@@ -6,14 +6,9 @@ import { createPointerDrag } from "./createPointerDrag";
 const KEYBOARD_STEP = 24;
 
 export interface ResizableTextareaProps extends Omit<TextareaProps, "ref" | "style"> {
-  /** The accessible name of the drag handle. */
   resizeLabel: string;
 }
 
-/**
- * A textarea with a drag grip in its bottom-right corner. The stylesheet sets the start height and
- * the minimum; a drag or the arrow keys change the height, and a double click returns to the start.
- */
 export function ResizableTextarea(props: ResizableTextareaProps): JSX.Element {
   const textareaProps = omit(props, "resizeLabel");
   let textarea: HTMLTextAreaElement | undefined;
@@ -21,7 +16,6 @@ export function ResizableTextarea(props: ResizableTextareaProps): JSX.Element {
   const [minimum, setMinimum] = createSignal(0);
   const [startHeight, setStartHeight] = createSignal(0);
 
-  // A field taller than the window cannot be read in one view, so the window height is the limit.
   const maximum = () => Math.max(minimum(), window.innerHeight);
   const clamp = (value: number) => Math.round(Math.min(maximum(), Math.max(minimum(), value)));
   const currentHeight = () => height() ?? startHeight();
@@ -49,7 +43,6 @@ export function ResizableTextarea(props: ResizableTextareaProps): JSX.Element {
   });
 
   const handleKeyDown = (event: KeyboardEvent) => {
-    // Measure now: the field can be hidden when it mounts, and then the start height is 0.
     const current = textarea?.offsetHeight ?? currentHeight();
     let next: number | undefined;
     if (event.key === "ArrowDown") next = current + KEYBOARD_STEP;

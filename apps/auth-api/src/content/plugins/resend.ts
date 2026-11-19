@@ -1,9 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Resend here is taken from resend.com and Resend's resend-mcp
-// repository. Each page used is in `sources`. Check the sources again, and move
-// `checkedAt`, whenever this file changes.
-
 export const RESEND_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

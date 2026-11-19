@@ -8,12 +8,10 @@ import { useCSSVariable } from "uniwind";
 import { ProviderMark } from "@/features/servers/components/provider-mark";
 import { planLimitWindowKey } from "@/features/servers/model/plan-limits";
 
-/** The desktop rail ring, scaled from its 34 pt: the stroke and the space between rings. */
 const STROKE_RATIO = 2.25 / 34;
 const SPACING_RATIO = 4.5 / 34;
 const LOGO_RATIO = 12 / 34;
 
-/** The text colour of a window's amount left, in the tone of its ring. */
 export const PLAN_LIMIT_TONE_TEXT = {
   neutral: "",
   warning: "text-warning-text",
@@ -22,13 +20,8 @@ export const PLAN_LIMIT_TONE_TEXT = {
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
-/** How long an arc takes to move to a new reading. */
 const FILL_DURATION_MS = 600;
 
-/**
- * An arc filled to `percent`, such as what is left of one window. A new reading moves the arc from its
- * last value; the first reading draws it at once, so the header does not animate each time it shows.
- */
 export function RingArc({
   center,
   radius,
@@ -71,12 +64,6 @@ function useToneColors(): Record<PlanLimitTone, string> {
   return { neutral: String(success), warning: String(warning), critical: String(danger) };
 }
 
-/**
- * The limits of one provider account as concentric rings, as on the desktop rail: the outer ring is
- * the longest window, the inner ring the shortest. Each arc shows how much is left, in the tone of that
- * window. The provider mark is in the middle. It is an image: the button that holds it has the label.
- * A `cutout` clears a circle of the rings, where another ring lies over this one, on any background.
- */
 export function PlanLimitRing({
   row,
   size,
@@ -110,7 +97,6 @@ export function PlanLimitRing({
             {windows.map((window, index) => {
               const radius = outer - index * spacing;
               return (
-                // The key is of the reading order, so a window keeps its ring when another window comes or goes.
                 <G key={planLimitWindowKey(window, windows.length - 1 - index)}>
                   <Circle
                     cx={center}

@@ -1,10 +1,5 @@
-/**
- * The desktop Routines view: the canvas of the open agent on the active server. This computer keeps
- * its own flows; a joined server serves them through `routine-flows-v1`, and an older one shows a
- * notice. Webhook routines change only for an account that manages the server's events.
- */
-
 import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
+import { ROUTINE_FLOW_STOP_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flow-stop-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import type { DiagramModelChoice } from "@openbot/ui/features/diagrams/DiagramNewAgentCard";
 import { useText } from "@openbot/ui/text";
@@ -40,7 +35,6 @@ export function WorkspaceRoutineFlows() {
   const { customAgents } = useCustomAgents();
   const { activeServer } = useServers();
   const { createAgentInPlace } = useAgentActions();
-  /** A new agent starts on the model the agent form would pick, and the user can change it. */
   const newAgentModels = createMemo((): DiagramModelChoice | undefined => {
     const initial = resolveCreationModel(
       serverSetupChoice() ?? setupState(),
@@ -58,22 +52,17 @@ export function WorkspaceRoutineFlows() {
         }
       : undefined;
   });
-  /** The server whose flows the canvas shows, or null when it cannot serve them. */
   const serverId = createMemo(() => {
     const server = activeServer();
     if (!server) return "local";
     return server.kind === "local" || serverSupportsCapability(server, ROUTINE_FLOWS_CAPABILITY) ? server.id : null;
   });
-  /**
-   * A joined server that has not answered the compatibility check yet. Each start, reconnect and wake
-   * clears what it reported, so it is not an older host until it answers.
-   */
   const checking = () => {
     const server = activeServer();
     return server?.kind === "remote" && !server.compatibility?.hostAppVersion;
   };
   const webhooks = () => serverCanAdminister(activeServer(), EVENTS_CAPABILITY);
-  /** A routine is made in the agent's settings, so the agent's chat opens with a new routine in them. */
+  const stops = () => serverSupportsCapability(activeServer(), ROUTINE_FLOW_STOP_CAPABILITY);
   function createRoutine(agentId: string): void {
     layout.setSidebarView("agents");
     selectAgent(agentId);
@@ -94,7 +83,7 @@ export function WorkspaceRoutineFlows() {
     >
       {(id) => (
         <RoutineFlowsCanvas
-          host={desktopRoutineFlowsHost(id, webhooks)}
+          host={desktopRoutineFlowsHost(id, webhooks, stops)}
           agent={activeAgent()}
           agents={agentList()}
           newAgentModels={newAgentModels()}

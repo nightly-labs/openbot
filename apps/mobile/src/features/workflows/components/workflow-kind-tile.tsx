@@ -18,7 +18,6 @@ import Zap from "lucide-react-native/icons/zap";
 import { View } from "react-native";
 import { useCSSVariable } from "uniwind";
 
-/** The colour family of each kind, from the file reference tokens: the same hues in both themes. */
 const KIND_TINT: Record<WorkflowNodeKind, string> = {
   trigger: "default",
   agent: "blue",
@@ -60,14 +59,12 @@ const TRIGGER_ICON: Record<WorkflowTriggerType, LucideIcon> = {
   slack: AtSign,
 };
 
-/** The icon of a step on its colour, as the desktop canvas marks each kind. */
 export function WorkflowKindTile({
   kind,
   trigger,
   size = 32,
 }: {
   kind: WorkflowNodeKind;
-  /** The type of a trigger, which picks its icon. */
   trigger?: WorkflowTriggerType;
   size?: number;
 }) {

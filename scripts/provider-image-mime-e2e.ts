@@ -1,6 +1,3 @@
-// Runs real provider clients against owned stdio CLIs. No account or model request is used.
-// bun scripts/provider-image-mime-e2e.ts
-// Each image must reach the protocol child with its correct MIME type and unchanged bytes.
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -19,7 +16,6 @@ const root = await mkdtemp(join(tmpdir(), "openbot-image-mime-"));
 const consumers = ["acp", "muse", "pi"] as const;
 type Consumer = (typeof consumers)[number];
 
-// Small complete images. FFmpeg made the 16 x 16 red JPEG and AVIF (SVT-AV1).
 const fixtures = [
   {
     extensions: ["png"],
@@ -40,8 +36,6 @@ const fixtures = [
   },
 ];
 
-// These children implement only the protocol needed for a session and a completed turn.
-// The real clients own spawning, SDK handshakes, encoding, dispatch, and process shutdown.
 const childSource = String.raw`
 const fs = require("node:fs");
 const crypto = require("node:crypto");
@@ -120,7 +114,6 @@ lines.on("line", (line) => {
   if (mode === "pi" && method === "get_session_stats") return reply({
     tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } });
   if (mode === "pi" && ["switch_session", "set_model"].includes(method)) return reply({});
-  // Fail setup on an unimplemented request, instead of treating it as a MIME failure.
   send({ jsonrpc: "2.0", id: message.id, error: { code: -32601, message: "Fixture does not implement " + method } });
 });
 `;
@@ -199,7 +192,6 @@ function running(pid: number): boolean {
   }
 }
 
-/** Subscribe before the request. The deadline bounds failure; it is not a sleep. */
 async function turn(client: AgentClient, threadId: string, path: string, model?: string): Promise<void> {
   let finish: () => void = () => {};
   let fail: (error: Error) => void = () => {};

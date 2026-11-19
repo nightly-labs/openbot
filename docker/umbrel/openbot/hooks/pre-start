@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+DATA_DIR="${APP_DATA_ROOT:-${APP_DATA_DIR}/data}"
+
+mkdir -p "${DATA_DIR}"
+if [[ "$(stat -c '%u:%g' "${DATA_DIR}")" != "1000:1000" ]]; then
+  chown 1000:1000 "${DATA_DIR}"
+fi
+chmod 0700 "${DATA_DIR}"

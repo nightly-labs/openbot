@@ -1,5 +1,3 @@
-// Channel routines: a standing instruction that fires into the channel on a schedule.
-
 import {
   decodeChannelRoutine,
   decodeChannelRoutineRun,
@@ -76,7 +74,6 @@ export function channelRoutineIpcHandlers({
       updateChannelRoutine: scopedHandler(parseUpdateChannelRoutine, {
         local: (parsed) => service.updateChannelRoutine(parsed),
         remote: (parsed, serverId) => {
-          // As for an agent: a host with `routines-once-v1` changes every schedule routine on its routes.
           if (remoteServers.supportsCapability(serverId, ROUTINES_ONCE_CAPABILITY))
             return updateChannelRoutineOnce(remoteOnceSend(remoteServers, serverId), parsed);
           requireReleasedScheduleOn(parsed.schedule, false);

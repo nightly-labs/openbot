@@ -8,22 +8,13 @@ import { createEffect, createSignal, For, onSettled, Show } from "solid-js";
 import { conversationPort, type SharedTableCalls } from "./conversation-port";
 
 interface SharedTablesModalProps {
-  /** Resolves an owner id to a name. The owner can be an agent the user deleted, hence the lookup. */
   agents: readonly AgentProfile[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCountChange: (count: number) => void;
-  /** Replaces the desktop calls, for a client that reaches the host another way. */
   calls?: SharedTableCalls | undefined;
 }
 
-/**
- * Everything the agents keep, listed under whichever agent's settings the user opened.
- *
- * The list is global on purpose: the agents share one database, and any of them can read and write
- * any table in it. `ownerAgentId` records which agent made a table, and it gates deletion for agents
- * only -- the user can delete any table here, including one whose owner no longer exists.
- */
 export function SharedTablesModal(props: SharedTablesModalProps) {
   const { t, errorMessage } = useText();
   const [tables, setTables] = createSignal<SharedTable[]>([]);
@@ -114,7 +105,14 @@ export function SharedTablesModal(props: SharedTablesModalProps) {
             </Show>
 
             <Show when={!loading()} fallback={<p class="agent-memory-state">{t("sharedTable.loading")}</p>}>
-              <Show when={tables().length > 0} fallback={<p class="agent-memory-state">{t("sharedTable.empty")}</p>}>
+              <Show
+                when={tables().length > 0}
+                fallback={
+                  <Show when={!error()}>
+                    <p class="agent-memory-state">{t("sharedTable.empty")}</p>
+                  </Show>
+                }
+              >
                 <ul
                   ref={scrollFades.bind}
                   class={["shared-table-list", scrollFades.classes()]}

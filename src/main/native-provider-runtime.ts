@@ -2,13 +2,12 @@ import { chmod, copyFile, mkdir, rename } from "node:fs/promises";
 import { join } from "node:path";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
-import { NATIVE_VERSION_PARSERS } from "../backend/cli";
+import { COPILOT_ENV, NATIVE_VERSION_PARSERS } from "../backend/cli";
 import { sha256File } from "../backend/file-hash";
 import { assertSafeArchive, extractArchive, extractZipTree, rejectNonRegularFiles } from "./provider-runtime-archive";
 import type { ProviderRuntimeDescriptor, ProviderStageContext } from "./provider-runtime-descriptors";
 import { ProviderRuntimeFailure, runtimeIO } from "./provider-runtime-effects";
 
-/** Native provider archives share staging and verification, not their wire protocols. */
 export function nativeProviderRuntime(
   runtime: "pi" | "muse" | "devin" | "copilot" | "mistral" | "antigravity",
 ): ProviderRuntimeDescriptor {
@@ -36,8 +35,6 @@ export function nativeProviderRuntime(
         yield* runtimeIO(() => mkdir(join(staging, "bin"), { recursive: true }));
         yield* runtimeIO(() => copyFile(downloadedPath, join(staging, "bin", spec.executableName)));
       } else if (runtime === "copilot" || runtime === "antigravity") {
-        // GitHub Copilot CLI 1.0.105 and Antigravity CLI 1.5.4 archives hold only the program, such as
-        // `copilot` or `antigravity.exe`.
         const bin = join(staging, "bin");
         yield* runtimeIO(() => mkdir(bin, { recursive: true }));
         if (spec.target === "win32-x64") {
@@ -48,9 +45,6 @@ export function nativeProviderRuntime(
           yield* rejectNonRegularFiles(bin);
         }
       } else if (runtime === "mistral") {
-        // Mistral Vibe 3.1.0 archives are a PyInstaller folder build: `vibe-acp` and the `_internal`
-        // folder that it loads Python from, so both go to `bin/`. The macOS Python framework keeps its
-        // links, as Kimi's does: copies of the files would break its code signature.
         const bin = join(staging, "bin");
         yield* runtimeIO(() => mkdir(bin, { recursive: true }));
         const roots = [spec.executableName, "_internal"];
@@ -62,8 +56,6 @@ export function nativeProviderRuntime(
           yield* rejectNonRegularFiles(bin, { links: true });
         }
       } else if (runtime === "devin") {
-        // Devin's archives hold only `bin/` and `share/`. Devin CLI 3000.11.234 has a skill that reads
-        // its documentation in `share/devin/docs`, so staging keeps both folders.
         if (spec.target === "win32-x64") {
           yield* extractZipTree(downloadedPath, staging, ["bin", "share"], message);
         } else {
@@ -96,8 +88,7 @@ export function nativeProviderRuntime(
       }
     }),
     parseVersion: NATIVE_VERSION_PARSERS[runtime],
-    // Antigravity 1.4.5 and earlier were the ACP server `agy_acp_server`, which OpenBot can no longer
-    // start.
+    ...(runtime === "copilot" ? { versionEnvironment: COPILOT_ENV } : {}),
     ...(runtime === "antigravity" ? { legacyExecutableNames: ["agy_acp_server.par", "agy_acp_server.exe"] } : {}),
   };
 }

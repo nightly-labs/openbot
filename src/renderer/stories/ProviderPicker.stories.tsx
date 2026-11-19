@@ -50,7 +50,6 @@ type Story = StoryObj<typeof meta>;
 
 export const Available: Story = {};
 
-/** Select Connect on Codex: after 25 s of `connecting`, the row offers the code sign-in. */
 export const BrowserSignInStalled: Story = {
   args: {
     allowUnavailableSelection: true,
@@ -93,10 +92,6 @@ export const ProviderUnavailable: Story = {
   },
 };
 
-/**
- * The three isolated update states. An update is a re-download of a newer runtime, so the
- * in-flight and failed rows reuse the Cancel and Retry buttons a first download already has.
- */
 const claudeReady: ProviderPickerOption["runtimeStatus"] = {
   phase: "ready",
   progress: 100,
@@ -137,11 +132,6 @@ export const UpdateFailed: Story = {
   },
 };
 
-/**
- * A CLI the user installed themselves, with a newer version pinned by this OpenBot release. The row
- * reads exactly like a managed update - same badge, same button - because only the work behind the
- * button differs, and the row does not choose it.
- */
 export const UserOwnedCliUpdate: Story = {
   args: {
     value: "codex",
@@ -166,10 +156,6 @@ export const AllowUnavailableSelection: Story = {
   },
 };
 
-/**
- * A custom endpoint runs as OpenCode, so its row follows OpenCode's row: it offers OpenCode's install
- * until the CLI is there, and Add from then on, with or without an OpenCode account.
- */
 function withOpenCode(state: ProviderPickerOption["state"]): ProviderPickerOption[] {
   return [...options, { id: "opencode", name: "OpenCode", state, description: "Use your installed OpenCode CLI" }];
 }
@@ -178,12 +164,6 @@ export const CustomProviderNotInstalled: Story = {
   args: { options: withOpenCode("not-installed"), onAddCustomProvider: fn(), onInstallProvider: fn() },
 };
 
-/**
- * Two saved endpoints in the one row that stands for them all. The row is a choice now, so it joins
- * the group and takes the check mark from the provider that serves it, and the count is the button
- * that opens the list. The button sits beside Add, outside the label: a button inside a `<label>`
- * would answer the radio instead.
- */
 export const CustomProviderEndpoints: Story = {
   args: {
     value: "opencode",
@@ -211,10 +191,6 @@ export const CustomProviderEndpoints: Story = {
   },
 };
 
-/**
- * One endpoint, chosen, and no list to open. Without `onManageCustomProviders` the count stays a
- * badge inside the label and counts in the singular. No provider row holds the check.
- */
 export const CustomProviderSelected: Story = {
   args: {
     value: "opencode",
@@ -238,10 +214,6 @@ export const CustomProviderReady: Story = {
   args: { options: withOpenCode("sign-in-required"), onAddCustomProvider: fn() },
 };
 
-/**
- * Every provider row has a switch that turns the provider on or off in OpenBot. An off row shows
- * only "Off" and the switch: OpenBot does not start, check or list that provider.
- */
 const switchOptions: ProviderPickerOption[] = [
   ...options,
   { id: "cursor", name: "Cursor", state: "error", checkError: "The model list could not be read." },
@@ -281,17 +253,14 @@ export const ProvidersOff: Story = {
   render: () => <ProviderSwitchStory off={["cursor", "opencode"]} />,
 };
 
-/** Agents use Codex and Claude, so their switches stay on. Turning one off shows a toast that tells why. */
 export const ProviderInUse: Story = {
   render: () => <ProviderSwitchStory off={["cursor"]} usedBy={{ codex: ["Ada"], claude: ["Rex", "Mila"] }} />,
 };
 
-/** Click a switch to see the pending state while storage has not answered. */
 export const ProviderSwitchPending: Story = {
   render: () => <ProviderSwitchStory off={[]} save={() => new Promise<void>(() => undefined)} />,
 };
 
-/** A failed save keeps the previous switch value and shows its error below the row. */
 export const ProviderSwitchError: Story = {
   render: () => (
     <ProviderSwitchStory
@@ -301,10 +270,6 @@ export const ProviderSwitchError: Story = {
   ),
 };
 
-/**
- * Codex has two accounts, so its row lists them under the provider with the agents that use each.
- * Claude has one, so its row shows the provider name and offers Add account.
- */
 export const ProviderAccounts: Story = {
   args: {
     embedded: true,

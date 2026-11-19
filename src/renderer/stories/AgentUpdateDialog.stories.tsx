@@ -2,7 +2,6 @@ import { AgentUpdateDialog } from "@openbot/ui/features/marketplace/AgentUpdateD
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
-/** Dr. Eggbot's six skills, by the names of the production catalog. */
 const SKILLS = [
   { skillId: "agent-designer", name: "Agent Designer" },
   { skillId: "eggbot-getting-started", name: "Eggbot Getting Started" },
@@ -30,8 +29,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Two skills with local changes; the other four fold into one line. */
 export const Default: Story = {};
 
-/** Every skill has local changes: the list scrolls, with a fade at the hidden edge. */
 export const AllChanged: Story = { args: { changed: SKILLS, othersCount: 0 } };

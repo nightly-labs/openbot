@@ -6,13 +6,8 @@ import { runApiResponse } from "../../server/effect-runtime";
 import { apiError } from "../../server/request-auth";
 import { requireWorkerBindings } from "../../server/types";
 
-/**
- * A sandbox ID that does not exist. A 404 for it shows that boat answers and accepts the key,
- * and the read changes nothing.
- */
 const PROBE_SANDBOX_ID = "openbot-status-probe";
 
-/** The status page checks every 5 minutes, but the route is public, so boat gets one call a minute at most. */
 const CACHE_SECONDS = 60;
 
 const hostingResponse = (healthy: boolean) =>
@@ -32,9 +27,7 @@ export const Route = createFileRoute("/health/hosting")({
       GET: ({ request }) =>
         runApiResponse(
           Effect.gen(function* () {
-            // One cache entry for every query string, so a query cannot skip the cache.
             const cacheKey = new Request(new URL("/health/hosting", request.url));
-            // A cache failure only costs one more boat call. It does not change the answer.
             const cache = yield* Effect.tryPromise(() => caches.open("health-hosting")).pipe(
               Effect.orElseSucceed(() => null),
             );

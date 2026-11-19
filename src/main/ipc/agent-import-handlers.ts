@@ -1,9 +1,3 @@
-import { Effect } from "effect";
-// Agent import into the local host, or into a joined server with `agent-import-v2` (in parts) or
-// `agent-import-v1`. The file dialog opens here, so the renderer never names a path. For a joined
-// server, main reads the file and sends it. A joined server reads its own Hermes folder with
-// `hermes-import-v1`.
-
 import { copyFile, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import {
@@ -29,6 +23,7 @@ import {
 } from "@openbot/contracts/team-protocol/hermes-import-v1";
 import type { AppTranslate } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect } from "effect";
 import { app, type BrowserWindow, dialog, type OpenDialogOptions, type SaveDialogOptions } from "electron";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { AgentImportService } from "../agent-import-service";
@@ -49,7 +44,6 @@ export interface AgentImportIpcDependencies {
   >;
   getMainWindow: () => BrowserWindow | null;
   translate: AppTranslate;
-  /** The folder of the export skills a user adds to Grok Bot or Hermes by hand: `<source>/SKILL.md`. */
   exportSkillDirectory: string;
 }
 
@@ -72,7 +66,6 @@ export function agentImportIpcHandlers({
     return result.canceled || !result.filePaths[0] ? null : result.filePaths[0];
   };
 
-  // Hermes keeps its profiles in a folder, so the user names the folder and main reads it.
   const chooseHermesFolder = async (): Promise<string | null> => {
     const mainWindow = getMainWindow();
     const options: OpenDialogOptions = {
@@ -165,7 +158,6 @@ export function agentImportIpcHandlers({
       }),
       readHermes: scopedQueryHandler({
         local: () => runCauseEffect(hermesImport.stage(hermesRoot())),
-        // The server reads its own Hermes folder.
         remote: async (serverId) => {
           requireRemoteHermes(serverId);
           return runCauseEffect(
@@ -176,8 +168,6 @@ export function agentImportIpcHandlers({
           );
         },
       }),
-      // Local only: the folder dialog shows the files of this computer, and a joined server cannot read
-      // them. On a joined server, Hermes on this computer comes with an export file instead.
       chooseHermes: handler(async () => {
         const folder = await chooseHermesFolder();
         if (!folder) return null;
