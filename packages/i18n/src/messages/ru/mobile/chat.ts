@@ -613,6 +613,7 @@ export const messages = {
   "mobile.chat.queue.cancelUpload": "Отменить загрузку из очереди",
   "mobile.chat.queue.waitingTitle": "Ожидание агента",
   "mobile.chat.queue.repliesTitle": "Ожидание ответов",
+  "mobile.chat.queue.providerRestart": "Ожидание перезапуска {provider}",
   "mobile.chat.queue.replyState.asked": "Спрошен",
   "mobile.chat.queue.replyState.working": "Работает",
   "mobile.chat.queue.replyState.replied": "Ответил",

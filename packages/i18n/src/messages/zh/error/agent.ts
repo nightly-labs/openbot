@@ -108,6 +108,7 @@ export const messages = {
   "error.agent.deleteIncomplete": "助手数据未能完全移除，请重试删除。",
   "error.agent.deleteFolderInUse":
     "另一个助手的工作仍在使用此助手的文件夹。请在该工作结束后，或重启 OpenBot 后，再次删除此助手。",
+  "error.agent.deleteWhenFolderFree": "另一个助手的工作仍在使用此助手的文件夹。该工作结束后，OpenBot 会删除此助手。",
   "error.agent.duplicationBusy": "该助手正在被复制。",
   "error.agent.waitBeforeDuplicate": "请等该助手结束并清空队列后再复制。",
   "error.agent.saveOtherAgent": "该保存操作属于另一个助手。",
@@ -157,6 +158,10 @@ export const messages = {
   "error.agent.mcpServerNotSaved": "该 MCP 服务器没有响应，因此未保存。{error}",
   "error.agent.mcpServerKeysMove":
     "MCP 服务器 {name} 保存着当前服务器的密钥。请让用户在“市场 → 应用 → {name}”中更改它的地址、命令、参数或传输方式。",
+  "error.agent.mcpServerHeadersNeedHttp":
+    "MCP 服务器 {name} 运行本地命令，因此不接受标头。请让用户在“市场 → 应用 → {name}”中输入它的密钥。",
+  "error.agent.mcpServerHeadersNeedPerson":
+    "只有此 OpenBot 的用户可以在与你的聊天中提供 MCP 服务器 {name} 的密钥。请让用户在“市场 → 应用 → {name}”中输入密钥。",
   "error.agent.mcpServerBuiltIn":
     "{name} 是 OpenBot 的一部分，MCP 工具无法测试、开启、关闭或移除它。用户在运行 OpenBot 的电脑上管理它：GitHub 连接在 市场、应用、GitHub，Computer Use 在 设置、Computer Use。",
   "error.agent.mcpServerUnknown": "没有名为 {name} 的 MCP 服务器。请调用 list_mcp_servers 查看名称。",

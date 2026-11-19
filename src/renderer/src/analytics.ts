@@ -344,8 +344,8 @@ interface DesktopAnalyticsEvents {
   analytics_preference_changed: { enabled: false };
 }
 
-type OnboardingStep = "choose" | "plan" | "computer" | "language";
-type OnboardingPath = "free" | "plan";
+type OnboardingStep = "existing" | "choose" | "plan" | "computer" | "language";
+type OnboardingPath = "free" | "plan" | "existing";
 type AttachmentKind = "image" | "document" | "spreadsheet" | "zip" | "other";
 const ATTACHMENT_KINDS: readonly AttachmentKind[] = ["image", "document", "spreadsheet", "zip", "other"];
 
@@ -669,8 +669,8 @@ const PROPERTY_ENUMS: Readonly<Record<string, readonly string[]>> = {
   currency: BILLING_CURRENCIES,
   direction: ["up", "down"],
   outcome: ["completed", "cancelled"],
-  step: ["choose", "plan", "computer", "language"],
-  path: ["free", "plan"],
+  step: ["existing", "choose", "plan", "computer", "language"],
+  path: ["free", "plan", "existing"],
   connector: ["slack", "discord", "telegram", "whatsapp", "github", "onepassword", "bitwarden", "protonpass"],
   permission: ["screen-recording", "accessibility"],
   method: ["browser", "code", "api_key"],

@@ -115,6 +115,8 @@ export const messages = {
   "error.agent.deleteIncomplete": "לא ניתן היה להסיר את נתוני הסוכן לגמרי. יש לנסות למחוק את הסוכן שוב.",
   "error.agent.deleteFolderInUse":
     "עבודה של סוכן אחר עדיין משתמשת בתיקייה של הסוכן הזה. יש למחוק את הסוכן שוב כשהעבודה הזו מסתיימת, או אחרי הפעלה מחדש של OpenBot.",
+  "error.agent.deleteWhenFolderFree":
+    "עבודה של סוכן אחר עדיין משתמשת בתיקייה של הסוכן הזה. OpenBot ימחק את הסוכן הזה כשהעבודה הזו תסתיים.",
   "error.agent.duplicationBusy": "הסוכן הזה כבר משוכפל.",
   "error.agent.waitBeforeDuplicate": "יש להמתין שהסוכן יסיים ולרוקן את התור שלו לפני השכפול.",
   "error.agent.saveOtherAgent": "השמירה הזו שייכת לסוכן אחר.",
@@ -168,6 +170,10 @@ export const messages = {
   "error.agent.mcpServerNotSaved": "שרת ה-MCP לא הגיב, ולכן לא נשמר. {error}",
   "error.agent.mcpServerKeysMove":
     "שרת ה-MCP {name} מחזיק מפתחות עבור השרת הנוכחי שלו. יש לבקש מהמשתמש לשנות את הכתובת, הפקודה, הארגומנטים או שיטת ההעברה שלו בחנות, אפליקציות, {name}.",
+  "error.agent.mcpServerHeadersNeedHttp":
+    "שרת ה-MCP {name} מריץ פקודה מקומית, ולכן אינו מקבל כותרות. בקש מהמשתמש להזין את המפתחות שלו בחנות, אפליקציות, {name}.",
+  "error.agent.mcpServerHeadersNeedPerson":
+    "רק המשתמש של OpenBot זה, בצ'אט איתך, יכול לתת את המפתחות של שרת ה-MCP {name}. בקש מהמשתמש להזין אותם בחנות, אפליקציות, {name}.",
   "error.agent.mcpServerBuiltIn":
     "{name} הוא חלק מ-OpenBot, ולכן כלי ה-MCP לא יכולים לבדוק, להפעיל, לכבות או להסיר אותו. המשתמש שולט בו במחשב שמריץ את OpenBot: חיבור GitHub בחנות, אפליקציות, GitHub, ושליטה במחשב בהגדרות, שליטה במחשב.",
   "error.agent.mcpServerUnknown": "אין שרת MCP בשם {name}. אפשר לקרוא ל-list_mcp_servers כדי לראות את השמות.",

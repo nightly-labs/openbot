@@ -26,6 +26,8 @@ export const messages = {
     "O computador anfitrião não permitiu que o OpenBot grave a tela. Conceda a permissão de gravação de tela no computador anfitrião e tente novamente.",
   "error.remote.windowsSessionDisconnected":
     "A sessão do Windows no computador anfitrião está desconectada, então não há tela para compartilhar. Entre no Windows na tela do computador anfitrião e tente novamente.",
+  "error.remote.macScreenLocked":
+    "O Mac está bloqueado, então não pode compartilhar a tela. Desbloqueie o Mac na tela dele e tente novamente.",
   "error.remote.streamTooSlowLowerQuality":
     "A conexão com o computador anfitrião está lenta demais para a imagem. Tente novamente: a próxima conexão usará uma qualidade mais baixa.",
   "error.remote.streamTooSlow":
@@ -197,6 +199,8 @@ export const messages = {
   "error.remote.iceFailed":
     "Não foi possível estabelecer uma conexão direta com o computador anfitrião. Um firewall, VPN ou proxy pode bloqueá-la.",
   "error.remote.iceDisconnected": "A conexão direta com o computador anfitrião foi perdida.",
+  "error.remote.webrtcBlocked":
+    "Este dispositivo bloqueia a conexão de que o OpenBot precisa. Se o Modo de Isolamento estiver ativado, desative-o para o OpenBot em Ajustes > Privacidade e Segurança > Modo de Isolamento.",
   "error.remote.directoryUnreachable": "O OpenBot não conseguiu acessar o serviço do OpenBot. Verifique sua conexão.",
   "error.remote.directoryTimeout": "O serviço do OpenBot não respondeu a tempo. Tente novamente.",
   "error.remote.inviteAlreadyUsed": "Este convite já foi usado. Peça um novo convite.",

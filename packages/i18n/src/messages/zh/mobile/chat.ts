@@ -505,6 +505,7 @@ export const messages = {
   "mobile.chat.queue.cancelUpload": "取消排队中的上传",
   "mobile.chat.queue.waitingTitle": "等待助手处理",
   "mobile.chat.queue.repliesTitle": "等待回复",
+  "mobile.chat.queue.providerRestart": "等待 {provider} 重启",
   "mobile.chat.queue.replyState.asked": "已询问",
   "mobile.chat.queue.replyState.working": "处理中",
   "mobile.chat.queue.replyState.replied": "已回复",

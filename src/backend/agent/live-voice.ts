@@ -46,7 +46,8 @@ const SUMMARY_RULES =
   "Write plain sentences without links, lists, formatting or code. " +
   "End with one sentence that says that the full answer is in the chat. ";
 const RELAY_INSTRUCTIONS =
-  "You relay requests. For every user request, call ask_agent exactly once with the request verbatim. " +
+  "You relay requests. For every user request, call ask_agent exactly once with the user's complete request " +
+  "in the user's own words, as the transcript gives them. Do not shorten or summarize it, and add no question of your own. " +
   "Never answer on your own. The tool result is the agent's answer, and a voice says your reply aloud. " +
   `If the first line of the result is ${LONG_ANSWER_MARK}, the answer is too long for the voice: reply with ` +
   SUMMARY_RULES +
@@ -86,6 +87,9 @@ function relayRequest(text: string): string {
   return input || text;
 }
 
+const HEARD_LINE_LIMIT = 20;
+const oneLine = (text: string) => text.replace(/\s+/gu, " ").trim();
+
 const logger = createOpenBotLogger("live-voice");
 
 class LiveVoiceFailed extends Schema.TaggedError<LiveVoiceFailed>()("LiveVoiceFailed", {
@@ -115,12 +119,23 @@ export interface LiveVoiceOwner {
   readonly sender: ConversationMessageSender | undefined;
 }
 
+interface LiveVoiceLine {
+  readonly role: "user" | "assistant";
+  readonly text: string;
+}
+
+export interface LiveVoiceRelayed {
+  readonly shown: string;
+  readonly request: string;
+  readonly heard: readonly LiveVoiceLine[];
+}
+
 export interface LiveVoiceHooks {
   agent(agentId: string): AgentSummary;
   relay(agent: AgentSummary): Effect.Effect<LiveVoiceRelay, { readonly cause: unknown }>;
   send(
     agentId: string,
-    text: string,
+    relayed: LiveVoiceRelayed,
     sender: ConversationMessageSender | undefined,
   ): Effect.Effect<string, { readonly cause: unknown }>;
   reply(agentId: string, deliveryId: string): LiveVoiceReply | null;
@@ -138,6 +153,8 @@ interface LiveSession {
   readonly client: AgentClient;
   readonly cwd: string;
   threadId: string | null;
+  readonly rule: string;
+  readonly heard: LiveVoiceLine[];
   readonly answer: Deferred.Deferred<string, LiveVoiceFailed>;
   readonly onNotification: (notification: AppServerNotification) => void;
   readonly onRequest: (request: AppServerRequest) => void;
@@ -189,6 +206,8 @@ export class LiveVoice {
       client: relay.client,
       cwd,
       threadId: null,
+      rule: oneLine(relayVoiceRule(name)),
+      heard: [],
       answer: Deferred.makeUnsafe<string, LiveVoiceFailed>(),
       onNotification: (notification) => this.#notification(session, notification),
       onRequest: (request) => this.#request(session, request),
@@ -339,6 +358,11 @@ export class LiveVoice {
             { type: "transcript", sessionId: session.id, role, text, final },
             session.owner?.memberId ?? null,
           );
+        const line = final ? text?.trim() : undefined;
+        if (line && !(role === "user" && oneLine(line) === session.rule)) {
+          session.heard.push({ role, text: line });
+          if (session.heard.length > HEARD_LINE_LIMIT) session.heard.shift();
+        }
         return;
       }
     }
@@ -362,14 +386,19 @@ export class LiveVoice {
       return;
     }
     const waits = this.#hooks.busy(session.agentId);
+    const heard = session.heard.splice(0);
+    const said = heard.flatMap((line) => (line.role === "user" ? [line.text] : [])).join("\n");
     Effect.runFork(
-      this.#hooks.send(session.agentId, text, session.owner?.sender).pipe(
+      this.#hooks.send(session.agentId, { shown: said || text, request: text, heard }, session.owner?.sender).pipe(
         Effect.match({
-          onFailure: (failure) =>
+          onFailure: (failure) => {
+            session.heard.unshift(...heard);
+            session.heard.splice(0, session.heard.length - HEARD_LINE_LIMIT);
             this.#respond(session, request.id, {
               success: false,
               text: failure.cause instanceof Error ? failure.cause.message : String(failure.cause),
-            }),
+            });
+          },
           onSuccess: (deliveryId) => {
             if (!this.#sessions.has(session.id)) return;
             const ask: PendingAsk = { session, requestId: request.signal?.aborted ? null : request.id, deliveryId };

@@ -116,6 +116,7 @@ export const messages = {
     "إضافة خادم MCP {name}: {target}. يحصل كل وكيل على هذا الخادم على أدواته. يتصل OpenBot به لاختباره.",
   "status.agent.mcpServerChange":
     "تغيير خادم MCP {name} إلى {target}. يحصل كل وكيل على هذا الخادم على أدواته. يتصل OpenBot به لاختباره.",
+  "status.agent.mcpServerHeaders": "ويغيّر أيضًا هذه الترويسات: {names}.",
   "status.agent.mcpServerEnable": "تشغيل خادم MCP {name} لكل وكيل على هذا الخادم.",
   "status.agent.mcpServerDisable": "إيقاف خادم MCP {name} لكل وكيل على هذا الخادم.",
   "status.agent.mcpServerRemove": "إزالة خادم MCP {name} وتسجيل دخوله من كل وكيل على هذا الخادم.",

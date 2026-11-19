@@ -641,6 +641,7 @@ export const messages = {
   "mobile.chat.queue.cancelUpload": "إلغاء الرفع في قائمة الانتظار",
   "mobile.chat.queue.waitingTitle": "في انتظار الوكيل",
   "mobile.chat.queue.repliesTitle": "في انتظار الردود",
+  "mobile.chat.queue.providerRestart": "في انتظار إعادة تشغيل {provider}",
   "mobile.chat.queue.replyState.asked": "تم السؤال",
   "mobile.chat.queue.replyState.working": "يعمل",
   "mobile.chat.queue.replyState.replied": "تم الرد",

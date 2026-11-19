@@ -20,6 +20,7 @@ import type { HostUpdateState } from "../../packages/contracts/src/host-manager"
 import { causeHelpers } from "../backend/effect-boundary";
 import { writeUpdateHandover, writeUpdateInstallRecord } from "./update-install-guard";
 import type { OpenBotSiblingInstance, SiblingScanFailed } from "./update-sibling-instances";
+import { verifyWindowsUpdateSignature } from "./windows-update-signature";
 
 const logger = createOpenBotLogger("update");
 
@@ -66,6 +67,11 @@ export async function loadElectronUpdater(): Promise<UpdateAdapter | null> {
   try {
     const updaterModule = await import("electron-updater");
     const adapter = updaterModule.autoUpdater ?? updaterModule.default?.autoUpdater ?? updaterModule.default;
+    const NsisUpdater = updaterModule.NsisUpdater ?? updaterModule.default?.NsisUpdater;
+    if (NsisUpdater && adapter instanceof NsisUpdater) {
+      adapter.verifyUpdateCodeSignature = (publisherNames, file) =>
+        Effect.runPromise(verifyWindowsUpdateSignature(publisherNames, file));
+    }
     if (adapter) return adapter;
     logger.warn("OpenBot updates are disabled: electron-updater did not export autoUpdater");
   } catch {
@@ -277,7 +283,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       }
       if (this.#operation === "download" && this.#isDownloadLive()) {
         this.#activeDownload = null;
-        this.#setError("download_failed");
+        this.#setError("download_failed", downloadFailureMessage(error));
       }
     });
     if (this.#options.platform === "darwin" && this.#options.shipItDirectory) {
@@ -510,7 +516,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
         if (Result.isFailure(result) && this.#downloadGeneration === generation) {
           logUpdateFailure("OpenBot update download failed.", result.failure.cause);
           this.#activeDownload = null;
-          this.#setError("download_failed");
+          this.#setError("download_failed", downloadFailureMessage(result.failure.cause));
         }
       }).pipe(
         Effect.ensuring(
@@ -888,6 +894,12 @@ function findAppImageInstallProblem(appImagePath: string): Effect.Effect<"missin
 function isMissingPathError(cause: unknown): boolean {
   const code = typeof cause === "object" && cause !== null && "code" in cause ? cause.code : undefined;
   return code === "ENOENT" || code === "ENOTDIR";
+}
+
+/** The download finished, but the Windows signature check did not accept the installer (`NsisUpdater`). */
+function downloadFailureMessage(error: unknown): string | undefined {
+  const code = typeof error === "object" && error !== null && "code" in error ? error.code : undefined;
+  return code === "ERR_UPDATER_INVALID_SIGNATURE" ? sourceText("error.update.signatureNotConfirmed") : undefined;
 }
 
 function errorMessage(code: UpdateFailureCode) {

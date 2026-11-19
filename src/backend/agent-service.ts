@@ -87,6 +87,7 @@ import type {
   ProviderCodeLoginStart,
   ProviderUsageResets,
   QueuedMessageReceipt,
+  QueueHold,
   QueueSnapshot,
   ReadAgentTaskAroundInput,
   ReadAgentTaskPageInput,
@@ -193,6 +194,7 @@ import {
   type LocalAttentionResponse,
   type PromptResponder,
 } from "./agent/attention-registry";
+import type { AvatarImageDecoder } from "./agent/avatar-file";
 import { backgroundModel, withBackgroundEffort } from "./agent/background-model";
 import { BootRecovery } from "./agent/boot-recovery";
 import type { AgentBrowserProfiles } from "./agent/browser-profile-tool";
@@ -225,7 +227,7 @@ import {
 import type { ImageFitter } from "./agent/image-reader";
 import { InstructionsChanges } from "./agent/instructions-changes";
 import type { AgentLibraryFolders } from "./agent/library-folder-tools";
-import { LiveVoice, type LiveVoiceOwner, type LiveVoiceReply } from "./agent/live-voice";
+import { LiveVoice, type LiveVoiceOwner, type LiveVoiceRelayed, type LiveVoiceReply } from "./agent/live-voice";
 import { MailboxSync } from "./agent/mailbox-sync";
 import { type GitHubConnectorSource, McpGateway, type TestMcpServerOptions } from "./agent/mcp-gateway";
 import { type MarketplaceAppServer, mcpFallbackRunsServer, mcpServersFromGateway } from "./agent/mcp-tools";
@@ -413,6 +415,7 @@ export interface AgentServiceOptions {
   screenCapture?: ScreenCaptureHost | null;
   videoReader?: VideoReaderHost | null;
   fitImage?: ImageFitter | null;
+  avatarDecoder?: AvatarImageDecoder | null;
   prepareMcpTest?: (config: McpServerConfig) => Effect.Effect<void, unknown>;
   mcpAgentAccess?: (mcpServerId: string, agentId: string | null) => boolean;
   marketplaceAppServer?: (appId: string) => MarketplaceAppServer | null;
@@ -470,6 +473,7 @@ export interface AgentServiceOptions {
 }
 
 const USER_SEND_RETRY_WINDOW_MS = 24 * 60 * 60 * 1000;
+const LIVE_VOICE_RELAYED_LIMIT = 50;
 
 function userSendKey(sender: ConversationMessageSender | undefined, agentId: string, clientMessageId: string): string {
   return `user-send:${createHash("sha256")
@@ -546,6 +550,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #drain: DrainScheduler;
   readonly #sessionSettings: SessionSettings;
   readonly #liveVoice: LiveVoice;
+  readonly #liveVoiceRelayed = new Map<string, LiveVoiceRelayed>();
   readonly #queue: QueueControls;
   readonly #attachments: AttachmentGateway;
   readonly #browserUploads: BrowserUploads;
@@ -978,6 +983,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         isProviderBusyApartFrom: (provider, agentId) => this.#isProviderBusyApartFrom(provider, agentId),
         isAgentBusy: (agentId) => this.#runsTurn(agentId),
         isProviderAssigned: (provider) => this.#store.list().some((agent) => providerForAgent(agent) === provider),
+        afterIdleCheck: () => this.#deleteReleasedFolders(),
         captureConfigRevision: () => this.#endpoints.committedRevision(),
         endpointsPending: (harness) => this.#endpoints.pending(harness),
         onProviderActivated: (provider, configRevision) =>
@@ -1021,7 +1027,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               .map((agent) => agent.id),
           );
           this.#retryHeldMoves();
+          this.#emitProviderQueues(provider);
         },
+        onProviderHeld: (provider) => this.#emitProviderQueues(provider),
         onAccountsChanged: () => this.#retryHeldMoves(),
         onProvidersUnready: () => this.#refreshHeldAgents(),
       },
@@ -1215,7 +1223,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       hooks: {
         emit: (event) => this.#emit(event),
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
-        queueHold: (agentId) => (this.#tasks.oneTurnAtATime(agentId) ? this.channels.queueHold(agentId) : null),
+        queueHold: (agentId) =>
+          (this.#tasks.oneTurnAtATime(agentId) ? this.channels.queueHold(agentId) : null) ??
+          this.#providerRestartHold(agentId),
         threadRequestsChanged: (agentId) => this.#tasks.changed(agentId),
       },
     });
@@ -1643,6 +1653,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
         redactMcp: (text) => this.#mcp.redact(text),
         tagReferences: (agentId, threadId) => this.#tagReferences(agentId, threadId),
+        liveVoiceRelayed: (deliveryId) => this.#liveVoiceRelayed.get(deliveryId) ?? null,
         isStopping: () => this.#stopping,
         isDeleting: (agentId) => this.#removal.deleting().has(agentId),
         servesModel: (model, provider) => this.#endpoints.serves(model, provider),
@@ -1707,8 +1718,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         return agent;
       },
       relay: (agent) => this.#liveVoiceRelay(agent),
-      send: (agentId, text, sender) =>
-        this.sendMessage({ agentId, text }, sender).pipe(
+      send: (agentId, relayed, sender) =>
+        this.#sendUserMessage(
+          { agentId, text: relayed.shown },
+          sender,
+          undefined,
+          undefined,
+          false,
+          false,
+          relayed,
+        ).pipe(
           Effect.flatMap((receipt) => {
             const deliveryId = receipt.deliveries[0]?.id;
             return deliveryId
@@ -1743,6 +1762,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           return this.#tasks.threadForDelivery(deliveryId);
         },
         tagReferences: (agentId, threadId) => this.#tagReferences(agentId, threadId),
+        liveVoiceRelayed: (deliveryId) => this.#liveVoiceRelayed.get(deliveryId) ?? null,
       },
     });
     this.#turn = new TurnLifecycle({
@@ -1781,6 +1801,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         poolHasOtherAccount: (agentId) => this.#poolHasOtherAccount(agentId),
         mayContinueOnBackup: (agentId) => this.#mayContinueStoppedWork(agentId),
         requeueChannelDelivery: (deliveryId, continueWork) => this.#requeueChannelDelivery(deliveryId, continueWork),
+        keepChannelDelivery: (deliveryId) => this.channels.keepForRetry(deliveryId),
         quietRoutineDelivery: (deliveryId) => this.#routines.quietRunForDelivery(deliveryId),
         closeRoutineSession: (externalThreadId, archive) => this.#threads.closeRoutineThread(externalThreadId, archive),
         conversationTurnEnded: (agentId, sideThreadId, counts, memoryCommitted) =>
@@ -1875,6 +1896,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
                 kept = true;
             return kept;
           }),
+        folderHeld: (agentId) => this.#folderHeld(agentId),
         currentClient: (provider) => this.#providers.currentClient(provider),
         usageLimitHolds: (agentId) => !this.#usageLimits.mayDrain(agentId),
         settleModelMoves: () => this.#endpoints.runExclusive(() => Effect.void),
@@ -1910,6 +1932,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.setCommitCoAuthor === undefined ? {} : { setCommitCoAuthor: options.setCommitCoAuthor }),
       ...(options.screenCapture === undefined ? {} : { screenCapture: options.screenCapture }),
       ...(options.videoReader === undefined ? {} : { videoReader: options.videoReader }),
+      ...(options.avatarDecoder === undefined ? {} : { avatarDecoder: options.avatarDecoder }),
       ...(options.fitImage === undefined ? {} : { fitImage: options.fitImage }),
       mcpServers: mcpServersFromGateway(
         this.#mcp,
@@ -1979,23 +2002,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           this.updateAgent(input, initiatingAgentId).pipe(toToolOperationFailed),
         setAvatar: (agentId, image) => this.setAvatar(agentId, image).pipe(toToolOperationFailed),
         ensureAgentDeletable: (agentId) => this.ensureAgentDeletable(agentId).pipe(toToolOperationFailed),
-        deleteAgent: (agentId) =>
-          this.deleteAgent(agentId).pipe(
-            toToolOperationFailed,
-            Effect.andThen(() =>
-              Effect.all([
-                this.#sidebarLayout?.removeAgent(agentId) ?? Effect.void,
-                this.#libraryFolders?.removeAgent(agentId) ?? Effect.void,
-              ]).pipe(
-                Effect.catch((failure) =>
-                  Effect.sync(() =>
-                    logger.warn("Could not remove the places of a deleted agent.", { agentId, error: failure.cause }),
-                  ),
-                ),
-              ),
-            ),
-            Effect.asVoid,
-          ),
+        deleteAgent: (agentId) => this.#deleteAgentAndPlaces(agentId).pipe(toToolOperationFailed),
         enabledMcpServers: (agentId) => this.enabledMcpServers(agentId),
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
         redactMcp: (text) => this.#mcp.redact(text),
@@ -4696,6 +4703,41 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     );
   }
 
+  #deleteAgentAndPlaces(agentId: string): Effect.Effect<void, AgentLifecycleFailed> {
+    return this.deleteAgent(agentId).pipe(
+      Effect.andThen(() =>
+        Effect.all([
+          this.#sidebarLayout?.removeAgent(agentId) ?? Effect.void,
+          this.#libraryFolders?.removeAgent(agentId) ?? Effect.void,
+        ]).pipe(
+          Effect.catch((failure) =>
+            Effect.sync(() =>
+              logger.warn("Could not remove the places of a deleted agent.", { agentId, error: failure.cause }),
+            ),
+          ),
+        ),
+      ),
+      Effect.asVoid,
+    );
+  }
+
+  #deleteReleasedFolders(): Effect.Effect<void> {
+    return Effect.suspend(() =>
+      this.#stopping
+        ? Effect.void
+        : Effect.forEach(
+            this.#removal.heldFoldersReleased(),
+            (agentId) =>
+              this.#deleteAgentAndPlaces(agentId).pipe(
+                Effect.catch((failure) =>
+                  Effect.sync(() => this.#emitError("agent_delete_failed", failure.cause, agentId)),
+                ),
+              ),
+            { discard: true },
+          ),
+    );
+  }
+
   deleteChannel(channelId: string): Effect.Effect<void, AgentLifecycleFailed> {
     return this.channels
       .deleteChannel(channelId)
@@ -5321,15 +5363,34 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   #sharedProcessesToRelease(agentId: string): AgentProvider[] {
-    const agents = this.#store.list();
-    const agent = agents.find((candidate) => candidate.id === agentId);
+    const reading = this.#providersReadingSessionSettings();
+    return this.#folderProviders(agentId).filter((provider) => !reading.has(provider));
+  }
+
+  #folderHeld(agentId: string): boolean {
+    if (!this.#providers.isReady()) return true;
+    const reading = this.#providersReadingSessionSettings();
+    return this.#folderProviders(agentId).some(
+      (provider) => provider !== "codex" && (reading.has(provider) || this.#providers.keepsSharedProcess(provider)),
+    );
+  }
+
+  #folderProviders(agentId: string): AgentProvider[] {
+    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     if (!agent) return [];
     const providers = new Set<AgentProvider>([providerForAgent(agent)]);
     if (agent.threadId)
       for (const session of this.#store.database.listProviderSessions(agent.threadId)) providers.add(session.provider);
-    for (const candidate of agents)
-      if (this.#drain.holdsSessionSettings(candidate.id)) providers.delete(providerForAgent(candidate));
     return [...providers];
+  }
+
+  #providersReadingSessionSettings(): Set<AgentProvider> {
+    return new Set(
+      this.#store
+        .list()
+        .filter((agent) => this.#drain.holdsSessionSettings(agent.id))
+        .map((agent) => providerForAgent(agent)),
+    );
   }
 
   #providerAvailable(provider: AgentProvider): boolean {
@@ -5704,6 +5765,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#mailbox
       .listActiveQueues(agentIds, this.#turn.failedTurns())
       .map((queue) => this.#mailboxSync.withHold(queue));
+  }
+
+  #emitProviderQueues(provider: AgentProvider): void {
+    for (const agent of this.#store.list())
+      if (providerForAgent(agent) === provider && this.#mailbox.queuedDeliveryIds(agent.id).length)
+        this.#mailboxSync.emitQueue(agent.id);
+  }
+
+  #providerRestartHold(agentId: string): QueueHold | null {
+    const agent = this.#store.get(agentId);
+    const provider = agent ? providerForAgent(agent) : null;
+    return provider && this.#providers.isReplacingCli(provider) ? { reason: "provider-restart", provider } : null;
   }
 
   listWaits(agentId: string): AgentWaitsSnapshot {
@@ -6173,6 +6246,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     idempotencyKey?: string,
     welcome = false,
     agentSetup = false,
+    relayed?: LiveVoiceRelayed,
   ) {
     const validateRecipient = yield* lifecycleStep("prepare message delivery", () =>
       this.#mailbox.prepareDelivery([input.agentId]),
@@ -6225,6 +6299,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         operation: "send message",
         cause: new Error(sourceText("error.agent.queuedMessageCreateFailed")),
       });
+    if (relayed) {
+      this.#liveVoiceRelayed.set(delivery.delivery.id, relayed);
+      for (const deliveryId of this.#liveVoiceRelayed.keys()) {
+        if (this.#liveVoiceRelayed.size <= LIVE_VOICE_RELAYED_LIMIT) break;
+        this.#liveVoiceRelayed.delete(deliveryId);
+      }
+    }
     if (task && this.#tasks.threadId(task.taskId) === null) {
       yield* this.cancelQueuedMessage(agent.id, delivery.delivery.id);
       if (idempotencyKey) this.#mailbox.forgetIdempotencyKey(idempotencyKey);

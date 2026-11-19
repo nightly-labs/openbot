@@ -498,6 +498,7 @@ export const messages = {
   "mobile.chat.queue.cancelUpload": "Annuleer upload in wachtrij",
   "mobile.chat.queue.waitingTitle": "Wachten op de agent",
   "mobile.chat.queue.repliesTitle": "Wachten op antwoorden",
+  "mobile.chat.queue.providerRestart": "Wachten tot {provider} herstart",
   "mobile.chat.queue.replyState.asked": "Gevraagd",
   "mobile.chat.queue.replyState.working": "Bezig",
   "mobile.chat.queue.replyState.replied": "Beantwoord",

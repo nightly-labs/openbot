@@ -236,6 +236,8 @@ export const messages = {
     '"{provider}" uç noktası isteği reddetti. API anahtarı veya başlıkları yanlış olabilir ya da hesabı bu modeli kullanamıyor olabilir. Bunları Sunucu ayarları → Sağlayıcılar bölümünde kontrol edin veya başka bir model seçin. Ardından tekrar deneyin.',
   "error.provider.customEndpointKeyMissing":
     '"{provider}" uç noktası bir API anahtarı gerektiriyor. Anahtarı Sunucu ayarları → Sağlayıcılar bölümünde ekleyin, ardından tekrar deneyin.',
+  "error.provider.customEndpointEffortRefused":
+    '"{provider}" uç noktası bu modelin akıl yürütme eforunu reddetti. Sunucu ayarları → Sağlayıcılar bölümünde "{provider}" öğesini düzenleyin. Efor altında yalnızca bu modelin kabul ettiği düzeyleri bırakın veya Akıl yürütme yok seçeneğini seçin. Ardından tekrar deneyin.',
   "error.provider.opencodeKeyExpired":
     "OpenCode API anahtarınızın süresi doldu. OpenCode Console'da yeni bir anahtar oluşturun, OpenCode ayarlarına yapıştırın, ardından tekrar deneyin.",
   "error.provider.opencodeKeyRefused":
@@ -293,6 +295,8 @@ export const messages = {
   "error.provider.noAnswerAfterSteps":
     "{provider} bazı adımları uyguladı, sonra turu yanıt vermeden bitirdi. Aynı isteği yeniden göndermeden önce ajana ne yaptığını sorun.",
   "error.provider.acpRefusedNoReason": "{provider} yanıt vermeden durdu. Mesajı yeniden gönderin.",
+  "error.provider.channelNoAnswer":
+    "{provider} turu yanıt vermeden bitirdi. Kanalda görevi yeniden çalıştırmak için Devam et'e, başka bir üyeye vermek için Yeniden ata'ya tıklayın.",
   "error.provider.chatgptPageFailed": "OpenBot ChatGPT bağlantı sayfasını açamadı.",
   "error.provider.noneReady": "Hiçbir ajan sağlayıcısı hazır değil.",
   "error.provider.claudeTurnActive": "Bağlamını yenilemeden önce etkin Claude turunun bitmesini bekleyin.",

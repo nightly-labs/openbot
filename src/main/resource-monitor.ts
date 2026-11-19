@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { cpus, totalmem } from "node:os";
 import { join } from "node:path";
 import { monitorEventLoopDelay } from "node:perf_hooks";
+import { getHeapStatistics } from "node:v8";
 import type { AgentEvent } from "@openbot/contracts/ipc";
 import { Effect, Exit, Option, Schema, Scope, Semaphore } from "effect";
 import {
@@ -63,6 +64,7 @@ const STALL_PROFILES_FILE = "stall-profiles.ndjson";
 const MAX_STALL_PROFILES_BYTES = 256 * 1024;
 const PROFILE_START_INTERVAL_MS = 30 * 60_000;
 const PROFILE_KEEP_INTERVAL_MS = 6 * 60 * 60_000;
+const PROFILE_LONGER_STALL_FACTOR = 10;
 const PS_TIMEOUT_MS = 5_000;
 const PS_MAX_BUFFER = 8 * 1024 * 1024;
 const MAX_ACTIVE_TURNS = 1_000;
@@ -105,6 +107,7 @@ interface ResourceSample {
   providers: Partial<Record<ResourceProvider, { rssMb: number; cpuPct: number | null; processes: number }>>;
   windowMemory: WindowMemory | null;
   mainLoopMs: { p99: number; max: number; phase: LoopPhase } | null;
+  mainHeapMb: { used: number; limit: number };
   database: { statements: number; maxMs: number };
   activeTurns: number;
   browserTabs: number;
@@ -120,6 +123,8 @@ export class ResourceMonitor implements AnalyticsResourceSource {
   readonly #profiler = new MainLoopProfiler();
   #profileStartedAt: number | null = null;
   #profileKeptAt: number | null = null;
+  #profileStartStallMs = 0;
+  #profileKeptStallMs = 0;
   #lastStallProfile: (MainLoopStallProfile & { at: string }) | null = null;
   #onStallProfile: (profile: MainLoopStallProfile) => void = () => {};
   readonly #loop = monitorEventLoopDelay({ resolution: LOOP_RESOLUTION_MS });
@@ -382,6 +387,7 @@ export class ResourceMonitor implements AnalyticsResourceSource {
       const profile = yield* this.#profiler.stop();
       if (!profile || !stalled) return;
       this.#profileKeptAt = now;
+      this.#profileKeptStallMs = Math.max(this.#profileStartStallMs, mainLoopMs.max);
       const summary: MainLoopStallProfile = {
         stallMs: Math.round(mainLoopMs.max),
         phase: mainLoopMs.phase,
@@ -398,8 +404,10 @@ export class ResourceMonitor implements AnalyticsResourceSource {
     }
     if (!stalled || mainLoopMs.phase === "startup" || mainLoopMs.phase === "resume") return;
     if (this.#profileStartedAt !== null && now - this.#profileStartedAt < PROFILE_START_INTERVAL_MS) return;
-    if (this.#profileKeptAt !== null && now - this.#profileKeptAt < PROFILE_KEEP_INTERVAL_MS) return;
+    const longerStall = mainLoopMs.max >= this.#profileKeptStallMs * PROFILE_LONGER_STALL_FACTOR;
+    if (this.#profileKeptAt !== null && now - this.#profileKeptAt < PROFILE_KEEP_INTERVAL_MS && !longerStall) return;
     this.#profileStartedAt = now;
+    this.#profileStartStallMs = mainLoopMs.max;
     yield* this.#profiler.start();
     this.#measureLoop();
   });
@@ -522,6 +530,7 @@ export class ResourceMonitor implements AnalyticsResourceSource {
     this.#countRendererTiming(day);
 
     const providerProcesses = sum(trees.map((tree) => tree.processCount));
+    const heap = getHeapStatistics();
     recordPeak(day, METRIC.activeTurns, this.#activeTurns.size);
     recordPeak(day, METRIC.browserTabs, tabPids.size);
     recordPeak(day, METRIC.providerProcesses, providerProcesses);
@@ -555,6 +564,10 @@ export class ResourceMonitor implements AnalyticsResourceSource {
         p99: Math.round(mainLoopMs.p99),
         max: Math.round(mainLoopMs.max),
         phase: mainLoopMs.phase,
+      },
+      mainHeapMb: {
+        used: Math.round(heap.used_heap_size / 1024 ** 2),
+        limit: Math.round(heap.heap_size_limit / 1024 ** 2),
       },
       database: { statements: statements.length, maxMs: Math.round(Math.max(0, ...statements)) },
       activeTurns: this.#activeTurns.size,

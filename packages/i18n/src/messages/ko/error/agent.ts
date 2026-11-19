@@ -121,6 +121,8 @@ export const messages = {
   "error.agent.deleteIncomplete": "에이전트 데이터를 완전히 제거하지 못했어요. 에이전트 삭제를 다시 시도해 주세요.",
   "error.agent.deleteFolderInUse":
     "다른 에이전트의 작업이 아직 이 에이전트의 폴더를 사용하고 있어요. 그 작업이 끝나거나 OpenBot을 다시 시작한 뒤에 다시 삭제해 주세요.",
+  "error.agent.deleteWhenFolderFree":
+    "다른 에이전트의 작업이 아직 이 에이전트의 폴더를 사용하고 있어요. 그 작업이 끝나면 OpenBot이 이 에이전트를 삭제해요.",
   "error.agent.duplicationBusy": "이 에이전트를 이미 복제하는 중이에요.",
   "error.agent.waitBeforeDuplicate": "복제하기 전에 에이전트가 끝나고 대기열이 비워질 때까지 기다려 주세요.",
   "error.agent.saveOtherAgent": "이 저장은 다른 에이전트의 것이에요.",
@@ -178,6 +180,10 @@ export const messages = {
   "error.agent.mcpServerNotSaved": "MCP 서버가 응답하지 않아 저장하지 않았어요. {error}",
   "error.agent.mcpServerKeysMove":
     "MCP 서버 {name}에는 현재 서버용 키가 있어요. 사용자에게 마켓플레이스, 앱, {name}에서 주소, 명령, 인수 또는 전송 방식을 변경해 달라고 요청하세요.",
+  "error.agent.mcpServerHeadersNeedHttp":
+    "MCP 서버 {name}은(는) 로컬 명령을 실행하므로 헤더를 받지 않아요. 사용자에게 마켓플레이스, 앱, {name}에서 키를 입력해 달라고 요청하세요.",
+  "error.agent.mcpServerHeadersNeedPerson":
+    "이 OpenBot의 사용자만 나와의 채팅에서 MCP 서버 {name}의 키를 줄 수 있어요. 사용자에게 마켓플레이스, 앱, {name}에서 키를 입력해 달라고 요청하세요.",
   "error.agent.mcpServerBuiltIn":
     "{name}은(는) OpenBot의 일부라서 MCP 도구로 테스트하거나 켜고 끄거나 제거할 수 없어요. 사용자가 OpenBot을 실행하는 컴퓨터에서 관리해요. GitHub 연결은 마켓플레이스, 앱, GitHub에서, 컴퓨터 제어는 설정, 컴퓨터 제어에서 관리해요.",
   "error.agent.mcpServerUnknown": "{name}(이)라는 MCP 서버가 없어요. list_mcp_servers를 호출해 이름을 확인하세요.",

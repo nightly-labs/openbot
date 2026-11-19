@@ -464,12 +464,14 @@ export function createConversationViewScope(props: ConversationProps) {
   const activity = createActivityStore({
     props,
     activeDeliveries,
+    shownMessages: () => scroll.shownMessages(),
     agentActivityLabels: resources.agentActivityLabels,
     turnRuntimes: resources.turnRuntimes,
   });
   const {
     renderedAgentActivity,
     activeStepActivity,
+    activeTurnOutputShown,
     agentActivitySpaceReserved,
     setAgentActivitySpaceReserved,
     agentActivity,
@@ -2494,6 +2496,7 @@ export function createConversationViewScope(props: ConversationProps) {
     removeAttachment,
     renderedAgentActivity,
     activeStepActivity,
+    activeTurnOutputShown,
     providerSilentMinutes,
     providerOffline,
     agentProviderName,

@@ -526,6 +526,7 @@ export const messages = {
   "mobile.chat.queue.cancelUpload": "Kuyruktaki yüklemeyi iptal et",
   "mobile.chat.queue.waitingTitle": "Ajan bekleniyor",
   "mobile.chat.queue.repliesTitle": "Yanıtlar bekleniyor",
+  "mobile.chat.queue.providerRestart": "{provider} yeniden başlatılması bekleniyor",
   "mobile.chat.queue.replyState.asked": "Soruldu",
   "mobile.chat.queue.replyState.working": "Çalışıyor",
   "mobile.chat.queue.replyState.replied": "Yanıtlandı",

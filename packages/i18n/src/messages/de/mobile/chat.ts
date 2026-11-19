@@ -539,6 +539,7 @@ export const messages = {
   "mobile.chat.queue.cancelUpload": "Hochladen aus der Warteschlange abbrechen",
   "mobile.chat.queue.waitingTitle": "Warten auf den Agenten",
   "mobile.chat.queue.repliesTitle": "Warten auf Antworten",
+  "mobile.chat.queue.providerRestart": "Wartet auf den Neustart von {provider}",
   "mobile.chat.queue.replyState.asked": "Angefragt",
   "mobile.chat.queue.replyState.working": "In Arbeit",
   "mobile.chat.queue.replyState.replied": "Beantwortet",

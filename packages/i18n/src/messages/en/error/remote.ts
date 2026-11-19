@@ -22,6 +22,8 @@ export const messages = defineMessages("error.remote", {
     "The host has not allowed OpenBot to record its screen. Grant screen recording on the host, then try again.",
   "error.remote.windowsSessionDisconnected":
     "The Windows session on the host is disconnected, so it has no screen to share. Sign in to Windows at the screen of the host, then try again.",
+  "error.remote.macScreenLocked":
+    "The Mac is locked, so it cannot share its screen. Unlock the Mac at its screen, then try again.",
   "error.remote.streamTooSlowLowerQuality":
     "The connection to the host is too slow for the picture. Try again: the next connection uses a lower quality.",
   "error.remote.streamTooSlow":
@@ -184,6 +186,8 @@ export const messages = defineMessages("error.remote", {
   "error.remote.relayUnavailable": "Signal sent no relay servers for this connection. Try again later.",
   "error.remote.iceFailed": "A direct connection to the host could not be made. A firewall, VPN or proxy can block it.",
   "error.remote.iceDisconnected": "The direct connection to the host was lost.",
+  "error.remote.webrtcBlocked":
+    "This device blocks the connection that OpenBot needs. If Lockdown Mode is on, turn it off for OpenBot in Settings > Privacy & Security > Lockdown Mode.",
   "error.remote.directoryUnreachable": "OpenBot could not reach the OpenBot service. Check your connection.",
   "error.remote.directoryTimeout": "The OpenBot service did not answer in time. Try again.",
   "error.remote.inviteAlreadyUsed": "This invitation was already used. Ask for a new invitation.",

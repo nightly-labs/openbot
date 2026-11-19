@@ -78,6 +78,7 @@ interface RemoteScreenGatewayOptions {
   getDisplays?: (() => RemoteDesktopDisplay[]) | undefined;
   getDisplayScreenOrigin?: ((displayId: string) => { x: number; y: number } | undefined) | undefined;
   sessionDisconnected?: (() => boolean) | undefined;
+  screenLocked?: (() => boolean) | undefined;
   getIceServers: () => Effect.Effect<RemoteDesktopIceServer[], RemoteWorkflowError>;
   createRuntime?: RemoteScreenGatewayCreateRuntime;
   audit?: (event: RemoteScreenAuditEvent) => void;
@@ -522,6 +523,11 @@ export class RemoteScreenGateway {
     if (this.#options.platform === "win32" && this.#options.sessionDisconnected?.()) {
       return yield* new RemoteWorkflowError({
         cause: new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.windowsSessionDisconnected")),
+      });
+    }
+    if (this.#options.platform === "darwin" && this.#options.screenLocked?.()) {
+      return yield* new RemoteWorkflowError({
+        cause: new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.macScreenLocked")),
       });
     }
     if (this.#testSessionId)

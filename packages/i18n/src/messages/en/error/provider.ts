@@ -226,6 +226,8 @@ export const messages = defineMessages("error.provider", {
     'The endpoint "{provider}" refused the request. Its API key or headers can be wrong, or its account cannot use this model. Check them in Server settings → Providers, or choose another model. Then try again.',
   "error.provider.customEndpointKeyMissing":
     'The endpoint "{provider}" needs an API key. Add the key in Server settings → Providers, then try again.',
+  "error.provider.customEndpointEffortRefused":
+    'The endpoint "{provider}" refused the reasoning effort of this model. In Server settings → Providers, edit "{provider}". Under Efforts, keep only the efforts that this model accepts, or select No reasoning. Then try again.',
   "error.provider.opencodeKeyExpired":
     "Your OpenCode API key expired. Create a new key in OpenCode Console, paste it in the OpenCode settings, then try again.",
   "error.provider.opencodeKeyRefused":
@@ -282,6 +284,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.noAnswerAfterSteps":
     "{provider} did some steps, then ended the turn with no answer. Ask the agent what it did before you send the same request again.",
   "error.provider.acpRefusedNoReason": "{provider} stopped without an answer. Send the message again.",
+  "error.provider.channelNoAnswer":
+    "{provider} ended the turn with no answer. In the channel, click Continue to run the task again, or Reassign to give it to another member.",
   "error.provider.chatgptPageFailed": "OpenBot could not open the ChatGPT connection page.",
   "error.provider.noneReady": "No agent provider is ready.",
   "error.provider.claudeTurnActive": "Wait for the active Claude turn before refreshing its context.",

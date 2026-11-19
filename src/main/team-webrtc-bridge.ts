@@ -5,8 +5,9 @@ import type { IceServer } from "@openbot/contracts/signal-protocol/messages";
 import type { RemoteMemberRole } from "@openbot/contracts/signal-protocol/ticket";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
+import { iceServerErrorDetail, knownIceCandidateRoute } from "@openbot/team-client/ice-diagnostics";
 import { Deferred, Effect, Exit, Fiber, Scope } from "effect";
-import { BrowserWindow, MessageChannelMain, type MessagePortMain } from "electron";
+import { BrowserWindow, MessageChannelMain, type MessagePortMain, webContents } from "electron";
 import { z } from "zod";
 import { RemoteWorkflowError, remoteCall, remoteDecode } from "./remote-service-effects";
 
@@ -72,6 +73,11 @@ const bridgeMessageSchema = z
     channel: z.enum(["rpc", "events", "files", "desktop"]).optional(),
     data: z.union([z.string(), z.instanceof(ArrayBuffer)]).optional(),
     path: z.enum(["p2p", "relay"]).optional(),
+    route: z.string().optional(),
+    side: z.enum(["host", "client"]).optional(),
+    url: z.string().optional(),
+    errorCode: z.number().int().optional(),
+    errorText: z.string().optional(),
     code: z.string().optional(),
     message: z.string().optional(),
     terminal: z.boolean().optional(),
@@ -109,7 +115,8 @@ type BridgeCommand =
         | "renew-host-signal"
         | "close"
         | "open-egress"
-        | "close-egress";
+        | "close-egress"
+        | "ping";
       peerId: string;
     }
   | { type: "send-egress"; peerId: string; data: string | ArrayBuffer }
@@ -117,6 +124,8 @@ type BridgeCommand =
 
 const COMMAND_TIMEOUT_MS = 15_000;
 const SEND_COMMAND_TIMEOUT_MS = 75_000;
+const LIVENESS_INTERVAL_MS = 30_000;
+const LIVENESS_MISSES = 2;
 
 const logger = createOpenBotLogger("team-webrtc-bridge");
 
@@ -335,6 +344,44 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
         Exit.isFailure(exit) ? remoteDecode(() => port1.off("message", listener)).pipe(Effect.orDie) : Effect.void,
       ),
     );
+    yield* Effect.forkIn(this.#watch(window, port1).pipe(Effect.ignore), this.#scope);
+  });
+
+  readonly #watch = Effect.fn("TeamWebRtcBridge.watch")(function* (
+    this: TeamWebRtcBridge,
+    window: BrowserWindow,
+    port: MessagePortMain,
+  ) {
+    let misses = 0;
+    while (this.#port === port) {
+      yield* Effect.sleep(LIVENESS_INTERVAL_MS);
+      if (this.#port !== port) return;
+      const answered = yield* this.#command({ type: "ping", peerId: "all" }).pipe(
+        Effect.as(true),
+        Effect.orElseSucceed(() => false),
+      );
+      if (this.#port !== port) return;
+      misses = answered ? 0 : misses + 1;
+      if (misses < LIVENESS_MISSES) continue;
+      const stopped = yield* remoteDecode(() => {
+        if (this.#port !== port || window.webContents.isDestroyed()) return true;
+        const processId = window.webContents.getOSProcessId();
+        const shared = webContents
+          .getAllWebContents()
+          .some(
+            (other) => other !== window.webContents && !other.isDestroyed() && other.getOSProcessId() === processId,
+          );
+        if (shared) return false;
+        logger.warn(
+          `The Team WebRTC bridge did not answer ${LIVENESS_MISSES} checks. It stops, and the next connection starts it again.`,
+        );
+        window.webContents.forcefullyCrashRenderer();
+        return true;
+      });
+      if (stopped) return;
+      if (misses === LIVENESS_MISSES)
+        logger.warn("The Team WebRTC bridge does not answer. It shares its process with another window, so it stays.");
+    }
   });
 
   readonly #command = Effect.fn("TeamWebRtcBridge.command")(function* (this: TeamWebRtcBridge, command: BridgeCommand) {
@@ -424,7 +471,15 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
     else if (message.type === "peer-disconnected") this.emit("disconnected", message.peerId);
     else if (message.type === "peer-path-lost") this.emit("pathLost", message.peerId);
     else if (message.type === "peer-path-restored") this.emit("pathRestored", message.peerId);
-    else if (message.type === "ice-path" && message.path) this.emit("path", message.peerId, message.path);
+    else if (message.type === "ice-path" && message.path) {
+      logger.info(
+        `WebRTC ${message.side ?? "unknown"} connection uses ${message.path}: ${knownIceCandidateRoute(message.route)}.`,
+      );
+      this.emit("path", message.peerId, message.path);
+    } else if (message.type === "ice-candidate-error" && message.errorCode !== undefined)
+      logger.warn(
+        `WebRTC ${message.side ?? "unknown"} connection cannot use ${iceServerErrorDetail(message.url ?? "", message.errorCode, message.errorText ?? "")}`,
+      );
     else if (message.type === "ice-servers" && message.iceServers) {
       this.#iceServers.set(message.peerId, message.iceServers);
       this.emit("iceServers", message.peerId, structuredClone(message.iceServers));
