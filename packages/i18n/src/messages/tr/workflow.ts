@@ -86,6 +86,8 @@ export const messages = {
   "workflow.node.settings.notRecorded": "Bu sonucun kayıtlı ayarı yok.",
   "workflow.node.settings.failed": "Ayarlar gösterilemiyor.",
   "workflow.node.settings.use": "Bu ayarları kullan",
+  "workflow.node.settings.showMore": "Daha fazla göster",
+  "workflow.node.settings.showLess": "Daha az göster",
 
   "workflow.prompt.title": "İstem",
   "workflow.prompt.name": "istem",

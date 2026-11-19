@@ -104,6 +104,8 @@ export const messages = {
   "workflow.node.settings.notRecorded": "لا توجد إعدادات محفوظة لهذه النتيجة.",
   "workflow.node.settings.failed": "تعذّر عرض الإعدادات.",
   "workflow.node.settings.use": "استخدام هذه الإعدادات",
+  "workflow.node.settings.showMore": "عرض المزيد",
+  "workflow.node.settings.showLess": "عرض أقل",
 
   "workflow.prompt.title": "الموجّه",
   "workflow.prompt.name": "موجّه",

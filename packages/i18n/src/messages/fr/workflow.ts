@@ -86,6 +86,8 @@ export const messages = {
   "workflow.node.settings.notRecorded": "Ce résultat n’a pas de réglages enregistrés.",
   "workflow.node.settings.failed": "Impossible d’afficher les réglages.",
   "workflow.node.settings.use": "Utiliser ces réglages",
+  "workflow.node.settings.showMore": "Afficher plus",
+  "workflow.node.settings.showLess": "Afficher moins",
 
   "workflow.prompt.title": "Prompt",
   "workflow.prompt.name": "prompt",

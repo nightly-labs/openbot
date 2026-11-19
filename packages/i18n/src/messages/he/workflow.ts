@@ -89,6 +89,8 @@ export const messages = {
   "workflow.node.settings.notRecorded": "לתוצאה זו אין הגדרות שמורות.",
   "workflow.node.settings.failed": "לא ניתן להציג את ההגדרות.",
   "workflow.node.settings.use": "שימוש בהגדרות אלה",
+  "workflow.node.settings.showMore": "הצג עוד",
+  "workflow.node.settings.showLess": "הצג פחות",
   "workflow.prompt.title": "פרומפט",
   "workflow.prompt.name": "פרומפט",
   "workflow.prompt.copy": "העתקה",

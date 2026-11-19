@@ -83,6 +83,8 @@ export const messages = {
   "workflow.node.settings.notRecorded": "이 결과에는 저장된 설정이 없습니다.",
   "workflow.node.settings.failed": "설정을 표시할 수 없습니다.",
   "workflow.node.settings.use": "이 설정 사용",
+  "workflow.node.settings.showMore": "더 보기",
+  "workflow.node.settings.showLess": "접기",
 
   "workflow.prompt.title": "프롬프트",
   "workflow.prompt.name": "프롬프트",

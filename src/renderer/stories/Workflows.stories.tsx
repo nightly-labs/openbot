@@ -331,6 +331,21 @@ export const ImageManyResults: Story = {
 
 const BRIEF = "Atlas launched on 22 Oct at €12 a seat, with a Slack connector";
 const REFERENCE = "story-reference-picture";
+const LONG_BRIEF = [
+  "Atlas launched on 22 Oct at €12 a seat, with a Slack connector and a shared inbox for small teams.",
+  "The launch post names three rivals: Relay, Northwind and Harbor. Relay costs €9 a seat but has no connectors.",
+  "Northwind sells only yearly plans. Harbor has a free plan for 3 seats and a Slack connector since September.",
+  "Early users on the forum ask for a Linear connector, an API and a way to export a workspace.",
+].join("\n\n");
+const LONG_PROMPT = [
+  "Read the research notes and write a short brief for the market team.",
+  "1. Start with one line that says what launched, when, and at what price.",
+  "2. Compare the price per seat with each rival that the notes name. Give the numbers, not adjectives.",
+  "3. List the connectors that each product has. Say which connector only Atlas has.",
+  "4. Name the requests from early users that we can answer in our next post.",
+  "5. End with one risk for our product and one action that we can take this week.",
+  "Keep it under 120 words. Use the names of the products as the notes write them. Do not guess numbers that are not in the notes.",
+].join("\n");
 
 const SAVED_SETTINGS: Record<string, WorkflowStepSettings> = {
   "llm-saved": {
@@ -342,6 +357,17 @@ const SAVED_SETTINGS: Record<string, WorkflowStepSettings> = {
       system: "You write for busy readers. Use short sentences and no adjectives.",
     },
     sources: [{ from: "brief", type: "text", stepId: "brief-result", attachmentId: null }],
+  },
+  "llm-long": {
+    settings: {
+      provider: "codex",
+      model: "gpt-5.6-luna",
+      effort: "high",
+      prompt: LONG_PROMPT,
+      system:
+        "You write for busy readers on a market team. Use short sentences, plain words and no adjectives. Put numbers before opinions. When the notes do not answer a question, say so.",
+    },
+    sources: [{ from: "brief", type: "text", stepId: "brief-long", attachmentId: null }],
   },
   "image-saved": {
     settings: {
@@ -382,6 +408,25 @@ export const ResultSettings: Story = {
       <PromptNode id="brief" text={BRIEF} />
       <LlmNode id="summary" prompt="Summarize the research in 3 lines" />
       <ImageNode id="hero" prompt="Hero image for the Atlas comparison page" />
+    </NodeGallery>
+  ),
+};
+
+export const ResultSettingsLongPrompt: Story = {
+  name: "Result settings, long prompt",
+  render: () => (
+    <NodeGallery
+      selected="summary"
+      catalogs={SAVED_CATALOGS}
+      edges={[{ id: "brief-summary", from: "brief", to: "summary", type: "text" }]}
+      results={{
+        brief: [{ id: "brief-long", at: todayAt(9, 10), value: LONG_BRIEF }],
+        summary: [{ id: "llm-long", at: todayAt(9, 14), value: LLM_RESULT }],
+      }}
+      fields={{ summary: { provider: "codex", model: "gpt-6-luna", effort: "low" } }}
+    >
+      <PromptNode id="brief" text={LONG_BRIEF} />
+      <LlmNode id="summary" prompt={LONG_PROMPT} />
     </NodeGallery>
   ),
 };

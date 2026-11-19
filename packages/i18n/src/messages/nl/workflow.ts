@@ -84,6 +84,8 @@ export const messages = {
   "workflow.node.settings.notRecorded": "Dit resultaat heeft geen opgeslagen instellingen.",
   "workflow.node.settings.failed": "De instellingen kunnen niet worden getoond.",
   "workflow.node.settings.use": "Deze instellingen gebruiken",
+  "workflow.node.settings.showMore": "Meer tonen",
+  "workflow.node.settings.showLess": "Minder tonen",
   "workflow.prompt.title": "Prompt",
   "workflow.prompt.name": "prompt",
   "workflow.prompt.copy": "Kopiëren",

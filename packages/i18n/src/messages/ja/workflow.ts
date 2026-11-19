@@ -83,6 +83,8 @@ export const messages = {
   "workflow.node.settings.notRecorded": "この結果には保存された設定がありません。",
   "workflow.node.settings.failed": "設定を表示できません。",
   "workflow.node.settings.use": "この設定を使う",
+  "workflow.node.settings.showMore": "もっと見る",
+  "workflow.node.settings.showLess": "折りたたむ",
 
   "workflow.prompt.title": "プロンプト",
   "workflow.prompt.name": "プロンプト",

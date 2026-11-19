@@ -85,6 +85,8 @@ export const messages = defineMessages("workflow", {
   "workflow.node.settings.notRecorded": "This result has no saved settings.",
   "workflow.node.settings.failed": "Cannot show the settings.",
   "workflow.node.settings.use": "Use these settings",
+  "workflow.node.settings.showMore": "Show more",
+  "workflow.node.settings.showLess": "Show less",
 
   "workflow.prompt.title": "Prompt",
   "workflow.prompt.name": "prompt",

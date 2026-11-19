@@ -98,6 +98,8 @@ export const messages = {
   "workflow.node.settings.notRecorded": "У этого результата нет сохранённых настроек.",
   "workflow.node.settings.failed": "Не удалось показать настройки.",
   "workflow.node.settings.use": "Использовать эти настройки",
+  "workflow.node.settings.showMore": "Показать больше",
+  "workflow.node.settings.showLess": "Свернуть",
 
   "workflow.prompt.title": "Промпт",
   "workflow.prompt.name": "промпт",

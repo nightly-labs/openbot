@@ -7,8 +7,9 @@ import {
   type WorkflowStepSource,
 } from "@openbot/contracts/ipc";
 import type { AppTranslate } from "@openbot/i18n";
-import { Button, Popover, Skeleton, SlidersHorizontal } from "@openbot/ui";
-import { createStore, For, Match, Show, Switch } from "solid-js";
+import { Button, CopyButton, Popover, Skeleton, SlidersHorizontal } from "@openbot/ui";
+import type { JSX } from "@solidjs/web";
+import { createSignal, createStore, For, Match, onSettled, Show, Switch } from "solid-js";
 import { useText } from "../../text";
 import { PORT_NAME, useBoard, type WfnBoard, type WfnFields, type WfnResult } from "./workflow-board";
 import type { WorkflowCatalogs } from "./workflow-model";
@@ -139,6 +140,48 @@ function sourceName(t: AppTranslate, settings: WorkflowFields, source: WorkflowS
   return t(PORT_NAME.image);
 }
 
+function ClampedText(props: { value: string }) {
+  const { t } = useText();
+  const [open, setOpen] = createSignal(false);
+  const [overflows, setOverflows] = createSignal(false);
+  let body: HTMLDivElement | undefined;
+  onSettled(() => {
+    if (body) setOverflows(body.scrollHeight > body.clientHeight + 1);
+  });
+  return (
+    <div class="wfn-step-text" data-clamped={overflows() && !open() ? "" : undefined}>
+      <div ref={body} class="wfn-step-text-body" data-open={open() ? "" : undefined}>
+        {props.value}
+      </div>
+      <Show when={overflows()}>
+        <Button
+          variant="link"
+          size="xs"
+          class="wfn-step-text-toggle"
+          aria-expanded={open() ? "true" : "false"}
+          onClick={() => {
+            setOpen((value) => !value);
+          }}
+        >
+          {open() ? t("workflow.node.settings.showLess") : t("workflow.node.settings.showMore")}
+        </Button>
+      </Show>
+    </div>
+  );
+}
+
+function TextBlock(props: { title: JSX.Element; value: string }) {
+  return (
+    <section class="wfn-step-block">
+      <div class="wfn-step-block-head">
+        <h3 class="wfn-step-block-title">{props.title}</h3>
+        <CopyButton class="wfn-step-block-copy" value={props.value} iconOnly size="icon-xs" />
+      </div>
+      <ClampedText value={props.value} />
+    </section>
+  );
+}
+
 function SourceRow(props: { source: WorkflowStepSource; settings: WorkflowFields }) {
   const board = useBoard();
   const { t } = useText();
@@ -151,14 +194,18 @@ function SourceRow(props: { source: WorkflowStepSource; settings: WorkflowFields
     const step = props.source.stepId;
     return board.results(props.source.from).find((result) => result.id === step && !result.failed)?.value;
   };
+  const title = () => (
+    <span class="wfn-step-source-head">
+      <PortIcon type={props.source.type} />
+      {sourceName(t, props.settings, props.source)}
+    </span>
+  );
   return (
     <li class="wfn-step-source">
-      <span class="wfn-step-source-head">
-        <PortIcon type={props.source.type} />
-        {sourceName(t, props.settings, props.source)}
-      </span>
+      <Show when={sent()} fallback={<h3 class="wfn-step-block-title">{title()}</h3>}>
+        {(value) => <TextBlock title={title()} value={value()} />}
+      </Show>
       <Show when={picture()}>{(src) => <img class="wfn-step-source-picture" src={src()} alt="" />}</Show>
-      <Show when={sent()}>{(value) => <span class="wfn-step-source-text">{value()}</span>}</Show>
     </li>
   );
 }
@@ -220,6 +267,8 @@ export function StepSettingsAction(props: { id: string; kind: WorkflowNodeKind }
     const settings = recorded();
     return settings ? settingLines(t, board.catalogs(), props.kind, settings) : [];
   };
+  const facts = () => lines().filter((line) => !line.long);
+  const texts = () => lines().filter((line) => line.long);
   const sources = () => view.saved?.sources ?? [];
   const restored = () => {
     const settings = recorded();
@@ -274,44 +323,53 @@ export function StepSettingsAction(props: { id: string; kind: WorkflowNodeKind }
               if (event.target instanceof Node && trigger?.contains(event.target)) event.preventDefault();
             }}
           >
-            <div class="wfn-step-settings-head">
+            <header class="wfn-step-settings-head">
               <Popover.Title class="wfn-popover-title">{t("workflow.node.settings.title")}</Popover.Title>
               <span class="wfn-step-settings-when">{when()}</span>
-            </div>
+            </header>
             <Switch>
               <Match when={view.phase === "loading"}>
-                <Skeleton class="wfn-step-settings-loading" />
+                <div class="wfn-step-settings-body">
+                  <Skeleton class="wfn-step-settings-loading" />
+                </div>
               </Match>
               <Match when={view.phase === "failed"}>
-                <p class="wfn-step-settings-note">{view.message}</p>
+                <p class="wfn-step-settings-body wfn-step-settings-note">{view.message}</p>
               </Match>
               <Match when={recorded() === undefined}>
-                <p class="wfn-step-settings-note">{t("workflow.node.settings.notRecorded")}</p>
+                <p class="wfn-step-settings-body wfn-step-settings-note">{t("workflow.node.settings.notRecorded")}</p>
               </Match>
               <Match when={view.phase === "ready"}>
-                <dl class="wfn-step-settings-list">
-                  <For each={lines()}>
-                    {(line) => (
-                      <div class="wfn-step-setting" data-long={line.long ? "" : undefined}>
-                        <dt>{line.label}</dt>
-                        <dd>{line.value}</dd>
-                      </div>
-                    )}
-                  </For>
-                </dl>
-                <Show when={sources().length > 0}>
-                  <section class="wfn-step-sources">
-                    <h3 class="wfn-step-sources-title">{t("workflow.node.settings.inputs")}</h3>
-                    <ul>
-                      <For each={sources()}>
-                        {(source) => <SourceRow source={source} settings={recordedFields()} />}
+                <div class="wfn-step-settings-body">
+                  <Show when={facts().length > 0}>
+                    <dl class="wfn-step-facts">
+                      <For each={facts()}>
+                        {(line) => (
+                          <div class="wfn-step-fact">
+                            <dt>{line.label}</dt>
+                            <dd title={line.value}>{line.value}</dd>
+                          </div>
+                        )}
                       </For>
-                    </ul>
-                  </section>
-                </Show>
-                <Button size="sm" variant="secondary" disabled={!usable()} onClick={use}>
-                  {t("workflow.node.settings.use")}
-                </Button>
+                    </dl>
+                  </Show>
+                  <For each={texts()}>{(line) => <TextBlock title={line.label} value={line.value} />}</For>
+                  <Show when={sources().length > 0}>
+                    <section class="wfn-step-sources">
+                      <h3 class="wfn-step-sources-title">{t("workflow.node.settings.inputs")}</h3>
+                      <ul>
+                        <For each={sources()}>
+                          {(source) => <SourceRow source={source} settings={recordedFields()} />}
+                        </For>
+                      </ul>
+                    </section>
+                  </Show>
+                </div>
+                <footer class="wfn-step-settings-foot">
+                  <Button size="sm" variant="secondary" disabled={!usable()} onClick={use}>
+                    {t("workflow.node.settings.use")}
+                  </Button>
+                </footer>
               </Match>
             </Switch>
           </Popover.Content>

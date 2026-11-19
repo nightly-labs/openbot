@@ -86,6 +86,8 @@ export const messages = {
   "workflow.node.settings.notRecorded": "此结果没有已保存的设置。",
   "workflow.node.settings.failed": "无法显示设置。",
   "workflow.node.settings.use": "使用这些设置",
+  "workflow.node.settings.showMore": "显示更多",
+  "workflow.node.settings.showLess": "收起",
 
   "workflow.prompt.title": "提示词",
   "workflow.prompt.name": "提示词",
