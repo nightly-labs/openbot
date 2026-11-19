@@ -1842,12 +1842,14 @@ export class TurnLifecycle {
         // account. The pool read only the usage readings, and Google's reading of a spent Antigravity
         // account can still show room, so each turn went to the spent account again (#11255). With no
         // other account, nothing is recorded: one error must not hold a single account until its reset.
+        // A model that is down or at capacity on the account does the same, such as Gemini's 503 "No
+        // capacity available": the pool's pick stayed the failed account, so the agent stayed on it (#12499).
         if (
           notification.method === "error" &&
           agentId &&
           errorTurnId !== null &&
           this.#runningTurns.has(errorTurnId) &&
-          context.causeCode === "usage_limit" &&
+          (context.causeCode === "usage_limit" || context.causeCode === "provider_unavailable") &&
           this.#hooks.poolHasOtherAccount(agentId)
         )
           this.#markFailed(agentId, context.model, { message, context });
