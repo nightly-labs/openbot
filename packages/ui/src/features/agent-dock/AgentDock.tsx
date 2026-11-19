@@ -276,6 +276,7 @@ export function AgentDock(props: AgentDockProps) {
   let shelfAgent: string | null = null;
   let shelfHeight = 0;
   let shelfCard = 0;
+  let shelfSeats: readonly string[] = initialSeats;
   let seatScroll!: HTMLDivElement;
   let seatList!: HTMLDivElement;
   const seatElements = new Map<string, HTMLElement>();
@@ -338,7 +339,7 @@ export function AgentDock(props: AgentDockProps) {
     return Math.min(last, Math.max(first, seatCenterY(seats.indexOf(id), count) - scroll));
   }
 
-  function shelfTarget(seats: readonly string[] = state.seats) {
+  function shelfTarget(seats: readonly string[] = shelfSeats) {
     const id = shelfAgent === null ? null : agentDockSeatKey({ kind: "agent", id: shelfAgent });
     if (id === null || !seats.includes(id) || leaving.has(id)) return 0;
     const line = Math.min(PANEL_HEIGHT, Math.max(shelfHeight, seatY(id, seats) + shelfCard / 2));
@@ -621,6 +622,7 @@ export function AgentDock(props: AgentDockProps) {
     const move = (spring: Spring, value: number) => (instant ? spring.jump(value) : spring.to(value));
     move(dockH, dockHeight(count));
     move(addY, addCenterY(count));
+    shelfSeats = seats;
     move(shelfOffset, shelfTarget(seats));
     const listHeight = SEAT_VIEW_INSET + seatsHeight(count);
     if (listHeight > listH.value) listH.jump(listHeight);
