@@ -4,12 +4,6 @@ import {
   parseMobileConnectUrl,
 } from "@openbot/contracts/mobile-connect";
 
-// `bun run dev:mobile` pairs a simulator, which has no camera, by opening the
-// Mobile Connect QR link with `simctl openurl`. Any app or web page on a device
-// can open the same scheme, and a redeemed ticket becomes a session that never
-// expires, so only a development build accepts the link, and only when it names
-// a loopback or private-network account service.
-
 type Listener = () => void;
 
 let pendingLink: string | null = null;
@@ -28,8 +22,6 @@ function readDevelopmentConnectLink(value: string, development: boolean): string
   return api.protocol === "http:" && isMobileConnectDevelopmentHost(api.hostname) ? link : null;
 }
 
-// Returns true when a development build queued the link for redemption. Any other
-// link, including a Mobile Connect link it rejects, keeps the confirmed incoming-link flow.
 export function acceptDevelopmentConnectLink(value: string, development: boolean): boolean {
   const link = readDevelopmentConnectLink(value, development);
   if (!link) return false;

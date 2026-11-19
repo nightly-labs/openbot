@@ -3,12 +3,6 @@ import { OPENBOT_SITE_URL } from "../lib/site-metadata";
 const SITE_ORIGIN = new URL(OPENBOT_SITE_URL).origin;
 const SITE_HOST = new URL(OPENBOT_SITE_URL).hostname;
 
-/**
- * Sends `http://openbot.run` and `www.openbot.run` to `https://openbot.run`, so
- * search engines index one address. The zone route sends plain HTTP here too, and
- * the `www` route exists only for this redirect: `www` has no origin of its own.
- * 308 keeps the method and the body, and search engines read it as permanent.
- */
 export function canonicalHostRedirect(request: Request): Response | null {
   const url = new URL(request.url);
   const isWww = url.hostname === `www.${SITE_HOST}`;
@@ -16,11 +10,6 @@ export function canonicalHostRedirect(request: Request): Response | null {
   return Response.redirect(`${SITE_ORIGIN}${url.pathname}${url.search}`, 308);
 }
 
-/**
- * The router answers a page address that ends in `/` with a 307 to the address
- * without it. A 307 is temporary, so search engines keep both addresses. This
- * makes that one redirect permanent and leaves every other 307 as it is.
- */
 export function permanentTrailingSlashRedirect(request: Request, response: Response): Response {
   if (response.status !== 307 || (request.method !== "GET" && request.method !== "HEAD")) return response;
   const location = response.headers.get("Location");
@@ -33,20 +22,10 @@ export function permanentTrailingSlashRedirect(request: Request, response: Respo
   return new Response(null, { status: 308, headers: response.headers });
 }
 
-/**
- * The page that a Slack or Discord install returns to. The callback runs on `api.openbot.run`, and the
- * page opens on `openbot.run`, where the browser client runs, so the client tab that started the
- * install can take its grant. Another origin, such as a development one, keeps its own.
- */
 export function installReturnPage(path: string, callbackUrl: URL): URL {
   return new URL(path, callbackUrl.hostname === `api.${SITE_HOST}` ? SITE_ORIGIN : callbackUrl);
 }
 
-/**
- * The account API origin for a sign-in that the browser client starts. The company provider knows one
- * callback, on `api.openbot.run`, and the browser client runs on `openbot.run`. Another origin, such as
- * a development one, keeps its own.
- */
 export function companySignInApiOrigin(siteUrl: URL): string {
   return siteUrl.hostname === SITE_HOST ? `${siteUrl.protocol}//api.${SITE_HOST}` : siteUrl.origin;
 }

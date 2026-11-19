@@ -11,16 +11,6 @@ import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAgentLevel, stringField } from "./request-helpers";
 import { requireVisibleChannel } from "./route-channels";
 
-/**
- * "Delete history" of an agent's own chat, and "New conversation", "Compact now" and "Delete history"
- * of a channel, from a joined server. Frozen by `chat-history-v1`.
- *
- * Deleting an agent's history needs manage access to the agent; the agent id is in the body, so the
- * router's check of the path does not see it, and this module refuses an agent hidden from the
- * caller. A member who sees a channel starts a new conversation or compacts it; only an owner or
- * admin deletes its history. A host without channels answers the channel routes as it answers every
- * channel route.
- */
 export async function routeChatHistory(
   context: TeamApiRequestContext,
   agents: Pick<
@@ -49,7 +39,6 @@ export async function routeChatHistory(
           : "error.team.historyDeleteUnsupported",
       ),
     );
-  // `readJson` has already run the body through the chat-history wire codec.
   const body = await readJson(request);
   try {
     if (path === CHAT_HISTORY_ROUTES.agentDelete) {
@@ -65,7 +54,6 @@ export async function routeChatHistory(
     const channelId = stringField(body, "channelId");
     if (!channels.store.exists(channelId)) throw new HttpError(404, sourceText("error.backend.channelNotFound"));
     const admin = canAdministerServer(member.role);
-    // Owners and admins see every channel, as in the channel list.
     requireVisibleChannel(channels, channelId, admin ? new Set() : hiddenAgentIds);
     if (path === CHAT_HISTORY_ROUTES.channelClear)
       await runCauseEffect(
@@ -77,8 +65,6 @@ export async function routeChatHistory(
       await runCauseEffect(agents.deleteChannelHistory(channelId));
     }
   } catch (error) {
-    // Work that still runs or waits, an archived channel, or a provider that cannot compact, is a
-    // sentence for the member. Any other error is a host fault.
     if (
       error instanceof ContextResetBusyError ||
       error instanceof ContextCompactRefusedError ||
@@ -90,7 +76,6 @@ export async function routeChatHistory(
   return json(200, {});
 }
 
-/** The sentences with which `ChannelService` refuses these actions. It throws a plain `Error` with them. */
 function channelRefusals(): ReadonlySet<string> {
   return new Set([
     sourceText("error.backend.channelWaitBeforeNewConversation"),

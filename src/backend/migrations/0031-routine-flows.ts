@@ -1,27 +1,5 @@
 import type { OpenBotMigration } from "./migration";
 
-// Shared by migration v31 and the separate new-database schema. IF NOT EXISTS throughout, because
-// this text is both the migration and the tail of the latest schema.
-//
-// A routine flow is what happens after an agent routine's own agent answers: each link hands that
-// answer on to another agent, which answers in turn. The rows are written directly, not through
-// `database.dispatch`: a step holds the text one agent gave another, and the event log is never
-// deleted from.
-//
-// Agent ids carry no foreign key, as in every other table keyed by an agent: `hardDeleteAgent`
-// removes the rows of a deleted agent by hand.
-//
-// `routine_flow_links`: one handoff inside one routine. The routine's own agent starts the flow; a
-// link from an agent passes that agent's answer to the next one. `instruction` is what the next
-// agent is asked to do with it, and may be empty.
-//
-// `routine_flow_positions`: where a node sits on one agent's canvas. `node_key` is `routine:<id>` or
-// `agent:<id>`. A row also places an agent on a canvas before any link reaches it.
-//
-// `routine_flow_steps`: one agent's part of one run, at most one per agent and run. The routine's
-// own agent gets one when its answer is in; every other agent when its input is sent. `delivery_id`
-// is the mailbox delivery that carried the input, absent for the routine's own agent, whose
-// delivery is the run's.
 export const ROUTINE_FLOW_SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS routine_flow_links (
     link_id TEXT PRIMARY KEY,
@@ -63,7 +41,5 @@ export const ROUTINE_FLOW_SCHEMA_SQL = `
 export const migration: OpenBotMigration = {
   version: 31,
   name: "routine-flows",
-  // Only creates tables, so no foreign-key pause and no vacuum. Existing routines have no links,
-  // so every routine keeps running only its own agent, which is what it did before.
   up: (db) => db.exec(ROUTINE_FLOW_SCHEMA_SQL),
 };

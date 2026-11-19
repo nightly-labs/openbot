@@ -11,45 +11,29 @@ type ScrollEdgesState = {
   end: boolean;
   rtl: boolean;
   short: boolean;
-  /** The area scrolls on either axis: a code block also scrolls up and down. */
   scrolls: boolean;
   middle: number | null;
 };
 
-/** Slack in pixels before an edge counts as reached, for sub-pixel scroll positions. */
 const EDGE_EPSILON = 1;
 
-/** An area lower or narrower than this gets the small arrow, so the arrow does not hide the content. */
 const SHORT_AREA = 56;
 
-/** Half an arrow and its space: the middle of the arrows stays this far from each end of the area. */
 const ARROW_HALF = 22;
 
-/** One arrow click scrolls this part of the visible width or height. */
 const STEP = 0.8;
 
-/**
- * A scroll area that shows where it has more content. The edge with more content fades, and while
- * the pointer is on the area, or the area has keyboard focus, an arrow on that edge scrolls it.
- * The system scrollbar does not show. The x arrows stay at the middle of the visible part of the
- * area, so a tall table keeps them in view.
- */
 export function ScrollEdges(props: {
   axis: ScrollEdgesAxis;
-  /** The accessible name of the scroll area. */
   label?: string;
-  /** The direction of the area, when it differs from the text around it, such as code. */
   dir?: "ltr" | "rtl";
-  /** The class of the frame around the scroll area. */
   class?: string;
-  /** The class of the scroll area. */
   viewClass?: string;
   children: JSX.Element;
 }) {
   const { t } = useText();
   const horizontal = untrack(() => props.axis) === "x";
   let view: HTMLElement | undefined;
-  // The middle is null until the first measurement, so the CSS fallback centres the arrows.
   const [state, setState] = createStore<ScrollEdgesState>({
     start: false,
     end: false,
@@ -59,14 +43,12 @@ export function ScrollEdges(props: {
     middle: null,
   });
 
-  /** The offset of the scroll area: in a right-to-left area it counts down from zero. */
   const measureEdges = (element: HTMLElement) => {
     const offset = Math.abs(horizontal ? element.scrollLeft : element.scrollTop);
     const range = horizontal ? element.scrollWidth - element.clientWidth : element.scrollHeight - element.clientHeight;
     const style = getComputedStyle(element);
     const rtl = horizontal && style.direction === "rtl";
     const short = (horizontal ? element.clientHeight : element.clientWidth) < SHORT_AREA;
-    // The other axis counts only when it can scroll, not when it clips, as block math does.
     const crossOverflow = horizontal ? style.overflowY : style.overflowX;
     const crossRange = horizontal
       ? element.scrollHeight - element.clientHeight
@@ -81,8 +63,6 @@ export function ScrollEdges(props: {
     });
   };
 
-  // The arrows show only while the pointer is on the area or the area has the focus, so the middle
-  // is measured only then: at most once in each frame, against the ancestors that clip the area.
   let hovered = false;
   let focused = false;
   let clips: HTMLElement[] | undefined;
@@ -157,7 +137,6 @@ export function ScrollEdges(props: {
     );
   };
 
-  // In a right-to-left area, the start edge is on the right.
   const arrow = (direction: 1 | -1) => {
     const left = (direction === -1) !== state.rtl;
     if (!horizontal) return direction === -1 ? "up" : "down";
@@ -182,7 +161,6 @@ export function ScrollEdges(props: {
             right: t("common.scrollRight"),
           }[arrow(direction)]
         }
-        // The scroll area itself takes the keyboard focus and scrolls with the arrow keys.
         tabindex="-1"
         onClick={() => step(direction)}
       >
@@ -218,7 +196,6 @@ export function ScrollEdges(props: {
       <section
         class={cx("scroll-edges-view", props.viewClass)}
         aria-label={props.label}
-        // Only an area that scrolls is a stop in the Tab order.
         tabindex={state.scrolls ? 0 : undefined}
         ref={(element) => (view = element)}
       >
@@ -230,7 +207,6 @@ export function ScrollEdges(props: {
   );
 }
 
-/** The ancestors that clip the element: the chat scrolls the table up and down, so its box cuts the visible part. */
 function clippingAncestors(element: HTMLElement): HTMLElement[] {
   const clips: HTMLElement[] = [];
   for (let parent = element.parentElement; parent; parent = parent.parentElement) {
@@ -239,7 +215,6 @@ function clippingAncestors(element: HTMLElement): HTMLElement[] {
   return clips;
 }
 
-/** The middle of the part of the element that is in view, measured from the element's top. */
 function visibleMiddle(element: HTMLElement, clips: HTMLElement[]): number {
   const box = element.getBoundingClientRect();
   if (box.height <= ARROW_HALF * 2) return box.height / 2;

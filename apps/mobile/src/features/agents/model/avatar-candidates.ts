@@ -23,10 +23,6 @@ export function createAvatarCandidates(seed: string, previous?: AvatarCandidates
 
 export type AvatarFace = { shape: SupportedAvatarSilhouetteId; expression: ExpressionId };
 
-/**
- * The seed that draws `face` in `style`, made as the desktop makes it. The agent's own plush face is
- * `faceKey` itself, so Plush after Flat gives back the seed that the agent had.
- */
 export function avatarSeedForStyledFace(faceKey: string, face: AvatarFace, style: AvatarStyle): string {
   if (style === "plush") {
     const own = bloubAvatarProfile(faceKey, null);
@@ -35,7 +31,6 @@ export function avatarSeedForStyledFace(faceKey: string, face: AvatarFace, style
   return avatarSeedForFace(faceKey, face, style);
 }
 
-/** Another shape and other eyes, never the ones the face has now, as the desktop Random face. */
 export function randomAvatarFace(current: AvatarFace): AvatarFace {
   return {
     shape: randomOther(SUPPORTED_AVATAR_SILHOUETTES, current.shape),

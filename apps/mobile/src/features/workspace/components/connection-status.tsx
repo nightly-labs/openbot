@@ -25,7 +25,6 @@ function ConnectionStatusText({ server: shown, note }: { server: MobileServer; n
     ? t("mobile.workspace.status.attempt", { attempt: recoveryAttempt(recovery), limit: REMOTE_RETRY_LIMIT })
     : server.connectionMessage && sourceText(server.connectionMessage);
   const remainingSeconds = reconnecting ? recoveryCountdown(recovery) : null;
-  // The chat keeps to the attempt and the countdown. The failure that caused a retry is in the support log.
 
   return (
     <View
@@ -76,7 +75,6 @@ function ConnectionStatusText({ server: shown, note }: { server: MobileServer; n
   );
 }
 
-/** Under the reconnect status: what the chat waits for, such as its history. */
 export function ConnectionStatus({ server, note = null }: { server: MobileServer | undefined; note?: string | null }) {
   return (
     <ConnectionStatusReveal

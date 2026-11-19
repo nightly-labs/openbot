@@ -1,12 +1,3 @@
-// Runs the real daily billing snapshot on a migrated SQLite database, with a Stripe API that knows a
-// fixed set of subscriptions (#2242). The snapshot must not read canceled or expired subscriptions
-// from Stripe, must read each FX rate once, must count and leave out subscriptions that stay bad, and
-// must fail without an event when Stripe has a failure that can pass or when every row is bad. A second
-// run on the same day makes no Stripe call. License subscriptions go in their own totals, and the
-// server plan totals do not include them.
-//
-// Run: bun apps/auth-api/scripts/billing-snapshot-e2e.ts
-// It writes .openbot-build/billing-snapshot-e2e/report.json and exits non-zero on a failure.
 import { readdirSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -28,7 +19,6 @@ function check(name: string, passed: boolean, detail?: unknown) {
   checks.push({ name, passed, ...(detail === undefined ? {} : { detail }) });
 }
 
-/** A D1 binding over node:sqlite, with the calls that the snapshot makes. Each query goes to `queries`. */
 function sqliteD1(database: DatabaseSync, queries: string[]): D1Database {
   const changes = () => Number(database.prepare("SELECT total_changes() AS changes").get()?.changes);
   const result = <T>(results: T[], changed: number): D1Result<T> => ({
@@ -141,10 +131,6 @@ function stripeSubscription(
   };
 }
 
-/**
- * The Team monthly license Price. It has graduated tiers, so Stripe sends no `unit_amount`, and its lookup key
- * and metadata name the plan (`scripts/stripe-bootstrap.ts`).
- */
 function stripeLicenseSubscription(id: string, currency: string, users: number) {
   const plan = { tier: "team", interval: "month", bundle: false } as const;
   return {
@@ -175,7 +161,6 @@ function stripeLicenseSubscription(id: string, currency: string, users: number) 
   };
 }
 
-/** A Stripe API stub. A body is a subscription; a number is an error status. Each URL goes to `calls`. */
 function stripeFetch(subscriptions: Record<string, object | number>, calls: string[]) {
   return async (input: string) => {
     calls.push(input);
@@ -253,7 +238,6 @@ async function snapshotSkipsTerminalAndBadRows() {
   const fxReads = queries.filter((query) => query.includes("FROM billing_fx_rates")).length;
   check("the EUR rate is read once", fxReads === 1, { fxReads });
   const [event] = storedEvents(database);
-  // EUR: round(1000 * 1.1) + round(2000 * 1.1); USD yearly: 12000 / 12. License: 7 users = 2500 + 5 * 1500, round(10000 * 1.1).
   const expected = {
     snapshot_date: DAY,
     mrr: 1_100 + 2_200 + 1_000,
@@ -299,7 +283,6 @@ async function transientStripeFailureFailsTheRun() {
 }
 
 async function allRowsBadFailsTheRun() {
-  // A Stripe key of another account or mode gives a 404 for each subscription.
   const database = migratedDatabase([
     { id: "sub_other_1", status: "active" },
     { id: "sub_other_2", status: "past_due" },

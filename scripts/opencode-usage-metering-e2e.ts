@@ -1,16 +1,3 @@
-// Checks that token usage through OpenCode is metered once per turn, with each count. Runs the real
-// agent service on a temporary profile with a fake OpenCode ACP server that answers `session/prompt`
-// as OpenCode 1.19 and 2.x do: `usage` holds the tokens of that prompt only, `inputTokens` is the
-// uncached input, and `cachedReadTokens`, `cachedWriteTokens` and `thoughtTokens` are left out when
-// they are 0. A message `tokens=<input>,<cached>,<written>,<output>,<thought>` sets the usage of its
-// turn. Cases: a first turn with no cache, a smaller second turn with cache reads (the session counter
-// before this change booked 0 for it and had no uncached input), a larger third turn with a cache
-// write and thinking, and a turn after the provider process starts again and resumes the session.
-// A message can also carry `cost=<total>`: the fake then sends a `usage_update` with that session
-// cost before the result, as OpenCode 2.1 does. Each turn books the difference from the last total,
-// also after a restart. A session from before costs were kept books its first total as the start.
-// `bun scripts/opencode-usage-metering-e2e.ts`. Writes
-// .openbot-build/opencode-usage-metering-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -28,7 +15,6 @@ const home = join(root, "home");
 const fakeOpenCode = join(root, "opencode");
 const logPath = join(root, "opencode.jsonl");
 
-// Before the service modules load: the stores read the home folder.
 process.env.HOME = home;
 process.env.OPENBOT_OPENCODE_PATH = fakeOpenCode;
 process.env.FAKE_OPENCODE_LOG = logPath;
@@ -40,7 +26,6 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
-/** An OpenCode ACP server with the methods that the service calls. */
 const FAKE_OPENCODE = `#!/usr/bin/env node
 const fs = require("node:fs");
 const NL = String.fromCharCode(10);
@@ -98,7 +83,6 @@ interface Turn {
   written: number;
   output: number;
   thought: number;
-  /** The session's total cost that OpenCode reports after this turn. */
   sessionCost?: number;
 }
 
@@ -141,7 +125,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service or of its database. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -190,7 +173,6 @@ const sqlite = () => {
 };
 const closeReader = () => connection?.close();
 
-/** The usage records of one provider turn. */
 function records(turnId: string): UsageTokens[] {
   return sqlite()
     .prepare("SELECT tokens_json FROM agent_usage_records WHERE turn_id = ? ORDER BY recorded_at, rowid")
@@ -198,7 +180,6 @@ function records(turnId: string): UsageTokens[] {
     .map((row) => decodeUsageTokens(JSON.parse(String(row.tokens_json))));
 }
 
-/** The cost booked for one provider turn. */
 function costOf(turnId: string): number | null {
   const value = sqlite()
     .prepare("SELECT estimated_cost_usd FROM agent_usage_records WHERE turn_id = ?")
@@ -206,7 +187,6 @@ function costOf(turnId: string): number | null {
   return typeof value === "number" ? value : null;
 }
 
-/** The provider turns that ran in one public thread, oldest first. */
 function turnsOf(threadId: string): string[] {
   return sqlite()
     .prepare(
@@ -221,7 +201,6 @@ const message = (turn: Turn) =>
   `tokens=${turn.input},${turn.cached},${turn.written},${turn.output},${turn.thought}` +
   (turn.sessionCost === undefined ? "" : ` cost=${turn.sessionCost}`);
 
-/** Checks that the turn at `index` of the thread has one record with the tokens of `sent` and `expectedCost`. */
 async function check(
   name: string,
   threadId: string,
@@ -292,15 +271,12 @@ try {
 
   const second: Turn = { input: 1_000, cached: 9_000, written: 0, output: 200, thought: 0 };
   await send(agent.id, second, "smaller second turn");
-  // No `usage_update`: the turn has no cost, and the next total includes it.
   await check("smaller second turn", threadId, 1, second, null);
 
   const third: Turn = { input: 15_000, cached: 6_000, written: 2_000, output: 900, thought: 400, sessionCost: 0.2 };
   await send(agent.id, third, "larger third turn");
   await check("larger third turn", threadId, 2, third, 0.15);
 
-  // The provider process stops between turns. The runtime starts it again and resumes the session,
-  // and OpenCode measures the next turn on its own.
   const session = store.activeProviderSession(agent.id)?.externalSessionId;
   assert.ok(session, "the agent has a provider session");
   const killedPid = protocol().find((entry) => entry.start)?.pid ?? 0;
@@ -317,8 +293,6 @@ try {
     "the turn after a restart resumes the session",
   );
 
-  // A session from before costs were kept: it has records but no cost checkpoint. Its first total
-  // also counts the earlier turns, so that turn has no cost and the next one books the difference.
   const sessionId = store.activeProviderSession(agent.id)?.id;
   assert.ok(sessionId, "the agent has an active provider session");
   sqlite()

@@ -72,7 +72,6 @@ const TAB_ITEMS = {
 export interface WebAccountSettingsProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Where the settings page shows, or nothing while the page is not on screen. */
   page: SettingsPagePlacement | undefined;
   account: CentralAuthUser;
   calls: WebAccountCalls;
@@ -80,20 +79,12 @@ export interface WebAccountSettingsProps {
   onChangeLanguage: (language: AppLanguage) => void;
   appearance: AppAppearance;
   onChangeAppearance: (appearance: AppAppearance) => void;
-  /** Closes these settings and opens the plans and servers of the account. */
   onOpenBilling: () => void;
   onSignOut: () => Promise<void>;
-  /** The levels of each host and its agents, which apply on all devices of the user. */
   notifications: WebNotificationSettings;
-  /** Opens Preferences at the notification row of one host. Each nonce opens once. */
   notificationFocusRequest?: { serverId: string; nonce: number } | null | undefined;
 }
 
-/**
- * The account's own settings in the web client, where Settings opens the settings of a host. Profile
- * is the desktop tab and store; Preferences holds what this browser keeps. Sites are in the settings
- * of their server.
- */
 export default function WebAccountSettings(props: WebAccountSettingsProps) {
   const [reportsEnabled, setReportsEnabled] = createSignal(webReportsEnabled());
   const { t, errorMessage } = useText();
@@ -110,7 +101,6 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
   const bubbleStyle = useChatBubbleStyle();
   const chatBackground = useWebChatBackground();
   const webLiveVoice = useWebLiveVoice();
-  // Playback reads the stored value on each event, so the menus follow a change from another tab.
   const [soundChoice, setSoundChoice] = createSignal(readActionSoundChoice());
   const readSoundSettings = () => {
     setTaskSoundChoice(readTaskSound());
@@ -136,7 +126,6 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
     () => activeTab() === "profile",
   );
   const navItem = () => TAB_ITEMS[activeTab()];
-  // A server menu or a settings link opens the notification levels, which are in Preferences.
   createEffect(
     () => (props.open ? props.notificationFocusRequest : null),
     (request) => {
@@ -272,7 +261,6 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
                   <AppearanceSelect
                     value={props.appearance}
                     onChange={(value) => {
-                      // The web client lists no palettes, so each value is an appearance.
                       if (isAppAppearance(value)) props.onChangeAppearance(value);
                     }}
                     {...(modalElement ? { mount: modalElement } : {})}
@@ -327,7 +315,6 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
               <MotionSwitches />
             </ItemGroup>
           </SettingsSection>
-          {/* The choice is kept in this browser and holds for each server that serves live voice. */}
           <SettingsSection title={t("settings.voice.live.section")}>
             <ItemGroup class="settings-modal-card">
               <SwitchField

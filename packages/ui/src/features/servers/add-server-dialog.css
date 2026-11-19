@@ -1,12 +1,8 @@
-/* The add-server dialog reuses the join-server-dialog shell (backdrop, surface, close button and
- * content padding). The pricing step is wider. */
 .add-server-dialog {
   width: min(460px, 100%);
   transition: width var(--openbot-duration-normal) var(--openbot-ease-out);
 }
 
-/* Long prices (for example in PLN) need wider columns: 48px for each character over 10, that is
- * 16px in each of the 3 columns. The width transition above animates the change. */
 .add-server-dialog[data-step="pricing"] {
   width: min(calc(760px + var(--add-server-extra-price-chars, 0) * 48px), 100%);
 }
@@ -24,8 +20,6 @@
   outline: none;
 }
 
-/* Pricing */
-
 .add-server-pricing {
   gap: var(--openbot-space-4);
 }
@@ -34,12 +28,10 @@
   padding: var(--openbot-space-6);
 }
 
-/* Over the plans, so it is as wide as the plans. */
 .add-server-limit.ui-alert {
   align-self: stretch;
 }
 
-/* What the plans buy, before the prices. */
 .add-server-intro {
   gap: var(--openbot-space-2);
   padding-block: var(--openbot-space-2);
@@ -51,7 +43,6 @@
   text-wrap: balance;
 }
 
-/* The inline padding keeps the title clear of the close button of the shell. */
 .add-server-intro .ui-heading {
   padding-inline: calc(var(--openbot-control-md) + var(--openbot-space-2));
   font-size: var(--openbot-text-3xl);
@@ -60,8 +51,6 @@
   letter-spacing: var(--openbot-tracking-tight);
 }
 
-/* The "Other options" button is wider than the close button. The same padding on the two sides keeps
- * the title in the centre, with space for the longest translation of the button. */
 .add-server-dialog:has(.add-server-other) .add-server-intro .ui-heading {
   padding-inline: 160px;
 }
@@ -72,8 +61,6 @@
   line-height: var(--openbot-leading-lg);
 }
 
-/* The billing switch is in the centre. The same inline padding on the two sides keeps it clear of
- * the close button of the shell. */
 .add-server-bar {
   position: relative;
   min-height: var(--openbot-control-md);
@@ -84,7 +71,6 @@
   padding-inline: calc(var(--openbot-control-md) + var(--openbot-space-2));
 }
 
-/* At the left, across from the close button, so that the billing switch stays in the centre. */
 .add-server-bar .hosted-currency {
   position: absolute;
   top: 50%;
@@ -94,7 +80,6 @@
   transform: translateY(-50%);
 }
 
-/* The account pays in one currency, so the code is text: the same height as the select, no chevron. */
 .hosted-currency-locked {
   display: inline-flex;
   align-items: center;
@@ -104,7 +89,6 @@
   font-size: var(--openbot-text-sm);
 }
 
-/* With a license offer: personal or work use at the left, the currency and billing at the right. */
 .add-server-bar[data-license] {
   justify-content: flex-end;
   padding-inline: 0;
@@ -119,7 +103,6 @@
   transform: none;
 }
 
-/* Two equal columns, so the pill moves by exactly its own width. */
 .hosted-billing {
   --hosted-billing-ease: cubic-bezier(0.34, 1.36, 0.64, 1);
   position: relative;
@@ -202,12 +185,10 @@
   animation: hosted-billing-save-pop 300ms var(--hosted-billing-ease) 80ms both;
 }
 
-/* The saving changes between personal and work use; equal digit widths keep the switch in place. */
 .add-server-bar[data-license] .hosted-billing-save {
   font-variant-numeric: tabular-nums;
 }
 
-/* One framed panel. Hairlines divide the plans. */
 .hosted-plans {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -220,8 +201,6 @@
   list-style: none;
 }
 
-/* The columns come in one after the other. The fill mode is backwards only, so the dimmed state
- * can still transition after the entrance ends. */
 .hosted-plan {
   position: relative;
   isolation: isolate;
@@ -248,7 +227,6 @@
   opacity: 0.5;
 }
 
-/* A cool-to-warm line on the top edge and a soft glow at the bottom of the recommended plan. */
 .hosted-plan[data-recommended]::before {
   content: "";
   position: absolute;
@@ -272,7 +250,6 @@
   transition: opacity var(--openbot-duration-overlay) var(--openbot-ease-out);
 }
 
-/* A fixed height, so that the badge does not move this column's content down. */
 .hosted-plan-head {
   height: var(--openbot-control-sm);
   display: flex;
@@ -289,15 +266,12 @@
   line-height: var(--openbot-leading-md);
 }
 
-/* Light, like the "Choose" button of the same plan. */
 .hosted-plan-badge {
   border-color: transparent;
   background: var(--openbot-surface-light);
   color: var(--openbot-text-on-light);
 }
 
-/* One line: the dialog gets wider for long prices. Only when the window is too narrow for that
- * width does the old price go on its own line above the new price. */
 .hosted-plan-price {
   display: flex;
   flex-wrap: wrap;
@@ -305,8 +279,6 @@
   margin: var(--openbot-space-4) 0 0;
 }
 
-/* The monthly price on yearly billing. The column grows from zero, so the price slides right
- * instead of jumping. */
 .hosted-plan-was {
   display: grid;
   grid-template-columns: 0fr;
@@ -363,7 +335,6 @@
   line-height: var(--openbot-leading-sm);
 }
 
-/* Only when the column is too narrow does the saving go on a second line. */
 .hosted-plan-billed {
   display: flex;
   flex-wrap: wrap;
@@ -396,7 +367,6 @@
   line-height: var(--openbot-leading-md);
 }
 
-/* The bundle discount of a server with its license, in place of the "Best value" badge. */
 .hosted-plan-bundle {
   padding: 0 var(--openbot-space-2);
   border-radius: var(--openbot-radius-pill);
@@ -407,7 +377,6 @@
   white-space: nowrap;
 }
 
-/* For work, the price includes the license: the line has the success color of the bundle and an icon. */
 .hosted-plan-summary[data-license] {
   display: flex;
   align-items: baseline;
@@ -416,8 +385,6 @@
   font-weight: var(--openbot-weight-medium);
 }
 
-/* The icon bottom is on the baseline of the first line. It moves down so that its middle is on the
- * middle of the capital letters. */
 .hosted-plan-summary svg {
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
@@ -426,12 +393,10 @@
   color: var(--openbot-success-text);
 }
 
-/* The personal and work summaries differ in length; two lines for both, so the buttons stay in place. */
 .hosted-plans[data-license] .hosted-plan-summary {
   min-height: 2lh;
 }
 
-/* The price line breaks for all counts or for none. LongestPrice measures the longest price. */
 .hosted-plans[data-license] .hosted-plan-price {
   position: relative;
 }
@@ -446,12 +411,10 @@
   pointer-events: none;
 }
 
-/* Only the visible price: the copy must not change the width that it measures. */
 .hosted-plans[data-stacked] .hosted-plan-price > .hosted-plan-was[data-shown] {
   flex-basis: 100%;
 }
 
-/* The people row closes the frame of the plans. It stays for personal use, disabled, so nothing moves. */
 .hosted-plans[data-license] {
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
@@ -490,7 +453,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* As wide as "10 members", so the buttons stay in place while the count changes. */
 .hosted-license-stepper > span {
   min-width: 11ch;
   text-align: center;
@@ -501,13 +463,10 @@
   border-radius: var(--openbot-radius-pill);
 }
 
-/* The buttons line up when the summaries wrap to different lengths. */
 .hosted-plan-choose.ui-button {
   margin-top: auto;
 }
 
-/* With the people row, the summaries have one height, and a work plan has one fact less: the
- * buttons follow the summary, so they stay on one line. */
 .hosted-plans[data-license] .hosted-plan-choose.ui-button {
   margin-top: 0;
 }
@@ -539,7 +498,6 @@
   transition: color var(--openbot-duration-normal) var(--openbot-ease-out);
 }
 
-/* Needs that the plans do not cover. */
 .add-server-custom {
   display: flex;
   align-items: center;
@@ -563,7 +521,6 @@
   flex: 0 0 auto;
 }
 
-/* The ways to add a server without a plan, across from the close button of the shell. */
 .add-server-other {
   position: absolute;
   top: var(--openbot-space-6);
@@ -575,12 +532,9 @@
   color: var(--openbot-text-muted);
 }
 
-/* The menu opens over the dialog, which is on a higher layer than menus. */
 .ui-action-menu.add-server-other-menu {
   z-index: calc(var(--openbot-layer-dialog) + 1);
 }
-
-/* Progress */
 
 .add-server-progress {
   align-items: stretch;
@@ -591,8 +545,6 @@
   gap: var(--openbot-space-2);
 }
 
-/* Three ring segments around the server logo, one for each step. The SVG turns by -90deg, so the
- * first segment starts at the top. With pathLength 100, each segment is 30.33 long with a gap of 3. */
 .add-server-ring {
   position: relative;
   width: 96px;
@@ -644,9 +596,7 @@
   stroke-dasharray: 0 100;
 }
 
-/* The running segment creeps to 90% and waits there for the step to end. */
 .add-server-ring-segment[data-state="active"] .add-server-ring-fill {
-  /* About how long a setup step takes. It is not a motion token: the step ends the creep. */
   --add-server-step-creep: 20s;
   stroke-dasharray: 27.3 100;
   transition: stroke-dasharray var(--add-server-step-creep) cubic-bezier(0.05, 0.7, 0.1, 1);
@@ -661,7 +611,6 @@
   stroke: var(--openbot-danger);
 }
 
-/* Ready: the gaps close and the three segments become one success ring. */
 .add-server-progress[data-status="ready"] .add-server-ring-segment circle {
   stroke-dasharray: 33.4 100;
   stroke: var(--openbot-success);
@@ -679,7 +628,6 @@
   stroke-dashoffset: -66.67;
 }
 
-/* A small server in the centre: one unit for each step, each with a light at the right. */
 .add-server-ring-core {
   position: relative;
   width: 72px;
@@ -706,7 +654,6 @@
   background: var(--openbot-bg-sidebar);
 }
 
-/* The drive slot at the left. */
 .add-server-light::before {
   content: "";
   position: absolute;
@@ -717,7 +664,6 @@
   background: var(--openbot-text-dim);
 }
 
-/* The light at the right. */
 .add-server-light::after {
   content: "";
   position: absolute;
@@ -753,7 +699,6 @@
   transform: scale(0.7);
 }
 
-/* The result appears after the ring has closed, then its check mark draws itself. */
 .add-server-ring-result {
   position: absolute;
   width: 72px;
@@ -782,7 +727,6 @@
     forwards;
 }
 
-/* What happens now. Each new line rolls in from below. */
 .add-server-ticker {
   margin: 0;
   color: var(--openbot-text-muted);
@@ -790,8 +734,6 @@
   line-height: var(--openbot-leading-md);
   animation: add-server-detail-in var(--openbot-duration-slow) var(--openbot-ease-out) both;
 }
-
-/* Confetti: pieces start at the logo, burst out, then fall. */
 
 .add-server-confetti {
   position: absolute;
@@ -887,7 +829,6 @@
   }
 }
 
-/* An uneven pattern, as disk activity is. */
 @keyframes add-server-light-flicker {
   0%,
   22%,
@@ -921,7 +862,6 @@
   }
 }
 
-/* After the other svg rules, because this selector is more specific. */
 @media (hover: hover) {
   .hosted-plan:not([data-recommended]):hover {
     background: var(--openbot-bg-surface);
@@ -953,7 +893,6 @@
     line-height: var(--openbot-leading-2xl);
   }
 
-  /* The title goes under the row of the "Other options" button and the close button. */
   .add-server-dialog:has(.add-server-other) .add-server-intro {
     padding-top: calc(var(--openbot-control-md) + var(--openbot-space-1));
   }
@@ -972,7 +911,6 @@
     line-height: var(--openbot-leading-md);
   }
 
-  /* The switch goes under the close button and fills the width. */
   .add-server-bar {
     padding: calc(var(--openbot-control-md) + var(--openbot-space-1)) 0 0;
   }
@@ -981,13 +919,11 @@
     flex: 1;
   }
 
-  /* In the row of the close button, so that the switch keeps the full width. */
   .add-server-bar .hosted-currency {
     top: 0;
     transform: none;
   }
 
-  /* Personal or work use and the currency on one line, the billing under them. */
   .add-server-bar[data-license] {
     flex-wrap: wrap;
     padding-top: 0;
@@ -1002,7 +938,6 @@
     align-items: stretch;
   }
 
-  /* The button goes under the text, so that the text keeps the width. */
   .add-server-limit.ui-alert {
     grid-template-columns: auto minmax(0, 1fr);
     align-items: start;

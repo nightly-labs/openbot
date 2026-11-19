@@ -1,9 +1,6 @@
 require 'digest'
 require 'fileutils'
 
-# The official sherpa-onnx iOS build, the version that desktop pins in scripts/prepare-voice.ts. It is
-# one dynamic framework with ONNX Runtime linked in, published by k2-fsa under the `xcframework`
-# release. It is fetched on `pod install` and checked against this hash; it is not in the repository.
 SHERPA_ONNX_VERSION = '1.13.8'
 SHERPA_ONNX_ARCHIVE = "sherpa-onnx-v#{SHERPA_ONNX_VERSION}-ios-shared-onnxruntime-static.xcframework.zip"
 SHERPA_ONNX_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/xcframework/#{SHERPA_ONNX_ARCHIVE}"

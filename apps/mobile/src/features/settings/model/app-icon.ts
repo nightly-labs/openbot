@@ -11,18 +11,14 @@ import { type NativeModule, requireOptionalNativeModule } from "expo";
 import { create } from "zustand";
 
 declare class AppIconModule extends NativeModule {
-  /** `default` for the main icon, or null when the phone cannot change the icon. */
   getIcon(): Promise<string | null>;
   setIcon(id: string): Promise<void>;
 }
 
-/** `modules/app-icon`. A build without it, such as Expo Go or an older binary, hides the picker. */
 const native = requireOptionalNativeModule<AppIconModule>("OpenBotAppIcon");
 
-/** The native ID of the main icon. `plugins/with-app-icons.js` names the other icons after their color. */
 const MAIN_ICON = "default";
 
-/** The icons are the logo colors of the desktop app, in the order of its picker. */
 export const APP_ICONS: readonly AppLogoColor[] = APP_LOGO_COLORS;
 
 export interface AppIconLook {
@@ -30,16 +26,10 @@ export interface AppIconLook {
   eyes: string;
 }
 
-/**
- * The colors of an icon in its default look. The previews always show it: the home screen look (Light,
- * Dark, Clear or Tinted on iOS) is a separate setting from the app and system appearance, and an app
- * cannot read it.
- */
 export function appIconLook(color: AppLogoColor): AppIconLook {
   return { body: APP_LOGO_COLOR_HEX[color], eyes: APP_LOGO_EYE_HEX[color] };
 }
 
-/** The names of the desktop logo colors, in the mobile catalog. */
 export const APP_ICON_LABELS = {
   rose: "mobile.settings.appIcon.color.rose",
   terracotta: "mobile.settings.appIcon.color.terracotta",
@@ -53,7 +43,6 @@ export const APP_ICON_LABELS = {
   white: "mobile.settings.appIcon.color.white",
 } as const satisfies Record<AppLogoColor, MobileTextKey>;
 
-/** The phone keeps the icon, so the app does not save it. `value` is null when the icon cannot change. */
 export const useAppIcon = create<{ value: AppLogoColor | null; ready: boolean; saving: boolean }>(() => ({
   value: null,
   ready: false,
@@ -62,7 +51,6 @@ export const useAppIcon = create<{ value: AppLogoColor | null; ready: boolean; s
 
 let loading: Promise<void> | null = null;
 
-/** Reads the icon once. The Appearance row and the picker share the read. */
 export function loadAppIcon(): Promise<void> {
   if (useAppIcon.getState().ready) return Promise.resolve();
   loading ??= readAppIcon().finally(() => {

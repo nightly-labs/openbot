@@ -16,10 +16,6 @@ import { currentText } from "@openbot/ui/text";
 
 const REQUEST_TIMEOUT_MS = 15_000;
 
-/**
- * The Billing dialog calls for a signed-in browser. They use the `/api/browser/v1/me/billing...`
- * operations. The page goes only to a Stripe Customer Portal URL.
- */
 export function createWebBillingCalls(
   accountFetch: typeof fetch,
   navigate: (url: string) => void = (url) => window.location.assign(url),
@@ -55,10 +51,6 @@ export function createWebBillingCalls(
   };
 }
 
-/**
- * The license calls for a signed-in browser, through the `/api/browser/v1/me/license...` operations.
- * Checkout goes only to a Stripe Checkout URL.
- */
 export function createWebLicenseCalls(
   accountFetch: typeof fetch,
   navigate: (url: string) => void = (url) => window.location.assign(url),
@@ -85,16 +77,11 @@ export function createWebLicenseCalls(
   };
 }
 
-/** The code of a discount link that the website saved in this browser, as a Checkout request field. */
 export function savedPromotionCode(): { promotionCode?: string } {
   const code = readPromotionCode(() => window.localStorage, Date.now());
   return code ? { promotionCode: code } : {};
 }
 
-/**
- * GET without a body, POST (or `method`) with one. Returns the decoded response, or null when it does
- * not decode.
- */
 function browserRequest(accountFetch: typeof fetch) {
   return async <T>(
     path: string,
@@ -125,21 +112,14 @@ function errorMessage(value: unknown): string {
   return currentText().t("webClient.error.requestFailed");
 }
 
-/** The Customer Portal returns to `/app?billing=portal`. */
 export const WEB_APP_BILLING_PARAM = "billing";
 
-/** The pricing page sends `/app?start=server` or `/app?start=license`, with the order of its form. */
 const WEB_APP_START_PARAM = "start";
-/**
- * What a pricing page button opens: the add server dialog or Billing, where the license is. With the order, the
- * dialog fills it in and goes on to Checkout. An old link has no order.
- */
 export interface WebAppStart {
   kind: "server" | "license";
   order: PricingOrder | null;
 }
 
-/** Reads the pricing page link and removes it from the URL, so a reload does not buy again. */
 export function takeWebAppStart(url: URL): WebAppStart | null {
   const start = url.searchParams.get(WEB_APP_START_PARAM);
   if (start === null) return null;

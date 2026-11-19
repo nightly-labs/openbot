@@ -1,7 +1,6 @@
 import Foundation
 import Security
 
-/// What the app wrote for this extension (`src/features/share/model/share-extension.ts`).
 struct ShareDirectory: Decodable {
   struct Server: Decodable {
     let id: String
@@ -14,10 +13,8 @@ struct ShareDirectory: Decodable {
     let serverId: String
     let id: String
     let name: String
-    /// The agent's picture, a file in `ShareExtensionData.avatarFolder`.
     let avatar: String?
 
-    /// The ID of the agent's share suggestion, as the app donates it.
     var conversationId: String { "\(serverId)/\(id)" }
   }
 
@@ -34,12 +31,8 @@ struct ShareDirectory: Decodable {
   let agents: [Agent]
   let lastTarget: Target?
   let text: [String: String]
-  /// The app's accent color, as `#rrggbb`.
   let accent: String
 
-  /// The text keys that the extension shows. The app writes all of them. The hint of the message
-  /// field, `mobile.share.extension.message`, is not in this list: the file of an app that has not
-  /// opened since the update does not have it, and the extension still sends without it.
   static let textKeys = [
     "mobile.app.route.share",
     "mobile.share.content",
@@ -56,7 +49,6 @@ struct ShareDirectory: Decodable {
     "common.done",
   ]
 
-  /// The text of `key` in the app's language. `name` takes the place of `{name}`.
   func t(_ key: String, name: String? = nil) -> String {
     let value = text[key] ?? ""
     guard let name else { return value }
@@ -64,7 +56,6 @@ struct ShareDirectory: Decodable {
   }
 }
 
-/// The session of the app. Only the app and this extension can read the keychain item.
 struct ShareSession: Decodable {
   let apiUrl: String
   let userId: String
@@ -78,7 +69,6 @@ enum ShareExtensionData {
   private static let keychainAccount = "session"
   private static let avatarFolder = "share-extension-avatars"
 
-  /// The agent pictures that the app wrote, by file name. An agent without a picture shows its initial.
   static func avatars(appGroupId: String, directory: ShareDirectory) -> [String: Data] {
     guard let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId) else {
       return [:]
@@ -91,8 +81,6 @@ enum ShareExtensionData {
     return avatars
   }
 
-  /// Nil when the extension cannot send by itself: the app has not written its data, the data is for
-  /// another account, or the app lock is on. Then the app takes the share.
   static func load(appGroupId: String) -> (ShareDirectory, ShareSession)? {
     guard
       let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId),
@@ -127,7 +115,6 @@ enum ShareExtensionData {
     return try? JSONDecoder().decode(ShareSession.self, from: data)
   }
 
-  /// The agent of the last share from this extension, for the account of `directory`.
   static func lastTarget(appGroupId: String, directory: ShareDirectory) -> ShareDirectory.Target? {
     guard
       let data = UserDefaults(suiteName: appGroupId)?.data(forKey: lastTargetKey),

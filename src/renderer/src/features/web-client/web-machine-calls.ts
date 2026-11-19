@@ -1,6 +1,3 @@
-// The disk, machine and Library folder calls of the web client, for the sidebar warning cards, the
-// Storage section and the Library. Desktop sends the same routes through preload and main.
-
 import {
   decodeLibraryFoldersSnapshot,
   decodeMachineAlertSettings,
@@ -28,11 +25,6 @@ import { currentText } from "@openbot/ui/text";
 import type { FilesPort } from "../files/files-port";
 import type { SidebarCardsPort } from "../sidebar/sidebar-port";
 
-/**
- * As on desktop, a host without the capability has no reading: null for the disk, the machine use
- * and the Library folders, an error for the alert settings and for a folder change. `request` names the connected host and throws for any
- * other, so each call is async and rejects instead.
- */
 export function webMachineCalls(
   request: (serverId: string) => TeamApiRequest,
   hasCapability: (capability: string) => boolean,

@@ -15,10 +15,6 @@ import { useText } from "@/shared/lib/text";
 
 const DATE_FORMAT = { dateStyle: "medium" } as const satisfies Intl.DateTimeFormatOptions;
 
-/**
- * The status that the page names, or null for an active plan, which needs no status row. The account
- * server sends only open plans, so a canceled or expired plan does not come.
- */
 const STATUS_TEXT = {
   active: null,
   trialing: "mobile.settings.billing.status.trialing",
@@ -30,16 +26,9 @@ const STATUS_TEXT = {
   paused: "mobile.settings.billing.status.paused",
 } as const satisfies Record<BillingSubscriptionStatus, MobileTextKey | null>;
 
-/**
- * The plan, the billing period, the next date and the price of each hosted server, read only. The
- * user changes a plan or the payment method in OpenBot on the computer. Settings shows this page only
- * while the cloudServers feature flag is on.
- */
 export function BillingSettingsScreen() {
   const { t, errorMessage } = useText();
   const { session } = useMobileSession();
-  // A link can open this page also while the flag is off, or before Settings read the flags. It reads
-  // the flags, and while the flag is off it reads and shows nothing.
   const apiUrl = session?.apiUrl ?? "";
   const cloudServersOn = useMobileFeature(apiUrl, "cloudServers");
   useEffect(() => {
@@ -53,7 +42,6 @@ export function BillingSettingsScreen() {
     }, [cloudServersOn, refetch]),
   );
 
-  // An account server with no billing has no plans to show, and the user cannot get one.
   if (!cloudServersOn || billing.data?.available === false) return <SettingsContent />;
 
   if (billing.isError && !billing.data) {
@@ -93,7 +81,6 @@ export function BillingSettingsScreen() {
   );
 }
 
-/** One plan. The last section has the footer that says where the user changes a plan. */
 function PlanSection({ plan, last }: { plan: BillingServerPlan; last: boolean }) {
   const { t, format } = useText();
   const status = STATUS_TEXT[plan.status];
@@ -138,7 +125,6 @@ function PlanSection({ plan, last }: { plan: BillingServerPlan; last: boolean })
   );
 }
 
-/** No plan yet. The flag is on here, so the page can say where the user gets a cloud server. */
 function NoPlans() {
   const { t } = useText();
   const [foreground] = useThemeColor(["foreground"]);

@@ -1,11 +1,3 @@
-// Reads Hermes Agent profiles from a Hermes folder on this computer, for the Hermes import.
-//
-// Hermes keeps one profile in its folder (`default`) and each named profile in `profiles/<name>`.
-// A profile has `SOUL.md` (persona), `memories/MEMORY.md` and `USER.md` (entries split by `§`),
-// `skills/[<category>/]<name>/SKILL.md`, `config.yaml` (model, MCP servers, terminal), `cron/jobs.json`,
-// `.env` and `auth.json` (secrets) and `state.db` (sessions). This module only reads. It never runs
-// anything from the folder, and it reads the names in `.env`, never the values.
-
 import { lstat, readdir, readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, join, sep } from "node:path";
@@ -25,29 +17,21 @@ import { type ArchiveOperationError, archiveCall, archiveFailure } from "./archi
 import { createRedaction } from "./instance-transfer-service";
 import { archiveDirectory, inspectArchive, normalizedFiles } from "./skill-package";
 
-/** A folder is a profile when it holds one of these, as Hermes decides. */
 const PROFILE_MARKERS = ["config.yaml", ".env", "SOUL.md", "profile.yaml", "auth.json", "state.db"];
 const MEMORY_DELIMITER = "\n§\n";
-/** The start of the error a skill package with a secret file, a key or an archive gives. */
 const UNSAFE_FILE_PREFIX = sourceText("error.skill.unsafeFile", { name: "" });
-/** Text files read from a profile are small in Hermes; a larger one is cut here. */
 const MAX_TEXT_BYTES = 256 * 1024;
 const MAX_SKILLS = 200;
 const MAX_JOBS = 200;
-/** OpenBot's own export skill, which a user adds to Hermes. It is never imported back. */
 const EXPORT_SKILL_NAME = "openbot-export";
-/** Files a skill can run: anything in `scripts/` or `bin/`, and source files anywhere in the skill. */
 const SKILL_CODE =
   /^(?:scripts|bin)\/|\.(?:sh|bash|zsh|fish|py|js|mjs|cjs|ts|rb|pl|php|ps1|bat|cmd|exe|go|rs|lua|jar)$/iu;
-/** Where the routine runs: platforms Hermes delivers to that OpenBot cannot reach on its own. */
 const LOCAL_DELIVERY = new Set(["", "local", "origin"]);
 
 interface HermesSkill {
   slug: string;
   name: string;
-  /** The skill folder. Its files are read again when the import runs, so the preview holds none. */
   directory: string;
-  /** The skill has code it can run, so it imports only when the user allows it. */
   scripts: boolean;
 }
 
@@ -55,17 +39,14 @@ interface HermesRoutine {
   name: string;
   instruction: string;
   active: boolean;
-  /** The Hermes `schedule`. It becomes an OpenBot schedule when the import runs, so a time is never stale. */
   source: unknown;
 }
 
 export interface HermesProfileData {
   key: string;
-  /** The real path of the profile folder. An earlier import is found by it. */
   directory: string;
   name: string;
   model: string | null;
-  /** The persona, or null when there is none or Hermes's starting text is unchanged. */
   soul: string | null;
   soulDefault: boolean;
   memories: string[];
@@ -75,7 +56,6 @@ export interface HermesProfileData {
     reason: Extract<HermesImportReason, "unsafeFile" | "invalidSkill" | "duplicateSkill">;
   }>;
   builtInSkills: number;
-  /** Values that can hold a secret are already removed. The servers are added turned off. */
   mcpServers: McpServerConfig[];
   routines: HermesRoutine[];
   skippedRoutines: Array<{ name: string; reason: Extract<HermesImportReason, "routineSchedule" | "routineScript"> }>;
@@ -85,7 +65,6 @@ export interface HermesProfileData {
   hasHistory: boolean;
 }
 
-/** The Hermes folder: `HERMES_HOME`, or `~/.hermes`. A `HERMES_HOME` that names a profile gives its folder. */
 export function hermesRoot(
   env: NodeJS.ProcessEnv = process.env,
   home: string = homedir(),
@@ -100,17 +79,14 @@ export function hermesRoot(
   return join(home, ".hermes");
 }
 
-/** A chosen `profiles/<name>` folder reads as the Hermes folder it belongs to. */
 export function profileRoot(directory: string): string {
   return basename(dirname(directory)) === "profiles" ? dirname(dirname(directory)) : directory;
 }
 
-/** The folder as the user knows it, with the home folder as `~`. */
 export function displayPath(path: string, home: string = homedir()): string {
   return path === home || path.startsWith(`${home}${sep}`) ? `~${path.slice(home.length)}` : path;
 }
 
-/** The profiles of a Hermes folder, or null when the folder has none. */
 export const readHermesProfiles = Effect.fn("HermesImport.readProfiles")(function* (
   root: string,
   timezone: string,
@@ -169,7 +145,6 @@ const readProfile = Effect.fn("HermesImport.readProfile")(function* (
   };
 });
 
-/** `default` is the agent the user calls Hermes. A named profile reads as words: `research-desk` is "Research desk". */
 function profileName(key: string): string {
   if (key === "default") return "Hermes";
   const words = key.replace(/[-_]+/gu, " ").trim();
@@ -185,7 +160,6 @@ function modelLabel(value: unknown): string | null {
   return label.slice(0, HERMES_IMPORT_LIMITS.model) || null;
 }
 
-/** The persona without HTML comments. Hermes's starting file is a heading and comments only. */
 function persona(text: string): string | null {
   const content = text.replace(/<!--[\s\S]*?-->/gu, "").trim();
   if (!content || /^#[^\n]*$/u.test(content)) return null;
@@ -202,7 +176,6 @@ function memoryEntries(text: string | null): string[] {
     .filter(Boolean);
 }
 
-/** The names before `=` in `.env`. The values are dropped as each line is read. */
 function envNames(text: string | null): string[] {
   if (!text) return [];
   const names: string[] = [];
@@ -219,7 +192,6 @@ function terminalBackend(value: unknown): string | null {
   return backend && backend !== "local" ? backend.slice(0, HERMES_IMPORT_LIMITS.name) : null;
 }
 
-/** Each server as OpenBot stores it: turned off, with every value that can hold a secret removed. */
 function mcpServers(value: unknown): McpServerConfig[] {
   if (!isDynamicRecord(value)) return [];
   const redact = createRedaction();
@@ -287,7 +259,6 @@ const readSkills = Effect.fn("HermesImport.readSkills")(function* (folder: strin
       });
       continue;
     }
-    // Two folders with one skill name would be one library skill, and the second would replace the first.
     if (skills.some((skill) => skill.slug === read.success.info.slug)) {
       skippedSkills.push({ name: name.slice(0, HERMES_IMPORT_LIMITS.name), reason: "duplicateSkill" });
       continue;
@@ -302,12 +273,10 @@ const readSkills = Effect.fn("HermesImport.readSkills")(function* (folder: strin
   return { skills, skippedSkills, builtInSkills };
 });
 
-/** True when a skill has a file it can run, so it needs the user's approval. */
 export function hasSkillCode(paths: readonly string[]): boolean {
   return paths.some((path) => SKILL_CODE.test(path));
 }
 
-/** A skill folder as OpenBot checks a skill package. Unsafe files and an invalid SKILL.md fail it. */
 function readSkillPackage(directory: string) {
   return archiveDirectory(directory).pipe(
     Effect.mapError((failure): unknown => failure.cause),
@@ -320,13 +289,11 @@ function readSkillPackage(directory: string) {
   );
 }
 
-/** The files of a skill when the import runs, checked again: the folder can change after the preview. */
 export const readSkillFiles = Effect.fn("HermesImport.readSkillFiles")(function* (directory: string) {
   const read = yield* readSkillPackage(directory).pipe(Effect.mapError((cause) => archiveFailure(cause)));
   return Object.entries(read.files);
 });
 
-/** `skills/<name>` and `skills/<category>/<name>`, without Hermes's own dot folders. */
 const skillFolders = Effect.fn("HermesImport.skillFolders")(function* (folder: string) {
   const found: string[] = [];
   for (const name of (yield* archiveCall(() => readdir(folder))).sort()) {
@@ -403,7 +370,6 @@ const readJobs = Effect.fn("HermesImport.readJobs")(function* (path: string, tim
   return { routines, skipped, gateways: gateways.slice(0, HERMES_IMPORT_LIMITS.names) };
 });
 
-/** A cron expression, an interval in minutes, or one run in the future. Other schedules stay in Hermes. */
 export function routineSchedule(value: unknown, timezone: string, now = new Date()): RoutineSchedule | null {
   if (!isDynamicRecord(value)) return null;
   if (value.kind === "cron" && isString(value.expr) && value.expr.trim().split(/\s+/u).length === 5)
@@ -436,7 +402,6 @@ export function routineSchedule(value: unknown, timezone: string, now = new Date
   return null;
 }
 
-/** The parts of `config.yaml` the import reads. Each is checked where it is used. */
 interface HermesConfig {
   model: unknown;
   mcp_servers: unknown;
@@ -457,7 +422,6 @@ const readConfig = Effect.fn("HermesImport.readConfig")(function* (path: string)
   return config;
 });
 
-/** A regular file's text, cut at the read limit, or null when there is none. Links are not followed. */
 const readText = Effect.fn("HermesImport.readText")(function* (path: string) {
   const info = yield* archiveCall(() => lstat(path).catch(() => null));
   if (!info?.isFile()) return null;

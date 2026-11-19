@@ -3,14 +3,10 @@ import ExpoModulesCore
 import UIKit
 
 struct AwayState: Record {
-  /// The time since the app went to the background, or nil when it did not go there.
   @Field var awayMs: Double? = nil
-  /// True when iOS locked the protected data of the phone since the last read.
   @Field var phoneLocked: Bool = false
 }
 
-/// Measures the time that the app is away, with a clock that counts while the phone sleeps and that a
-/// change of the phone's time does not move. All calls run on the main queue.
 final class AppLockMonitor {
   static let shared = AppLockMonitor()
   private var watchPhoneLock = false
@@ -51,8 +47,6 @@ final class AppLockMonitor {
       center.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) {
         [weak self] _ in self?.endTask()
       },
-      // iOS posts this when it locks the protected data, about 10 seconds after the phone locks, and
-      // only when the phone has a passcode.
       center.addObserver(
         forName: UIApplication.protectedDataWillBecomeUnavailableNotification,
         object: nil,
@@ -65,11 +59,8 @@ final class AppLockMonitor {
   }
 
   private func enterBackground() {
-    // On Darwin, CLOCK_MONOTONIC continues while the phone sleeps.
     if awaySince == nil { awaySince = clock_gettime_nsec_np(CLOCK_MONOTONIC) }
     guard watchPhoneLock, task == .invalid else { return }
-    // iOS stops the app soon after it goes to the background, and the protected data closes later.
-    // The short background time that iOS gives lets the app hear the lock that put it there.
     task = UIApplication.shared.beginBackgroundTask(withName: "OpenBotAppLock") { [weak self] in
       self?.endTask()
     }
@@ -88,7 +79,6 @@ final class PinHashException: Exception, @unchecked Sendable {
   }
 }
 
-/// PBKDF2-HMAC-SHA256 with a 32-byte result, as lowercase hex. JavaScript takes seconds for the same work.
 private func derivePin(_ pin: String, saltHex: String, iterations: Int) throws -> String {
   guard !pin.isEmpty, iterations > 0, iterations <= Int(UInt32.max), let salt = bytes(hex: saltHex) else {
     throw PinHashException()
@@ -127,19 +117,16 @@ public class AppLockModule: Module {
   public func definition() -> ModuleDefinition {
     Name("OpenBotAppLock")
 
-    /// Starts or stops the signals. The phone lock signal keeps the app awake for a short time after it leaves.
     AsyncFunction("configure") { (enabled: Bool, watchPhoneLock: Bool) in
       AppLockMonitor.shared.configure(enabled: enabled, watchPhoneLock: watchPhoneLock)
     }
     .runOnQueue(.main)
 
-    /// Returns the time away and the phone lock since the last read, and clears them.
     AsyncFunction("takeAway") { () -> AwayState in
       AppLockMonitor.shared.takeAway()
     }
     .runOnQueue(.main)
 
-    /// Runs on the module's background queue, so the hash does not stop the interface.
     AsyncFunction("derivePin") { (pin: String, saltHex: String, iterations: Int) throws -> String in
       try derivePin(pin, saltHex: saltHex, iterations: iterations)
     }

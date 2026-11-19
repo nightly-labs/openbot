@@ -8,16 +8,12 @@ final class ShareModel: ObservableObject {
     case choosing
     case sending(String)
     case sent(String)
-    /// `unconfirmed`: the message can be in the chat, so the share is not offered to the app again.
     case failed(unconfirmed: Bool)
   }
 
   @Published var phase: Phase = .choosing
   @Published var selected: String?
-  /// The user's own words. They go before the shared content, in the same message.
   @Published var message = ""
-  /// The servers whose agents show. The first server of the app's list and the server of the
-  /// selected agent start open, so a long list of one server does not hide the others.
   @Published var expanded: Set<String>
   let directory: ShareDirectory
   let content: ShareContent
@@ -47,7 +43,6 @@ final class ShareModel: ObservableObject {
     directory.agents.first { $0.conversationId == selected }
   }
 
-  /// The text of the message: the user's words, then the shared text.
   var text: String {
     [message.trimmingCharacters(in: .whitespacesAndNewlines), content.text]
       .filter { !$0.isEmpty }
@@ -63,8 +58,6 @@ final class ShareModel: ObservableObject {
   }
 }
 
-/// The extension's sheet: what is shared, the agents by server, and Send. It looks like the app's
-/// share sheet (`share-screen.tsx`), in a native list.
 struct ShareView: View {
   @ObservedObject var model: ShareModel
 
@@ -124,7 +117,6 @@ struct ShareView: View {
         let agents = directory.agents.filter {
           $0.serverId == server.id && $0.conversationId != model.lastAgent?.conversationId
         }
-        // One server needs no fold.
         let open = directory.servers.count == 1 || model.expanded.contains(server.id)
         Section {
           if open {
@@ -172,7 +164,6 @@ struct ShareView: View {
     } label: {
       HStack(spacing: 12) {
         avatar(agent).frame(width: 36, height: 36).clipShape(Circle()).accessibilityHidden(true)
-        // A list button gives its label the tint; the name keeps the text color.
         Text(agent.name).foregroundStyle(Color.primary).lineLimit(1)
         Spacer()
         if model.selected == agent.conversationId {
@@ -228,7 +219,6 @@ struct ShareView: View {
 }
 
 private extension Color {
-  /// A `#rrggbb` color, or nil for any other text.
   init?(hex: String) {
     guard hex.count == 7, hex.hasPrefix("#"), let value = UInt32(hex.dropFirst(), radix: 16) else { return nil }
     self.init(

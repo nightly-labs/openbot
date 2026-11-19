@@ -1,21 +1,3 @@
-// Ranks the free OpenCode models on real agent tasks, to choose the models that a new OpenCode agent
-// starts on (`OPENCODE_RECOMMENDED_FREE_MODELS` in `packages/contracts/src/agent-providers.ts`).
-//
-// Each run is `opencode run --standalone --auto --format json` in a new temporary HOME and XDG
-// folders, so OpenCode never reads the developer's config, keys or sessions, and a new workspace
-// with the files of one task. No key is set: the runs use the keyless free tier, as a new user does.
-// After the run, the script checks the workspace and the reply. A task passes only when the check
-// passes. All free models share one usage limit, so a run that the limit stops is an error, not a
-// failure of the model.
-//
-// The limit stops the bench: each finished run is saved in runs.jsonl, and the next invocation runs
-// only the jobs that are missing (`--fresh` starts again). A model that answers "not available in
-// your country" is reported as not available, and its other jobs do not run.
-//
-// The model list is what keyless `opencode models` lists, filtered with `isFreeOpencodeModel`.
-// `OPENCODE_CLI=<opencode> bun run bench:opencode-free-models [--repeats=2] [--concurrency=4]
-// [--model=<id>]... [--task=<id>]... [--fresh]`
-// Writes .openbot-build/opencode-free-models-bench/runs.jsonl and report.json.
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -35,7 +17,6 @@ function flag(name: string): string[] {
 const REPEATS = Number(flag("repeats")[0] ?? 2);
 const CONCURRENCY = Number(flag("concurrency")[0] ?? 4);
 
-/** The managed OpenCode binary of the installed app, the newest version first. */
 async function opencodeCli(): Promise<string> {
   if (process.env.OPENCODE_CLI) return process.env.OPENCODE_CLI;
   const platform = `${process.platform}-${process.arch}`;
@@ -132,7 +113,6 @@ interface Check {
 
 interface Task {
   id: string;
-  /** What the task measures. */
   skill: string;
   files: Record<string, string>;
   prompt: string;
@@ -194,14 +174,12 @@ const TASKS: Task[] = [
     skill: "Find and fix two bugs from a failing test",
     files: {
       "package.json": '{ "type": "module" }\n',
-      "src/math.js": `// The sum of the integers from \`from\` to \`to\`, both included.
-export function sumRange(from, to) {
+      "src/math.js": `export function sumRange(from, to) {
   let total = 0;
   for (let n = from; n < to; n += 1) total += n;
   return total;
 }
 
-// The average of a list, or 0 for an empty list.
 export function average(values) {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
@@ -417,9 +395,7 @@ Attendees: Ana, Bo, Chen, Dee.
     skill: "Fix a parser with subtle bugs; hidden cases catch a fix that only fits the tests",
     files: {
       "package.json": '{ "type": "module" }\n',
-      "parse.js": `// Splits one CSV line into its fields (RFC 4180): a field in double quotes can hold commas,
-// and two double quotes inside it stand for one.
-export function parseLine(line) {
+      "parse.js": `export function parseLine(line) {
   const fields = [];
   let current = "";
   let quoted = false;
@@ -595,7 +571,6 @@ const RunSchema = Schema.Struct({
   task: Schema.String,
   repeat: Schema.Number,
   pass: Schema.Boolean,
-  /** Set when the run did not reach a result: the free limit, a refusal, a timeout or a crash. */
   error: Schema.NullOr(Schema.String),
   detail: Schema.String,
   wallMs: Schema.Number,
@@ -606,7 +581,6 @@ const RunSchema = Schema.Struct({
   outputTokens: Schema.Number,
   reasoningTokens: Schema.Number,
 });
-// Built field by field while the run's events are read.
 type Run = { -readonly [Key in keyof Schema.Schema.Type<typeof RunSchema>]: Schema.Schema.Type<typeof RunSchema>[Key] };
 const decodeRun = Schema.decodeUnknownSync(Schema.fromJsonString(RunSchema));
 
@@ -720,7 +694,6 @@ const isFreeLimit = (run: Run) => Boolean(run.error?.includes("provider.free-lim
 const isRegionRefusal = (run: Run) => Boolean(run.error?.includes("not available in your country"));
 const RUNS_FILE = join(OUT, "runs.jsonl");
 
-/** The runs of earlier invocations, so that a bench that the free limit stopped goes on where it stopped. */
 async function savedRuns(): Promise<Run[]> {
   if (process.argv.includes("--fresh")) await rm(RUNS_FILE, { force: true });
   const text = (await readText(RUNS_FILE)) ?? "";
@@ -742,7 +715,6 @@ async function main(): Promise<void> {
   const runs = await savedRuns();
   const done = new Set(runs.map((run) => `${run.model} ${run.task} ${run.repeat}`));
   const refused = new Set(runs.filter(isRegionRefusal).map((run) => run.model));
-  // Repeat-major and task-major, so each model meets the same time of day and the same limit state.
   const jobs = Array.from({ length: REPEATS }, (_, repeat) =>
     tasks.flatMap((task) => models.map((model) => ({ model, task, repeat }))),
   )
@@ -759,13 +731,11 @@ async function main(): Promise<void> {
       while (!limited && next < jobs.length) {
         const job = jobs[next++];
         if (!job) break;
-        // A model that the country refuses refuses every task; one refusal is enough to report it.
         if (refused.has(job.model)) continue;
         const run = await runOnce(cli, job.model, job.task, job.repeat);
         finished += 1;
         const state = run.error ? `ERROR ${run.error.slice(0, 120)}` : run.pass ? "pass" : `fail ${run.detail}`;
         print(`[${finished}/${jobs.length}] ${job.model} ${job.task.id}#${job.repeat} ${run.wallMs}ms ${state}`);
-        // The limit says nothing about the model, so the run is not kept and runs again next time.
         if (isFreeLimit(run)) {
           limited = true;
           break;
@@ -794,7 +764,6 @@ async function main(): Promise<void> {
         failedTasks: own.filter((run) => !run.pass).map((run) => `${run.task}#${run.repeat}`),
       };
     })
-    // Available first, then the best pass rate; between equal rates, the faster model.
     .sort(
       (a, b) => Number(b.available) - Number(a.available) || b.passRate - a.passRate || a.medianWallMs - b.medianWallMs,
     );

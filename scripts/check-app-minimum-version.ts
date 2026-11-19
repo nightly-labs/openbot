@@ -1,9 +1,3 @@
-// Fails when a value in `APP_MINIMUM_VERSIONS` is not a release that is 60 days old or older. The
-// desktop and host date comes from CHANGELOG.md; the ios and android date is the store date in
-// apps/mobile/CHANGELOG.md. Over-the-air versions do not count.
-//
-//   bun scripts/check-app-minimum-version.ts
-
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { APP_SURFACES, type AppSurface } from "@openbot/contracts/app-minimum-version";
@@ -15,7 +9,6 @@ const SUPPORT_DAYS = 60;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const OTA_VERSION = /^\d+\.\d+\.\d+\.\d+$/;
 
-/** The problems of `versions` on the day `today` (`YYYY-MM-DD`). Empty when every value is allowed. */
 export function appMinimumVersionProblems(
   versions: Readonly<Record<AppSurface, string | null>>,
   releases: Readonly<Record<ChangelogPlatform, readonly ChangelogRelease[]>>,

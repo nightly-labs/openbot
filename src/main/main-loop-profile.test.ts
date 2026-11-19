@@ -4,7 +4,6 @@ import { type CpuProfile, isProfileFrame, isProfileStack, summarizeCpuProfile } 
 const APP = "/Users/alice/Applications/OpenBot.app/Contents/Resources/app.asar";
 
 function profile(frames: { functionName: string; url: string; lineNumber?: number }[]): CpuProfile {
-  // One chain: each frame calls the next one, and each has 10 ms of own time.
   const nodes = [
     { id: 1, callFrame: { functionName: "(root)", url: "", lineNumber: -1 }, children: [2] },
     ...frames.map((frame, index) => ({
@@ -22,8 +21,6 @@ function profile(frames: { functionName: string; url: string; lineNumber?: numbe
   };
 }
 
-// Failure modes: a home directory, a file outside the application, a URL, or a name from evaluated
-// text or other code reaches the log file or the analytics event.
 describe("summarizeCpuProfile", () => {
   it("keeps names of application code and no directory", () => {
     const summary = summarizeCpuProfile(

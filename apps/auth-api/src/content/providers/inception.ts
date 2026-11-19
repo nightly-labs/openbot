@@ -1,10 +1,5 @@
 import type { ProviderPage } from "./provider-page";
 
-// Every statement about Inception and Mercury here is taken from inceptionlabs.ai and
-// Inception's documentation. Each page used is in `sources`. OpenBot runs Mercury in its own
-// copy of Pi (`src/backend/pi-key-providers.ts`). Check the sources again, and move `checkedAt`,
-// whenever this file changes.
-
 const DOCS = "https://docs.inceptionlabs.ai/get-started";
 
 export const INCEPTION_PROVIDER: ProviderPage = {

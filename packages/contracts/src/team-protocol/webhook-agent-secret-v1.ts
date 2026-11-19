@@ -1,10 +1,3 @@
-// Frozen optional webhook-agent-secret-v1 wire contract. Keep IPC types and limits out of this file.
-//
-// What it grants, recorded here because freezing it makes it permanent: an owner or admin of a
-// server gives a new signing secret of one webhook routine of an agent to that agent. The host makes
-// the secret, saves it as an API key of the agent, and then replaces the routine secret with it. The
-// route ID stays. The answer has only the key name: the secret never leaves the host. Widening any of
-// it needs a second capability string.
 import { adminRoute, fields, identifier, type OptionalRouteCodec, string } from "./admin-wire";
 import { routineOwner } from "./events-v1";
 

@@ -2,19 +2,10 @@ import type { AccountSession, AvatarColor, AvatarImageInput } from "@openbot/con
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { currentText } from "@openbot/ui/text";
 
-/**
- * The desktop Settings > Profile calls for a signed-in browser. They use the
- * `/api/browser/v1/...` operations, which authenticate with the browser cookie instead of a bearer token.
- */
 export interface WebAccountCalls {
   updateName: (name: string) => Promise<void>;
-  /**
-   * Saves the user's analytics answer on the account, so their other devices follow it. `ageMs` is
-   * the age of the choice. Returns the account's answer: a newer answer from another device stays.
-   */
   updateAnalytics: (enabled: boolean, ageMs: number) => Promise<boolean | null>;
   updateAvatar: (image: AvatarImageInput | null) => Promise<void>;
-  /** Saves the chat color on the account. Members of each server of the user see it. */
   setChatColor: (color: AvatarColor | null) => Promise<void>;
   listSessions: () => Promise<AccountSession[]>;
   revokeSession: (sessionId: string) => Promise<void>;
@@ -30,7 +21,6 @@ export function createWebAccountCalls(
     path: string,
     init: { method: string; body?: BodyInit; contentType?: string } = { method: "GET" },
   ): Promise<Response> {
-    // As the team client's browser requests: a stalled request fails, so the panel does not stay busy.
     const response = await accountFetch(`/api/browser/${path}`, {
       method: init.method,
       credentials: "same-origin",

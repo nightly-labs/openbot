@@ -14,13 +14,6 @@ import java.io.ByteArrayOutputStream
 
 class ThemeSnapshotException : CodedException("The window has no picture")
 
-/**
- * A picture of the activity window, with the sheets that React Native Screens draws in it. The theme
- * change (`src/features/settings/components/theme-sweep.tsx`) shows it as the old theme while the new
- * one comes in under it. `PixelCopy` copies the pixels on screen. A redraw of the views, as Skia's
- * `makeImageFromView` does, misses the sheet's offset and some text padding. The picture goes to
- * JavaScript as JPEG bytes. The copy and the JPEG run on a background thread.
- */
 class ThemeSnapshotModule : Module() {
   private var worker: HandlerThread? = null
 

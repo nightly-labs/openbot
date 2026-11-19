@@ -19,10 +19,8 @@ internal data class OpenedNotification(
   val kind: String,
   val title: String,
   val body: String,
-  /** Set when the phone has more than one server, so the notification says which one it is. */
   val serverName: String?,
 ) {
-  /** The notification data that the app reads, as `NotificationService.swift` gives it on iOS. */
   fun data(): JSONObject =
     JSONObject()
       .put("serverId", serverId)
@@ -31,14 +29,6 @@ internal data class OpenedNotification(
       .put("kind", kind)
 }
 
-/**
- * Opens a notification that an OpenBot host sealed, with the keys of each server that the app writes
- * into `push-notifications.json` in its files folder (`android-push-notifications.android.ts`).
- *
- * The seal is the one of `live-activity-seal.ts` in `@openbot/team-client`: a keystream of
- * HMAC-SHA256 blocks over a 16-byte nonce and a 32-bit counter, then a 16-byte HMAC-SHA256 tag over
- * the nonce and the ciphertext, as base64url. `NotificationService.swift` opens it on iOS.
- */
 internal object SealedNotification {
   private const val NONCE_BYTES = 16
   private const val TAG_BYTES = 16
@@ -74,7 +64,6 @@ internal object SealedNotification {
       } catch (error: JSONException) {
         return null
       }
-      // A host seals with the keys of its own server only, so it cannot speak for another one.
       if (json.opt("serverId") != server.serverId) return null
       val agentId = json.opt("agentId") as? String ?: return null
       val kind = json.opt("kind") as? String ?: return null

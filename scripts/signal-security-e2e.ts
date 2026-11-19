@@ -1,10 +1,3 @@
-// Starts the real Signal service (`remote/api`) on a free local port with throwaway secrets and a
-// fake account service, then checks its secret and authentication rules over real HTTP and
-// WebSocket connections: the Telegram secret header, the Slack signature, the signed account
-// events, the GitHub App signature and the fan-out of a GitHub event to each host that watches its repository, the body limits, the remote and route tickets, a failed account service during an initial ticket check after a start, the limit on parallel account service checks during a burst of hellos, the generic webhook headers, the start of a sleeping hosted server for a generic webhook (once for each host in its wake interval), the Standard Webhooks headers only for a host that names the format, the hello deadline, the reuse of
-// TURN credentials, the pick of one TURN relay that allocates for each host, the `signal` ticket claim and the entry rule of
-// two Signal machines (with a second Signal and a fake DNS server), and that no frame or log line holds the Telegram bot token. Writes .openbot-build/signal-security-e2e/report.json and exits
-// non-zero when a check fails. It makes no request to Telegram, Slack or Discord.
 import { type ChildProcess, spawn } from "node:child_process";
 import { createHmac, generateKeyPairSync, randomBytes, randomUUID } from "node:crypto";
 import { createSocket, type Socket } from "node:dgram";
@@ -49,7 +42,6 @@ const WAIT_MS = 10_000;
 
 const logger = createOpenBotLogger("signal-security-e2e");
 
-// Throwaway values for this run only. The bot token's secret part must never leave Signal.
 const BOT_ID = "777000111";
 const BOT_TOKEN_SECRET = `AAH-${randomBytes(18).toString("base64url")}`;
 const BOT_TOKEN = `${BOT_ID}:${BOT_TOKEN_SECRET}`;
@@ -61,7 +53,6 @@ const HOST_ID = "host-e2e";
 const ROUTED_CHAT = "-100";
 const SECOND_CHAT = "-300";
 const WEBHOOK_ROUTE = "route-e2e";
-// A host that names the Standard Webhooks format in its hello, and its route.
 const STANDARD_HOST_ID = "host-standard-e2e";
 const STANDARD_ROUTE = "route-standard-e2e";
 const GITHUB_WEBHOOK_SECRET = randomBytes(32).toString("hex");
@@ -71,27 +62,21 @@ const GITHUB_REPOSITORY = 77;
 const LINK_HOST_ID = "host-link-e2e";
 const LINK_CHAT = "-500";
 const LINK_CODE = randomBytes(32).toString("base64url");
-// The account service fails for the sessions of this host, and calls the sessions of the next one inactive.
 const UNAVAILABLE_HOST_ID = "host-unavailable-e2e";
 const INACTIVE_HOST_ID = "host-inactive-e2e";
-// The account service answers the sessions of these hosts slowly, and the run counts how many checks wait at a time.
 const BURST_HOST_PREFIX = "host-burst-e2e-";
 const BURST_PEERS = 100;
 const BURST_CHECK_MILLISECONDS = 300;
-// `RESUME_CHECK_CONCURRENCY` in remote/api/src/index.ts.
 const RESUME_CHECK_CONCURRENCY = 64;
 const burstChecks = { active: 0, maximum: 0 };
-// Two names of the fake TURN server, which allocates, and one name that does not resolve.
 const LIVE_RELAYS = ["127.0.0.1", "localhost"];
 const DOWN_RELAY = "turn-down.invalid";
 const RELAY_HOST_IDS = Array.from({ length: 12 }, (_, index) => `host-relay-e2e-${index}`);
 const METRICS_TOKEN = randomBytes(32).toString("base64url");
-// The `SIGNAL_ID` of both Signals of this run, and the entry name that the fake DNS server answers.
 const SIGNAL_ID = "a";
 const ENTRY_HOST = "signal.entry.test";
 const ENTRY_IPV4 = "192.0.2.1";
 const OTHER_IPV4 = "192.0.2.2";
-// The address that the fake DNS server gives for the entry name. The run changes it to move the entry.
 const entryDns = { address: ENTRY_IPV4 };
 
 interface Check {
@@ -119,10 +104,6 @@ function expect(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
 
-/**
- * A TURN server that answers each Allocate as coturn does: 401 with a realm and a nonce without
- * credentials, success with them. It does not check the credentials. It answers each Refresh.
- */
 function startTurnServer(): Promise<Socket> {
   const socket = createSocket("udp4");
   const attribute = (type: number, value: Buffer) => {
@@ -156,10 +137,6 @@ function startTurnServer(): Promise<Socket> {
   return new Promise((resolveSocket) => socket.bind(0, "127.0.0.1", () => resolveSocket(socket)));
 }
 
-/**
- * A DNS server that answers the A query of `ENTRY_HOST` with `entryDns.address`, and any other query with
- * NXDOMAIN. The TTL is 0, so each lookup of Signal asks again.
- */
 function startEntryDns(): Promise<Socket> {
   const socket = createSocket("udp4");
   socket.on("message", (query, sender) => {
@@ -171,7 +148,6 @@ function startEntryDns(): Promise<Socket> {
       labels.push(query.subarray(offset + 1, offset + 1 + length).toString());
       offset += 1 + length;
     }
-    // The zero label, the type and the class.
     const questionEnd = offset + 5;
     if (questionEnd > query.length) return;
     const matches = labels.join(".").toLowerCase() === ENTRY_HOST && query.readUInt16BE(offset + 1) === 1;
@@ -191,7 +167,6 @@ function startEntryDns(): Promise<Socket> {
   return new Promise((resolveSocket) => socket.bind(0, "127.0.0.1", () => resolveSocket(socket)));
 }
 
-/** The host names in the STUN and TURN URLs of a `ready` frame. */
 function relayHosts(ready: { iceServers?: Array<{ urls: string | string[] }> }): string[] {
   const urls = (ready.iceServers ?? []).flatMap((server) => [server.urls].flat());
   return [...new Set(urls.map((url) => url.replace(/^(?:stun|turns?):/u, "").replace(/:[0-9]+(?:\?.*)?$/u, "")))];
@@ -214,21 +189,15 @@ function hmac(secret: string, text: string, encoding: "hex" | "base64url") {
   return createHmac("sha256", secret).update(text).digest(encoding);
 }
 
-// The account service that Signal asks. It confirms every route that a ticket names, and records
-// whether each request carried a valid service signature.
 const controlPlaneCalls: Array<{ path: string; signed: boolean }> = [];
-// The Telegram chat and the `wake` flag of each route-wake request.
 const routeWakes: Array<{ chatId: string; wake: boolean }> = [];
-// The generic webhook routes of hosted servers that sleep, and each route-wake request for a webhook.
 const SLEEPING_WEBHOOK_ROUTES: Record<string, string> = {
   "route-sleeping-a1": "host-sleeping-a",
   "route-sleeping-a2": "host-sleeping-a",
   "route-sleeping-b": "host-sleeping-b",
   "route-sleeping-c": "host-sleeping-c",
 };
-// A hosted server whose resume failed: its row stays `running`, so the account service answers `starting`.
 const STARTING_WEBHOOK_ROUTES: Record<string, string> = { "route-starting-d": "host-starting-d" };
-// The first start of this route fails, as when the account service has an error.
 let failNextWebhookWake = "route-sleeping-c";
 const webhookWakes: Array<{ routeId: string; wake: boolean }> = [];
 function readBody(request: IncomingMessage): Promise<string> {
@@ -267,10 +236,8 @@ function startControlPlane(port: number): Promise<Server> {
       return answer(200, { valid: payload.hostId !== INACTIVE_HOST_ID });
     }
     if (path === "/v2/remote/telegram-route/validate") return answer(200, { chats: payload.chats });
-    // Only the one link code of this run links a chat, to the host of the link check.
     if (path === "/v2/remote/telegram-route/link")
       return payload.code === LINK_CODE ? answer(200, { hostId: LINK_HOST_ID, linkedAt: Date.now() }) : answer(404);
-    // With route wakes, Signal keeps events for a host. No route here is of a hosted server.
     if (path === "/v2/remote/route-wake") {
       if (payload.route?.platform === "telegram") routeWakes.push({ chatId: payload.route.chatId, wake: payload.wake });
       if (payload.route?.platform === "webhook") {
@@ -293,7 +260,6 @@ function startControlPlane(port: number): Promise<Server> {
   return new Promise((resolveServer) => server.listen(port, "127.0.0.1", () => resolveServer(server)));
 }
 
-// Tickets that the account service would sign for a host.
 const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
 const { privateKey: foreignKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
 const publicJwk = { ...(await exportJWK(publicKey)), kid: "e2e-1", alg: "ES256", use: "sig" };
@@ -412,7 +378,6 @@ const turnServer = await startTurnServer();
 const serviceOutput: string[] = [];
 const child = spawn("bun", [resolve(ROOT, "remote/api/src/index.ts")], {
   cwd: resolve(ROOT, "remote/api"),
-  // Only what Signal needs, so no developer or production secret reaches it.
   env: {
     PATH: process.env.PATH ?? "",
     HOME: process.env.HOME ?? "",
@@ -434,7 +399,6 @@ const child = spawn("bun", [resolve(ROOT, "remote/api/src/index.ts")], {
     GITHUB_WEBHOOK_SECRET,
     TELEGRAM_BOT_TOKENS: BOT_TOKEN,
     TELEGRAM_WEBHOOK_SECRET,
-    // All sockets of the burst check come from one address.
     REMOTE_MAX_CONNECTIONS_PER_IP: String(BURST_PEERS * 2),
     REMOTE_MAX_MESSAGES_PER_MINUTE: String(BURST_PEERS * 20),
   },
@@ -443,7 +407,6 @@ const child = spawn("bun", [resolve(ROOT, "remote/api/src/index.ts")], {
 child.stdout?.on("data", (chunk: Buffer) => serviceOutput.push(chunk.toString()));
 child.stderr?.on("data", (chunk: Buffer) => serviceOutput.push(chunk.toString()));
 
-// The second Signal and the DNS server of the entry checks.
 let entryChild: ChildProcess | null = null;
 let entryDnsServer: Socket | null = null;
 
@@ -495,7 +458,6 @@ const postGitHub = (
 const githubEvent = (installation: number, repository: number) =>
   JSON.stringify({ action: "opened", installation: { id: installation }, repository: { id: repository } });
 
-/** An ingress socket of `hostId` with a GitHub route for the one repository of this run. */
 async function githubIngress(hostId: string, routeHostId = hostId): Promise<Peer> {
   const peer = await connect(signalUrl);
   peer.socket.send(
@@ -513,7 +475,6 @@ async function githubIngress(hostId: string, routeHostId = hostId): Promise<Peer
   return peer;
 }
 
-/** Answers each `github-delivery` of `peer` with `status`. */
 function answerGitHub(peer: Peer, status: number) {
   peer.socket.addEventListener("message", (event) => {
     const frame = JSON.parse(String(event.data));
@@ -524,21 +485,18 @@ function answerGitHub(peer: Peer, status: number) {
   });
 }
 
-/** Sends a host hello and returns the socket. */
 async function hello(url: string, token: string): Promise<Peer> {
   const peer = await connect(url);
   peer.socket.send(JSON.stringify({ type: "hello", version: 1, peer: "host", token }));
   return peer;
 }
 
-/** The `ready` frame of a host hello. */
 async function helloReady(url: string, token: string): Promise<{ peer: Peer; ready: { resumeToken?: string } }> {
   const peer = await hello(url, token);
   const ready = JSON.parse(await peer.next((frame) => frame.includes('"type":"ready"'), "ready after hello"));
   return { peer, ready };
 }
 
-/** Waits until `/metrics` of the Signal on `port` has the line `sample`. */
 async function metricShows(port: number, sample: string): Promise<string> {
   const deadline = Date.now() + WAIT_MS;
   let lines: string[] = [];
@@ -567,7 +525,6 @@ try {
   await waitForReady(`${base}/health/ready`, child);
   logger.info(`Signal is ready on port ${signalPort}.`);
 
-  // 1. Telegram: only a request with the bot's own secret header reaches a host.
   const ingress = await connect(signalUrl);
   ingress.socket.send(
     JSON.stringify({
@@ -606,7 +563,6 @@ try {
     expect(wrong.status === 401, `wrong secret: ${wrong.status}`);
     expect(empty.status === 401, `empty secret: ${empty.status}`);
     expect(otherBot.status === 404, `unknown bot: ${otherBot.status}`);
-    // The next valid update is the barrier: when it arrives, nothing before it did.
     const accepted = await postUpdate(update(ROUTED_CHAT, "right secret"));
     expect(accepted.status === 200, `right secret: ${accepted.status}`);
     const delivery = await ingress.next(
@@ -638,7 +594,6 @@ try {
 
   await check("A Telegram link that lands while its host connects again reaches the next socket", async () => {
     const queueKey = await createIngressQueueKeyPair();
-    // The route ticket is made before the link, so it does not name the chat.
     const staleRoute = await sign({ hid: LINK_HOST_ID, chats: [] }, TELEGRAM_ROUTE_AUDIENCE);
     const hello = async () =>
       JSON.stringify({
@@ -671,7 +626,6 @@ try {
       `kept frame: ${opened.type}`,
     );
     second.socket.send(JSON.stringify({ type: "queued-delivery-ack", version: 1, id: kept.id }));
-    // The next socket holds the chat, though its route ticket does not name it.
     await postUpdate(update(LINK_CHAT, "after link"));
     await second.next(
       (frame) => frame.includes('"type":"telegram-delivery"') && frame.includes(`"chatId":"${LINK_CHAT}"`),
@@ -682,7 +636,6 @@ try {
   });
 
   await check("Only a Telegram update that can address OpenBot asks to start a hosted server", async () => {
-    // Each case uses its own chat that no socket holds, so Signal asks the account service once for it.
     const message = <Fields extends object>(fields: Fields) => ({ message_id: 1, from: { id: 5 }, ...fields });
     const cases: Array<{ chatId: string; wake: boolean; body: object }> = [
       { chatId: "-600", wake: false, body: { message: message({ chat: { id: -600, type: "group" }, text: "hi" }) } },
@@ -752,7 +705,6 @@ try {
     return "plain text and caption: wake=false; mention, caption mention, reply, thread, direct, rename, button: wake=true";
   });
 
-  // 2. Signed account events: Signal acts only on an event that the account service signed now.
   await check("An account event with a bad or stale signature gets 401; a signed one revokes the route", async () => {
     const body = JSON.stringify({ type: "telegram-route-revoked", botId: BOT_ID, chatId: ROUTED_CHAT, through: 2_000 });
     const bad = await postAuthEvent(body, nowSeconds(), "x".repeat(43));
@@ -769,7 +721,6 @@ try {
     const timestamp = nowSeconds();
     const signed = await postAuthEvent(body, timestamp, hmac(AUTH_WEBHOOK_SECRET, `${timestamp}.${body}`, "base64url"));
     expect(signed.status === 204, `signed: ${signed.status}`);
-    // The revoked chat no longer reaches the host. The update of the chat that stays routed is the barrier.
     const before = ingress.frames.length;
     await postUpdate(update(ROUTED_CHAT, "after revoke"));
     await postUpdate(update(SECOND_CHAT, "still routed"));
@@ -786,7 +737,6 @@ try {
     return "bad 401, stale 401, other body 401, signed 204, revoked chat not delivered";
   });
 
-  // 3. Generic webhooks: Signal relays only a request with well-formed signed headers.
   await check("A generic webhook request without well-formed signed headers gets 401", async () => {
     const body = JSON.stringify({ event: "e2e" });
     const headers = (signature: string, timestamp = nowSeconds()) => ({
@@ -818,8 +768,6 @@ try {
     return "missing 401, malformed 401, bad timestamp 401, unheld route 503, nothing delivered";
   });
 
-  // A generic webhook for a route that no socket holds starts a hosted server that sleeps, but Signal
-  // keeps nothing and answers 503, so the sender sends again. A host starts once in its wake interval.
   await check("A generic webhook starts a sleeping hosted server once and still gets 503", async () => {
     const body = JSON.stringify({ event: "e2e-wake" });
     const post = (routeId: string) =>
@@ -841,26 +789,20 @@ try {
       expect(done(), `no ${label}`);
     };
     const statuses: number[] = [];
-    // Two tries of the same delivery: the second one finds the cached answer and starts nothing more.
     statuses.push((await post("route-sleeping-a1")).status);
     await waitUntil(() => calls("route-sleeping-a1", true) === 1, "wake of route-sleeping-a1");
     statuses.push((await post("route-sleeping-a1")).status);
-    // Another route of the same host is looked up, but the host already started in this interval.
     statuses.push((await post("route-sleeping-a2")).status);
     await waitUntil(() => calls("route-sleeping-a2", false) === 1, "lookup of route-sleeping-a2");
-    // A route of another host starts that host. Its wake comes after the lookup of route-sleeping-a2.
     statuses.push((await post("route-sleeping-b")).status);
     await waitUntil(() => calls("route-sleeping-b", true) === 1, "wake of route-sleeping-b");
-    // A start that failed does not count against the interval: the next try asks again.
     statuses.push((await post("route-sleeping-c")).status);
     await waitUntil(() => calls("route-sleeping-c", true) === 1, "failed wake of route-sleeping-c");
     statuses.push((await post("route-sleeping-c")).status);
     await waitUntil(() => calls("route-sleeping-c", true) === 2, "second wake of route-sleeping-c");
-    // A server that stays `starting` after a failed resume is asked to start again, once in the interval.
     statuses.push((await post("route-starting-d")).status);
     await waitUntil(() => calls("route-starting-d", true) === 1, "wake of route-starting-d");
     statuses.push((await post("route-starting-d")).status);
-    // A route that no host has is looked up and starts nothing.
     statuses.push((await post("route-nobody-has")).status);
     await waitUntil(() => calls("route-nobody-has", false) === 1, "lookup of route-nobody-has");
     expect(
@@ -876,8 +818,6 @@ try {
     return `503 x${statuses.length}; host-sleeping-a woke once for two routes; host-sleeping-b woke; host-sleeping-c woke again after a failed start; host-starting-d woke once; unknown route woke nothing`;
   });
 
-  // Standard Webhooks (Composio, Svix): Signal relays the `webhook-*` or `svix-*` headers only to a
-  // host that names the format, because an older host refuses that signature.
   await check("A Standard Webhooks request reaches only a host that names the format", async () => {
     const body = JSON.stringify({ type: "composio.trigger.message", metadata: { trigger_slug: "E2E" } });
     const standard = (route: string, prefix: "webhook" | "svix", id: string, signature = `v1,${"A".repeat(43)}=`) =>
@@ -891,7 +831,6 @@ try {
         },
         body,
       });
-    // The ingress socket above names no format, as an OpenBot version before this one.
     const older = await standard(WEBHOOK_ROUTE, "webhook", "msg_older");
     expect(older.status === 401, `older host: ${older.status}`);
     expect(!ingress.frames.some((frame) => frame.includes('"msg_older"')), "The older host got the request.");
@@ -937,8 +876,6 @@ try {
     return `older host 401, malformed 401, ${statuses.join(", ")} with the format`;
   });
 
-  // GitHub: Signal checks the App's signature, and passes an event to every host that watches its
-  // repository in the same installation.
   await check("A GitHub route ticket of another host is refused", async () => {
     const peer = await githubIngress(HOST_ID, GITHUB_HOST_ID);
     const code = await withDeadline(peer.closed, "close after a GitHub route of another host");
@@ -981,7 +918,6 @@ try {
       const body = JSON.parse(Buffer.from(frame.bodyBase64, "base64").toString());
       expect(body.repository.id === GITHUB_REPOSITORY, "The body changed on the way.");
     }
-    // An issue and its comment at GitHub's longest text, as CJK, fit; a larger body gets 413.
     const long = JSON.stringify({
       ...JSON.parse(githubEvent(GITHUB_INSTALLATION, GITHUB_REPOSITORY)),
       issue: { body: "文".repeat(65_536) },
@@ -1020,7 +956,6 @@ try {
     },
   );
 
-  // 4. Slack: Signal checks the signature, its age, and that the secret belongs to the named app.
   await check("A Slack request with a bad, stale or other-app signature gets 401", async () => {
     const challenge = JSON.stringify({ type: "url_verification", challenge: "e2e-challenge", token: "unused" });
     const bad = await postSlack(challenge, nowSeconds(), "v0=bad");
@@ -1050,8 +985,6 @@ try {
     return "bad 401, stale 401, unknown secret 401, other app 401, valid challenge 200";
   });
 
-  // Slack turns off events for the whole app when more than 95% of deliveries fail for 60 minutes.
-  // A channel message of a workspace whose computer is off must not count as a failure (#4345).
   await check("A Slack event for a host with no socket gets 200 only when it is chatter", async () => {
     const post = async (event: Record<string, string>) => {
       const body = JSON.stringify({ type: "event_callback", api_app_id: SLACK_APP_ID, team_id: "T0E2EOFF", event });
@@ -1071,14 +1004,12 @@ try {
     return "channel message 200; mention, direct message, thread reply, app_uninstalled 503";
   });
 
-  // A body with no declared length: Signal must stop at its limit, so it answers before the body ends.
   await check("A Slack request or an account event with a body that does not end gets 413", async () => {
     const endless = () => {
       const chunk = new Uint8Array(16 * 1024).fill(0x20);
       let sent = 0;
       return new ReadableStream<Uint8Array>({
         pull(controller) {
-          // Past 1 MiB the stream sends nothing more and does not end.
           if (sent >= 1024 * 1024) return new Promise<void>(() => {});
           sent += chunk.byteLength;
           controller.enqueue(chunk);
@@ -1102,7 +1033,6 @@ try {
     return "account event 413, Slack 413";
   });
 
-  // 5. Remote tickets: a host connects only with a current ticket that the account service signed.
   await helloFails("A ticket signed by another key is refused", await remoteTicket({}, foreignKey));
   await helloFails(
     "A ticket of an expired remote session is refused",
@@ -1115,8 +1045,6 @@ try {
       protocolMaximum: REMOTE_TICKET_PROTOCOL_VERSION + 1,
     }),
   );
-  // After a restart, Signal asks the account service about each session. A failed account service
-  // must not end a session that can still be active; an inactive session still ends.
   await check("A session that the account service cannot check is closed with 1013 and no error", async () => {
     const peer = await connect(signalUrl);
     peer.socket.send(
@@ -1176,9 +1104,6 @@ try {
     );
     return `closed with ${code} and an authentication_required error`;
   });
-  // After a restart every peer connects again at once. Signal sends a limited number of checks to the
-  // account service at the same time, and each peer still gets ready. The hellos use initial tickets,
-  // which Signal checks with the account service only in the first 3 minutes after its start.
   await check(
     `A burst of hellos sends at most ${RESUME_CHECK_CONCURRENCY} account service checks at a time`,
     async () => {
@@ -1214,8 +1139,6 @@ try {
     return `closed with ${code}`;
   });
 
-  // 6. Idle sockets and TURN credentials. The idle check runs between the two refreshes, so the
-  // second refresh is at least one second later and new credentials would have a new username.
   const refresh = async (): Promise<string> => {
     const before = ingress.frames.length;
     ingress.socket.send(JSON.stringify({ type: "turn-refresh", version: 1, connectionId: null }));
@@ -1259,7 +1182,6 @@ try {
     return `${controlPlaneCalls.length} requests, all signed: ${[...new Set(controlPlaneCalls.map((call) => call.path))].join(", ")}`;
   });
 
-  // 7. TURN relays: Signal probes each relay and gives each host one relay that allocates.
   await check("Signal marks each TURN relay by its probe", async () => {
     const expected = [...LIVE_RELAYS.map((host) => `{host="${host}"} 1`), `{host="${DOWN_RELAY}"} 0`].map(
       (sample) => `openbot_remote_turn_relay_available${sample}`,
@@ -1317,8 +1239,6 @@ try {
     return `${response.status} ${body}`;
   });
 
-  // 8. Two Signal machines. A Signal with `SIGNAL_ID` refuses a ticket of another machine. A second
-  // Signal with the entry rule refuses the tickets of the entry while the entry name names another machine.
   await check("A ticket whose signal claim names another Signal is refused", async () => {
     const peer = await hello(signalUrl, await remoteTicket({ signal: "b" }));
     const code = await withDeadline(peer.closed, "close after a ticket of another Signal");
@@ -1380,7 +1300,6 @@ try {
   const entrySignalUrl = `ws://127.0.0.1:${entrySignalPort}/v1/signal`;
   const entryTicket = (hostId: string, signal?: string) =>
     remoteTicket({ hostId, membershipId: `${hostId}:host`, ...(signal ? { signal } : {}) });
-  // Without a content type: the entry answers 415, another machine 503 before it reads anything.
   const postEntryWebhook = () =>
     fetch(`${entryBase}${WEBHOOK_EVENTS_PATH}/${WEBHOOK_ROUTE}`, { method: "POST", body: "{}" });
   await waitForReady(`${entryBase}/health/ready`, secondSignal);
@@ -1436,7 +1355,6 @@ try {
     return `${sample}; a ticket without a signal claim is ready`;
   });
 
-  // 9. The bot token stays in Signal.
   await check("No frame and no log line holds the Telegram bot token", async () => {
     const framesWithToken = allFrames.filter((frame) => frame.includes(BOT_TOKEN_SECRET));
     const logsWithToken = serviceOutput.filter((line) => line.includes(BOT_TOKEN_SECRET));

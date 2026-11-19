@@ -1,37 +1,3 @@
-// Checks the automatic plan continuation: a turn of the agent's own chat or of a side thread that
-// ends with open steps in the agent's plan runs once more with a short note, up to 8 times for one
-// request. A turn with no open step runs once more, at most 2 times, when its answer only asks whether
-// to continue or is short and ends on a next step that it did not do. Runs the real agent service on a temporary profile with a fake Codex app-server. The
-// current message names its turns in `<<PLAN[...]PLAN>>`: each element is one turn, with its plan
-// steps, its answer, its delay and its OpenBot tool calls. A continuation turn takes the next element
-// of its thread.
-// Checks:
-//   1. A turn with open steps continues once, and the request completes when the plan is done.
-//   2. A request continues at most 8 times.
-//   3. A continuation that does not change the open steps stops the chain.
-//   4. An answer whose last line asks a question does not continue. A question about a named action
-//      does not continue either.
-//   4a. An answer that only asks whether to continue keeps a plan with open steps going. An
-//       approval question ("Proceed?"), a real question before it, or a wait does not continue.
-//   4b. A turn with no plan continues when its answer ends on a next step or asks whether to
-//       continue, at most 2 times for one request. A long report that ends on a next step does not.
-//       A Portuguese next step ("Vou consultar o conector agora.") or a status ("I'm checking …")
-//       continues too; one that waits for the user, a later time or a send does not.
-//   4c. A turn that reads a teammate's answer to the agent's own request continues when its answer
-//       ends on a next step, also before a closing "De você, nada." (#9392). A turn that reads a
-//       teammate's request does not continue.
-//   5. A turn that opens a wait does not continue.
-//   6. Stop during a continuation ends the chain. The next message works.
-//   7. A message that waits in the queue stops the continuation and runs next.
-//   8. A side thread continues in its own thread only.
-//   9. A routine run does not continue.
-//   9a. A continuation in a new session, as after a tool change, gets the request again before the
-//       note (#8779). The session that ran the request gets the note only (check 1).
-//  10. A restart while a continuation waits completes the request with no new turn.
-// Not checked: a message sent in the short gap before a continuation starts. The drain starts the
-// continuation at once, and a hidden agent refuses new messages. Check 7 covers the same rule.
-// No provider, account or network is used. `bun run test:plan-continuation`.
-// Writes .openbot-build/plan-continuation-e2e/report.json.
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -50,7 +16,6 @@ const fakeCodex = join(root, "codex");
 const fakeLog = join(root, "codex.jsonl");
 const NOTE_MARKER = "OpenBot note, not a message from the user";
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -64,21 +29,15 @@ const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
 type StepStatus = "pending" | "inProgress" | "completed";
 
-/**
- * One turn of the fake: its plan, its answer, its delay and its OpenBot tool calls. With `holdUntil`,
- * the turn ends only after that file exists.
- */
 interface FakeTurn {
   steps: [string, StepStatus][];
   answer?: string;
-  /** The turn ends with its plan only, as a model that stops without an answer does (#8263). */
   noAnswer?: boolean;
   delayMs?: number;
   holdUntil?: string;
   calls?: { tool: string; arguments: Record<string, string | string[] | boolean> }[];
 }
 
-/** The turns as a marker. Escaped angle brackets let a plan hold another plan, as a teammate's answer. */
 const plan = (...turns: FakeTurn[]) =>
   `<<PLAN${JSON.stringify(turns).replaceAll("<", "\\u003c").replaceAll(">", "\\u003e")}PLAN>>`;
 
@@ -96,7 +55,6 @@ let threads = 0;
 let turns = 0;
 const waiting = new Map();
 const timers = new Map();
-/** The turns that each thread has still to run, from the message that named them. */
 const scripts = new Map();
 process.stdout.on("error", (error) => {
   if (error.code === "EPIPE") process.exit(0);
@@ -220,7 +178,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service, its database or the fake's log. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -298,7 +255,6 @@ async function createAgent(name: string) {
   return agent;
 }
 
-/** Sends a message, to the agent's own chat or to its side thread. Answers its delivery id. */
 async function send(agentId: string, text: string, taskId?: string): Promise<string> {
   const receipt = await runCauseEffect(
     current.service.sendMessage({ agentId, text, attachmentDraftIds: [], ...(taskId ? { taskId } : {}) }),
@@ -308,7 +264,6 @@ async function send(agentId: string, text: string, taskId?: string): Promise<str
   return deliveryId;
 }
 
-/** Waits for the delivery to end, with all of its continuations, and answers its status. */
 function settled(deliveryId: string, timeoutMs?: number) {
   return waitFor(
     `delivery ${deliveryId} to end`,
@@ -320,20 +275,17 @@ function settled(deliveryId: string, timeoutMs?: number) {
   );
 }
 
-/** The messages of the agent's own chat or of one side thread, as the database holds them. */
 function chatMessages(agentId: string, sideThreadId?: string) {
   const threadId = sideThreadId ?? current.store.list().find((agent) => agent.id === agentId)?.threadId ?? null;
   return current.database.readConversation(agentId, threadId).messages;
 }
 
-/** The continuation lines of the agent's own chat or of one side thread, as the database holds them. */
 function continuationLines(agentId: string, sideThreadId?: string) {
   return chatMessages(agentId, sideThreadId).filter(
     (message) => message.itemType === PLAN_CONTINUATION_ITEM_TYPE && !message.id.endsWith(":plan-stopped"),
   );
 }
 
-/** The lines that say that the agent stopped with open steps in its plan (#8263). */
 function stopLines(agentId: string) {
   return chatMessages(agentId).filter(
     (message) => message.itemType === PLAN_CONTINUATION_ITEM_TYPE && message.id.endsWith(":plan-stopped"),
@@ -529,7 +481,6 @@ try {
       "Next, I'll implement it after your confirmation.",
       "Let me check with the team and get back to you.",
     ];
-    // Each request opens a new step, so a step left open by an earlier answer does not hide the plan.
     for (const [index, answer] of answers.slice(0, 6).entries()) {
       const mark = loggedTurns().length;
       const id = await send(
@@ -557,7 +508,6 @@ try {
   });
 
   await check("Portuguese offers, later times, sends and reported problems do not continue", async () => {
-    // A new agent, so that the long chat of the check above does not start a memory turn here.
     const agent = await createAgent("Cuidadoso");
     const answers = [
       "Vou consultar o conector se você quiser.",
@@ -680,7 +630,6 @@ try {
     const reviewer = await createAgent("Reviewer");
     const mark = loggedTurns().length;
     const since = current.events.length;
-    // The reviewer's result is its answer, and it names the lead's next turns.
     const review = plan({
       steps: [],
       answer: `Review done: fix the parser. ${plan(
@@ -716,7 +665,6 @@ try {
     const lead = await createAgent("Owner");
     const asker = await createAgent("Asker");
     const mark = loggedTurns().length;
-    // The update tells the asker to send the owner a request, which names the owner's turn.
     const request = plan({ steps: [], answer: "Estou corrigindo agora. De você, nada." });
     const update = plan({
       steps: [],
@@ -740,7 +688,6 @@ try {
     await waitFor("the owner's answer to the request", () =>
       chatMessages(lead.id).some((message) => message.text === "Estou corrigindo agora. De você, nada."),
     );
-    // The result goes back to the asker only when the owner's turn does not continue.
     const leadThread = turnsSince(mark).find((turn) => turn.text.includes("Tell Asker."))?.threadId;
     await waitFor(
       "the result for the asker",
@@ -995,8 +942,6 @@ try {
       })}`,
     );
     const first = await waitFor("the first turn", () => turnsSince(mark)[0]);
-    // Without its tool record, the session no longer has the current tools, as after a new MCP
-    // server: the continuation starts a new session. The first turn ends only after the removal.
     await rm(join(userData, "provider-toolsets", createHash("sha256").update(first.threadId).digest("hex")));
     await writeFile(release, "");
     assert.equal(await settled(id), "completed");
@@ -1045,7 +990,6 @@ try {
       )}`,
     );
     await waitFor("the first turn", () => turnsSince(mark).length === 1);
-    // A hidden agent finishes its turn, and its queue waits: the continuation waits too.
     await runCauseEffect(current.service.setAgentHidden({ agentId: agent.id, hidden: true }));
     await waitFor("the continuation to wait", () => continuationLines(agent.id).length === 1);
     assert.equal(

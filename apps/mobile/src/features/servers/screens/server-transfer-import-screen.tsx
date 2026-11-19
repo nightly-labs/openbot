@@ -28,11 +28,6 @@ import { useText } from "@/shared/lib/text";
 
 type Phase = "idle" | "reading" | "review" | "importing" | "done";
 
-/**
- * Server settings › Transfer › Import. The chosen transfer file goes to the host, which keeps it under a
- * token: the review shows what is in it before anything changes. A token left open when the page
- * closes is released.
- */
 export function ServerTransferImportScreen() {
   const { t, errorMessage } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
@@ -44,8 +39,6 @@ export function ServerTransferImportScreen() {
   const [preview, setPreview] = useState<InstanceTransferPreview | null>(null);
   const [result, setResult] = useState<RemoteInstanceTransferResult | null>(null);
 
-  // The open token, for the release when the page closes. A token that comes back after that is
-  // released when it arrives.
   const token = useRef<string | null>(null);
   token.current = preview?.token ?? null;
   const closed = useRef(false);
@@ -106,7 +99,6 @@ export function ServerTransferImportScreen() {
       setPhase("done");
       void haptics.notification("success");
     } catch (caught) {
-      // The token is spent once the host starts, so the file must be chosen again.
       setPreview(null);
       setPhase("idle");
       setError(errorMessage(caught, t("mobile.server.transfer.importFailed")));
@@ -196,7 +188,6 @@ function TransferReview({
       selected.map((agent) => agent.key),
       settings,
     );
-  // An agent whose name is already on this server imports as a second, separate agent: the user accepts that first.
   const confirmAndStart = () => {
     const duplicates = selected.filter((agent) => agent.nameExists);
     if (duplicates.length === 0) return start();
@@ -267,7 +258,6 @@ function TransferReview({
   );
 }
 
-/** The agents that an import or a copy added, and what the user must do next. */
 export function TransferResult({
   result,
   title,

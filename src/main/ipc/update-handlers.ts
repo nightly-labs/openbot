@@ -1,5 +1,3 @@
-// The application updater, its preferences, and the restart an admin of a joined server asked for.
-
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { IdleRestart } from "../idle-restart";
 import type { RequestedUpdate } from "../requested-update";

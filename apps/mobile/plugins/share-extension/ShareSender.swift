@@ -1,11 +1,6 @@
 import UIKit
 import WebKit
 
-/// Sends one share through the page `share-sender.html`, which holds the app's Team client
-/// (`src/features/share/extension/share-sender.ts`). WebRTC runs in a web view, as in the app.
-///
-/// The page asks this side for two things only: a request to the account service of the session,
-/// and the bytes of one shared file. A request to any other address is refused.
 @MainActor
 final class ShareSender: NSObject, WKNavigationDelegate, WKScriptMessageHandlerWithReply {
   struct File {
@@ -16,7 +11,6 @@ final class ShareSender: NSObject, WKNavigationDelegate, WKScriptMessageHandlerW
 
   enum Outcome {
     case sent
-    /// `unconfirmed`: the message went to the server and no answer came. It can be in the chat.
     case failed(unconfirmed: Bool, detail: String)
   }
 
@@ -41,7 +35,6 @@ final class ShareSender: NSObject, WKNavigationDelegate, WKScriptMessageHandlerW
     super.init()
     configuration.userContentController.addScriptMessageHandler(self, contentWorld: .page, name: Self.handlerName)
     webView.navigationDelegate = self
-    // A web view outside a window can stop its timers. This one is in the view, and nobody sees it.
     webView.alpha = 0
     webView.isUserInteractionEnabled = false
     container.addSubview(webView)
@@ -82,8 +75,6 @@ final class ShareSender: NSObject, WKNavigationDelegate, WKScriptMessageHandlerW
     session.invalidateAndCancel()
   }
 
-  // MARK: - Navigation
-
   func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
     loaded?.resume()
     loaded = nil
@@ -99,7 +90,6 @@ final class ShareSender: NSObject, WKNavigationDelegate, WKScriptMessageHandlerW
     loaded = nil
   }
 
-  /// The page opens nothing but itself.
   func webView(
     _ webView: WKWebView,
     decidePolicyFor navigationAction: WKNavigationAction,
@@ -108,8 +98,6 @@ final class ShareSender: NSObject, WKNavigationDelegate, WKScriptMessageHandlerW
     let url = navigationAction.request.url
     decisionHandler(url?.isFileURL == true && url?.path == pageURL?.path ? .allow : .cancel)
   }
-
-  // MARK: - Page requests
 
   func userContentController(
     _ userContentController: WKUserContentController,

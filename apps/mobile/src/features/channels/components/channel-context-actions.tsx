@@ -13,12 +13,6 @@ import type { MobileChannelStore } from "../model/channel-store";
 
 type Action = "clear" | "compact" | "delete";
 
-/**
- * "New conversation", "Compact context" and "Delete history" of a channel, as in the desktop channel
- * settings (`chat-history-v1`). Each member who sees the channel starts a new conversation or
- * compacts; only an owner or admin deletes the history. The host refuses while work of the channel
- * runs or waits, and its reason shows in the alert.
- */
 export function ChannelContextActions({
   serverId,
   channelId,
@@ -32,12 +26,10 @@ export function ChannelContextActions({
   channelName: string;
   store: MobileChannelStore;
   available: boolean;
-  /** An owner or admin of the server. The host checks the role again. */
   canDeleteHistory: boolean;
 }) {
   const { t } = useText();
   const [running, setRunning] = useState<Action | null>(null);
-  // The host starts the compaction and answers; the members' providers finish it later.
   const [compactStarted, setCompactStarted] = useState(false);
 
   function run(action: Action): void {

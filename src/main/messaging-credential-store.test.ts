@@ -8,7 +8,6 @@ import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MessagingCredentialStore } from "./messaging-credential-store";
 
-/** Reverses the bytes, so the file never holds the plain text and a test can still read it back. */
 const cipher = {
   encrypt: (value: string) => Buffer.from(value, "utf8").reverse(),
   decrypt: (value: Buffer) => Buffer.from(value).reverse().toString("utf8"),
@@ -27,7 +26,6 @@ afterEach(async () => {
 });
 
 describe("MessagingCredentialStore redaction", () => {
-  // Each test uses its own values: the registered secrets stay for the life of the process.
   it("redacts the saved tokens and keeps the chat, bot and server names readable", async () => {
     const store = new MessagingCredentialStore(path, cipher);
     await Effect.runPromise(store.load());

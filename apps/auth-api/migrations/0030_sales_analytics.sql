@@ -1,5 +1,3 @@
--- New tables only. The Worker that runs before this deploy does not read them.
--- Keep every source key forever. A paid invoice must never be sent twice after a retry.
 CREATE TABLE IF NOT EXISTS billing_analytics_events (
   source_key TEXT PRIMARY KEY,
   profile_id TEXT REFERENCES users(id) ON DELETE SET NULL,
@@ -26,8 +24,6 @@ CREATE INDEX IF NOT EXISTS billing_analytics_events_profile
   ON billing_analytics_events(profile_id, event_timestamp)
   WHERE profile_id IS NOT NULL;
 
--- A deleted account must not turn an undelivered account event into an anonymous revenue event.
--- The source key remains in the ledger for deduplication; the foreign key clears the profile id.
 CREATE TRIGGER IF NOT EXISTS billing_analytics_events_user_deleted
 BEFORE DELETE ON users
 BEGIN
@@ -37,8 +33,6 @@ BEGIN
    WHERE profile_id = OLD.id AND status IN ('pending', 'sending', 'uncertain', 'rejected');
 END;
 
--- Resolve each requested UTC day once. source_day identifies the prior available ECB quote.
--- Existing resolutions are immutable and contain no credentials or payment identifiers.
 CREATE TABLE IF NOT EXISTS billing_fx_rates (
   day TEXT NOT NULL,
   currency TEXT NOT NULL,

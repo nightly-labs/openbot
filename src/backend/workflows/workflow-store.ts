@@ -1,10 +1,3 @@
-/**
- * The workflow tables: graphs, versions and triggers. Rows are written directly, not through
- * `database.dispatch`, because a step holds the text one step gave another and the event log is
- * never deleted from. It owns no events: the runtime says when something changed. It never imports
- * the database facade's other controllers.
- */
-
 import {
   isRoutineSchedule,
   isWorkflowEdge,
@@ -43,24 +36,16 @@ import type { OpenBotDatabase } from "../openbot-database";
 import { nodeTimezone } from "./workflow-graph";
 import { workflowTransaction } from "./workflow-transaction";
 
-/**
- * A refusal the user reads: the message is already a sentence for them. `missing` says there is no
- * such workflow, version, run, step or node, so a client shows it as gone.
- */
 export class WorkflowStoreError extends Schema.TaggedError<WorkflowStoreError>()("WorkflowStoreError", {
   code: Schema.Literals(["missing", "refused"]),
   message: Schema.String,
 }) {}
 
-/** The open runs that hold a workflow's schedule triggers: an occurrence waits until the run ends. */
 const NO_OPEN_RUN = `NOT EXISTS (SELECT 1 FROM workflow_runs AS r WHERE r.workflow_id = t.workflow_id
   AND r.status IN ('running', 'approval', 'stopping'))`;
 
-/** The trigger kinds that have a row: a `message` trigger does not run in this version. */
 const STORED_TRIGGER_KINDS = ["manual", "schedule", "webhook"] as const;
 type StoredTriggerKind = (typeof STORED_TRIGGER_KINDS)[number];
-
-/** A save adds an `auto` version only when the last version is older than this. */
 
 const PROBLEM_TEXT = {
   annotation: "error.workflow.annotation",
@@ -70,20 +55,17 @@ const PROBLEM_TEXT = {
   duplicate: "error.workflow.duplicateEdge",
 } as const satisfies Record<WorkflowGraphProblem, string>;
 
-/** A schedule trigger whose next occurrence came. */
 export interface DueWorkflowTrigger {
   workflowId: string;
   nodeId: string;
   schedule: RoutineSchedule;
   timezone: string | null;
-  /** The occurrence that came, as stored. */
   dueAt: string;
 }
 
 export interface WorkflowStoreOptions {
   database: OpenBotDatabase;
   createId?: () => string;
-  /** The next occurrence of a schedule trigger, or null. The trigger service supplies it. */
   nextDueAt?: (schedule: RoutineSchedule, timezone: string | null, now: Date) => string | null;
 }
 
@@ -104,7 +86,6 @@ export class WorkflowStore {
     ).map(toSummary);
   }
 
-  /** Every workflow with its graph, in the order of `list`, in three reads. */
   listWithGraphs(): { summary: WorkflowSummary; graph: WorkflowGraph }[] {
     const db = this.#database.connection;
     const rows = databaseRows(db.prepare(`${SUMMARY_SELECT} ORDER BY w.updated_at DESC, w.workflow_id`).all());
@@ -127,7 +108,6 @@ export class WorkflowStore {
     });
   }
 
-  /** The workflows that have an agent step of the agent. */
   workflowsOfAgent(agentId: string): string[] {
     return databaseRows(
       this.#database.connection
@@ -171,7 +151,6 @@ export class WorkflowStore {
     return this.#requireDetail(workflowId).summary;
   }
 
-  /** Deletes a workflow and every row that belongs to it. Its webhook routes stop at the relay. */
   remove(workflowId: string, now = new Date()): boolean {
     return this.#transaction(() => {
       this.#database.connection
@@ -185,10 +164,6 @@ export class WorkflowStore {
     });
   }
 
-  /**
-   * Replaces the graph, when no one saved since `baseRevision`. A stale save gets the current workflow
-   * back, so the editor can show it instead of overwriting newer work.
-   */
   saveGraph(workflowId: string, baseRevision: number, graph: WorkflowGraph, now = new Date()): WorkflowSaveResult {
     assertRunnable(graph);
     return this.#transaction(() => {
@@ -203,10 +178,6 @@ export class WorkflowStore {
     });
   }
 
-  /**
-   * The earliest next occurrence of any schedule trigger, or null. A workflow with an open run does
-   * not count: its occurrence comes when the run ends, and the end plans the timer again.
-   */
   nextTriggerDueAt(): string | null {
     const row = databaseRow(
       this.#database.connection
@@ -219,7 +190,6 @@ export class WorkflowStore {
     return row ? optionalStringColumn(row, "due") : null;
   }
 
-  /** The schedule triggers whose next occurrence is not after `now`, earliest first, of workflows with no open run. */
   dueTriggers(now: Date): DueWorkflowTrigger[] {
     return databaseRows(
       this.#database.connection
@@ -231,7 +201,6 @@ export class WorkflowStore {
         .all(now.toISOString()),
     ).flatMap((row) => {
       const schedule = JSON.parse(optionalStringColumn(row, "schedule_json") ?? "null");
-      // The save checked the schedule; a row without one has nothing to plan.
       if (!isRoutineSchedule(schedule)) return [];
       return [
         {
@@ -245,10 +214,6 @@ export class WorkflowStore {
     });
   }
 
-  /**
-   * Moves a schedule trigger to its next occurrence. It changes nothing when a save planned the
-   * trigger again after `dueAt` was read, so the new plan stays.
-   */
   advanceTrigger(due: DueWorkflowTrigger, nextDueAt: string | null, now = new Date()): boolean {
     const result = this.#database.connection
       .prepare(
@@ -270,7 +235,6 @@ export class WorkflowStore {
     ).map(toVersion);
   }
 
-  /** The graph of one version, or null when the workflow has no such version. A version never changes. */
   versionGraph(workflowId: string, versionId: string): WorkflowGraph | null {
     const row = databaseRow(
       this.#database.connection
@@ -280,7 +244,6 @@ export class WorkflowStore {
     return row ? storedGraph(requiredStringColumn(row, "graph_json")) : null;
   }
 
-  /** Puts a version's graph back. The graph before it becomes a `restore` version, so the restore can be undone. */
   restoreVersion(workflowId: string, versionId: string, now = new Date()): WorkflowDetail {
     return this.#transaction(() => {
       const row = databaseRow(
@@ -299,11 +262,6 @@ export class WorkflowStore {
     });
   }
 
-  /**
-   * Keeps the graph a run starts from in the version history, when the newest version is of another
-   * revision. Runs of a graph that does not change add one version only, so they do not push the
-   * saved versions out of the history.
-   */
   addRunVersion(workflowId: string, revision: number, graph: WorkflowGraph, now = new Date()): void {
     const newest = databaseRow(
       this.#database.connection
@@ -347,10 +305,6 @@ export class WorkflowStore {
     }));
   }
 
-  /**
-   * Writes the nodes, edges, triggers and drawing of a graph. A node that stays keeps its trigger row,
-   * so its next occurrence and its webhook route stay too. A removed webhook trigger stops at the relay.
-   */
   #writeGraph(workflowId: string, graph: WorkflowGraph, now: Date): void {
     const db = this.#database.connection;
     const at = now.toISOString();
@@ -437,7 +391,6 @@ export class WorkflowStore {
       const timezone = nodeTimezone(node);
       const scheduleJson = kind === "schedule" && node.schedule ? JSON.stringify(node.schedule) : null;
       const before = previous.get(nodeId);
-      // An unchanged trigger keeps its next occurrence; only a changed one is planned again.
       if (before?.kind === kind && before.schedule_json === scheduleJson && before.timezone === timezone) continue;
       const nextDueAt = kind === "schedule" && node.schedule ? this.#nextDueAt(node.schedule, timezone, now) : null;
       upsertTrigger.run(workflowId, nodeId, kind, timezone, scheduleJson, nextDueAt, at);

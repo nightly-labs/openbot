@@ -46,7 +46,6 @@ const NO_ALIASES: ReadonlyMap<string, string> = new Map();
 const NO_EXCHANGES: readonly SideQuestionExchange[] = [];
 const NO_AGENTS: MobileAgent[] = [];
 
-/** The questions and answers as chat messages, so the list draws them as the agent's chat does. */
 function exchangeMessages(exchanges: readonly SideQuestionExchange[]): ConversationMessage[] {
   return exchanges.flatMap((exchange): ConversationMessage[] => {
     const question: ConversationMessage = {
@@ -70,16 +69,9 @@ function exchangeMessages(exchanges: readonly SideQuestionExchange[]): Conversat
   });
 }
 
-/**
- * A question about an agent's chat that stays out of the chat, as the side question pane on desktop.
- * The agent answers with its own model, with no tools, and the host keeps nothing of it. Back keeps
- * it on this phone, so the More menu and the swipe open it again; Delete in the header deletes it.
- */
 export function SideQuestionScreen() {
   const { t } = useText();
   const { serverId, agentId } = useLocalSearchParams<{ serverId: string; agentId: string }>();
-  // Only this agent: a change elsewhere in the workspace, such as a streamed reply, does not render the
-  // screen again.
   const agent = useMobileWorkspaceSelector(
     (current) => current.agents.find((item) => item.id === agentId && item.serverId === serverId),
     sameAgent,
@@ -112,7 +104,6 @@ function SideQuestionChat({ target }: { target: AgentChatTarget }) {
   const agents = useMobileWorkspaceSelector((current) => current.agents, sameAgentsApartFromMessage);
   const supported = useMobileWorkspaceSelector((current) => current.canAskSideQuestion(serverId));
   const online = showsOnline(server);
-  // As in the agent's chat: while the connection resumes, a question waits for it.
   const canAsk = online && supported;
   const serverAgents = useMemo(() => agents.filter((item) => item.serverId === serverId), [agents, serverId]);
   const sideQuestion = useSideQuestion(serverId, agentId);
@@ -151,8 +142,6 @@ function SideQuestionChat({ target }: { target: AgentChatTarget }) {
     rowsShown && messages.length > 0,
     lastUserId,
   );
-  // As in the agent's chat: the mic beside the main control dictates into the draft, and only Send
-  // asks. Losing the server or a screen on top stops listening and keeps the words.
   const dictation = useComposerDictation({
     enabled: isFocused && canAsk,
     focused: isFocused,
@@ -166,7 +155,6 @@ function SideQuestionChat({ target }: { target: AgentChatTarget }) {
     [target.avatarSeed, target.avatarHue, target.avatarColor, dark],
   );
 
-  // A failed question removes its row, so the list stops waiting to show it at the top.
   const cancelSend = useRef(motion.cancelSend);
   useEffect(() => {
     cancelSend.current = motion.cancelSend;
@@ -175,7 +163,6 @@ function SideQuestionChat({ target }: { target: AgentChatTarget }) {
     if (failures > 0) cancelSend.current();
   }, [failures]);
 
-  // A Send that asks nothing, such as while the last question waits for its answer, keeps Send open.
   const [ignoredSends, setIgnoredSends] = useState(0);
   const ask = (value: string) => {
     const question = value.trim();

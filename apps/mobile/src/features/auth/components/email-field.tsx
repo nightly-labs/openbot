@@ -17,12 +17,10 @@ interface EmailFieldProps {
   invalid: boolean;
   rejection: number;
   editable: boolean;
-  /** The field stays mounted and only shows or hides, so focus never waits for a mount. */
   visible: boolean;
   reduced: boolean;
 }
 
-/** The email field of the email step. A lavender ring marks focus; a red ring marks an error. */
 export function EmailField({
   ref,
   value,
@@ -40,7 +38,6 @@ export function EmailField({
   const [focused, setFocused] = useState(false);
   const shake = useShake(rejection, reduced);
   return (
-    // The field comes down 8 pt into the top slot when the buttons below it are done.
     <Animated.View
       pointerEvents={visible ? "auto" : "none"}
       accessibilityElementsHidden={!visible}

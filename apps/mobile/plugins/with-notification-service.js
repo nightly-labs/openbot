@@ -2,12 +2,6 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { withDangerousMod, withEntitlementsPlist, withInfoPlist, withXcodeProject } = require("expo/config-plugins");
 
-// Adds the Notification Service Extension that opens a sealed OpenBot notification before iOS shows
-// it (`notification-service/NotificationService.swift`). It reads the keys that the app writes into
-// the App Group, so it has the App Group entitlement and nothing else. It also makes an agent
-// notification a communication notification with the agent picture, so the app has the Communication
-// Notifications entitlement and declares `INSendMessageIntent`.
-
 const SOURCE = "NotificationService.swift";
 const SEND_MESSAGE_INTENT = "INSendMessageIntent";
 
@@ -93,10 +87,7 @@ const withNotificationServiceFiles = (config, props) =>
 const withNotificationServiceTarget = (config, { targetName, bundleIdentifier }) =>
   withXcodeProject(config, (mod) => {
     const project = mod.modResults;
-    // `addTarget` writes the name in quotes, and a project read again keeps them. Without both forms,
-    // each `prebuild --no-clean` adds one more target, and `pod install` fails on the shared source.
     if (project.pbxTargetByName(targetName) || project.pbxTargetByName(`"${targetName}"`)) return mod;
-    // `addTarget` adds a dependency, and the `xcode` package fails when these sections are missing.
     const objects = project.hash.project.objects;
     objects.PBXTargetDependency ??= {};
     objects.PBXContainerItemProxy ??= {};
@@ -112,7 +103,6 @@ const withNotificationServiceTarget = (config, { targetName, bundleIdentifier })
       }
     }
 
-    // An app extension target is embedded into the app by a copy phase of the app target.
     const target = project.addTarget(targetName, "app_extension", targetName, bundleIdentifier);
     project.addBuildPhase([SOURCE], "PBXSourcesBuildPhase", "Sources", target.uuid);
     project.addBuildPhase([], "PBXResourcesBuildPhase", "Resources", target.uuid);
@@ -123,7 +113,6 @@ const withNotificationServiceTarget = (config, { targetName, bundleIdentifier })
     for (const { value } of configurations.buildConfigurations) {
       Object.assign(sections[value].buildSettings, {
         CODE_SIGN_ENTITLEMENTS: `"${targetName}/${targetName}.entitlements"`,
-        // The app and its extensions carry the same version, as App Store Connect requires.
         CURRENT_PROJECT_VERSION: `"${config.ios?.buildNumber ?? "1"}"`,
         MARKETING_VERSION: `"${config.ios?.version ?? config.version ?? "1.0"}"`,
         IPHONEOS_DEPLOYMENT_TARGET: `"${config.ios?.deploymentTarget ?? "16.4"}"`,

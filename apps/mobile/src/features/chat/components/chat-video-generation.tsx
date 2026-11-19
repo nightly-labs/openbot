@@ -10,18 +10,12 @@ import { ChatAttachmentView } from "./chat-attachment";
 import type { ImageGenerationStatus } from "./chat-image-generation";
 import { ImageGenerationCanvas } from "./image-generation-canvas";
 
-/** The same shapes as desktop, until the video gives its first frame. */
 function requestedRatio(aspectRatio: ImageGenerationAspectRatio) {
   if (aspectRatio === "portrait") return 9 / 16;
   if (aspectRatio === "square") return 1;
   return 16 / 9;
 }
 
-/**
- * A video that an agent makes: the canvas of an image generation while it is made, then the chat's
- * video card, which plays it. The frame keeps the size of that card, so the chat does not move when
- * the video arrives. A host without video generation sends only the video, which shows as a file.
- */
 export function ChatVideoGeneration({
   generation,
   status,
@@ -38,8 +32,6 @@ export function ChatVideoGeneration({
   const [base, accent, surface, muted] = useThemeColor(["muted", "accent", "surface-secondary", "muted"]);
   const ratio = requestedRatio(generation.aspectRatio);
   const frame = attachmentFrame(null, Math.min(MAX_FRAME_WIDTH, windowWidth - 80), ratio);
-  // The host marks the video completed, then copies its file. The copy ends with the file or with a
-  // failure, so the canvas stays until then.
   const video = status === "completed" ? attachment : undefined;
   const failed = status === "failed" || status === "interrupted";
   const label =
@@ -58,7 +50,6 @@ export function ChatVideoGeneration({
           ? sourceText(generation.error)
           : t("mobile.chat.videoGeneration.wasInterrupted")
         : null;
-  // What the model was asked for. The finished video shows its real length on its card.
   const specs = [
     generation.durationSeconds ? playbackTime(generation.durationSeconds, format) : null,
     generation.resolution ?? null,

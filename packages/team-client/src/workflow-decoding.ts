@@ -1,10 +1,3 @@
-// Workflow payloads from a joined server, for the desktop app and the mobile app. `workflows-v1`
-// carries kinds and statuses as open names, so a newer host can add one. The decoders below map a
-// name that this app does not know to a known one before the closed IPC guards run: a status or a
-// source to the nearest neutral value, and a node kind or a port type to a locked note that the app
-// shows but does not save. A trigger type or an output target that it does not know keeps its node,
-// but the app shows the workflow read-only, as a save from a choice that falls back would change it.
-
 import {
   isWorkflowDetail,
   isWorkflowGitHubCatalog,
@@ -42,7 +35,6 @@ import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "@openbot
 
 type Json = DynamicRecord;
 
-/** The record with `fallback` at `key` when the name there is one that this app does not know. */
 function withKnown(record: Json, key: string, choices: readonly string[], fallback: string): Json {
   return isUnknownName(choices, record[key]) ? { ...record, [key]: fallback } : record;
 }
@@ -51,7 +43,6 @@ function isUnknownName(choices: readonly string[], value: unknown): boolean {
   return isString(value) && !isOneOf(choices, value);
 }
 
-/** A map of a record; any other value goes to its guard as it is. */
 const onRecord =
   (map: (record: Json) => Json) =>
   (value: unknown): unknown =>
@@ -78,7 +69,6 @@ const version = onRecord((record) => withKnown(record, "kind", WORKFLOW_VERSION_
 
 const trigger = onRecord((record) => withKnown(record, "type", WORKFLOW_TRIGGER_TYPES, "manual"));
 
-/** A trigger type or an output target that this app does not know. */
 function hasUnknownSetting(node: Json): boolean {
   const fields = isDynamicRecord(node.fields) ? node.fields : {};
   if (node.kind === "trigger") return isUnknownName(WORKFLOW_TRIGGER_TYPES, fields.trigger);
@@ -86,11 +76,6 @@ function hasUnknownSetting(node: Json): boolean {
   return false;
 }
 
-/**
- * The detail with each node of an unknown kind as a locked note in its place, without the edges of
- * such nodes and the edges of an unknown port type, and marked so the app does not save it. A node
- * with an unknown trigger type or output target stays, and it also marks the detail.
- */
 const detail = onRecord((record) => {
   const base = mapList({ ...record, summary: summary(record.summary) }, "triggers", trigger);
   const graph = base.graph;
@@ -126,10 +111,6 @@ function mapped<T>(map: (value: unknown) => unknown, decode: (value: unknown) =>
 
 export const decodeRemoteWorkflowSummary = mapped(summary, guardedDecoder(isWorkflowSummary, "remote workflow"));
 export const decodeRemoteWorkflowDetail = mapped(detail, guardedDecoder(isWorkflowDetail, "remote workflow"));
-/**
- * The `workflows-v1` version-graph route wraps its graph as `{ graph }`. A graph with a kind that this
- * app does not know shows with locked notes in its place; the restore itself runs on the host.
- */
 export function decodeRemoteWorkflowVersionGraph(value: unknown) {
   if (!isDynamicRecord(value)) throw new Error("Invalid remote workflow version.");
   const mappedDetail = detail({ graph: value.graph });
@@ -151,50 +132,40 @@ const decodeVersionGraph = guardedDecoder(isWorkflowGraph, "remote workflow vers
 const decodeWorkflowSummaries = guardedListDecoder(isWorkflowSummary, "remote workflow list");
 const decodeWorkflowVersions = guardedListDecoder(isWorkflowVersion, "remote workflow versions");
 
-/** The `workflows-media-v1` keep-picture route answers `{ fileId }`; the app keeps only the id. */
 export function decodeRemoteWorkflowPicture(value: unknown): string {
   if (!isDynamicRecord(value) || typeof value.fileId !== "string" || !value.fileId)
     throw new Error("Invalid remote workflow picture.");
   return value.fileId;
 }
 
-/** The `workflows-sunra-v1` providers route answers `{ sunra }`. */
 export function decodeRemoteWorkflowMediaProviders(value: unknown): { sunra: boolean } {
   if (!isDynamicRecord(value) || typeof value.sunra !== "boolean")
     throw new Error("Invalid remote workflow providers.");
   return { sunra: value.sunra };
 }
 
-/** The `workflows-higgsfield-v1` providers route answers `{ higgsfield }`. */
 export function decodeRemoteHiggsfieldProviders(value: unknown): { higgsfield: boolean } {
   if (!isDynamicRecord(value) || typeof value.higgsfield !== "boolean")
     throw new Error("Invalid remote workflow providers.");
   return { higgsfield: value.higgsfield };
 }
 
-/** One service's credits in a credits route answer: null when the host has no credits to show. */
 function remoteCreditBalance(value: unknown): WorkflowMediaCreditBalance | null {
   if (value === null) return null;
   if (!isWorkflowMediaCreditBalance(value)) throw new Error("Invalid remote workflow credits.");
   return { available: value.available, quota: value.quota };
 }
 
-/** The `workflows-sunra-v1` credits route answers `{ sunra }`, with null when the host has no credits to show. */
 export function decodeRemoteWorkflowMediaCredits(value: unknown): { sunra: WorkflowMediaCreditBalance | null } {
   if (!isDynamicRecord(value)) throw new Error("Invalid remote workflow credits.");
   return { sunra: remoteCreditBalance(value.sunra) };
 }
 
-/** The `workflows-higgsfield-v1` credits route answers `{ higgsfield }`, as the Sunra route does. */
 export function decodeRemoteHiggsfieldCredits(value: unknown): { higgsfield: WorkflowMediaCreditBalance | null } {
   if (!isDynamicRecord(value)) throw new Error("Invalid remote workflow credits.");
   return { higgsfield: remoteCreditBalance(value.higgsfield) };
 }
 
-/**
- * The `workflows-media-catalog-v1` catalog route answers `{ models }`. The app drops a model that it
- * cannot read, so one odd entry does not hide the others.
- */
 export function decodeRemoteWorkflowMediaCatalog(value: unknown): WorkflowMediaCatalog {
   if (!isDynamicRecord(value) || !Array.isArray(value.models) || value.models.length > WORKFLOW_MEDIA_CATALOG_MAX)
     throw new Error("Invalid remote workflow catalog.");
@@ -214,29 +185,21 @@ export function decodeRemoteWorkflowMediaCatalog(value: unknown): WorkflowMediaC
   };
 }
 
-/** The `workflows-media-catalog-v1` price route answers `{ credits }`, with null when there is no quote. */
 export function decodeRemoteWorkflowMediaPrice(value: unknown): WorkflowMediaPrice {
   if (!isWorkflowMediaPrice(value)) throw new Error("Invalid remote workflow price.");
   return { credits: value.credits };
 }
 
-/** The `workflows-v1` list route wraps its list as `{ workflows }`. */
 export function decodeRemoteWorkflowList(value: unknown) {
   if (!isDynamicRecord(value) || !Array.isArray(value.workflows)) throw new Error("Invalid remote workflow list.");
   return decodeWorkflowSummaries(value.workflows.map(summary));
 }
 
-/** The `workflows-v1` versions route wraps its list as `{ versions }`. */
 export function decodeRemoteWorkflowVersions(value: unknown) {
   if (!isDynamicRecord(value) || !Array.isArray(value.versions)) throw new Error("Invalid remote workflow versions.");
   return decodeWorkflowVersions(value.versions.map(version));
 }
 
-/**
- * A delivery of `workflows-github-v1` with names that this app knows. The capability carries the event,
- * the outcome and the reason as open names. An event that this app does not know has no text to show,
- * so its delivery is dropped. An outcome that it does not know shows as skipped, and a reason as none.
- */
 const githubDelivery = (value: unknown): unknown[] => {
   if (!isDynamicRecord(value)) return [value];
   if (isUnknownName(WORKFLOW_GITHUB_EVENTS, value.event)) return [];
@@ -248,17 +211,14 @@ const githubHistory = onRecord((record) =>
   Array.isArray(record.deliveries) ? { ...record, deliveries: record.deliveries.flatMap(githubDelivery) } : record,
 );
 
-/** The `workflows-github-v1` event history of a workflow, newest first. */
 export const decodeRemoteWorkflowGitHubHistory = mapped(
   githubHistory,
   guardedDecoder(isWorkflowGitHubHistory, "remote workflow GitHub history"),
 );
-/** The `workflows-github-v1` catalog of the host's GitHub connection. */
 export const decodeRemoteWorkflowGitHubCatalog = guardedDecoder(
   isWorkflowGitHubCatalog,
   "remote workflow GitHub catalog",
 );
-/** The `workflows-github-v1` labels and people of one repository. */
 export const decodeRemoteWorkflowGitHubOptions = guardedDecoder(
   isWorkflowGitHubRepositoryOptions,
   "remote workflow GitHub options",

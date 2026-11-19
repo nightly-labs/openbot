@@ -1,9 +1,3 @@
-// A time series of what one app instance holds, for `dev:bench`. Each tick
-// reads the `ps` tree under the recorded pid; every few ticks it also reads the
-// JS heap and DOM counters of each page over CDP and the main-process heap over
-// the Node inspector. Those two are slower and wake the process they read, so
-// they run less often than `ps`, which costs the app nothing.
-
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { Logger } from "@openbot/logging";
@@ -17,16 +11,12 @@ import { describeTarget } from "./page-url";
 const run = promisify(execFile);
 
 export interface ResourceSamplerOptions {
-  // Getters: sampling starts at spawn, to catch the startup peak, before CDP
-  // and the inspector answer.
   browser: () => Browser | null;
   inspector: () => InspectorClient | null;
   rootPid: number;
-  // The app window. Its heap is reported apart from the helper surfaces.
   appPage: () => Page | null;
   logger: Logger;
   intervalMs?: number;
-  // Heap and DOM readings every this many ticks.
   heapEvery?: number;
 }
 
@@ -40,8 +30,6 @@ async function readProcessTree(rootPid: number): Promise<ProcessTableRow[]> {
   return collectDescendants(parseProcessTable(stdout), rootPid);
 }
 
-// macOS only. Elsewhere, or for a process the tool may not read, the pid is
-// missing from the map and only RSS is reported for it.
 async function readFootprints(rows: ProcessTableRow[]): Promise<Map<number, number>> {
   if (process.platform !== "darwin" || rows.length === 0) return new Map();
   try {
@@ -52,7 +40,6 @@ async function readFootprints(rows: ProcessTableRow[]): Promise<Map<number, numb
     );
     return parseFootprint(stdout);
   } catch (error) {
-    // A process that exits between `ps` and `footprint` fails the whole call.
     const stdout = error instanceof Error && "stdout" in error && typeof error.stdout === "string" ? error.stdout : "";
     return parseFootprint(stdout);
   }
@@ -68,7 +55,6 @@ async function withSession<T>(page: Page, use: (session: CDPSession) => Promise<
     session = await page.context().newCDPSession(page);
     return await use(session);
   } catch {
-    // A page that closes while we attach is not a failed run.
     return null;
   } finally {
     await session?.detach().catch(() => undefined);
@@ -145,7 +131,6 @@ export class ResourceSampler {
       const started = Date.now();
       const sample = await this.#sample(this.#tick % heapEvery === 0);
       this.#tick += 1;
-      // The first reading has no CPU interval. It still carries RSS.
       this.#samples.push(sample);
       if (this.#stopped) return;
       this.#timer = setTimeout(
@@ -165,11 +150,6 @@ export class ResourceSampler {
     return [...this.#samples];
   }
 
-  /**
-   * Collects garbage in main and in each page, waits, and reads everything
-   * once. CPU in this reading covers the wait only, which is the idle cost
-   * after the scenario.
-   */
   async settled(waitMs: number): Promise<MetricValues> {
     const { rootPid } = this.#options;
     await this.#options

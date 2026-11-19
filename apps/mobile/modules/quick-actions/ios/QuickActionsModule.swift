@@ -3,7 +3,6 @@ import UIKit
 
 private let quickActionEvent = "onQuickAction"
 
-/// The SF Symbol of each icon name that JavaScript sends.
 private let symbols = [
   "agent": "bubble.left",
   "routines": "calendar",
@@ -19,8 +18,6 @@ struct QuickActionItem: Record {
   @Field var icon: String = ""
 }
 
-/// Holds the chosen action until JavaScript listens. A quick action that starts the app comes before
-/// JavaScript loads. All calls run on the main queue.
 final class QuickActionInbox {
   static let shared = QuickActionInbox()
   private var pending: String?
@@ -44,7 +41,6 @@ public class QuickActionsModule: Module {
 
     Events(quickActionEvent)
 
-    /// Replaces the quick actions of the app icon. iOS always takes them; Android can refuse.
     AsyncFunction("setItems") { (items: [QuickActionItem]) -> Bool in
       UIApplication.shared.shortcutItems = items.map { item in
         UIApplicationShortcutItem(
@@ -75,7 +71,6 @@ public class QuickActionsModule: Module {
   }
 }
 
-/// `ExpoAppSceneDelegate` gives this method each quick action, also the one that starts the app.
 public class QuickActionsAppDelegateSubscriber: ExpoAppDelegateSubscriber {
   public func application(
     _ application: UIApplication,

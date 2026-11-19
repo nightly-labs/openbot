@@ -3,20 +3,6 @@ const path = require("node:path");
 const { IOSConfig, withDangerousMod, withXcodeProject } = require("expo/config-plugins");
 const { buildPage } = require("./with-share-target");
 
-// Adds the shortcuts of the app (List Agents, Send Message and Open Agent) to the iOS app target. The Swift
-// files in `shortcuts/` hold the App Intents, their snippets and the `AppShortcutsProvider`. They
-// are in the app target, not in the pod of `modules/shortcuts`: Xcode reads the shortcuts of an app
-// from the app target when it builds.
-//
-// Send Message sends without the JavaScript of the app, as the share extension does. So the app
-// target also gets the sender of that extension (`share-extension/ShareSender.swift`) and its page
-// `share-sender.html`, from `with-share-target.js`. One source file serves both targets, so both
-// check the page's requests in the same way.
-//
-// The intents read the file that the app writes to the App Group
-// (`src/features/shortcuts/model/shortcut-directory.ts`), and the servers, the agent pictures and
-// the session of the share extension. `expo-widgets` and `with-share-target.js` add both entitlements, so this plugin adds none.
-
 const SOURCE_DIRECTORY = path.join(__dirname, "shortcuts");
 const SOURCES = ["ShortcutData.swift", "ShortcutIntents.swift", "ShortcutSend.swift", "ShortcutSnippets.swift"];
 const SENDER = path.join(__dirname, "share-extension", "ShareSender.swift");

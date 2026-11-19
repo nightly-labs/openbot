@@ -10,22 +10,8 @@ const {
   withXcodeProject,
 } = require("expo/config-plugins");
 
-// Applies expo-sharing, which adds the iOS share extension and the Android share intents, with the
-// options from app.json. Then it makes the iOS extension send a share by itself, without the app:
-// - The Swift files in `share-extension/` take the place of expo-sharing's controller. They show the
-//   agents, and send through `share-sender.html`, a page with the app's Team client that
-//   `scripts/mobile-share-sender.ts` builds here. When the extension cannot send, it opens the app with
-//   the share, as expo-sharing does.
-// - The app and the extension share one keychain group, so the extension can read the session that
-//   the app gives it (`modules/share-extension`). The app's own group stays first, so the app's
-//   keychain items keep their group.
-// - The extension takes `INSendMessageIntent`, so the share sheet offers the agents that the app donates.
-// - Info.plist sets the display name to the target name, `expo-sharing-extension`. The iOS share
-//   sheet shows that name under the OpenBot icon, so the extension gets the app's name.
-
 const TARGET_NAME = "expo-sharing-extension";
 const SOURCE_DIRECTORY = path.join(__dirname, "share-extension");
-/** expo-sharing adds the controller to the target; this plugin replaces its content. */
 const CONTROLLER = "ShareIntoViewController.swift";
 const ADDED_SOURCES = ["ShareExtensionData.swift", "ShareInput.swift", "ShareSender.swift", "ShareView.swift"];
 const PAGE = "share-sender.html";
@@ -44,7 +30,6 @@ function changePlist(file, change) {
   fs.writeFileSync(file, plist.build(value));
 }
 
-/** The page that this prebuild built. Each target that needs the page gets a copy of it. */
 let builtPage = "";
 
 /**
@@ -109,9 +94,6 @@ const withExtensionProject = (config) =>
     });
     if (!groupKey) throw new Error(`The Xcode project has no ${TARGET_NAME} group.`);
     const group = objects.PBXGroup[groupKey];
-    // expo-sharing and expo-widgets both add a reference to an `Info.plist`. The xcode package gives
-    // the second one the reference of the first, and Xcode cannot open a project with one reference in
-    // two groups. The extension gets its own reference; its build settings name the file already.
     for (const child of group.children) {
       if (unquoted(objects.PBXFileReference[child.value]?.path) !== "Info.plist") continue;
       const shared = Object.keys(objects.PBXGroup).some(
@@ -159,9 +141,6 @@ const withExtensionProject = (config) =>
       group.children.push({ value: fileRef, comment: file });
       into.phase.files.push({ value: buildFile, comment: `${file} in ${into.name}` });
     }
-    // Expo sets the team of `ios.appleTeamId` on the targets that exist when its own mod runs.
-    // expo-sharing adds this target after that, so in a new project the target would have no team,
-    // and `expo run:ios` would then select a team for all targets by itself.
     if (mod.ios?.appleTeamId) {
       const sections = project.pbxXCBuildConfigurationSection();
       const configurations = objects.XCConfigurationList[target.buildConfigurationList].buildConfigurations;
@@ -173,8 +152,6 @@ const withExtensionProject = (config) =>
 /** @type {import('expo/config-plugins').ConfigPlugin<string>} */
 const withAppKeychainGroup = (config, keychainGroup) =>
   withEntitlementsPlist(config, (mod) => {
-    // Without this entitlement the app's group is its application identifier. The first group in the
-    // list is where new items go, so that group comes first.
     const groups = mod.modResults["keychain-access-groups"] ?? [
       `$(AppIdentifierPrefix)${config.ios?.bundleIdentifier}`,
     ];
@@ -187,7 +164,6 @@ const withAppKeychainGroup = (config, keychainGroup) =>
 const withAppInfo = (config, keychainGroup) =>
   withInfoPlist(config, (mod) => {
     mod.modResults.OpenBotShareKeychainGroup = keychainGroup;
-    // iOS shows the donated agents in the share sheet only for an app that declares the intent.
     const types = mod.modResults.NSUserActivityTypes ?? [];
     if (!types.includes(SEND_MESSAGE_INTENT)) types.push(SEND_MESSAGE_INTENT);
     mod.modResults.NSUserActivityTypes = types;
@@ -200,8 +176,6 @@ const withShareTarget = (config, props) => {
   const bundleIdentifier = config.ios?.bundleIdentifier;
   if (!bundleIdentifier) throw new Error("The share extension needs ios.bundleIdentifier.");
   const keychainGroup = sharedKeychainGroup(bundleIdentifier);
-  // A mod runs before the mods registered earlier. These are registered before expo-sharing, so they
-  // run after expo-sharing has copied the extension files and added the target.
   const withExtension = withExtensionProject(withExtensionFiles(config, keychainGroup));
   const withApp = withAppInfo(withAppKeychainGroup(withExtension, keychainGroup), keychainGroup);
   return withPlugins(withApp, [["expo-sharing", props]]);

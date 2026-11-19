@@ -86,10 +86,6 @@ import { WORKFLOWS_HIGGSFIELD_ROUTES } from "@openbot/contracts/team-protocol/wo
 import { WORKFLOWS_MEDIA_CATALOG_ROUTES } from "@openbot/contracts/team-protocol/workflows-media-catalog-v1";
 import { WORKFLOWS_SUNRA_ROUTES } from "@openbot/contracts/team-protocol/workflows-sunra-v1";
 
-/**
- * POST routes that a client sends with no user action: polls, previews, mark-read, and reads that use
- * POST for their body. They do not keep a hosted server running.
- */
 const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   TEAM_API_ROUTES.browser.preview,
   TEAM_API_ROUTES.browser.visible,
@@ -198,23 +194,15 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   PROVIDERS_ADMIN_ROUTES.runtimesStatus,
   PROVIDERS_RUNTIMES_V2_ROUTES.runtimesStatus,
   USAGE_CREDITS_ROUTES.list,
-  // A focused app counts as use only for a limited time: `TeamApiServer` records it on its own.
   FOCUS_USE_ROUTES.ping,
-  // Input on the computer of a desktop app keeps the member's phones quiet, not a hosted server running.
   COMPUTER_ACTIVITY_ROUTES.report,
 ]);
 
-/** A client opens a conversation and the app marks it read, or a member marks it unread. */
 const PASSIVE_PATTERNS: readonly RegExp[] = [
   /^\/v1\/agents\/[^/]+\/conversation\/(?:read|unread)$/u,
   /^\/v1\/direct\/conversations\/[^/]+\/read$/u,
 ];
 
-/**
- * Whether a signed-in request is a user action: a send, a change, or an answer. Only these keep a hosted
- * server running. A route that is not in the list counts, so a new route keeps the server running
- * rather than stopping it under the user.
- */
 export function isClientUse(method: string, pathname: string): boolean {
   if (method === "GET" || method === "HEAD" || method === "OPTIONS") return false;
   if (PASSIVE_ROUTES.has(pathname)) return false;

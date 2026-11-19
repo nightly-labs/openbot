@@ -26,7 +26,6 @@ export const messages = {
     "{names} araçlarını doğrudan çağır. tool_describe arama araçlarını açıklamaz.",
   "error.agent.routineScheduleArgumentsInvalid":
     "Rutin zamanlaması geçersiz: {detail} Zamanlamayı düzeltip yeniden deneyin. openbot.tool_describe şemayı verir.",
-  // Agent errors that the main process and the backend send.
   "error.agent.approvalWhileDeleting": "Ajan silinirken onay verilemez.",
   "error.agent.accessLocalOnly": "Ajan erişimi yalnızca ajanı çalıştıran bilgisayarda değiştirilebilir.",
   "error.agent.duplicateCleanupFailed": "Ajan çoğaltma başarısız oldu ve tamamlanmamış kopya kaldırılamadı.",
@@ -133,7 +132,6 @@ export const messages = {
     'Kayıtlı bir ajan profili okunamayan bir "{field}" değerine sahip; OpenBot\'u başlatmadan önce verileri güncelleyin.',
   "error.agent.storedProfileUnreadableId":
     '{id} kayıtlı ajan profili okunamayan bir "{field}" değerine sahip; OpenBot\'u başlatmadan önce verileri güncelleyin.',
-  // Written by `QueueEditRejectedError` in @openbot/contracts, which cannot import this package.
   "error.agent.queueEditRejected": "Kuyruk düzenlemesi reddedildi: {reason}",
   "error.agent.computerUseLocalOnly": "Bilgisayar Kullanımı yalnızca ajanı çalıştıran bilgisayarda değiştirilebilir.",
   "error.agent.automationLocalOnly": "Yerel betiklere yalnızca ajanı çalıştıran bilgisayarda izin verilebilir.",

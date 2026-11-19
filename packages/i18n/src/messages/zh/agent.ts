@@ -21,7 +21,6 @@ export const messages = {
   "agent.setup.creating": "正在创建助手…",
   "agent.setup.create": "创建助手",
   "agent.setup.suggestions": "推荐",
-  // Suggested agents. Selecting one copies its name and purpose into the new agent.
   "agent.setup.suggestion.label": "{name}。{description}",
   "agent.setup.suggestion.inboxHelper.name": "收件箱助手",
   "agent.setup.suggestion.inboxHelper.description": "起草回复，避免遗漏跟进。",
@@ -86,7 +85,6 @@ export const messages = {
   "agent.error.provider": "服务商错误",
   "agent.error.run": "{provider} · {model}",
   "agent.error.providerNamed": "{provider} 错误",
-  // Avatar color names. They fill `{color}` and `{hue}` inside a sentence.
   "agent.color.red": "红色",
   "agent.color.orange": "橙色",
   "agent.color.yellow": "黄色",

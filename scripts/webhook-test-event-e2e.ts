@@ -1,11 +1,3 @@
-// Sends signed test events to a webhook routine, from the windows of the running dev apps. Start the
-// two-client harness with `bun run dev:test-client`: the host app answers through the `events` IPC
-// group, and the test client, which joins it as an owner, through `webhook-tests-v1`. On each, the
-// script makes one webhook routine on the host's first agent, sends a test event while it is paused
-// and again while it is active, reads the activity, refuses a test for a schedule routine, and deletes
-// the routines. The active test starts one run of the agent. Writes
-// .openbot-build/webhook-test-event-e2e/report.json. Needs `--allow-mutations`:
-// `bun scripts/webhook-test-event-e2e.ts --allow-mutations`.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -17,7 +9,6 @@ import type { Page } from "playwright-core";
 import { assertMutationAllowed, connectToDevApp } from "./dev-automation/cdp-client";
 import { type DevInstanceRecord, readDevInstanceRecords } from "./dev-automation/instance-registry";
 
-// The page functions below run in the app window, where the preload bridge sets this.
 declare global {
   interface Window {
     openbot: OpenBotDesktopApi;
@@ -52,7 +43,6 @@ const logger = createOpenBotLogger("webhook-test-event-e2e");
 const checks: Check[] = [];
 const check = (name: string, passed: boolean, detail: unknown = null) => checks.push({ name, passed, detail });
 
-/** The error message of a test event that must fail, or `null` when it succeeded. */
 function refusal(page: Page, id: string, owner: EventRoutineOwner, serverId: string) {
   return page.evaluate(
     async ([routineId, routineOwner, server]) => {
@@ -94,7 +84,6 @@ async function runChecks(page: Page, serverId: string, label: string): Promise<v
     created.push(saved.routine.id);
     check(`${label}: a new webhook routine has a secret`, saved.secret !== null, { secret: saved.secret !== null });
 
-    // Paused: the receipt is written, and no run starts.
     const paused = await send(saved.routine.id);
     check(
       `${label}: a paused routine ignores the test event`,
@@ -102,7 +91,6 @@ async function runChecks(page: Page, serverId: string, label: string): Promise<v
       paused,
     );
 
-    // Active: the event matches the type and the filter, so a run starts.
     await save({ ...base, id: saved.routine.id, active: true });
     const active = await send(saved.routine.id);
     check(

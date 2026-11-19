@@ -1,14 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { OpenBotMigration } from "./migration";
 
-// Migration v50: Discord triggers of workflows. The text below is the migration; the latest schema takes
-// the run source line of migration 53, so do not edit it after release.
-//
-// `workflow_runs` gets `discord` in its source CHECK. SQLite cannot change a CHECK in place, so the
-// migration rebuilds the table, as migration 49 did; its rows keep their run ids, so the steps, output
-// deliveries and GitHub rows that point to them stay as they are. A Discord trigger has no table of its
-// own: the run payload keeps the message that started it, and a Discord output's post or reaction is a
-// row of `workflow_output_deliveries`.
 const V50_WORKFLOW_RUN_SOURCE_SQL =
   "source TEXT NOT NULL CHECK(source IN ('manual', 'schedule', 'webhook', 'github', 'discord')),";
 
@@ -18,10 +10,6 @@ const V50_WORKFLOW_RUN_INDEXES_SQL = `
     ON workflow_runs(status) WHERE status IN ('running', 'approval', 'stopping');
 `;
 
-/**
- * Migration 50. The caller pauses foreign keys: the old table is dropped while steps point to its runs,
- * and the new one takes its name and every run id.
- */
 function addDiscordWorkflows(db: DatabaseSync): void {
   db.exec(`
     CREATE TABLE workflow_runs_v50 (
@@ -60,8 +48,6 @@ function addDiscordWorkflows(db: DatabaseSync): void {
 export const migration: OpenBotMigration = {
   version: 50,
   name: "discord-workflows",
-  // Rebuilds the run table again to add the Discord run source, as migration 49 did, so foreign keys
-  // pause and run ids do not change. Few rows, so no vacuum. No table is added.
   disableForeignKeys: true,
   up: addDiscordWorkflows,
 };

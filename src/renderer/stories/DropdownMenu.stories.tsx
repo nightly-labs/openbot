@@ -18,8 +18,6 @@ import { createSignal, For, Show } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import "./DropdownMenu.css";
 
-// The menu look, after https://kobra.systems/components/dropdown-menu. The model select also shows
-// parts that only this story draws: the avatar cluster on the trigger and drag to paint.
 const meta = {
   title: "Foundations/Dropdown Menu",
   parameters: { layout: "fullscreen", a11y: { test: "error" } },
@@ -61,8 +59,6 @@ function ModelAvatar(props: { model: ModelOption }) {
 
 const MODEL_ORDER = MODELS.map((model) => model.id);
 
-// The trigger cluster: one avatar fills the 24px box, two overlap on the diagonal, and three or
-// four share a 2 by 2 grid. Each avatar moves to its new place instead of popping in.
 const CLUSTER_SLOTS: Record<number, readonly (readonly [x: number, y: number, size: number])[]> = {
   1: [[0, 0, 24]],
   2: [
@@ -84,7 +80,6 @@ const CLUSTER_SLOTS: Record<number, readonly (readonly [x: number, y: number, si
 
 function ModelCluster(props: { selected: readonly ModelOption[] }) {
   const slots = () => CLUSTER_SLOTS[props.selected.length] ?? [];
-  // A hidden avatar stays where it was, so it fades out in place.
   const lastSlot = new Map<string, readonly [number, number, number]>();
   const slotOf = (model: ModelOption) => {
     const index = props.selected.indexOf(model);
@@ -146,8 +141,6 @@ function ModelSelectMenu() {
     setSelected(next);
   };
 
-  // Drag to paint: press a row and drag across the others to give them all the new value
-  // of the first row. The row that started the stroke does not toggle again on release.
   let stroke: PaintStroke | undefined;
   let skipChange = false;
   const startStroke = (event: PointerEvent & { currentTarget: HTMLElement }, id: string) => {
@@ -188,7 +181,6 @@ function ModelSelectMenu() {
     if (stroke?.pointerId !== event.pointerId) return;
     if (stroke.painting) {
       skipChange = true;
-      // The release may land outside a row, so no change follows it.
       setTimeout(() => {
         skipChange = false;
       });

@@ -1,19 +1,5 @@
 import type { OpenBotMigration } from "./migration";
 
-// Shared by migration v25 and the separate new-database schema. IF NOT EXISTS throughout, because
-// this text is both the migration and the tail of the latest schema.
-//
-// `platform` has no CHECK on purpose: the next platform must not need a table rebuild, which is
-// what a CHECK change costs (migrations 17, 22 and 23). The code only accepts the platforms it has
-// a driver for.
-//
-// A connection is one workspace of a platform, such as a Slack workspace that installed the OpenBot
-// app. Its orchestrator agent receives each new conversation and asks its teammates. No token is
-// stored here. The tokens of a connection live in the main process's
-// encrypted credential file, keyed by `connection_id`.
-//
-// A messaging thread is an execution thread of the agent that answers it, like a channel context:
-// its own row in `projection_threads`, which the agent's public chat never shows.
 export const MESSAGING_SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS projection_messaging_connections (
     connection_id TEXT PRIMARY KEY,
@@ -49,6 +35,5 @@ export const MESSAGING_SCHEMA_SQL = `
 export const migration: OpenBotMigration = {
   version: 25,
   name: "messaging",
-  // Only creates tables, so no foreign-key pause and no vacuum.
   up: (db) => db.exec(MESSAGING_SCHEMA_SQL),
 };

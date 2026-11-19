@@ -15,19 +15,12 @@ import { currentText, useText } from "@/shared/lib/text";
 import { END_X } from "@/shared/lib/text-direction";
 import { type PinnedMessageRow, useMessagePins, usePinnedMessageRows } from "../components/use-message-pins";
 
-/** The route name of a thread in the app stack, `app/(app)/task/[taskId].tsx`. */
 const TASK_ROUTE = "task/[taskId]";
-/** The width of the Unpin action that a swipe shows. */
 const UNPIN_WIDTH = 88;
 const UNPIN_ACTION = "unpin";
 
-/** A new value each time, so that a chat that already shows the message opens at it again. */
 const focusAt = () => String(Date.now());
 
-/**
- * One pin: who wrote the message and when, its start, and its chat and who pinned it. A tap opens the
- * message in its chat. A swipe toward the start shows Unpin; a screen reader has Unpin as an action.
- */
 function PinnedMessageItem({
   row,
   onOpen,
@@ -66,7 +59,6 @@ function PinnedMessageItem({
     <ReanimatedSwipeable
       ref={swipeable}
       friction={1}
-      // The action is at the end of the row. Swipeable places its actions on the screen's sides.
       overshootRight={false}
       overshootLeft={false}
       rightThreshold={UNPIN_WIDTH / 2}
@@ -113,15 +105,8 @@ function PinnedMessageItem({
   );
 }
 
-/**
- * The pinned messages of all chats of an agent, from the More menu of its chat or the menu of one of
- * its threads: the pins of that chat first, then the others. A tap closes the sheet and shows the
- * message in its chat; a message of another thread opens that thread in place of the sheet, so Back
- * returns to the chat under it.
- */
 export function PinnedMessagesScreen() {
   const { t } = useText();
-  // The stack that presents this sheet. The sheet has its own stack inside.
   const sheetStack = useNavigation().getParent();
   const params = useLocalSearchParams<{ agentId: string; serverId: string; taskId?: string }>();
   const agentId = params.agentId;

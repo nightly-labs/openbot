@@ -5,19 +5,12 @@ import macMockUrl from "./assets/remote-desktop-mac-mock.png?inline";
 
 const PAGES_ROUTE = "/__openbot/chat-visual";
 
-/** Publishes a page to the Storybook server (`.storybook/chat-visual-pages.ts`) and gives its URL. */
 export async function publishChatVisualPage(html: string): Promise<string> {
   const response = await fetch(PAGES_ROUTE, { method: "POST", body: chatVisualDocument(html) });
   if (!response.ok) throw new Error(`The Storybook server did not keep the page: ${response.status}`);
   return response.text();
 }
 
-/*
- * Pages that an agent could publish as a visual reply. Each follows the layout rules that the agent
- * gets: no background on the page, no outer card or title, and the theme variables for colour.
- */
-
-/** A bar chart that its own script draws as SVG, with no library. */
 export const INLINE_SVG_CHART = `<!doctype html>
 <html><head>
 <style>
@@ -58,7 +51,6 @@ export const INLINE_SVG_CHART = `<!doctype html>
 </script>
 </body></html>`;
 
-/** A line chart with Chart.js from a CDN, which a visual reply can load. */
 export const CDN_CHART = `<!doctype html>
 <html><head>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
@@ -92,7 +84,6 @@ export const CDN_CHART = `<!doctype html>
 </script>
 </body></html>`;
 
-/** A comparison in boxes, as a mockup or a decision table. */
 export const COMPARISON_MOCKUP = `<!doctype html>
 <html><head>
 <style>
@@ -112,7 +103,6 @@ export const COMPARISON_MOCKUP = `<!doctype html>
 </div>
 </body></html>`;
 
-/** A list of sources. A click on a link asks the app to open it in the browser. */
 export const LINK_OUT = `<!doctype html>
 <html><head>
 <style>
@@ -130,7 +120,6 @@ export const LINK_OUT = `<!doctype html>
 <p id="notes"><small>Only http and https links go to the app.</small></p>
 </body></html>`;
 
-/** A page that is higher than a frame can be, so the frame stops at its limit and the page scrolls. */
 export const TALL_PAGE = `<!doctype html>
 <html><head>
 <style>
@@ -147,10 +136,6 @@ export const TALL_PAGE = `<!doctype html>
 </script>
 </body></html>`;
 
-/**
- * A collage of screenshots. The agent gives local image paths, and the app puts each image into the
- * page as a data URL when it publishes the page, so the page does not need the files later.
- */
 export const IMAGE_COLLAGE = `<!doctype html>
 <html><head>
 <style>
@@ -169,10 +154,6 @@ export const IMAGE_COLLAGE = `<!doctype html>
 </div>
 </body></html>`;
 
-/**
- * A page that answers the agent: a choice goes to the message box, the count goes to the context,
- * and the page can go full screen. Its count shows that full screen does not load the page again.
- */
 export const INTERACTIVE_CHOICE = `<!doctype html>
 <html><head>
 <style>
@@ -192,7 +173,6 @@ export const INTERACTIVE_CHOICE = `<!doctype html>
 </div>
 <img id="chart" alt="Runs per day">
 <script>
-  // The chart is an image, drawn here with the theme colours, so a click on it opens the image viewer.
   const canvas = document.createElement("canvas");
   canvas.width = 480;
   canvas.height = 200;

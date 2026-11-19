@@ -1,12 +1,5 @@
 import type { OpenBotMigration } from "./migration";
 
-/**
- * Durable provider history state.
- *
- * Provider history is an import stream, not a replacement for the conversation projection. The
- * import cursor and every item are kept separately so a page that fails halfway through can be
- * retried without deleting messages that were not present in that page.
- */
 export const PROVIDER_HISTORY_SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS provider_history_imports (
     session_id TEXT PRIMARY KEY,
@@ -52,7 +45,5 @@ export const PROVIDER_HISTORY_SCHEMA_SQL = `
 export const migration: OpenBotMigration = {
   version: 29,
   name: "provider-history",
-  // Provider history is additive durable import state. Existing conversation projections and
-  // provider sessions remain untouched, so foreign keys stay enabled and no vacuum is needed.
   up: (db) => db.exec(PROVIDER_HISTORY_SCHEMA_SQL),
 };

@@ -1,5 +1,3 @@
-// A provider record goes to the renderer and to history after this redaction. It must stay a valid
-// record, and a value that the MCP configuration knows must not reach either place.
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -11,7 +9,6 @@ import { mcpSecretValues, redactMcpRecord } from "./mcp-redaction";
 import { createPiMcpExtension } from "./pi-mcp";
 
 describe("redactMcpRecord", () => {
-  // A setting word is never a credential. Masking it broke `QA_READY=true` in a workflow (#10680).
   it("keeps JSON literals and setting words when a known value is `true` or `null`", () => {
     const record = { path: "README.md", enabled: true, note: null, label: "true story", flag: "QA_READY=TRUE" };
     expect(redactMcpRecord(record, ["true", "null", "TRUE", "false"])).toEqual({
@@ -45,7 +42,6 @@ describe("redactMcpRecord", () => {
     expect(redacted).not.toContain("sig_part");
   });
 
-  // The record is the agent's own chat: the user must read the address (#9988), not its secrets.
   it("keeps an email address and still redacts secrets", () => {
     const record = { item: { type: "agentMessage", text: "Sign in as admin@example.com. password=hunter2" } };
     expect(redactMcpRecord(record, [])).toEqual({
@@ -54,9 +50,6 @@ describe("redactMcpRecord", () => {
   });
 });
 
-// The Computer Use server inherits HOME, USER and TMPDIR. Masking HOME broke each Shared file link
-// in a Pi or Muse transcript (#4863). A credential beside them, or a value typed under a profile
-// name, must stay masked.
 describe("mcpSecretValues", () => {
   const home = "/Users/smoke-home";
   const originalHome = process.env.HOME;

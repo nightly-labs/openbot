@@ -83,7 +83,6 @@ interface OpenBotToolDefinition {
   shape: z.ZodRawShape;
 }
 
-/** The page rules for `html_render` and `html_preview`. The names match the variables that `ChatVisual` sends. */
 const VISUAL_PAGE_RULES = [
   "Write one self-contained HTML document with inline <style> and <script>. Remote http(s) files, such as a chart library from a CDN, load as they are; local file paths do not load.",
   "The page runs in a sandbox: it cannot use cookies, storage or pop-up windows. A click on an http(s) link opens the link in the user's browser.",
@@ -92,7 +91,6 @@ const VISUAL_PAGE_RULES = [
   "OpenBot sets these CSS variables on :root from the app theme, which is dark on the desktop: --background (transparent), --foreground, --muted-foreground, --muted, --card, --card-foreground, --border, --accent, --destructive, --success, --chart-1 to --chart-6, --radius, --font-sans, --font-mono. The base style sets the body font and color from them.",
 ].join(" ");
 
-/** What an `html_render` page can ask of the app. The names match `window.openbotPage` in the frame bootstrap. */
 const VISUAL_PAGE_ACTIONS = [
   "For a choice, a form or a game, call openbotPage.sendMessage(text) from a click: OpenBot puts the text in the user's message box, and the user sends it.",
   `openbotPage.setContext(text) from a click keeps the page state as a quote in the user's message box, so you read it with the next message; up to ${CHAT_VISUAL_CONTEXT_LIMIT} characters, and empty text removes it.`,
@@ -129,7 +127,6 @@ export const setBackdropToolSchema = z.object({
 
 const CHAT_VISUAL_PREVIEW_MIN_WIDTH = 240;
 const CHAT_VISUAL_PREVIEW_MAX_WIDTH = 1_600;
-/** The width of the reply column in a desktop chat. */
 export const CHAT_VISUAL_PREVIEW_DEFAULT_WIDTH = 728;
 
 export const htmlPreviewToolSchema = z.object({
@@ -146,9 +143,6 @@ export const htmlPreviewToolSchema = z.object({
   appearance: z.enum(["dark", "light"]).optional().describe("The app theme to draw with. The default is dark."),
 });
 
-// `ask_ui` input. The limits are the contract's; `normalizeUiBlockSpec` then checks the rules a schema
-// cannot say, such as unique ids and option labels. An id passes the same check as a stored block id.
-// The ask_ui description gives the id rule once, not on each id.
 const uiBlockIdSchema = z
   .string()
   .regex(/^[A-Za-z0-9.:-][A-Za-z0-9_.:-]{0,63}$/)
@@ -177,7 +171,6 @@ export const routineReportFailureToolSchema = z.object({
     .describe("Why the task could not be done, in one short sentence."),
 });
 
-/** `acknowledge_request`: the action ids of its plan card. */
 export const ACKNOWLEDGE_REQUEST_ACTIONS = { start: "start", alternative: "alternative", cancel: "cancel" } as const;
 
 export const acknowledgeRequestToolSchema = z.object({
@@ -200,11 +193,6 @@ export const acknowledgeRequestToolSchema = z.object({
     .describe("A smaller option that the user may prefer, such as Only find the cause."),
 });
 
-/**
- * Agents get only the confirm block: an approval, such as of a draft in its preview. A question with
- * options goes to `ask_user`, which costs less context in each request. The choice and form blocks
- * stay in the contract: OpenBot makes forms itself, and older chats show both.
- */
 export const askUiToolSchema = z.object({
   blockId: uiBlockIdSchema.optional().describe("Your id for this block. OpenBot makes one when you omit it."),
   block: z.strictObject({
@@ -256,12 +244,10 @@ export const saveApiKeyToolSchema = z.strictObject({
     .describe("What the key is for. Never a secret. Omit it to keep the saved notes."),
 });
 
-/** `openbot.web_search`: one search turn on a ChatGPT account (`AgentService.searchWeb`). */
 export const webSearchToolSchema = z.strictObject({
   query: z.string().trim().min(1).max(1_000).describe("The whole question, with its context."),
 });
 
-/** `openbot.create_server_install_command`: a one-time command for a new server of this account. */
 export const serverInstallCommandToolSchema = z.strictObject({
   name: z
     .string()
@@ -278,13 +264,11 @@ export const sendToChannelToolSchema = z.strictObject({
   paths: z.array(z.string().min(1).max(INPUT_LIMITS.path)).max(INPUT_LIMITS.attachments).optional(),
 });
 
-/** The Marketplace apps that the chat draws a card for: the bundled catalog plugins and the connectors. */
 export const MARKETPLACE_APP_IDS: readonly string[] = [
   ...pluginCatalog.plugins.map((plugin) => plugin.slug),
   ...CONNECTOR_IDS,
 ];
 
-/** Shared declarations for Codex, Grok, and Claude. Service handlers enforce execution rules. */
 export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   ...CHANNEL_TOOL_DEFINITIONS,
   ...MESSAGING_TOOL_DEFINITIONS,
@@ -758,8 +742,6 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   },
   {
     name: "suggest_marketplace_app",
-    /* The description does not list the apps: the catalog has more than 200, and each agent turn would
-       carry them. An unknown name returns the list. */
     description:
       "Call this when the user needs an outside service, such as Notion or Slack, and your shell or browser cannot do it. It shows a card in the chat to connect the app; only the user connects it. For an installed app, it tests it and returns the fix, such as a Sign in card or setup steps. An unknown name returns the list of apps.",
     shape: {

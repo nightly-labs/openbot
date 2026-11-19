@@ -1,15 +1,3 @@
-// Frozen optional mcp-sign-in-v1 wire contract.
-//
-// An owner or admin of a joined server signs the host in to an OAuth MCP server. The host opens the
-// server's sign-in page in a private tab of its own browser, and the client shows that tab with
-// `browser-view`: the user signs in there, and the server sends the grant to the host's own loopback
-// listener. No credential travels on these routes. A member cannot use any route; `requireAdmin` on
-// the host is the only gate.
-//
-// `start` returns at once and the sign-in runs on the host. `status` answers `tabId` while the page
-// is open and `result` once the sign-in ended, in the shape of an MCP test; both are `null` while the
-// host looks for the page. `cancel` ends a waiting sign-in. `signOut` and `list` answer whether each
-// http row of the host holds a sign-in, yes or no only.
 import {
   adminRoute,
   boolean,
@@ -35,7 +23,6 @@ export const MCP_SIGN_IN_ROUTES = {
 } as const;
 
 const pair = fields({ key: string(255), value: string(8_192) });
-// The configuration the form shows, saved or not: an empty id is a draft.
 const config = fields({
   id: string(128),
   name: string(80),

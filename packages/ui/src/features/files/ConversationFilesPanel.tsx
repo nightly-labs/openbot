@@ -9,16 +9,12 @@ import { fileCountLabel, type StoredFileAction, type StoredFileRow } from "./fil
 export interface ConversationFilesPanelProps {
   conversationTitle: string;
   files: readonly StoredFileRow[];
-  /** Messages and files of this chat together. */
   chatBytes: number;
-  /** Names the sender agent in a group chat. Leave it out in a chat with one agent. */
   agents?: readonly AgentProfile[];
   loading?: boolean;
-  /** The viewer can delete files of this chat. */
   canDelete?: boolean;
   error?: string | null;
   onRetry?: () => void;
-  /** Panel width in pixels. The resizer of the real panel sets it later. */
   width?: number;
   now?: Date;
   onClose: () => void;
@@ -26,10 +22,6 @@ export interface ConversationFilesPanelProps {
   onFileAction: (file: StoredFileRow, action: StoredFileAction) => void | Promise<void>;
 }
 
-/**
- * Chat > Files: every file of one chat, newest first by day, in the same side-panel frame as the
- * file preview. "Show in chat" in a row menu scrolls the conversation to the message.
- */
 export function ConversationFilesPanel(props: ConversationFilesPanelProps) {
   const { t, format } = useText();
   const fades = createScrollFades();
@@ -63,7 +55,6 @@ export function ConversationFilesPanel(props: ConversationFilesPanelProps) {
         </Button>
       </header>
       <div class={["conversation-files-content", fades.classes()]} ref={fades.bind} onScroll={fades.measure}>
-        {/* Files load after the panel opens and change the scroll height while the body keeps its size. */}
         <div ref={fades.watch}>
           <FileList
             label={t("files.conversation.label", { title: props.conversationTitle })}

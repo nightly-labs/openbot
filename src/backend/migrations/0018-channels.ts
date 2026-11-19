@@ -1,9 +1,5 @@
 import type { OpenBotMigration } from "./migration";
 
-// Shared by migration v18 and the separate new-database schema. IF NOT EXISTS throughout, because
-// this text is both the migration and the tail of the latest schema: a database built from the
-// latest schema and then replayed forward - which is how a test fakes an older version - meets its
-// own tables.
 export const CHANNEL_SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS projection_channels (
     channel_id TEXT PRIMARY KEY,

@@ -1,14 +1,12 @@
 const { withAppDelegate } = require("expo/config-plugins");
 const { mergeContents, removeContents } = require("@expo/config-plugins/build/utils/generateCode");
 
-// Expo CLI launches without Xcode's LLDB hook. Load Connect before React Native starts.
 /**
  * @param {string} contents
  * @param {string | undefined} frameworkPath
  */
 function addRocketSim(contents, frameworkPath) {
   if (!frameworkPath) return removeContents({ src: contents, tag: "openbot-rocketsim" }).contents;
-  // JSON string escapes are also valid Swift escapes for local paths, except control characters.
   if (Array.from(frameworkPath).some((character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)) {
     throw new Error("RocketSim path contains control characters.");
   }

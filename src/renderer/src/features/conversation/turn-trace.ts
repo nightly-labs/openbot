@@ -4,10 +4,6 @@ import { useText } from "@openbot/ui/text";
 import { currentDevicePlatform } from "../../send-shortcut-preference";
 import type { createTurnSteps } from "./turn-steps";
 
-/**
- * The trace that the steps row of an answer opens, the same in an agent chat, a channel and a thread.
- * `agentName` names the agent that answered, when it is not the agent of the chat.
- */
 export function useTurnTrace(deps: {
   turnSteps: ReturnType<typeof createTurnSteps>;
   agentName: () => string | undefined;

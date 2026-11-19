@@ -9,12 +9,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAgentLevel, requireListedAgent, stringField } from "./request-helpers";
 
-/**
- * The requests that each side thread of an agent sent to other agents and that wait for their answer,
- * from a joined server. A member who can send the agent a message can read them, as the thread on this
- * computer shows them. An agent that this peer cannot see answers as a missing agent does. Frozen by
- * `agent-thread-requests-v1`.
- */
 export async function routeAgentThreadRequests(
   context: TeamApiRequestContext,
   tasks: TeamApiAgentTasks | undefined,
@@ -24,7 +18,6 @@ export async function routeAgentThreadRequests(
   if (method !== "POST" || url.pathname !== AGENT_THREAD_REQUESTS_ROUTES.list) return "unmatched";
   if (!tasks || !capabilities.has(AGENT_THREAD_REQUESTS_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.threadRequestsUnsupported"));
-  // `readJson` has already run the body through the agent-thread-requests wire codec.
   const agentId = stringField(await readJson(request), "agentId");
   if (hiddenAgentIds.has(agentId)) throw new HttpError(404, sourceText("error.team.agentNotFound"));
   requireListedAgent(tasks, agentId);

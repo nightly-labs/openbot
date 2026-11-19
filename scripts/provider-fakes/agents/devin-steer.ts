@@ -1,13 +1,3 @@
-// The Devin agent of `devin-steer-e2e.ts`. It steers as `devin acp` 3000.12.57 did in a live probe:
-// `initialize` reports `agentInfo.version` "0.0.0-dev" and `cognition.ai/midTurnPrompts`. A prompt
-// that arrives while another prompt of the session is open moves the running command to the
-// background, and the run goes on under the new prompt. When the run ends, each of its open prompts
-// gets `end_turn` with the same `usage` and the same `cognition.ai/userMessageId`.
-// A `work` prompt opens one tool call and stays open. A steer that starts with `more` also stays
-// open. A steer that starts with `separate` ends the run of the open prompt first, and then answers
-// in a run of its own. Another steer ends the run and answers with its text. An `ask` prompt asks for
-// a permission and answers with the outcome. Each other prompt answers at once.
-// `FAKE_MID_TURN=0` leaves out the capability, as a Devin CLI before it does.
 import { randomUUID } from "node:crypto";
 import { type AcpPeer, type AcpRequest, logEntry, serveFakeAcpAgent } from "../acp-agent";
 
@@ -15,11 +5,9 @@ const MODELS = {
   availableModels: [{ modelId: "swe-fake", name: "SWE Fake" }],
   currentModelId: "swe-fake",
 };
-/** The prompts of the run that is open, by session. */
 const open = new Map<string, AcpRequest[]>();
 let sessions = 0;
 let runs = 0;
-/** The peer of the last request, for `session/cancel`, which is a notification. */
 let lastPeer: AcpPeer | undefined;
 
 function promptText(request: AcpRequest): string {
@@ -30,7 +18,6 @@ function promptText(request: AcpRequest): string {
     .trim();
 }
 
-/** Ends a run: each of its prompts gets `end_turn` with the run's usage and message id. */
 function endRun(peer: AcpPeer, prompts: readonly AcpRequest[]): void {
   runs += 1;
   const result = {

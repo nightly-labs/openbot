@@ -41,61 +41,22 @@ export interface LocalMcpSession {
     headers: Array<{ name: string; value: string }>;
   }>;
   setThreadId(threadId: string): void;
-  /** Whether the client sent a request to each of `servers` since the session opened. */
   reached(): boolean;
-  /**
-   * Whether the client gave up a server of this session: it did not get the tools of a token that
-   * this session was the first to send within `limitMs` of `sentAt`, the time of the session request.
-   * Such a server is marked, so a session that joins it later gets a new token.
-   */
   dropped(sentAt: number, limitMs: number): boolean;
-  /**
-   * Gives each marked server a new token, which all sessions of its directory share. `servers` then
-   * has the new tokens, and is returned.
-   */
   renew(): LocalMcpSession["servers"];
   close(): void;
 }
 
-/**
- * How often a tool call that is still running tells the client it is alive. An MCP client times out
- * a call that sends nothing: opencode after 60 seconds, unless a progress notification resets the
- * deadline. `ask_user` waits for the user, which can take much longer.
- */
 const LOCAL_MCP_PROGRESS_INTERVAL_MS = 20_000;
 
-/**
- * How long a call with no progress token may wait before OpenBot must answer it. Such a client gets
- * no progress notification, so its own timeout cannot be reset: 60 seconds in the MCP TypeScript SDK,
- * which Cursor 2026.10 uses with no option to change it. A question answers the call before then and
- * stays open (#6230).
- */
 const LOCAL_MCP_UNEXTENDED_DETACH_MS = 45_000;
 
-/**
- * The `_meta` key in which OpenCode 2.1.4 names the session that makes a tool call. Its ACP session
- * id is that session id, so a call on a token that a directory's sessions share finds its own thread.
- */
 const OPENCODE_SESSION_META = "ai.opencode/sessionID";
 
-/**
- * A session request that the client answered this close to its connection limit, with no tools listed,
- * gave up the server. The client starts its attempt after the request leaves, so it ends a little later.
- */
 const DROP_JUDGE_MARGIN_MS = 2_000;
 
-/**
- * How long the bridge keeps an idle connection. Go's HTTP client, which Antigravity uses, keeps one for
- * up to 90 seconds and does not read `Keep-Alive: timeout=5`. With Node's 5-second default, it can send
- * a tool call into a connection that the bridge just closed, and the call fails (#11465).
- */
 const LOCAL_MCP_KEEP_ALIVE_MS = 95_000;
 
-/**
- * Keeps idle connections for `LOCAL_MCP_KEEP_ALIVE_MS`. `close` ends only the connections idle at that
- * moment, so a connection ends after its last response once the server stops listening. Otherwise it
- * would hold the close for the whole keep-alive time.
- */
 function keepIdleConnections(server: HttpServer): HttpServer {
   server.keepAliveTimeout = LOCAL_MCP_KEEP_ALIVE_MS;
   const inFlight = new WeakMap<object, number>();
@@ -111,30 +72,16 @@ function keepIdleConnections(server: HttpServer): HttpServer {
   return server;
 }
 
-/** One session that a token serves. A token shared by a directory serves each session in it. */
 interface BridgeMember {
   threadId: string;
   activeTurnId: () => string | null;
-  /** The tools of this session, by server name. Sessions in one directory can have different tools. */
   namespaces: ReadonlyMap<string, DynamicToolNamespace>;
 }
 
 interface BridgeRoute {
   namespace: DynamicToolNamespace;
-  /**
-   * The sessions in the order they opened. A call goes to the one that the client names, else to the
-   * one in a turn, else to the last. With more than one in a turn and no name, the call is refused.
-   */
   members: BridgeMember[];
-  /** The key in `#shared`, for a token that a directory's sessions share. */
   shareKey: string | null;
-  /**
-   * `signal` aborts when the client abandons the call: it sent `notifications/cancelled` (an MCP
-   * client does this when its own timeout ends) or closed the response stream. Nothing reads the
-   * result after that, so the owner must stop waiting for the user. `detachAfterMs` is set when the
-   * client cannot be kept waiting: see `AppServerRequest.detachAfterMs`. `subagent` is true for a
-   * call from a session that the client started itself: see `AppServerRequest.subagent`.
-   */
   call: (
     params: {
       threadId: string;
@@ -148,23 +95,11 @@ interface BridgeRoute {
     detachAfterMs: number | undefined,
     subagent: boolean,
   ) => Effect.Effect<DynamicToolResult, ProviderClientOperationError>;
-  /**
-   * The calls still running, by JSON-RPC id. Each POST gets a new MCP server, so the POST that
-   * carries `notifications/cancelled` cannot reach the call through the SDK and finds it here.
-   */
   running: Map<RequestId, AbortController>;
-  /** Whether the client sent a request with this token. */
   reached: boolean;
-  /**
-   * The tokens of this route, the current one last. A renewed route keeps its earlier tokens, so a
-   * call still running on one of them is not refused.
-   */
   tokens: string[];
-  /** The session that sent the current token first, which judges whether the client loaded it. */
   sentBy: BridgeMember;
-  /** When the client first listed the tools with the current token, or null. */
   listedAt: number | null;
-  /** The client gave up the current token: OpenCode 2.3.0 does not connect again to the same settings. */
   dropped: boolean;
 }
 
@@ -172,19 +107,11 @@ export class LocalMcpBridge {
   #server: HttpServer | null = null;
   #port: number | null = null;
   #listening: Deferred.Deferred<void, McpOperationError> | null = null;
-  /** Counts the closes, so a session asked for before a close does not register after it. */
   #closes = 0;
   #closing: Deferred.Deferred<void, McpOperationError> | null = null;
   readonly #routes = new Map<string, BridgeRoute>();
-  /** The token of each shared route, by directory and server name. */
   readonly #shared = new Map<string, string>();
 
-  /**
-   * `directory` is set for an agent that keeps one MCP server of each name for a directory, not for
-   * a session. Its sessions in that directory then get one token, which lasts until the last of them
-   * closes: a token of their own would be replaced by the newest session's, and closing that session
-   * would leave the others with a token that is refused.
-   */
   readonly createSession = Effect.fn("LocalMcpBridge.createSession")(function* (
     this: LocalMcpBridge,
     threadId: string,
@@ -207,10 +134,8 @@ export class LocalMcpBridge {
       const sharedToken = shareKey === null ? undefined : this.#shared.get(shareKey);
       const shared = sharedToken === undefined ? undefined : this.#routes.get(sharedToken);
       if (shared) {
-        // The server takes the name and description of the session that opened last.
         shared.namespace = namespace;
         shared.members.push(member);
-        // The client gave up this server, and the same settings would not make it connect again.
         if (shared.dropped) this.#renewToken(shared, member);
         return shared;
       }
@@ -238,7 +163,6 @@ export class LocalMcpBridge {
         url: `http://127.0.0.1:${this.#port}/mcp`,
         headers: [{ name: "Authorization", value: `Bearer ${route.tokens.at(-1)}` }],
       }));
-    // One array for the session: a renew changes it in place, so a caller that kept its entries still finds them.
     const current = servers();
     return {
       servers: current,
@@ -251,8 +175,6 @@ export class LocalMcpBridge {
         let dropped = false;
         for (const route of routes) {
           if (route.sentBy !== member || route.dropped) continue;
-          // OpenCode answers the session request after its connection attempt ends. With no tools
-          // listed, an answer that came just before the limit can still be followed by the list.
           route.dropped =
             route.listedAt === null
               ? now - sentAt >= limitMs - DROP_JUDGE_MARGIN_MS
@@ -278,7 +200,6 @@ export class LocalMcpBridge {
     };
   });
 
-  /** A new token for `route`: a client that gave up its server connects again to changed settings. */
   #renewToken(route: BridgeRoute, member: BridgeMember): void {
     const token = randomBytes(32).toString("base64url");
     route.tokens.push(token);
@@ -309,7 +230,6 @@ export class LocalMcpBridge {
   readonly #shutDown = Effect.fn("LocalMcpBridge.shutDown")(function* (
     this: LocalMcpBridge,
   ): Effect.fn.Return<void, McpOperationError> {
-    // A bind still in flight sets the server when it ends, so it is awaited before the close.
     if (this.#listening) yield* Deferred.await(this.#listening).pipe(Effect.ignore);
     const server = this.#server;
     this.#server = null;
@@ -318,7 +238,6 @@ export class LocalMcpBridge {
     this.#listening = null;
   });
 
-  /** One bind, however many sessions ask for it at once: a second would leave a server listening. */
   readonly #listen = Effect.fn("LocalMcpBridge.listen")(function* (this: LocalMcpBridge) {
     if (this.#listening) return yield* Deferred.await(this.#listening);
     const listening = Deferred.makeUnsafe<void, McpOperationError>();
@@ -393,7 +312,6 @@ export class LocalMcpBridge {
         ...(route.namespace.description === undefined ? {} : { instructions: route.namespace.description }),
       },
     );
-    // The client lists one set for all sessions of a shared token; a call is checked against its own session.
     mcp.setRequestHandler(ListToolsRequestSchema, async () => {
       if (token === route.tokens.at(-1)) route.listedAt ??= Date.now();
       return {
@@ -407,9 +325,6 @@ export class LocalMcpBridge {
     mcp.setRequestHandler(CallToolRequestSchema, ({ params }, extra) =>
       runCauseEffect(
         Effect.gen({ self: this }, function* (): Effect.fn.Return<CallToolResult, McpOperationError> {
-          // A shared token does not say which session called. OpenCode names it in `_meta`; without
-          // that, the one in a turn did. With two in a turn at once, no one can tell, so the call fails
-          // rather than act in the other thread.
           const caller = extra._meta?.[OPENCODE_SESSION_META];
           const inTurn = route.members.filter((candidate) => candidate.activeTurnId() !== null);
           if (inTurn.length > 1 && !route.members.some((candidate) => candidate.threadId === caller))
@@ -417,13 +332,10 @@ export class LocalMcpBridge {
           const member =
             route.members.find((candidate) => candidate.threadId === caller) ?? inTurn[0] ?? route.members.at(-1);
           if (!member) return yield* mcpFailure(new Error(`The ${route.namespace.name} session closed.`));
-          // A tool that another session of the directory has, and this one does not, stays refused.
           const tool = member.namespaces
             .get(route.namespace.name)
             ?.tools.find((candidate) => candidate.name === params.name);
           if (!tool) return yield* mcpFailure(new Error(`Unknown ${route.namespace.name} tool: ${params.name}`));
-          // The SDK aborts `extra.signal` when this POST's transport closes, which follows a closed
-          // response stream. A cancel on another POST aborts `abandoned` through `route.running`.
           const abandoned = new AbortController();
           const abandon = () => abandoned.abort();
           extra.signal.addEventListener("abort", abandon, { once: true });
@@ -452,9 +364,6 @@ export class LocalMcpBridge {
                 },
                 abandoned.signal,
                 progressToken === undefined ? LOCAL_MCP_UNEXTENDED_DETACH_MS : undefined,
-                // An OpenCode subagent names its own child session, which no member is. Its call goes to
-                // the parent's chat and turn, but the subagent runs in the background and can still wait
-                // after the parent's turn ends (#10657).
                 typeof caller === "string" && caller !== member.threadId,
               )
               .pipe(Effect.mapError(({ cause }) => mcpFailure(cause)));
@@ -485,7 +394,6 @@ export class LocalMcpBridge {
       ),
     );
 
-    // No `sessionIdGenerator`: the transport runs stateless, one transport for each request.
     const transport = new StreamableHTTPServerTransport({});
     yield* Effect.gen({ self: this }, function* () {
       try {
@@ -573,7 +481,6 @@ export const readJsonBody = Effect.fn("LocalMcpBridge.readJsonBody")(function* (
   });
 });
 
-/** The tools of every session of a route, newest session first, each name once. */
 function listedTools(route: BridgeRoute): DynamicToolNamespace["tools"] {
   const tools = new Map<string, DynamicToolNamespace["tools"][number]>();
   for (const member of route.members.toReversed())

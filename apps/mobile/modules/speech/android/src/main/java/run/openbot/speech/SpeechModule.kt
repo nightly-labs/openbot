@@ -28,7 +28,6 @@ import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.atomic.AtomicInteger
 
-/** One part of a reply that waits to play. A null id is the signal that ends the playback thread. */
 private class SpeechPart(val id: String?, val samples: FloatArray, val sampleRate: Int, val generation: Int)
 
 private class SpeechModelException : CodedException("ERR_SPEECH_MODEL", "The speech model could not load.", null)
@@ -37,7 +36,6 @@ private class CapturePermissionException : CodedException("ERR_CAPTURE_PERMISSIO
 
 private class CaptureException : CodedException("ERR_CAPTURE", "The microphone could not start.", null)
 
-/** Outputs that the user connected for a call: a call plays there and not on the loudspeaker. */
 private val CALL_HEADSETS = setOf(
   AudioDeviceInfo.TYPE_WIRED_HEADSET,
   AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
@@ -46,15 +44,9 @@ private val CALL_HEADSETS = setOf(
   AudioDeviceInfo.TYPE_BLE_HEADSET,
 )
 
-/** A path from a `file://` URI, as the app's file system API names its files, or a plain path. */
 private fun pathOf(location: String): String =
   if (location.startsWith("file:")) Uri.parse(location).path ?: location else location
 
-/**
- * Reads replies aloud with Supertonic 3 through sherpa-onnx, and plays speech audio. One thread
- * synthesizes the parts of a reply in order, and another plays them, so the next part is synthesized
- * while one plays. A stop makes the parts that wait or play stale.
- */
 class SpeechModule : Module() {
   private val synthesis = Executors.newSingleThreadExecutor()
   private val parts = LinkedBlockingQueue<SpeechPart>()
@@ -62,12 +54,9 @@ class SpeechModule : Module() {
   private var tts: OfflineTts? = null
   private var loadedDirectory: String? = null
   @Volatile private var track: AudioTrack? = null
-  /** The speed of every part. 1 is normal speed; the pitch stays the same. */
   @Volatile private var speed = 1f
   private var playback: Thread? = null
-  /** The audio mode before GPT live voice set the call mode; null while no call runs. */
   private var callModeBefore: Int? = null
-  /** Only the recognition executor reads and writes it. */
   private var recognizer: OfflineSpeechRecognizer? = null
   private val recognition = Executors.newSingleThreadExecutor()
   private val captureExecutor = Executors.newSingleThreadExecutor()
@@ -87,7 +76,6 @@ class SpeechModule : Module() {
       playback = Thread({ playLoop() }, "openbot-speech-playback").apply { start() }
     }
 
-    /** Loads Supertonic 3 from a downloaded model directory. The same directory keeps the loaded model. */
     AsyncFunction("load") { location: String, threads: Int, promise: Promise ->
       synthesis.execute {
         val directory = pathOf(location)
@@ -126,29 +114,20 @@ class SpeechModule : Module() {
       }
     }
 
-    /**
-     * The directory for downloaded voice models. It is in the app's files, because the app's file
-     * system API writes only there and in the cache. Auto Backup leaves it out: the app's backup rules,
-     * from expo-secure-store, include only shared preferences. A model is over the backup quota of the
-     * whole app, and the phone can download it again.
-     */
     Function("modelRoot") {
       val context = appContext.reactContext ?: throw SpeechModelException()
       val root = File(context.filesDir, "voice").apply { mkdirs() }
       Uri.fromFile(root).toString()
     }
 
-    /** Loads Parakeet from a downloaded model directory. The same directory keeps the loaded model. */
     AsyncFunction("loadRecognizer") { location: String, threads: Int, promise: Promise ->
       loadRecognizer(location, RecognizerModel.PARAKEET, threads, promise)
     }
 
-    /** Loads Qwen3-ASR from a downloaded model directory. The same directory keeps the loaded model. */
     AsyncFunction("loadQwenRecognizer") { location: String, threads: Int, promise: Promise ->
       loadRecognizer(location, RecognizerModel.QWEN3_ASR, threads, promise)
     }
 
-    /** Frees the recognizer, such as before its files are deleted. */
     AsyncFunction("unloadRecognizer") { promise: Promise ->
       recognition.execute {
         recognizer?.release()
@@ -157,7 +136,6 @@ class SpeechModule : Module() {
       }
     }
 
-    /** Opens the microphone: `transcribe` recognizes speech with the loaded recognizer, `stream` sends the audio. */
     AsyncFunction("startCapture") { mode: String, promise: Promise ->
       val context = appContext.reactContext
       if (context?.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
@@ -175,21 +153,14 @@ class SpeechModule : Module() {
       }
     }
 
-    /** Closes the microphone, sends the text of the speech that is left, then `onCaptureEnd`. */
     Function("finishCapture") {
       captureExecutor.execute { capture.finish() }
     }
 
-    /** Closes the microphone and drops the speech that was not sent. */
     Function("cancelCapture") {
       captureExecutor.execute { capture.cancel() }
     }
 
-    /**
-     * GPT live voice: WebRTC plays the reply as a call, which Android puts on the earpiece. The call
-     * mode keeps echo cancellation on, and the reply goes to the loudspeaker, or to a headset that is
-     * connected. `false` gives the audio back to the mode from before the call.
-     */
     Function("setCallAudio") { active: Boolean ->
       val audio = appContext.reactContext?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
         ?: return@Function
@@ -219,7 +190,6 @@ class SpeechModule : Module() {
       }
     }
 
-    /** Frees the model, such as before its files are deleted. */
     AsyncFunction("unload") { promise: Promise ->
       synthesis.execute {
         tts?.release()
@@ -229,7 +199,6 @@ class SpeechModule : Module() {
       }
     }
 
-    /** Reads one part of a reply with Supertonic 3 and plays it after the parts before it. */
     Function("speak") { id: String, text: String, language: String, speaker: Int, steps: Int ->
       val own = generation.get()
       synthesis.execute {
@@ -261,9 +230,7 @@ class SpeechModule : Module() {
       }
     }
 
-    /** Plays little-endian 16-bit mono PCM, such as a reply part from ElevenLabs, after the parts before it. */
     Function("playPcm") { id: String, pcm: Uint8Array, sampleRate: Int ->
-      // The typed array belongs to JavaScript: copy it before this call returns.
       val bytes = ByteArray(pcm.byteLength)
       pcm.read(bytes, 0, pcm.byteLength)
       val shorts = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
@@ -271,17 +238,14 @@ class SpeechModule : Module() {
       parts.put(SpeechPart(id, samples, sampleRate, generation.get()))
     }
 
-    /** Plays every part at this speed, also the part that plays now. */
     Function("setSpeed") { value: Double ->
       speed = value.toFloat()
       try {
         track?.let { applySpeed(it) }
       } catch (error: IllegalStateException) {
-        // The playback thread released the track; the next track takes the speed.
       }
     }
 
-    /** Stops the part that plays and drops the parts that wait. */
     Function("stop") {
       generation.incrementAndGet()
       parts.clear()
@@ -310,7 +274,6 @@ class SpeechModule : Module() {
     }
   }
 
-  /** Loads a recognizer on the recognition executor. The same directory and model keep the loaded one. */
   private fun loadRecognizer(location: String, model: RecognizerModel, threads: Int, promise: Promise) {
     recognition.execute {
       val directory = pathOf(location)
@@ -329,7 +292,6 @@ class SpeechModule : Module() {
     }
   }
 
-  /** Plays the parts in order, one at a time, on one audio track for each sample rate. */
   private fun playLoop() {
     while (true) {
       val part = parts.take()
@@ -350,24 +312,19 @@ class SpeechModule : Module() {
 
   private var trackRate = 0
 
-  /** Writes the part and waits until it has played. False when a stop came first. */
   private fun play(part: SpeechPart): Boolean {
     val audio = trackFor(part.sampleRate)
     val stale = { part.generation != generation.get() }
-    // The head counts from the last flush: `stop` flushes the track, also while no part plays.
     val head = { audio.playbackHeadPosition.toLong() and 0xffffffffL }
     val end = head() + part.samples.size
     if (audio.playState != AudioTrack.PLAYSTATE_PLAYING) audio.play()
     var offset = 0
-    // Non-blocking: a write to a track that `stop` paused would otherwise wait for ever.
     while (offset < part.samples.size && !stale()) {
       val count = audio.write(part.samples, offset, part.samples.size - offset, AudioTrack.WRITE_NON_BLOCKING)
       if (count < 0) break
       if (count == 0) Thread.sleep(10)
       offset += count
     }
-    // The track plays what was written after `write` returns: wait for its head to reach the end,
-    // and no longer than the part lasts at the slowest speed and a little more, in case the track stalls.
     val deadline = System.nanoTime() + (part.samples.size * 1_000_000_000L / part.sampleRate * 4 / 3) + 2_000_000_000L
     while (!stale() && offset == part.samples.size && head() < end) {
       if (System.nanoTime() > deadline) break

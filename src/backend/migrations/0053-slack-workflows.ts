@@ -1,14 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { OpenBotMigration } from "./migration";
 
-// Migration v53: Slack triggers of workflows. The text below is the migration; the latest schema takes
-// the same run source line, so do not edit it after release.
-//
-// `workflow_runs` gets `slack` in its source CHECK. SQLite cannot change a CHECK in place, so the
-// migration rebuilds the table, as migrations 50 and 52 did; its rows keep their run ids, so the steps, output
-// deliveries and GitHub rows that point to them stay as they are. A Slack trigger has no table of its
-// own: the run payload keeps the message that started it, and a Slack output's post or reaction is a
-// row of `workflow_output_deliveries`.
 export const V53_WORKFLOW_RUN_SOURCE_SQL =
   "source TEXT NOT NULL CHECK(source IN ('manual', 'schedule', 'webhook', 'github', 'discord', 'telegram', 'slack')),";
 
@@ -18,10 +10,6 @@ const V53_WORKFLOW_RUN_INDEXES_SQL = `
     ON workflow_runs(status) WHERE status IN ('running', 'approval', 'stopping');
 `;
 
-/**
- * Migration 53. The caller pauses foreign keys: the old table is dropped while steps point to its runs,
- * and the new one takes its name and every run id.
- */
 function addSlackWorkflows(db: DatabaseSync): void {
   db.exec(`
     CREATE TABLE workflow_runs_v53 (
@@ -60,8 +48,6 @@ function addSlackWorkflows(db: DatabaseSync): void {
 export const migration: OpenBotMigration = {
   version: 53,
   name: "slack-workflows",
-  // Rebuilds the run table again to add the Slack run source, as migrations 50 and 52 did, so foreign
-  // keys pause and run ids do not change. Few rows, so no vacuum. No table is added.
   disableForeignKeys: true,
   up: addSlackWorkflows,
 };
