@@ -1,7 +1,8 @@
 // The Workflows page of the joined server in the browser client. The host serves the workflows
 // through `workflows-v1`, and the GitHub catalog, options, history and last-event runs through
 // `workflows-github-v1`, and keeps an uploaded picture through `workflows-media-v1`. It gives the live
-// Sunra and Higgsfield models and a price for a step through `workflows-media-catalog-v1`. The targets
+// Sunra and Higgsfield models and a price for a step through `workflows-media-catalog-v1`, or `-v2` with
+// the settings of each model. The targets
 // of an output use the same capabilities as on desktop.
 
 import {
@@ -30,6 +31,10 @@ import {
   WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
   WORKFLOWS_MEDIA_CATALOG_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-catalog-v1";
+import {
+  WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY,
+  WORKFLOWS_MEDIA_CATALOG_V2_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-catalog-v2";
 import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-size-v1";
 import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-transparent-v1";
 import {
@@ -229,14 +234,19 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
         return { ...sunra, ...higgsfield };
       },
       // A host without `workflows-media-catalog-v1` runs only the fixed models and gives no quote.
+      // A host with v2 also sends the settings of each model.
       mediaCatalog: async () =>
-        has(WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
-          ? post(WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
-          : { models: [] },
+        has(WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY)
+          ? post(WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
+          : has(WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
+            ? post(WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
+            : { models: [] },
       mediaPrice: async (input) =>
-        has(WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
-          ? post(WORKFLOWS_MEDIA_CATALOG_ROUTES.price, decodeRemoteWorkflowMediaPrice, input)
-          : { credits: null },
+        has(WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY)
+          ? post(WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.price, decodeRemoteWorkflowMediaPrice, input)
+          : has(WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
+            ? post(WORKFLOWS_MEDIA_CATALOG_ROUTES.price, decodeRemoteWorkflowMediaPrice, input)
+            : { credits: null },
     },
     onChanged(changed) {
       const events = options.onHostEvent((event) => {

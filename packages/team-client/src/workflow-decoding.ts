@@ -192,8 +192,8 @@ export function decodeRemoteHiggsfieldCredits(value: unknown): { higgsfield: Wor
 }
 
 /**
- * The `workflows-media-catalog-v1` catalog route answers `{ models }`. The app drops a model that it
- * cannot read, so one odd entry does not hide the others.
+ * The `workflows-media-catalog-v1` and `-v2` catalog routes answer `{ models }`; only v2 sends
+ * `options`, `inputs` and `modes`. The app drops a model that it cannot read, so one odd entry does not hide the others.
  */
 export function decodeRemoteWorkflowMediaCatalog(value: unknown): WorkflowMediaCatalog {
   if (!isDynamicRecord(value) || !Array.isArray(value.models) || value.models.length > WORKFLOW_MEDIA_CATALOG_MAX)
@@ -210,6 +210,20 @@ export function decodeRemoteWorkflowMediaCatalog(value: unknown): WorkflowMediaC
       durations: [...model.durations],
       resolutions: [...model.resolutions],
       transparent: model.transparent,
+      ...(model.options?.length
+        ? {
+            options: model.options.map((option) => ({
+              name: option.name,
+              kind: option.kind,
+              values: [...option.values],
+              default: option.default,
+            })),
+          }
+        : {}),
+      ...(model.inputs ? { inputs: [...model.inputs] } : {}),
+      ...(model.modes?.length
+        ? { modes: model.modes.map((mode) => ({ value: mode.value, inputs: [...mode.inputs] })) }
+        : {}),
     })),
   };
 }

@@ -46,10 +46,14 @@ export class McpMediaFailed extends Schema.TaggedError<McpMediaFailed>()("McpMed
 export const mediaFail = (message: string) => new McpMediaFailed({ message });
 export const mediaFailed = () => mediaFail(sourceText("error.workflow.mediaFailed"));
 
-/** Finds the file of each input picture. A missing file or a file that is not a picture fails the step. */
+/**
+ * Finds the file of each input picture. A missing file or a file that is not a picture fails the step.
+ * A file in a role that `takesClip` names must be a video or an audio file instead.
+ */
 export const resolveMediaInputs = Effect.fnUntraced(function* <Role>(
   dependencies: McpMediaDependencies,
   images: readonly { role: Role; attachmentId: string }[],
+  takesClip: (role: Role) => boolean = () => false,
 ) {
   const files: { role: Role; path: string; mimeType: string }[] = [];
   for (const image of images) {
@@ -57,7 +61,11 @@ export const resolveMediaInputs = Effect.fnUntraced(function* <Role>(
       .resolveAttachment(image.attachmentId)
       .pipe(Effect.mapError(() => mediaFail(sourceText("error.workflow.mediaInputMissing"))));
     if (!file) return yield* mediaFail(sourceText("error.workflow.mediaInputMissing"));
-    if (!file.mimeType.startsWith("image/")) return yield* mediaFail(sourceText("error.workflow.mediaInputNotImage"));
+    if (takesClip(image.role)) {
+      if (!/^(?:video|audio)\//u.test(file.mimeType))
+        return yield* mediaFail(sourceText("error.workflow.mediaInputNotClip"));
+    } else if (!file.mimeType.startsWith("image/"))
+      return yield* mediaFail(sourceText("error.workflow.mediaInputNotImage"));
     files.push({ role: image.role, ...file });
   }
   return files;
@@ -243,8 +251,20 @@ const MEDIA_TYPES: Record<string, string> = {
   "video/quicktime": "mov",
 };
 
-/** The file type of an input picture, for the file name that a service asks for. */
-export const pictureExtension = (mimeType: string) => MEDIA_TYPES[mimeType] ?? mimeType.split("/")[1] ?? "png";
+/** The audio types of an input file. A result is never audio, so `MEDIA_TYPES` does not have them. */
+const AUDIO_TYPES: Record<string, string> = {
+  "audio/mpeg": "mp3",
+  "audio/mp3": "mp3",
+  "audio/wav": "wav",
+  "audio/x-wav": "wav",
+  "audio/mp4": "m4a",
+  "audio/x-m4a": "m4a",
+  "audio/ogg": "ogg",
+};
+
+/** The file type of an input file, for the file name that a service asks for. */
+export const pictureExtension = (mimeType: string) =>
+  MEDIA_TYPES[mimeType] ?? AUDIO_TYPES[mimeType] ?? mimeType.split("/")[1] ?? "png";
 
 /**
  * Downloads a result, with the size limit of a stored attachment. Each hop must be on the service's

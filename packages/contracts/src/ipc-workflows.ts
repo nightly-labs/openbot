@@ -109,9 +109,12 @@ export type WorkflowFieldValue = string | number | boolean;
  *   and `lastFrame` (the id of an image node that an
  *   `image` edge connects, whose picture is the first or the last frame) and `voice` (an id of
  *   `WORKFLOW_VIDEO_VOICES`), and for an image `background` ("transparent" for a picture with clear
- *   pixels around its subject, from a model with `transparent`; absent is the model's own background).
+ *   pixels around its subject, from a model with `transparent`; absent is the model's own background), and
+ *   `options` (a JSON text of an object, an option name of the model's `options` to one of its values;
+ *   see `workflowMediaOptions`).
  *   The pictures of the other image nodes with an `image` edge into it are
- *   references. The output of its step is the id of the generated attachment.
+ *   references. For a video of a model with `videos` or `audios` in its `inputs`, the video and audio
+ *   files of the nodes with a `file` edge into it are references too. The output of its step is the id of the generated attachment.
  * Every other field is view state, such as a colour or a font, and the host keeps it as it is.
  */
 export type WorkflowFields = Record<string, WorkflowFieldValue>;
@@ -121,10 +124,22 @@ export type WorkflowMediaKind = (typeof WORKFLOW_MEDIA_KINDS)[number];
 
 /**
  * Every aspect ratio of a step. A host reads "4:5" and "5:4" only with `workflows-media-size-v1`; an
- * older host reads them as the first aspect ratio of the model.
+ * older host reads them as the first aspect ratio of the model. Only a catalog model of
+ * `workflows-media-catalog-v2` has "21:9" and "3:4".
  */
-export const WORKFLOW_MEDIA_ASPECTS = ["1:1", "4:3", "16:9", "9:16", "4:5", "5:4"] as const;
+export const WORKFLOW_MEDIA_ASPECTS = ["1:1", "4:3", "16:9", "9:16", "4:5", "5:4", "21:9", "3:4"] as const;
 export type WorkflowMediaAspect = (typeof WORKFLOW_MEDIA_ASPECTS)[number];
+/** The aspect ratios that `workflows-media-catalog-v1` sends. */
+export const WORKFLOW_MEDIA_CATALOG_V1_ASPECTS: readonly WorkflowMediaAspect[] = [
+  "1:1",
+  "4:3",
+  "16:9",
+  "9:16",
+  "4:5",
+  "5:4",
+];
+/** The aspect ratios of an image model without `aspects`. */
+const WORKFLOW_IMAGE_ASPECTS = WORKFLOW_MEDIA_CATALOG_V1_ASPECTS;
 /** The aspect ratios of a video model without `aspects`: no 4:5 or 5:4, which the video models do not make. */
 const WORKFLOW_VIDEO_ASPECTS: readonly WorkflowMediaAspect[] = ["1:1", "4:3", "16:9", "9:16"];
 /** The aspect ratios that a host without `workflows-media-size-v1` reads. */
@@ -178,7 +193,53 @@ export interface WorkflowMediaModel {
   resolutions?: readonly string[];
   /** Whether an image can have a transparent background (`background` "transparent"). */
   transparent?: boolean;
+  /** The other settings that the service lists for a catalog model (`workflows-media-catalog-v2`). */
+  options?: readonly WorkflowMediaOption[];
+  /** The inputs that a catalog model takes (`workflows-media-catalog-v2`). Absent is frames and references. */
+  inputs?: readonly WorkflowMediaInput[];
+  /** The values of its `mode` option and the inputs of each (`workflows-media-catalog-v2`). */
+  modes?: readonly WorkflowMediaMode[];
 }
+
+/**
+ * A setting of a catalog model, such as sound or bitrate: `name` is the parameter name at the service.
+ * A `switch` has the values "off" and "on"; a `choice` has 2 to `WORKFLOW_MEDIA_OPTION_VALUES_MAX` values.
+ */
+export interface WorkflowMediaOption {
+  name: string;
+  kind: "switch" | "choice";
+  values: readonly string[];
+  default: string;
+}
+
+/** One chosen setting of a step: an option name and one of its values. */
+export interface WorkflowMediaOptionValue {
+  name: string;
+  value: string;
+}
+
+/**
+ * An input of a video model: the first and the last frame, reference pictures, and reference videos
+ * and audio files, which come in on a `file` edge.
+ */
+export const WORKFLOW_MEDIA_INPUTS = ["frames", "references", "videos", "audios"] as const;
+export type WorkflowMediaInput = (typeof WORKFLOW_MEDIA_INPUTS)[number];
+
+/**
+ * A value of the `mode` option of a catalog model and the inputs that the model takes in it. A model
+ * with modes has a `choice` option named `WORKFLOW_MEDIA_MODE_OPTION` with the same values.
+ */
+export interface WorkflowMediaMode {
+  value: string;
+  inputs: readonly WorkflowMediaInput[];
+}
+export const WORKFLOW_MEDIA_MODE_OPTION = "mode";
+
+export const WORKFLOW_MEDIA_OPTIONS_MAX = 16;
+export const WORKFLOW_MEDIA_OPTION_VALUES_MAX = 16;
+export const WORKFLOW_MEDIA_OPTION_TEXT_MAX = 64;
+/** The values of a `switch` option. */
+export const WORKFLOW_MEDIA_SWITCH_VALUES = ["off", "on"] as const;
 
 /** The Sunra image models, from Sunra's `list_models` (2026-11-12). */
 const SUNRA_IMAGE_RESOLUTIONS = ["1K", "2K", "4K"] as const;
@@ -323,13 +384,13 @@ export function workflowMediaKind(fields: WorkflowFields): WorkflowMediaKind {
 }
 
 /** The choices of a model, or of every model when it is not known. */
-type WorkflowMediaRange = Pick<WorkflowMediaModel, "aspects" | "durations" | "resolutions" | "transparent">;
+type WorkflowMediaRange = Pick<WorkflowMediaModel, "aspects" | "durations" | "resolutions" | "transparent" | "options">;
 
 export function workflowMediaAspects(
   model: WorkflowMediaRange | null | undefined,
   kind: WorkflowMediaKind,
 ): readonly WorkflowMediaAspect[] {
-  return model?.aspects ?? (kind === "video" ? WORKFLOW_VIDEO_ASPECTS : WORKFLOW_MEDIA_ASPECTS);
+  return model?.aspects ?? (kind === "video" ? WORKFLOW_VIDEO_ASPECTS : WORKFLOW_IMAGE_ASPECTS);
 }
 
 export function workflowVideoDurations(model: WorkflowMediaRange | null | undefined): readonly number[] {
@@ -406,6 +467,31 @@ export interface WorkflowMediaSpecs {
   transparent: boolean;
   /** The size in pixels that the host crops and scales the image to, or null for the model's own size. */
   size: WorkflowMediaSize | null;
+  /** The settings that the node chose, in the order of the model's `options`: only names and values that it has. */
+  options: readonly WorkflowMediaOptionValue[];
+}
+
+/**
+ * The settings that the `options` field of an `image` node chose for its model: a JSON text of an
+ * object, an option name to a value. A name or a value that the model does not have is left out.
+ */
+export function workflowMediaOptions(
+  fields: WorkflowFields,
+  model: WorkflowMediaRange | null | undefined,
+): WorkflowMediaOptionValue[] {
+  const options = model?.options;
+  if (!options?.length || typeof fields.options !== "string" || !fields.options) return [];
+  let chosen: unknown;
+  try {
+    chosen = JSON.parse(fields.options);
+  } catch {
+    return [];
+  }
+  if (!isDynamicRecord(chosen)) return [];
+  return options.flatMap((option) => {
+    const value = chosen[option.name];
+    return typeof value === "string" && option.values.includes(value) ? [{ name: option.name, value }] : [];
+  });
 }
 
 /**
@@ -437,7 +523,7 @@ export function workflowMediaSpecs(
       ? preferred
       : (resolutions[0] ?? null);
   const transparent = kind === "image" && model?.transparent === true && fields.background === "transparent";
-  return { aspect, duration, resolution, transparent, size };
+  return { aspect, duration, resolution, transparent, size, options: workflowMediaOptions(fields, model) };
 }
 
 /**
@@ -566,7 +652,8 @@ export const WORKFLOW_PORTS: Readonly<
   asset: { in: [], out: ALL_PORTS },
   llm: { in: ALL_PORTS, out: ["text"] },
   agent: { in: ALL_PORTS, out: ["text"] },
-  image: { in: ["text", "image"], out: ["image"] },
+  // A video step gives its video on a `file` edge and takes video and audio references on one.
+  image: { in: ["text", "image", "file"], out: ["image", "file"] },
   condition: { in: ["text"], out: ["text"] },
   approval: { in: ["text"], out: ["text"] },
   output: { in: ALL_PORTS, out: [] },
@@ -1160,6 +1247,12 @@ export interface WorkflowMediaCatalogModel {
   durations: readonly number[];
   resolutions: readonly string[];
   transparent: boolean;
+  /** The other settings of the model. Only `workflows-media-catalog-v2` sends them. */
+  options?: readonly WorkflowMediaOption[];
+  /** The inputs that the model takes. Only `workflows-media-catalog-v2` sends them. */
+  inputs?: readonly WorkflowMediaInput[];
+  /** The values of the `mode` option and the inputs of each. Only `workflows-media-catalog-v2` sends them. */
+  modes?: readonly WorkflowMediaMode[];
 }
 
 /** The models of the signed-in media services. A service that did not answer gives its fixed models. */
@@ -1179,13 +1272,45 @@ export function isWorkflowMediaCatalogModel(value: unknown): value is WorkflowMe
     isBoundedString(value.name, WORKFLOW_MEDIA_NAME_MAX) &&
     isBoundedString(value.maker, WORKFLOW_MEDIA_MAKER_MAX) &&
     isListOf(value.kinds, 2, (entry): entry is WorkflowMediaKind => isOneOf(WORKFLOW_MEDIA_KINDS, entry)) &&
-    isListOf(value.aspects, 6, (entry): entry is WorkflowMediaAspect => isOneOf(WORKFLOW_MEDIA_ASPECTS, entry)) &&
+    isListOf(value.aspects, WORKFLOW_MEDIA_ASPECTS.length, (entry): entry is WorkflowMediaAspect =>
+      isOneOf(WORKFLOW_MEDIA_ASPECTS, entry),
+    ) &&
     isListOf(value.durations, 64, isCreditCount) &&
     isListOf(value.resolutions, 16, (entry): entry is string =>
       isBoundedString(entry, WORKFLOW_MEDIA_RESOLUTION_MAX),
     ) &&
-    isBoolean(value.transparent)
+    isBoolean(value.transparent) &&
+    (value.options === undefined || isListOf(value.options, WORKFLOW_MEDIA_OPTIONS_MAX, isWorkflowMediaOption)) &&
+    (value.inputs === undefined || isListOf(value.inputs, WORKFLOW_MEDIA_INPUTS.length, isWorkflowMediaInput)) &&
+    (value.modes === undefined || isListOf(value.modes, WORKFLOW_MEDIA_OPTION_VALUES_MAX, isWorkflowMediaMode))
   );
+}
+
+const isWorkflowMediaInput = (value: unknown): value is WorkflowMediaInput => isOneOf(WORKFLOW_MEDIA_INPUTS, value);
+
+function isWorkflowMediaMode(value: unknown): value is WorkflowMediaMode {
+  return (
+    isDynamicRecord(value) &&
+    isOptionText(value.value) &&
+    isListOf(value.inputs, WORKFLOW_MEDIA_INPUTS.length, isWorkflowMediaInput)
+  );
+}
+
+const isOptionText = (value: unknown): value is string =>
+  isBoundedString(value, WORKFLOW_MEDIA_OPTION_TEXT_MAX) && value.length > 0;
+
+function isWorkflowMediaOption(value: unknown): value is WorkflowMediaOption {
+  return (
+    isDynamicRecord(value) &&
+    isIdentifier(value.name) &&
+    isOneOf(["switch", "choice"] as const, value.kind) &&
+    isListOf(value.values, WORKFLOW_MEDIA_OPTION_VALUES_MAX, isOptionText) &&
+    isOptionText(value.default)
+  );
+}
+
+function isWorkflowMediaOptionValue(value: unknown): value is WorkflowMediaOptionValue {
+  return isDynamicRecord(value) && isIdentifier(value.name) && isOptionText(value.value);
 }
 
 export function isWorkflowMediaCatalog(value: unknown): value is WorkflowMediaCatalog {
@@ -1211,6 +1336,9 @@ export function workflowCatalogMediaModel(entry: WorkflowMediaCatalogModel): Wor
     ...(kind === "video" ? { durations: entry.durations } : {}),
     resolutions: entry.resolutions,
     transparent: kind === "image" && entry.transparent,
+    ...(entry.options?.length ? { options: entry.options } : {}),
+    ...(kind === "video" && entry.inputs ? { inputs: entry.inputs } : {}),
+    ...(kind === "video" && entry.modes?.length ? { modes: entry.modes } : {}),
   };
 }
 
@@ -1244,6 +1372,8 @@ export interface WorkflowMediaPriceRequest {
   duration: number;
   resolution: string | null;
   transparent: boolean;
+  /** The chosen settings (`workflows-media-catalog-v2`). Absent is the defaults of the service. */
+  options?: readonly WorkflowMediaOptionValue[];
 }
 
 /** What one file costs, in the credits of the service, or null when the service gives no quote. */
@@ -1261,7 +1391,8 @@ export function isWorkflowMediaPriceRequest(value: unknown): value is WorkflowMe
     isOneOf(WORKFLOW_MEDIA_ASPECTS, value.aspect) &&
     isCreditCount(value.duration) &&
     (value.resolution === null || isBoundedString(value.resolution, WORKFLOW_MEDIA_RESOLUTION_MAX)) &&
-    isBoolean(value.transparent)
+    isBoolean(value.transparent) &&
+    (value.options === undefined || isListOf(value.options, WORKFLOW_MEDIA_OPTIONS_MAX, isWorkflowMediaOptionValue))
   );
 }
 

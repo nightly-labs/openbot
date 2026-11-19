@@ -34,6 +34,7 @@ export const messages = {
   "error.workflow.mediaInputMissing": "Obraz z wcześniejszego kroku jest niedostępny. Uruchom ten krok ponownie.",
   "error.workflow.mediaEmptyRequest": "Napisz opis albo uruchom wcześniejsze kroki, aby dotarł tekst lub obraz.",
   "error.workflow.mediaInputNotImage": "Ten krok przyjmuje tylko obrazy, nie wideo. Usuń połączenie z wideo.",
+  "error.workflow.mediaInputNotClip": "To wejście przyjmuje tylko wideo i pliki audio. Usuń połączenie z pliku.",
   "error.workflow.stepMissing": "Ten krok już nie istnieje.",
   "error.workflow.nodeMissing": "Tego kroku nie ma w przepływie pracy.",
   "error.workflow.runMissing": "To uruchomienie już nie istnieje.",

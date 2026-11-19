@@ -36,6 +36,7 @@ export const messages = {
   "error.workflow.mediaEmptyRequest":
     "Напишите описание или запустите предыдущие шаги, чтобы пришёл текст или изображение.",
   "error.workflow.mediaInputNotImage": "Этот шаг принимает только изображения, не видео. Удалите связь от видео.",
+  "error.workflow.mediaInputNotClip": "Этот вход принимает только видео и аудиофайлы. Удалите связь от файла.",
   "error.workflow.stepMissing": "Этого шага больше нет.",
   "error.workflow.nodeMissing": "Этого шага нет в рабочем процессе.",
   "error.workflow.runMissing": "Этого запуска больше нет.",

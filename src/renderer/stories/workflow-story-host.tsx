@@ -24,6 +24,7 @@ import { WorkflowCanvas } from "@openbot/ui/features/workflows/WorkflowCanvas";
 import { WORKFLOW_FEATURES_V1, type WorkflowFeatures } from "@openbot/ui/features/workflows/workflow-model";
 import type { WorkflowPresence } from "@openbot/ui/features/workflows/workflow-presence";
 import type { WorkflowRunView } from "@openbot/ui/features/workflows/workflow-run-view";
+import type { JSX } from "@solidjs/web";
 import { createSignal, Show, untrack } from "solid-js";
 import { fn } from "storybook/test";
 import { defaultSidebarLayout } from "../src/features/sidebar/sidebar-sections";
@@ -63,7 +64,7 @@ function mergeRuns(fixture: WorkflowRunView | undefined, live: WorkflowRunPage):
  * A host over the preview mock that also shows the fixture history of `workflows`. The mock lists
  * the newest workflow first, so the seeds are older in story order and the first one opens.
  */
-function storyWorkflowHost(workflows: readonly StoryWorkflow[]): WorkflowHost {
+export function storyWorkflowHost(workflows: readonly StoryWorkflow[]): WorkflowHost {
   const fixtures = new Map(workflows.map((workflow) => [workflow.id, workflow]));
   const fixtureRuns = new Set(workflows.flatMap((workflow) => workflow.runs?.runs ?? []).map((entry) => entry.run.id));
   const fixtureSteps = new Map(
@@ -200,13 +201,11 @@ export function WorkflowStory(props: {
 const usageRows = accountUsageProviderRows(null);
 
 /**
- * The workflow canvas in the desktop window: the page rail and the server menu are the real app
- * components. The canvas is a page that covers the agent list, as the schedule, usage and Marketplace
- * pages do. Its bar goes in the window's top row after the server menu, and the canvas fills the card.
+ * The desktop window around a workflow page: the page rail and the server menu are the real app
+ * components. The page covers the agent list, as the schedule, usage and Marketplace pages do. Its bar
+ * goes in the window's top row after the server menu, and the page fills the card.
  */
-export function WorkflowInAppStory(props: { workflows: readonly StoryWorkflow[]; features?: WorkflowFeatures }) {
-  const story = createWorkflowsController(storyWorkflowHost(untrack(() => props.workflows)));
-  const features = () => props.features ?? WORKFLOW_FEATURES_V1;
+export function WorkflowAppWindow(props: { children: JSX.Element }) {
   const [page, setPage] = createSignal<PageRailPage | null>("routines");
   const [view, setView] = createSignal<SidebarView>("routines");
   return (
@@ -276,21 +275,30 @@ export function WorkflowInAppStory(props: { workflows: readonly StoryWorkflow[];
           view={view()}
           onViewChange={setView}
         />
-        <div class="window-page wfn-app-pane">
-          <Show when={story.detail()}>
-            {(workflow) => (
-              <WorkflowCanvas
-                workflow={workflow()}
-                features={features()}
-                catalogs={STORY_CATALOGS}
-                github={story.github}
-                frame="window"
-                {...story.props}
-              />
-            )}
-          </Show>
-        </div>
+        <div class="window-page wfn-app-pane">{props.children}</div>
       </div>
     </div>
+  );
+}
+
+/** The workflow canvas in the desktop window, where the Routines page shows its board today. */
+export function WorkflowInAppStory(props: { workflows: readonly StoryWorkflow[]; features?: WorkflowFeatures }) {
+  const story = createWorkflowsController(storyWorkflowHost(untrack(() => props.workflows)));
+  const features = () => props.features ?? WORKFLOW_FEATURES_V1;
+  return (
+    <WorkflowAppWindow>
+      <Show when={story.detail()}>
+        {(workflow) => (
+          <WorkflowCanvas
+            workflow={workflow()}
+            features={features()}
+            catalogs={STORY_CATALOGS}
+            github={story.github}
+            frame="window"
+            {...story.props}
+          />
+        )}
+      </Show>
+    </WorkflowAppWindow>
   );
 }

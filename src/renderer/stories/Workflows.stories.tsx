@@ -25,6 +25,7 @@ import {
   AGENT_RESULT,
   competitorWatch,
   githubTriage,
+  higgsfieldVideo,
   LLM_RESULT,
   newCompetitorAlert,
   STORY_CATALOGS,
@@ -92,6 +93,12 @@ export const ExampleWithCollaborators: Story = {
 export const InApp: Story = {
   name: "In app",
   render: () => <WorkflowInAppStory workflows={[competitorWatch(), newCompetitorAlert()]} />,
+};
+
+/** A Higgsfield video step. Select it: its settings have the wider frames, Sound and Bitrate. */
+export const HiggsfieldVideo: Story = {
+  name: "Higgsfield video",
+  render: () => <WorkflowStory workflows={[higgsfieldVideo()]} features={STORY_ALL_FEATURES} />,
 };
 
 export const ExampleAfterRun: Story = {

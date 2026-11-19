@@ -124,7 +124,7 @@ export function Port(props: {
         data-wfn-port-type={props.type}
         data-wfn-port-branch={props.branch}
         data-missing={props.missing ? "" : undefined}
-        data-connected={board.connected(props.node, props.side, props.type, props.branch) ? "" : undefined}
+        data-connected={board.lined(props.node, props.side, props.type, props.branch) ? "" : undefined}
         data-armed={armed() ? "" : undefined}
         data-target={target() ? "" : undefined}
         data-refused={refused() ? "" : undefined}

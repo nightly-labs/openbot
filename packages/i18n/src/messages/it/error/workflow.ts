@@ -39,6 +39,8 @@ export const messages = {
     "Scrivi una descrizione o esegui i passaggi precedenti, così arriva un testo o un’immagine.",
   "error.workflow.mediaInputNotImage":
     "Questo passaggio accetta solo immagini, non video. Rimuovi il collegamento dal video.",
+  "error.workflow.mediaInputNotClip":
+    "Questo ingresso accetta solo video e file audio. Rimuovi il collegamento dal file.",
   "error.workflow.stepMissing": "Questo passaggio non esiste più.",
   "error.workflow.nodeMissing": "Questo passaggio non è nel flusso di lavoro.",
   "error.workflow.runMissing": "Questa esecuzione non esiste più.",

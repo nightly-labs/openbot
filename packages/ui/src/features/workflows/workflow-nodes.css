@@ -279,6 +279,27 @@
   left: calc(100% + var(--openbot-space-3));
 }
 
+/*
+ * A bridge fills the gap between the ports and the resize band of the card, so the pointer stays on
+ * the node on its way to a port. On a zoomed-in canvas the gap is wider than the band: without the
+ * bridge the node lost its hover in the gap, and the ports and the summary faded out and in again.
+ * The bridge stops at the band, so a press on the band still resizes.
+ */
+.wfn-ports::before {
+  position: absolute;
+  inset-block: 0;
+  width: max(0px, var(--openbot-space-3) + var(--wfn-grip-band-out));
+  content: "";
+}
+
+.wfn-ports[data-side="in"]::before {
+  left: 100%;
+}
+
+.wfn-ports[data-side="out"]::before {
+  right: 100%;
+}
+
 .wfn-port-slot {
   position: relative;
   display: grid;
@@ -526,28 +547,53 @@
 }
 
 /*
- * The glass layer on an image: hidden at rest, shown on hover, focus or selection. It never grows
- * past the card, as on Higgsfield: the prompt stops at three lines and scrolls, and on a short card
- * it gives up more of its height.
+ * The glass summary on an image: hidden at rest, shown on hover, focus or selection. It never grows
+ * past the card, as on Higgsfield: the prompt shows two lines, and on a short card it gives up more
+ * of its height. It is inert: a press goes to the card, and the composer under the selected card
+ * changes the step.
+ *
+ * Each glass part fades, not the summary: a parent with an opacity under 1 hides the picture from
+ * the blur of its glass, so the blur would come on only at the end of the fade.
  */
 .wfn-overlay {
+  --wfn-overlay-opacity: 0;
+
   position: absolute;
   inset: auto 0 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: var(--openbot-space-1);
   max-height: 100%;
-  padding: var(--openbot-space-2);
-  opacity: 0;
+  padding: var(--openbot-space-1-5);
+  pointer-events: none;
   translate: 0 4px;
-  transition:
-    opacity var(--openbot-duration-normal) var(--openbot-ease-out),
-    translate var(--openbot-duration-normal) var(--openbot-ease-out);
+  transition: translate var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.wfn-overlay :is(.wfn-chip, .wfn-elapsed, .wfn-panel) {
+  opacity: var(--wfn-overlay-opacity);
+  transition: opacity var(--openbot-duration-normal) var(--openbot-ease-out);
 }
 
 .wfn-node:is(:hover, :focus-within, [data-selected]) .wfn-overlay {
-  opacity: 1;
+  --wfn-overlay-opacity: 1;
+
   translate: 0 0;
+}
+
+/* The selected card shows only its picture or video: the composer under it has the rest. */
+.wfn-canvas[data-composer] .wfn-node[data-selected] .wfn-overlay {
+  display: none;
+}
+
+.wfn-stage .wfn-media-overlay :is(.wfn-chip, .wfn-elapsed) {
+  height: calc(var(--openbot-control-xs) - var(--openbot-space-1));
+  cursor: default;
+}
+
+/* The summary opens no menu, so the model has no arrow. */
+.wfn-media-overlay .wfn-media-pill > svg:last-child {
+  display: none;
 }
 
 .wfn-overlay-bar {
@@ -578,33 +624,11 @@
   height: var(--openbot-icon-xs);
 }
 
-.wfn-stage .wfn-collapse {
-  margin-left: auto;
-  border-radius: var(--openbot-radius-sm);
-  color: var(--openbot-text-primary);
-}
-
-/* The specs of a media step sit on the right of the bar, next to the collapse button. */
+/* The specs of a media step, on the left of the bar. */
 .wfn-media-specs {
   display: inline-flex;
   gap: var(--openbot-space-1);
   align-items: center;
-  margin-left: auto;
-}
-
-/* On a picture or video, the collapse button has the same box as the specs next to it. */
-.wfn-stage .wfn-media-overlay .wfn-collapse {
-  width: var(--openbot-control-xs);
-  height: var(--openbot-control-xs);
-  margin-left: 0;
-  background: var(--wfn-glass);
-  box-shadow: inset 0 0 0 1px var(--wfn-ring-strong);
-  backdrop-filter: var(--wfn-glass-blur);
-}
-
-.wfn-stage .wfn-media-overlay .wfn-collapse svg {
-  width: var(--openbot-icon-xs);
-  height: var(--openbot-icon-xs);
 }
 
 /* The dots of the chat frame fill the card at its final size while the model works. */
@@ -616,7 +640,8 @@
 
 /* While the model works, the panel stays in view, so Stop is always one press away. */
 .wfn-node:has(.wfn-generating) .wfn-overlay {
-  opacity: 1;
+  --wfn-overlay-opacity: 1;
+
   translate: 0 0;
 }
 
@@ -668,7 +693,11 @@
   }
 }
 
-.wfn-node:has(.media-generation-player[data-playing]) :is(.wfn-overlay, .wfn-clip-length) {
+.wfn-node:has(.media-generation-player[data-playing]) .wfn-overlay {
+  --wfn-overlay-opacity: 0;
+}
+
+.wfn-node:has(.media-generation-player[data-playing]) .wfn-clip-length {
   opacity: 0;
   pointer-events: none;
 }
@@ -684,9 +713,9 @@
 .wfn-panel {
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
-  gap: var(--openbot-space-2);
+  gap: var(--openbot-space-1-5);
   min-height: 0;
-  padding: 10px;
+  padding: var(--openbot-space-2);
   border-radius: var(--openbot-radius-md);
   background: var(--wfn-glass);
   box-shadow: inset 0 0 0 1px var(--wfn-ring);
@@ -694,7 +723,7 @@
 }
 
 .wfn-panel .wfn-input {
-  max-height: calc(var(--openbot-leading-sm) * 3);
+  max-height: calc(var(--openbot-leading-sm) * 2);
   overflow-y: auto;
   font-weight: var(--openbot-weight-medium);
   scrollbar-width: none;
@@ -1104,19 +1133,6 @@ fieldset.wfn-picker-group {
   font-size: var(--openbot-text-3xl);
 }
 
-/* An aspect ratio shows its frame. The longer side is one icon long. */
-.wfn-picker-aspect {
-  width: calc(var(--openbot-icon-md) * var(--wfn-aspect-w));
-  height: calc(var(--openbot-icon-md) * var(--wfn-aspect-h));
-  border: 1.5px solid currentcolor;
-  border-radius: var(--openbot-radius-xs);
-}
-
-/* A custom size has no fixed shape, so its frame is dashed. */
-.wfn-picker-aspect[data-custom] {
-  border-style: dashed;
-}
-
 /* An effort shows five bars. The bars up to the level are lit. */
 .wfn-picker-meter {
   display: flex;
@@ -1418,22 +1434,6 @@ fieldset.wfn-picker-group {
   background: var(--wfn-glass);
   box-shadow: 0 0 0 1px var(--wfn-ring-strong);
   backdrop-filter: var(--wfn-glass-blur);
-}
-
-/* A custom size: the width and the height side by side. */
-.ui-popover-menu-surface.wfn-popover.wfn-size-popover {
-  width: 240px;
-}
-
-.wfn-size-fields {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--openbot-space-2);
-}
-
-.wfn-size-field {
-  display: grid;
-  gap: var(--openbot-space-1);
 }
 
 /* The title of a popover, with one action at the end, such as Upload. */
@@ -1870,9 +1870,32 @@ fieldset.wfn-picker-group {
   }
 }
 
-/* A connected port stays visible; while you connect, the ports that cannot take the line dim. */
+/*
+ * A connected port stays visible and takes a soft tint of the colour of what it carries: text as a
+ * text step, a picture as an image step, a file as an asset. So the inputs that have a line read at a
+ * glance. While you connect, the ports that cannot take the line dim.
+ */
+.wfn-stage .wfn-port[data-wfn-port-type="text"] {
+  --wfn-port-tone: var(--openbot-file-teal);
+}
+
+.wfn-stage .wfn-port[data-wfn-port-type="image"] {
+  --wfn-port-tone: var(--openbot-file-pink);
+}
+
+.wfn-stage .wfn-port[data-wfn-port-type="file"] {
+  --wfn-port-tone: var(--openbot-file-orange);
+}
+
 .wfn-stage .wfn-port[data-connected] {
+  background: color-mix(in srgb, var(--wfn-port-tone) 22%, var(--wfn-port));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--wfn-port-tone) 40%, transparent);
+  color: var(--wfn-port-tone);
   opacity: 1;
+}
+
+.wfn-stage .wfn-port[data-connected]:hover {
+  background: color-mix(in srgb, var(--wfn-port-tone) 34%, var(--wfn-port));
 }
 
 .wfn-stage .wfn-port:is([data-armed], [data-target]) {
@@ -2391,15 +2414,20 @@ fieldset.wfn-picker-group {
  * The resize grips: every corner and side resizes, but only the bottom-right corner shows a mark, a
  * short arc on the ring, concentric with the card (card radius + gap). So the card edge stays calm.
  */
-.wfn-grip {
-  --wfn-grip-size: calc(18px / var(--wfn-scale, 1));
+/* The ports read the band measures too, so the bridge to their card stops at the band. */
+.wfn-grip,
+.wfn-ports {
   --wfn-grip-line: calc(3px / var(--wfn-scale, 1));
   --wfn-grip-out: calc(var(--wfn-select-gap) + var(--wfn-select-line) / 2 + var(--wfn-grip-line) / 2);
-  --wfn-grip-radius: calc(var(--wfn-radius-card) + var(--wfn-grip-out));
-  --wfn-grip-arc: var(--wfn-grip-line) solid var(--wfn-grip-color, transparent);
   /* The band of a side, centred on the selection ring. */
   --wfn-grip-band: calc(12px / var(--wfn-scale, 1));
   --wfn-grip-band-out: calc(var(--wfn-grip-out) * -1 - var(--wfn-grip-band) / 2);
+}
+
+.wfn-grip {
+  --wfn-grip-size: calc(18px / var(--wfn-scale, 1));
+  --wfn-grip-radius: calc(var(--wfn-radius-card) + var(--wfn-grip-out));
+  --wfn-grip-arc: var(--wfn-grip-line) solid var(--wfn-grip-color, transparent);
 
   position: absolute;
   z-index: 2;
@@ -3586,62 +3614,522 @@ svg.wfn-shape-surface {
   }
 }
 
-/* ------------------------------------------------------- Media inputs */
+/* ------------------------------------------------------- Media composer */
 
-/* The pictures that come in sit above the description. */
-.wfn-panel[data-inputs] {
-  grid-template-rows: auto minmax(0, 1fr) auto;
+/* The popover and the lists of its tiles are in portals, outside the composer, so they get the same tokens. */
+.wfn-composer,
+.wfn-composer-popover,
+.wfn-composer-list {
+  --wfn-composer-ring: color-mix(in srgb, var(--openbot-text-primary) 9%, transparent);
+  --wfn-composer-surface: color-mix(in srgb, var(--openbot-bg-frame) 65%, var(--openbot-bg-surface-raised));
+  --wfn-composer-field: color-mix(in srgb, var(--openbot-text-primary) 4%, transparent);
+  --wfn-composer-field-hover: color-mix(in srgb, var(--openbot-text-primary) 8%, transparent);
+  --wfn-composer-tile: 56px;
 }
 
-.wfn-media-inputs {
+/*
+ * The composer of the selected image or video, under its card. It keeps its size at each zoom. One
+ * width for each card: 40 pixels past each edge of a 380 pixel card, so a video bar (model, length,
+ * size, resolution and price) has room. The canvas moves it with `translate`; it shows after its
+ * first place is known, and rises into place with `transform`, which the canvas does not set.
+ */
+.wfn-composer {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  left: 0;
+  display: grid;
+  /* The column keeps the width of the composer: a long model name shortens, it does not push out. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--openbot-space-3);
+  width: 540px;
+  max-width: calc(100% - var(--openbot-space-6));
+  padding: calc(var(--openbot-space-3) + var(--openbot-space-0-5));
+  border-radius: var(--openbot-radius-bubble);
+  background: var(--wfn-composer-surface);
+  box-shadow: 0 0 0 1px var(--wfn-composer-ring);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  visibility: hidden;
+}
+
+.wfn-composer[data-placed] {
+  visibility: visible;
+  animation: wfn-composer-in var(--openbot-duration-slow) var(--openbot-ease-out);
+}
+
+@keyframes wfn-composer-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(var(--openbot-space-2) * -1));
+  }
+}
+
+/* The prompt grows with its text from 2 to 5 lines, then scrolls. The composer keeps its width. */
+.wfn-composer .wfn-composer-prompt {
+  min-height: calc(1.6em * 2);
+  max-height: calc(1.6em * 5);
+  padding: 0 var(--openbot-space-1) 0 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: var(--openbot-text-md);
+  line-height: 1.6;
+  resize: none;
+  field-sizing: content;
+}
+
+.wfn-composer .wfn-composer-prompt:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+/* The pictures that come in. Many pictures scroll sideways. */
+.wfn-composer-pictures {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--openbot-space-1);
-  min-inline-size: 0;
+  gap: var(--openbot-space-2);
+  /* The list keeps its full width, so the scroll area measures it and fades the clipped edge. */
+  width: max-content;
   margin: 0;
   padding: 0;
-  border: 0;
+  list-style: none;
 }
 
-.wfn-stage .wfn-media-input {
+.wfn-composer-picture {
   position: relative;
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--wfn-composer-tile);
+  height: var(--wfn-composer-tile);
   overflow: hidden;
-  padding: 0;
-  border: 0;
-  border-radius: var(--openbot-radius-sm);
-  background: var(--wfn-field);
-  box-shadow: inset 0 0 0 1px var(--wfn-ring);
+  border-radius: var(--openbot-radius-md);
+  background: var(--wfn-composer-field);
   color: var(--openbot-text-secondary);
 }
 
-.wfn-stage button.wfn-media-input {
-  cursor: pointer;
-}
-
-.wfn-media-input img {
+.wfn-composer-picture img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.wfn-media-input > svg {
-  width: var(--openbot-icon-sm);
-  height: var(--openbot-icon-sm);
+/* The frame that a picture gives the video: Start, End or Loop, as on the port. */
+.wfn-composer-badge {
+  position: absolute;
+  top: var(--openbot-space-0-5);
+  left: var(--openbot-space-0-5);
+  padding: 0 var(--openbot-space-1);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-media-control-scrim);
+  color: var(--openbot-media-control-text);
+  font-size: var(--openbot-text-xs);
+  font-weight: var(--openbot-weight-medium);
+  line-height: 1.6;
 }
 
-/* The mark of a frame, along the bottom of its picture. */
-.wfn-media-input-badge {
-  position: absolute;
-  inset: auto 0 0;
-  padding: 1px 0;
-  background: var(--wfn-glass);
+/* The model and the settings are the same kind of chip: both open a menu. */
+.wfn-composer-bar {
+  display: flex;
+  gap: var(--openbot-space-1-5);
+  align-items: center;
+}
+
+.wfn-composer-chip {
+  display: inline-flex;
+  flex: none;
+  gap: var(--openbot-space-1-5);
+  align-items: center;
+  height: var(--openbot-control-md);
+  padding: 0 var(--openbot-space-3);
+  border: 0;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--wfn-composer-field);
   color: var(--openbot-text-primary);
+  font: inherit;
   font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-medium);
-  line-height: var(--openbot-leading-sm);
-  text-align: center;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.wfn-composer-chip:is(:hover, [data-expanded]) {
+  background: var(--wfn-composer-field-hover);
+}
+
+.wfn-composer-chip:disabled {
+  background: var(--wfn-composer-field);
+  color: var(--openbot-text-muted);
+  cursor: default;
+}
+
+.wfn-composer-chip svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  color: var(--openbot-text-secondary);
+}
+
+.wfn-stage .wfn-composer-bar :is(.wfn-composer-chip, .wfn-media-pill):focus-visible {
+  outline: none;
+  box-shadow: var(--openbot-focus-ring);
+}
+
+/* The model picker of the card, at the size of the bar. */
+.wfn-composer-bar .wfn-media-pill {
+  flex: 0 1 auto;
+  gap: var(--openbot-space-1-5);
+  min-width: 0;
+  height: var(--openbot-control-md);
+  padding: 0 var(--openbot-space-3);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--wfn-composer-field);
+  box-shadow: none;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+}
+
+/* A long model name gives up its room first and ends with "…". */
+.wfn-composer-bar .wfn-media-pill-name {
+  overflow: hidden;
+  flex: 0 1 auto;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wfn-composer-bar .wfn-media-pill:is(:hover, [aria-expanded="true"]) {
+  background: var(--wfn-composer-field-hover);
+}
+
+.wfn-composer-bar .wfn-media-pill:disabled {
+  background: var(--wfn-composer-field);
+  color: var(--openbot-text-muted);
+}
+
+/* The arrow of each chip is the arrow of the model picker: small and muted. It turns while its menu is open. */
+.wfn-composer-bar :is(.wfn-composer-arrow, .wfn-media-pill > svg:last-child) {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+  color: var(--openbot-text-muted);
+  transition: rotate var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+.wfn-composer-bar :is(.wfn-composer-chip[data-expanded], .wfn-media-pill[aria-expanded="true"]) > svg:last-child {
+  rotate: 180deg;
+}
+
+/* While the step runs, its time shows before Stop. */
+.wfn-composer-elapsed {
+  margin-left: auto;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Generate is a pill at the right; it keeps the primary button of the app. */
+.wfn-composer .wfn-composer-generate {
+  flex: none;
+  height: var(--openbot-control-md);
+  margin-left: auto;
+  padding: 0 var(--openbot-space-3);
+  border-radius: var(--openbot-radius-pill);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.wfn-composer .wfn-composer-elapsed + .wfn-composer-generate {
+  margin-left: 0;
+}
+
+.wfn-composer-stop {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+  fill: currentcolor;
+}
+
+/* The settings popover. A short window keeps it inside the room that Kobalte measures: the body scrolls. */
+.wfn-composer-popover {
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  width: 320px;
+  /* At most half the window: one side of the chip always has the room, and the popover goes there.
+     A height from the space that is left under the chip would keep it there, with a short scroll. */
+  max-height: min(520px, calc(50vh - var(--openbot-space-8) - var(--openbot-space-1)));
+  border-radius: var(--openbot-radius-xl);
+  background: var(--wfn-composer-surface);
+  box-shadow: 0 0 0 1px var(--wfn-composer-ring);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  transform-origin: var(--kb-popover-content-transform-origin);
+  animation: wfn-composer-popover-in var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+.wfn-composer-popover:focus-visible {
+  outline: none;
+}
+
+@keyframes wfn-composer-popover-in {
+  from {
+    opacity: 0;
+    scale: 0.97;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wfn-composer[data-placed],
+  .wfn-composer-popover {
+    animation: none;
+  }
+}
+
+.wfn-composer-scroll {
+  max-height: inherit;
+  border-radius: inherit;
+}
+
+/* The settings are tiles in 2 columns. The length takes a row. */
+.wfn-composer-settings {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--openbot-space-1-5);
+  padding: var(--openbot-space-2);
+}
+
+.wfn-composer-tile {
+  min-width: 0;
+}
+
+/* A tile alone on the last row takes the whole row. The length comes first and takes a row of its own,
+   so with it the tiles start a row on the even children. */
+.wfn-composer-settings:not(:has(> .wfn-composer-length)) > :last-child:nth-child(odd),
+.wfn-composer-settings:has(> .wfn-composer-length) > :last-child:nth-child(even) {
+  grid-column: 1 / -1;
+}
+
+/* A tile with a list: its name over its value, and the arrow at the end. */
+.wfn-composer-pick.ui-select-trigger {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--openbot-space-0-5) var(--openbot-space-2);
+  height: auto;
+  min-height: calc(var(--openbot-control-lg) + var(--openbot-space-4));
+  padding: var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-3);
+  border: 0;
+  border-radius: var(--openbot-radius-lg);
+  background: var(--wfn-composer-field);
+  box-shadow: none;
+  font-size: var(--openbot-text-md);
+}
+
+.wfn-composer-pick.ui-select-trigger:hover:not([data-disabled]),
+.wfn-composer-pick.ui-select-trigger[data-expanded] {
+  background: var(--wfn-composer-field-hover);
+}
+
+.wfn-composer-tile .wfn-composer-pick.ui-select-trigger:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--openbot-text-muted);
+}
+
+.wfn-composer-pick-name,
+.wfn-composer-pick .ui-select-value {
+  grid-column: 1;
+}
+
+.wfn-composer-pick-name {
+  overflow: hidden;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wfn-composer-pick .ui-select-trigger-icon {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+}
+
+.wfn-composer-list.ui-select-content {
+  background: var(--wfn-composer-surface);
+  box-shadow: 0 0 0 1px var(--wfn-composer-ring);
+}
+
+.wfn-composer-list-note {
+  color: var(--openbot-text-muted);
+}
+
+/* A custom size: its name over the width and the height, in one tile. */
+.wfn-composer-size {
+  display: grid;
+  align-content: center;
+  gap: var(--openbot-space-0-5);
+  min-width: 0;
+  min-height: calc(var(--openbot-control-lg) + var(--openbot-space-4));
+  margin: 0;
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  border: 0;
+  border-radius: var(--openbot-radius-lg);
+  background: var(--wfn-composer-field);
+}
+
+/* A float makes the name a normal item of the tile, not a name on the border. */
+.wfn-composer-size > legend {
+  float: left;
+  padding: 0;
+}
+
+.wfn-composer-size:hover {
+  background: var(--wfn-composer-field-hover);
+}
+
+.wfn-composer-size:has(:focus-visible) {
+  box-shadow: inset 0 0 0 1px var(--openbot-text-muted);
+}
+
+/* Each side is as wide as its 4 digits, so the tile reads as one size. */
+.wfn-composer-size-row {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+}
+
+.wfn-composer-size-input.ui-input {
+  width: 4ch;
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  appearance: textfield;
+}
+
+.wfn-composer-size-input.ui-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.wfn-composer-size-input::-webkit-inner-spin-button,
+.wfn-composer-size-input::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+.wfn-composer-size-by {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+  color: var(--openbot-text-muted);
+}
+
+/* A setting that is on or off: its name and a switch. */
+.wfn-composer-toggle.ui-switch-field {
+  min-height: calc(var(--openbot-control-lg) + var(--openbot-space-4));
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--wfn-composer-field);
+}
+
+.wfn-composer-toggle .ui-switch-label {
+  font-size: var(--openbot-text-sm);
+}
+
+/* The length is one tile: its name, the track, and the value in a row. The fill grows from the left
+   edge of the tile, under the name, to the thumb, a thin bar. A tick marks each length. */
+.wfn-composer-length {
+  --wfn-composer-tick: color-mix(in srgb, var(--openbot-text-primary) 22%, transparent);
+  grid-column: 1 / -1;
+  height: calc(var(--openbot-control-lg) + var(--openbot-space-2));
+  overflow: hidden;
+  border-radius: var(--openbot-radius-lg);
+  background: var(--wfn-composer-field);
+}
+
+.wfn-composer-length .ui-slider-field {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  height: 100%;
+  padding-inline: var(--openbot-space-3);
+}
+
+.wfn-composer-length .ui-slider-header {
+  display: contents;
+}
+
+.wfn-composer-length .ui-slider-label,
+.wfn-composer-length .ui-slider-value {
+  position: relative;
+  z-index: 1;
+  grid-row: 1;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+}
+
+.wfn-composer-length .ui-slider-label {
+  grid-column: 1;
+  font-weight: var(--openbot-weight-medium);
+}
+
+.wfn-composer-length .ui-slider-value {
+  grid-column: 3;
+}
+
+.wfn-composer-length .ui-slider-track {
+  grid-row: 1;
+  grid-column: 2;
+  align-self: stretch;
+  height: auto;
+  margin: 0 var(--openbot-space-3);
+  border-radius: 0;
+  background:
+    repeating-linear-gradient(
+      to right,
+      var(--wfn-composer-tick) 0 1px,
+      transparent 1px calc(100% / var(--wfn-composer-steps))
+    )
+    center / 100% var(--openbot-space-2) no-repeat;
+}
+
+.wfn-composer-length .ui-slider-track::before {
+  inset: 0;
+}
+
+/* The part of the fill before the track, under the name. The tile clips it at its left edge. */
+.wfn-composer-length .ui-slider-track::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 100%;
+  width: 100vw;
+  background: var(--wfn-composer-field-hover);
+}
+
+.wfn-composer-length .ui-slider-fill {
+  border-radius: 0;
+  background: var(--wfn-composer-field-hover);
+}
+
+/* At the longest length the bar is full: the fill also goes under the value, to the end of the tile. */
+.wfn-composer-length[data-full] .ui-slider-fill::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 100%;
+  width: 100vw;
+  background: inherit;
+}
+
+.wfn-composer-length .ui-slider-thumb {
+  top: calc(50% - var(--openbot-space-2));
+  width: 3px;
+  height: var(--openbot-space-4);
+  box-shadow: none;
+}
+
+.wfn-composer-length .ui-slider-thumb:focus-visible {
+  box-shadow: 0 0 0 1px var(--openbot-text-muted);
 }

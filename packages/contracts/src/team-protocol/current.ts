@@ -237,6 +237,7 @@ import { WORKFLOWS_GITHUB_CAPABILITY } from "./workflows-github-v1";
 import { WORKFLOWS_HIGGSFIELD_CAPABILITY } from "./workflows-higgsfield-v1";
 import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "./workflows-media-account-v1";
 import { WORKFLOWS_MEDIA_CATALOG_CAPABILITY } from "./workflows-media-catalog-v1";
+import { WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY } from "./workflows-media-catalog-v2";
 import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "./workflows-media-size-v1";
 import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "./workflows-media-transparent-v1";
 import { WORKFLOWS_MEDIA_CAPABILITY } from "./workflows-media-v1";
@@ -504,6 +505,7 @@ export {
   WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY,
   WORKFLOWS_MEDIA_CAPABILITY,
   WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
+  WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY,
   WORKFLOWS_MEDIA_SIZE_CAPABILITY,
   WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
   WORKFLOWS_SUNRA_CAPABILITY,
@@ -800,6 +802,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [WEBHOOK_AGENT_SECRET_CAPABILITY, V10],
   [ATTACHMENT_PREVIEW_CAPABILITY, V10],
   [ROUTINE_QUIET_ANSWERS_CAPABILITY, V10],
+  [WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

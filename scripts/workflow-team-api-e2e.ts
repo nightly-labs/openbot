@@ -30,6 +30,11 @@
 // The host advertises `workflows-media-catalog-v1` to a protocol 9 peer. A member reads the live models
 // of the signed-in services and the price of a step's choices; a bad price request is refused. A step
 // with a model that only the live list has reaches the media maker with its id at the service.
+// The host advertises `workflows-media-catalog-v2` to a protocol 10 peer only. Its catalog sends the other
+// settings of a model and the aspect ratios 21:9 and 3:4; the v1 catalog leaves them out, and the v1 price
+// refuses 21:9. A v2 price request with settings reaches the host's price read unchanged, and a step sends
+// only the settings and values that its model has. The v2 catalog also sends the inputs and modes of a
+// video model, and a `file` edge from an asset into a video step reaches the media maker as a `file` input.
 // Agent steps answer through stand-ins, so no model turn is sent. The account check reads the provider
 // status, which can start a provider CLI to list its models; it never starts a turn or makes a file.
 // Run: `bun scripts/workflow-team-api-e2e.ts`.
@@ -45,6 +50,7 @@ import type {
   WorkflowDetail,
   WorkflowGraph,
   WorkflowMediaCatalogModel,
+  WorkflowMediaOptionValue,
   WorkflowMediaPriceRequest,
   WorkflowNode,
 } from "@openbot/contracts/ipc";
@@ -56,9 +62,15 @@ import {
   TEAM_PROTOCOL_VERSION_HEADER,
 } from "@openbot/contracts/team-protocol";
 import { AGENT_ACCESS_CODECS, AGENT_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/agent-access-v1";
-import { teamCapabilitiesForProtocol } from "@openbot/contracts/team-protocol/current";
+import {
+  decodeTeamProtocolSupportExpanded,
+  TEAM_CURRENT_CAPABILITIES,
+  teamCapabilitiesForProtocol,
+  teamCapabilityHeaders,
+} from "@openbot/contracts/team-protocol/current";
 import { TEAM_PROTOCOL_V7 } from "@openbot/contracts/team-protocol/v7";
 import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
+import { TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
 import {
@@ -72,6 +84,11 @@ import {
   WORKFLOWS_MEDIA_CATALOG_CODECS,
   WORKFLOWS_MEDIA_CATALOG_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-catalog-v1";
+import {
+  WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY,
+  WORKFLOWS_MEDIA_CATALOG_V2_CODECS,
+  WORKFLOWS_MEDIA_CATALOG_V2_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-catalog-v2";
 import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-size-v1";
 import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-transparent-v1";
 import {
@@ -123,6 +140,10 @@ let higgsfieldSignedIn = false;
 const mediaAccounts: (string | null)[] = [];
 /** Whether each media request asks for a transparent image, its prompt and its aspect ratio, in order. */
 const mediaRequests: { transparent: boolean; prompt: string; aspect: string }[] = [];
+/** The settings of each media request, in order. */
+const mediaOptions: (readonly WorkflowMediaOptionValue[])[] = [];
+/** The input files of each media request, in order. */
+const mediaImages: (readonly { role: string; attachmentId: string }[])[] = [];
 /** The model id at the provider and the catalog id of each media request, in order. */
 const mediaModels: { model: string; catalogId: string }[] = [];
 /** Each price request that reached the host's price read, in order. */
@@ -141,6 +162,43 @@ const LIVE_MODEL: WorkflowMediaCatalogModel = {
   transparent: false,
 };
 const LIVE_PRICE = 22.5;
+/** A live Higgsfield model with settings and the aspect ratios of `workflows-media-catalog-v2`. */
+const OPTIONS_MODEL: WorkflowMediaCatalogModel = {
+  id: "higgsfield-seedance_e2e",
+  provider: "higgsfield",
+  providerModel: "seedance_e2e",
+  name: "Seedance e2e",
+  maker: "ByteDance",
+  kinds: ["video"],
+  aspects: ["16:9", "21:9", "3:4"],
+  durations: [5, 10],
+  resolutions: ["720p", "1080p"],
+  transparent: false,
+  options: [
+    { name: "mode", kind: "choice", values: ["t2v", "omni_reference"], default: "t2v" },
+    { name: "generate_audio", kind: "switch", values: ["off", "on"], default: "on" },
+  ],
+  inputs: ["frames", "references", "videos", "audios"],
+  modes: [
+    { value: "t2v", inputs: [] },
+    { value: "omni_reference", inputs: ["frames", "references", "videos", "audios"] },
+  ],
+};
+/** A live model with only an aspect ratio of v2, which the v1 catalog leaves out. */
+const CINEMA_MODEL: WorkflowMediaCatalogModel = {
+  id: "higgsfield-cinema_e2e",
+  provider: "higgsfield",
+  providerModel: "cinema_e2e",
+  name: "Cinema e2e",
+  maker: "ByteDance",
+  kinds: ["video"],
+  aspects: ["21:9"],
+  durations: [5],
+  resolutions: ["720p"],
+  transparent: false,
+};
+/** The live Higgsfield list after the sign-in. */
+let liveModels: readonly WorkflowMediaCatalogModel[] = [LIVE_MODEL];
 /** Each crop to a custom size, in order. The stand-in crop fails while `sizeFails` is true. */
 const sizeRequests: { attachmentId: string; width: number; height: number }[] = [];
 let sizeFails = false;
@@ -374,7 +432,7 @@ async function startHost(): Promise<Host> {
           higgsfield: higgsfieldSignedIn ? { available: 42, quota: null } : null,
         }),
       // As the app answers: the live Higgsfield list after the sign-in. No Sunra or Higgsfield call is made.
-      mediaCatalog: () => Effect.succeed({ models: higgsfieldSignedIn ? [LIVE_MODEL] : [] }),
+      mediaCatalog: () => Effect.succeed({ models: higgsfieldSignedIn ? liveModels : [] }),
       mediaPrice: (request) =>
         Effect.sync(() => {
           priceRequests.push(request);
@@ -386,6 +444,8 @@ async function startHost(): Promise<Host> {
       generateMedia: (request) => {
         mediaAccounts.push(request.account);
         mediaModels.push({ model: request.model, catalogId: request.catalogId });
+        mediaOptions.push(request.specs.options);
+        mediaImages.push(request.images);
         mediaRequests.push({
           transparent: request.specs.transparent,
           prompt: request.prompt,
@@ -472,7 +532,7 @@ async function call(
     Accept: "application/json",
     [TEAM_PROTOCOL_VERSION_HEADER]: String(protocol),
     [TEAM_APP_VERSION_HEADER]: HOST_VERSION,
-    [TEAM_CAPABILITIES_HEADER]: (input.capabilities ?? teamCapabilitiesForProtocol(protocol)).join(","),
+    ...teamCapabilityHeaders(protocol, input.capabilities ?? teamCapabilitiesForProtocol(protocol)),
   };
   if (input.body !== undefined) headers["Content-Type"] = "application/json";
   if (input.token) headers.Authorization = `Bearer ${input.token}`;
@@ -1776,6 +1836,134 @@ try {
         };
       } finally {
         higgsfieldSignedIn = false;
+      }
+    },
+  );
+
+  await step(
+    "media catalog v2: the host advertises workflows-media-catalog-v2 to protocol 10; its catalog and price carry settings and 21:9, the v1 routes do not, and a step sends only the settings of its model",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        decodeTeamProtocolSupportExpanded((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body)
+          .capabilities;
+      assert.ok((await capabilities(TEAM_PROTOCOL_V10)).includes(WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY));
+      const codec = (route: string) => {
+        const found = WORKFLOWS_MEDIA_CATALOG_V2_CODECS.get(route) ?? WORKFLOWS_MEDIA_CATALOG_CODECS.get(route);
+        assert.ok(found, `No codec for ${route}.`);
+        return found;
+      };
+      const raw = async (route: string, body: unknown, capabilities: readonly string[] = TEAM_CURRENT_CAPABILITIES) =>
+        call("POST", route, { token: member, body, protocol: TEAM_PROTOCOL_V10, capabilities });
+      /** A request through the frozen codec of its route, in both directions. */
+      const read = async (route: string, body: unknown) => {
+        codec(route).request(body);
+        const response = await raw(route, body);
+        assert.equal(response.status, 200, JSON.stringify(response.body));
+        return codec(route).response(response.status, response.body);
+      };
+      higgsfieldSignedIn = true;
+      liveModels = [LIVE_MODEL, OPTIONS_MODEL, CINEMA_MODEL];
+      try {
+        const catalogV2 = await read(WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.catalog, {});
+        assert.deepEqual(catalogV2, { models: [LIVE_MODEL, OPTIONS_MODEL, CINEMA_MODEL] });
+        // The v1 catalog keeps its shape: no settings, inputs or modes, no v2 aspect ratio, and no model
+        // left with none.
+        const catalogV1 = await read(WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog, {});
+        const { options: _options, inputs: _inputs, modes: _modes, ...withoutOptions } = OPTIONS_MODEL;
+        assert.deepEqual(catalogV1, { models: [LIVE_MODEL, { ...withoutOptions, aspects: ["16:9"] }] });
+        const ask: WorkflowMediaPriceRequest = {
+          model: OPTIONS_MODEL.id,
+          kind: "video",
+          aspect: "21:9",
+          duration: 5,
+          resolution: "720p",
+          transparent: false,
+          options: [{ name: "generate_audio", value: "off" }],
+        };
+        const before = priceRequests.length;
+        const priceV2 = await read(WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.price, ask);
+        assert.deepEqual(priceV2, { credits: null });
+        assert.deepEqual(priceRequests.slice(before), [ask], "the settings reached the host's price read unchanged");
+        // The v1 price never reads 21:9.
+        const { options: _asked, ...askV1 } = ask;
+        const priceV1 = await raw(WORKFLOWS_MEDIA_CATALOG_ROUTES.price, askV1);
+        assert.equal(priceV1.status, 400, JSON.stringify(priceV1.body));
+        assert.equal(priceRequests.length, before + 1);
+        // A step sends the settings that its model has, and leaves out an unknown name and an unknown value.
+        // A video from an asset on a `file` edge is a reference file of the step.
+        const beforeMedia = {
+          options: mediaOptions.length,
+          requests: mediaRequests.length,
+          images: mediaImages.length,
+        };
+        const workflow = await hostWorkflow("Higgsfield settings", {
+          nodes: [
+            promptNode,
+            { id: "clip", kind: "asset", at: { x: 0, y: 200 }, fields: { fileId: "e2e-reference-video" } },
+            {
+              id: "image",
+              kind: "image",
+              at: at(300),
+              fields: {
+                model: OPTIONS_MODEL.id,
+                media: "video",
+                aspect: "21:9",
+                duration: 5,
+                resolution: "720p",
+                options: JSON.stringify({
+                  mode: "omni_reference",
+                  generate_audio: "off",
+                  bitrate_mode: "turbo",
+                  seed: "7",
+                }),
+              },
+            },
+          ],
+          edges: [
+            { id: "edge", from: "prompt", to: "image", type: "text" },
+            { id: "clip-edge", from: "clip", to: "image", type: "file" },
+          ],
+          strokes: [],
+        });
+        const started = await ok(WORKFLOWS_ROUTES.startRun, ownerToken, {
+          workflowId: workflow.id,
+          requestId: requestId(),
+        });
+        const done = await settled(text(record(started.run, "run").id, "run id"), "image");
+        assert.equal(done.status, "done", JSON.stringify(done.error));
+        assert.deepEqual(mediaOptions.slice(beforeMedia.options), [
+          [
+            { name: "mode", value: "omni_reference" },
+            { name: "generate_audio", value: "off" },
+          ],
+        ]);
+        assert.deepEqual(mediaImages.slice(beforeMedia.images), [
+          [{ role: "file", attachmentId: "e2e-reference-video" }],
+        ]);
+        assert.equal(mediaRequests[beforeMedia.requests]?.aspect, "21:9");
+        const old = await raw(
+          WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.catalog,
+          {},
+          TEAM_CURRENT_CAPABILITIES.filter((capability) => capability !== WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY),
+        );
+        assert.equal(old.status, 400, JSON.stringify(old.body));
+        assert.ok(
+          JSON.stringify(old.body).includes(sourceText("error.workflow.serverTooOld")),
+          JSON.stringify(old.body),
+        );
+        return {
+          catalogV2,
+          catalogV1,
+          priceV2,
+          priceV1: priceV1.status,
+          stepOptions: mediaOptions.slice(beforeMedia.options),
+          stepImages: mediaImages.slice(beforeMedia.images),
+          old: old.status,
+        };
+      } finally {
+        higgsfieldSignedIn = false;
+        liveModels = [LIVE_MODEL];
       }
     },
   );

@@ -350,7 +350,7 @@ import { generateHiggsfieldMedia, HIGGSFIELD_MCP_HOST, readHiggsfieldCredits } f
 import { WorkflowMediaCatalogCache } from "./workflows/media-catalog";
 import { generateSunraMedia, readSunraCredits, SUNRA_MCP_HOST } from "./workflows/sunra-media";
 import type { WorkflowTools } from "./workflows/workflow-tools";
-import { type MediaImageRole, mediaInputText } from "./workflows/workflow-walk";
+import { type MediaImageRole, type MediaPictureRole, mediaInputText } from "./workflows/workflow-walk";
 import type { WorkflowRunEnd } from "./workflows/workflows";
 import {
   listWorkspaceDirectory,
@@ -3283,6 +3283,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       },
     ) {
       const failed = (message: string) => new ProfileGenerationFailed({ cause: new Error(message) });
+      // Only a Higgsfield video takes reference videos and audio files (`file` role). The other
+      // providers get the pictures only.
+      const pictures = input.images.filter(
+        (image): image is { role: MediaPictureRole; attachmentId: string } => image.role !== "file",
+      );
       if (input.provider === "sunra") {
         if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
         const plan = yield* this.#mediaCatalog.sunraPlan(input.catalogId, input.kind);
@@ -3297,7 +3302,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             model: input.model,
             prompt: input.prompt,
             specs: input.specs,
-            images: input.images,
+            images: pictures,
             plan,
           },
         ).pipe(
@@ -3334,8 +3339,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         );
       }
       const provider = input.provider;
-      const images: { role: MediaImageRole; path: string }[] = [];
-      for (const image of input.images) {
+      const images: { role: MediaPictureRole; path: string }[] = [];
+      for (const image of pictures) {
         const file = yield* this.#mailbox
           .resolveAttachment(image.attachmentId)
           .pipe(Effect.mapError(() => failed(sourceText("error.workflow.mediaInputMissing"))));

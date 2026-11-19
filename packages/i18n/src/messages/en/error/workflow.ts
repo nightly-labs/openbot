@@ -35,6 +35,8 @@ export const messages = defineMessages("error.workflow", {
     "Write a description, or run the steps before this one so that a text or a picture comes in.",
   "error.workflow.mediaInputNotImage":
     "This step takes only pictures, not videos. Remove the connection from the video.",
+  "error.workflow.mediaInputNotClip":
+    "This input takes only videos and audio files. Remove the connection from the file.",
   "error.workflow.stepMissing": "This step no longer exists.",
   "error.workflow.nodeMissing": "This step is not in the workflow.",
   "error.workflow.runMissing": "This run no longer exists.",

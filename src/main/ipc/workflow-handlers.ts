@@ -3,7 +3,8 @@
 // its GitHub catalog, options, event history and last-event runs through `workflows-github-v1`, and
 // keeps an uploaded picture through `workflows-media-v1`. It says whether it can use Sunra through
 // `workflows-sunra-v1`, and Higgsfield through `workflows-higgsfield-v1`. It gives the live models of
-// both, and a price for a step, through `workflows-media-catalog-v1`.
+// both, and a price for a step, through `workflows-media-catalog-v1`, or with the settings of each
+// model through `workflows-media-catalog-v2`.
 
 import {
   WORKFLOWS_GITHUB_CAPABILITY,
@@ -17,6 +18,10 @@ import {
   WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
   WORKFLOWS_MEDIA_CATALOG_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-catalog-v1";
+import {
+  WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY,
+  WORKFLOWS_MEDIA_CATALOG_V2_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-catalog-v2";
 import {
   WORKFLOWS_MEDIA_CAPABILITY,
   WORKFLOWS_MEDIA_ROUTES,
@@ -88,7 +93,8 @@ interface WorkflowRemoteServers {
       | typeof WORKFLOWS_MEDIA_CAPABILITY
       | typeof WORKFLOWS_SUNRA_CAPABILITY
       | typeof WORKFLOWS_HIGGSFIELD_CAPABILITY
-      | typeof WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
+      | typeof WORKFLOWS_MEDIA_CATALOG_CAPABILITY
+      | typeof WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY,
   ): boolean;
   request<T>(
     serverId: string,
@@ -266,18 +272,24 @@ export function workflowIpcHandlers({
       mediaCatalog: scopedQueryHandler({
         local: () => runCauseEffect(workflows.mediaCatalog()),
         // A host without `workflows-media-catalog-v1` runs only the fixed models, so it has no catalog.
+        // A host with v2 also sends the settings of each model.
         remote: (serverId) =>
-          remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
-            ? remote(serverId, WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
-            : Promise.resolve({ models: [] }),
+          remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY)
+            ? remote(serverId, WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
+            : remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
+              ? remote(serverId, WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
+              : Promise.resolve({ models: [] }),
       }),
       mediaPrice: scopedHandler(parseWorkflowMediaPrice, {
         local: (input) => runCauseEffect(workflows.mediaPrice(input)),
-        // A host without `workflows-media-catalog-v1` gives no quote.
+        // A host without `workflows-media-catalog-v1` gives no quote. The v1 codec drops `options`, and only a
+        // model of the v2 catalog has an aspect ratio that v1 does not have.
         remote: (input, serverId) =>
-          remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
-            ? remote(serverId, WORKFLOWS_MEDIA_CATALOG_ROUTES.price, decodeRemoteWorkflowMediaPrice, input)
-            : Promise.resolve({ credits: null }),
+          remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY)
+            ? remote(serverId, WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.price, decodeRemoteWorkflowMediaPrice, input)
+            : remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
+              ? remote(serverId, WORKFLOWS_MEDIA_CATALOG_ROUTES.price, decodeRemoteWorkflowMediaPrice, input)
+              : Promise.resolve({ credits: null }),
       }),
     },
   };

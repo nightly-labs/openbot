@@ -222,15 +222,20 @@ function textEdges(
   });
 }
 
-/** A picture that an image step reads: the image or asset node it comes from and the attachment of its file. */
+/**
+ * A file that an image step reads: the image or asset node it comes from, the attachment of its file,
+ * and whether it came on an `image` edge (a picture) or a `file` edge (a video or an audio file).
+ */
 export interface MediaInput {
   from: string;
   attachmentId: string;
+  file?: true;
 }
 
 /**
- * The pictures that come into an image step, in edge order: the newest file of each image node with
- * an `image` edge into it, and the file of each asset node. A node before it with no file gives none.
+ * The files that come into an image step, in edge order: the newest file of each image node with an
+ * `image` or a `file` edge into it, and the file of each asset node. A node before it with no file
+ * gives none.
  */
 export function mediaInputs(
   graph: WorkflowGraph,
@@ -238,9 +243,11 @@ export function mediaInputs(
   latest: ReadonlyMap<string, StoredWorkflowStep>,
 ): MediaInput[] {
   const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
-  return graph.edges.flatMap((edge) =>
-    edge.to === nodeId && edge.type === "image" ? edgeFile(nodes.get(edge.from), latest) : [],
-  );
+  return graph.edges.flatMap((edge) => {
+    if (edge.to !== nodeId || (edge.type !== "image" && edge.type !== "file")) return [];
+    const files = edgeFile(nodes.get(edge.from), latest);
+    return edge.type === "file" ? files.map((input) => ({ ...input, file: true as const })) : files;
+  });
 }
 
 /**
@@ -270,13 +277,19 @@ function edgeFile(node: WorkflowNode | undefined, latest: ReadonlyMap<string, St
   return source?.status === "done" && source.output ? [{ from: node.id, attachmentId: source.output }] : [];
 }
 
-/** How an image step uses a picture: the first or the last frame of a video, or a reference. */
-export type MediaImageRole = "first" | "last" | "reference";
+/**
+ * How an image step uses a file: the first or the last frame of a video, a reference picture, or a
+ * reference video or audio file of a video (`file`).
+ */
+export type MediaImageRole = "first" | "last" | "reference" | "file";
+/** The roles of a picture. */
+export type MediaPictureRole = Exclude<MediaImageRole, "file">;
 
 /**
- * The pictures that an image step sends with its request. For a video, the nodes that `firstFrame`
- * and `lastFrame` name give the first and the last frame; one node can give both, for a loop. Every
- * other picture is a reference.
+ * The files that an image step sends with its request. For a video, the nodes that `firstFrame` and
+ * `lastFrame` name give the first and the last frame; one node can give both, for a loop. Every other
+ * picture is a reference. A file on a `file` edge is a reference video or audio file of a video; an
+ * image takes none.
  */
 export function mediaImages(
   fields: WorkflowFields,
@@ -287,6 +300,7 @@ export function mediaImages(
   const first = frame("firstFrame");
   const last = frame("lastFrame");
   return inputs.flatMap((input) => {
+    if (input.file) return kind === "video" ? [{ role: "file" as const, attachmentId: input.attachmentId }] : [];
     const roles: MediaImageRole[] = [];
     if (input.from === first) roles.push("first");
     if (input.from === last) roles.push("last");

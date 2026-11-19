@@ -96,6 +96,7 @@ import { ConditionNode } from "./WorkflowConditionNode";
 import { showWorkflowDeleteToast } from "./WorkflowDeleteUndoToast";
 import { ImageNode } from "./WorkflowImageNode";
 import { LlmNode } from "./WorkflowLlmNode";
+import { WorkflowMediaComposer } from "./WorkflowMediaComposer";
 import { minimapLayout, WorkflowMinimap } from "./WorkflowMinimap";
 import { NoteNode } from "./WorkflowNoteNode";
 import { OutputNode } from "./WorkflowOutputNode";
@@ -972,6 +973,11 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   );
   /** A deleted workflow hides until its Undo toast closes. Undo brings it back as it was. */
   const [deleted, setDeleted] = createSignal(false);
+  /** The one selected image or video step on the live canvas, which has the composer under its card. */
+  const composerId = createMemo(() => {
+    const id = board.selected();
+    return id && !frozen() && !deleted() && !board.isRemoved(id) && kindOf(id) === "image" ? id : null;
+  });
   /** Closes the open Undo toast of a delete and keeps the delete. */
   let closeDelete: (() => void) | undefined;
   let workflowMenu: HTMLButtonElement | undefined;
@@ -3022,6 +3028,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         data-draw={ui.tool === "draw" ? ui.draw : undefined}
         data-hud-hidden={ui.hidden ? "" : undefined}
         data-frame={props.frame}
+        data-composer={composerId() ? "" : undefined}
         aria-label={t("workflow.canvas.label", { name: name() })}
         onPointerDown={(event) => {
           // The person works on the canvas, so the agent's change shows whole.
@@ -3415,6 +3422,9 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
             </ContextMenu.Content>
           </ContextMenu.Portal>
         </ContextMenu.Root>
+        <Show when={composerId()} keyed>
+          {(id) => <WorkflowMediaComposer id={id} root={() => root} />}
+        </Show>
         <Show when={followedPeer()}>{(peer) => <FollowFrame peer={peer()} />}</Show>
         <Show when={live().length === 0 && !frozen() && allows("trigger")}>
           <div class="wfn-empty">

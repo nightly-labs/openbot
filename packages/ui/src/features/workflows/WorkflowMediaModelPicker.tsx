@@ -30,6 +30,7 @@ import { isApiKeyAccount, providerAccountName } from "../../components/provider-
 import { useText } from "../../text";
 import { createPickerFades, type PickerChip, type PickerOption, PickerRow, pickerMatches } from "./WorkflowPicker";
 import { Hint } from "./workflow-board";
+import { resolutionsBySize } from "./workflow-media-step";
 import type { WorkflowImageModel } from "./workflow-model";
 
 /** One rail tab: a payer, or one account of a payer that has more than one. */
@@ -49,11 +50,9 @@ const entryKey = (provider: string, accountId: string | null) => (accountId ? `$
 /** One value for each row: the All tab lists a model once for each account that pays for it. */
 const rowValue = (entry: string, model: string) => `${entry}|${model}`;
 
-const sizeOf = (value: string) => Number.parseFloat(value) * (value.endsWith("K") ? 1000 : 1);
-
 /** "1K–4K", "720p–1080p", or one value. */
 function span(values: readonly string[]): string | undefined {
-  const sorted = [...values].sort((left, right) => sizeOf(left) - sizeOf(right));
+  const sorted = resolutionsBySize(values);
   const first = sorted[0];
   const last = sorted.at(-1);
   if (!first || !last) return undefined;

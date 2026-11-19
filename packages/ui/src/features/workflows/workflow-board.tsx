@@ -270,6 +270,11 @@ export interface WfnBoard {
   viewing: () => number | null;
   view: (run: number | null) => void;
   connected: (node: string, side: WfnPortSide, type: WfnPortType, branch?: string) => boolean;
+  /**
+   * Whether a connection of this port shows a line: the port at its other end is on the canvas. An
+   * asset with no file has no output, so its edge stays in the graph with no line.
+   */
+  lined: (node: string, side: WfnPortSide, type: WfnPortType, branch?: string) => boolean;
   armed: (node: string, side: WfnPortSide, type: WfnPortType, branch?: string) => boolean;
   /** While a connection is open: whether this port can take it. */
   accepts: (node: string, side: WfnPortSide, type: WfnPortType, branch?: string) => boolean;
@@ -1028,6 +1033,21 @@ export function createBoard(options: BoardOptions) {
         if (edge.to !== node) return false;
         const slots = slotsOf(edge);
         return branch === undefined ? slots.length === 0 : slots.includes(branch);
+      }),
+    lined: (node, side, type, branch) =>
+      point(node, side, type, branch) !== undefined &&
+      state.edges.some((edge) => {
+        if (edge.type !== type) return false;
+        const slots = slotsOf(edge);
+        if (side === "out") {
+          if (edge.from !== node || edge.branch !== branch) return false;
+          return (slots.length > 0 ? slots : [undefined]).some(
+            (slot) => point(edge.to, "in", type, slot) !== undefined,
+          );
+        }
+        if (edge.to !== node) return false;
+        if (branch === undefined ? slots.length > 0 : !slots.includes(branch)) return false;
+        return point(edge.from, "out", type, edge.branch) !== undefined;
       }),
     armed: (node, side, type, branch) => isArmed({ node, side, type, branch }),
     accepts: (node, side, type, branch) => accepts({ node, side, type, branch }),

@@ -32,6 +32,7 @@ export const messages = {
   "error.workflow.mediaInputMissing": "תמונה משלב קודם אינה זמינה. יש להריץ את השלב הזה שוב.",
   "error.workflow.mediaEmptyRequest": "יש לכתוב תיאור, או להריץ את השלבים שלפני השלב הזה כדי שיגיע טקסט או תמונה.",
   "error.workflow.mediaInputNotImage": "שלב זה מקבל רק תמונות, לא סרטונים. יש להסיר את החיבור מהסרטון.",
+  "error.workflow.mediaInputNotClip": "הקלט הזה מקבל רק סרטונים וקובצי שמע. יש להסיר את החיבור מהקובץ.",
   "error.workflow.stepMissing": "השלב הזה כבר לא קיים.",
   "error.workflow.nodeMissing": "השלב הזה אינו בתהליך העבודה.",
   "error.workflow.runMissing": "ההרצה הזו כבר לא קיימת.",

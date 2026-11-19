@@ -11,7 +11,13 @@
 
 import { readFile } from "node:fs/promises";
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import type { WorkflowMediaCreditBalance, WorkflowMediaKind, WorkflowMediaSpecs } from "@openbot/contracts/ipc";
+import {
+  WORKFLOW_MEDIA_MODE_OPTION,
+  type WorkflowMediaCreditBalance,
+  type WorkflowMediaInput,
+  type WorkflowMediaKind,
+  type WorkflowMediaSpecs,
+} from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Duration, Effect } from "effect";
@@ -34,7 +40,7 @@ import {
   resolveMediaInputs,
   uploadToService,
 } from "./mcp-media";
-import type { MediaImageRole } from "./workflow-walk";
+import type { MediaImageRole, MediaPictureRole } from "./workflow-walk";
 
 /** The host of Higgsfield's MCP server. An enabled http MCP row with this host is the Higgsfield connection. */
 export const HIGGSFIELD_MCP_HOST = "mcp.higgsfield.ai";
@@ -138,8 +144,12 @@ function isHiggsfieldMedia(value: string): boolean {
 
 const firstRecord = (value: unknown) => (Array.isArray(value) ? value.find(isDynamicRecord) : undefined) ?? null;
 
-/** Puts one input picture in the user's Higgsfield uploads and answers its media id. */
-const uploadPicture = Effect.fnUntraced(function* (
+/** The Higgsfield media type of an input file: a picture, a video or an audio file. */
+const mediaType = (mimeType: string) =>
+  mimeType.startsWith("video/") ? "video" : mimeType.startsWith("audio/") ? "audio" : "image";
+
+/** Puts one input file in the user's Higgsfield uploads and answers its media id. */
+const uploadMedia = Effect.fnUntraced(function* (
   client: Client,
   file: { path: string; mimeType: string },
   index: number,
@@ -164,20 +174,48 @@ const uploadPicture = Effect.fnUntraced(function* (
     HIGGSFIELD_TRANSFER_DEADLINE.upload,
     timedOut,
   );
-  const confirmed = yield* callTool(client, "media_confirm", { type: "image", media_id: media });
+  const confirmed = yield* callTool(client, "media_confirm", { type: mediaType(file.mimeType), media_id: media });
   const results = Array.isArray(confirmed.results) ? confirmed.results.filter(isDynamicRecord) : [];
   if (!results.some((result) => result.media_id === media)) return yield* mediaFailed();
   return media;
 });
 
+/** The mode that the step chose, when the model has it (`workflows-media-catalog-v2`), or null. */
+function chosenMode(specs: WorkflowMediaSpecs, plan: HiggsfieldPlan): string | null {
+  const value = specs.options.find((option) => option.name === WORKFLOW_MEDIA_MODE_OPTION)?.value;
+  return value !== undefined && plan.modes && Object.hasOwn(plan.modes, value) ? value : null;
+}
+
 /**
- * The `medias` of the request: each picture in a role that the model takes, within its limits. A
- * model that takes frames but no references (Wan 2.7) gets a reference as the frame that is still
- * free, first frame before last frame, as Higgsfield itself does with such a request.
+ * The `medias` of the request: each file in a role that the model takes, within its limits, and in
+ * a chosen mode only the inputs of that mode. A model that takes frames but no references (Wan 2.7)
+ * gets a reference as the frame that is still free, first frame before last frame, as Higgsfield
+ * itself does with such a request.
  */
 function requestMedias(
   plan: HiggsfieldPlan,
-  media: (role: MediaImageRole) => string[],
+  pictures: (role: MediaPictureRole) => string[],
+  clips: (input: "videos" | "audios") => string[],
+  inputs: readonly WorkflowMediaInput[] | null,
+): { value: string; role: string }[] {
+  const takes = (input: WorkflowMediaInput) => inputs === null || inputs.includes(input);
+  const media = (role: MediaPictureRole) =>
+    takes(role === "reference" ? "references" : "frames") ? pictures(role) : [];
+  const clip = (input: "videos" | "audios") => {
+    const target = input === "videos" ? plan.videos : plan.audios;
+    return target && takes(input)
+      ? clips(input)
+          .slice(0, target.max)
+          .map((value) => ({ value, role: target.role }))
+      : [];
+  };
+  return [...requestPictures(plan, media), ...clip("videos"), ...clip("audios")];
+}
+
+/** The pictures of the request: its frames and its references. */
+function requestPictures(
+  plan: HiggsfieldPlan,
+  media: (role: MediaPictureRole) => string[],
 ): { value: string; role: string }[] {
   const asFrames = (plan.start || plan.end) && plan.referenceRole === null ? media("reference") : [];
   const first = plan.start ? (media("first")[0] ?? asFrames.shift()) : undefined;
@@ -210,9 +248,29 @@ function requestMode(plan: HiggsfieldPlan, medias: readonly { role: string }[]):
 }
 
 /**
- * The choices of the step as the model takes them: aspect, resolution, length and background. GPT
- * Image is told "opaque" for a solid background: its default, "auto", can make a clear background
- * that the canvas did not ask for.
+ * The settings of the step that the plan of the model has (`workflows-media-catalog-v2`), as the model
+ * takes them. A name or a value that the plan does not list is not sent. A setting that the step did not
+ * choose and whose canvas default is not the service default gets the canvas default.
+ */
+function requestOptions(specs: WorkflowMediaSpecs, plan: HiggsfieldPlan): McpToolArguments {
+  const sent: Record<string, string | boolean> = {};
+  const chosen = new Set(specs.options.map((entry) => entry.name));
+  const unchosen = Object.entries(plan.defaults ?? {})
+    .filter(([name]) => !chosen.has(name))
+    .map(([name, value]) => ({ name, value }));
+  for (const { name, value } of [...specs.options, ...unchosen]) {
+    const values = plan.options && Object.hasOwn(plan.options, name) ? plan.options[name] : undefined;
+    const param = values && Object.hasOwn(values, value) ? values[value] : undefined;
+    if (param !== undefined) sent[name] = param;
+  }
+  return sent;
+}
+
+/**
+ * The choices of the step as the model takes them: its settings, aspect, resolution, length and
+ * background. The choices that the host sets come after the settings, so a setting never replaces
+ * one. GPT Image is told "opaque" for a solid background: its default, "auto", can make a clear
+ * background that the canvas did not ask for.
  */
 function requestChoices(kind: WorkflowMediaKind, specs: WorkflowMediaSpecs, plan: HiggsfieldPlan): McpToolArguments {
   const resolution = specs.resolution
@@ -233,6 +291,7 @@ function requestChoices(kind: WorkflowMediaKind, specs: WorkflowMediaSpecs, plan
             ? { background: "opaque" }
             : {};
   return {
+    ...requestOptions(specs, plan),
     aspect_ratio: specs.aspect,
     ...resolution,
     ...(kind === "video" ? { duration: specs.duration } : {}),
@@ -296,21 +355,28 @@ export const generateHiggsfieldMedia = Effect.fn("generateHiggsfieldMedia")(func
 ) {
   const signIn = dependencies.signIn();
   if (!signIn) return yield* notSignedIn();
-  const files = yield* resolveMediaInputs(dependencies, request.images);
+  const files = yield* resolveMediaInputs(dependencies, request.images, (role) => role === "file");
   const made = yield* Effect.scoped(
     Effect.gen(function* () {
       const client = yield* connectSignedIn(signIn, notSignedIn);
-      // Only the pictures that the request sends, and one upload for each file, also when a picture is
+      // Only the files that the request sends, and one upload for each file, also when a picture is
       // both frames.
-      const sent = requestMedias(request.plan, (role) =>
-        files.filter((file) => file.role === role).map((file) => file.path),
+      const mode = chosenMode(request.specs, request.plan);
+      const sent = requestMedias(
+        request.plan,
+        (role) => files.filter((file) => file.role === role).map((file) => file.path),
+        (input) =>
+          files
+            .filter((file) => file.role === "file" && (mediaType(file.mimeType) === "audio") === (input === "audios"))
+            .map((file) => file.path),
+        mode ? (request.plan.modes?.[mode] ?? null) : null,
       );
       const uploaded = new Map<string, string>();
       for (const { value: path } of sent) {
         if (uploaded.has(path)) continue;
         const file = files.find((candidate) => candidate.path === path);
         if (!file) return yield* mediaFailed();
-        uploaded.set(path, yield* uploadPicture(client, file, uploaded.size));
+        uploaded.set(path, yield* uploadMedia(client, file, uploaded.size));
       }
       const medias = sent.flatMap((media) => {
         const value = uploaded.get(media.value);
@@ -322,7 +388,9 @@ export const generateHiggsfieldMedia = Effect.fn("generateHiggsfieldMedia")(func
         count: 1,
         use_unlim: false,
         ...requestChoices(request.kind, request.specs, request.plan),
-        mode: requestMode(request.plan, medias),
+        // The chosen mode, else the mode of the files. With no mode of its own, the plan keeps the
+        // `mode` setting of the step.
+        ...(request.plan.mode ? { mode: mode ?? requestMode(request.plan, medias) } : {}),
         ...(medias.length > 0 ? { medias } : {}),
       };
       const answer = yield* callTool(client, request.kind === "video" ? "generate_video" : "generate_image", {
@@ -426,7 +494,7 @@ export interface HiggsfieldPriceRequest {
 /**
  * What one file costs with the choices of the step, in credits, or null when Higgsfield gives no
  * price. `get_cost` only asks for the price: Higgsfield starts no job and spends no credits. The quote
- * sends no picture, so a mode is the mode with no picture.
+ * sends no picture, so a mode is the chosen mode or the mode with no picture.
  */
 export const readHiggsfieldPrice = Effect.fn("readHiggsfieldPrice")(function* (
   signIn: McpMediaSignIn,
@@ -442,7 +510,7 @@ export const readHiggsfieldPrice = Effect.fn("readHiggsfieldPrice")(function* (
           count: 1,
           use_unlim: false,
           ...requestChoices(request.kind, request.specs, request.plan),
-          mode: request.plan.mode?.text,
+          ...(request.plan.mode ? { mode: chosenMode(request.specs, request.plan) ?? request.plan.mode.text } : {}),
           get_cost: true,
         },
       });
