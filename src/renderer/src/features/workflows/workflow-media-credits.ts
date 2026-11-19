@@ -1,10 +1,23 @@
-import type { WorkflowMediaCredits } from "@openbot/contracts/ipc";
+import type {
+  WorkflowCatalogProvider,
+  WorkflowMediaCredits,
+  WorkflowMediaServiceAccount,
+} from "@openbot/contracts/ipc";
 import type { MediaCreditsRailRow } from "@openbot/ui/features/window/PageRail";
 import { createEffect, createSignal, onCleanup, untrack } from "solid-js";
 
-/** Brand names: they are not translated. */
-const SUNRA_NAME = "Sunra";
-const HIGGSFIELD_NAME = "Higgsfield";
+/**
+ * Brand names: they are not translated. The first account of a service has no name of its own, and
+ * Apps names it by the app, so the canvas and the rail do the same.
+ */
+const MEDIA_SERVICE_NAMES: Readonly<Record<WorkflowCatalogProvider, string>> = {
+  sunra: "Sunra",
+  higgsfield: "Higgsfield",
+};
+
+/** The name of a media service account, as Apps shows it. */
+export const mediaServiceAccountName = (account: WorkflowMediaServiceAccount) =>
+  account.name ?? MEDIA_SERVICE_NAMES[account.provider];
 
 /** Goes up by one each time a Sunra or Higgsfield step of the open canvas ends. */
 const [mediaStepsEnded, setMediaStepsEnded] = createSignal(0);
@@ -58,12 +71,39 @@ export function createWorkflowMediaCredits(
     request += 1;
     window.removeEventListener("focus", refresh);
   });
-  /** The rail rows of the credits: each service that told them. */
+  /**
+   * The rail rows of the credits: each account that told them, by its name. A host that does not list
+   * its accounts gives the first account of each service, by the name of the service.
+   */
   return (): MediaCreditsRailRow[] => {
     const answer = credits();
+    if (!answer) return [];
+    if (answer.accounts) {
+      const accounts = answer.accounts;
+      return accounts.flatMap((account) => {
+        if (!account.credits) return [];
+        // A service with more than one account numbers them in Apps order, as the model picker does.
+        const service = accounts.filter((entry) => entry.provider === account.provider);
+        return [
+          {
+            key: `${account.provider}:${account.id}`,
+            provider: account.provider,
+            name: mediaServiceAccountName(account),
+            ...account.credits,
+            ...(service.length > 1 ? { number: service.indexOf(account) + 1 } : {}),
+          },
+        ];
+      });
+    }
     const rows: MediaCreditsRailRow[] = [];
-    if (answer?.sunra) rows.push({ provider: "sunra", name: SUNRA_NAME, ...answer.sunra });
-    if (answer?.higgsfield) rows.push({ provider: "higgsfield", name: HIGGSFIELD_NAME, ...answer.higgsfield });
+    if (answer.sunra) rows.push({ key: "sunra", provider: "sunra", name: MEDIA_SERVICE_NAMES.sunra, ...answer.sunra });
+    if (answer.higgsfield)
+      rows.push({
+        key: "higgsfield",
+        provider: "higgsfield",
+        name: MEDIA_SERVICE_NAMES.higgsfield,
+        ...answer.higgsfield,
+      });
     return rows;
   };
 }

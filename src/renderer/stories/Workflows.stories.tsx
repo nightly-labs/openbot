@@ -318,6 +318,43 @@ export const ImageManyResults: Story = {
   ),
 };
 
+/** The host is signed in to two Higgsfield accounts in Apps: the second has a name there. */
+const TWO_HIGGSFIELD_ACCOUNTS: WorkflowCatalogs = {
+  ...STORY_CATALOGS,
+  imageModels: STORY_CATALOGS.imageModels?.map((model) =>
+    model.provider === "higgsfield"
+      ? {
+          ...model,
+          accounts: [
+            { id: "default", label: "Higgsfield", email: null, state: "connected", message: null },
+            { id: "a1b2c3d4", label: "Higgsfield 2", email: null, state: "connected", message: null },
+          ],
+        }
+      : model,
+  ),
+};
+
+/**
+ * Two Higgsfield accounts. The picker has an entry for each one, and the step shows the account that
+ * pays. The first step uses the first account, the second step the account "Higgsfield 2".
+ */
+export const ImageTwoHiggsfieldAccounts: Story = {
+  name: "Image, two Higgsfield accounts",
+  render: () => {
+    const model = TWO_HIGGSFIELD_ACCOUNTS.imageModels?.find((entry) => entry.provider === "higgsfield")?.id ?? "";
+    return (
+      <NodeGallery
+        selected="second"
+        catalogs={TWO_HIGGSFIELD_ACCOUNTS}
+        fields={{ first: { model, account: "" }, second: { model, account: "a1b2c3d4" } }}
+      >
+        <ImageNode id="first" prompt="Hero image for the Atlas comparison page" />
+        <ImageNode id="second" prompt="Hero image for the Atlas comparison page" />
+      </NodeGallery>
+    );
+  },
+};
+
 /** A cut-out PNG: a figure on clear pixels, with a soft shadow that is half clear. */
 function cutOutPicture(): string {
   const canvas = document.createElement("canvas");

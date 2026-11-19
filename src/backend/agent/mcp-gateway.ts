@@ -11,7 +11,7 @@ import type {
   TestMcpServerInput,
 } from "@openbot/contracts/ipc";
 import { GITHUB_CONNECTOR_MCP_SERVER_ID, mcpConfigErrors, normalizeMcpConfig } from "@openbot/contracts/ipc";
-import { withoutMcpAccountFragment } from "@openbot/contracts/mcp-accounts";
+import { mcpAccountFragment, withoutMcpAccountFragment } from "@openbot/contracts/mcp-accounts";
 import { matchingSourceKeys, sourceText } from "@openbot/i18n/source";
 import { type Logger, redactSecrets, toLogValue } from "@openbot/logging";
 import { Effect, Result, Schema } from "effect";
@@ -66,6 +66,17 @@ export interface TestMcpServerOptions {
   open?: McpSignInOpener;
   /** The link that the computer of `open` returns to OpenBot on. See `McpOAuth.signIn`. */
   deepLinkRedirectUrl?: string;
+}
+
+/** One account of a service that OpenBot itself calls; see `McpGateway.serviceSignIns`. */
+export interface McpServiceSignIn {
+  /** The id of its Apps row. */
+  id: string;
+  /** The row name, or null for the row of the first connect. */
+  name: string | null;
+  url: string;
+  token: () => Effect.Effect<string | null, McpOperationError>;
+  refresh: (rejected: string) => Effect.Effect<string | null, McpOperationError>;
 }
 
 export interface McpGatewayHooks {
@@ -644,30 +655,43 @@ export class McpGateway {
   }
 
   /**
-   * The sign-in of the first enabled row on `host` that goes through the OAuth proxy, for a feature
-   * of OpenBot itself that calls that server, such as the Sunra models of the canvas. The token stays
-   * in this process and is read at each use. Null when no such row is signed in.
+   * The sign-ins of the enabled rows on `host` that go through the OAuth proxy, for a feature of
+   * OpenBot itself that calls that server, such as the Sunra and Higgsfield models of the canvas. They
+   * come in the order of Apps: the row of the first connect (no account fragment), then the accounts
+   * that the user added. The first one is the default. `name` is the row name, or null for the row of
+   * the first connect, which Apps names by the app. Each token stays in this process and is read at
+   * each use.
    */
-  serviceSignIn(host: string): {
-    url: string;
-    token: () => Effect.Effect<string | null, McpOperationError>;
-    refresh: (rejected: string) => Effect.Effect<string | null, McpOperationError>;
-  } | null {
+  serviceSignIns(host: string): McpServiceSignIn[] {
     const oauth = this.#oauth;
-    const config = this.#servers.listEnabled().find((row) => {
-      if (!this.#proxied(row) || !oauth?.signedIn(row.url)) return false;
+    if (!oauth) return [];
+    const rows = this.#servers.listEnabled().filter((row) => {
+      if (!this.#proxied(row) || !oauth.signedIn(row.url)) return false;
       try {
         return new URL(row.url).hostname === host;
       } catch {
         return false;
       }
     });
-    if (!config || !oauth) return null;
-    return {
+    return [
+      ...rows.filter((row) => mcpAccountFragment(row.url) === null),
+      ...rows.filter((row) => mcpAccountFragment(row.url) !== null),
+    ].map((config) => ({
+      id: config.id,
+      name: mcpAccountFragment(config.url) === null ? null : config.name,
       url: withoutMcpAccountFragment(config.url),
       token: () => oauth.accessToken(config.url),
-      refresh: (rejected) => oauth.refreshAccessToken(config.url, rejected),
-    };
+      refresh: (rejected: string) => oauth.refreshAccessToken(config.url, rejected),
+    }));
+  }
+
+  /**
+   * The sign-in of one account on `host`: the row `accountId`, or the first account when it is null.
+   * Null when that account is not signed in; it never gives another account.
+   */
+  serviceSignIn(host: string, accountId: string | null = null): McpServiceSignIn | null {
+    const accounts = this.serviceSignIns(host);
+    return (accountId === null ? accounts[0] : accounts.find((account) => account.id === accountId)) ?? null;
   }
 
   /**

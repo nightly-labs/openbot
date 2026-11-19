@@ -314,12 +314,20 @@ function CustomAgentUsageButton(props: { row: CustomAgentUsageRailRow; onOpen: (
 
 /** The credits of a media service that a canvas step spends, such as Sunra or Higgsfield. */
 export interface MediaCreditsRailRow {
+  /** One for each row: a service can have more than one account. */
+  key: string;
   provider: "sunra" | "higgsfield";
+  /** The name of the account, as Apps shows it. */
   name: string;
   /** The credits that the account can spend now. */
   available: number;
   /** The limit of a team member, or null for an account with no limit of its own. */
   quota: number | null;
+  /**
+   * The number of the account in its service, as on its tab in the workflow model picker. Absent when
+   * the service has one account.
+   */
+  number?: number | undefined;
 }
 
 /** The part of the quota that is left, 0 to 100. A quota of 0 has nothing left. */
@@ -395,6 +403,13 @@ function MediaCreditsButton(props: { row: MediaCreditsRailRow; onOpen: (button: 
       <span class="window-rail-credits-count" data-usage-tone={mediaCreditsTone(props.row)} aria-hidden="true">
         {format.compact(props.row.available)}
       </span>
+      <Show when={props.row.number}>
+        {(number) => (
+          <span class="window-rail-credits-badge" aria-hidden="true">
+            {number()}
+          </span>
+        )}
+      </Show>
     </RailButton>
   );
 }
@@ -766,7 +781,7 @@ export function PageRail(props: PageRailProps) {
           <For each={props.customAgentUsage ?? []} keyed={(row) => row.id}>
             {(row) => <CustomAgentUsageButton row={row()} onOpen={props.onUsage} />}
           </For>
-          <For each={props.mediaCredits ?? []} keyed={(row) => row.provider}>
+          <For each={props.mediaCredits ?? []} keyed={(row) => row.key}>
             {(row) => <MediaCreditsButton row={row()} onOpen={() => props.onMediaCredits?.(row().provider)} />}
           </For>
           <Show when={props.onMarketplace}>

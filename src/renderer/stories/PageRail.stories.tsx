@@ -103,21 +103,31 @@ const customAgentUsage: CustomAgentUsageRailRow[] = [
 ];
 
 /** On the Canvas page: a Sunra team member with 120 of a 500-credit quota left. */
-const teamCredits: MediaCreditsRailRow[] = [{ provider: "sunra", name: "Sunra", available: 120, quota: 500 }];
+const teamCredits: MediaCreditsRailRow[] = [
+  { key: "sunra", provider: "sunra", name: "Sunra", available: 120, quota: 500 },
+];
 
 /** A personal Sunra account has no quota of its own. */
-const personalCredits: MediaCreditsRailRow[] = [{ provider: "sunra", name: "Sunra", available: 2140, quota: null }];
+const personalCredits: MediaCreditsRailRow[] = [
+  { key: "sunra", provider: "sunra", name: "Sunra", available: 2140, quota: null },
+];
 
 /** Sunra and Higgsfield both signed in on the host: one button for each service. */
 const bothCredits: MediaCreditsRailRow[] = [
   ...teamCredits,
-  { provider: "higgsfield", name: "Higgsfield", available: 860, quota: null },
+  { key: "higgsfield", provider: "higgsfield", name: "Higgsfield", available: 860, quota: null, number: 1 },
+];
+
+/** Two Higgsfield accounts on the host: one button for each account, with the name that Apps shows. */
+const twoAccountCredits: MediaCreditsRailRow[] = [
+  { key: "higgsfield:first", provider: "higgsfield", name: "Higgsfield", available: 860, quota: null, number: 1 },
+  { key: "higgsfield:second", provider: "higgsfield", name: "Higgsfield 2", available: 95, quota: null, number: 2 },
 ];
 
 /** Almost no Sunra team credits, and no Higgsfield credits. */
 const lowCredits: MediaCreditsRailRow[] = [
-  { provider: "sunra", name: "Sunra", available: 140, quota: 2000 },
-  { provider: "higgsfield", name: "Higgsfield", available: 0, quota: null },
+  { key: "sunra", provider: "sunra", name: "Sunra", available: 140, quota: 2000 },
+  { key: "higgsfield", provider: "higgsfield", name: "Higgsfield", available: 0, quota: null },
 ];
 
 /** The page rail as the desktop window shows it, with the menu of the open server at its end. Hover a button, or move to it with Tab, to see its tooltip. */
@@ -256,6 +266,11 @@ export const MediaCreditsPersonal: Story = {
 /** The Canvas page with Sunra and Higgsfield: a button for each service. */
 export const MediaCreditsTwoServices: Story = {
   args: { mediaCredits: bothCredits },
+};
+
+/** The Canvas page with two Higgsfield accounts: a button for each account, with its number. Hover one to see its name. */
+export const MediaCreditsTwoAccounts: Story = {
+  args: { mediaCredits: twoAccountCredits },
 };
 
 /** Low credits: 7% of the Sunra team quota is left, and the Higgsfield account has none. Both numbers show in red. */
