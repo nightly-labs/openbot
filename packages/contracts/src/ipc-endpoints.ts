@@ -363,6 +363,7 @@ import type { GitHubConnectorRepositories, GitHubConnectorStatus } from "./ipc-g
 import type { GithubSkillSource } from "./ipc-github-skills";
 import type { ApplyHermesImportInput, HermesImportPreview } from "./ipc-hermes-import";
 import type { HiddenAgentsSnapshot, SetAgentHiddenInput } from "./ipc-hidden-agents";
+import type { HostAgentLimitSettings } from "./ipc-host-agent-limit";
 import type { HostAnalytics, HostAnalyticsInput } from "./ipc-host-analytics";
 import type { HostPersonality } from "./ipc-host-personality";
 import type { HostReleaseStatus } from "./ipc-host-release";
@@ -1203,6 +1204,8 @@ export const IPC_ENDPOINTS = {
     ),
     getTimezone: scopedQuery<HostTimezoneSettings, "required">()("host-admin:get-timezone"),
     setTimezone: scopedRequest<string | null, HostTimezoneSettings, "required">()("host-admin:set-timezone"),
+    getAgentLimit: scopedQuery<HostAgentLimitSettings, "required">()("host-admin:get-agent-limit"),
+    setAgentLimit: scopedRequest<number | null, HostAgentLimitSettings, "required">()("host-admin:set-agent-limit"),
     getTurnLimits: scopedQuery<HostTurnLimits, "required">()("host-admin:get-turn-limits"),
     setTurnLimits: scopedRequest<HostTurnLimitsInput, HostTurnLimits, "required">()("host-admin:set-turn-limits"),
     getPersonality: scopedQuery<HostPersonality, "required">()("host-admin:get-personality"),

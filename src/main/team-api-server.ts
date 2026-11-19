@@ -395,6 +395,7 @@ import { routeFocusUse } from "./team-api/route-focus-use";
 import { routeGithubSkills } from "./team-api/route-github-skills";
 import { routeHermesImport } from "./team-api/route-hermes-import";
 import { routeHostAdmin } from "./team-api/route-host-admin";
+import { routeHostAgentLimit } from "./team-api/route-host-agent-limit";
 import { routeHostAppearance } from "./team-api/route-host-appearance";
 import { routeHostKeyRotation } from "./team-api/route-host-key-rotation";
 import { routeHostPersonality } from "./team-api/route-host-personality";
@@ -1264,6 +1265,7 @@ export class TeamApiServer {
       if ((await routeHostAppearance(context, this.#options.admin)) === "handled") return;
       if ((await routeHostUpdate(context, this.#options.admin)) === "handled") return;
       if ((await routeHostTimezone(context, this.#options.admin)) === "handled") return;
+      if ((await routeHostAgentLimit(context, this.#options.admin)) === "handled") return;
       if ((await routeHostTurnLimits(context, this.#options.admin)) === "handled") return;
       if ((await routeHostRestart(context, this.#options.admin)) === "handled") return;
       if ((await routeHostPersonality(context, this.#options.admin)) === "handled") return;

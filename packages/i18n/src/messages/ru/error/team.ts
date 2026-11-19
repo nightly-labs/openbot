@@ -125,6 +125,7 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "Это подключение не поддерживает изменение идентификатора сервера.",
   "error.team.hostUpdateUnsupported": "Это подключение не поддерживает обновление хоста.",
   "error.team.hostTimezoneUnsupported": "Это подключение не поддерживает часовой пояс сервера.",
+  "error.team.hostAgentLimitUnsupported": "Лимит агентов не поддерживается этим соединением.",
   "error.team.hostRestartUnsupported": "Это подключение не поддерживает перезапуск сервера.",
   "error.team.hostKeyRotationUnsupported": "Это подключение не поддерживает смену ключа сервера.",
   "error.team.localServersUnsupported": "Это подключение не поддерживает серверы на этом компьютере.",

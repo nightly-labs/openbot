@@ -328,6 +328,13 @@ export const messages = {
   "server.settings.editLogo": "Modifica il logo del server",
   "server.settings.addLogo": "Aggiungi il logo del server",
   "server.settings.removeLogo": "Rimuovi il logo del server",
+  "server.settings.agentLimitSection": "Limiti",
+  "server.settings.agentLimit": "Agenti massimi",
+  "server.settings.agentLimitDescription":
+    "Il numero massimo di agenti che questo server può contenere. Vuoto usa il valore predefinito.",
+  "server.settings.agentLimitDefault": "Predefinito ({count})",
+  "server.settings.agentLimitInvalid": "Inserisci un numero intero da 1 a {max}.",
+  "server.settings.agentLimitLoadFailed": "Impossibile caricare il limite di agenti di questo server.",
   "server.settings.appearance": "Forma e colore",
   "server.settings.appearanceShapes": "Forme del server",
   "server.settings.appearanceShapeOption": "Forma {number}",

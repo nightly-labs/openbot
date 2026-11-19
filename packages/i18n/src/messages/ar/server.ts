@@ -358,6 +358,13 @@ export const messages = {
   "server.settings.editLogo": "تعديل شعار الخادم",
   "server.settings.addLogo": "إضافة شعار الخادم",
   "server.settings.removeLogo": "إزالة شعار الخادم",
+  "server.settings.agentLimitSection": "الحدود",
+  "server.settings.agentLimit": "الحد الأقصى للوكلاء",
+  "server.settings.agentLimitDescription":
+    "أقصى عدد من الوكلاء يمكن أن يحتويه هذا الخادم. اتركه فارغًا لاستخدام القيمة الافتراضية.",
+  "server.settings.agentLimitDefault": "الافتراضي ({count})",
+  "server.settings.agentLimitInvalid": "أدخل عددًا صحيحًا من 1 إلى {max}.",
+  "server.settings.agentLimitLoadFailed": "تعذّر تحميل حد الوكلاء لهذا الخادم.",
   "server.settings.appearance": "الشكل واللون",
   "server.settings.appearanceShapes": "أشكال الخادم",
   "server.settings.appearanceShapeOption": "الشكل {number}",

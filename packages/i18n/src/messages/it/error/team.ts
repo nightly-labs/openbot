@@ -137,6 +137,7 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "La modifica dell'identità del server non è supportata da questa connessione.",
   "error.team.hostUpdateUnsupported": "Gli aggiornamenti dell'host non sono supportati da questa connessione.",
   "error.team.hostTimezoneUnsupported": "Questa connessione non supporta il fuso orario del server.",
+  "error.team.hostAgentLimitUnsupported": "Il limite di agenti non è supportato da questa connessione.",
   "error.team.hostRestartUnsupported": "Questa connessione non supporta il riavvio del server.",
   "error.team.hostKeyRotationUnsupported": "Questa connessione non supporta il cambio della chiave del server.",
   "error.team.localServersUnsupported": "Questa connessione non supporta i server su questo computer.",

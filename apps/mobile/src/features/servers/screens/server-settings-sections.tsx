@@ -11,6 +11,7 @@ import Download from "lucide-react-native/icons/download";
 import Earth from "lucide-react-native/icons/earth";
 import Fingerprint from "lucide-react-native/icons/fingerprint-pattern";
 import HardDrive from "lucide-react-native/icons/hard-drive";
+import Hash from "lucide-react-native/icons/hash";
 import KeyRound from "lucide-react-native/icons/key-round";
 import RefreshCcw from "lucide-react-native/icons/refresh-ccw";
 import RefreshCw from "lucide-react-native/icons/refresh-cw";
@@ -38,6 +39,7 @@ import { SERVER_ROLE_LABEL_KEYS } from "@/features/servers/model/server-role";
 import { canRestartServer } from "@/features/servers/model/server-settings-access";
 import { timeZoneLabel } from "@/features/servers/model/time-zones";
 import { useLockedAction } from "@/features/servers/model/use-locked-action";
+import { useServerAgentLimit } from "@/features/servers/model/use-server-agent-limit";
 import { useServerBrowserProfiles } from "@/features/servers/model/use-server-browser-profiles";
 import { useServerProviders } from "@/features/servers/model/use-server-providers";
 import { useServerSites } from "@/features/servers/model/use-server-sites";
@@ -315,16 +317,19 @@ export function useAgentSettingsAvailable(serverId: string): boolean {
 }
 
 export function ServerGeneralSection({ serverId }: { serverId: string }) {
-  const { t, errorMessage } = useText();
+  const { t, errorMessage, format } = useText();
   const timezone = useServerTimezone(serverId);
+  const agentLimit = useServerAgentLimit(serverId);
   const update = useServerUpdate(serverId, { poll: false });
   const row = useServerRows(serverId);
   const updateRow = row((checks) => checks.serverUpdateAccess(serverId));
   const timezoneRow = row((checks) => checks.canManageServerTimezone(serverId));
+  const agentLimitRow = row((checks) => checks.canManageServerAgentLimit(serverId));
   const agentsRow = row((checks) => permitsAgentSettings(checks, serverId));
   const updateShown = Boolean(update.access || update.query.data) || updateRow === "disabled";
-  if (!updateShown && timezoneRow === "hidden" && agentsRow === "hidden") return null;
+  if (!updateShown && timezoneRow === "hidden" && agentLimitRow === "hidden" && agentsRow === "hidden") return null;
   const zone = timezone.query.data;
+  const limit = agentLimit.query.data;
   return (
     <SettingsSection
       title={t("mobile.server.settings.serverSection")}
@@ -351,6 +356,26 @@ export function ServerGeneralSection({ serverId }: { serverId: string }) {
           onPress={() => router.push({ pathname: "/server-settings/timezone", params: { serverId } })}
         >
           <Typography.Paragraph>{t("mobile.server.settings.timezone")}</Typography.Paragraph>
+        </SettingsRow>
+      )}
+      {agentLimitRow === "hidden" ? null : (
+        <SettingsRow
+          leading={<RowIcon icon={Hash} />}
+          trailing={
+            limit ? (
+              <TrailingValue
+                value={
+                  limit.limit === null
+                    ? t("mobile.server.settings.agentLimitDefault", { count: format.number(limit.defaultLimit) })
+                    : format.number(limit.limit)
+                }
+              />
+            ) : undefined
+          }
+          disabled={agentLimitRow === "disabled"}
+          onPress={() => router.push({ pathname: "/server-settings/agent-limit", params: { serverId } })}
+        >
+          <Typography.Paragraph>{t("mobile.server.settings.agentLimit")}</Typography.Paragraph>
         </SettingsRow>
       )}
       {agentsRow === "hidden" ? null : (

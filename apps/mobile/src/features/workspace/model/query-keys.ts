@@ -119,6 +119,7 @@ export const queryKeys = {
   serverMembers: (scope: QueryScope, serverId: string) => ["server-members", ...scope, serverId],
   serverInvites: (scope: QueryScope, serverId: string) => ["server-invites", ...scope, serverId],
   serverTimezone: (scope: QueryScope, serverId: string) => ["server-timezone", ...scope, serverId],
+  serverAgentLimit: (scope: QueryScope, serverId: string) => ["server-agent-limit", ...scope, serverId],
   localServers: (scope: QueryScope, serverId: string) => ["local-servers", ...scope, serverId],
   agentMemoryLimit: (scope: QueryScope, serverId: string) => ["agent-memory-limit", ...scope, serverId],
   memoryReview: (scope: QueryScope, serverId: string) => ["memory-review", ...scope, serverId],

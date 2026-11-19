@@ -71,6 +71,7 @@ import {
   decodeCustomProviderSummaries,
   decodeGithubSkillSource,
   decodeHostAddedAgent,
+  decodeHostAgentLimitSettings,
   decodeHostAgentMemoryLimit,
   decodeHostAgentTemplatePreview,
   decodeHostAgentTemplatePublication,
@@ -126,6 +127,7 @@ import {
   type GithubSkillSource,
   type HiddenAgentsSnapshot,
   type HostAddMessagingOrchestratorInput,
+  type HostAgentLimitSettings,
   type HostAgentMemoryLimit,
   type HostBrowsingMemory,
   type HostDiscordAccessInput,
@@ -318,6 +320,7 @@ import { DISCORD_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/discord-
 import { EVENTS_ROUTES } from "@openbot/contracts/team-protocol/events-v1";
 import { GITHUB_SKILLS_ROUTES } from "@openbot/contracts/team-protocol/github-skills-v1";
 import { HOST_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/host-admin-v1";
+import { HOST_AGENT_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/host-agent-limit-v1";
 import { HOST_APPEARANCE_ROUTES, type ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import { HOST_KEY_ROTATION_ROUTES } from "@openbot/contracts/team-protocol/host-key-rotation-v1";
 import { HOST_MEMBER_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-member-update-v1";
@@ -793,6 +796,19 @@ export function setHostTimezone(
   timezone: string | null,
 ): Effect.Effect<HostTimezoneSettings, TeamAdminRequestError> {
   return adminCall(() => request("POST", HOST_TIMEZONE_ROUTES.update, decodeHostTimezoneSettings, { timezone }));
+}
+
+export function getHostAgentLimit(
+  request: TeamApiRequest,
+): Effect.Effect<HostAgentLimitSettings, TeamAdminRequestError> {
+  return adminCall(() => request("POST", HOST_AGENT_LIMIT_ROUTES.settings, decodeHostAgentLimitSettings, {}));
+}
+
+export function setHostAgentLimit(
+  request: TeamApiRequest,
+  limit: number | null,
+): Effect.Effect<HostAgentLimitSettings, TeamAdminRequestError> {
+  return adminCall(() => request("POST", HOST_AGENT_LIMIT_ROUTES.update, decodeHostAgentLimitSettings, { limit }));
 }
 
 export function requestHostRestart(request: TeamApiRequest): Effect.Effect<void, TeamAdminRequestError> {

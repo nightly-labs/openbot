@@ -329,6 +329,13 @@ export const messages = {
   "server.settings.editLogo": "Sunucu logosunu düzenle",
   "server.settings.addLogo": "Sunucu logosu ekle",
   "server.settings.removeLogo": "Sunucu logosunu kaldır",
+  "server.settings.agentLimitSection": "Sınırlar",
+  "server.settings.agentLimit": "Maksimum ajan",
+  "server.settings.agentLimitDescription":
+    "Bu sunucunun barındırabileceği en fazla ajan sayısı. Boş bırakılırsa varsayılan kullanılır.",
+  "server.settings.agentLimitDefault": "Varsayılan ({count})",
+  "server.settings.agentLimitInvalid": "1 ile {max} arasında bir tam sayı girin.",
+  "server.settings.agentLimitLoadFailed": "Bu sunucunun ajan sınırı yüklenemedi.",
   "server.settings.appearance": "Şekil ve renk",
   "server.settings.appearanceShapes": "Sunucu şekilleri",
   "server.settings.appearanceShapeOption": "Şekil {number}",

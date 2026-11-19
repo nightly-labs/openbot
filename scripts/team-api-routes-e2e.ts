@@ -254,6 +254,10 @@ import {
 import { GITHUB_SKILLS_CAPABILITY, GITHUB_SKILLS_ROUTES } from "@openbot/contracts/team-protocol/github-skills-v1";
 import { HERMES_IMPORT_CAPABILITY, HERMES_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/hermes-import-v1";
 import {
+  HOST_AGENT_LIMIT_CAPABILITY,
+  HOST_AGENT_LIMIT_ROUTES,
+} from "@openbot/contracts/team-protocol/host-agent-limit-v1";
+import {
   HOST_APPEARANCE_CAPABILITY,
   HOST_APPEARANCE_EVENT,
   HOST_APPEARANCE_ROUTES,
@@ -491,6 +495,7 @@ import {
 import { createCustomProviderChanges } from "../src/main/custom-provider-changes";
 import { CustomProviderStore } from "../src/main/custom-provider-store";
 import { githubSkillSource } from "../src/main/github-skill-source";
+import { HostAgentLimitPreferenceStore } from "../src/main/host-agent-limit-preference-store";
 import type { HostEventsApi } from "../src/main/host-events-api";
 import { HostTurnLimitsPreferenceStore } from "../src/main/host-turn-limits-preference-store";
 import {
@@ -582,6 +587,9 @@ const busyMessageModePreferences = new BusyMessageModePreferenceStore(join(root,
 const hostTurnLimitsPath = join(root, "host-turn-limits.json");
 const hostTurnLimits = new HostTurnLimitsPreferenceStore(hostTurnLimitsPath, () => 8);
 await runCauseEffect(hostTurnLimits.load());
+const hostAgentLimitPath = join(root, "host-agent-limit.json");
+const hostAgentLimit = new HostAgentLimitPreferenceStore(hostAgentLimitPath);
+await runCauseEffect(hostAgentLimit.load());
 const transferUploads = join(root, "user-data", "instance-transfer-uploads");
 const checks: Check[] = [];
 const calls: RecordedCall[] = [];
@@ -2526,6 +2534,7 @@ try {
           ),
       },
       turnLimits: hostTurnLimits,
+      agentLimit: hostAgentLimit,
       localServers: {
         list: () => Effect.sync(() => ({ servers: [...localServerList], limit: 5 })),
         create: (name) =>
@@ -3885,6 +3894,70 @@ try {
     check(
       "an admin returns both limits to their defaults",
       adminReset.status === 200 && isDeepStrictEqual(adminReset.body, automatic),
+      summary(adminReset),
+    );
+  }
+
+  {
+    const v10 = { capabilities: [HOST_AGENT_LIMIT_CAPABILITY], protocol: TEAM_PROTOCOL_V10 };
+    const defaults = { limit: null, defaultLimit: INPUT_LIMITS.agents, maxLimit: INPUT_LIMITS.hostAgentLimitMax };
+    const adminRead = await call("POST", HOST_AGENT_LIMIT_ROUTES.settings, { token: adaToken, json: {}, ...v10 });
+    check(
+      "an admin reads the default agent limit of a host",
+      adminRead.status === 200 && isDeepStrictEqual(adminRead.body, defaults),
+      summary(adminRead),
+    );
+    const unsupported = await call("POST", HOST_AGENT_LIMIT_ROUTES.settings, { token: adaToken, json: {} });
+    const memberRead = await call("POST", HOST_AGENT_LIMIT_ROUTES.settings, { token: bobToken, json: {}, ...v10 });
+    const memberSet = await call("POST", HOST_AGENT_LIMIT_ROUTES.update, {
+      token: bobToken,
+      json: { limit: 5 },
+      ...v10,
+    });
+    check(
+      "a member cannot read or set the agent limit, and a client without host-agent-limit-v1 gets 400",
+      errorIs(unsupported, 400, sourceText("error.team.hostAgentLimitUnsupported")) &&
+        errorIs(memberRead, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberSet, 403, sourceText("error.team.adminRequired")) &&
+        isDeepStrictEqual(hostAgentLimit.get(), defaults),
+      [summary(unsupported), summary(memberRead), summary(memberSet)],
+    );
+    const outOfRange = await Promise.all(
+      [{ limit: 0 }, { limit: INPUT_LIMITS.hostAgentLimitMax + 1 }, { limit: 2.5 }, { limit: "many" }].map((json) =>
+        call("POST", HOST_AGENT_LIMIT_ROUTES.update, { token: adaToken, json, ...v10 }),
+      ),
+    );
+    check(
+      "the host refuses an agent limit outside 1 to 1000 and saves nothing",
+      outOfRange.every((reply) => reply.status === 400) &&
+        isDeepStrictEqual(hostAgentLimit.get(), defaults) &&
+        !existsSync(hostAgentLimitPath),
+      outOfRange.map(summary),
+    );
+    const adminSet = await call("POST", HOST_AGENT_LIMIT_ROUTES.update, {
+      token: adaToken,
+      json: { limit: 250 },
+      ...v10,
+    });
+    const reloaded = new HostAgentLimitPreferenceStore(hostAgentLimitPath);
+    await runCauseEffect(reloaded.load());
+    const raised = { limit: 250, defaultLimit: INPUT_LIMITS.agents, maxLimit: INPUT_LIMITS.hostAgentLimitMax };
+    check(
+      "an admin sets an agent limit above the default and the file keeps it",
+      adminSet.status === 200 &&
+        isDeepStrictEqual(adminSet.body, raised) &&
+        isDeepStrictEqual(reloaded.get(), raised) &&
+        reloaded.effective() === 250,
+      summary(adminSet),
+    );
+    const adminReset = await call("POST", HOST_AGENT_LIMIT_ROUTES.update, {
+      token: adaToken,
+      json: { limit: null },
+      ...v10,
+    });
+    check(
+      "an admin returns the agent limit to the default",
+      adminReset.status === 200 && isDeepStrictEqual(adminReset.body, defaults) && hostAgentLimit.effective() === 100,
       summary(adminReset),
     );
   }

@@ -378,6 +378,7 @@ export const messages = {
   "mobile.server.route.invite": "Пригласить людей",
   "mobile.server.route.member": "Участник",
   "mobile.server.route.timezone": "Часовой пояс",
+  "mobile.server.route.agentLimit": "Максимум агентов",
   "mobile.server.route.personality": "Личность агента",
   "mobile.server.route.agents": "Агенты",
   "mobile.server.settings.storage": "Хранилище",
@@ -514,6 +515,17 @@ export const messages = {
     "Подключитесь к этому серверу как владелец или администратор, чтобы изменить его часовой пояс.",
   "mobile.server.settings.timezoneUnsupported":
     "Обновите OpenBot на этом сервере, чтобы изменить здесь его часовой пояс.",
+  "mobile.server.settings.agentLimit": "Максимум агентов",
+  "mobile.server.settings.agentLimitDescription": "Максимальное число агентов на этом сервере. Максимум — {max}.",
+  "mobile.server.settings.agentLimitDefault": "По умолчанию ({count})",
+  "mobile.server.settings.agentLimitInvalid": "Введите целое число от 1 до {max}.",
+  "mobile.server.settings.agentLimitLoadFailed": "Не удалось загрузить лимит агентов этого сервера.",
+  "mobile.server.settings.agentLimitLoading": "Загрузка лимита агентов…",
+  "mobile.server.settings.agentLimitUnavailable":
+    "Подключитесь к этому серверу как владелец или администратор, чтобы изменить лимит агентов.",
+  "mobile.server.settings.agentLimitUnsupported":
+    "Обновите OpenBot на этом сервере, чтобы изменить лимит агентов здесь.",
+  "mobile.server.settings.agentLimitSaveFailed": "Не удалось сохранить лимит агентов. Попробуйте снова.",
   "mobile.server.settings.keySection": "Ключ сервера",
   "mobile.server.settings.keyChanged": "Последнее изменение",
   "mobile.server.settings.keyChange": "Сменить ключ",

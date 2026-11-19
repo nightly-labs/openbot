@@ -247,6 +247,7 @@ import { githubSkillSource } from "./github-skill-source";
 import { hermesRoot } from "./hermes-import-reader";
 import { HermesImportService } from "./hermes-import-service";
 import { HermesInstaller } from "./hermes-installer";
+import { HOST_AGENT_LIMIT_PREFERENCE_FILE, HostAgentLimitPreferenceStore } from "./host-agent-limit-preference-store";
 import { HostEventsRuntime } from "./host-events-runtime";
 import {
   agentWebhookRoutineWriter,
@@ -692,6 +693,7 @@ export interface ApplicationServices {
   mcpAccess: McpAccessControl;
   serverAudit: ServerAuditStore;
   serverTimezone: ServerTimezonePreferenceStore;
+  hostAgentLimit: HostAgentLimitPreferenceStore;
   hostTurnLimits: HostTurnLimitsPreferenceStore;
   serverPersonality: ServerPersonalityPreferenceStore;
   promptCacheTtl: PromptCacheTtlPreferenceStore;
@@ -1171,12 +1173,17 @@ export async function createApplicationServices({
     join(app.getPath("userData"), AGENT_DEFAULTS_PREFERENCE_FILE),
   );
   await runCauseEffect(agentDefaults.load());
+  const hostAgentLimit = new HostAgentLimitPreferenceStore(
+    join(app.getPath("userData"), HOST_AGENT_LIMIT_PREFERENCE_FILE),
+  );
+  await runCauseEffect(hostAgentLimit.load());
   const store = new AgentStore(
     app.getPath("userData"),
     homedir(),
     new OpenBotDatabase(app.getPath("userData"), checkDatabaseIntegrityInHost),
     () => agentDefaults.get(),
     localServerChild?.agentRoot,
+    () => hostAgentLimit.effective(),
   );
   performance.mark("openbot:services.pre-store");
   await runCauseEffect(store.initialize());
@@ -3111,6 +3118,7 @@ export async function createApplicationServices({
         changeSettings: (change) => scheduledUpdate().changeSettings(change),
       },
       timezone: serverTimezone,
+      agentLimit: hostAgentLimit,
       turnLimits: hostTurnLimits,
       ...(serverModeEnvironment
         ? {
@@ -4153,6 +4161,7 @@ export async function createApplicationServices({
     mcpAccess,
     serverAudit,
     serverTimezone,
+    hostAgentLimit,
     hostTurnLimits,
     serverPersonality,
     promptCacheTtl,

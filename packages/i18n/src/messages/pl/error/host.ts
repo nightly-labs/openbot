@@ -22,6 +22,7 @@ export const messages = {
   "error.host.noServer": "Ten komputer nie ma serwera do zmiany.",
   "error.host.identityLocalOnly": "Nazwę i logo serwera można zmienić tylko na komputerze, na którym działa.",
   "error.host.timezoneInvalid": "Ta strefa czasowa jest nieznana.",
+  "error.host.agentLimitInvalid": "Ten limit agentów jest nieprawidłowy.",
   "error.host.turnLimitInvalid": "Ten limit wątków jest nieprawidłowy.",
   "error.host.maintenanceInterrupted":
     "Przerwano konserwację hosta. Sprawdź aplikację i zresetuj stan hosta, zanim spróbujesz ponownie.",

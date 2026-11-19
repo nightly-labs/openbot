@@ -3,6 +3,7 @@ import {
   type AgentAccessSnapshot,
   type AgentProviderRef,
   decodeAgentAccessSnapshot,
+  decodeHostAgentLimitSettings,
   decodeHostAgentMemoryLimit,
   decodeHostBrowsingMemory,
   decodeHostMemoryReview,
@@ -70,6 +71,10 @@ import {
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { HOST_ADMIN_CAPABILITY, HOST_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/host-admin-v1";
 import {
+  HOST_AGENT_LIMIT_CAPABILITY,
+  HOST_AGENT_LIMIT_ROUTES,
+} from "@openbot/contracts/team-protocol/host-agent-limit-v1";
+import {
   HOST_APPEARANCE_CAPABILITY,
   HOST_APPEARANCE_ROUTES,
   type ServerAppearance,
@@ -122,6 +127,7 @@ import type { AgentMemoryLimitSetting } from "../agent-memory-limit-preference-s
 import type { BrowsingMemoryPreferenceStore } from "../browsing-memory-preference-store";
 import type { ClaudeCompactWindowControl } from "../claude-compact-window-preference-store";
 import type { ClaudeUserSetupControl } from "../claude-user-setup-preference-store";
+import { type HostAgentLimitPreferenceStore, parseHostAgentLimit } from "../host-agent-limit-preference-store";
 import type { HostService } from "../host-service";
 import type { HostTurnLimitsPreferenceStore } from "../host-turn-limits-preference-store";
 import type { MachineAlertMonitor } from "../machine-alerts";
@@ -163,6 +169,7 @@ interface HostAdminIpcDependencies {
   host: Pick<HostService, "updateIdentity" | "rotateIdentityKey">;
   remoteServers: HostAdminRemoteServers;
   serverTimezone: Pick<ServerTimezonePreferenceStore, "get" | "set">;
+  hostAgentLimit: Pick<HostAgentLimitPreferenceStore, "get" | "set">;
   hostTurnLimits: Pick<HostTurnLimitsPreferenceStore, "get" | "set">;
   serverPersonality: Pick<ServerPersonalityPreferenceStore, "get" | "set">;
   agentMemoryLimit: AgentMemoryLimitSetting;
@@ -190,6 +197,7 @@ export function hostAdminIpcHandlers({
   host,
   remoteServers,
   serverTimezone,
+  hostAgentLimit,
   hostTurnLimits,
   serverPersonality,
   agentMemoryLimit,
@@ -224,6 +232,13 @@ export function hostAdminIpcHandlers({
     if (!remoteServers.supportsCapability(serverId, HOST_TIMEZONE_CAPABILITY))
       throw new Error(sourceText("error.team.hostTimezoneUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, route, decodeHostTimezoneSettings, { method: "POST", body }));
+  }
+  function remoteAgentLimit(serverId: string, route: string, body: { limit?: number | null }) {
+    if (!remoteServers.supportsCapability(serverId, HOST_AGENT_LIMIT_CAPABILITY))
+      throw new Error(sourceText("error.team.hostAgentLimitUnsupported"));
+    return runCauseEffect(
+      remoteServers.request(serverId, route, decodeHostAgentLimitSettings, { method: "POST", body }),
+    );
   }
   function remoteTurnLimits(serverId: string, route: string, body: Record<string, never> | HostTurnLimitsInput) {
     if (!remoteServers.supportsCapability(serverId, HOST_TURN_LIMITS_CAPABILITY))
@@ -436,6 +451,14 @@ export function hostAdminIpcHandlers({
       setTimezone: scopedHandler(parseServerTimezone, {
         local: (timezone) => runCauseEffect(serverTimezone.set(timezone)),
         remote: (timezone, serverId) => remoteTimezone(serverId, HOST_TIMEZONE_ROUTES.update, { timezone }),
+      }),
+      getAgentLimit: scopedQueryHandler({
+        local: () => hostAgentLimit.get(),
+        remote: (serverId) => remoteAgentLimit(serverId, HOST_AGENT_LIMIT_ROUTES.settings, {}),
+      }),
+      setAgentLimit: scopedHandler(parseHostAgentLimit, {
+        local: (limit) => runCauseEffect(hostAgentLimit.set(limit)),
+        remote: (limit, serverId) => remoteAgentLimit(serverId, HOST_AGENT_LIMIT_ROUTES.update, { limit }),
       }),
       getTurnLimits: scopedQueryHandler({
         local: () => hostTurnLimits.get(),

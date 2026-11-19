@@ -70,6 +70,7 @@ import { FOCUS_USE_CODECS } from "./focus-use-v1";
 import { GITHUB_SKILLS_CODECS } from "./github-skills-v1";
 import { HERMES_IMPORT_CODECS } from "./hermes-import-v1";
 import { HOST_ADMIN_CODECS } from "./host-admin-v1";
+import { HOST_AGENT_LIMIT_CODECS } from "./host-agent-limit-v1";
 import { HOST_APPEARANCE_CODECS } from "./host-appearance-v1";
 import { HOST_KEY_ROTATION_CODECS } from "./host-key-rotation-v1";
 import { HOST_MEMBER_UPDATE_CODECS } from "./host-member-update-v1";
@@ -193,6 +194,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...HOST_ADMIN_CODECS,
   ...HOST_UPDATE_CODECS,
   ...HOST_TIMEZONE_CODECS,
+  ...HOST_AGENT_LIMIT_CODECS,
   ...HOST_TURN_LIMITS_CODECS,
   ...HOST_PERSONALITY_CODECS,
   ...HOST_KEY_ROTATION_CODECS,

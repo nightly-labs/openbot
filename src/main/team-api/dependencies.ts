@@ -59,6 +59,7 @@ import type { PeerCustomProviderChanges } from "../custom-provider-changes";
 import type { GitHubConnectorService } from "../github-connector-service";
 import type { WorkflowGitHubDirectory } from "../github-rest";
 import type { HermesImportService } from "../hermes-import-service";
+import type { HostAgentLimitPreferenceStore } from "../host-agent-limit-preference-store";
 import type { HostEventsApi } from "../host-events-api";
 import type { HostEventsService } from "../host-events-service";
 import type { HostReleaseService } from "../host-release-service";
@@ -444,6 +445,7 @@ export interface TeamApiAdmin {
   update?: Pick<RequestedUpdate, "snapshot" | "check" | "start" | "requestWhenIdle" | "cancel" | "changeSettings">;
   restart?: { request(memberId: string): void };
   timezone?: Pick<ServerTimezonePreferenceStore, "get" | "set">;
+  agentLimit?: Pick<HostAgentLimitPreferenceStore, "get" | "set">;
   turnLimits?: Pick<HostTurnLimitsPreferenceStore, "get" | "set">;
   personality?: Pick<ServerPersonalityPreferenceStore, "get" | "set">;
   hostKey?: { rotate(): Effect.Effect<{ publicKey: string }, RemoteWorkflowError> };

@@ -67,6 +67,7 @@ import type {
   ForeignProviderId,
   GitHubConnectorRepositories,
   HostAddMessagingOrchestratorInput,
+  HostAgentLimitSettings,
   HostAgentMemoryLimit,
   HostAnalytics,
   HostAnalyticsInput,
@@ -403,6 +404,9 @@ export interface MobileWorkspaceContextValue {
   canManageServerTimezone: (serverId: string) => boolean;
   loadServerTimezone: (serverId: string) => Promise<HostTimezoneSettings>;
   setServerTimezone: (timezone: string | null, serverId: string) => Promise<HostTimezoneSettings>;
+  canManageServerAgentLimit: (serverId: string) => boolean;
+  loadServerAgentLimit: (serverId: string) => Promise<HostAgentLimitSettings>;
+  setServerAgentLimit: (limit: number | null, serverId: string) => Promise<HostAgentLimitSettings>;
   canManageAgentMemoryLimit: (serverId: string) => boolean;
   loadAgentMemoryLimit: (serverId: string) => Promise<HostAgentMemoryLimit>;
   setAgentMemoryLimit: (limit: number, serverId: string) => Promise<HostAgentMemoryLimit>;
@@ -820,6 +824,7 @@ type ServerCheckKey =
   | "canCreateLocalServers"
   | "canRestartServerItself"
   | "canManageServerTimezone"
+  | "canManageServerAgentLimit"
   | "canReadMachineMetrics"
   | "canManageAgentMemoryLimit"
   | "canManageMemoryReview"

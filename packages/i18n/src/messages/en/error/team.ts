@@ -122,6 +122,7 @@ export const messages = defineMessages("error.team", {
   "error.team.hostIdentityUnsupported": "Server identity changes are not supported by this connection.",
   "error.team.hostUpdateUnsupported": "Host updates are not supported by this connection.",
   "error.team.hostTimezoneUnsupported": "The server timezone is not supported by this connection.",
+  "error.team.hostAgentLimitUnsupported": "The agent limit is not supported by this connection.",
   "error.team.hostRestartUnsupported": "Restarting the server is not supported by this connection.",
   "error.team.hostKeyRotationUnsupported": "Server key changes are not supported by this connection.",
   "error.team.localServersUnsupported": "Servers on this computer are not supported by this connection.",

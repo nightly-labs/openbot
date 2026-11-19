@@ -413,6 +413,7 @@
     "test:ipc-input": "bun scripts/ipc-input-e2e.ts",
     "test:automation-cli": "bun scripts/automation-cli-e2e.ts",
     "test:team-api-routes": "bun --preload ./scripts/team-api-routes-e2e-electron.mjs scripts/team-api-routes-e2e.ts",
+    "test:host-agent-limit": "bun scripts/host-agent-limit-e2e.ts",
     "test:crm-team-api": "bun scripts/crm-team-api-e2e.ts",
     "test:team-legacy-clients": "bun scripts/team-api-legacy-clients-e2e.ts",
     "test:team-protocol-v10": "bun scripts/team-protocol-v10-e2e.ts",

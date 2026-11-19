@@ -26,6 +26,7 @@ import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { type Accessor, createStore, Show, snapshot } from "solid-js";
 import { actionToast } from "../../action-toast";
+import { ServerAgentLimitSetting } from "./ServerAgentLimitSetting";
 import { serverCanAdminister } from "./server-capabilities";
 import type { ServerSettingsSectionHost } from "./server-settings-section";
 
@@ -91,6 +92,8 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
     serverCanAdminister(props.server, "host-appearance-v1") &&
     actionsAvailable() &&
     (!local() || configured());
+  const canEditAgentLimit = () =>
+    Boolean(props.hostAgentLimit) && serverCanAdminister(props.server, "host-agent-limit-v1") && actionsAvailable();
   const appearance = (): ServerAppearance | null =>
     panels.appearance === undefined ? (props.server.appearance ?? null) : panels.appearance;
   let queuedAppearance: ServerAppearance | null | undefined;
@@ -437,6 +440,18 @@ export function createServerGeneralSection(host: ServerSettingsSectionHost): Ser
             </Item>
           </ItemGroup>
         </SettingsSection>
+        <Show when={canEditAgentLimit()}>
+          <SettingsSection title={t("server.settings.agentLimitSection")}>
+            <ItemGroup class="settings-modal-card">
+              <ServerAgentLimitSetting
+                {...props.hostAgentLimit}
+                serverId={props.server.id}
+                disabled={Boolean(busy()) && busy() !== "agentLimit"}
+                run={run}
+              />
+            </ItemGroup>
+          </SettingsSection>
+        </Show>
         <Show when={canRotateKey() || keyChangedAt() !== undefined}>
           <SettingsSection title={t("server.settings.hostKeyTitle")}>
             <ItemGroup class="settings-modal-card">

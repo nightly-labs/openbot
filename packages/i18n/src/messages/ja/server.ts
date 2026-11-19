@@ -326,6 +326,13 @@ export const messages = {
   "server.settings.editLogo": "サーバーのロゴを編集",
   "server.settings.addLogo": "サーバーのロゴを追加",
   "server.settings.removeLogo": "サーバーのロゴを削除",
+  "server.settings.agentLimitSection": "上限",
+  "server.settings.agentLimit": "エージェントの上限",
+  "server.settings.agentLimitDescription":
+    "このサーバーが持てるエージェントの最大数です。空欄にすると既定値を使います。",
+  "server.settings.agentLimitDefault": "既定 ({count})",
+  "server.settings.agentLimitInvalid": "1 から {max} までの整数を入力してください。",
+  "server.settings.agentLimitLoadFailed": "このサーバーのエージェント上限を読み込めませんでした。",
   "server.settings.appearance": "形と色",
   "server.settings.appearanceShapes": "サーバーの形",
   "server.settings.appearanceShapeOption": "形 {number}",

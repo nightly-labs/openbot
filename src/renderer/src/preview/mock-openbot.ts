@@ -237,6 +237,7 @@ import { createMockChannels, type MockChannelSeed } from "./mock-channels";
 import { type MockCrmSeed, mockCrm } from "./mock-crm";
 import { createMockEvents } from "./mock-events";
 import { createMockGitHubConnector } from "./mock-github-connector";
+import { createMockHostAgentLimit } from "./mock-host-agent-limit";
 import { createMockHostPersonality } from "./mock-host-personality";
 import { createMockHostTimezone } from "./mock-host-timezone";
 import { createMockHostTurnLimits } from "./mock-host-turn-limits";
@@ -3598,6 +3599,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       restartHost: async () => {},
       ...createMockHostUpdate(options),
       ...createMockHostTimezone(),
+      ...createMockHostAgentLimit(),
       ...hostTurnLimits,
       ...createMockHostPersonality(),
       getAgentMemoryLimit: async () => hostAgentMemoryLimit(agentMemoryLimit),

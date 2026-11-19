@@ -321,6 +321,7 @@ export const messages = {
   "mobile.server.route.invite": "사람 초대",
   "mobile.server.route.member": "멤버",
   "mobile.server.route.timezone": "시간대",
+  "mobile.server.route.agentLimit": "에이전트 최대 수",
   "mobile.server.route.personality": "에이전트 성격",
   "mobile.server.route.agents": "에이전트",
   "mobile.server.settings.storage": "저장 공간",
@@ -444,6 +445,18 @@ export const messages = {
   "mobile.server.settings.timezoneSaveFailed": "시간대를 저장하지 못했어요. 다시 시도해 주세요.",
   "mobile.server.settings.timezoneUnavailable": "시간대를 변경하려면 소유자나 관리자로 이 서버에 연결하세요.",
   "mobile.server.settings.timezoneUnsupported": "여기에서 시간대를 변경하려면 이 서버의 OpenBot을 업데이트해 주세요.",
+  "mobile.server.settings.agentLimit": "에이전트 최대 수",
+  "mobile.server.settings.agentLimitDescription":
+    "이 서버가 가질 수 있는 에이전트의 최대 수입니다. 최대값은 {max}입니다.",
+  "mobile.server.settings.agentLimitDefault": "기본값 ({count})",
+  "mobile.server.settings.agentLimitInvalid": "1부터 {max}까지의 정수를 입력하세요.",
+  "mobile.server.settings.agentLimitLoadFailed": "이 서버의 에이전트 한도를 불러올 수 없습니다.",
+  "mobile.server.settings.agentLimitLoading": "에이전트 한도를 불러오는 중…",
+  "mobile.server.settings.agentLimitUnavailable":
+    "소유자 또는 관리자로 이 서버에 연결하면 에이전트 한도를 변경할 수 있습니다.",
+  "mobile.server.settings.agentLimitUnsupported":
+    "여기서 에이전트 한도를 변경하려면 이 서버의 OpenBot을 업데이트하세요.",
+  "mobile.server.settings.agentLimitSaveFailed": "에이전트 한도를 저장할 수 없습니다. 다시 시도하세요.",
   "mobile.server.settings.keySection": "서버 키",
   "mobile.server.settings.keyChanged": "마지막 변경",
   "mobile.server.settings.keyChange": "키 변경",

@@ -343,6 +343,13 @@ export const messages = {
   "server.settings.editLogo": "Bewerk serverlogo",
   "server.settings.addLogo": "Voeg serverlogo toe",
   "server.settings.removeLogo": "Verwijder serverlogo",
+  "server.settings.agentLimitSection": "Limieten",
+  "server.settings.agentLimit": "Maximaal aantal agenten",
+  "server.settings.agentLimitDescription":
+    "Het maximale aantal agenten op deze server. Laat leeg voor de standaardwaarde.",
+  "server.settings.agentLimitDefault": "Standaard ({count})",
+  "server.settings.agentLimitInvalid": "Voer een geheel getal van 1 tot {max} in.",
+  "server.settings.agentLimitLoadFailed": "Kan de agentlimiet van deze server niet laden.",
   "server.settings.appearance": "Vorm en kleur",
   "server.settings.appearanceShapes": "Servervormen",
   "server.settings.appearanceShapeOption": "Vorm {number}",

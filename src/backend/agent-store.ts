@@ -171,6 +171,7 @@ export class AgentStore {
   readonly #creationQueue = Semaphore.makeUnsafe(1);
 
   readonly #agentDefaults: () => AgentDefaults;
+  readonly #agentLimit: () => number;
 
   constructor(
     userDataPath: string,
@@ -178,6 +179,7 @@ export class AgentStore {
     database: OpenBotDatabase,
     agentDefaults: () => AgentDefaults = () => DEFAULT_AGENT_DEFAULTS,
     openbotRoot = join(homePath, "OpenBot"),
+    agentLimit: () => number = () => INPUT_LIMITS.agents,
   ) {
     this.#statePath = join(userDataPath, LEGACY_AGENTS_STATE_FILE);
     this.#agentsRoot = join(openbotRoot, "Agents");
@@ -190,6 +192,7 @@ export class AgentStore {
     this.#automationRoot = automationRoot(userDataPath);
     this.#database = database;
     this.#agentDefaults = agentDefaults;
+    this.#agentLimit = agentLimit;
     this.#profileCreationRecovery = new ProfileCreationRecovery(
       join(userDataPath, "agent-profile-creations"),
       this.#agentsRoot,
@@ -308,8 +311,8 @@ export class AgentStore {
     profileOperationId?: string,
   ): Effect.fn.Return<AgentSummary, StoredStateFailure> {
     try {
-      if (this.#state.agents.length >= INPUT_LIMITS.agents) {
-        throw new Error(sourceText("error.agent.hostLimit", { limit: INPUT_LIMITS.agents }));
+      if (this.#state.agents.length >= this.#agentLimit()) {
+        throw new Error(sourceText("error.agent.hostLimit", { limit: this.#agentLimit() }));
       }
       const name = requiredText(input.name, "Agent name", INPUT_LIMITS.agentName);
       const description = limitedText(input.description, "Agent description", INPUT_LIMITS.agentDescription);
@@ -350,8 +353,8 @@ export class AgentStore {
       if (this.#database.commandResult(duplicationCommandId(operationId)) !== undefined) {
         throw new Error("This agent duplication operation is already committed.");
       }
-      if (this.#state.agents.length >= INPUT_LIMITS.agents) {
-        throw new Error(sourceText("error.agent.hostLimit", { limit: INPUT_LIMITS.agents }));
+      if (this.#state.agents.length >= this.#agentLimit()) {
+        throw new Error(sourceText("error.agent.hostLimit", { limit: this.#agentLimit() }));
       }
       const source = this.#requireAgent(sourceId);
       const sourceProfileSignature = duplicationProfileSignature(source);
@@ -1029,8 +1032,8 @@ export class AgentStore {
         yield* storedIO(() => mkdir(existing.workspacePath, { recursive: true, mode: 0o700 }));
         return { ...existing };
       }
-      if (this.#state.agents.length >= INPUT_LIMITS.agents) {
-        throw new Error(sourceText("error.agent.hostLimit", { limit: INPUT_LIMITS.agents }));
+      if (this.#state.agents.length >= this.#agentLimit()) {
+        throw new Error(sourceText("error.agent.hostLimit", { limit: this.#agentLimit() }));
       }
 
       const record = this.#createRecord(id, name ?? titleFromId(id), title ?? "Local teammate");

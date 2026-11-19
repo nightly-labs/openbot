@@ -333,6 +333,13 @@ export const messages = {
   "server.settings.editLogo": "서버 로고 편집",
   "server.settings.addLogo": "서버 로고 추가",
   "server.settings.removeLogo": "서버 로고 삭제",
+  "server.settings.agentLimitSection": "한도",
+  "server.settings.agentLimit": "에이전트 최대 수",
+  "server.settings.agentLimitDescription":
+    "이 서버가 가질 수 있는 에이전트의 최대 수입니다. 비워 두면 기본값을 사용합니다.",
+  "server.settings.agentLimitDefault": "기본값 ({count})",
+  "server.settings.agentLimitInvalid": "1부터 {max}까지의 정수를 입력하세요.",
+  "server.settings.agentLimitLoadFailed": "이 서버의 에이전트 한도를 불러올 수 없습니다.",
   "server.settings.appearance": "모양과 색상",
   "server.settings.appearanceShapes": "서버 모양",
   "server.settings.appearanceShapeOption": "모양 {number}",

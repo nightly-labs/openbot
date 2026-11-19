@@ -127,6 +127,7 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "Deze verbinding ondersteunt het wijzigen van de serveridentiteit niet.",
   "error.team.hostUpdateUnsupported": "Deze verbinding ondersteunt geen updates van de host.",
   "error.team.hostTimezoneUnsupported": "Deze verbinding ondersteunt de tijdzone van de server niet.",
+  "error.team.hostAgentLimitUnsupported": "De agentlimiet wordt door deze verbinding niet ondersteund.",
   "error.team.hostRestartUnsupported": "Deze verbinding ondersteunt het herstarten van de server niet.",
   "error.team.hostKeyRotationUnsupported": "Deze verbinding ondersteunt het wijzigen van de serversleutel niet.",
   "error.team.localServersUnsupported": "Deze verbinding ondersteunt geen servers op deze computer.",

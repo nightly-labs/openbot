@@ -75,6 +75,7 @@ export const INPUT_LIMITS = {
   mimeType: 255,
   path: 4_096,
   agents: 100,
+  hostAgentLimitMax: 1_000,
   sidebarSections: 100,
   sidebarSectionName: 40,
   browserTabs: 25,

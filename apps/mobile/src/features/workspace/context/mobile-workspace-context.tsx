@@ -43,6 +43,7 @@ import {
 import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
 import { FOCUS_USE_CAPABILITY, FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
 import { HOST_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/host-admin-v1";
+import { HOST_AGENT_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/host-agent-limit-v1";
 import { HOST_APPEARANCE_CAPABILITY } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import { HOST_KEY_ROTATION_CAPABILITY } from "@openbot/contracts/team-protocol/host-key-rotation-v1";
 import { HOST_MEMBER_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-member-update-v1";
@@ -2436,6 +2437,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           administers(serverId, LOCAL_SERVERS_CAPABILITY),
         canRestartServerItself: (serverId) => administers(serverId, HOST_RESTART_CAPABILITY),
         canManageServerTimezone: (serverId) => administers(serverId, HOST_TIMEZONE_CAPABILITY),
+        canManageServerAgentLimit: (serverId) => administers(serverId, HOST_AGENT_LIMIT_CAPABILITY),
         canReadMachineMetrics: (serverId) => administers(serverId, MACHINE_RESOURCES_CAPABILITY),
         canManageAgentMemoryLimit: (serverId) => administers(serverId, AGENT_MEMORY_LIMIT_CAPABILITY),
         canManageMemoryReview: (serverId) => administers(serverId, MEMORY_REVIEW_CAPABILITY),

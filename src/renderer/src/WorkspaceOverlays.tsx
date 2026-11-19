@@ -847,6 +847,7 @@ function ServerSettings() {
           }
           hostUpdate={{}}
           hostTimezone={{}}
+          hostAgentLimit={{}}
           hostTurnLimits={{}}
           hostPersonality={{}}
           hostMemoryLimit={{}}

@@ -122,6 +122,7 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "この接続ではサーバーの ID を変更できません。",
   "error.team.hostUpdateUnsupported": "この接続ではホストをアップデートできません。",
   "error.team.hostTimezoneUnsupported": "この接続はサーバーのタイムゾーンに対応していません。",
+  "error.team.hostAgentLimitUnsupported": "この接続ではエージェント上限を利用できません。",
   "error.team.hostRestartUnsupported": "この接続はサーバーの再起動に対応していません。",
   "error.team.hostKeyRotationUnsupported": "この接続はサーバーキーの変更に対応していません。",
   "error.team.localServersUnsupported": "この接続はこのコンピュータ上のサーバーに対応していません。",

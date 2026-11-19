@@ -116,6 +116,7 @@ import {
   deleteStoredFile,
   getAgentAdminSettings,
   getHostAgentAccess,
+  getHostAgentLimit,
   getHostAgentMemoryLimit,
   getHostAuditLog,
   getHostBrowsingMemory,
@@ -134,6 +135,7 @@ import {
   listHostedSites,
   requestHostRestart,
   setHostAgentAccess,
+  setHostAgentLimit,
   setHostAgentMemoryLimit,
   setHostBrowsingMemory,
   setHostClaudeCompactWindow,
@@ -280,6 +282,7 @@ import { AddServerOverlay, type AddServerResume } from "../servers/AddServerOver
 import { createHostedUpsellOffline, HostedServerUpsell } from "../servers/hosted-server-upsell-controller";
 import { mcpSignInRecord } from "../servers/mcp-servers";
 import { saveRemoteFrameChannels } from "../servers/remote-workspace-frame";
+import type { HostAgentLimitCalls } from "../servers/ServerAgentLimitSetting";
 import type { HostAgentDefaultsCalls } from "../servers/ServerAgentsSection";
 import type { HostServerAuditCalls } from "../servers/ServerAuditSection";
 import type { HostBrowsingMemoryCalls } from "../servers/ServerBrowsingMemorySetting";
@@ -1551,6 +1554,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       runTeamEffect(getHostTimezone(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
     setTimezone: async (timezone, serverId) =>
       runTeamEffect(setHostTimezone(hostRequest(serverId), timezone).pipe(Effect.mapError((error) => error.cause))),
+  };
+  const hostAgentLimitCalls: HostAgentLimitCalls = {
+    getAgentLimit: async (serverId) =>
+      runTeamEffect(getHostAgentLimit(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
+    setAgentLimit: async (limit, serverId) =>
+      runTeamEffect(setHostAgentLimit(hostRequest(serverId), limit).pipe(Effect.mapError((error) => error.cause))),
   };
   const hostTurnLimitsCalls: HostTurnLimitsCalls = {
     getTurnLimits: async (serverId) =>
@@ -3325,6 +3334,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         providers={providerSettings()}
                         hostUpdate={{ calls: hostUpdateCalls }}
                         hostTimezone={{ calls: hostTimezoneCalls }}
+                        hostAgentLimit={{ calls: hostAgentLimitCalls }}
                         hostTurnLimits={{ calls: hostTurnLimitsCalls }}
                         hostPersonality={{ calls: hostPersonalityCalls }}
                         hostMemoryLimit={{ calls: hostMemoryLimitCalls }}

@@ -22,6 +22,7 @@ export const messages = {
   "error.host.noServer": "لا يوجد على هذا الحاسوب خادم لتغييره.",
   "error.host.identityLocalOnly": "لا يمكن تغيير اسم الخادم وشعاره إلا على الحاسوب الذي يشغّله.",
   "error.host.timezoneInvalid": "هذه المنطقة الزمنية غير معروفة.",
+  "error.host.agentLimitInvalid": "حد الوكلاء هذا غير صالح.",
   "error.host.turnLimitInvalid": "هذا الحد للخيوط غير صالح.",
   "error.host.maintenanceInterrupted": "توقفت صيانة المضيف. تحقق من التطبيق وأعد تعيين حالة المضيف قبل إعادة المحاولة.",
   "error.host.updateFailed":

@@ -75,6 +75,7 @@ import type { HostDefaultProviderOptions, HostDefaultProviderSource } from "../s
 import type { HostModelVisibilityOptions, ProviderModelVisibilitySource } from "../settings/provider-model-visibility";
 import type { HostPromptCacheTtlOptions, ProviderPromptCacheSource } from "../settings/provider-prompt-cache";
 import { type ServerVaultOptions, ServerVaultPanel } from "../vault/ServerVaultPanel";
+import type { ServerAgentLimitOptions } from "./ServerAgentLimitSetting";
 import { createServerAgentsSection, type ServerAgentDefaultsOptions } from "./ServerAgentsSection";
 import { createServerAuditSection, type ServerAuditOptions } from "./ServerAuditSection";
 import type { ServerBrowsingMemoryOptions } from "./ServerBrowsingMemorySetting";
@@ -139,6 +140,7 @@ export interface ServerSettingsModalProps {
   instanceTransfer?: ServerTransferOptions | undefined;
   hostUpdate?: ServerUpdateOptions | undefined;
   hostTimezone?: ServerTimezoneOptions | undefined;
+  hostAgentLimit?: ServerAgentLimitOptions | undefined;
   hostTurnLimits?: ServerTurnLimitsOptions | undefined;
   hostPersonality?: ServerPersonalityOptions | undefined;
   hostMemoryLimit?: ServerMemoryLimitOptions | undefined;
@@ -224,6 +226,7 @@ const SECTION_ROWS: Partial<Record<Section, readonly AppTextKey[]>> = {
   general: [
     "server.settings.name",
     "server.settings.logo",
+    "server.settings.agentLimit",
     "server.settings.hostKeyTitle",
     "server.settings.leaveTitle",
     "server.settings.removeTitle",

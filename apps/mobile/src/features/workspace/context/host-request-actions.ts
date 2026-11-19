@@ -138,6 +138,7 @@ import {
   TEAM_ZIP_ATTACHMENTS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/events-v1";
+import { HOST_AGENT_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/host-agent-limit-v1";
 import { HOST_MEMBER_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-member-update-v1";
 import { HOST_PERSONALITY_CAPABILITY } from "@openbot/contracts/team-protocol/host-personality-v1";
 import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-release-v1";
@@ -235,6 +236,7 @@ import {
   excludeAgentFolder,
   getHostAgentAccess,
   getHostAgentBrowserProfile,
+  getHostAgentLimit,
   getHostAgentMemoryLimit,
   getHostAuditLog,
   getHostBrowsingMemory,
@@ -298,6 +300,7 @@ import {
   setAgentSessionSetting,
   setAgentSkillEnabled,
   setHostAgentAccess,
+  setHostAgentLimit,
   setHostAgentMemoryLimit,
   setHostBrowserProfileProxy,
   setHostBrowsingMemory,
@@ -505,6 +508,8 @@ type HostRequestActions = Pick<
   | "restartServerItself"
   | "loadServerTimezone"
   | "setServerTimezone"
+  | "loadServerAgentLimit"
+  | "setServerAgentLimit"
   | "loadAgentMemoryLimit"
   | "setAgentMemoryLimit"
   | "loadMemoryReview"
@@ -781,6 +786,8 @@ export function createHostRequestActions({
     capabilityApi(serverId, HOST_RESTART_CAPABILITY, "mobile.server.settings.restartUnsupported");
   const timezoneAdmin = (serverId: string) =>
     capabilityApi(serverId, HOST_TIMEZONE_CAPABILITY, "mobile.server.settings.timezoneUnsupported");
+  const agentLimitAdmin = (serverId: string) =>
+    capabilityApi(serverId, HOST_AGENT_LIMIT_CAPABILITY, "mobile.server.settings.agentLimitUnsupported");
   const memoryLimitAdmin = (serverId: string) =>
     capabilityApi(serverId, AGENT_MEMORY_LIMIT_CAPABILITY, "mobile.server.settings.memoryLimitUnsupported");
   const memoryReviewAdmin = (serverId: string) =>
@@ -854,6 +861,8 @@ export function createHostRequestActions({
     restartServerItself: async (serverId) => runTeamRequest(requestHostRestart(restartAdmin(serverId))),
     loadServerTimezone: async (serverId) => runTeamRequest(getHostTimezone(timezoneAdmin(serverId))),
     setServerTimezone: async (timezone, serverId) => runTeamRequest(setHostTimezone(timezoneAdmin(serverId), timezone)),
+    loadServerAgentLimit: async (serverId) => runTeamRequest(getHostAgentLimit(agentLimitAdmin(serverId))),
+    setServerAgentLimit: async (limit, serverId) => runTeamRequest(setHostAgentLimit(agentLimitAdmin(serverId), limit)),
     loadAgentMemoryLimit: async (serverId) => runTeamRequest(getHostAgentMemoryLimit(memoryLimitAdmin(serverId))),
     setAgentMemoryLimit: async (limit, serverId) =>
       runTeamRequest(setHostAgentMemoryLimit(memoryLimitAdmin(serverId), limit)),

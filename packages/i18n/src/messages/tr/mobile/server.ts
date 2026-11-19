@@ -338,6 +338,7 @@ export const messages = {
   "mobile.server.route.invite": "Kişileri davet et",
   "mobile.server.route.member": "Üye",
   "mobile.server.route.timezone": "Saat dilimi",
+  "mobile.server.route.agentLimit": "Maksimum ajan",
   "mobile.server.route.personality": "Ajan kişiliği",
   "mobile.server.route.agents": "Ajanlar",
   "mobile.server.settings.storage": "Depolama",
@@ -465,6 +466,18 @@ export const messages = {
     "Saat dilimini değiştirmek için bu sunucuya sahip veya yönetici olarak bağlanın.",
   "mobile.server.settings.timezoneUnsupported":
     "Saat dilimini burada değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
+  "mobile.server.settings.agentLimit": "Maksimum ajan",
+  "mobile.server.settings.agentLimitDescription":
+    "Bu sunucunun barındırabileceği en fazla ajan sayısı. Üst sınır {max}.",
+  "mobile.server.settings.agentLimitDefault": "Varsayılan ({count})",
+  "mobile.server.settings.agentLimitInvalid": "1 ile {max} arasında bir tam sayı girin.",
+  "mobile.server.settings.agentLimitLoadFailed": "Bu sunucunun ajan sınırı yüklenemedi.",
+  "mobile.server.settings.agentLimitLoading": "Ajan sınırı yükleniyor…",
+  "mobile.server.settings.agentLimitUnavailable":
+    "Ajan sınırını değiştirmek için bu sunucuya sahip veya yönetici olarak bağlanın.",
+  "mobile.server.settings.agentLimitUnsupported":
+    "Ajan sınırını burada değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
+  "mobile.server.settings.agentLimitSaveFailed": "Ajan sınırı kaydedilemedi. Yeniden deneyin.",
   "mobile.server.settings.keySection": "Sunucu anahtarı",
   "mobile.server.settings.keyChanged": "Son değişiklik",
   "mobile.server.settings.keyChange": "Anahtarı değiştir",

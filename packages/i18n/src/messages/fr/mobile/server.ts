@@ -334,6 +334,7 @@ export const messages = {
   "mobile.server.route.invite": "Inviter des personnes",
   "mobile.server.route.member": "Membre",
   "mobile.server.route.timezone": "Fuseau horaire",
+  "mobile.server.route.agentLimit": "Agents maximum",
   "mobile.server.route.personality": "Personnalité de l’agent",
   "mobile.server.route.agents": "Agents",
   "mobile.server.settings.storage": "Stockage",
@@ -466,6 +467,17 @@ export const messages = {
     "Connectez-vous à ce serveur en tant que propriétaire ou admin pour changer son fuseau horaire.",
   "mobile.server.settings.timezoneUnsupported":
     "Mettez à jour OpenBot sur ce serveur pour changer son fuseau horaire ici.",
+  "mobile.server.settings.agentLimit": "Agents maximum",
+  "mobile.server.settings.agentLimitDescription": "Le nombre d'agents maximum de ce serveur. Le maximum est de {max}.",
+  "mobile.server.settings.agentLimitDefault": "Par défaut ({count})",
+  "mobile.server.settings.agentLimitInvalid": "Saisissez un nombre entier de 1 à {max}.",
+  "mobile.server.settings.agentLimitLoadFailed": "Impossible de charger la limite d'agents de ce serveur.",
+  "mobile.server.settings.agentLimitLoading": "Chargement de la limite d'agents…",
+  "mobile.server.settings.agentLimitUnavailable":
+    "Connectez-vous à ce serveur en tant que propriétaire ou admin pour changer sa limite d'agents.",
+  "mobile.server.settings.agentLimitUnsupported":
+    "Mettez à jour OpenBot sur ce serveur pour changer sa limite d'agents ici.",
+  "mobile.server.settings.agentLimitSaveFailed": "Impossible d'enregistrer la limite d'agents. Réessayez.",
   "mobile.server.settings.keySection": "Clé du serveur",
   "mobile.server.settings.keyChanged": "Dernier changement",
   "mobile.server.settings.keyChange": "Changer la clé",

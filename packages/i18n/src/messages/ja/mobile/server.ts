@@ -327,6 +327,7 @@ export const messages = {
   "mobile.server.route.invite": "ユーザーを招待",
   "mobile.server.route.member": "メンバー",
   "mobile.server.route.timezone": "タイムゾーン",
+  "mobile.server.route.agentLimit": "エージェントの上限",
   "mobile.server.route.personality": "エージェントの性格",
   "mobile.server.route.agents": "エージェント",
   "mobile.server.settings.storage": "ストレージ",
@@ -454,6 +455,17 @@ export const messages = {
     "タイムゾーンを変更するには、オーナーまたは管理者としてこのサーバーに接続してください。",
   "mobile.server.settings.timezoneUnsupported":
     "ここでタイムゾーンを変更するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.settings.agentLimit": "エージェントの上限",
+  "mobile.server.settings.agentLimitDescription": "このサーバーが持てるエージェントの最大数です。上限は {max} です。",
+  "mobile.server.settings.agentLimitDefault": "既定 ({count})",
+  "mobile.server.settings.agentLimitInvalid": "1 から {max} までの整数を入力してください。",
+  "mobile.server.settings.agentLimitLoadFailed": "このサーバーのエージェント上限を読み込めませんでした。",
+  "mobile.server.settings.agentLimitLoading": "エージェント上限を読み込んでいます…",
+  "mobile.server.settings.agentLimitUnavailable":
+    "オーナーまたは管理者としてこのサーバーに接続すると、エージェントの上限を変更できます。",
+  "mobile.server.settings.agentLimitUnsupported":
+    "ここでエージェントの上限を変更するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.settings.agentLimitSaveFailed": "エージェント上限を保存できませんでした。もう一度お試しください。",
   "mobile.server.settings.keySection": "サーバーキー",
   "mobile.server.settings.keyChanged": "最終変更",
   "mobile.server.settings.keyChange": "キーを変更",

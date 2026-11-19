@@ -101,6 +101,7 @@ import { GITHUB_SKILLS_CAPABILITY } from "./github-skills-v1";
 import { HERMES_IMPORT_CAPABILITY } from "./hermes-import-v1";
 import { TEAM_HISTORY_EXTENT_CAPABILITY } from "./history-extent-v1";
 import { HOST_ADMIN_CAPABILITY } from "./host-admin-v1";
+import { HOST_AGENT_LIMIT_CAPABILITY } from "./host-agent-limit-v1";
 import { HOST_APPEARANCE_CAPABILITY } from "./host-appearance-v1";
 import { HOST_KEY_ROTATION_CAPABILITY } from "./host-key-rotation-v1";
 import { HOST_MEMBER_UPDATE_CAPABILITY } from "./host-member-update-v1";
@@ -756,6 +757,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [SKILL_PROBLEMS_CAPABILITY, V10],
   [ROUTINE_RESULTS_WHATSAPP_CAPABILITY, V10],
   [QUEUE_HOLD_CAPABILITY, V10],
+  [HOST_AGENT_LIMIT_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

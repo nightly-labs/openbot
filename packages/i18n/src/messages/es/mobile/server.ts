@@ -334,6 +334,7 @@ export const messages = {
   "mobile.server.route.invite": "Invitar personas",
   "mobile.server.route.member": "Miembro",
   "mobile.server.route.timezone": "Zona horaria",
+  "mobile.server.route.agentLimit": "Máximo de agentes",
   "mobile.server.route.personality": "Personalidad del agente",
   "mobile.server.route.agents": "Agentes",
   "mobile.server.settings.storage": "Almacenamiento",
@@ -463,6 +464,18 @@ export const messages = {
   "mobile.server.settings.timezoneUnavailable":
     "Conéctate a este servidor como propietario o administrador para cambiar su zona horaria.",
   "mobile.server.settings.timezoneUnsupported": "Actualiza OpenBot en este servidor para cambiar aquí su zona horaria.",
+  "mobile.server.settings.agentLimit": "Máximo de agentes",
+  "mobile.server.settings.agentLimitDescription":
+    "Cuántos agentes puede tener este servidor como máximo. El máximo es {max}.",
+  "mobile.server.settings.agentLimitDefault": "Predeterminado ({count})",
+  "mobile.server.settings.agentLimitInvalid": "Escribe un número entero del 1 al {max}.",
+  "mobile.server.settings.agentLimitLoadFailed": "No se pudo cargar el límite de agentes de este servidor.",
+  "mobile.server.settings.agentLimitLoading": "Cargando el límite de agentes…",
+  "mobile.server.settings.agentLimitUnavailable":
+    "Conéctate a este servidor como propietario o administrador para cambiar su límite de agentes.",
+  "mobile.server.settings.agentLimitUnsupported":
+    "Actualiza OpenBot en este servidor para cambiar aquí su límite de agentes.",
+  "mobile.server.settings.agentLimitSaveFailed": "No se pudo guardar el límite de agentes. Inténtalo de nuevo.",
   "mobile.server.settings.keySection": "Clave del servidor",
   "mobile.server.settings.keyChanged": "Último cambio",
   "mobile.server.settings.keyChange": "Cambiar clave",

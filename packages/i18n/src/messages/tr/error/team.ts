@@ -124,6 +124,7 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "Sunucu kimliği değişiklikleri bu bağlantı tarafından desteklenmiyor.",
   "error.team.hostUpdateUnsupported": "Ana makine güncellemeleri bu bağlantı tarafından desteklenmiyor.",
   "error.team.hostTimezoneUnsupported": "Bu bağlantı sunucunun saat dilimini desteklemiyor.",
+  "error.team.hostAgentLimitUnsupported": "Ajan sınırı bu bağlantıda desteklenmiyor.",
   "error.team.hostRestartUnsupported": "Bu bağlantı sunucuyu yeniden başlatmayı desteklemiyor.",
   "error.team.hostKeyRotationUnsupported": "Bu bağlantı sunucu anahtarı değişikliğini desteklemiyor.",
   "error.team.localServersUnsupported": "Bu bağlantı bu bilgisayardaki sunucuları desteklemiyor.",
