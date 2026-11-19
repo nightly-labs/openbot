@@ -461,6 +461,71 @@ try {
     libraryAfter,
   });
 
+  const badEvent = await call("failure-event", "edit_workflow", {
+    title: "Pull request review",
+    ops: [{ op: "add", kind: "trigger", fields: { trigger: "github", event: "pull_request.opened" } }],
+  });
+  check(
+    "an unknown trigger event is refused with the events to use, and makes no workflow",
+    !badEvent.ok &&
+      JSON.stringify(badEvent.value).includes("pull_request.opened") &&
+      JSON.stringify(badEvent.value).includes("pr.opened") &&
+      (await runCauseEffect(workflows.list())).length === libraryBefore,
+    badEvent.value,
+  );
+  const noEvent = await call("failure-no-event", "edit_workflow", {
+    title: "Telegram mentions",
+    ops: [{ op: "add", kind: "trigger", fields: { trigger: "telegram" } }],
+  });
+  check(
+    "a messaging trigger without an event is refused, and makes no workflow",
+    !noEvent.ok &&
+      JSON.stringify(noEvent.value).includes("mention") &&
+      (await runCauseEffect(workflows.list())).length === libraryBefore,
+    noEvent.value,
+  );
+  const review = await call("event", "edit_workflow", {
+    title: "Pull request review",
+    ops: [
+      { op: "add", ref: "pr", kind: "trigger", fields: { trigger: "github", repositories: "acme/app" } },
+      { op: "update", node: "pr", fields: { event: "pr.opened" } },
+    ],
+  });
+  const reviewId = z.object({ workflowId: z.string() }).parse(review.value).workflowId;
+  const reviewDetail = await runCauseEffect(workflows.get(reviewId));
+  const prTrigger = reviewDetail.graph.nodes.find((node) => node.kind === "trigger");
+  check(
+    "a later op of the same call can give a new trigger its event",
+    review.ok && prTrigger?.fields.event === "pr.opened",
+    prTrigger,
+  );
+  assert.ok(prTrigger);
+  const storedBad = await runCauseEffect(
+    workflows.saveGraph({
+      workflowId: reviewId,
+      baseRevision: reviewDetail.revision,
+      graph: {
+        ...reviewDetail.graph,
+        nodes: reviewDetail.graph.nodes.map((node) =>
+          node.id === prTrigger.id ? { ...node, fields: { ...node.fields, event: "pull_request.opened" } } : node,
+        ),
+      },
+    }),
+  );
+  assert.ok(storedBad.ok);
+  const otherField = await call("event-kept", "edit_workflow", {
+    workflowId: reviewId,
+    ops: [{ op: "update", node: prTrigger.id, fields: { filters: "notBot" } }],
+  });
+  const keptTrigger = (await runCauseEffect(workflows.get(reviewId))).graph.nodes.find(
+    (node) => node.id === prTrigger.id,
+  );
+  check(
+    "an edit that does not change the event keeps a saved event as it is",
+    otherField.ok && keptTrigger?.fields.event === "pull_request.opened" && keptTrigger.fields.filters === "notBot",
+    { result: otherField.value, trigger: keptTrigger },
+  );
+
   const caseInput = "Shipment 4417: review the packet from the supplier in Gdansk.";
   const fromNode = await call("failure-run-from-node", "run_workflow", {
     workflowId,
