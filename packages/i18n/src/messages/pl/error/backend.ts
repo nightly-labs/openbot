@@ -366,7 +366,6 @@ export const messages = {
   "error.backend.takeoverInactive": "To przejęcie przeglądarki nie jest już aktywne.",
   "error.backend.authSubmitting": "Wysyłanie uwierzytelnienia już trwa.",
   "error.backend.apiKeySaveFailed": "OpenBot nie mógł zapisać klucza API. Spróbuj ponownie.",
-  "error.backend.apiKeyNotAllowed": "Klucz API może wpisać tylko właściciel serwera lub administrator.",
   "error.backend.apiKeySaving": "Klucz API jest już zapisywany.",
   "error.backend.apiKeyAnswerUnreadable":
     "OpenBot nie mógł odczytać klucza API. Wpisz klucz o długości do 8000 znaków i wybierz, kto może go używać.",
@@ -411,7 +410,7 @@ export const messages = {
   "error.backend.popupLoadFailed": "Nie udało się wczytać wyskakującego okna. Ponów logowanie na pierwotnej stronie.",
   "error.backend.browserTabNotFound": "Nie znaleziono karty przeglądarki.",
   "error.backend.authActive": "Uwierzytelnianie jest już aktywne.",
-  "error.backend.authHttpsRequired": "Bezpieczne uwierzytelnianie wymaga HTTPS.",
+  "error.backend.authWebPageRequired": "Bezpieczne uwierzytelnianie wymaga HTTP/HTTPS.",
   "error.backend.authDigitsRange": "Kody uwierzytelniające muszą mieć od 4 do 12 cyfr.",
   "error.backend.authExpired": "Żądanie uwierzytelnienia wygasło.",
   "error.backend.authDigitsRequired": "Wpisz wymaganą liczbę cyfr.",

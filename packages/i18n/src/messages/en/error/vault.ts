@@ -6,7 +6,7 @@ export const messages = defineMessages("error.vault", {
   "error.vault.tooLarge": "The Vault is full. Delete some items, then try again.",
   "error.vault.itemMissing": "This item is no longer in the Vault.",
   "error.vault.valueTooLong": "A value is too long.",
-  "error.vault.websiteInvalid": "Enter an HTTPS website address.",
+  "error.vault.websiteInvalid": "Enter an HTTP or HTTPS website address.",
   "error.vault.passwordRequired": "Enter a password.",
   "error.vault.twoStepKeyInvalid":
     "This is not a two-step key. Enter the setup key or the otpauth:// link of the site.",
