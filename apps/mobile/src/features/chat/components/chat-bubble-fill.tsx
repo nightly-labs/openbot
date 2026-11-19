@@ -1,6 +1,6 @@
 import { createContext, type PropsWithChildren, useContext } from "react";
 import { useCSSVariable } from "uniwind";
-import { mixColor } from "@/features/settings/model/message-color";
+import { mixColor, PLAIN_BUBBLE_SHARE } from "@/features/settings/model/message-color";
 
 const SolidSurfaceContext = createContext<string | undefined>(undefined);
 
@@ -13,4 +13,12 @@ export function useSolidChatFill(share: number): string | undefined {
   const control = String(useCSSVariable("--openbot-bg-control") ?? "");
   if (surface === undefined) return undefined;
   return mixColor(surface, control, share) ?? control;
+}
+
+export function useChatCardSurface() {
+  const fill = useSolidChatFill(PLAIN_BUBBLE_SHARE);
+  return {
+    fillClass: fill ? "" : "bg-control/60",
+    style: fill ? { borderCurve: "circular" as const, backgroundColor: fill } : { borderCurve: "circular" as const },
+  };
 }
