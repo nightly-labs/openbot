@@ -6,14 +6,13 @@ import {
   SKILL_CATEGORIES,
   type SkillCategory,
 } from "@openbot/contracts/ipc";
-import type { MobileTextKey } from "@openbot/i18n/mobile";
+import type { MobileTextKey, MobileTranslate } from "@openbot/i18n/mobile";
 import type { MobileConnectorId } from "@/features/servers/model/connectors";
 import { mcpServerDetail } from "@/features/servers/model/mcp-server-draft";
 import type { ConnectorRow } from "@/features/servers/model/use-connector-rows";
 import { catalogImageUrl, pluginIconUrl } from "../api/marketplace-catalog";
 import { MOBILE_PLUGINS, type MobilePlugin } from "./plugin-catalog.generated";
 
-/** The three kinds the Marketplace offers. The filter menu names them Agents, Apps and Skills. */
 export type MarketplaceKind = "agent" | "app" | "skill";
 
 export const MARKETPLACE_KINDS: readonly MarketplaceKind[] = ["agent", "app", "skill"];
@@ -24,12 +23,10 @@ interface ListingBase {
   description: string;
   category: SkillCategory | null;
   creatorName: string;
-  /** An absolute https address, or null for a listing without an image. */
   imageUrl: string | null;
   featured: boolean;
 }
 
-/** One row of the Marketplace. Each kind keeps the record it came from, for its page. */
 export type MarketplaceListing =
   | (ListingBase & {
       kind: "agent";
@@ -41,9 +38,7 @@ export type MarketplaceListing =
     })
   | (ListingBase & { kind: "skill"; installs: number; skill: MarketplaceSkillSummary })
   | (ListingBase & { kind: "app"; source: "plugin"; plugin: MobilePlugin })
-  /** A connector of the server: its page is the connector page of Server settings, as on the desktop. */
   | (ListingBase & { kind: "app"; source: "connector"; connector: MobileConnectorId; connected: boolean })
-  /** An MCP server that the user added and that no catalog app claims. */
   | (ListingBase & { kind: "app"; source: "custom"; server: McpServerConfig });
 
 export function agentListing(apiUrl: string, agent: MarketplaceAgentSummary): MarketplaceListing {
@@ -79,7 +74,6 @@ export function skillListing(apiUrl: string, skill: MarketplaceSkillSummary): Ma
   };
 }
 
-/** The plugin's first app gives the icon; every plugin carries exactly one app today. */
 export function appListings(apiUrl: string): MarketplaceListing[] {
   return MOBILE_PLUGINS.map(
     (plugin): MarketplaceListing => ({
@@ -97,7 +91,6 @@ export function appListings(apiUrl: string): MarketplaceListing[] {
   );
 }
 
-/** The category of each connector app, as the desktop catalog gives it. */
 const CONNECTOR_CATEGORY = {
   slack: "productivity",
   discord: "productivity",
@@ -120,10 +113,6 @@ export const CONNECTOR_TAGLINES = {
   protonpass: "mobile.marketplace.app.protonPassTagline",
 } as const satisfies Record<MobileConnectorId, MobileTextKey>;
 
-/**
- * A connector that the server runs, as an app. A connector that a phone cannot set up, such as Bitwarden
- * on a host without `bitwarden-connector-v1`, has no app, as the desktop lists only the ones it can connect.
- */
 export function connectorListing(row: ConnectorRow, name: string, tagline: string): MarketplaceListing | null {
   if (row.status === "unavailable") return null;
   return {
@@ -141,7 +130,6 @@ export function connectorListing(row: ConnectorRow, name: string, tagline: strin
   };
 }
 
-/** An MCP server that the user added, as an app. Its line is its address, or its command. */
 export function customListing(server: McpServerConfig): MarketplaceListing {
   return {
     kind: "app",
@@ -157,7 +145,6 @@ export function customListing(server: McpServerConfig): MarketplaceListing {
   };
 }
 
-/** What the filter menu narrows the page to. Nothing set is the overview. */
 export interface MarketplaceFilter {
   kind: MarketplaceKind | null;
   category: SkillCategory | null;
@@ -170,7 +157,6 @@ export function isMarketplaceFiltered(filter: MarketplaceFilter): boolean {
   return filter.kind !== null || filter.category !== null || filter.installed;
 }
 
-/** The listing matches every part of the filter that is set. */
 export function matchesFilter(
   listing: MarketplaceListing,
   filter: MarketplaceFilter,
@@ -183,7 +169,6 @@ export function matchesFilter(
   );
 }
 
-/** A plain text match on the name, description and creator. The catalog search does the same server side. */
 export function matchesQuery(listing: MarketplaceListing, query: string): boolean {
   const needle = query.trim().toLocaleLowerCase();
   if (!needle) return true;
@@ -192,7 +177,6 @@ export function matchesQuery(listing: MarketplaceListing, query: string): boolea
   );
 }
 
-/** The categories in catalog order. `other` comes last, as on the desktop. */
 export const MARKETPLACE_CATEGORIES: readonly SkillCategory[] = SKILL_CATEGORIES;
 
 export const CATEGORY_LABELS = {
@@ -212,16 +196,25 @@ export const KIND_LABELS = {
   skill: "mobile.marketplace.kind.skills",
 } as const satisfies Record<MarketplaceKind, MobileTextKey>;
 
-/** The singular, for the line under a listing's name. */
 export const KIND_SINGULAR_LABELS = {
   agent: "mobile.marketplace.kind.agent",
   app: "mobile.marketplace.kind.app",
   skill: "mobile.marketplace.kind.skill",
 } as const satisfies Record<MarketplaceKind, MobileTextKey>;
 
-/** The overview's order: featured first, then by installs. Apps have no install count yet. */
+export function installsOf(listing: MarketplaceListing): number {
+  return listing.kind === "app" ? 0 : listing.installs;
+}
+
 export function byPopularity(left: MarketplaceListing, right: MarketplaceListing): number {
   if (left.featured !== right.featured) return left.featured ? -1 : 1;
-  const installs = (listing: MarketplaceListing) => (listing.kind === "app" ? 0 : listing.installs);
-  return installs(right) - installs(left);
+  return installsOf(right) - installsOf(left);
+}
+
+export function marketplaceFilterTokens(filter: MarketplaceFilter, t: MobileTranslate) {
+  return [
+    filter.kind ? { id: "kind", label: t(KIND_LABELS[filter.kind]) } : null,
+    filter.category ? { id: "category", label: t(CATEGORY_LABELS[filter.category]) } : null,
+    filter.installed ? { id: "installed", label: t("mobile.marketplace.installed") } : null,
+  ].filter((token) => token !== null);
 }

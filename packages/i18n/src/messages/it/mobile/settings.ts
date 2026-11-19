@@ -124,10 +124,45 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Luminosità",
   "mobile.settings.appearance.messageColorFooter":
     "Con Colore dell'agente, i tuoi messaggi in una chat con un agente usano il colore di quell'agente. Con Colore personalizzato, i tuoi messaggi in tutte le chat usano il colore che scegli. Il colore del testo cambia per restare leggibile.",
+  "mobile.settings.appearance.bubbleStyle": "Stile delle bolle",
+  "mobile.settings.appearance.bubbleStyleSolid": "Pieno",
+  "mobile.settings.appearance.bubbleStyleTint": "Tinta",
+  "mobile.settings.appearance.seeThroughBubbles": "Bolle trasparenti",
+  "mobile.settings.appearance.seeThroughBubblesNote":
+    "Le bolle dell’agente e le bolle senza colore lasciano vedere lo sfondo. Senza sfondo, le bolle sono sempre piene.",
+  "mobile.settings.appearance.tab.colors": "Colori",
+  "mobile.settings.appearance.tab.chat": "Chat",
+  "mobile.settings.appearance.preview.routines": "3 esecuzioni di routine",
+  "mobile.settings.appearance.preview.thinking": "Ha pensato per 4 secondi",
+  "mobile.settings.appearance.preview.memory": "1 ricordo salvato",
+  "mobile.settings.appearance.backdrop.title": "Sfondo",
+  "mobile.settings.appearance.backdrop.footer":
+    "Appare dietro la Home e le tue chat su questo telefono. Un agente può impostarne uno per te; Annulla nella chat ripristina quello precedente.",
+  "mobile.settings.appearance.backdrop.none": "Nessuno",
+  "mobile.settings.appearance.backdrop.pond": "Laghetto koi",
+  "mobile.settings.appearance.backdrop.jellyfish": "Meduse",
+  "mobile.settings.appearance.backdrop.sunset": "Tramonto rétro",
+  "mobile.settings.appearance.backdrop.snowfall": "Nevicata",
+  "mobile.settings.appearance.backdrop.fireflies": "Lucciole",
+  "mobile.settings.appearance.backdrop.agentPage": "Pagina dell'agente",
+  "mobile.settings.appearance.backdrop.agentPageNote": "Impostato da un agente",
+  "mobile.settings.appearance.backdrop.photo": "Foto",
+  "mobile.settings.appearance.backdrop.photoChoose": "Scegli dalle tue foto",
+  "mobile.settings.appearance.backdrop.photoChange": "Tocca di nuovo per scegliere un'altra foto",
+  "mobile.settings.appearance.backdrop.strength": "Intensità dello sfondo",
+  "mobile.settings.appearance.backdrop.calm": "Tenue",
+  "mobile.settings.appearance.backdrop.vivid": "Vivace",
+  "mobile.settings.appearance.backdrop.strengthFooter":
+    "Uno sfondo tenue mantiene leggibili le risposte lunghe. Si vede di più nella parte alta della Home.",
+  "mobile.settings.appearance.backdrop.previewQuestion": "Puoi scrivere la nota di rilascio?",
+  "mobile.settings.appearance.backdrop.previewAnswer":
+    "Ecco una bozza: lo sfondo impostato da un agente ora appare anche sul tuo telefono.",
   "mobile.settings.appearance.chatBackground": "Sfondo della chat",
   "mobile.settings.appearance.chatBackgroundDefault": "Predefinito",
   "mobile.settings.appearance.chatBackgroundFooter":
     "Ogni tema mantiene il proprio colore. Un colore che rende il testo difficile da leggere diventa più scuro o più chiaro.",
+  "mobile.settings.appearance.chatBackgroundBackdropFooter":
+    "Lo sfondo sostituisce lo sfondo della chat. Scegli Nessuno come sfondo per usare un colore.",
   "mobile.settings.appearance.collapseRoutines": "Comprimi attività delle routine",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Gli eventi consecutivi delle routine in una chat appaiono come una riga compressa. Tocca la riga per mostrarli.",
@@ -252,6 +287,7 @@ export const messages = {
   "mobile.settings.conversations.media": "Foto e file",
   "mobile.settings.conversations.swipeLeft": "Scorri a sinistra in una chat",
   "mobile.settings.conversations.swipeRight": "Scorri a destra in una chat",
+  "mobile.settings.conversations.swipeQuestion": "Domanda a parte",
   "mobile.settings.conversations.swipeThreads": "Thread",
   "mobile.settings.conversations.swipeBrowser": "Browser",
   "mobile.settings.conversations.swipeOff": "Disattivato",
@@ -546,7 +582,8 @@ export const messages = {
   "mobile.settings.shortcuts.card.noAgent.action": "Scegli agente",
   "mobile.settings.shortcuts.card.locked.title": "OpenBot è bloccato",
   "mobile.settings.shortcuts.card.locked.action": "Apri OpenBot",
-  "mobile.settings.shortcuts.footer": "Send Message nell’app Comandi rapidi invia a questo agente. L’app non si apre.",
+  "mobile.settings.shortcuts.footer":
+    "Send Message nell’app Comandi rapidi invia a questo agente. L’app non si apre. Open Agent apre la sua chat.",
   "mobile.settings.shortcuts.send.sent": "Inviato",
   "mobile.settings.shortcuts.send.failed": "OpenBot non è riuscito a inviarlo.",
   "mobile.settings.shortcuts.send.unconfirmed": "Nessuna risposta dal server. Il messaggio potrebbe essere nella chat.",

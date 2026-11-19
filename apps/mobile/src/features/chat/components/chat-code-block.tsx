@@ -1,53 +1,37 @@
+import { LegendList } from "@legendapp/list/react-native";
 import type { ShjToken } from "@speed-highlight/core";
-import * as Clipboard from "expo-clipboard";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Check from "lucide-react-native/icons/check";
 import Copy from "lucide-react-native/icons/copy";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { type ColorValue, Text, View } from "react-native";
+import { memo, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type ColorValue, Text, View, type ViewStyle } from "react-native";
 import { useCSSVariable } from "uniwind";
-import { showFailureAlert } from "@/features/analytics/failure-reports";
-import { haptics } from "@/shared/lib/haptics";
+import { useFontScale } from "@/shared/lib/font-scale";
 import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { CODE_LAYOUT_STYLE, CODE_TEXT_STYLE } from "@/shared/lib/text-direction";
 import type { BubbleTone } from "../model/bubble-tone";
 import { type CodeToken, cachedHighlight, codeLanguageLabel, highlightCode } from "../model/code-highlight";
+import { SCROLLING_CODE_LINES } from "../model/markdown-preview-parts";
+import { copyToClipboard } from "./use-copy-message";
 import { useListSettled } from "./use-list-settled";
 
-/** A streaming block grows each frame. Highlight it at most this often; the new tail stays plain until then. */
 const STREAMING_HIGHLIGHT_INTERVAL_MS = 250;
-/**
- * Each highlight reads the whole block again, so a long block waits longer for the next one: the time
- * that the highlight takes stays a small part of the time between two of them.
- */
 const STREAMING_HIGHLIGHT_CHARACTERS_PER_MS = 40;
 
 function streamingHighlightInterval(length: number): number {
   return Math.max(STREAMING_HIGHLIGHT_INTERVAL_MS, Math.round(length / STREAMING_HIGHLIGHT_CHARACTERS_PER_MS));
 }
 
-/**
- * Android makes a set of spans for each coloured run of a text, and each new span is sorted against
- * the spans before it. A block with thousands of runs then blocks the main thread when its text is
- * made, laid out, drawn or read by accessibility services, and Android shows "App isn't responding".
- * Above this many coloured runs, Android draws the code in the colour of the block. iOS keeps all runs.
- */
 const ANDROID_MAX_COLORED_RUNS = 300;
 
-/** A run of code in one colour. `color` is unset for code in the colour of the block. */
 export interface CodeRun {
   offset: number;
   text: string;
   color: ColorValue | undefined;
 }
 
-/**
- * The tokens as runs of one colour. Many token types share a colour, and most tokens have the colour
- * of the block, so a block has far fewer runs than tokens. The list draws a block again each time
- * its row scrolls into view, and each run that has a colour is a text span to make.
- */
 export function codeRuns(
   tokens: readonly CodeToken[],
   colors: Partial<Record<ShjToken, ColorValue>>,
@@ -77,17 +61,11 @@ interface ChatCodeBlockProps {
   text: string;
   language?: string;
   selectable?: boolean;
-  /** The text will not change, so its highlight is kept for the app run. */
   finished?: boolean;
-  /**
-   * The colors of a bubble with a message color. The code is in the bubble's text color: the theme
-   * colors of highlighted code do not read on every message color.
-   */
   tone?: BubbleTone;
 }
 
 export const ChatCodeBlock = memo(function ChatCodeBlock(props: ChatCodeBlockProps) {
-  // A block that mounts during a fast fling of the chat colours its code when the list slows down.
   const settled = useListSettled();
   return <CodeBlockBody {...props} highlight={settled} />;
 });
@@ -98,77 +76,84 @@ const CodeBlockBody = memo(function CodeBlockBody({
   selectable = true,
   finished = false,
   tone,
-  highlight: highlightAllowed,
+  highlight,
 }: ChatCodeBlockProps & { highlight: boolean }) {
+  const { runs, foreground } = useCodeRuns(text, language, finished, highlight, tone);
+  return (
+    <CodeBlockFrame language={language} copyText={text} tone={tone} panelStyle={{ padding: 12 }}>
+      <CodeText runs={runs} foreground={foreground} selectable={selectable} />
+    </CodeBlockFrame>
+  );
+});
+
+const CODE_LINE_HEIGHT = 20;
+
+export const ScrollingCodeBlock = memo(function ScrollingCodeBlock({
+  text,
+  pieces,
+  language,
+}: {
+  text: string;
+  pieces: readonly string[];
+  language?: string;
+}) {
+  const fontScale = useFontScale();
+  return (
+    <CodeBlockFrame
+      language={language}
+      copyText={text}
+      panelStyle={{ height: (SCROLLING_CODE_LINES * CODE_LINE_HEIGHT + 24) * fontScale, overflow: "hidden" }}
+    >
+      <LegendList
+        data={pieces}
+        keyExtractor={(_, index) => String(index)}
+        renderItem={({ item }) => <CodePiece text={item} language={language} />}
+        estimatedItemSize={CODE_LINE_HEIGHT * 40}
+        recycleItems={false}
+        nestedScrollEnabled
+        style={{ flex: 1 }}
+        ListHeaderComponent={<View style={{ height: 12 }} />}
+        ListFooterComponent={<View style={{ height: 12 }} />}
+      />
+    </CodeBlockFrame>
+  );
+});
+
+function CodePiece({ text, language }: { text: string; language?: string }) {
+  const { runs, foreground } = useCodeRuns(text, language, true, true, undefined);
+  return (
+    <View style={{ paddingHorizontal: 12 }}>
+      <CodeText runs={runs} foreground={foreground} selectable />
+    </View>
+  );
+}
+
+function CodeBlockFrame({
+  language,
+  copyText,
+  tone,
+  panelStyle,
+  children,
+}: {
+  language: string | undefined;
+  copyText: string;
+  tone?: BubbleTone;
+  panelStyle: ViewStyle;
+  children: ReactNode;
+}) {
   const { t } = useText();
   const theme = useCodeTokenColors();
   const muted = tone?.muted ?? theme.muted;
-  // The block is drawn as a table: the language and the copy button on a card, and the code on an
-  // inset panel of the canvas. The card is a clear layer of the text color, so it shows on every
-  // surface: the screen, an agent's bubble or a card. A message color gives its own surfaces.
   const [textColor, canvas] = useCSSVariable(["--openbot-text-primary", "--openbot-bg-native-canvas"]).map(String);
   const card = tone?.panel ?? `${textColor}0f`;
   const panel = tone?.deep ?? canvas;
-  const foreground = tone?.foreground ?? theme.foreground;
-  const colors: Partial<Record<ShjToken, ColorValue>> = tone ? { cmnt: tone.muted } : theme.colors;
-  const [highlight, setHighlight] = useState<{ text: string; language?: string; tokens: CodeToken[] } | null>(() => {
-    const tokens = cachedHighlight(text, language);
-    return tokens ? { text, language, tokens } : null;
-  });
   const [copiedText, setCopiedText] = useState<string | null>(null);
-  const lastHighlight = useRef<number | null>(null);
-  useEffect(() => {
-    const cached = cachedHighlight(text, language);
-    if (cached) {
-      setHighlight((current) =>
-        current?.text === text && current.language === language ? current : { text, language, tokens: cached },
-      );
-      return;
-    }
-    if (!highlightAllowed) return;
-    let active = true;
-    const run = () => {
-      lastHighlight.current = Date.now();
-      void highlightCode(text, language, finished)
-        .then((tokens) => {
-          if (active) setHighlight({ text, language, tokens });
-        })
-        .catch(() => {
-          if (active) setHighlight(null);
-        });
-    };
-    const last = lastHighlight.current;
-    // The text of a finished block does not change again: it gets its colours at once.
-    const interval = finished ? STREAMING_HIGHLIGHT_INTERVAL_MS : streamingHighlightInterval(text.length);
-    const delay = last === null ? 0 : Math.max(0, interval - (Date.now() - last));
-    const timer = delay === 0 ? null : setTimeout(run, delay);
-    if (timer === null) run();
-    return () => {
-      active = false;
-      if (timer !== null) clearTimeout(timer);
-    };
-  }, [text, language, finished, highlightAllowed]);
-  const tokens =
-    !highlight || highlight.language !== language || !text.startsWith(highlight.text)
-      ? [{ text, offset: 0 }]
-      : highlight.text === text
-        ? highlight.tokens
-        : [...highlight.tokens, { text: text.slice(highlight.text.length), offset: highlight.text.length }];
-  const runs = useMemo(() => codeRuns(tokens, colors, foreground), [tokens, colors, foreground]);
-  const copied = copiedText === text;
+  const copied = copiedText === copyText;
   async function copy() {
-    try {
-      await Clipboard.setStringAsync(text);
-      setCopiedText(text);
-      void haptics.notification("success");
-    } catch (error) {
-      void haptics.notification("error");
-      showFailureAlert(error, "turn", t("mobile.chat.code.copyFailed"), t("mobile.chat.copyFailedMessage"));
-    }
+    if (await copyToClipboard(copyText, "mobile.chat.code.copyFailed", t)) setCopiedText(copyText);
   }
   return (
     <View className="overflow-hidden" style={{ borderRadius: 16, borderCurve: "continuous", backgroundColor: card }}>
-      {/* The label lines up with the code on the inset panel, as a table header does with its rows. */}
       <View className="flex-row items-center justify-between gap-3" style={{ paddingStart: 15, paddingEnd: 4 }}>
         <Typography.Paragraph
           type="body-xs"
@@ -197,34 +182,91 @@ const CodeBlockBody = memo(function CodeBlockBody({
             borderRadius: 13,
             borderCurve: "continuous",
             backgroundColor: panel,
-            paddingHorizontal: 12,
-            paddingVertical: 12,
           },
+          panelStyle,
         ]}
       >
-        <Typography.Code
-          selectable={selectable}
-          className="bg-transparent p-0"
-          style={[CODE_TEXT_STYLE, { color: foreground, fontSize: 14, lineHeight: 20 }]}
-        >
-          {runs.map((run) =>
-            run.color === undefined ? (
-              run.text
-            ) : (
-              // A plain native span in the font of the block around it, not a `Typography`: a long
-              // block has hundreds of runs, and each `Typography` adds four components to the row.
-              <Text key={run.offset} style={{ color: run.color }}>
-                {run.text}
-              </Text>
-            ),
-          )}
-        </Typography.Code>
+        {children}
       </View>
     </View>
   );
-});
+}
 
-/** The colours of highlighted code, shared by the code block in a message and the code view of a preview. */
+function useCodeRuns(
+  text: string,
+  language: string | undefined,
+  finished: boolean,
+  highlightAllowed: boolean,
+  tone: BubbleTone | undefined,
+) {
+  const theme = useCodeTokenColors();
+  const foreground = tone?.foreground ?? theme.foreground;
+  const colors: Partial<Record<ShjToken, ColorValue>> = tone ? { cmnt: tone.muted } : theme.colors;
+  const [highlight, setHighlight] = useState<{ text: string; language?: string; tokens: CodeToken[] } | null>(() => {
+    const tokens = cachedHighlight(text, language);
+    return tokens ? { text, language, tokens } : null;
+  });
+  const lastHighlight = useRef<number | null>(null);
+  useEffect(() => {
+    const cached = cachedHighlight(text, language);
+    if (cached) {
+      setHighlight((current) =>
+        current?.text === text && current.language === language ? current : { text, language, tokens: cached },
+      );
+      return;
+    }
+    if (!highlightAllowed) return;
+    let active = true;
+    const run = () => {
+      lastHighlight.current = Date.now();
+      void highlightCode(text, language, finished)
+        .then((tokens) => {
+          if (active) setHighlight({ text, language, tokens });
+        })
+        .catch(() => {
+          if (active) setHighlight(null);
+        });
+    };
+    const last = lastHighlight.current;
+    const interval = finished ? STREAMING_HIGHLIGHT_INTERVAL_MS : streamingHighlightInterval(text.length);
+    const delay = last === null ? 0 : Math.max(0, interval - (Date.now() - last));
+    const timer = delay === 0 ? null : setTimeout(run, delay);
+    if (timer === null) run();
+    return () => {
+      active = false;
+      if (timer !== null) clearTimeout(timer);
+    };
+  }, [text, language, finished, highlightAllowed]);
+  const tokens =
+    !highlight || highlight.language !== language || !text.startsWith(highlight.text)
+      ? [{ text, offset: 0 }]
+      : highlight.text === text
+        ? highlight.tokens
+        : [...highlight.tokens, { text: text.slice(highlight.text.length), offset: highlight.text.length }];
+  const runs = useMemo(() => codeRuns(tokens, colors, foreground), [tokens, colors, foreground]);
+  return { runs, foreground };
+}
+
+function CodeText({ runs, foreground, selectable }: { runs: CodeRun[]; foreground: ColorValue; selectable: boolean }) {
+  return (
+    <Typography.Code
+      selectable={selectable}
+      className="bg-transparent p-0"
+      style={[CODE_TEXT_STYLE, { color: foreground, fontSize: 14, lineHeight: CODE_LINE_HEIGHT }]}
+    >
+      {runs.map((run) =>
+        run.color === undefined ? (
+          run.text
+        ) : (
+          <Text key={run.offset} style={{ color: run.color }}>
+            {run.text}
+          </Text>
+        ),
+      )}
+    </Typography.Code>
+  );
+}
+
 export function useCodeTokenColors() {
   const [foreground, muted, keyword] = useThemeColor(["foreground", "muted", "link"]);
   const [string, number, error] = useCSSVariable([

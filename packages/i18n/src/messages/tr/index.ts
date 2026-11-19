@@ -53,11 +53,6 @@ import { messages as webClient } from "./webClient";
 import { messages as window } from "./window";
 import { messages as workflow } from "./workflow";
 
-/**
- * Turkish. Written from the English source: a key that is missing here renders its English source.
- *
- * This is the desktop catalog: shared keys, source text, and every desktop area.
- */
 export const tr = {
   ...shared,
   ...source,

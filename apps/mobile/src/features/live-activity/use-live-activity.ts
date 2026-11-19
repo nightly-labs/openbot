@@ -52,46 +52,24 @@ import {
 } from "./model/live-activity-link";
 import { LiveActivitySync } from "./model/live-activity-sync";
 
-/**
- * How long content stays current after the app leaves the foreground. A host that sends updates
- * moves the date on with each one. Without them, the content then looks out of date.
- */
 const STALE_AFTER_BACKGROUND_MS = 5 * 60 * 1000;
-/** Streaming replies change the island many times a second. iOS throttles faster updates anyway. */
 const PUBLISH_DELAY_MS = 1000;
-/**
- * In the background a timer can outlive the app, so changes publish at once. A streamed reply still
- * changes many times a second, and iOS has an update budget. So in one mode, the background
- * publishes at most once in this time.
- */
 const BACKGROUND_PUBLISH_INTERVAL_MS = 1000;
-/** Pictures drawn between two pauses, so a long agent list does not stop the interface. */
 const BLOUBS_PER_PAUSE = 4;
-/** The longest delay that `setTimeout` keeps. A longer one runs at once. */
 const MAX_TIMER_MS = 2_147_483_647;
 
 interface LiveActivityInput {
   servers: readonly Pick<MobileServer, "id" | "state">[];
   activeServerId: string | null;
   agents: readonly MobileAgent[];
-  /** Unread state comes from the host read state, so a chat read on any device clears it. */
   liveState: LiveWorkspaceStore;
   foreground: boolean;
   post: (serverId: string, path: string, body: TeamProtocolV2Json) => Promise<void>;
   loadAgentAvatar: (agentId: string, avatarUrl: string, serverId: string) => Promise<string>;
-  /** Whether the host can update the activity while iOS suspends the app. */
   supportsPush: (serverId: string) => boolean;
-  /** The thread of the side thread that runs a turn, or null for a turn of the agent's own chat. */
   sideThreadOfTurn: (serverId: string, agentId: string, turnId: string) => string | null;
 }
 
-/**
- * Shows the desktop Dynamic Island state as an iOS Live Activity. The desktop island logic reads the
- * same team events, so both show the same event for the same state. Returns the handler for those
- * events. The phone updates the activity while it runs. iOS then suspends it and its connections,
- * so the phone gives the active host the push token of the activity, and that host updates it
- * through Apple with content sealed for this phone.
- */
 export function useLiveActivity({
   servers,
   activeServerId,
@@ -111,63 +89,41 @@ export function useLiveActivity({
   }, []);
   const sync = useRef<LiveActivitySync<AgentLiveActivityProps> | null>(null);
   const [pushToken, setPushToken] = useState<string | null>(null);
-  /** The Apple environment of the activity token, from the profile that signed the app. */
   const environment = usePushEnvironment();
   const [activityStartedAt, setActivityStartedAt] = useState<number | null>(null);
-  /** The phone secret. Each host gets its own secret and keys made from it. */
   const [secret, setSecret] = useState<Uint8Array | null>(null);
   const secretRef = useRef(secret);
   secretRef.current = secret;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Nothing is known before the first event. Publishing then would end the activity from the last launch.
   const received = useRef(false);
   const serverIds = useMemo(() => servers.map((server) => server.id), [servers]);
   const serverOrder = useRef<string[]>([]);
   serverOrder.current = activeServerId
     ? [activeServerId, ...serverIds.filter((id) => id !== activeServerId)]
     : [...serverIds];
-  /**
-   * The servers that the Live Activity does not show, because the user muted them or chose "Nothing"
-   * for them in their notification settings. `null` until the settings are read.
-   */
   const [hidden, setHidden] = useState<ReadonlySet<string> | null>(null);
   const hiddenRef = useRef(hidden);
   hiddenRef.current = hidden;
   const foregroundRef = useRef(foreground);
   foregroundRef.current = foreground;
-  /** Set once when the app leaves the foreground. A new date for each update would make every update differ. */
   const staleDate = useRef<Date | undefined>(undefined);
   const lastPublish = useRef<{ mode: string | null; at: number }>({ mode: null, at: 0 });
-  // The connection checks itself when the app returns, and a dead one reports it in the next render.
-  // An answer waits for that render, so it is not sent on a connection that only looks online.
   const [resumed, setResumed] = useState(foreground);
   useEffect(() => setResumed(foreground), [foreground]);
-  /** Picture file names by picture name. `null` while the picture loads or when it failed. */
   const avatars = useRef(new Map<string, string | null>());
-  /** The photo files by photo name, which the host names in its updates. */
   const [photos, setPhotos] = useState<Readonly<Record<string, string>>>({});
   const agentsRef = useRef(agents);
   agentsRef.current = agents;
   const loadAvatarRef = useRef(loadAgentAvatar);
   loadAvatarRef.current = loadAgentAvatar;
-  // `publish` loads photos through this, and the photo loader publishes, so neither depends on the other.
   const loadPhotoRef = useRef<(serverId: string, agentId: string, avatarUrl: string) => void>(() => undefined);
   const postRef = useRef(post);
   postRef.current = post;
   const sideThreadOfTurnRef = useRef(sideThreadOfTurn);
   sideThreadOfTurnRef.current = sideThreadOfTurn;
   const [request, setRequest] = useState<LiveActivityRequest | null>(null);
-  /**
-   * Set after sign-out. An avatar load or an answer can finish later, and must not start the
-   * activity again with the agents and messages of the removed workspace.
-   */
   const disposed = useRef(false);
-  /** The host that has the push token, and what it has. */
   const registered = useRef<{ serverId: string; key: string } | null>(null);
-  /**
-   * Registrations and removals run one at a time, in order. A removal then cannot reach a host
-   * before the registration that it removes.
-   */
   const registrationQueue = useRef<Promise<void>>(Promise.resolve());
   const enqueueRegistration = useCallback((run: () => Promise<void>) => {
     registrationQueue.current = registrationQueue.current.then(run).catch(() => undefined);
@@ -187,20 +143,13 @@ export function useLiveActivity({
     return sync.current;
   }, []);
 
-  /** The number of pictures when old files were last deleted. */
   const keptAvatars = useRef(0);
   const keepAvatars = useCallback(() => {
     keptAvatars.current = avatars.current.size;
     live?.native.removeAvatars(new Set([...avatars.current.values()].filter((file) => file !== null)));
   }, [live]);
 
-  // `drawBloub` publishes when a picture is ready, and `publish` asks for the pictures it lacks, so
-  // neither depends on the other.
   const publishRef = useRef<() => void>(() => undefined);
-  /**
-   * Draws the plush of an agent with the face of `mood` into the App Group, the first time it is
-   * needed. Until then the activity shows the mode symbol.
-   */
   const drawBloub = useCallback(
     async (agent: Pick<DynamicIslandAgentIdentity, "avatarSeed" | "avatarHue">, mood: LiveActivityMood) => {
       if (!live) return;
@@ -217,16 +166,13 @@ export function useLiveActivity({
         if (disposed.current) return;
         const base = liveActivityFileName(["bloub", agent.avatarSeed, String(agent.avatarHue ?? ""), mood]);
         written = live.native.saveAvatar(base, dataUrl);
-      } catch {
-        // Without the picture the activity shows the mode symbol.
-      }
+      } catch {}
       avatars.current.set(file, written);
       if (written) publishRef.current();
     },
     [live],
   );
 
-  /** The file of a drawn plush, or "" while it is drawn. */
   const bloubFile = useCallback(
     (agent: Pick<DynamicIslandAgentIdentity, "avatarSeed" | "avatarHue">, mood: LiveActivityMood): string => {
       const file = liveActivityBloubFile(agent.avatarSeed, agent.avatarHue, mood);
@@ -238,23 +184,19 @@ export function useLiveActivity({
     [drawBloub],
   );
 
-  /** The `force` skips the background interval, for the stale date that the app must send before iOS suspends it. */
   const publish = useCallback(
     (force = false) => {
       if (timer.current) clearTimeout(timer.current);
       timer.current = null;
       if (!live || !received.current || disposed.current) return;
       const preference = useLiveActivitiesPreference.getState();
-      // Wait for the stored choice, so a user who turned them off sees no activity at launch.
       if (!preference.ready) return;
       if (!preference.enabled) {
         void syncFor(live.native).show(null);
         return;
       }
-      // The same for a server that the user muted. Its load publishes again.
       const hiddenServers = hiddenRef.current;
       if (!hiddenServers) return;
-      // The buttons need the keys. Their load publishes again.
       const phoneSecret = secretRef.current;
       if (!phoneSecret) return;
       const shownOrder = serverOrder.current.filter((serverId) => !hiddenServers.has(serverId));
@@ -267,7 +209,6 @@ export function useLiveActivity({
         agentColor: avatarHeadColor,
         avatar,
         unreadAgents: agentsRef.current
-          // An agent with its notifications off is not in the island, so it is not in the list.
           .filter(
             (agent) =>
               unread.has(agent.id) &&
@@ -283,16 +224,13 @@ export function useLiveActivity({
             avatarUrl: agent.avatarUrl ?? null,
             count: Math.max(1, unreadCounts[agent.id] ?? 1),
           })),
-        // Only the host that the buttons answer can sign them too.
         actionKey: liveActivityHostKeys(phoneSecret, presentation.serverId).keys.action,
-        // A question, an approval or the work of a side thread opens that thread.
         threadId: live.coordinator.requestThreadId(presentation) ?? workingThread(),
         redact: redactText,
       });
       if (avatars.current.size !== keptAvatars.current) keepAvatars();
       const mode = props?.mode ?? null;
       const wait = lastPublish.current.at + BACKGROUND_PUBLISH_INTERVAL_MS - Date.now();
-      // A change of mode, such as the end of a turn, is the update that matters most. It never waits.
       if (!force && !foregroundRef.current && mode === lastPublish.current.mode && wait > 0) {
         timer.current = setTimeout(() => publish(), wait);
         return;
@@ -310,13 +248,11 @@ export function useLiveActivity({
 
       function avatar(serverId: string, agent: DynamicIslandAgentIdentity, mood: LiveActivityMood): string {
         if (!live) return "";
-        // The app avatar without a photo is the plush. Its picture is drawn once for each face.
         if (!agent.avatarUrl) return bloubFile(agent, mood);
         const name = photoName(serverId, agent.id, agent.avatarUrl);
         const saved = avatars.current.get(name);
         if (saved) return saved;
         if (saved === undefined) loadPhotoRef.current(serverId, agent.id, agent.avatarUrl);
-        // As in the app, the plush shows while the photo loads, or when it cannot load.
         return bloubFile(agent, mood);
       }
     },
@@ -327,7 +263,6 @@ export function useLiveActivity({
     else timer.current ??= setTimeout(publish, PUBLISH_DELAY_MS);
   };
 
-  /** Loads an agent photo into the App Group, then publishes again with it. */
   const loadPhoto = useCallback(
     (serverId: string, agentId: string, avatarUrl: string) => {
       if (!live) return;
@@ -346,7 +281,6 @@ export function useLiveActivity({
           if (!foregroundRef.current) publish();
           else timer.current ??= setTimeout(publish, PUBLISH_DELAY_MS);
         })
-        // Without the photo the activity shows the mode symbol.
         .catch(() => undefined);
     },
     [live, keepAvatars, publish],
@@ -354,8 +288,6 @@ export function useLiveActivity({
   loadPhotoRef.current = loadPhoto;
 
   const schedule = useCallback(() => {
-    // In the background iOS can suspend the app before a timer fires, and the last event, such as
-    // the end of a turn, would never reach the activity. So the background publishes at once.
     if (!foregroundRef.current) publish();
     else timer.current ??= setTimeout(publish, PUBLISH_DELAY_MS);
   }, [publish]);
@@ -364,15 +296,12 @@ export function useLiveActivity({
     (serverId: string, event: AgentEvent | TeamRealtimeEvent) => {
       if (!live || !isAgentEvent(event)) return;
       received.current = true;
-      // Unread replies come from the host read state, so no server counts its own arrivals.
       live.coordinator.applyEvent({ serverId, event }, serverId);
       schedule();
     },
     [live, schedule],
   );
 
-  // The keys seal host updates and sign the buttons. Each button link is checked with the key of
-  // the host that it answers.
   useEffect(() => {
     if (!live) return;
     let cancelled = false;
@@ -382,7 +311,6 @@ export function useLiveActivity({
         setSecret(phoneSecret);
         setLiveActivityLinkKeys((serverId) => liveActivityHostKeys(phoneSecret, serverId).keys.action);
       },
-      // Without the keys the activity has no buttons, and only this app updates it.
       () => undefined,
     );
     return () => {
@@ -394,8 +322,6 @@ export function useLiveActivity({
     if (secret) publish();
   }, [secret, publish]);
 
-  // The widget opens the updates of the active host only, with the two keys in its layout. A host
-  // that the phone used before cannot update the activity after a change of host.
   useEffect(() => {
     if (!live || !secret) return;
     const { t } = currentText();
@@ -408,7 +334,6 @@ export function useLiveActivity({
 
   useEffect(() => {
     if (!live) return;
-    // The store changes many times in one turn. Reading it here does not re-render the workspace.
     const applyUnread = () => {
       const { unreadAgentIds, unreadCounts } = liveState.get();
       const unread = new Set(unreadAgentIds);
@@ -437,14 +362,12 @@ export function useLiveActivity({
 
   useEffect(() => (live ? onLiveActivityAction(setRequest) : undefined), [live]);
 
-  // A button opens the app, which reconnects first. The answer waits for its server to be online.
   useEffect(() => {
     if (!live || !request || !foreground || !resumed) return;
     const { action, command } = request;
     const server = servers.find((candidate) => candidate.id === action.serverId);
     if (server && server.state !== "online") return;
     setRequest(null);
-    // The user removed the server after the activity showed it.
     if (!server) return;
     const perform = () =>
       void performAction(action, post).then(
@@ -464,8 +387,6 @@ export function useLiveActivity({
       perform();
       return;
     }
-    // iOS can hide the command on a locked screen, and the tap then unlocks straight into the app.
-    // So the user sees the command here before the host runs it. The signed link carries it.
     const { t } = currentText();
     if (!command) {
       showFailureAlert(
@@ -482,8 +403,6 @@ export function useLiveActivity({
     ]);
   }, [live, request, servers, post, schedule, foreground, resumed]);
 
-  // Settings can turn Live Activities off and on. The change shows at once.
-  // A subscription, not a hook: the setting must not re-render the workspace.
   const [enabled, setEnabled] = useState(() => {
     const preference = useLiveActivitiesPreference.getState();
     return preference.ready && preference.enabled;
@@ -499,10 +418,6 @@ export function useLiveActivity({
     [publish],
   );
 
-  // The notification settings of each server also decide whether the Live Activity shows it: the level
-  // that the user chose for all of their devices, or this phone's level, and this phone's mute. A change
-  // shows at once, and the activity ends when no server that it can show has anything to show.
-  // A subscription, not a hook: a change that shows no other server must not re-render the workspace.
   useEffect(() => {
     let muteEnd: ReturnType<typeof setTimeout> | null = null;
     const apply = () => {
@@ -519,8 +434,6 @@ export function useLiveActivity({
         next = new Set(
           settings.filter(([, setting]) => !showsInLiveActivity(setting, now)).map(([serverId]) => serverId),
         );
-        // A timed mute ends with no change of the settings. While iOS suspends the app, the timer
-        // waits, and it runs when the app runs again.
         const ends = settings.flatMap(([, setting]) => {
           const until = mutedUntil(setting, now);
           return until !== null && Number.isFinite(until) ? [until] : [];
@@ -547,8 +460,6 @@ export function useLiveActivity({
     };
   }, [serverIds, publish]);
 
-  // The agent levels that the user chose for all of their devices hide single agents on the island,
-  // while the server stays shown. A mute or unmute on this phone or on another device republishes.
   useEffect(() => {
     if (!live) return;
     const apply = () => {
@@ -568,18 +479,12 @@ export function useLiveActivity({
     return unsubscribe;
   }, [live, schedule]);
 
-  // The app can be suspended at any moment after it leaves the foreground: publish the stale date now.
   useEffect(() => {
     staleDate.current = foreground ? undefined : new Date(Date.now() + STALE_AFTER_BACKGROUND_MS);
-    // The host could update or end the activity while the app was away. Show the app state again.
     if (foreground) sync.current?.forget();
     publish(!foreground);
   }, [foreground, publish]);
 
-  // The active host gets the push token while the app runs, and a flag when the app goes away.
-  // A server that goes offline keeps the token: in the background the app stops its connections,
-  // and that is when the host needs the token. The request then fails, and the host also counts the
-  // closed connection as away. A host that the Live Activity does not show must not update it.
   const pushServerId =
     live &&
     enabled &&
@@ -591,30 +496,23 @@ export function useLiveActivity({
     supportsPush(activeServerId)
       ? activeServerId
       : null;
-  // The notification registration tells this host when the activity started.
   useEffect(() => {
     useLiveActivityHost.setState({ serverId: pushServerId, startedAt: pushServerId ? activityStartedAt : null });
     return () => useLiveActivityHost.setState({ serverId: null, startedAt: null });
   }, [pushServerId, activityStartedAt]);
-  // The request needs the connection. When it comes back, the phone tells the host again.
   const pushServerOnline = servers.some((server) => server.id === pushServerId && server.state === "online");
   useEffect(() => {
     if (!live) return;
     const previous = registered.current;
     if (previous && previous.serverId !== pushServerId) {
       registered.current = null;
-      // The host also forgets it when the session ends, so a failed request leaves nothing behind.
       void enqueueRegistration(() => post(previous.serverId, LIVE_ACTIVITY_PUSH_ROUTES.remove, {}));
     }
-    // A host that restarts keeps registrations in memory only, so a new connection registers again.
     if (!pushServerOnline && registered.current) registered.current = { ...registered.current, key: "" };
     if (!pushServerId || !pushServerOnline || !pushToken || !secret || !environment) return;
     let cancelled = false;
     const serverAgents = agentsRef.current.filter((agent) => agent.serverId === pushServerId);
     void (async () => {
-      // The host names only pictures that exist, so the phone draws each face before the host needs it.
-      // The host names the plush of an agent whose photo it was not given, so a photo agent has its
-      // plush too.
       let drawn = 0;
       for (const agent of serverAgents) {
         if (agent.avatarUrl) loadPhotoRef.current(pushServerId, agent.id, agent.avatarUrl);
@@ -642,15 +540,12 @@ export function useLiveActivity({
       const key = JSON.stringify(registration);
       await enqueueRegistration(async () => {
         if (cancelled || disposed.current || registered.current?.key === key) return;
-        // Recorded before the request, so a change of host or a sign-out during it queues its removal.
         registered.current = { serverId: pushServerId, key: "" };
         try {
           await post(pushServerId, LIVE_ACTIVITY_PUSH_ROUTES.register, { ...registration });
         } catch {
-          // The activity then shows its last state until the app returns, and marks it out of date.
           return;
         }
-        // A newer run of this effect sends its own registration and records it.
         if (!cancelled && registered.current?.serverId === pushServerId) {
           registered.current = { serverId: pushServerId, key };
         }
@@ -680,8 +575,6 @@ export function useLiveActivity({
       disposed.current = true;
       if (timer.current) clearTimeout(timer.current);
       timer.current = null;
-      // Sign-out removes the workspace. The activity must not keep its agents, messages, and actions,
-      // and the host of that workspace must not update the next one.
       resetLiveActivityActions();
       const previous = registered.current;
       registered.current = null;
@@ -691,7 +584,6 @@ export function useLiveActivity({
       void resetLiveActivitySecret().catch(() => undefined);
       if (!live) return;
       live.native.removeAvatars(new Set());
-      // The files are gone, so the next mount draws and loads them again. Fast Refresh keeps the refs.
       avatars.current.clear();
       keptAvatars.current = 0;
       setPhotos({});
@@ -702,7 +594,6 @@ export function useLiveActivity({
   return applyTeamEvent;
 }
 
-/** The view the widget shows when it cannot open a host update, such as after sign-out. */
 function unreadableProps(t: MobileTranslate): AgentLiveActivityProps {
   return {
     mode: "working",
@@ -730,7 +621,6 @@ function unreadableProps(t: MobileTranslate): AgentLiveActivityProps {
   };
 }
 
-/** The Alert title and the fallback message for an action that the host did not accept. */
 const ACTION_FAILURES: Record<LiveActivityAction["type"], readonly [MobileTextKey, MobileTextKey]> = {
   "open-agent": ["mobile.liveActivity.error.openChat", "mobile.liveActivity.error.openChatFallback"],
   "open-failure": ["mobile.liveActivity.error.clearFailure", "mobile.liveActivity.error.clearFailureFallback"],
@@ -762,7 +652,6 @@ function performAction(
   }
 }
 
-/** The picture name of an agent photo. It changes with the photo version. */
 function photoName(serverId: string, agentId: string, avatarUrl: string): string {
   return liveActivityFileName([serverId, agentId, avatarVersion(avatarUrl)]);
 }
@@ -771,7 +660,6 @@ function avatarVersion(avatarUrl: string): string {
   try {
     return new URL(avatarUrl).searchParams.get("v") ?? "";
   } catch {
-    // The host sends a URL. Without a version, the photo is not loaded again after a change.
     return "";
   }
 }

@@ -12,10 +12,6 @@ import { SiteHeader } from "../landing/SiteHeader";
 import { InstallerButton } from "./DownloadPieces";
 import { DownloadResources } from "./DownloadResources";
 
-// The centred index hero of the other site pages, with the installer for this computer as the landing
-// hero offers it. Then one card per system in the colours of the landing download cards, and a row of
-// cards for the phone apps under them. Each card has every installer of its system, and a link to its
-// page for the requirements and install steps.
 export function DownloadHubPage() {
   onSettled(() => landingAnalytics.start(document, window.location.hostname, downloadPagePath("hub")));
 

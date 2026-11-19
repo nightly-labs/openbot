@@ -1,10 +1,5 @@
-/* The desktop window: the page rail at the left, and the frame as the card of the page that the rail
- * selects. The rail shares the darker surface of the frame edge, so the rail and the top row show as
- * one L around the card. */
 .app-window {
-  /* The frame is darker than the card, so the card comes forward. */
   --window-frame: var(--openbot-bg-frame);
-  /* The thin frame at the right and the bottom of the card */
   --window-edge: var(--openbot-space-1);
   --window-hairline-height: var(--openbot-icon-lg);
   display: grid;
@@ -15,8 +10,6 @@
   background: var(--window-frame);
 }
 
-/* A hidden rail stays out of the grid. The frame keeps the last column, which then takes the whole
- * window. */
 .app-window > .window-rail[hidden] {
   display: none;
 }
@@ -25,24 +18,17 @@
   grid-column: -2;
 }
 
-/* The padding of each top row: the chat header, a page header and the Workflows bar. The buttons of
- * the frame are 2px below its top (`.sidebar-topbar`), so each top row has their centre line, and
- * its content starts 8px after them. */
 .app-window {
   --top-row-padding-block: 2px 0;
   --top-row-padding-inline: var(--openbot-space-2) var(--openbot-space-3);
 }
 
-/* The frame below the edge layout keeps its own shape, so the rail would only take width. */
 @media (max-width: 720px) {
   .app-window > .window-rail {
     display: none;
   }
 }
 
-/* A window with no macOS window buttons starts the server menu at the left edge of the search field
- * and the rows below it, at all widths. The web frame has the macOS class but no buttons. The
- * selector must out-rank the macOS rule below, which also matches the web frame. */
 .app-window
   > :is(.web-app-frame, .app-frame:not(.app-frame-platform-darwin)):not(.app-frame-with-server-rail)
   > .sidebar:not(.sidebar-compact)
@@ -51,14 +37,10 @@
 }
 
 @media (min-width: 721px) {
-  /* The top row holds a short line at the end of the sidebar. */
   .app-window > .app-frame-edge > .sidebar:not(.sidebar-compact) .sidebar-topbar {
     position: relative;
   }
 
-  /* The rail holds the window buttons, so the server menu needs only the part of them that is past
-   * the rail. The window buttons are at the inline start in every language (`window-buttons.ts`).
-   * The web frame has no window buttons; the rule above sets its inset. */
   .app-window
     > .app-frame-platform-darwin:not(.app-frame-with-server-rail, .web-app-frame)
     > .sidebar:not(.sidebar-compact)
@@ -66,14 +48,9 @@
     padding-inline-start: var(--openbot-space-6);
   }
 
-  /* The page rail shows the menu of the open server below Settings, on each page. The top row then
-   * holds Back, Forward and the sidebar toggle and, directly after them, the chat tabs or the title of
-   * the page. A narrower window has no rail, so there the server name stays in the top row. */
   .app-window > .window-rail:not([hidden]) ~ .app-frame-edge {
-    /* Where Back starts, from the start of the sidebar: the padding of the top row. */
     --top-row-controls-start: 10px;
-    /* The width of Back and Forward, of the sidebar toggle, and of the server update button, each with
-     * the 3px gap after it. The web client has no Back and Forward. */
+
     --top-row-history-width: 0px;
     --top-row-toggle-width: 0px;
     --top-row-update-width: 0px;
@@ -103,7 +80,6 @@
     --top-row-history-width: calc(2 * (var(--openbot-control-sm) + 3px));
   }
 
-  /* Only the agents page has a sidebar to toggle. The Tasks page is in the frame of the agents page. */
   .app-window
     > .window-rail:not([hidden])
     ~ .app-frame-edge[data-window-page-kind="agents"]:has(> .sidebar .sidebar-toggle-button) {
@@ -122,12 +98,34 @@
     --top-row-update-width: calc(var(--openbot-control-sm) + 3px);
   }
 
-  /* The buttons of the top row are squares; the padding of a text button would make them wider. */
   .app-window > .window-rail:not([hidden]) ~ .app-frame-edge > .sidebar .sidebar-topbar-actions > .sidebar-icon-button {
     padding: 0;
   }
 
-  /* The rail also opens the marketplace. */
+  .app-window > .window-rail:not([hidden]) ~ .app-frame-edge > .sidebar .sidebar-topbar-actions > .sidebar-icon-button {
+    border-radius: var(--openbot-radius-md);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .app-window
+      > .window-rail:not([hidden])
+      ~ .app-frame-edge
+      > .sidebar
+      .sidebar-topbar-actions
+      > .sidebar-icon-button:hover:not(:disabled) {
+      background: var(--openbot-bg-control-hover);
+    }
+
+    .app-window
+      > .window-rail:not([hidden])
+      ~ .app-frame-edge
+      > .sidebar
+      .sidebar-topbar-actions
+      > .sidebar-icon-button:hover:not(:disabled, .sidebar-update-button) {
+      color: var(--openbot-text-primary);
+    }
+  }
+
   .app-window
     > .window-rail:not([hidden])
     ~ .app-frame-edge
@@ -140,10 +138,25 @@
     justify-content: flex-start;
   }
 
-  /* The compact sidebar is narrower than the controls, so its top row goes past its end, in one row
-   * with the window buttons. The clip keeps the rest of the sidebar in its column. */
+  .app-window > .window-rail:not([hidden]) ~ .app-frame-edge > .sidebar:not(.sidebar-compact) .sidebar-topbar {
+    gap: 3px;
+    padding-inline-end: var(--openbot-space-3);
+  }
+
+  .app-window > .window-rail:not([hidden]) ~ .app-frame-edge > .sidebar:not(.sidebar-compact) .sidebar-topbar-actions {
+    display: contents;
+  }
+
+  .app-window > .window-rail:not([hidden]) ~ .app-frame-edge > .sidebar:not(.sidebar-compact) .sidebar-toggle-button {
+    order: 1;
+    margin-inline-start: auto;
+  }
+
+  .app-window > .window-rail:not([hidden]) ~ .app-frame-edge > .sidebar:not(.sidebar-compact) .dev-worktree-label {
+    margin-inline-start: calc(var(--openbot-space-2) - 3px);
+  }
+
   .app-window > .window-rail:not([hidden]) ~ .app-frame-edge > .sidebar.sidebar-compact {
-    /* Above the chat pane, which starts at the end of the sidebar and would take the clicks. */
     z-index: 1;
     overflow: visible;
     clip-path: polygon(
@@ -188,9 +201,6 @@
     transform: none;
   }
 
-  /* With the sidebar open, the chat tabs start at the end of the sidebar, above the chat. With the
-   * compact sidebar, the controls go past its end, so the chat header starts after them. The panes
-   * clip their content, so they let the header out. */
   .app-window
     > .window-rail:not([hidden])
     ~ .app-frame-edge[data-window-page-kind="agents"].app-frame-sidebar-compact
@@ -206,7 +216,6 @@
     --conversation-header-shift: max(0px, calc(var(--top-row-tabs-start) - var(--left-panel-width)));
   }
 
-  /* The chat header has the centre line of the buttons of the frame, as each page header has. */
   .app-window
     > .window-rail:not([hidden])
     ~ .app-frame-edge[data-window-page-kind="agents"]
@@ -215,9 +224,6 @@
     padding-block: var(--top-row-padding-block);
   }
 
-  /* The frame animates the width of the sidebar column. The start of the chat header moves in the
-   * same time, so the tabs do not jump when the sidebar closes or opens. A moved header also ends at
-   * the end of the chat: a full-width header (`panel-layout.css`) would go under the side panel. */
   .app-window
     > .window-rail:not([hidden])
     ~ .app-frame-edge[data-window-page-kind="agents"]
@@ -230,8 +236,6 @@
       max-width var(--panel-resize-duration, var(--openbot-duration-overlay)) cubic-bezier(0.32, 0.72, 0, 1);
   }
 
-  /* The sidebar button of the top row closes the agent list. The sidebar column has no width; only
-   * the top row of the sidebar shows, and the chat starts at the start of the card. */
   .app-window > .window-rail:not([hidden]) ~ .app-frame-edge[data-window-page-kind="agents"].app-frame-sidebar-closed {
     grid-template-columns: 0 0 minmax(0, 1fr);
   }
@@ -269,9 +273,6 @@
     --conversation-header-shift: var(--top-row-tabs-start);
   }
 
-  /* One card holds the sidebar, the chat and the side panel, below the top row. The frame draws the
-   * card, and the panes have no background of their own, so the card's line and its four rounded
-   * corners show. The padding keeps the panes inside the card's line. */
   .app-window > .app-frame-edge {
     position: relative;
     isolation: isolate;
@@ -296,8 +297,6 @@
     inset-inline-start: var(--server-rail-width);
   }
 
-  /* The agent dock in the window has its column at the right edge, as wide as the dock
-   * (`DOCK_WIDTH` in `agent-dock-motion.ts`), so it does not cover the card. */
   .app-window > .app-frame-edge.app-frame-agent-dock {
     --agent-dock-column: calc(64px - var(--window-edge) - 1px);
     padding-inline-end: calc(var(--window-edge) + 1px + var(--agent-dock-column));
@@ -317,8 +316,6 @@
     background: transparent;
   }
 
-  /* The sidebar shows the card, and the channel title sits on the top row, so an avatar outline takes
-   * the colour of the one it is on. */
   .app-window > .app-frame-edge > .sidebar {
     --agent-avatar-outline: var(--openbot-bg-canvas);
   }
@@ -331,10 +328,6 @@
     content: none;
   }
 
-  /* The selected tab of the chat header and of the side panel is part of the card: a shape with the card
-   * fill and the card line goes from the top of the tab down to the card's top line, and two inward curves
-   * join its sides to that line. The shape is behind the content of the tab row. A translucent card would
-   * show the card line through it, so the transparent window keeps the fill of the tabs. */
   :root:not([data-openbot-window-glass])
     .app-window
     > .app-frame-edge
@@ -377,9 +370,6 @@
     visibility: hidden;
   }
 
-  /* Each curve is a square with a quarter circle cut out: the line follows the arc, and the card fill is
-   * outside it. The square also covers the bottom of the shape's side line, so that line turns into the
-   * arc and does not go on down beside it. The arc starts on the side line and ends on the card line. */
   :root:not([data-openbot-window-glass])
     .app-window
     > .app-frame-edge
@@ -439,8 +429,6 @@
       );
   }
 
-  /* While the shape shows, it is the fill of the selected tab. A selected thread that waits or failed
-   * keeps its state icon, but not its tinted fill. A tab that the pointer drags keeps its fill. */
   :root:not([data-openbot-window-glass])
     .app-window
     > .app-frame-edge
@@ -472,8 +460,6 @@
     background: transparent;
   }
 
-  /* The line between the agent list and the chat starts at the card's top line. In the top row, a short
-   * line sits above it. */
   .app-window > .app-frame-edge > .sidebar::before {
     inset-block: var(--left-header-height) 0;
     inset-inline: auto 0;
@@ -502,7 +488,6 @@
     inset-inline-end: 0;
   }
 
-  /* A full page spans the sidebar, so no sidebar ends at the short line. */
   .app-window
     > .window-rail:not([hidden])
     ~ .app-frame-edge:not([data-window-page-kind="agents"])
@@ -511,7 +496,6 @@
     content: none;
   }
 
-  /* A side panel is the right part of the card. Its line to the chat starts at the card's top line. */
   .app-window > .app-frame-edge :is(.settings-panel, .browser-panel) {
     border-inline-start: 0;
   }
@@ -539,8 +523,6 @@
     inset-inline-start: 0;
   }
 
-  /* In the side panel, the tab row is in the top row and a pane starts under it, so the pane's line to
-   * the chat starts at the pane's top, and its own header has no short line. */
   .app-window > .app-frame-edge .side-panel-docked > :is(.settings-panel, .browser-panel)::before {
     top: 0;
   }
@@ -553,14 +535,11 @@
     content: none;
   }
 
-  /* A maximized pane covers the hidden chat. A chat preview frame keeps its own visibility, so the
-   * pane paints the card under it. */
   .app-window > .app-frame-edge .side-panel-maximized > :is(.settings-panel, .browser-panel) {
     border-end-end-radius: calc(var(--openbot-radius-card) - 1px);
     background: var(--openbot-bg-canvas);
   }
 
-  /* The routine canvas fills the card, so its board follows the card's rounded corner. */
   .app-window > .app-frame-edge .diagram-view-body {
     border-top: 0;
     border-inline-end: 0;
@@ -568,8 +547,6 @@
     border-end-end-radius: calc(var(--openbot-radius-card) - 1px);
   }
 
-  /* The top row controls are flat: one height and one radius, with no line. A control fills on hover,
-   * and an open control keeps a stronger fill. */
   .app-window > .app-frame-edge .conversation-header-actions {
     gap: var(--openbot-space-2);
   }
@@ -610,7 +587,6 @@
     color: var(--openbot-text-primary);
   }
 
-  /* A short line between the model and the side panel button */
   .app-window > .app-frame-edge .conversation-header-actions > .side-panel-toggle {
     position: relative;
     margin-inline-start: calc(var(--openbot-space-2) + 1px);
@@ -629,17 +605,10 @@
     pointer-events: none;
   }
 
-  /* The usage and schedule pages sit in the card, as the chat does. Their title and controls go in the
-   * top row, as the chat header does, and the rest of the page goes in the card below it. The card
-   * draws the surface, the line and the rounded corner, so the page has no background of its own. */
   .app-frame-edge > .window-page > :is(.agent-usage, .schedule-pane) {
     background: transparent;
   }
 
-  /* The header of a page (`PageHeader`) is its top row. Each top row starts 8px after the buttons of
-   * the frame, or after the end of the open sidebar, and has the centre line of those buttons. The
-   * rail is the way back, so the page gives the header the `window` frame: no Back button and no
-   * server name (`createPageHeaderFrame`). */
   .app-window > .app-frame-edge .page-header {
     box-sizing: border-box;
     flex: none;
@@ -657,7 +626,6 @@
     -webkit-app-region: no-drag;
   }
 
-  /* In a narrow window, the title gets shorter and the controls keep their size. */
   .app-window > .app-frame-edge .page-header > :not(.page-header-identity) {
     flex: none;
   }
@@ -666,8 +634,6 @@
     overflow: hidden;
   }
 
-  /* The chip of a parent in a path starts before its text. The identity clips a long title, so it starts
-     earlier by the same width and does not cut the chip. The text stays where it was. */
   .app-window > .app-frame-edge .page-header-identity[data-path] {
     margin-inline-start: calc(-1 * var(--openbot-space-2) - 1px);
     padding-inline-start: calc(var(--openbot-space-2) + 1px);
@@ -680,7 +646,6 @@
     white-space: nowrap;
   }
 
-  /* Flat controls, as in the chat header. */
   .app-window > .app-frame-edge .page-header :is(.ui-select-trigger, .ui-icon-button) {
     height: var(--openbot-control-sm);
     border-color: transparent;
@@ -701,7 +666,6 @@
     }
   }
 
-  /* The schedule header holds the title in the top row; the week below it scrolls in the card. */
   .app-window > .app-frame-edge > .window-page > .schedule-pane {
     padding: 0;
     overflow: hidden;
@@ -727,8 +691,6 @@
     padding: var(--openbot-space-4) var(--openbot-space-6) var(--openbot-space-6);
   }
 
-  /* The empty month fills the card and clips at its bottom edge, so the pitch stays in the middle of
-   * what the user sees. A pitch taller than the card scrolls. */
   .app-window > .app-frame-edge > .window-page .routine-planner-empty {
     min-height: 0;
     overflow-y: auto;
@@ -744,16 +706,12 @@
     grid-template-rows: minmax(0, 1fr);
   }
 
-  /* A narrow card puts the runs below the pitch, so both rows keep their height and scroll. */
   @container (max-width: 920px) {
     .app-window > .app-frame-edge > .window-page .routine-planner-empty {
       grid-template-rows: none;
     }
   }
 
-  /* The Tasks page sits in the middle pane beside the agent list, as the routine canvas does. Its title
-   * goes in the top row, as the chat header does. The list and the task panel go in the card below it.
-   * The card draws the surface, so the page has no background of its own. */
   .app-window > .app-frame-edge > .app-frame-panes .tasks-page {
     position: relative;
     box-sizing: border-box;
@@ -761,7 +719,6 @@
     background: transparent;
   }
 
-  /* The header spans the top row of the pane. */
   .app-window > .app-frame-edge > .app-frame-panes .tasks-page-header {
     position: absolute;
     top: 0;
@@ -777,8 +734,6 @@
     border-end-end-radius: calc(var(--openbot-radius-card) - 1px);
   }
 
-  /* With the sidebar closed, the title starts after the buttons of the top row, as the chat tabs do.
-   * It moves with the sidebar column. */
   .app-window > .window-rail:not([hidden]) ~ .app-frame-edge > .app-frame-panes .tasks-page-header {
     transition: margin-inline-start var(--panel-resize-duration, var(--openbot-duration-overlay))
       cubic-bezier(0.32, 0.72, 0, 1);
@@ -792,7 +747,6 @@
     margin-inline-start: var(--top-row-tabs-start);
   }
 
-  /* A narrow sidebar is compact but not closed. The buttons go past its end, as they do above a chat. */
   .app-window
     > .window-rail:not([hidden])
     ~ .app-frame-edge.app-frame-sidebar-compact:not(.app-frame-sidebar-closed)
@@ -801,11 +755,6 @@
     margin-inline-start: max(0px, calc(var(--top-row-tabs-start) - var(--left-panel-width)));
   }
 
-  /* The settings, schedule, usage and Marketplace pages cover the sidebar, so the week has room for
-   * seven days. The server menu stays in the top row, so the user can select the server that the page
-   * shows. The "settings" kind is both settings pages; the "titled" kind is schedule, usage and Marketplace. */
-  /* Out of the grid flow: a grid cell would push the sidebar to a second row. The grid area of an
-   * absolute item is its containing block, so the item spans the whole grid. */
   .app-frame-edge:not([data-window-page-kind="agents"]) > .window-page {
     position: absolute;
     grid-row: 1 / -1;
@@ -814,11 +763,6 @@
     inset-inline: 1px 0;
   }
 
-  /* The schedule, usage and Marketplace titles, and the path to an open settings detail page, go in the
-   * top row, after the server menu, and the rest of the top row lets clicks through to that menu. The
-   * rail is the way back, so these titles have no Back button and no server name. The section list and
-   * the panel of a settings page start below the top row. The page covers the server menu and inherits
-   * `-webkit-app-region`, so the frame must not drag: a drag region over the menu takes its clicks. */
   .app-frame-edge[data-window-page-kind="settings"] > .window-page {
     pointer-events: none;
   }
@@ -839,14 +783,10 @@
     -webkit-app-region: no-drag;
   }
 
-  /* Close sits in the top corner of the window, at the end of the page, above the end of the card. The
-   * page clips its overflow, so a negative margin would cut the button. */
   .app-frame-edge[data-window-page-kind="settings"] > .window-page > .settings-page > .settings-page-close {
     margin-inline-end: 0;
   }
 
-  /* The row stays when it has no path, because a section page shows its title in the panel. It is
-   * the part of the top row that moves the window. */
   .app-frame-edge[data-window-page-kind="settings"] > .window-page > .settings-page > .settings-page-path-row {
     display: flex;
     padding-block: 0;
@@ -859,12 +799,10 @@
     > .settings-page
     > .settings-page-path-row
     > .settings-page-path {
-    /* Only the path text stops the drag, so the rest of the top row still moves the window. */
     width: auto;
     flex: 0 1 auto;
     max-width: none;
-    /* The path starts near the section list. The pill of the section before the open page starts just after
-       the line of the list, so the start padding is the start inset of the pill. */
+
     margin-inline: 0;
     padding-inline: calc(var(--openbot-space-2) + 1px) var(--openbot-space-3);
   }
@@ -873,8 +811,6 @@
     pointer-events: none;
   }
 
-  /* The pricing page (`HostedPricingPage`) of the add-server flow shows in the card, as the usage page does. Its
-   * mount does not make a box of its own. */
   .app-frame-edge > .window-page > .window-page-portal {
     display: contents;
   }
@@ -888,13 +824,10 @@
     visibility: hidden;
   }
 
-  /* New agent and New section add to the agent list, so the button shows only on the agents page. */
-  .app-frame-edge:not([data-window-page-kind="agents"]) > .sidebar .sidebar-new-button {
+  .app-frame-edge:not([data-window-page-kind="agents"]) > .sidebar :is(.sidebar-new-button, .sidebar-filter-button) {
     display: none;
   }
 
-  /* The page spans the sidebar, so the line at the end of the sidebar does not show. The section list of a
-   * settings page has its own line, at a minimum width, so a narrow sidebar would show a second line. */
   .app-frame-edge:not([data-window-page-kind="agents"]) > .sidebar::before {
     display: none;
   }
@@ -919,8 +852,6 @@
     pointer-events: auto;
   }
 
-  /* The Marketplace page: the path of a page goes in the top row, as the usage title does. The side panel and the
-   * list are below it. */
   .app-window > .app-frame-edge > .window-page > .skills-marketplace-page {
     grid-template-rows: var(--left-header-height) minmax(0, 1fr);
   }
@@ -933,9 +864,7 @@
   }
 }
 
-/* The settings page: the nav at the width of the sidebar, and the path to an open detail page above the panel. */
 .settings-page {
-  /* The widest line of the panel and of the path above it. */
   --settings-page-column-width: 960px;
   display: grid;
   width: 100%;
@@ -946,7 +875,6 @@
 }
 
 .settings-page-path-row {
-  /* The room of the Close button. */
   --settings-page-close-room: calc(var(--openbot-space-8) + var(--openbot-space-4));
   display: flex;
   min-width: 0;
@@ -961,7 +889,6 @@
   display: none;
 }
 
-/* Close is at the end of the row of the path, above it, so a long path stops before the button. */
 .settings-page-close {
   z-index: 1;
   border-radius: var(--openbot-radius-pill);
@@ -972,10 +899,6 @@
   margin-inline-end: var(--openbot-space-3);
 }
 
-/*
- * Below the top row, the path takes the column and the inline padding of the panel, so both start on one edge.
- * The row ends before the Close button, so the start margin adds that room back to center on the panel column.
- */
 .settings-page-path-row > .settings-page-path {
   width: 100%;
   max-width: var(--settings-page-column-width);
@@ -995,7 +918,6 @@
   padding: var(--openbot-space-4) var(--openbot-space-2) 0;
 }
 
-/* The title and the search stay at the top. The list below them scrolls. */
 .settings-page-sections,
 .settings-page-results {
   min-height: 0;
@@ -1004,8 +926,6 @@
   padding-bottom: var(--openbot-space-3);
 }
 
-/* An edge of the list fades when more sections are past it, so the footer row does not cut a
-   section in half. The fade follows the scroll position. */
 @property --settings-page-fade-start {
   syntax: "<length>";
   inherits: false;
@@ -1060,7 +980,6 @@
   }
 }
 
-/* The title starts on the edge of the row icons below it. */
 .settings-page-title {
   margin: 0 0 var(--openbot-space-3);
   padding: 0 var(--openbot-space-2);
@@ -1070,13 +989,10 @@
   line-height: var(--openbot-leading-2xl);
 }
 
-/* The heading takes the focus when the page opens, only so a screen reader reads it. */
 .settings-page-title:focus {
   outline: none;
 }
 
-/* A capsule search field */
-/* The search has more space below it than the gap of the nav, so it does not look like a section row. */
 .settings-page-search {
   flex: none;
   height: var(--openbot-control-md);
@@ -1100,7 +1016,6 @@
   display: none;
 }
 
-/* The text that shows when no setting matches the search */
 .settings-page-empty {
   margin: var(--openbot-space-4) 0 var(--openbot-space-1);
   padding: 0 var(--openbot-space-2);
@@ -1108,7 +1023,6 @@
   font-size: var(--openbot-text-sm);
 }
 
-/* The server mark and name, as the server menu shows them */
 .settings-page-server {
   display: flex;
   min-width: 0;
@@ -1121,7 +1035,6 @@
   height: var(--openbot-icon-md);
 }
 
-/* The row to the other settings page: below the section list, apart from it, at the end of the column. */
 .settings-page-footer {
   flex: none;
   margin-inline: calc(-1 * var(--openbot-space-2));
@@ -1134,14 +1047,10 @@
   display: none;
 }
 
-/* The row fills the footer with the same space on each side. Its corners are concentric with the
-   corner of the window below it. The space around the icons is the same on all sides: the chevron
-   glyph leaves a third of its box empty at its end, so the end padding is that much smaller. */
 .settings-page-footer > .settings-page-switch {
   min-height: var(--openbot-control-xl);
   border-radius: var(--settings-page-switch-radius);
   padding-inline: var(--openbot-space-3) calc(var(--openbot-space-3) - var(--openbot-icon-md) / 3);
-  /* A section row, not a button: the text of the shared button is larger and heavier. */
   font-size: var(--openbot-text-md);
   font-weight: inherit;
 }
@@ -1179,18 +1088,14 @@
   color: var(--openbot-text-muted);
 }
 
-/* The chevron points to the reading direction. */
 .settings-page-switch-chevron:dir(rtl) {
   transform: scaleX(-1);
 }
 
-/* The rows of the list are close together, so a long list shows in one view. */
 .settings-page-nav-group .settings-modal-nav {
   gap: var(--openbot-space-0-5);
 }
 
-/* The selected row keeps the weight of the other rows, so its name does not get wider when it is selected.
-   Only its background and color change. */
 .settings-page-nav-group .settings-modal-nav-item,
 .settings-page-nav-group .settings-modal-nav-item[aria-current="page"] {
   min-height: var(--openbot-control-sm);
@@ -1203,7 +1108,6 @@
   color: var(--openbot-text-primary);
 }
 
-/* A search result: the section with its icon, and below it the matching row title */
 .settings-page-results {
   display: flex;
   flex-direction: column;
@@ -1254,7 +1158,6 @@
   height: var(--openbot-icon-sm);
 }
 
-/* The icons of the section list have a thin line, so the list looks light. */
 .settings-page-search > svg,
 .settings-page-footer svg,
 .settings-page-nav-group .settings-modal-nav-item svg {
@@ -1277,7 +1180,6 @@
   min-height: 0;
 }
 
-/* The panel of the settings window, as a page: it fills the content column and has no dialog frame. */
 .settings-page-content > .settings-modal.settings-modal-page {
   width: 100%;
   height: 100%;
@@ -1294,7 +1196,6 @@
   background: transparent;
 }
 
-/* The content uses the width of the window, up to a readable line, and is in the center of the panel. */
 .settings-page-content > .settings-modal-page .settings-modal-content {
   width: 100%;
   max-width: var(--settings-page-column-width);
@@ -1302,20 +1203,17 @@
   padding-inline: var(--openbot-space-6);
 }
 
-/* The row that a search result opened */
 .settings-page-content [data-search-match] {
   border-radius: var(--openbot-radius-md);
   background: var(--openbot-bg-control-active);
 }
 
-/* A narrow window stacks the page: the heading and the sections above the panel. */
 @media (max-width: 720px) {
   .settings-page {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto auto minmax(0, 1fr);
   }
 
-  /* The path of an open detail page is between the sections and the panel. */
   .settings-page-path-row {
     grid-column: 1;
     grid-row: 2;
@@ -1326,7 +1224,6 @@
     padding-inline: var(--openbot-space-4);
   }
 
-  /* Close is at the end of the heading. */
   .settings-page-close {
     grid-column: 1;
     align-self: start;
@@ -1352,7 +1249,6 @@
 
   .settings-page-title {
     margin-bottom: var(--openbot-space-2);
-    /* The room of the Close button. */
     padding-inline-end: calc(var(--openbot-space-8) + var(--openbot-space-2));
   }
 
@@ -1363,8 +1259,6 @@
   }
 }
 
-/* A window that shows one chat has no sidebar and no resizer, so the chat takes the whole
- * frame. Its header starts after the macOS window buttons. */
 .app-window > .app-frame.app-frame-chat-window {
   grid-template-columns: 0 0 minmax(0, 1fr);
 }
@@ -1377,10 +1271,6 @@
   padding-inline-start: 76px;
 }
 
-/* The hint that one press of Cmd + Q does not quit. The window behind it is dimmed and blurred, as
- * behind a dialog, so the hint is clear on every page. It is over every page and dialog of the page.
- * A browser tab is a native view, so the conversation hides it while the hint shows. A click goes
- * through the hint to the page below. */
 .quit-shortcut-backdrop {
   position: fixed;
   inset: 0;
@@ -1393,7 +1283,6 @@
   animation: quit-shortcut-in var(--openbot-duration-fast) var(--openbot-ease-out);
 }
 
-/* The hint names the agents that the quit stops, beside their working faces. */
 .quit-shortcut-hint {
   --agent-avatar-outline: var(--openbot-bg-surface-raised);
 
@@ -1414,7 +1303,6 @@
   align-items: center;
 }
 
-/* The plush sits low in its box, as in a sidebar row, so the same optical offset centres it. */
 .quit-shortcut-avatars .agent-avatar {
   --agent-avatar-optical-offset: -5px;
 

@@ -1,7 +1,6 @@
 import { PRIVACY_POLICY_META, PRIVACY_POLICY_ROUTE } from "./privacy-policy";
 import { OPENBOT_LEGAL_SOCIAL_IMAGE, OPENBOT_X_HANDLE, pageSocialImageMeta } from "./site-metadata";
 
-/** The head of the privacy policy at /privacy-policy and /privacy. The canonical link is /privacy-policy on both. */
 export function privacyPolicyHead(siteUrl: string) {
   const url = new URL(PRIVACY_POLICY_ROUTE, siteUrl).toString();
   const { title, description } = PRIVACY_POLICY_META;

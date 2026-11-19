@@ -17,15 +17,6 @@ import { haptics } from "@/shared/lib/haptics";
 import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 
-/**
- * The one place for the notification settings. First what the user hears about from each server and
- * agent, which the host keeps for all of their devices, and the mute of this phone. Then the ways this
- * phone tells the user, with the switch for the replies of side threads, and the one sound that they
- * play. On iOS, notifications and Live Activities
- * tell the user, and the sound is there while either is on. Android has notifications only, which
- * reach the phone through Google. The server settings and the agent settings open this screen with
- * `serverId`, and the agent settings also with `agentId`, to show that server and that agent.
- */
 export function NotificationsSettingsScreen() {
   const { t } = useText();
   const { theme } = useUniwind();
@@ -154,7 +145,6 @@ export function NotificationsSettingsScreen() {
           isAndroid ? "mobile.settings.notifications.soundFooterAndroid" : "mobile.settings.notifications.soundFooter",
         )}
       >
-        {/* The hosts get the sound with the notification choices, also with notifications off. */}
         <SettingsRow>
           <SettingsSwitch
             value={preference.playSound}
@@ -189,7 +179,6 @@ export function NotificationsSettingsScreen() {
               onChange={(sound) => {
                 void haptics.selection();
                 save({ sound });
-                // Without notification permission the phone plays nothing, as it would for a notification.
                 void pushNotificationsNative?.previewSound(sound).catch(() => undefined);
               }}
             />

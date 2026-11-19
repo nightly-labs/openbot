@@ -62,6 +62,8 @@ export const messages = {
   "mobile.app.update.group.removed": "عناصر مُزالة",
   "mobile.app.update.group.deprecated": "عناصر مُهملة",
   "mobile.app.update.group.security": "الأمان",
+  "mobile.app.update.requiredTitle": "التحديث مطلوب",
+  "mobile.app.update.requiredBody": "لم يعد OpenBot {version} مدعومًا. حدّث إلى {minimum} أو أحدث للمتابعة.",
   "mobile.app.update.notesFailed": "تعذّر تحميل ملاحظات الإصدار.",
   "mobile.app.update.notesEmpty": "لا توجد ملاحظات إصدار لهذا الإصدار بعد.",
   "mobile.app.update.fullChangelog": "سجل التغييرات الكامل",

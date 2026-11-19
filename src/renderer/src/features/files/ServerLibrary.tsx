@@ -25,36 +25,25 @@ import { escapeClosesViewer } from "./viewer-escape";
 
 const FilePreviewPanel = lazy(() => import("../conversation/FilePreviewPanel"));
 
-/** The viewer fills the page, so the panel takes the largest width it has. */
 const VIEWER_WIDTH = 4000;
 
 interface Viewing {
   file: StoredFileRow;
   preview: FilePreview;
-  /** The tile that opened the file. Focus goes back to it when the viewer closes. */
   origin: HTMLElement | undefined;
 }
 
 export interface ServerLibraryProps {
   serverId: string;
-  /** The server of `serverId`, for its role and its capabilities. */
   server: ServerSummary | undefined;
-  /** The storage and agent calls: the desktop bridge, or the requests of the web client. */
   calls: () => FilesPort;
-  /** Reads the levels of a member on a joined server, and tells when they change. */
   levels: Pick<AgentLevelsSource, "readLevels" | "onLevelsChanged">;
   onShowInChat: (agentId: string, messageId: string) => void;
   onOpenUrl: (url: string) => void;
-  /** Reads the pictures that have no `previewUrl`: the web client gets none. */
   mediaSource?: AttachmentMediaSource | undefined;
-  /** The files are on this computer: they open in their app and show in their folder. The default is true. */
   opensFiles?: boolean | undefined;
 }
 
-/**
- * The Library of one server: every file and picture of its chats. A file that the app can show opens
- * in the file viewer over the page; any other file opens in its app, or downloads on the web client.
- */
 export function ServerLibrary(props: ServerLibraryProps) {
   const { t, errorMessage } = useText();
   const platform = usePlatform();
@@ -65,7 +54,6 @@ export function ServerLibrary(props: ServerLibraryProps) {
   const fileAgents = createMemo(
     () => new Map((storage.state.usage?.files ?? []).map((file) => [file.id, file.agentId] as const)),
   );
-  /** The joined server whose roles decide who changes the folders of an agent. Null: each viewer does. */
   const levelsServerId = () => {
     const current = props.server;
     return current?.kind === "remote" &&
@@ -75,19 +63,16 @@ export function ServerLibrary(props: ServerLibraryProps) {
       : null;
   };
   const level = createAgentLevels({ levelsServerId, ...props.levels });
-  /** A member changes the folders of an agent that they can chat with. The host checks it again. */
   const canOrganize = (agentId: string) => {
     if (levelsServerId() === null) return true;
     const known = level(agentId);
     return known !== undefined && agentAccessRank(known) >= agentAccessRank("chat");
   };
-  // Each member reads the folders. Only the delete of files needs `canDelete`.
   const folders = createLibraryFolders(
     () => props.serverId,
     () => ({ agentIds: agentIds(), fileAgent: (fileId) => fileAgents().get(fileId) }),
     props.calls,
   );
-  // A new scan follows a change of the files on the host. The folders load again with it, so they match the files.
   createEffect(
     () => storage.state.loading,
     (loading, was) => {
@@ -101,7 +86,6 @@ export function ServerLibrary(props: ServerLibraryProps) {
   };
   const macWindowControls = () => platform.appInfo()?.platform === "darwin";
 
-  // The page calls this after a change, outside a tracking scope. The server of that moment is the right one.
   function saveCollapsedRows(keys: readonly string[]): void {
     saveLibraryCollapsedRows(
       untrack(() => props.serverId),
@@ -129,7 +113,6 @@ export function ServerLibrary(props: ServerLibraryProps) {
     try {
       const preview = await attachmentFilePreview(file);
       if (preview.previewKind === "none") return act(file, "open");
-      // A list row gives no origin. The row that has focus opened the file.
       const focused = document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
       setViewing({ file, preview, origin: origin ?? focused });
     } catch (error) {
@@ -143,7 +126,6 @@ export function ServerLibrary(props: ServerLibraryProps) {
   function closeViewer(): void {
     const origin = viewing()?.origin;
     setViewing(null);
-    // The page stays inert until the update applies, and an inert tile cannot take focus.
     flush();
     if (origin?.isConnected) origin.focus({ preventScroll: true });
   }
@@ -151,7 +133,6 @@ export function ServerLibrary(props: ServerLibraryProps) {
   return (
     <div class="library-panel">
       <div class="library-panel-content" data-folders={hasFolders()} inert={viewing() !== null}>
-        {/* The first answer tells if the host has folders. The page waits for it, so it does not change its form. */}
         <Show when={folders.ready()}>
           <LibraryPage
             files={storage.state.usage?.files ?? []}
@@ -193,7 +174,6 @@ export function ServerLibrary(props: ServerLibraryProps) {
   );
 }
 
-/** The file over the Library page, at the full size of the page. Escape or the close button closes it. */
 function LibraryViewer(props: {
   viewing: Viewing;
   agents: AgentProfile[];
@@ -212,7 +192,6 @@ function LibraryViewer(props: {
   const reveal = () => void props.onAction(file(), "reveal");
   const onReveal = () => (props.opensFiles ? reveal : undefined);
   return (
-    // The page under the viewer is inert, so the viewer is the only part that takes input.
     <section
       class="library-viewer"
       aria-label={file().name}

@@ -12,7 +12,8 @@ of something remote — which is what makes the first section below non-negotiab
   error, restore foreign-key enforcement in `finally`, and run the integrity checks before startup
   continues.
 - Never edit or delete a migration that may have shipped, including the frozen version 8 baseline.
-  Append the next contiguous version and update the separate latest schema for new databases.
+  Append the next contiguous version; a new database runs it too ([One build path](#one-build-path)).
+  See [Frozen migrations](#frozen-migrations).
   Add the new version to `openbot-database-schema-history.json`: the parity test fails and prints
   the entry to add. A red test on a recorded version means a shipped migration changed. Change the
   migration back; do not change its entry.
@@ -22,18 +23,35 @@ of something remote — which is what makes the first section below non-negotiab
 - No automatic full-database backups: conversation history lives in SQLite, so their time and disk
   cost is unbounded. Make the migration itself safe instead.
 
-### The two build paths
+### Frozen migrations
 
-`openbot-database-schema.ts` builds a database twice. `createLatestDatabase` execs
-`LATEST_SCHEMA_SQL` and then stamps every entry in `MIGRATIONS` as applied **without running it**;
-an existing database runs them for real. A DDL migration that is not also mirrored by hand into
-`LATEST_SCHEMA_SQL` therefore ships new installs a database missing that column while upgraded
-installs get it, silently, on the user's machine.
+Each migration is one file in `migrations/`: `<4-digit version>-<name>.ts`, which exports
+`migration` with the same `version` and `name`. `migrations/registry.ts` lists them in order.
+`bun run check:migrations` (CI job Check) compares the folder with the newest `v*` release tag:
 
-`openbot-database-schema-parity.test.ts` builds a database both ways and compares the normalised
-`sqlite_master` SQL and `PRAGMA table_info` per table, so that divergence is a red test rather than a
-support ticket. Do not weaken it; a new DDL migration means editing `LATEST_SCHEMA_SQL` in the same
-change.
+- A file that the tag has must not change, move or go away. `registry.ts` and the `migration.ts`
+  type are the only exceptions. This includes helpers in a migration file and `runtime-values.ts`.
+- A new migration takes a version above the newest released one. Versions are contiguous from 8,
+  and names are unique.
+- A migration file imports only `node:*`, `@openbot/logging`, `./runtime-values`, earlier migrations,
+  and types (`import type`) from `./migration`. Copy any other code into the file, so a change to live
+  code cannot change a released migration.
+
+To fix a bug in a released migration, do not edit it. Add a new migration that repairs each
+database that the bad one made, and keep it safe for databases that the bad one did not touch. Give
+it fixtures for every affected released schema. An unreleased migration can still change.
+
+### One build path
+
+A new database runs the same migrations as an existing one. `migrateOpenBotDatabase` sees an empty file
+and runs every entry of `MIGRATIONS` from the version 8 baseline, which creates each table with
+`IF NOT EXISTS`. So there is no second schema to update, and a new install cannot miss a column that an
+upgraded install has. A new database skips `vacuumAfterCommit`: it has no free pages.
+
+`openbot-database-schema-parity.test.ts` builds a new database from an empty file and compares it with
+the schema that `openbot-database-schema-history.json` records, version by version. Do not weaken it.
+Databases that an older release made for a new install (from its separate `LATEST_SCHEMA_SQL`) are
+in `released-schemas/releases.json`, and the migration harness upgrades them.
 
 ### The migration harness
 
@@ -62,6 +80,14 @@ a new install's, and that a second start changes nothing.
 One user database is 17 GB: `orchestration_events` 11.9 GB, `provider_history_staging` 2.9 GB, and
 `projection_thread_messages`. Nothing copies the file first, so a migration runs on that file on the
 user's computer, and it must finish with the disk that is free.
+After start, OpenBot replaces each imported Codex and Claude row of `provider_history_staging` with a
+hash, in small transactions, only at schema 64 or later: an older release cannot read a hash row, so
+the marker migration 64 makes it refuse the file. The file keeps its size; SQLite uses the free pages again.
+After that, it removes from each old thread event the `changedMessages` items that a replay does not
+need (`database/thread-event-compaction.ts`): one thread at a time, in small transactions, with each
+done thread in `thread_event_compaction` (migration 65, which older releases refuse). Each event row
+stays. The rule uses the replay's own fold (`database/thread-message-fold.ts`). When you change the
+fold, run `bun scripts/thread-event-compaction-e2e.ts`.
 
 - Do not rebuild, rewrite every row of, or `VACUUM` because of a large table unless the change needs
   it. Prefer `ADD COLUMN` with no default or a constant default, a new table, or a partial index.
@@ -102,8 +128,8 @@ controller per concern, each constructed and owned by the service; `openbot-data
 into modules under `database/`, leaving a ~560-line facade that had to keep its class name, instance
 identity, constructor signature and public surface because callers reach past it into `connection`
 and `dispatch`. The shape in both: one class per file, kebab-case, `<Name>Options` + `<Name>`,
-`readonly #` fields, a constructor that only assigns, and a doc comment saying what the class
-**owns** and that it never imports the facade. No barrel file.
+`readonly #` fields, and a constructor that only assigns. Each class **owns** one concern and never
+imports the facade. No barrel file.
 
 Two rules those controllers depend on and a reader cannot infer. They hold the core object and read
 `.connection` at each use — a cached handle survives `initialize()` and then silently addresses a

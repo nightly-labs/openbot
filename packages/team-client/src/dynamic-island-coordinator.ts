@@ -22,11 +22,9 @@ type ServerRuntime = DynamicIslandPresentationInput & {
   incomingMessageAnchors: Map<string, string>;
   completedAgents: Set<string>;
   lastRecordedMessageIds: Map<string, string>;
-  /** The replies counted during each agent's active turn, so a quiet routine turn can take them back. */
   turnReplies: Map<string, { turnId: string; count: number }>;
   receivedConversations: Set<string>;
   resolvedPrompts: Map<string, string>;
-  /** The failed turn of each agent that the user dismissed from the island. The agent keeps its failed mark. */
   dismissedFailures: Map<string, string>;
   rawMessageBodies: Map<string, string>;
   /** The agent ids that this member muted. The island does not show them, also when their notifications are on. */
@@ -38,7 +36,6 @@ export class DynamicIslandCoordinator {
   readonly #servers = new Map<string, ServerRuntime>();
   readonly #text: () => DynamicIslandText;
 
-  /** `text` is read for each presentation, so the island follows a change of language. */
   constructor(text: () => DynamicIslandText) {
     this.#text = text;
   }
@@ -112,6 +109,11 @@ export class DynamicIslandCoordinator {
     }
     this.#servers.set(input.serverId, {
       ...input,
+      activeTurns: { ...input.activeTurns },
+      queues: { ...input.queues },
+      unreadReplies: { ...input.unreadReplies },
+      failedTurns: { ...input.failedTurns },
+      ...(input.unreadMessageIds ? { unreadMessageIds: { ...input.unreadMessageIds } } : {}),
       turnProgress,
       pendingApprovals,
       pendingPrompts,
@@ -129,10 +131,6 @@ export class DynamicIslandCoordinator {
     });
   }
 
-  /**
-   * Sets one server's unread replies from the host read state. Mobile uses it instead of counting
-   * arrivals, so a chat read on any device clears the island.
-   */
   replaceUnreadReplies(serverId: string, unreadReplies: Record<string, number>): void {
     const runtime = this.#runtime(serverId);
     runtime.unreadReplies = { ...unreadReplies };
@@ -141,15 +139,10 @@ export class DynamicIslandCoordinator {
     );
   }
 
-  /** Sets the agents that this member muted. The island does not show them. */
   setMemberMutedAgentIds(serverId: string, agentIds: Iterable<string>): void {
     this.#runtime(serverId).memberMutedAgentIds = new Set(agentIds);
   }
 
-  /**
-   * The agents whose notifications are off, or that this member muted. The island does not show
-   * them.
-   */
   mutedAgentIds(serverId: string): ReadonlySet<string> {
     const runtime = this.#servers.get(serverId);
     const agents = runtime?.agents ?? [];
@@ -241,7 +234,6 @@ export class DynamicIslandCoordinator {
         };
         return;
       case "turn-completed":
-        // A quiet routine run posted no message, so the island has no new reply to show.
         if (
           serverId !== activeServerId &&
           event.status === "completed" &&
@@ -250,13 +242,9 @@ export class DynamicIslandCoordinator {
         ) {
           runtime.completedAgents.add(event.agentId);
         }
-        // The answers of a quiet routine run are gone from the chat, so their count goes too.
         if (event.quiet && serverId !== activeServerId) this.#takeBackTurnReplies(runtime, event.agentId, event.turnId);
         runtime.turnReplies.delete(event.agentId);
         runtime.activeTurns[event.agentId] = null;
-        // A host sends a phone `queue-invalidated` instead of the queue, and no snapshot after the turn.
-        // The queue of the last runtime snapshot can still list the finished turn as running, which
-        // kept the Live Activity on "Working" after the reply. The end of the turn ends its delivery.
         this.#endTurnDeliveries(runtime, event.agentId, event.turnId);
         if (runtime.turnProgress[event.agentId]?.turnId === event.turnId) delete runtime.turnProgress[event.agentId];
         runtime.pendingPrompts[event.agentId] = undefined;
@@ -325,12 +313,6 @@ export class DynamicIslandCoordinator {
     }
   }
 
-  /**
-   * The thread of the request that `presentation` shows: the question, the approval or the browser
-   * step of its agent. Null when it shows no request, or when the request is gone. The request can be
-   * of a side thread or of a channel thread, so a Live Activity link carries this thread, and a tap
-   * opens it and not only the agent's own chat.
-   */
   requestThreadId(presentation: DynamicIslandPresentation): string | null {
     if (presentation.mode !== "question" && presentation.mode !== "approval" && presentation.mode !== "takeover")
       return null;
@@ -350,18 +332,11 @@ export class DynamicIslandCoordinator {
     return null;
   }
 
-  /**
-   * The agent and the turn of the work that `presentation` shows first, or null when it shows no work
-   * or the turn has not started. The runtime work of an agent has the work of its side threads too, so
-   * the turn can run in a side thread. The caller finds that thread, and a Live Activity link then
-   * opens it.
-   */
   workingTurn(presentation: DynamicIslandPresentation): { agentId: string; turnId: string } | null {
     if (presentation.mode !== "working") return null;
     const agentId = presentation.working[0]?.agent.id;
     const runtime = this.#servers.get(presentation.serverId);
     if (!agentId || !runtime) return null;
-    // The view shows the text of the running delivery, so the turn of that delivery comes first.
     const running = runtime.queues[agentId]?.deliveries.find(
       (delivery) => delivery.status === "starting" || delivery.status === "running",
     );
@@ -444,10 +419,6 @@ export class DynamicIslandCoordinator {
     if (runtime.unreadMessageIds) delete runtime.unreadMessageIds[agentId];
   }
 
-  /**
-   * Removes the started or running deliveries of a finished turn. A starting delivery without a turn
-   * is also stale: its turn either is this one or has not started, and a new turn sends its own event.
-   */
   #endTurnDeliveries(runtime: ServerRuntime, agentId: string, turnId: string): void {
     const queue = runtime.queues[agentId];
     if (!queue) return;
@@ -487,8 +458,6 @@ export class DynamicIslandCoordinator {
     const liveMessages: Record<string, DynamicIslandMessageSource[]> = {};
     const incomingMessageAnchors = new Map(runtime.incomingMessageAnchors);
     for (const message of snapshot.latestMessages) {
-      // The snapshot text is capped at `AGENT_RUNTIME_TEXT_LIMIT`, so a message that deltas have made
-      // longer stays as it is. Live Activity gets only snapshots, so a longer snapshot replaces the body.
       const body = cleanAgentMessageText(message.text);
       const current = runtime.liveMessages[message.agentId]?.find((candidate) => candidate.id === message.id);
       const converted =
@@ -629,8 +598,6 @@ export function reconcileQueuesWithRuntimeWork(
       deliveries: [
         ...active.map((delivery) => {
           const prior = previous.get(delivery.id);
-          // A runtime work item has no sender. Keep the queue's sender, or a reload reports a
-          // routine run as a user message and the sidebar mark disappears.
           if (!prior) return delivery;
           return { ...prior, status: delivery.status, turnId: delivery.turnId, error: delivery.error };
         }),
@@ -651,7 +618,6 @@ function toDynamicIslandMessage(
 ) {
   if (
     (message.author !== "assistant" && message.author !== "agent") ||
-    // A message that another agent sent to this one is not a reply to the user.
     message.senderAgentId ||
     message.itemType === "commentary" ||
     message.itemType === "question_prompt" ||

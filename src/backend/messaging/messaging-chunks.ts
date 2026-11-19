@@ -1,9 +1,5 @@
 export const FENCE = "```";
 
-/**
- * Splits markdown into posts of at most `limit` characters, at line ends where it can. A code block
- * that a split cuts is closed at the end of one post and opened again at the start of the next.
- */
 export function chunkMarkdown(text: string, limit: number): string[] {
   const reserve = FENCE.length + 1;
   const chunks: string[] = [];
@@ -35,7 +31,6 @@ function hardSplit(line: string, size: number): string[] {
     let end = Math.min(index + size, line.length);
     const before = line.charCodeAt(end - 1);
     const after = line.charCodeAt(end);
-    // Move a pair boundary back only when the split still advances.
     if (end - index > 1 && before >= 0xd800 && before <= 0xdbff && after >= 0xdc00 && after <= 0xdfff) end -= 1;
     parts.push(line.slice(index, end));
     index = end;

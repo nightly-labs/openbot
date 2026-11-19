@@ -25,7 +25,6 @@ export interface RoutineRecordsOptions {
   agentExists(agentId: string): boolean;
   channelExists(channelId: string): boolean;
   channelRoutinesChanged(channelId: string): void;
-  /** True while a restart waits for the agents. Webhook runs then wait like scheduled runs. */
   routinesHeld(): boolean;
 }
 
@@ -33,13 +32,7 @@ function failed(operation: string) {
   return (failure: { readonly cause: unknown }) => new RoutineRecordFailed({ operation, cause: failure.cause });
 }
 
-/**
- * Owns the owner-neutral routine surface of the events API: agent and channel routines of every
- * trigger kind and the public webhook routes. Each method picks the agent or the channel scheduler
- * by owner. It never imports `AgentService`.
- */
 export class RoutineRecords {
-  /** The public routes of webhook triggers, their secrets, revocations and receipts. */
   readonly routes: WebhookRouteStore;
   readonly #options: RoutineRecordsOptions;
 
@@ -70,7 +63,6 @@ export class RoutineRecords {
       : this.#options.channelRoutines.saveRecord(owner.id, routineId, input);
   }
 
-  /** The newest runs of one routine, with the records of the occurrences it missed. */
   listRuns(owner: EventRoutineOwner, routineId: string, limit: number): EventRoutineRun[] {
     if (owner.kind === "agent") {
       return this.#options.agentRoutines
@@ -82,7 +74,6 @@ export class RoutineRecords {
       .map((run) => ({ ...eventRoutineRun(run), requestMessageId: run.requestMessageId }));
   }
 
-  /** Tells open editors to reload, for example after a background route sync stored a webhook URL. */
   changed(owner: EventRoutineOwner): void {
     if (owner.kind === "agent") this.#options.agentRoutines.stateChanged(owner.id);
     else this.#options.channelRoutinesChanged(owner.id);
@@ -107,10 +98,6 @@ export class RoutineRecords {
     return Effect.mapError(Effect.asVoid(run), failed("test"));
   }
 
-  /**
-   * Starts a run for one verified webhook request. `unavailable` means the owner cannot take a run
-   * now, so the sender should retry; nothing was written.
-   */
   receiveWebhook(
     owner: EventRoutineOwner,
     routineId: string,
@@ -125,7 +112,6 @@ export class RoutineRecords {
   }
 }
 
-/** The fields of a run that `routine-recovery-v1` carries, without its owner. */
 function eventRoutineRun({
   id,
   routineId,

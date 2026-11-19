@@ -1,4 +1,4 @@
-import type { WorkflowGraph, WorkflowNode } from "@openbot/contracts/ipc";
+import type { WorkflowBranch, WorkflowGraph, WorkflowNode } from "@openbot/contracts/ipc";
 import type { MobileTranslate } from "@openbot/i18n/mobile";
 import { Typography } from "heroui-native";
 import CornerDownLeft from "lucide-react-native/icons/corner-down-left";
@@ -15,25 +15,29 @@ import type { MenuAction } from "@/shared/components/menu-view";
 import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 
-/** The actions that a step row offers, such as Run from here. A step without actions has no menu. */
 export interface WorkflowStepMenu {
   actions: (node: WorkflowNode) => MenuAction[];
   onAction: (node: WorkflowNode, actionId: string) => void;
 }
 
-/** The most lines of a step's text in the list. A prompt can be long; the full text is on the step's page. */
 const TEXT_LINES = 4;
 
-/** The left padding of a row at a depth of the paths: each path one step deeper than its split. */
 export function rowIndent(depth: number) {
   return 16 + depth * 20;
 }
 
-/**
- * A row of a workflow of any shape that is not a step: the label of a path, a way back or on to a step
- * shown at another place, the end of a path with no step, or the heading of the steps that no trigger
- * reaches.
- */
+export function pathLabel(branch: WorkflowBranch | null, index: number, t: MobileTranslate): string {
+  return branch === "yes"
+    ? t("mobile.workflow.path.yes")
+    : branch === "no"
+      ? t("mobile.workflow.path.no")
+      : t("mobile.workflow.flow.path", { number: index + 1 });
+}
+
+export function pathTone(branch: WorkflowBranch | null) {
+  return branch === "yes" ? "text-success-text" : branch === "no" ? "text-danger-text" : "text-grouped-secondary";
+}
+
 export function FlowRowNote({
   row,
   labelOf,
@@ -44,20 +48,8 @@ export function FlowRowNote({
   const { t } = useText();
   const muted = String(useCSSVariable("--openbot-text-grouped-secondary"));
   if (row.type === "path" || row.type === "loose") {
-    const text =
-      row.type === "loose"
-        ? t("mobile.workflow.editor.loose")
-        : row.branch === "yes"
-          ? t("mobile.workflow.path.yes")
-          : row.branch === "no"
-            ? t("mobile.workflow.path.no")
-            : t("mobile.workflow.flow.path", { number: row.index + 1 });
-    const tone =
-      row.type === "path" && row.branch === "yes"
-        ? "text-success-text"
-        : row.type === "path" && row.branch === "no"
-          ? "text-danger-text"
-          : "text-grouped-secondary";
+    const text = row.type === "loose" ? t("mobile.workflow.editor.loose") : pathLabel(row.branch, row.index, t);
+    const tone = row.type === "path" ? pathTone(row.branch) : "text-grouped-secondary";
     return (
       <View className="pt-2.5 pr-4 pb-1" style={{ paddingLeft: rowIndent(row.depth) }}>
         <Typography.Paragraph className={`font-semibold ${tone}`} style={typeScale.small}>
@@ -78,7 +70,6 @@ export function FlowRowNote({
   );
 }
 
-/** One step of a workflow, read-only: its kind and what it does. A tap opens its menu, when it has one. */
 function WorkflowStepLine({
   node,
   agents,
@@ -88,9 +79,7 @@ function WorkflowStepLine({
 }: {
   node: WorkflowNode;
   agents: readonly MobileAgent[];
-  /** A step of a condition path sits under the condition. */
   inset?: boolean;
-  /** The depth of the path of the step in a workflow of any shape; it sets the indent. */
   depth?: number;
   menu?: WorkflowStepMenu | undefined;
 }) {
@@ -147,11 +136,6 @@ function PathLabel({ text }: { text: string }) {
   );
 }
 
-/**
- * The steps of a workflow as rows of one group. A workflow of the outline shape shows its condition
- * paths under the condition; any other one shows its steps in the order that a run goes, with each
- * path of a split under its label, one level deeper.
- */
 export function workflowStepRows(
   graph: WorkflowGraph,
   agents: readonly MobileAgent[],
@@ -164,7 +148,6 @@ export function workflowStepRows(
     const node = byId.get(id);
     return node ? <WorkflowStepLine key={id} node={node} agents={agents} inset={inset} menu={menu} /> : null;
   };
-  // A workflow of another shape lists its steps in the order that a run goes, each path under its label.
   if (!outline) {
     const labelOf = (id: string) => {
       const node = byId.get(id);

@@ -1,9 +1,3 @@
-/**
- * The webhook of a routine, set from the canvas: its endpoint, its signing secret, and the events
- * that start a run. The card is the one the routine settings use. Changes to the events wait for
- * Save; a new secret is made at once and shown one time.
- */
-
 import {
   type EventFilterDraft,
   eventFilterDraft,
@@ -17,12 +11,9 @@ import { useText } from "../../text";
 import { RoutineWebhookTrigger } from "../conversation/RoutineWebhookTrigger";
 import type { DiagramRoutineWebhook } from "./diagram-model";
 
-/** What the canvas can do with the webhook of a routine. The app reaches the host for each one. */
 export interface DiagramWebhookActions {
-  /** The connection of the host to the relay. Null while it is not known. */
   connected: boolean | null;
   onSave: (routineNodeId: string, change: { eventType: string | null; filters: EventFilter[] }) => Promise<void>;
-  /** Makes a new signing secret and answers it, to be shown one time. */
   onRegenerateSecret: (routineNodeId: string) => Promise<string>;
 }
 

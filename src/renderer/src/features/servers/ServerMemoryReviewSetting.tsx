@@ -14,25 +14,14 @@ import {
 import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, Show, untrack } from "solid-js";
 
-/** The memory review calls of one server's host. The desktop reaches them through main. */
 export type HostMemoryReviewCalls = Pick<OpenBotDesktopApi["hostAdmin"], "getMemoryReview" | "setMemoryReview">;
 
 export interface ServerMemoryReviewOptions {
-  /** The calls of a client with no `window.openbot`, such as the web client. */
   calls?: HostMemoryReviewCalls;
 }
 
-/**
- * The last value that this window read for each server. The row shows it at once when the settings
- * open again, so the row does not change its size when the host answers.
- */
 const lastSettings = new Map<string, HostMemoryReview>();
 
-/**
- * Server Settings > General: how many completed turns of one conversation pass between two
- * background memory reviews of the agents of this computer or a joined server, or Off
- * (`memory-review-v1`). The values come from the host. The host checks the role again.
- */
 export function ServerMemoryReviewSetting(
   props: ServerMemoryReviewOptions & {
     serverId: string;
@@ -45,7 +34,6 @@ export function ServerMemoryReviewSetting(
   const calls = (): HostMemoryReviewCalls => props.calls ?? window.openbot.hostAdmin;
   const [settings, setSettings] = createSignal<HostMemoryReview | null>(null);
   const [loadError, setLoadError] = createSignal<string | null>(null);
-  /** Bumped for each server and each change, so an earlier answer is dropped. */
   let generation = 0;
 
   createEffect(
@@ -103,7 +91,6 @@ export function ServerMemoryReviewSetting(
           <ItemActions>
             <Select<number>
               class="settings-modal-select"
-              // A host that no longer permits its stored value still shows it.
               options={
                 current().choices.includes(current().interval)
                   ? current().choices

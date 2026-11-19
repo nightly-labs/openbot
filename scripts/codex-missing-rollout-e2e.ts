@@ -1,19 +1,3 @@
-// Checks the Codex history backfill at startup for sessions that the reading process has no rollout
-// for (#2726). Codex 0.163.0 answers `thread/turns/list` for such an unloaded thread with
-// `-32600 thread not loaded: <id>`, and the backfill showed that text in the chat at every start.
-// Runs the real agent service on a temporary profile with a fake Codex app-server that keeps its
-// rollouts in its `CODEX_HOME`, as the real one does, and starts the service twice on that profile.
-// 1. A session whose first turn Codex refused has no rollout. The backfill reads it once, shows no
-//    error, and does not read it again after the provider restarts.
-// 2. The session of an agent on a provider account after the first is in that account's folder. The
-//    backfill does not read it through the shared process, which has another `CODEX_HOME`.
-// 3. Control: a session with a rollout is read again after each provider start.
-// 4. The next message to the agent of case 1 cannot resume its session (`no rollout found`), so it
-//    starts a new session and runs, rather than fail each time.
-// 5. A provider start runs the backfill while the first turn of a new session runs. Codex 0.165.0
-//    answers the read with `-32601 paginated_threads is not supported yet` then (#3609). The backfill
-//    shows no error, and the next provider start after that turn imports the session.
-// `bun run test:codex-missing-rollout`. Writes .openbot-build/codex-missing-rollout-e2e/report.json.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -31,7 +15,6 @@ const controlPath = join(root, "control.json");
 const fakeCodex = join(root, "codex");
 const defaultHome = join(home, ".codex");
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = defaultHome;
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -46,9 +29,6 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
-// A Codex app-server that saves a rollout in its `CODEX_HOME` when a turn completes, and answers
-// `thread/turns/list` as Codex 0.163.0 does: from the rollout, or from a thread loaded in this
-// process, else with `thread not loaded`. The control file makes it refuse `turn/start`.
 const FAKE_CODEX = `#!/usr/bin/env node
 const fs = require("node:fs");
 const path = require("node:path");
@@ -58,7 +38,6 @@ if (process.argv.includes("--version")) {
 }
 const codexHome = process.env.CODEX_HOME;
 const rolloutsPath = path.join(codexHome, "fake-rollouts.json");
-// The saved turns, as { threadId, turnId }.
 const rollouts = () => { try { return JSON.parse(fs.readFileSync(rolloutsPath, "utf8")); } catch { return []; } };
 const hasRollout = (threadId) => rollouts().some((turn) => turn.threadId === threadId);
 const control = () => { try { return JSON.parse(fs.readFileSync(process.env.OPENBOT_FAKE_CODEX_CONTROL, "utf8")); } catch { return {}; } };
@@ -66,7 +45,6 @@ const log = (entry) => fs.appendFileSync(process.env.OPENBOT_FAKE_CODEX_LOG, JSO
 log({ start: true });
 const config = { config: { mcp_servers: {} }, layers: [{ name: { type: "user", file: "/fake/.codex/config.toml", profile: null }, version: "1", config: { mcp_servers: {} } }] };
 const loaded = new Set();
-// The threads with a turn started in this process.
 const started = new Set();
 let buffer = "";
 let threads = 0;
@@ -98,7 +76,6 @@ const answer = (message) => {
       return write({ id: message.id, result: { thread: { id: params.threadId, turns: [] } } });
     case "thread/unsubscribe": return write({ id: message.id, result: { status: "unsubscribed" } });
     case "thread/turns/list":
-      // Codex 0.165.0 cannot read a new thread while its first turn starts and is not saved yet.
       if (started.has(params.threadId) && !hasRollout(params.threadId))
         return write({ id: message.id, error: { code: -32601, message: "paginated_threads is not supported yet" } });
       if (!loaded.has(params.threadId) && !hasRollout(params.threadId))
@@ -120,7 +97,6 @@ const answer = (message) => {
       write({ method: "turn/started", params: { threadId: params.threadId, turn: { id: turnId } } });
       started.add(params.threadId);
       const complete = () => {
-        // The control file holds the turn open, and with it the unsaved first turn of a new thread.
         if (control().holdTurns) return setTimeout(complete, 25);
         fs.writeFileSync(rolloutsPath, JSON.stringify([...rollouts(), { threadId: params.threadId, turnId }]));
         const item = { type: "agentMessage", id: "message-" + turnId, text: "Done.", phase: "final_answer" };
@@ -204,7 +180,6 @@ function protocol(): ProtocolLine[] {
   }
 }
 
-/** Waits for a state of the service or of the fake Codex. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -219,7 +194,6 @@ await writeFile(fakeCodex, FAKE_CODEX, { mode: 0o755 });
 const accountsPath = join(userData, "openbot-provider-accounts-v1.json");
 const accountsRoot = join(userData, "provider-accounts");
 
-/** One run of the app on the profile: the service and the stores it owns. */
 async function startApp() {
   const database = new OpenBotDatabase(userData);
   const store = new AgentStore(userData, home, database);
@@ -242,7 +216,6 @@ async function startApp() {
   return { database, store, agents, providerAccounts, errors };
 }
 
-/** True when the backfill completed the import of the agent's provider session after `since`. */
 function importedSince(agentId: string, since: string): boolean {
   const session = app.store.activeProviderSession(agentId);
   const imported = session ? app.store.database.providerHistoryImport(session.id) : null;
@@ -262,7 +235,6 @@ try {
   if (!account) throw new Error("The provider account was not created.");
   const accountHome = app.providerAccounts.home(account);
 
-  // The backfill reads the newest agent first, so the control is made first and read last.
   const complete = await runCauseEffect(
     app.agents.createAgent({
       name: "Complete",
@@ -315,7 +287,6 @@ try {
   writeFileSync(controlPath, JSON.stringify({}));
   report.threads = { refused: refusedThread, account: accountThread, complete: completeThread };
 
-  // Quit, then start the app again on the same profile.
   await runCauseEffect(app.agents.stop());
   app.database.close();
   const linesBefore = protocol().length;
@@ -337,11 +308,9 @@ try {
       .slice(linesBefore)
       .find((line) => line.start && line.codexHome === defaultHome),
   );
-  // The control is the last session read, so the others are done when its import is.
   await waitFor("the backfill at the first start", () => importedSince(complete.id, startedAt));
   report.firstStart = reads(shared.pid);
 
-  // The provider restarts, and its readiness runs the backfill again.
   const restartedAt = new Date().toISOString();
   process.kill(shared.pid, "SIGTERM");
   const restarted = await waitFor("Codex to start again", () =>
@@ -370,8 +339,6 @@ try {
     errors: app.errors.filter((error) => error.agentId === refused.id).map((error) => error.code),
   };
 
-  // A provider start runs the backfill while the first turn of a new session runs in another
-  // process, as when an agent moves to a backup provider (#3609).
   writeFileSync(controlPath, JSON.stringify({ holdTurns: true }));
   const starting = await runCauseEffect(
     app.agents.createAgent(
@@ -406,11 +373,9 @@ try {
   };
   writeFileSync(controlPath, JSON.stringify({}));
   await waitFor("the first turn of the new session to end", () => idle(app, starting.id));
-  // The session is readable once its first turn is saved, so the next provider start imports it.
   const thirdRestartAt = new Date().toISOString();
   const lastShared = protocol().findLast((line) => line.start && line.codexHome === defaultHome);
   if (lastShared) process.kill(lastShared.pid, "SIGTERM");
-  // A third exit in a short time stops the automatic restarts. The user then refreshes the provider.
   await waitFor(
     "Codex to exit",
     () => app.agents.getStatus().providers?.find((provider) => provider.id === "codex")?.state !== "available",

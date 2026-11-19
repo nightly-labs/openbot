@@ -1,10 +1,3 @@
-// Checks that only a person's message, in the agent's own chat or a side thread that the person
-// opened, can change, delete or run a workflow through the agent tools, that a delete also waits for
-// the person's approval when the agent has Full access, and that reads stay open. A routine run or a workflow run can carry text
-// from outside, such as a webhook body, and a team member's message is checked by the Team API.
-// Runs the real agent service, tool router and workflow service on a temporary profile with a fake
-// Codex app-server. The fake calls the tool through `tool_call`, as a model does, and logs the result.
-// `bun scripts/agent-workflow-gate-e2e.ts`. Writes .openbot-build/agent-workflow-gate-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -23,7 +16,6 @@ const home = join(root, "home");
 const fakeCodex = join(root, "codex");
 const fakeLog = join(root, "codex.jsonl");
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -42,15 +34,9 @@ const { createWorkflows } = await import("../src/backend/workflows/workflows");
 
 const CALL_MARK = "WORKFLOW-CALL";
 const PERSON = { id: "local", name: "Alex" };
-/** A team member, whose app has only what the Team API gives it. */
 const MEMBER = { id: "member-remote", name: "Sam" };
 const REFUSAL = "Only a person's message";
 
-/**
- * A Codex app-server with the methods that the service calls. A turn whose input has
- * `WORKFLOW-CALL <<ARGS{"__tool":"…",…}ARGS>>` calls `openbot.<__tool>` with the rest of that JSON
- * through `tool_call`, logs the result, and ends. The last call in the input is the current one. Other turns answer "Done.".
- */
 const FAKE_CODEX = `#!/usr/bin/env node
 const { appendFileSync } = require("node:fs");
 if (process.argv.includes("--version")) {
@@ -62,7 +48,6 @@ const config = { config: { mcp_servers: {} }, layers: [{ name: { type: "user", f
 let buffer = "";
 let threads = 0;
 let turns = 0;
-/** Tool request id -> the turn that waits for its result. */
 const waiting = new Map();
 process.stdout.on("error", (error) => {
   if (error.code === "EPIPE") process.exit(0);
@@ -101,7 +86,6 @@ const answer = (message) => {
       if (!match) return setTimeout(() => finish(params.threadId, turnId), 20);
       const id = "tool-" + turnId;
       waiting.set(id, { threadId: params.threadId, turnId });
-      // The packet carries the request as JSON text, so its quotes arrive escaped.
       const { __tool, ...args } = JSON.parse(match[1].replace(/\\\\"/g, '"'));
       return write({
         id,
@@ -146,14 +130,12 @@ process.stdin.on("data", (chunk) => {
 });
 `;
 
-/** The arguments the fake passes to the tool. */
 interface WorkflowToolArgs {
   workflowId?: string;
   title?: string;
   brief?: string;
   ops?: (
     | { op: "add"; ref: string; kind: "trigger"; fields: { trigger: "manual" } }
-    // Not valid: a field value cannot be an object.
     | { op: "update"; node: string; fields: { schedule: { kind: string } } }
   )[];
 }
@@ -185,7 +167,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service or the fake's log. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -234,7 +215,6 @@ const agents = new AgentService({
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
   timezone: () => "UTC",
   channelRemotePerson: (personId) => personId === MEMBER.id,
-  // Full access: a workflow delete must still ask the person.
   approvalAutomation: {
     autoApproves: () => true,
     set: () => Effect.succeed({ defaultAutoApprove: true, autoApproveOverrides: {} }),
@@ -245,13 +225,11 @@ const agents = new AgentService({
   },
 });
 
-/** The approval cards that the service shows, in order. */
 const approvals: { requestId: string | number; reason: string | null }[] = [];
 agents.on("event", (event) => {
   if (event.type === "approval") approvals.push({ requestId: event.approval.requestId, reason: event.approval.reason });
 });
 
-/** Waits until the agent's chat has no open delivery. */
 function idle(agentId: string) {
   return waitFor("the chat turn to end", () =>
     agents
@@ -260,7 +238,6 @@ function idle(agentId: string) {
   );
 }
 
-/** Logs and returns the tool result of the fake's last call. */
 async function logged(name: string, before: number) {
   const entry = await waitFor(`${name} tool result`, () => toolLogs()[before]);
   const text = entry.result?.contentItems.map((item) => item.text).join("\n") ?? JSON.stringify(entry.error);
@@ -271,7 +248,6 @@ async function logged(name: string, before: number) {
 const callText = (tool: string, args: WorkflowToolArgs) =>
   `${CALL_MARK} <<ARGS${JSON.stringify({ __tool: tool, ...args })}ARGS>>`;
 
-/** Sends a message to the agent's own chat that makes the fake call `tool`. */
 async function callFromChat(
   name: string,
   agentId: string,
@@ -286,7 +262,6 @@ async function callFromChat(
   return result;
 }
 
-/** Asks the agent to delete the workflow, and answers its approval card as the person. */
 async function deleteWithAnswer(name: string, agentId: string, workflowId: string, decision: "accept" | "decline") {
   const before = approvals.length;
   const result = callFromChat(name, agentId, "delete_workflow", { workflowId });
@@ -295,7 +270,6 @@ async function deleteWithAnswer(name: string, agentId: string, workflowId: strin
   return { ...(await result), reason: approval.reason };
 }
 
-/** Runs a routine whose instruction makes the fake call `tool`, as a webhook body could. */
 async function callFromRoutine(name: string, agentId: string, tool: string, args: WorkflowToolArgs) {
   const before = toolLogs().length;
   const routine = agents.createRoutine({
@@ -312,14 +286,12 @@ async function callFromRoutine(name: string, agentId: string, tool: string, args
   return result;
 }
 
-/** Waits until no side thread of the agent has a turn that runs or waits to start. */
 function threadsIdle(agentId: string) {
   return waitFor("the side thread turns to end", () =>
     agents.listTasks(agentId).tasks.every((task) => task.state !== "running" && task.state !== "queued"),
   );
 }
 
-/** Starts a side thread as the person, with a first message that makes the fake call `tool`. */
 async function callFromNewThread(name: string, agentId: string, tool: string, args: WorkflowToolArgs) {
   const before = toolLogs().length;
   await runCauseEffect(agents.startTask({ agentId, text: callText(tool, args) }, PERSON));
@@ -328,7 +300,6 @@ async function callFromNewThread(name: string, agentId: string, tool: string, ar
   return result;
 }
 
-/** The workflow's title and revision, or null when it is gone. */
 async function stored(workflowId: string) {
   assert.ok(workflows);
   const summary = (await Effect.runPromise(workflows.list())).find((item) => item.id === workflowId);
@@ -369,7 +340,6 @@ try {
   );
   await idle(agent.id);
 
-  // 1. A person's message in the agent's own chat creates a workflow.
   const created = await callFromChat("create from the person", agent.id, "edit_workflow", {
     title: "Gate check",
     ops: [{ op: "add", ref: "start", kind: "trigger", fields: { trigger: "manual" } }],
@@ -381,8 +351,6 @@ try {
   pass("A person's message can create a workflow", created.success && before?.nodes === 1, created.text);
   assert.ok(before);
 
-  // A schedule put in the fields fails the schema. The model gets the field path as a tool failure,
-  // not a JSON-RPC error, which Codex replaces with "dynamic tool request failed".
   const badArgs = await callFromChat("edit with a field that is an object", agent.id, "edit_workflow", {
     workflowId,
     ops: [{ op: "update", node: "start", fields: { schedule: { kind: "daily" } } }],
@@ -395,7 +363,6 @@ try {
     badArgs.text,
   );
 
-  // 2. A routine run reads, but cannot change, run or delete the workflow.
   const read = await callFromRoutine("read from a routine run", agent.id, "read_workflow", { workflowId });
   pass("A routine run can read a workflow", read.success && read.text.includes("trigger"), read.text);
   const listed = await callFromRoutine("list from a routine run", agent.id, "list_workflows", {});
@@ -419,7 +386,6 @@ try {
     runsAfterRoutine.text,
   );
 
-  // 3. A team member's message is refused, also for a read: the Team API checks that member's agent access.
   const fromMember = await callFromChat(
     "edit from a team member",
     agent.id,
@@ -447,7 +413,6 @@ try {
     readFromMember.text,
   );
 
-  // 4. A side thread that the person opened counts as the person's chat.
   const fromThread = await callFromNewThread("edit from the person's side thread", agent.id, "edit_workflow", {
     workflowId,
     title: "Gate check 2",
@@ -460,7 +425,6 @@ try {
   );
   assert.ok(renamed);
 
-  // 5. A thread that the agent started with start_task does not, also for the person's later message.
   const started = await callFromChat("start a thread as the agent", agent.id, "start_task", {
     title: "Agent thread",
     brief: "Say hello.",
@@ -485,7 +449,6 @@ try {
     inAgentThread.text,
   );
 
-  // 6. The person runs and deletes the workflow.
   const run = await callFromChat("run from the person", agent.id, "run_workflow", { workflowId });
   pass("A person's message can run a workflow", run.success && run.text.includes("runId"), run.text);
   pass("No refused call showed an approval card", approvals.length === 0, JSON.stringify(approvals));

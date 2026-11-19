@@ -32,11 +32,6 @@ import { STORY_AGENT_STATUS, STORY_PRESENCE } from "./fixtures";
 import type { MockChannelSeed } from "./mock-channels";
 import type { MockOpenBotOptions } from "./mock-openbot";
 
-/*
- * The app demo on the home page: four agents, each on a different provider, that plan a launch
- * together. Every time is an offset from the moment the page opens, so the demo always shows today.
- */
-
 const LANDING_PREVIEW_EMAIL = "norbertbodziony@gmail.com";
 const MINUTE_MS = 60_000;
 
@@ -58,7 +53,6 @@ const LANDING_CONTEXT_WINDOWS: Record<string, number> = {
   pulse: 256_000,
 };
 
-/** The tokens in each agent's context window before and after its demo scene. */
 export const LANDING_CONTEXT_TOKENS: Record<string, { before: number; after: number }> = {
   atlas: { before: 41_200, after: 96_800 },
   scout: { before: 118_000, after: 212_000 },
@@ -89,7 +83,6 @@ function landingContextState(agentId: string, usedTokens: number): AgentContextS
   };
 }
 
-/** A runtime snapshot with no turn running. It carries the context meter of each agent. */
 export function landingRuntimeSnapshot(
   agents: readonly ClientAgentSummary[],
   contextTokens: Record<string, number>,
@@ -307,7 +300,6 @@ function landingServers(): ServerSummary[] {
   ];
 }
 
-/** The two teammates of the demo: Alice and Maya. */
 const LANDING_MEMBER_IDS = new Set(["member-self", "member-alice", "member-maya"]);
 
 function landingPresence(at: (minutesAgo: number) => string): TeamPresenceSnapshot {
@@ -450,11 +442,6 @@ type LandingRoutines = Required<
   Pick<MockOpenBotOptions, "routines" | "routineRuns" | "routineFlowLinks" | "routineFlowSteps">
 >;
 
-/**
- * The routines, with links and the steps of the last run, so the Routines canvas shows what each
- * agent was asked and what it answered. They use the visitor's time zone, so the app does not offer
- * to move them.
- */
 function landingRoutines(at: (minutesAgo: number) => string, timezone: string): LandingRoutines {
   const createdAt = at(14 * 24 * 60);
   const routine = (
@@ -494,7 +481,6 @@ function landingRoutines(at: (minutesAgo: number) => string, timezone: string): 
     createdAt: at(minutesAgo),
     updatedAt: at(minutesAgo - durationMinutes),
   });
-  /** The message a linked agent gets, in the template of `handoffText` in `src/backend/routine-flows/routine-flows.ts`. */
   const handoff = (routineName: string, from: string, answer: string, instruction: string) =>
     `The routine "${routineName}" continues with you.\n\n${from} answered:\n\n${answer}\n\n${instruction}`;
 
@@ -612,7 +598,6 @@ const LANDING_CHANNEL_ID = "channel-launch";
 
 type LandingChannelLine = [author: "member-self" | "atlas" | "pulse" | "scout", text: string, minutesAgo: number];
 
-/** The launch channel: you and the agents plan Friday together. */
 function landingChannels(at: (minutesAgo: number) => string): MockChannelSeed[] {
   const authors = {
     "member-self": { kind: "member", id: "member-self", name: "Norbert" },
@@ -664,7 +649,6 @@ function landingChannels(at: (minutesAgo: number) => string): MockChannelSeed[] 
   ];
 }
 
-/** Two sections: the launch work, and the research that feeds it. */
 function landingSidebarLayout(): SidebarLayoutSnapshot {
   return {
     revision: 1,
@@ -684,7 +668,6 @@ function landingSidebarLayout(): SidebarLayoutSnapshot {
   };
 }
 
-/** Each chat starts read through its last message, so a reply that lands later shows as unread. */
 function landingConversationReads(
   snapshots: Record<string, ConversationSnapshot>,
 ): Record<string, ConversationReadState> {
@@ -739,7 +722,6 @@ export function createLandingPreviewOptions(now: Date): MockOpenBotOptions {
     browserTabs: [],
     browserControlState: { sessions: [] },
     remoteDesktopSessions: [],
-    // The team server serves every capability, `host-update-v1` too; it is up to date, so no update notice shows.
     hostUpdate: {
       phase: "idle",
       currentVersion: "0.49.0",

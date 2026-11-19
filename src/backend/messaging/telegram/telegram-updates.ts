@@ -6,29 +6,23 @@ import {
 import type { InboundAction, InboundFile, InboundMessage, MessageTarget } from "../messaging-types";
 import type { TelegramChatState } from "./telegram-chats";
 
-/** The `callback_data` prefix of each button the agent posts. The token follows it. */
 export const TELEGRAM_CALLBACK_PREFIXES = { accept: "a:", decline: "d:", stop: "s:" } as const;
 
-/** The thread key of a private chat: one conversation for the whole chat. */
 const TELEGRAM_DIRECT_THREAD = "dm";
 
 const START_COMMAND = /^\/start(?:@[A-Za-z0-9_]{1,64})?(?:\s+(\S+))?\s*$/u;
 
 export type TelegramUpdateEvent =
   | { type: "message"; message: InboundMessage }
-  /** A button press. Every press is answered, so the button stops its spinner; `action` is null for a button OpenBot does not know. */
   | { type: "action"; callbackQueryId: string; action: InboundAction | null }
-  /** The bot left the chat, was removed, or the group became a supergroup with a new ID. */
   | { type: "removed" }
   | { type: "renamed"; title: string };
 
-/** A `/start <code>` that linked this chat to the host: Signal and the account service checked the code. */
 export interface TelegramLink {
   title: string;
   isDirect: boolean;
 }
 
-/** A Telegram update is always a JSON object. Anything else is not from Telegram. */
 export function parseTelegramUpdate(body: Uint8Array): DynamicRecord | null {
   try {
     const value = JSON.parse(new TextDecoder().decode(body));
@@ -49,19 +43,6 @@ export function telegramLink(update: DynamicRecord): TelegramLink | null {
   return { title: title || String(chat.id), isDirect };
 }
 
-/**
- * One update as an event for OpenBot, or null when it does not address OpenBot.
- *
- * - A private chat is one conversation. Every message in it addresses OpenBot.
- * - In a group, a message that mentions the bot, or a reply to the bot, starts or continues the
- *   conversation of its reply chain. Another message in a chain counts only in a conversation that
- *   an agent already answers (`requiresLink`). The bot has privacy mode off, so Telegram sends every
- *   group message: privacy mode drops a plain mention to a bot that is not a group admin.
- * - The conversation key: a supergroup gives each reply chain a `message_thread_id`, the ID of its
- *   first message. A forum topic is one conversation. A basic group has no thread IDs, so the chain
- *   comes from the reply map in `TelegramChatState`.
- * - Messages of bots, edits, `/start` and other service messages are ignored.
- */
 export function telegramUpdateEvent(
   update: DynamicRecord,
   botId: string,
@@ -81,7 +62,6 @@ export function telegramUpdateEvent(
   return messageEvent(message, botId, chatId, state);
 }
 
-/** True when the bot left the chat, was removed, or the group became a supergroup with a new ID. */
 export function telegramRemoval(update: DynamicRecord, botId: string, chatId: string): boolean {
   const member = update.my_chat_member;
   if (isDynamicRecord(member)) {
@@ -121,8 +101,6 @@ function messageEvent(
   const reply = isDynamicRecord(message.reply_to_message) ? message.reply_to_message : null;
   const replyFrom = reply && isDynamicRecord(reply.from) ? reply.from : null;
   const replyToBot = replyFrom !== null && String(replyFrom.id) === botId;
-  // The message it answers is the best context of a reply chain. OpenBot's own posts are in the
-  // agent's thread already.
   if (reply && replyFrom && !replyToBot && isNumber(reply.message_id)) {
     const replyAuthor = String(replyFrom.id);
     state.rememberName(replyAuthor, personName(replyFrom));
@@ -137,7 +115,6 @@ function messageEvent(
     });
   }
   const { text, mentioned } = withoutMention(rawText, entities, botId, state.botUsername);
-  // Saved with its files, such as a voice note without a mention, which the agent gets later.
   const files = inboundFiles(message);
   state.rememberMessage({
     id: String(messageId),
@@ -158,11 +135,9 @@ function messageEvent(
       target: { platformChannelId: chatId, replyThreadId: `${threadKey}:${messageId}` },
       platformMessageId: String(messageId),
       isDirect,
-      // A reply to the bot, such as to its welcome message, can start a conversation.
       requiresLink: !isDirect && !mentioned && !replyToBot,
       authorId,
       text,
-      // A Telegram mention is already a readable `@username`.
       mentionedUserIds: [],
       files,
     },
@@ -211,7 +186,6 @@ function callbackEvent(query: DynamicRecord, chatId: string, state: TelegramChat
   return { type: "action", callbackQueryId, action: null };
 }
 
-/** The conversation of one message. See `telegramUpdateEvent`. */
 function threadKeyOf(message: DynamicRecord, state: TelegramChatState): string {
   const chat = isDynamicRecord(message.chat) ? message.chat : {};
   if (chat.type === "private") return TELEGRAM_DIRECT_THREAD;
@@ -223,11 +197,6 @@ function threadKeyOf(message: DynamicRecord, state: TelegramChatState): string {
   return String(message.message_id);
 }
 
-/**
- * The thread and reply of a post. `replyThreadId` is `<thread key>` or `<thread key>:<message ID>`.
- * A post replies to that message, or to the first message of the chain, so Telegram keeps it in the
- * same reply chain. A forum post goes to its topic.
- */
 export function telegramPlacement(target: MessageTarget): {
   message_thread_id?: number;
   reply_parameters?: TelegramReplyParameters;
@@ -243,15 +212,10 @@ export function telegramPlacement(target: MessageTarget): {
   };
 }
 
-/** The conversation key in a target. */
 export function telegramThreadKey(target: MessageTarget): string {
   return (target.replyThreadId ?? TELEGRAM_DIRECT_THREAD).split(":")[0] ?? TELEGRAM_DIRECT_THREAD;
 }
 
-/**
- * The text without OpenBot's own mentions, and whether the message names OpenBot. A command such as
- * `/help@bot` keeps its name, so the agent sees it.
- */
 function withoutMention(
   text: string,
   entities: unknown[],
@@ -290,7 +254,6 @@ function inboundFiles(message: DynamicRecord): InboundFile[] {
     });
   };
   if (Array.isArray(message.photo)) {
-    // Telegram sends each size of a photo. The last is the largest.
     add(message.photo.filter(isDynamicRecord).at(-1), "photo.jpg", "image/jpeg");
   }
   add(message.document, "document", "application/octet-stream");
@@ -302,7 +265,6 @@ function inboundFiles(message: DynamicRecord): InboundFile[] {
   return files;
 }
 
-/** The text of a saved message that has only files. */
 function fileNames(files: readonly InboundFile[]): string {
   return files.map((file) => file.name).join(", ");
 }

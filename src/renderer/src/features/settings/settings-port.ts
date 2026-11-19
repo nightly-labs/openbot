@@ -1,11 +1,5 @@
 import type { OpenBotDesktopApi } from "@openbot/contracts/ipc";
 
-/**
- * What the settings context reaches in main: the app-wide preferences, the switches for updates,
- * notifications and the Dynamic Island, the local agents and their background processes of the
- * Agents tab, and the agents and the user's own notification levels of each server for the
- * Notifications tab.
- */
 export interface SettingsPort {
   getAgentDefaults: OpenBotDesktopApi["getAgentDefaults"];
   getAgentMemoryLimitPreference: OpenBotDesktopApi["getAgentMemoryLimitPreference"];
@@ -41,7 +35,6 @@ export interface SettingsPort {
   update: Pick<OpenBotDesktopApi["update"], "getPreference" | "onPreference" | "setPreference">;
 }
 
-/** Read on each call: tests and stories replace `window.openbot` per case. */
 export function settingsPort(): SettingsPort {
   return window.openbot;
 }

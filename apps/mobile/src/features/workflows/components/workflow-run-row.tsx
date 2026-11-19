@@ -8,7 +8,6 @@ import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
 import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 
-/** A run in a Runs group: its number, its status and when it started. */
 export function WorkflowRunRow({ detail, onPress }: { detail: WorkflowRunDetail; onPress: () => void }) {
   const { t, format } = useText();
   const { run } = detail;

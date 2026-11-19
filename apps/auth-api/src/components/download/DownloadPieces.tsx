@@ -7,16 +7,10 @@ import { LandingIcon } from "../landing/LandingIcon";
 
 export interface InstallerButtonProps {
   installer: DownloadInstaller;
-  /** The first installer is filled; the others are outlined. */
   primary: boolean;
-  /** Inside a card that already names the system, the button shows only the processor. */
   short?: boolean;
 }
 
-/**
- * A direct installer link for a coloured panel or card: dark on the system's colour. A plain anchor,
- * because the link answers with a redirect to a file and the router must not try to render it.
- */
 export function InstallerButton(props: InstallerButtonProps) {
   return (
     <a
@@ -35,7 +29,6 @@ export function InstallerButton(props: InstallerButtonProps) {
 
 const COPIED_FOR_MS = 1600;
 
-/** A shell command with a copy button. The text stays selectable when the clipboard is not allowed. */
 export function CommandBlock(props: { code: string }) {
   const [copied, setCopied] = createSignal(false);
   let reset: ReturnType<typeof setTimeout> | undefined;
@@ -65,7 +58,6 @@ export function CommandBlock(props: { code: string }) {
   );
 }
 
-/** A small card in the system's colour that opens its page. */
 export function SystemCard(props: { platform: DownloadPagePlatform }) {
   const page = () => DOWNLOAD_PAGES[props.platform];
   return (

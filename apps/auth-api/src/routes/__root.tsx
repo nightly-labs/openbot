@@ -3,6 +3,8 @@ import type { JSX } from "@solidjs/web";
 import { createRootRoute, type ErrorComponentProps, HeadContent, Outlet, Scripts } from "@tanstack/solid-router";
 import { createSignal, onSettled, Show } from "solid-js";
 import "@openbot/brand/logo.css";
+import { rememberPromotionCode } from "@openbot/contracts/promotion-code";
+import { rememberReferralCode } from "@openbot/contracts/referral";
 import { installPointerFocusGuard } from "@openbot/ui/pointer-focus";
 import "../styles.css";
 import { NotFoundPage } from "../components/landing/NotFoundPage";
@@ -20,24 +22,16 @@ const NOT_FOUND_TITLE = "Page not found · OpenBot";
 
 export const Route = createRootRoute({
   beforeLoad: () => ({ siteUrl: servingSiteUrl(), locale: requestLocale() }),
-  // The error page text, in the language of the request, and the English header and footer of the
-  // pages that are in English only. The server loads them once per document, and the browser reads
-  // them from the loader data.
   loader: async ({ context }) => {
     const [page, site] = await Promise.all([loadPageText(context.locale, rootPageText), loadSiteChrome("en")]);
     return { ...page, site };
   },
   shouldReload: false,
-  // The router marks the match that shows the global 404 with `_notFound`. That page has no route of
-  // its own, so the root head gives it its title. A child route's own title still wins. The 404 page
-  // is English only, so its title is English too.
   head: ({ matches }) => {
     const head = openBotRootHead(interLatinFont);
     if (!matches.some((match) => match._notFound)) return head;
     return { ...head, meta: head.meta.map((tag) => ("title" in tag ? { title: NOT_FOUND_TITLE } : tag)) };
   },
-  // The HTML holds catalog text in the language of `Accept-Language`, or of the language cookie, so a
-  // cache must keep them apart.
   headers: () => ({ ...OPENBOT_SECURITY_HEADERS, Vary: "Accept-Language, Cookie" }),
   component: RootComponent,
   shellComponent: RootDocument,
@@ -46,15 +40,12 @@ export const Route = createRootRoute({
 });
 
 function RootComponent() {
-  // Runs only in the browser: the server render has no document.
   onSettled(() => installPointerFocusGuard());
+  onSettled(() => rememberPromotionCode(() => window.localStorage, window.location.href, Date.now()));
+  onSettled(() => rememberReferralCode(() => window.localStorage, window.location.href, Date.now()));
   return <Outlet />;
 }
 
-/**
- * The load error page. Its text comes from the root loader data. When the root loader itself did not
- * finish, the browser loads the English text, and the page shows when that text is ready.
- */
 function RootError(props: ErrorComponentProps) {
   console.error(props.error);
   const loaded = Route.useMatch({ select: (match) => match.loaderData });
@@ -80,14 +71,11 @@ const NO_SCRIPT_STYLE = "<style>[data-revealed=false],[data-revealed=false] *{op
 
 function RootDocument(props: { children: JSX.Element }) {
   const chrome = useRouteSiteChrome();
-  // The language of the header, the menu and the footer is the language of the page.
   const lang = () => chrome()?.lang ?? "en";
   return (
     <html lang={lang()}>
       <head>
         <HeadContent />
-        {/* Text waits at opacity 0 for a script to reveal it. Without scripts,
-            show it as it is, so the page can still be read. */}
         <noscript innerHTML={NO_SCRIPT_STYLE} />
       </head>
       <body>

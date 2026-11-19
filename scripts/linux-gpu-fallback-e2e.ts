@@ -1,19 +1,3 @@
-// Runs the real Electron with the Linux GPU mode of `src/main/linux-gpu-mode.ts` (#992):
-// 1. A first start uses the GPU. A crash of the real GPU process (SIGSEGV) writes `gpu-crash.json`.
-// 2. The next start uses software rendering. `OPENBOT_DISABLE_GPU=0` uses the GPU again.
-// 3. A crash file from another Chromium major version does not count, and a clean quit removes the start file.
-//    A GPU process exit after a GPU context loss, which Chromium restarts, writes no crash file.
-// 4. A start that is killed before it is confirmed leaves no crash dump, so the next start tries the GPU
-//    once more. A kill of that start, or a crash of the main process, makes the next start use software
-//    rendering. A quit that starts confirms the start, also when the teardown is killed before it ends.
-// 5. `OPENBOT_DISABLE_GPU=1` uses software rendering and writes no start file.
-// 6. A server composites on the CPU, has WebGL (#6404), and writes no start file, also with
-//    `OPENBOT_DISABLE_GPU=0`. A GPU process crash turns off hardware acceleration at the next start,
-//    and `OPENBOT_DISABLE_GPU=1` turns it off. Under `xvfb-run` on a computer with no GPU, the report
-//    shows SwiftShader as the WebGL renderer of the server step.
-//
-// Run on a Linux desktop with a working GPU: bun scripts/linux-gpu-fallback-e2e.ts
-// It writes .openbot-build/linux-gpu-fallback-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { closeSync, existsSync, openSync, readdirSync, readFileSync } from "node:fs";
@@ -27,10 +11,8 @@ import { withoutElectronRuntimeFlags } from "./electron-spawn-env";
 const ROOT = resolve(import.meta.dirname, "..");
 const OUT = join(ROOT, ".openbot-build", "linux-gpu-fallback-e2e");
 const STATE_TIMEOUT_MS = 30_000;
-// The file names of `src/main/linux-gpu-mode.ts`, which imports Electron and cannot load in Bun.
 const GPU_START_FILE = "gpu-start.json";
 const GPU_CRASH_FILE = "gpu-crash.json";
-// The Electron binary itself, not the `.bin/electron` Node wrapper: the test kills the main process.
 const electronPath = join(
   ROOT,
   "node_modules",
@@ -85,7 +67,6 @@ try {
   ]);
   assert.equal(build.status, 0, `bun build failed: ${build.stderr.toString()}`);
 
-  // 1. The first start uses the GPU, and a crash of the real GPU process is recorded.
   const data = join(root, "user-data");
   let launch = await start(data, 1_000);
   assert.deepEqual(launch.ready.mode, { hardwareAcceleration: true, reason: "default" });
@@ -98,19 +79,38 @@ try {
   await until(() => existsSync(join(data, GPU_CRASH_FILE)), "the GPU crash writes the crash file");
   await quit(launch);
 
-  // 2. The next start uses software rendering, and OPENBOT_DISABLE_GPU=0 overrides it.
   launch = await start(data, 1_000);
   assert.deepEqual(launch.ready.mode, { hardwareAcceleration: false, reason: "gpu-process-crash" });
   assert.equal(launch.ready.hardwareAccelerationEnabled, false);
   assert.equal(existsSync(join(data, GPU_START_FILE)), false, "a software start writes no start file");
   steps.push({ step: "after gpu crash", ready: launch.ready });
+  let softwareGpuProcess = await until(() => descendantWithType(launch.ready.pid, "gpu-process"), "a GPU process");
+  for (let exit = 0; exit < 3; exit += 1) softwareGpuProcess = await stopGpuProcess(launch, softwareGpuProcess);
+  steps.push({ step: "software start after 3 GPU process exits", ready: launch.ready, gpuProcess: softwareGpuProcess });
   await quit(launch);
+  launch = await start(data, 1_000);
+  assert.deepEqual(launch.ready.mode, { hardwareAcceleration: false, reason: "gpu-process-crash" });
+  softwareGpuProcess = await until(() => descendantWithType(launch.ready.pid, "gpu-process"), "a GPU process");
+  let looping = true;
+  void launch.exited.then(() => {
+    looping = false;
+  });
+  while (looping) {
+    process.kill(softwareGpuProcess, "SIGKILL");
+    const previous = softwareGpuProcess;
+    const next = await until(
+      () => !looping || descendantWithType(launch.ready.pid, "gpu-process", previous),
+      "a new GPU process or the quit",
+    );
+    if (typeof next === "number") softwareGpuProcess = next;
+  }
+  assert.equal(await launch.exited, 0, "a GPU process restart loop ends with a clean quit");
+  steps.push({ step: "software start with a GPU process restart loop", ready: launch.ready });
   launch = await start(data, 1_000, { OPENBOT_DISABLE_GPU: "0" });
   assert.deepEqual(launch.ready.mode, { hardwareAcceleration: true, reason: "environment-on" });
   steps.push({ step: "OPENBOT_DISABLE_GPU=0", ready: launch.ready });
   await quit(launch);
 
-  // 3. A crash with another Chromium major version does not count. A clean quit confirms the start.
   await writeFile(join(data, GPU_CRASH_FILE), JSON.stringify({ version: 1, chromium: "0" }));
   launch = await start(data, 600_000);
   assert.deepEqual(launch.ready.mode, { hardwareAcceleration: true, reason: "default" });
@@ -127,7 +127,6 @@ try {
   steps.push({ step: "after a GPU context loss", ready: launch.ready });
   await quit(launch);
 
-  // 4. A killed start (#6208) gets one retry. A second stop, or a crash (as with SIGTRAP in #992), turns off the GPU.
   const killed = join(root, "killed-start");
   launch = await start(killed, 600_000);
   await killTree(launch.ready.pid, launch.exited);
@@ -165,7 +164,6 @@ try {
   steps.push({ step: "after a killed teardown", ready: launch.ready });
   await quit(launch);
 
-  // 5. OPENBOT_DISABLE_GPU=1 always uses software rendering.
   const forced = join(root, "forced-software");
   launch = await start(forced, 1_000, { OPENBOT_DISABLE_GPU: "1" });
   assert.deepEqual(launch.ready.mode, { hardwareAcceleration: false, reason: "environment-off" });
@@ -173,8 +171,6 @@ try {
   steps.push({ step: "OPENBOT_DISABLE_GPU=1", ready: launch.ready });
   await quit(launch);
 
-  // 6. A server has no GPU: it composites on the CPU, and the environment value does not change it.
-  //    It keeps WebGL on SwiftShader for the sites that its agents open.
   const server = join(root, "server");
   launch = await start(server, 1_000, { OPENBOT_DISABLE_GPU: "0" }, ["--server"]);
   assert.deepEqual(launch.ready.mode, { hardwareAcceleration: true, reason: "server" });
@@ -214,8 +210,6 @@ try {
   if (!passed) process.exitCode = 1;
 }
 
-// The app's output goes to a log file, not to a pipe: a closed pipe makes a later write in the app
-// fail with EPIPE, and Electron shows that as an error dialog on the desktop.
 async function start(
   userData: string,
   confirmMs: number,
@@ -248,7 +242,6 @@ function once(child: ChildProcess): Promise<number | null> {
   return new Promise((done) => child.once("exit", (code) => done(code)));
 }
 
-/** Kills the main process as a crash would, then the child processes it leaves. */
 async function killTree(pid: number, exited: Promise<number | null>): Promise<void> {
   const descendants = descendantsOf(pid);
   process.kill(pid, "SIGKILL");
@@ -292,11 +285,17 @@ function descendantsOf(root: number): number[] {
   });
 }
 
-/** The PID of a process under `root` whose command line has `--type=<type>`. */
-function descendantWithType(root: number, type: string): number | undefined {
+async function stopGpuProcess(launch: Launch, gpuProcess: number): Promise<number> {
+  process.kill(gpuProcess, "SIGKILL");
+  const next = await until(() => descendantWithType(launch.ready.pid, "gpu-process", gpuProcess), "a new GPU process");
+  assert.equal(launch.child.exitCode ?? launch.child.signalCode, null, "the app runs after a GPU process exit");
+  return next;
+}
+
+function descendantWithType(root: number, type: string, except?: number): number | undefined {
   return descendantsOf(root).find((pid) => {
+    if (pid === except) return false;
     try {
-      // Chromium rewrites its process title, so the arguments can be one string with spaces.
       return readFileSync(`/proc/${pid}/cmdline`, "utf8").split(/[\0 ]/u).includes(`--type=${type}`);
     } catch {
       return false;

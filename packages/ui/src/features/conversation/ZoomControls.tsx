@@ -1,28 +1,21 @@
 import { Button, Minus, Plus } from "@openbot/ui";
 import { useText } from "../../text";
 
-/** The view of a zoomed image: its scale and its offset. */
 export interface Camera {
   x: number;
   y: number;
   scale: number;
 }
 
-/** The closest zoom shows each pixel of the image this many times larger. */
 export const MAX_SCALE = 8;
-/** One button press or key press zooms by this factor. */
 export const ZOOM_STEP = 1.25;
-/** A double-click zooms the fitted image in by this factor. */
 export const DOUBLE_CLICK_ZOOM = 2.5;
-/** How fast a pinch or Ctrl and the wheel zooms, per pixel of wheel movement. */
 export const WHEEL_ZOOM_RATE = 0.01;
 
-/** Zoom out, the zoom level, which fits the view when pressed, and zoom in. */
 export function ZoomControls(props: {
   class: string;
   levelClass: string;
   buttonClass?: string;
-  /** The zoom level, as a part of the natural size. */
   zoom: number;
   onZoomOut: () => void;
   onFit: () => void;

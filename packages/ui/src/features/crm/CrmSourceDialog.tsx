@@ -20,14 +20,11 @@ import { createSignal, For, Show } from "solid-js";
 import { SOURCE_ERROR_KEY, SOURCE_KEY, timeAgo } from "./crm-model";
 import type { CrmViewModel } from "./crm-state";
 
-/** The app icon of each connector. */
 const SOURCE_MARK = { stripe: StripeTile } as const satisfies Record<CrmSourceKind, () => JSX.Element>;
 
-/** A restricted key: the host refuses a secret key and checks the permissions. */
 const KEY_FORM = /^rk_(live|test)_[A-Za-z0-9]+$/u;
 const KEY_MAX = 255;
 
-/** The one dialog of the connectors. The list and the page of a connector change inside it. */
 function SourceFrame(props: { crm: CrmViewModel; children: JSX.Element }) {
   return (
     <Dialog.Root open onOpenChange={(open: boolean) => !open && props.crm.closeForm()}>
@@ -42,7 +39,6 @@ function SourceFrame(props: { crm: CrmViewModel; children: JSX.Element }) {
   );
 }
 
-/** The title of a connector's page, with Back to the list. */
 function SourceTitle(props: { title: string; onBack: () => void }) {
   const { t } = useText();
   return (
@@ -55,10 +51,8 @@ function SourceTitle(props: { title: string; onBack: () => void }) {
   );
 }
 
-/** From this many connectors, the list has a search field. */
 const SEARCH_FROM = 8;
 
-/** Each connector with its state: a dot and the last sync when it is connected. */
 function ConnectorList(props: { crm: CrmViewModel; onOpen: (kind: CrmSourceKind) => void }) {
   const { t, locale } = useText();
   const [query, setQuery] = createSignal("");
@@ -123,7 +117,6 @@ function ConnectForm(props: { crm: CrmViewModel; kind: CrmSourceKind; onBack: ()
     if (!valid() || busy()) return;
     setBusy(true);
     try {
-      // The dialog stays open: it shows the connected source and its first sync.
       if (await props.crm.sourceActions().connect(props.kind, key().trim())) setKey("");
     } finally {
       setBusy(false);
@@ -272,12 +265,7 @@ function SourceState(props: { crm: CrmViewModel; source: CrmSource; onBack: () =
   );
 }
 
-/**
- * The connectors of the CRM: the list, and the page of one connector. A page connects its source, or
- * shows the connected one with its sync, Sync now and Disconnect.
- */
 export function CrmSourceDialog(props: { crm: CrmViewModel; kind: CrmSourceKind | null }) {
-  // The page changes inside the dialog, so the dialog does not close and open again.
   const [kind, setKind] = createSignal(props.kind);
   const back = () => setKind(null);
   return (

@@ -335,10 +335,19 @@ Server settings > Transfer > Copy to another server joins the two directions in 
 desktop only. It shows when the user administers two or more servers with `instance-transfer-v1`,
 this computer's included. `instance-transfer:copy` is scoped to the destination and takes
 `{ fromServerId, agentIds }`. Main exports the agents of the source with their workspace files and
-without chat history or server settings to a temporary file. As in a file export, the file also has
+server settings and without chat history to a temporary file. As in a file export, the file also has
 the channels that have a selected agent as a member and the Shared folder. Each apply adds the
-channels again as new channels. Main then stages the file at the destination, applies all of its
-agents, and removes the file. Each side uses the routes above, in parts when its host has
+channels again as new channels. Main then keeps only the settings of the copied agents in the file
+(`InstanceTransferService.keepCopiedSettings`, with `@openbot/team-client/instance-transfer-copy`): the
+routine flows between them, the places on their routine canvas, and the workflows with a step for one
+of them or an output to one of their channels. MCP servers, custom providers and agents, sidebar
+sections and shared skills stay out. It writes a new manifest and a new central directory over the old
+directory, so the other entries are not copied; nothing reads the old manifest that stays in the file.
+This computer's export leaves the shared skills out; a joined source server still puts them in the
+file, and the new directory leaves them out. The manifest must be stored, not compressed, as every
+export writes it. Each host
+in the support window reads the result, so the copy needs no new capability. Main stages the file at
+the destination, applies all of its agents with the settings, and removes the file. Each side uses the routes above, in parts when its host has
 `instance-transfer-chunks-v1`, so a host needs no new route; a destination with only
 `instance-transfer-v1` takes at most 100 MB, the Shared folder included. An agent whose name is already on the destination is
 added beside it. The browser client has no copy: it connects to one host at a time.
@@ -346,7 +355,9 @@ added beside it. The browser client has no copy: it connects to one host at a ti
 The mobile app has the same copy in Server settings > Transfer > Copy to another server. The source
 is the server of the page, and the destination is another online server that the user administers
 with `instance-transfer-v1`. The phone downloads the file from the source with the export route,
-sends it to the destination with the upload route, and applies all of its agents. The phone uses
+keeps the same settings as the desktop (`copiedTransferUpload` in `@openbot/team-client`, which decodes
+only the Base64 of the manifest and the end of the file), sends it to the destination with the upload
+route, and applies all of its agents with the settings. The phone uses
 only `instance-transfer-v1`, so the file is at most 100 MB. The file stays in memory on the phone and
 is not written to its storage. A token that the destination keeps when the page closes before the
 apply is discarded.
@@ -496,6 +507,22 @@ the live list has the same `sunra-` or `higgsfield-` form as a fixed id. A clien
 the capability shows the fixed models and no price. The Run button of an image step shows the price,
 and the page rail shows the number of credits under the logo when the account has no quota.
 
+`workflows-media-service-account-v1` lets a step choose which Sunra or Higgsfield account pays. Apps
+can have more than one account of a service (`mcp-accounts-v1`). The accounts of a service are its
+enabled, signed-in Apps rows in the order of Apps: the row of the first connect, then the accounts
+that the person added (`McpGateway.serviceSignIns`). The first one is the default. The `account`
+field of an image step then also applies to a Sunra or a Higgsfield model: empty or `default` is the
+first account, and the id of an Apps row is that account. When the host does not have that account,
+the step fails with "account not found" and the host never makes the file on another account.
+`POST /v1/workflows/media/service-accounts {}` answers `{ accounts }`, each with `provider`, `id` and
+`name` (null for the row of the first connect, which Apps names by the app).
+`POST /v1/workflows/media/service-credits {}` answers the same list with the `credits` of each
+account. Both are reads that each member who can use workflows can call; they give no token or
+address. The catalog, the price and the answers of `workflows-sunra-v1` and `workflows-higgsfield-v1`
+stay on the first account. The capability goes to protocol 10 peers. When a service has more than one
+account, the model picker lists each one ("Higgsfield credits · Higgsfield 2"), and the page rail
+shows one credits button for each account, with its name.
+
 The optional event `workflows-changed { workflowId }` names the workflow that changed, so the
 client reads it again. A client without the capability shows `serverTooOld` on the Workflows page.
 
@@ -610,6 +637,14 @@ so the closed card shows what the agent got; the stored resolution leaves the ke
 web client and the mobile app open the editor only on a host that advertises it. Elsewhere the
 `edit_preview` button answers as any other button, and the agent asks what to change.
 
+`routine-quiet-answers-v1` (`team-protocol/routine-quiet-answers-v1.ts`, protocol 10 only) adds no
+route and no field. A host with it sends the `routine_quiet_answer` messages, the text of a routine run
+or a teammate update that ended with nothing to report, in pages, live events and read state to a
+client that sends it, as the local desktop chat has them. The desktop with a joined server and the web
+client show them under their run or update, which starts closed. The mobile app sends it too, but
+shows the run row only. Before it, a user on a server could never read a report that the agent ended
+quiet by mistake (#11174). A host or client without it leaves these messages out, as before.
+
 ### Subagents
 
 `subagents-v1` carries the subagents that an agent started in one turn (see
@@ -684,6 +719,17 @@ comes back after a reconnect. The WebRTC host peer encodes the events again with
 Compacting the context of a joined server's agent stays local only: the Team API has no route for it.
 The iPhone app advertises the capability through the shared team client, but it shows no meter.
 
+### Background work
+
+`agent-background-work-v1` (protocol 10) tells a client that an agent waits for its own background
+work after its turn ended (see `team-protocol/agent-background-work-v1.ts`). It adds `backgroundWork`
+beside the frozen keys of the `snapshot` of the `runtime-snapshot` event: one entry for each waiting
+chat or thread, with `botId`, `taskId` (`null` for the agent's chat) and `since`. The host adds it only
+for a connection that advertises the capability, and filters it as the rest of the snapshot. The
+desktop and the web client show a waiting row with a timer in the chat or the thread until the job
+wakes the agent. A host without the capability never sends it, so the client shows no row. Only a
+Claude agent reports background work. The iPhone app does not show the row.
+
 ### Queue window
 
 `queue-window-v1` keeps the queue snapshot of a long-lived agent inside one WebRTC frame. The
@@ -704,6 +750,18 @@ Every current client sends `teamCapabilitiesForProtocol(7)`, so the phone, the w
 joined desktop get the window without other client code. A released phone keeps the full list
 until it updates. `scripts/queue-window-e2e.ts` checks the frame size with and without the
 capability.
+
+### Open queues of all agents
+
+`agent-active-queues-v1` adds `POST /v1/agent-active-queues/list`. A client reads the open work of
+each visible agent (queued, starting and running deliveries, the failed deliveries of a failed turn,
+and the welcome mark) in one request, not one `GET /v1/agents/:id/queue` for each agent. On a server
+with many agents, those reads filled the data channel after connect and delayed the chat. The
+answer has no finished history; agents that do not fit in one WebRTC frame, or that have more than 200
+open deliveries, are in `omitted`, and the client reads them on the released route. The web client and a joined desktop use the route on
+connect, resync, agent changes and `queue-invalidated`, and read the full queue of an agent when the
+user opens its chat. A host without the capability gets the released per-agent reads.
+`scripts/team-api-routes-e2e.ts` checks the route.
 
 ### Browser control and page state
 
@@ -931,8 +989,10 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `events-v1` | Manage webhook routines, their secrets, and activity | `events` |
 | `routine-recovery-v1` | Read and set a routine's missed-run policy; read its runs with the missed occurrences | `events` |
 | `routine-results-v1` | List the messaging connections and their places; read and set where an agent routine sends its answers. Deliveries stay on the host | none: only the mobile app sends it |
+| `routine-results-whatsapp-v1` | No route or field of its own. The `routine-results-v1` answers can name `whatsapp`, so the options list the host's WhatsApp numbers and a routine can send its answers to one. The host sends WhatsApp only to a client that sends it. Protocol 10 only | none |
 | `webhook-tests-v1` | Send one signed test event to a webhook routine | `events` |
 | `webhook-sender-secret-v1` | Set a webhook routine's signing secret to a secret that the sender made | `events` |
+| `webhook-agent-secret-v1` | Give a new signing secret of an agent's webhook routine to that agent as an API key. The answer has only the key name | `events` |
 | `vault-v1` | The host's Vault: list, add, change and delete logins, cards and contact info; show one saved password, card number or security code; reset a Vault that the host cannot read. No CSV import. A change sends `vault-changed` with no data, so a client reads the list again | `vault` |
 | `vault-v2` | All of `vault-v1`, under `/v1/admin/vault/v2/`, and API keys as a fourth item kind: list each key's variable name and notes, add, change and delete keys, and show one saved key. The host leaves API keys out of every `vault-v1` answer, and `vault-v1` cannot delete or show one, so an older client keeps a valid list. It uses the `vault-changed` event of `vault-v1` | `vault` |
 | `vault-v3` | All of `vault-v2`, under `/v1/admin/vault/v3/`, and a two-step (TOTP) key on a login: list items carry `hasTwoStep`, save adds, replaces or removes the key (absent keeps it, empty removes it), and `codes` answers the current code of each login with a key. No route answers with a key. `vault-v1` and `vault-v2` lists leave out `hasTwoStep`, and their save keeps the saved key. It uses the `vault-changed` event of `vault-v1` | `vault` |
@@ -1799,7 +1859,9 @@ the time until the workspace can be used, and the host requests that block that 
   the stack with `OPENBOT_DEV_RTT_MS=<ms>`: an unpackaged main then delays the account service calls
   by the full time and each data-channel send and message by half of it. The desktop Signal socket is
   in the hidden peer window, so it keeps its time. The report warns when this value is not equal to
-  `--latency`.
+  `--latency`. `OPENBOT_DEV_DOWNLINK_KBPS=<kbit/s>` also limits the data that an unpackaged desktop
+  client receives on the data channel to that rate. `scripts/workflow-canvas-pictures-perf-e2e.ts`
+  uses both values to measure the pictures of the Workflows canvas on a joined server.
 - A failed request records a safe code (`http/<status>/<code>`, `errno/<code>` or `error/<tag>`), and
   an interrupted one is `aborted`. The report counts them by route. It never records a message, a URL
   or a host.

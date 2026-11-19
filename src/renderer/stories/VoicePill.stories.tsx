@@ -8,7 +8,6 @@ import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { STORY_AGENT } from "./fixtures";
 
 const QUIET = new Array(24).fill(0);
-/** A few words and a short pause, as the waveform shows them. */
 const SPEECH = [
   0, 0, 0.05, 0.3, 0.55, 0.4, 0.7, 0.5, 0.2, 0.05, 0, 0, 0.1, 0.45, 0.8, 0.6, 0.35, 0.6, 0.9, 0.5, 0.25, 0.4, 0.65, 0.5,
 ];
@@ -28,8 +27,6 @@ const meta = {
     speed: 1,
     onCycleSpeed: fn(),
   },
-  // Mute, speed and the open pill are local here; in the app the voice conversation and the saved
-  // speed hold them. End sends the pill back into the top edge, and Start brings it out again.
   render: (args) => {
     const { t } = useText();
     const [muted, setMuted] = createSignal(untrack(() => args.muted));
@@ -97,7 +94,6 @@ export const Thinking: Story = { args: { phase: "thinking" } };
 
 export const Speaking: Story = { args: { phase: "speaking", levels: SPEECH } };
 
-/** Codex live voice speaks at the speed of the realtime model, so it has no speed button. */
 export const LiveVoice: Story = { args: { onCycleSpeed: undefined } };
 
 export const MicrophoneBlocked: Story = {

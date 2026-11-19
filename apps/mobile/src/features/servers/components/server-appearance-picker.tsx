@@ -21,26 +21,18 @@ import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspac
 import type { MobileServer } from "@/features/workspace/model/workspace-types";
 import { useText } from "@/shared/lib/text";
 
-/** Columns of each grid, so that the rows are full: 10 shapes, and 17 colours with Automatic. */
 const SHAPE_COLUMNS = 5;
 const COLOR_COLUMNS = 9;
 const SHAPE_SIZE = 40;
 
-/**
- * The shape and colour of the plush that the server shows with no logo, for an owner or admin of a
- * connected host that serves `host-appearance-v1`. Each choice saves at once; the host tells every
- * member.
- */
 export function ServerAppearancePicker({ server }: { server: MobileServer }) {
   const { t, errorMessage } = useText();
   const { setServerAppearance } = useMobileWorkspace();
   const { busy, error, perform } = useLockedAction();
-  // The choice that is being saved, so it shows at once. Undefined shows the saved one.
   const [pending, setPending] = useState<ServerAppearance | null | undefined>();
   const shown = pending === undefined ? (server.appearance ?? null) : pending;
 
   function save(choice: ServerAppearance | null): void {
-    // The squircle in the automatic colour is the automatic look, so it is saved as null, as on desktop.
     const next = choice?.shape === "squircle" && choice.color === null ? null : choice;
     setPending(next);
     void perform(
@@ -49,7 +41,6 @@ export function ServerAppearancePicker({ server }: { server: MobileServer }) {
     ).finally(() => setPending(undefined));
   }
 
-  // A colour with no shape yet takes the first shape, which is the automatic one.
   const selectShape = (shape: ServerAppearanceShape) => save({ shape, color: shown?.color ?? null });
   const selectColor = (color: ServerAppearance["color"]) =>
     save({ shape: shown?.shape ?? SERVER_APPEARANCE_SHAPES[0], color });
@@ -110,7 +101,6 @@ export function ServerAppearancePicker({ server }: { server: MobileServer }) {
               </View>
             </ChoiceCell>
             {AVATAR_COLOR_CHOICES.map((choice) => {
-              // The host saves a colour as lower-case `#rrggbb`.
               const color = choice.swatch.toLowerCase();
               if (!isServerAppearanceColor(color)) return null;
               return (
@@ -138,7 +128,6 @@ export function ServerAppearancePicker({ server }: { server: MobileServer }) {
   );
 }
 
-/** One shape in the colour that the server shows. */
 function ShapeThumbnail({
   serverId,
   shape,

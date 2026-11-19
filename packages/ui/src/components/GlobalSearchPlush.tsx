@@ -2,11 +2,8 @@ import { PlushMascot } from "@openbot/ui";
 import { createEffect, createSignal, onSettled } from "solid-js";
 import { prefersReducedMotion } from "../utils";
 
-/** How long the typing stops before the plush looks for a result. */
 const IDLE_MS = 500;
-/** The caret distance, in pixels, at which the eyes turn the most. */
 const GAZE_REACH = 160;
-/** How far the eyes look to each side when the plush looks for a result, in pixels. */
 const LOOK_PX = 4;
 
 interface Gaze {
@@ -14,7 +11,6 @@ interface Gaze {
   y: number;
 }
 
-/** Where the caret of `input` is on the screen. */
 function caretPoint(input: HTMLInputElement, context: CanvasRenderingContext2D): Gaze {
   const style = getComputedStyle(input);
   context.font = style.font;
@@ -28,17 +24,10 @@ function clampUnit(value: number): number {
   return Math.max(-1, Math.min(1, value));
 }
 
-/**
- * The plush of the "No results" state. Its eyes follow the caret of `input` while the user types.
- * When the typing stops and no search runs, it looks left and right for a result, then tilts its
- * head. It is decoration: the text beside it is the accessible content. With reduced motion it
- * stays still.
- */
 export function GlobalSearchPlush(props: { input: () => HTMLInputElement | undefined; searching: boolean }) {
   const [gaze, setGaze] = createSignal<Gaze | null>(null);
   let root: HTMLSpanElement | undefined;
   let idle: ReturnType<typeof setTimeout> | undefined;
-  // The typing stopped while a search ran, so the plush looks when the search ends.
   let waiting = false;
   let animations: Animation[] = [];
 
@@ -109,7 +98,6 @@ export function GlobalSearchPlush(props: { input: () => HTMLInputElement | undef
       waitForIdle();
     }
 
-    // The state shows after an input, so the plush first looks at the caret, then looks for a result.
     follow();
     waitForIdle();
     document.addEventListener("input", follow, true);

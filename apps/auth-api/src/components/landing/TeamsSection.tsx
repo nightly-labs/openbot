@@ -15,9 +15,7 @@ const OFFER_ICONS: Record<LandingTeamsOfferId, LandingIconName> = {
 
 const pad = (value: number) => String(value).padStart(2, "0");
 
-/** The heading and the button stay on the left; one colour card for each offer stacks as the page scrolls. */
 export function TeamsSection() {
-  // The card on top of the stack. The list on the left marks it.
   const [active, setActive] = createSignal(0);
   const landing = useLandingText();
   const path = useSitePath();
@@ -31,14 +29,12 @@ export function TeamsSection() {
       if (!stack) return;
       const cards = Array.from(stack.querySelectorAll<HTMLElement>(":scope > li"));
       const style = getComputedStyle(stack);
-      // The distance between two stuck cards, so the label row of each card stays visible.
       const step = Number.parseFloat(style.getPropertyValue("--landing-teams-step"));
       const gap = Number.parseFloat(style.rowGap);
       let top = 0;
       cards.forEach((card, index) => {
         const next = cards[index + 1];
         const box = card.getBoundingClientRect();
-        // 0 while the next card is in its place in the list; 1 when it is stuck on top of this one.
         const distance = next ? next.getBoundingClientRect().top - box.top : 0;
         const covered = next ? Math.min(1, Math.max(0, 1 - (distance - step) / (box.height + gap - step))) : 0;
         card.style.setProperty("--landing-teams-covered", covered.toFixed(3));

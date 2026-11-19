@@ -29,7 +29,7 @@ they do. This skill adds the rules for an agent.
 1. Get the four inputs: the VPS ID, the owner's email, one word for the customer (`a-z`, `0-9`) and
    the server name that the customer sees (6 to 32 characters). Ask for each one that is missing.
    When the developer does not know the VPS ID, run `leaseweb-pool.ts free`: it lists each VPS with no
-   reference on the four accounts.
+   reference on the five accounts.
 2. Write the operator keys to `.openbot-build/custom/operator-keys`, as the docs say.
 3. Run the command without `--apply`. Show the plan: the reference, the hostname and the server
    name. Do not show the email in a message that other people can read.

@@ -5,8 +5,6 @@ import { Effect } from "effect";
 import { afterEach, describe, expect, it } from "vitest";
 import { TraceFile } from "./trace-file";
 
-// Failure modes: a path or a secret in a provider status reaches the file; a line holds more than the four span
-// fields; a cut-off line from a crash breaks the summary; a turn with no start is recorded.
 describe("TraceFile", () => {
   let directory = "";
   afterEach(async () => {

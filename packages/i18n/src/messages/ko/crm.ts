@@ -220,7 +220,7 @@ export const messages = {
   "crm.customer.paidOn": "{date} 지불",
   "crm.customer.billing": "청구",
   "crm.customer.details": "세부 정보",
-  "crm.customer.since": "고객 등록일",
+  "crm.customer.added": "추가일",
   "crm.customer.activity": "활동",
   "crm.customer.loading": "불러오는 중…",
 

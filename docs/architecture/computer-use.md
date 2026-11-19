@@ -178,6 +178,23 @@ script presses V. Text that the host
 already has from an earlier paste is not sent again, so a copy made on the host stays on its
 clipboard. A host with no clipboard writer serves neither route.
 
+The same script watches the stream. Moonlight's viewer says "connected" when the video track
+arrives, before a frame, and neither Moonlight Web nor Sunshine can lower the rate during a stream.
+On a connection slower than the stream, each lost frame makes the streamer wait for a full frame,
+which the connection loses again, so the picture stays black or frozen (#11271). The script counts
+the frames that the browser decodes (`framesDecoded` of Moonlight's peer connection). Sunshine
+sends at least half the frame rate, also for a still screen, so no frame for 20 s is a stall, or
+60 s before the first frame, as the viewer's own stream check waits. The script judges only while
+the page shows, a peer connection is up, and the browser reports video. It then reports `error`
+with a text that says the connection is too slow, and `connected` again when frames come back.
+When Moonlight already reported its own error, such as for a host that stopped, the script stays
+quiet, so that text stays and the quality does not change. In the desktop app and the browser, a
+stall also sets Moonlight's `bitrate` and `fps` to the phone app's Data saver values (3 Mbit/s,
+30 fps) for the streams of that server in the next 24 hours, so Retry shows a picture. The key holds
+the server ID, because one viewer origin shows all joined servers. The phone app keeps the quality
+from its menu. The host serves this script also when it has no clipboard writer, but then without
+the paste part.
+
 On Linux, the gateway accepts only an X11 session (`DISPLAY` set, no `WAYLAND_DISPLAY`, and
 `XDG_SESSION_TYPE` not `wayland`). Sunshine then runs with X11 capture and software encoding, and
 sends input through XTest, so a hosted server under Xvfb needs no uinput device and no extra
@@ -283,3 +300,14 @@ When Computer Use is off for the agent or the driver is unavailable, the thread 
 entry disabled. A registration failure stops the thread with steps to repair the configuration or
 turn off Computer Use. The application-access questions from the driver still use their existing
 approval flow.
+
+### Codex's own Computer Use
+
+Codex loads its bundled Computer Use plugins by default (`computer-use@openai-bundled`, which starts
+`node_repl` and `cua_node`, and `unified-computer-use@openai-bundled`). A session without Computer
+Use sets `plugins.<id>.enabled = false` for both in the thread configuration: an agent with the
+setting off, or a task or channel thread beside the agent's own chat. The thread value wins over the
+user's own Codex file. Codex (0.160 to 0.170) does not read `features.computer_use`, so OpenBot does not use it.
+A loaded session keeps the plugins of its start, so the session fingerprint has a value for a
+session without Computer Use. The next turn replaces a session from before, and a session whose
+setting changed, with the usual handoff.

@@ -1,9 +1,5 @@
 import type { ProviderPage } from "./provider-page";
 
-// Every statement about OpenCode here is taken from opencode.ai and OpenCode's GitHub
-// repository. Each page used is in `sources`. Check them again, and move `checkedAt`,
-// whenever this file changes.
-
 const DOCS = "https://opencode.ai/docs";
 
 export const OPENCODE_PROVIDER: ProviderPage = {

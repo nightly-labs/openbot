@@ -1,5 +1,3 @@
-/** The canvas search: it finds a step by its name, its fields or its results, and shows the step. */
-
 import type { WorkflowNodeKind } from "@openbot/contracts/ipc";
 import { Button, Input, Search, X } from "@openbot/ui";
 import { For, Show } from "solid-js";
@@ -7,7 +5,6 @@ import { useText } from "../../text";
 import { AddItemLabel, addItem } from "./WorkflowAddMenu";
 import { HudButton } from "./WorkflowCanvasHud";
 
-/** The part of a text around the first match, so a long prompt shows where the words are. */
 function snippet(text: string, query: string): string {
   const flat = text.replace(/\s+/g, " ").trim();
   const at = flat.toLowerCase().indexOf(query.trim().toLowerCase());
@@ -18,7 +15,6 @@ function snippet(text: string, query: string): string {
 
 export interface SearchMatch {
   node: { id: string; kind: WorkflowNodeKind };
-  /** The text that holds the query. */
   text: string;
 }
 

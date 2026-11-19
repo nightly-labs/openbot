@@ -6,11 +6,6 @@ import { FakeProviderDownloads, lazyProviderAgentStatus, MockedOnboardingApi } f
 
 const setupState: AppSetupState = { completed: false, preferredProvider: null, preferredModel: null };
 
-/**
- * A new computer: nothing is downloaded. OpenCode downloads when first run opens, and "Use free models"
- * starts it while the user reads the next step. A plan provider downloads and then opens its
- * sign-in. The computer step asks for both permissions.
- */
 function NewComputerFirstRun(props: { args: FirstRunFlowProps; downloaded?: boolean; tickMs?: number }) {
   return (
     <FakeProviderDownloads
@@ -56,42 +51,50 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** One question: start free now, or connect a plan. */
 export const Choice: Story = {};
 
 export const ChoiceNarrow: Story = {
   globals: { viewport: "onboardingNarrow" },
 };
 
-/**
- * Not macOS, so there is no computer step. "Use free models" waits on the first screen until OpenCode
- * is ready, then opens the app.
- */
 export const ChoiceWithoutComputerStep: Story = {
   args: { platform: "linux" },
 };
 
-/**
- * "Use your … plan": ChatGPT, Claude and Grok are downloaded, so the plan step only connects.
- * OpenCode is not in the list; "Use free models instead" leaves the plan step.
- */
 export const SubscriptionPath: Story = {
   render: (storyArgs) => <NewComputerFirstRun args={storyArgs} downloaded />,
 };
 
-/**
- * OpenCode downloads slowly. Press "Use free models", then "Open OpenBot" at once: the button waits,
- * says why, and opens the app when OpenCode is ready.
- */
 export const FreeStillDownloading: Story = {
   render: (storyArgs) => <NewComputerFirstRun args={storyArgs} tickMs={600} />,
 };
 
-/** Setup cannot be saved, so the last step shows the error and keeps the button. */
 export const FinishFails: Story = {
   args: {
     onSave: fn(async () => {
       throw new Error("The settings file is read-only.");
+    }),
+  },
+};
+
+const ACCOUNT_SERVERS: NonNullable<FirstRunFlowProps["existingServers"]> = [
+  { id: "host-7f3a91c2", name: "MacBook-Pro", state: "online", logoUrl: null },
+  { id: "host-0b6d44e8", name: "MacBook-Air", state: "offline", logoUrl: null },
+  { id: "host-52c9e0aa", name: "Research server on a Hetzner VPS in Falkenstein", state: "connecting", logoUrl: null },
+];
+
+export const ExistingServers: Story = {
+  args: {
+    existingServers: ACCOUNT_SERVERS,
+    onOpenServer: fn(async () => new Promise<boolean>(() => undefined)),
+  },
+};
+
+export const ExistingServerOpenFails: Story = {
+  args: {
+    existingServers: ACCOUNT_SERVERS,
+    onOpenServer: fn(async () => {
+      throw new Error("The server did not answer.");
     }),
   },
 };

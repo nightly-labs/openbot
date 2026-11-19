@@ -1,12 +1,3 @@
-/**
- * One channel in a section. A channel is filed and dragged exactly like an agent, so this shares
- * the agent row's drag wrapper, its `.agent-row` anatomy and its context menu's pin and "Move to"
- * items; what differs is the avatar, the preview line and the agent-only actions it leaves out.
- *
- * A channel whose work waits for the user sits in the "Needs you" group, as a waiting agent does.
- * There it does not drag, and it has the same badge, chip and tooltip as the agent row.
- */
-
 import type { ChannelSummary } from "@openbot/contracts/ipc";
 import { Badge, buttonVariants, ContextMenu } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
@@ -20,7 +11,6 @@ import { sidebarUnreadBadge } from "./sidebar-agent-states";
 import { sidebarAgentStateLabel, sidebarMessageTime } from "./sidebar-filtering";
 import { useSidebarScope } from "./sidebar-scope";
 
-/** `waiting` is set by the "Needs you" and "Unread" groups, as on `SidebarAgentRow`. */
 export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?: boolean }) {
   const {
     dragOffset,
@@ -44,21 +34,15 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?:
   const draggable = () => !rowProps.channel.archived && chatsDraggable() && !props.compact && !rowProps.waiting;
   const [menuOpen, setMenuOpen] = createSignal(false);
   const title = () => rowProps.channel.title.trim();
-  // A row from a saved frame has no last message yet: it shows no preview and no time until the list loads.
   const previewPending = () => props.channelPreviewsPending === true && !rowProps.channel.lastMessage;
-  /* Running work is a prefix on the preview line rather than a word beside the name: one line
-   * carries both and the row keeps the height every other row in the list has. */
   const time = () =>
     previewPending() ? "" : sidebarMessageTime(rowProps.channel.lastMessage?.at ?? rowProps.channel.createdAt, format);
   const preview = () => {
-    // A waiting row previews the question, as on the agent row.
     const text =
       wait()?.detail ||
       (rowProps.channel.lastMessage?.text ?? (previewPending() ? "" : t("sidebar.channel.noMessages")));
     return rowProps.channel.activeTasks > 0 ? t("sidebar.channel.workingPreview", { preview: text }) : text;
   };
-  // The wait label already reads the question, so the label does not say it twice, unless the
-  // preview also says that work runs.
   const labelPreview = () => (wait()?.detail && rowProps.channel.activeTasks === 0 ? "" : `. ${preview()}`);
   const row = (): JSX.Element => (
     <ContextMenu.Root modal={false} onOpenChange={setMenuOpen}>

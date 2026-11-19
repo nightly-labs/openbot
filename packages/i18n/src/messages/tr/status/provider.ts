@@ -14,6 +14,8 @@ export const messages = {
     "{provider} model sağlayıcısına bağlanamıyor. Yeniden deniyor: deneme {attempt}.",
   "status.provider.modelRetryServerError":
     "Model sağlayıcısı meşgul veya bir hata verdi. {provider} yeniden deniyor: deneme {attempt}.",
+  "status.provider.modelRetryOutOfMemory":
+    "Model sunucusunun belleği bu sohbet için yetmedi. {provider} yeniden deniyor: deneme {attempt}. Yeni bir sohbet daha az bellek gerektirir.",
   "status.provider.modelRetryRecovered": "Model sağlayıcısı yeniden yanıt veriyor.",
   "status.provider.retryRecovered": "{provider} sunucusundan yeniden yanıt alıyor.",
   "status.provider.claudeFastModeNeedsUsageCredits":
