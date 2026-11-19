@@ -1,8 +1,3 @@
-// The CRM group of the preview, in memory, with the host's rules: the three built-in statuses, a
-// revision check on a customer update, a first payment when a plan starts, the next payment when a
-// recurring one is paid, and proposals that an approval applies. It starts empty unless a story
-// gives a seed. Each change emits `crm-changed`.
-
 import {
   CRM_BUILTIN_STATUS_IDS,
   CRM_LIMITS,
@@ -25,11 +20,9 @@ import {
 } from "@openbot/contracts/ipc";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 
-/** A customer as a story gives it: the totals come from the payments. */
 export type MockCrmCustomer = Omit<CrmCustomer, "paidMinor" | "openMinor" | "lateMinor" | "nextDueOn" | "lastPaidAt">;
 
 export interface MockCrmSeed {
-  /** Statuses after the built-in ones. */
   statuses?: CrmStatus[];
   tags?: CrmTag[];
   customers?: MockCrmCustomer[];
@@ -38,7 +31,6 @@ export interface MockCrmSeed {
   privateFields?: CrmPrivateField[];
   agentIds?: string[];
   sources?: CrmSource[];
-  /** The Server Settings > Experimental switch. The preview shows the CRM unless a story turns it off. */
   enabled?: boolean;
 }
 
@@ -50,7 +42,6 @@ const BUILTIN_TONES: Record<(typeof CRM_BUILTIN_STATUS_IDS)[number], CrmStatus["
 
 const MONTHS: Record<Exclude<CrmEvery, "once">, number> = { month: 1, quarter: 3, year: 12 };
 
-/** `date` moved by whole months; a day that the month does not have becomes its last day. */
 function addMonths(date: string, months: number): string {
   const [year = 0, month = 1, day = 1] = date.split("-").map(Number);
   const first = new Date(Date.UTC(year, month - 1 + months, 1));
@@ -61,10 +52,8 @@ function addMonths(date: string, months: number): string {
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-/** The CRM error keys that take no values. */
 type CrmErrorKey = Exclude<Extract<keyof SourceMessages, `error.crm.${string}`>, "error.crm.amountDecimals">;
 
-/** The host's error text. `missing` is true for an item that is gone, as the host's code `missing`. */
 class MockCrmError extends Error {
   constructor(
     key: CrmErrorKey,
@@ -109,8 +98,6 @@ export function mockCrm(seed: MockCrmSeed, emit: () => void): OpenBotDesktopApi[
     for (const id of ids) if (!tags.some((tag) => tag.id === id)) fail("error.crm.tagMissing");
     return [...ids];
   };
-  /** A status that a person made; the built-in ones cannot change. */
-  /** As on the host: a row that a source owns is read-only. */
   const editable = <T extends { source: CrmSource["kind"] | null }>(row: T): T =>
     row.source === null ? row : fail("error.crm.sourceOwned");
   const customStatus = (id: string) =>
@@ -146,10 +133,6 @@ export function mockCrm(seed: MockCrmSeed, emit: () => void): OpenBotDesktopApi[
     return id;
   }
 
-  /**
-   * As the host does: the next payment of a recurring plan, while the plan has no open payment and has
-   * not ended. The due date is the first period after the plan's last payment, counted from its start.
-   */
   function nextPayment(paid: CrmPayment): void {
     if (paid.planId === null) return;
     const entry = plan(paid.planId);
@@ -191,7 +174,6 @@ export function mockCrm(seed: MockCrmSeed, emit: () => void): OpenBotDesktopApi[
     };
   }
 
-  /** One change, as the host applies it. `proposedBy` names the agent of an approved proposal. */
   function apply(change: CrmChange | CrmProposedChange, actor: CrmActor, proposedBy: string | null): CrmApplyResult {
     switch (change.kind) {
       case "customer-create": {
@@ -238,7 +220,6 @@ export function mockCrm(seed: MockCrmSeed, emit: () => void): OpenBotDesktopApi[
           change.patch.stripeCustomerId !== entry.stripeCustomerId
         )
           fail("error.crm.sourceOwned");
-        // Plans and payments keep minor units of the customer's currency.
         const used = entry.plans.length > 0 || [...payments.values()].some((item) => item.customerId === entry.id);
         if (change.patch.currency !== undefined && change.patch.currency !== entry.currency && used)
           fail("error.crm.currencyInUse");
@@ -333,7 +314,6 @@ export function mockCrm(seed: MockCrmSeed, emit: () => void): OpenBotDesktopApi[
         return { ok: true, id: null };
       }
       case "payment-paid": {
-        // A null `paidAt` marks the payments unpaid again.
         const paidAt = change.paidAt === null ? null : new Date(change.paidAt).toISOString();
         for (const entry of change.paymentIds.map(payment)) editable(entry);
         for (const entry of change.paymentIds.map(payment)) {
@@ -352,7 +332,6 @@ export function mockCrm(seed: MockCrmSeed, emit: () => void): OpenBotDesktopApi[
           fail("error.crm.splitTotal");
         const [first, ...rest] = change.parts;
         if (!first) fail("error.crm.invalidChange");
-        // The first part keeps the invoice number; each other part gets a new one.
         Object.assign(entry, first);
         for (const part of rest) addPayment({ ...entry, ...part });
         log(entry.customerId, actor, change.kind, proposedBy);
@@ -381,7 +360,6 @@ export function mockCrm(seed: MockCrmSeed, emit: () => void): OpenBotDesktopApi[
         if (statuses.length >= CRM_LIMITS.statuses) fail("error.crm.tooManyStatuses");
         if (statuses.some((entry) => entry.label === change.label)) fail("error.crm.statusExists");
         const id = crypto.randomUUID();
-        // A new status takes the next tone, as the host gives it.
         statuses.push({
           id,
           label: change.label,
@@ -427,7 +405,6 @@ export function mockCrm(seed: MockCrmSeed, emit: () => void): OpenBotDesktopApi[
           proposals = proposals.filter((entry) => entry.id !== proposal.id);
           return result;
         } catch (error) {
-          // As on the host: a missing item ends the proposal; a refused change stays pending.
           if (error instanceof MockCrmError && error.missing)
             proposals = proposals.filter((entry) => entry.id !== proposal.id);
           throw error;
@@ -436,7 +413,6 @@ export function mockCrm(seed: MockCrmSeed, emit: () => void): OpenBotDesktopApi[
     }
   }
 
-  /** The rows after `after`, at most one page, and the cursor of the next page. */
   function page<T>(rows: T[], after: string | undefined): { rows: T[]; next: string | null } {
     const start = after === undefined ? 0 : Number(after);
     const end = start + CRM_LIMITS.page;
@@ -477,8 +453,6 @@ export function mockCrm(seed: MockCrmSeed, emit: () => void): OpenBotDesktopApi[
       if (result.ok) emit();
       return result;
     },
-    // The preview has no Stripe: a connect adds the source with nothing to import, and a sync only
-    // moves its time.
     sourceConnect: async (input) => {
       if (!/^rk_(live|test)_[A-Za-z0-9]+$/u.test(input.key.trim()))
         fail(input.key.trim().startsWith("sk_") ? "error.crm.sourceSecretKey" : "error.crm.sourceInvalidKey");
@@ -503,7 +477,6 @@ export function mockCrm(seed: MockCrmSeed, emit: () => void): OpenBotDesktopApi[
     sourceDisconnect: async (input) => {
       const entry = sources.find((item) => item.id === input.sourceId) ?? fail("error.crm.sourceMissing");
       sources = sources.filter((item) => item.id !== entry.id);
-      // The rows stay and become editable.
       for (const item of customers.values()) {
         item.source = null;
         for (const owned of item.plans) owned.source = null;

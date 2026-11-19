@@ -1,12 +1,3 @@
-// The live provider test: one real turn on Codex, Claude and Gemini, each in its own
-// desktop app, at the same time. The e2e framework (https://e2e.com/docs) is the runner; it drives
-// each app window through the DevTools port. See docs/provider-live-e2e.md.
-//
-// Each provider uses the sign-in of the user who runs the test, and each run sends two short
-// messages to each provider.
-// `bun run test:provider-live`; `--target=<codex|claude|antigravity>` runs one provider.
-// `--bench` runs only the bench tests, on Codex, Claude and Grok; they send more and longer turns.
-// Writes scripts/provider-live/.e2e/report.json, summary.md, junit.xml and a trace for each test.
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { rmSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -32,18 +23,14 @@ if (target !== undefined && !providers.includes(target))
 
 const environment = withoutElectronRuntimeFlags(process.env);
 
-/** The port of the local account service of this worktree, when it runs and answers. */
 async function accountServicePort(): Promise<number | null> {
-  // A worktree can have more than one stack record, and not each one has the service.
   for (const record of readDevStackRecords()) {
     if (resolve(record.projectRoot) !== ROOT) continue;
     const port = record.ports.find((entry) => entry.name === "api")?.port;
     if (port === undefined) continue;
     try {
       if ((await fetch(`http://127.0.0.1:${port}/health/live`)).ok) return port;
-    } catch {
-      // This record has no live service. The next one can have it.
-    }
+    } catch {}
   }
   return null;
 }
@@ -52,16 +39,13 @@ function run(command: string, args: string[], env: NodeJS.ProcessEnv = environme
   return spawnSync(command, args, { cwd: ROOT, env, stdio: "inherit" }).status ?? 1;
 }
 
-// A run that stops before e2e must not leave the report of an earlier run.
 rmSync(join(ROOT, "scripts/provider-live/.e2e"), { recursive: true, force: true });
 
 let startedService: ChildProcess | null = null;
 let exitCode = 1;
 try {
-  // The app signs a development account in on the local account service. It starts with no secrets.
   let port = await accountServicePort();
   if (port === null) {
-    // `process.execPath` is Bun. With the name "bun", knip reads the argument "api" as a binary.
     startedService = spawn(process.execPath, [join(ROOT, "scripts/dev-services.ts"), "api"], {
       cwd: ROOT,
       env: environment,
@@ -94,8 +78,6 @@ try {
     },
   );
 } finally {
-  // Only the service that this run started: its process is the supervisor of its stack record.
-  // `stop` with no `--pid` stops each stack of this worktree, also the developer's.
   if (startedService?.pid !== undefined) {
     run("bun", [join(ROOT, "scripts/dev-stack.ts"), "stop", `--pid=${startedService.pid}`]);
   }

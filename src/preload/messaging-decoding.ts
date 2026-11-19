@@ -1,7 +1,3 @@
-// What main answers for the Slack workspaces, Discord servers, Telegram chats and WhatsApp numbers of
-// this computer.
-// These guard the renderer.
-
 import {
   type AddMessagingOrchestratorResult,
   type DiscordAccess,
@@ -21,7 +17,6 @@ import {
   type WhatsAppOverview,
 } from "@openbot/contracts/ipc";
 
-/** The orchestrator that main created, and the sidebar section it went to. */
 export function decodeAddOrchestratorReply(value: unknown): AddMessagingOrchestratorResult {
   if (!isAddMessagingOrchestratorResult(value)) throw new Error("Invalid messaging orchestrator response.");
   return value;

@@ -16,19 +16,10 @@ import {
   stringField,
 } from "./request-helpers";
 
-/**
- * The frozen `agent-tasks-v1` snapshot carries a limit of 1 to 4. A higher host default goes out as 4:
- * no client starts a turn from it.
- */
 export function agentTasksWireSnapshot(snapshot: AgentTasksSnapshot): AgentTasksSnapshot {
   return snapshot.limit <= AGENT_TASK_LIMIT_MAX ? snapshot : { ...snapshot, limit: AGENT_TASK_LIMIT_MAX };
 }
 
-/**
- * `agent-tasks-v1`: the tasks of one agent. A member who can send a message to the agent can use them,
- * so no role is checked, as for `POST /v1/agents/:id/messages`. The member is the sender of a start and
- * of a message. An agent that this peer cannot see (`hiddenAgentIds`) answers as a missing agent does.
- */
 export async function routeAgentTasks(
   context: TeamApiRequestContext,
   tasks: TeamApiAgentTasks | undefined,
@@ -86,7 +77,6 @@ function startTask(tasks: TeamApiAgentTasks, agentId: string, body: DynamicRecor
   );
 }
 
-/** The frozen codec has already checked that it is an identifier. */
 function clientMessageId(body: DynamicRecord): { clientMessageId?: string } {
   return isString(body.clientMessageId) ? { clientMessageId: body.clientMessageId } : {};
 }

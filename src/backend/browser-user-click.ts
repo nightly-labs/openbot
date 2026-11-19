@@ -9,22 +9,10 @@ import {
 } from "./browser-cdp-values";
 import { stepText, USER_BROWSING_TEXT_CHARACTERS } from "./user-browsing-log";
 
-/** A page that does not answer in this time gives no click step. */
 export const CLICK_READ_TIMEOUT_MS = 1_000;
-/** Frames inside frames. Past this a press gives no click step. */
 const MAX_CLICK_FRAME_DEPTH = 8;
-/** The automation-world global that keeps the frame element under the pointer for the next read. */
 const CLICK_FRAME_GLOBAL = "__openbotClickFrame";
 
-/**
- * Reads what is under the pointer in one frame, in CSS pixels, also inside an open shadow root. On a
- * frame element it keeps that element in `CLICK_FRAME_GLOBAL` and gives the offset of the frame's
- * content, so the read goes on in that frame. `byHover` finds the frame by `:hover` before the point,
- * which is not yet in this frame's pixels; without a point and a hovered frame it gives null. A click
- * outside a control gives null, so page text is not
- * recorded. It never reads what a person typed: a field gives its label, never its value, and an
- * editable area gives no name. A password field gives null.
- */
 const clickScript = (point: { x: number; y: number } | null, byHover: boolean) => `(() => {
   const point = ${JSON.stringify(point)};
   const isFrame = (element) => element?.tagName === "IFRAME" || element?.tagName === "FRAME";
@@ -68,13 +56,11 @@ const clickScript = (point: { x: number; y: number } | null, byHover: boolean) =
   const textRoles = ["link", "button", "tab", "menuitem", "menuitemcheckbox", "menuitemradio", "option", "checkbox", "radio", "switch", "treeitem", "label"];
   const role = target.getAttribute("role") || (tag === "input" ? inputRoles[type] || "textbox" : tagRoles[tag]) || tag;
   const text = (value) => (value || "").replace(/\\s+/g, " ").trim();
-  // An ID names an element of the same tree: the document, or the shadow root of the target.
   const tree = target.getRootNode();
   const byId = (id) => (typeof tree.getElementById === "function" ? tree : document).getElementById(id);
   const labelled = text((target.getAttribute("aria-labelledby") || "").split(/\\s+/).map((id) => byId(id)?.textContent || "").join(" "));
   const editable = target.isContentEditable || tag === "textarea" || (tag === "input" && !["checkbox", "radio", "button", "submit", "reset", "image", "range"].includes(type)) || tag === "select";
   const fieldLabel = () => text([...(target.labels || [])].map((label) => label.textContent).join(" ")) || text(target.getAttribute("placeholder"));
-  // Only a button input shows its value as its name. A checkbox, a radio or a slider value is a field value.
   const valueNamed = tag === "input" && ["button", "submit", "reset"].includes(type);
   const name =
     text(target.getAttribute("aria-label")) ||
@@ -87,13 +73,6 @@ const clickScript = (point: { x: number; y: number } | null, byHover: boolean) =
   return { role, name: name.slice(0, ${USER_BROWSING_TEXT_CHARACTERS * 2}) };
 })()`;
 
-/**
- * The role and the name of what a person pressed at `x`, `y` (CSS pixels), or null. `inPage` says
- * that the point is in the pixels of the page. Otherwise the press went to a frame in another process
- * and the point is in the pixels of that frame, so the read finds the frame by `:hover` first. Each
- * frame under the point is read in its own automation world: the page's own world cannot reach into a
- * frame of another origin. `frameSession` gives the session of a frame that runs in another process.
- */
 export const readClickTarget = Effect.fn("Browser.readClickTarget")(function* (
   send: SendCommand,
   frameSession: (frameId: string) => string | undefined,
@@ -138,7 +117,6 @@ export const readClickTarget = Effect.fn("Browser.readClickTarget")(function* (
     } else {
       sessionId = frameSessionId;
       contextId = yield* automationContextId(send, sessionId);
-      // A press that went to a frame in another process is in the pixels of the last such frame.
       point = inPage ? inner : { x, y };
     }
   }

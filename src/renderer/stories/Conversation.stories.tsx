@@ -529,7 +529,6 @@ const markdownImageMessages: RendererAgentMessage[] = [
   },
 ];
 
-/** A reply that names a file by its full path, beside a user message, in a medium-width chat. */
 const longPathReplyMessages: RendererAgentMessage[] = [
   {
     id: "long-path-user",
@@ -735,10 +734,6 @@ const readingHistoryMessages = (length: number) =>
 
 const readingHistoryStreamSentence = "I am still checking the release plan and adding each finding to this reply. ";
 
-/**
- * A reply that grows and a thinking line that changes for as long as the story is open, under a
- * history that is long enough to scroll. The reader can scroll up while the agent is working.
- */
 function StreamingWhileReadingHistoryConversation(props: {
   args: Parameters<typeof Conversation>[0];
   history: RendererAgentMessage[];
@@ -992,10 +987,6 @@ const queuedDelivery: QueueDeliveryFixture = {
   createdAt: "2026-08-19T10:00:00.000Z",
 };
 
-/**
- * The panel shows what waits behind the work that runs now, so `presentQueueDeliveries` returns
- * nothing for a queue with no running delivery. Every queue fixture carries this one.
- */
 const runningDelivery: QueueDeliveryFixture = {
   ...queuedDelivery,
   id: "queued-running",
@@ -1060,10 +1051,6 @@ const referenceQueue: QueueSnapshot = {
 const LIVE_DICTATION =
   "Can you check the release notes for 2.18 and tell me which fixes still need a changelog entry before Friday?";
 
-/**
- * Live dictation as the app shows it: a partial pass about once a second, a few words longer each
- * time, then the final pass (darker text) and the transcript in the draft. The animated story loops.
- */
 function playLiveDictation(
   controller: ReturnType<typeof createConversationController>,
   target: { agentId: string; serverId: string },
@@ -1150,8 +1137,6 @@ function MockedConversation(props: {
       controller.setVoicePhase(voicePhase);
     });
   }
-  // The same keyed entry `agent-event-bridge` writes when a provider reports an error, so the
-  // story shows the banner where the chat it belongs to actually renders it.
   if (initialAgentId && props.conversationError) {
     onSettled(() => {
       controller.setConversationErrors({
@@ -1307,7 +1292,6 @@ export const RichConversation: Story = {};
 
 const contextStoryAgent = requireFixture(args.agent, "Context story agent");
 
-/** The real conversation composer receives the same numeric snapshot as the desktop host. */
 export const ContextIndication: Story = {
   args: {
     contextState: {
@@ -1338,7 +1322,6 @@ export const ContextCompactionFailed: Story = {
   },
 };
 
-/** The real composer with a signed-out provider: the notice takes the queue's place above the input. */
 export const ProviderSignInRequired: Story = {
   name: "Provider sign in required",
   args: {
@@ -1352,7 +1335,6 @@ export const ProviderSignInRequired: Story = {
   },
 };
 
-/** The real composer with a spent plan window and a dismissible notice. */
 export const UsageLimitReached: Story = {
   name: "Usage limit reached",
   args: {
@@ -1368,12 +1350,6 @@ export const UsageLimitReached: Story = {
   },
 };
 
-/**
- * The real composer after a provider reported an error. The report stands above the input, in the
- * same column as the usage-limit and sign-in notices, rather than as a bubble in the transcript:
- * a provider that retries a dropped transport reports the same failure once per attempt, and one
- * banner stands for the whole run. One press clears it.
- */
 export const ProviderErrorBanner: Story = {
   name: "Provider error banner",
   render: (storyArgs) => (
@@ -1415,7 +1391,6 @@ export const VoiceRequestingMicrophone: Story = {
   render: (storyArgs) => <MockedConversation args={storyArgs} voicePhase="requesting" />,
 };
 
-/** After Stop: the last live text shows in full colour until the final pass replaces the draft. */
 export const VoiceTranscribing: Story = {
   name: "Voice transcribing",
   render: (storyArgs) => (
@@ -1489,7 +1464,6 @@ export const ScrollToLatest: Story = {
   },
 };
 
-/** Five days of history, 120 messages: the scroll rail is on the right edge. */
 export const LongHistory: Story = {
   args: {
     messages: Array.from({ length: 120 }, (_, index): RendererAgentMessage => {
@@ -1511,7 +1485,6 @@ export const LongHistory: Story = {
   },
 };
 
-/** One agent chat on a team: two other people write, their runs group, and a reply quotes one. */
 export const SeveralPeople: Story = {
   name: "Several people",
   args: {
@@ -1631,7 +1604,6 @@ export const LongFilePathInReply: Story = {
   ),
 };
 
-/** The composer and the sent reply quote the same Markdown message, and render it the same way. */
 export const MarkdownReplyQuote: Story = {
   name: "Markdown reply quote",
   args: {
@@ -1661,7 +1633,6 @@ export const StreamingWhileReadingHistory: Story = {
   render: (storyArgs) => <StreamingWhileReadingHistoryConversation args={storyArgs} history={shortReadingHistory} />,
 };
 
-/** More than 100 rows, so the timeline draws only the rows near the screen. */
 const longReadingHistory = readingHistoryMessages(120);
 
 export const StreamingWhileReadingLongHistory: Story = {
@@ -1674,10 +1645,6 @@ export const StreamingWhileReadingLongHistory: Story = {
   render: (storyArgs) => <StreamingWhileReadingHistoryConversation args={storyArgs} history={longReadingHistory} />,
 };
 
-/**
- * A new agent message arrives every 400ms for as long as the story is open, and the newest one is still
- * streaming, as when several agents report in a row. The reader can scroll up and read.
- */
 function ReplyBurstConversation(props: { args: Parameters<typeof Conversation>[0]; history: RendererAgentMessage[] }) {
   const [count, setCount] = createSignal(1);
   const replies = () =>
@@ -1713,7 +1680,6 @@ export const ReplyBurstWhileReadingHistory: Story = {
   render: (storyArgs) => <ReplyBurstConversation args={storyArgs} history={shortReadingHistory} />,
 };
 
-/** More than 100 rows, so the timeline draws only the rows near the screen. */
 export const ReplyBurstWhileReadingLongHistory: Story = {
   args: {
     messages: longReadingHistory,
@@ -1798,7 +1764,6 @@ export const BrowserTakeover: Story = {
   render: (storyArgs) => <MockedConversation args={storyArgs} takeoverStateGallery />,
 };
 
-/** The message box and its queue stay under a browser takeover too. */
 export const QueuedDuringBrowserTakeover: Story = {
   ...BrowserTakeover,
   name: "Queued during browser takeover",
@@ -1816,7 +1781,6 @@ export const PromptQuestionsInChat: Story = {
   },
 };
 
-/** An answered question card in the chat history. Its page height must not change after it opens. */
 export const AnsweredQuestionsInChat: Story = {
   name: "Answered questions in chat",
   args: {
@@ -1880,7 +1844,6 @@ const uiBlockEpic: UiConfirmBlock = {
   ],
 };
 
-/** More columns than the widest card holds: the table scrolls sideways in the card. */
 const uiBlockEarlierEpic: UiConfirmBlock = {
   ...uiBlockEpic,
   title: "Approve the Saturday epic before I open it?",
@@ -1903,10 +1866,6 @@ const uiBlockEpicScript: UiConfirmBlock = {
   actions: [{ id: "run", label: "Run", style: "primary" }],
 };
 
-/**
- * A table or code in a card preview makes the card as wide as an agent reply with a table, live and
- * in the history. A table wider than that scrolls sideways in the card.
- */
 export const UiBlockWithTable: Story = {
   name: "Agent UI block with a table",
   args: {
@@ -1975,10 +1934,6 @@ export const Queued: Story = {
   args: { queue },
 };
 
-/**
- * An approval stands at the end of the chat, and the message box and its queue stay under it, so a
- * message sent while the agent works stays in view (#1745).
- */
 export const QueuedDuringApproval: Story = {
   args: {
     activeTurnId: "turn-active",
@@ -1998,10 +1953,6 @@ export const QueuedDuringApproval: Story = {
   },
 };
 
-/**
- * Chief asked Research and Sales. Research answered while Chief worked, so its answer waits above
- * the composer with the question, not in the queue panel. The person's own message stays queued.
- */
 export const WaitingForReplies: Story = {
   args: {
     queue: { agentId: "chief", deliveries: [...(STORY_QUEUES.chief ?? []), queuedDelivery, runningDelivery] },
@@ -2009,12 +1960,10 @@ export const WaitingForReplies: Story = {
   },
 };
 
-/** Every card above the input at once: one card with a line between each part, and no gaps. */
 export const WaitingForRepliesWithUsageLimit: Story = {
   args: { ...WaitingForReplies.args, accountUsage: UsageLimitReached.args?.accountUsage },
 };
 
-/** The plan of the turn that runs: the block is open and the running step shimmers. */
 export const PlanInProgress: Story = {
   args: {
     activeTurnId: "turn-plan-live",
@@ -2053,7 +2002,6 @@ export const ThreeQueuedMessages: Story = {
   args: { queue: queueWithItems(3), activeTurnId: "turn-active" },
 };
 
-/** Messages sent to steer that wait in the queue instead, each with the reason on its row. */
 export const QueuedAfterSteerFallback: Story = {
   args: {
     activeTurnId: "turn-active",
@@ -2362,8 +2310,6 @@ export const ActionMarkerSpacing: Story = {
   args: actionMarkerArgs,
 };
 
-/* The history opens and closes inside a real timeline, where the messages under
-   the marker move with it. The isolated marker story cannot show that. */
 export const ActionMarkerHistory: Story = {
   name: "Action marker history",
   args: {
@@ -2437,7 +2383,6 @@ function agentExchangeMessage(
   };
 }
 
-/* Consecutive messages with other agents show as one row in the chat. Each message opens its text under its marker. */
 export const AgentMessageGroupInChat: Story = {
   name: "Agent message group in chat",
   args: {
@@ -2481,7 +2426,6 @@ export const AgentMessageGroupInChat: Story = {
   },
 };
 
-/** One routine run as the host stores it: a "running" marker, then the final state a minute later. */
 function routineRunMessages(
   hour: number,
   minute: number,
@@ -2510,7 +2454,6 @@ function routineRunMessages(
   });
 }
 
-/* Consecutive completed runs of one routine show as one row. A failed run keeps its own row. */
 export const RoutineRunGroupInChat: Story = {
   name: "Routine run group in chat",
   args: {
@@ -2534,12 +2477,6 @@ export const RoutineRunGroupInChat: Story = {
   },
 };
 
-/**
- * A host that answers each message in the order the desktop host does: the receipt, then the
- * message with the turn that starts it, a thinking step, the reply while the agent writes it, the
- * finished reply, and the end of the turn. The chat starts with `historyRows` rows, so a send can
- * also take the transcript over the 100 rows that the timeline draws in full.
- */
 function NaturalSendLoopConversation(props: { args: Parameters<typeof Conversation>[0]; historyRows: number }) {
   const [chat, setChat] = createSignal<RendererAgentMessage[]>(readingHistoryMessages(props.historyRows));
   const [activeTurnId, setActiveTurnId] = createSignal<string | null>(null);
@@ -2568,7 +2505,6 @@ function NaturalSendLoopConversation(props: { args: Parameters<typeof Conversati
       position: 0,
       createdAt: new Date().toISOString(),
     };
-    // As the host does: it reports the queued message first, answers the send, then starts the turn.
     setDeliveries((current) => [...current, delivery]);
     later(220, () => {
       setDeliveries((current) =>
@@ -2619,7 +2555,6 @@ function NaturalSendLoopConversation(props: { args: Parameters<typeof Conversati
     );
     later(2260, () => {
       setActiveTurnId((current) => (current === id ? null : current));
-      // The host keeps a finished message in the snapshot.
       setDeliveries((current) =>
         current.map((item) => (item.id === id ? { ...item, status: "completed" as const, position: null } : item)),
       );
@@ -2641,19 +2576,16 @@ function NaturalSendLoopConversation(props: { args: Parameters<typeof Conversati
   );
 }
 
-/** Send a message: it rises above the working face, and the reply comes as one bubble. */
 export const NaturalSendLoop: Story = {
   args: { messages: [], activeTurnId: null, queue: undefined, unreadCount: 0, firstUnreadMessageId: null },
   render: (storyArgs) => <NaturalSendLoopConversation args={storyArgs} historyRows={20} />,
 };
 
-/** 100 rows: the first send takes the transcript over the rows that the timeline draws in full. */
 export const NaturalSendLoopAtRowLimit: Story = {
   args: NaturalSendLoop.args,
   render: (storyArgs) => <NaturalSendLoopConversation args={storyArgs} historyRows={99} />,
 };
 
-/** A long transcript, which draws only the rows near the screen. */
 export const NaturalSendLoopLongHistory: Story = {
   args: NaturalSendLoop.args,
   render: (storyArgs) => <NaturalSendLoopConversation args={storyArgs} historyRows={300} />,

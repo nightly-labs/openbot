@@ -3,16 +3,11 @@ import { DatabaseSync, type SQLOutputValue } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
-// Failure modes: an upgrade loses a routine, trigger or run; an old routine gets a policy other than
-// "skip"; an old run reads as a missed-run record or gets a source; a partial migration survives a
-// failure; a retry adds a column twice; a newer or incomplete history is changed; the new CHECKs accept
-// bad values.
 const databases: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of databases.splice(0)) db.close();
 });
 
-/** The agent routine tables are the v8 baseline's. Migration 19 added the channel ones. */
 const CHANNEL_ROUTINES_SINCE = 19;
 
 function databaseAt(version: number): DatabaseSync {
@@ -26,7 +21,6 @@ function databaseAt(version: number): DatabaseSync {
   return db;
 }
 
-/** One active routine with a trigger and two runs per owner kind, in the columns every release has. */
 function seedRoutines(db: DatabaseSync, version: number): void {
   const stamp = "2026-10-01T07:00:00.000Z";
   const owners = [
@@ -88,7 +82,6 @@ const ROUTINE_TABLES = [
   "projection_channel_routine_runs",
 ] as const;
 
-/** The routine tables that exist, or the named ones. A later migration can add the channel tables. */
 function rows(db: DatabaseSync, tables?: readonly string[]): Record<string, TableRow[]> {
   const present = new Set(
     db
@@ -104,10 +97,6 @@ function rows(db: DatabaseSync, tables?: readonly string[]): Record<string, Tabl
   );
 }
 
-/**
- * What the upgrade adds to each old row: the "skip" policy, no missed-run record and no run source. A
- * source before migration 27 also gets that migration's "wait" limit policy.
- */
 function withAddedColumns(before: Record<string, TableRow[]>): Record<string, TableRow[]> {
   return Object.fromEntries(
     Object.entries(before).map(([table, tableRows]) => [
@@ -118,7 +107,6 @@ function withAddedColumns(before: Record<string, TableRow[]>): Record<string, Ta
               limit_policy: "wait",
               ...row,
               missed_policy: "skip",
-              // Migration 57 gives each agent routine the chat as the place where it runs.
               ...(table === "projection_agent_routines" ? { run_in: "chat" } : {}),
             }
           : table.endsWith("_runs")
@@ -138,7 +126,7 @@ describe("routine missed-run and run source migrations", () => {
       const before = rows(db);
       migrateOpenBotDatabase(db);
       expect(rows(db, Object.keys(before))).toEqual(withAddedColumns(before));
-      expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 63 });
+      expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 65 });
       expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
       expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
       expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -193,9 +181,9 @@ describe("routine missed-run and run source migrations", () => {
     const db = databaseAt(32);
     seedRoutines(db, 32);
     const before = rows(db);
-    db.exec("INSERT INTO schema_migrations VALUES(64, 'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(66, 'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version = 64; DELETE FROM schema_migrations WHERE version = 27");
+    db.exec("DELETE FROM schema_migrations WHERE version = 66; DELETE FROM schema_migrations WHERE version = 27");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 27");
     expect(rows(db)).toEqual(before);
   });
@@ -250,9 +238,9 @@ describe("routine run source migration", () => {
     const db = databaseAt(34);
     seedRoutines(db, 34);
     const before = rows(db);
-    db.exec("INSERT INTO schema_migrations VALUES(64, 'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(66, 'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version = 64; DELETE FROM schema_migrations WHERE version = 33");
+    db.exec("DELETE FROM schema_migrations WHERE version = 66; DELETE FROM schema_migrations WHERE version = 33");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 33");
     expect(rows(db)).toEqual(before);
   });

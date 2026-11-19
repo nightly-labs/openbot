@@ -17,11 +17,8 @@ import {
 
 const APP_URL = "https://openbot.run/app";
 const PRODUCT_NAME = "OpenBot";
-/** The name of a server before its first publish, as in `ServerMode`. */
 const DEFAULT_SERVER_NAME = "OpenBot";
-/** How often the page asks again while the account loads or the server starts. */
 const STATUS_POLL_MS = 2_000;
-/** How often the page asks again after an error. The server retries the account service by itself. */
 const ERROR_POLL_MS = 10_000;
 
 interface ServerView {
@@ -33,15 +30,9 @@ interface ServerView {
 
 interface SetupState {
   login: CentralAuthState;
-  /** The signed-in server, or null while the page shows the sign-in. */
   server: ServerView | null;
 }
 
-/**
- * The setup page of a server in a container (docs/umbrel.md): the sign-in screen of the app, then the
- * status of the server. The page has no sign-out: another account needs `openbot logout` in the
- * container.
- */
 export function ServerSetupScreen() {
   const { t, sourceText } = useText();
   const variant: AppVariant = import.meta.env.DEV ? "dev" : "production";
@@ -77,7 +68,6 @@ export function ServerSetupScreen() {
     return retryAfterSeconds ? { code, message, retryAfterSeconds } : { code, message };
   }
 
-  /** The server refused because of its account state: the page shows that state. */
   function refusedByAccount(answer: SetupAnswer): boolean {
     const code = text(answer, "error");
     return code === "signed_in" || (code?.startsWith("account_") ?? false);
@@ -91,7 +81,6 @@ export function ServerSetupScreen() {
   function showStatus(answer: SetupAnswer): void {
     window.clearTimeout(pollTimer);
     if (!answer.ok) {
-      // The screen of an unreachable service, with its retry button.
       const issue = { code: "auth_api_unavailable", message: fallbackMessage(text(answer, "error") ?? NO_ANSWER) };
       setState((draft) => {
         draft.server = null;
@@ -127,7 +116,6 @@ export function ServerSetupScreen() {
       draft.server = null;
       if (issue) draft.login = { status: "error", issue };
       else if (loading) draft.login = { status: "loading" };
-      // A code that another page asked for stays with that page: this one starts at the email.
       else if (!keepChallenge) draft.login = { status: "signed_out" };
     });
     if (loading) poll();

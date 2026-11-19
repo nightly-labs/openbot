@@ -39,7 +39,6 @@ export const messages = {
   "mobile.app.route.usage": "用量",
   "mobile.app.route.marketplace": "市场",
   "mobile.app.route.library": "资料库",
-  // The quick actions of the app icon, which the phone shows when the icon is held.
   "mobile.app.quickAction.search": "搜索",
   "mobile.app.quickAction.share": "分享 OpenBot",
   "mobile.app.quickAction.support": "等等，别删除我！",
@@ -63,6 +62,8 @@ export const messages = {
   "mobile.app.update.group.removed": "移除",
   "mobile.app.update.group.deprecated": "已弃用",
   "mobile.app.update.group.security": "安全",
+  "mobile.app.update.requiredTitle": "需要更新",
+  "mobile.app.update.requiredBody": "OpenBot {version} 已不再受支持。请更新到 {minimum} 或更高版本以继续使用。",
   "mobile.app.update.notesFailed": "无法加载版本说明。",
   "mobile.app.update.notesEmpty": "此版本暂无版本说明。",
   "mobile.app.update.fullChangelog": "完整更新日志",

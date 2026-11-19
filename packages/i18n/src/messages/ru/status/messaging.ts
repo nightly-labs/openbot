@@ -1,7 +1,6 @@
 import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/status/messaging";
 
-// Not translated yet: the screen shows the English text.
 export const messages = {
   "status.messaging.working": "Уже работаю…",
   "status.messaging.queued": "Ожидание: предыдущий запрос ещё выполняется. Ответ придёт сюда.",
@@ -13,6 +12,7 @@ export const messages = {
   "status.messaging.stopped": "Остановлено.",
   "status.messaging.stop": "Остановить",
   "status.messaging.approvalTitle": "OpenBot просит подтверждения, чтобы продолжить.",
+  "status.messaging.approvalTitleTeammate": "Агент {agent} просит подтверждения, чтобы продолжить.",
   "status.messaging.approvalCommand": "Выполнить команду",
   "status.messaging.approvalFileChange": "Изменить файлы",
   "status.messaging.approvalPermissions": "Получить дополнительные разрешения",

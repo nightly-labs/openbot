@@ -1,12 +1,5 @@
 import { appSoundContext } from "./completion-sound";
 
-/**
- * The cues of the voice recording limit, made with Web Audio like the task completion sound. They
- * play whatever the sound settings say: the user is speaking, and may not look at the screen.
- * `unlockCompletionSound` starts their audio context from the click that starts a recording.
- */
-
-/** Two short high pips: the recording stops soon. */
 export function playVoiceLimitWarning(): void {
   void playTones([
     { frequency: 880, at: 0, duration: 0.09, volume: 0.08 },
@@ -14,7 +7,6 @@ export function playVoiceLimitWarning(): void {
   ]);
 }
 
-/** A falling two-note chime, unlike the completion sweep: the recording stopped at the limit. */
 export function playVoiceLimitStop(): void {
   void playTones([
     { frequency: 784, at: 0, duration: 0.18, volume: 0.14 },
@@ -50,7 +42,5 @@ async function playTones(
       oscillator.start(start);
       oscillator.stop(start + tone.duration);
     }
-  } catch {
-    // A cue that cannot play is not worth an error: the countdown still shows.
-  }
+  } catch {}
 }

@@ -1,5 +1,3 @@
-// The optional API keys a provider CLI needs, encrypted at rest by the operating system.
-
 import { readFile, rm } from "node:fs/promises";
 import type { AgentProviderId, ProviderApiKeyStatus } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
@@ -15,21 +13,12 @@ export class CredentialStoreFailure extends Schema.TaggedError<CredentialStoreFa
 
 const { io: credentialIO, sync: credentialSync } = causeHelpers(CredentialStoreFailure);
 
-/** The name of a key in the envelope that is not a provider's. */
 export type OpenBotSecretName = `openbot:${string}`;
 
 function accountKeyName(provider: AgentProviderId, accountId: string): string {
   return `${provider}:${accountId}`;
 }
 
-/**
- * One envelope holding every provider's key, each encrypted on its own.
- *
- * `version` is checked rather than tolerated: an envelope OpenBot does not understand is reported
- * as unreadable instead of silently read as empty, because "no key" and "a key OpenBot cannot
- * decode" have to behave differently -- one starts the free tier, the other must not quietly drop a
- * saved account.
- */
 const envelopeSchema = z.object({
   version: z.literal(1),
   credentials: z.record(z.string(), z.string()),
@@ -37,10 +26,6 @@ const envelopeSchema = z.object({
 
 const MAX_ENVELOPE_BYTES = 64 * 1024;
 
-/**
- * A file that `#read` would refuse. The write stops before it, so the saved keys stay readable: a file
- * over the limit would make every provider and account key unreadable at the next start.
- */
 export class CredentialFileTooLarge extends Error {
   constructor() {
     super(sourceText("error.provider.credentialFileTooLarge"));
@@ -53,19 +38,11 @@ export interface SecretCipher {
   decrypt: (value: Buffer) => string;
 }
 
-/**
- * Reads and writes the provider keys, holding the decrypted values only in memory.
- *
- * `electron` is never imported here: the cipher arrives as two callbacks, so the whole store runs
- * under a unit test with a fake one. `get` is synchronous because a spawn cannot await: the caller
- * has to `load()` once at startup, and after that a read is a map lookup.
- */
 export class ProviderCredentialStore {
   readonly #path: string;
   readonly #cipher: SecretCipher;
   #keys = new Map<string, string>();
   #loaded = false;
-  /** Why the file on disk could not be read. Until the user saves or removes a key, it is kept. */
   #loadError: Error | null = null;
   #writes = Semaphore.makeUnsafe(1);
 
@@ -74,13 +51,6 @@ export class ProviderCredentialStore {
     this.#cipher = cipher;
   }
 
-  /**
-   * Reads the envelope, and returns the error when the file is there but cannot be read.
-   *
-   * That error does not stop startup. Every other service still starts, the providers run with no
-   * key, and the file stays as it is: a keychain that refuses once must not cost the user the key,
-   * so only an explicit save or removal replaces it.
-   */
   load(): Effect.Effect<Error | null> {
     return Effect.gen({ self: this }, function* () {
       this.#keys = new Map();
@@ -97,28 +67,21 @@ export class ProviderCredentialStore {
     });
   }
 
-  /** The stored key, or `null`. Throws when `load` has not run, rather than reporting no key. */
   get(provider: AgentProviderId): string | null {
     if (!this.#loaded) throw new Error("The provider credential store is not loaded.");
     return this.#keys.get(provider) ?? null;
   }
 
-  /** Whether a key is stored. This is the only fact that may cross the IPC boundary. */
   status(provider: AgentProviderId): ProviderApiKeyStatus {
     if (this.get(provider) !== null) return "saved";
     return this.#loadError ? "unreadable" : "missing";
   }
 
-  /**
-   * The key of a provider account that is a key, or `null`. It is in the envelope under the provider
-   * and the account, so a build that does not know it keeps it and never reads it as a provider's key.
-   */
   accountKey(provider: AgentProviderId, accountId: string): string | null {
     if (!this.#loaded) throw new Error("The provider credential store is not loaded.");
     return this.#keys.get(accountKeyName(provider, accountId)) ?? null;
   }
 
-  /** Saves the key of a provider account, or removes it when `key` is null. */
   setAccountKey(
     provider: AgentProviderId,
     accountId: string,
@@ -127,8 +90,6 @@ export class ProviderCredentialStore {
     const name = accountKeyName(provider, accountId);
     return this.#edit((keys) => {
       if (key === null) return keys.delete(name);
-      // A save into a file that could not be read replaces every provider key in it. The key dialog of
-      // a provider warns before that; an account key has no such warning, so it does not replace the file.
       if (this.#loadError) throw new Error(sourceText("error.provider.credentialFileUnreadable"));
       registerSecretValue(key);
       keys.set(name, key);
@@ -136,20 +97,11 @@ export class ProviderCredentialStore {
     });
   }
 
-  /**
-   * A key that is not a provider's, such as the key of the CLI proxy. Its name starts with
-   * `openbot:`, so no provider and no account of a provider can have it, and a build that does not
-   * know it keeps it and never reads it.
-   */
   secret(name: OpenBotSecretName): string | null {
     if (!this.#loaded) throw new Error("The provider credential store is not loaded.");
     return this.#keys.get(name) ?? null;
   }
 
-  /**
-   * Saves the keys of `secret`, or removes the ones whose value is null, as one write of the file, so a
-   * change of many keys encrypts and writes the envelope one time.
-   */
   setSecrets(
     changes: readonly (readonly [OpenBotSecretName, string | null])[],
   ): Effect.Effect<void, CredentialStoreFailure> {
@@ -160,7 +112,6 @@ export class ProviderCredentialStore {
           changed = keys.delete(name) || changed;
           continue;
         }
-        // As an account key: a save into a file that could not be read would replace every provider key.
         if (this.#loadError) throw new Error(sourceText("error.provider.credentialFileUnreadable"));
         registerSecretValue(value);
         keys.set(name, value);
@@ -186,11 +137,6 @@ export class ProviderCredentialStore {
     });
   }
 
-  /**
-   * Runs one save or removal after the previous one. Each provider has its own command queue, so
-   * two providers can change their keys at the same time; each edit must start from the keys the
-   * previous edit committed, or the last write drops the other provider's key.
-   */
   #edit(change: (keys: Map<string, string>) => boolean): Effect.Effect<void, CredentialStoreFailure> {
     return this.#writes.withPermit(
       Effect.gen({ self: this }, function* () {
@@ -200,19 +146,11 @@ export class ProviderCredentialStore {
     );
   }
 
-  /**
-   * A copy to change. An unreadable envelope starts from empty: nothing in it can be decrypted, so
-   * a save or a removal the user asked for replaces the whole file.
-   */
   #editableKeys(): Map<string, string> {
     if (!this.#loaded) throw new Error("The provider credential store is not loaded.");
     return new Map(this.#loadError ? [] : this.#keys);
   }
 
-  /**
-   * Writes `next` and only then makes it the store's state. A failed write leaves memory and disk
-   * as they were, so a spawn never reads a key the file does not hold, and a retry runs again.
-   */
   #commit = Effect.fn("ProviderCredentialStore.commit")(function* (
     this: ProviderCredentialStore,
     next: Map<string, string>,
@@ -253,7 +191,6 @@ export class ProviderCredentialStore {
       const credentials: Record<string, string> = {};
       for (const [provider, key] of keys) credentials[provider] = this.#cipher.encrypt(key).toString("base64");
       const text = `${JSON.stringify({ version: 1, credentials })}\n`;
-      // The same measure as `#read`.
       if (text.length > MAX_ENVELOPE_BYTES) throw new CredentialFileTooLarge();
       return text;
     });

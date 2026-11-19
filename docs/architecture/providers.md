@@ -768,6 +768,14 @@ expired one (#9095). OpenBot sends its saved key only to OpenCode Go, so with a 
 `error.provider.opencodeKeyRefused`. With no saved key, a refused key and a missing key look the
 same, and the text stays `error.provider.opencodeAuthRequired`.
 
+OpenCode 2.2.5 sends a 401 and a 403 as the same `-32000`, but it keeps the provider's status in the
+newest `session_message` row of the failed turn (`{"error":{"type":"provider.auth","status":403,…}}`).
+OpenCode Go answers a bad key with 401, and refuses a valid key with 403, for example when the Go
+plan is not active or the network is blocked. The client's `providerRefusalStatus` option reads that
+row read-only (`readOpenCodeRefusalStatus` in `opencode-usage.ts`), and with a saved key a 403 shows
+`error.provider.opencodeGoRequestRefused`, which does not ask for a new key (#12281). No row, another
+status, or a database that cannot be read keeps `error.provider.opencodeKeyRefused`.
+
 OpenCode 2.3.0 also sends each HTTP 401 and 403 of a provider as this `-32000`, with no status, also
 when a firewall blocks a VPN address (#10166). The client's `providerKeyStored` option then reads
 OpenCode's own store (`hasOpenCodeProviderKey` in `opencode-usage.ts`): an active `credential` row
@@ -902,7 +910,11 @@ logged. On Windows the CLI runs `C:\Windows\System32\rundll32.exe url.dll,FilePr
 absolute path, so a folder on `PATH` cannot catch the link. There OpenBot makes no opener folder
 (`googleSignInByOpenBot`): the page opens from the CLI itself. A remote host cannot relay it, as
 with 1.4.5 (#4521), so OpenBot refuses a sign-in from another device before the process starts, and
-a Reconnect does not sign the account out. The Windows test of 1.5.4 confirmed this. A valid saved Google token answers `authenticate` with no browser page.
+a Reconnect does not sign the account out. A relayed sign-in from the desktop app that runs a server
+on this computer is not from another device: its Team API session is a password session of the
+owner, which only that app can open. The owner's other devices connect through Signal and stay
+refused. The sign-in runs as a Connect on this computer, the CLI opens the page here, and the relay
+ends with no page (#11677). The Windows test of 1.5.4 confirmed this. A valid saved Google token answers `authenticate` with no browser page.
 So a Reconnect of a connected Google sign-in, with no saved key, first calls ACP `logout`, which
 `initialize` advertises in `agentCapabilities.auth.logout`. `logout` deletes `antigravity-oauth-token`
 and `cache/acp-auth-state.json` only: it does not revoke the token at Google, and a copy of the old
@@ -971,8 +983,10 @@ Antigravity 1.5 has no `/usage` command. The driver's `readRateLimits`
 (`src/backend/antigravity-usage.ts`) reads the access token from the account's token file and calls
 Google's Code Assist service as the CLI does: `loadCodeAssist` gives the account's project, and
 `retrieveUserQuotaSummary` gives each quota group with its buckets. Google refuses these calls (403)
-unless the User-Agent is `antigravity/<version> <os>/<arch>`, and it sends the "Gemini Models" group only
-to the desktop app's version, not to the CLI's, so the User-Agent names the desktop version (#7215). 
+unless the User-Agent names Antigravity, and it sends the "Gemini Models" group only to the desktop app's
+version, not to the CLI's, so the User-Agent names the desktop version (#7215). It is the desktop app's own
+form, `antigravity/hub/<version> (aidev_client; os_type=<os>; arch=<arch>; cl=<build>)`: with
+`antigravity/<version> <os>/<arch>`, Pro plans got no "Gemini 4 Argon" group (#10934). 
 `loadCodeAssist` goes to `cloudcode-pa`. The summary comes only from `daily-cloudcode-pa`, the host
 that meters a Google account sign-in: the other host's room for the account can be wrong, and a wrong
 "spent" reading would hold Gemini turns. OpenBot does not refresh the token: it
@@ -1155,6 +1169,12 @@ empty model list and no error. `noModelsWhenSignedOut` reads that list as "sign-
 change with `session/set_model` does not write a file. Devin answers a lost session with `-32016`
 and `{ "cognition.ai/errorKind": "session_not_found" }`, which `DEVIN_ACP_FLAVOR` reads as a missing
 session.
+
+Devin CLI 3000.14.30821 keeps a session after a plain `session/close`, also in the background process
+that outlives OpenBot for about 10 minutes, and a later `session/load` keeps the MCP servers that the
+session got first. It advertises `sessionCapabilities.close._meta["cognition.ai/force"]`, so the ACP
+client sends that `_meta` with each `session/close`, and a forced close before it loads a session that
+it does not hold. The session then gets the new token of the OpenBot bridge (#12082).
 
 No frozen Team API protocol knows `devin`. The host hides Devin agents, models, status, and sign-in
 state from peers below protocol 8, and `providers-v8` carries it.

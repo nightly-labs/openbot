@@ -1,13 +1,4 @@
-/**
- * The private network route: a connection to this host uses only addresses on a local or private
- * network, such as the Wi-Fi or a Tailscale tailnet. The host gets no STUN or TURN servers, so it
- * has no relayed or server-reflexive candidates, and these filters remove every other candidate
- * that names a public address. Chats and files then never go through OpenBot servers.
- */
-
-/** Whether an ICE candidate line names a host address on a private network, or an mDNS name. */
 export function isPrivateNetworkCandidate(candidate: string): boolean {
-  // candidate:<foundation> <component> <transport> <priority> <address> <port> typ <type> ...
   const fields = candidate.replace(/^a=/u, "").trim().split(/\s+/u);
   const address = fields[4];
   const type = fields[7];
@@ -15,7 +6,6 @@ export function isPrivateNetworkCandidate(candidate: string): boolean {
   return isPrivateNetworkAddress(address);
 }
 
-/** Removes the candidates of a session description that are not on a private network. */
 export function privateNetworkSdp(sdp: string): string {
   return sdp
     .split(/\r\n/u)
@@ -23,12 +13,6 @@ export function privateNetworkSdp(sdp: string): string {
     .join("\r\n");
 }
 
-/**
- * Private IPv4 (RFC 1918), shared address space (RFC 6598, which Tailscale uses), unique local IPv6
- * (which includes the Tailscale `fd7a:115c:a1e0::/48` prefix), and mDNS `.local` names. A `.local`
- * name resolves only on the local link. Link-local and loopback addresses do not count: a phone
- * cannot use them.
- */
 export function isPrivateNetworkAddress(address: string): boolean {
   const name = address.toLowerCase();
   if (name.endsWith(".local")) return true;

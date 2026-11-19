@@ -1,12 +1,3 @@
-// Reading a Team API request: the parsers, the validators and the capability filters that every
-// route module needs and none of them owns.
-//
-// Two rules hold this file together. Every validator here throws `HttpError` rather than returning a
-// failure, because the router has the only `try` and turning a throw into a response in one place is
-// what keeps a route from accidentally answering twice. And every limit is checked here, not at the
-// call site: this is the outside edge of the machine, so `readJson` refusing an oversized body is a
-// property of the reader, not something ~50 routes each have to remember.
-
 import type { IncomingMessage } from "node:http";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
@@ -40,15 +31,18 @@ import {
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { teamProtocolCapabilityLimit } from "@openbot/contracts/team-protocol/capability-limits";
 import {
   CHANNEL_BROWSER_CAPABILITY,
   CHANNEL_ISOLATION_CAPABILITY,
   CHANNEL_PICTURE_CAPABILITY,
+  expandTeamCapabilitiesV10,
   isTeamCurrentCapability,
   supportsTeamSemanticTags,
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { teamHttpCodec } from "@openbot/contracts/team-protocol/http-codecs";
+import { ROUTINE_QUIET_ANSWERS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-quiet-answers-v1";
 import { SETTING_LINK_MARKERS_CAPABILITY } from "@openbot/contracts/team-protocol/setting-link-markers-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import {
@@ -57,35 +51,30 @@ import {
   TEAM_PROTOCOL_VERSION_HEADER,
 } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V2_MAX_JSON_FRAME_BYTES } from "@openbot/contracts/team-protocol/v2";
-import { TEAM_PROTOCOL_V9, TEAM_PROTOCOL_V9_CAPABILITY_LIMIT } from "@openbot/contracts/team-protocol/v9";
+import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
+import {
+  readTeamCapabilitiesV10,
+  TEAM_ABSENT_CAPABILITIES_HEADER,
+  TEAM_PROTOCOL_V10,
+  type TeamCapabilitiesV10,
+} from "@openbot/contracts/team-protocol/v10";
 import { sourceText } from "@openbot/i18n/source";
 import { readBodyWithin } from "../http-body";
 import { HttpError } from "./http-error";
 import type { TeamApiRequestContext } from "./request-context";
 
 export const JSON_LIMIT = 1024 * 1024;
-/** A response body leaves room in one WebRTC frame for the response envelope around it. */
 export const WEBRTC_FRAME_BODY_BUDGET = Math.floor(TEAM_PROTOCOL_V2_MAX_JSON_FRAME_BYTES * 0.75);
 
-/** A client draws a text of a few megabytes for seconds, so a cut text keeps at most this much. */
 const CUT_TEXT_BYTES = 256 * 1024;
 
-/**
- * A page of one message can still be larger than one WebRTC frame, and a remote client could then not
- * open the chat or read the history behind that message. The texts of `messages` give up
- * `excessBytes` of their JSON size: the largest texts are cut to one size, at most `CUT_TEXT_BYTES`,
- * and the smaller texts stay whole. The start and the end of a cut text stay, with a note between
- * them. The host keeps the whole text.
- */
 export function messageTextCut(
   messages: readonly ConversationMessage[],
   excessBytes: number,
 ): (message: ConversationMessage) => ConversationMessage {
   const sizes = new Map(messages.map((message) => [message, jsonBytes(message.text)]));
-  // A message that is also a reply reference is in the page twice, so its size counts twice.
   const ascending = messages.map((message) => sizes.get(message) ?? 0).sort((left, right) => left - right);
   let remaining = ascending.reduce((sum, size) => sum + size, 0) - excessBytes;
-  // The rest of the page alone is too large: a cut cannot help, so every text stays whole.
   if (remaining <= 0) return (message) => message;
   let cap = Number.POSITIVE_INFINITY;
   for (const [index, size] of ascending.entries()) {
@@ -104,12 +93,10 @@ export function messageTextCut(
 function cutText(text: string, maxBytes: number): string {
   const textBytes = Buffer.byteLength(text);
   for (let keep = Math.floor(text.length / 2); ; ) {
-    // Do not split a surrogate pair at either cut.
     const end = isHighSurrogate(text.charCodeAt(keep - 1)) ? keep - 1 : keep;
     const start = isLowSurrogate(text.charCodeAt(text.length - keep)) ? text.length - keep + 1 : text.length - keep;
     const head = text.slice(0, end);
     const tail = text.slice(start);
-    // Rounded up to 0.1 MB, so a cut never reads as 0.0 MB.
     const size = (Math.ceil((textBytes - Buffer.byteLength(head) - Buffer.byteLength(tail)) / 104_857.6) / 10).toFixed(
       1,
     );
@@ -133,17 +120,32 @@ function isLowSurrogate(code: number): boolean {
 }
 
 export function requestCapabilities(request: IncomingMessage): Set<string> {
+  const protocol = requestProtocol(request);
+  if (protocol >= TEAM_PROTOCOL_V10) {
+    const lists = requestCapabilityListsV10(request);
+    return new Set(lists ? expandTeamCapabilitiesV10(lists).filter(isTeamCurrentCapability) : []);
+  }
   const header = request.headers[TEAM_CAPABILITIES_HEADER.toLowerCase()];
   const value = Array.isArray(header) ? header.join(",") : header;
-  const protocol = requestProtocol(request);
-  // Protocol 9 lists up to 256 capabilities, which can pass 4 KB.
   if (!value || value.length > (protocol >= TEAM_PROTOCOL_V9 ? 8_192 : 4_096)) return new Set();
   const capabilities = value.split(",").map((capability) => capability.trim());
-  if (
-    capabilities.length > (protocol >= TEAM_PROTOCOL_V9 ? TEAM_PROTOCOL_V9_CAPABILITY_LIMIT : protocol >= 7 ? 128 : 64)
-  )
-    return new Set();
+  if (capabilities.length > teamProtocolCapabilityLimit(protocol)) return new Set();
   return new Set(capabilities.filter(isTeamCurrentCapability));
+}
+
+export function requestCapabilityListsV10(request: IncomingMessage): TeamCapabilitiesV10 | null {
+  return readTeamCapabilitiesV10(
+    headerCapabilityList(request, TEAM_CAPABILITIES_HEADER),
+    headerCapabilityList(request, TEAM_ABSENT_CAPABILITIES_HEADER),
+  );
+}
+
+function headerCapabilityList(request: IncomingMessage, name: string): string[] | null {
+  const header = request.headers[name.toLowerCase()];
+  const value = Array.isArray(header) ? header.join(",") : header;
+  if (!value) return [];
+  if (value.length > 8_192) return null;
+  return value.split(",").map((capability) => capability.trim());
 }
 
 export function conversationSnapshotForCapabilities(
@@ -201,26 +203,15 @@ export function markerExclusionsForCapabilities(capabilities: ReadonlySet<string
     excludeRoutineEvents: !capabilities.has("routine-event-markers"),
     excludeRoutineRunEvents: !capabilities.has("routine-run-event-markers"),
     excludeHostedSiteEvents: !capabilities.has("hosted-site-event-markers"),
-    excludeRoutineQuietAnswers: true,
+    excludeRoutineQuietAnswers: !capabilities.has(ROUTINE_QUIET_ANSWERS_CAPABILITY),
     excludeSettingLinks: !capabilities.has(SETTING_LINK_MARKERS_CAPABILITY),
   };
 }
 
-/**
- * Whether a client can show a message of this kind. No client can collapse a quiet routine answer
- * into its run, so a quiet answer goes to none: it would show as a new answer to every client. A new
- * agent's setup message (`agent-welcome-v1`) and the continuation of a channel request are for the
- * agent only, so they go to none either.
- */
-function markerSupported(itemType: string | undefined, capabilities: ReadonlySet<string>): boolean {
-  if (
-    itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE ||
-    itemType === AGENT_WELCOME_ITEM_TYPE ||
-    itemType === CHANNEL_RESUME_ITEM_TYPE
-  )
-    return false;
+export function markerSupported(itemType: string | undefined, capabilities: ReadonlySet<string>): boolean {
+  if (itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE) return capabilities.has(ROUTINE_QUIET_ANSWERS_CAPABILITY);
+  if (itemType === AGENT_WELCOME_ITEM_TYPE || itemType === CHANNEL_RESUME_ITEM_TYPE) return false;
   if (itemType?.startsWith(ROUTINE_EVENT_ITEM_TYPE_PREFIX)) return capabilities.has("routine-event-markers");
-  // Paged history drops suggestions with routine events, so live events drop them the same way.
   if (itemType?.startsWith(MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX)) return capabilities.has("routine-event-markers");
   if (itemType?.startsWith(ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX)) {
     return capabilities.has("routine-run-event-markers");
@@ -253,12 +244,10 @@ export function firstHeaderValue(value: string | string[] | undefined): string |
   return first?.trim();
 }
 
-/** The member who made this request, as the sender the host stamps on the message they write. */
 export function memberSender(member: TeamMemberSummary): ConversationMessageSender | undefined {
   return conversationMessageSender(member.id, member.name?.trim() || member.email || member.username);
 }
 
-/** The released routine codecs reject a `once` schedule, so a Team API request cannot save one. */
 export function requireReleasedSchedule(schedule: unknown): void {
   if (schedule !== undefined && !isReleasedRoutineSchedule(schedule)) {
     throw new HttpError(400, sourceText("error.backend.routineScheduleInvalid"));
@@ -273,30 +262,18 @@ export function requireOwner(member: TeamMemberSummary): void {
   if (member.role !== "owner") throw new HttpError(403, sourceText("error.team.ownerRequired"));
 }
 
-/**
- * An action on one agent never creates it. A device can still hold the id of an agent that another
- * device deleted; it gets the same 404 as for an agent hidden from it.
- */
 export function requireListedAgent(agents: { listAgents(): readonly { id: string }[] }, agentId: string): void {
   if (!agents.listAgents().some((agent) => agent.id === agentId)) {
     throw new HttpError(404, sourceText("error.team.agentNotFound"));
   }
 }
 
-/**
- * The router checks the agent ID in the path and the query. A module that reads it from the body
- * checks it here: an agent hidden from the caller answers as a missing agent does.
- */
 export function requireVisibleBodyAgent(body: DynamicRecord, hiddenAgentIds: ReadonlySet<string>): void {
   if (isString(body.agentId) && hiddenAgentIds.has(body.agentId)) {
     throw new HttpError(404, sourceText("error.team.agentNotFound"));
   }
 }
 
-/**
- * A write to one agent needs the level that it changes: `chat` to talk to the agent, `manage` to change
- * it. A `none` agent never gets here; the router answers 404 for it.
- */
 export function requireAgentLevel(
   context: Pick<TeamApiRequestContext, "agentLevel">,
   agentId: string,
@@ -545,6 +522,7 @@ export function agentCreate(value: DynamicRecord): CreateAgentInput {
     ...(value.provider === undefined ? {} : { provider: value.provider }),
     ...(value.model === undefined ? {} : { model: value.model }),
     ...(value.reasoningEffort === undefined ? {} : { reasoningEffort: value.reasoningEffort }),
+    ...(isString(value.operationId) ? { operationId: value.operationId } : {}),
   };
 }
 
@@ -555,16 +533,10 @@ function requiredCreateText(value: unknown, field: string, maximum: number): str
   return value;
 }
 
-/**
- * Reads a body of up to `limit` bytes into one array. With a `Content-Length`, the chunks go
- * directly into that array, so the body is in memory one time. Without it, the chunks are kept
- * until the end and then copied one time.
- */
 export async function readBinary(request: IncomingMessage, limit: number): Promise<Uint8Array> {
   const tooLarge = () => new HttpError(413, "Attachment exceeds the 100 MB limit.");
   const header = request.headers["content-length"];
   const declared = header !== undefined && /^\d+$/u.test(header) ? Number(header) : null;
-  // Node ends the body at `Content-Length`, so a larger declared body always fails the limit.
   if (declared !== null && declared > limit) throw tooLarge();
   const target = declared === null ? null : new Uint8Array(declared);
   const chunks: Buffer[] = [];

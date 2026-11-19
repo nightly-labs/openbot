@@ -1,9 +1,3 @@
-// What main answers for a conversation: its pages, search, read state, attachments, queue and file
-// previews.
-//
-// Each decoder checks every field the contract type requires and keeps each optional field it
-// carries, so a value the renderer reads always has the shape its type says.
-
 import {
   type AgentApproval,
   type AgentTask,
@@ -56,6 +50,10 @@ import {
   requiredString,
 } from "@openbot/contracts/ipc-decoding";
 import { isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import {
+  type AgentActiveQueues,
+  decodeAgentActiveQueues,
+} from "@openbot/contracts/team-protocol/agent-active-queues-v1";
 
 export function decodeAttachmentDownloadProgress(value: unknown): AttachmentDownloadProgress {
   const progress = decodeRecord(value, "attachment download progress");
@@ -77,7 +75,6 @@ export function decodeAttachmentImportProgress(value: unknown): AttachmentImport
   };
 }
 
-/** The address of a temporary page that main keeps, or null when its page store is full. */
 export function decodeOptionalFilePreviewPageUrl(value: unknown): string | null {
   if (value === null) return null;
   if (!isFilePreviewPageUrl(value)) throw new Error("Invalid file preview page URL response.");
@@ -276,6 +273,10 @@ export function decodeTaskWindow(value: unknown): AgentTaskWindow {
     throw new Error("Invalid task part response.");
   }
   return value;
+}
+
+export function decodeActiveQueues(value: unknown): AgentActiveQueues | null {
+  return value === null ? null : decodeAgentActiveQueues(value);
 }
 
 export function decodeQueue(value: unknown): QueueSnapshot {

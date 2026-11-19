@@ -24,16 +24,6 @@ if (!architecture || (platform === "win32" && architecture !== "x64")) {
 const tarExecutable =
   process.platform === "win32" ? join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe") : "tar";
 
-/**
- * The Linux build captures an X11 display, such as the Xvfb display of a hosted server, and encodes
- * in software. The other capture and encoder paths need a GPU, a Wayland compositor or elevated
- * capabilities, and each would add libraries that such a computer does not have. With no tray, the
- * binary also loads no GTK modules.
- *
- * Boost.Locale turns on its ICU backend when it finds ICU, and each Ubuntu release has another ICU
- * version. Sunshine only converts UTF-8, which the iconv backend of glibc does. The RUNPATH makes
- * Sunshine load the libraries in `lib/` (LINUX_BUNDLED_LIBRARIES) before those of the system.
- */
 const LINUX_SUNSHINE_OPTIONS = [
   "-DBOOST_LOCALE_ENABLE_ICU=OFF",
   "-DCMAKE_BUILD_WITH_INSTALL_RPATH=ON",
@@ -49,10 +39,6 @@ const LINUX_SUNSHINE_OPTIONS = [
   "-DSUNSHINE_ENABLE_X11=ON",
 ];
 
-/**
- * The libraries that the Linux runtime carries, and the Ubuntu 24.04 package of each. Ubuntu 26.04
- * has libminiupnpc21 only, and its ABI is not that of libminiupnpc17.
- */
 const LINUX_BUNDLED_LIBRARIES: Readonly<Record<string, string>> = {
   "libminiupnpc.so.17": "libminiupnpc17",
 };
@@ -94,8 +80,6 @@ try {
   } else {
     await cp(sunshineBinary, join(outputRoot, `sunshine${executableSuffix}`));
   }
-  // Windows Sunshine reads its DirectX shaders from `assets/` in its working directory, the
-  // runtime directory. Without them it cannot convert a captured frame and does not start.
   if (platform === "win32") {
     await cp(join(sunshineSource, "src_assets/windows/assets/shaders"), join(outputRoot, "assets/shaders"), {
       recursive: true,
@@ -114,7 +98,6 @@ try {
   if (platform === "darwin") {
     const bundled = bundleMacRuntimeDependencies(outputRoot);
     bundledLibraries = bundled.libraries;
-    // Before signing, not after: rewriting a load command invalidates the signature over it.
     signMacRuntime(outputRoot, bundled.signTargets);
   }
   if (platform === "linux") bundledLibraries = bundleLinuxRuntimeDependencies(outputRoot);
@@ -124,9 +107,6 @@ try {
   await Promise.all([
     cp(join(sunshineSource, "LICENSE"), join(licenses, "Sunshine-GPL-3.0.txt")),
     cp(join(moonlightSource, "LICENSE"), join(licenses, "moonlight-web-stream-GPL-3.0.txt")),
-    // The copies the runtime now carries are OpenBot's to redistribute, so their notices ship with
-    // them. Taken from the tree that was linked against, so the notice is the one for the binary in
-    // the archive rather than whatever the formula says today.
     ...(platform === "linux" ? linuxLibraryLicenses(bundledLibraries) : bundledLibraryLicenses(bundledLibraries)).map(
       ({ file, source }) => cp(source, join(licenses, file)),
     ),
@@ -326,12 +306,6 @@ function buildMoonlight(source: string): void {
   });
 }
 
-/**
- * On an Intel Mac, moonlight-common-c's Reed-Solomon code picks its SIMD path with
- * `__builtin_cpu_supports`, which reads `__cpu_model` from the compiler runtime. rustc links with
- * `-nodefaultlibs`, so `libclang_rt.osx.a` is not on the link line and `streamer` fails with an
- * undefined `___cpu_model`. The ARM64 build never calls the x86 check.
- */
 function moonlightCargoEnvironment(): NodeJS.ProcessEnv {
   if (platform !== "darwin" || architecture !== "x64") return process.env;
   const resourceDirectory = execFileSync("xcrun", ["clang", "-print-resource-dir"], { encoding: "utf8" }).trim();
@@ -385,15 +359,8 @@ function auditNpmDependencies(source: string): void {
   execFileSync("npm", ["audit", "--audit-level=high"], { cwd: source, stdio: "inherit" });
 }
 
-// CMake links Sunshine against Homebrew's miniupnpc and OpenSSL by absolute path, so the binary that
-// runs on the build runner cannot start on a Mac without those formulae -- and nothing downstream
-// would say so: the app reports remote control as available, the session opens, and no frame ever
-// arrives. `verify-remote-desktop-runtime.ts` fails the build if any of this is left behind.
 function bundleMacRuntimeDependencies(root: string): { libraries: BundledLibrary[]; signTargets: string[] } {
   const app = join(root, "Sunshine.app", "Contents");
-  // The app bundle signs `--deep`, so its own copies need no separate pass. The two loose
-  // executables do, which is why only their libraries come back as signing targets. Both sets need
-  // their licences, so both are returned.
   const inBundle = bundleMacDynamicLibraries(join(app, "MacOS", "Sunshine"), join(app, "Frameworks"));
   const besideExecutables = ["web-server", "streamer"].flatMap((executable) =>
     bundleMacDynamicLibraries(join(root, executable), join(root, "lib")),
@@ -404,8 +371,6 @@ function bundleMacRuntimeDependencies(root: string): { libraries: BundledLibrary
   };
 }
 
-// Copies each library of LINUX_BUNDLED_LIBRARIES that Sunshine loads into `lib/`. `ldd` gives the
-// file that the build linked against.
 function bundleLinuxRuntimeDependencies(root: string): BundledLibrary[] {
   const libraries: BundledLibrary[] = [];
   for (const line of execFileSync("ldd", [join(root, "sunshine")], { encoding: "utf8" }).split("\n")) {
@@ -454,9 +419,7 @@ function findSunshineBinary(source: string): string {
     try {
       accessSync(candidate);
       return candidate;
-    } catch {
-      // Continue to the next platform-specific CMake output.
-    }
+    } catch {}
   }
   throw new Error("The Sunshine build did not produce its executable.");
 }

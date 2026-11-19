@@ -21,7 +21,6 @@ import { haptics } from "@/shared/lib/haptics";
 import { selectionColorProps } from "@/shared/lib/selection-color";
 import { useText } from "@/shared/lib/text";
 
-/** Why a saved login that fits the site was not filled, as the user reads it. */
 const VAULT_SKIP_TEXT = {
   "agent-script": "mobile.chat.browserSecret.vaultSkip.agentScript",
   "field-kind": "mobile.chat.browserSecret.vaultSkip.fieldKind",
@@ -30,10 +29,6 @@ const VAULT_SKIP_TEXT = {
   "vault-unreadable": "mobile.chat.browserSecret.vaultSkip.vaultUnreadable",
 } as const satisfies Record<BrowserVaultSkipReason, MobileTextKey>;
 
-/**
- * The surface of a browser request above the composer: one opaque gray, as the chat scrolls under
- * it, and the neutral action color for the one main action. Cancel is the close button.
- */
 function BrowserRequestCard({
   icon,
   title,
@@ -93,7 +88,6 @@ function BrowserRequestCard({
   );
 }
 
-/** A browser step that the user completes in the browser: Open browser, I'm done, or Cancel. */
 export function BrowserTakeoverCard({
   request,
   respondToTakeover,
@@ -101,7 +95,6 @@ export function BrowserTakeoverCard({
 }: {
   request: BrowserTakeoverRequest;
   respondToTakeover: (decision: "complete" | "cancel") => Promise<void>;
-  /** Shows the tab live on the phone. Absent when the host cannot stream it. */
   openBrowser?: () => void;
 }) {
   const { t } = useText();
@@ -123,7 +116,6 @@ export function BrowserTakeoverCard({
     }
   };
   const reload = request.secret?.requiresReload ? ` ${t("mobile.chat.browserSecret.takeoverReload")}` : "";
-  // The site refused the server's address. Only the desktop app sends a sign-in from the user's own device (#9783).
   const signInBlocked = request.reason === "sign-in-blocked";
   return (
     <BrowserRequestCard
@@ -174,20 +166,13 @@ export function BrowserTakeoverCard({
   );
 }
 
-/** The request asks the user to type a secret on the phone, not to complete a step in the browser. */
 export function asksForSecret(request: BrowserTakeoverRequest) {
   return Boolean(request.secret && !request.secret.requiresReload);
 }
 
-// The composer's bar: its inset, its height and its corner, so the secure field takes its place.
 const BAR_INSET = 16;
 const BAR_HEIGHT = 48;
 
-/**
- * Takes the place of the composer while an agent asks for a password or a code, so the screen has
- * one field. The value stays in this component: it does not go to the draft, the queue or the chat,
- * and it is cleared when sent. The composer comes back when the request is answered or cancelled.
- */
 export function BrowserSecretComposer({
   request,
   respond,
@@ -299,11 +284,6 @@ interface SecureComposerColors {
   actionForeground: ViewStyle["backgroundColor"];
 }
 
-/**
- * The masked field in the place of the composer, with the composer's inset, height and send button,
- * so the screen has one field. Its value is the caller's: it never goes to the draft, the queue or
- * the chat.
- */
 function SecureComposerBar({
   label,
   placeholder,
@@ -325,7 +305,6 @@ function SecureComposerBar({
   actionForeground,
 }: SecureComposerColors & {
   label: string;
-  /** The text of the empty field, when it is not the label. */
   placeholder?: string | undefined;
   value: string;
   onChangeText?: ((text: string) => void) | undefined;
@@ -335,7 +314,6 @@ function SecureComposerBar({
   keyboardType: "default" | "number-pad";
   autoComplete: "off" | "one-time-code";
   maxLength: number;
-  /** When the masked field lives in the question card, the bar is only a Send button. */
   submitOnly?: boolean | undefined;
 }) {
   const { t } = useText();
@@ -370,7 +348,6 @@ function SecureComposerBar({
           </Typography>
         ) : (
           <TextInput
-            // The composer's ID: the chat's keyboard gesture follows the one field that is shown.
             nativeID="chat-composer-input"
             accessibilityLabel={label}
             placeholder={placeholder ?? label}
@@ -413,11 +390,6 @@ function SecureComposerBar({
   );
 }
 
-/**
- * Takes the place of the composer while the open question of a form asks for a private answer, such
- * as an API key, a password or a card number. The question card above keeps the title, the masked
- * field, Skip and Cancel; this bar sends the answer. The value is cleared when it is sent.
- */
 export function QuestionSecretComposer({
   controller,
   ...colors

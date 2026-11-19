@@ -1,11 +1,4 @@
 #!/bin/bash
-# The terminal command of a self-hosted server. openbot-server-setup links it to
-# /usr/local/bin/openbot. It talks to the running OpenBot over the control socket in
-# src/main/server-mode.ts, and to systemd for the service.
-#
-# The socket is in /run/openbot, which only the service user can enter. Run this as that user or
-# with sudo. In the Docker image (`mode` is `container`) there is no systemd: Docker starts, stops
-# and replaces OpenBot, and only the account commands work.
 set -euo pipefail
 # shellcheck source=openbot-hosted-update
 source "$(dirname "$(readlink -f "$0")")/openbot-hosted-update"
@@ -46,7 +39,6 @@ in_container() {
   [ -r "$INSTALL/hosted/mode" ] && [ "$(<"$INSTALL/hosted/mode")" = container ]
 }
 
-# Stops a command that Docker does in the image.
 require_host() {
   in_container || return 0
   fail "In a container, $1. See https://github.com/nightly-labs/openbot/blob/main/docs/docker.md"
@@ -56,7 +48,6 @@ require_root() {
   [ "$(id -u)" -eq 0 ] || fail "Run this with sudo: sudo openbot $*"
 }
 
-# Stops with the command that shows the log, which is not the same in a container.
 not_answering() {
   if in_container; then
     fail "OpenBot does not answer. Read the log on the host with: docker logs <container>"
@@ -64,12 +55,23 @@ not_answering() {
   fail "OpenBot does not answer. Read the log with: openbot logs"
 }
 
-# Waits for the socket after a start. A user that cannot enter /run/openbot never sees it.
+not_running() {
+  if start_loop_stopped; then
+    fail "OpenBot stopped because its start failed again and again. Read the log with: openbot logs
+Install a new release with: sudo openbot update. Or try again with: sudo openbot restart"
+  fi
+  fail "OpenBot is not running. Start it with: sudo openbot start"
+}
+
 wait_for_socket() {
   local second
   for ((second = 0; second < 30; second++)); do
     [ -S "$SOCKET" ] && return 0
-    in_container || systemctl is-active --quiet "$UNIT" || fail "OpenBot is not running. Start it with: sudo openbot start"
+    in_container || systemctl is-active --quiet "$UNIT" || not_running
+    if ! in_container && safe_mode_running; then
+      fail "OpenBot does not start, so it runs its safe mode: members see why. Read the log with: openbot logs
+Install a new release with: sudo openbot update. Or try again with: sudo openbot restart"
+    fi
     if [ -d /run/openbot ] && [ ! -x /run/openbot ]; then
       fail "Run this with sudo, or as the user $(service_user)."
     fi
@@ -78,14 +80,10 @@ wait_for_socket() {
   not_answering
 }
 
-# Percent-encodes each byte. printf is a shell builtin, so the value is in no process arguments.
 form_value() {
   printf '%s' "$1" | od -An -tx1 -v | tr -d ' \n' | sed 's/../%&/g'
 }
 
-# control <method> <path> [<name>=<value> ...]. Sets `response` to the answer lines and a last
-# `status=<HTTP status>` line. The body goes to curl on standard input: other users can read the
-# arguments of a process in /proc, and a value can be the sign-in code.
 control() {
   local method=$1 path=$2 field body="" arguments=()
   shift 2
@@ -103,7 +101,6 @@ value() {
   sed -n "s/^$1=//p" <<<"$response" | head -n 1
 }
 
-# Prints the error of a failed answer and returns 1, or returns 0 for a good answer.
 check_answer() {
   [ "$(value status)" = 200 ] && return 0
   local message
@@ -140,7 +137,6 @@ show_status() {
   esac
   if [ -n "$name" ]; then echo "Server: $name ($server)"; else echo "Server: $server"; fi
   case $server in error | unconfigured) if [ -n "$message" ]; then echo "  $message"; fi ;; esac
-  # The limit is the smaller of the machine memory and the limit of the unit or the container.
   limit=$(value memory_limit)
   if [ -n "$limit" ]; then
     echo "Memory: $(($(value memory_available) / 1048576)) MiB free of $((limit / 1048576)) MiB ($(value memory_level))"
@@ -185,7 +181,6 @@ login_command() {
   fi
   if [ -n "$with_claim" ]; then
     [ -z "$email" ] || fail "The claim names the account. Give no email with --claim."
-    # Never an argument: other users can read the arguments of a process. It works once.
     if [ -t 0 ]; then read -rsp "Claim: " claim && echo; else read -r claim || true; fi
     [ -n "$claim" ] || fail "Give the claim on standard input."
     control POST /v1/login/claim "claim=$claim" ${name:+"name=$name"}
@@ -194,7 +189,6 @@ login_command() {
   else
     [ -t 0 ] || fail "Run openbot login in a terminal."
     if [ -z "$email" ]; then read -rp "Email: " email; fi
-    # With the name, OpenBot refuses a name that it cannot publish before it sends a code.
     control POST /v1/login/start "email=$email" ${name:+"name=$name"}
     check_answer || exit 1
     challenge=$(value challenge)
@@ -210,7 +204,6 @@ login_command() {
   for ((second = 0; second < 90; second += 2)); do
     control GET /v1/status
     case $(value server) in online | error) break ;; esac
-    # Publishing failed before the host started. The start retry tries again every minute.
     if [ "$(value server)" = unconfigured ] && [ -n "$(value server_message)" ]; then break; fi
     sleep 2
   done
@@ -226,7 +219,6 @@ mobile_connect_command() {
   control POST /v1/mobile-connect
   check_answer || exit 1
   expires_at=$(value expires_at)
-  # Arithmetic runs a command in an array index, so only digits go into it.
   [[ $expires_at =~ ^[0-9]+$ ]] || fail "OpenBot sent an invalid Mobile Connect code."
   value qr | base64 -d
   echo "In the OpenBot phone app, select Scan QR code and scan this code."
@@ -239,9 +231,6 @@ logs_command() {
   exec journalctl --unit "$UNIT" --lines 200 --no-pager
 }
 
-# OpenBot starts again when `apply` fails or a signal stops the update, as in `request`. A copy that
-# did not complete is done again first, because a partial release cannot start. The status stays.
-# A second signal must not stop the recovery, and the `apply` child ignores it too.
 restart_after_failed_update() {
   local status=$?
   trap '' INT TERM HUP
@@ -278,9 +267,6 @@ update_command() {
   echo "Installed OpenBot $(version_of "$INSTALL/app")."
 }
 
-# Removes what openbot-server-setup installed. The home folder of the service user and the keyring in
-# /srv/openbot-hosted stay: the keyring has the key of the encrypted data in that home folder, so the
-# two go together, and a later install uses them again.
 uninstall_command() {
   require_host "run openbot logout, then remove the container on the host. The data stays in its volume"
   require_root uninstall
@@ -292,12 +278,9 @@ uninstall_command() {
     read -rp "Remove OpenBot from this computer? The data of the user $user stays. [y/N] " reply
     [[ $reply == [yY]* ]] || return 0
   fi
-  # The session then stops on the account server too, and the data keeps no session. A stopped
-  # service starts for it.
   if ! (systemctl start "$UNIT" && control POST /v1/logout && check_answer); then
     echo "OpenBot did not sign out. Remove the server in the app." >&2
   fi
-  # Waits for an update that runs now.
   exec 9>"$LOCK"
   flock 9
   systemctl disable --now --quiet "${UNITS[@]}" 2>/dev/null || true
@@ -306,7 +289,6 @@ uninstall_command() {
   if [ -f /etc/apparmor.d/openbot-hosted ] && command -v apparmor_parser >/dev/null &&
     [ -d /sys/kernel/security/apparmor ]; then
     apparmor_parser --remove /etc/apparmor.d/openbot-hosted 2>/dev/null || true
-    # The rule that openbot-hosted-update added for the Claude sandbox.
     if grep -qs '^# OpenBot: ' /etc/apparmor.d/local/bwrap-userns-restrict; then
       sed -i -e '/^# OpenBot: /d' -e '/^priority=1 allow pix \/\*\* -> &bwrap,$/d' \
         /etc/apparmor.d/local/bwrap-userns-restrict
@@ -314,7 +296,6 @@ uninstall_command() {
     fi
   fi
   rm -f /etc/apparmor.d/openbot-hosted /usr/local/bin/openbot
-  # The desktop .deb also installs into /opt/OpenBot, so only the entries of a server go.
   for entry in app hosted staged staged.ready .applying; do rm -rf "${INSTALL:?}/$entry"; done
   rmdir "$INSTALL" 2>/dev/null || true
   home=$(getent passwd "$user" | cut -d: -f6)
@@ -345,6 +326,7 @@ case $command in
     require_host "run docker $command <container> on the host"
     require_root "$command"
     systemctl "$command" "$UNIT"
+    if [ "$command" = stop ]; then systemctl reset-failed "$UNIT" 2>/dev/null || true; fi
     ;;
   update) update_command ;;
   uninstall) uninstall_command ;;

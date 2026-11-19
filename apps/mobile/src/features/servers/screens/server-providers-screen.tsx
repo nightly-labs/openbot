@@ -33,17 +33,11 @@ import { RowIcon } from "@/features/settings/components/settings-row-icon";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, type MobileText, useText } from "@/shared/lib/text";
 
-/** The status of a row, as the desktop Providers tab shows it. */
 export function providerStatusLabel(row: ProviderRow, { t, format }: Pick<MobileText, "t" | "format">): string {
   const text = providerStatusText(row);
   return "percent" in text ? format.percent(Math.round(text.percent * 100) / 100) : t(text.key);
 }
 
-/**
- * Server settings > Providers: the AI providers of the computer that runs the server, for an owner or
- * admin of a host that serves `providers-v1`. A tap opens the provider, where it signs in, downloads
- * or updates on the host.
- */
 export function ServerProvidersScreen() {
   const text = useText();
   const { t, errorMessage } = text;
@@ -63,7 +57,6 @@ export function ServerProvidersScreen() {
         </SettingsNote>
       </SettingsContent>
     );
-  // The connected providers first, then the others; a group with no provider is not shown.
   const connected = rows.filter((row) => row.status?.state === "available");
   const sections = [
     { title: t("mobile.server.providers.connectedTitle"), rows: connected },
@@ -107,7 +100,6 @@ export function ServerProvidersScreen() {
       ))}
       {admin ? <CustomProvidersSection serverId={serverId} admin={admin} /> : null}
       {admin && (admin.registry || admin.customAgents) ? <AgentsSection serverId={serverId} admin={admin} /> : null}
-      {/* Only a host that downloads runtimes has updates to check. */}
       {runtimes.data && admin ? (
         <SettingsSection footer={checkResult ?? undefined}>
           <SettingsRow
@@ -148,10 +140,6 @@ export function ServerProvidersScreen() {
   );
 }
 
-/**
- * The OpenAI-compatible endpoints of the host, as the Custom providers list of the desktop Providers
- * tab. A tap opens an endpoint; the last row adds one.
- */
 function CustomProvidersSection({ serverId, admin }: { serverId: string; admin: ProviderAdmin }) {
   const { t, errorMessage } = useText();
   const [muted, accent] = useCSSVariable(["--openbot-text-grouped-secondary", "--openbot-accent"]);
@@ -220,10 +208,6 @@ function CustomProvidersSection({ serverId, admin }: { serverId: string; admin: 
   );
 }
 
-/**
- * The ACP agents of the host: its custom agents (`custom-agents-v1`) and the ACP registry
- * (`acp-registry-v1`), as the Agents part of the desktop Providers tab.
- */
 function AgentsSection({ serverId, admin }: { serverId: string; admin: ProviderAdmin }) {
   const { t, errorMessage } = useText();
   const accent = useCSSVariable("--openbot-accent");
@@ -296,10 +280,6 @@ function AgentsSection({ serverId, admin }: { serverId: string; admin: ProviderA
   );
 }
 
-/**
- * The provider that a new agent of the host starts on (`provider-default-v1`), as the Default
- * provider select of the desktop Providers tab: the connected providers and the current choice.
- */
 function DefaultProviderSection({
   serverId,
   setting,

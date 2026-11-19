@@ -71,44 +71,30 @@ import {
   VAT_METADATA,
 } from "./stripe-client";
 
-/** Prices change only when `stripe-bootstrap.ts` runs, so each isolate reads the price once in this time. */
 const PRICE_TTL_MS = 5 * 60_000;
 const priceCache = new Map<string, { expiresAt: number; prices: ReadonlyMap<string, StripePrice> }>();
 
-/** Where the Stripe page sends the user back: the desktop return page or the web client. */
 export type LicenseReturnTarget = "desktop" | "web";
 
-/**
- * The keys of the license email claims in `billing_webhook_events`. No Stripe event id has them. The
- * welcome and ended claims name the subscription, the failed payment claim names the invoice.
- */
 const LICENSE_EMAIL_CLAIM_PREFIXES = {
   welcome: "openbot_license_email:",
   payment_failed: "openbot_license_payment_failed:",
   ended: "openbot_license_ended:",
 } as const satisfies Record<LicenseEmailInput["kind"], string>;
-/** A license that changes from one of these statuses had no payment yet. */
 const BEFORE_FIRST_PAYMENT_STATUSES: ReadonlySet<string> = new Set(["trialing", "incomplete"]);
-/** A license with one of these statuses waits for a payment that failed or is missing. */
 const UNPAID_STATUSES: ReadonlySet<string> = new Set(["past_due", "unpaid", "paused"]);
-/** The longest first period after a trial, with one day more for the calendar. */
 const FIRST_PERIOD_AFTER_TRIAL_MS: Readonly<Record<BillingInterval, number>> = {
   month: 32 * 86_400_000,
   year: 367 * 86_400_000,
 };
 
-/** The unpaid renewal invoice of a license, read from an `invoice.payment_failed` event. */
 export interface FailedLicenseInvoice {
   invoiceId: string;
-  /** In minor units of the license currency. */
   amountDue: number;
-  /** Milliseconds since the epoch, or null when Stripe does not try again. */
   nextAttemptAt: number | null;
-  /** Stripe's page for the invoice, or null. */
   invoiceUrl: string | null;
 }
 
-/** A license subscription that a sync stored. */
 export interface LicenseSync {
   kind: "license";
   userId: string;
@@ -120,7 +106,6 @@ export interface LicenseSync {
   status: BillingSubscriptionStatus;
 }
 
-/** The stored state of a license before a sync writes it. */
 interface StoredLicense {
   users: number;
   status: string;
@@ -158,34 +143,15 @@ export interface LicenseServiceOptions {
   database: D1Database;
   stripe: StripeClient;
   secretKey: string;
-  /** A license bought before this time is free until then, in milliseconds since the epoch. */
   trialEnd?: number | null;
-  /** A Checkout page needs the billing country (`checkoutTax`). Off: Stripe Tax for a customer with none. */
   countryRequired?: boolean;
   now: () => number;
-  /** The Stripe customer of the account. Server plans and the license use the same customer. */
   ensureCustomer: (user: { id: string; email: string }) => Effect.Effect<string, BillingError | BillingOperationError>;
-  /** Reports the lifecycle of a license. The sync reports each stored change once. */
+  referralCoupon?: (userId: string) => Effect.Effect<string | null, BillingError | BillingOperationError>;
   analytics?: AccountAnalytics;
-  /** The sales ledger. Without it, a started Checkout goes to `analytics`. */
   sales?: BillingSales | null;
-  /**
-   * Runs after a sync stores a license that opened or closed, has other users, or started or stopped
-   * giving its users since its last write. The member limit of the owner's servers follows the license.
-   * A failure is logged and does not fail the sync.
-   */
   onLicenseChanged?: (userId: string) => Effect.Effect<void, RemoteFailure>;
-  /**
-   * Runs once for each license email: the first payment (a sync stores the license as `active` after no
-   * status, a trial, or an incomplete Checkout), each failed renewal invoice, and the end of a license
-   * that had a payment. A successful renewal sends none. It must not throw or wait: the email goes after
-   * the webhook answers.
-   */
   onLicenseEmail?: (message: SmtpLicenseMessage) => void;
-  /**
-   * Runs once for each license that starts, ends, or cancels or resumes its renewal, with the email of
-   * its account. It must not throw or wait.
-   */
   onPurchase?: (purchase: BillingPurchase) => void;
 }
 
@@ -194,15 +160,11 @@ class LicenseDependencies extends Context.Service<
   { database: D1Database; stripe: StripeClient; now: () => number }
 >()("auth-api/LicenseService/Dependencies") {}
 
-/**
- * The commercial license of an account: one subscription whose quantity is the number of users. Its
- * Price gives the tier and the interval (`LICENSE_PLANS`). It uses its own table, so the server plans,
- * their member limits and the released routes do not change.
- */
 export class LicenseService {
   readonly #layer: Layer.Layer<LicenseDependencies>;
   readonly #secretKey: string;
   readonly #ensureCustomer: LicenseServiceOptions["ensureCustomer"];
+  readonly #referralCoupon: NonNullable<LicenseServiceOptions["referralCoupon"]> | null;
   readonly #analytics: AccountAnalytics;
   readonly #sales: BillingSales | null;
   readonly #trialEnd: number | null;
@@ -218,6 +180,7 @@ export class LicenseService {
     this.#countryRequired = options.countryRequired ?? false;
     this.#now = options.now;
     this.#ensureCustomer = options.ensureCustomer;
+    this.#referralCoupon = options.referralCoupon ?? null;
     this.#analytics = options.analytics ?? NO_ACCOUNT_ANALYTICS;
     this.#sales = options.sales ?? null;
     this.#onLicenseChanged = options.onLicenseChanged ?? null;
@@ -230,19 +193,10 @@ export class LicenseService {
     });
   }
 
-  /**
-   * The end of the free trial of a license bought now, in milliseconds since the epoch. Null when a new
-   * license is paid at once. Stripe Checkout refuses a trial that ends less than 48 hours after it.
-   */
   trialEnd(): number | null {
     return this.#trialEnd !== null && this.#trialEnd - this.#now() >= LICENSE_TRIAL_MARGIN_MS ? this.#trialEnd : null;
   }
 
-  /**
-   * The license of the account, the people that it counts, and the licenses of other owners that cover
-   * this account. People count: the owner and each account that is an active member of a server that the
-   * owner owns. AI agents and chat-app participants have no membership, so they do not count.
-   */
   readonly getState = Effect.fn("LicenseService.getState")(
     function* (
       this: LicenseService,
@@ -289,8 +243,6 @@ export class LicenseService {
       const users = licenseUsers(userId, userRows.results);
       const trialEnd = this.trialEnd();
       return {
-        // Sales pause when the Stripe price is archived. The section still shows, and checkout then
-        // tells the user whom to contact.
         available: true,
         currency,
         license: license ? licenseFromRow(license) : null,
@@ -306,13 +258,6 @@ export class LicenseService {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
-  /**
-   * A Stripe Checkout page for a new license. An account has one open license and one open license page.
-   * Two requests at the same time keep the newer page and both return it. Stripe is the source of truth:
-   * a page paid before its webhook, or a page paid while this request runs, stops the new page.
-   * An account that pays for a hosted server buys the bundle price. During a promotion the license is
-   * free until `trialEnd()`.
-   */
   readonly createCheckout = Effect.fn("LicenseService.createCheckout")(
     function* (
       this: LicenseService,
@@ -320,6 +265,7 @@ export class LicenseService {
       request: Required<LicenseCheckoutRequest>,
       target: LicenseReturnTarget,
       origin: string,
+      promotionCode: string | null = null,
     ): Effect.fn.Return<string, BillingError | BillingOperationError, LicenseDependencies> {
       const dependencies = yield* LicenseDependencies;
       const plan: LicensePlan = {
@@ -328,20 +274,17 @@ export class LicenseService {
         bundle: yield* this.#bundle(user.id),
       };
       const price = yield* this.#price(plan);
-      // A currency such as BRL is optional: only a Price with that currency option can sell in it.
       if (!price || !priceHasCurrency(price, request.currency)) return yield* licenseUnavailable();
       if (yield* this.#openLicense(user.id)) return yield* licenseExists();
-      // The account service refuses a join above the license, so a license cannot start below the
-      // people that it counts now.
       const { used } = yield* this.getState(user.id);
       if (request.users < used)
         return yield* new BillingError(409, "license_users_in_use", sourceText("error.billing.licenseUsersInUse"));
-      // A Stripe customer pays all its subscriptions in one currency.
       const locked = yield* this.#lockedCurrency(user.id);
       if (locked && locked !== request.currency)
         return yield* new BillingError(409, "license_currency", sourceText("error.billing.licenseCurrency"));
       const customerId = yield* this.#ensureCustomer(user);
       const tax = yield* checkoutTax(dependencies.stripe, customerId, this.#countryRequired);
+      const referralCouponId = this.#referralCoupon ? yield* this.#referralCoupon(user.id) : null;
       const returnUrl = licenseReturnUrl(origin, target);
       const trialEnd = this.trialEnd();
       const session = yield* this.#stripeCall(() =>
@@ -354,6 +297,8 @@ export class LicenseService {
           tax,
           metadata: licenseMetadata(plan),
           ...(trialEnd === null ? {} : { trialEndSeconds: Math.floor(trialEnd / 1_000) }),
+          ...(promotionCode ? { promotionCode } : {}),
+          ...(referralCouponId ? { referralCouponId } : {}),
           successUrl: returnUrl,
           cancelUrl: `${returnUrl}${returnUrl.includes("?") ? "&" : "?"}cancelled=1`,
           nowSeconds: Math.floor(dependencies.now() / 1_000),
@@ -361,19 +306,16 @@ export class LicenseService {
       );
       const listed = yield* this.#stripeCall(() => dependencies.stripe.listOpenCheckoutSessions(customerId));
       const pages = listed.filter((page) => sellsLicense(page) && page.url !== null);
-      // The list can be read before Stripe shows the new page in it.
       if (!pages.some((page) => page.id === session.id))
         pages.push({ ...session, status: "open", created: Math.floor(dependencies.now() / 1_000), metadata: {} });
       pages.sort((left, right) => right.created - left.created || right.id.localeCompare(left.id));
       const [kept = session, ...older] = pages;
-      // A newer server order page sells the license. The loop below closes this page.
       const ordered = pages[0] !== undefined && pages[0].metadata[LICENSE_METADATA.kind] !== LICENSE_METADATA_KIND;
       let paid = false;
       for (const page of older) {
         const closed = yield* this.#stripeCall(() => dependencies.stripe.expireCheckoutSession(page.id));
         if (closed.status === "complete") paid = true;
       }
-      // Read after the older pages closed, so that a page paid before they closed shows here.
       const readAt = dependencies.now();
       const subscriptions = yield* this.#stripeCall(() => dependencies.stripe.listCustomerSubscriptions(customerId));
       const open = subscriptions.find(
@@ -388,7 +330,6 @@ export class LicenseService {
         return yield* licenseExists();
       }
       if (kept.id !== session.id && ordered) return yield* licenseExists();
-      // Each page starts once: a request that returns a newer page of another request reports nothing.
       if (kept.id === session.id)
         yield* this.#checkoutStarted(user.id, session.id, plan, request.users, request.currency);
       return kept.url ?? session.url;
@@ -396,11 +337,6 @@ export class LicenseService {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
-  /**
-   * Changes the number of users. More users are invoiced now for the rest of the period, and the change
-   * fails when that payment fails. Fewer users apply from the next invoice, with no refund. The license
-   * cannot go below the people that it counts now.
-   */
   readonly setUsers = Effect.fn("LicenseService.setUsers")(
     function* (
       this: LicenseService,
@@ -422,16 +358,12 @@ export class LicenseService {
       if (!item) return yield* noLicense();
       if (licensePlanFromPrice(item.price).tier !== "team") return yield* licenseOneUser();
       const quantity = item.quantity ?? 1;
-      // Fewer users apply with no refund, so the users that this period already paid for stay paid. Only
-      // users above that count are invoiced now.
       const periodEnd = String(subscriptionPeriodEnd(current) ?? "");
       const paidUsers = Number(current.metadata[LICENSE_METADATA.paidUsers]);
       const paid =
         current.metadata[LICENSE_METADATA.paidPeriodEnd] === periodEnd && Number.isSafeInteger(paidUsers)
           ? Math.max(quantity, paidUsers)
           : quantity;
-      // Each write gets the time after Stripe answers: the webhook of an earlier write in this change can
-      // read Stripe after this change started, and its older state must not replace this one.
       const setQuantity = (next: number, proration: "always_invoice" | "none") =>
         stripeRequest(() =>
           dependencies.stripe.setSubscriptionQuantity({
@@ -450,16 +382,12 @@ export class LicenseService {
         yield* this.sync(updated, userId, readAt);
         return yield* this.getState(userId);
       }
-      // Stripe prorates from the current quantity, so the license first goes back to the paid users at no
-      // charge. When the payment fails, Stripe keeps the paid users and the license goes back to as it was.
       if (quantity !== paid) yield* setQuantity(paid, "none").pipe(Effect.mapError(stripeFailure));
       const sync = (written: { updated: StripeSubscription; readAt: number }) =>
         this.sync(written.updated, userId, written.readAt);
       const { updated, readAt } = yield* setQuantity(users, "always_invoice").pipe(
         Effect.catch((error) =>
           Effect.gen(function* () {
-            // With no answer from Stripe, the increase can be applied and paid. Read it again, so that a paid
-            // increase is kept and not charged a second time.
             if (!(error instanceof StripeRequestError)) {
               const readAt = dependencies.now();
               const after = yield* stripeRequest(() => dependencies.stripe.getSubscription(current.id)).pipe(
@@ -490,11 +418,6 @@ export class LicenseService {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
-  /**
-   * Moves an open license to a higher plan: a 1-user license to Team, or a monthly Team license to
-   * yearly. Stripe invoices the prorated difference now and refuses the change when that payment fails.
-   * A lower plan is not offered: the user cancels at the end of the period and buys again.
-   */
   readonly changePlan = Effect.fn("LicenseService.changePlan")(
     function* (
       this: LicenseService,
@@ -513,7 +436,6 @@ export class LicenseService {
       const item = subscriptionLicenseItem(current);
       if (!item) return yield* noLicense();
       const from = licensePlanFromPrice(item.price);
-      // The new plan is invoiced now, so it takes the bundle price that the account has now.
       const to: LicensePlan = { tier: "team", interval: request.interval, bundle: yield* this.#bundle(userId) };
       if (!isUpgrade(from, to)) return yield* licensePlanChange();
       const price = yield* this.#price(to);
@@ -526,14 +448,11 @@ export class LicenseService {
           quantity: request.users,
           proration: "always_invoice",
           priceId: price.id,
-          // The paid users of the old plan do not apply to the new one. An empty value removes the key.
           metadata: { [LICENSE_METADATA.paidUsers]: "", [LICENSE_METADATA.paidPeriodEnd]: "" },
         }),
       ).pipe(
         Effect.catch((error) =>
           Effect.gen(function* () {
-            // With no answer from Stripe, the change can be applied and paid. Read it again, so that a
-            // paid change is kept.
             if (!(error instanceof StripeRequestError)) {
               const after = yield* stripeRequest(() => dependencies.stripe.getSubscription(current.id)).pipe(
                 Effect.mapError(stripeFailure),
@@ -554,12 +473,6 @@ export class LicenseService {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
-  /**
-   * Moves an open license to its bundle price when the account pays for a hosted server, and back to its
-   * plain price when it stops. The tier, interval and users stay. The new price applies from the next
-   * renewal, with no proration and no refund. A server plan sync calls it, so a failure is logged and does
-   * not fail that sync.
-   */
   readonly alignBundlePrice = Effect.fn("LicenseService.alignBundlePrice")(
     function* (this: LicenseService, userId: string): Effect.fn.Return<void, never, LicenseDependencies> {
       const self = this;
@@ -573,12 +486,10 @@ export class LicenseService {
           dependencies.stripe.getSubscription(license.stripe_subscription_id),
         );
         const item = subscriptionLicenseItem(current);
-        // A server order that is not split yet: the split moves the license first.
         if (!item || subscriptionServerItem(current)) return;
         const from = licensePlanFromPrice(item.price);
         const readAt = dependencies.now();
         if (from.bundle === bundle) {
-          // The stored row is behind Stripe.
           yield* self.sync(current, userId, readAt);
           return;
         }
@@ -606,15 +517,6 @@ export class LicenseService {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
-  /**
-   * Moves the license of a paid server order to its own subscription. The order's one Checkout made one
-   * subscription with a server item and a license item. The new subscription has the same customer, Price,
-   * users and payment method, and renews on the same date with no charge before it. Then the license item
-   * leaves the server subscription with no proration. During a promotion the order has no license item:
-   * its metadata names the license, which is free until the trial end of the order. Then the metadata
-   * leaves the server subscription. A failed step runs again on the next webhook: the idempotency key and
-   * the `orderSubscription` metadata make the license only once.
-   */
   readonly splitOrder = Effect.fn("LicenseService.splitOrder")(
     function* (
       this: LicenseService,
@@ -636,7 +538,6 @@ export class LicenseService {
         console.warn("billing: server order cannot be split", { subscriptionId: subscription.id });
         return;
       }
-      // A late webhook can come after the trial end. Stripe then needs a trial end in the future.
       const nowSeconds = Math.floor(dependencies.now() / 1_000);
       const anchorSeconds = ordered
         ? Math.max(ordered.trialEndSeconds, nowSeconds + 3_600)
@@ -645,8 +546,12 @@ export class LicenseService {
       const vatTreatmentMark = subscription.metadata[VAT_METADATA.treatment];
       const listed = yield* this.#stripeCall(() => dependencies.stripe.listCustomerSubscriptions(customerId));
       const readAt = dependencies.now();
+      const made = listed.find(
+        (candidate) => candidate.metadata[LICENSE_METADATA.orderSubscription] === subscription.id,
+      );
+      const referralCouponId = made || !this.#referralCoupon ? null : yield* this.#referralCoupon(ownerId);
       const license =
-        listed.find((candidate) => candidate.metadata[LICENSE_METADATA.orderSubscription] === subscription.id) ??
+        made ??
         (yield* this.#stripeCall(() =>
           dependencies.stripe
             .createSubscription(
@@ -660,20 +565,17 @@ export class LicenseService {
                 automaticTax: subscription.automatic_tax?.enabled === true,
                 taxRateIds: (subscription.default_tax_rates ?? []).map((rate) => rate.id),
                 paymentMethodId: subscriptionPaymentMethodId(subscription),
+                ...(referralCouponId ? { couponId: referralCouponId } : {}),
                 metadata: {
                   [BILLING_METADATA.userId]: ownerId,
                   ...licenseMetadata(licensePlanFromPrice(price)),
                   [LICENSE_METADATA.orderSubscription]: subscription.id,
-                  // Only a subscription with a VAT treatment sends it, so the retry of an older split keeps
-                  // the body of its idempotency key.
                   ...(vatTreatmentMark === undefined ? {} : { [VAT_METADATA.treatment]: vatTreatmentMark }),
                 },
               },
               `license-split:${subscription.id}`,
             )
             .pipe(
-              // `checkout.session.completed` and `invoice.paid` come at the same time. The webhook that
-              // makes the license now also finishes the split.
               Effect.catchIf(
                 (error) => error instanceof StripeRequestError && error.code === "idempotency_key_in_use",
                 () => Effect.succeed(null),
@@ -694,7 +596,6 @@ export class LicenseService {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
-  /** The Price of a license plan, or null when the Stripe account has none. */
   readonly price = Effect.fn("LicenseService.planPrice")(
     function* (
       this: LicenseService,
@@ -705,11 +606,6 @@ export class LicenseService {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
-  /**
-   * Fails when a server order cannot buy this license: the account has an open license, or the license
-   * has fewer users than the people that it counts now, as a license checkout refuses. `keepOrderPage`
-   * then checks Stripe after the page opens.
-   */
   readonly assertCanOrder = Effect.fn("LicenseService.assertCanOrder")(
     function* (
       this: LicenseService,
@@ -724,12 +620,6 @@ export class LicenseService {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
-  /**
-   * Keeps one open Checkout page that sells a license, as the license checkout does: the newest. A server
-   * order page closes the customer's older pages that sell a license, and then reads Stripe, so a page
-   * paid before it closed, or a paid order that is not split yet, refuses the order. When a newer page
-   * sells a license, the order page closes.
-   */
   readonly keepOrderPage = Effect.fn("LicenseService.keepOrderPage")(
     function* (
       this: LicenseService,
@@ -743,7 +633,6 @@ export class LicenseService {
       let newer = false;
       for (const page of listed) {
         if (page.id === sessionId || !sellsLicense(page)) continue;
-        // The same order as the license checkout: created, then id.
         if ((page.created - created || page.id.localeCompare(sessionId)) > 0) {
           newer = true;
           continue;
@@ -765,7 +654,6 @@ export class LicenseService {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
-  /** Fails when the account's open plans use another currency. A Stripe customer pays in one currency. */
   readonly assertCurrency = Effect.fn("LicenseService.assertCurrency")(
     function* (
       this: LicenseService,
@@ -779,7 +667,6 @@ export class LicenseService {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
-  /** True when the account has an open license. */
   readonly hasLicense = Effect.fn("LicenseService.hasLicense")(
     function* (
       this: LicenseService,
@@ -790,7 +677,6 @@ export class LicenseService {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
-  /** Cancels the license at the end of its period, or renews it again. */
   readonly setRenewal = Effect.fn("LicenseService.setRenewal")(
     function* (
       this: LicenseService,
@@ -810,10 +696,6 @@ export class LicenseService {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
-  /**
-   * Stores a license subscription that the webhook or a change read from Stripe. Two reads of one
-   * subscription can run at the same time, so the write of the older read is skipped.
-   */
   readonly sync = Effect.fn("LicenseService.sync")(
     function* (
       this: LicenseService,
@@ -829,7 +711,6 @@ export class LicenseService {
         ? licensePlanFromPrice(item.price)
         : { tier: "team", interval: "month", bundle: false };
       if (
-        // A server order before its split is a server plan. The split stores its license.
         subscriptionServerItem(subscription) ||
         !isBillingCurrency(currency) ||
         !isOneOf(BILLING_SUBSCRIPTION_STATUSES, subscription.status) ||
@@ -841,7 +722,6 @@ export class LicenseService {
       }
       const cancelAtPeriodEnd = subscription.cancel_at_period_end || typeof subscription.cancel_at === "number";
       const periodEnd = subscriptionPeriodEnd(subscription);
-      // One transaction reads the state before the write, so each stored change is reported once.
       const [before, written] = yield* billingCall(() =>
         dependencies.database.batch<StoredLicense>([
           dependencies.database
@@ -888,7 +768,6 @@ export class LicenseService {
         written?.meta.changes === 1
           ? licenseChange(previous, { users, status: subscription.status, cancelAtPeriodEnd, plan, currency })
           : null;
-      // A trial whose first payment failed is unpaid until a later try or the customer pays.
       const unpaidTrial =
         previous !== null &&
         UNPAID_STATUSES.has(previous.status) &&
@@ -900,17 +779,13 @@ export class LicenseService {
           plan,
           users,
           currency,
-          // Stripe gives a discount only as an ID, so a discounted license shows no price.
           amount: subscriptionHasDiscount(subscription) ? null : licensePeriodAmount(plan, users, currency),
           nextPaymentAt: cancelAtPeriodEnd ? null : periodEnd,
         });
       }
-      // A trial or an incomplete Checkout that ends had no payment, so it gets no email.
       if (change?.endReason && !neverPaid) {
         yield* this.#sendEmail(ownerId, subscription.id, { kind: "ended", plan, users, reason: change.endReason });
       }
-      // Checkout lets one account open one license. A second one comes only from the Dashboard or a payment
-      // that no check could stop, and a person must refund it.
       const others = yield* billingCall(() =>
         dependencies.database
           .prepare(
@@ -925,8 +800,6 @@ export class LicenseService {
           subscriptionIds: [subscription.id, ...others.results.map((row) => row.stripe_subscription_id)],
         });
       if (change) {
-        // A license that starts after every earlier license of the account ended. A failed read leaves
-        // the property out: the license is already saved, so the event must not fail the sync.
         const reactivated =
           change.action !== "plan_started"
             ? undefined
@@ -964,6 +837,7 @@ export class LicenseService {
             {
               event,
               periodEnd: subscriptionEnd(subscription),
+              cancelRequest: subscription.canceled_at ?? null,
               ...(change.endReason ? { endReason: change.endReason } : {}),
               product: "license",
               tier: plan.tier,
@@ -977,16 +851,12 @@ export class LicenseService {
           );
         }
       }
-      // A `past_due` license stops giving its users at its period end with no change to its row. The lapse
-      // sweep reads it after that time, so the view at the previous write's time is the one to compare.
       if (
         this.#onLicenseChanged &&
         written?.meta.changes === 1 &&
         memberLimitView(previous, previous?.updated_at ?? readAt) !==
           memberLimitView({ users, status: subscription.status, current_period_end: periodEnd }, readAt)
       ) {
-        // The license is stored, and a retry of this event finds no change. A failed notice does not fail
-        // the sync: each client reads the new limit with its next server list.
         yield* this.#onLicenseChanged(ownerId).pipe(
           Effect.catch(() =>
             Effect.sync(() => {
@@ -1009,11 +879,6 @@ export class LicenseService {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
-  /**
-   * Sends the email for a failed renewal payment of a stored license, once for each invoice. The first
-   * payment fails on the Checkout page, which shows the error, so it sends none. A license that ended
-   * with the failed payment gets the ended email only.
-   */
   readonly paymentFailed = Effect.fn("LicenseService.paymentFailed")(
     function* (
       this: LicenseService,
@@ -1034,10 +899,6 @@ export class LicenseService {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
-  /**
-   * Gives a license email to `onLicenseEmail` once for its claim key. A webhook retry or a second read
-   * finds the claim and sends nothing. A failed read is logged and does not fail the sync.
-   */
   readonly #sendEmail = Effect.fn("LicenseService.sendEmail")(
     function* (
       this: LicenseService,
@@ -1070,7 +931,6 @@ export class LicenseService {
       ),
   );
 
-  /** The account of a stored license, or null for a subscription that is not a stored license. */
   readonly storedOwner = Effect.fn("LicenseService.storedOwner")(
     function* (
       this: LicenseService,
@@ -1088,7 +948,6 @@ export class LicenseService {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
-  /** The open licenses whose period ended before `before` and that no sync read since `readBefore`. */
   readonly lapsed = Effect.fn("LicenseService.lapsed")(
     function* (
       this: LicenseService,
@@ -1112,10 +971,6 @@ export class LicenseService {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
-  /**
-   * Records a started license Checkout. The page is already open, so a failed write is logged and does
-   * not fail the request.
-   */
   readonly #checkoutStarted = Effect.fn("LicenseService.checkoutStarted")(function* (
     this: LicenseService,
     userId: string,
@@ -1167,7 +1022,6 @@ export class LicenseService {
     );
   });
 
-  /** The open license, else the newest ended license. */
   readonly #latestLicense = Effect.fn("LicenseService.latestLicense")(function* (
     this: LicenseService,
     userId: string,
@@ -1185,7 +1039,6 @@ export class LicenseService {
     );
   });
 
-  /** The currency of the account's open server plans and license, or null when it has none. */
   readonly #lockedCurrency = Effect.fn("LicenseService.lockedCurrency")(function* (
     this: LicenseService,
     userId: string,
@@ -1205,10 +1058,6 @@ export class LicenseService {
     return row && isBillingCurrency(row.currency) ? row.currency : null;
   });
 
-  /**
-   * The Price of a license plan, or null when the Stripe account has none. One read gets all the plans.
-   * A Price whose metadata names another plan is not used, so a wrong lookup key cannot sell it.
-   */
   readonly #price = Effect.fn("LicenseService.price")(function* (
     this: LicenseService,
     plan: LicensePlan,
@@ -1229,7 +1078,6 @@ export class LicenseService {
     return prices.get(lookupKey) ?? null;
   });
 
-  /** True when the account pays for a hosted server, so a license gets the bundle price. */
   readonly #bundle = Effect.fn("LicenseService.bundle")(function* (
     this: LicenseService,
     userId: string,
@@ -1246,7 +1094,6 @@ export class LicenseService {
   );
 }
 
-/** The owner first, then each other person once, with the names of the owner's servers where they are a member. */
 function licenseUsers(ownerId: string, rows: readonly LicenseUserRow[]): LicenseUser[] {
   const users = new Map<string, LicenseUser>();
   for (const row of rows) {
@@ -1257,7 +1104,6 @@ function licenseUsers(ownerId: string, rows: readonly LicenseUserRow[]): License
   return [...users.values()].sort((left, right) => Number(right.owner) - Number(left.owner));
 }
 
-/** The plan of a stored license. A license from before the tiers has none and is Team monthly. */
 function rowPlan(row: { tier: string | null; billing_interval: string | null; bundle: number }): LicensePlan {
   return {
     tier: isOneOf(LICENSE_TIERS, row.tier) ? row.tier : "team",
@@ -1270,7 +1116,6 @@ function samePlan(left: LicensePlan, right: LicensePlan): boolean {
   return left.tier === right.tier && left.interval === right.interval && left.bundle === right.bundle;
 }
 
-/** The metadata of a license Checkout and subscription. */
 function licenseMetadata(plan: LicensePlan): Record<string, string> {
   return {
     [LICENSE_METADATA.kind]: LICENSE_METADATA_KIND,
@@ -1280,10 +1125,8 @@ function licenseMetadata(plan: LicensePlan): Record<string, string> {
   };
 }
 
-/** The changes that the app sells: a 1-user license to Team, and a monthly Team license to yearly. */
 function isUpgrade(from: LicensePlan, to: LicensePlan): boolean {
   if (to.tier !== "team") return false;
-  // A yearly license does not go back to monthly: Stripe would credit the rest of the year.
   if (from.tier !== "team") return from.interval === "month" || to.interval === "year";
   return from.interval === "month" && to.interval === "year";
 }
@@ -1306,10 +1149,6 @@ function licenseFromRow(row: LicenseRow): License | null {
   };
 }
 
-/**
- * The change of a license that one sync stored, with the same actions as a server plan. One sync reports
- * one action: a start or an end first, then a change of users, then a change of renewal.
- */
 function licenseChange(
   previous: StoredLicense | null,
   current: {
@@ -1335,7 +1174,6 @@ function licenseChange(
   if (previous.users !== current.users || !samePlan(previousPlan, current.plan)) {
     const before = licenseMonthlyAmount(previousPlan, previous.users, current.currency);
     const after = licenseMonthlyAmount(current.plan, current.users, current.currency);
-    // A move to yearly lowers the monthly amount but is an upgrade.
     const up = after > before || (previousPlan.interval === "month" && current.plan.interval === "year");
     return { action: "plan_changed", direction: up ? "up" : "down" };
   }
@@ -1344,19 +1182,13 @@ function licenseChange(
   return { action: current.cancelAtPeriodEnd ? "cancel_scheduled" : "cancel_withdrawn" };
 }
 
-/**
- * The web client opens Billing again. The desktop app reads the license again, so its page only says to go back.
- * `kind` tells the return page which Stripe page closed.
- */
 function licenseReturnUrl(origin: string, target: LicenseReturnTarget): string {
   if (target === "web") return `${origin}/app?billing=license`;
   return `${origin}/billing/return?kind=license`;
 }
 
-/** A trial sold with less time left than this would end before Stripe accepts it (48 hours). */
 const LICENSE_TRIAL_MARGIN_MS = 49 * 60 * 60_000;
 
-/** The free license that a paid server order of a promotion names in its metadata, or null. */
 function orderedLicense(
   subscription: StripeSubscription,
 ): { tier: LicensePlan["tier"]; interval: BillingInterval; users: number; trialEndSeconds: number } | null {
@@ -1376,15 +1208,10 @@ function orderedLicense(
   return { tier, interval, users, trialEndSeconds };
 }
 
-/**
- * True for a server subscription whose license is not split yet: a license item, or the metadata of a
- * promotion order.
- */
 export function ordersLicense(subscription: StripeSubscription): boolean {
   return subscriptionLicenseItem(subscription) !== null || orderedLicense(subscription) !== null;
 }
 
-/** A trial end from the Worker settings, as an ISO 8601 time. Null when it is empty or not a time. */
 export function parseLicenseTrialEnd(value: string | undefined): number | null {
   const trimmed = value?.trim();
   if (!trimmed) return null;
@@ -1392,7 +1219,6 @@ export function parseLicenseTrialEnd(value: string | undefined): number | null {
   return Number.isFinite(time) ? time : null;
 }
 
-/** True for a Checkout page that sells a license: a license page, or a server order with a license. */
 function sellsLicense(page: { metadata: Readonly<Record<string, string>> }): boolean {
   return (
     page.metadata[LICENSE_METADATA.kind] === LICENSE_METADATA_KIND ||
@@ -1400,10 +1226,6 @@ function sellsLicense(page: { metadata: Readonly<Record<string, string>> }): boo
   );
 }
 
-/**
- * What the member limit of the owner's servers reads from a license at one time: its users while it is
- * open, and if it gives them. A renewal changes none of these, so it tells no client.
- */
 function memberLimitView(
   license: { users: number; status: string; current_period_end: number | null } | null,
   at: number,
@@ -1433,10 +1255,6 @@ function noLicense(): BillingError {
   return new BillingError(404, "no_license", sourceText("error.billing.noLicense"));
 }
 
-/**
- * True in the first period after a trial. Stripe keeps `trial_end` after the trial, and each later period
- * moves the period end past this limit.
- */
 function inFirstPeriodAfterTrial(
   subscription: StripeSubscription,
   interval: BillingInterval,

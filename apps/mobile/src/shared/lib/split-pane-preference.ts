@@ -1,12 +1,10 @@
 import * as SecureStore from "expo-secure-store";
 import { create } from "zustand";
 
-/** How the pane of a wide window shows: the full list, or its avatars only. */
 export type SplitPaneMode = "list" | "rail";
 
 interface SplitPanePreference {
   mode: SplitPaneMode;
-  /** The list width that the user dragged to, or null for the width that the window gives. */
   width: number | null;
 }
 
@@ -38,7 +36,6 @@ function read(): SplitPanePreference {
 
 export const useSplitPanePreference = create<SplitPanePreference>(read);
 
-/** Keeps the pane as the user left it, for the next start. A failed write keeps the change for this run. */
 export function setSplitPanePreference(change: Partial<SplitPanePreference>): void {
   useSplitPanePreference.setState(change);
   const { mode, width } = useSplitPanePreference.getState();

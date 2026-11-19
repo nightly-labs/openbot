@@ -1,4 +1,3 @@
-/* Text for screen readers only. It keeps its place in the accessibility tree but takes no space. */
 .sr-only {
   position: absolute;
   width: 1px;

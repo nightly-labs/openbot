@@ -4,15 +4,12 @@ import { useText } from "@openbot/ui/text";
 import { Loading, Show } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { usePlatform } from "../../platform";
+import { serverSupportsCapability } from "../servers/server-capabilities";
 import { browserSecretVault } from "./browser-secret-vault";
 import { conversationPort } from "./conversation-port";
 import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
 
-/**
- * The browser takeover of the open thread, with the secure card for a code or a password, and its result
- * after the user answers. The agent's chat and an open side thread show it.
- */
 export function ConversationBrowserTakeover() {
   const {
     props,
@@ -28,10 +25,6 @@ export function ConversationBrowserTakeover() {
   const { t, errorMessage } = useText();
   const runtime = conversationRuntime(props);
   const platform = usePlatform();
-  /**
-   * A chat window shows no browser, so the main window opens the page (#10055). Elsewhere the page opens
-   * here, and a page that this view cannot open is not offered.
-   */
   const openPage = () => {
     const chatWindow = platform.chatWindow;
     const request = props.browserTakeover;
@@ -51,7 +44,13 @@ export function ConversationBrowserTakeover() {
     }
     return canOpenBrowserTakeoverTab() ? () => openBrowserTakeoverTab() : undefined;
   };
-  /** The agent that asks in a card: in a channel, the working agent whose card shows. */
+  const completeHere = () =>
+    !(
+      platform.chatWindow &&
+      props.browserTakeover?.reason === "sign-in-blocked" &&
+      props.server?.kind === "remote" &&
+      serverSupportsCapability(props.server, "browser-sign-in")
+    );
   const agentName = () =>
     (channel ? channel.interactionAgentName() : props.agent?.name) ?? t("chat.message.agentFallback");
   return (
@@ -65,7 +64,7 @@ export function ConversationBrowserTakeover() {
             preview={browserTakeoverPreview().preview}
             previewStatus={browserTakeoverPreview().status}
             onOpen={openPage()}
-            onComplete={() => respondToBrowserTakeover("complete")}
+            onComplete={completeHere() ? () => respondToBrowserTakeover("complete") : undefined}
             onCancel={() => respondToBrowserTakeover("cancel")}
             onSignInLocally={localSignIn.canStartForTakeover() ? localSignIn.startForTakeover : undefined}
             signInBlocked={localSignIn.blockedTakeover()}

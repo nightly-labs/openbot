@@ -16,21 +16,14 @@ import type { TransitionMode } from "@/shared/lib/motion";
 import { isIOS } from "@/shared/lib/platform";
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
-// Only iOS draws the blur. On Android, `BlurTargetView` moves its children into a native view of its
-// own, which stops the layout animations of the rows inside, and a `BlurView` that mounts paints its
-// tint and the window background for a frame. Android sheets draw no blur at their edges either.
 const BLUR_VEIL = isIOS;
-// The values of `BlurReveal`, so a swap looks like the other blurred reveals of the app. A fade for
-// reduced motion is shorter: it has no movement to show. The fade carries the change, so it stays.
 const DURATION = { blur: { enter: 240, leave: 180 }, fade: { enter: 160, leave: 120 } } as const;
-// Items of a list in a layer: they come in, go out and move to their new place.
 const ITEM_IN = { duration: 220, easing: EASE_OUT, reduceMotion: ReduceMotion.Never };
 const ITEM_OUT = { duration: 160, easing: EASE_OUT, reduceMotion: ReduceMotion.Never };
 const ITEM_FADE_IN = { duration: 160, easing: EASE_OUT, reduceMotion: ReduceMotion.Never };
 const ITEM_FADE_OUT = { duration: 120, easing: EASE_OUT, reduceMotion: ReduceMotion.Never };
 const ITEM_MOVE = LinearTransition.duration(240).easing(EASE_OUT).reduceMotion(ReduceMotion.Never);
 
-/** False while a layer mounts with its first content, so that content does not come in again on its own. */
 const SwapLayerSettledContext = createContext(false);
 
 interface Layer {
@@ -41,11 +34,6 @@ interface Layer {
   delay: number;
 }
 
-/**
- * Replaces its content when `swapKey` changes: the old content fades out with a blur while the new
- * content fades in. Content with the same key changes in place. The new content is in the layout at
- * once; the old content stays on top of it, out of the layout, until it has faded.
- */
 export function BlurSwap({
   swapKey,
   mode,
@@ -54,7 +42,6 @@ export function BlurSwap({
 }: {
   swapKey: string;
   mode: TransitionMode;
-  /** Waits before the new content comes in, so content that is replaced soon after never shows. */
   enterDelay?: number;
   children: ReactNode;
 }) {
@@ -89,12 +76,10 @@ function SwapLayer({ layer, mode, onLeft }: { layer: Layer; mode: TransitionMode
   const progress = useSharedValue(layer.enters ? 0 : 1);
   const [settled, setSettled] = useState(false);
   useEffect(() => setSettled(true), []);
-  // The blur costs a render pass while it is mounted, so it shows only while the layer moves.
   const [veiled, setVeiled] = useState(BLUR_VEIL && layer.enters && mode === "blur");
   const { key, leaving, enters, delay } = layer;
   useEffect(() => {
     if (mode === "none") {
-      // Settings turned the motion off while the layer moved.
       if (leaving) onLeft(key);
       progress.set(1);
       setVeiled(false);
@@ -137,7 +122,6 @@ function SwapLayer({ layer, mode, onLeft }: { layer: Layer; mode: TransitionMode
       importantForAccessibility={leaving ? "no-hide-descendants" : "auto"}
       style={[leaving ? { position: "absolute", top: 0, left: 0, right: 0 } : undefined, style]}
     >
-      {/* The items of a layer move with it: they do not come in when it does, or go out after it. */}
       <SwapLayerSettledContext value={settled}>
         <LayoutAnimationConfig skipEntering skipExiting>
           {layer.node}
@@ -181,20 +165,12 @@ function itemFadeOut() {
   return { initialValues: { opacity: 1 }, animations: { opacity: withTiming(0, ITEM_FADE_OUT) } };
 }
 
-/**
- * The layout animations of an item in a list inside a layer, such as a search result or a section of
- * results. With reduced motion the items only fade, and the others take their new place at once.
- */
 export function swapItemMotion(mode: TransitionMode) {
   if (mode === "none") return { entering: undefined, exiting: undefined, layout: undefined };
   if (mode === "fade") return { entering: itemFadeIn, exiting: itemFadeOut, layout: undefined };
   return { entering: itemEntering, exiting: itemExiting, layout: ITEM_MOVE };
 }
 
-/**
- * Blurs its content for a moment when it comes into a layer that is already shown, such as a section
- * of results that a search adds. The parent places the blur: give it no padding around the content.
- */
 export function BlurEnter({ mode, children }: { mode: TransitionMode; children: ReactNode }) {
   const settled = useContext(SwapLayerSettledContext);
   const [veiled, setVeiled] = useState(BLUR_VEIL && mode === "blur" && settled);

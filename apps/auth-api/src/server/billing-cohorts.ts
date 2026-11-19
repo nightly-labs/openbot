@@ -10,7 +10,6 @@ export interface BillingCohortCounts {
   checkout_pending_accounts: number;
 }
 
-/** One cohort per account, starting with its first recorded checkout. */
 export const readBillingCohortCounts = Effect.fn("BillingSales.cohorts")(function* (
   database: D1Database,
   timestamp: number,

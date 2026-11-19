@@ -1,9 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Netlify here is taken from docs.netlify.com and from Netlify's
-// official MCP server repository on github.com. Each page used is in `sources`. Check the
-// sources again, and move `checkedAt`, whenever this file changes.
-
 export const NETLIFY_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

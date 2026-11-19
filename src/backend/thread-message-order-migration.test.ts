@@ -4,10 +4,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import { ORDER_KEY_COLUMNS, ORDER_KEY_DESC, ORDERED_THREAD_MESSAGES } from "./database/conversation-queries";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
-// Failure modes: an upgrade loses or changes a message; a stored key differs from the order that pages
-// computed before, so a page or a cursor that a client holds moves; a turn id that two threads share
-// mixes their orders; a partial migration survives a failure; a retry adds a column twice or keeps a
-// wrong key; a newer or incomplete history is changed.
 const databases: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of databases.splice(0)) db.close();
@@ -39,22 +35,17 @@ type Seed = [
 ];
 
 const MESSAGES: readonly Seed[] = [
-  // A turn with commentary and a steer: from the second input on, the turn goes by time.
   [THREAD, "ask", "turn-1", "user", null, "2026-10-01T10:00:00.000Z", 0],
   [THREAD, "thinking", "turn-1", "assistant", "commentary", "2026-10-01T10:00:01.000Z", 1],
-  // Queued while the turn ran: it stays after the turn's answer (#1540).
   [THREAD, "queued", null, "user", null, "2026-10-01T10:00:01.500Z", 2],
   [THREAD, "steer", "turn-1", "user", null, "2026-10-01T10:00:02.000Z", 3],
   [THREAD, "answer", "turn-1", "assistant", null, "2026-10-01T10:00:03.000Z", 4],
-  // A teammate's turn: an incoming exchange is input, then the plan, then the outgoing reply.
   [THREAD, "reply", "turn-2", "agent", null, "2026-10-01T10:01:00.000Z", 5, "outgoing"],
   [THREAD, "request", "turn-2", "agent", null, "2026-10-01T10:01:01.000Z", 6, "incoming"],
   [THREAD, "plan", "turn-2", "assistant", "plan", "2026-10-01T10:01:02.000Z", 7],
-  // A blank turn id is no turn, and two messages at one time go by their ordinal.
   [THREAD, "notice", "", "system", "context_reset", "2026-10-01T10:02:00.000Z", 8],
   [THREAD, "same-time-b", null, "agent", null, "2026-10-01T10:03:00.000Z", 9],
   [THREAD, "same-time-a", null, "agent", null, "2026-10-01T10:03:00.000Z", 10],
-  // Another thread with the same turn id, earlier: it must not move the first thread's turn.
   [OTHER_THREAD, "other-ask", "turn-1", "user", null, "2026-10-01T09:00:00.000Z", 0],
   [OTHER_THREAD, "other-answer", "turn-1", "assistant", null, "2026-10-01T09:00:01.000Z", 1],
 ];
@@ -103,10 +94,6 @@ function seedMessages(db: DatabaseSync): void {
   }
 }
 
-/**
- * The window that pages ran over a thread before migration 40, frozen here as the reference that the
- * stored keys must equal.
- */
 const RELEASED_ORDER = `WITH ranked AS (
   SELECT created_at, ordinal, message_id, author, item_type, NULLIF(turn_id, '') AS turn,
     CASE
@@ -160,7 +147,7 @@ function orderIndexes(db: DatabaseSync) {
 }
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 63 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 65 });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -174,7 +161,6 @@ describe("thread message order migration", () => {
       seedMessages(db);
       const before = releasedRows(db);
       const released = [THREAD, OTHER_THREAD].map((thread) => orderKeys(db, RELEASED_ORDER, thread));
-      // A cursor that a client holds: the page before the queued message.
       const cursor = released[0]?.find((row) => row.message_id === "queued");
       if (!cursor) throw new Error("The fixture has no queued message.");
       const cursorKeys = ORDER_KEY_COLUMNS.split(", ").map((column) => cursor[column] ?? null);
@@ -234,9 +220,9 @@ describe("thread message order migration", () => {
     seedMessages(db);
     const before = releasedRows(db);
     const columns = columnNames(db);
-    db.exec("INSERT INTO schema_migrations VALUES(64, 'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(66, 'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version = 64; DELETE FROM schema_migrations WHERE version = 38");
+    db.exec("DELETE FROM schema_migrations WHERE version = 66; DELETE FROM schema_migrations WHERE version = 38");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 38");
     expect(releasedRows(db)).toEqual(before);
     expect(columnNames(db)).toEqual(columns);

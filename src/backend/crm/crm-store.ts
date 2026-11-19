@@ -54,14 +54,9 @@ import {
   requiredNumberColumn,
   requiredStringColumn,
 } from "../database/database-rows";
+import { withTransaction } from "../database/sqlite-transaction";
 import type { OpenBotDatabase } from "../openbot-database";
 import { CrmError } from "./crm-handle";
-
-/**
- * The CRM tables of `openbot.db` (see `crm-schema.ts`). Synchronous SQL; each write is one
- * transaction, or a part of the caller's transaction when one is open. A failure that the user can
- * correct throws `CrmError`; any other error is a fault.
- */
 
 type CrmErrorKey = Exclude<Extract<keyof SourceMessages, `error.crm.${string}`>, "error.crm.amountDecimals">;
 
@@ -90,7 +85,6 @@ const CRM_TEXT_COLUMNS = {
 
 const PERIOD_MONTHS = { month: 1, quarter: 3, year: 12 } as const;
 
-/** A customer row without its tags, plans and payment totals. */
 export interface CrmCustomerRecord extends CrmCustomerText {
   id: string;
   number: number;
@@ -101,9 +95,7 @@ export interface CrmCustomerRecord extends CrmCustomerText {
   createdAt: string;
   updatedAt: string;
   revision: number;
-  /** Set while a connected source links the customer. */
   sourceId: string | null;
-  /** The customer at the source, such as `stripe:cus_…`. It stays after a disconnect. */
   sourceRef: string | null;
 }
 
@@ -120,7 +112,6 @@ export function newCrmId(): string {
   return randomBytes(16).toString("hex");
 }
 
-/** Lower case, with no accents, so "Zoë" matches "zoe". */
 export function normalizeCrmSearch(value: string): string {
   return value.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase();
 }
@@ -129,13 +120,11 @@ function searchText(text: CrmCustomerText): string {
   return JSON.stringify(Object.fromEntries(CRM_TEXT_FIELDS.map((field) => [field, normalizeCrmSearch(text[field])])));
 }
 
-/** The date of `date` on the host's own calendar, `YYYY-MM-DD`. */
 export function localCrmDate(date: Date): string {
   const pad = (value: number) => String(value).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-/** `date` plus `months`, with the day kept or moved back to the last day of a shorter month. */
 function addCrmMonths(date: string, months: number): string | null {
   const total = Number(date.slice(0, 4)) * 12 + Number(date.slice(5, 7)) - 1 + months;
   const year = Math.floor(total / 12);
@@ -146,7 +135,6 @@ function addCrmMonths(date: string, months: number): string | null {
   return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-/** Cursors are opaque to clients: base64url JSON of the sort key of the last row. */
 export function encodeCrmCursor(key: readonly [string, string | number]): string {
   return Buffer.from(JSON.stringify(key)).toString("base64url");
 }
@@ -162,14 +150,12 @@ function cursorKey(cursor: string): [string, unknown] {
   return [value[0], value[1]];
 }
 
-/** A cursor of a sort text and a number, such as a due date and an invoice number. */
 export function decodeCrmNumberCursor(cursor: string): [string, number] {
   const [key, number] = cursorKey(cursor);
   if (!isNumber(number) || !Number.isSafeInteger(number)) throw crmRefused("error.crm.badCursor");
   return [key, number];
 }
 
-/** A cursor of two texts, such as a time and an activity id. */
 function decodeCrmTextCursor(cursor: string): [string, string] {
   const [key, text] = cursorKey(cursor);
   if (!isString(text)) throw crmRefused("error.crm.badCursor");
@@ -212,14 +198,12 @@ function decodeCrmCustomerRecord(row: DynamicRecord): CrmCustomerRecord {
   };
 }
 
-/** The kind of the connected source that owns a row, from the `source_kind` column of a read. */
 function sourceKind(row: DynamicRecord): CrmSourceKind | null {
   return row.source_kind === null || row.source_kind === undefined
     ? null
     : checkedColumn(row, "source_kind", CRM_SOURCE_KINDS);
 }
 
-/** The `source_kind` column of a CRM row `alias` that has a `source_id`. */
 function crmSourceKindColumn(alias: string): string {
   return `(SELECT s.kind FROM crm_sources AS s WHERE s.source_id = ${alias}.source_id)`;
 }
@@ -322,7 +306,6 @@ function decodeSource(row: DynamicRecord): CrmSource {
   };
 }
 
-/** A row that a connected source owns is read-only for people and agents. */
 function editable(row: { source: CrmSourceKind | null }): void {
   if (row.source !== null) throw crmRefused("error.crm.sourceOwned");
 }
@@ -340,17 +323,12 @@ function decodeTag(row: DynamicRecord): CrmTag {
   return { id: requiredStringColumn(row, "tag_id"), label: requiredStringColumn(row, "label") };
 }
 
-/** The tag ids and plans that the customer query reads as JSON arrays. */
 function jsonArray(row: DynamicRecord, key: string): unknown[] {
   const value = JSON.parse(requiredStringColumn(row, key));
   if (!Array.isArray(value)) throw new Error(`Invalid SQLite column ${key}.`);
   return value;
 }
 
-/**
- * One customer with its tag ids (in label order), plans and payment totals. `?1` is today: an open
- * payment due before it is late.
- */
 export const CRM_CUSTOMER_COLUMNS = `c.*,
   (SELECT json_group_array(tag_id) FROM (SELECT ct.tag_id FROM crm_customer_tags AS ct
     JOIN crm_tags AS t ON t.tag_id = ct.tag_id WHERE ct.customer_id = c.customer_id ORDER BY t.label, t.tag_id)) AS tag_ids,
@@ -406,7 +384,6 @@ export class CrmStore {
     this.#now = options.now;
   }
 
-  /** Read at each use: the facade can open a new connection after a repair. */
   get db() {
     return this.#database.connection;
   }
@@ -420,21 +397,8 @@ export class CrmStore {
   }
 
   transaction<T>(work: () => T): T {
-    const db = this.db;
-    const owns = !db.isTransaction;
-    if (owns) db.exec("BEGIN IMMEDIATE");
-    try {
-      const result = work();
-      if (owns) db.exec("COMMIT");
-      return result;
-    } catch (error) {
-      // SQLite may have rolled back already, and a second ROLLBACK would replace the error that did it.
-      if (owns && db.isTransaction) db.exec("ROLLBACK");
-      throw error;
-    }
+    return withTransaction(this.db, work);
   }
-
-  // --- Lookups ---------------------------------------------------------------------------------
 
   customerRecord(customerId: string): CrmCustomerRecord {
     const row = databaseRow(this.db.prepare("SELECT * FROM crm_customers WHERE customer_id = ?").get(customerId));
@@ -506,7 +470,6 @@ export class CrmStore {
     return decodeSource(row);
   }
 
-  /** True when `change` writes a row that a connected source owns. Throws when a target is gone. */
   sourceOwns(change: CrmProposedChange): boolean {
     switch (change.kind) {
       case "plan-update":
@@ -537,8 +500,6 @@ export class CrmStore {
       this.db.prepare("SELECT tag_id FROM crm_customer_tags WHERE customer_id = ?").all(customerId),
     ).map((row) => requiredStringColumn(row, "tag_id"));
   }
-
-  // --- Reads -----------------------------------------------------------------------------------
 
   overview(): CrmOverview {
     const proposals = databaseRows(
@@ -642,9 +603,6 @@ export class CrmStore {
     };
   }
 
-  // --- Writes ----------------------------------------------------------------------------------
-
-  /** One change by an owner or admin. A failed approval marks its proposal rejected and then throws. */
   apply(change: CrmChange, actor: CrmActor): CrmApplyResult {
     if (!isCrmChange(change) || actor.kind !== "person") throw crmRefused("error.crm.invalidChange");
     const outcome = this.transaction(() =>
@@ -652,7 +610,6 @@ export class CrmStore {
         ? this.#decide(change.proposalId, change.approve, actor)
         : { result: new CrmWrite(this, actor, null).apply(change), error: null },
     );
-    // Thrown after the commit, so the proposal stays rejected.
     if (outcome.error) throw outcome.error;
     return outcome.result;
   }
@@ -688,40 +645,32 @@ export class CrmStore {
         error: approve ? crmMissing("error.crm.proposalMissing") : null,
       };
     }
-    // A row that a source owns stays read-only, so the proposal can never apply.
     if (this.#sourceOwnsOrGone(change)) {
       reject();
       return { result: { ok: true, id: null }, error: crmRefused("error.crm.sourceOwned") };
     }
-    this.db.exec("SAVEPOINT crm_proposal");
+    let result: CrmApplyResult;
     try {
-      const result = new CrmWrite(this, actor, agentId).apply(change);
-      this.db.exec("RELEASE crm_proposal");
-      decide("approved");
-      return { result, error: null };
+      result = withTransaction(this.db, () => new CrmWrite(this, actor, agentId).apply(change));
     } catch (error) {
       if (!(error instanceof CrmError) || !this.db.isTransaction) throw error;
-      this.db.exec("ROLLBACK TO crm_proposal");
-      this.db.exec("RELEASE crm_proposal");
-      // A change that can no longer apply, such as one for a deleted payment, ends the proposal. A
-      // refused one stays pending, so the person can correct the CRM and approve it again.
       if (error.code === "refused") throw error;
       reject();
       return { result: { ok: true, id: null }, error };
     }
+    decide("approved");
+    return { result, error: null };
   }
 
   #sourceOwnsOrGone(change: CrmProposedChange): boolean {
     try {
       return this.sourceOwns(change);
     } catch (error) {
-      // A missing target ends the proposal in the apply below.
       if (error instanceof CrmError) return false;
       throw error;
     }
   }
 
-  /** Adds an agent's proposal. The caller checks the agent's access and the change. */
   propose(input: {
     agentId: string;
     customerId: string | null;
@@ -764,7 +713,6 @@ export class CrmStore {
   }
 }
 
-/** A change of the source id of a linked customer: the source keeps it. */
 function linkedIdChange(customer: CrmCustomerRecord, patch: CrmCustomerPatch): boolean {
   return (
     customer.sourceId !== null &&
@@ -773,13 +721,8 @@ function linkedIdChange(customer: CrmCustomerRecord, patch: CrmCustomerPatch): b
   );
 }
 
-/** The most pending proposals of one agent, so one agent cannot fill the review list. */
 const AGENT_PENDING_PROPOSALS = 50;
 
-/**
- * One applied change: its actor, its activity rows, and the customers whose revision goes up once.
- * A source sync (`crm-source-store.ts`) also writes through it, and calls `finish` at the end.
- */
 export class CrmWrite {
   readonly #store: CrmStore;
   readonly #actor: CrmActor;
@@ -808,7 +751,6 @@ export class CrmWrite {
     return { ok: true, id };
   }
 
-  /** Raises the revision of each changed customer once. */
   finish(): void {
     for (const customerId of this.#touched)
       this.#db
@@ -840,7 +782,6 @@ export class CrmWrite {
       );
   }
 
-  /** Activity that also counts as a change of the customer. */
   record(customerId: string, kind: string, details: CrmDetails): void {
     this.log(customerId, kind, details);
     this.#touched.add(customerId);
@@ -874,7 +815,6 @@ export class CrmWrite {
         return null;
       case "customer-delete": {
         const customer = this.#store.customerRecord(change.customerId);
-        // A sync does not import a deleted linked customer again.
         if (customer.sourceRef !== null)
           this.#db.prepare("INSERT OR IGNORE INTO crm_source_ignored (source_ref) VALUES (?)").run(customer.sourceRef);
         this.#db.prepare("DELETE FROM crm_customers WHERE customer_id = ?").run(customer.id);
@@ -944,12 +884,9 @@ export class CrmWrite {
         return null;
       }
       case "proposal-decide":
-        // `CrmStore.apply` decides proposals; an approved proposal never holds another decision.
         throw crmRefused("error.crm.invalidChange");
     }
   }
-
-  // --- Customers -------------------------------------------------------------------------------
 
   createCustomer(input: CrmCustomerInput): string {
     const statusId = input.statusId ?? "lead";
@@ -1000,7 +937,6 @@ export class CrmWrite {
       );
     const link = this.#db.prepare("INSERT INTO crm_customer_tags (customer_id, tag_id) VALUES (?, ?)");
     for (const tagId of tagIds) link.run(customerId, tagId);
-    // A new customer starts at revision 1, so its activity does not count as a change.
     this.log(customerId, "customer-created", { number });
     return customerId;
   }
@@ -1043,7 +979,6 @@ export class CrmWrite {
       this.record(customer.id, "field-changed", { field: "method", from: customer.method, to: patch.method });
     }
     if (patch.currency !== undefined && patch.currency !== customer.currency) {
-      // Plans and payments keep minor units of the customer's currency, so they cannot move to another one.
       const used =
         this.#count("SELECT count(*) AS count FROM crm_plans WHERE customer_id = ?", customer.id) +
         this.#count("SELECT count(*) AS count FROM crm_payments WHERE customer_id = ?", customer.id);
@@ -1083,8 +1018,6 @@ export class CrmWrite {
     for (const tagId of added) link.run(customerId, tagId);
     this.record(customerId, "tags-changed", details);
   }
-
-  // --- Plans and payments ----------------------------------------------------------------------
 
   insertPayment(input: {
     customerId: string;
@@ -1171,7 +1104,6 @@ export class CrmWrite {
       this.#db
         .prepare("UPDATE crm_plans SET amount_minor = ?, updated_at = ? WHERE plan_id = ?")
         .run(patch.amountMinor, this.#at, planId);
-      // Only an open payment that still has the plan amount follows it. A split part or a changed amount stays.
       this.#db
         .prepare(
           `UPDATE crm_payments SET amount_minor = ?, updated_at = ?
@@ -1212,7 +1144,6 @@ export class CrmWrite {
   #deletePlan(planId: string): void {
     const plan = this.#store.plan(planId);
     editable(plan);
-    // Paid payments are history: the plan's delete keeps them, with no plan.
     const removedPayments = this.#removeOpenPayments(planId, null);
     this.#db.prepare("DELETE FROM crm_plans WHERE plan_id = ?").run(planId);
     this.record(plan.customerId, "plan-deleted", { plan: plan.name, removedPayments });
@@ -1308,7 +1239,6 @@ export class CrmWrite {
     if (payment.planId !== null) this.#nextPlanPayment(payment.planId, payment.method);
   }
 
-  /** A paid recurring plan with no other open payment gets its next one. */
   #nextPlanPayment(planId: string, paidMethod: CrmMethod | null): void {
     const plan = this.#store.plan(planId);
     if (plan.every === "once") return;
@@ -1356,7 +1286,6 @@ export class CrmWrite {
       throw crmRefused("error.crm.splitTotal");
     const [first, ...rest] = parts;
     if (!first) throw crmRefused("error.crm.invalidChange");
-    // The first part keeps the invoice number; each other part gets a new one.
     this.#db
       .prepare("UPDATE crm_payments SET amount_minor = ?, due_on = ?, updated_at = ? WHERE payment_id = ?")
       .run(first.amountMinor, first.dueOn, this.#at, paymentId);
@@ -1382,8 +1311,6 @@ export class CrmWrite {
       currency: payment.currency,
     });
   }
-
-  // --- Tags and statuses -----------------------------------------------------------------------
 
   #createTag(label: string): string {
     if (this.#count("SELECT count(*) AS count FROM crm_tags") >= CRM_LIMITS.tags)

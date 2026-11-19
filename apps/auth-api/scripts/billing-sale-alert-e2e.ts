@@ -1,12 +1,3 @@
-// Runs the real sales ledger of the account server on a migrated SQLite database, with Stripe invoices
-// and a refund of a server plan and of a license. `processPending` must send the operator one message
-// for each paid invoice line, each failed payment and each refund, with the account email, the product,
-// the amount without VAT and the period, in the form of the purchase messages. A fact that stays pending after a
-// failed FX lookup sends its message one time, in the run that ends it. An imported payment and a ledger
-// with no alert send no message.
-//
-// Run: bun run test:billing-sale-alert
-// It writes .openbot-build/billing-sale-alert-e2e/report.json and exits non-zero on a failure.
 import { readdirSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -34,12 +25,11 @@ function invoice(type: StripeEvent["type"], id: string, object: StripeEvent["dat
   return { id: `evt_${id}`, type, created: NOW / 1_000, data: { object: { id: `in_${id}`, ...object } } };
 }
 
-const SERVER_PAID =
-  "Paid server plan for `owner@example.test`: standard, $29.00 (USD), 1 month period. First purchase.";
-const SERVER_FAILED =
-  "Failed payment of the server plan for `owner@example.test`: standard, $29.00 (USD), 1 month period. Reason: card_declined.";
-const LICENSE_PAID = "Paid license for `owner@example.test`: 5 users, PLN\u00a0480.00 (PLN), 1 year period. Renewal.";
-const LICENSE_REFUNDED = "Refunded license for `owner@example.test`: 5 users, PLN\u00a0120.00 (PLN), 1 year period.";
+const SERVER_RENEWED = "💵 **Renewed** server · `owner@example.test` · standard · $29/mo";
+const SERVER_ADJUSTED = "💵 **Paid** server · `owner@example.test` · standard · $12.50 · adjustment";
+const SERVER_FAILED = "⚠️ **Payment failed** server · `owner@example.test` · standard · $29/mo · card_declined";
+const LICENSE_PAID = "💵 **Renewed** license · `owner@example.test` · 5 users · PLN 480/yr";
+const LICENSE_REFUNDED = "↩️ **Refunded** license · `owner@example.test` · 5 users · PLN 120";
 
 async function eachPaidInvoiceSendsOneMessage() {
   const database = new DatabaseSync(":memory:");
@@ -55,7 +45,6 @@ async function eachPaidInvoiceSendsOneMessage() {
       alerts.push(String(JSON.parse(String(init.body)).content));
       return new Response(null, { status: 204 });
     }
-    // The ECB rates and OpenPanel are not there in this test.
     return new Response(null, { status: 503 });
   };
   const options = { database: sqliteD1(database), clientId: "client", clientSecret: "secret", fetch, now: () => NOW };
@@ -82,6 +71,28 @@ async function eachPaidInvoiceSendsOneMessage() {
         currency: "usd",
         amount_paid: 2900,
         billing_reason: "subscription_create",
+      }),
+      server,
+    ),
+  );
+  await run(
+    sales.webhook(
+      invoice("invoice.paid", "renewal", {
+        subscription: "sub_server",
+        currency: "usd",
+        amount_paid: 2900,
+        billing_reason: "subscription_cycle",
+      }),
+      server,
+    ),
+  );
+  await run(
+    sales.webhook(
+      invoice("invoice.paid", "upgrade", {
+        subscription: "sub_server",
+        currency: "usd",
+        amount_paid: 1250,
+        billing_reason: "subscription_update",
       }),
       server,
     ),
@@ -127,20 +138,24 @@ async function eachPaidInvoiceSendsOneMessage() {
 
   await run(sales.processPending());
   check(
-    "a paid server plan and a failed payment each send one message with the email, the plan, the amount and the period",
-    alerts.length === 2 && alerts.includes(SERVER_PAID) && alerts.includes(SERVER_FAILED),
+    "a renewal, an adjustment and a failed payment each send one message with the email, the plan, the amount and the period",
+    alerts.length === 3 &&
+      alerts.includes(SERVER_RENEWED) &&
+      alerts.includes(SERVER_ADJUSTED) &&
+      alerts.includes(SERVER_FAILED),
     [...alerts],
   );
-  check("an imported payment and a $0 trial invoice send no message, and no fact stays pending", pending() === 0, {
-    pending: pending(),
-  });
+  check(
+    "a first purchase, an imported payment and a $0 trial invoice send no message, and no fact stays pending",
+    pending() === 0,
+    { pending: pending() },
+  );
 
   await run(
     sales.webhook(
       invoice("invoice.paid", "license", {
         subscription: "sub_license",
         currency: "pln",
-        // 23% VAT on top of 480 zł. The message and the revenue count only 480 zł.
         amount_paid: 59040,
         total: 59040,
         total_excluding_tax: 48000,
@@ -152,7 +167,7 @@ async function eachPaidInvoiceSendsOneMessage() {
   await run(sales.processPending());
   check(
     "a paid license whose FX lookup fails stays pending and sends no message",
-    alerts.length === 2 && pending() === 1,
+    alerts.length === 3 && pending() === 1,
     { alerts: [...alerts], pending: pending() },
   );
 
@@ -163,7 +178,7 @@ async function eachPaidInvoiceSendsOneMessage() {
   await run(sales.processPending());
   check(
     "the run that ends the fact sends its message one time, with the amount without VAT",
-    alerts.length === 3 && alerts[2] === LICENSE_PAID,
+    alerts.length === 4 && alerts[3] === LICENSE_PAID,
     [...alerts],
   );
 
@@ -178,7 +193,6 @@ async function eachPaidInvoiceSendsOneMessage() {
             id: "re_license",
             status: "succeeded",
             payment_intent: "pi_license",
-            // A quarter of the payment, VAT included.
             amount: 14760,
             currency: "pln",
           },
@@ -191,7 +205,7 @@ async function eachPaidInvoiceSendsOneMessage() {
   await run(sales.processPending());
   check(
     "a refund sends one message with the refunded amount without VAT",
-    alerts.length === 4 && alerts[3] === LICENSE_REFUNDED,
+    alerts.length === 5 && alerts[4] === LICENSE_REFUNDED,
     [...alerts],
   );
   check(
@@ -216,7 +230,7 @@ async function eachPaidInvoiceSendsOneMessage() {
     ),
   );
   await run(silent.processPending());
-  check("a ledger with no alert ends the fact and sends nothing", alerts.length === 4 && pending() === 0, {
+  check("a ledger with no alert ends the fact and sends nothing", alerts.length === 5 && pending() === 0, {
     alerts: [...alerts],
     pending: pending(),
   });

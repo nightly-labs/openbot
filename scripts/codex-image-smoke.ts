@@ -1,9 +1,3 @@
-// Runs one real Codex turn with the OpenBot thread settings and asks for one image. It checks that
-// `codex app-server` sends an `imageGeneration` item that the backend can store: a file in
-// `saved_path`, or the image data in `result` (`image-generation.ts`). Runs the real
-// `codex app-server` with a copy of the user's Codex login (see `codex-agent-harness.ts`).
-// Costs one GPT-6 Luna turn with one image. `bun scripts/codex-image-smoke.ts`; `--model=<id>`
-// replaces GPT-6 Luna. Writes .openbot-build/codex-image-smoke/report.json and a copy of the image.
 import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -43,7 +37,6 @@ await makeGitWorkspace(workspace);
 const home = await makeCodexHome(join(root, "home"));
 const cli = await runCauseEffect(resolveCodexCli());
 const agent = await startCodexAgent(cli, home, workspace);
-/** The last completed image item. The notification handler sets it. */
 const completed: { image: { savedPath: string | null; result: string | null } | null } = { image: null };
 agent.client.on("notification", (notification) => {
   if (notification.method !== "item/started" && notification.method !== "item/completed") return;

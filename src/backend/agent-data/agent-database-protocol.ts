@@ -1,14 +1,5 @@
-// The wire shape between the main process and the database host child, plus the numbers both sides
-// agree on.
-//
-// This file carries no runtime import at all, which is what lets `agent-database-host.ts` reference
-// every shape through `import type` and limit runtime imports to `node:*` and Effect. See that file for
-// why that restriction exists.
-
-/** A value a caller can bind. A blob has no JSON form, so no statement can take one as input. */
 export type AgentDatabaseParameter = null | number | string;
 
-/** A value that survives the JSON hop in both directions. A blob is reported by size, not content. */
 export type AgentDatabaseValue = AgentDatabaseParameter | { blobBytes: number };
 
 export type AgentDatabaseMode = "read" | "write";
@@ -24,38 +15,21 @@ export interface AgentDatabaseLimits {
 export interface AgentDatabaseStatement {
   kind: "statement";
   id: number;
-  /** Absolute, and decided by `AgentTables`. The host never resolves a path itself. */
   databasePath: string;
   mode: AgentDatabaseMode;
-  /**
-   * OpenBot's own setup statement rather than an agent's. Only `AgentTables` sets it, and it means
-   * two things: create the file if it is missing, and allow this one statement to write the
-   * reserved metadata table. No agent-authored SQL ever reaches a request with this set.
-   */
   provision: boolean;
-  /**
-   * Tables the requesting agent did not create. The authorizer refuses a `DROP` or an `ALTER` that
-   * names one of these, which is how "only the agent that made a table may remove it" is enforced
-   * where SQLite itself can see the target, rather than by reading the model's SQL.
-   */
   protectedTables: string[];
   sql: string;
   parameters: AgentDatabaseParameter[];
   limits: AgentDatabaseLimits;
 }
 
-/** Close the handles for one file so the main process can unlink or move it. */
 interface AgentDatabaseClose {
   kind: "close";
   id: number;
   databasePath: string;
 }
 
-/**
- * `PRAGMA quick_check` of `openbot.db` after a stop that did not close it. The check reads every page,
- * minutes on a large file, so the main process asks a host of its own for it. Only the main process
- * sends it; no agent request can carry it.
- */
 interface AgentDatabaseIntegrityCheck {
   kind: "integrity-check";
   id: number;
@@ -64,28 +38,18 @@ interface AgentDatabaseIntegrityCheck {
 
 export type AgentDatabaseRequest = AgentDatabaseStatement | AgentDatabaseClose | AgentDatabaseIntegrityCheck;
 
-/**
- * A request before the supervisor numbers it. Spelled as a union of two `Omit`s rather than
- * `Omit<AgentDatabaseRequest, "id">`, which would collapse the two members into their common keys
- * and lose the discriminant.
- */
 export type AgentDatabaseRequestInput = Omit<AgentDatabaseStatement, "id"> | Omit<AgentDatabaseClose, "id">;
 
 export interface AgentDatabaseRows {
   columns: string[];
   rows: AgentDatabaseValue[][];
-  /** True when a cap stopped the read before the statement ran out of rows. */
   truncated: boolean;
   changes: number;
   lastInsertRowid: number | null;
 }
 
-/**
- * Why a statement did not run. Never an `Error`: its stack quotes absolute paths, and every one of
- * these sentences is read by a model and may be read by the user.
- */
 export interface AgentDatabaseFailure {
-  kind: "sqlite" | "not-authorized" | "size-limit" | "busy" | "missing" | "internal";
+  kind: "sqlite" | "not-authorized" | "size-limit" | "busy" | "missing" | "newer-schema" | "internal";
   message: string;
   sqliteCode?: number | undefined;
 }
@@ -94,28 +58,12 @@ export type AgentDatabaseResponse =
   | { id: number; ok: true; result: AgentDatabaseRows }
   | { id: number; ok: false; failure: AgentDatabaseFailure };
 
-/**
- * The first message of a host: it has loaded and reads requests from now on. The supervisor sends
- * nothing before it, so the start of the process is never counted against a statement.
- */
 export interface AgentDatabaseHostReady {
   kind: "ready";
 }
 
 export type AgentDatabaseHostMessage = AgentDatabaseResponse | AgentDatabaseHostReady;
 
-/**
- * `maxPageCount` times SQLite's 4 KB default page gives the 256 MB ceiling the shared database may
- * reach. One file holds every agent's tables, so the ceiling is the whole store's. The statement
- * deadline is what the supervisor arms before it sends a statement, and the start deadline what it
- * arms when it starts a host; every other number bounds a payload that would otherwise be unbounded
- * because a model chose it.
- *
- * The start deadline is shorter than the queue wait, so a request that comes while a host starts can
- * still run once the host is ready. A request that already waited behind a stopped statement has
- * less time left. The start deadline is long because a slow Windows computer, with a virus scan
- * of the new process, can take several seconds to load the host.
- */
 export const AGENT_DATABASE_LIMITS = {
   maxSqlLength: 20_000,
   maxParameters: 100,
@@ -126,32 +74,20 @@ export const AGENT_DATABASE_LIMITS = {
   maxPageCount: 65_536,
   statementDeadlineMs: 5_000,
   hostStartDeadlineMs: 15_000,
-  /** The first wait after a second failed start in a row. It doubles up to the maximum. */
   hostStartRetryDelayMs: 30_000,
   maxHostStartRetryDelayMs: 300_000,
   queueWaitMs: 20_000,
   busyTimeoutMs: 2_000,
 } as const;
 
-/** The reserved table that records which agent created each shared table. */
+export const AGENT_DATABASE_SCHEMA_VERSION = 1;
+
 export const AGENT_DATABASE_METADATA_TABLE = "openbot_metadata";
 
-/**
- * One running database host, seen from the supervisor.
- *
- * The supervisor never spawns anything itself, because how the host is started is not the same
- * answer in every environment. The packaged app ships the `runAsNode: false` fuse, so
- * `process.execPath` cannot be run as Node and the host is an Electron `utilityProcess` that is
- * talked to by message. A test spawns the `.ts` source under a real `node` and talks to it over
- * stdio. This interface is what both of those look like from here.
- */
 export interface AgentDatabaseHostProcess {
   send(request: AgentDatabaseRequest): void;
   onMessage(listener: (message: AgentDatabaseHostMessage) => void): void;
-  /** The host ended without being asked to. `code` is null when the transport does not give one. */
   onExit(listener: (code: number | null) => void): void;
-  /** The end of what the host wrote to stderr, for the log when it does not start. */
   recentOutput?(): string;
-  /** End it now, whatever it is in the middle of. */
   kill(): void;
 }

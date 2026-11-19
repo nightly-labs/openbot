@@ -1,7 +1,6 @@
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import type { OnboardingAvatarVariant } from "./onboarding-avatars";
 
-/** The picture of the computer step: an agent drags a window across a desktop. */
 export function OnboardingComputerVisual(props: { avatar: OnboardingAvatarVariant }) {
   return (
     <div class="onboarding-computer-visual" aria-hidden="true">

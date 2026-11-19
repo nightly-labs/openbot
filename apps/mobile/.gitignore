@@ -1,15 +1,10 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
-
-# dependencies
 node_modules/
 
-# Expo
 .expo/
 dist/
 web-build/
 expo-env.d.ts
 
-# Native
 .kotlin/
 *.orig.*
 *.jks
@@ -18,33 +13,25 @@ expo-env.d.ts
 *.key
 *.mobileprovision
 
-# Metro
 .metro-health-check*
 
-# debug
 npm-debug.*
 yarn-debug.*
 yarn-error.*
 
-# macOS
 .DS_Store
 *.pem
-# The update signing certificate is public: each binary has it. Its private key is never in the repository.
 !/certs/certificate.pem
 
-# local env files
 .env*.local
 
-# typescript
 *.tsbuildinfo
 
 example
 
-# generated native folders
 /ios
 /android
 
-# Gradle output of the local native modules
 /modules/*/android/build/
 /modules/*/android/.gradle/
 /modules/*/android/.cxx/

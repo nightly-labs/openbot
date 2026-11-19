@@ -1,6 +1,3 @@
-// A stdio MCP server for `claude-mcp-cache-bench.ts`. It answers `initialize` only after the delay in
-// its first argument (milliseconds), as a slow user MCP server does, and lists ten tools with
-// mid-size schemas. Their tool calls are not used.
 import { createInterface } from "node:readline";
 import { Schema } from "effect";
 

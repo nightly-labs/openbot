@@ -4,10 +4,6 @@ import type { CrmConnectorsRequest } from "@openbot/ui/features/crm/crm-state";
 import { createCrmController } from "./crm-controller";
 import type { CrmHost } from "./crm-port";
 
-/**
- * The CRM page with the data of `host`, for the desktop and the web client. Mount it again for
- * another server: it reads one server.
- */
 export function CrmScreen(props: {
   serverId: string;
   host: CrmHost;

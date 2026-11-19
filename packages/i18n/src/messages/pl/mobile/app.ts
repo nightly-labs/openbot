@@ -62,6 +62,9 @@ export const messages = {
   "mobile.app.update.group.removed": "Usunięte",
   "mobile.app.update.group.deprecated": "Przestarzałe",
   "mobile.app.update.group.security": "Bezpieczeństwo",
+  "mobile.app.update.requiredTitle": "Wymagana aktualizacja",
+  "mobile.app.update.requiredBody":
+    "OpenBot {version} nie jest już obsługiwany. Zaktualizuj do wersji {minimum} lub nowszej, aby kontynuować.",
   "mobile.app.update.notesFailed": "Nie udało się wczytać informacji o wersji.",
   "mobile.app.update.notesEmpty": "Nie ma jeszcze informacji o tej wersji.",
   "mobile.app.update.fullChangelog": "Pełna lista zmian",

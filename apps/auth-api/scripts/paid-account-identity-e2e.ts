@@ -1,11 +1,3 @@
-// Runs the real account analytics and sales ledger on a migrated SQLite database, with an OpenPanel
-// API that records each request. A paid billing event of a server plan or a license must set the
-// normalized account email on the profile (OpenPanel `identify`) and send the event with no email. An
-// event that is not a payment must not identify. A failed identify or a failed email read must not
-// stop the event. The ledger identifies an account once in each drain.
-//
-// Run: bun apps/auth-api/scripts/paid-account-identity-e2e.ts
-// It writes .openbot-build/paid-account-identity-e2e/report.json and exits non-zero on a failure.
 import { readdirSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -28,7 +20,6 @@ function check(name: string, passed: boolean, detail?: unknown) {
 
 interface Request {
   type: string;
-  /** A track has `name` and `properties`; an identify has `email`. */
   payload: { profileId?: string; name?: string; email?: string; properties?: object };
 }
 
@@ -42,7 +33,6 @@ function migratedDatabase(): DatabaseSync {
   return database;
 }
 
-/** An OpenPanel API that records each request and can refuse `identify`. */
 function openPanel() {
   const requests: Request[] = [];
   const state = { refuseIdentify: false };

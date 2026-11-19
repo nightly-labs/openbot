@@ -5,10 +5,6 @@ import X from "lucide-react-native/icons/x";
 import { View } from "react-native";
 import { useCSSVariable } from "uniwind";
 
-/**
- * As on desktop: a dot while the task runs, a ring while it waits or has not started, and a mark for
- * how its last turn ended. The state is in the text beside it, so the mark is hidden from VoiceOver.
- */
 export function AgentTaskMark({ task }: { task: AgentTask }) {
   const muted = String(useCSSVariable("--openbot-text-grouped-secondary"));
   const accent = String(useCSSVariable("--openbot-accent-text"));

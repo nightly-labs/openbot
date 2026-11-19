@@ -1,7 +1,6 @@
 import type { AgentProviderId } from "@openbot/contracts/agent-providers";
 import type { CauseCode } from "@openbot/telemetry";
 
-/** Local analytics context. This is not an IPC or Team API payload. */
 export interface FailureContext {
   causeCode?: CauseCode;
   provider?: AgentProviderId;

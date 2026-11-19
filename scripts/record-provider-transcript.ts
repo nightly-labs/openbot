@@ -1,16 +1,3 @@
-// Records a redacted transcript of one real provider CLI, for `provider-transcript-replay-e2e.ts`.
-// Runs OpenBot's own driver for the provider against the real CLI through `transcript-proxy.ts`:
-// one session in an empty temporary folder, and one short turn. Use a free model: the turn is real.
-// The CLI runs with an empty temporary home folder and only the variables in `KEPT_ENV`, so it sees
-// no account, saved key, token or settings of this computer, and the transcript lists only the
-// models that need no sign-in.
-//
-// bun scripts/record-provider-transcript.ts --provider=opencode --model=opencode/big-pickle \
-//   [--executable=<path>] [--known=<email>,<other value>]
-//
-// Writes scripts/provider-fakes/transcripts/<provider>-<version>.jsonl only after the turn and the
-// redaction check pass, so a failed recording keeps the committed file. Read the file before you
-// commit it: the redaction is an allow-list, and `--known` adds values that it must also remove.
 import { execFileSync } from "node:child_process";
 import { chmod, copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -51,12 +38,10 @@ const known = values.known
   .filter(Boolean);
 const clients: AgentClient[] = [];
 
-/** The variables that the driver and the CLI get. Others can hold tokens or point at saved settings. */
 const KEPT_ENV: ReadonlySet<string> = new Set(["PATH", "TMPDIR", "LANG", "LC_ALL", "LC_CTYPE", "TERM", "SHELL"]);
 for (const name of Object.keys(process.env)) {
   if (!KEPT_ENV.has(name)) delete process.env[name];
 }
-// The driver also reads `HOME`, for example to find the CLI's settings.
 process.env.HOME = home;
 
 const recordTurn = async (): Promise<void> => {
@@ -77,7 +62,6 @@ try {
   await mkdir(workspace, { recursive: true });
   await mkdir(home);
   await mkdir(join(root, "bin"));
-  // The header is written here, not by the proxy, because it holds only values this script chose.
   await writeFile(recording, `${JSON.stringify({ transcript: 1, provider, version, model })}\n`);
   const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
   await writeFile(
@@ -94,12 +78,10 @@ try {
   );
   await chmod(wrapper, 0o755);
 
-  // When the proxy stops the CLI, the turn fails too; the proxy's reason is the one to report.
   const error = await recordTurn().then(
     () => null,
     (cause: unknown) => cause,
   );
-  // The CLI can still write after the turn, so the check result is final only after it stops.
   await stopClients(clients.splice(0));
   failure = await readFile(`${recording}.failed`, "utf8").catch(() => null);
   if (failure === null && error !== null) throw error;
