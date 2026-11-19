@@ -6,7 +6,7 @@ import {
   agentStepActivity,
 } from "@openbot/contracts/ipc";
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
-import type { AgentProfile } from "@openbot/ui/data";
+import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
 import { type AgentActivityLabel, nextAgentActivityLabel } from "@openbot/ui/features/conversation/AgentActivity";
 import {
   agentActivityExitDelay,
@@ -41,6 +41,7 @@ export interface TurnRuntime {
 export interface ActivityStoreDeps {
   props: ConversationProps;
   activeDeliveries: () => Array<{ id: string; turnId?: string | null }>;
+  shownMessages: () => readonly AgentMessage[];
   agentActivityLabels: Map<string, { activityId: string; label: AgentActivityLabel }>;
   turnRuntimes: Map<string, TurnRuntime>;
 }
@@ -77,13 +78,27 @@ export function createActivityStore(deps: ActivityStoreDeps) {
     if (current?.agent?.id === agentId) return current.activityId;
     return `${agentId}:message:${streamingMessage.id}`;
   });
-  const activeTurnOutputShown = createMemo<boolean>((previous) => {
-    if (!activeActivityId()) return previous ?? false;
-    if (streamingAgentMessage()) return true;
-    const turnId = deps.props.activeTurnId ?? deps.activeDeliveries()[0]?.turnId;
+  const turnOutputShown = () => {
+    if (deps.props.activityDetail?.trim()) return true;
+    const turnId = deps.activeDeliveries()[0]?.turnId ?? deps.props.activeTurnId;
     if (!turnId) return false;
-    return deps.props.messages.some((message) => message.author === "agent" && message.turnId === turnId);
-  });
+    const rows = deps.shownMessages();
+    for (let index = rows.length - 1; index >= 0; index -= 1) {
+      const row = rows[index];
+      if (row?.turnId === turnId && row.author === "agent" && row.kind !== "thinking") return true;
+    }
+    return false;
+  };
+  const activityOutput = createMemo<{ activityId: string | null; shown: boolean }>(
+    (previous) => {
+      const activityId = activeActivityId();
+      if (!activityId) return previous ?? { activityId: null, shown: false };
+      if (previous?.activityId === activityId && previous.shown) return previous;
+      return { activityId, shown: turnOutputShown() };
+    },
+    { lazy: true },
+  );
+  const activeTurnOutputShown = () => activityOutput().shown;
   const latestActiveCommentary = createMemo(() => {
     const activeTurnId = deps.props.activeTurnId;
     if (!activeTurnId) return null;
