@@ -226,6 +226,14 @@ const US_KEYS: ReadonlyMap<string, UsKey> = new Map<string, UsKey>([
   ),
 ]);
 
+const DIGIT_KEY_CODE = /^(Digit|Numpad)([0-9])$/u;
+
+export function printableKeyCode(key: string, code: string): number | undefined {
+  const digit = DIGIT_KEY_CODE.exec(code);
+  if (digit) return (digit[1] === "Digit" ? 48 : 96) + Number(digit[2]);
+  return US_KEYS.get(key)?.keyCode;
+}
+
 const MAX_KEYED_TEXT = 128;
 
 const EDITOR_COMPLETED_TEXT = /[\n\r([{'"`<]/;
