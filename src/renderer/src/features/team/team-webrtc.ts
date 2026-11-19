@@ -441,7 +441,11 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
       client &&
         (state.restartIceOnReady ||
           client.connectionState !== "connected" ||
-          (turnRefresh && (await selectedPath(client).catch(() => "relay")) === "relay")),
+          (turnRefresh &&
+            (await selectedPath(client).then(
+              ({ path }) => path,
+              () => "relay",
+            )) === "relay")),
     );
     state.restartIceOnReady = false;
     state.resumeToken = message.resumeToken;
