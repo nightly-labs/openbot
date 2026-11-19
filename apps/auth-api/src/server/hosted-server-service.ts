@@ -47,6 +47,7 @@ import {
   type BillingReturnTarget,
   type BillingService,
   type CheckoutOrder,
+  type ServerRefund,
   type SubscriptionSync,
 } from "./billing-service";
 import {
@@ -172,11 +173,12 @@ const RETENTION_DISK_KEPT_MS = 14 * 24 * 60 * 60_000;
  */
 const RETENTION_WAKE_EVERY_MINUTES = 10;
 /**
- * The Terms and the DPA keep the data of an ended plan for 30 days. After that the cron deletes a server
- * that runs on a machine of the operator, and the operator reinstalls the machine for the next customer
- * (docs/hosted-servers.md#reuse-a-pool-machine).
+ * The Terms keep the data of an ended plan for 14 days. After that the cron deletes a server that runs on
+ * a machine of the operator, and the operator reinstalls the machine for the next customer
+ * (docs/hosted-servers.md#reuse-a-pool-machine). boat deletes the disk of a stopped sandbox after the
+ * same 14 days (`RETENTION_DISK_KEPT_MS`).
  */
-export const OPERATOR_HOST_DATA_KEPT_MS = 30 * 24 * 60 * 60_000;
+export const OPERATOR_HOST_DATA_KEPT_MS = 14 * 24 * 60 * 60_000;
 /** A server can report a routine run at most this far ahead. A later run is reported when it comes nearer. */
 const NEXT_RUN_MAX_AHEAD_MS = 400 * 24 * 60 * 60_000;
 /**
@@ -875,6 +877,63 @@ export class HostedServerService {
       yield* this.#finishDelete(yield* this.#requireRow(row.server_id));
     }).pipe(Effect.ensuring(this.#releaseLifecycle(row.server_id, token).pipe(Effect.orDie)));
   });
+
+  /**
+   * Deletes the server of a cancelled and refunded plan, with no 14-day retention (Terms: Hosted Server
+   * Subscription Termination). The billing webhook runs it after it stored the ended plan. An open
+   * plan of the server, such as a renewal paid just now, keeps the server. A failure before the row is
+   * `deleted` makes Stripe send the event again; after it, the cron finishes a failed deletion.
+   */
+  readonly deleteForRefund = Effect.fn("HostedServerService.deleteForRefund")(
+    function* (
+      this: HostedServerService,
+      refund: ServerRefund,
+    ): Effect.fn.Return<void, HostedFailure, HostedServerDependencies> {
+      const dependencies = yield* HostedServerDependencies;
+      const row = yield* hostedCall(() =>
+        dependencies.database
+          .prepare(`SELECT ${ROW_COLUMNS} FROM hosted_servers WHERE server_id = ? AND owner_user_id = ?`)
+          .bind(refund.serverId, refund.userId)
+          .first<HostedServerRow>(),
+      );
+      // A deleted row is finished by the cron.
+      if (!row || row.desired_state === "deleted") return;
+      const token = crypto.randomUUID();
+      if (!(yield* this.#claimLifecycle(row.server_id, token))) return yield* lifecycleFailure();
+      yield* Effect.gen({ self: this }, function* () {
+        // A renewal page that the owner paid just now keeps the server. A page that does not close yet
+        // fails the event, so Stripe sends it again.
+        const checkout = (yield* this.#requireRow(row.server_id)).checkout_session_id;
+        const closed = checkout ? yield* this.#closeCheckout(checkout) : "closed";
+        if (closed === "paid") return;
+        if (closed !== "closed") return yield* lifecycleFailure();
+        const claimed = yield* hostedCall(() =>
+          dependencies.database
+            .prepare(
+              `UPDATE hosted_servers SET desired_state = 'deleted', updated_at = ?
+         WHERE server_id = ? AND desired_state != 'deleted' AND lifecycle_token = ? AND lifecycle_lease_until > ?
+         AND NOT EXISTS(SELECT 1 FROM billing_subscriptions s WHERE s.server_id = hosted_servers.server_id
+           AND s.status IN ${OPEN_STATUSES_SQL})`,
+            )
+            .bind(dependencies.now(), row.server_id, token, dependencies.now())
+            .run(),
+        );
+        if (claimed.meta.changes !== 1) return;
+        this.#track(row, { name: "hosted_server_action", action: "deleted", plan: row.plan, size: row.size });
+        yield* this.#finishDelete(yield* this.#requireRow(row.server_id)).pipe(
+          Effect.catch((error) =>
+            Effect.sync(() => {
+              console.warn("Hosted server delete after a refund failed; the cron tries again.", {
+                serverId: row.server_id,
+                error: safeErrorCode(error),
+              });
+            }),
+          ),
+        );
+      }).pipe(Effect.ensuring(this.#releaseLifecycle(row.server_id, token).pipe(Effect.orDie)));
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
 
   readonly delete = Effect.fn("HostedServerService.delete")(
     function* (

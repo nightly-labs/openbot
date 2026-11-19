@@ -114,6 +114,7 @@ export function createHostedBilling(
           : {}),
         onSubscriptionSynced: (sync) =>
           hosting.onSubscriptionSynced(sync).pipe(Effect.andThen(() => options.planChanged(sync.serverId))),
+        onServerRefunded: (refund) => hosting.deleteForRefund(refund),
         onLicenseChanged: options.licenseChanged,
       })
     : null;

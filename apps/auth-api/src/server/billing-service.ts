@@ -65,13 +65,7 @@ import {
 import type { BillingOss } from "./billing-oss";
 import { type BillingPurchase, purchaseEvent, reportPurchase, subscriptionEnd } from "./billing-purchase";
 import { BillingReferral } from "./billing-referral";
-import {
-  type BillingSales,
-  type BillingSalesSynced,
-  type PaymentReversal,
-  paymentReversal,
-  withoutTax,
-} from "./billing-sales";
+import { type BillingSales, type BillingSalesSynced, paymentReversal, withoutTax } from "./billing-sales";
 import { billingDetailsOf, checkoutCountryMismatch, checkoutTax, setCustomerBillingDetails } from "./billing-tax";
 import type { HostedFailure } from "./hosted-server-service";
 import {
@@ -185,6 +179,11 @@ export interface BillingServiceOptions {
    * billing does not know about the provider. An error makes Stripe send the event again.
    */
   onSubscriptionSynced?: (sync: SubscriptionSync) => Effect.Effect<void, HostedFailure | RemoteFailure>;
+  /**
+   * Runs when the plan of a server is cancelled and refunded, after the webhook stored the ended plan. The Terms delete
+   * the server and its data at once. An error makes Stripe send the event again.
+   */
+  onServerRefunded?: (refund: ServerRefund) => Effect.Effect<void, HostedFailure>;
   /** Runs after the webhook stores a license change that can change the member limit of the owner's servers. */
   onLicenseChanged?: (userId: string) => Effect.Effect<void, RemoteFailure>;
   analytics?: AccountAnalytics;
@@ -212,6 +211,12 @@ export interface BillingServiceOptions {
   onVatMismatch?: (text: string) => void;
   /** Counts the paid invoices of consumers in other EU countries, for the One Stop Shop limit. */
   oss?: BillingOss;
+}
+
+/** A server whose plan a refund ended. */
+export interface ServerRefund {
+  userId: string;
+  serverId: string;
 }
 
 /** The first plan of an account, for its welcome email. */
@@ -248,6 +253,10 @@ interface SyncedSubscription {
   interval: BillingInterval;
   currency: BillingCurrency;
   latestInvoiceId: string | null;
+  /** The server that the subscription metadata names, or null. */
+  serverId: string | null;
+  /** True when Stripe ended the subscription (`canceled`). */
+  ended: boolean;
 }
 
 export interface CheckoutRequest {
@@ -279,6 +288,7 @@ class BillingDependencies extends Context.Service<
     stripe: StripeClient;
     now: () => number;
     onSubscriptionSynced: ((sync: SubscriptionSync) => Effect.Effect<void, HostedFailure | RemoteFailure>) | null;
+    onServerRefunded: ((refund: ServerRefund) => Effect.Effect<void, HostedFailure>) | null;
     analytics: AccountAnalytics;
   }
 >()("auth-api/BillingService/Dependencies") {}
@@ -320,6 +330,7 @@ export class BillingService {
       stripe,
       now,
       onSubscriptionSynced,
+      onServerRefunded: options.onServerRefunded ?? null,
       analytics: this.#analytics,
     });
     this.#referral = new BillingReferral({
@@ -1074,10 +1085,28 @@ export class BillingService {
         : null;
       const subscriptionId = eventSubscriptionId(event) ?? payment?.subscriptionId ?? null;
       const synced = subscriptionId ? yield* this.#syncSubscription(subscriptionId) : null;
-      // The server of an ended plan stops and keeps its disk.
-      if (reversal && payment && synced && (yield* this.#reversalEndsPlan(reversal, payment, synced))) {
+      // A dispute ends the plan now, so Stripe does not charge the disputed card again. The server of an
+      // ended plan stops and keeps its disk.
+      if (reversal?.type === "payment_disputed" && payment && synced) {
         yield* this.cancelSubscription(payment.subscriptionId);
         yield* this.#syncSubscription(payment.subscriptionId);
+      }
+      // A refund alone changes no plan, so an operator can give money back and keep the server. A refund
+      // of a cancelled plan deletes its server and data at once (Terms: Hosted Server Subscription
+      // Termination): the refund comes after the cancel, or the cancel comes after a refund of the last
+      // invoice.
+      // A new plan of the same server keeps it: `deleteForRefund` deletes no server with an open plan.
+      if (synced?.kind === "plan" && synced.ended && synced.serverId && dependencies.onServerRefunded) {
+        const invoiceId = synced.latestInvoiceId;
+        const refunded =
+          reversal?.type === "payment_refunded" ||
+          (event.type === "customer.subscription.deleted" &&
+            invoiceId !== null &&
+            (yield* this.#stripeCall(() => dependencies.stripe.isInvoiceRefunded(invoiceId))));
+        if (refunded)
+          yield* dependencies
+            .onServerRefunded({ userId: synced.userId, serverId: synced.serverId })
+            .pipe(Effect.mapError((error) => (error instanceof BillingError ? error : new BillingOperationError({}))));
       }
       // Stripe tries a failed renewal again by itself. The account gets one email for each unpaid invoice.
       const failedInvoice = synced?.kind === "license" ? failedRenewalInvoice(event, synced.currency) : null;
@@ -1119,25 +1148,6 @@ export class BillingService {
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
-
-  /**
-   * A dispute ends the plan now, so Stripe does not charge the disputed card again. A full refund of the
-   * invoice that paid the current period ends it too, because the account paid nothing for that period.
-   * A partial refund, or a refund of an earlier invoice or of a plan change, keeps the plan.
-   */
-  readonly #reversalEndsPlan = Effect.fn("BillingService.reversalEndsPlan")(function* (
-    this: BillingService,
-    reversal: PaymentReversal,
-    payment: { invoiceId: string; billingReason: string | null },
-    synced: SyncedSubscription | LicenseSync,
-  ): Effect.fn.Return<boolean, BillingError | BillingOperationError, BillingDependencies> {
-    if (reversal.type === "payment_disputed") return true;
-    if (reversal.type !== "payment_refunded") return false;
-    if (payment.invoiceId !== synced.latestInvoiceId) return false;
-    if (payment.billingReason !== "subscription_create" && payment.billingReason !== "subscription_cycle") return false;
-    const dependencies = yield* BillingDependencies;
-    return yield* this.#stripeCall(() => dependencies.stripe.isPaymentRefunded(reversal.paymentIntentId));
-  });
 
   /** Reports a payment or an expired Checkout. A change of the plan itself is reported by the sync. */
   readonly #trackEvent = Effect.fn("BillingService.trackEvent")(function* (
@@ -1262,6 +1272,8 @@ export class BillingService {
       interval: key.interval,
       currency,
       latestInvoiceId: subscriptionLatestInvoiceId(subscription),
+      serverId,
+      ended: subscription.status === "canceled",
     };
     // A paid server order moves its license to its own subscription, and any server plan gives the license
     // the bundle price from its next renewal. A sync that stores nothing new also runs both, so a failed

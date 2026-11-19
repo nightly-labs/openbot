@@ -1976,7 +1976,8 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     );
   },
   async refund(account) {
-    // A partial refund keeps the plan. The second refund makes the payment refunded in full and ends it.
+    // A refund alone keeps the plan and the server. A cancel of the refunded plan deletes the server and
+    // its data at once (Terms: Hosted Server Subscription Termination).
     const { server } = await account.createServer("Refund");
     const sub = await account.pay(server.serverId);
     await provisioned(account, server.serverId);
@@ -1988,33 +1989,70 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     const row = account.row(server.serverId);
     record(
       "refund",
-      "a partial refund keeps the plan and the server",
+      "a refund alone keeps the plan and the server",
       plan?.status === "active" && row?.desired_state === "running" && row.observed_error !== "plan_ended",
       { refund: partial.status, plan, row },
     );
-    const rest = await stripe("POST", "/v1/refunds", refundSchema, { payment_intent: paid.intent });
-    await applied("refund.created", rest.id);
-    const ended = await rowWhere(account, server.serverId, "plan ended", (row) => row.desired_state === "stopped");
-    const stripeSub = await subscription(sub);
+    await stripe("DELETE", `/v1/subscriptions/${sub}`, idSchema);
+    const removed = await rowWhere(
+      account,
+      server.serverId,
+      "server deleted",
+      (row) => row.desired_state === "deleted" && row.observed_state === "deleted",
+    );
     record(
       "refund",
-      "a full refund of the current invoice cancels the plan now; the server stops with plan_ended and is kept",
-      stripeSub.status === "canceled" && ended.observed_error === "plan_ended" && ended.deleted_at === null,
-      { refund: rest.status, stripeStatus: stripeSub.status, row: ended },
+      "a cancel after a refund of the last invoice deletes the server and its sandbox",
+      removed.deleted_at !== null,
+      removed,
+    );
+    // The other order: the operator cancels the plan, and then refunds it.
+    const later = await account.createServer("Refund after cancel");
+    const laterSub = await account.pay(later.server.serverId);
+    await provisioned(account, later.server.serverId);
+    const laterPaid = await paymentIntent(laterSub);
+    await stripe("DELETE", `/v1/subscriptions/${laterSub}`, idSchema);
+    const stopped = await rowWhere(
+      account,
+      later.server.serverId,
+      "plan ended",
+      (row) => row.desired_state === "stopped",
+    );
+    record(
+      "refund",
+      "a cancel with no refund stops the server and keeps it",
+      stopped.observed_error === "plan_ended",
+      stopped,
+    );
+    const laterRefund = await stripe("POST", "/v1/refunds", refundSchema, {
+      payment_intent: laterPaid.intent,
+      amount: "100",
+    });
+    await applied("refund.created", laterRefund.id);
+    const laterRemoved = await rowWhere(
+      account,
+      later.server.serverId,
+      "server deleted",
+      (row) => row.desired_state === "deleted" && row.observed_state === "deleted",
+    );
+    record(
+      "refund",
+      "a refund of a cancelled plan deletes the server and its sandbox",
+      laterRemoved.deleted_at !== null,
+      laterRemoved,
     );
     if (sales) {
       const recorded = facts(paid.invoice);
       record(
         "refund",
-        "each refund is a payment_refunded sales fact",
-        recorded.some((fact) => fact.source_key === `refund:${partial.id}:succeeded`) &&
-          recorded.some((fact) => fact.source_key === `refund:${rest.id}:succeeded`),
+        "a refund is a payment_refunded sales fact",
+        recorded.some((fact) => fact.source_key === `refund:${partial.id}:succeeded`),
         recorded,
       );
     } else {
       print("SKIP [refund] sales facts: the Worker has no OpenPanel client");
     }
-    // This test card makes the refund fail after Stripe accepts it. The refund is partial, so the plan stays.
+    // This test card makes the refund fail after Stripe accepts it. A refund alone keeps the plan.
     const second = await account.createServer("Refund fails");
     await account.useCard("pm_card_refundFail");
     const secondSub = await account.pay(second.server.serverId);

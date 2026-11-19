@@ -215,6 +215,18 @@ const subscriptionDiscountsSchema = Schema.Struct({
   ),
 });
 const invoicePaymentListSchema = Schema.Struct({ data: Schema.Array(Schema.Struct({ invoice: expandable })) });
+const invoicePaymentIntentListSchema = Schema.Struct({
+  data: Schema.Array(
+    Schema.Struct({
+      payment: Schema.Struct({ payment_intent: Schema.optional(Schema.NullOr(expandable)) }),
+    }),
+  ),
+});
+const paymentIntentSchema = Schema.Struct({
+  latest_charge: Schema.optional(
+    Schema.NullOr(Schema.Union([Schema.String, Schema.Struct({ amount_refunded: Schema.Int })])),
+  ),
+});
 const invoiceSchema = Schema.Struct({
   id: Schema.String,
   billing_reason: Schema.optional(Schema.NullOr(Schema.String)),
@@ -228,11 +240,6 @@ const invoiceSchema = Schema.Struct({
         ),
       }),
     ),
-  ),
-});
-const paymentIntentSchema = Schema.Struct({
-  latest_charge: Schema.optional(
-    Schema.NullOr(Schema.Union([Schema.String, Schema.Struct({ refunded: Schema.Boolean })])),
   ),
 });
 const eventSchema = Schema.Struct({
@@ -866,6 +873,31 @@ export class StripeClient {
     };
   }).bind(this);
 
+  /** True when a payment of the invoice has a refund, of any amount. */
+
+  readonly isInvoiceRefunded = Effect.fn("StripeClient.isInvoiceRefunded")(function* (
+    this: StripeClient,
+    invoiceId: string,
+  ): Effect.fn.Return<boolean, StripeRequestError | StripeTransportError> {
+    const list = new URLSearchParams({ invoice: invoiceId, limit: "10" });
+    const payments = yield* this.#requestEffect(
+      "GET",
+      `/v1/invoice_payments?${list}`,
+      null,
+      invoicePaymentIntentListSchema,
+    );
+    for (const { payment } of payments.data) {
+      const intent = payment.payment_intent;
+      if (!intent) continue;
+      const intentId = typeof intent === "string" ? intent : intent.id;
+      const query = new URLSearchParams({ "expand[]": "latest_charge" });
+      const path = `/v1/payment_intents/${encodeURIComponent(intentId)}?${query}`;
+      const charge = (yield* this.#requestEffect("GET", path, null, paymentIntentSchema)).latest_charge;
+      if (typeof charge === "object" && charge !== null && charge.amount_refunded > 0) return true;
+    }
+    return false;
+  }).bind(this);
+
   /**
    * The currency of a customer, and its credit for each currency in minor units (above 0). Null for a
    * customer that was deleted. In `invoice_credit_balance` a credit is above 0, unlike `balance`, where a
@@ -985,18 +1017,6 @@ export class StripeClient {
     for (const [index, id] of keep.entries()) body.set(`discounts[${index}][discount]`, id);
     yield* this.#requestEffect("POST", path, body, subscriptionDiscountsSchema);
     return true;
-  }).bind(this);
-
-  /** True when the refunds of the PaymentIntent's charge add up to its full amount. */
-
-  readonly isPaymentRefunded = Effect.fn("StripeClient.isPaymentRefunded")(function* (
-    this: StripeClient,
-    paymentIntentId: string,
-  ): Effect.fn.Return<boolean, StripeRequestError | StripeTransportError> {
-    const query = new URLSearchParams({ "expand[]": "latest_charge" });
-    const path = `/v1/payment_intents/${encodeURIComponent(paymentIntentId)}?${query}`;
-    const charge = (yield* this.#requestEffect("GET", path, null, paymentIntentSchema)).latest_charge;
-    return typeof charge === "object" && charge !== null && charge.refunded;
   }).bind(this);
 
   readonly #requestEffect = Effect.fn("StripeClient.request")(function* <T>(

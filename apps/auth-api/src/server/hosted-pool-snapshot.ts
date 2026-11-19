@@ -15,7 +15,7 @@ class HostedPoolSnapshotError extends Schema.TaggedError<HostedPoolSnapshotError
  *
  * - `free`: no server has it. It is ready for a move.
  * - `to_reinstall`: its server is deleted, and the operator must reinstall it (`leaseweb-pool.ts sync`).
- * - `plan_ended`: the plan of its server ended. The cron deletes the server 30 days later.
+ * - `plan_ended`: the plan of its server ended. The cron deletes the server 14 days later.
  * - `cancel_scheduled`: the plan or the server ends at the end of the period, or at a date.
  * - `in_use`: each other server.
  *

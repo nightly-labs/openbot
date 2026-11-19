@@ -69,8 +69,10 @@ when a server is idle or boat stops a sandbox; and `error` and `deleted`. The Wo
    renews on the same day as the server ([Commercial license](architecture/servers.md#commercial-license)).
    While the license promotion (`LICENSE_TRIAL_END`) runs, the page has the server line only, and the
    license starts with a free trial until the promotion ends.
-   Refunds are by email only: email licenses@openbot.run within 24 hours of the first payment for a
-   refund less a €3 / $3.60 / 13.20 zł fee, once per account. There are no refunds for later changes.
+   Refunds are by email only (Terms: Consumer Right of Withdrawal): email hello@openbot.run within
+   2 hours of the purchase for a 90% refund, or use the statutory withdrawal. An operator makes the
+   refund in the Stripe Dashboard and cancels the subscription now. A refunded and cancelled server plan
+   deletes the server and its data at once (step 7).
    The desktop main process opens the URL only when it is an `https://checkout.stripe.com` URL; the
    renderer never gets it. The web client goes to the page in the same tab, and Stripe returns to
    `/app?hosting=checkout&hosted_server=<id>` (`&cancelled=1` when the user went back).
@@ -267,20 +269,23 @@ when a server is idle or boat stops a sandbox; and `error` and `deleted`. The Wo
    runs with no payment. A cancel at the period end (`cancel_at_period_end` or `cancel_at`)
    shows the end date and keeps the server running until then.
 
-   Refunds and disputes. A full refund (`refund.created` or `refund.updated` with `succeeded`) of
-   the invoice that paid the current period cancels the plan now: the account paid nothing for that
-   period. That invoice is the subscription's `latest_invoice`, made for a new plan or a renewal
-   (`billing_reason` `subscription_create` or `subscription_cycle`). Partial refunds that add up to
-   the full amount count as a full refund (the charge is `refunded`). A partial refund, or a refund of
-   an earlier invoice or of a plan change, keeps the plan and the server. After a plan change in the
-   period, `latest_invoice` is the plan change invoice, so a refund of the renewal keeps the plan too.
-   To end the plan in these cases, cancel the subscription in the Stripe Dashboard. A dispute
-   (`charge.dispute.created`, an inquiry too) cancels the plan of the disputed invoice now, so Stripe
-   does not charge that card again. In both cases
-   the server stops with `plan_ended` and keeps its disk. The Worker finds the plan through the
-   invoice of the PaymentIntent (`GET /v1/invoice_payments`). A refund or dispute of a payment that
-   is not an OpenBot plan invoice changes nothing. A refund that fails after it succeeded does not
-   start the plan again.
+   Refunds and disputes. A refund alone (`refund.created` or `refund.updated` with `succeeded`) changes
+   no plan, so an operator can give back part of a payment and keep the server. To end a plan with a
+   refund, the operator cancels the subscription now in the Stripe Dashboard and refunds the payment,
+   in either order. When the subscription is `canceled`, the server is deleted with its data at once,
+   with no 14-day retention (Terms: Hosted Server Subscription Termination):
+   - a refund of any amount of a cancelled plan deletes its server;
+   - at `customer.subscription.deleted`, a refund of the subscription's `latest_invoice` deletes the
+     server (`StripeClient.isInvoiceRefunded`).
+
+   The webhook deletes the server as the owner does (`HostedServerService.deleteForRefund`). An open
+   plan of the server, such as a renewal paid just now, keeps it. A cancel at the period end after a
+   refund of that period also deletes the server when the period ends. A refund that fails after it
+   succeeded does not bring the server back. A dispute (`charge.dispute.created`, an inquiry too)
+   cancels the plan of the disputed invoice now, so Stripe does not charge that card again. After a
+   dispute the server stops with `plan_ended` and keeps its disk. The Worker finds the plan through
+   the invoice of the PaymentIntent (`GET /v1/invoice_payments`). A refund or dispute of a payment
+   that is not an OpenBot plan invoice changes nothing.
 8. **Plan change.** The Customer Portal has no plan change (`subscription_update` is off), so only an
    operator changes a plan, in the Stripe Dashboard. A portal request with `flow: "update"` from an
    older app opens the Portal home. The owner of a server on a VPS can buy more storage: see
@@ -1235,7 +1240,7 @@ writes `observed_state`:
 | The plan changes | Sets `size` at once. | Nothing: each pool server has the same size. |
 | The plan ends | Sets `desired_state = 'stopped'`, `observed_error = 'plan_ended'` and `plan_ended_at`. A start request gets `402 plan_required`. | Stop `openbot.service`, then write `observed_state = 'stopped'`. Until then the server still runs. |
 | The owner renews | Sets `desired_state = 'running'` and clears the error. `plan_ended_at` stays. | Start `openbot.service`, then write `observed_state = 'running'`. |
-| 30 days after the plan ended, with no open subscription | Reads the subscription at Stripe, then deletes the server as the owner does. | As for a delete. |
+| 14 days after the plan ended, with no open subscription | Reads the subscription at Stripe, then deletes the server as the owner does. | As for a delete. |
 | The owner or an admin restarts the server | Refuses with `409 hosted_server_restart_unavailable`. | Restart `openbot.service` on a request to support. |
 | The owner deletes the server | Cancels the plan, deletes the sandbox in `retired_sandbox_id`, removes the Remote host, ends the session, and sets `observed_state = 'deleted'`. `operator_host` stays. | Reinstall the VPS, set its reference to `pool`, then set `operator_host = NULL`. |
 | boat sends an event for the old sandbox | Finds no row for it. | Nothing. |
@@ -1716,12 +1721,13 @@ system and goes back to the pool for the next new server or the next move. The W
 
 1. The plan ends. The Worker sets `desired_state = 'stopped'` and `plan_ended_at`. `sync` stops
    OpenBot on the machine. The data stays, so the owner can renew.
-2. 30 days after `plan_ended_at`, the cron of the Worker deletes the server when its newest
+2. 14 days after `plan_ended_at`, the cron of the Worker deletes the server when its newest
    subscription is not open and Stripe reports it `canceled`. The delete is the one of the owner: the
    old sandbox, the Remote host and the session go, and `observed_state = 'deleted'`. A subscription
    that Stripe still retries (`past_due`, `unpaid`, `paused`) keeps the server, with no limit: the
-   operator decides. A renewal before the 30 days keeps the server. The 30 days are
-   `OPERATOR_HOST_DATA_KEPT_MS` in `hosted-server-service.ts`.
+   operator decides. A renewal before the 14 days keeps the server. The 14 days are
+   `OPERATOR_HOST_DATA_KEPT_MS` in `hosted-server-service.ts`. A refunded and cancelled plan deletes the
+   server at once (step 7 of the plan flow).
 3. `sync` reinstalls the machine with `UBUNTU_26_04_64BIT`, which erases the disk, sets its reference
    to `pool`, and sets `operator_host = NULL` on the deleted row. The machine is free.
    Leaseweb shows the state `RUNNING` for the whole reinstall, so `sync` waits until SSH shows new
@@ -1730,7 +1736,7 @@ system and goes back to the pool for the next new server or the next move. The W
    ([A new server on a pool machine](#a-new-server-on-a-pool-machine)).
 
 A server that ended before migration 0053 gets `plan_ended_at` at the first cron run after the deploy,
-so its 30 days start then.
+so its 14 days start then.
 
 Tested on 2026-11-12 with the test Worker, its D1 and one VPS in `AMS-01`: `add`, `status`, `sync`
 stop and start, the cron delete of a server whose plan ended 31 days before with a `canceled` Stripe
@@ -1785,12 +1791,12 @@ A longer interval adds up more than one snapshot. The snapshot counts each machi
 | --- | --- |
 | `free` | No server. Ready for a move. `ready` counts the free machines that a new server can get now. |
 | `to_reinstall` | Its server is deleted. Free after the next `sync`. |
-| `plan_ended` | Its plan ended. Free 30 days after `plan_ended_at`, unless the owner renews. |
+| `plan_ended` | Its plan ended. Free 14 days after `plan_ended_at`, unless the owner renews. |
 | `cancel_scheduled` | The owner cancelled the plan at the period end, or scheduled a delete. |
 | `in_use` | Each other server. |
 
 `free_in_7d` and `free_in_30d` count the machines that are free in that time when no owner renews.
-A machine whose plan ends at the period end is free 30 days after that end. A plan that ended with a
+A machine whose plan ends at the period end is free 14 days after that end. A plan that ended with a
 subscription that Stripe still retries, or with no subscription, has no date: the cron does not delete
 that server. A server that names a machine that is not in the
 pool is in the group `unknown`: add the machine. When `ready` is 0 for a product, the next customer of
@@ -1861,7 +1867,7 @@ date of the cancel message. One sync sends one message: a cancel that Stripe sto
 change of plan or users sends no cancel message. A change of plan or users sends no purchase message.
 A server order with a license sends two messages, one for each subscription. A subscription that ends
 after its owner cancelled the renewal sends the cancel message and, later, the end message. A deleted
-server, a full refund and a dispute end the plan at once. The reason is `not paid` when the last
+server and a dispute end the plan at once. The reason is `not paid` when the last
 payment of the plan had failed, and `cancelled` in each other case. The boat message goes out only
 after the Worker stores the boat start, so a lost race, a retry of a boat attempt, or a pool change
 whose answer was lost sends nothing. A failed send logs one line and is not sent again. Without the
