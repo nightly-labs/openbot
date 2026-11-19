@@ -45,10 +45,13 @@ export function sortConversationMessages(messages: ConversationMessage[]): Conve
 function turnSteerTimes(messages: readonly ConversationMessage[]): Map<string, number> {
   const userTimes = new Map<string, number[]>();
   const firstTimes = new Map<string, number>();
+  const questionTimes = new Map<string, number>();
   for (const message of messages) {
     if (!message.turnId) continue;
     const time = messageTime(message);
     firstTimes.set(message.turnId, Math.min(firstTimes.get(message.turnId) ?? time, time));
+    if (message.questionPrompt)
+      questionTimes.set(message.turnId, Math.min(questionTimes.get(message.turnId) ?? time, time));
     if (turnMessageRank(message) !== 0) continue;
     const times = userTimes.get(message.turnId) ?? [];
     times.push(time);
@@ -60,11 +63,11 @@ function turnSteerTimes(messages: readonly ConversationMessage[]): Map<string, n
     if (second !== undefined) steeredAt.set(turnId, second);
   }
   for (const message of messages) {
-    if (!message.turnId || !message.steered || turnMessageRank(message) !== 0) continue;
+    if (!message.turnId || turnMessageRank(message) !== 0) continue;
     const time = messageTime(message);
-    const firstTime = firstTimes.get(message.turnId);
+    const startsAfter = message.steered ? firstTimes.get(message.turnId) : questionTimes.get(message.turnId);
     const steerAt = steeredAt.get(message.turnId);
-    if (firstTime !== undefined && time > firstTime && (steerAt === undefined || time < steerAt))
+    if (startsAfter !== undefined && time > startsAfter && (steerAt === undefined || time < steerAt))
       steeredAt.set(message.turnId, time);
   }
   return steeredAt;
