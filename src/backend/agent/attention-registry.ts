@@ -1996,8 +1996,8 @@ export class AttentionRegistry {
       return;
     }
 
-    this.#expireDetachedInChat(agentId, publicThreadId);
     const messageId = this.#persistQuestionPrompt(agentId, publicThreadId, turnId, request.id, questions);
+    this.#expireDetachedInChat(agentId, publicThreadId);
     const pending: PendingPrompt = {
       client,
       id: request.id,
@@ -2080,8 +2080,8 @@ export class AttentionRegistry {
       return;
     }
 
-    this.#expireDetachedInChat(agentId, publicThreadId);
     const messageId = this.#persistQuestionPrompt(agentId, publicThreadId, turnId, request.id, questions, uiBlock);
+    this.#expireDetachedInChat(agentId, publicThreadId);
     let autoAnswerTimer: PendingPrompt["autoAnswer"];
     if (auto && autoAnswer) {
       const timer = setTimeout(() => this.#answerAutomatically(request.id), autoAnswer.afterMs);
@@ -2153,6 +2153,7 @@ export class AttentionRegistry {
       return;
     }
     const messageId = this.#persistQuestionPrompt(agentId, publicThreadId, turnId, request.id, questions);
+    this.#expireDetachedInChat(agentId, publicThreadId);
     this.#prompts.set(request.id, {
       client,
       id: request.id,
@@ -2237,6 +2238,7 @@ export class AttentionRegistry {
     }
 
     const messageId = this.#persistQuestionPrompt(agentId, publicThreadId, turnId, request.id, questions);
+    this.#expireDetachedInChat(agentId, publicThreadId);
     this.#prompts.set(request.id, {
       client,
       id: request.id,
@@ -2298,45 +2300,69 @@ export class AttentionRegistry {
    * each would wait for the other. The questions and blocks of the turn close as skipped, with a note
    * to follow the message. A form whose key or item is being saved finishes on its own. Approvals,
    * MCP elicitations and browser takeovers stay: a message must not refuse an action or end a sign-in.
-   *
-   * A detached question of the chat closes too, of any turn and also with no running turn (`turnId`
-   * null): the user moved on, and the card would still ask for an answer that the message can hold
-   * (#12449). Its call has its answer already, so the agent reads only the message.
    */
-  releaseForUserMessage(agentId: string, publicThreadId: string, turnId: string | null): void {
+  releaseForUserMessage(agentId: string, publicThreadId: string, turnId: string): void {
     let changed = false;
     for (const [requestId, pending] of this.#prompts) {
-      if (pending.agentId !== agentId || pending.publicThreadId !== publicThreadId) continue;
-      if (!pending.detached && pending.turnId !== turnId) continue;
-      if (pending.saving || pending.responseKind === "mcp-elicitation") continue;
-      // A detached question gave its turn back when it detached.
-      if (!pending.detached) this.#routines.markRunningForTurn(pending.turnId);
-      // The card closes as the user's own skip does, and says why: the user did not press Skip (#7678).
-      const uiBlockState = pending.uiBlock
-        ? answeredUiBlockState(pending.uiBlock.spec, null, undefined, undefined)
-        : undefined;
-      if (uiBlockState) uiBlockState.outcome = sourceText("status.agent.uiBlockClosedByMessage");
-      this.#closePrompt(
-        requestId,
-        pending,
-        userMessagePromptResult(pending.responseKind, pending.uiBlock?.blockId, pending.client.userInputNote),
-        { status: "cancelled" },
-        uiBlockState,
-      );
+      if (pending.agentId !== agentId || pending.publicThreadId !== publicThreadId || pending.turnId !== turnId)
+        continue;
+      // A detached question holds no call: `closeDetachedForUserMessage` closes it.
+      if (pending.saving || pending.detached || pending.responseKind === "mcp-elicitation") continue;
+      this.#routines.markRunningForTurn(turnId);
+      this.#closeForUserMessage(requestId, pending);
       changed = true;
     }
     if (changed) this.#emitRuntimeSnapshot();
   }
 
   /**
+   * The user wrote in their own chat with the agent, or in a task's thread, while a detached question
+   * waits there. The user moved on, and the card would still ask for an answer that the message can
+   * hold (#12449). It closes as `releaseForUserMessage` closes a question, of any turn and also with no
+   * running turn. Its call has its answer already, so the agent reads only the message. A form whose
+   * key or item is being saved finishes on its own.
+   */
+  closeDetachedForUserMessage(agentId: string, publicThreadId: string): void {
+    let changed = false;
+    for (const [requestId, pending] of this.#prompts) {
+      if (!pending.detached || pending.saving) continue;
+      if (pending.agentId !== agentId || pending.publicThreadId !== publicThreadId) continue;
+      if (this.#closeForUserMessage(requestId, pending)) changed = true;
+    }
+    if (changed) this.#emitRuntimeSnapshot();
+  }
+
+  /**
+   * Closes a question or block as the user's own skip does, and says why: the user did not press Skip
+   * (#7678). An MCP elicitation stays, and the result is false: a message must not end a sign-in.
+   */
+  #closeForUserMessage(requestId: RequestId, pending: PendingPrompt): boolean {
+    if (pending.responseKind === "mcp-elicitation") return false;
+    const uiBlockState = pending.uiBlock
+      ? answeredUiBlockState(pending.uiBlock.spec, null, undefined, undefined)
+      : undefined;
+    if (uiBlockState) uiBlockState.outcome = sourceText("status.agent.uiBlockClosedByMessage");
+    this.#closePrompt(
+      requestId,
+      pending,
+      userMessagePromptResult(pending.responseKind, pending.uiBlock?.blockId, pending.client.userInputNote),
+      { status: "cancelled" },
+      uiBlockState,
+    );
+    return true;
+  }
+
+  /**
    * The agent asks again in a chat where a detached question waits. A chat shows one question, so the
    * old card would come back when the new one closes, and ask for an answer that the user maybe gave
-   * already (#12449). The old card expires, and the new question replaces it.
+   * already (#12449). The old card expires, and the new question replaces it. A form whose key or item
+   * is being saved finishes on its own.
    */
   #expireDetachedInChat(agentId: string, publicThreadId: string): void {
     let changed = false;
     for (const [requestId, pending] of this.#prompts) {
-      if (!pending.detached || pending.agentId !== agentId || pending.publicThreadId !== publicThreadId) continue;
+      if (!pending.detached || pending.saving) continue;
+      if (pending.agentId !== agentId || pending.publicThreadId !== publicThreadId) continue;
       this.#expirePrompt(requestId, pending);
       changed = true;
     }
