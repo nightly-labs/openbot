@@ -145,10 +145,11 @@ mock. The separate web preview implements the browser runtime with that same moc
   the HTML file (8 MB or less, HTML type on the attachment and the file) and the frame shows it as
   `srcdoc`, with the same `allow-scripts allow-forms` sandbox as desktop and never
   `allow-same-origin`. The page has an opaque origin and cannot read the web client's storage or
-  host keys. The last 8 pages stay in memory. The frame inherits the `/app` CSP, so a `script-src`
-  or `default-src` there would stop every page. Differences from desktop: a relative URL in the
-  page resolves to the `/app` origin, and the browser blocks `http:` and private-network loads from
-  the page.
+  host keys. At most 4 pages download at the same time for each host connection, because the web
+  client accepts at most 10 open file transfers from the host. The last 8 pages stay in memory. The
+  frame inherits the `/app` CSP, so a `script-src` or `default-src` there would stop every page.
+  Differences from desktop: a relative URL in the page resolves to the `/app` origin, and the
+  browser blocks `http:` and private-network loads from the page.
 - Pinned agents and channels and collapsed sections are kept in local storage for each account and
   host, with the same storage modules as desktop. Only ids are stored. Pins do not delete
   conversations. Notification changes use the host's existing settings and include

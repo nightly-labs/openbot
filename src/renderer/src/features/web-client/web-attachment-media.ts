@@ -4,6 +4,7 @@ import { base64ToBytes, bytesToBase64 } from "@openbot/team-client/base64";
 import { MOBILE_ATTACHMENT_BYTES } from "@openbot/team-client/remote-peer";
 import type { AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
 import { createSignal } from "solid-js";
+import { createDownloadLimit } from "./web-download-limit";
 import type { WebWorkspaceRuntime } from "./web-runtime";
 
 const WEB_THUMBNAIL_BYTES = 2 * 1024 * 1024;
@@ -59,8 +60,6 @@ export function createWebAttachmentMedia(
   const entries = new Map<string, Entry>();
   const [shown, setShown] = createSignal<ReadonlyMap<string, string>>(new Map());
   const loading = new Map<string, Promise<boolean>>();
-  const waiting: (() => void)[] = [];
-  let active = 0;
   let cachedHost = "";
   let total = 0;
   let generation = 0;
@@ -93,14 +92,7 @@ export function createWebAttachmentMedia(
     }
     publish();
   };
-  const slot = async () => {
-    if (active >= CONCURRENT_DOWNLOADS) await new Promise<void>((resolve) => waiting.push(resolve));
-    active += 1;
-  };
-  const release = () => {
-    active -= 1;
-    waiting.shift()?.();
-  };
+  const limited = createDownloadLimit(CONCURRENT_DOWNLOADS);
 
   const entryFor = (attachment: AttachmentSummary, type: string, bytes: Uint8Array<ArrayBuffer>): Entry => {
     const blob = new Blob([bytes], { type });
@@ -114,19 +106,18 @@ export function createWebAttachmentMedia(
 
   async function download(attachment: AttachmentSummary, type: string, limit: number, key: string) {
     const started = generation;
-    await slot();
-    try {
-      if (generation !== started) return false;
-      const file = await remote.download(attachment.id);
-      const bytes = base64ToBytes(file.base64);
-      if (bytes.byteLength > limit || generation !== started) return false;
-      store(key, entryFor(attachment, type, bytes));
-      return true;
-    } catch {
-      return false;
-    } finally {
-      release();
-    }
+    return limited(async () => {
+      try {
+        if (generation !== started) return false;
+        const file = await remote.download(attachment.id);
+        const bytes = base64ToBytes(file.base64);
+        if (bytes.byteLength > limit || generation !== started) return false;
+        store(key, entryFor(attachment, type, bytes));
+        return true;
+      } catch {
+        return false;
+      }
+    });
   }
 
   return {
