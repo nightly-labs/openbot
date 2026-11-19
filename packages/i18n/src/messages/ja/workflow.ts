@@ -532,6 +532,12 @@ export const messages = {
   "workflow.canvas.version.run": "実行前",
   "workflow.canvas.deleteUndo.title": "{name} を削除しました",
   "workflow.canvas.deleteUndo.action": "元に戻す",
+  "workflow.canvas.none.lead": "手順の設定は一度だけ。",
+  "workflow.canvas.none.title": "あとは{run}だけ。",
+  "workflow.canvas.none.run": "動かす",
+  "workflow.canvas.none.trigger": "トリガーがワークフローを開始します。",
+  "workflow.canvas.none.handoff": "各ステップが結果を次のステップに渡します。",
+  "workflow.canvas.none.open": "{name}を開く",
   "workflow.page.failed": "OpenBot で実行できませんでした。もう一度お試しください。",
   "workflow.page.needsNewerApp":
     "このワークフローには新しいバージョンの OpenBot のステップがあります。変更するには OpenBot を更新してください。",

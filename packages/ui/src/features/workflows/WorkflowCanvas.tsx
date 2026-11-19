@@ -96,6 +96,7 @@ import { PromptNode } from "./WorkflowPromptNode";
 import { WorkflowSearch } from "./WorkflowSearch";
 import { SHAPES, ShapeIcon, ShapeNode, ShapeSurface, shapeSize } from "./WorkflowShapeNode";
 import { type SwitcherAction, type SwitcherWorkflow, WorkflowSwitcher } from "./WorkflowSwitcher";
+import { nextWorkflowAfterDelete, WorkflowsEmpty } from "./WorkflowsEmpty";
 import { TextNode } from "./WorkflowTextNode";
 import { TriggerNode } from "./WorkflowTriggerNode";
 import { WorkflowVersionBar } from "./WorkflowVersionBar";
@@ -840,6 +841,11 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     });
   };
   onCleanup(() => closeDelete?.());
+  createEffect(deleted, (hidden) => {
+    for (const layer of Array.from(root?.children ?? [])) {
+      if (!layer.classList.contains("wfn-none")) layer.toggleAttribute("inert", hidden);
+    }
+  });
   const [ui, setUi] = createStore<{
     tool: Tool;
     draw: DrawMode;
@@ -2955,7 +2961,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       <main
         ref={root}
         class="wfn-stage wfn-canvas"
-        inert={deleted()}
         data-deleted={deleted() ? "" : undefined}
         data-preview={previewing() ? "" : undefined}
         data-tool={ui.tool}
@@ -2964,6 +2969,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         data-frame={props.frame}
         aria-label={t("workflow.canvas.label", { name: name() })}
         onPointerDown={(event) => {
+          if (deleted()) return;
           if (builder() || unbuilt().size > 0) endBuild();
           if (drop() && !(event.target instanceof Element && event.target.closest(".wfn-drop-menu"))) closeDrop();
           pressing = true;
@@ -2978,7 +2984,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           if (!panning && ui.tool === "select") canvas.selectFrom(event.target, event.shiftKey);
         }}
         onFocusIn={(event) => {
-          if (!pressing) canvas.selectFrom(event.target);
+          if (!pressing && !deleted()) canvas.selectFrom(event.target);
         }}
       >
         <ContextMenu.Root modal={false}>
@@ -3419,6 +3425,13 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
               {t("workflow.canvas.empty.add")}
             </Button>
           </div>
+        </Show>
+        <Show when={deleted()}>
+          <WorkflowsEmpty
+            next={nextWorkflowAfterDelete(listed(), openId())}
+            onOpen={(workflowId) => onSwitcher(`open:${workflowId}`)}
+            onCreate={() => onSwitcher("new")}
+          />
         </Show>
 
         <WorkflowCanvasHeader
