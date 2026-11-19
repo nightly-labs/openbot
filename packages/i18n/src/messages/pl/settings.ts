@@ -108,7 +108,8 @@ export const messages = {
   "settings.quitGuard.always": "Zawsze",
   "settings.quitGuard.never": "Nigdy",
   "settings.externalLinks.title": "Otwieraj linki zewnętrzne w",
-  "settings.externalLinks.description": "Tu otwierają się linki z czatów, stron logowania i płatności.",
+  "settings.externalLinks.description":
+    "Tu otwierają się linki z czatów, stron logowania i płatności. Gdy wybierzesz OpenBot, w OpenBot otwierają się tylko linki z czatów w głównym oknie z agentami na tym komputerze. Inne linki otwierają się w domyślnej przeglądarce.",
   "settings.externalLinks.defaultBrowser": "Przeglądarka",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "Przeglądarka ({name})",

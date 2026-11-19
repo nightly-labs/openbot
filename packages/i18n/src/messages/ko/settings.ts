@@ -107,7 +107,8 @@ export const messages = {
   "settings.quitGuard.always": "항상",
   "settings.quitGuard.never": "안 함",
   "settings.externalLinks.title": "외부 링크 열기",
-  "settings.externalLinks.description": "채팅, 로그인 페이지, 결제 페이지의 링크가 여기에서 열려요.",
+  "settings.externalLinks.description":
+    "채팅, 로그인 페이지, 결제 페이지의 링크가 여기에서 열려요. OpenBot을 선택하면 메인 창에서 이 컴퓨터의 에이전트와 나눈 채팅 링크만 OpenBot에서 열려요. 다른 링크는 기본 브라우저에서 열려요.",
   "settings.externalLinks.defaultBrowser": "기본 브라우저",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "기본 브라우저({name})",

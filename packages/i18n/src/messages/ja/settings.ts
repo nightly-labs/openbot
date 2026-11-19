@@ -109,7 +109,8 @@ export const messages = {
   "settings.quitGuard.always": "常に",
   "settings.quitGuard.never": "しない",
   "settings.externalLinks.title": "外部リンクの開き方",
-  "settings.externalLinks.description": "チャット、サインインページ、請求ページのリンクをここで開きます。",
+  "settings.externalLinks.description":
+    "チャット、サインインページ、請求ページのリンクをここで開きます。OpenBot を選ぶと、OpenBot で開くのはメインウィンドウで、このコンピューターのエージェントとのチャットにあるリンクだけです。その他のリンクは既定のブラウザーで開きます。",
   "settings.externalLinks.defaultBrowser": "既定のブラウザー",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "既定のブラウザー（{name}）",

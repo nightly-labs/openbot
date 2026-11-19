@@ -112,7 +112,7 @@ export const messages = {
   "settings.quitGuard.never": "Nunca",
   "settings.externalLinks.title": "Abrir enlaces externos en",
   "settings.externalLinks.description":
-    "Los enlaces de los chats, las páginas de inicio de sesión y las de facturación se abren aquí.",
+    "Los enlaces de los chats, las páginas de inicio de sesión y las de facturación se abren aquí. Con OpenBot, solo los enlaces de los chats de la ventana principal con agentes de este ordenador se abren en OpenBot. Los demás enlaces se abren en el navegador habitual.",
   "settings.externalLinks.defaultBrowser": "Navegador habitual",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "Navegador habitual ({name})",

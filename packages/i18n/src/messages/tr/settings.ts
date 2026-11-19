@@ -110,7 +110,7 @@ export const messages = {
   "settings.quitGuard.never": "Asla",
   "settings.externalLinks.title": "Harici bağlantıları şurada aç",
   "settings.externalLinks.description":
-    "Sohbetlerdeki, oturum açma ve faturalandırma sayfalarındaki bağlantılar burada açılır.",
+    "Sohbetlerdeki, oturum açma ve faturalandırma sayfalarındaki bağlantılar burada açılır. OpenBot seçiliyken yalnızca ana pencerede bu bilgisayardaki ajanlarla yapılan sohbetlerin bağlantıları OpenBot'ta açılır. Diğer bağlantılar varsayılan tarayıcıda açılır.",
   "settings.externalLinks.defaultBrowser": "Varsayılan tarayıcı",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "Varsayılan tarayıcı ({name})",
