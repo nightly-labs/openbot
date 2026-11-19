@@ -43,7 +43,7 @@ export interface RoutineSettingsRequest {
   nonce: number;
 }
 
-interface SidePanelFile {
+export interface SidePanelFile {
   key: string;
   name: string;
   folder: boolean;
@@ -735,7 +735,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   };
 }
 
-function filePreviewKey(source: SidebarFilePreview["source"]): string {
+export function filePreviewKey(source: SidebarFilePreview["source"]): string {
   if (source.kind === "attachment") return `attachment\u0000${source.attachment.id}`;
   if (source.kind === "shared") return `shared\u0000${source.path}`;
   return `${source.kind}\u0000${source.agentId}\u0000${source.path}`;
