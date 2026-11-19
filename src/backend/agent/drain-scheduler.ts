@@ -1152,7 +1152,7 @@ export class DrainScheduler {
             this.#channels?.deliveryUncertain(delivery.id);
             this.#hooks.emitError(
               "delivery_start_unconfirmed",
-              `${error.providerName} did not confirm the turn start in time. OpenBot will wait for lifecycle events instead of retrying potentially duplicated work.`,
+              sourceText("error.backend.turnStartUnconfirmed", { provider: error.providerName }),
               delivery.recipientAgentId,
             );
             const ids = batch.map(({ delivery: item }) => item.id);
@@ -1344,6 +1344,7 @@ export class DrainScheduler {
       if (routineThreadId) yield* this.#threads.closeRoutineThread(routineThreadId);
       releaseReservation();
       this.#mailboxSync.emitQueue(agentId);
+      this.#hooks.emitError("delivery_start_unconfirmed", sourceText("error.backend.turnStartAbandoned"), agentId);
       this.scheduleDrain(agentId);
     },
     Effect.catch((failure) => Effect.sync(() => this.#hooks.emitError("delivery_start_unconfirmed", failure.cause))),

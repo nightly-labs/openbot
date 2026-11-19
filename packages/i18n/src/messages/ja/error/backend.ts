@@ -134,6 +134,10 @@ export const messages = {
   "error.backend.routineRunFailedNoReason":
     "実行はエラーで停止しましたが、理由は届いていません。実行を開いて、エージェントが何をしたかを確認してください。",
   "error.backend.turnNotStarted": "プロバイダーはこのターンを開始しませんでした。",
+  "error.backend.turnStartUnconfirmed":
+    "{provider} はこのメッセージを開始したことを時間内に確認しませんでした。作業が二重に実行されないように、OpenBot はメッセージを再送信しません。OpenBot はエージェントが開始するまで最大 5 分待ちます。",
+  "error.backend.turnStartAbandoned":
+    "エージェントは 5 分以内にこのメッセージを開始しませんでした。メッセージをもう一度送信してください。",
   "error.backend.routineResultConnectionOff":
     "このメッセージ接続はオフか削除されています。別の送信先を選んでください。",
   "error.backend.routineResultNoDelivery": "この実行には再送信できる回答がありません。",

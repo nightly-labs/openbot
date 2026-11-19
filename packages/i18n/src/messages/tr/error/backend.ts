@@ -125,6 +125,9 @@ export const messages = {
   "error.backend.routineRunFailedNoReason":
     "Çalıştırma bir hatayla durdu, ancak bir neden gelmedi. Ajanın ne yaptığını görmek için çalıştırmayı açın.",
   "error.backend.turnNotStarted": "Sağlayıcı bu turu başlatmadı.",
+  "error.backend.turnStartUnconfirmed":
+    "{provider} bu mesajı başlattığını zamanında onaylamadı. İş iki kez çalışmasın diye OpenBot mesajı yeniden göndermez. OpenBot, ajanın başlaması için en fazla 5 dakika bekler.",
+  "error.backend.turnStartAbandoned": "Ajan bu mesajı 5 dakika içinde başlatmadı. Mesajı yeniden gönderin.",
   "error.backend.routineResultConnectionOff": "Bu mesajlaşma bağlantısı kapalı veya kaldırılmış. Başka bir yer seçin.",
   "error.backend.routineResultNoDelivery": "Bu çalıştırmanın yeniden gönderilecek bir yanıtı yok.",
   "error.backend.channelMemoryLimit": "Bir kanal en fazla {limit} belleğe sahip olabilir.",

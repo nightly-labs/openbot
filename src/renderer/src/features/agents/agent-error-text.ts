@@ -7,6 +7,7 @@ const RETRY_NOTICE_KEYS: ReadonlySet<string> = new Set([
   "error.backend.providerRetrying",
   "error.backend.providerRetryingLargeContext",
   "error.backend.providerModelAtCapacity",
+  "error.backend.turnStartUnconfirmed",
 ]);
 
 export function createRetryNotices() {
