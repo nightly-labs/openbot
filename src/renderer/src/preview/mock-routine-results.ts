@@ -1,6 +1,3 @@
-// The routine result group of the preview: destinations and deliveries in memory. It posts nothing,
-// so "send again" marks the delivery as sent at once.
-
 import type {
   OpenBotDesktopApi,
   Routine,
@@ -11,13 +8,10 @@ import type {
 
 export interface MockRoutineResultsOptions {
   routineResultOptions?: RoutineResultConnectionOption[];
-  /** Each routine's destination, by routine id. */
   routineResultDestinations?: Record<string, RoutineResultDestination>;
-  /** Each routine's deliveries, newest first, by routine id. */
   routineResultDeliveries?: Record<string, RoutineResultDelivery[]>;
 }
 
-/** `emit` sends the agent event `routines-changed` for the agent whose results changed. */
 export function mockRoutineResults(
   routines: Map<string, Routine[]>,
   options: MockRoutineResultsOptions,

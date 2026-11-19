@@ -1,13 +1,6 @@
 import type { HostProviderSettings } from "../settings/ProviderSettingsSection";
 import type { SetupProviderProps } from "./SetupProviderPicker";
 
-/**
- * The providers of a joined server's host, as the provider step of setup takes them.
- *
- * The step then gives only what reaches the host: runtime downloads, the OpenCode key, a code
- * sign-in and the host's endpoints. A browser sign-in, an install guide and the scan for local
- * servers are of this computer, so the step shows none of them.
- */
 export function hostSetupProviderProps(settings: HostProviderSettings): SetupProviderProps {
   return {
     hostProviders: true,

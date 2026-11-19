@@ -1,17 +1,3 @@
-// Checks the staged rollout (docs/RELEASING.md#staged-rollout) on the update manifests of a real
-// release. It downloads the manifests of v0.67.0 with `gh release download`, which only reads, and
-// changes only local copies. Then it:
-// - runs `scripts/update-rollout.ts` on the four manifests at 10%, 0% and 100%, and checks that only
-//   the `stagingPercentage` line changes and that each SHA-512 and size stays the same;
-// - checks that the script stops for a changed value, a wrong version, a missing manifest and a
-//   percentage that is not a whole number from 0 to 100;
-// - merges the macOS manifest from its two halves, as the publish job does, and sets the percentage;
-// - runs `scripts/verify-update-artifacts.ts` on a small dist folder with each kind of value;
-// - runs the update check of the installed electron-updater, against a local HTTP server that serves
-//   the changed manifests, for 2,000 installs, each with its own `.updaterId`;
-// - runs the app's `UpdateService` on that updater: an automatic check keeps the stage, a check that a
-//   person asks for skips it, and a paused release (0%) stays paused for both.
-// `bun run test:update-rollout [-- --manifests <dir>]`. Writes .openbot-build/update-rollout-e2e/report.json.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -44,11 +30,6 @@ const RELEASE_TAG = "v0.67.0";
 const VERSION = RELEASE_TAG.slice(1);
 const INSTALLS = 2000;
 
-/**
- * The electron-updater base class with an app adapter in place of Electron. A check goes through its
- * own provider, YAML parser and `isUpdateAvailable`, which reads the per-install ID from
- * `<userData>/.updaterId` and creates it on the first check.
- */
 class ProbeUpdater extends AppUpdater {
   constructor(userData: string, version: string, platform: NodeJS.Platform) {
     super(null, {
@@ -65,7 +46,6 @@ class ProbeUpdater extends AppUpdater {
     });
     this.logger = null;
     this.autoDownload = false;
-    // electron-updater's own test option, and an HTTP client that needs no Electron `net` module.
     Object.assign(this, {
       _testOnlyOptions: { platform },
       httpExecutor: {
@@ -132,7 +112,6 @@ for (const name of UPDATE_MANIFESTS) {
   );
 }
 
-// 1. The CLI on copies of the four manifests.
 const workDir = join(OUT, "work");
 const workPaths = UPDATE_MANIFESTS.map((name) => join(workDir, name));
 const resetWork = async () => {
@@ -159,7 +138,6 @@ for (const percentage of [10, 0, 50, 100]) {
     ),
   );
 }
-// From 0% back to 100% gives the bytes of the release.
 assert.deepEqual(cliHashes["100%"], sourceHashes);
 
 const refusals: Record<string, number | null> = {};
@@ -187,7 +165,6 @@ for (const value of ["101", "-1", "2.5", "010", "ten", ""]) {
 }
 await refuse("no percentage", ["--version", VERSION, ...workPaths]);
 
-// 2. The check that runs before each write stops for any other change.
 const tamperCases: Record<string, string> = {};
 for (const name of UPDATE_MANIFESTS) {
   const source = original(name);
@@ -211,7 +188,6 @@ for (const name of UPDATE_MANIFESTS) {
   }
 }
 
-// 3. The publish job merges the macOS halves and then sets the percentage.
 const mac = readUpdateManifest(original("latest-mac.yml"));
 const macFiles = mac.files;
 const isArm64 = (file: UpdateManifest["files"][number]) => file.url.includes("arm64");
@@ -223,7 +199,6 @@ assertSameUpdaterValues(merged, mergedStaged, 10);
 assert.deepEqual(parse(merged, { version: "1.1" }), parse(original("latest-mac.yml"), { version: "1.1" }));
 const macMerge = { files: macFiles.length, arm64: macFiles.filter(isArm64).length, staged: sha256(mergedStaged) };
 
-// 4. `verify-update-artifacts.ts` accepts a whole number from 0 to 100 and no field, and stops for other values.
 const verifyResults: Record<string, number | null> = {};
 const verifyRoot = join(OUT, "verify");
 const fakeAppImage = Buffer.from("not an AppImage: a small file that the verify script hashes\n");
@@ -259,7 +234,6 @@ for (const [label, line, expected] of [
   verifyResults[label] = result.status;
 }
 
-// 5. The update check of electron-updater, through its own HTTP request, YAML parser and staging check.
 const served = new Map<string, string>();
 const server = Bun.serve({
   port: 0,
@@ -306,11 +280,9 @@ try {
         const available = await updater.check(`http://127.0.0.1:${server.port}/${feed.name}/${scenario}/`);
         if (available) offered[scenario]?.add(install);
       }
-      // The same install is in the same part of the stage at the next check.
       const again = await updater.check(`http://127.0.0.1:${server.port}/${feed.name}/10/`);
       assert.equal(again, offered["10"]?.has(install), "an install keeps its place in the stage");
       ids.add((await readFile(join(userData, ".updaterId"), "utf8")).trim());
-      // An install that already has this version gets no update at any percentage.
       const current = new ProbeUpdater(userData, VERSION, feed.platform);
       assert.equal(await current.check(`http://127.0.0.1:${server.port}/${feed.name}/absent/`), false);
     }
@@ -323,8 +295,6 @@ try {
       ["10", 0.1],
       ["50", 0.5],
     ] as const) {
-      // Five standard deviations of a binomial count: the eight counts fail by chance about once in
-      // 200,000 runs.
       const margin = 5 * Math.sqrt(installs * share * (1 - share));
       assert.ok(
         Math.abs(count(scenario) - installs * share) <= margin,
@@ -340,8 +310,6 @@ try {
     };
   }
 
-  // 6. The app's UpdateService on the same updater and feed. Its timer runs the automatic check; its
-  // `checkForUpdates()` is the check that a person asks for in Settings > Updates.
   process.env.TEST_UPDATER_ARCH = "x64";
   const feedUrl = (scenario: string) => `http://127.0.0.1:${server.port}/latest-linux.yml/${scenario}/`;
   const placed: { inside?: string; outside?: string } = {};
@@ -352,7 +320,6 @@ try {
   }
   const { inside, outside } = placed;
   assert.ok(inside && outside);
-  // The next release, also at 10%. The requested check skips the stage only for the release it found.
   const [major, minor] = VERSION.split(".");
   const laterVersion = `${major}.${Number(minor) + 1}.0`;
   served.set(
@@ -364,7 +331,6 @@ try {
   serviceResults.outsideAt0 = await serviceChecks(outside, "0.66.0", feedUrl("0"));
   serviceResults.insideAt0 = await serviceChecks(inside, "0.66.0", feedUrl("0"));
   serviceResults.currentAt10 = await serviceChecks(outside, VERSION, feedUrl("10"));
-  // `staged` is the release that Settings > Updates names after the automatic check.
   assert.deepEqual(serviceResults.outsideAt10, {
     automatic: "up-to-date",
     staged: VERSION,
@@ -380,7 +346,6 @@ try {
   delete process.env.TEST_UPDATER_ARCH;
 }
 
-// The downloaded release manifests are the same at the end.
 for (const name of UPDATE_MANIFESTS) assert.equal(await readFile(join(sourceDir, name), "utf8"), original(name));
 await rm(installsRoot, { recursive: true, force: true });
 const report = {
@@ -398,11 +363,6 @@ const report = {
 await writeFile(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
 logger.info(`The staged rollout checks passed. Report: ${join(OUT, "report.json")}`);
 
-/**
- * Starts an UpdateService for the install in `userData`, waits for its first automatic check, then
- * asks for a check as the Settings button does. Returns the phase after each check. With
- * `laterFeedUrl`, the next automatic check reads that feed.
- */
 async function serviceChecks(userData: string, version: string, feedUrl: string, laterFeedUrl?: string) {
   const updater = new ProbeUpdater(userData, version, "linux");
   updater.setFeedURL({ provider: "generic", url: feedUrl });
@@ -413,7 +373,6 @@ async function serviceChecks(userData: string, version: string, feedUrl: string,
     beforeInstall: async () => undefined,
     platform: "linux",
     initialCheckDelayMs: 0,
-    // A short interval only when the test waits for the next automatic check.
     checkIntervalMs: laterFeedUrl ? 100 : 3_600_000,
   });
   const automatic = new Promise<UpdateStatus>((resolvePhase) => {
@@ -431,7 +390,6 @@ async function serviceChecks(userData: string, version: string, feedUrl: string,
     const result = { automatic: first.phase, staged: first.stagedVersion ?? null, requested: requested.phase };
     if (!laterFeedUrl) return result;
     updater.setFeedURL({ provider: "generic", url: laterFeedUrl });
-    // The first outcome after the next automatic check starts.
     const later = await new Promise<UpdateStatus>((resolvePhase) => {
       let checking = false;
       service.on("status", (status) => {
@@ -446,7 +404,6 @@ async function serviceChecks(userData: string, version: string, feedUrl: string,
   }
 }
 
-/** The values that electron-updater reads, with js-yaml, are those of the release, with the new percentage. */
 function assertSameUpdaterValues(before: string, after: string, percentage: number): void {
   const url = new URL("https://example.invalid/latest.yml");
   const old = parseUpdateInfo(before, "latest.yml", url);

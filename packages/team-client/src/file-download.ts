@@ -18,24 +18,17 @@ interface Download {
   mimeType: string;
   size: number;
   received: number;
-  /**
-   * The hash and the Base64 grow with each chunk, so a large file is ready when its last byte
-   * arrives. Hashing and encoding 40 MB at the end kept the file waiting for seconds.
-   */
   hash: ReturnType<typeof sha256.create>;
   base64: string[];
-  /** The last bytes that do not fill a group of three, for the next chunk's Base64. */
   carry: Uint8Array;
   digest: string;
   complete: boolean;
-  /** An allowed larger file. It does not count against the attachment total. */
   allowed: boolean;
   timer: ReturnType<typeof setTimeout>;
 }
 
 interface DownloadAllowance {
   maxBytes: number;
-  /** Without a type, the allowance takes a larger file of any type. */
   mimeType: string | undefined;
   taken: boolean;
 }
@@ -46,23 +39,14 @@ interface DownloadWatch {
   transferId: string | null;
 }
 
-/** Receives the released file protocol; bytes are exposed only after digest validation. */
 export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Effect<void, E, R>) {
   const downloads = new Map<string, Download>();
-  // Requests that wait for one file larger than an attachment, such as a transfer file. Each one
-  // takes the first larger file of its type that fits it, and it ends with its request.
   const allowances = new Set<DownloadAllowance>();
   const waiters = new Map<
     string,
     { resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }
   >();
-  // The reason of each file that ended before its request read it. The host sends the file before it
-  // answers the request, so a refused file usually has no waiter yet. Its request then fails with this
-  // reason at once, not with a timeout a minute later.
   const ended = new Map<string, string>();
-  // Requests that report the progress of their file. The host names a file only in its answer, after
-  // the last byte, so the size ties a file to its request. Two files of one size can swap their
-  // progress; their bytes still go to the request that the answer names.
   const watches = new Set<DownloadWatch>();
   function report(id: string, received: number, size: number) {
     for (const watch of watches) if (watch.transferId === id) watch.onProgress(received, size);
@@ -72,7 +56,6 @@ export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Ef
     if (entry) clearTimeout(entry.timer);
     downloads.delete(id);
   }
-  /** Ends the download and the request that waits for it, so the request does not wait for the timeout. */
   function fail(id: string, message: string) {
     remove(id);
     const waiter = waiters.get(id);
@@ -136,8 +119,6 @@ export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Ef
     if (typeof data !== "string") {
       const chunk = yield* Effect.try({ try: () => decodeTeamProtocolV2FileChunk(data), catch: fileTransferError });
       const entry = downloads.get(chunk.transferId);
-      // A timed-out transfer may still have chunks in flight. Cancel only that
-      // transfer; an expired download must not invalidate the peer connection.
       if (!entry) {
         yield* sendFrame(
           encodeTeamProtocolV2Frame({
@@ -153,7 +134,6 @@ export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Ef
         return yield* transferFailure("The host sent an invalid attachment chunk.");
       entry.received += chunk.bytes.length;
       entry.hash.update(chunk.bytes);
-      // A chunk joins the carry of the chunk before only when there is one, so a usual chunk is not copied.
       let pending = chunk.bytes;
       if (entry.carry.length > 0) {
         pending = new Uint8Array(entry.carry.length + chunk.bytes.length);
@@ -203,8 +183,6 @@ export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Ef
             reason: "Attachments must be 10 MB or smaller. Download fewer files at once.",
           }),
         );
-        // A request can wait for this file before it starts. It ends now, not at the timeout. A request
-        // that allows a larger file gets the limit that it allows.
         fail(
           frame.transferId,
           sourceText(
@@ -265,7 +243,6 @@ export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Ef
       }
       return true;
     }
-    // A cancel can come before the file starts, while a request already waits for it.
     if (frame.type === "file-cancel" && (downloads.has(frame.transferId) || waiters.has(frame.transferId))) {
       fail(frame.transferId, sourceText("error.remote.downloadStopped"));
       return true;
@@ -273,10 +250,6 @@ export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Ef
     return false;
   });
   return {
-    /**
-     * Lets one file of `mimeType` (any type without it) and up to `maxBytes` arrive while a request waits for it. Call the
-     * answer when the request ends; a file still arriving then keeps its place.
-     */
     allow(maxBytes: number, mimeType?: string) {
       const allowance: DownloadAllowance = { maxBytes, mimeType, taken: false };
       allowances.add(allowance);
@@ -284,10 +257,6 @@ export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Ef
         allowances.delete(allowance);
       };
     },
-    /**
-     * Reports the bytes of the next file of `size` that the host opens. Call the answer when the
-     * request ends. Progress never changes the download.
-     */
     watch(size: number, onProgress: (received: number, size: number) => void) {
       const watch: DownloadWatch = { size, onProgress, transferId: null };
       watches.add(watch);

@@ -2,9 +2,6 @@
 @import "@openbot/brand/tokens.css";
 @import "@openbot/brand/logo.css";
 
-/* The status page. Every rule is under `.status-page`, so the page also renders in Storybook. */
-
-/* The site stylesheet sets this for every element. The widths below depend on it. */
 .status-page,
 .status-page *,
 .status-page *::before,
@@ -48,7 +45,6 @@
   --status-text: var(--openbot-accent-text);
 }
 
-/* A day or a service that no check has covered. */
 .status-page [data-state="none"] {
   --status-color: var(--openbot-text-muted);
   --status-text: var(--openbot-text-muted);
@@ -67,8 +63,6 @@
   color: inherit;
   text-decoration: none;
 }
-
-/* Header and footer ------------------------------------------------------ */
 
 .status-header,
 .status-main,
@@ -109,8 +103,6 @@
   padding-block: 24px 40px;
   border-top: 1px solid var(--status-hairline);
 }
-
-/* Shared pieces ------------------------------------------------------ */
 
 .status-dot {
   flex: 0 0 auto;
@@ -188,7 +180,6 @@
   }
 }
 
-/* The site's small secondary button (`landing-button-secondary landing-button-sm`). */
 .status-button {
   display: inline-flex;
   align-items: center;
@@ -216,7 +207,6 @@
   flex: 0 0 auto;
 }
 
-/* Lucide has no brand icons, so the GitHub mark is a mask. */
 .status-button[data-icon="github"]::before {
   content: "";
   background: currentColor;
@@ -235,7 +225,6 @@
   transform: scale(0.97);
 }
 
-/* The range toggle: the look of the changelog's app switch, on buttons. */
 .status-toggle {
   display: inline-flex;
   padding: 3px;
@@ -271,7 +260,6 @@
   box-shadow: 0 0 0 2px var(--openbot-accent-strong);
 }
 
-/* Updates of one incident, newest first. */
 .status-updates {
   display: grid;
   gap: 16px;
@@ -328,8 +316,6 @@
   font-size: 13px;
   white-space: nowrap;
 }
-
-/* Page ------------------------------------------------------------------ */
 
 .status-hero {
   display: flex;

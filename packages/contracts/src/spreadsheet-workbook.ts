@@ -1,6 +1,5 @@
 import { strFromU8, unzipSync } from "fflate";
 
-/** Formats a cell number in the reader's language. `AppFormat` from `@openbot/i18n` fits it. */
 export interface SpreadsheetNumberFormat {
   number: (value: number, options?: Intl.NumberFormatOptions) => string;
 }
@@ -9,7 +8,6 @@ const ENGLISH_NUMBERS: SpreadsheetNumberFormat = {
   number: (value, options) => new Intl.NumberFormat("en", options).format(value),
 };
 
-/** The rows and columns that a preview reads from each sheet. */
 export const SPREADSHEET_MAX_ROWS = 500;
 export const SPREADSHEET_MAX_COLUMNS = 50;
 const MAX_ZIP_ENTRY_BYTES = 8 * 1024 * 1024;
@@ -102,7 +100,6 @@ function parseNumberFormats(bytes: Uint8Array | undefined): string[] {
 
 function formatExcelDate(value: number, format: string, date1904: boolean): string {
   const epoch = date1904 ? Date.UTC(1904, 0, 1) : Date.UTC(1899, 11, 30);
-  // Excel includes the fictional date 1900-02-29 at serial 60 for compatibility.
   const adjustedValue = !date1904 && value > 0 && value < 60 ? value + 1 : value;
   const date = new Date(epoch + adjustedValue * 86_400_000);
   if (Number.isNaN(date.getTime())) return String(value);
@@ -164,9 +161,7 @@ function formatExcelNumber(value: string, format: string, date1904: boolean, num
   const hasDate = hasDateFormat(format);
   if (hasDate) return formatExcelDate(number, format, date1904);
   if (hasTimeFormat(format)) return number < 0 ? value : formatExcelTime(number, format);
-  // A one-section format puts the minus sign before all of its text, so "$" shows -$1.00.
   const sign = number < 0 ? "-" : "";
-  // A format with only literal text shows that text in place of the number.
   if (unquotedFormat(format).trim() === "")
     return `${sign}${format.replace(/"([^"]*)"|\\(.)/gu, (_match, quoted?: string, escaped?: string) => quoted ?? escaped ?? "")}`;
   const prefix = format.match(/^"([^"]*)"/u)?.[1] ?? "";
@@ -262,9 +257,6 @@ function unzipSpreadsheet(bytes: Uint8Array) {
   });
 }
 
-/**
- * The sheets of an `.xlsx` workbook as text, for the desktop, web and mobile previews. It needs
- * `DOMParser`, so mobile calls it in a DOM component. `numbers` formats cell numbers. The default is English, for a caller outside the app. */
 export function parseSpreadsheet(
   bytes: Uint8Array,
   numbers: SpreadsheetNumberFormat = ENGLISH_NUMBERS,

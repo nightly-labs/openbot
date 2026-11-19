@@ -11,7 +11,6 @@ import {
   requireServerClaimsAdmin,
 } from "../../../server/request-auth";
 
-/** An operator makes a one-time claim that signs a new server in for the user of the email. */
 export const Route = createFileRoute("/v2/admin/server-claims")({
   server: {
     handlers: {

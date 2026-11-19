@@ -13,7 +13,6 @@ const CHANNEL_MEMORY_TABLES: MemoryTables = {
   limitMessage: (limit) => sourceText("error.backend.channelMemoryLimit", { limit }),
 };
 
-/** The channel twin of `AgentMemoryStore`: the same `MemoryStore`, with a channel for an owner. */
 export class ChannelMemoryStore extends MemoryStore {
   constructor(database: OpenBotDatabase) {
     super(database, CHANNEL_MEMORY_TABLES);
@@ -36,23 +35,12 @@ export class ChannelMemoryStore extends MemoryStore {
     return { ...super.updateManual(channelId, memoryId, text), channelId };
   }
 
-  /**
-   * A channel tool writes at call time, so there is no `expectedUpdatedAt` race to guard. `commandId`
-   * is the call's own receipt key: a retried tool call reads it and saves nothing more.
-   */
   saveFromTool(channelId: string, text: string, sourceTurnId: string, commandId: string): ChannelMemory {
     const memory = this.saveAutomaticEntry(channelId, { text, sourceTurnId, commandId });
     if (!memory) throw new Error(sourceText("error.backend.memoryGone"));
     return { ...memory, channelId };
   }
 
-  /**
-   * `channel_forget_memory` names the text, not an id: the model never sees a memory id. An exact,
-   * case-sensitive match wins first: `MemoryStore#save` does not merge entries that differ only by
-   * case, so two such entries can coexist, and forgetting one must not delete the other instead.
-   * Only when no exact match exists does this fall back to a case-insensitive match, since a model
-   * or user retypes the fact from memory rather than copying it verbatim.
-   */
   deleteByText(channelId: string, text: string): boolean {
     const target = text.trim();
     const entries = this.list(channelId);

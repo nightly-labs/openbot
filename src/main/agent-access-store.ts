@@ -16,14 +16,12 @@ import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } f
 
 export const AGENT_ACCESS_FILE = "openbot-agent-access-v1.json";
 
-/** The roles of one server, as the host stores them. */
 export interface AgentAccessState {
   revision: number;
   everyone: AgentAccessLevels;
   roles: AgentAccessRole[];
 }
 
-/** Records a replace that an owner or admin made, with the roles before and after it. */
 export type AgentAccessAudit = (
   serverId: string,
   before: AgentAccessState,
@@ -31,16 +29,10 @@ export type AgentAccessAudit = (
   actor: ServerAuditName | null,
 ) => Effect.Effect<void>;
 
-/** A replace that named a revision other than the stored one: another admin saved first. */
 export class AgentAccessStale extends Schema.TaggedError<AgentAccessStale>()("AgentAccessStale", {}) {}
 
 const EMPTY: AgentAccessState = { revision: 0, everyone: {}, roles: [] };
 
-/**
- * The level of `member` for `agentId`. Owners and admins always manage. A member gets the highest
- * of "everyone" (`manage` for an agent that it does not list) and of each role that names the member
- * (`none` for an agent that the role does not list).
- */
 export function agentAccessLevel(
   state: AgentAccessState | "closed",
   member: Pick<TeamMemberSummary, "id" | "role">,
@@ -58,10 +50,6 @@ export function agentAccessLevel(
   return level;
 }
 
-/**
- * What `member` reads. `shown` names the agents that the caller can see, in their order; the
- * levels of other agents stay on the host. A member reads only `mine`.
- */
 export function agentAccessSnapshot(
   state: AgentAccessState | "closed",
   member: Pick<TeamMemberSummary, "id" | "role">,
@@ -85,8 +73,6 @@ export function agentAccessSnapshot(
   };
 }
 
-// An admin replaces the levels of the agents that they see. The levels of an agent that their client
-// cannot show, or that has not loaded yet, stay as they were. The levels of a deleted agent go.
 function mergeShown(
   stored: AgentAccessLevels,
   sent: AgentAccessLevels,
@@ -100,7 +86,6 @@ function mergeShown(
   return merged;
 }
 
-/** A copy of `state` with the levels of the agents in `agents` only. */
 function onlyAgents(state: AgentAccessState, agents: ReadonlySet<string>): AgentAccessState {
   const only = (levels: AgentAccessLevels) =>
     Object.fromEntries(Object.entries(levels).filter(([agentId]) => agents.has(agentId)));
@@ -134,13 +119,6 @@ function decodeServers(parsed: unknown): Map<string, AgentAccessState> | null {
   return servers;
 }
 
-/**
- * The roles of each server that this computer hosts, by server ID. A preference file rather than the
- * database: it needs no migration, and an older build ignores it, so a downgrade keeps the roles.
- *
- * A missing file reads as no roles. A file that does not decode closes every agent to members, so it
- * does not open agents that its roles closed. The next save replaces it.
- */
 export class AgentAccessStore {
   readonly #path: string;
   #servers = new Map<string, AgentAccessState>();
@@ -154,7 +132,6 @@ export class AgentAccessStore {
     this.#audit = options.audit;
   }
 
-  /** Returns false when the file exists and does not decode. */
   load(): Effect.Effect<boolean, PreferenceFileFailure> {
     return Effect.gen({ self: this }, function* () {
       const loaded = yield* Effect.result(readPreferenceFile(this.#path, decodeServers));
@@ -173,15 +150,10 @@ export class AgentAccessStore {
     return copyState(this.#closed ? EMPTY : (this.#servers.get(serverId) ?? EMPTY));
   }
 
-  /** `closed` when a damaged file must keep members out. */
   levels(serverId: string): AgentAccessState | "closed" {
     return this.#closed ? "closed" : (this.#servers.get(serverId) ?? EMPTY);
   }
 
-  /**
-   * Replaces the roles. `shown` names the agents that the caller can see, and `existing` all agents of
-   * the host; see `mergeShown`. `actor` is the owner or admin who made the change, for the audit log.
-   */
   readonly set = Effect.fn("AgentAccessStore.set")(function* (
     this: AgentAccessStore,
     serverId: string,
@@ -203,13 +175,11 @@ export class AgentAccessStore {
         })),
       };
     });
-    // A save drops the levels of a deleted agent. Nobody changed those, so the log does not show them.
     if (before && this.#audit && saved.revision !== before.revision)
       yield* this.#audit(serverId, onlyAgents(before, existing), onlyAgents(saved, existing), actor);
     return saved;
   }).bind(this);
 
-  /** Takes a removed member out of each role. */
   readonly removeMember = Effect.fn("AgentAccessStore.removeMember")(function* (
     this: AgentAccessStore,
     serverId: string,
@@ -228,10 +198,6 @@ export class AgentAccessStore {
     );
   }).bind(this);
 
-  /**
-   * Gives a duplicated agent the levels of its source, so that the copy, with its memories and routines,
-   * is not open to members that the source was closed to.
-   */
   readonly copyAgent = Effect.fn("AgentAccessStore.copyAgent")(function* (
     this: AgentAccessStore,
     serverId: string,
@@ -239,7 +205,6 @@ export class AgentAccessStore {
     agentId: string,
   ) {
     yield* this.#replace(serverId, (state) => {
-      // A damaged file keeps members out of every agent; a write here would replace it.
       if (this.#closed) return "unchanged";
       const copy = (levels: AgentAccessLevels): AgentAccessLevels => {
         const level = levels[sourceAgentId];
@@ -260,7 +225,6 @@ export class AgentAccessStore {
 
   #replace(
     serverId: string,
-    // Null when the change is stale; "unchanged" when there is nothing to write.
     next: (current: AgentAccessState) => Omit<AgentAccessState, "revision"> | "unchanged" | null,
   ): Effect.Effect<AgentAccessState, PreferenceFileFailure | AgentAccessStale> {
     return this.#writes.withPermit(

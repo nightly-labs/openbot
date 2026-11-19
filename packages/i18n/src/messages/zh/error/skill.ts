@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/skill";
 
 export const messages = {
-  // Skill package, library, and marketplace errors.
   "error.skill.symlinks": "技能包不能包含符号链接。",
   "error.skill.expandedTooLarge": "解压后的技能必须小于 10 MB。",
   "error.skill.irregularEntry": "技能包只能包含普通文件和文件夹。",

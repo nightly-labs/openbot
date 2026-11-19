@@ -1,5 +1,3 @@
-// The one Link sign-in of this computer, encrypted at rest by the operating system.
-
 import { readFile, rm } from "node:fs/promises";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result, Semaphore } from "effect";
@@ -11,23 +9,16 @@ import type { SecretCipher } from "./provider-credential-store";
 const linkAccountRecordSchema = z.object({
   accessToken: z.string().min(1),
   accessTokenExpiresAt: z.number().nullable(),
-  /** Null after Link refused it: the panel then shows the sign-in as expired. */
   refreshToken: z.string().min(1).nullable(),
   email: z.string().nullable(),
 });
 
 export type LinkAccountRecord = z.infer<typeof linkAccountRecordSchema>;
 
-/** A version that this build cannot read is reported as unreadable; a new sign-in replaces the file. */
 const envelopeSchema = z.object({ version: z.literal(1), record: z.string() });
 
-/** One token set is small; a larger file is not one that this app wrote. */
 const MAX_ENVELOPE_BYTES = 64 * 1024;
 
-/**
- * Reads and writes the Link sign-in. The decrypted record is kept in memory only. Writes run one at a
- * time, because a refresh and a disconnect can arrive together.
- */
 export class LinkAccountStore {
   readonly #path: string;
   readonly #cipher: SecretCipher;
@@ -39,7 +30,6 @@ export class LinkAccountStore {
     this.#cipher = cipher;
   }
 
-  /** Reads the file. Returns the error when the file is there but cannot be read. */
   readonly load = Effect.fn("LinkAccountStore.load")(function* (this: LinkAccountStore) {
     this.#record = null;
     const result = yield* this.#readEffect().pipe(Effect.result);

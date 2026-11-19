@@ -1,24 +1,3 @@
-// Checks `routine_report_failure` (#2804): an agent marks its routine run failed when the task could
-// not be done. Runs the real agent service, tool router, routine flows and routine result store on a
-// temporary profile with a fake Codex app-server. The routines run in a separate thread. The fake calls the OpenBot tools that a turn's input
-// names in `<<CALLS[...]CALLS>>`, logs each result, and then answers. The check asserts that a called
-// run ends `failed` with the redacted reason while its delivery stays `completed` and its answer shows in its routine thread,
-// that a later queue change keeps it failed, that a run with no call succeeds, that a provider failure
-// still wins, that a failed script run is never quiet, that the tool fails outside a routine run, that
-// a teammate's update that wants no answer can end quiet (#6821), that a teammate's answer to a
-// request of a quiet run can end quiet and the answer to a Test run's request cannot (#8364), that a
-// teammate's request can end quiet after the agent sent its result to that teammate (#7465) or after
-// OpenBot sent the turn's answer to it (#8021), that
-// a flow skips the agents after a failed owner or linked step, that a result destination gets the
-// answer of a reported failure but not of a provider failure, that a failed run does not pause its
-// own routine in either call order (#9856), and that a routine that its own run paused says which run
-// until the next change of the routine, also after a restart (#10048), and that the routine prompt
-// says that a request to a teammate is not a failure (#10928), and that a stop that the user asked
-// for is not a failure, which Test and script runs do not get (#11578). A run whose turn fails with no
-// error keeps a reason that says so, with one failed marker also after a later queue change, that an
-// older failed run with no reason stays as it was, and that list_routines gives each routine its
-// newest run with that reason (#11627).
-// `bun scripts/routine-report-failure-e2e.ts`. Writes .openbot-build/routine-report-failure-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -43,7 +22,6 @@ const home = join(root, "home");
 const fakeCodex = join(root, "codex");
 const fakeLog = join(root, "codex.jsonl");
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -68,7 +46,6 @@ const NO_ANSWER_ERROR = "The fake provider sent no answer.";
 const NOTICE_TEXT = "Before the check: I run one harmless command and report the result to my teammate.";
 const LINK_REASON = "The mirror is down.";
 
-/** A tool call that the fake makes. */
 interface FakeCall {
   tool: "routine_report_failure" | "routine_no_update" | "list_routines" | "send_message" | "update_routine";
   arguments: {
@@ -90,29 +67,8 @@ const pauseRoutine = (routineId: string): FakeCall => ({
   tool: "update_routine",
   arguments: { routineId, active: false },
 });
-/** The calls of the turn that reads a teammate's answer to a request of the routine run. */
 const replyCalls = (...items: FakeCall[]) => `<<REPLY${JSON.stringify(items)}REPLY>>`;
 
-/**
- * A Codex app-server with the methods that the service calls. A turn calls, one at a time, the
- * OpenBot tools that its input (the task, for a routine prompt) names in `<<CALLS[...]CALLS>>`, logs each
- * result, then answers:
- * `FAILED_ANSWER` after a call, `Relay report <<CALLS...CALLS>>` for an input with `<<NEXT...NEXT>>`
- * (so the next agent of a flow gets the calls), and "All good." otherwise. An input with
- * `PROVIDER-FAIL` ends the turn failed with an error and no answer. `SILENT-FAIL` ends it failed with
- * no error at all. `EMPTY-ANSWER` does the same with
- * the `empty_answer` cause, as Grok does when the model sends only its reasoning. `QUIET-HANG` sends
- * nothing after its calls until a `turn/interrupt`, as Grok does while it tries such a reply again
- * (#8629). `QUIET-LOOP` calls \`routine_no_update\` again after each result until a \`turn/interrupt\`, as
- * Kimi does (#9375). An input with
- * `TEAMMATE-QUIET` and no calls calls `routine_no_update`. A turn that reads a teammate's answer
- * makes the calls in `<<REPLY[...]REPLY>>` when its input names them. An input with `TEAMMATE-REQUEST`
- * and no calls calls `routine_no_update`, sends the result to the teammate who asked, then calls
- * `routine_no_update` again. With `TEAMMATE-REQUEST-TEXT` it only sends that result and then writes text, as
- * Claude does when it does not load the no-update tool. With `TEAMMATE-REQUEST-NOREPLY` it makes no call
- * and writes text. `NOTICE` first writes a notice to the user (a \`msg_\` commentary item) and a thought
- * (an \`rs_\` commentary item), as Codex does. `NO-FINAL` ends the turn with no answer.
- */
 const FAKE_CODEX = `#!/usr/bin/env node
 const { appendFileSync } = require("node:fs");
 if (process.argv.includes("--version")) {
@@ -124,9 +80,7 @@ const config = { config: { mcp_servers: {} }, layers: [{ name: { type: "user", f
 let buffer = "";
 let threads = 0;
 let turns = 0;
-/** Tool request id -> the turn that waits for its result. */
 const waiting = new Map();
-/** Turn id -> each turn that calls \`routine_no_update\` again until it is stopped. */
 const looping = new Map();
 process.stdout.on("error", (error) => {
   if (error.code === "EPIPE") process.exit(0);
@@ -190,13 +144,11 @@ const answer = (message) => {
       log({ method: "turn/start", threadId: params.threadId, turnId, text });
       write({ id: message.id, result: { turn: { id: turnId, status: "inProgress", items: [] } } });
       write({ method: "turn/started", params: { threadId: params.threadId, turn: { id: turnId } } });
-      // Only the task of a routine prompt: the prompt can quote earlier chat messages before it.
       const start = text.lastIndexOf("--- routine task ---");
       const task = start >= 0 ? text.slice(start) : text;
       const answered = text.includes("This replies to message:") ? /<<REPLY([\\s\\S]*?)REPLY>>/.exec(task) : null;
       const named = answered || /<<CALLS([\\s\\S]*?)CALLS>>/.exec(task);
       const next = /<<NEXT([\\s\\S]*?)NEXT>>/.exec(task);
-      // The sender and the message ID of a teammate's request, from the delivery prompt.
       const request = !named && task.includes("TEAMMATE-REQUEST") ? /Message from OpenBot teammate .*? \\(([^()\\s]+)\\)\\.\\nMessage ID: (\\S+)/.exec(task) : null;
       const requestReply = request && { tool: "send_message", arguments: { recipientAgentIds: [request[1]], replyToMessageId: request[2], text: "Status: done\\nResult: The build passed.\\nEvidence: none", expectsReply: false } };
       const textOnly = task.includes("TEAMMATE-REQUEST-TEXT");
@@ -255,7 +207,6 @@ const report: {
   runs: Record<string, Pick<RoutineRun, "status" | "error"> & { deliveryStatus?: string | null }>;
   flowSteps: Record<string, { agent: string; status: string; error: string | null }[]>;
   resultRuns: string[];
-  /** The run time that each routine list gives for the routine that its own run paused (#10048). */
   pauseReasons?: Record<string, string | undefined>;
   checks: { name: string; passed: boolean }[];
   passed: boolean;
@@ -283,7 +234,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service, its database or the fake's log. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -381,7 +331,6 @@ function createRoutine(agentId: string, name: string, instruction: string) {
   });
 }
 
-/** Waits for a run's delivery and run to end, and records both. */
 async function settledRun(name: string, run: RoutineRun, timeoutMs?: number) {
   const deliveryId = run.deliveryId;
   assert.ok(deliveryId, `${name}: no delivery`);
@@ -466,7 +415,6 @@ try {
     placeId: "C1",
     placeName: "#ops",
   };
-  // A connection row only: the result service that would post to it does not run here.
   store.database.connection
     .prepare(
       `INSERT INTO projection_messaging_connections (connection_id, platform, workspace_id, workspace_name, enabled,
@@ -480,7 +428,6 @@ try {
   await connect(relayed.id, relay.id, responder.id);
   await connect(relayed.id, responder.id, finisher.id);
 
-  // Outside a routine run, the tool fails as `routine_no_update` does.
   const chatReceipt = await runCauseEffect(
     agents.sendMessage({ agentId: checker.id, text: `Hello. ${calls(reportFailure("Not a run."))}` }),
   );
@@ -499,7 +446,6 @@ try {
   );
   pass("A chat turn with a refused call still completes", chatDelivery.status === "completed" && !chatDelivery.error);
 
-  // A teammate's update that wants no answer: the recipient's turn can end quiet (#6821).
   const update: FakeCall = {
     tool: "send_message",
     arguments: { recipientAgentIds: [checker.id], text: "The build is live. TEAMMATE-QUIET", expectsReply: false },
@@ -538,8 +484,6 @@ try {
     { sendResult, quietResult, quietEvent, updateAnswers },
   );
 
-  // A teammate's request: the recipient sends its result with send_message, and then its turn can end
-  // quiet. Before the reply, the no-update tool asks for the reply first (#7465).
   const ask: FakeCall = {
     tool: "send_message",
     arguments: { recipientAgentIds: [checker.id], text: "Check the release build. TEAMMATE-REQUEST" },
@@ -584,9 +528,6 @@ try {
     );
   pass("The teammate who asked gets the one reply and no second result", repliesToRelay.length === 1, repliesToRelay);
 
-  // The same request when the model writes text after its reply and does not call the no-update tool,
-  // as Claude does when it does not load that tool: the reply makes the turn quiet (#7465). Without a
-  // reply, the text stays in the chat, because then the teammate has nothing yet.
   const requestTurnOf = async (text: string) => {
     const ask: FakeCall = { tool: "send_message", arguments: { recipientAgentIds: [checker.id], text } };
     await runCauseEffect(agents.sendMessage({ agentId: relay.id, text: `Ask again. ${calls(ask)}` }));
@@ -613,8 +554,6 @@ try {
       latestTurnAnswer(textRequest.answers, textRequest.turn.turnId) === undefined,
     textRequest,
   );
-  // The notice that Codex wrote to the user before its reply stays in the quiet turn as a quiet answer.
-  // Its thought goes. The notice went with the thought when the turn ended (#11848).
   const noticeRequest = await requestTurnOf("Check the notice build. TEAMMATE-REQUEST-TEXT NOTICE NO-FINAL");
   const notices = noticeRequest.answers.filter((message) => message.id.startsWith("msg_"));
   pass(
@@ -629,8 +568,6 @@ try {
       latestTurnAnswer(noticeRequest.answers, noticeRequest.turn.turnId) === undefined,
     noticeRequest,
   );
-  // With no reply, OpenBot sends the turn's answer to the teammate as its result. The teammate has it,
-  // so the turn ends quiet too, and the history import decides the same (#8021).
   const unanswered = await requestTurnOf("Check the site build. TEAMMATE-REQUEST-NOREPLY");
   const unansweredMessageId = /Message ID: (\S+)/.exec(unanswered.turn.text ?? "")?.[1];
   const sentResults = await waitFor("the result for the unanswered request", () => {
@@ -660,7 +597,6 @@ try {
     { unanswered, sentResults, unansweredDelivery },
   );
 
-  // A Test run that reports a failure.
   const healthRun = await settledRun(
     "Health check",
     await runCauseEffect(agents.testRoutine({ agentId: checker.id, routineId: health.id })),
@@ -699,7 +635,6 @@ try {
     (entry) => entry.method === "turn/start" && entry.turnId === healthRun.delivery.turnId,
   )?.text;
   pass("The Test-run prompt names the tool", healthPrompt?.includes("call the routine_report_failure tool") === true);
-  // A run that waited for teammates reported a failure before their replies came (#10928).
   pass(
     "The routine prompt says that a teammate request is not a failure",
     healthPrompt?.includes("A request to a teammate is not a failure") === true &&
@@ -729,7 +664,6 @@ try {
     healthTransitions,
   );
 
-  // A routine run with no call, and a provider failure.
   const plainRun = await settledRun(
     "Plain check",
     await runCauseEffect(agents.testRoutine({ agentId: checker.id, routineId: plain.id })),
@@ -757,7 +691,6 @@ try {
     silentRun.run,
   );
 
-  // A later queue change reconciles every delivery of the queue again.
   const laterReceipt = await runCauseEffect(
     agents.sendMessage({ agentId: checker.id, text: `Anything else? ${calls(listRoutines)}` }),
   );
@@ -776,8 +709,6 @@ try {
     silentListed?.lastRun?.status === "failed" && silentListed.lastRun.reason === NO_REASON,
     silentListed?.lastRun ?? laterList,
   );
-  // A run that failed with no reason before this change keeps its row and its finish time when a queue
-  // change reconciles its delivery again.
   const olderRun = new AgentRoutineStore(store.database).updateRunStatus(silentRun.run.id, "failed", null);
   const olderReceipt = await runCauseEffect(agents.sendMessage({ agentId: checker.id, text: "One more thing?" }));
   const olderId = olderReceipt.deliveries[0]?.id;
@@ -799,14 +730,12 @@ try {
     healthAfter?.status === "failed" && healthAfter.error === healthRun.run.error,
   );
 
-  // Script runs: a reported failure is never quiet, also after `routine_no_update`.
   await runCauseEffect(agents.updateAgent({ agentId: checker.id, allowAutomation: true }));
   const quietOkRun = await settledRun(
     "Quiet ok",
     await runCauseEffect(agents.runRoutineFromAutomation({ agentId: checker.id, routineId: quietOk.id, payload: "" })),
   );
   pass("A script run with only routine_no_update succeeds", quietOkRun.run.status === "succeeded");
-  // Grok fails the prompt when the model sends only its reasoning after the call (#6247).
   const quietEmptyRun = await settledRun(
     "Quiet empty",
     await runCauseEffect(
@@ -820,7 +749,6 @@ try {
       quietEmptyRun.delivery.status === "completed",
     quietEmptyRun.run,
   );
-  // Grok tries such a reply again for minutes with no update; OpenBot ends the turn after 30 s (#8629).
   const quietHangRun = await settledRun(
     "Quiet hang",
     await runCauseEffect(
@@ -836,8 +764,6 @@ try {
       fakeEntries().some((entry) => entry.method === "turn/interrupt" && entry.turnId === quietHangRun.delivery.turnId),
     quietHangRun.run,
   );
-  // Kimi calls routine_no_update again every 2 s, so its turn is never silent; OpenBot ends it at the
-  // second call, not after the 30 s of silence (#9375).
   const quietLoopStarted = Date.now();
   const quietLoopRun = await settledRun(
     "Quiet loop",
@@ -887,7 +813,6 @@ try {
       failedThenQuietRun.run.status === "failed",
     noUpdateAfterFailure,
   );
-  // A quiet run keeps no normal answer in its routine thread: its answers are dropped or marked quiet.
   const routineThreadOf = (routineId: string) =>
     agents.listTasks(checker.id).tasks.find((task) => task.routineId === routineId);
   const shownAnswers = (routineId: string, turnId: string | null) => {
@@ -915,8 +840,6 @@ try {
       quietness.failedThenQuiet?.includes(FAILED_ANSWER) === true,
     quietness,
   );
-  // The notice that the quiet run wrote before its step stays in its routine thread as a quiet answer,
-  // and its thought goes (#11848).
   const quietOkThread = routineThreadOf(quietOk.id);
   const quietOkNotes = quietOkThread
     ? agents
@@ -933,7 +856,6 @@ try {
     ) && quietOkNotes.every((message) => !message.id.startsWith("rs_")),
     quietOkNotes,
   );
-  // A run in a routine thread notifies through its own event, and a quiet run does not notify.
   const routineTurns = (turnId: string | null) =>
     events.filter((event) => event.type === "thread-turn-completed" && event.routine && event.turn.turnId === turnId);
   const routineThread = (routineId: string) =>
@@ -950,8 +872,6 @@ try {
       !events.some((event) => event.type === "turn-completed" && event.turnId === quietFailedRun.delivery.turnId),
     { failedTurns, failedThread },
   );
-  // A turn in a side thread that a person started sends the same event, marked as not a routine's:
-  // the phone notifies about it, and the desktop notification and sound leave it out.
   const sideTask = await runCauseEffect(agents.startTask({ agentId: checker.id, text: "Hello from a side thread." }));
   const sideTurn = await waitFor("the side thread turn", () =>
     events.find((event) => event.type === "thread-turn-completed" && event.taskId === sideTask.id),
@@ -977,9 +897,6 @@ try {
       healthPrompt?.includes(`routineId "${health.id}"`) === false,
     scriptPrompt,
   );
-  // A run that the user paused or stopped on purpose ended as failed (#11578). A Test run and a script
-  // run are requests to run now, also when the routine is paused, so their prompts do not say to skip
-  // the task.
   const userStopLine = "A stop that the user asked for is not a failure.";
   pass(
     "The Test-run and script-run prompts do not say to skip the task when the routine is paused (#11578)",
@@ -987,7 +904,6 @@ try {
     { scriptPrompt, healthPrompt },
   );
 
-  // Flows: a failed owner step skips the next agent.
   const healthSteps = await steps("Health check", healthRun.run.id, 2);
   const healthOwner = healthSteps.find((step) => step.agentId === checker.id);
   pass(
@@ -1001,7 +917,6 @@ try {
     report.flowSteps["Health check"],
   );
 
-  // Flows: a call in a linked step fails that step only.
   const relayedRun = await settledRun(
     "Mirror check",
     await runCauseEffect(agents.testRoutine({ agentId: relay.id, routineId: relayed.id })),
@@ -1037,7 +952,6 @@ try {
     linkedPrompt,
   );
 
-  // A run that pauses its own routine keeps the pause, but a failed run does not stop its routine (#9856).
   const selfPausing = async (name: string, routineCalls: (routineId: string) => FakeCall[]) => {
     const routine = createRoutine(checker.id, name, "Check the folders.");
     agents.updateRoutine({
@@ -1061,14 +975,12 @@ try {
     stopped.active === false && stopped.ran.run.status === "succeeded",
     { active: stopped.active, run: stopped.ran.run.status },
   );
-  // Routines and the chat card say which run paused the routine (#10048).
   const stoppedId = stopped.ran.run.routineId;
   const pausedBy = (list: readonly { id: string; pausedByRun?: { scheduledFor: string } }[]) =>
     list.find((entry) => entry.id === stoppedId)?.pausedByRun?.scheduledFor;
   const reasons = {
     routine: pausedBy(agents.listRoutines(checker.id)),
     record: pausedBy(agents.routineRecords.list({ kind: "agent", id: checker.id })),
-    // A second store on the same database reads what a restart reads.
     restarted: pausedBy(new AgentRoutineStore(store.database).list(checker.id)),
     run: stopped.ran.run.scheduledFor,
   };
@@ -1120,8 +1032,6 @@ try {
     if (routine) agents.updateRoutine({ agentId: checker.id, routineId: routine.id, active: false });
   }
 
-  // A teammate's answer to a request that a quiet run sent continues the run: its turn can end quiet
-  // after `routine_no_update`. The answer to a Test run's request shows (#8364).
   const askAndStayQuiet = (word: string) =>
     `Ask ${finisher.name}. ${calls({
       tool: "send_message",
@@ -1147,7 +1057,6 @@ try {
   );
   const quietAnswerTurnId = await answerTurn("Quiet ask");
   const quietAnswerResult = toolResults(quietAnswerTurnId, "routine_no_update")[0]?.result;
-  // The answer runs in the routine's thread, where a turn that is not quiet sends an event.
   const answerEvents = (turnId: string) =>
     events.filter(
       (event) =>
@@ -1180,7 +1089,6 @@ try {
     { shownAnswerResult, testAnswers },
   );
 
-  // Result destinations: the answer of a reported failure goes; a provider failure has none.
   const pending = results.runsWithoutDelivery(since).map((run) => run.runId);
   report.resultRuns = pending;
   pass("A result destination gets a reported failure", pending.includes(healthRun.run.id));

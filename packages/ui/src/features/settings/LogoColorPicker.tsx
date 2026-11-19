@@ -23,7 +23,6 @@ export interface LogoColorPickerProps {
   onChange: (value: AppLogoColor) => void;
 }
 
-/** One swatch for each logo color, in the same shape as the agent avatar color grid. */
 export function LogoColorPicker(props: LogoColorPickerProps): JSX.Element {
   const { t } = useText();
   return (

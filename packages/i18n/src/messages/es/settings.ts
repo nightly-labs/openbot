@@ -477,7 +477,6 @@ export const messages = {
   "settings.profile.share.copyFailed": "No se pudo copiar la imagen.",
   "settings.profile.share.createFailed": "No se pudo crear la imagen.",
   "settings.profile.share.fileName": "openbot-activity.png",
-  // The text in the image to share.
   "settings.profile.share.caption": "Mis últimos seis meses con OpenBot",
   "settings.profile.activity.title": "Actividad en este equipo",
   "settings.profile.activity.activeDays": {
@@ -487,7 +486,6 @@ export const messages = {
   "settings.profile.activity.empty": "Aún no hay actividad",
   "settings.profile.activity.loading": "Cargando actividad…",
   "settings.profile.activity.loadFailed": "No se pudo cargar tu actividad.",
-  // {tokens} is a short number, such as 1.2M.
   "settings.profile.activity.heatmapLabel": {
     one: "{tokens} tokens en {count} día activo en el último año",
     other: "{tokens} tokens en {count} días activos en el último año",
@@ -667,7 +665,6 @@ export const messages = {
   "settings.hostedServers.plan.standard.summary": "Para un equipo pequeño con rutinas diarias.",
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Para muchos agentes y trabajo intensivo con el navegador.",
-  // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "Dictado",
   "settings.voice.model.parakeet.description":
     "Rápido. Detecta el idioma hablado por sí mismo, en 25 idiomas europeos.",

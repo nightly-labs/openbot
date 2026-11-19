@@ -7,13 +7,11 @@ import { queryKeys } from "@/features/workspace/model/query-keys";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText } from "@/shared/lib/text";
 
-/** Pin, run and edit, as the list, the workflow page and the drawer offer them. */
 export function useWorkflowCommands(serverId: string) {
   const queryClient = useQueryClient();
   const queryScope = useQueryScope();
   const { toggleWorkflowPin, startWorkflowRun, runWorkflowStep, runWorkflowGitHubLastEvent } =
     useMobileWorkspaceActions();
-  /** Runs `start` and reads the workflow again, or shows why the host refused it and answers null. */
   const started = async <T>(workflowId: string, start: () => Promise<T>): Promise<T | null> => {
     void haptics.impact("light");
     try {
@@ -36,16 +34,10 @@ export function useWorkflowCommands(serverId: string) {
       void haptics.selection();
       toggleWorkflowPin(workflowId, serverId);
     },
-    /**
-     * Starts a run of the whole workflow, or of `fromNodeId` and the steps after it, and answers the
-     * run id, or null when the host refused it.
-     */
     run: async (workflowId: string, fromNodeId?: string): Promise<string | null> =>
       (await started(workflowId, () => startWorkflowRun(workflowId, serverId, fromNodeId)))?.run.id ?? null,
-    /** Runs one step alone. Its result shows on the step, not in a run. */
     runStep: async (workflowId: string, nodeId: string): Promise<boolean> =>
       (await started(workflowId, () => runWorkflowStep({ workflowId, nodeId }, serverId))) !== null,
-    /** Runs a GitHub trigger with the newest item that matches it, and answers the run id. */
     runLastEvent: async (workflowId: string, nodeId: string): Promise<string | null> =>
       (await started(workflowId, () => runWorkflowGitHubLastEvent({ workflowId, nodeId }, serverId)))?.run.id ?? null,
     edit: (workflowId: string) => {

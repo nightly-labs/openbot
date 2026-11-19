@@ -1,6 +1,5 @@
 import type { AppTextKey } from "@openbot/i18n";
 
-/** The restart blockers that `checkRestartReadiness` reports, as the user reads them. */
 const RESTART_REASON_LABELS: Record<string, AppTextKey> = {
   "agent-turn": "server.update.reason.agentTurn",
   "queued-delivery": "server.update.reason.queuedDelivery",
@@ -16,7 +15,6 @@ const RESTART_REASON_LABELS: Record<string, AppTextKey> = {
   initialization: "server.update.reason.initialization",
 };
 
-/** A reason from a newer version has no label here yet. */
 export function restartReasonKey(reason: string): AppTextKey {
   return RESTART_REASON_LABELS[reason] ?? "server.update.reason.other";
 }

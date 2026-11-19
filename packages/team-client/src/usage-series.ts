@@ -1,19 +1,11 @@
 import { type AnalyticsDay, type AnalyticsProviderDay, analyticsTokens } from "@openbot/contracts/ipc";
 
-// The one series a report without a provider split still draws. It cannot collide with a
-// provider column: the fallback returns it as the whole series list.
 export const usageTotalSeries = "total";
 
 export interface UsageSeriesRow {
   date: string;
   [provider: string]: string | number | null;
 }
-/**
- * Pivots the daily-by-provider grid into the wide rows the chart reads: one row per day,
- * one column per provider. A provider with no cell for a day spent nothing there, so it
- * reads zero; a cell whose cost is unknown stays null, which is what draws a gap instead
- * of a false zero.
- */
 export function usageSeries(
   cells: AnalyticsProviderDay[],
   daily: AnalyticsDay[],
@@ -21,8 +13,6 @@ export function usageSeries(
 ): { series: string[]; rows: UsageSeriesRow[] } {
   const measure = (value: AnalyticsDay | AnalyticsProviderDay) =>
     metric === "cost" ? value.estimatedCostUsd : analyticsTokens(value);
-  // A remote host sends cells without `cachedInput` (frozen host-analytics v1), so their tokens
-  // would still count cache reads. The days carry `cachedInput`, so the token chart draws their total.
   if (cells.length === 0 || (metric === "tokens" && cells.some((cell) => cell.cachedInput === undefined)))
     return {
       series: [usageTotalSeries],
@@ -45,9 +35,6 @@ export function usageSeries(
       const row: UsageSeriesRow = { date: day.date };
       const cellsForDay = byDate.get(day.date);
       for (const provider of series) {
-        // Absent and unpriced are different answers. No cell means the provider spent nothing
-        // that day, which is a real zero; a cell whose cost estimate is null means the day is
-        // unavailable, and `connectNulls={false}` draws that as the gap it is.
         const value = cellsForDay?.get(provider);
         row[provider] = value === undefined ? 0 : value;
       }

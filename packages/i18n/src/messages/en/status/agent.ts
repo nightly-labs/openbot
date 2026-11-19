@@ -1,7 +1,6 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("status.agent", {
-  // `{address}` is in a code span, so the card links only to the whole page.
   "status.agent.mcpSignInPage": "{name} asks you to sign in on `{address}`. [Sign in]({url}), then choose Continue.",
   "status.agent.mcpSignInPageDoneDetail": "The agent tries the request again.",
   "status.agent.mcpSignInPageDecline": "Don't sign in",

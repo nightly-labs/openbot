@@ -1,9 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Trello here is taken from Trello's help center and Atlassian's
-// trello-mcp-server repository. Each page used is in `sources`. Check the sources again, and move
-// `checkedAt`, whenever this file changes.
-
 export const TRELLO_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

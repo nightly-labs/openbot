@@ -18,7 +18,6 @@ import { ConversationViewScopeContext, createConversationViewScope } from "./con
 import type { ConversationProps } from "./conversation-types";
 import { conversationOwnerId } from "./stores/composer-store";
 
-/** @internal Keeps file-drag state active while the pointer moves between conversation descendants. */
 function isDragLeavingConversation(currentTarget: HTMLElement, relatedTarget: EventTarget | null): boolean {
   return !(relatedTarget instanceof Node && currentTarget.contains(relatedTarget));
 }
@@ -51,10 +50,6 @@ export function ConversationView(props: ConversationProps) {
     cancelVoiceRecording,
   } = scope;
   const { t } = useText();
-  /**
-   * Each view of the docked side panel makes the same room at the end of the chat, so a change to another tab
-   * does not move the chat.
-   */
   const sidePanelUsesBrowserWidth = () => {
     const mode = activeRightPanel();
     if (mode === "browser") return browserSidebarOpen();
@@ -62,11 +57,6 @@ export function ConversationView(props: ConversationProps) {
     return sidePanelOpen();
   };
   const folderCalls = agentFolderCalls();
-  /**
-   * A local agent in Workspace only mode can get a folder from a drop on the chat. With wider access a
-   * folder gives it nothing new, except to a provider whose own file tools reach only its folders.
-   * The desktop changes the folders of a local agent only; `agent-folders-v1` is used by the mobile app.
-   */
   function folderDropAgent() {
     const agent = props.agent;
     if (!agent || props.server?.kind !== "local" || props.runtime) return undefined;
@@ -89,7 +79,6 @@ export function ConversationView(props: ConversationProps) {
       <main
         ref={(element) => {
           setConversationPanelElement(element);
-          // In the capture phase, because a folder dropped on the settings panel stops the drop there.
           element.addEventListener("drop", () => setDropActive(false), { capture: true });
         }}
         aria-label={t("conversation.view.label")}
@@ -115,7 +104,6 @@ export function ConversationView(props: ConversationProps) {
         }}
         onDrop={(event) => {
           event.preventDefault();
-          // The desktop preload imports a dropped file; a client with its own runtime imports it here.
           if (props.runtime?.importFiles) void props.runtime.importFiles([...(event.dataTransfer?.files ?? [])]);
         }}
       >
@@ -142,8 +130,6 @@ export function ConversationView(props: ConversationProps) {
         <ConversationHeader />
         {props.notice}
 
-        {/* A side thread covers the agent's own chat and its message box. They stay mounted, so the way
-            back keeps their rows and scroll position and does not build the chat again. */}
         <ConversationTimeline />
         <ConversationComposer />
         <Show when={sideThreadOpen()}>
@@ -151,7 +137,6 @@ export function ConversationView(props: ConversationProps) {
         </Show>
 
         <ConversationPanels onOpenUsage={props.onOpenUsage} />
-        {/* A page such as Usage covers the chat, and its recording goes on: the bar stays in sight over the page. */}
         <Show when={props.workspaceCovered && voicePhase() === "recording"}>
           <Portal>
             <CoveredVoiceRecording

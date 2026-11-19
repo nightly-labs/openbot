@@ -1,10 +1,7 @@
 import type { ContextEntry } from "../messaging-types";
 
-/** What one chat remembers of the messages it saw. Telegram has no history API. */
 const RECENT_MESSAGES = 200;
-/** The reply map of a basic group, which has no thread IDs. */
 const THREAD_ENTRIES = 2_000;
-/** The most messages, and the time before it, that give the context of a conversation's first message. */
 const PRECEDING_MESSAGES = 10;
 const PRECEDING_WINDOW_MS = 15 * 60_000;
 
@@ -12,15 +9,8 @@ interface RecentMessage extends ContextEntry {
   threadKey: string;
 }
 
-/**
- * What the host knows of one Telegram chat, in memory only: the names of the people it saw, the
- * messages it saw (the context of a reply chain), and, in a basic group, which conversation each
- * message belongs to. The adapter and the transport of the chat share it. A restart forgets it: a
- * reply in a basic group to a message from before the restart starts a new conversation.
- */
 export class TelegramChatState {
   title: string;
-  /** The bot's username, without `@`, for mention detection. Empty until known. */
   botUsername: string;
   readonly #names = new Map<string, string>();
   readonly #threads = new Map<number, string>();
@@ -59,11 +49,6 @@ export class TelegramChatState {
     if (this.#recent.length > RECENT_MESSAGES) this.#recent.shift();
   }
 
-  /**
-   * The messages of one conversation after `afterId` and before `beforeId`, oldest first. The first
-   * message of a conversation has no chain before it: its context is the chat's messages of the last
-   * minutes before it, such as a voice note that a person sent without a mention, as on Discord.
-   */
   history(threadKey: string, afterId: string | null, beforeId: string): ContextEntry[] {
     if (threadKey === beforeId) {
       const first = this.#recent.find((entry) => entry.id === beforeId);
@@ -88,7 +73,6 @@ export class TelegramChatState {
       .map(({ threadKey: _threadKey, ...entry }) => entry);
   }
 
-  /** The newest messages of one conversation, or of the whole chat for null, oldest first. */
   recent(threadKey: string | null, limit: number): ContextEntry[] {
     return this.#recent
       .filter((entry) => threadKey === null || entry.threadKey === threadKey)
@@ -97,7 +81,6 @@ export class TelegramChatState {
   }
 }
 
-/** The state of each chat, by `<bot ID>:<chat ID>`, for one driver. */
 export class TelegramChats {
   readonly #chats = new Map<string, TelegramChatState>();
 

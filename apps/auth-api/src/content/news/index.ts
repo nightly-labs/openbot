@@ -1,9 +1,3 @@
-// Slug to article body for /news.
-//
-// The imports are eager on purpose. A lazy route would ship an article page whose
-// prose arrives after hydration, which is exactly the content a crawler came for.
-// These bodies are text; the whole set costs less than one photograph.
-
 import type { ArticleBody } from "../body";
 import { ChannelsPutAgentsInOneRoom } from "./channels-put-agents-in-one-room";
 import { EveryAgentGetsAWorkspace } from "./every-agent-gets-a-workspace";

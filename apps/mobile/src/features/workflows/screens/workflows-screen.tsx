@@ -17,10 +17,6 @@ import { typeScale } from "@/shared/lib/type-scale";
 
 const NO_IDS: readonly string[] = [];
 
-/**
- * Drawer > Workflows: the workflows of a server. The ones with a run that goes on or waits for the
- * person come first. A row opens the workflow; a long press pins it to the drawer, runs it or edits it.
- */
 export function WorkflowsScreen() {
   const { t, errorMessage } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();

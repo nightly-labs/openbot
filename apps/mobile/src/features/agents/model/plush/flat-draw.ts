@@ -5,16 +5,11 @@ import { BlendMode, type SkCanvas, Skia } from "@shopify/react-native-skia";
 import { saturationMatrix } from "./plush-draw";
 import { type Matrix, matrixOf, PLUSH_BODY_SCALE, VIEW_BOX } from "./plush-felt";
 
-/**
- * The flat face of a seed: the Bloub that agents had before the plush, as the desktop draws a seed of
- * the flat style. The mood only chooses the eyes, as on the desktop; the shape stays.
- */
 export function flatGeometryKey(seed: string, mood: AvatarMood = "idle"): string {
   const profile = bloubAvatarProfile(seed, null);
   return `flat:${profile.shape}:${avatarMoodPresentation(mood).expression ?? profile.expression}`;
 }
 
-/** A still flat face, in the units of the bloub viewBox. */
 interface FlatFrame {
   body: string;
   bodyAlpha: number;
@@ -22,7 +17,6 @@ interface FlatFrame {
 }
 
 const MAX_CACHED_FRAMES = 128;
-/** A long list mounts many avatars with few distinct faces, so each face is sampled once. */
 const frames = new Map<string, FlatFrame>();
 
 export function flatRestFrame(seed: string, mood: AvatarMood = "idle"): FlatFrame {
@@ -45,11 +39,6 @@ export function flatRestFrame(seed: string, mood: AvatarMood = "idle"): FlatFram
   return frame;
 }
 
-/**
- * Draws a flat face in a square of `size` pixels. The square is the box of a plush picture, which
- * reaches past the avatar by `PLUSH_BODY_SCALE`; the flat body fills the avatar box, as on the
- * desktop. The eyes are holes in the body, as the desktop mask cuts them.
- */
 export function drawFlat(canvas: SkCanvas, frame: FlatFrame, color: string, size: number, saturation = 1) {
   const scale = size / (VIEW_BOX * PLUSH_BODY_SCALE);
   canvas.save();

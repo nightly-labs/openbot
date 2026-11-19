@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/dialog";
 
 export const messages = {
-  // Native file pickers.
   "dialog.chooseSiteDirectory": "정적 사이트 폴더 선택",
   "dialog.chooseAgentFolder": "{agent}의 폴더 선택",
   "dialog.chooseAgentExclusion": "{agent}이(가) 변경하면 안 되는 폴더 선택",

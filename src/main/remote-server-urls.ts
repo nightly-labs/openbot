@@ -1,10 +1,3 @@
-// URLs and query strings the Team API client builds.
-//
-// The `openbot-remote-*` schemes are how a remote host's attachments, agent avatars and server logo
-// reach the renderer: the host's own URLs are not reachable from there, so `addRemotePreviewUrls`
-// rewrites them in place on a decoded payload before it leaves the main process. `src/main/index.ts`
-// registers the matching protocol handlers, and they parse exactly what these builders emit.
-
 import { playableMediaKind } from "@openbot/contracts/attachment-files";
 import type { ConversationPageAnchor, DirectConversationPageAnchor } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
@@ -34,8 +27,6 @@ export function addRemotePreviewUrls<T>(value: T, serverId: string): T {
   if (!isDynamicRecord(value)) return value;
   const record = value;
   if ("previewUrl" in record && isString(record.id)) {
-    // A player loads the whole file before it plays. With the size, that load reports its bytes, so a
-    // download that waits for it shows them (#10075).
     const mediaSize =
       isString(record.mimeType) && playableMediaKind(record.mimeType) && isNumber(record.size)
         ? record.size
@@ -45,7 +36,6 @@ export function addRemotePreviewUrls<T>(value: T, serverId: string): T {
   if (isString(record.avatarUrl) && record.avatarUrl.startsWith("openbot-avatar:") && isString(record.id)) {
     Reflect.set(record, "avatarUrl", remoteAgentAvatarUrl(serverId, record.id, record.avatarUrl));
   }
-  // A channel of a host with channel-picture-v1. A URL that is not the host's channel form shows no image.
   if (isString(record.imageUrl) && record.imageUrl.startsWith("openbot-avatar:") && isString(record.id)) {
     Reflect.set(record, "imageUrl", remoteChannelPictureUrl(serverId, record.id, record.imageUrl));
   }
@@ -58,7 +48,6 @@ function remoteAttachmentPreviewUrl(serverId: string, attachmentId: string, size
   return size === undefined ? url : `${url}?size=${size}`;
 }
 
-/** The size that `addRemotePreviewUrls` puts on a media preview URL, or undefined. */
 export function remoteAttachmentPreviewSize(url: URL): number | undefined {
   const size = Number(url.searchParams.get("size"));
   return Number.isSafeInteger(size) && size > 0 ? size : undefined;
@@ -71,11 +60,6 @@ function remoteAgentAvatarUrl(serverId: string, agentId: string, sourceUrl: stri
   return target.toString();
 }
 
-/**
- * The `openbot-remote-avatar:` URL of the image of a channel, from the host's
- * `openbot-avatar://channel/<id>?v=<version>&type=<mime>` URL (`channel-picture-v1`). The protocol
- * handler reads the bytes with `GET /v1/channels/image`. Null for a URL that is not of this channel.
- */
 function remoteChannelPictureUrl(serverId: string, channelId: string, sourceUrl: string): string | null {
   const version = channelPictureVersion(sourceUrl, channelId);
   if (!version) return null;
@@ -106,11 +90,6 @@ function channelPictureVersion(value: string, channelId: string): string | null 
   }
 }
 
-/**
- * What an `openbot-remote-avatar:` URL names: the avatar of an agent (one path segment) or the
- * picture of a channel (`channel` and the channel id). Any other form is null, so the protocol
- * handler answers 404 and asks the host for nothing.
- */
 export function parseRemoteAvatarUrl(
   value: string,
 ): { kind: "agent" | "channel"; serverId: string; id: string; version: string } | null {
