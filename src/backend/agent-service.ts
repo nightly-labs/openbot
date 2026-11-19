@@ -3535,6 +3535,26 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     );
   }
 
+  readonly #settleStaleTaskTurns = Effect.fn("AgentService.settleStaleTaskTurns")(function* (
+    this: AgentService,
+    agentId: string,
+  ) {
+    const stale = yield* lifecycleStep("find stale task turns", () =>
+      this.#conversation.workingTaskSnapshots(agentId).flatMap(({ activeTurnId: turnId, threadId }) => {
+        if (!turnId || !threadId) return [];
+        if (this.#turn.turnStartedAt(turnId) !== null || this.#turn.isCompleting(turnId)) return [];
+        if (this.#mailbox.findDeliveriesByTurn(agentId, turnId).length > 0) return [];
+        const taskId = this.#tasks.taskForThread(threadId) ?? undefined;
+        if (this.#mailbox.startingDeliveriesForAgent(agentId, taskId).length > 0) return [];
+        return [{ turnId, threadId }];
+      }),
+    );
+    for (const { turnId, threadId } of stale) {
+      logger.warn("A task turn that no provider runs held the agent. It ends as interrupted.", { agentId, turnId });
+      yield* this.#turn.settleOrphanedTurn(agentId, threadId, turnId, "interrupted");
+    }
+  });
+
   readonly #applyAgentUpdate = Effect.fn("AgentService.updateAgent")(function* (
     this: AgentService,
     input: AgentUpdate,
@@ -3566,6 +3586,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       const refusal = idleRefusal(previous);
       if (refusal !== null) throw new AgentSettingsRefused(refusal);
     };
+    if (input.provider !== undefined || input.model !== undefined || input.providerAccountId !== undefined)
+      yield* this.#settleStaleTaskTurns(input.agentId);
     const { previous, requestedModel, requestedProvider, previousAccount, requestedAccount } = yield* lifecycleStep(
       "validate agent update",
       () => {
