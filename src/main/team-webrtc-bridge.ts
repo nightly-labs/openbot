@@ -4,6 +4,7 @@ import type { RemoteDesktopIceServer } from "@openbot/contracts/ipc";
 import type { IceServer } from "@openbot/contracts/signal-protocol/messages";
 import type { RemoteMemberRole } from "@openbot/contracts/signal-protocol/ticket";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect, Exit, Fiber, Scope } from "effect";
 import { BrowserWindow, MessageChannelMain, type MessagePortMain } from "electron";
 import { z } from "zod";
@@ -132,6 +133,8 @@ type BridgeCommand =
 const COMMAND_TIMEOUT_MS = 15_000;
 const SEND_COMMAND_TIMEOUT_MS = 75_000;
 
+const logger = createOpenBotLogger("team-webrtc-bridge");
+
 export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
   readonly #options: TeamWebRtcBridgeOptions;
   readonly #pending = new Map<string, Deferred.Deferred<void, RemoteWorkflowError>>();
@@ -141,6 +144,13 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
   #scope = Scope.makeUnsafe();
   #stopping: Deferred.Deferred<void, RemoteWorkflowError> | null = null;
   readonly #iceServers = new Map<string, RemoteDesktopIceServer[]>();
+  /** The peers that a `connect` opened and no `disconnect` closed. They end with the bridge window. */
+  readonly #peers = new Set<string>();
+  /**
+   * A window whose renderer stopped. It stays until the next bridge window exists: outside macOS,
+   * the close of the last window quits the app, and on a server the bridge can be the only window.
+   */
+  #lostWindow: BrowserWindow | null = null;
 
   constructor(options: TeamWebRtcBridgeOptions = {}) {
     super();
@@ -173,6 +183,7 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
     },
   ) {
     yield* this.start();
+    this.#peers.add(input.peerId);
     yield* this.#command({ type: "connect", ...input, iceTransportPolicy: this.#options.iceTransportPolicy ?? "all" });
   }).bind(this);
 
@@ -203,6 +214,7 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
   }).bind(this);
 
   readonly disconnect = Effect.fn("TeamWebRtcBridge.disconnect")(function* (this: TeamWebRtcBridge, peerId: string) {
+    this.#peers.delete(peerId);
     if (this.#port) yield* this.#command({ type: "disconnect", peerId });
   }).bind(this);
 
@@ -280,11 +292,16 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
   }, Effect.uninterruptible).bind(this);
 
   #reset(message: string): void {
-    this.#port?.close();
+    // Before the close: the close of the port and the end of the window must not count as a loss.
+    const port = this.#port;
     this.#port = null;
+    port?.close();
     this.#window?.destroy();
     this.#window = null;
+    this.#lostWindow?.destroy();
+    this.#lostWindow = null;
     this.#iceServers.clear();
+    this.#peers.clear();
     for (const pending of this.#pending.values()) {
       Deferred.doneUnsafe(pending, Effect.fail(new RemoteWorkflowError({ cause: new Error(message) })));
     }
@@ -306,6 +323,8 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
         }),
     );
     this.#window = window;
+    this.#lostWindow?.destroy();
+    this.#lostWindow = null;
     yield* remoteDecode(() => window.webContents.setWindowOpenHandler(() => ({ action: "deny" })));
     yield* remoteCall(() =>
       this.#options.developmentUrl
@@ -320,8 +339,23 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
       this.#handleMessage(message);
       if (message.type === "bridge-ready") Deferred.doneUnsafe(ready, Effect.void);
     };
+    // A crashed or killed bridge window answers no command. Without this, each command waited for its
+    // timeout, the joined servers stopped answering until a restart, and the quit hit its deadline
+    // (#12547). The peers end with the window: their owners connect again, which starts a new one.
+    const lost = (reason: string) => {
+      if (this.#port !== port1) return;
+      logger.warn(`The Team WebRTC bridge stopped (${reason}). The next connection starts it again.`);
+      const peers = [...this.#peers];
+      this.#ready = null;
+      this.#window = null;
+      this.#reset(sourceText("error.remote.bridgeStopped"));
+      this.#lostWindow = window;
+      if (!this.#stopping) for (const peerId of peers) this.emit("disconnected", peerId);
+    };
     yield* remoteDecode(() => {
       port1.on("message", listener);
+      port1.on("close", () => lost("port closed"));
+      window.webContents.on("render-process-gone", (_event, details) => lost(details.reason));
       port1.start();
     });
     yield* Effect.gen(function* () {
