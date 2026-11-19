@@ -111,6 +111,7 @@ export const messages = {
     "הוספת שרת MCP {name}: {target}. כל סוכן בשרת הזה מקבל את הכלים שלו. OpenBot מתחבר אליו כדי לבדוק אותו.",
   "status.agent.mcpServerChange":
     "שינוי שרת MCP {name} אל {target}. כל סוכן בשרת הזה מקבל את הכלים שלו. OpenBot מתחבר אליו כדי לבדוק אותו.",
+  "status.agent.mcpServerHeaders": "הוא גם משנה את הכותרות האלה: {names}.",
   "status.agent.mcpServerEnable": "הפעלת שרת MCP {name} עבור כל סוכן בשרת הזה.",
   "status.agent.mcpServerDisable": "כיבוי שרת MCP {name} עבור כל סוכן בשרת הזה.",
   "status.agent.mcpServerRemove": "הסרת שרת MCP {name} וההתחברות שלו מכל סוכן בשרת הזה.",

@@ -198,6 +198,10 @@ export const messages = {
   "error.agent.mcpServerNotSaved": "De MCP-server reageerde niet, dus is hij niet opgeslagen. {error}",
   "error.agent.mcpServerKeysMove":
     "De MCP-server {name} bewaart sleutels voor de huidige server. Vraag de gebruiker om het adres, de opdracht, de argumenten of het transport te wijzigen in Marktplaats, Apps, {name}.",
+  "error.agent.mcpServerHeadersNeedHttp":
+    "De MCP-server {name} voert een lokale opdracht uit en neemt dus geen headers aan. Vraag de gebruiker de sleutels in te voeren in Marktplaats, Apps, {name}.",
+  "error.agent.mcpServerHeadersNeedPerson":
+    "Alleen de gebruiker van deze OpenBot kan in een chat met jou de sleutels van de MCP-server {name} geven. Vraag de gebruiker ze in te voeren in Marktplaats, Apps, {name}.",
   "error.agent.mcpServerBuiltIn":
     "{name} is een onderdeel van OpenBot, dus de MCP-tools kunnen deze niet testen, aan- of uitzetten of verwijderen. De gebruiker beheert deze op de computer waarop OpenBot draait: de GitHub-koppeling in Marktplaats, Apps, GitHub, en PC-besturing in Instellingen, PC-besturing.",
   "error.agent.mcpServerUnknown": "Er is geen MCP-server met de naam {name}. Roep list_mcp_servers aan voor de namen.",
