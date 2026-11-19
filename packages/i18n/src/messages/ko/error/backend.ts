@@ -396,7 +396,7 @@ export const messages = {
   "error.backend.popupLoadFailed": "팝업을 불러올 수 없어요. 원래 페이지에서 로그인을 다시 시도하세요.",
   "error.backend.browserTabNotFound": "브라우저 탭을 찾을 수 없어요.",
   "error.backend.authActive": "인증이 이미 진행 중이에요.",
-  "error.backend.authHttpsRequired": "보안 인증에는 HTTPS가 필요해요.",
+  "error.backend.authWebPageRequired": "보안 인증에는 HTTP/HTTPS가 필요해요.",
   "error.backend.authDigitsRange": "인증 코드는 4~12자리여야 해요.",
   "error.backend.authExpired": "인증 요청이 만료되었어요.",
   "error.backend.authDigitsRequired": "요청된 자릿수만큼 숫자를 입력하세요.",
