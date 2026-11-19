@@ -137,48 +137,7 @@ export function ChatQuestionPrompt({
   return (
     <View className="w-full gap-2.5" accessibilityLabel={t("mobile.chat.question.form")}>
       <View className={`max-w-[92%] self-start gap-1 rounded-[20px] ${card.fillClass} px-4 py-3`} style={card.style}>
-        <View className="flex-row items-center gap-2">
-          <View className="min-w-0 flex-1">
-            <QuestionText question={question.question} variant="title" />
-          </View>
-          <Button
-            variant="ghost"
-            size="sm"
-            isIconOnly
-            accessibilityLabel={t("mobile.chat.question.cancelForm")}
-            isDisabled={disabled}
-            onPress={() => void submit({})}
-          >
-            <X color={String(muted)} size={18} />
-          </Button>
-        </View>
-        {prompt.questions.length > 1 ? (
-          <View className="flex-row items-center justify-between">
-            <Typography type="body-xs" className="flex-1 text-text-secondary">
-              {t("mobile.chat.question.position", { current: index + 1, total: prompt.questions.length })}
-            </Typography>
-            <Button
-              variant="ghost"
-              size="sm"
-              isIconOnly
-              accessibilityLabel={t("mobile.chat.question.previous")}
-              isDisabled={disabled || index === 0}
-              onPress={() => setIndex(index - 1)}
-            >
-              <ChevronLeft color={String(muted)} size={18} style={MIRROR_IN_RTL} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              isIconOnly
-              accessibilityLabel={t("mobile.chat.question.next")}
-              isDisabled={disabled || index === prompt.questions.length - 1}
-              onPress={() => setIndex(index + 1)}
-            >
-              <ChevronRight color={String(muted)} size={18} style={MIRROR_IN_RTL} />
-            </Button>
-          </View>
-        ) : null}
+        <QuestionText question={question.question} variant="title" />
         {described.length ? (
           <View className="gap-2 pt-1">
             {described.map((option) => (
@@ -198,6 +157,49 @@ export function ChatQuestionPrompt({
             {t("mobile.chat.question.secretBelow")}
           </Typography>
         ) : null}
+        <View className="flex-row items-center gap-1 pt-1">
+          {prompt.questions.length > 1 ? (
+            <Typography type="body-xs" className="min-w-0 shrink text-text-secondary">
+              {t("mobile.chat.question.position", { current: index + 1, total: prompt.questions.length })}
+            </Typography>
+          ) : null}
+          <View className="ms-auto flex-row items-center">
+            {prompt.questions.length > 1 ? (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  isIconOnly
+                  accessibilityLabel={t("mobile.chat.question.previous")}
+                  isDisabled={disabled || index === 0}
+                  onPress={() => setIndex(index - 1)}
+                >
+                  <ChevronLeft color={String(muted)} size={18} style={MIRROR_IN_RTL} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  isIconOnly
+                  accessibilityLabel={t("mobile.chat.question.next")}
+                  isDisabled={disabled || index === prompt.questions.length - 1}
+                  onPress={() => setIndex(index + 1)}
+                >
+                  <ChevronRight color={String(muted)} size={18} style={MIRROR_IN_RTL} />
+                </Button>
+              </>
+            ) : null}
+            <Button
+              variant="ghost"
+              size="sm"
+              isIconOnly
+              accessibilityLabel={t("mobile.chat.question.cancelForm")}
+              isDisabled={disabled}
+              onPress={() => void submit({})}
+            >
+              <X color={String(muted)} size={18} />
+            </Button>
+          </View>
+        </View>
       </View>
 
       <View className="flex-row flex-wrap gap-2">
