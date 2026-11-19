@@ -675,7 +675,7 @@ export function createConversationViewScope(props: ConversationProps) {
   }
   /**
    * A side thread tab left the side panel. When it showed, the side thread next to it shows, else the
-   * last pane. With no tab, the panel lists the panes.
+   * last pane. With no tab, the panel closes.
    */
   function leavePanelThread(id: string, leave: () => void) {
     const shown = activeRightPanel() === "thread" && shownPanelThreadId() === id;
@@ -692,7 +692,7 @@ export function createConversationViewScope(props: ConversationProps) {
     else if (file) {
       setActiveRightPanel("side-panel");
       openSidePanelFile(file.key);
-    } else setActiveRightPanel("side-panel");
+    } else closeEmptySidePanel();
   }
   /** Closes the tab of a side thread in the side panel. The thread stays in the thread list. */
   function closePanelThread(id: string) {
@@ -733,17 +733,23 @@ export function createConversationViewScope(props: ConversationProps) {
   );
   /** The subagent that the side panel shows now, or null. */
   const shownSubagentId = () => (activeRightPanel() === "subagent" ? panelSubagentId() : null);
-  /** A click on a subagent opens it on the side; a click on the subagent that shows closes its pane. */
+  /**
+   * A click on a subagent opens it on the side; a click on the subagent that shows closes its pane. The
+   * click is in the transcript, so the focus stays there.
+   */
   function toggleSubagentPanel(subagentId: string) {
-    if (shownSubagentId() === subagentId) closeSidePanelPane("subagent");
+    if (shownSubagentId() === subagentId) closeSidePanelPane("subagent", false);
     else openSubagentPanel(subagentId);
   }
-  /** Closes the tab of a pane. The next tab takes its place; with no tab, the panel lists the panes. */
-  function closeSidePanelPane(pane: SidePanelPane) {
+  /**
+   * Closes the tab of a pane. The next tab takes its place; with no tab, the panel closes. See
+   * `closeEmptySidePanel` for `focusComposer`.
+   */
+  function closeSidePanelPane(pane: SidePanelPane, focusComposer = true) {
     sidePanelPaneActions[pane]?.release?.();
     const shown = sidePanelOpen() && sidePanel().selected === pane;
     const next = removeSidePanelPane(pane);
-    if (shown) showSidePanelInPlaceOf(next);
+    if (shown) showSidePanelInPlaceOf(next, focusComposer);
   }
   /**
    * Closes the browser pane when its last tab closes. The full view and picture in picture are outside the
@@ -751,10 +757,24 @@ export function createConversationViewScope(props: ConversationProps) {
    * panel mode that a write sets does not show yet, so this does not read the mode.
    */
   function closeBrowserPane() {
-    showSidePanelInPlaceOf(removeSidePanelPane("browser"));
+    // An agent can close the tab too. The closed tab left the page before this effect, so the composer
+    // takes the focus only when no element has it, and not when the user selected text.
+    const focusLost =
+      (document.activeElement === null || document.activeElement === document.body) &&
+      (document.getSelection()?.isCollapsed ?? true);
+    showSidePanelInPlaceOf(removeSidePanelPane("browser"), focusLost);
   }
-  /** Shows the next tab of the side panel after a tab closed; with no tab, the panel lists the panes. */
-  function showSidePanelInPlaceOf(next: SidePanelPane | null) {
+  /**
+   * The last tab of the side panel closed, so the panel closes too, as the panel button closes it. The
+   * pane list shows only when the user opens a panel that has no tab. With `focusComposer`, the composer
+   * takes the focus, which the closed tab took with it. A close from outside the panel keeps the focus.
+   */
+  function closeEmptySidePanel(focusComposer = true) {
+    hideBrowserPanel();
+    if (focusComposer) setComposerFocusRequest((value) => value + 1);
+  }
+  /** Shows the next tab of the side panel after a tab closed; with no tab, the panel closes. */
+  function showSidePanelInPlaceOf(next: SidePanelPane | null, focusComposer = true) {
     const thread = sideThreadIds()[0];
     const file = sidePanel().files.at(-1);
     if (next) openSidePanelPane(next);
@@ -763,11 +783,11 @@ export function createConversationViewScope(props: ConversationProps) {
       // The closed pane must not stay on screen while the file reads, or after a failed read.
       setActiveRightPanel("side-panel");
       openSidePanelFile(file.key);
-    } else setActiveRightPanel("side-panel");
+    } else closeEmptySidePanel(focusComposer);
   }
   /**
    * Closes the tab of a file. When the file showed, the file next to it shows, else the last pane or
-   * side thread. With no tab, the panel lists the panes.
+   * side thread. With no tab, the panel closes.
    */
   function closeSidePanelFile(key: string) {
     const shown = filePreviewOpen() && sidePanel().file === key;
@@ -784,7 +804,7 @@ export function createConversationViewScope(props: ConversationProps) {
     const thread = sideThreadIds()[0];
     if (pane) openSidePanelPane(pane);
     else if (thread) openPanelThread(thread);
-    else setActiveRightPanel("side-panel");
+    else closeEmptySidePanel();
   }
   /** Closes the tab of the file that shows. */
   function closeShownSidePanelFile() {

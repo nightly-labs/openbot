@@ -909,8 +909,8 @@ function SidePanelTabRow(
 }
 
 /**
- * With no open pane, the side panel lists the panes it can open. When the last tab closes, the focus
- * goes with it, so the first pane button takes the focus.
+ * With no open pane, the side panel lists the panes it can open. When no element has the focus as the
+ * list shows, the first pane button takes it.
  */
 export function SidePanelLauncher(props: {
   available: readonly SidePanelPane[];
