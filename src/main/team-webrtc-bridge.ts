@@ -333,7 +333,7 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
     );
     const { port1, port2 } = yield* remoteDecode(() => new MessageChannelMain());
     this.#port = port1;
-    const ready = Deferred.makeUnsafe<void>();
+    const ready = Deferred.makeUnsafe<void, RemoteWorkflowError>();
     const listener = (event: { data: unknown }) => {
       const message = bridgeMessageSchema.parse(event.data);
       this.#handleMessage(message);
@@ -350,6 +350,11 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
       this.#window = null;
       this.#reset(sourceText("error.remote.bridgeStopped"));
       this.#lostWindow = window;
+      // A start that waits for this window ends now, not at its timeout.
+      Deferred.doneUnsafe(
+        ready,
+        Effect.fail(new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.bridgeStopped")) })),
+      );
       if (!this.#stopping) for (const peerId of peers) this.emit("disconnected", peerId);
     };
     yield* remoteDecode(() => {
