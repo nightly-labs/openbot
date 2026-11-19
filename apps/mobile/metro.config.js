@@ -2,13 +2,15 @@ const { getDefaultConfig } = require("expo/metro-config");
 const fs = require("node:fs");
 const path = require("node:path");
 const { withUniwindConfig } = require("uniwind/metro");
-
-process.env.EXPO_METRO_CACHE_OUTPUT_DIR ??= path.join(__dirname, ".expo/metro-cache");
+const { createTransformCacheStore } = require("./metro-cache");
 
 const config = getDefaultConfig(__dirname);
 config.fileMapCacheDirectory = path.join(__dirname, ".expo/metro-file-map");
 fs.mkdirSync(config.fileMapCacheDirectory, { recursive: true });
-config.cacheVersion = [config.cacheVersion, __dirname].filter(Boolean).join(":");
+const transformCacheStore = createTransformCacheStore(__dirname);
+if (!transformCacheStore) {
+  config.cacheVersion = [config.cacheVersion, __dirname].filter(Boolean).join(":");
+}
 const nativeModuleShims = new Map([
   ["@solidjs/web", path.resolve(__dirname, "src/shims/solidjs-web.ts")],
   ["solid-js", path.resolve(__dirname, "src/shims/solid-js.ts")],
@@ -44,6 +46,7 @@ const uniwindConfig = withUniwindConfig(config, {
   cssEntryFile: "./global.css",
   dtsFile: "./src/uniwind-types.d.ts",
 });
+if (transformCacheStore) uniwindConfig.cacheStores = [transformCacheStore];
 
 const SHIMS = path.resolve(__dirname, "src/shims");
 const UNIWIND_REACT_NATIVE = path.join(SHIMS, "uniwind-react-native.js");

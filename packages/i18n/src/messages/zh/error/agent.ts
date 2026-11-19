@@ -163,6 +163,10 @@ export const messages = {
   "error.agent.mcpServerNotSaved": "该 MCP 服务器没有响应，因此未保存。{error}",
   "error.agent.mcpServerKeysMove":
     "MCP 服务器 {name} 保存着当前服务器的密钥。请让用户在“市场 → 应用 → {name}”中更改它的地址、命令、参数或传输方式。",
+  "error.agent.mcpServerHeadersNeedHttp":
+    "MCP 服务器 {name} 运行本地命令，因此不接受标头。请让用户在“市场 → 应用 → {name}”中输入它的密钥。",
+  "error.agent.mcpServerHeadersNeedPerson":
+    "只有此 OpenBot 的用户可以在与你的聊天中提供 MCP 服务器 {name} 的密钥。请让用户在“市场 → 应用 → {name}”中输入密钥。",
   "error.agent.mcpServerBuiltIn":
     "{name} 是 OpenBot 的一部分，MCP 工具无法测试、开启、关闭或移除它。用户在运行 OpenBot 的电脑上管理它：GitHub 连接在 市场、应用、GitHub，Computer Use 在 设置、Computer Use。",
   "error.agent.mcpServerUnknown": "没有名为 {name} 的 MCP 服务器。请调用 list_mcp_servers 查看名称。",
@@ -172,6 +176,8 @@ export const messages = {
     "该区域不在任何单个显示器内，请使用某个显示器范围内的桌面坐标（来自 list_capture_sources）。",
   "error.agent.screenCapturePermissionMissing":
     "OpenBot 没有屏幕录制权限。请让用户打开“系统设置 > 隐私与安全性 > 屏幕与系统音频录制”，允许 OpenBot，然后退出并重新打开 OpenBot。",
+  "error.agent.screenCaptureListPermission":
+    "OpenBot 还没有屏幕录制权限，因此无法列出窗口。要截取显示器，请以 target screen 调用 capture_screen。用户先批准截取，然后 macOS 可能会向用户请求该权限。",
   "error.agent.screenCaptureEmptyWindows":
     "Windows 返回了空图像。请让用户解锁电脑并关闭受保护的内容；组织策略也可能阻止截屏。",
   "error.agent.screenCaptureFailed": "截屏失败，请重试。",

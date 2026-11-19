@@ -220,6 +220,7 @@ export interface TurnHooks {
   poolHasOtherAccount(agentId: string): boolean;
   mayContinueOnBackup(agentId: string): boolean;
   requeueChannelDelivery(deliveryId: string, continueWork?: boolean): Effect.Effect<boolean>;
+  keepChannelDelivery(deliveryId: string): Effect.Effect<boolean>;
   quietRoutineDelivery(deliveryId: string): boolean;
   taskForThread(threadId: string): string | null;
   inMessagingLane(agentId: string, threadId: string): boolean;
@@ -857,7 +858,8 @@ export class TurnLifecycle {
       return false;
     }
     if (deliveries.every(({ delivery }) => this.#mailbox.isAgentSetupDelivery(delivery.id))) return false;
-    const message = sourceText("error.provider.acpNoAnswer", {
+    const channelTask = this.#channelTask(snapshot.threadId, deliveries);
+    const message = sourceText(channelTask ? "error.provider.channelNoAnswer" : "error.provider.acpNoAnswer", {
       provider: agentProviderDescriptor(source.provider).displayName,
     });
     const context = {
@@ -871,6 +873,13 @@ export class TurnLifecycle {
     this.#turnErrors.set(turnId, message);
     this.#failoverTurns.set(turnId, { message, context });
     return true;
+  }
+
+  #channelTask(threadId: string | null, deliveries: readonly DeliveryContext[]): boolean {
+    return (
+      this.#conversation.channelForThread(threadId) !== null ||
+      deliveries.some(({ channelId }) => channelId !== undefined)
+    );
   }
 
   #noteNoAnswerAfterSteps(
@@ -1883,9 +1892,7 @@ export class TurnLifecycle {
           : null;
       const model = this.#hooks.turnModel(agentId, turnId);
       const failedKey = this.#usageLimits.failureKey(agentId, model);
-      const channelTask =
-        this.#conversation.channelForThread(snapshot.threadId) !== null ||
-        deliveries.some(({ channelId }) => channelId !== undefined);
+      const channelTask = this.#channelTask(snapshot.threadId, deliveries);
       const backupTakes = () =>
         ((mayRunAgain || failedAfterWork) && this.#hooks.mayFailOver(agentId)) ||
         (spentAfterWork && this.#hooks.mayContinueOnBackup(agentId));
@@ -1896,18 +1903,29 @@ export class TurnLifecycle {
         !channelTask &&
         deliveries.every(({ delivery }) => !this.#failoverRetries.get(delivery.id)?.has(failedKey)) &&
         backupTakes();
-      const runsAgainHere =
+      const mayRunHere =
         !failedOver &&
         mayRunAgain &&
         failedKey !== null &&
         deliveries.length > 0 &&
-        this.#conversation.channelForThread(snapshot.threadId) === null &&
-        deliveries.every(({ delivery }) => !this.#failoverRetries.get(delivery.id)?.has(failedKey)) &&
-        (isRefusedGeminiToken(failover.context.provider, failover.message) ||
-          (failover.context.causeCode === "empty_answer" &&
-            deliveries.every(
-              ({ delivery }) => delivery.sender.kind === "agent" && Boolean(delivery.replyToMessageId),
-            )));
+        deliveries.every(({ delivery }) => !this.#failoverRetries.get(delivery.id)?.has(failedKey));
+      const [onlyDelivery] = deliveries;
+      const channelRunsAgain =
+        mayRunHere &&
+        channelTask &&
+        deliveries.length === 1 &&
+        onlyDelivery !== undefined &&
+        failover.context.causeCode === "empty_answer" &&
+        (yield* this.#hooks.keepChannelDelivery(onlyDelivery.delivery.id));
+      const runsAgainHere =
+        channelRunsAgain ||
+        (mayRunHere &&
+          this.#conversation.channelForThread(snapshot.threadId) === null &&
+          (isRefusedGeminiToken(failover.context.provider, failover.message) ||
+            (failover.context.causeCode === "empty_answer" &&
+              deliveries.every(
+                ({ delivery }) => delivery.sender.kind === "agent" && Boolean(delivery.replyToMessageId),
+              ))));
       const continuedWork = Effect.gen({ self: this }, function* () {
         const workSteps = running
           ? yield* readCapturedSteps(running.client, threadId, turnId).pipe(
@@ -2003,7 +2021,7 @@ export class TurnLifecycle {
           failedOver && mayContinue ? yield* continuedWork : undefined,
           running?.failureReports,
         );
-        if (failedOver) this.#markFailed(agentId, model, failover);
+        if (failedOver || (channelRunsAgain && backupTakes())) this.#markFailed(agentId, model, failover);
         if (failingSession) yield* this.#dropFailingSession(agentId, threadId, running.client.provider);
         this.#hooks.scheduleDrain(agentId);
         return;

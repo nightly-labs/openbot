@@ -23,6 +23,8 @@ export const messages = {
     "Ana makine OpenBot'un ekranını kaydetmesine izin vermedi. Ana makinede ekran kaydı izni verin, ardından tekrar deneyin.",
   "error.remote.windowsSessionDisconnected":
     "Ana makinedeki Windows oturumunun bağlantısı kesik, bu yüzden paylaşılacak ekran yok. Ana makinenin ekranında Windows'ta oturum açın, ardından tekrar deneyin.",
+  "error.remote.macScreenLocked":
+    "Mac kilitli, bu yüzden ekranını paylaşamıyor. Mac'in kilidini kendi ekranında açın, ardından tekrar deneyin.",
   "error.remote.streamTooSlowLowerQuality":
     "Ana makineyle bağlantı görüntü için çok yavaş. Tekrar deneyin: sonraki bağlantı daha düşük bir kalite kullanır.",
   "error.remote.streamTooSlow":
@@ -188,6 +190,8 @@ export const messages = {
   "error.remote.iceFailed":
     "Ana makineyle doğrudan bağlantı kurulamadı. Bir güvenlik duvarı, VPN veya proxy bunu engelleyebilir.",
   "error.remote.iceDisconnected": "Ana makineyle doğrudan bağlantı kesildi.",
+  "error.remote.webrtcBlocked":
+    "Bu cihaz OpenBot'un ihtiyaç duyduğu bağlantıyı engelliyor. Kilitlenme Modu açıksa Ayarlar > Gizlilik ve Güvenlik > Kilitlenme Modu'nda OpenBot için kapatın.",
   "error.remote.directoryUnreachable": "OpenBot, OpenBot hizmetine ulaşamadı. Bağlantınızı kontrol edin.",
   "error.remote.directoryTimeout": "OpenBot hizmeti zamanında yanıt vermedi. Tekrar deneyin.",
   "error.remote.inviteAlreadyUsed": "Bu davet zaten kullanıldı. Yeni bir davet isteyin.",
