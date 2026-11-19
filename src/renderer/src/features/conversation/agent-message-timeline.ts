@@ -59,7 +59,7 @@ export function groupAgentMessageMarkers(
 /**
  * Sets on the marker of each agent message that has text or quiet answers whether they show under
  * the marker. `open` holds the exchange ids of the open messages, and `answers` the quiet answers by
- * exchange id (`teammateUpdateAnswers`). A message with neither gets no toggle.
+ * exchange id (`teammateTurnAnswers`). A message with neither gets no toggle.
  */
 export function markOpenAgentMessages(
   messages: readonly AgentMessage[],
@@ -75,17 +75,22 @@ export function markOpenAgentMessages(
 }
 
 /**
- * The quiet answers of each turn that teammate updates started, by the exchange id of the last update
- * of the turn. An update wants no answer, so when nothing in the turn was for the user, OpenBot kept
- * the agent's text as quiet answers (#6821). They show under the marker of the update, which starts
- * closed, as the answers of a quiet routine run show under its run. A turn with no teammate update
- * keeps its quiet answers in place.
+ * The quiet answers of each turn that teammate updates or requests started, by the exchange id of the
+ * last such message of the turn. An update wants no answer, and a request got its answer with the
+ * agent's own reply, so when nothing in the turn was for the user, OpenBot kept the agent's text as
+ * quiet answers (#6821, #7465). They show under the marker of that message, which starts closed, as
+ * the answers of a quiet routine run show under its run. A reply to this agent's message is never
+ * quiet. A turn with no such message keeps its quiet answers in place.
  */
-export function teammateUpdateAnswers(messages: readonly AgentMessage[]): Map<string, AgentMessage[]> {
+export function teammateTurnAnswers(messages: readonly AgentMessage[]): Map<string, AgentMessage[]> {
   const updateByTurn = new Map<string, string>();
   for (const message of messages) {
     const exchange = message.exchange;
-    if (message.turnId && exchange?.direction === "incoming" && exchange.expectsReply === false)
+    if (
+      message.turnId &&
+      exchange?.direction === "incoming" &&
+      (exchange.expectsReply === false || !exchange.replyToMessageId)
+    )
       updateByTurn.set(message.turnId, exchange.messageId);
   }
   const answers = new Map<string, AgentMessage[]>();

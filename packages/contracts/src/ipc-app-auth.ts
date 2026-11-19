@@ -98,6 +98,11 @@ export interface UpdateStatus {
    * phase `up-to-date`. A check that a person asks for gets this release. Absent when none waits.
    */
   stagedVersion?: string;
+  /**
+   * The supported minimum, while this version is below it: the app shows "Update required". Absent
+   * when the version is supported or no check succeeded.
+   */
+  requiredVersion?: string;
 }
 
 /** `relaunch` starts OpenBot again; `update` installs the downloaded update. */
@@ -401,6 +406,8 @@ export function decodeTestCompanySignInResult(value: unknown): TestCompanySignIn
 export interface VerifyEmailCodeInput {
   challengeId: string;
   code: string;
+  /** The invite code that the person typed at sign-in. The account server uses it only for a new account. */
+  referralCode?: string;
 }
 
 export type MacPermissionId = "screen-recording" | "accessibility";
@@ -470,11 +477,14 @@ export function isBackgroundProcess(value: unknown): value is BackgroundProcess 
  * `driver-missing` says the build carries no driver, which every release does, and `error` says the
  * driver is there and answered with something else. Both are faults rather than steps, and they
  * stay apart because a report that only said "not ready" would hide which one happened.
+ * `restart-required` says that macOS reports both grants but still refuses Accessibility calls
+ * (#10658); a restart of OpenBot is the step the user takes, and the panel writes those steps.
  */
 export const COMPUTER_USE_STATUSES = [
   "unsupported",
   "driver-missing",
   "permissions-required",
+  "restart-required",
   "ready",
   "error",
 ] as const;
@@ -620,6 +630,8 @@ export type ExternalDestination =
   | "grok-bot-export"
   // The email for a hosted server plan that the add server dialog does not have, such as a Mac.
   | "hosted-server-contact"
+  // The download page, from "Update required" when this install cannot update itself.
+  | "download"
   // Not a page: the macOS pane that grants OpenBot screen recording. It is here rather than behind
   // its own endpoint because the destination is still a fixed address the renderer only names.
   | "mac-screen-recording";

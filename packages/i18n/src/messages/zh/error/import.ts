@@ -69,6 +69,18 @@ export const messages = {
   "error.import.transferModelMissing":
     "{name}：模型“{model}”在此处暂不可用，助手将使用默认模型。待其服务商就绪后请重新选择该模型。",
   "error.import.transferSettingSkipped": "{name} 未导入。{reason}",
+  "error.import.transferRunsSkipped": "{name}：自动化任务“{routine}”的运行历史未导入。",
+  "error.import.transferSharedSkillsSkipped": "无法读取共享技能，因此文件中不包含它们。",
+  "error.import.transferSharedSkillsNotAdded": "无法将文件中的共享技能添加到此服务器。",
+  "error.import.transferMemberPreferencesSkipped": {
+    one: "无法保存 {count} 位成员的选择。",
+    other: "无法保存 {count} 位成员的选择。",
+  },
+  "error.import.transferSharedSkillExists": "该服务器上已有同名但文件不同的共享技能。",
+  "error.import.transferServerPreferencesSkipped": {
+    one: "文件中有 {count} 项服务器偏好在此处无效，因此不会导入。",
+    other: "文件中有 {count} 项服务器偏好在此处无效，因此不会导入。",
+  },
   "error.import.transferRoutineFlowSkipped": "导入时略过了一个自动化任务流程。{reason}",
   "error.import.transferCustomAgentCommand":
     "{name}：自定义助手不会导入，因为它们需要运行命令。请检查命令“{command}”，并在设置中重新添加该助手。",
@@ -78,7 +90,8 @@ export const messages = {
   "error.import.transferProviderKey": "{name}：请在设置中重新输入它的 API 密钥。",
   "error.import.transferAgentEnv": "{name}：请在设置中重新输入 {names} 的值。",
   "error.import.transferMcpValues":
-    "{name}：MCP 服务器以关闭状态添加。请检查其命令，重新输入其取值和完整地址，然后在 MCP 设置中开启。",
+    "{name}：MCP 服务器以关闭状态添加。请检查其命令，重新输入其取值和完整地址，然后在 市场、应用 中开启。",
   "error.import.transferValuesCleared": "{name}：可能包含密钥的取值已从其参数或地址中移除，请在设置中重新输入。",
   "error.import.transferSharedKept": "共享文件夹中已有 {number} 个同名文件，因此保持原样。",
+  "error.import.transferPartSkipped": "文件的部分内容无法导入。其他部分已在此服务器上，请不要再次导入该文件。",
 } as const satisfies PartialTranslation<typeof source>;

@@ -10,7 +10,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { isAgentTaskActive } from "@openbot/team-client/agent-tasks";
-import { Button } from "@openbot/ui";
+import { Button, CopyButton, toast } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import type {
   AgentMessage,
@@ -24,15 +24,17 @@ import {
   type AgentStep,
   AgentStepsDisclosure,
   type AgentStepsFacts,
+  type AgentStepsTrace,
 } from "@openbot/ui/features/conversation/AgentSteps";
 import {
   AttachmentCards,
   type AttachmentDownloads,
   type AttachmentMediaSource,
 } from "@openbot/ui/features/conversation/AttachmentCards";
+import { AwaitingReplies, type AwaitingReplyItem } from "@openbot/ui/features/conversation/AwaitingReplies";
 import { agentActivityExitDuration } from "@openbot/ui/features/conversation/activity-timing";
 import { branchPointIds } from "@openbot/ui/features/conversation/branch-points";
-import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
+import { type ChangeMarkerActions, ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
 import { type ChatMessageAuthor, ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
 import { ComposerAddMenu } from "@openbot/ui/features/conversation/ComposerAddMenu";
 import {
@@ -51,6 +53,8 @@ import { ComposerSendControl } from "@openbot/ui/features/conversation/ComposerS
 import { ComposerStackCard } from "@openbot/ui/features/conversation/ComposerStackCard";
 import { ContextUsageMeter, type ContextUsageView } from "@openbot/ui/features/conversation/ContextUsage";
 import { ApprovalCard } from "@openbot/ui/features/conversation/ConversationPrompts";
+import { dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
+import { CHAT_TIME_GAP_MS, continuesSenderRun } from "@openbot/ui/features/conversation/chat-grouping";
 import {
   preferredMessageScrollBehavior,
   ScrollToLatestButton,
@@ -62,6 +66,7 @@ import {
   MessageMenuItems,
   type MessageMenuItemsProps,
 } from "@openbot/ui/features/conversation/MessageRendering";
+import { type ChatBubbleStyle, ownMessageAuthor } from "@openbot/ui/features/conversation/own-bubble";
 import { QueuePanel } from "@openbot/ui/features/conversation/QueuePanel";
 import {
   MessageSelectionActions,
@@ -101,17 +106,17 @@ function shownInThread(message: AgentMessage): boolean {
     message.body.trim().length > 0 ||
     (message.attachments?.length ?? 0) > 0 ||
     message.imageGeneration !== undefined ||
+    message.videoGeneration !== undefined ||
     message.questionPrompt !== undefined ||
     message.plan !== undefined ||
     message.actionMarker !== undefined
   );
 }
 
-/** Why the next message of a queued thread waits. */
+/** Why the next message of a queued thread waits. Without a known hold, the thread names no reason. */
 export function agentThreadHoldText(task: AgentTask, limit: number, t: TextValue["t"]): string | null {
-  if (task.state !== "queued") return null;
-  if (task.hold === "task-limit" || task.hold === null)
-    return t("conversation.threads.hold.threadLimit", { count: limit });
+  if (task.state !== "queued" || task.hold === null) return null;
+  if (task.hold === "task-limit") return t("conversation.threads.hold.threadLimit", { count: limit });
   return t(HOLD_TEXT[task.hold]);
 }
 
@@ -214,10 +219,20 @@ export interface AgentThreadViewProps {
   onStop: () => void;
   onOpenLink: (url: string) => void;
   /**
+   * Opens a file that a message links to: from the shared folder, or from the workspace of `agentId`, the
+   * agent that wrote the message. `asWritten` is the file name as the message wrote it, when the path joins
+   * it to a folder. Without it, a file link shows as text.
+   */
+  onOpenFile?:
+    | ((kind: "shared" | "workspace", agentId: string | undefined, path: string, asWritten?: string) => void)
+    | undefined;
+  /**
    * Opens an agent's chat, or one of its threads by tab id. With it, a message to or from another agent
    * shows as a marker, as in the agent's own chat. Without it, the message shows as a row.
    */
   onSelectAgent?: ((agentId: string, tabId?: string) => void) | undefined;
+  /** The actions of a skill or instruction change line. An instruction change has View, not Undo. */
+  changeMarkerActions?: ChangeMarkerActions | undefined;
   onPreview: (attachment: AttachmentSummary) => void;
   onAttachmentAction: (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => void;
   /** The window draws the macOS window controls over the top start corner. The image viewer leaves room. */
@@ -243,8 +258,13 @@ export interface AgentThreadViewProps {
    * to the latest message shows. `onLoad` reads them in the place of the part.
    */
   newerMessages?: AgentThreadOlderMessages | undefined;
-  /** The card that the app draws in the place of a message row, such as an MCP sign-in. Undefined keeps the row. */
-  messageCard?: ((message: AgentMessage) => JSX.Element | undefined) | undefined;
+  /**
+   * The card that the app draws in the place of a message row, such as an MCP sign-in or a visual
+   * reply page. `quote` puts text in this message box. Undefined keeps the row.
+   */
+  messageCard?:
+    | ((message: AgentMessage, quote: (messageId: string, text: string) => void) => JSX.Element | undefined)
+    | undefined;
   /**
    * The steps of the finished turn above an answer, or on the thinking row of a finished turn with no
    * answer. Undefined for a message that has none.
@@ -252,8 +272,15 @@ export interface AgentThreadViewProps {
   stepsAbove?: ((messageId: string) => AgentStep[] | undefined) | undefined;
   /** The time that the turn of an answer took, and how many of its steps failed. */
   factsAbove?: ((messageId: string) => AgentStepsFacts | undefined) | undefined;
+  /** The trace of the turn of an answer. With it, the steps stand beside the answer, as in the agent's chat. */
+  traceAbove?: ((messageId: string) => AgentStepsTrace) | undefined;
   /** The steps of the running turn, for its activity row. */
   activeSteps?: readonly AgentStep[] | undefined;
+  /**
+   * When the background work of the thread started, in epoch milliseconds, while it still runs after
+   * its turn ended. The agent continues when it ends, so the thread shows that it waits.
+   */
+  backgroundWorkSince?: number | undefined;
   /** The "Show agent steps" setting: the steps are open at first. */
   stepsOpenByDefault?: boolean | undefined;
   /** Receives the message list, where the app searches the thread. */
@@ -271,6 +298,8 @@ export interface AgentThreadViewProps {
    * Branch in the row, as before.
    */
   compactMessageActions?: boolean | undefined;
+  /** How the reader's own bubbles look: the agent's color, solid or as a tint, or classic grey (the default). */
+  bubbleStyle?: ChatBubbleStyle | undefined;
   /**
    * Copies the thread through an answer into a new thread. Only the last answer of each finished turn
    * offers it. Missing where the host cannot branch.
@@ -283,6 +312,11 @@ export interface AgentThreadViewProps {
   onDeleteMessage?: ((messageId: string) => Promise<void>) | undefined;
   /** Whether the reader can delete a message. Without it, every message that is not streaming can. */
   canDeleteMessage?: ((message: AgentMessage) => boolean) | undefined;
+  /**
+   * The "Use as backdrop" action of a message, or undefined when the message has nothing that can go
+   * behind the window. Missing where the host has no backdrop.
+   */
+  backdropAction?: ((message: AgentMessage) => (() => void) | undefined) | undefined;
   /** Where the thread came from, when it is a branch. A line shows after the copied messages. */
   branchSource?: AgentThreadBranchSource | undefined;
   /** Makes the draft a reply to a message of the thread. Missing where the host cannot take a reply in a thread. */
@@ -302,6 +336,10 @@ export interface AgentThreadViewProps {
    * start of each queued message: a joined server sends no more on `agent-tasks-v1`.
    */
   queue?: AgentThreadQueue | undefined;
+  /** The agents that the thread asked and that have not answered yet, as the agent's own chat shows them. */
+  awaiting?: readonly AwaitingReplyItem[] | undefined;
+  /** Opens an agent of `awaiting` that waits for the user, where it waits. Without it, `onSelectAgent` opens the agent. */
+  onOpenWaitingAgent?: ((agentId: string) => void) | undefined;
   /**
    * The actions for text selected in the thread. Quote puts the text in this message box, and a send
    * goes to this thread. Without it, selected text has no actions.
@@ -321,7 +359,7 @@ export interface AgentThreadSelectionActions {
  * busy-message mode says.
  */
 export function AgentThreadView(props: AgentThreadViewProps) {
-  const { t } = useText();
+  const { t, format, errorMessage } = useText();
   // Resolved once, so the card is built one time for the check and the row.
   const attention = children(() => props.attention);
   const [sending, setSending] = createSignal(false);
@@ -491,7 +529,8 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   const title = () => props.task?.title ?? t("conversation.threads.new");
   const placeholder = () =>
     props.task
-      ? t("conversation.threads.view.placeholder", { name: props.agent.name, title: props.task.title })
+      ? // The tab already names the thread, and a title can be a whole message.
+        t("conversation.threads.view.placeholder", { name: props.agent.name })
       : t("conversation.threads.view.newPlaceholder", { name: props.agent.name });
   const voicePhase = () => props.voice?.phase ?? "idle";
   const recording = () => voicePhase() === "recording";
@@ -514,7 +553,13 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   };
   // An answer from another agent to a request of this thread shows with the name of that agent.
   const author = (message: AgentMessage): ChatMessageAuthor => {
-    if (message.author === "you") return { kind: "you", name: t("chat.message.you") };
+    if (message.author === "you")
+      return ownMessageAuthor({
+        name: t("chat.message.you"),
+        style: props.bubbleStyle ?? "classic",
+        agent: props.agent,
+        chatColor: undefined,
+      });
     const senderId = message.senderAgentId;
     if (senderId === undefined || senderId === props.agent.id)
       return { kind: "agent", name: props.agent.name, agent: props.agent };
@@ -540,6 +585,23 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     if (marker?.kind !== "agent-message" || !props.onSelectAgent) return undefined;
     if (message.body.trim() === "") return marker;
     return { ...marker, expanded: openAgentMessages().has(marker.messageId) };
+  };
+  /** A skill or instruction change line, which shows as a marker with its actions, as in the agent's own chat. */
+  const changeMarker = (message: AgentMessage) => {
+    const marker = message.actionMarker;
+    return marker?.kind === "skill-lifecycle" || marker?.kind === "instructions-change" ? marker : undefined;
+  };
+  /** Opens the shared files that a message of `agentId` links to, as in the agent's chat. */
+  const sharedFileOpener = (agentId: string | undefined) => {
+    const open = props.onOpenFile;
+    return open ? (path: string, asWritten?: string) => open("shared", agentId, path, asWritten) : undefined;
+  };
+  /** Opens the workspace files that a message of `agentId` links to, as in the agent's chat. */
+  const workspaceFileOpener = (agentId: string | undefined) => {
+    const open = props.onOpenFile;
+    return open && agentId
+      ? (path: string, asWritten?: string) => open("workspace", agentId, path, asWritten)
+      : undefined;
   };
   /** The text of an open agent message, under its marker, as the sender's message. Its attachments stay under the marker. */
   const agentMessageText = (messageId: string) => {
@@ -571,6 +633,9 @@ export function AgentThreadView(props: AgentThreadViewProps) {
             onOpenLink={props.onOpenLink}
             onPreview={props.onPreview}
             onAttachmentAction={props.onAttachmentAction}
+            // A path is in the workspace of the agent that sent the message.
+            onOpenSharedFile={sharedFileOpener(current().exchange?.senderAgentId)}
+            onOpenWorkspaceFile={workspaceFileOpener(current().exchange?.senderAgentId)}
             macWindowControls={props.macWindowControls}
           />
         )}
@@ -583,7 +648,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     const pinned = pins.isPinned(message.id);
     return { pinned, onToggle: () => pins.onToggle(message.id, !pinned) };
   }
-  /** The items of a message's menu: Reply, Copy, Pin, Branch on the last answer of a finished turn, and Delete. */
+  /** The items of a message's menu: Reply, Copy, Pin, Branch on the last answer of a finished turn, Use as backdrop, and Delete. */
   function menuItems(message: AgentMessage, onCopy: (message: AgentMessage) => void): MessageMenuItemsProps {
     return {
       message,
@@ -594,16 +659,18 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       onBranch: branchAction(message),
       branchDisabled: branchBusy(),
       pin: pinAction(message),
+      onUseAsBackdrop: props.backdropAction?.(message),
       onDelete: deleteAction(message),
     };
   }
   /**
    * The action row of a message. The compact row has Reply, and More with the items of the right-click
-   * menu. The full row has Reply, Copy, and Branch on the last answer of a finished turn.
+   * menu. The full row has Reply, Copy, and Branch on the last answer of a finished turn. The text
+   * above a waiting question is a step of the turn, so it has no actions, as in the agent's chat.
    */
   function messageActions(message: AgentMessage): JSX.Element | undefined {
     const onCopy = props.onCopyMessage;
-    if (!onCopy || message.streaming) return undefined;
+    if (!onCopy || message.streaming || message.itemType === "commentary") return undefined;
     return (
       <Show
         when={props.compactMessageActions !== false}
@@ -643,12 +710,65 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   /** The right-click menu of a message, with the items of its More button. */
   function messageMenu(message: AgentMessage): (() => JSX.Element) | undefined {
     const onCopy = props.onCopyMessage;
-    if (!onCopy || message.streaming) return undefined;
+    if (!onCopy || message.streaming || message.itemType === "commentary") return undefined;
     return () => <MessageMenu {...menuItems(message, onCopy)} authorName={author(message).name} />;
   }
   /** A finished turn with no answer shows its steps on its thinking row, with no message under them. */
   const shownRow = (message: AgentMessage) =>
     shownInThread(message) || (message.kind === "thinking" && props.stepsAbove?.(message.id) !== undefined);
+  const shownRows = createMemo(() => props.messages.filter(shownRow));
+  /** A marker, a question or a thinking row draws no message row, so a run of one sender cannot continue under it. */
+  const holdsSenderRun = (message: AgentMessage) =>
+    message.kind !== "thinking" &&
+    message.kind !== "plan" &&
+    message.kind !== "subagents" &&
+    message.kind !== "memory-changes" &&
+    message.questionPrompt === undefined &&
+    !agentMessageMarker(message) &&
+    !changeMarker(message);
+  const senderRunRow = (message: AgentMessage) => ({
+    author: message.author === "agent" ? `agent:${message.senderAgentId ?? props.agent.id}` : message.author,
+    ...(message.createdAt === undefined ? {} : { createdAt: message.createdAt }),
+    ...(message.turnId === undefined ? {} : { turnId: message.turnId }),
+  });
+  /**
+   * As in the agent's chat: a separator names the time above the first row and above a new day. The
+   * compact action row shows no time, so a pause of an hour or more also gets one.
+   */
+  const timeMarkers = createMemo(() => {
+    const labels = new Map<string, string>();
+    const gap = props.compactMessageActions === false ? {} : { gapMs: CHAT_TIME_GAP_MS };
+    let previous: AgentMessage | undefined;
+    for (const message of shownRows()) {
+      const label =
+        message.createdAt === undefined
+          ? previous === undefined
+            ? (message.time ?? t("chat.day.now"))
+            : null
+          : dayMarkerLabel(previous?.createdAt, message.createdAt, { t, format, ...gap });
+      if (label !== null) labels.set(message.id, label);
+      previous = message;
+    }
+    return labels;
+  });
+  /** As in the agent's chat: the messages of a run by one sender read as one block. */
+  const continuesRunIds = createMemo(() => {
+    const ids = new Set<string>();
+    const markers = timeMarkers();
+    let previous: AgentMessage | undefined;
+    for (const message of shownRows()) {
+      if (
+        holdsSenderRun(message) &&
+        continuesSenderRun(previous && senderRunRow(previous), senderRunRow(message), {
+          previousDrawsTime: previous !== undefined && holdsSenderRun(previous),
+          startsDay: markers.has(message.id),
+        })
+      )
+        ids.add(message.id);
+      previous = message;
+    }
+    return ids;
+  });
   /**
    * The row that the branch line follows: the last message that the branch copied. That message can be
    * one that the thread does not show as a row, such as a thought in the steps of a turn. Then the line
@@ -657,7 +777,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   const branchDividerId = createMemo(() => {
     const source = props.branchSource;
     if (!source) return undefined;
-    const shown = props.messages.filter(shownRow);
+    const shown = shownRows();
     if (shown.some((message) => message.id === source.throughMessageId)) return source.throughMessageId;
     const branchedAt = props.task ? Date.parse(props.task.createdAt) : Number.NaN;
     if (Number.isNaN(branchedAt)) return undefined;
@@ -668,9 +788,23 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     return branchDividerId() === messageId ? props.branchSource : undefined;
   }
   const failed = () => (props.task?.state === "idle" && props.task.outcome === "failed" ? props.task : undefined);
+  /**
+   * The reason of the failed turn, as the main chat shows it. A thread keeps the provider's text (#5220),
+   * which can be technical; the notice then shows the general sentence, and Copy details keeps the
+   * text, which the host redacted, for a report (#10888).
+   */
+  const failure = (error: string | null) => {
+    const reason = error?.trim() ?? "";
+    if (!reason) return { body: t("conversation.threads.view.failedBody"), details: null };
+    const fallback = t("agent.error.continueFailed");
+    const body = errorMessage(reason, fallback);
+    return { body, details: body === fallback ? reason : null };
+  };
   const running = () =>
     props.task?.state === "running" && !props.approval && !props.waitsForAnswer ? props.task : undefined;
   const queued = () => (props.task && props.task.queuedMessages.length > 0 ? props.task : undefined);
+  // As in the agent's chat: a live turn hides the row, also while it waits for an approval or an answer.
+  const backgroundWorkSince = () => (props.task?.state === "running" ? undefined : props.backgroundWorkSince);
   const hold = () => (props.task ? agentThreadHoldText(props.task, props.limit, t) : null);
   const editingQueued = () => Boolean(props.queue?.editingDeliveryId);
   const sendLabel = () =>
@@ -783,20 +917,47 @@ export function AgentThreadView(props: AgentThreadViewProps) {
               {t("conversation.threads.view.startedByAgent", { name: props.agent.name })}
             </p>
           </Show>
-          <For each={props.messages.filter(shownRow)} keyed={(message) => message.id}>
+          <For each={shownRows()} keyed={(message) => message.id}>
             {(message) => {
-              const card = createMemo(() => props.messageCard?.(message()));
+              const card = createMemo(() => props.messageCard?.(message(), quoteSelection));
+              // As in the agent's chat: the steps of an answer stand beside it and open only the trace.
+              // "Show agent steps" keeps the open list above the answer.
+              const stepsInRow = () =>
+                props.traceAbove !== undefined &&
+                !props.stepsOpenByDefault &&
+                message().kind !== "thinking" &&
+                message().questionPrompt === undefined &&
+                !agentMessageMarker(message()) &&
+                !changeMarker(message()) &&
+                !card() &&
+                author(message()).kind === "agent";
+              const stepsDisclosure = () => (
+                <Show when={props.stepsAbove?.(message().id)}>
+                  {(steps) => (
+                    <AgentStepsDisclosure
+                      steps={steps()}
+                      defaultOpen={props.stepsOpenByDefault ?? false}
+                      list={!stepsInRow()}
+                      // A turn with no answer shows its steps on its thinking row, with no trace, as in the chat.
+                      trace={message().kind === "thinking" ? undefined : props.traceAbove?.(message().id)}
+                      facts={props.factsAbove?.(message().id)}
+                    />
+                  )}
+                </Show>
+              );
               return (
-                <div class="virtual-chat-row">
-                  <Show when={props.stepsAbove?.(message().id)}>
-                    {(steps) => (
-                      <AgentStepsDisclosure
-                        steps={steps()}
-                        defaultOpen={props.stepsOpenByDefault ?? false}
-                        facts={props.factsAbove?.(message().id)}
-                      />
+                <div
+                  class="virtual-chat-row"
+                  data-grouped={!card() && continuesRunIds().has(message().id) ? "sender" : undefined}
+                >
+                  <Show when={timeMarkers().get(message().id)}>
+                    {(label) => (
+                      <div class="time-marker">
+                        <span>{label()}</span>
+                      </div>
                     )}
                   </Show>
+                  <Show when={!stepsInRow()}>{stepsDisclosure()}</Show>
                   <Show when={message().kind !== "thinking" && agentMessageMarker(message())}>
                     {(marker) => (
                       <article data-chat-search-message={message().id}>
@@ -821,7 +982,22 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                       </article>
                     )}
                   </Show>
-                  <Show when={message().kind !== "thinking" && !agentMessageMarker(message())}>
+                  <Show when={message().kind !== "thinking" && changeMarker(message())}>
+                    {(marker) => (
+                      <article data-chat-search-message={message().id}>
+                        <ChatActionMarker
+                          marker={marker()}
+                          agents={props.agents}
+                          onSelectAgent={(agentId, tabId) => props.onSelectAgent?.(agentId, tabId)}
+                          onOpenSkill={props.changeMarkerActions?.onOpenSkill}
+                          onOpenInstructions={props.changeMarkerActions?.onOpenInstructions}
+                        />
+                      </article>
+                    )}
+                  </Show>
+                  <Show
+                    when={message().kind !== "thinking" && !agentMessageMarker(message()) && !changeMarker(message())}
+                  >
                     <Show
                       when={card()}
                       fallback={
@@ -836,6 +1012,8 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                           onOpenLink={props.onOpenLink}
                           onPreview={props.onPreview}
                           onAttachmentAction={props.onAttachmentAction}
+                          onOpenSharedFile={sharedFileOpener(props.agent.id)}
+                          onOpenWorkspaceFile={workspaceFileOpener(props.agent.id)}
                           mediaSource={props.mediaSource}
                           downloads={props.downloads}
                           onDownload={(attachment) => props.onAttachmentAction(attachment, "download")}
@@ -846,6 +1024,9 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                             if (id) showMessage(id);
                           }}
                           actions={messageActions(message())}
+                          steps={stepsInRow() ? stepsDisclosure() : undefined}
+                          actionTime={props.compactMessageActions === false}
+                          actionsBeside={stepsInRow() || author(message()).kind === "you"}
                           menu={messageMenu(message())}
                           data-chat-search-message={message().id}
                         />
@@ -861,13 +1042,25 @@ export function AgentThreadView(props: AgentThreadViewProps) {
           </For>
           <Show when={running()}>
             {(task) => (
-              <div class="virtual-chat-row">
+              <div class="virtual-chat-row virtual-chat-row-activity">
                 <AgentActivityIndicator
                   agent={props.agent}
                   label={activityLabel}
                   detail={task().progress}
                   steps={props.activeSteps}
                   stepsOpenByDefault={props.stepsOpenByDefault}
+                />
+              </div>
+            )}
+          </Show>
+          <Show when={backgroundWorkSince()}>
+            {(since) => (
+              <div class="virtual-chat-row virtual-chat-row-activity">
+                <AgentActivityIndicator
+                  agent={props.agent}
+                  label={activityLabel}
+                  detail={t("chat.activity.backgroundWork")}
+                  since={since()}
                 />
               </div>
             )}
@@ -911,12 +1104,33 @@ export function AgentThreadView(props: AgentThreadViewProps) {
         {/* One card for everything above the input: see composer-stack.css. */}
         <div class="composer-stack">
           <ComposerStackCard when={failed()}>
-            {(task) => (
-              <ComposerNotice
-                tone="danger"
-                title={t("conversation.threads.view.failed")}
-                body={task().error || t("conversation.threads.view.failedBody")}
-              />
+            {(task) => {
+              const shown = () => failure(task().error);
+              return (
+                <ComposerNotice
+                  tone="danger"
+                  title={t("conversation.threads.view.failed")}
+                  body={shown().body}
+                  action={
+                    <Show when={shown().details}>
+                      {(details) => (
+                        <CopyButton
+                          value={details()}
+                          variant="outline"
+                          size="sm"
+                          label={t("agent.error.copyDetails")}
+                          onCopyError={() => toast.error(t("app.clipboard.copyFailed"))}
+                        />
+                      )}
+                    </Show>
+                  }
+                />
+              );
+            }}
+          </ComposerStackCard>
+          <ComposerStackCard when={props.awaiting?.length ? props.awaiting : undefined}>
+            {(items) => (
+              <AwaitingReplies items={items()} onOpenAgent={props.onOpenWaitingAgent ?? props.onSelectAgent} />
             )}
           </ComposerStackCard>
           <Show when={props.queue}>
@@ -1056,6 +1270,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                     onStart={() => voice().onStart()}
                     onCancel={() => voice().onCancel()}
                     onFinish={() => voice().onFinish()}
+                    onSend={() => void send()}
                     send={sendButton()}
                   />
                 )}

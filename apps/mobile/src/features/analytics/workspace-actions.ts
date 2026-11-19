@@ -48,7 +48,7 @@ export function trackWorkspaceActions(
         {
           action: "upload",
           attachment_count: 1,
-          size_bucket: attachmentSizeBucket(Math.floor((input.base64.length * 3) / 4)),
+          size_bucket: attachmentSizeBucket(input.file?.size ?? Math.floor((input.base64.length * 3) / 4)),
         },
         () => workspace.uploadAttachment(id, input, server, onProgress),
       ),

@@ -14,7 +14,7 @@ import { isObject, requireString, stringPayload } from "./validation";
 
 export interface AccountIpcDependencies {
   centralAuth: CentralAuthManager;
-  host: Pick<HostService, "configure" | "getStatus" | "start" | "getMobileConnectHost">;
+  host: Pick<HostService, "configure" | "getStatus" | "start" | "getMobileConnectHost" | "refreshRegistration">;
 }
 
 export function accountIpcHandlers({ centralAuth, host }: AccountIpcDependencies): Pick<IpcGroupHandlers, "auth"> {
@@ -33,7 +33,9 @@ export function accountIpcHandlers({ centralAuth, host }: AccountIpcDependencies
         runCauseEffect(centralAuth.requestEmailCode(email)),
       ),
       verifyEmailCode: payloadHandler(parseEmailCodeVerification, (verification) =>
-        runCauseEffect(centralAuth.verifyEmailCode(verification.challengeId, verification.code)),
+        runCauseEffect(
+          centralAuth.verifyEmailCode(verification.challengeId, verification.code, verification.referralCode),
+        ),
       ),
       updateName: payloadHandler(parseProfileName, (name) => runCauseEffect(centralAuth.updateName(name))),
       updateAvatar: payloadHandler(parseAvatarImage, (parsed) => runCauseEffect(centralAuth.updateAvatar(parsed))),

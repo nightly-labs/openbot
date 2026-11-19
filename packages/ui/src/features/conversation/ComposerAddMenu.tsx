@@ -1,6 +1,17 @@
-import { AudioLines, CircleDot, DropdownMenu, File, MessageCircleQuestionMark, Plus, Puzzle } from "@openbot/ui";
+import {
+  AudioLines,
+  CircleDot,
+  DropdownMenu,
+  File,
+  MessageCirclePlus,
+  MessageCircleQuestionMark,
+  Plus,
+  Puzzle,
+} from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
-import { Show } from "solid-js";
+import { createSignal, Show } from "solid-js";
+import type { AgentProfile } from "../../data";
+import { AgentNewChatDialog } from "./AgentNewChatDialog";
 
 export interface ComposerAddMenuProps {
   open: boolean;
@@ -17,11 +28,24 @@ export interface ComposerAddMenuProps {
   onSideQuestion?: (() => void) | undefined;
   /** Without it, no voice conversation item. */
   onVoice?: (() => void) | undefined;
+  /**
+   * The New chat action, which asks first. Without it, no New chat item. The context ring has it too,
+   * but the ring shows only after the provider reports usage, so this item keeps New chat in reach (#8725).
+   */
+  newChat?:
+    | {
+        agent: Pick<AgentProfile, "name" | "avatarSeed" | "avatarHue" | "avatarUrl">;
+        start: () => Promise<void>;
+        /** A running compaction: the ring's New chat row is disabled for the same reason. */
+        disabled?: boolean | undefined;
+      }
+    | undefined;
 }
 
-/** The "+" menu of a message box: files, skills, and the side panes of the agent. */
+/** The "+" menu of a message box: files, skills, the side panes of the agent, and New chat. */
 export function ComposerAddMenu(props: ComposerAddMenuProps) {
   const { t } = useText();
+  const [confirmingNewChat, setConfirmingNewChat] = createSignal(false);
   let skillPickerChosen = false;
   // The browser opens a file picker only in the event of the click or the key.
   const attach = () => {
@@ -32,91 +56,118 @@ export function ComposerAddMenu(props: ComposerAddMenuProps) {
     if (event.key === "Enter" || event.key === " ") attach();
   };
   return (
-    <DropdownMenu.Root
-      open={props.open}
-      onOpenChange={(open) => {
-        props.onOpenChange(open);
-        const chosen = skillPickerChosen;
-        skillPickerChosen = false;
-        if (open || !chosen) return;
-        // The menu gives the focus back to its trigger two frames after it closes; open the picker after that.
-        requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => props.onPickSkill?.())));
-      }}
-      placement="top-start"
-      gutter={8}
-      modal={false}
-    >
-      <DropdownMenu.Trigger class="composer-button" aria-label={t("composer.add.label")} disabled={props.disabled}>
-        <Plus aria-hidden="true" />
-      </DropdownMenu.Trigger>
-      <DropdownMenu.Portal>
-        <DropdownMenu.Content aria-label={t("composer.add.label")}>
-          <Show when={props.onAttach}>
-            <DropdownMenu.Item
-              disabled={props.attachDisabled ?? false}
-              onPointerDown={(event) => {
-                if (event.button === 0) attach();
-              }}
-              onKeyDown={attachFromKey}
-            >
-              <File aria-hidden="true" />
-              <span>{t("composer.add.files")}</span>
-            </DropdownMenu.Item>
-          </Show>
-          <Show when={props.onPickSkill}>
-            <DropdownMenu.Item
-              onPointerDown={(event) => {
-                if (event.button === 0) skillPickerChosen = true;
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") skillPickerChosen = true;
-              }}
-            >
-              <Puzzle aria-hidden="true" />
-              <span>{t("composer.add.skill")}</span>
-            </DropdownMenu.Item>
-          </Show>
-          <Show when={props.onTeach}>
-            {(teach) => (
-              <DropdownMenu.Item onSelectAfterClose={() => teach()()}>
-                <CircleDot class="composer-add-record" aria-hidden="true" />
-                <span>{t("composer.add.teach")}</span>
+    <>
+      <DropdownMenu.Root
+        open={props.open}
+        onOpenChange={(open) => {
+          props.onOpenChange(open);
+          const chosen = skillPickerChosen;
+          skillPickerChosen = false;
+          if (open || !chosen) return;
+          // The menu gives the focus back to its trigger two frames after it closes; open the picker after that.
+          requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => props.onPickSkill?.())));
+        }}
+        placement="top-start"
+        gutter={8}
+        modal={false}
+      >
+        <DropdownMenu.Trigger class="composer-button" aria-label={t("composer.add.label")} disabled={props.disabled}>
+          <Plus aria-hidden="true" />
+        </DropdownMenu.Trigger>
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content aria-label={t("composer.add.label")}>
+            <Show when={props.onAttach}>
+              <DropdownMenu.Item
+                disabled={props.attachDisabled ?? false}
+                onPointerDown={(event) => {
+                  if (event.button === 0) attach();
+                }}
+                onKeyDown={attachFromKey}
+              >
+                <File aria-hidden="true" />
+                <span>{t("composer.add.files")}</span>
               </DropdownMenu.Item>
-            )}
-          </Show>
-          <Show when={props.onSideQuestion}>
-            {(open) => (
-              <>
-                <DropdownMenu.Separator />
+            </Show>
+            <Show when={props.onPickSkill}>
+              <DropdownMenu.Item
+                onPointerDown={(event) => {
+                  if (event.button === 0) skillPickerChosen = true;
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") skillPickerChosen = true;
+                }}
+              >
+                <Puzzle aria-hidden="true" />
+                <span>{t("composer.add.skill")}</span>
+              </DropdownMenu.Item>
+            </Show>
+            <Show when={props.onTeach}>
+              {(teach) => (
+                <DropdownMenu.Item onSelectAfterClose={() => teach()()}>
+                  <CircleDot class="composer-add-record" aria-hidden="true" />
+                  <span>{t("composer.add.teach")}</span>
+                </DropdownMenu.Item>
+              )}
+            </Show>
+            <Show when={props.onSideQuestion}>
+              {(open) => (
+                <>
+                  <DropdownMenu.Separator />
+                  <DropdownMenu.Item
+                    onSelectAfterClose={() => {
+                      // The menu gives the focus back first. A side panel tab that gets it selects its
+                      // pane, so open the side question after that.
+                      requestAnimationFrame(() => open()());
+                    }}
+                  >
+                    <MessageCircleQuestionMark aria-hidden="true" />
+                    <span>{t("conversation.sidePanel.pane.question")}</span>
+                  </DropdownMenu.Item>
+                </>
+              )}
+            </Show>
+            {/* Only where a side question is: after its separator. */}
+            <Show when={props.onVoice}>
+              {(open) => (
                 <DropdownMenu.Item
                   onSelectAfterClose={() => {
-                    // The menu gives the focus back first. A side panel tab that gets it selects its
-                    // pane, so open the side question after that.
+                    // As for the side question: open the pane after the menu gives the focus back.
                     requestAnimationFrame(() => open()());
                   }}
                 >
-                  <MessageCircleQuestionMark aria-hidden="true" />
-                  <span>{t("conversation.sidePanel.pane.question")}</span>
+                  <AudioLines aria-hidden="true" />
+                  <span>{t("conversation.sidePanel.pane.voice")}</span>
                 </DropdownMenu.Item>
-              </>
-            )}
-          </Show>
-          {/* Only where a side question is: after its separator. */}
-          <Show when={props.onVoice}>
-            {(open) => (
-              <DropdownMenu.Item
-                onSelectAfterClose={() => {
-                  // As for the side question: open the pane after the menu gives the focus back.
-                  requestAnimationFrame(() => open()());
-                }}
-              >
-                <AudioLines aria-hidden="true" />
-                <span>{t("conversation.sidePanel.pane.voice")}</span>
-              </DropdownMenu.Item>
-            )}
-          </Show>
-        </DropdownMenu.Content>
-      </DropdownMenu.Portal>
-    </DropdownMenu.Root>
+              )}
+            </Show>
+            <Show when={props.newChat}>
+              {(newChat) => (
+                <>
+                  <DropdownMenu.Separator />
+                  {/* The menu gives the focus back to its trigger first; the dialog then gives it back there. */}
+                  <DropdownMenu.Item
+                    disabled={newChat().disabled ?? false}
+                    onSelectAfterClose={() => setConfirmingNewChat(true)}
+                  >
+                    <MessageCirclePlus aria-hidden="true" />
+                    <span>{t("composer.newChat.action")}</span>
+                  </DropdownMenu.Item>
+                </>
+              )}
+            </Show>
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu.Root>
+      <Show when={props.newChat}>
+        {(newChat) => (
+          <AgentNewChatDialog
+            agent={newChat().agent}
+            open={confirmingNewChat()}
+            onClose={() => setConfirmingNewChat(false)}
+            start={() => newChat().start()}
+          />
+        )}
+      </Show>
+    </>
   );
 }

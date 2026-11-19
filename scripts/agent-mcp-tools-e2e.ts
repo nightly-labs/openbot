@@ -3,7 +3,8 @@
 // recorded where the router would show them. No provider or account is used. It also checks what
 // suggest_marketplace_app answers for a Marketplace app that is already installed, and that a
 // startup moves an app installed from an earlier catalog pin to the current pin, and that the
-// built-in GitHub connection is listed as the agents get it (#7088).
+// built-in GitHub connection is listed as the agents get it (#7088), and that tool_call runs a tool that
+// Antigravity left out of the model's tool list on the agent's saved row (#7427).
 // bun scripts/agent-mcp-tools-e2e.ts. Writes .openbot-build/agent-mcp-tools-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -15,11 +16,14 @@ import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
 import { McpGateway } from "../src/backend/agent/mcp-gateway";
 import {
+  findAgentMcpTool,
   handleMcpServerTool,
   type MarketplaceAppServer,
   type McpServerToolName,
   marketplaceAppStatus,
+  mcpFallbackRunsServer,
   mcpServersFromGateway,
+  mcpToolCallResponse,
 } from "../src/backend/agent/mcp-tools";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { CATALOG_PIN_MOVES, McpServerStore } from "../src/backend/mcp-server-store";
@@ -32,7 +36,7 @@ const URL_SECRET = "url-secret-7f3a91";
 const HEADER_SECRET = "header-secret-2c8d40";
 
 /** How each local server answers a request without a token. */
-type Mode = "open" | "sign-in" | "key";
+type Mode = "open" | "sign-in" | "key" | "guarded";
 
 async function body(request: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = [];
@@ -49,6 +53,26 @@ async function mcpServer(mode: Mode): Promise<{ url: string; close: () => Promis
   const server: Server = createServer((request, response) => {
     void (async () => {
       const path = new URL(request.url ?? "/", "http://127.0.0.1").pathname;
+      // A Bearer challenge on every path, its OAuth documents included: the server wants its key
+      // even there, so it has no sign-in (#10547).
+      if (mode === "guarded")
+        return json(
+          response,
+          401,
+          { error: "a valid API key is required" },
+          { "www-authenticate": 'Bearer realm="e2e"' },
+        );
+      // A Bearer challenge without `resource_metadata` wants a sign-in only when the origin publishes
+      // OAuth metadata. Without it, the server takes a key, as Coolify does (#9176).
+      if (mode === "sign-in" && path === "/.well-known/oauth-authorization-server") {
+        const origin = `http://${request.headers.host}`;
+        return json(response, 200, {
+          issuer: origin,
+          authorization_endpoint: `${origin}/authorize`,
+          token_endpoint: `${origin}/token`,
+          response_types_supported: ["code"],
+        });
+      }
       if (path !== "/mcp") return json(response, 404, { error: "not found" });
       if (mode === "sign-in")
         return json(response, 401, { error: "unauthorized" }, { "www-authenticate": 'Bearer realm="e2e"' });
@@ -57,7 +81,11 @@ async function mcpServer(mode: Mode): Promise<{ url: string; close: () => Promis
         response.writeHead(405).end();
         return;
       }
-      const message: { id?: number | string; method: string } = JSON.parse(await body(request));
+      const message: {
+        id?: number | string;
+        method: string;
+        params?: { name?: string; arguments?: unknown };
+      } = JSON.parse(await body(request));
       if (message.id === undefined) {
         response.writeHead(202).end();
         return;
@@ -78,6 +106,15 @@ async function mcpServer(mode: Mode): Promise<{ url: string; close: () => Promis
           jsonrpc: "2.0",
           id: message.id,
           result: { tools: [tool("search"), tool("read_page"), tool("create_page")] },
+        });
+      }
+      if (message.method === "tools/call") {
+        const name = message.params?.name ?? "";
+        const text = `${name} ${JSON.stringify(message.params?.arguments ?? {})}`;
+        return json(response, 200, {
+          jsonrpc: "2.0",
+          id: message.id,
+          result: { content: [{ type: "text", text }], isError: name === "missing" },
         });
       }
       return json(response, 200, { jsonrpc: "2.0", id: message.id, error: { code: -32601, message: "unknown" } });
@@ -105,7 +142,7 @@ interface ToolAnswer {
   error?: string;
   toolCount?: number;
   tools?: string[];
-  servers?: Array<{ name: string; headerNames?: string[]; builtIn?: boolean }>;
+  servers?: Array<{ name: string; headerNames?: string[]; builtIn?: boolean; forYou?: boolean }>;
   enabled?: boolean;
   removed?: boolean;
   setupSteps?: string[];
@@ -129,6 +166,7 @@ const servers: Record<Mode, { url: string; close: () => Promise<void> }> = {
   open: await mcpServer("open"),
   "sign-in": await mcpServer("sign-in"),
   key: await mcpServer("key"),
+  guarded: await mcpServer("guarded"),
 };
 const calls: Call[] = [];
 let refreshes = 0;
@@ -163,6 +201,7 @@ try {
     const response = await runCauseEffect(
       handleMcpServerTool(using, {
         tool,
+        agentId: "agent-a",
         arguments: args,
         approve: (reason) =>
           Effect.sync(() => {
@@ -252,6 +291,14 @@ try {
   assert.equal(key.signInCards.length, 0);
   assert.ok(row("crm"), "a server that needs a key is saved for the user to add it");
 
+  const guarded = await call("a server that wants its key on every path needs a key", "save_mcp_server", {
+    name: "billing",
+    url: servers.guarded.url,
+  });
+  assert.equal(guarded.result.status, "needs_key");
+  assert.equal(guarded.signInCards.length, 0);
+  assert.ok(row("billing"), "a server that wants its key on every path is saved for the user to add it");
+
   const down = await call("a server that does not answer is not saved", "save_mcp_server", {
     name: "down",
     url: await closedUrl(),
@@ -309,6 +356,23 @@ try {
   const listed = await call("list shows no secret", "list_mcp_servers", {});
   const crmListed = listed.result.servers?.find((entry) => entry.name === "crm");
   assert.deepEqual(crmListed?.headerNames, ["Authorization"]);
+  assert.equal(crmListed?.forYou, true, "A server with no selected agents goes to every agent.");
+
+  // The user selected other agents for crm (#10992): the list tells the agent that it does not get crm.
+  const crmId = row("crm")?.id;
+  const limited = mcpServersFromGateway(gateway, undefined, undefined, (mcpServerId, agentId) =>
+    mcpServerId === crmId ? agentId === "agent-b" : true,
+  );
+  const limitedListed = await call(
+    "list shows the servers the agent does not get",
+    "list_mcp_servers",
+    {},
+    true,
+    limited,
+  );
+  const forYou = Object.fromEntries((limitedListed.result.servers ?? []).map((entry) => [entry.name, entry.forYou]));
+  assert.equal(forYou.crm, false);
+  assert.equal(forYou.docs, true);
 
   const off = await call("turn a server off", "set_mcp_server_enabled", { name: "docs", enabled: false });
   assert.equal(off.success, true);
@@ -457,6 +521,75 @@ try {
       for (const row of [installed, renamed, edited]) store.remove(row.id);
     }
   }
+
+  // Antigravity 1.5 leaves the tools over its schema budget out of the model's tool list (#7427).
+  // openbot.tool_call names one, and OpenBot runs it on the agent's saved row.
+  const fallback = store.save({ ...calendar, id: "", name: "Product Hunt", url: servers.open.url });
+  const agentTools = mcpServersFromGateway(gateway, undefined, () => [fallback]);
+  for (const name of ["Product_Hunt.get_leaderboard", "Product Hunt.get_leaderboard"]) {
+    const found = findAgentMcpTool(agentTools.forAgent("agent"), name);
+    assert.equal(found?.config.id, fallback.id, name);
+    assert.equal(found?.tool, "get_leaderboard", name);
+  }
+  assert.equal(findAgentMcpTool([fallback], "other.get_leaderboard"), null, "another server's name");
+  assert.equal(findAgentMcpTool([fallback], "mcp_Product_Hunt_get_leaderboard"), null, "the ambiguous mcp_ form");
+  const ran = await runCauseEffect(agentTools.callTool(fallback, "get_leaderboard", { limit: 3 }));
+  assert.ok("result" in ran, "the tool runs on the saved row");
+  assert.deepEqual(mcpToolCallResponse(ran.result), {
+    success: true,
+    contentItems: [{ type: "inputText", text: 'get_leaderboard {"limit":3}' }],
+  });
+  const failed = await runCauseEffect(agentTools.callTool(fallback, "missing", {}));
+  assert.ok("result" in failed && !mcpToolCallResponse(failed.result).success, "a tool error stays a failure");
+  const offline = store.save({ ...calendar, id: "", name: "offline", url: await closedUrl() });
+  const unreachable = await runCauseEffect(agentTools.callTool(offline, "get_leaderboard", {}));
+  assert.ok("error" in unreachable, "a server that is down is a sentence");
+
+  // A stdio row runs for a Full access agent, with its environment, as the Test button starts it
+  // (#10146). A Workspace only agent keeps it out: its provider starts the row in its sandbox.
+  const stdioProgram = join(root, "stdio-mcp-server.js");
+  await writeFile(
+    stdioProgram,
+    `let buffer = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk) => {
+  buffer += chunk;
+  for (let end = buffer.indexOf("\\n"); end >= 0; end = buffer.indexOf("\\n")) {
+    const message = JSON.parse(buffer.slice(0, end));
+    buffer = buffer.slice(end + 1);
+    if (message.id === undefined) continue;
+    const result =
+      message.method === "initialize"
+        ? { protocolVersion: message.params.protocolVersion, capabilities: { tools: {} }, serverInfo: { name: "local", version: "1" } }
+        : message.method === "tools/call"
+          ? { content: [{ type: "text", text: message.params.name + " key=" + (process.env.LOCAL_KEY === "set") }] }
+          : {};
+    process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: message.id, result }) + "\\n");
+  }
+});
+`,
+  );
+  const stdioRow = store.save({
+    ...calendar,
+    id: "",
+    name: "local_stdio",
+    transport: "stdio",
+    command: process.execPath,
+    args: [stdioProgram],
+    env: [{ key: "LOCAL_KEY", value: "set" }],
+    headers: [],
+    url: "",
+  });
+  assert.equal(mcpFallbackRunsServer(stdioRow, { access: "full" }), true, "stdio for Full access");
+  assert.equal(mcpFallbackRunsServer(stdioRow, { access: "workspace" }), false, "no stdio for Workspace only");
+  assert.equal(mcpFallbackRunsServer(fallback, { access: "workspace" }), true, "http for Workspace only");
+  const stdioRan = await runCauseEffect(agentTools.callTool(stdioRow, "get_messages", {}));
+  assert.ok("result" in stdioRan, "the stdio tool runs on the saved row");
+  assert.deepEqual(mcpToolCallResponse(stdioRan.result), {
+    success: true,
+    contentItems: [{ type: "inputText", text: "get_messages key=true" }],
+  });
+  store.remove(stdioRow.id);
 
   // Nothing an agent reads names a key: not the query of an address, not a header value.
   const everything = JSON.stringify(calls.map(({ result, approvals }) => ({ result, approvals })));

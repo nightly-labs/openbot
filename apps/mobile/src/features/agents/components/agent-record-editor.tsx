@@ -1,4 +1,4 @@
-import { Host, Switch } from "@expo/ui";
+import { Host } from "@expo/ui";
 import { eventFilterDraftsValid, eventFiltersFromDrafts } from "@openbot/contracts/event-filter-value";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
@@ -40,6 +40,7 @@ import {
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
+import { AppSwitch } from "@/shared/components/app-switch";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
@@ -337,7 +338,8 @@ export function RoutineEditor({
   available,
   port,
 }: {
-  agent: Pick<MobileAgent, "id" | "serverId">;
+  // A channel passes no name: its routines have no single agent to give a secret to.
+  agent: Pick<MobileAgent, "id" | "serverId"> & Partial<Pick<MobileAgent, "name">>;
   routine?: RoutineRecord;
   available: boolean;
   port?: {
@@ -355,6 +357,9 @@ export function RoutineEditor({
   const toggle = useRecordAction(port?.queryKey);
   const testRun = useRecordAction(port?.queryKey, "mobile.agent.record.testFailed");
   const rotate = useRecordAction(port?.queryKey, "mobile.agent.webhook.rotateFailed");
+  const give = useRecordAction(port?.queryKey, "mobile.agent.webhook.giveFailed");
+  // The agent that got the newest secret. Its name shows until a new secret replaces it.
+  const [givenTo, setGivenTo] = useState<string | null>(null);
   const [testStarted, setTestStarted] = useState(false);
   const [activeOverride, setActiveOverride] = useState<boolean | null>(null);
   // The host returns a signing secret one time: from the save that makes a webhook trigger, or from a rotation.
@@ -363,6 +368,7 @@ export function RoutineEditor({
   const [created, setCreated] = useState<WebhookRoutine | null>(null);
   const keepOpen = useRef(false);
   const eventOwner = { kind: port ? "channel" : "agent", id: agent.id } as const;
+  const agentName = agent.name;
   const webhookRoutine = isWebhookRoutine(routine) ? routine : undefined;
   useEffect(() => {
     if (routine?.active === activeOverride) setActiveOverride(null);
@@ -406,6 +412,9 @@ export function RoutineEditor({
   // Such a host saves a scheduled routine through the event routes, which carry `missedPolicy`.
   const missedRuns = useMobileWorkspaceSelector((current) => current.canManageMissedRuns(agent.serverId));
   const routineResults = useMobileWorkspaceSelector((current) => current.canManageRoutineResults(agent.serverId));
+  const agentSecretSupported = useMobileWorkspaceSelector((current) =>
+    current.canGiveWebhookSecretToAgent(agent.serverId),
+  );
   const savedMissedPolicy = routine?.missedPolicy ?? "skip";
   const missedPolicy = edits.missedPolicy ?? savedMissedPolicy;
   const setMissedPolicy = (missedPolicy: RoutineMissedPolicy) => setEdits((current) => ({ ...current, missedPolicy }));
@@ -620,8 +629,26 @@ export function RoutineEditor({
                       { id: webhookRoutine.id, owner: eventOwner },
                       agent.serverId,
                     );
+                    setGivenTo(null);
                     setSecret(rotated.secret);
                   })
+              : undefined
+          }
+          agentSecret={
+            webhookRoutine && eventsSupported && agentSecretSupported && eventOwner.kind === "agent" && agentName
+              ? {
+                  agentName,
+                  pending: give.pending,
+                  give: () =>
+                    void give.run(async () => {
+                      await workspace.giveEventRoutineSecretToAgent(
+                        { id: webhookRoutine.id, owner: eventOwner },
+                        agent.serverId,
+                      );
+                      setSecret(null);
+                      setGivenTo(agentName);
+                    }),
+                }
               : undefined
           }
         />
@@ -690,7 +717,7 @@ export function RoutineEditor({
           <SettingsRow
             trailing={
               <Host matchContents colorScheme={theme === "dark" ? "dark" : "light"}>
-                <Switch
+                <AppSwitch
                   label={t("mobile.agent.record.enabled")}
                   value={activeOverride ?? routine.active}
                   disabled={disabled || toggle.pending}
@@ -772,6 +799,16 @@ export function RoutineEditor({
       {rotate.error ? (
         <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
           {rotate.error}
+        </Typography.Paragraph>
+      ) : null}
+      {givenTo && !give.error ? (
+        <Typography.Paragraph accessibilityLiveRegion="polite" className="text-success-text">
+          {t("mobile.agent.webhook.given", { name: givenTo })}
+        </Typography.Paragraph>
+      ) : null}
+      {give.error ? (
+        <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
+          {give.error}
         </Typography.Paragraph>
       ) : null}
       {toggle.error ? (

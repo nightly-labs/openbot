@@ -27,7 +27,7 @@ export const UPLOAD_BLUR_RADIUS = 24;
  * The sent fraction of an upload, gliding between reports on the UI thread. The host reports
  * bytes that have left the phone, so the value is measured, not guessed.
  */
-function useGlidingProgress(progress: number) {
+export function useGlidingProgress(progress: number) {
   const reducedMotion = useReducedMotion();
   const value = useSharedValue(progress);
   useEffect(() => {

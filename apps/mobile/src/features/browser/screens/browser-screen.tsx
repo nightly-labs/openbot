@@ -45,6 +45,7 @@ import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
+import { useCloseScreen } from "@/shared/lib/use-close-screen";
 import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";
 import { BrowserLiveStage, type BrowserLiveStageHandle } from "../components/browser-live-stage";
 import { useBrowserFeature } from "../components/use-browser-feature";
@@ -148,6 +149,9 @@ function BrowserView({
   onReconnect: () => void;
 }) {
   const { t, sourceText, format, errorMessage } = useText();
+  // The hand back waits for the server: the user can close the browser in that time. Then nothing
+  // closes, never the chat under it. A sheet above the browser closes with it.
+  const closeBrowser = useCloseScreen(leaveFirstBrowser);
   const insets = useSafeAreaInsets();
   const liquidGlass = useLiquidGlass();
   const reducedMotion = useReducedMotion();
@@ -174,6 +178,7 @@ function BrowserView({
     tab?.id ?? null,
     allowed && online && support.view && appForeground,
     (menu) => contextMenu.current(menu),
+    (text) => void copyText(text),
   );
   const [mode, setMode] = useState<LiveViewMode>(rememberedMode);
   const stage = useRef<BrowserLiveStageHandle>(null);
@@ -396,7 +401,7 @@ function BrowserView({
     try {
       await respondToBrowserTakeover(agent.serverId, { requestId: takeover.requestId, decision: "complete" });
       void haptics.notification("success");
-      if (router.canGoBack()) router.back();
+      closeBrowser();
     } catch {
       void haptics.notification("error");
       setNotice(t("mobile.browser.notice.handBackFailed"));
@@ -834,6 +839,10 @@ function BrowserView({
 }
 
 function ignoreInput() {}
+
+function leaveFirstBrowser() {
+  if (router.canGoBack()) router.back();
+}
 
 /**
  * A glass circle of the control size, as the chat header draws one. The menu owns the touch. Hidden,

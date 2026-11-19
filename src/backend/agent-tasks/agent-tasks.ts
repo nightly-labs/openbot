@@ -28,6 +28,7 @@ import {
   type AgentThreadRecord,
   type AgentThreadStore,
   copyBranchMessages,
+  type ThreadListPosition,
 } from "../agent-threads/agent-thread-store";
 import type { MailboxStore } from "../mailbox-store";
 import type { DynamicToolCallParams } from "../protocol";
@@ -58,6 +59,8 @@ export interface AgentTasksHooks {
   emit(event: AgentEvent): void;
   /** The agent, for its provider and its task limit. */
   agent(agentId: string): AgentSummary | undefined;
+  /** The task limit of an agent that has no limit of its own on this host. */
+  defaultTaskLimit(): number;
   /** Why the drain holds the next message of this task, as the drain names it, or null. Read late. */
   hold(agentId: string, taskId: string): string | null;
   /** A message is queued in a task: the queue and the drain take it. */
@@ -82,6 +85,13 @@ export class AgentTaskBranchFailed extends Schema.TaggedError<AgentTaskBranchFai
 }) {}
 
 type BranchFailure = AgentTaskBranchFailed["reason"];
+
+/** The agent has the most open threads that it can have. The message tells the person what to do. */
+export class AgentThreadLimitError extends Error {
+  constructor() {
+    super(sourceText("error.backend.threadOpenLimitReached", { count: INPUT_LIMITS.agentTasks }));
+  }
+}
 
 function branchStep<A>(reason: BranchFailure, run: () => A): Effect.Effect<A, AgentTaskBranchFailed> {
   return Effect.try({ try: run, catch: (cause) => new AgentTaskBranchFailed({ reason, cause }) });
@@ -135,7 +145,7 @@ export class AgentTasks implements TaskLanes {
 
   limit(agentId: string): number {
     const agent = this.#hooks.agent(agentId);
-    return agent ? agentTaskLimit(agent) : 1;
+    return agent ? agentTaskLimit(agent, this.#hooks.defaultTaskLimit()) : 1;
   }
 
   /** Whether the agent's provider runs one turn at a time, across its own chat and its tasks. */
@@ -153,9 +163,10 @@ export class AgentTasks implements TaskLanes {
   }
 
   snapshot(agentId: string): AgentTasksSnapshot {
+    const awaited = this.#mailbox.awaitedThreadRequests();
     return {
       agentId,
-      tasks: this.#store.list(agentId).map((task) => this.#publicTask(task)),
+      tasks: this.#store.list(agentId).map((task) => this.#publicTask(task, awaited)),
       limit: this.limit(agentId),
     };
   }
@@ -177,9 +188,12 @@ export class AgentTasks implements TaskLanes {
     return task;
   }
 
-  /** The side threads of this agent, open and archived, with activity at or after `after`. The latest first. */
-  recent(agentId: string, after: string | null, limit: number): AgentThreadRecord[] {
-    return this.#store.recent(agentId, after, limit);
+  /**
+   * The side threads of this agent, open and archived, with activity at or after `after`. The latest
+   * first. With `last`, the next page of a list that ended with `last`.
+   */
+  recent(agentId: string, after: string | null, limit: number, last?: ThreadListPosition | null): AgentThreadRecord[] {
+    return this.#store.recent(agentId, after, limit, last);
   }
 
   /** Whether this agent has the task, open or closed. */
@@ -350,8 +364,7 @@ export class AgentTasks implements TaskLanes {
 
   /** The task list holds `INPUT_LIMITS.agentTasks` tasks, open ones first, so more open tasks could not be seen or stopped. */
   #requireRoom(agentId: string): void {
-    if (this.#store.openTaskIds(agentId).length >= INPUT_LIMITS.agentTasks)
-      throw new Error(sourceText("error.backend.threadOpenLimitReached", { count: INPUT_LIMITS.agentTasks }));
+    if (this.#store.openTaskIds(agentId).length >= INPUT_LIMITS.agentTasks) throw new AgentThreadLimitError();
   }
 
   /** Removes a new task that took no message, because the move into it was refused. */
@@ -682,7 +695,7 @@ export class AgentTasks implements TaskLanes {
     return this.#store.taskForThread(threadId);
   }
 
-  #publicTask(task: AgentThreadRecord): AgentTask {
+  #publicTask(task: AgentThreadRecord, awaited = this.#mailbox.awaitedThreadRequests()): AgentTask {
     const snapshot = this.#conversation.loadedExecutionSnapshot(task.threadId);
     const activeTurnId = task.closedAt === null ? (snapshot?.activeTurnId ?? null) : null;
     const queuedMessages =
@@ -711,6 +724,10 @@ export class AgentTasks implements TaskLanes {
       error: task.outcome === "failed" ? task.error : null,
       queuedMessages,
       queue: task.closedAt === null ? this.#mailbox.taskQueue(task.agentId, task.taskId) : [],
+      // An answer to an archived thread goes to the agent's own chat, so only an open thread waits.
+      awaitedReplies: awaited.flatMap(({ taskId, messageId, recipientAgentId, status }) =>
+        taskId === task.taskId && task.closedAt === null ? [{ messageId, recipientAgentId, status }] : [],
+      ),
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,
       closedAt: task.closedAt,
@@ -783,11 +800,17 @@ function taskTitle(text: string): string {
 /** The drain names more reasons than the user needs: the ones a task cannot change become "agent-busy". */
 function publicHold(reason: string | null): AgentTaskHold | null {
   switch (reason) {
+    // The providers start, restart, or cannot start at all: no task hold names that, so none shows (#8915).
     case null:
+    case "providers-not-ready":
+    // A routine run waits for its provider to start again (#6751).
+    case "provider-start":
       return null;
     case "task-limit":
       return "task-limit";
     case "agent-client-changing":
+    // The provider replaces its CLI after the running turns, and the agent's process starts again on it (#8915).
+    case "provider-cli-replaced":
       return "agent-restarting";
     case "usage-limit":
       return "usage-limit";

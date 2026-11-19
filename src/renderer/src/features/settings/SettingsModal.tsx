@@ -11,6 +11,7 @@ import type {
   MobileConnectedDevice,
   MobileConnectLink,
   MobileConnectTicket,
+  ReferralDesktopApi,
   RemoteNetworkRoute,
   RemoteNetworkRouteState,
   ServerNotificationLevel,
@@ -31,8 +32,14 @@ import { BillingPanel } from "@openbot/ui/features/billing/BillingPanel";
 import { createBillingStore } from "@openbot/ui/features/billing/billing-store";
 import { LicenseSection } from "@openbot/ui/features/billing/LicenseSection";
 import { createLicenseStore } from "@openbot/ui/features/billing/license-store";
+import { ReferralPanel } from "@openbot/ui/features/referral/ReferralPanel";
+import { createReferralStore } from "@openbot/ui/features/referral/referral-store";
 import type { GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
-import { SettingsDialogShell, type SettingsPagePlacement } from "@openbot/ui/features/settings/SettingsDialogShell";
+import {
+  SettingsDialogShell,
+  SettingsNavGroupLabel,
+  type SettingsPagePlacement,
+} from "@openbot/ui/features/settings/SettingsDialogShell";
 import { SettingsMobileConnectTab } from "@openbot/ui/features/settings/SettingsMobileConnectTab";
 import { SettingsProfileTab } from "@openbot/ui/features/settings/SettingsProfileTab";
 import { SettingsUpdatesTab } from "@openbot/ui/features/settings/SettingsUpdatesTab";
@@ -49,7 +56,6 @@ import { createNotificationLevelsStore } from "./notification-levels-store";
 import { createProfileActivityStore } from "./profile-activity-store";
 import { renderProfileShareImage } from "./profile-share-image";
 import { type AgentDockSettingsModel, SettingsAgentDockTab } from "./SettingsAgentDockTab";
-import { createSettingsAgentsSection } from "./SettingsAgentsSection";
 import { SettingsDynamicIslandTab } from "./SettingsDynamicIslandTab";
 import { SettingsGeneralTab } from "./SettingsGeneralTab";
 import { SettingsNotificationsTab } from "./SettingsNotificationsTab";
@@ -105,6 +111,8 @@ export interface SettingsModalProps {
   onSignOut?: (() => Promise<void>) | undefined;
   processAvatarFile?: (file: File) => Promise<AvatarImageInput>;
   billingApi?: BillingDesktopApi;
+  /** Invite friends: the invite link, the credit and the friends of the account. */
+  referralApi?: ReferralDesktopApi | undefined;
   /** The commercial license of the account. It shows only when the account server sells licenses. */
   licenseApi?: LicenseDesktopApi | undefined;
   /** Opens the sales contact, for a license with more users than the app sells. */
@@ -155,6 +163,10 @@ export function SettingsModal(props: SettingsModalProps) {
     () => props.billingApi,
     () => props.open && activeTab() === "billing",
   );
+  const referral = createReferralStore(
+    () => props.referralApi,
+    () => props.open && activeTab() === "referral",
+  );
   const license = createLicenseStore(
     () => props.licenseApi,
     () => props.open && activeTab() === "billing",
@@ -165,11 +177,6 @@ export function SettingsModal(props: SettingsModalProps) {
   const notificationLevels = createNotificationLevelsStore({
     visible: () => props.open && activeTab() === "notifications",
     servers: () => props.servers ?? [],
-  });
-  const agents = createSettingsAgentsSection({
-    visible: () => props.open && activeTab() === "agents",
-    value: () => props.value,
-    onValueChange: (value) => props.onValueChange(value),
   });
   let handledHostedServerDeleteNonce = 0;
   createEffect(
@@ -190,7 +197,6 @@ export function SettingsModal(props: SettingsModalProps) {
     (tab) => {
       if (!tab) return;
       setActiveTab(tab);
-      agents.showList();
     },
   );
   const agentDockShown = () =>
@@ -204,7 +210,6 @@ export function SettingsModal(props: SettingsModalProps) {
     );
 
   const title = () => i18n.t(navItem(activeTab()).titleKey);
-  const agentsCrumb = () => (activeTab() === "agents" ? agents.crumb() : null);
   const description = () => i18n.t(navItem(activeTab()).descriptionKey);
 
   const tabsProps = {
@@ -214,7 +219,8 @@ export function SettingsModal(props: SettingsModalProps) {
     onChange(value: string) {
       if (
         value === "general" ||
-        value === "agents" ||
+        value === "appearance" ||
+        value === "app-behavior" ||
         value === "notifications" ||
         value === "voice" ||
         (value === "dynamic-island" && dynamicIslandShown()) ||
@@ -222,6 +228,7 @@ export function SettingsModal(props: SettingsModalProps) {
         value === "computer-use" ||
         value === "profile" ||
         value === "billing" ||
+        value === "referral" ||
         value === "mobile-connect" ||
         value === "updates"
       ) {
@@ -270,24 +277,27 @@ export function SettingsModal(props: SettingsModalProps) {
         page={props.page}
         open={props.open}
         title={title()}
-        crumb={agentsCrumb()}
         description={description()}
-        contentKey={`${activeTab()}:${agents.crumb()?.title ?? ""}`}
+        contentKey={activeTab()}
         restoreFocusTarget={props.restoreFocusTarget}
         onContentElement={(element) => (modalElement = element)}
         sidebar={
           <Tabs.List class="settings-modal-nav" aria-label={i18n.t("settings.sections.label")}>
-            {visibleNavItems().map((item) => {
+            {visibleNavItems().map((item, index, items) => {
               const NavIcon = item.icon;
+              const group = item.group !== items[index - 1]?.group ? item.group : undefined;
               return (
-                <Tabs.Trigger
-                  class="settings-modal-nav-item"
-                  value={item.value}
-                  aria-current={activeTab() === item.value ? "page" : undefined}
-                >
-                  <NavIcon aria-hidden="true" />
-                  <span>{i18n.t(item.titleKey)}</span>
-                </Tabs.Trigger>
+                <>
+                  {group ? <SettingsNavGroupLabel label={i18n.t(group)} /> : null}
+                  <Tabs.Trigger
+                    class="settings-modal-nav-item"
+                    value={item.value}
+                    aria-current={activeTab() === item.value ? "page" : undefined}
+                  >
+                    <NavIcon aria-hidden="true" />
+                    <span>{i18n.t(item.titleKey)}</span>
+                  </Tabs.Trigger>
+                </>
               );
             })}
           </Tabs.List>
@@ -296,6 +306,7 @@ export function SettingsModal(props: SettingsModalProps) {
         <Tabs.Content value="general" class="settings-modal-tab-panel" data-tab="general">
           {preferencesLoadError()}
           <SettingsGeneralTab
+            part="general"
             value={props.value}
             variant={props.appInfo?.variant ?? "production"}
             platform={props.appInfo?.platform}
@@ -307,9 +318,34 @@ export function SettingsModal(props: SettingsModalProps) {
           />
         </Tabs.Content>
 
-        <Tabs.Content value="agents" class="settings-modal-tab-panel" data-tab="agents">
+        <Tabs.Content value="appearance" class="settings-modal-tab-panel" data-tab="appearance">
           {preferencesLoadError()}
-          <agents.Panel menuMount={modalElement} />
+          <SettingsGeneralTab
+            part="appearance"
+            value={props.value}
+            variant={props.appInfo?.variant ?? "production"}
+            platform={props.appInfo?.platform}
+            onUpdateSetting={updateSetting}
+            onUpdateSettings={updateSettings}
+            selectMount={modalElement}
+            chatColor={props.account.chatColor ?? null}
+            onSetChatColor={props.onSetChatColor}
+          />
+        </Tabs.Content>
+
+        <Tabs.Content value="app-behavior" class="settings-modal-tab-panel" data-tab="app-behavior">
+          {preferencesLoadError()}
+          <SettingsGeneralTab
+            part="app-behavior"
+            value={props.value}
+            variant={props.appInfo?.variant ?? "production"}
+            platform={props.appInfo?.platform}
+            onUpdateSetting={updateSetting}
+            onUpdateSettings={updateSettings}
+            selectMount={modalElement}
+            chatColor={props.account.chatColor ?? null}
+            onSetChatColor={props.onSetChatColor}
+          />
         </Tabs.Content>
 
         <Tabs.Content value="notifications" class="settings-modal-tab-panel" data-tab="notifications">
@@ -394,9 +430,14 @@ export function SettingsModal(props: SettingsModalProps) {
                 store={license}
                 onManagePayment={() => void billing.openPortal({ flow: "manage" })}
                 onContactUs={licenseContactUs(props.onContactUs)}
+                billingDetails={props.billingApi}
               />
             }
           />
+        </Tabs.Content>
+
+        <Tabs.Content value="referral" class="settings-modal-tab-panel" data-tab="referral">
+          <ReferralPanel store={referral} available={props.referralApi !== undefined} />
         </Tabs.Content>
 
         <Tabs.Content value="mobile-connect" class="settings-modal-tab-panel" data-tab="mobile-connect">

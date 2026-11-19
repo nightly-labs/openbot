@@ -185,27 +185,42 @@ export function createActivityStore(deps: ActivityStoreDeps) {
     window.clearTimeout(agentActivityExitDelayTimer);
     agentActivityExitDelayTimer = undefined;
   };
+  /** The chat that the line follows. A memo, so that a new server object does not start the timers again. */
+  const chat = createMemo(() => agentConversationKey(deps.props.server?.id ?? "local", deps.props.agent?.id ?? ""));
+  const waitsForUser = createMemo(() =>
+    Boolean(deps.props.prompt || deps.props.approval || deps.props.browserTakeover),
+  );
+  let openChat: string | undefined;
   createEffect(
     () => ({
       activityId: activeActivityId(),
       agent: deps.props.agent,
+      chat: chat(),
       label: activityLabel(),
+      waitsForUser: waitsForUser(),
     }),
-    ({ activityId, agent, label }) => {
+    ({ activityId, agent, chat, label, waitsForUser }) => {
       clearAgentActivityShowTimer();
       clearAgentActivityExitDelayTimer();
       clearAgentActivityExitTimer();
+      const opened = chat !== openChat;
+      openChat = chat;
+      // A chat that opens keeps room for the line only when its agent works.
+      if (opened) setAgentActivitySpaceReserved(Boolean(activityId && label));
       if (activityId && label) {
+        const current = untrack(renderedAgentActivity);
         const nextActivity = {
           activityId,
           agent,
           detail: untrack(activeActivityDetail),
-          since: Date.now(),
+          since: current?.activityId === activityId ? current.since : Date.now(),
           phase: "active" as const,
           label,
         };
-        const current = untrack(renderedAgentActivity);
-        if (current?.agent?.id === agent?.id) {
+        // The delay keeps a short turn from flashing its line. A turn that already ran when its chat
+        // opened, or that waits for the user, is not short: its line shows with the chat, and does not
+        // push the messages up later.
+        if (current?.agent?.id === agent?.id || opened || waitsForUser) {
           setAgentActivitySpaceReserved(true);
           setRenderedAgentActivity(nextActivity);
           return;

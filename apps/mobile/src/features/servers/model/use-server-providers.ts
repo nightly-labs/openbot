@@ -104,7 +104,8 @@ export function useServerProviders(serverId: string, options: { watchStatus?: bo
 export function useServerCustomProviders(serverId: string, admin: ProviderAdmin | null) {
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();
-  const queryKey = queryKeys.customProviders(queryScope, serverId);
+  // The list is read again when the edit capability arrives, as on desktop and the web client.
+  const queryKey = queryKeys.customProviders(queryScope, serverId, Boolean(admin?.updateCustom));
   const keys = useRef(queryKey);
   keys.current = queryKey;
   const list = useQuery({

@@ -2,6 +2,7 @@ import {
   type AgentAccessLevel,
   canAdministerServer,
   graphAgentIds,
+  WORKFLOW_GROUP_FIELDS,
   type WorkflowDetail,
   type WorkflowGraph,
   type WorkflowRunDetail,
@@ -12,6 +13,26 @@ import {
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKFLOWS_GITHUB_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-github-v1";
+import {
+  WORKFLOWS_HIGGSFIELD_CAPABILITY,
+  WORKFLOWS_HIGGSFIELD_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-higgsfield-v1";
+import {
+  WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
+  WORKFLOWS_MEDIA_CATALOG_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-catalog-v1";
+import {
+  WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
+  WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-service-account-v1";
+import {
+  WORKFLOWS_MEDIA_CAPABILITY,
+  WORKFLOWS_MEDIA_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-v1";
+import {
+  WORKFLOWS_SUNRA_CAPABILITY,
+  WORKFLOWS_SUNRA_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-sunra-v1";
 import {
   WORKFLOW_RUN_STEP_LIMIT,
   WORKFLOW_STEP_TEXT_LIMIT,
@@ -33,6 +54,7 @@ import {
   parseStartWorkflowRun,
   parseWorkflowGitHubLastEvent,
   parseWorkflowGitHubRepository,
+  parseWorkflowMediaPrice,
   parseWorkflowRuns,
   parseWorkflowTrigger,
   parseWorkflowVersion,
@@ -46,6 +68,11 @@ import { runEventsEffect } from "./route-events";
 
 const WORKFLOW_PATHS = new Set<string>(Object.values(WORKFLOWS_ROUTES));
 const WORKFLOW_GITHUB_PATHS = new Set<string>(Object.values(WORKFLOWS_GITHUB_ROUTES));
+const WORKFLOW_MEDIA_PATHS = new Set<string>(Object.values(WORKFLOWS_MEDIA_ROUTES));
+const WORKFLOW_SUNRA_PATHS = new Set<string>(Object.values(WORKFLOWS_SUNRA_ROUTES));
+const WORKFLOW_HIGGSFIELD_PATHS = new Set<string>(Object.values(WORKFLOWS_HIGGSFIELD_ROUTES));
+const WORKFLOW_MEDIA_CATALOG_PATHS = new Set<string>(Object.values(WORKFLOWS_MEDIA_CATALOG_ROUTES));
+const WORKFLOW_MEDIA_ACCOUNT_PATHS = new Set<string>(Object.values(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES));
 
 function workflowMissing(): never {
   throw new HttpError(404, sourceText("error.workflow.missing"));
@@ -84,11 +111,15 @@ function placeOutputs(graph: WorkflowGraph): Map<string, string> {
   return places;
 }
 
+/** The fields that put a node in a group of the canvas. Any member that can change the workflow sets them. */
+const GROUP_FIELD_KEYS: ReadonlySet<string> = new Set(Object.values(WORKFLOW_GROUP_FIELDS));
+
 /**
  * The settings of each GitHub, Discord, Telegram or Slack trigger and output, and of each output into an
  * OpenBot channel, by node. Their changes act as the host's GitHub App bot, speak in the host's Discord
  * servers, Telegram chats or Slack workspaces, or post in the host's channels, so only an owner or admin
- * can add or change one (`workflows-github-v1`, `workflows-chats-v1`, `workflows-channels-v1`).
+ * can add or change one (`workflows-github-v1`, `workflows-chats-v1`, `workflows-channels-v1`). The group
+ * fields are not settings.
  */
 function adminNodes(graph: WorkflowGraph): Map<string, string> {
   const nodes = new Map<string, string>();
@@ -97,6 +128,7 @@ function adminNodes(graph: WorkflowGraph): Map<string, string> {
     if (kind !== "github" && kind !== "discord" && kind !== "telegram" && kind !== "slack" && kind !== "chat-channel")
       continue;
     const fields = Object.keys(node.fields)
+      .filter((key) => !GROUP_FIELD_KEYS.has(key))
       .sort()
       .map((key) => [key, node.fields[key] ?? null]);
     nodes.set(node.id, JSON.stringify([node.kind, fields]));
@@ -155,11 +187,30 @@ export async function routeWorkflows(
   const { method, url, capabilities, member, request, json, protocol } = context;
   const path = url.pathname;
   const githubPath = WORKFLOW_GITHUB_PATHS.has(path);
-  if (method !== "POST" || !(githubPath || WORKFLOW_PATHS.has(path))) return "unmatched";
+  const mediaPath = WORKFLOW_MEDIA_PATHS.has(path);
+  const sunraPath = WORKFLOW_SUNRA_PATHS.has(path);
+  const higgsfieldPath = WORKFLOW_HIGGSFIELD_PATHS.has(path);
+  const catalogPath = WORKFLOW_MEDIA_CATALOG_PATHS.has(path);
+  const accountPath = WORKFLOW_MEDIA_ACCOUNT_PATHS.has(path);
+  if (
+    method !== "POST" ||
+    !(githubPath || mediaPath || sunraPath || higgsfieldPath || catalogPath || accountPath || WORKFLOW_PATHS.has(path))
+  )
+    return "unmatched";
   if (!workflows || !capabilities.has(WORKFLOWS_CAPABILITY))
     throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
   const github = workflows.github;
   if (githubPath && (!github || !capabilities.has(WORKFLOWS_GITHUB_CAPABILITY)))
+    throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
+  if (mediaPath && !capabilities.has(WORKFLOWS_MEDIA_CAPABILITY))
+    throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
+  if (sunraPath && !capabilities.has(WORKFLOWS_SUNRA_CAPABILITY))
+    throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
+  if (higgsfieldPath && !capabilities.has(WORKFLOWS_HIGGSFIELD_CAPABILITY))
+    throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
+  if (catalogPath && !capabilities.has(WORKFLOWS_MEDIA_CATALOG_CAPABILITY))
+    throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
+  if (accountPath && !capabilities.has(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY))
     throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
   // `readJson` has already run the body through the workflows wire codec.
   const body = await readJson(request);
@@ -358,6 +409,33 @@ export async function routeWorkflows(
       return json(200, await runEventsEffect(workflows.rotateWorkflowSecret(input)));
     }
   }
+  // Each member can keep a picture, as each member can send a draft. The draft id is known only to
+  // its sender.
+  if (path === WORKFLOWS_MEDIA_ROUTES.keepPicture) {
+    return json(200, { fileId: await run(workflows.keepPicture(stringField(body, "draftId"))) });
+  }
+  // Each member who can use workflows can read it: it says only whether the host has a Sunra sign-in.
+  // Each route answers the field of its own frozen capability only.
+  if (path === WORKFLOWS_SUNRA_ROUTES.providers) return json(200, { sunra: workflows.mediaProviders().sunra });
+  // The same members can read the credits: they spend them when they run a Sunra step.
+  if (path === WORKFLOWS_SUNRA_ROUTES.credits)
+    return json(200, { sunra: (await run(workflows.mediaCredits("sunra"))).sunra });
+  // The same for Higgsfield.
+  if (path === WORKFLOWS_HIGGSFIELD_ROUTES.providers)
+    return json(200, { higgsfield: workflows.mediaProviders().higgsfield });
+  if (path === WORKFLOWS_HIGGSFIELD_ROUTES.credits)
+    return json(200, { higgsfield: (await run(workflows.mediaCredits("higgsfield"))).higgsfield });
+  // The same members can read the accounts and their credits: they choose the account that pays for a
+  // step. The answer has the name and the row id only, never a token or an address.
+  if (path === WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.accounts)
+    return json(200, { accounts: workflows.mediaProviders().accounts ?? [] });
+  if (path === WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.credits)
+    return json(200, { accounts: (await run(workflows.mediaCredits())).accounts ?? [] });
+  // The same members can read the live models and a price: they choose a model and run its steps. Both
+  // are reads that never give a token or an account, and never start a job.
+  if (path === WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog) return json(200, await run(workflows.mediaCatalog()));
+  if (path === WORKFLOWS_MEDIA_CATALOG_ROUTES.price)
+    return json(200, await run(workflows.mediaPrice(parse(parseWorkflowMediaPrice, body))));
   if (!github) return "unmatched";
   switch (path) {
     case WORKFLOWS_GITHUB_ROUTES.catalog:

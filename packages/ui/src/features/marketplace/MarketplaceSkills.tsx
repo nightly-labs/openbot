@@ -1,4 +1,5 @@
 import {
+  githubSkillUrl,
   type InstalledSkill,
   type MarketplaceSkillSort,
   type MarketplaceSkillSummary,
@@ -12,6 +13,7 @@ import {
   ChevronDown,
   ChevronRight,
   DropdownMenu,
+  ExternalLink,
   Heading,
   IconButton,
   Input,
@@ -25,10 +27,11 @@ import {
 import { SkillGradient } from "@openbot/ui/skill-gradient";
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createMemo, createStore, For, onCleanup, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createStore, For, Match, onCleanup, Show, Switch, untrack } from "solid-js";
 import { DialogAgents, type DialogSkill } from "./MarketplaceAgentsDialog";
 import { useInstalls } from "./MarketplaceCards";
 import { ListingPanel, MenuCheck, MissingNotice, SkillMark } from "./MarketplaceParts";
+import { createGithubRead, GithubTrustNote, githubLinkOf, githubListings } from "./marketplace-github";
 import { CATEGORY_LABELS, createMarketplaceListing } from "./marketplace-listing";
 import type { MarketplaceModel } from "./marketplace-model";
 import { moveView } from "./marketplace-motion";
@@ -327,10 +330,14 @@ function SkillSourceSwitch(props: { nav: MarketplaceNavigation }) {
 }
 
 /** The search of the Marketplace. The Skills and Agents tabs and their group pages share it. */
-export function MarketplaceSearch(props: { nav: MarketplaceNavigation; label?: string | undefined }) {
+export function MarketplaceSearch(props: {
+  nav: MarketplaceNavigation;
+  label?: string | undefined;
+  placeholder?: string | undefined;
+}) {
   const { t } = useText();
   const label = () => props.label ?? t("marketplace.search.label");
-  const placeholder = () => props.label ?? t("marketplace.search.placeholder");
+  const placeholder = () => props.placeholder ?? props.label ?? t("marketplace.search.placeholder");
   return (
     <label class="search-field marketplace-search">
       <Search aria-hidden="true" />
@@ -418,6 +425,87 @@ function CreateSkill(props: { model: MarketplaceModel }) {
 }
 
 /**
+ * The skills under a GitHub link in the search, in place of the catalog: the server reads the link
+ * at its newest commit. "Add" installs that commit. OpenBot did not review these skills, so the note
+ * says so above the rows.
+ */
+function GithubSkills(props: { scope: MarketplaceScope; link: string }) {
+  const { t } = useText();
+  const model = () => props.scope.model;
+  const read = createGithubRead(model, () => props.link);
+  const found = () => {
+    const value = read();
+    return value !== null && value !== "reading" && value.status === "found" ? value.source : null;
+  };
+  const failed = () => {
+    const value = read();
+    return value !== null && value !== "reading" && value.status === "failed" ? value.message : null;
+  };
+  const repository = (owner: string, repo: string) => `${owner}/${repo}`;
+  return (
+    <section class="marketplace-app-group marketplace-github" aria-labelledby="marketplace-skills-github">
+      <Switch>
+        <Match when={failed()}>
+          {(message) => (
+            <div class="marketplace-empty" role="alert">
+              <Text as="p" variant="body-sm" tone="muted" id="marketplace-skills-github">
+                {message()}
+              </Text>
+            </div>
+          )}
+        </Match>
+        <Match when={found()}>
+          {(source) => (
+            <>
+              <div class="marketplace-skill-group-head">
+                <h4 id="marketplace-skills-github" class="marketplace-app-group-title">
+                  {repository(source().owner, source().repo)}
+                  <span class="marketplace-app-group-count">{source().skills.length}</span>
+                </h4>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-label={t("marketplace.skills.github.openName", {
+                    repository: repository(source().owner, source().repo),
+                  })}
+                  onClick={() => model().openUrl(githubSkillUrl(source()))}
+                >
+                  {t("marketplace.skills.github.open")}
+                  <ExternalLink aria-hidden="true" />
+                </Button>
+              </div>
+              <GithubTrustNote />
+              <ul class="marketplace-app-list marketplace-skill-list">
+                <For each={githubListings(source())} keyed={(skill) => skill.id}>
+                  {(skill) => (
+                    <LibraryRow
+                      name={skill().name}
+                      iconUrl={null}
+                      verified={false}
+                      line={undefined}
+                      fallback={skill().description}
+                      onOpen={() => props.scope.nav.go({ kind: "skill", listing: skill() })}
+                    >
+                      <DialogAgents model={model()} skill={skill()} />
+                    </LibraryRow>
+                  )}
+                </For>
+              </ul>
+            </>
+          )}
+        </Match>
+        <Match when={read() === "reading"}>
+          <Text as="p" variant="body-sm" tone="muted" role="status" id="marketplace-skills-github">
+            {t("marketplace.skills.github.reading")}
+          </Text>
+        </Match>
+      </Switch>
+    </section>
+  );
+}
+
+/**
  * The Skills tab: "Your skills" first, with their actions in each row; then the catalog skills that no
  * agent has, by category. Each group shows its first 6 skills, also during a search; "See all" opens
  * the group page.
@@ -427,15 +515,8 @@ export function SkillLibrary(props: { scope: MarketplaceScope; noMatch: JSX.Elem
   const nav = () => props.scope.nav;
   const model = () => props.scope.model;
   const rows = createSkillRows(props.scope, () => props.scope.skills.items());
-  const searching = () => nav().state.query.trim() !== "";
-  /* The empty state shows only to a user who can add skills and has none at all. */
-  const showYours = () =>
-    model().agents().length > 0 && (rows.mine().length > 0 || (!searching() && rows.all().length === 0));
-  const seeAll = (group: SkillGroup) => nav().go({ kind: "skillGroup", group });
-  /* The server can hold more skills of a category than the overview brought. */
-  const more = (skills: readonly MarketplaceSkillSummary[]) =>
-    skills.length > GROUP_LIMIT || props.scope.skills.hasMore();
-  const shown = () => (showYours() ? rows.mine().length : 0) + rows.available().length;
+  const githubLink = () => githubLinkOf(model(), nav().state.query);
+  const searchHint = () => (model().readGithubSkills ? t("marketplace.skills.github.search") : undefined);
 
   return (
     <div class="marketplace-view marketplace-browse">
@@ -452,50 +533,76 @@ export function SkillLibrary(props: { scope: MarketplaceScope; noMatch: JSX.Elem
           <SkillSourceSwitch nav={nav()} />
         </div>
         <div class="marketplace-toolbar">
-          <MarketplaceSearch nav={nav()} />
+          <MarketplaceSearch nav={nav()} placeholder={searchHint()} />
           <CreateSkill model={model()} />
         </div>
       </header>
-      <div class="marketplace-stack">
-        <Show when={nav().state.missingListing === "skill"}>
-          <MissingNotice>{t("marketplace.skills.missing")}</MissingNotice>
-        </Show>
-        <Show when={showYours()}>
-          <section class="marketplace-app-group" aria-labelledby="marketplace-skills-yours">
-            <GroupHead
-              id="marketplace-skills-yours"
-              label={t("marketplace.skills.yours")}
-              count={rows.mine().length}
-              more={rows.mine().length > GROUP_LIMIT}
-              onSeeAll={() => seeAll("yours")}
-            />
-            <Show when={rows.mine().length > 0} fallback={<NoSkills />}>
-              <OwnRows scope={props.scope} rows={rows} skills={rows.mine().slice(0, GROUP_LIMIT)} />
-            </Show>
-          </section>
-        </Show>
-        <ListingPanel
-          listing={props.scope.skills}
-          loadingLabel={t("marketplace.loading.skills")}
-          count={shown()}
-          paged={false}
-          empty={props.noMatch}
-        >
-          <For each={rows.byCategory()} keyed={(group) => group.category}>
-            {(group) => (
-              <section class="marketplace-app-group" aria-labelledby={`marketplace-skills-${group().category}`}>
-                <GroupHead
-                  id={`marketplace-skills-${group().category}`}
-                  label={t(CATEGORY_LABELS[group().category])}
-                  more={more(group().skills)}
-                  onSeeAll={() => seeAll(group().category)}
-                />
-                <CatalogRows scope={props.scope} rows={rows} skills={group().skills.slice(0, GROUP_LIMIT)} />
-              </section>
-            )}
-          </For>
-        </ListingPanel>
-      </div>
+      <Show when={githubLink()} fallback={<SkillCatalog scope={props.scope} rows={rows} noMatch={props.noMatch} />}>
+        {(link) => (
+          <div class="marketplace-stack">
+            <GithubSkills scope={props.scope} link={link()} />
+          </div>
+        )}
+      </Show>
+    </div>
+  );
+}
+
+/** "Your skills" and the catalog groups of the Skills tab. */
+function SkillCatalog(props: { scope: MarketplaceScope; rows: SkillRows; noMatch: JSX.Element }) {
+  const { t } = useText();
+  const nav = () => props.scope.nav;
+  const model = () => props.scope.model;
+  const rows = props.rows;
+  const searching = () => nav().state.query.trim() !== "";
+  /* The empty state shows only to a user who can add skills and has none at all. */
+  const showYours = () =>
+    model().agents().length > 0 && (rows.mine().length > 0 || (!searching() && rows.all().length === 0));
+  const seeAll = (group: SkillGroup) => nav().go({ kind: "skillGroup", group });
+  /* The server can hold more skills of a category than the overview brought. */
+  const more = (skills: readonly MarketplaceSkillSummary[]) =>
+    skills.length > GROUP_LIMIT || props.scope.skills.hasMore();
+  const shown = () => (showYours() ? rows.mine().length : 0) + rows.available().length;
+  return (
+    <div class="marketplace-stack">
+      <Show when={nav().state.missingListing === "skill"}>
+        <MissingNotice>{t("marketplace.skills.missing")}</MissingNotice>
+      </Show>
+      <Show when={showYours()}>
+        <section class="marketplace-app-group" aria-labelledby="marketplace-skills-yours">
+          <GroupHead
+            id="marketplace-skills-yours"
+            label={t("marketplace.skills.yours")}
+            count={rows.mine().length}
+            more={rows.mine().length > GROUP_LIMIT}
+            onSeeAll={() => seeAll("yours")}
+          />
+          <Show when={rows.mine().length > 0} fallback={<NoSkills />}>
+            <OwnRows scope={props.scope} rows={rows} skills={rows.mine().slice(0, GROUP_LIMIT)} />
+          </Show>
+        </section>
+      </Show>
+      <ListingPanel
+        listing={props.scope.skills}
+        loadingLabel={t("marketplace.loading.skills")}
+        count={shown()}
+        paged={false}
+        empty={props.noMatch}
+      >
+        <For each={rows.byCategory()} keyed={(group) => group.category}>
+          {(group) => (
+            <section class="marketplace-app-group" aria-labelledby={`marketplace-skills-${group().category}`}>
+              <GroupHead
+                id={`marketplace-skills-${group().category}`}
+                label={t(CATEGORY_LABELS[group().category])}
+                more={more(group().skills)}
+                onSeeAll={() => seeAll(group().category)}
+              />
+              <CatalogRows scope={props.scope} rows={rows} skills={group().skills.slice(0, GROUP_LIMIT)} />
+            </section>
+          )}
+        </For>
+      </ListingPanel>
     </div>
   );
 }

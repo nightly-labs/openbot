@@ -20,6 +20,7 @@ import {
   requiredNumberColumn,
   requiredStringColumn,
 } from "./database/database-rows";
+import { withTransaction, withTransactionAsync } from "./database/sqlite-transaction";
 import { LineTooLongError } from "./jsonl";
 import { getString, isRecord, type ThreadItem } from "./protocol";
 import { providerFailure } from "./provider-client-effects";
@@ -44,6 +45,8 @@ export interface ClaudeSessionMessage {
   parent_tool_use_id: string | null;
   parent_agent_id: string | null;
   timestamp?: string;
+  /** The task run whose end this task notification reports (`origin.runId`). */
+  task_run_id?: string;
 }
 
 interface ParsedRecord {
@@ -62,6 +65,7 @@ interface ParsedRecord {
   teamName?: unknown;
   subtype?: unknown;
   compactMetadata?: unknown;
+  origin?: unknown;
   message?: unknown;
 }
 
@@ -131,6 +135,18 @@ export function claudeHistoryReader(options: ClaudeHistoryOptions = {}): ReadPro
       try: (signal) => scanClaudeHistory(request, consume, options, signal),
       catch: providerFailure,
     });
+}
+
+/**
+ * The turn ID of a turn that Claude Code starts by itself to answer the end of a background task.
+ * The live stream gives no ID of the transcript entry for that turn, so the live client and the history
+ * import both make this ID from the task run that ended. Then the import finds the turn that the live
+ * client stored and does not add its messages again.
+ */
+export function claudeTaskTurnId(sessionId: string, taskId: string, runId: string): string {
+  const hex = createHash("sha256").update(`claude-task-turn\n${sessionId}\n${taskId}\n${runId}`).digest("hex");
+  const variant = ((Number.parseInt(hex.slice(16, 17), 16) & 0x3) | 0x8).toString(16);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-8${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
 
 /** Explicit test boundary for an injected SDK history reader. Production uses claudeHistoryReader. */
@@ -209,7 +225,13 @@ async function scanClaudeHistory(
         await selectConversation(database, signal);
         await populateTurnMetadata(database, transcript, request.items === "full", signal);
         if (request.items === "none") await emitMetadata(database, consume, signal);
-        else await emitTurns(database, transcript, consume, signal);
+        else {
+          const { resumeKey } = request;
+          const fromSeq = resumeKey === undefined ? 0 : resumeStartSeq(database, resumeKey);
+          if ((await emitTurns(database, transcript, consume, signal, fromSeq)) && resumeKey !== undefined) {
+            writeResumePoint(database, resumeKey);
+          }
+        }
         return;
       } finally {
         database.close();
@@ -244,16 +266,18 @@ async function buildIndex(
   identity: FileIdentity,
   signal: AbortSignal,
 ): Promise<number> {
+  // A transcript can write one record more than once (#11557). Keep the first copy: an indexed row
+  // never changes, because a resumed read does not send the turns before its resume point again.
   const insert = database.prepare(
     `INSERT INTO entries
       (uuid, type, offset, length, parent_uuid, timestamp, session_id, parent_tool_use_id,
        parent_agent_id, is_sidechain, is_meta, team_name, subtype, compact_metadata, visible_user)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(uuid) DO NOTHING`,
   );
   let nextOffset = startOffset;
   let lineNumber = 0;
-  database.exec("BEGIN IMMEDIATE");
-  try {
+  return withTransactionAsync(database, async () => {
     for await (const record of readTranscriptLines(filePath, signal, startOffset, fileSize)) {
       if (signal.aborted) throw signal.reason;
       const parsed = record.complete ? parseRecord(record.line.trim()) : null;
@@ -290,12 +314,8 @@ async function buildIndex(
       if (lineNumber % 256 === 0) await new Promise<void>((resume) => setImmediate(resume));
     }
     writeHistoryState(database, identity, nextOffset, await scanBoundaryHash(filePath, nextOffset));
-    database.exec("COMMIT");
     return nextOffset;
-  } catch (cause) {
-    database.exec("ROLLBACK");
-    throw cause;
-  }
+  });
 }
 
 async function* readTranscriptLines(
@@ -397,25 +417,13 @@ function writeHistoryState(database: DatabaseSync, identity: FileIdentity, scanO
 }
 
 function resetIndex(database: DatabaseSync): void {
-  database.exec("BEGIN IMMEDIATE");
-  try {
+  withTransaction(database, () => {
     database.exec("DELETE FROM entries; DELETE FROM selected; DELETE FROM turn_metadata; DELETE FROM history_meta;");
-    database.exec("COMMIT");
-  } catch (cause) {
-    database.exec("ROLLBACK");
-    throw cause;
-  }
+  });
 }
 
 async function selectConversation(database: DatabaseSync, signal: AbortSignal): Promise<void> {
-  database.exec("BEGIN IMMEDIATE");
-  try {
-    await writeSelectedConversation(database, signal);
-    database.exec("COMMIT");
-  } catch (cause) {
-    database.exec("ROLLBACK");
-    throw cause;
-  }
+  await withTransactionAsync(database, () => writeSelectedConversation(database, signal));
 }
 
 async function writeSelectedConversation(database: DatabaseSync, signal: AbortSignal): Promise<void> {
@@ -530,8 +538,7 @@ async function populateTurnMetadata(
   const insert = database.prepare(
     "INSERT OR REPLACE INTO turn_metadata (turn_id, start_seq, end_seq, timestamp, final_answer_uuid) VALUES (?, ?, ?, ?, ?)",
   );
-  database.exec("BEGIN IMMEDIATE");
-  try {
+  await withTransactionAsync(database, async () => {
     database.exec("DELETE FROM turn_metadata");
     const file = includeAnswerMetadata ? await open(filePath, "r") : null;
     try {
@@ -547,11 +554,7 @@ async function populateTurnMetadata(
     } finally {
       if (file) await file.close();
     }
-    database.exec("COMMIT");
-  } catch (cause) {
-    database.exec("ROLLBACK");
-    throw cause;
-  }
+  });
 }
 
 async function findFinalAnswer(
@@ -615,24 +618,100 @@ async function emitMetadata(
   }
 }
 
+/** Sends the turns that start at `fromSeq` or later, newest first. False when the consumer stopped. */
 async function emitTurns(
   database: DatabaseSync,
   filePath: string,
   consume: ProviderHistoryConsumer,
   signal: AbortSignal,
-): Promise<void> {
+  fromSeq: number,
+): Promise<boolean> {
   let cursor = Number.MAX_SAFE_INTEGER;
   const statement = database.prepare(
-    "SELECT turn_id, start_seq, end_seq, timestamp, final_answer_uuid FROM turn_metadata WHERE start_seq < ? ORDER BY start_seq DESC LIMIT 1",
+    "SELECT turn_id, start_seq, end_seq, timestamp, final_answer_uuid FROM turn_metadata WHERE start_seq < ? AND start_seq >= ? ORDER BY start_seq DESC LIMIT 1",
   );
   for (;;) {
     if (signal.aborted) throw signal.reason;
-    const raw = statement.get(cursor);
-    if (raw === undefined) return;
+    const raw = statement.get(cursor, fromSeq);
+    if (raw === undefined) return true;
     const row = decodeTurnMetadata(raw);
     cursor = row.startSeq;
-    if (!(await emitTurnFragments(database, filePath, row, consume, signal))) return;
+    if (!(await emitTurnFragments(database, filePath, row, consume, signal))) return false;
   }
+}
+
+const RESUME_POINT_KEY = "resume_point";
+
+interface TurnListDigest {
+  turns: number;
+  digest: string;
+  /** The start of the newest turn. It is sent again, because new records can add to it. */
+  lastStart: number;
+}
+
+/**
+ * The first `limit` turns of the index as one hash. Each turn adds its id, range and final answer, and
+ * the last one only its id and start: its end and answer move when records come after it. The hash
+ * also counts the selected records before the last turn. A changed branch, a compaction or a
+ * rewritten transcript changes an earlier turn or that count, so the hash changes too.
+ */
+function turnListDigest(database: DatabaseSync, limit: number): TurnListDigest | null {
+  const rows = [
+    ...database
+      .prepare("SELECT turn_id, start_seq, end_seq, final_answer_uuid FROM turn_metadata ORDER BY start_seq LIMIT ?")
+      .iterate(limit),
+  ].map((raw) => {
+    const row = databaseRow(raw);
+    if (!row) throw new Error("Invalid Claude history turn row.");
+    return [
+      requiredStringColumn(row, "turn_id"),
+      requiredNumberColumn(row, "start_seq"),
+      requiredNumberColumn(row, "end_seq"),
+      optionalStringColumn(row, "final_answer_uuid") ?? null,
+    ] as const;
+  });
+  const last = rows.at(-1);
+  if (!last) return null;
+  const selectedBefore = databaseRow(
+    database.prepare("SELECT COUNT(*) AS count FROM selected WHERE seq < ?").get(last[1]),
+  );
+  const hash = createHash("sha256");
+  for (const row of rows.slice(0, -1)) hash.update(`${JSON.stringify(row)}\n`);
+  hash.update(JSON.stringify([last[0], last[1], selectedBefore ? requiredNumberColumn(selectedBefore, "count") : 0]));
+  return { turns: rows.length, digest: hash.digest("hex"), lastStart: last[1] };
+}
+
+/**
+ * Where a read with `resumeKey` starts. After a full read with the same key, the turns before the
+ * newest turn of that read did not change when the hash of the turn list is the same, so they are
+ * not sent again. Any other case sends all turns.
+ */
+function resumeStartSeq(database: DatabaseSync, resumeKey: string): number {
+  const raw = database.prepare("SELECT value FROM history_meta WHERE key = ?").get(RESUME_POINT_KEY);
+  const row = raw === undefined ? null : databaseRow(raw);
+  if (!row) return 0;
+  let stored: unknown;
+  try {
+    stored = JSON.parse(requiredStringColumn(row, "value"));
+  } catch {
+    return 0;
+  }
+  if (!isRecord(stored) || stored.key !== resumeKey || typeof stored.turns !== "number") return 0;
+  const current = turnListDigest(database, stored.turns);
+  return current && current.turns === stored.turns && current.digest === stored.digest ? current.lastStart : 0;
+}
+
+/** Saves the turn list of a read that sent every turn to a consumer with this key. */
+function writeResumePoint(database: DatabaseSync, resumeKey: string): void {
+  const current = turnListDigest(database, -1);
+  const value = current ? JSON.stringify({ key: resumeKey, turns: current.turns, digest: current.digest }) : null;
+  if (value === null) database.prepare("DELETE FROM history_meta WHERE key = ?").run(RESUME_POINT_KEY);
+  else
+    database
+      .prepare(
+        "INSERT INTO history_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+      )
+      .run(RESUME_POINT_KEY, value);
 }
 
 async function emitTurnFragments(
@@ -646,12 +725,14 @@ async function emitTurnFragments(
   let items: ThreadItem[] = [];
   let itemOffset = 0;
   let stopped = false;
+  let liveTurnId: string | null = null;
   const flush = async (complete: boolean): Promise<boolean> => {
     if (signal.aborted) throw signal.reason;
     const count = items.length;
     const result = await Effect.runPromise(
       consume({
         turnId: turn.turnId,
+        ...(liveTurnId ? { liveTurnId } : {}),
         status: "completed",
         startedAt: turnStartedAt(turn.timestamp, turn.startSeq),
         itemOffset,
@@ -700,6 +781,7 @@ async function emitTurnFragments(
           if (stopped) break;
           continue;
         }
+        if (row.seq === turn.startSeq && isClaudeTaskNotification(text)) liveTurnId = taskNotificationTurnId(message);
         if (
           row.seq !== turn.startSeq ||
           !text ||
@@ -763,6 +845,17 @@ async function emitTurnFragments(
   }
 }
 
+/**
+ * The ID that the live client gave the turn that this task notification started. A notice can report
+ * more than one task; the live client takes the last task that ended before the turn.
+ */
+function taskNotificationTurnId(message: ClaudeSessionMessage): string | null {
+  const taskId = [...messageText(message.message).matchAll(/<task-id>([^<]+)<\/task-id>/g)].at(-1)?.[1];
+  return taskId && message.task_run_id && message.session_id
+    ? claudeTaskTurnId(message.session_id, taskId, message.task_run_id)
+    : null;
+}
+
 function decodeTurnRow(raw: unknown): { seq: number; uuid: string; timestamp: string | null } {
   const row = databaseRow(raw);
   if (!row) throw new Error("Invalid Claude history turn row.");
@@ -812,6 +905,8 @@ async function readMessage(
   if (result.bytesRead !== row.length) throw new Error("Claude transcript changed while it was being read.");
   const parsed = parseRecord(buffer.toString("utf8"));
   if (!parsed || (parsed.type !== "user" && parsed.type !== "assistant" && parsed.type !== "system")) return null;
+  const taskRunId =
+    isRecord(parsed.origin) && parsed.origin.kind === "task-notification" ? stringOrNull(parsed.origin.runId) : null;
   return {
     type: parsed.type,
     uuid: parsed.uuid,
@@ -820,6 +915,7 @@ async function readMessage(
     parent_tool_use_id: stringOrNull(parsed.parentToolUseId ?? parsed.parent_tool_use_id),
     parent_agent_id: stringOrNull(parsed.parentAgentId ?? parsed.parent_agent_id),
     ...(parsed.timestamp ? { timestamp: String(parsed.timestamp) } : {}),
+    ...(taskRunId ? { task_run_id: taskRunId } : {}),
   };
 }
 
@@ -965,6 +1061,7 @@ function parseRecord(line: string): ParsedRecord | null {
       teamName: value.teamName,
       subtype: value.subtype,
       compactMetadata: value.compactMetadata,
+      origin: value.origin,
       message: value.message,
     };
   } catch {

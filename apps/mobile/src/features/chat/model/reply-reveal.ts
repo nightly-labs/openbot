@@ -86,10 +86,28 @@ function wordCount(token: Token): number {
   return count;
 }
 
+const blockWords = new WeakMap<Token, readonly string[]>();
+
+/**
+ * The reveal words of a block at the top level of a reply. A streamed chunk parses only the last
+ * blocks again, and the blocks before them keep their tokens, so their words are read once.
+ */
+function wordsOfBlock(token: Token): readonly string[] {
+  let words = blockWords.get(token);
+  if (!words) {
+    const collected: string[] = [];
+    collectWords([token], collected);
+    words = collected;
+    blockWords.set(token, words);
+    wordCounts.set(token, words.length);
+  }
+  return words;
+}
+
 /** Reveal parsed leaves without reparsing Markdown at every animation step. */
 export function createReplyReveal(tokens: Token[]) {
   const words: string[] = [];
-  collectWords(tokens, words);
+  for (const token of tokens) for (const word of wordsOfBlock(token)) words.push(word);
   function clip(limit: number): Token[] {
     let remaining = limit;
     function visit(entries: Token[]): Token[] {

@@ -25,10 +25,14 @@ export const messages = {
   "prompt.approval.allow": "İzin ver",
   "prompt.approval.alwaysAllow": "Her zaman izin ver",
   "prompt.approval.deny": "Reddet",
+  "prompt.approval.cut":
+    "Bu kart isteğin yalnızca başını gösterdiği için yalnızca Reddet sunuyor. İzin ver yakında görünmezse sunucudaki OpenBot'u güncelleyin.",
   "prompt.approval.report.bugHeadline": "Bir hata mı buldun? Hadi düzeltelim.",
   "prompt.approval.report.ideaHeadline": "Bir fikrin mi var? Hadi hayata geçirelim.",
   "prompt.approval.report.dontSend": "Şimdi değil",
   "prompt.approval.report.send": "OpenBot ekibine gönder",
+  "prompt.approval.report.phoneOnly":
+    "Bu sohbeti OpenBot telefon uygulamasında açın ve raporu oradan gönderin. Telefon kendi sürümünü, sistemini ve destek günlüğünü ekler. Telefon bağlanamıyorsa telefon uygulamasında Ayarlar > Destek bölümünü açın ve sorunu GitHub'da bildirin.",
   "prompt.approval.title.command": "Bir komut çalıştır",
   "prompt.approval.title.fileChange": "Dosyaları değiştir",
   "prompt.approval.title.permissions": "İzinleri ver",
@@ -41,12 +45,13 @@ export const messages = {
   "prompt.browser.title.pending": "{host} üzerinde adımı tamamlayın",
   "prompt.browser.cancelled": "İptal edildi",
   "prompt.browser.reload":
-    "Oturum açma işlemini tamamlayın, ardından “Tamamladım” seçeneğini seçmeden önce tarayıcı sayfasını yenileyin. Sayfa incelemesi, sayfa yeniden yüklenene kadar engellenir.",
+    "OpenBot parolayı veya kodu girmeyi tamamlayamadı. Sayfayı kontrol edin ve eksik olanı girin. Oturum açma işlemini tamamlayın, ardından “Tamamladım” seçeneğini seçmeden önce tarayıcı sayfasını yenileyin. Sayfa incelemesi, sayfa yeniden yüklenene kadar engellenir.",
   "prompt.browser.continuing": "{name} devam ediyor.",
   "prompt.browser.cancelledBody": "Tarayıcı adımı iptal edildi.",
   "prompt.browser.pendingBody":
     "Oturum açma, doğrulama veya onayı tamamlamak için sayfayı açın. Ardından {name} ajanının devam etmesine izin verin.",
   "prompt.browser.openPage": "{title} sayfasını aç",
+  "prompt.browser.openFailed": "Sayfa ana pencerede açılamadı. Yeniden deneyin.",
   "prompt.browser.done": "Tamamladım",
   "prompt.browser.pageFallback": "Tarayıcı sayfası",
   "prompt.browser.hostFallback": "tarayıcı",
@@ -54,6 +59,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "{host} oturum açma işlemi iptal edildi",
   "prompt.browser.signInBlocked.body":
     "Bu bilgisayarda oturum açın. OpenBot {server} sunucusuna yalnızca {host} oturumunu gönderir ve {name} devam eder.",
+  "prompt.browser.signInBlocked.desktopBody":
+    "{host} sunucudan oturum açmayı kabul etmiyor. Bu sohbeti bilgisayarınızdaki OpenBot masaüstü uygulamasında açın ve orada oturum açın. Ardından {name} devam eder.",
   "prompt.browser.signInBlocked.cancelledBody": "Oturum açma iptal edildi.",
   "prompt.browser.signInBlocked.waiting": "Oturum açma bekleniyor",
   "prompt.browser.signInBlocked.waitingButton": "Oturum açma bekleniyor…",

@@ -1,12 +1,26 @@
+import {
+  DEFAULT_PROVIDER_ACCOUNT_ID,
+  type ProviderAccountStatus,
+  WORKFLOW_MEDIA_MODELS,
+  type WorkflowCatalogProvider,
+  type WorkflowMediaCatalogModel,
+  type WorkflowMediaModel,
+  type WorkflowMediaServiceAccount,
+  workflowCatalogMediaModel,
+  workflowCatalogProvider,
+} from "@openbot/contracts/ipc";
+import { providerAvailability, providerTurnedOff } from "@openbot/ui/components/provider-model-options";
 import { WorkflowCanvas } from "@openbot/ui/features/workflows/WorkflowCanvas";
 import {
   WORKFLOW_FEATURES_V1,
   type WorkflowCatalogs,
   type WorkflowFeatures,
 } from "@openbot/ui/features/workflows/workflow-model";
-import { createMemo, Show, untrack } from "solid-js";
+import { currentText } from "@openbot/ui/text";
+import { createEffect, createMemo, createSignal, onCleanup, Show, untrack } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
-import { createWorkflowsController } from "./workflows-controller";
+import { mediaServiceAccountName, noteMediaStepEnded } from "./workflow-media-credits";
+import { createWorkflowsController, type WorkflowRequest } from "./workflows-controller";
 import type { WorkflowHost } from "./workflows-port";
 
 /**
@@ -21,12 +35,112 @@ export function WorkflowsCanvas(props: {
   models: WorkflowCatalogs["models"];
   status: WorkflowCatalogs["status"];
   self?: WorkflowCatalogs["self"];
+  /** The workflow to open, such as the one of a clicked notification. Without it, the first one opens. */
+  request?: WorkflowRequest | undefined;
+  /** The server of the host. The page shows the workflow of its last visit while it reads the host. */
+  serverId?: string | undefined;
 }) {
   // The keyed parent mounts a new canvas for each server, so the host does not change.
   const workflows = createWorkflowsController(
     untrack(() => props.host),
     () => desktopAnalytics.scope(),
+    untrack(() => props.request),
+    untrack(() => props.serverId),
   );
+  // Sunra and Higgsfield make files on the host's sign-in of that service, which the person makes in
+  // Apps and finishes in the browser. The canvas reads them, and the live models of both, again when
+  // the window comes back to the front. A failed read keeps the last answer.
+  const [sunra, setSunra] = createSignal(false);
+  const [higgsfield, setHiggsfield] = createSignal(false);
+  // The accounts of both services, or null when the host makes each file on the first account.
+  const [serviceAccounts, setServiceAccounts] = createSignal<readonly WorkflowMediaServiceAccount[] | null>(null);
+  const [catalog, setCatalog] = createSignal<readonly WorkflowMediaCatalogModel[]>([]);
+  let disposed = false;
+  const readMediaProviders = () => {
+    if (!props.host.mediaSupported()) return;
+    void props.host.workflows
+      .mediaProviders()
+      .then((providers) => {
+        if (disposed) return;
+        setSunra(providers.sunra);
+        setHiggsfield(providers.higgsfield);
+        setServiceAccounts(providers.accounts);
+      })
+      .catch(() => undefined);
+    void props.host.workflows
+      .mediaCatalog()
+      .then((answer) => {
+        if (!disposed) setCatalog(answer.models);
+      })
+      .catch(() => undefined);
+  };
+  /**
+   * The models of Sunra and Higgsfield: the live list of the host, then each fixed model that the live
+   * list does not have. An older host gives no live list. The host still runs a fixed model, so a step
+   * saved with one keeps its model.
+   */
+  const serviceModels = (provider: "sunra" | "higgsfield"): readonly WorkflowMediaModel[] => {
+    const live = catalog()
+      .filter((entry) => entry.provider === provider)
+      .flatMap((entry) => workflowCatalogMediaModel(entry) ?? []);
+    const ids = new Set(live.map((model) => model.id));
+    return [...live, ...WORKFLOW_MEDIA_MODELS.filter((model) => model.provider === provider && !ids.has(model.id))];
+  };
+  /**
+   * The accounts of a service as the picker lists them, when it has more than one: the first is the
+   * step's default, so it saves no account, and each other one saves the id of its Apps row.
+   */
+  const serviceAccountRows = (provider: WorkflowCatalogProvider): readonly ProviderAccountStatus[] | undefined => {
+    const accounts = serviceAccounts()?.filter((account) => account.provider === provider) ?? [];
+    if (accounts.length < 2) return undefined;
+    return accounts.map((account, index) => ({
+      id: index === 0 ? DEFAULT_PROVIDER_ACCOUNT_ID : account.id,
+      label: mediaServiceAccountName(account),
+      email: null,
+      state: "connected",
+      message: null,
+    }));
+  };
+  readMediaProviders();
+  // A Sunra or Higgsfield step spends credits, so the rail reads them again when one ends: in a run, or
+  // alone. A fast step can show as ended in the first view after its start, so each end after the
+  // newest time of the first view of the workflow counts. Older runs that "load more" shows do not.
+  // The times come from the host, so the clock of this computer does not matter.
+  let shown: { workflowId: string; since: string; ends: Set<string> } | null = null;
+  createEffect(
+    () => ({ view: workflows.props.runs, workflow: workflows.detail() }),
+    ({ view, workflow }) => {
+      if (!workflow) return;
+      const steps = [...view.runs.flatMap((run) => run.steps), ...view.soloSteps].filter(
+        (step) => step.workflowId === workflow.summary.id,
+      );
+      if (shown?.workflowId !== workflow.summary.id) {
+        const times = steps.flatMap((step) => [step.startedAt ?? "", step.endedAt ?? ""]);
+        shown = {
+          workflowId: workflow.summary.id,
+          since: times.reduce((a, b) => (b > a ? b : a), ""),
+          ends: new Set(),
+        };
+        return;
+      }
+      let ended = false;
+      for (const step of steps) {
+        if (step.endedAt === null || step.endedAt <= shown.since) continue;
+        // A retry ends the same step again, with a new attempt.
+        const end = `${step.id}:${step.attempt}`;
+        if (shown.ends.has(end)) continue;
+        shown.ends.add(end);
+        const model = workflow.graph.nodes.find((node) => node.id === step.nodeId)?.fields.model;
+        if (typeof model === "string" && workflowCatalogProvider(model)) ended = true;
+      }
+      if (ended) noteMediaStepEnded();
+    },
+  );
+  window.addEventListener("focus", readMediaProviders);
+  onCleanup(() => {
+    disposed = true;
+    window.removeEventListener("focus", readMediaProviders);
+  });
   const catalogs: WorkflowCatalogs = {
     get agents() {
       return props.agents;
@@ -52,8 +166,75 @@ export function WorkflowsCanvas(props: {
     get channels() {
       return workflows.channels();
     },
-    imageModels: [],
-    files: [],
+    // Only the models of a provider that is on and signed in now. The host makes the file with that
+    // subscription, or with the provider's API key when it uses one. Sunra and Higgsfield models need
+    // the host's sign-in of that service, and its credits pay for each file.
+    get imageModels() {
+      if (!props.host.mediaSupported()) return [];
+      const fixed = WORKFLOW_MEDIA_MODELS.flatMap((model) => {
+        // Sunra and Higgsfield models come after, from the live list.
+        if (model.provider === "sunra" || model.provider === "higgsfield") return [];
+        if (providerTurnedOff(props.status, model.provider)) return [];
+        const status = providerAvailability(props.status, props.models, model.provider, currentText().t);
+        if (status.state !== "available") return [];
+        // The picker lists each account of a provider that has more than one, when the host makes the
+        // file on the account of the step.
+        const accounts = props.host.mediaAccountSupported()
+          ? props.status.providers?.find((row) => row.id === model.provider)?.accounts
+          : undefined;
+        // An older host ignores the background of a step, so its models make no transparent image.
+        const { transparent, ...rest } = model;
+        return [
+          {
+            ...rest,
+            ...(transparent && props.host.mediaTransparentSupported() ? { transparent } : {}),
+            ...(status.apiKeyInUse ? { apiKey: true } : {}),
+            ...(accounts && accounts.length > 1 ? { accounts } : {}),
+          },
+        ];
+      });
+      // An older host ignores the background of a step, so its models make no transparent image.
+      // A host that lists the accounts of a service makes the file on the account of the step.
+      const service = (provider: WorkflowCatalogProvider, on: boolean) => {
+        if (!on) return [];
+        const accounts = serviceAccountRows(provider);
+        return serviceModels(provider).map(({ transparent, ...rest }) => ({
+          ...rest,
+          ...(transparent && props.host.mediaTransparentSupported() ? { transparent } : {}),
+          ...(accounts ? { accounts } : {}),
+        }));
+      };
+      return [...fixed, ...service("sunra", sunra()), ...service("higgsfield", higgsfield())];
+    },
+    get mediaPrice() {
+      return props.host.mediaSupported() ? props.host.workflows.mediaPrice : undefined;
+    },
+    get mediaSize() {
+      return props.host.mediaSizeSupported();
+    },
+    get media() {
+      return props.host.mediaSupported() ? props.host.mediaUrl : undefined;
+    },
+    get mediaPreview() {
+      return props.host.mediaSupported() ? props.host.mediaPreviewUrl : undefined;
+    },
+    // The Library pictures that an asset step can use. A picture with no preview address, as the
+    // browser gets, reads its file only when the canvas shows it.
+    get files() {
+      return workflows.pictures().map((file) =>
+        file.previewUrl
+          ? file
+          : {
+              ...file,
+              get previewUrl() {
+                return props.host.mediaUrl(file.id, "image") ?? null;
+              },
+            },
+      );
+    },
+    get upload() {
+      return props.host.mediaSupported() ? workflows.uploadPicture : undefined;
+    },
     get self() {
       return props.self;
     },
@@ -77,8 +258,12 @@ export function WorkflowsCanvas(props: {
       ...(telegram ? (["telegram"] as const) : []),
       ...(slack ? (["slack"] as const) : []),
     ];
+    const media = props.host.mediaSupported();
     return {
       ...WORKFLOW_FEATURES_V1,
+      // An asset step uses a picture of the host's Library, or one that the person sends to the host.
+      kinds: media ? [...WORKFLOW_FEATURES_V1.kinds, "image", "asset"] : WORKFLOW_FEATURES_V1.kinds,
+      uploads: media,
       triggers: [...WORKFLOW_FEATURES_V1.triggers, ...added],
       outputs: [...outputs, ...added],
     };

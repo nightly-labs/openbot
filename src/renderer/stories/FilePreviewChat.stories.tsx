@@ -141,7 +141,6 @@ function FilePreviewChat(props: {
             preview={file()}
             pageUrl={file().mimeType === "text/html" ? props.htmlPageUrl : undefined}
             agents={STORY_AGENTS}
-            defaultWidth={() => PANEL_DEFAULT}
             maxWidth={() => Math.min(PANEL_MAX, Math.max(PANEL_MIN, stageWidth() - CONVERSATION_MIN))}
             onWidthChange={(next) => {
               setWidth(next);

@@ -160,6 +160,15 @@ export type RoutineMissedPolicy = (typeof ROUTINE_MISSED_POLICIES)[number];
 export const ROUTINE_RUN_PLACES = ["chat", "thread"] as const;
 export type RoutineRunPlace = (typeof ROUTINE_RUN_PLACES)[number];
 
+/** The scheduled run that paused its own routine. `scheduledFor` is the time of that run. */
+export interface RoutinePausedByRun {
+  scheduledFor: string;
+}
+
+export function isRoutinePausedByRun(value: unknown): value is RoutinePausedByRun {
+  return isDynamicRecord(value) && isString(value.scheduledFor) && !Number.isNaN(Date.parse(value.scheduledFor));
+}
+
 /**
  * The part of a routine that does not name its owner. One store and one settings panel serve both
  * an agent and a channel; `Routine` and `ChannelRoutine` only add the owner id and keep their own
@@ -181,6 +190,11 @@ export interface RoutineFields {
    * A channel routine and the released Team API routes leave it out.
    */
   runIn?: RoutineRunPlace;
+  /**
+   * Set on a paused agent routine when one of its own scheduled runs paused it and nothing changed the
+   * routine after that. This computer's host sets it, and a remote host with `routine-pause-reasons-v1`.
+   */
+  pausedByRun?: RoutinePausedByRun;
   createdAt: string;
   updatedAt: string;
 }
@@ -201,6 +215,7 @@ export function isRoutineFields(value: unknown): value is RoutineFields {
     (value.limitPolicy === undefined || isOneOf(ROUTINE_LIMIT_POLICIES, value.limitPolicy)) &&
     (value.missedPolicy === undefined || isOneOf(ROUTINE_MISSED_POLICIES, value.missedPolicy)) &&
     (value.runIn === undefined || isOneOf(ROUTINE_RUN_PLACES, value.runIn)) &&
+    (value.pausedByRun === undefined || isRoutinePausedByRun(value.pausedByRun)) &&
     isString(value.createdAt) &&
     isString(value.updatedAt)
   );
@@ -225,6 +240,7 @@ export const ROUTINE_MISSED_COUNT_LIMIT = 999;
 /**
  * The occurrences that one `cancelled` run stands for: they came due while OpenBot was closed, and
  * none of them ran. `until` is the last of them, or null for one occurrence at `scheduledFor`.
+ * When the scheduler skipped them for another reason, the run's `error` holds that reason.
  */
 export interface RoutineMissedRuns {
   count: number;

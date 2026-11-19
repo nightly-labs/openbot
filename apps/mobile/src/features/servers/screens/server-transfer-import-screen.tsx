@@ -5,6 +5,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
 import { useEffect, useRef, useState } from "react";
+import { Alert } from "react-native";
 import {
   agentContents,
   exportDate,
@@ -113,7 +114,14 @@ export function ServerTransferImportScreen() {
     }
   }
 
-  if (phase === "done" && result) return <TransferResult result={result} />;
+  if (phase === "done" && result)
+    return (
+      <TransferResult
+        result={result}
+        title={t("mobile.server.transfer.imported", { count: result.agents.length })}
+        footer={t("mobile.server.transfer.next")}
+      />
+    );
 
   if (preview && phase !== "idle")
     return (
@@ -183,6 +191,24 @@ function TransferReview({
     selected.length > 0
       ? t("mobile.server.transfer.submit", { count: selected.length })
       : t("mobile.server.transfer.submitSettings");
+  const start = () =>
+    onImport(
+      selected.map((agent) => agent.key),
+      settings,
+    );
+  // An agent whose name is already on this server imports as a second, separate agent: the user accepts that first.
+  const confirmAndStart = () => {
+    const duplicates = selected.filter((agent) => agent.nameExists);
+    if (duplicates.length === 0) return start();
+    Alert.alert(
+      t("mobile.server.import.duplicatesTitle"),
+      t("mobile.server.import.duplicatesBody", { names: duplicates.map((agent) => agent.name).join(", ") }),
+      [
+        { text: t("common.cancel"), style: "cancel" },
+        { text: t("mobile.server.import.duplicatesConfirm"), onPress: start },
+      ],
+    );
+  };
 
   return (
     <SettingsContent>
@@ -192,12 +218,7 @@ function TransferReview({
         pending={importing}
         label={label}
         pendingLabel={t("mobile.server.transfer.importing")}
-        onSave={() =>
-          onImport(
-            selected.map((agent) => agent.key),
-            settings,
-          )
-        }
+        onSave={confirmAndStart}
       />
       <SettingsSection title={t("mobile.server.transfer.contains")} footer={error ?? label}>
         <SettingsRow disclosure={false} supportingText={contents}>
@@ -246,14 +267,20 @@ function TransferReview({
   );
 }
 
-function TransferResult({ result }: { result: RemoteInstanceTransferResult }) {
+/** The agents that an import or a copy added, and what the user must do next. */
+export function TransferResult({
+  result,
+  title,
+  footer,
+}: {
+  result: RemoteInstanceTransferResult;
+  title: string;
+  footer: string;
+}) {
   const { t, sourceText: localize } = useText();
   return (
     <SettingsContent>
-      <SettingsSection
-        title={t("mobile.server.transfer.imported", { count: result.agents.length })}
-        footer={t("mobile.server.transfer.next")}
-      >
+      <SettingsSection title={title} footer={footer}>
         {result.agents.map((agent) => (
           <SettingsRow key={agent.agentId} disclosure={false}>
             <Typography.Paragraph>{agent.name}</Typography.Paragraph>

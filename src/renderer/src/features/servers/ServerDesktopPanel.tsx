@@ -23,6 +23,7 @@ const ISSUE_TITLES = {
   client_update_required: "server.desktop.clientUpdateRequired",
   host_update_required: "server.desktop.hostUpdateRequired",
   protocol_error: "server.desktop.connectionUnavailable",
+  server_safe_mode: "server.desktop.connectionUnavailable",
   authentication_required: "server.desktop.connectionUnavailable",
   network_unavailable: "server.desktop.connectionUnavailable",
 } as const satisfies Record<ServerConnectionIssueCode, AppTextKey>;

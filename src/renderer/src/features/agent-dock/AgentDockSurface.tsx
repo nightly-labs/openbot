@@ -1,12 +1,16 @@
 import type {
+  AgentApproval,
   AgentDockAction,
+  AgentDockApproval,
   AgentDockChannel,
   AgentDockPresentation,
   AgentDockSeatRef as AgentDockSeatContract,
+  AgentRuntimeApproval,
 } from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
 import {
   AgentDock,
+  type AgentDockChatAnswers,
   type AgentDockChatModel,
   type AgentDockSeat,
   type AgentDockSeatRef,
@@ -58,6 +62,7 @@ export function AgentDockSurface() {
   const { t, errorMessage } = useText();
   const [presentation, setPresentation] = createSignal<AgentDockPresentation | null>(null);
   const [closeRequest, setCloseRequest] = createSignal(0);
+  const [blurRequest, setBlurRequest] = createSignal(0);
   const [tucked, setTuckedSignal] = createSignal(false);
   /* A plain copy: a signal write shows in a read only after the next flush. */
   let isTucked = false;
@@ -80,7 +85,8 @@ export function AgentDockSurface() {
   /** The pointer is close to the edge strip. */
   let near = false;
   let tuckTimer: ReturnType<typeof setTimeout> | undefined;
-  let sent = { interactive: false, keyboard: false };
+  /** Null until the first send: a reloaded page cannot know what the window takes (#11606). */
+  let sent: { interactive: boolean; keyboard: boolean } | null = null;
   /** The dock parts at rest, or null while the dock moves. */
   let dockShape: readonly AgentDockShapeRect[] | null = null;
   let sentShape = "";
@@ -183,7 +189,7 @@ export function AgentDockSurface() {
   const sync = () => {
     updateTuck();
     const next = { interactive: pointerIn, keyboard: chatOpen || menuOpen() };
-    if (next.interactive === sent.interactive && next.keyboard === sent.keyboard) return;
+    if (next.interactive === sent?.interactive && next.keyboard === sent.keyboard) return;
     sent = next;
     void agentDockPort()
       .agentDock.setInteractive(next)
@@ -219,7 +225,8 @@ export function AgentDockSurface() {
       pointerIn = false;
       sync();
     };
-    const onBlur = () => setCloseRequest((value) => value + 1);
+    // A chat that the user keeps open stays when a clipboard overlay or another window takes the focus.
+    const onBlur = () => setBlurRequest((value) => value + 1);
     // A menu opens and closes in a portal on the body.
     const menus = new MutationObserver(() => {
       sync();
@@ -250,8 +257,19 @@ export function AgentDockSurface() {
     (presentation()?.seats ?? []).map(
       (seat): AgentDockSeat =>
         seat.kind === "agent"
-          ? { kind: "agent", agent: seat.agent, mood: seat.mood, state: seat.state ?? undefined }
-          : { kind: "channel", channel: uiChannel(seat.channel), state: seat.state ?? undefined },
+          ? {
+              kind: "agent",
+              agent: seat.agent,
+              mood: seat.mood,
+              state: seat.state ?? undefined,
+              temporary: seat.temporary,
+            }
+          : {
+              kind: "channel",
+              channel: uiChannel(seat.channel),
+              state: seat.state ?? undefined,
+              temporary: seat.temporary,
+            },
     ),
   );
   const availableChannels = createMemo(() => (presentation()?.availableChannels ?? []).map(uiChannel));
@@ -270,14 +288,84 @@ export function AgentDockSurface() {
           attachments: message.attachments,
         }),
       );
-      bySeat.set(agentDockSeatKey(chat.seat), { messages, working: chat.working, wait: chat.wait });
+      bySeat.set(agentDockSeatKey(chat.seat), {
+        messages,
+        working: chat.working,
+        wait: chat.wait,
+        approval: chat.approval ? { approval: shownApproval(chat.approval), attempt: chat.approval.attempt } : null,
+        prompt: chat.prompt,
+        takeover: chat.takeover,
+        usageLimit: chat.usageLimit,
+      });
     }
     return bySeat;
   });
   const agents = createMemo(() => [...(presentation()?.agents ?? [])]);
   const results = createMemo(() => [...(presentation()?.results ?? [])]);
   const chat = (seat: AgentDockSeatRef): AgentDockChatModel =>
-    chats().get(agentDockSeatKey(seat)) ?? { messages: [], working: false, wait: null };
+    chats().get(agentDockSeatKey(seat)) ?? {
+      messages: [],
+      working: false,
+      wait: null,
+      approval: null,
+      prompt: null,
+      takeover: null,
+      usageLimit: null,
+    };
+  /**
+   * The main renderer answers the requests of the chat. A failed answer comes back as a new attempt of
+   * the same request, so the card shows its controls again. A password or a code goes to main from this
+   * window, and not through the main renderer.
+   */
+  const answersFor = (server: string): AgentDockChatAnswers => ({
+    approval: async (approval, decision) => {
+      await perform({
+        type: "respond-approval",
+        serverId: server,
+        agentId: approval.agentId,
+        requestId: approval.requestId,
+        decision,
+      });
+      return true;
+    },
+    prompt: async (prompt, answers) => {
+      await perform({
+        type: "answer-prompt",
+        serverId: server,
+        agentId: prompt.agentId,
+        threadId: prompt.threadId,
+        requestId: prompt.requestId,
+        answers,
+      });
+      return true;
+    },
+    takeover: async ({ request }, decision) => {
+      await perform({
+        type: "respond-takeover",
+        serverId: server,
+        agentId: request.agentId,
+        threadId: request.threadId,
+        requestId: request.requestId,
+        decision,
+      });
+      return true;
+    },
+    secret: (_takeover, input) => agentDockPort().agent.respondToBrowserSecret(input, server),
+    usageLimitSend: async (limit, option, remember) => {
+      await perform({
+        type: "usage-limit-send",
+        serverId: server,
+        agentId: limit.agentId,
+        optionKey: option.key,
+        remember,
+      });
+      // The result comes with a later presentation: the card goes, or a failure shows it again. Until
+      // then the card stays busy, so this promise does not settle.
+      await new Promise<never>(() => undefined);
+    },
+    usageLimitWait: (limit) =>
+      void perform({ type: "usage-limit-wait", serverId: server, agentId: limit.agentId }).catch(() => undefined),
+  });
 
   const serverId = createMemo(() => presentation()?.serverId ?? null);
   const voice = createAgentDockVoice(() => serverId() ?? "local");
@@ -300,6 +388,7 @@ export function AgentDockSurface() {
             availableChannels={availableChannels()}
             chat={chat}
             closeRequest={closeRequest()}
+            blurRequest={blurRequest()}
             voice={voice}
             side={presentation()?.edge ?? "right"}
             tucked={tucked()}
@@ -365,6 +454,7 @@ export function AgentDockSurface() {
             onOpenWindow={(agentId) =>
               void perform({ type: "open-window", serverId: server, agentId }).catch(() => undefined)
             }
+            answers={answersFor(server)}
             agents={agents()}
             onSelectAgent={(agentId) =>
               void perform({ type: "open-agent", serverId: server, agentId }).catch(() => undefined)
@@ -408,4 +498,11 @@ function uiChannel(channel: AgentDockChannel): AgentDockUiChannel {
 /** A plain seat for the action: the dock state can hold a store copy. */
 function contractSeat(seat: AgentDockSeatRef): AgentDockSeatContract {
   return seat.kind === "channel" ? { kind: "channel", id: seat.id } : { kind: "agent", id: seat.id };
+}
+
+/** The approval as the card reads it. A cut approval gets its runtime mark back, so the card offers only Deny. */
+function shownApproval(current: AgentDockApproval): AgentApproval {
+  if (!current.cut) return current.approval;
+  const cut: AgentRuntimeApproval = { ...current.approval, truncated: true };
+  return cut;
 }

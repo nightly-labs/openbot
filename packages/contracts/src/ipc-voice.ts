@@ -144,7 +144,7 @@ export const VOICE_MODELS: readonly VoiceModelInfo[] = [
     kind: "local",
     id: "whisper-turbo",
     name: "Whisper large-v3 turbo",
-    bytes: 1_036_613_791,
+    bytes: 1_311_742_559,
     supportsLanguage: true,
     livePreview: false,
   },
@@ -281,6 +281,51 @@ export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
   modelId: DEFAULT_VOICE_MODEL_ID,
   language: AUTOMATIC_VOICE_LANGUAGE,
 };
+
+/** The 25 European languages that Parakeet TDT v3 finds. It cannot write any other language. */
+const PARAKEET_TDT_LANGUAGES = [
+  "bg",
+  "cs",
+  "da",
+  "de",
+  "el",
+  "en",
+  "es",
+  "et",
+  "fi",
+  "fr",
+  "hr",
+  "hu",
+  "it",
+  "lt",
+  "lv",
+  "mt",
+  "nl",
+  "pl",
+  "pt",
+  "ro",
+  "ru",
+  "sk",
+  "sl",
+  "sv",
+  "uk",
+] as const satisfies readonly WhisperLanguage[];
+
+/** BCP 47 language codes that Whisper writes in another way. */
+const WHISPER_LANGUAGE_ALIASES: Readonly<Record<string, WhisperLanguage>> = { nb: "no", nn: "no", iw: "he", jv: "jw" };
+
+/**
+ * The dictation settings before the user chooses a model, from the language they use (a BCP 47 tag
+ * such as `ko-KR`). Parakeet stays the default for its own languages and for an unknown language.
+ * Another language that Whisper knows gets Whisper turbo: Parakeet would write it as wrong words.
+ * Whisper finds the spoken language itself, so speech in a second language stays correct.
+ */
+export function defaultVoiceSettings(locale: string): VoiceSettings {
+  const code = locale.toLowerCase().split(/[-_]/u)[0] ?? "";
+  const language = WHISPER_LANGUAGE_ALIASES[code] ?? code;
+  if (!isOneOf(WHISPER_LANGUAGES, language) || isOneOf(PARAKEET_TDT_LANGUAGES, language)) return DEFAULT_VOICE_SETTINGS;
+  return { modelId: "whisper-turbo", language: AUTOMATIC_VOICE_LANGUAGE };
+}
 
 export type VoiceModelPhase = "missing" | "downloading" | "ready" | "error";
 
@@ -484,6 +529,14 @@ export type SpeechLanguage = (typeof SPEECH_LANGUAGES)[number];
 export const SPEECH_SPEEDS = [0.75, 1, 1.25, 1.5, 2] as const;
 export type SpeechSpeed = (typeof SPEECH_SPEEDS)[number];
 
+/**
+ * How long the user can be quiet in a voice conversation before their words go to the agent, in
+ * milliseconds. The first one is the default, the same as the phone app's. A longer pause suits a slow
+ * speaker, or one who stops to think.
+ */
+export const VOICE_TURN_PAUSES = [1_500, 2_000, 3_000, 5_000] as const;
+export type VoiceTurnPause = (typeof VOICE_TURN_PAUSES)[number];
+
 /** The order in which a speed button goes through the speeds: from normal speed up, then the slower ones. */
 const SPEECH_SPEED_CYCLE: readonly SpeechSpeed[] = [
   ...SPEECH_SPEEDS.filter((speed) => speed >= 1),
@@ -515,6 +568,8 @@ export interface SpeechSettings {
   codexLive: boolean;
   /** The voice of Codex live voice. Null lets OpenAI choose. */
   codexLiveVoice: CodexLiveVoice | null;
+  /** The pause that ends a turn of a transcribed voice conversation. Codex live voice finds the end itself. */
+  turnPauseMs: VoiceTurnPause;
 }
 
 export const DEFAULT_SPEECH_SETTINGS: SpeechSettings = {
@@ -526,6 +581,7 @@ export const DEFAULT_SPEECH_SETTINGS: SpeechSettings = {
   speed: 1,
   codexLive: false,
   codexLiveVoice: null,
+  turnPauseMs: VOICE_TURN_PAUSES[0],
 };
 
 /**
@@ -647,6 +703,10 @@ export function isCodexLiveVoice(value: unknown): value is CodexLiveVoice {
 
 export function isSpeechSpeed(value: unknown): value is SpeechSpeed {
   return isOneOf(SPEECH_SPEEDS, value);
+}
+
+export function isVoiceTurnPause(value: unknown): value is VoiceTurnPause {
+  return isOneOf(VOICE_TURN_PAUSES, value);
 }
 
 export function isSpeechLanguage(value: unknown): value is SpeechLanguage {

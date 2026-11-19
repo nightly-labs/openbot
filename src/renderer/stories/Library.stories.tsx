@@ -5,6 +5,7 @@ import {
   type LibraryFoldersSnapshot,
 } from "@openbot/contracts/ipc";
 import { Toaster } from "@openbot/ui";
+import type { AgentProfile } from "@openbot/ui/data";
 import type { StoredFileRow } from "@openbot/ui/features/files/files-view";
 import { type BatchFileAction, type LibraryLocation, LibraryPage } from "@openbot/ui/features/files/LibraryPage";
 import type { ComponentProps } from "@solidjs/web";
@@ -12,6 +13,7 @@ import { createSignal, untrack } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { FILES_AGENTS, FILES_NOW, FILES_ROWS } from "./files-fixtures";
+import { MANY_AGENTS } from "./marketplace-story-support";
 
 const meta = {
   title: "Files/Library",
@@ -113,8 +115,45 @@ const FOLDERS_SNAPSHOT: LibraryFoldersSnapshot = {
   ),
 };
 
-const FOLDER_AGENTS = new Set(FILES_AGENTS.map((agent) => agent.id));
-const FILE_AGENTS = new Map(FILES_ROWS.map((file) => [file.id, file.agentId] as const));
+/** The story agents, then the agents of the many-agents fixture: a server with a large team. */
+const TEAM_AGENTS: readonly AgentProfile[] = (() => {
+  const known = new Set(FILES_AGENTS.map((agent) => agent.id));
+  const base = FILES_AGENTS[0];
+  if (!base) return FILES_AGENTS;
+  const more = MANY_AGENTS.filter((summary) => !known.has(summary.id)).map(
+    (summary): AgentProfile => ({
+      ...base,
+      id: summary.id,
+      name: summary.name,
+      title: summary.title,
+      avatarSeed: summary.avatarSeed,
+      avatarHue: summary.avatarHue,
+    }),
+  );
+  return [...FILES_AGENTS, ...more];
+})();
+
+/**
+ * The story files, and two older files for each of 17 more agents: a large team where many agents
+ * made files, so the side panel shows only the agents with the newest files.
+ */
+const TEAM_FILES: readonly StoredFileRow[] = [
+  ...FILES_ROWS,
+  ...TEAM_AGENTS.slice(FILES_AGENTS.length, FILES_AGENTS.length + 17).flatMap((agent, index) =>
+    [0, 1].flatMap((offset) => {
+      const source = FILES_ROWS[(index * 2 + offset) % FILES_ROWS.length];
+      if (!source) return [];
+      const createdAt = new Date(FILES_NOW.getTime() - (index + 2 + offset) * DAY_MS).toISOString();
+      return [{ ...source, id: `${source.id}-${agent.id}`, agentId: agent.id, conversation: null, createdAt }];
+    }),
+  ),
+];
+
+const FOLDER_AGENTS = new Set(TEAM_AGENTS.map((agent) => agent.id));
+const FILE_AGENTS = new Map(TEAM_FILES.map((file) => [file.id, file.agentId] as const));
+
+/** A folder and an agent that the viewer starred. */
+const FAVORITES = ["folder-launch", "agent:research"];
 
 /** The Library of a host that has folders. The story keeps the folders, as the host does. */
 function FolderStage(props: { initialLocation?: LibraryLocation }) {
@@ -128,17 +167,26 @@ function FolderStage(props: { initialLocation?: LibraryLocation }) {
     );
   return (
     <LibraryStage
-      args={{ ...libraryArgs(), folders: folders(), onFolderAction: change, initialLocation: props.initialLocation }}
+      args={{
+        ...libraryArgs(),
+        files: TEAM_FILES,
+        agents: TEAM_AGENTS,
+        folders: folders(),
+        onFolderAction: change,
+        initialLocation: props.initialLocation,
+        initialFavorites: FAVORITES,
+      }}
     />
   );
 }
 
 /**
- * A host with folders. The side panel has the search field and one tree: all files, then each agent
- * with its folders. A folder can hold folders, and a row with folders collapses and expands. The "+" of
- * an agent makes a folder; the menu of a folder makes a folder in it, renames it or deletes it. A drag
- * moves files to a folder, and a folder to a new position or into a folder. The top row has the path,
- * the view buttons and Select. The menu of a file moves it, and a folder delete has an Undo.
+ * A host with folders and a large team. The side panel has the views (all files, recent, not in a
+ * folder), the favorites, and the agents with the newest files; the list of all agents finds the others. The
+ * folders of the place show as tiles above the files. A drag moves files and folders into a folder of
+ * the panel, a tile or the path; a drag that stays on a folder opens it, and the "New folder" tile takes
+ * the dragged files into a new folder. The menu of a folder stars it, makes a folder in it, renames it
+ * or deletes it, and a delete has an Undo.
  */
 export const Folders: Story = { render: () => <FolderStage /> };
 

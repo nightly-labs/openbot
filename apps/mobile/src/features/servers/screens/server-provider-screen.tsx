@@ -5,6 +5,7 @@ import {
   isAgentProvider,
   isInstallerProvider,
   isKeyOnlyProvider,
+  isProviderEnvironmentProvider,
   PROMPT_CACHE_TTLS,
   type PromptCacheTtl,
   type ProviderAccountPool,
@@ -28,10 +29,12 @@ import Minimize2 from "lucide-react-native/icons/minimize-2";
 import Package from "lucide-react-native/icons/package";
 import RefreshCw from "lucide-react-native/icons/refresh-cw";
 import RotateCcw from "lucide-react-native/icons/rotate-ccw";
+import Smartphone from "lucide-react-native/icons/smartphone";
 import Star from "lucide-react-native/icons/star";
 import UserPlus from "lucide-react-native/icons/user-plus";
 import UserRound from "lucide-react-native/icons/user-round";
 import Users from "lucide-react-native/icons/users";
+import Variable from "lucide-react-native/icons/variable";
 import X from "lucide-react-native/icons/x";
 import { useRef, useState } from "react";
 import { Alert, View } from "react-native";
@@ -41,9 +44,11 @@ import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { ProviderMark } from "@/features/servers/components/provider-mark";
 import { TrailingValue } from "@/features/servers/components/trailing-value";
 import {
+  isProviderKeyAccount,
   type ProviderAdmin,
   type ProviderRow,
   providerAccountStateKey,
+  providerAccountsAreKeys,
   providerRuntimeBusy,
   providerSignOutOffered,
 } from "@/features/servers/model/provider-admin";
@@ -169,7 +174,7 @@ export function ServerProviderScreen() {
 
   const state = row.status?.state;
   /** The sign-in runs on its own page, which closes when the sign-in ends. */
-  function openSignIn(method: "code" | "relay", extra: { add?: "1" } = {}) {
+  function openSignIn(method: "code" | "relay" | "account-code", extra: { add?: "1" } = {}) {
     if (provider) openSignInPage({ serverId, provider, method, ...extra });
   }
 
@@ -220,8 +225,13 @@ export function ServerProviderScreen() {
   const isDefault = defaultProvider.current.data?.provider === provider;
   const connectOnComputer =
     connectable && !connect && state !== "available" && !(row.apiKey && isKeyOnlyProvider(provider));
-  const signInShown =
-    !hasAccounts && (Boolean(row.status?.email) || (connectable && Boolean(connect)) || disconnectable);
+  // Each account of such a provider after the first is an API key. The first one keeps the provider's
+  // own sign-in, which has no account page of the relay, so its Connect stays on this page.
+  const keyAccounts = providerAccountsAreKeys(provider);
+  const connectKey = admin.accounts?.connectKey ?? null;
+  const signInShown = hasAccounts
+    ? keyAccounts && connectable && Boolean(connect)
+    : Boolean(row.status?.email) || (connectable && Boolean(connect)) || disconnectable;
 
   const providerName = row.name;
   const signedInAs = row.status?.email ?? row.name;
@@ -300,7 +310,7 @@ export function ServerProviderScreen() {
                   : undefined
           }
         >
-          {row.status?.email ? (
+          {row.status?.email && !hasAccounts ? (
             <SettingsRow
               disclosure={false}
               leading={<RowIcon icon={UserRound} />}
@@ -355,9 +365,19 @@ export function ServerProviderScreen() {
           serverId={serverId}
           provider={provider}
           accounts={providerAccounts}
-          canAdd={connectable && admin.accounts?.canSignIn(provider) === true}
+          // A new account is an API key where the host takes one (`provider-account-keys-v1`), and
+          // never the browser sign-in for such a provider.
+          canAdd={connectable && (keyAccounts ? connectKey !== null : admin.accounts?.canSignIn(provider) === true)}
+          // A host with `provider-account-code-v1` also adds an account with the code sign-in of its CLI.
+          canAddWithCode={connectable && !keyAccounts && admin.accounts?.code?.offered(provider) === true}
+          keyAccounts={keyAccounts}
           busy={busy}
-          onAdd={() => openSignIn("relay", { add: "1" })}
+          onAddWithCode={() => openSignIn("account-code", { add: "1" })}
+          onAdd={() =>
+            keyAccounts
+              ? router.push({ pathname: "/server-settings/provider-key", params: { serverId, provider, add: "1" } })
+              : openSignIn("relay", { add: "1" })
+          }
           pool={pool}
           onPoolChange={
             setPool
@@ -426,6 +446,18 @@ export function ServerProviderScreen() {
               />
             </SettingsRow>
           ) : null}
+        </SettingsSection>
+      ) : null}
+      {!off && admin.environment && isProviderEnvironmentProvider(provider) ? (
+        <SettingsSection title={t("mobile.server.environment.title")}>
+          <SettingsRow
+            leading={<RowIcon icon={Variable} />}
+            onPress={() =>
+              router.push({ pathname: "/server-settings/provider-environment", params: { serverId, provider } })
+            }
+          >
+            <Typography.Paragraph>{t("mobile.server.environment.row")}</Typography.Paragraph>
+          </SettingsRow>
         </SettingsSection>
       ) : null}
       {provider === "claude" && !off && admin.promptCache ? (
@@ -704,8 +736,11 @@ function ProviderAccountsSection({
   provider,
   accounts,
   canAdd,
+  canAddWithCode,
+  keyAccounts,
   busy,
   onAdd,
+  onAddWithCode,
   pool,
   onPoolChange,
 }: {
@@ -713,8 +748,12 @@ function ProviderAccountsSection({
   provider: AgentProviderId;
   accounts: readonly ProviderAccountStatus[];
   canAdd: boolean;
+  canAddWithCode: boolean;
+  /** Each account after the first is an API key of the provider. */
+  keyAccounts: boolean;
   busy: boolean;
   onAdd: () => void;
+  onAddWithCode: () => void;
   /** The pool of the accounts, while it is on. */
   pool: ProviderAccountPool | undefined;
   /** Null when the host does not have the pool. */
@@ -724,20 +763,25 @@ function ProviderAccountsSection({
   const { theme } = useUniwind();
   const accountName = useProviderAccountName();
   // As on desktop: a saved key has no plan limit, so it is not a pool member. The switch shows when
-  // the provider has a second plan account to use, or the pool is on.
-  const planAccounts = accounts.filter((account) => account.id !== CLAUDE_API_KEY_ACCOUNT_ID);
+  // the provider has a second plan account to use, or the pool is on. An account that is an API key
+  // of the provider, such as a Cursor account after the first, is not a pool member either.
+  const planAccounts = accounts.filter(
+    (account) => account.id !== CLAUDE_API_KEY_ACCOUNT_ID && !isProviderKeyAccount(provider, account.id),
+  );
   const poolOffered = onPoolChange !== null && (planAccounts.length > 1 || Boolean(pool));
   return (
     <SettingsSection
       title={t("mobile.server.providers.accounts")}
       footer={t(
-        pool
-          ? canAdd
-            ? "mobile.server.providers.accountsPooledHint"
-            : "mobile.server.providers.accountsPooledOnComputer"
-          : canAdd
-            ? "mobile.server.providers.accountsHint"
-            : "mobile.server.providers.accountsOnComputer",
+        keyAccounts && canAdd
+          ? "mobile.server.providers.accountsKeyHint"
+          : pool
+            ? canAdd || canAddWithCode
+              ? "mobile.server.providers.accountsPooledHint"
+              : "mobile.server.providers.accountsPooledOnComputer"
+            : canAdd || canAddWithCode
+              ? "mobile.server.providers.accountsHint"
+              : "mobile.server.providers.accountsOnComputer",
       )}
     >
       {poolOffered ? (
@@ -753,8 +797,9 @@ function ProviderAccountsSection({
       ) : null}
       {accounts.map((account, index) => {
         const name = accountName(account, index);
-        const leftOut = account.id !== CLAUDE_API_KEY_ACCOUNT_ID && pool?.leftOut.includes(account.id) === true;
-        const inUse = !leftOut && pool?.inUse === account.id;
+        const member = account.id !== CLAUDE_API_KEY_ACCOUNT_ID && !isProviderKeyAccount(provider, account.id);
+        const leftOut = member && pool?.leftOut.includes(account.id) === true;
+        const inUse = member && !leftOut && pool?.inUse === account.id;
         return (
           <SettingsRow
             key={account.id}
@@ -797,6 +842,18 @@ function ProviderAccountsSection({
           onPress={onAdd}
         >
           <Typography.Paragraph className="text-accent">{t("mobile.server.providers.addAccount")}</Typography.Paragraph>
+        </SettingsRow>
+      ) : null}
+      {canAddWithCode ? (
+        <SettingsRow
+          disclosure={false}
+          disabled={busy}
+          leading={<RowIcon icon={Smartphone} tone="accent" />}
+          onPress={onAddWithCode}
+        >
+          <Typography.Paragraph className="text-accent">
+            {t("mobile.server.providers.addAccountWithCode")}
+          </Typography.Paragraph>
         </SettingsRow>
       ) : null}
     </SettingsSection>

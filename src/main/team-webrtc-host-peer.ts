@@ -5,13 +5,21 @@ import { dirname, join } from "node:path";
 import { BROWSER_SECRET_RESPONSE_PATH } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { AGENT_BACKGROUND_WORK_CAPABILITY } from "@openbot/contracts/team-protocol/agent-background-work-v1";
+import { AGENT_PENDING_RUNTIME_CAPABILITY } from "@openbot/contracts/team-protocol/agent-pending-runtime-v1";
 import { AGENT_TASK_UI_BLOCKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-task-ui-blocks-v1";
 import { browserViewStreamSessionId } from "@openbot/contracts/team-protocol/browser-view-v1";
+import { TEAM_PROTOCOL_CAPABILITY_LIMITS } from "@openbot/contracts/team-protocol/capability-limits";
 import {
   BROWSER_SIGN_IN_CAPABILITY,
+  BROWSER_VAULT_SKIP_CAPABILITY,
   CHANNEL_BROWSER_CAPABILITY,
   CHANNEL_ISOLATION_CAPABILITY,
   CHANNEL_PICTURE_CAPABILITY,
+  CHANNEL_SEEN_SUBTASKS_CAPABILITY,
+  CHANNEL_TASK_WAITS_CAPABILITY,
+  encodeTeamCapabilitiesV10,
+  expandTeamCapabilitiesV10,
   isAgentProfileRoute,
   supportsTeamSemanticTags,
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
@@ -19,13 +27,17 @@ import {
   TEAM_CONTEXT_USAGE_CAPABILITY,
   TEAM_CURRENT_CAPABILITIES,
   TEAM_HISTORY_EXTENT_CAPABILITY,
+  TEAM_MEMORY_CHANGES_CAPABILITY,
   TEAM_PROMPT_MULTI_SELECT_CAPABILITY,
   TEAM_SUBAGENTS_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
+  TEAM_USAGE_TERTIARY_CAPABILITY,
+  TEAM_VIDEO_GENERATION_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { toWireAgentKeysObjectForPath } from "@openbot/contracts/team-protocol/current-agent-keys";
 import { MCP_MANY_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-many-servers-v1";
 import { optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
+import { ROUTINE_RESULTS_WHATSAPP_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-whatsapp-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import {
   addSkillSuggestionNames,
@@ -54,11 +66,6 @@ import {
   teamProtocolV2AuthenticationTranscript,
 } from "@openbot/contracts/team-protocol/v2";
 import { createTeamProtocolV2Event } from "@openbot/contracts/team-protocol/v2-adapter";
-import {
-  decodeTeamProtocolV3WebRtcHttpRequest,
-  encodeTeamProtocolV3WebRtcHttpResponse,
-  isTeamProtocolV3OnlyRoute,
-} from "@openbot/contracts/team-protocol/v3-webrtc-adapter";
 import {
   createTeamProtocolV4Event,
   decodeTeamProtocolV4WebRtcHttpRequest,
@@ -91,8 +98,16 @@ import {
 import {
   decodeTeamProtocolSupportV9,
   TEAM_LONG_CAPABILITY_LISTS_CAPABILITY,
-  TEAM_PROTOCOL_V9_CAPABILITY_LIMIT,
 } from "@openbot/contracts/team-protocol/v9";
+import { decodeTeamProtocolV9WebRtcHttpRequest } from "@openbot/contracts/team-protocol/v9-webrtc-adapter";
+import {
+  decodeTeamProtocolSupportV10,
+  readTeamCapabilitiesV10,
+  TEAM_ABSENT_CAPABILITIES_HEADER,
+  TEAM_CAPABILITY_BASELINE_CAPABILITY,
+  TEAM_PROTOCOL_V10,
+  TEAM_PROTOCOL_V10_ABSENT_LIMIT,
+} from "@openbot/contracts/team-protocol/v10";
 import { sourceText } from "@openbot/i18n/source";
 import { Context, Deferred, Effect, Exit, Fiber, Layer, ManagedRuntime } from "effect";
 import type * as Ws from "ws";
@@ -113,6 +128,12 @@ import { rawDataBytes, sendableCloseCode } from "./ws-raw-data";
 const requireModule = createRequire(import.meta.url);
 const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("ws/package.json")), "index.js"));
 const MAXIMUM_BUFFERED_EVENTS = 2_000;
+/**
+ * The total length of the event frames that wait to be sent to one device. One frame can be about
+ * 1 MB, so the count limit alone let a device that does not take its events, such as one on a slow
+ * relay, keep about 2 GB in the main process (#11429).
+ */
+const MAXIMUM_BUFFERED_EVENT_CHARACTERS = 32 * 1024 * 1024;
 /** A Moonlight session and a few browser views, which is more than a member watches at once. */
 const MAXIMUM_DESKTOP_STREAMS = 6;
 
@@ -173,6 +194,7 @@ export class TeamWebRtcHostPeer {
   readonly #responses = new Map<string, string>();
   readonly #responsesInFlight = new Map<string, Fiber.Fiber<string, RemoteWorkflowError>>();
   readonly #events = new Map<number, string>();
+  #eventCharacters = 0;
   #peerCapabilities = new Set<string>();
   #peerId: string | null = null;
   readonly #hostId: string;
@@ -340,6 +362,7 @@ export class TeamWebRtcHostPeer {
     if (connection.sessionId === this.#localSessionId && this.#localSessionToken) return;
     // incoming already cleared the prior session; retain the active authentication gate.
     this.#events.clear();
+    this.#eventCharacters = 0;
     this.#responses.clear();
     this.#nextEventSequence = 1;
     this.#eventsSentThrough = 0;
@@ -654,13 +677,33 @@ export class TeamWebRtcHostPeer {
       return yield* new RemoteWorkflowError({
         cause: new GatewayError(503, "remote_disconnected", sourceText("error.remote.peerDisconnected")),
       });
-    const peerCapabilities = new Set(input.capabilities ?? []);
+    // A protocol 10 peer sends two lists (`v10.ts`). A malformed list fails closed.
+    const baseline = input.capabilities?.includes(TEAM_CAPABILITY_BASELINE_CAPABILITY) ?? false;
+    const lists = baseline ? readTeamCapabilitiesV10(input.capabilities, input.absent ?? []) : null;
+    if (baseline && !lists)
+      return yield* new RemoteWorkflowError({
+        cause: new GatewayError(400, "protocol_error", "Invalid Team API protocol headers."),
+      });
+    const peerCapabilities = new Set(lists ? expandTeamCapabilitiesV10(lists) : (input.capabilities ?? []));
+    // A request with no protocol marker comes from a release before v0.7.0 (2026-09-09), which is
+    // outside the support window. The HTTP gate refuses a request with no protocol header in the same way.
+    const protocol = webRtcPeerProtocol(peerCapabilities);
+    if (protocol === null)
+      return yield* new RemoteWorkflowError({
+        cause: new GatewayError(426, "client_update_required", sourceText("error.team.clientUpdateRequired")),
+      });
     const capabilitiesChanged =
       peerCapabilities.size !== this.#peerCapabilities.size ||
       [...peerCapabilities].some((capability) => !this.#peerCapabilities.has(capability));
     this.#peerCapabilities = peerCapabilities;
     if (capabilitiesChanged) this.#sendAgentEventScope();
-    const request = { url, peerId, peerCapabilities, preserveSemanticTags: supportsTeamSemanticTags(peerCapabilities) };
+    const request = {
+      url,
+      peerId,
+      peerCapabilities,
+      protocol,
+      preserveSemanticTags: supportsTeamSemanticTags(peerCapabilities),
+    };
     // An uploaded body stays on disk: the request reads it from the file, and the file is removed
     // after the response is complete.
     if (input.bodyTransferId) {
@@ -678,40 +721,24 @@ export class TeamWebRtcHostPeer {
       url,
       peerId,
       peerCapabilities,
+      protocol,
       preserveSemanticTags,
-    }: { url: URL; peerId: string; peerCapabilities: Set<string>; preserveSemanticTags: boolean },
+    }: { url: URL; peerId: string; peerCapabilities: Set<string>; protocol: number; preserveSemanticTags: boolean },
     uploaded: ReceivedWebRtcFile | null,
   ): Effect.fn.Return<TeamProtocolV2Json, RemoteWorkflowError, HostPeerTransport> {
     const sideRoute = teamSideRouteCodec(input.path);
-    // Protocol 9 is the protocol 8 wire. Its marker is in the bootstrap list too, so the first
-    // compatibility read of a protocol 9 peer gets the full capability list.
-    const protocol = peerCapabilities.has(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY)
-      ? 9
-      : peerCapabilities.has(TEAM_OPEN_PROVIDERS_CAPABILITY)
-        ? 8
-        : peerCapabilities.has(TEAM_PI_MUSE_CAPABILITY)
-          ? 7
-          : peerCapabilities.has(TEAM_CURSOR_CLINE_CAPABILITY)
-            ? 6
-            : peerCapabilities.has(TEAM_LOCAL_PROVIDERS_CAPABILITY)
-              ? 5
-              : peerCapabilities.has("opencode")
-                ? 4
-                : isTeamProtocolV3OnlyRoute(input.method, input.path)
-                  ? 3
-                  : 1;
     const decodeRequest =
-      protocol >= 8
-        ? decodeTeamProtocolV8WebRtcHttpRequest
-        : protocol === 7
-          ? decodeTeamProtocolV7WebRtcHttpRequest
-          : protocol === 6
-            ? decodeTeamProtocolV6WebRtcHttpRequest
-            : protocol === 5
-              ? decodeTeamProtocolV5WebRtcHttpRequest
-              : protocol === 4
-                ? decodeTeamProtocolV4WebRtcHttpRequest
-                : decodeTeamProtocolV3WebRtcHttpRequest;
+      protocol >= 9
+        ? decodeTeamProtocolV9WebRtcHttpRequest
+        : protocol === 8
+          ? decodeTeamProtocolV8WebRtcHttpRequest
+          : protocol === 7
+            ? decodeTeamProtocolV7WebRtcHttpRequest
+            : protocol === 6
+              ? decodeTeamProtocolV6WebRtcHttpRequest
+              : protocol === 5
+                ? decodeTeamProtocolV5WebRtcHttpRequest
+                : decodeTeamProtocolV4WebRtcHttpRequest;
     const requestBody =
       input.method === "GET"
         ? undefined
@@ -745,6 +772,10 @@ export class TeamWebRtcHostPeer {
                     : decoded,
                 );
               });
+    const forwarded =
+      protocol >= TEAM_PROTOCOL_V10
+        ? encodeTeamCapabilitiesV10([...this.#peerCapabilities])
+        : { capabilities: [...this.#peerCapabilities], absent: [] };
     return yield* Effect.acquireUseRelease(
       HostPeerTransport.use((transport) =>
         transport.fetch(url, {
@@ -754,7 +785,8 @@ export class TeamWebRtcHostPeer {
             "Content-Type": uploaded?.mimeType ?? input.contentType ?? "application/json",
             "OpenBot-Protocol-Version": String(protocol),
             "OpenBot-App-Version": this.#appVersion,
-            "OpenBot-Capabilities": [...this.#peerCapabilities].join(","),
+            "OpenBot-Capabilities": forwarded.capabilities.join(","),
+            ...(forwarded.absent.length ? { [TEAM_ABSENT_CAPABILITIES_HEADER]: forwarded.absent.join(",") } : {}),
             ...(this.#localSessionId ? { "X-OpenBot-WebRTC-Session": this.#localSessionId } : {}),
           },
           ...(requestBody === undefined ? {} : { body: requestBody }),
@@ -796,7 +828,7 @@ export class TeamWebRtcHostPeer {
             };
           }
           // A variable, not a literal: only the V7 and V8 encoders declare `historyExtent`, `uiBlocks`,
-          // `subagents` and `promptMultiSelect`.
+          // `subagents`, `promptMultiSelect` and `videoGeneration`.
           const responseOptions = {
             preserveSemanticTags,
             historyExtent: peerCapabilities.has(TEAM_HISTORY_EXTENT_CAPABILITY),
@@ -804,11 +836,18 @@ export class TeamWebRtcHostPeer {
             channelIsolation: peerCapabilities.has(CHANNEL_ISOLATION_CAPABILITY),
             channelPicture: peerCapabilities.has(CHANNEL_PICTURE_CAPABILITY),
             channelBrowser: peerCapabilities.has(CHANNEL_BROWSER_CAPABILITY),
+            channelSeenSubtasks: peerCapabilities.has(CHANNEL_SEEN_SUBTASKS_CAPABILITY),
+            channelTaskWaits: peerCapabilities.has(CHANNEL_TASK_WAITS_CAPABILITY),
             mcpManyServers: peerCapabilities.has(MCP_MANY_SERVERS_CAPABILITY),
+            routineResultsWhatsApp: peerCapabilities.has(ROUTINE_RESULTS_WHATSAPP_CAPABILITY),
             agentTaskUiBlocks: peerCapabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY),
             uiBlocks: peerCapabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
             subagents: peerCapabilities.has(TEAM_SUBAGENTS_CAPABILITY),
             promptMultiSelect: peerCapabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
+            videoGeneration: peerCapabilities.has(TEAM_VIDEO_GENERATION_CAPABILITY),
+            memoryChanges: peerCapabilities.has(TEAM_MEMORY_CHANGES_CAPABILITY),
+            usageTertiary: peerCapabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
+            agentPendingRuntime: peerCapabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
           };
           return yield* remoteDecode(() => ({
             status: response.status,
@@ -818,28 +857,13 @@ export class TeamWebRtcHostPeer {
               sideRoute
                 ? sideRoute.response(input.path, response.status, body, responseOptions)
                 : // A protocol 9 peer reads more capabilities than the protocol 7 and 8 encoders allow.
-                  peerCapabilities.has(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY) &&
-                    input.method === "GET" &&
-                    input.path === TEAM_API_ROUTES.compatibility &&
-                    response.status === 200
-                  ? { ...decodeTeamProtocolSupportV9(body) }
-                  : (peerCapabilities.has(TEAM_OPEN_PROVIDERS_CAPABILITY)
-                      ? encodeTeamProtocolV8WebRtcHttpResponse
-                      : peerCapabilities.has(TEAM_PI_MUSE_CAPABILITY)
-                        ? encodeTeamProtocolV7WebRtcHttpResponse
-                        : peerCapabilities.has(TEAM_CURSOR_CLINE_CAPABILITY)
-                          ? encodeTeamProtocolV6WebRtcHttpResponse
-                          : peerCapabilities.has(TEAM_LOCAL_PROVIDERS_CAPABILITY)
-                            ? encodeTeamProtocolV5WebRtcHttpResponse
-                            : peerCapabilities.has("opencode")
-                              ? encodeTeamProtocolV4WebRtcHttpResponse
-                              : encodeTeamProtocolV3WebRtcHttpResponse)(
-                      input.method,
-                      input.path,
-                      response.status,
-                      body,
-                      responseOptions,
-                    ),
+                  // A protocol 10 peer reads the two lists of the protocol 10 answer.
+                  protocol >= TEAM_PROTOCOL_V10 && isCompatibilityRead(input.method, input.path, response.status)
+                  ? { ...decodeTeamProtocolSupportV10(body) }
+                  : peerCapabilities.has(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY) &&
+                      isCompatibilityRead(input.method, input.path, response.status)
+                    ? { ...decodeTeamProtocolSupportV9(body) }
+                    : webRtcResponseEncoder(protocol)(input.method, input.path, response.status, body, responseOptions),
             ),
           }));
         }),
@@ -898,11 +922,17 @@ export class TeamWebRtcHostPeer {
                 preserveBrowserSecrets: this.#peerCapabilities.has("browser-secret-handoff"),
                 // Only the V8 event reads them.
                 browserSignIn: this.#peerCapabilities.has(BROWSER_SIGN_IN_CAPABILITY),
+                browserVaultSkip: this.#peerCapabilities.has(BROWSER_VAULT_SKIP_CAPABILITY),
                 contextUsage: this.#peerCapabilities.has(TEAM_CONTEXT_USAGE_CAPABILITY),
+                backgroundWork: this.#peerCapabilities.has(AGENT_BACKGROUND_WORK_CAPABILITY),
+                usageTertiary: this.#peerCapabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
+                agentPendingRuntime: this.#peerCapabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
                 // Only the V7 and V8 events read them.
                 uiBlocks: this.#peerCapabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
                 subagents: this.#peerCapabilities.has(TEAM_SUBAGENTS_CAPABILITY),
                 promptMultiSelect: this.#peerCapabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
+                videoGeneration: this.#peerCapabilities.has(TEAM_VIDEO_GENERATION_CAPABILITY),
+                memoryChanges: this.#peerCapabilities.has(TEAM_MEMORY_CHANGES_CAPABILITY),
               }),
         );
         if (this.#peerCapabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY))
@@ -914,8 +944,15 @@ export class TeamWebRtcHostPeer {
       }
       const sequence = this.#nextEventSequence++;
       // If this removes events that the sender did not send, the sender resets the client.
-      if (this.#events.size >= MAXIMUM_BUFFERED_EVENTS) this.#events.clear();
+      if (
+        this.#events.size >= MAXIMUM_BUFFERED_EVENTS ||
+        this.#eventCharacters + frame.length > MAXIMUM_BUFFERED_EVENT_CHARACTERS
+      ) {
+        this.#events.clear();
+        this.#eventCharacters = 0;
+      }
       this.#events.set(sequence, frame);
+      this.#eventCharacters += frame.length;
       const sessionId = this.#localSessionId;
       if (sessionId && this.#eventSender !== sessionId) {
         this.#eventSender = sessionId;
@@ -968,7 +1005,7 @@ export class TeamWebRtcHostPeer {
       return yield* new RemoteWorkflowError({ cause: new Error("The event frame is not client control data.") });
     // Do not send `event-reset` here. The client can acknowledge an old event after the stream
     // already reset it, and a second reset would move it back before the newer events it has.
-    for (const sequence of this.#events.keys()) if (sequence <= frame.throughSequence) this.#events.delete(sequence);
+    // The sender already removed each event that it read, so the acknowledgement frees nothing.
   });
 
   readonly #sendEvents = Effect.fn("TeamHostPeer.sendEvents")(function* (
@@ -985,6 +1022,9 @@ export class TeamWebRtcHostPeer {
       if (sequence >= this.#nextEventSequence) break;
       this.#eventsSentThrough = sequence;
       const frame = this.#events.get(sequence);
+      // No path sends an event again, so the buffer keeps only the events that are not sent yet.
+      this.#events.delete(sequence);
+      if (frame !== undefined) this.#eventCharacters -= frame.length;
       // The buffer limit removed this event before it was sent.
       if (frame === undefined) {
         this.#eventResetPending = true;
@@ -1175,6 +1215,40 @@ interface HttpRequestPayload {
   bodyTransferId?: string;
   contentType?: string;
   capabilities?: string[];
+  /** The baseline capabilities that a protocol 10 peer does not serve. Released hosts ignore it. */
+  absent?: string[];
+}
+
+/**
+ * The protocol of a WebRTC request, from the markers in its capability list. Protocol 9 is the
+ * protocol 8 wire. Its marker is in the bootstrap list too, so the first compatibility read of a
+ * protocol 9 peer gets the full capability list. Protocol 10 is the protocol 9 wire with the two
+ * capability lists. A list with no marker gives `null`: each release since v0.7.0 sends one.
+ */
+function webRtcPeerProtocol(capabilities: ReadonlySet<string>): number | null {
+  if (capabilities.has(TEAM_CAPABILITY_BASELINE_CAPABILITY)) return TEAM_PROTOCOL_V10;
+  if (capabilities.has(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY)) return 9;
+  if (capabilities.has(TEAM_OPEN_PROVIDERS_CAPABILITY)) return 8;
+  if (capabilities.has(TEAM_PI_MUSE_CAPABILITY)) return 7;
+  if (capabilities.has(TEAM_CURSOR_CLINE_CAPABILITY)) return 6;
+  if (capabilities.has(TEAM_LOCAL_PROVIDERS_CAPABILITY)) return 5;
+  return capabilities.has("opencode") ? 4 : null;
+}
+
+/**
+ * The response encoder of a peer protocol from `webRtcPeerProtocol`. Protocols 9 and 10 use the
+ * protocol 8 encoder; each other protocol uses its own. A request of protocols 1-3 gets 426 before this.
+ */
+function webRtcResponseEncoder(protocol: number) {
+  if (protocol >= 8) return encodeTeamProtocolV8WebRtcHttpResponse;
+  if (protocol === 7) return encodeTeamProtocolV7WebRtcHttpResponse;
+  if (protocol === 6) return encodeTeamProtocolV6WebRtcHttpResponse;
+  if (protocol === 5) return encodeTeamProtocolV5WebRtcHttpResponse;
+  return encodeTeamProtocolV4WebRtcHttpResponse;
+}
+
+function isCompatibilityRead(method: string, path: string, status: number): boolean {
+  return method === "GET" && path === TEAM_API_ROUTES.compatibility && status === 200;
 }
 
 function isHttpRequest(value: TeamProtocolV2Json): value is TeamProtocolV2Json & HttpRequestPayload {
@@ -1188,13 +1262,21 @@ function isHttpRequest(value: TeamProtocolV2Json): value is TeamProtocolV2Json &
     (value.capabilities === undefined ||
       (Array.isArray(value.capabilities) &&
         value.capabilities.length <=
-          (value.capabilities.includes(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY)
-            ? TEAM_PROTOCOL_V9_CAPABILITY_LIMIT
-            : value.capabilities.includes(TEAM_PI_MUSE_CAPABILITY) ||
-                value.capabilities.includes(TEAM_OPEN_PROVIDERS_CAPABILITY)
-              ? 128
-              : 64) &&
+          TEAM_PROTOCOL_CAPABILITY_LIMITS[
+            value.capabilities.includes(TEAM_CAPABILITY_BASELINE_CAPABILITY)
+              ? TEAM_PROTOCOL_V10
+              : value.capabilities.includes(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY)
+                ? 9
+                : value.capabilities.includes(TEAM_PI_MUSE_CAPABILITY) ||
+                    value.capabilities.includes(TEAM_OPEN_PROVIDERS_CAPABILITY)
+                  ? 7
+                  : 1
+          ] &&
         value.capabilities.every(isString))) &&
+    (value.absent === undefined ||
+      (Array.isArray(value.absent) &&
+        value.absent.length <= TEAM_PROTOCOL_V10_ABSENT_LIMIT &&
+        value.absent.every(isString))) &&
     (value.bodyTransferId === undefined || isString(value.bodyTransferId)) &&
     (value.contentType === undefined || isString(value.contentType))
   );

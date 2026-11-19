@@ -1,12 +1,14 @@
-import type { BillingPortalRequest, BillingState } from "@openbot/contracts/billing";
+import type { BillingPortalRequest, BillingState, BillingStorageRequest } from "@openbot/contracts/billing";
 import { createEffect, createStore, untrack } from "solid-js";
 import { currentText } from "../../text";
 
 /** The billing calls of one surface: desktop IPC or the web client's account server requests. */
 export interface BillingCalls {
   getState: () => Promise<BillingState>;
-  /** Opens the Stripe Customer Portal for the account, or on the plan change or cancel page of one plan. */
+  /** Opens the Stripe Customer Portal for the account, or on the cancel page of one plan. */
   openPortal: (request: BillingPortalRequest) => Promise<void>;
+  /** Buys a larger storage tier for one server and returns the new state. */
+  buyStorage: (request: BillingStorageRequest) => Promise<BillingState>;
 }
 
 interface BillingPanelState {
@@ -86,7 +88,28 @@ export function createBillingStore(calls: () => BillingCalls | undefined, isActi
     }
   }
 
-  return { state, load, openPortal };
+  /**
+   * Buys a storage tier and takes the state that the account server returns. A load that started before
+   * the purchase can end after it, so a load runs again after it. A failure goes to the caller, which
+   * shows it in the storage dialog.
+   */
+  async function buyStorage(request: BillingStorageRequest): Promise<void> {
+    const api = calls();
+    if (!api) throw new TypeError("The billing calls are not available.");
+    try {
+      const billing = await api.buyStorage(request);
+      setState((draft) => {
+        draft.billing = billing;
+      });
+      void load();
+    } catch (error) {
+      // A lost response can follow a completed charge. Read the actual state.
+      void load();
+      throw error;
+    }
+  }
+
+  return { state, load, openPortal, buyStorage };
 }
 
 export type BillingStore = ReturnType<typeof createBillingStore>;

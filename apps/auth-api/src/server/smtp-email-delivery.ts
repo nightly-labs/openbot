@@ -179,7 +179,7 @@ export const prepareTeamInvite = Effect.fn("Email.prepareTeamInvite")(function* 
   };
 });
 
-/** The welcome email of an account's first plan. A reply goes to the sending mailbox. */
+/** The welcome email of an account's first plan. A reply goes to the team's inbox. */
 export const prepareWelcomeEmail = Effect.fn("Email.prepareWelcome")(function* (
   message: SmtpWelcomeMessage,
 ): Effect.fn.Return<PreparedEmailMessage, SmtpFailure> {
@@ -199,7 +199,7 @@ export function prepareLicenseEmail(message: SmtpLicenseMessage): Effect.Effect<
   return Effect.sync(() => ({ email: message.email, content: renderLicenseEmail(message) }));
 }
 
-/** A message from the site's contact form to `recipient`, the sending mailbox. A reply goes to the visitor. */
+/** A message from the site's contact form to `recipient`, the team's inbox. A reply goes to the visitor. */
 export function prepareContactMessage(
   recipient: string,
   message: SmtpContactMessage,

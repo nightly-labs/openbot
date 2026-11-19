@@ -1,3 +1,4 @@
+import { isReferralCode } from "@openbot/contracts/referral";
 import { isString } from "@openbot/contracts/runtime-values";
 import { createFileRoute } from "@tanstack/solid-router";
 import { Effect } from "effect";
@@ -31,6 +32,8 @@ export const Route = createFileRoute("/v1/mobile-auth/email/verify")({
                 code: body.code,
                 sourceIp: requestSourceIp(request),
                 device: { id: body.deviceId, name: body.deviceName, platform: body.platform },
+                // A code that is not valid does not stop the sign-in: the account gets no invite.
+                referralCode: isReferralCode(body.referralCode) ? body.referralCode : null,
               }),
             );
           }),

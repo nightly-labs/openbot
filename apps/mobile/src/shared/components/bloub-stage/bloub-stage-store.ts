@@ -6,9 +6,11 @@ type BloubShape = { kind: "cover" } | { kind: "header"; bottom: number } | { kin
 
 /**
  * How the eyes behave. `think` looks around while the app works; `frame` and `found` turn the
- * eyes into the corners of a scanner frame.
+ * eyes into the corners of a scanner frame. The rating moods go from `cry` (closed eyes with tears)
+ * through `sad` and `meh` (flat eyes) to `happy` and `joy`: on a header, `joy` also makes the block
+ * stretch and settle, and the eyes swing until the mood changes.
  */
-export type BloubMood = "idle" | "think" | "down" | "sad" | "happy" | "frame" | "found";
+export type BloubMood = "idle" | "think" | "down" | "sad" | "happy" | "frame" | "found" | "cry" | "meh" | "joy";
 
 interface BloubCaption {
   /** A title under the eyes. Without one, the text is a status line at the bottom of the screen. */

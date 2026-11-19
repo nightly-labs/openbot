@@ -105,6 +105,8 @@ export const messages = defineMessages("sitePage", {
   "sitePage.pricing.consent.statement": "I declare that I accept {policy}, {terms}.",
   "sitePage.pricing.consent.policy": "policy",
   "sitePage.pricing.consent.terms": "terms and right of withdrawal",
+  "sitePage.pricing.consent.earlyStart":
+    "I request that the hosting service begin before the 14-day withdrawal period ends. I acknowledge that if I withdraw from the contract before the service has been fully performed, I will have to pay for the services provided up to the time of withdrawal, and that once the service has been fully performed, I will lose my right to withdraw from the contract.",
   // The /teams page for companies.
   "sitePage.teams.title": "OpenBot for Teams",
   "sitePage.teams.description":
@@ -448,6 +450,8 @@ export const messages = defineMessages("sitePage", {
   "sitePage.landing.download.googlePlay": "Get it on Google Play",
   // Links to the install page of each platform follow.
   "sitePage.landing.download.pages": "System requirements and install steps:",
+  // Starts the download of the Android app as an APK file. It is next to "Get it on Google Play".
+  "sitePage.landing.download.apk": "Get the APK",
   // The header, the menu, the footer and the last call to action of the public site.
   "sitePage.site.download": "Download",
   "sitePage.site.app": "App",

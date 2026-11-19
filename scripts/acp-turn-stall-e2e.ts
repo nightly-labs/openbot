@@ -2,8 +2,13 @@
 // (#2858). Drives the real `AcpAgentClient` with the OpenCode and Antigravity flavors over one fake
 // agent (`provider-fakes/agents/stall.ts`) and a short stall limit:
 // - a silent prompt fails with the stall message, and the next turn opens the session again;
+// - OpenCode retries a model request after a wait as long as the stall limit: a turn whose retry
+//   notice comes just after that limit goes on, one whose timeout retries get no answer fails without
+//   waiting for each retry, and rate limit retries keep a turn open (#9941);
 // - a stall on a custom endpoint's model names the endpoint, not OpenCode (#3234);
 // - a custom endpoint with a longer limit of its own is not ended at the agent's limit (#3823);
+// - an agent whose flavor has a longer limit of its own, as Grok, is not ended at the plain limit,
+//   and a prompt that stays silent still ends at the flavor's limit (#12295);
 // - an open tool call longer than the limit is not a stall;
 // - a stop of a prompt that ignores `session/cancel` ends the turn as interrupted;
 // - OpenCode answer text streams before the prompt answers;
@@ -31,6 +36,12 @@ const STALL_MS = 1_500;
 const TOOL_MS = STALL_MS * 3;
 const CHUNK_GAP_MS = 500;
 const FIRST_UPDATE_MS = 1_000;
+/** The stall limit of the retry cases: long enough for a margin of 400 ms around each notice. */
+const RETRY_STALL_MS = 4_000;
+/** OpenCode's wait before a model retry, just over the plain stall limit, as OpenBot measures it. */
+const RETRY_MS = RETRY_STALL_MS * 1.1;
+/** The time between rate limit retries: shorter than the limit, so each notice keeps the turn open. */
+const RATE_RETRY_MS = RETRY_STALL_MS * 0.75;
 
 interface LogEntry {
   event: string;
@@ -42,8 +53,12 @@ interface Report {
   passed: boolean;
   stall?: { status: string | null; error: string | null; elapsedMs: number; cancelSent: boolean };
   afterStall?: { status: string | null; sessionRestored: boolean };
+  retry?: { status: string | null; reply: string; elapsedMs: number };
+  retryForever?: { status: string | null; error: string | null; elapsedMs: number };
+  rateLimitRetry?: { status: string | null; reply: string; elapsedMs: number };
   endpointStall?: { status: string | null; error: string | null };
   slowEndpoint?: { status: string | null; reply: string; elapsedMs: number };
+  slowFlavor?: { quietStatus: string | null; hangStatus: string | null; hangElapsedMs: number };
   tool?: { status: string | null; elapsedMs: number };
   stop?: { status: string | null; elapsedMs: number; next: string | null };
   stream?: { deltaBeforeCompletion: boolean; reply: string };
@@ -67,6 +82,8 @@ async function open(
   env: Readonly<Record<string, string>> = {},
   customEndpoint?: (modelId: string | null) => AcpCustomEndpoint | null,
   firstUpdateMs?: number,
+  /** Null leaves the option out, so the flavor's limit applies. */
+  turnStallMs: number | null = STALL_MS,
 ): Promise<AgentClient> {
   const executable = join(root, provider, "bin", provider);
   await installFakeAgent(executable, "stall", {
@@ -81,7 +98,7 @@ async function open(
     argv: ["acp"],
     env: {},
     signInMessage: "Sign in to the fake agent.",
-    turnStallMs: STALL_MS,
+    ...(turnStallMs !== null ? { turnStallMs } : {}),
     ...(customEndpoint ? { customEndpoint } : {}),
     ...(firstUpdateMs ? { firstUpdateMs } : {}),
   });
@@ -143,6 +160,58 @@ try {
   assert.equal(afterStall.status, "completed", "A turn after a stall completes.");
   assert.equal(sessionRestored, true, "A turn after a stall opens the session again.");
 
+  // OpenCode retries a model that did not answer after a wait as long as the stall limit. The turn
+  // waits for that retry, and the retried model's answer completes it.
+  const retrying = await open(
+    "opencode",
+    OPENCODE_ACP_FLAVOR,
+    join(root, "retry.jsonl"),
+    { FAKE_RETRY_MS: String(RETRY_MS), FAKE_RATE_RETRY_MS: String(RATE_RETRY_MS) },
+    undefined,
+    undefined,
+    RETRY_STALL_MS,
+  );
+  const retryThread = await startThread(retrying, { cwd: workspace });
+  const retried = await timed(() =>
+    runTurn(retrying, retryThread, { text: "retry-once", timeoutMs: RETRY_STALL_MS * 10 }),
+  );
+  report.retry = { status: retried.value.status, reply: retried.value.reply, elapsedMs: retried.elapsedMs };
+  assert.equal(retried.value.status, "completed", "A turn whose model retry comes after the plain limit goes on.");
+  assert.equal(retried.value.reply, "ok", "The retried model's answer is the turn's answer.");
+  assert.ok(retried.elapsedMs >= RETRY_MS * 2, "The turn waited for the retry and its answer.");
+
+  // Retries that never get an answer fail the turn after the first retry's limit, not after the last retry.
+  const forever = await timed(() =>
+    runTurn(retrying, retryThread, { text: "retry-forever", timeoutMs: RETRY_STALL_MS * 20 }),
+  );
+  report.retryForever = { status: forever.value.status, error: forever.value.error, elapsedMs: forever.elapsedMs };
+  assert.equal(forever.value.status, "failed", "Retries with no answer fail the turn.");
+  assert.equal(
+    forever.value.error,
+    sourceText("error.agent.turnStalled", { provider: "OpenCode" }),
+    "Retries with no answer name the stall.",
+  );
+  assert.ok(forever.elapsedMs >= RETRY_MS * 2, "The first retry got the whole limit.");
+  assert.ok(forever.elapsedMs < RETRY_MS * 4, "Later retries did not keep the turn open.");
+
+  // Retries after a rate limit come sooner than the limit, and each one keeps the turn open as before.
+  // A new session: the fake still sends the notices of `retry-forever` to the session before.
+  const rateThread = await startThread(retrying, { cwd: workspace });
+  const rateLimited = await timed(() =>
+    runTurn(retrying, rateThread, { text: "retry-rate-limit", timeoutMs: RETRY_STALL_MS * 10 }),
+  );
+  report.rateLimitRetry = {
+    status: rateLimited.value.status,
+    reply: rateLimited.value.reply,
+    elapsedMs: rateLimited.elapsedMs,
+  };
+  assert.equal(rateLimited.value.status, "completed", "Rate limit retries keep the turn open.");
+  assert.equal(rateLimited.value.reply, "ok", "The answer after the rate limit retries is the turn's answer.");
+  assert.ok(
+    rateLimited.elapsedMs >= RATE_RETRY_MS + RETRY_STALL_MS * 1.2,
+    "The turn went on after the first retry's limit.",
+  );
+
   // OpenCode serves a custom endpoint, and the user knows that turn by the endpoint's name. The fake
   // agent's one model stands for an endpoint model here.
   const endpoint = await open("opencode", OPENCODE_ACP_FLAVOR, join(root, "endpoint.jsonl"), {}, (modelId) =>
@@ -172,6 +241,39 @@ try {
   assert.equal(slowTurn.value.status, "completed", "A slow endpoint turn is not ended at the agent's limit.");
   assert.equal(slowTurn.value.reply, "working, done", "The slow endpoint's answer is complete.");
   assert.ok(slowTurn.elapsedMs >= STALL_MS * 2, "The endpoint was silent for longer than the agent's limit.");
+
+  // An agent that waits longer for a silent model, as Grok waits 10 minutes, has a longer limit in its
+  // flavor. A turn silent for longer than the plain limit goes on, and a prompt that stays silent
+  // still ends, at the flavor's limit.
+  const slowFlavor = await open(
+    "cline",
+    { ...DEFAULT_ACP_FLAVOR, turnStallMs: STALL_MS * 3 },
+    join(root, "slow-flavor.jsonl"),
+    { FAKE_QUIET_MS: String(STALL_MS * 2) },
+    undefined,
+    undefined,
+    null,
+  );
+  const slowFlavorThread = await startThread(slowFlavor, { cwd: workspace });
+  const slowQuiet = await runTurn(slowFlavor, slowFlavorThread, { text: "quiet", timeoutMs: STALL_MS * 10 });
+  const slowHang = await timed(() => runTurn(slowFlavor, slowFlavorThread, { text: "hang", timeoutMs: STALL_MS * 10 }));
+  report.slowFlavor = {
+    quietStatus: slowQuiet.status,
+    hangStatus: slowHang.value.status,
+    hangElapsedMs: slowHang.elapsedMs,
+  };
+  assert.equal(
+    slowQuiet.status,
+    "completed",
+    "A turn of a flavor with a longer limit is not ended at the plain limit.",
+  );
+  assert.equal(slowHang.value.status, "failed", "A silent prompt of that flavor still fails.");
+  assert.equal(
+    slowHang.value.error,
+    sourceText("error.agent.turnStalled", { provider: "Cline" }),
+    "A silent prompt of that flavor names the stall.",
+  );
+  assert.ok(slowHang.elapsedMs >= STALL_MS * 3, "The silent prompt was ended at the flavor's limit, not before.");
 
   // An open tool call is work, not a stall, also when it takes longer than the limit.
   const tool = await timed(() => runTurn(client, thread, { text: "tool" }));

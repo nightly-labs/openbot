@@ -2,7 +2,6 @@ import {
   type AgentBrowserProfile,
   agentAutomationAllowed,
   agentNotificationLevelMap,
-  assignedSkillCount,
   type BrowserProfileSummary,
   type BrowserProxyComputer,
   type BrowserProxySummary,
@@ -10,8 +9,9 @@ import {
   type FilePreview,
   type ServerNotificationLevel,
   type TestRoutineInput,
+  userAssignedSkills,
 } from "@openbot/contracts/ipc";
-import { BookMarked, CalendarClock, FileText, Folder, Gauge, Puzzle, Table2, Upload } from "@openbot/ui";
+import { Blocks, BookMarked, CalendarClock, FileText, Folder, Gauge, Puzzle, Table2, Upload } from "@openbot/ui";
 import { SettingsLinkGroup, SettingsLinkRow } from "@openbot/ui/components/SettingsPanel";
 import type { AgentProfile } from "@openbot/ui/data";
 import type { BrowserProfileSelectProfile } from "@openbot/ui/features/browser/BrowserProfileSelect";
@@ -29,11 +29,12 @@ import SharedAgentSettingsPanel, {
   type AgentNotificationLevelOptions,
   type AgentSettingsPanelProps as SharedAgentSettingsPanelProps,
 } from "@openbot/ui/features/conversation/AgentSettingsPanel";
+import type { AgentSettingLinkId, AgentSettingReveal } from "@openbot/ui/features/conversation/agent-setting-links";
 import { agentFilesLinkValue } from "@openbot/ui/features/files/AgentFilesView";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, createStore, Show, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
-import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
+import { createSidePanelWidth, readSidePanelWidth, saveSidePanelWidth } from "../../components/side-panel-width";
 import type { SkillCatalogCalls } from "../../skills-port";
 import { agentSkillCalls, skillsPort } from "../../skills-port";
 import type { BrowserProfileCalls } from "../browser/browser-profiles-port";
@@ -42,7 +43,7 @@ import { type AgentFilesOptions, AgentFilesSettings } from "../files/AgentFilesS
 import { filesPort } from "../files/files-port";
 import { createStorageUsage } from "../files/storage-usage";
 import { AgentMemoriesSettings } from "./AgentMemoriesSettings";
-import { AgentRoutinesSettings, type RoutineSelectionRequest } from "./AgentRoutinesSettings";
+import { AgentRoutinesSettings, type DetailLeaveGuard, type RoutineSelectionRequest } from "./AgentRoutinesSettings";
 import { AgentSkillsModal, type AgentSkillsMode, type SkillDetail } from "./AgentSkillsModal";
 import { conversationPort, type SharedTableCalls } from "./conversation-port";
 import type { AgentNotificationLevelCalls, ConversationRuntime } from "./conversation-runtime";
@@ -60,7 +61,15 @@ import { SharedTablesModal } from "./SharedTablesModal";
 interface AgentSettingsPanelProps
   extends Omit<
     SharedAgentSettingsPanelProps,
-    "width" | "onResize" | "onResizeEnd" | "links" | "detailOpen" | "children" | "browserProfiles" | "notificationLevel"
+    | "width"
+    | "onResize"
+    | "onResizeEnd"
+    | "links"
+    | "detailOpen"
+    | "children"
+    | "browserProfiles"
+    | "notificationLevel"
+    | "reveal"
   > {
   remoteClient?: boolean;
   /** The marketplace skills catalog of a remote client. Absent, its skills show only what the host sends. */
@@ -77,6 +86,8 @@ interface AgentSettingsPanelProps
   adminCalls?: ConversationRuntime["admin"] | undefined;
   onPublish?: (() => void) | undefined;
   onOpenUsage?: ((trigger: HTMLButtonElement) => void) | undefined;
+  /** Opens the Marketplace on Apps. Absent for a user who cannot manage the server's MCP servers. */
+  onOpenApps?: (() => void) | undefined;
   onWidthChange: (width: number) => void;
   skillSelectionRequest?: { skillId: string } | null | undefined;
   /**
@@ -86,6 +97,10 @@ interface AgentSettingsPanelProps
   instructionsFile?: AgentInstructionsCalls | undefined;
   /** Opens the Instructions page, from the chat line that says the agent changed the file. */
   instructionsRequest?: { agentId: string } | null | undefined;
+  /** Shows one setting, from a setting card in the chat. A new object shows it again. */
+  settingReveal?: AgentSettingReveal | null | undefined;
+  /** The panel took the `settingReveal` with this nonce. */
+  onSettingRevealHandled?: ((nonce: number) => void) | undefined;
   routineSelectionRequest?: RoutineSelectionRequest | null | undefined;
   onRoutineSelectionRequestHandled?: ((nonce: number) => void) | undefined;
   onOpenRoutineRun?: ((messageId: string, routineId?: string) => void) | undefined;
@@ -178,7 +193,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
         }),
     };
   });
-  const [panelWidth, setPanelWidth] = createSettingsPanelWidth();
+  const [panelWidth, setPanelWidth] = createSidePanelWidth();
   const [draft, setDraft] = createStore({
     tables: { count: 0, open: false },
     memories: { count: 0, open: false },
@@ -443,7 +458,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           ? await skillsPort().agent.listInstalledSkills(agentId)
           : await skillCalls().listInstalled(agentId);
       setDraft((state) => {
-        state.skills.count = assignedSkillCount(items);
+        // The same list as the skills dialog, so the row and the dialog show the same number.
+        state.skills.count = userAssignedSkills(items).length;
       });
     } catch {
       setDraft((state) => {
@@ -500,14 +516,49 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       });
   });
 
+  // A setting card opens the page of a link row here, and gives each other row to the shared panel.
+  const settingReveal = createMemo(() => props.settingReveal);
+  const [panelReveal, setPanelReveal] = createSignal<AgentSettingReveal | null>(null);
+  // The open detail page that can hold a card, such as to ask before it discards an edit.
+  let detailLeaveGuard: DetailLeaveGuard | null = null;
+  createEffect(settingReveal, (request) => {
+    if (!request) return;
+    props.onSettingRevealHandled?.(request.nonce);
+    const guard = detailLeaveGuard;
+    untrack(() => (guard ? guard(() => revealSetting(request)) : revealSetting(request)));
+  });
+  function revealSetting(request: AgentSettingReveal): void {
+    const detail = revealDetail(request.settingId);
+    setDraft((state) => {
+      state.instructions.open = detail === "instructions";
+      state.memories.open = detail === "memories";
+      state.skills.open = detail === "skills";
+      state.routines.open = detail === "routines";
+      state.files.open = false;
+    });
+    // A detail page covers the panel, and its Back goes to the root list that holds its link row, so the
+    // panel still moves to that page. The skills dialog opens over the page that the panel shows.
+    setPanelReveal(detail === "skills" ? null : request);
+  }
+  /** The page that a link row opens for the setting, when this agent shows that row. */
+  function revealDetail(settingId: AgentSettingLinkId): "instructions" | "memories" | "skills" | "routines" | null {
+    if (settingId === "agent.instructions" && props.instructionsFile) return "instructions";
+    if (settingId === "agent.memories" && memoriesShown()) return "memories";
+    if (settingId === "agent.skills" && skillsMode() !== "hidden") return "skills";
+    if (settingId === "agent.routines" && routinesShown()) return "routines";
+    return null;
+  }
+
   return (
     <SharedAgentSettingsPanel
       {...props}
+      reveal={panelReveal()}
       browserProfiles={browserProfileOptions()}
       notificationLevel={notificationLevelOptions()}
       width={panelWidth()}
       onResize={setPanelWidth}
-      onResizeEnd={saveSettingsPanelWidth}
+      onResizeEnd={saveSidePanelWidth}
+      preferredWidth={readSidePanelWidth}
       onUnshownSaveError={(message) =>
         actionToast.error(message, {
           id: "agent-settings-save-failed",
@@ -597,7 +648,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
               </Show>
             </SettingsLinkGroup>
           </Show>
-          <Show when={routinesShown() || props.onOpenUsage || props.onPublish}>
+          <Show when={routinesShown() || props.onOpenUsage || props.onOpenApps || props.onPublish}>
             <SettingsLinkGroup inset title={t("agentSettings.groups.does")}>
               <Show when={routinesShown()}>
                 <SettingsLinkRow
@@ -616,6 +667,15 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   icon={<Gauge aria-hidden="true" />}
                   label={t("agentSettings.links.usage")}
                   onClick={(trigger) => props.onOpenUsage?.(trigger)}
+                />
+              </Show>
+              {/* Apps are the server's, not this agent's, so the row says that every agent gets them. */}
+              <Show when={props.onOpenApps}>
+                <SettingsLinkRow
+                  icon={<Blocks aria-hidden="true" />}
+                  label={t("agentSettings.links.apps")}
+                  value={t("agentSettings.links.appsScope")}
+                  onClick={() => props.onOpenApps?.()}
                 />
               </Show>
               <Show when={props.onPublish}>
@@ -676,10 +736,14 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
               })
             }
             onClose={props.onClose}
+            registerLeaveGuard={(guard) => {
+              detailLeaveGuard = guard;
+            }}
             selectionRequest={props.routineSelectionRequest}
             onSelectionRequestHandled={props.onRoutineSelectionRequestHandled}
             onOpenRun={props.onOpenRoutineRun}
             onOpenThread={props.onOpenRoutineThread}
+            agentName={props.agent.name}
           />
         </div>
       </Show>

@@ -4,6 +4,9 @@ import type { ContextEntry } from "../messaging-types";
 const RECENT_MESSAGES = 200;
 /** The reply map of a basic group, which has no thread IDs. */
 const THREAD_ENTRIES = 2_000;
+/** The most messages, and the time before it, that give the context of a conversation's first message. */
+const PRECEDING_MESSAGES = 10;
+const PRECEDING_WINDOW_MS = 15 * 60_000;
 
 interface RecentMessage extends ContextEntry {
   threadKey: string;
@@ -56,8 +59,25 @@ export class TelegramChatState {
     if (this.#recent.length > RECENT_MESSAGES) this.#recent.shift();
   }
 
-  /** The messages of one conversation after `afterId` and before `beforeId`, oldest first. */
+  /**
+   * The messages of one conversation after `afterId` and before `beforeId`, oldest first. The first
+   * message of a conversation has no chain before it: its context is the chat's messages of the last
+   * minutes before it, such as a voice note that a person sent without a mention, as on Discord.
+   */
   history(threadKey: string, afterId: string | null, beforeId: string): ContextEntry[] {
+    if (threadKey === beforeId) {
+      const first = this.#recent.find((entry) => entry.id === beforeId);
+      const since = Date.parse(first?.sentAt ?? new Date().toISOString()) - PRECEDING_WINDOW_MS;
+      return this.#recent
+        .filter(
+          (entry) =>
+            Number(entry.id) < Number(beforeId) &&
+            Date.parse(entry.sentAt) >= since &&
+            (afterId === null || Number(entry.id) > Number(afterId)),
+        )
+        .slice(-PRECEDING_MESSAGES)
+        .map(({ threadKey: _threadKey, ...entry }) => entry);
+    }
     return this.#recent
       .filter(
         (entry) =>

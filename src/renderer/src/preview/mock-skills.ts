@@ -1,11 +1,15 @@
-import type {
-  InstalledSkill,
-  MarketplaceSkillDetail,
-  MarketplaceSkillPage,
-  MarketplaceSkillQuery,
-  MarketplaceSkillSummary,
-  OpenBotDesktopApi,
-  SkillSubmission,
+import {
+  type GithubSkillSource,
+  githubSkillDetail,
+  githubSkillId,
+  type InstalledSkill,
+  isGithubSkillId,
+  type MarketplaceSkillDetail,
+  type MarketplaceSkillPage,
+  type MarketplaceSkillQuery,
+  type MarketplaceSkillSummary,
+  type OpenBotDesktopApi,
+  type SkillSubmission,
 } from "@openbot/contracts/ipc";
 import {
   STORY_INSTALLED_SKILLS,
@@ -58,6 +62,60 @@ export function mockSkillPage(
   const start = Number(query.cursor ?? 0);
   const end = start + (query.limit ?? 50);
   return clone({ skills: ordered.slice(start, end), nextCursor: end < ordered.length ? String(end) : null });
+}
+
+const GITHUB_COMMIT = "c5d8b1e2f4a6c8e0b2d4f6a8c0e2b4d6f8a0c2e4";
+const GITHUB_SKILLS: readonly (readonly [string, string])[] = [
+  ["docx", "Creates, edits and reads Word documents, with tracked changes and comments."],
+  ["frontend-design", "Builds distinctive, production-grade web interfaces."],
+  ["mcp-builder", "Guides the build of an MCP server in Python or TypeScript."],
+  ["pdf", "Extracts text and tables, fills in forms, and merges or splits PDF files."],
+  ["skill-creator", "Helps write a new skill and test it."],
+  ["xlsx", "Creates and edits spreadsheets with formulas, formatting and charts."],
+];
+
+/** The public anthropics/skills repository as the host reads it. */
+function mockGithubSource(): GithubSkillSource {
+  return {
+    owner: "anthropics",
+    repo: "skills",
+    commit: GITHUB_COMMIT,
+    committedAt: "2026-10-28T14:12:00.000Z",
+    path: "",
+    skills: GITHUB_SKILLS.map(([slug, description]) => {
+      const path = `skills/${slug}`;
+      return {
+        id: githubSkillId({ owner: "anthropics", repo: "skills", commit: GITHUB_COMMIT, path }),
+        path,
+        slug,
+        name: slug,
+        description,
+        instructions: `# ${slug}\n\n${description}\n`,
+        files: ["SKILL.md", "reference.md"],
+      };
+    }),
+  };
+}
+
+/** Reads a link to anthropics/skills, or to one of its folders. Other links fail as a private one does. */
+function readMockGithub(link: string): GithubSkillSource {
+  const match = /^(?:https?:\/\/)?(?:www\.)?github\.com\/anthropics\/skills(?:\/(?:tree|blob)\/[^/]+\/?(.*))?$/iu.exec(
+    link.trim(),
+  );
+  if (!match) throw new Error("OpenBot cannot open this repository. The repository is private, or it does not exist.");
+  const folder = (match[1] ?? "").replace(/\/?SKILL\.md$/iu, "").replace(/\/$/u, "");
+  const source = mockGithubSource();
+  const skills = source.skills.filter(
+    (skill) => !folder || skill.path === folder || skill.path.startsWith(`${folder}/`),
+  );
+  if (skills.length === 0) throw new Error(`There is no SKILL.md in ${folder}.`);
+  return { ...source, path: folder, skills };
+}
+
+function mockGithubDetail(skillId: string): MarketplaceSkillDetail | undefined {
+  const source = mockGithubSource();
+  const skill = source.skills.find((item) => item.id === skillId);
+  return skill && githubSkillDetail(source, skill);
 }
 
 /** The skills marketplace, local skills, and the skills installed on each agent. */
@@ -200,7 +258,9 @@ export function createMockSkills(options: MockSkillsOptions, onChanged: (agentId
         const skill = await skills.localGet({ skillId });
         return skills.localInstall({ agentId, skillId, revision: skill.version });
       }
-      const skill = marketplaceSkills.find((candidate) => candidate.id === skillId);
+      const skill = isGithubSkillId(skillId)
+        ? mockGithubDetail(skillId)
+        : marketplaceSkills.find((candidate) => candidate.id === skillId);
       if (!skill) throw new Error("Skill not found");
       const previous = readInstalledSkills(agentId).find((item) => item.skillId === skillId);
       const installed: InstalledSkill = {
@@ -239,5 +299,10 @@ export function createMockSkills(options: MockSkillsOptions, onChanged: (agentId
     },
   };
 
-  return { skills, installedSkills, readInstalledSkills };
+  return {
+    skills,
+    installedSkills,
+    readInstalledSkills,
+    readGithub: async (link: string) => clone(readMockGithub(link)),
+  };
 }

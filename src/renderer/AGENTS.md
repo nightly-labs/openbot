@@ -1,7 +1,7 @@
 # `src/renderer`
 
-The UI stack sits on prerelease channels your training data does not cover: `solid-js@2.0.0-rc.18`
-with `@solidjs/signals` and `@solidjs/web` at the same RC, `@kobalte/core@2.0.0-alpha.0` (patched
+The UI stack sits on releases your training data does not cover: `solid-js@2.0.0` (stable)
+with `@solidjs/signals` and `@solidjs/web` at the same version, `@kobalte/core@2.0.0-alpha.0` (patched
 here), plus patched `lucide-solid` and `solid-sonner`. Read props in the compute function of a
 `createEffect`, not in its callback. The compiler makes a conditional prop (`a() && b`, `x.y ? a : b`)
 a getter that creates a memo, and a memo created in an effect callback throws

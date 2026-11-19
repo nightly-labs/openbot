@@ -44,10 +44,13 @@ mode map.
    - `open` runs in place of the mode change. The Browser pane uses it to start a tab.
    - `release` runs before the tab closes. The question pane uses it to delete its question.
 6. Release long-lived resources in the owning feature. A store can watch
-   `SidePanelState.panes` and stop when its pane leaves the list, as `createVoiceSessions` does for a
-   voice conversation. A component releases its own resources in `onCleanup`.
+   `SidePanelState.panes` and stop when its pane leaves the list. A component releases its own
+   resources in `onCleanup`.
 
 ### Close behavior
+
+The X at the end of a tab closes it, and the tab menu (right-click or long press) has Close tab.
+The menu of a side thread tab also has Open in the chat.
 
 `closeSidePanelPane` runs the `release` action, removes the tab, and keeps the order of the other
 tabs. When the closed pane showed, the panel shows, in this order:
@@ -58,6 +61,9 @@ tabs. When the closed pane showed, the panel shows, in this order:
 4. The pane list, when no tab stays.
 
 The panel keeps its tabs while it is collapsed. Each agent and each channel has its own tabs.
+The panel stays open or closed when the user opens another agent or channel on the same server
+(`keepSidePanelShown` in `conversation-scope.ts`). An open panel shows the last tab of the new chat,
+or the pane list when that chat has no tab.
 
 ### Verification
 
@@ -69,13 +75,15 @@ these in the real app:
 - Collapse and open the panel again. The same tab must show.
 - Maximize and restore the panel.
 - File tabs and side threads beside the panes.
-- Switch to another agent or server and back.
-- The question pane deletes its question on close, and the voice conversation stops on close.
+- Switch to another agent or server and back. An open panel stays open, and a closed panel stays closed.
+- The question pane deletes its question on close.
+- Drag the start edge of each pane, side threads included. All panes keep one width.
+- Right-click each kind of tab: Close tab closes it, and Open in the chat moves a side thread to the chat.
 
 `scripts/side-panel-panes-e2e.ts` checks the launcher and Add menu order, selection, close, collapse,
-maximize, an agent change, and the side question release in the `App/Playground` story.
+maximize, an agent change with the panel open and closed, and the side question release in the
+`App/Playground` story.
 `scripts/web-side-panel-e2e.ts` compares the web and desktop panels in Storybook.
-`scripts/voice-pane-e2e.ts` checks the Voice pane.
 
 An agent change closes Agent settings, Files, and a file preview (`resetPanelsForAgent` in
-`conversation-scope.ts`). The tabs stay.
+`conversation-scope.ts`). The tabs stay. When the panel stays open, it then shows the last tab again.

@@ -20,6 +20,8 @@ export const messages = defineMessages("error.vault", {
   "error.vault.apiKeyNameInvalid":
     "Enter a variable name with capital letters A–Z, digits and _, which starts with a letter, such as OPENAI_API_KEY.",
   "error.vault.apiKeyNameTaken": "The Vault has an API key with this variable name already.",
+  "error.vault.apiKeyAgentTaken": "An agent that you chose has an API key with this variable name already.",
+  "error.vault.agentsRequired": "Choose at least one agent.",
   "error.vault.csvInvalid": "This file is not a password export in CSV format.",
   "error.vault.csvTooLarge": "The CSV file is too large.",
 });

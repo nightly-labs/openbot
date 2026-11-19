@@ -17,6 +17,7 @@ import { readFile } from "node:fs/promises";
 import type { ServerNotificationLevel, TeamRole } from "@openbot/contracts/ipc";
 import { LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
+import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result, Semaphore } from "effect";
 import {
@@ -67,6 +68,7 @@ export interface RemoteServerPatch {
   role?: TeamRole;
   encryptedToken?: string;
   logoVersion?: string | null;
+  appearance?: ServerAppearance | null;
   remoteDesktopAvailable?: boolean;
 }
 
@@ -242,18 +244,16 @@ export class RemoteServerStore implements RemoteServerDirectory {
   });
 
   // A local server that started again: a new port and a new session, in the slot it had. Only a new
-  // one is added at the end, and only a new one is selected - a restart must not move the user.
+  // one is added at the end. It never selects the server: the caller opens it after the start (#11203).
 
   readonly attachLocal = Effect.fn("RemoteStore.attachLocal")(function* (
     this: RemoteServerStore,
     server: StoredRemoteServer,
-    select: boolean,
   ): Effect.fn.Return<void, RemoteWorkflowError> {
     this.#forgetUnreadable(server.id);
     this.#state.servers = this.has(server.id)
       ? this.#state.servers.map((candidate) => (candidate.id === server.id ? server : candidate))
       : [...this.#state.servers, server];
-    if (select) this.setActiveServerId(server.id);
     yield* this.persist();
   });
 

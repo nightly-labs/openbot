@@ -131,7 +131,6 @@ interface LiveProps<Spec extends UiBlockSpec> {
   disabled?: boolean;
   busy?: boolean;
   onSkip?: () => void;
-  footerFieldId?: string | undefined;
 }
 
 /** Keeps the answer in the story, so a pending card freezes the way it does in the chat. */
@@ -146,7 +145,6 @@ function live<Spec extends UiBlockSpec>(
         state={state()}
         disabled={props.disabled ?? false}
         busy={props.busy ?? false}
-        footerFieldId={props.footerFieldId}
         onRespond={(response) => {
           props.onRespond(response);
           setState(answered(props.spec, response));
@@ -333,7 +331,7 @@ export const SecretFormAnswered: Story = {
   ),
 };
 
-/** The form of `request_api_key` with `vault`: the key, and who can use it, small next to the submit button. */
+/** The form of `request_api_key` with `vault` on a client that does not draw the Vault card, such as a joined server. */
 const apiKeySpec: UiFormSpec = {
   type: "form",
   title: "PrivateMail app password for the CRM sync",
@@ -352,7 +350,7 @@ const apiKeySpec: UiFormSpec = {
 };
 
 export const ApiKeyPending: Story = {
-  render: (args) => <LiveForm spec={apiKeySpec} footerFieldId={UI_API_KEY_SCOPE_FIELD_ID} onRespond={args.onRespond} />,
+  render: (args) => <LiveForm spec={apiKeySpec} onRespond={args.onRespond} />,
 };
 
 export const Narrow: Story = {
