@@ -160,6 +160,7 @@ export interface ConversationTransactionResult<T> {
 export class ConversationRuntime {
   readonly #store: AgentStore;
   readonly #emit: (event: AgentEvent) => void;
+  readonly #activeTurnChanged: ((agentId: string) => void) | undefined;
   /**
    * Deliberately not `store.list()`: the service filters out agents that are mid-duplication, and
    * `requireKnownAgent` must keep throwing for those so a transaction on one rolls back.
@@ -212,10 +213,23 @@ export class ConversationRuntime {
    */
   readonly #routineSessions = new Map<string, string>();
 
-  constructor(store: AgentStore, emit: (event: AgentEvent) => void, listAgents: () => AgentSummary[]) {
+  constructor(
+    store: AgentStore,
+    emit: (event: AgentEvent) => void,
+    listAgents: () => AgentSummary[],
+    activeTurnChanged?: (agentId: string) => void,
+  ) {
     this.#store = store;
     this.#emit = emit;
     this.#listAgents = listAgents;
+    this.#activeTurnChanged = activeTurnChanged;
+  }
+
+  /** Changes live activity before a turn can yield to mailbox or attachment work. */
+  setActiveTurn(snapshot: ConversationSnapshot, turnId: string | null): void {
+    if (snapshot.activeTurnId === turnId) return;
+    snapshot.activeTurnId = turnId;
+    this.#activeTurnChanged?.(snapshot.agentId);
   }
 
   /**
@@ -295,10 +309,12 @@ export class ConversationRuntime {
     this.#dropCachedSnapshot(agentId);
     const cached = boundedConversationSnapshot(snapshot, digests, signature);
     const current = this.#snapshots.get(agentId);
+    const previousTurnId = current?.activeTurnId ?? null;
     const retained = current === snapshot ? copySnapshotContents(snapshot, cached.snapshot) : cached.snapshot;
     this.#snapshots.set(agentId, retained);
     this.#cachedSnapshots.set(agentId, retained === cached.snapshot ? cached : { ...cached, snapshot: retained });
     this.#cachedSnapshotBytes += cached.bytes;
+    if (previousTurnId !== retained.activeTurnId) this.#activeTurnChanged?.(agentId);
     this.#evictCachedSnapshots();
     this.#snapshotUsedAt.set(agentId, Date.now());
     this.#evictionTimer ??= setInterval(() => {
@@ -322,6 +338,7 @@ export class ConversationRuntime {
     this.#dropCachedExecutionSnapshot(threadId);
     const cached = boundedConversationSnapshot(snapshot, digests, signature);
     const current = this.#executionSnapshots.get(threadId);
+    const previousTurnId = current?.activeTurnId ?? null;
     const retained = current === snapshot ? copySnapshotContents(snapshot, cached.snapshot) : cached.snapshot;
     this.#executionSnapshots.set(threadId, retained);
     this.#cachedExecutionSnapshots.set(
@@ -329,6 +346,7 @@ export class ConversationRuntime {
       retained === cached.snapshot ? cached : { ...cached, snapshot: retained },
     );
     this.#cachedSnapshotBytes += cached.bytes;
+    if (previousTurnId !== retained.activeTurnId) this.#activeTurnChanged?.(retained.agentId);
     this.#evictCachedSnapshots();
   }
 
@@ -967,7 +985,9 @@ export class ConversationRuntime {
     this.#forgottenExecutionThreads.add(threadId);
     this.#taskThreads.delete(threadId);
     this.#channelThreads.delete(threadId);
+    const snapshot = this.#executionSnapshots.get(threadId);
     this.#executionSnapshots.delete(threadId);
+    if (snapshot?.activeTurnId) this.#activeTurnChanged?.(snapshot.agentId);
     this.#dropCachedExecutionSnapshot(threadId);
     this.#conversationSignatures.delete(threadId);
     this.#unstoredSends.delete(threadId);

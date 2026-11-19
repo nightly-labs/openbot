@@ -2545,6 +2545,7 @@ export async function createApplicationServices({
     listModels: () => service.listModels(),
     listRoutines: (agentId) => service.listRoutines(agentId),
     runRoutine: (input) => service.runRoutineFromAutomation(input),
+    getAgentActivity: (agentId) => service.getAgentActivity(agentId),
     sendMessage: (input) => service.sendMessage(input),
     getLocalAttention: (agentId) => service.getLocalAttention(agentId),
     respondToLocalAttention: (agentId, input) => service.respondToLocalAttention(agentId, input),

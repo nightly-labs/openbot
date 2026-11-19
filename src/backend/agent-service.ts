@@ -182,6 +182,7 @@ import { createOpenBotLogger } from "@openbot/logging";
 import { workflowMediaCreditsOf, workflowMediaProvidersOf } from "@openbot/team-client/workflow-decoding";
 import { type CauseCode, classifyFailure, isCauseCode } from "@openbot/telemetry";
 import { Cause, Deferred, Effect, Exit, Fiber, Result, Schema, Scope, Semaphore } from "effect";
+import { AgentActivityController } from "./agent/agent-activity-controller";
 import { AgentMemories } from "./agent/agent-memories";
 import { AgentRemoval, AgentRemovalFailed } from "./agent/agent-removal";
 import { AgentSettingsRefused } from "./agent/agent-settings-refused";
@@ -723,6 +724,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #boot: BootRecovery;
   readonly #deltas: DeltaBuffer;
   readonly #turn: TurnLifecycle;
+  readonly #agentActivity = new AgentActivityController({
+    waitsForPerson: (agentId) => this.#attention.waitsFor(agentId).length > 0,
+    runsWork: (agentId) =>
+      this.#conversation.anyWorkingSnapshot(agentId) !== undefined || this.#turn.hasRunningSubagents(agentId),
+  });
   readonly #compaction: ContextCompaction;
   readonly #duplication: DuplicationGate;
   readonly #removal: AgentRemoval;
@@ -837,6 +843,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       store,
       (event) => this.#emit(event),
       () => this.listAgents(),
+      (agentId) => this.#agentActivity.refresh(agentId),
     );
     this.#history = new AgentHistoryTransfer({
       database: store.database,
@@ -2471,6 +2478,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   getLocalAttention(agentId: string) {
     return this.#attention.localAttention(agentId);
+  }
+
+  getAgentActivity(agentId: string) {
+    return this.#agentActivity.read(agentId);
   }
 
   respondToLocalAttention(agentId: string, input: LocalAttentionResponse): Effect.Effect<void, AgentLifecycleFailed> {
@@ -7844,6 +7855,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   #emit(event: AgentEvent, memberId?: string): void {
     recordAgentRestartActivity(event);
+    // Observe work before an execution lane consumes its events.
+    this.#agentActivity.observe(event);
     // The account in use is not saved: a new reading, as at start, sets it again.
     if (event.type === "usage-changed") for (const provider of AGENT_PROVIDERS) this.#refreshPoolInUse(provider);
     this.#liveVoice?.observe(event);

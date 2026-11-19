@@ -1268,7 +1268,7 @@ export class DrainScheduler {
       // A provider can end the turn before this answer is read, as when an ACP process exits during
       // `turn/start`. Its end already cleared the turn, so it is not marked active again: no later
       // event would end it, and it would hold every message of this agent.
-      if (!this.#hooks.turnEnded(response.turn.id)) snapshot.activeTurnId = response.turn.id;
+      if (!this.#hooks.turnEnded(response.turn.id)) this.#conversation.setActiveTurn(snapshot, response.turn.id);
       confirmedTurnId = response.turn.id;
       this.#busyRetries.delete(agent.id);
       this.#turnModels.set(laneKey({ agentId: agent.id, taskId: laneId }), {
@@ -1293,7 +1293,7 @@ export class DrainScheduler {
         }
         const live = this.#conversation.ensureSnapshot(agent.id, threadId);
         for (const held of new Set([snapshot, live])) {
-          if (held.activeTurnId === response.turn.id) held.activeTurnId = null;
+          if (held.activeTurnId === response.turn.id) this.#conversation.setActiveTurn(held, null);
         }
         for (const item of batch) this.#mailboxSync.syncDeliveryMessage(live, item.delivery.id);
         this.#mailboxSync.emitQueue(agent.id);

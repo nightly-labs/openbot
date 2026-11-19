@@ -33,11 +33,13 @@ const home = join(root, "home");
 const claudeConfig = join(home, ".claude");
 const askTrigger = join(root, "ask");
 const asking = join(root, "asking");
+const finishSideTurn = join(root, "finish-side-turn");
 const standInLog = join(root, "stand-in.jsonl");
 const claudeExecutable = join(root, "claude");
 const CLAUDE_MODEL = defaultProviderModel("claude");
 const QUESTION = "Which pet do you like?";
 const MESSAGE = "Please list three launch risks.";
+const SIDE_MESSAGE = "Hold the side thread open for this check.";
 const ANSWER = "Here are three launch risks.";
 const NO_MESSAGE_ANSWER = "You did not pick a pet. I wait for your new message.";
 /** The question, then the message sent while it waited, then the answer that read the message. */
@@ -85,18 +87,29 @@ const result = (text) =>
     duration_ms: 1, duration_api_ms: 1, num_turns: 1, total_cost_usd: 0, usage: { input_tokens: 1, output_tokens: 1 },
     permission_denials: [] }));
 /** A turn that answers a user message names it in its first stream event, as the CLI does. */
-const answerMessage = (message, text) => {
+const startMessage = (message) => {
   write(frame({ type: "stream_event", uuid: randomUUID(), user_message_uuid: message.uuid, user_message_uuids: [message.uuid],
     event: { type: "message_start", message: { id: "msg_" + message.uuid, type: "message", role: "assistant", content: [] } } }));
+};
+const finishMessage = (message, text) => {
   assistant([{ type: "text", text }], { user_message_uuid: message.uuid });
   result(text);
+};
+const answerMessage = (message, text) => {
+  startMessage(message);
+  finishMessage(message, text);
 };
 /** The question's request id while the question waits, and the messages that came during it. */
 let question = null;
 let queued = [];
 let asked = false;
+let sideMessage = null;
 setInterval(() => {
-  if (asked || !fs.existsSync(${JSON.stringify(askTrigger)})) return;
+  if (sideMessage && fs.existsSync(${JSON.stringify(finishSideTurn)})) {
+    finishMessage(sideMessage, "Side turn ended.");
+    sideMessage = null;
+  }
+  if (sideMessage || asked || !fs.existsSync(${JSON.stringify(askTrigger)})) return;
   asked = true;
   // The background work ended: the CLI starts a turn of its own, which asks.
   const toolUseId = "toolu_" + randomUUID().replaceAll("-", "");
@@ -130,7 +143,11 @@ process.stdin.on("data", (chunk) => {
       result(text);
       queued = [];
     } else if (message.type === "user") {
-      if (question) {
+      if (JSON.stringify(message.message).includes(${JSON.stringify(SIDE_MESSAGE)})) {
+        sideMessage = message;
+        asked = true;
+        startMessage(message);
+      } else if (question) {
         log("message-during-question");
         queued.push(message);
       } else if (JSON.stringify(message.message).includes(${JSON.stringify(MESSAGE)})) {
@@ -277,6 +294,18 @@ const standInEvents = () =>
 await writeFile(claudeExecutable, STAND_IN_CLAUDE, { mode: 0o755 });
 const database = new OpenBotDatabase(userData);
 const store = new AgentStore(userData, home, database);
+let previewStarted = false;
+const finishFirstPreview = Promise.withResolvers<void>();
+const updatePreview = store.updatePreview;
+// Hold the first turn after it clears the active turn but before it publishes completion.
+store.updatePreview = (agentId, preview) =>
+  Effect.gen(function* () {
+    if (preview === "Started.") {
+      previewStarted = true;
+      yield* Effect.promise(() => finishFirstPreview.promise);
+    }
+    yield* updatePreview(agentId, preview);
+  });
 const mailbox = new MailboxStore(userData, store.sharedRoot, store.database);
 const agents = new AgentService({
   store,
@@ -290,6 +319,10 @@ const agents = new AgentService({
 const checked = (text: string) => SHOWN_ORDER.find((shown) => text.startsWith(shown));
 try {
   await runCauseEffect(agents.initialize());
+  const firstBusy: { since: string | null } = { since: null };
+  agents.on("event", (event) => {
+    if (event.type === "turn-started") firstBusy.since ??= agents.getAgentActivity(event.agentId).since;
+  });
   const agent = await runCauseEffect(
     agents.createAgent({
       name: "Question steer",
@@ -309,6 +342,23 @@ try {
     !agents
       .listQueue(agent.id)
       .deliveries.some((delivery) => ["queued", "starting", "running"].includes(delivery.status));
+  await waitFor("the first turn to begin its final preview write", () => previewStarted);
+  const firstIdle = agents.getAgentActivity(agent.id);
+  const firstBusySince = firstBusy.since;
+  assert.ok(firstBusySince, "The first turn records when the agent became busy.");
+  assert.equal(firstIdle.state, "idle");
+  const side = await runCauseEffect(agents.startTask({ agentId: agent.id, text: SIDE_MESSAGE }));
+  const sideTask = () => agents.listTasks(agent.id).tasks.find((task) => task.id === side.id);
+  await waitFor("the side thread to run", () => sideTask()?.state === "running");
+  const busy = await waitFor("the agent to be busy", () => {
+    const activity = agents.getAgentActivity(agent.id);
+    return activity.state === "busy" && activity;
+  });
+  assert.ok(busy.since, "The side turn records when the agent became busy.");
+  assert.ok(busy.since > firstBusySince, "The side turn has a new busy start time.");
+  assert.ok(firstIdle.since, "The idle transition has a time before the first completion event.");
+  assert.ok(busy.since >= firstIdle.since);
+  finishFirstPreview.resolve();
   await waitFor("the first turn to end", idle);
 
   // The turn that the CLI starts by itself asks its question.
@@ -319,14 +369,23 @@ try {
     async () => (await live()).messages.find((message) => message.questionPrompt)?.turnId,
   );
   report.questionTurnId = questionTurnId;
+  const waiting = agents.getAgentActivity(agent.id);
+  assert.equal(sideTask()?.state, "running", "The side turn still runs while the main turn asks.");
+  assert.equal(waiting.state, "waiting", "The main turn's question takes priority over the running side turn.");
+  assert.ok(waiting.since, "The question records when the agent began waiting.");
+  assert.ok(waiting.since >= firstIdle.since);
+  assert.deepEqual(agents.getAgentActivity(agent.id), waiting, "Reading activity keeps the transition time.");
 
   const receipt = await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: MESSAGE }));
   const deliveryId = receipt.deliveries[0]?.id;
   assert.ok(deliveryId, "The message has a delivery.");
   await waitFor(
-    "the answer and the end of all turns",
+    "the answer and the end of the main turn",
     async () => (await live()).messages.some((message) => message.text === ANSWER) && (await idle()),
   );
+  assert.equal(agents.getAgentActivity(agent.id).state, "busy", "The side turn still runs after the answer.");
+  writeFileSync(finishSideTurn, "");
+  await waitFor("the side turn to end", () => sideTask()?.outcome === "completed");
 
   report.standInEvents = standInEvents();
   assert.deepEqual(
@@ -335,6 +394,9 @@ try {
     "The message reaches the CLI before the question's result.",
   );
   const conversation = await live();
+  const finalIdle = agents.getAgentActivity(agent.id);
+  assert.equal(finalIdle.state, "idle");
+  assert.ok(finalIdle.since && finalIdle.since >= waiting.since, "The completed turn records the new idle time.");
   report.messageTurnId = conversation.messages.find((message) => message.id === deliveryId)?.turnId ?? null;
   assert.equal(report.messageTurnId, questionTurnId, "The message stays in the turn that read it.");
   report.shownLive = conversation.messages.flatMap((message) => checked(message.text) ?? []);
@@ -349,6 +411,7 @@ try {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);
   process.exitCode = 1;
 } finally {
+  finishFirstPreview.resolve();
   await runCauseEffect(agents.stop()).catch(() => {});
   database.close();
   mkdirSync(OUT, { recursive: true });

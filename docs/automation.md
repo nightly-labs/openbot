@@ -103,11 +103,30 @@ Each request needs `Authorization: Bearer <token>`.
 
 ### `GET /v1/agents`
 
-The agents that allow local scripts, with their routines:
+The agents that allow local scripts, with their routines and activity:
 
 ```json
-[{ "id": "agent-1", "name": "Ada", "routines": [{ "id": "routine-1", "name": "Wake", "active": false }] }]
+[
+  {
+    "id": "agent-1",
+    "name": "Ada",
+    "routines": [{ "id": "routine-1", "name": "Wake", "active": false }],
+    "state": "busy",
+    "since": "2026-01-01T09:15:00.000Z"
+  }
+]
 ```
+
+- `waiting` means a turn needs a person to answer a question, decide on an approval, or finish a
+  browser takeover. A takeover counts after OpenBot presents its card. This state takes priority
+  if another thread still runs. A detached question that does not block work does not count.
+- `busy` means a turn or a background subagent is running in any of the agent's threads.
+- `idle` means no turn or background subagent is running and no turn waits for a person. Queued
+  work, including work held by a provider limit, can still exist.
+
+`since` is the UTC time when OpenBot recorded the last change to the current state. It is
+`null` when the time is unknown, for example if an agent has been idle since OpenBot started.
+The host keeps the time for the current process. Polling does not change it.
 
 ### `POST /v1/agents/:agentId/routines/:routineId/run`
 

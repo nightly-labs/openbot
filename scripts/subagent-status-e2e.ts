@@ -7,6 +7,7 @@
 //    runtime snapshot still names the agent in `subagentTurns`. When the subagent ends, a new runtime
 //    snapshot drops it.
 // `bun run test:subagent-status`. Writes .openbot-build/subagent-status-e2e/report.json.
+import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -178,7 +179,13 @@ try {
   await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: "background" }));
   await waitFor("the second turn to end", () => turnEnds().length === 2);
   const afterTurn = turns(agents.getRuntimeSnapshot());
+  const busy = agents.getAgentActivity(agent.id);
+  assert.equal(busy.state, "busy", "The parent remains busy while a background subagent runs.");
+  assert.ok(busy.since, "The running work has an activity start time.");
   await waitFor("the background subagent to end", () => turns(agents.getRuntimeSnapshot()).length === 0, 10_000);
+  const idle = agents.getAgentActivity(agent.id);
+  assert.equal(idle.state, "idle", "The agent becomes idle when its last subagent ends.");
+  assert.ok(idle.since && idle.since >= busy.since, "The subagent end records the new idle time.");
   const lastSnapshot = events.findLast(
     (event): event is Extract<AgentEvent, { type: "runtime-snapshot" }> => event.type === "runtime-snapshot",
   );

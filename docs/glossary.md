@@ -12,6 +12,8 @@ table, IPC channel or product string, or when a term in the code disagrees with 
   (`ipc-agent-templates.ts`, `agent-templates:*`, D1 `agent_templates`, `openbot.run/agents/<id>`).
   It holds no workspace files and no memories. It is not a marketplace agent: it has no review and
   no listing.
+- **agent activity**: the current state of an agent across its threads. The agent is waiting when
+  work needs a person, busy while work runs, or idle otherwise.
 - **browser profile**: a named, persistent browser session on the computer that runs the agents
   (`browser_profiles`, `BrowserProfileSummary`, `AgentBrowserProfile`, `agent:admin:*-browser-profile*`,
   `persist:openbot-browser-profile-<id>`). The built-in choices "Shared" and "Only this agent" (shown

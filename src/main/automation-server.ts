@@ -76,6 +76,7 @@ export interface AutomationServerOptions {
   /** The models that the provider CLIs list now. */
   listModels: () => AgentModelOption[];
   listRoutines: (agentId: string) => readonly Pick<Routine, "id" | "name" | "active">[];
+  getAgentActivity: AgentService["getAgentActivity"];
   runRoutine: (input: {
     agentId: string;
     routineId: string;
@@ -418,6 +419,7 @@ export class AutomationServer {
       .map((agent) => ({
         id: agent.id,
         name: agent.name,
+        ...this.#options.getAgentActivity(agent.id),
         routines: this.#options
           .listRoutines(agent.id)
           .map((routine) => ({ id: routine.id, name: routine.name, active: routine.active })),

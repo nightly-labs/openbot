@@ -438,6 +438,8 @@ const TYPED_PASSWORD_NOT_SAVED =
 
 interface PendingBrowserTakeover {
   client: AgentClient;
+  /** The person has a card. A request can be pending while OpenBot tries a saved login. */
+  published?: true;
   /** The provider's request. `submit_secret` keys the entry by a new id, so it is kept here. */
   providerRequestId: RequestId;
   secret?: PreparedBrowserSecret | undefined;
@@ -711,7 +713,8 @@ export class AttentionRegistry {
     if ([...this.#approvals.values()].some((pending) => pending.approval.agentId === agentId)) kinds.push("approval");
     if ([...this.#prompts.values()].some((pending) => pending.agentId === agentId && pending.detached === undefined))
       kinds.push("answer");
-    if ([...this.#takeovers.values()].some((pending) => pending.request.agentId === agentId)) kinds.push("browser");
+    if ([...this.#takeovers.values()].some((pending) => pending.published && pending.request.agentId === agentId))
+      kinds.push("browser");
     return kinds;
   }
 
@@ -1157,7 +1160,7 @@ export class AttentionRegistry {
       pending.request.secret = { ...pending.request.secret, requiresReload: true };
     else delete pending.request.secret;
     yield* this.#browser.beginTakeover(pending.request.tabId).pipe(toAttentionOperationFailed);
-    this.#emit({ type: "browser-takeover-requested", request: pending.request });
+    this.#publishBrowserTakeover(pending);
     this.#emitRuntimeSnapshot();
   }, Effect.uninterruptible);
 
@@ -1497,7 +1500,7 @@ export class AttentionRegistry {
             this.#resolveBrowserTakeover(requestId, pending, "cancel");
           } else {
             this.#routines.markNeedsAttention(turnId);
-            this.#emit({ type: "browser-takeover-requested", request: takeover });
+            this.#publishBrowserTakeover(pending);
           }
         }
       } else {
@@ -2752,6 +2755,11 @@ export class AttentionRegistry {
     if (this.#takeovers.get(requestId) === pending) this.#routines.markNeedsAttention(pending.request.turnId);
     return true;
   }).bind(this);
+
+  #publishBrowserTakeover(pending: PendingBrowserTakeover): void {
+    pending.published = true;
+    this.#emit({ type: "browser-takeover-requested", request: pending.request });
+  }
 
   #resolveBrowserTakeover(
     requestId: RequestId,

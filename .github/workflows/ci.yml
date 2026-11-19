@@ -515,6 +515,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:subagent-status
 
+      - name: Run the waiting turn and message order E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:question-steer-order
+
+      - name: Run the browser takeover deadline and Vault fill E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:browser-takeover-deadline
+
       - name: Run the hung Codex app-server E2E test
         if: ${{ !cancelled() }}
         run: bun run test:codex-hung-app-server
@@ -827,6 +835,8 @@ jobs:
             .openbot-build/memory-changes-e2e/
             .openbot-build/codex-subagent-steps-e2e/
             .openbot-build/subagent-status-e2e/
+            .openbot-build/question-steer-order-e2e/
+            .openbot-build/browser-takeover-deadline-e2e/
             .openbot-build/codex-hung-app-server-e2e/
             .openbot-build/codex-midturn-compaction-e2e/
             .openbot-build/codex-missing-rollout-e2e/

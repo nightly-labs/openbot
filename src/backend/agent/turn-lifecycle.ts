@@ -635,6 +635,10 @@ export class TurnLifecycle {
     return this.#failedTurns;
   }
 
+  hasRunningSubagents(agentId: string): boolean {
+    return this.#subagentTurns.has(agentId);
+  }
+
   /** The newest turn with running subagents of each agent in `agentIds`. */
   subagentTurns(agentIds: ReadonlySet<string>): Array<{ agentId: string; turnId: string }> {
     const turns: Array<{ agentId: string; turnId: string }> = [];
@@ -1509,7 +1513,7 @@ export class TurnLifecycle {
         const started = this.#runningTurns.get(turnId);
         if (started && reports && unprompted) started.reports = reports;
         const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
-        snapshot.activeTurnId = turnId;
+        this.#conversation.setActiveTurn(snapshot, turnId);
         if (laneId === null || laneId === MESSAGING_LANE) this.#failedTurns.delete(agentId);
         const origin = starting?.sender.kind ?? "unknown";
         if (!unprompted) {
@@ -2372,7 +2376,7 @@ export class TurnLifecycle {
       // idle chat and asked the busy provider for a turn again and again. An id of a turn that no
       // longer runs is cleared, as before.
       if (snapshot.activeTurnId === turnId || !this.#runningTurns.has(snapshot.activeTurnId ?? ""))
-        snapshot.activeTurnId = null;
+        this.#conversation.setActiveTurn(snapshot, null);
       const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
       // A task turn ends as a turn of the agent's own chat does, in the task's own lane.
       const taskTurn = this.#conversation.isTaskThread(snapshot.threadId);
