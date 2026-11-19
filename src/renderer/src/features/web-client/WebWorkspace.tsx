@@ -712,7 +712,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       hostedSleep: workspace.state.hostedSleep,
       updating: hostUpdating(),
       blocked: workspace.state.recovery?.phase === "suspended",
-      loading: workspace.state.status === "connecting",
+      // Signal holds the attempt of a host that is offline. As on desktop, that is not a load: the notice
+      // shows the connect step, not "Loading" with Connect done.
+      loading: workspace.state.status === "connecting" && !workspace.state.hostOffline,
       hasContent: workspace.state.workspaceLoaded && !frameFirstLoad(),
     });
   /**
