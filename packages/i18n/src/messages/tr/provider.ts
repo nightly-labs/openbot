@@ -117,9 +117,13 @@ export const messages = {
   "provider.picker.download": "{name} indirmesi",
   "provider.picker.search": "Modellerde ara",
   "provider.picker.noMatches": "Aramanızla eşleşen model yok.",
+  "provider.picker.workspaceOnlyUnavailable":
+    'Bu modeller Windows ve Linux\'ta "Yalnızca çalışma alanı" ile çalışmaz. Kullanmak için ajan ayarlarında "İzinler"i değiştirin.',
   "provider.picker.olderModels": "Eski modeller",
   "provider.picker.olderModelsList": "Eski {name} modelleri",
   "provider.picker.noModels": "{name} sağlayıcısından kullanılabilir model yok.",
+  "provider.picker.endpointModelsInCustom": "{name} özel uç noktalarınızı çalıştırıyor. Modelleri Özel sekmesinde.",
+  "provider.picker.showCustomModels": "Modelleri göster",
   "provider.picker.museNoModels":
     "Muse bu hesap için model göndermedi. Muse, bu ajanın çalıştığı ülkede kullanılamıyor olabilir. Başka bir sağlayıcıdan model seçin.",
   "provider.picker.customEmpty":
@@ -147,6 +151,8 @@ export const messages = {
   "provider.picker.selectEffort": "Efor seçin",
   "provider.picker.custom": "Özel",
   "provider.picker.cliReady": "{cli} hazır",
+  "provider.picker.modelSourceProvider": "{cli} ayarlarındaki {name} kullanılıyor",
+  "provider.picker.modelSourceCatalog": "{cli} ayarlarındaki model listesi kullanılıyor",
   "provider.status.signInRequired": "Oturum açılmalı",
   "provider.model.free": "Ücretsiz",
   "provider.model.new": "Yeni",
@@ -167,22 +173,36 @@ export const messages = {
   "provider.geminiKey.title": "Gemini API anahtarı",
   "provider.geminiKey.description":
     "Bu bilgisayara bir Gemini API anahtarı kaydedin. Kayıtlı anahtar, Google hesabınızın yerine kullanılır. Google ile oturum açmak için anahtarı kaldırın ve Gemini satırında Bağlan'ı seçin.",
+  "provider.geminiKey.descriptionHost":
+    "Ana makineye bir Gemini API anahtarı kaydedin. Kayıtlı anahtar, Google hesabınızın yerine kullanılır. Google ile oturum açmak için anahtarı kaldırın ve Gemini satırında Bağlan'ı seçin.",
   "provider.geminiKey.label": "Gemini API anahtarı",
   "provider.claudeKey.title": "Anthropic API anahtarı",
   "provider.claudeKey.description":
     'Ana bilgisayara bir Anthropic API anahtarı kaydedin. Anthropic her isteği Claude planınıza değil, anahtarın API kredisine faturalar. Bir ajan için kullanmak üzere ajanın model menüsünde "API anahtarı" hesabını seçin. Claude\'da oturum açık değilse tüm ajanlar anahtarı kullanır.',
   "provider.claudeKey.label": "Anthropic API anahtarı",
+  "provider.cursorKey.title": "Cursor API anahtarı",
+  "provider.cursorKey.description":
+    "İlkinden sonraki her Cursor hesabı bir API anahtarı kullanır. Cursor panelinde, Integrations bölümünde bir anahtar oluşturun ve buraya yapıştırın. Anahtar bu bilgisayara kaydedilir.",
+  "provider.cursorKey.descriptionHost":
+    "İlkinden sonraki her Cursor hesabı bir API anahtarı kullanır. Cursor panelinde, Integrations bölümünde bir anahtar oluşturun ve buraya yapıştırın. Anahtar ana makineye kaydedilir.",
+  "provider.cursorKey.label": "Cursor API anahtarı",
   "provider.inceptionKey.title": "Inception API anahtarı",
   "provider.inceptionKey.description":
     "Mercury modellerini kullanmak için bu bilgisayara bir Inception API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",
+  "provider.inceptionKey.descriptionHost":
+    "Mercury modellerini kullanmak için ana makineye bir Inception API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",
   "provider.inceptionKey.label": "Inception API anahtarı",
   "provider.deepseekKey.title": "DeepSeek API anahtarı",
   "provider.deepseekKey.description":
     "DeepSeek modellerini kullanmak için bu bilgisayara bir DeepSeek API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",
+  "provider.deepseekKey.descriptionHost":
+    "DeepSeek modellerini kullanmak için ana makineye bir DeepSeek API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",
   "provider.deepseekKey.label": "DeepSeek API anahtarı",
   "provider.openrouterKey.title": "OpenRouter API anahtarı",
   "provider.openrouterKey.description":
     "OpenRouter modellerini kullanmak için bu bilgisayara bir OpenRouter API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",
+  "provider.openrouterKey.descriptionHost":
+    "OpenRouter modellerini kullanmak için ana makineye bir OpenRouter API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",
   "provider.openrouterKey.label": "OpenRouter API anahtarı",
   "provider.openCodeKey.title": "OpenCode Go'da oturum açın",
   "provider.openCodeKey.description":
@@ -199,6 +219,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "Yeniden bağlanılamadı.",
   "provider.account.add": "Hesap ekle",
   "provider.account.addLabel": "Başka bir {name} hesabı ekle",
+  "provider.account.addWithCode": "Kodla hesap ekle",
   "provider.account.count": { one: "{count} hesap", other: "{count} hesap" },
   "provider.account.numbered": "Hesap {number}",
   "provider.account.apiKey": "API anahtarı",
@@ -246,6 +267,12 @@ export const messages = {
     "Google oturumu yerine kayıtlı bir Gemini API anahtarı kullanılıyor. Bir Google planını ve modellerini kullanmak için anahtarı kaldır.",
   "provider.settings.versionInstalledByUser": "{version} · senin yüklediğin",
   "provider.settings.versionDownloaded": "{version} · OpenBot tarafından indirildi",
+  "provider.settings.otherVersionInstalledByUser": "Kullanılmıyor: {version} · senin yüklediğin",
+  "provider.settings.otherVersionDownloaded": "Kullanılmıyor: {version} · OpenBot tarafından indirildi",
+  "provider.settings.installedVersionIncomplete":
+    "Bazı modeller bu sürümde olmayan bir bileşene ihtiyaç duyar. Bunları kullanmak için OpenBot sürümünü indir.",
+  "provider.settings.useInstalledVersion": "Yüklü sürümü kullan",
+  "provider.settings.useDownloadedVersion": "OpenBot sürümünü kullan",
   "provider.settings.cache": "Önbellek",
   "provider.settings.promptCache": "İstem önbelleği",
   "provider.settings.promptCacheDescription":
@@ -267,6 +294,29 @@ export const messages = {
   "provider.settings.compactWindowDefault": "Claude Code varsayılanı",
   "provider.settings.compactWindowTokens": "{size} token",
   "provider.settings.compactWindowLoadFailed": "Bu sunucunun sıkıştırma boyutu yüklenemedi.",
+  "provider.settings.environment": "Ortam",
+  "provider.settings.environmentVariables": "Değişkenler",
+  "provider.settings.environmentDescription":
+    "Her {name} sürecinin aldığı API anahtarları, temel URL’ler ve diğer ayarlar. Bir değişiklik, süren turlar bitince geçerli olur.",
+  "provider.settings.environmentCodexHint":
+    "OPENAI_BASE_URL, anahtar olarak OPENAI_API_KEY ile ChatGPT’nin model isteklerini bu adrese gönderir.",
+  "provider.settings.environmentShellNote": "Ajanların çalıştırdığı komutlar bu değerleri okuyabilir.",
+  "provider.settings.environmentAdd": "Değişken ekle",
+  "provider.settings.environmentNamePlaceholder": "VARIABLE_NAME",
+  "provider.settings.environmentValuePlaceholder": "Değer",
+  "provider.settings.environmentSaved": "Kayıtlı",
+  "provider.settings.environmentSensitive": "Gizli",
+  "provider.settings.environmentNameLabel": "Değişken adı {index}",
+  "provider.settings.environmentValueLabel": "{name} değeri",
+  "provider.settings.environmentSensitiveLabel": "{name} gizli tutulsun",
+  "provider.settings.environmentRemoveLabel": "{name} kaldır",
+  "provider.settings.environmentUnnamed": "değişken {index}",
+  "provider.settings.environmentPending":
+    "Kaydetmek, süren turlar bitince {name} uygulamasını yeniden başlatır. Gizli değerler sunucuda kalır.",
+  "provider.settings.environmentDone": "Kaydedildi. {name}, süren turlar bitince yeniden başlar.",
+  "provider.settings.environmentDiscard": "Vazgeç",
+  "provider.settings.environmentSave": "Kaydet",
+  "provider.settings.environmentLoadFailed": "{name} değişkenleri yüklenemedi.",
   "provider.settings.models": "Modeller",
   "provider.settings.modelsDescription": {
     one: "{count} modelden {shown} tanesi model seçicide görünür.",

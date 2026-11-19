@@ -4,7 +4,14 @@ import type { messages as source } from "../en/vault";
 export const messages = {
   "vault.items.title": "Opgeslagen items",
   "vault.items.description":
-    "Elke agent op deze server kan deze items gebruiken. OpenBot typt wachtwoorden, kaartnummers en beveiligingscodes zelf in de pagina, zodat agents ze nooit zien.",
+    "Elke agent op deze server kan deze items gebruiken. OpenBot typt wachtwoorden, kaartnummers en beveiligingscodes zelf in de pagina, zodat agents ze nooit zien. Agents lezen API-sleutels uit een bestand, niet uit de chat.",
+  "vault.items.scopedDescription":
+    "Elk item is voor de agents die je kiest. OpenBot typt wachtwoorden, kaartnummers en beveiligingscodes zelf in de pagina, zodat agents ze nooit zien. Agents lezen API-sleutels uit een bestand, niet uit de chat. Alle agents draaien als dezelfde systeemgebruiker, dus een agent kan ook een API-sleutelbestand lezen dat voor andere agents is.",
+  "vault.agents.label": "Agents",
+  "vault.agents.all": "Alle agents",
+  "vault.agents.some": "{chosen} van {total}",
+  "vault.agents.choose": "Agents kiezen voor {name}: {agents}",
+  "vault.agents.list": "Agents die {name} kunnen gebruiken",
   "vault.newItem": "Nieuw item",
   "vault.kind.login": "Login",
   "vault.kind.card": "Kaart",
@@ -98,6 +105,8 @@ export const messages = {
   "vault.request.addLogin": "Login toevoegen",
   "vault.request.addCard": "Kaart toevoegen",
   "vault.request.addContact": "Adres toevoegen",
+  "vault.request.addApiKey": "API-sleutel toevoegen",
+  "vault.request.apiKeyPrivate": "Gaat naar je Kluis, niet naar de chat.",
   "vault.request.saved": "Opgeslagen in de Kluis",
   "vault.twoStep.title": "Verificatiecode",
   "vault.twoStep.on": "Aan",

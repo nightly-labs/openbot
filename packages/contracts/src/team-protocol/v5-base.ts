@@ -1,6 +1,3 @@
-// Frozen provider-aware schema for protocol 5: the protocol 4 schema, with Gemini (`antigravity`) and
-// custom ACP agents (`acp`) added to the providers and auth kinds. Versions 1-4 retain their own codec.
-// The schema is in `provider-aware-codec.ts`; this file holds only what protocol 5 accepts.
 import { createProviderAwareCodec } from "./provider-aware-codec";
 
 export type {
@@ -33,7 +30,6 @@ export const TEAM_PROTOCOL_V5Base_WEBSOCKET = "openbot-team-v5";
 const codec = createProviderAwareCodec({
   providers: ["codex", "claude", "grok", "opencode", "antigravity", "acp"],
   authKinds: ["chatgpt", "claude", "grok", "opencode", "antigravity", "acp"],
-  // Brackets as in `isAgentModel`: the Claude CLI names a 1M-context model `claude-opus-5-5[1m]`.
   agentModel: /^[A-Za-z0-9][A-Za-z0-9._:/[\]-]{0,159}$/u,
 });
 

@@ -1,9 +1,3 @@
-// `instance-transfer-chunks-v1` on the desktop client: a transfer file to or from a joined server in
-// parts, so it can be larger than one WebRTC file transfer. The file is read and written one part at
-// a time, never whole in memory. A part that fails is sent again a few times; a host that refuses
-// a request is not asked again. A failed upload stays on the host for 30 minutes, and the next
-// upload of the same file sends only the parts that the host does not have.
-
 import { createHash } from "node:crypto";
 import { type FileHandle, open, rename, rm } from "node:fs/promises";
 import {
@@ -17,8 +11,10 @@ import {
   INSTANCE_TRANSFER_CHUNK_BYTES,
   INSTANCE_TRANSFER_CHUNKS_ROUTES,
 } from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
+import { INSTANCE_TRANSFER_FULL_COPY_ROUTES } from "@openbot/contracts/team-protocol/instance-transfer-full-copy-v1";
 import { INSTANCE_TRANSFER_REMOTE_BYTES } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { decodeInstanceTransferExportState, fullCopyExportBody } from "@openbot/team-client/team-api-requests";
 import { Effect, Schedule } from "effect";
 import { type ArchiveOperationError, archiveCall, archiveFailure } from "./archive-effects";
 import { readFully, sha256Hex, writeFully } from "./instance-transfer-chunks";
@@ -29,8 +25,8 @@ import { RemoteWorkflowError } from "./remote-service-effects";
 type Remote = Pick<RemoteServerManager, "request" | "sendInstanceTransferPart" | "readInstanceTransferPart">;
 type TransferError = ArchiveOperationError | RemoteWorkflowError;
 
-/** How many more times one part is sent or read after it fails. */
 const PART_RETRIES = 3;
+const PROGRESS_INTERVAL_MS = 200;
 
 interface UploadState {
   uploadId: string;
@@ -47,18 +43,14 @@ interface ExportState {
   warnings: string[];
 }
 
-const SHA256 = /^[0-9a-f]{64}$/u;
-
 function isCount(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
 
-/** The client turns a decoder failure into a protocol error. */
 function protocolError(): Error {
   return new Error("Invalid instance transfer parts.");
 }
 
-/** A part size that one WebRTC file transfer carries. */
 function isPartSize(value: unknown): value is number {
   return isCount(value) && value > 0 && value <= INSTANCE_TRANSFER_REMOTE_BYTES;
 }
@@ -76,33 +68,13 @@ function decodeUploadState(value: unknown): UploadState {
 }
 
 function decodeExportState(value: unknown): ExportState {
-  if (
-    !isDynamicRecord(value) ||
-    !isString(value.exportId) ||
-    !isCount(value.size) ||
-    value.size === 0 ||
-    value.size > INSTANCE_TRANSFER_LIMITS.archiveBytes ||
-    !isString(value.sha256) ||
-    !SHA256.test(value.sha256) ||
-    !isPartSize(value.chunkBytes) ||
-    !Array.isArray(value.chunks) ||
-    value.chunks.length !== Math.ceil(value.size / value.chunkBytes) ||
-    !value.chunks.every((chunk) => isString(chunk) && SHA256.test(chunk)) ||
-    !Array.isArray(value.warnings) ||
-    !value.warnings.every(isString)
-  )
+  try {
+    return decodeInstanceTransferExportState(value);
+  } catch {
     throw protocolError();
-  return {
-    exportId: value.exportId,
-    size: value.size,
-    sha256: value.sha256,
-    chunkBytes: value.chunkBytes,
-    chunks: value.chunks.filter(isString),
-    warnings: value.warnings.filter(isString),
-  };
+  }
 }
 
-/** A host that answers a request and refuses it gets the same request again only from the user. */
 function isRefusal(error: TransferError): boolean {
   if (!(error instanceof RemoteWorkflowError)) return false;
   const { cause } = error;
@@ -137,11 +109,24 @@ async function hashFile(handle: FileHandle, size: number, buffer: Buffer): Promi
   return hash.digest("hex");
 }
 
-/** Sends the file at `path` to the host and answers the preview of `instance-transfer-v1` stage. */
+function progressReporter(size: number, report: ((sent: number, total: number) => void) | undefined) {
+  let reported = -1;
+  let reportedAt = 0;
+  return (sent: number, force = false) => {
+    if (!report || sent <= reported) return;
+    const now = Date.now();
+    if (!force && now - reportedAt < PROGRESS_INTERVAL_MS) return;
+    reported = sent;
+    reportedAt = now;
+    report(Math.min(sent, size), size);
+  };
+}
+
 export const uploadTransferInParts = Effect.fn("RemoteInstanceTransfer.upload")(function* (
   remote: Remote,
   serverId: string,
   path: string,
+  onProgress?: (sent: number, total: number) => void,
 ): Effect.fn.Return<InstanceTransferPreview, TransferError> {
   const handle = yield* archiveCall(() => open(path, "r"));
   return yield* Effect.gen(function* () {
@@ -160,15 +145,23 @@ export const uploadTransferInParts = Effect.fn("RemoteInstanceTransfer.upload")(
       timeoutMs: AGENT_IMPORT_UPLOAD_TIMEOUT_MS,
     });
     const received = new Set(upload.received);
+    const partLength = (index: number) => Math.min(upload.chunkBytes, size - index * upload.chunkBytes);
+    const report = progressReporter(size, onProgress);
+    let done = 0;
+    for (const index of received) if (index * upload.chunkBytes < size) done += partLength(index);
+    report(done, true);
     const buffer = Buffer.allocUnsafe(Math.min(upload.chunkBytes, size));
     for (let index = 0; index * upload.chunkBytes < size; index++) {
       if (received.has(index)) continue;
       const position = index * upload.chunkBytes;
-      const bytes = yield* archiveCall(() =>
-        readFully(handle, buffer, position, Math.min(upload.chunkBytes, size - position)),
-      );
+      const bytes = yield* archiveCall(() => readFully(handle, buffer, position, partLength(index)));
       const part = { uploadId: upload.uploadId, index, sha256: sha256Hex(bytes) };
-      yield* retryPart(remote.sendInstanceTransferPart(serverId, part, bytes));
+      const before = done;
+      yield* retryPart(
+        remote.sendInstanceTransferPart(serverId, part, bytes, (sent) => report(before + Math.min(sent, bytes.length))),
+      );
+      done += bytes.length;
+      report(done, true);
     }
     return yield* remote.request(
       serverId,
@@ -179,16 +172,23 @@ export const uploadTransferInParts = Effect.fn("RemoteInstanceTransfer.upload")(
   }).pipe(Effect.ensuring(archiveCall(() => handle.close()).pipe(Effect.ignore)));
 });
 
-/** Writes the host's transfer file to `destination`. The file appears only when it is complete. */
+function transferExportBegin(input: ExportInstanceInput, fullCopy: boolean) {
+  return fullCopy
+    ? { route: INSTANCE_TRANSFER_FULL_COPY_ROUTES.exportBegin, body: fullCopyExportBody(input) }
+    : { route: INSTANCE_TRANSFER_CHUNKS_ROUTES.exportBegin, body: input };
+}
+
 export const downloadTransferInParts = Effect.fn("RemoteInstanceTransfer.download")(function* (
   remote: Remote,
   serverId: string,
   input: ExportInstanceInput,
   destination: string,
+  fullCopy = false,
 ): Effect.fn.Return<{ warnings: string[] }, TransferError> {
-  const file = yield* remote.request(serverId, INSTANCE_TRANSFER_CHUNKS_ROUTES.exportBegin, decodeExportState, {
+  const begin = transferExportBegin(input, fullCopy);
+  const file = yield* remote.request(serverId, begin.route, decodeExportState, {
     method: "POST",
-    body: input,
+    body: begin.body,
     timeoutMs: AGENT_IMPORT_UPLOAD_TIMEOUT_MS,
   });
   const part = `${destination}.part`;

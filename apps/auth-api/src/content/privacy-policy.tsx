@@ -1,6 +1,3 @@
-// The text of the privacy policy. Legal wording: change it only from the approved source text,
-// and move `PRIVACY_POLICY_UPDATED_AT` with it.
-
 import { Link } from "@tanstack/solid-router";
 
 const PRIVACY_EMAIL = "privacy@openbot.run";

@@ -61,11 +61,22 @@ export const Ready: Story = {
   ),
 };
 
+export const RestartRequired: Story = {
+  render: () => (
+    <MockedSetup
+      state={{
+        status: "restart-required",
+        permissions: permissions(["screen-recording", "accessibility"]),
+        message: null,
+      }}
+    />
+  ),
+};
+
 export const Loading: Story = {
   render: () => <MockedSetup loading />,
 };
 
-/** A build that carries no driver. A fault of that build, so the panel names no command to run. */
 export const DriverMissing: Story = {
   render: () => (
     <MockedSetup
@@ -78,7 +89,6 @@ export const DriverMissing: Story = {
   ),
 };
 
-/** Windows and Linux grant no permission, so a driver that answers is all the panel has to report. */
 export const ReadyWithoutPermissions: Story = {
   render: () => <MockedSetup state={{ status: "ready", permissions: [], message: null }} />,
 };

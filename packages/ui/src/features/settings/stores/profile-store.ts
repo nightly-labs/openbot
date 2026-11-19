@@ -29,29 +29,17 @@ interface AvatarUpload {
   error: string | null;
 }
 
-/**
- * One record per panel of the Profile tab. Each group's fields are written together — a save
- * touches the draft, its error and its busy flag at once — so they are one store rather than a
- * signal each, and replacing one field re-renders only what read that field.
- */
 interface SettingsProfilePanels {
   avatar: AvatarUpload;
   profile: ProfileNameEdit;
   sessions: {
     items: AccountSession[];
     loading: boolean;
-    /** The failed read or disconnect, with the code of its cause. */
     error: UserErrorDetails | null;
     revokingId: string | null;
   };
 }
 
-/**
- * The Profile tab: the display-name draft, the avatar upload and the account session list.
- *
- * Created by the settings dialog rather than by the tab, so the session list follows the dialog's
- * open state and the selected tab.
- */
 export function createSettingsProfileStore(props: ProfileStoreProps, isActive: () => boolean) {
   const [panels, setPanels] = createStore<SettingsProfilePanels>({
     avatar: { busy: false, error: null },
@@ -194,7 +182,6 @@ export function createSettingsProfileStore(props: ProfileStoreProps, isActive: (
     });
   }
 
-  /** The blur handler: a draft the user never changed must not start showing errors. */
   function markTouchedIfDirty(): void {
     if (!nameDirty()) return;
     setPanels((state) => {
@@ -245,7 +232,6 @@ export function createSettingsProfileStore(props: ProfileStoreProps, isActive: (
     }
   }
 
-  /** The photo as the account stores it. The edit dialog shows it before it saves it. */
   function processAvatarFile(file: File): Promise<AvatarImageInput> {
     return (props.processAvatarFile ?? normalizeAvatarFile)(file);
   }

@@ -12,7 +12,6 @@ export interface MockAuthOptions {
   authState?: CentralAuthState;
 }
 
-/** The OpenBot account: its sign-in state and the sessions signed in to it. */
 export function createMockAuth(options: MockAuthOptions, { emit }: MockRuntime) {
   const defaultAuthState: CentralAuthState = {
     status: "signed_in",

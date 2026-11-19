@@ -62,6 +62,7 @@ export const messages = {
   "mobile.marketplace.facts.accessSignIn": "登录",
   "mobile.marketplace.facts.accessLocal": "这台电脑",
   "mobile.marketplace.facts.accessNone": "无需登录",
+  "mobile.marketplace.facts.accessMac": "仅限 Mac",
   "mobile.marketplace.permission.admin": "只有所有者和管理员可以从市场安装。",
   "mobile.marketplace.permission.unavailable":
     "该服务器已离线，或其 OpenBot 版本过旧。请更新运行它的电脑上的 OpenBot。",
@@ -92,6 +93,7 @@ export const messages = {
   "mobile.marketplace.skill.doc": "SKILL.md",
   "mobile.marketplace.skill.examplePrompt": "帮我使用这个技能。",
   "mobile.marketplace.app.add": "添加应用",
+  "mobile.marketplace.app.addCustom": "添加自定义项",
   "mobile.marketplace.app.connect": "连接",
   "mobile.marketplace.app.connectTitle": "连接 {name}",
   "mobile.marketplace.app.keyIntro": "粘贴你账号中的密钥。服务器会先测试密钥，再保存该应用。",
@@ -108,6 +110,7 @@ export const messages = {
   "mobile.marketplace.app.linkInvalid": "请使用 {hostname} 上的 https 链接。",
   "mobile.marketplace.app.docs": "获取密钥",
   "mobile.marketplace.app.local": "该应用运行在装有 OpenBot 的电脑上。请在那台电脑上设置。",
+  "mobile.marketplace.app.needsMac": "此应用仅在运行 OpenBot 的 Mac 上可用，而此服务器不是 Mac。",
   "mobile.marketplace.app.relayUnsupported":
     "该应用需要在浏览器中登录。请更新服务器上的 OpenBot，或在电脑上连接该应用。",
   "mobile.marketplace.app.waiting": "正在等待登录页面…",

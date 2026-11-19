@@ -1,10 +1,7 @@
-/* The Folders row sits in the Rules group after Permissions. The + opens the folder picker; the rest
-   of the row opens the Folders page. */
 .agent-folders-entry {
   position: relative;
 }
 
-/* The + sits over an empty slot in the row, between the count and the chevron; a button cannot hold a button. */
 .agent-folders-entry-add-slot {
   flex: none;
   width: 24px;
@@ -18,30 +15,25 @@
   transform: translateY(-50%);
 }
 
-/* The + is 24px; the row is 40px tall, so it takes a 40px target. */
 .agent-folders-entry-add::before {
   position: absolute;
   inset: -8px;
   content: "";
 }
 
-/* The count changes as folders come and go; its digits keep one width. */
 .agent-folders-count,
 .agent-folders-lost {
   font-variant-numeric: tabular-nums;
 }
 
-/* A folder that is no longer on the disk shows on the row, so the user does not have to open the page. */
 .agent-folders-lost {
   color: var(--openbot-warning-text);
 }
 
-/* The value holds the count, a dot, then the warning; the row's 8px gap is too wide around a dot. */
 .agent-folders-dot {
   margin-inline: calc(var(--openbot-space-1) * -1);
 }
 
-/* While a folder is dragged over the side panel, the Folders row and the Added group show where it goes. */
 .agent-folders-entry,
 .agent-folders-drop-target {
   outline: 1px dashed transparent;
@@ -62,7 +54,6 @@
   gap: var(--openbot-space-4);
 }
 
-/* Icon, text, then the actions the row has: Locate… for a missing folder, then X. */
 .agent-folders-row {
   display: grid;
   grid-auto-columns: auto;
@@ -102,7 +93,6 @@
   color: var(--openbot-warning-text);
 }
 
-/* The note on the Folders page when the agent can change all files. */
 .agent-folders-access {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -123,7 +113,6 @@
   color: var(--openbot-text-muted);
 }
 
-/* The button is 32px; the row is 48px tall, so it can take a 44px target. */
 .agent-folders-remove::before {
   position: absolute;
   inset: -6px;
@@ -138,7 +127,6 @@
   color: var(--openbot-text-primary);
 }
 
-/* A folder the user just added comes in under the others. */
 @media (prefers-reduced-motion: no-preference) {
   .agent-folders-row[data-fresh] {
     animation: agent-folders-row-in var(--openbot-duration-normal) var(--openbot-ease-out) both;
@@ -148,14 +136,12 @@
     animation: agent-folders-fade-in var(--openbot-duration-fast) var(--openbot-ease-out) both;
   }
 
-  /* The user tried to add a folder that this row already gives: the row shows itself once. */
   .agent-folders-row[data-flash],
   .agent-folders-entry[data-flash] {
     animation: agent-folders-row-flash 900ms var(--openbot-ease-out);
   }
 }
 
-/* Without motion the row stays marked a moment and the mark goes at once. */
 @media (prefers-reduced-motion: reduce) {
   .agent-folders-row[data-flash],
   .agent-folders-entry[data-flash] {
@@ -183,8 +169,6 @@
   }
 }
 
-/* The chat's drop overlay in two halves. It takes the place of the chat's own overlay for a local
-   agent in Workspace only mode; with wider access a folder gives nothing new, so files only attach. */
 .agent-folders-chat-drop {
   position: absolute;
   z-index: 60;
@@ -198,7 +182,6 @@
   backdrop-filter: blur(3px);
 }
 
-/* The settings panel takes its own drops, so the overlay stops at its edge. */
 .conversation-panel[data-settings-panel] .agent-folders-chat-drop {
   inset-inline-end: calc(var(--settings-panel-width, 360px) + var(--openbot-space-3));
 }
@@ -247,8 +230,6 @@
   color: var(--openbot-text-primary);
 }
 
-/* The folder picker for an agent on another computer. It uses the frame of the "More providers"
-   dialog: a title, a close button and one plain list, here with the places, the path and the buttons. */
 .host-folder-picker-places {
   display: flex;
   flex-wrap: wrap;

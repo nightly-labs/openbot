@@ -16,7 +16,6 @@ import { PreferenceStore } from "./preference-file";
 
 const logger = createOpenBotLogger("external-links");
 
-/** The program that opens web pages for the user. Main reads it for each page that it opens. */
 export type ExternalLinkPreferenceStore = PreferenceStore<ExternalLinkPreference>;
 
 export function createExternalLinkPreferenceStore(path: string): ExternalLinkPreferenceStore {
@@ -38,19 +37,10 @@ class ExternalLinkFailure extends Schema.TaggedError<ExternalLinkFailure>()("Ext
 export interface ExternalLinkOpenerDependencies {
   preference: ExternalLinkPreferenceStore;
   platform: NodeJS.Platform;
-  /** The operating system's own open, `shell.openExternal`. */
   openDefault: (url: string) => Promise<void>;
-  /** Tells the window that the chosen program did not start. */
   onFallback: (fallback: ExternalLinkFallback) => void;
 }
 
-/**
- * Opens each web page in the program that the user chose in Settings. An address that is not an
- * http or https page, such as a System Settings pane, always goes to the operating system.
- *
- * The program gets the address as one argument, with no shell, so an address cannot add a command.
- * When the program does not start, the default browser opens the page and the window shows a notice.
- */
 export class ExternalLinkOpener {
   readonly #dependencies: ExternalLinkOpenerDependencies;
 
@@ -59,9 +49,13 @@ export class ExternalLinkOpener {
   }
 
   readonly open = Effect.fn("ExternalLinkOpener.open")(function* (this: ExternalLinkOpener, url: string) {
-    const { preference, platform, openDefault, onFallback } = this.#dependencies;
+    const { preference, platform, onFallback } = this.#dependencies;
     const target = preference.get().target;
     const page = webPage(url);
+    const openDefault = () =>
+      platform === "linux" && page
+        ? startProgram("xdg-open", [page], true, XDG_OPEN_ENV)
+        : this.#dependencies.openDefault(url);
     if (target.kind === "app" && page) {
       const launched = yield* Effect.result(launchApp(platform, target.path, page));
       if (Result.isSuccess(launched)) return;
@@ -69,14 +63,13 @@ export class ExternalLinkOpener {
         "The chosen browser did not start, so the default browser opens the page.",
         toLogValue(launched.failure.cause),
       );
-      yield* Effect.tryPromise({ try: () => openDefault(url), catch: (cause) => new ExternalLinkFailure({ cause }) });
+      yield* Effect.tryPromise({ try: openDefault, catch: (cause) => new ExternalLinkFailure({ cause }) });
       onFallback({ name: externalLinkAppName(platform === "darwin" ? target.path : programOf(target.path)) });
       return;
     }
-    yield* Effect.tryPromise({ try: () => openDefault(url), catch: (cause) => new ExternalLinkFailure({ cause }) });
+    yield* Effect.tryPromise({ try: openDefault, catch: (cause) => new ExternalLinkFailure({ cause }) });
   });
 
-  /** The applications that open web pages. Empty when the system does not tell, as on Linux and Windows. */
   readonly listBrowsers = Effect.fn("ExternalLinkOpener.listBrowsers")(function* (this: ExternalLinkOpener) {
     if (this.#dependencies.platform !== "darwin") return { defaultBrowser: null, browsers: [] };
     const listed = yield* Effect.result(listMacBrowsers());
@@ -86,18 +79,12 @@ export class ExternalLinkOpener {
   });
 }
 
-/** The address as an http or https page, or null for any other scheme. */
 function webPage(url: string): string | null {
   if (!URL.canParse(url)) return null;
   const parsed = new URL(url);
   return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.toString() : null;
 }
 
-/**
- * The words of a Linux or Windows command, split at spaces. A value that names a file, such as
- * `C:\Program Files\Mozilla Firefox\firefox.exe`, is one word. Double quotes keep a path with
- * spaces in one word. A backslash is a plain character, as in a Windows path. No shell reads the words.
- */
 function commandWords(command: string): string[] {
   if (existsSync(command)) return [command];
   return Array.from(command.matchAll(/"([^"]*)"|[^\s"]+/g), (match) => match[1] ?? match[0]);
@@ -107,36 +94,59 @@ function programOf(command: string): string {
   return commandWords(command)[0] ?? command;
 }
 
-/**
- * The address starts with `http`, so neither `open` nor the program can read it as an option.
- * `open -a` stops with an error when the application is missing. It has no time limit: it waits
- * while macOS asks the user to open a downloaded application. A program on Linux or Windows fails
- * to spawn when it is missing or cannot run.
- */
+const LINUX_START_FAILURE_WAIT_MS = 3_000;
+
+const XDG_OPEN_ENV = { MM_NOTTTY: "1" };
+
+function startProgram(
+  program: string,
+  args: string[],
+  watchExit: boolean,
+  env: Record<string, string> = {},
+): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const child = spawn(program, args, {
+      shell: false,
+      detached: true,
+      stdio: "ignore",
+      env: { ...process.env, ...env },
+    });
+    child.once("error", reject);
+    child.once("spawn", () => {
+      if (!watchExit) {
+        child.unref();
+        resolve();
+        return;
+      }
+      const stopped = (code: number | null, signal: NodeJS.Signals | null) => {
+        clearTimeout(running);
+        if (code === 0) resolve();
+        else reject(new Error(`${program} stopped with ${signal ?? `exit code ${code}`}.`));
+      };
+      const running = setTimeout(() => {
+        child.removeListener("exit", stopped);
+        child.unref();
+        resolve();
+      }, LINUX_START_FAILURE_WAIT_MS);
+      child.once("exit", stopped);
+    });
+  });
+}
+
 function launchApp(platform: NodeJS.Platform, path: string, page: string): Effect.Effect<void, ExternalLinkFailure> {
   return Effect.tryPromise({
-    try: () =>
-      platform === "darwin"
-        ? new Promise<void>((resolve, reject) => {
-            execFile("open", ["-a", path, page], (error) => (error ? reject(error) : resolve()));
-          })
-        : new Promise<void>((resolve, reject) => {
-            const [program = path, ...options] = commandWords(path);
-            const child = spawn(program, [...options, page], { shell: false, detached: true, stdio: "ignore" });
-            child.once("error", reject);
-            child.once("spawn", () => {
-              child.unref();
-              resolve();
-            });
-          }),
+    try: () => {
+      if (platform === "darwin")
+        return new Promise<void>((resolve, reject) => {
+          execFile("open", ["-a", path, page], (error) => (error ? reject(error) : resolve()));
+        });
+      const [program = path, ...options] = commandWords(path);
+      return startProgram(program, [...options, page], platform === "linux");
+    },
     catch: (cause) => new ExternalLinkFailure({ cause }),
   });
 }
 
-/**
- * LaunchServices knows each application that opens an https page, and the default one. AppKit
- * gives both lists; `osascript` runs the script with no shell.
- */
 const MAC_BROWSERS_SCRIPT = `
 ObjC.import("AppKit");
 const workspace = $.NSWorkspace.sharedWorkspace;
@@ -173,8 +183,6 @@ function decodeMacBrowsers(value: unknown): ExternalLinkBrowsers {
     isDynamicRecord(item) && typeof item.name === "string" && typeof item.path === "string"
       ? { name: item.name.replace(/\.app$/, ""), path: item.path }
       : null;
-  // A copy on a mounted disk image or in a hidden tool folder, such as a test Chrome, is not a
-  // browser that the user installed. OpenBot itself also opens https pages.
   const bundleEnd = process.execPath.indexOf(".app/");
   const ownBundle = bundleEnd === -1 ? null : process.execPath.slice(0, bundleEnd + 4);
   const installed = (path: string) => !path.startsWith("/Volumes/") && !path.includes("/.") && path !== ownBundle;

@@ -1,7 +1,5 @@
 export const INPUT_LIMITS = {
   identifier: 128,
-  // A saved login id from `list_logins`. The longest is a Proton Pass id:
-  // `proton:` + share id (256) + `:` + item id (256).
   vaultLoginId: 520,
   email: 254,
   accountName: 120,
@@ -15,41 +13,24 @@ export const INPUT_LIMITS = {
   avatarUrl: 2_048,
   browserActionText: 50_000,
   agentName: 80,
-  // Model names come from a CLI's `displayName`, which nothing bounds, and the released Team v1
-  // adapter already accepts 160 — so the agent-name limit would reject a model list a shipped peer
-  // is entitled to send.
   modelName: 160,
-  // A provider service tier id, such as Codex `priority`.
   serviceTier: 64,
   agentTitle: 120,
   agentDescription: 2_000,
-  // The instructions of a stored channel. New text must fit `agentDescription`, but a database can
-  // already hold a longer one (#5929), and a stricter read made that channel, and the whole channel
-  // list, unreadable. Reads accept up to this so the channel keeps working.
   storedChannelInstructions: 32_000,
-  // The instruction file at the root of an agent's workspace. Local-only, so no Team API bounds it;
-  // Codex reads at most 32 KiB of `AGENTS.md` by default.
   agentInstructionsFile: 32_000,
-  // The smallest choice of the app setting `AGENT_MEMORY_LIMITS`.
   agentMemories: 64,
   agentSkills: 32,
   sharedTables: 64,
   sharedTableName: 64,
-  // Half the default agent cap. A channel packet is rebuilt every turn and the memories block is paid in
-  // full each time, against `ChannelHistory.prepare`'s hard character budget.
   channelMemories: 32,
-  // The facts of one messaging connection. Like a channel packet, every external message pays for the
-  // whole block, so the cap matches the channel one.
   messagingMemories: 32,
   agentMemoryText: 500,
   agentRoutines: 64,
   routineName: 80,
   routineInstruction: 100_000,
   routineRunsPage: 100,
-  // Handoffs inside one routine. A flow wider than this is no longer readable on one canvas.
   routineFlowLinks: 50,
-  // One workflow graph. Far more than one canvas shows at a readable zoom; the wire codec keeps its
-  // own copies of these numbers.
   workflowNodes: 200,
   workflowEdges: 400,
   workflowNodeFields: 32,
@@ -57,39 +38,25 @@ export const INPUT_LIMITS = {
   workflowStrokes: 500,
   workflowStrokePoints: 2_000,
   workflowTitle: 160,
-  // The JSON of one saved graph. A workflow and its triggers must fit one WebRTC frame (1.5 MiB of
-  // body) when a member reads it.
   workflowGraphBytes: 1024 * 1024,
   workflowRunsPage: 50,
-  // The input of one step: the outputs of the steps before it, joined.
   workflowStepInput: 32_000,
-  // The body of a webhook that starts a workflow, as the first step reads it.
   workflowWebhookPayload: 64_000,
-  // The reason an agent gives when it reports that its routine run failed.
   routineFailureReason: 500,
-  // Open waits of one agent. A wait is a request the agent has not finished, and more than this many
-  // at once is a loop that opens waits, not work.
   agentWaits: 20,
   agentWaitNote: 500,
-  // Tasks of one agent in one list: the open ones, then the newest closed ones.
   agentTasks: 50,
   agentTaskTitle: 120,
   agentTaskProgress: 500,
   agentTaskError: 2_000,
-  // The text a local script adds to a routine run through the automation server.
   automationPayload: 4_000,
-  // The longest range the routine calendar reads: a six-week month view, with one day before it and
-  // two after it for the viewer's time zone.
   routineCalendarDays: 44,
   routineCron: 255,
   messageText: 100_000,
-  // A longer text paste becomes a `pasted-text.txt` attachment, so the message keeps all of it.
   pastedText: 4_000,
   directMessageText: 20_000,
-  // A side question carries its earlier questions and answers, because nothing on the host keeps them.
   sideQuestionTurns: 20,
   sideQuestionAnswer: 32_000,
-  /** The start of each earlier side question and answer that the prompt reads. */
   sideQuestionEarlierText: 4_000,
   promptQuestions: 32,
   promptOptions: 5,
@@ -103,7 +70,6 @@ export const INPUT_LIMITS = {
   attachments: 10,
   draftAttachments: 50,
   messageRecipients: 32,
-  // A reorder names the whole queue. The Team API allows 100.
   queueReorder: 100,
   attachmentName: 255,
   mimeType: 255,
@@ -114,9 +80,6 @@ export const INPUT_LIMITS = {
   browserTabs: 25,
   browserCoordinate: 100_000,
   browserDimension: 16_384,
-  // MCP server configuration. `identifier` covers the id and `path` covers the working directory.
-  // The two value bounds are equal today and kept apart on purpose: an environment value and an
-  // HTTP header are different things, and only one of them has a protocol that bounds it.
   mcpServers: 100,
   mcpServerName: 80,
   mcpCommand: 4_096,
@@ -130,24 +93,16 @@ export const INPUT_LIMITS = {
   mcpUrl: 2_048,
   mcpToolCount: 10_000,
   mcpErrorText: 2_000,
-  // A sign-in app (`mcp-sign-in-app-v1`). Generous for every provider checked; the wire codec keeps
-  // its own copies of these numbers.
   mcpClientId: 1_024,
   mcpClientSecret: 4_096,
   mcpScope: 2_048,
-  // A relayed sign-in (`sign-in-relay-v1`): the page address and the callback the browser came back to.
   signInRelayAddress: 8_192,
   teamMembers: 100,
   activeInvites: 100,
-  // Permanent links accept unlimited joins until revoked, so a leaked link is open
-  // enrollment. The cap stays small; single-use invitations keep the larger budget.
   maxPermanentInvites: 5,
   sessionsPerMember: 10,
 } as const;
 
-// Active members of one host with no plan and no entitled license of its owner, owner included: the
-// owner and two others. A plan sets its own limit (`memberLimitForPlan`), and a license gives its users.
-// `INPUT_LIMITS.teamMembers` stays the wire cap for stored members.
 export const DEFAULT_TEAM_MEMBER_LIMIT = 3;
 
 export const ATTACHMENT_LIMITS = {

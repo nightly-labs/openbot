@@ -62,6 +62,7 @@ export const messages = {
   "mobile.marketplace.facts.accessSignIn": "Login",
   "mobile.marketplace.facts.accessLocal": "Este computador",
   "mobile.marketplace.facts.accessNone": "Sem login",
+  "mobile.marketplace.facts.accessMac": "Só Mac",
   "mobile.marketplace.permission.admin": "Só proprietários e administradores podem instalar da loja.",
   "mobile.marketplace.permission.unavailable":
     "Este servidor está offline, ou o OpenBot dele é antigo demais para isso. Atualize o OpenBot no computador que o executa.",
@@ -92,6 +93,7 @@ export const messages = {
   "mobile.marketplace.skill.doc": "SKILL.md",
   "mobile.marketplace.skill.examplePrompt": "Ajude-me a usar esta habilidade.",
   "mobile.marketplace.app.add": "Adicionar app",
+  "mobile.marketplace.app.addCustom": "Adicionar personalizado",
   "mobile.marketplace.app.connect": "Conectar",
   "mobile.marketplace.app.connectTitle": "Conectar {name}",
   "mobile.marketplace.app.keyIntro": "Cole a chave da sua conta. O servidor a testa antes de salvar o app.",
@@ -109,6 +111,8 @@ export const messages = {
   "mobile.marketplace.app.linkInvalid": "Use um link https em {hostname}.",
   "mobile.marketplace.app.docs": "Obter chave",
   "mobile.marketplace.app.local": "Este app roda no computador com o OpenBot. Configure-o nesse computador.",
+  "mobile.marketplace.app.needsMac":
+    "Este app só funciona em um Mac que executa o OpenBot, e este servidor não é um Mac.",
   "mobile.marketplace.app.relayUnsupported":
     "Este app precisa de login no navegador. Atualize o OpenBot no servidor ou conecte o app no computador.",
   "mobile.marketplace.app.waiting": "Aguardando a página de login…",

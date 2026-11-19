@@ -1,7 +1,3 @@
-/* transitions.dev panel reveal for the file preview. The panel enters from
-   the end edge, so it travels on X. `.browser-panel` declares its own
-   transition later in the cascade than the `.t-panel-slide` snippet, so both
-   property lists are restated here at a higher specificity. */
 .file-preview-panel.t-panel-slide {
   --panel-translate-x: 24px;
   --panel-translate-y: 0px;
@@ -46,7 +42,6 @@
   white-space: nowrap;
 }
 
-/* Copy is a shared icon button; its icon matches the other header icons. */
 .file-preview-copy svg {
   width: 15px;
   height: 15px;
@@ -147,12 +142,14 @@
   margin: 20px;
 }
 
-.file-preview-video {
-  display: block;
-  width: 100%;
+.media-generation-stage.file-preview-video {
   max-height: 100%;
+  border-radius: 0;
   background: var(--openbot-bg-canvas);
-  object-fit: contain;
+}
+
+.file-preview-video .media-generation-player:not(:popover-open) video {
+  background: var(--openbot-bg-canvas);
 }
 
 .file-preview-spreadsheet {
@@ -333,12 +330,10 @@
   text-align: center;
 }
 
-/* In RTL the panel is on the left edge, so it enters from the left. */
 :dir(rtl) .file-preview-panel.t-panel-slide {
   --panel-translate-x: -24px;
 }
 
-/* Back points to the start side. */
 :dir(rtl) .file-preview-header svg[class~="lucide-arrow-left"] {
   transform: scaleX(-1);
 }

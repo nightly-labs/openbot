@@ -1,8 +1,3 @@
-import { Effect, Schema, Semaphore } from "effect";
-// Named browser profiles, and the profile of each agent, as this computer holds them. The local
-// window uses this; the agent setting writes through `AgentService.updateAgent`, which closes the
-// agent's tabs when its profile changes. A profile name is user data: it is never logged.
-
 import {
   type AgentBrowserProfile,
   type AgentSummary,
@@ -26,6 +21,7 @@ import {
   type UpdateBrowserProfileInput,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect, Schema, Semaphore } from "effect";
 import type { AgentService } from "../backend/agent-service";
 import type { BrowserHost } from "../backend/browser-host";
 import type { BrowserProfileRecord, BrowserProfileStore } from "../backend/browser-profiles/browser-profile-store";
@@ -56,7 +52,6 @@ export interface BrowserProfileServiceDependencies {
     | "assign"
     | "ensureComputer"
   >;
-  /** Encrypts a proxy password. The password is never logged and never sent back. */
   cipher: Pick<SecretStorageCipher, "canPersist" | "encrypt">;
   agents: Pick<AgentService, "listAgents" | "updateAgent">;
   browser: Pick<
@@ -69,43 +64,27 @@ export interface BrowserProfileServiceDependencies {
     | "forgetProxyFailure"
     | "releaseProfileProxy"
   >;
-  /** The name of a member of this server, or null when it is not a member now. Never logged. */
   memberName?: (memberId: string) => string | null;
-  /** Whether the computer of a member shares its connection with this server now. */
   computerOnline?: (memberId: string) => boolean;
-  /** Runs after each change that succeeds, so every open profile list reads them again. */
   onChanged?: () => void;
 }
 
 export interface BrowserProfileService {
   list(): BrowserProfileList;
   create(name: string): Effect.Effect<BrowserProfileSummary, BrowserProfileFailure>;
-  /** Changes the name, the color, or both. Data and tabs stay. */
   update(input: UpdateBrowserProfileInput): Effect.Effect<BrowserProfileSummary, BrowserProfileFailure>;
-  /** Closes the tabs of the profile or the agent session, then deletes its cookies, storage and cache. */
   clear(input: ClearBrowserDataInput): Effect.Effect<void, BrowserProfileFailure>;
-  /** Moves the agents of the profile to the shared session, closes its tabs and deletes its data. */
   delete(profileId: string): Effect.Effect<void, BrowserProfileFailure>;
   readAgent(agentId: string): AgentBrowserProfile;
   updateAgent(input: UpdateAgentBrowserProfileInput): Effect.Effect<AgentBrowserProfile, BrowserProfileFailure>;
-  /** The profile of each open tab that is not in the shared session. */
   tabProfiles(): BrowserTabProfile[];
-  /** `memberId` is the member who asks, so the list can mark that member's own computer. */
   listProxies(memberId?: string): BrowserProxyList;
-  /** Adds the computer of the member who asks. Its connection is used only while that member shares it. */
   saveOwnComputer(memberId: string): Effect.Effect<BrowserProxyComputer, BrowserProfileFailure>;
-  /** Adds a proxy, or changes one and closes the tabs of the profiles that use it. */
   saveProxy(input: SaveBrowserProxyInput): Effect.Effect<BrowserProxySummary, BrowserProfileFailure>;
-  /** Moves the profiles of the proxy to the proxy settings of the computer and closes their tabs. */
   deleteProxy(input: DeleteBrowserProxyInput): Effect.Effect<void, BrowserProfileFailure>;
-  /** Sets the proxy of one profile, or none, and closes its tabs when it changes. */
   setProfileProxy(input: SetBrowserProfileProxyInput): Effect.Effect<void, BrowserProfileFailure>;
 }
 
-/**
- * The proxy of a named profile as the browser connects to it, with the password decrypted, or null
- * for the proxy settings of the computer. It throws when the password cannot be read.
- */
 export function browserProxyConnection(
   proxies: Pick<BrowserProxyStore, "proxyOfProfile" | "get" | "password">,
   cipher: Pick<SecretStorageCipher, "decrypt">,
@@ -168,7 +147,6 @@ export function createBrowserProfileService({
       tabCount: browser.tabIdsInSession({ kind: "profile", profileId: profile.id }).length,
     };
   }
-  // One change at a time, so an agent cannot move into a profile while a delete moves its agents out.
   const changes = Semaphore.makeUnsafe(1);
   const serialized = <A>(change: Effect.Effect<A, BrowserProfileFailure>) =>
     changes
@@ -232,7 +210,6 @@ export function createBrowserProfileService({
     for (const profileId of profileIds) {
       for (const tabId of browser.tabIdsInSession({ kind: "profile", profileId }))
         yield* browser.close(tabId).pipe(toBrowserProfileFailure);
-      // The relay of the old proxy stops with the tabs, not at the next tab.
       yield* browser.releaseProfileProxy(profileId).pipe(toBrowserProfileFailure);
     }
   });
@@ -249,7 +226,6 @@ export function createBrowserProfileService({
         throw new BrowserProfileRejectedError(sourceText("error.backend.browserProxyAddressInvalid"));
       const { scheme, host, port, username, password } = parsed;
       const existing = proxyId === undefined ? undefined : requireAddress(proxyId);
-      // A different admin changed the proxy after this one opened it: the save would undo that change.
       if (existing !== undefined && browserProxyAddressText(existing) !== previousAddress)
         throw new BrowserProfileRejectedError(sourceText("error.backend.browserProxyChanged"));
       const all = proxies.list().filter((proxy) => proxy.kind === "address");
@@ -268,8 +244,6 @@ export function createBrowserProfileService({
       if (taken) throw new BrowserProfileRejectedError(sourceText("error.backend.browserProxyTaken"));
       if (password !== null && !cipher.canPersist())
         throw new BrowserProfileRejectedError(sourceText("error.app.secretStorageUnavailable"));
-      // The edit field shows a mask in place of the saved password; a kept mask keeps the password.
-      // A password needs a user name, so an address without one keeps no password.
       const keptPassword =
         existing !== undefined && keepPassword === true && username !== null ? proxies.password(existing.id) : null;
       const row = {
@@ -311,8 +285,6 @@ export function createBrowserProfileService({
     const profileIds = yield* check(() => {
       requireProxy(proxyId);
       const users = profilesOf(proxyId, proxies.assignments());
-      // Its profiles change to Automatic. Only the profiles that the admin saw can change so: a profile
-      // that a different admin moved to the proxy since then must not send its pages directly.
       if (users.length !== seen.length || users.some((profileId) => !seen.includes(profileId)))
         throw new BrowserProfileRejectedError(sourceText("error.backend.browserProxyChanged"));
       proxies.delete(proxyId);
@@ -374,7 +346,6 @@ export function createBrowserProfileService({
 
   const remove = Effect.fn("BrowserProfiles.delete")(function* (profileId: string) {
     yield* check(() => requireProfile(profileId));
-    // The agents move first, so none of them opens a new tab in the profile while it goes.
     for (const agent of agents.listAgents().filter((candidate) => candidate.browserProfileId === profileId))
       yield* agents.updateAgent({ agentId: agent.id, ownBrowserSession: false }).pipe(toBrowserProfileFailure);
     yield* closeAndClear({ kind: "profile", profileId });
@@ -440,7 +411,6 @@ export function createBrowserProfileService({
   };
 }
 
-/** A change that the person who manages the profiles can correct: its message is catalog text for them. */
 export class BrowserProfileRejectedError extends Error {}
 
 class BrowserProfileFailure extends Schema.TaggedError<BrowserProfileFailure>()("BrowserProfileFailure", {

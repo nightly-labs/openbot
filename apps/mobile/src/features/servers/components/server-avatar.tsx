@@ -11,6 +11,7 @@ import { useCSSVariable } from "uniwind";
 import { thumbnailColor } from "@/features/agents/components/bloub-avatar";
 import { useMobileSession, useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { loadServerLogo } from "@/features/servers/model/server-logo";
+import { useServerPlush } from "@/features/servers/model/server-plush";
 import { DISCONNECTED_APPEARANCE } from "@/features/workspace/components/use-connection-appearance";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { showsOnline } from "@/features/workspace/model/server-status";
@@ -18,18 +19,11 @@ import type { MobileServer } from "@/features/workspace/model/workspace-types";
 import { END_X } from "@/shared/lib/text-direction";
 
 const INK = "rgba(0, 0, 0, 0.72)";
-/** The squircle's corner radius as a part of its side. */
 export const SERVER_AVATAR_CORNER_RATIO = 0.32;
 const DOT = 12;
 const DOT_OVERHANG = 2;
-// The ring cut out of the squircle around the dot, so the dot works on any background.
 const DOT_GAP = 2.5;
 
-/**
- * A square with a circular hole around the dot. The mask keeps only the filled part. The dot is at
- * the bottom end corner: `right` puts it on the left in a right-to-left layout, but the drawing
- * of the mask counts from the left, so the hole moves with it.
- */
 function cutoutPath(size: number): string {
   const centerY = size + DOT_OVERHANG - DOT / 2;
   const centerX = END_X === 1 ? centerY : size - centerY;
@@ -46,11 +40,6 @@ function serverInitials(name: string): string {
   return initials.toUpperCase() || "S";
 }
 
-/**
- * A squircle with the server logo, or with initials in the agent avatar palette, and a dot for the
- * connection state. `logoUri` replaces the saved logo with a draft; `null` shows no logo.
- * `showStatus={false}` leaves out the dot and the dimming, for a place that shows the logo only.
- */
 export function ServerAvatar({
   server,
   size = 48,
@@ -72,7 +61,6 @@ export function ServerAvatar({
       if (!session || !logoKey) throw new Error("The server logo is unavailable.");
       return loadServerLogo(session, server.id, logoKey);
     },
-    // The event that names a new logo can arrive before the host has uploaded it.
     retry: 4,
     staleTime: Infinity,
   });
@@ -92,37 +80,58 @@ export function ServerAvatar({
         ? warning
         : offline;
   const muted = showStatus && !online;
-  const tile = (
-    <View
-      className="items-center justify-center"
-      style={{
-        backgroundColor: thumbnailColor(avatarHeadColor(server.id, null), muted),
-        borderCurve: "continuous",
-        borderRadius: size * SERVER_AVATAR_CORNER_RATIO,
-        height: size,
-        opacity: muted ? DISCONNECTED_APPEARANCE.opacity : 1,
-        overflow: "hidden",
-        width: size,
-      }}
-    >
-      {server.kind === "local" ? (
-        <Monitor color={INK} size={size * 0.42} strokeWidth={2} />
-      ) : (
-        <Typography weight="semibold" style={{ color: INK, fontSize: size * 0.32, lineHeight: size * 0.42 }}>
-          {serverInitials(server.name)}
-        </Typography>
-      )}
-      {logo && !logoFailed ? (
-        <Image
-          source={{ uri: logo }}
-          contentFit="cover"
-          recyclingKey={logo}
-          style={{ height: size, position: "absolute", width: size }}
-          onError={() => setFailedUri(logo)}
-        />
-      ) : null}
-    </View>
+  const showsLogo = Boolean(logo && !logoFailed);
+  const showsPlush = !showsLogo && (server.kind !== "local" || Boolean(server.appearance));
+  const plush = useServerPlush(
+    server.id,
+    server.appearance,
+    size,
+    muted ? DISCONNECTED_APPEARANCE.saturation : 1,
+    showsPlush,
   );
+  const tile =
+    showsPlush && !plush.failed ? (
+      <View style={{ height: size, opacity: muted ? DISCONNECTED_APPEARANCE.opacity : 1, width: size }}>
+        {plush.uri ? (
+          <Image
+            source={{ uri: plush.uri }}
+            contentFit="contain"
+            recyclingKey={plush.uri}
+            style={{ height: size, width: size }}
+          />
+        ) : null}
+      </View>
+    ) : (
+      <View
+        className="items-center justify-center"
+        style={{
+          backgroundColor: thumbnailColor(avatarHeadColor(server.id, null), muted),
+          borderCurve: "continuous",
+          borderRadius: size * SERVER_AVATAR_CORNER_RATIO,
+          height: size,
+          opacity: muted ? DISCONNECTED_APPEARANCE.opacity : 1,
+          overflow: "hidden",
+          width: size,
+        }}
+      >
+        {server.kind === "local" ? (
+          <Monitor color={INK} size={size * 0.42} strokeWidth={2} />
+        ) : (
+          <Typography weight="semibold" style={{ color: INK, fontSize: size * 0.32, lineHeight: size * 0.42 }}>
+            {serverInitials(server.name)}
+          </Typography>
+        )}
+        {showsLogo && logo ? (
+          <Image
+            source={{ uri: logo }}
+            contentFit="cover"
+            recyclingKey={logo}
+            style={{ height: size, position: "absolute", width: size }}
+            onError={() => setFailedUri(logo)}
+          />
+        ) : null}
+      </View>
+    );
   if (!showStatus)
     return (
       <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">

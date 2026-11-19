@@ -1,5 +1,3 @@
-// The error of a failed tool step goes to the renderer, to Team API clients and to the trace. The
-// text must be redacted before the cut, so a secret that the cut divides does not show half of it.
 import { CONVERSATION_TRACE_TEXT_LIMIT } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
 import { redactMcpValues } from "../mcp-redaction";

@@ -15,6 +15,7 @@ import type {
   RemoteControlPolicy,
   RemoteDesktopSession,
   SendDirectMessageInput,
+  ServerAppearance,
   ServerSummary,
   SetTeamTypingInput,
   TeamInviteSummary,
@@ -50,10 +51,6 @@ export interface MockTeamOptions {
   remoteDesktopSessions?: RemoteDesktopSession[];
 }
 
-/**
- * The team side: the server list, the local host with its members and invitations, direct messages
- * between members, and remote desktop sessions. They share one host status and one presence.
- */
 export function createMockTeam(
   options: MockTeamOptions,
   { emit }: MockRuntime,
@@ -132,6 +129,11 @@ export function createMockTeam(
     emit(remoteDesktopListeners, sessionsValue);
   }
 
+  function setServerAppearance(serverId: string, appearance: ServerAppearance | null): void {
+    servers = servers.map((server) => (server.id === serverId ? { ...server, appearance } : server));
+    emit(serverListeners, servers);
+  }
+
   const serversApi: OpenBotDesktopApi["servers"] = {
     setMuted: async ({ serverId, muted, durationMs }) => {
       if (!servers.some((server) => server.id === serverId)) throw new Error("Remote server not found.");
@@ -199,7 +201,6 @@ export function createMockTeam(
     retryConnection: async (serverId) => {
       const server = servers.find((candidate) => candidate.id === serverId);
       if (!server) throw new Error("Server not found");
-      // As in main, the check keeps an online server and its connection.
       if (server.state === "online" && !server.issue && !server.hostedSleep && !server.hostedIssue)
         return clone(server);
       const connected = {
@@ -334,7 +335,6 @@ export function createMockTeam(
       directTypingListeners.add(listener);
       return () => directTypingListeners.delete(listener);
     },
-    // The unfiltered streams the preload narrows to one server. The preview sends only the narrowed ones.
     onScopedPresence: () => () => undefined,
     onScopedDirectMessage: () => () => undefined,
     onScopedDirectTyping: () => () => undefined,
@@ -364,7 +364,12 @@ export function createMockTeam(
       hostStatus = {
         ...hostStatus,
         ...(input.serverName === undefined ? {} : { serverName: input.serverName }),
+        ...(input.appearance === undefined ? {} : { appearance: input.appearance }),
       };
+      if (input.appearance !== undefined) {
+        const local = servers.find((server) => server.kind === "local");
+        if (local) setServerAppearance(local.id, input.appearance);
+      }
       emitHostStatus(hostStatus);
       return clone(hostStatus);
     },
@@ -384,7 +389,6 @@ export function createMockTeam(
       emitHostStatus(hostStatus);
       return clone(hostStatus);
     },
-    // The preview has no runtime to ask, so the check is what a granted permission looks like.
     recheckScreenRecording: async () => {
       hostStatus = { ...hostStatus, remoteDesktopScreenRecordingDenied: false };
       emitHostStatus(hostStatus);
@@ -410,7 +414,6 @@ export function createMockTeam(
       remoteControlPolicy = { access: policy.access, askOnHost: policy.askOnHost };
       return clone(remoteControlPolicy);
     },
-    // The preview's sessions end at once, as the host's do.
     stopRemoteControl: async () => {
       hostStatus = { ...hostStatus, remoteDesktopActiveSessions: 0 };
       emitHostStatus(hostStatus);
@@ -514,7 +517,6 @@ export function createMockTeam(
   return {
     servers: serversApi,
     localServers: localServersApi,
-    /** The server the preview shows, which its agent events belong to. */
     activeServerId: () => servers.find((server) => server.active)?.id ?? "local",
     host,
     remoteDesktop,
@@ -523,6 +525,7 @@ export function createMockTeam(
     emitDirectTyping,
     emitInvite,
     emitHostStatus,
+    setServerAppearance,
     emitRemoteDesktopSessions,
     readDirectConversationSnapshot,
     updateDirectConversationSnapshot,

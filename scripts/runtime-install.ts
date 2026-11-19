@@ -13,11 +13,6 @@ export async function isCurrentInstallation(verify: () => Promise<void>): Promis
   }
 }
 
-/**
- * Downloads one file. A network error, HTTP 429 or HTTP 5xx gets two more attempts, because a
- * release runner can lose its connection (v0.40.0 timed out on the Grok runtime). Callers check
- * the SHA-256 of the result, so a retry cannot change what they install.
- */
 export async function download(fetchImpl: typeof fetch, url: string, label: string): Promise<Buffer> {
   const attempts = 3;
   for (let attempt = 1; ; attempt += 1) {
@@ -43,7 +38,6 @@ export async function download(fetchImpl: typeof fetch, url: string, label: stri
   }
 }
 
-/** Splits a relative archive path into parts and rejects absolute, drive, `.` and `..` paths. */
 export function safeArchivePathParts(name: string, label: string): string[] {
   if (name.includes("\0") || name.includes("\\")) throw new Error(`Unsafe ${label} archive path: ${name}`);
   const normalized = name.replace(/\/+$/u, "");

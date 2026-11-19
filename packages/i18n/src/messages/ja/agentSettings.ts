@@ -146,8 +146,6 @@ export const messages = {
   "agentSettings.runtime.accessLabel": "エージェントのアクセス",
   "agentSettings.runtime.busyMessage": "作業中",
   "agentSettings.runtime.busyMessageLabel": "エージェントの作業中に送るメッセージ",
-  "agentSettings.runtime.taskLimit": "並列スレッド",
-  "agentSettings.runtime.taskLimitLabel": "同時に実行するスレッド",
   "agentSettings.runtime.workingDirectory": "作業ディレクトリ",
   "agentSettings.runtime.notAvailable": "まだ利用できません",
   "agentSettings.runtime.fullAccessNote":
@@ -167,9 +165,6 @@ export const messages = {
   "agentSettings.busyMessage.steer": "方向を修正",
   "agentSettings.busyMessage.steerUnsupported":
     "{provider} は実行中のターンの方向を修正できません。作業中に送ったメッセージはキューで待ちます。",
-  "agentSettings.taskLimit.default": "デフォルト ({count})",
-  "agentSettings.taskLimit.oneTurn":
-    "{provider} は一度に1ターンずつ実行します。このエージェントのスレッドは互いに待ち合わせます。",
 
   "agentSettings.notificationLevel.title": "自分への通知",
   "agentSettings.notificationLevel.server": "サーバーの既定 ({level})",
@@ -204,6 +199,8 @@ export const messages = {
   "agentSettings.fullAccess.askConfirm": "事前に確認を使用",
 
   "agentSettings.links.usage": "使用状況",
+  "agentSettings.links.apps": "アプリ",
+  "agentSettings.links.appsScope": "すべてのエージェント",
   "agentSettings.links.memories": "メモリー",
   "agentSettings.links.memoriesCount": { other: "{count} 件保存済み" },
   "agentSettings.links.skills": "スキル",

@@ -29,10 +29,13 @@ export const messages = {
   "billing.status.paused": "Wstrzymany",
   "billing.otherServers": "Inne serwery",
   "billing.action.menu": "Działania planu: {server}",
-  "billing.action.change": "Zmień plan",
+  "billing.action.addStorage": "Dodaj miejsce",
   "billing.action.cancel": "Anuluj plan",
   "billing.action.renew": "Odnów plan",
   "billing.action.updatePayment": "Zaktualizuj metodę płatności",
+  "billing.storage.title": "Więcej miejsca dla {server}",
+  "billing.storage.add": "Dodaj {size}",
+  "billing.storage.failed": "Nie udało się dodać miejsca.",
   "billing.lifecycle.cancelRenewal": "Anuluj odnawianie",
   "billing.lifecycle.cancelTitle": "Anulować odnawianie serwera {name}?",
   "billing.lifecycle.cancelDescription":
@@ -152,7 +155,6 @@ export const messages = {
   "billing.license.cancel.descriptionNow":
     "Licencja wygasa z końcem opłaconego okresu. Nie wpływa to na twoje serwery.",
   "billing.license.cancel.keep": "Zachowaj licencję",
-  // The order form: a hosted server and a license in one order. The pricing page and Billing show it.
   "billing.order.billing": "Okres rozliczeniowy",
   "billing.order.currency": "Waluta",
   "billing.order.monthly": "Miesięcznie",
@@ -162,6 +164,7 @@ export const messages = {
   "billing.order.server.summary": "Uruchamiamy OpenBot dla twojego zespołu.",
   "billing.order.server.none": "Bez serwera",
   "billing.order.server.noneDetail": "Uruchamiaj OpenBot na własnym komputerze",
+  "billing.order.server.thisComputer": "Twój komputer",
   "billing.order.server.bestValue": "Najlepsza oferta",
   "billing.order.server.bestFor.starter": "Najlepszy dla jednej osoby",
   "billing.order.server.bestFor.standard": "Najlepszy dla małego zespołu",
@@ -217,6 +220,7 @@ export const messages = {
   "billing.order.cta.server": "Utwórz serwer",
   "billing.order.cta.license": "Kup licencję",
   "billing.order.cta.download": "Pobierz",
+  "billing.order.cta.keepComputer": "Zostań na tym komputerze",
   "billing.license.invite.title": "Dodać użytkownika do licencji?",
   "billing.license.invite.description":
     "To zaproszenie dodaje 1 użytkownika do twojej licencji: {price} więcej miesięcznie.",
@@ -231,4 +235,10 @@ export const messages = {
     other:
       "Twoja licencja ma maksymalną liczbę użytkowników: {count}. Skontaktuj się z nami w sprawie większej licencji. Nowe osoby nie mogą dołączyć do Twoich serwerów.",
   },
+  "billing.details.country": "Kraj rozliczenia",
+  "billing.details.countryPlaceholder": "Wybierz kraj",
+  "billing.details.vatId": "Numer VAT UE (opcjonalnie)",
+  "billing.details.vatIdInvalid": "To nie jest numer VAT wybranego kraju.",
+  "billing.details.countryMissing": "Wybierz kraj rozliczenia.",
+  "billing.details.saveFailed": "Nie udało się zapisać danych rozliczeniowych",
 } as const satisfies PartialTranslation<typeof source>;

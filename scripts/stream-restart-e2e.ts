@@ -1,6 +1,3 @@
-// Run: bun scripts/stream-restart-e2e.ts
-// Report: .openbot-build/stream-restart-e2e.json
-
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { watch } from "node:fs";
@@ -15,7 +12,6 @@ import { TeamWebRtcFileTransfer } from "../src/main/team-webrtc-file-transfer";
 
 type BridgeEvents = TeamWebRtcBridge extends EventEmitter<infer Events> ? Events : never;
 
-// No peer traffic is expected before the input stream ends.
 class InertBridge extends EventEmitter<BridgeEvents> {
   sends = 0;
 
@@ -41,7 +37,6 @@ async function waitForDiskBytes(directory: string, bytes: Buffer, signal: AbortS
   signal.addEventListener("abort", onAbort, { once: true });
   try {
     while (true) {
-      // Register the next wake before reading, so a write during the read is not lost.
       const changed = new Promise<void>((resolve) => {
         wake = resolve;
       });
@@ -109,7 +104,6 @@ async function checkWriting(directory: string, action: StreamAction): Promise<Sc
     const failure = new Error("External input failed during disk spooling.");
     if (action === "stop") {
       const stopping = Effect.runPromise(service.stop());
-      // Release the external producer after stop requests cancellation.
       input.destroy(failure);
       await stopping;
     } else {

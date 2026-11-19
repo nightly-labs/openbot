@@ -5,7 +5,6 @@ import { Effect } from "effect";
 import { type MobileEventName, type MobileEventProperties, type SafeProperties, sanitizeMobileEvent } from "./events";
 
 export interface MobileAnalyticsClient {
-  /** `profileId` is the install ID when tracking is off; otherwise the client's identified profile. */
   track(name: string, properties: SafeProperties, timestamp?: string, profileId?: string): Promise<unknown> | undefined;
   identify(user: { profileId: string; email: string }): Promise<unknown> | undefined;
   clear(): undefined;
@@ -14,11 +13,6 @@ export interface MobileAnalyticsScope {
   track<N extends MobileEventName>(name: N, properties: MobileEventProperties<N>): void;
 }
 
-/**
- * The operation of a failed event in its failure report. Each event has one, so a new event cannot
- * report the wrong operation. Pairing, connection, input, conversation and server events keep
- * `team`, as in earlier versions.
- */
 const FAILURE_OPERATIONS: Record<MobileEventName, Operation> = {
   mobile_app_opened: "other",
   usage_viewed: "other",
@@ -53,17 +47,11 @@ const ANONYMOUS_TTL_MS = 30 * 60 * 1_000;
 const MAX_PENDING_EVENTS = 100;
 type PendingEvent = { name: MobileEventName; properties: SafeProperties; timestamp: string };
 
-/**
- * A scope belongs to the account and consent state that started an operation. With tracking on,
- * events go with the account ID and email. With tracking off, they go with the random install ID
- * only: no account ID, no email, no identify.
- */
 export class MobileAnalytics {
   private anonymous: PendingEvent[] = [];
   private anonymousStartedAt: number | null = null;
   private expiry: ReturnType<typeof setTimeout> | undefined;
   private enabled = false;
-  /** Set while the last event before an opt-out goes out. No other event starts. */
   private closing = false;
   private consentReady = false;
   private userReady = false;
@@ -95,7 +83,6 @@ export class MobileAnalytics {
     } else this.identify();
   }
 
-  /** Set once, before the preference loads. Null when the phone cannot keep an install ID. */
   setInstallId(installId: string | null): void {
     this.installId = installId;
     if (this.consentReady && !this.enabled) {
@@ -104,12 +91,10 @@ export class MobileAnalytics {
     }
   }
 
-  /** True when events go out: with the account when tracking is on, with the install ID when it is off. */
   isSending(): boolean {
     return this.enabled || this.installId !== null;
   }
 
-  /** The install ID while tracking is off. The payload filter puts it on each event. */
   anonymousProfileId(): string | null {
     return this.enabled ? null : this.installId;
   }
@@ -262,10 +247,6 @@ export class MobileAnalytics {
     }
   }
 
-  /**
-   * Sends one last event and waits until it and the events before it are sent, for at most `limitMs`.
-   * The caller then turns tracking off. Until then, no other event starts.
-   */
   async sendLast<N extends MobileEventName>(
     name: N,
     properties: MobileEventProperties<N>,

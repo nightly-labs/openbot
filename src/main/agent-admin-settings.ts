@@ -1,8 +1,3 @@
-import { Effect, Schema, Semaphore } from "effect";
-// Access and auto-approve of one agent, as this computer holds them. The local IPC handlers and the
-// `agent-admin-v1` host routes share this, so a remote admin changes the same state as the local
-// window does, through the same writers.
-
 import {
   type AgentAdminSettings,
   type AgentSummary,
@@ -11,6 +6,7 @@ import {
   type UpdateAgentAdminSettingsInput,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect, Schema, Semaphore } from "effect";
 import type { AgentService } from "../backend/agent-service";
 import { causeHelpers } from "../backend/effect-boundary";
 import type { ApprovalAutomation } from "./approval-automation-store";
@@ -41,11 +37,9 @@ export function createAgentAdminSettings({
     return {
       access: agent.access ?? DEFAULT_AGENT_ACCESS,
       autoApprove: agentAutoApprovalEnabled(preference, agent.id),
-      // Turbo mode is gone; the field stays because `agent-admin-v1` carries it.
       autoApproveLocked: false,
     };
   }
-  // Two quick changes must not interleave their two writes, or the agent could keep half of each.
   const writes = Semaphore.makeUnsafe(1);
   return {
     read: (agentId) => settings(requireAgent(agentId)),
@@ -66,8 +60,6 @@ export function createAgentAdminSettings({
         if (autoApprove !== undefined)
           yield* approvalAutomation.set({ agentId, autoApprove }).pipe(toAgentSettingsFailure);
       });
-      // Write the narrower half first. When the second write fails, or between the two writes, the
-      // agent then has less reach than the user chose, never more.
       if (access === "workspace") {
         yield* writeAccess();
         yield* writeGrant();

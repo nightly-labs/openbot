@@ -64,7 +64,6 @@ import { FoundModelPicker } from "./FoundModelPicker";
 import { ModelChoiceMenu } from "./ModelChoiceMenu";
 import { type RepeatableColumn, RepeatableRows, type RepeatableTable } from "./RepeatableRows";
 
-// Examples of identifiers and addresses. They are not words, so they are the same in each language.
 const PROVIDER_ID_PLACEHOLDER = "my-provider";
 const BASE_URL_PLACEHOLDER = "http://127.0.0.1:11434/v1";
 const MODEL_ID_PLACEHOLDER = "model-id";
@@ -75,21 +74,17 @@ const INPUT_KIND_LABEL = {
   pdf: "customProvider.model.inputPdf",
 } as const satisfies Record<CustomProviderInputKind, AppTextKey>;
 
-/** A provider that can run the endpoint, and whether it can run it now. */
 export interface CustomProviderHarnessChoice {
   id: CustomProviderHarness;
   ready: boolean;
-  /** The download of a provider that is not ready, when OpenBot downloads it. */
   runtime?: ProviderRuntimeStatus | undefined;
 }
 
-/** Where the download of a provider that cannot run the endpoint yet is. */
 function harnessDownload(choice: CustomProviderHarnessChoice): ProviderRuntimeStatus["phase"] | null {
   const phase = choice.ready ? null : choice.runtime?.phase;
   return phase && phase !== "ready" ? phase : null;
 }
 
-/** A download that waits for the user: the first one, or one that failed. */
 function startsDownload(phase: ProviderRuntimeStatus["phase"] | null): boolean {
   return phase === "not-downloaded" || phase === "download-error";
 }
@@ -97,10 +92,6 @@ function startsDownload(phase: ProviderRuntimeStatus["phase"] | null): boolean {
 type ModelRow = CustomProviderDraft["models"][number];
 type HeaderRow = CustomProviderDraft["headers"][number];
 
-/**
- * Storybook and Solid both hand this object over as a proxy, and `structuredClone` refuses a proxy
- * with a `DataCloneError`, so the two nested lists are copied by hand.
- */
 function cloneDraft(draft: CustomProviderDraft): CustomProviderDraft {
   return {
     ...draft,
@@ -115,42 +106,17 @@ function cloneDraft(draft: CustomProviderDraft): CustomProviderDraft {
 
 interface CustomProviderDialogProps {
   open: boolean;
-  /** Prefilled fields, for editing a provider or for a story. Defaults to a blank form. */
   draft?: CustomProviderDraft | undefined;
-  /** Set by a story to show the messages without typing into every field first. */
   showErrors?: boolean | undefined;
   busy?: boolean | undefined;
   submitError?: string | null | undefined;
-  /**
-   * The provider IDs already saved. A duplicate is a field error before a round trip; main refuses
-   * one as well, because this list is only as fresh as the last list the renderer was given.
-   */
   takenProviderIds?: readonly string[] | undefined;
-  /** Edit of a saved endpoint: the ID names it, so it cannot change. */
   providerIdLocked?: boolean | undefined;
-  /** Main holds a key for this endpoint. A blank key field keeps it. */
   apiKeyKept?: boolean | undefined;
-  /**
-   * Shows the context window, max output and efforts of each model. This computer only: a joined
-   * server's host takes the model fields of the Team API, which has none of them.
-   */
   contextWindows?: boolean | undefined;
-  /**
-   * Shows "Runs on", the provider that runs the endpoint. This computer only: the Team API saves an
-   * endpoint without one, and the host runs it on OpenCode.
-   */
   harnesses?: readonly CustomProviderHarnessChoice[] | undefined;
-  /**
-   * Downloads a provider of "Runs on" that is not ready. Without it, the list shows only the
-   * providers that can run the endpoint now.
-   */
   onDownloadHarness?: ((harness: CustomProviderHarness) => void) | undefined;
-  /** Why the last download of "Runs on" failed. The host's own alert is behind the dialog. */
   harnessError?: string | undefined;
-  /**
-   * The last model list request. The host owns it because the request leaves the renderer. Without
-   * `onDiscoverModels` the dialog has no find control and only the typed rows.
-   */
   discovery?: ModelDiscovery | undefined;
   onDiscoverModels?: ((endpoint: CustomProviderEndpoint) => void) | undefined;
   onSubmit: (value: SaveCustomProviderInput) => void;
@@ -160,28 +126,17 @@ interface CustomProviderDialogProps {
 
 export function CustomProviderDialog(props: CustomProviderDialogProps) {
   const { t, format } = useText();
-  // The form owns its state from here on: the incoming draft is read once, as a snapshot, so later
-  // edits by the caller do not reach in and overwrite what the user is typing.
   const [draft, setDraft] = createStore<CustomProviderDraft>(
     untrack(() => (props.draft ? cloneDraft(props.draft) : emptyCustomProviderDraft())),
   );
-  // Nothing is red until the user has asked OpenBot to accept the form, so a blank form does not
-  // open covered in messages about fields nobody has reached yet.
   const [submitted, setSubmitted] = createSignal(untrack(() => Boolean(props.showErrors)));
 
-  // Set by a Find click: the list that it gets fills the empty fields of the rows (#3946).
   let fillNextList = false;
 
-  /**
-   * Both hosts keep this dialog mounted after a close, and the draft above is a snapshot, so without
-   * this a second "Add provider" reopens the form still holding the last endpoint - including its API
-   * key. Re-snapshot on the false-to-true edge only, never while the dialog is open.
-   */
   createEffect(
     () => props.open,
     (open, previous) => {
       if (!open || previous) return;
-      // A snapshot: a later change of the draft prop must not reach the open form.
       const next = untrack(() => props.draft);
       setDraft(() => (next ? cloneDraft(next) : emptyCustomProviderDraft()));
       setSubmitted(untrack(() => Boolean(props.showErrors)));
@@ -195,12 +150,10 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
   const busy = () => Boolean(props.busy);
   const discovery = (): ModelDiscovery => props.discovery ?? { status: "idle" };
   const [mount, setMount] = createSignal<HTMLElement | undefined>(undefined);
-  /** The saved choice, or the first provider that can run the endpoint now. */
   const harness = (): CustomProviderHarness =>
     draft.harness ?? props.harnesses?.find((choice) => choice.ready)?.id ?? DEFAULT_CUSTOM_PROVIDER_HARNESS;
   const choiceOf = (id: CustomProviderHarness): CustomProviderHarnessChoice =>
     props.harnesses?.find((choice) => choice.id === id) ?? { id, ready: true };
-  /** The phase of the chosen provider's download while it runs, for the closed field. */
   const downloading = (id: CustomProviderHarness): ProviderRuntimeStatus["phase"] | null => {
     const phase = harnessDownload(choiceOf(id));
     return phase === "downloading" || phase === "finishing" ? phase : null;
@@ -213,8 +166,6 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
     return t("common.download");
   }
 
-  // The form itself scrolls, and its own box keeps the same size when a row is added, so the
-  // helper's ResizeObserver never fires for new content. Remeasure on what changes the height.
   const fades = createScrollFades();
   onSettled(() => fades.stop);
   createEffect(
@@ -256,7 +207,6 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
   const contextWindowColumn: RepeatableColumn<ModelRow> = {
     label: (number) => t("customProvider.model.contextWindow", { number }),
     placeholder: () => t("customProvider.model.contextWindowPlaceholder"),
-    // `100,000,000` with its separators.
     maxlength: 16,
     identifier: true,
     numeric: true,
@@ -296,7 +246,6 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
     setDraft((state) => {
       const model = state.models[index];
       if (!model) return;
-      // In place: the store tracks each item, so a new array would re-run every reader of the row.
       model.reasoningEfforts ??= [];
       const at = model.reasoningEfforts.indexOf(effort);
       if (checked && at < 0) model.reasoningEfforts.push(effort);
@@ -305,11 +254,9 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
   }
 
   const modelEfforts = (row: ModelRow): readonly CustomProviderReasoningEffort[] => row.reasoningEfforts ?? [];
-  /** With no effort chosen, the model keeps the efforts of the provider that runs it. */
   const noEfforts = () =>
     harness() === "pi" ? t("customProvider.model.effortsNone") : t("customProvider.model.effortsDefault");
 
-  /** What the model accepts beside text: the saved kinds, or the default of the harness that runs it. */
   const modelInputs = (row: ModelRow): readonly CustomProviderInputKind[] =>
     row.inputs ?? CUSTOM_PROVIDER_DEFAULT_INPUTS[harness()];
 
@@ -317,8 +264,6 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
     setDraft((state) => {
       const model = state.models[index];
       if (!model) return;
-      // The first change saves the default that the field showed, so the other kinds stay as shown.
-      // In place after that, as for the efforts.
       model.inputs ??= [...CUSTOM_PROVIDER_DEFAULT_INPUTS[harness()]];
       const at = model.inputs.indexOf(kind);
       if (checked && at < 0) model.inputs.push(kind);
@@ -326,11 +271,6 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
     });
   }
 
-  /**
-   * The models of this computer are a table: one line for each model, with the efforts and the input
-   * kinds as menus. Only the kinds that the harness can send show; a hidden kind stays saved, so a
-   * change of harness and back keeps it.
-   */
   const modelTable: RepeatableTable<ModelRow> = {
     get header() {
       return [
@@ -367,12 +307,7 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
       </>
     ),
   };
-  /**
-   * The wide table shows only the fields that this computer saves. A joined server's host takes the
-   * model fields of the Team API, which has an ID and a name only, so its form keeps the two columns.
-   */
   const modelsTable = () => (props.contextWindows ? modelTable : undefined);
-  // One string: the dialog primitive joins a class array with commas.
   const dialogClass = () =>
     props.contextWindows ? "custom-provider-dialog custom-provider-dialog-wide" : "custom-provider-dialog";
 
@@ -416,18 +351,12 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
   };
   const listed = (id: string) => draft.models.some((model) => model.id.trim() === id);
 
-  /**
-   * The list that a Find click gets fills the empty fields of the rows that it names, such as the rows
-   * of a saved endpoint. A list that the dialog opens with does not: an empty saved field there is the
-   * harness default that the user kept.
-   */
   createEffect(discovery, (list) => {
     if (list.status === "loading") return;
     const fill = fillNextList;
     fillNextList = false;
     if (!fill || list.status !== "found") return;
     const models = list.models;
-    // The user asked for the list, so the list opens.
     if (models.length > 0) setPicking(true);
     if (!untrack(() => props.contextWindows)) return;
     setDraft((state) => {
@@ -439,10 +368,8 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
   });
 
   const [picking, setPicking] = createSignal(false);
-  /** The form holds as many models as one endpoint can have. */
   const full = () => draft.models.filter((row) => !blankModel(row)).length >= CUSTOM_PROVIDER_LIMITS.models;
 
-  /** A found model is a row in the same list the user types into, so submit has one source. */
   function addRow(state: CustomProviderDraft, model: DiscoveredModel): void {
     if (state.models.some((row) => row.id.trim() === model.id)) return;
     const row = {
@@ -453,7 +380,6 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
       ...(model.reasoningEfforts ? { reasoningEfforts: [...model.reasoningEfforts] } : {}),
       ...(model.inputs ? { inputs: [...model.inputs] } : {}),
     };
-    // The blank row that a new form opens with is a placeholder, not a model the user added.
     const blank = state.models.findIndex(blankModel);
     if (blank >= 0) state.models[blank] = row;
     else state.models.push(row);
@@ -472,7 +398,6 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
     });
   }
 
-  /** Adds or removes each model that the search shows. An endpoint holds a limited number of models. */
   function toggleModels(models: readonly DiscoveredModel[], checked: boolean): void {
     setDraft((state) => {
       for (const model of models) {
@@ -538,11 +463,6 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
               </IconButton>
             </header>
 
-            {/*
-             * The fields scroll inside the form rather than the form scrolling itself, so the footer
-             * below stays reachable and outside the scroll fade. Submit is a `type="submit"` button,
-             * which needs the form as an ancestor - hence the wrapper rather than a sibling footer.
-             */}
             <form
               class="custom-provider-body"
               onSubmit={(event) => {
@@ -612,8 +532,6 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                         error={props.harnessError || undefined}
                       >
                         <Select<CustomProviderHarness>
-                          // The providers that can run the endpoint now, the saved one, and the ones to
-                          // download, as the default provider select does, so the list stays one control.
                           options={choices()
                             .filter(
                               (choice) =>
@@ -624,7 +542,6 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                             .map((choice) => choice.id)}
                           value={harness()}
                           onChange={(next) => {
-                            // A click on the chosen item clears the choice; on a failed download it retries.
                             const chosen = next ?? harness();
                             setDraft((state) => {
                               state.harness = chosen;
@@ -650,7 +567,6 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                                       </Text>
                                     }
                                   >
-                                    {/* The item is the control; the button shape shows what a choice of it does. */}
                                     <span
                                       class={buttonVariants({
                                         variant: "default",

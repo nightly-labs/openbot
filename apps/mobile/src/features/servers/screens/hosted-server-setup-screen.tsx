@@ -22,12 +22,9 @@ import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 
-/** How often the screen reads the server while it waits for the payment and the setup. */
 const POLL_INTERVAL_MS = 3_000;
-/** The setup reports only its step, so the detail lines of a step change on a timer, as on desktop. */
 const DETAIL_MS = 2_000;
 
-/** The payment, then the setup steps of the desktop dialog, in order. */
 const STEPS = [
   { label: "mobile.server.hosted.step.payment", details: ["mobile.server.hosted.detail.payment"] },
   {
@@ -66,12 +63,6 @@ const STEP_OF_STATUS: Record<Exclude<HostedSetupStatus, "error">, number> = {
 
 type StepState = "done" | "active" | "pending" | "failed";
 
-/**
- * A server of the account in setup: the payment, then the setup until the server shows in the server
- * list of this phone. The phone does not take the payment: app store rules do not allow a purchase
- * outside the store, so the user pays in OpenBot on the computer. The account server goes on with
- * the setup when this sheet closes.
- */
 export function HostedServerSetupScreen() {
   const { serverId = "" } = useLocalSearchParams<{ serverId?: string }>();
   const { t } = useText();
@@ -86,7 +77,6 @@ export function HostedServerSetupScreen() {
   const status: HostedSetupStatus | null = missing ? "error" : server ? hostedSetupStatus(server, listed) : null;
   const settled = status !== null && hostedSetupSettled(status);
 
-  // The error status does not tell which step failed, so it keeps the last step that ran.
   const lastStep = useRef(0);
   if (status && status !== "error") lastStep.current = Math.min(STEP_OF_STATUS[status], STEPS.length - 1);
   const current = status === "ready" ? STEPS.length : lastStep.current;
@@ -101,7 +91,6 @@ export function HostedServerSetupScreen() {
     let active = true;
     let reading = false;
     async function poll(): Promise<void> {
-      // A read can take longer than the interval, so the next tick skips and reads do not overlap.
       if (reading || AppState.currentState !== "active" || !calls) return;
       reading = true;
       try {
@@ -111,7 +100,6 @@ export function HostedServerSetupScreen() {
         ]);
         if (!active || !list) return;
         const next = list.servers.find((entry) => entry.serverId === serverId);
-        // An unpaid server is removed when its payment page expires.
         if (!next) {
           setMissing(true);
           return;
@@ -124,7 +112,6 @@ export function HostedServerSetupScreen() {
     }
     void poll();
     const timer = setInterval(() => void poll(), POLL_INTERVAL_MS);
-    // The read runs again as soon as the user returns to the app, such as after a payment on the computer.
     const subscription = AppState.addEventListener("change", (state) => {
       if (state === "active") void poll();
     });

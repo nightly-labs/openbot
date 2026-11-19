@@ -6,7 +6,6 @@
   max-width: 100%;
 }
 
-/* One row under the bubble, shown on hover, so an action takes one click. */
 .message-action-row {
   display: flex;
   min-height: 24px;
@@ -15,11 +14,10 @@
   padding-inline: var(--openbot-space-1);
 }
 
-/* Keep the face beside the bubble, independent of the author name and footer height. The face is a
-   little shorter than a one-line bubble, so it reads at the size of the sidebar faces. */
 .message-entry-with-author,
 .message-author-gutter,
-.chat-visual-with-author {
+.chat-visual-with-author,
+.question-prompt-with-author {
   --message-author-face-size: var(--openbot-space-8);
   --message-author-column: calc(var(--message-author-face-size) + var(--openbot-space-1));
 }
@@ -73,11 +71,6 @@
   background: transparent;
 }
 
-/*
- * The empty column under a face. A message that continues a run of messages by one author draws no
- * face, and without this spacer its bubble would step left, off the line the run started on. A chat
- * with one agent draws no faces at all, so it never asks for the column.
- */
 .message-author-gutter {
   width: var(--message-author-column);
   flex: 0 0 var(--message-author-column);
@@ -90,7 +83,6 @@
   min-width: 0;
   color: var(--message-author-color, var(--openbot-text-muted));
   font-weight: var(--openbot-weight-regular);
-  /* A long name with no space wraps instead of widening the row. */
   overflow-wrap: anywhere;
 }
 
@@ -112,11 +104,6 @@
   color: inherit;
 }
 
-/*
- * The keyframes alone hide a new row, so a row whose animation is off (reduced motion, which
- * Windows reports while its animation effects are off) still shows.
- */
-/* The row is as wide as the chat, so each bubble grows from its own side and does not move toward the middle. */
 .message-entry-animated {
   transform-origin: left bottom;
   animation: message-bubble-in 280ms cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
@@ -149,7 +136,6 @@
   justify-content: flex-end;
 }
 
-/* A person's images stand above the bubble, outside it, with a small gap. */
 .message-stack {
   display: grid;
   width: 100%;
@@ -209,15 +195,11 @@
   opacity: 1;
 }
 
-/* A channel shows an agent's actions beside the bubble, in the same line. They go under the bubble
-   only when the line has no room, so only a long answer keeps space for them. */
 .message-entry-actions-beside .message-shell {
   flex-wrap: wrap;
   row-gap: var(--openbot-space-1);
 }
 
-/* The face stays at the end of the bubble when the actions go under it. */
-/* Each row scopes its anchor name, so an engine with no anchor-scope keeps the face in the flow. */
 @supports (position-anchor: --message-bubble) and (anchor-scope: --message-bubble) {
   .message-entry-actions-beside {
     anchor-scope: --message-bubble;
@@ -234,7 +216,6 @@
   }
 }
 
-/* The steps of the turn: a quiet summary at the end of the action row, shown with the actions. */
 .message-steps {
   min-width: 0;
   opacity: 0;
@@ -246,8 +227,6 @@
   margin-bottom: 0;
 }
 
-/* The general steps row rules load later, so these name the steps block too. */
-/* The steps button matches the action buttons beside it: their height, and their hover as one unit. */
 .message-steps .agent-steps .agent-steps-header {
   height: 24px;
   margin-inline-start: 0;
@@ -293,10 +272,6 @@
   }
 }
 
-/*
- * Another person in an agent chat stands on the right, so the name ends with the bubble: a wrapped
- * name aligns to the end, and the time, hidden until hover, goes before the name.
- */
 .message-entry-user .message-author-name {
   text-align: end;
 }
@@ -305,31 +280,20 @@
   order: -1;
 }
 
-/* Their bubble takes a tint of their name colour, so it does not read as the reader's own. */
 .ui-bubble.message-bubble-member {
   --message-bubble-tint: var(--message-author-color, var(--openbot-accent));
   --message-bubble-tint-amount: 22%;
 }
 
-/*
- * A chat color tints the bubble: the reader's own, an agent's, or another person's. The author sets
- * it in Settings or in the agent settings, and everyone in the chat sees the same tint.
- */
 .ui-bubble.message-bubble-colored {
   --message-bubble-tint: var(--message-chat-color);
   --message-bubble-tint-amount: 30%;
 }
 
-/* 22% of a color on the dark surface is dull, so the dark theme takes more of a chat color. */
 :root[data-openbot-color-scheme="light"] .ui-bubble.message-bubble-colored {
   --message-bubble-tint-amount: 22%;
 }
 
-/*
- * The bubble keeps the plain surface values, because its content sets the same tokens again and a
- * token cannot refer to itself. A tinted bubble mixes the tint into the raised surface; an agent's
- * muted bubble mixes it into the surface.
- */
 .ui-bubble:is(.message-bubble-member, .message-bubble-colored) {
   --message-plain-canvas: var(--openbot-bg-canvas);
   --message-plain-sidebar: var(--openbot-bg-sidebar);
@@ -341,7 +305,8 @@
   --message-bubble-base: var(--openbot-bg-surface-raised);
 }
 
-.message-entry-agent .ui-bubble-variant-muted.message-bubble-colored {
+.message-entry-agent .ui-bubble-variant-muted.message-bubble-colored,
+.agent-dock-bubble.ui-bubble-variant-muted.message-bubble-colored {
   --message-bubble-base: var(--openbot-bg-surface);
 }
 
@@ -353,15 +318,9 @@
   );
 }
 
-/*
- * Code, tables, quotes, file chips and cards in a bubble with a chat color take the same tint as the bubble, so
- * they do not stand on it as neutral panels. Each surface keeps its step from the next one, as in a
- * plain bubble, and a little of the text colour lifts them all from the bubble: lighter in the dark
- * theme, darker in the light theme. Without the lift, a block on a tinted bubble shows only its
- * border.
- */
 .message-entry-user .ui-bubble.message-bubble-colored > .ui-bubble-content,
-.message-entry-agent .ui-bubble-variant-muted.message-bubble-colored > .ui-bubble-content {
+.message-entry-agent .ui-bubble-variant-muted.message-bubble-colored > .ui-bubble-content,
+.agent-dock-bubble.ui-bubble-variant-muted.message-bubble-colored > .ui-bubble-content {
   --message-surface-lift: 5%;
   --openbot-bg-canvas: color-mix(
     in srgb,
@@ -414,9 +373,45 @@
   );
 }
 
-/* A menu, a tooltip or a popover that opens in a bubble with a chat color covers the chat, so it stays plain. */
+:root .ui-bubble.message-bubble-colored.message-bubble-solid {
+  --message-bubble-tint-amount: 100%;
+  --message-solid-text: var(--openbot-text-on-accent);
+  --message-plain-text-primary: var(--openbot-text-primary);
+  --message-plain-text-secondary: var(--openbot-text-secondary);
+  --message-plain-text-muted: var(--openbot-text-muted);
+  --message-plain-text-dim: var(--openbot-text-dim);
+  --message-plain-accent: var(--openbot-accent);
+  --message-plain-accent-text: var(--openbot-accent-text);
+  --message-plain-accent-soft: var(--openbot-accent-soft);
+  --message-plain-accent-strong: var(--openbot-accent-strong);
+  --message-plain-success: var(--openbot-success);
+  --message-plain-warning: var(--openbot-warning);
+  --message-plain-danger: var(--openbot-danger);
+}
+
+:root .ui-bubble.message-bubble-colored.message-bubble-solid.message-bubble-solid-dark-text {
+  --message-solid-text: var(--openbot-paper-text);
+}
+
+.ui-bubble.message-bubble-colored.message-bubble-solid > .ui-bubble-content {
+  --message-surface-lift: 14%;
+  --openbot-text-primary: var(--message-solid-text);
+  --openbot-text-secondary: color-mix(in srgb, var(--message-solid-text) 86%, transparent);
+  --openbot-text-muted: color-mix(in srgb, var(--message-solid-text) 72%, transparent);
+
+  --openbot-text-dim: color-mix(in srgb, var(--message-solid-text) 60%, transparent);
+  --openbot-accent: var(--message-solid-text);
+  --openbot-accent-text: var(--message-solid-text);
+  --openbot-accent-soft: color-mix(in srgb, var(--message-solid-text) 16%, transparent);
+  --openbot-accent-strong: color-mix(in srgb, var(--message-solid-text) 34%, transparent);
+  --openbot-success: var(--message-solid-text);
+  --openbot-warning: var(--message-solid-text);
+  --openbot-danger: var(--message-solid-text);
+  color: var(--message-solid-text);
+}
+
 .ui-bubble.message-bubble-colored
-:is([data-popper-positioner], [role="dialog"], [role="menu"], [role="listbox"], [role="tooltip"]) {
+  :is([data-popper-positioner], [role="dialog"], [role="menu"], [role="listbox"], [role="tooltip"]) {
   --openbot-bg-canvas: var(--message-plain-canvas);
   --openbot-bg-sidebar: var(--message-plain-sidebar);
   --openbot-bg-surface: var(--message-plain-surface);
@@ -426,15 +421,28 @@
   --openbot-bg-control-active: var(--message-plain-control-active);
 }
 
-/*
- * A file icon tile is a clear tint of the file colour. On a chat color that tint would mix with the
- * chat color, so the tile lays it on the plain control and keeps its own colour. An audio or video
- * card keeps its neutral control tile, which takes the tint of the bubble as the other cards do.
- */
+.ui-bubble.message-bubble-solid
+  :is([data-popper-positioner], [role="dialog"], [role="menu"], [role="listbox"], [role="tooltip"]) {
+  --openbot-text-primary: var(--message-plain-text-primary);
+  --openbot-text-secondary: var(--message-plain-text-secondary);
+  --openbot-text-muted: var(--message-plain-text-muted);
+  --openbot-text-dim: var(--message-plain-text-dim);
+  --openbot-accent: var(--message-plain-accent);
+  --openbot-accent-text: var(--message-plain-accent-text);
+  --openbot-accent-soft: var(--message-plain-accent-soft);
+  --openbot-accent-strong: var(--message-plain-accent-strong);
+  --openbot-success: var(--message-plain-success);
+  --openbot-warning: var(--message-plain-warning);
+  --openbot-danger: var(--message-plain-danger);
+  color: var(--openbot-text-primary);
+}
+
 :is(
-  .message-entry-user .ui-bubble.message-bubble-colored > .ui-bubble-content,
-  .message-entry-agent .ui-bubble-variant-muted.message-bubble-colored > .ui-bubble-content
-) :is(.attachment-file-visual, .attachment-reference-visual):not(.message-attachment[data-media] *) {
+    .message-entry-user .ui-bubble.message-bubble-colored > .ui-bubble-content,
+    .message-entry-agent .ui-bubble-variant-muted.message-bubble-colored > .ui-bubble-content,
+    .agent-dock-bubble.ui-bubble-variant-muted.message-bubble-colored > .ui-bubble-content
+  )
+  :is(.attachment-file-visual, .attachment-reference-visual):not(.message-attachment[data-media] *) {
   background: linear-gradient(var(--file-reference-soft) 0 0), var(--message-plain-control);
 }
 
@@ -453,7 +461,6 @@
     color var(--openbot-duration-hover) ease;
 }
 
-/* Every button of the row, the reaction trigger too, takes the hover of a ghost button. */
 .message-action-button:hover,
 .message-action-button:focus-visible,
 .message-action-button[aria-expanded="true"] {
@@ -469,9 +476,6 @@
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  /* No stroke-width: every icon in this row is hand-drawn on a 20-unit grid and carries
-   * its own scaled weight from .ui-glyph-20. Setting it here outranks that class and
-   * paints them a fifth heavier than the grid they were drawn for. */
 }
 
 .message-action-button svg circle:not(:first-child),
@@ -624,7 +628,6 @@
   animation: message-bubble-in 280ms cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
 }
 
-/* The line's padding, the 32px face, and its lower padding. */
 .agent-activity-slot[data-reserved="true"] {
   min-height: 52px;
 }
@@ -647,8 +650,6 @@
   grid-template-rows: 0fr;
 }
 
-/* The slot keeps the room of a plain line, so that line enters and leaves in place: only its face and
-   text animate, and the messages above do not move. A line with steps is taller, so it still opens. */
 .agent-activity-slot[data-reserved="true"] > .agent-activity-entry[data-plain="true"],
 .agent-activity-slot[data-reserved="true"] > .agent-activity-entry[data-plain="true"][data-state="exiting"] {
   grid-template-rows: 1fr;
@@ -662,8 +663,7 @@
   gap: 8px;
   overflow: clip;
   overflow-clip-margin: var(--openbot-space-3);
-  /* The working face's felt dots reach about 10px above it. The top padding keeps them in this line,
-     so they do not cover the message above. */
+
   padding-block: var(--openbot-space-3) 8px;
   padding-inline: 8px 0;
   opacity: 1;
@@ -702,8 +702,6 @@
   will-change: transform;
 }
 
-/* The face of a working agent pops in from half size, rises from its lower edge, and settles with a
-   small bounce, as a new bubble does. `backwards`, so the exit transition can shrink it afterwards. */
 .agent-activity-entry .agent-activity-avatar {
   transform-origin: center bottom;
   animation: agent-activity-avatar-in 420ms cubic-bezier(0.34, 1.45, 0.64, 1) backwards;
@@ -720,82 +718,131 @@
   }
 }
 
-/* The face leaves the way it came: it shrinks to its lower edge while the line fades. */
 .agent-activity-entry[data-state="exiting"] .agent-activity-avatar {
   transform: translateY(4px) scale(0.6);
 }
 
 .agent-activity-label {
+  position: relative;
   display: -webkit-box;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
-  background: linear-gradient(
-    90deg,
-    var(--openbot-text-primary) 0%,
-    var(--openbot-text-primary) 30%,
-    var(--openbot-text-muted) 45%,
-    var(--openbot-text-muted) 55%,
-    var(--openbot-text-primary) 70%,
-    var(--openbot-text-primary) 100%
-  );
-  background-size: 300% 100%;
-  background-clip: text;
-  color: transparent;
   font-size: var(--openbot-text-sm);
   line-height: 20px;
   overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: image-generation-shine 2.25s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+  -webkit-text-fill-color: var(--openbot-text-primary);
 }
 
-/* A wait for the provider is not work, so its label does not shine. */
+.agent-activity-shine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -200%;
+  width: 300%;
+  pointer-events: none;
+  user-select: none;
+  -webkit-line-clamp: inherit;
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent 30%,
+    var(--openbot-text-primary) 45%,
+    var(--openbot-text-primary) 55%,
+    transparent 70%
+  );
+  mask-image: linear-gradient(
+    90deg,
+    transparent 30%,
+    var(--openbot-text-primary) 45%,
+    var(--openbot-text-primary) 55%,
+    transparent 70%
+  );
+  animation: agent-activity-shine-window 2.25s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+}
+
+.agent-activity-shine-text {
+  display: -webkit-box;
+  width: calc(100% / 3);
+  margin-left: calc(200% / 3);
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: inherit;
+  -webkit-text-fill-color: var(--openbot-text-muted);
+  animation: agent-activity-shine-text 2.25s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+}
+
+@keyframes agent-activity-shine-window {
+  0%,
+  18% {
+    transform: translateX(0);
+  }
+  82%,
+  100% {
+    transform: translateX(calc(200% / 3));
+  }
+}
+
+@keyframes agent-activity-shine-text {
+  0%,
+  18% {
+    transform: translateX(0);
+  }
+  82%,
+  100% {
+    transform: translateX(-200%);
+  }
+}
+
 .agent-activity-entry[data-waiting="true"] .agent-activity-label {
-  animation: none;
-  background: none;
   color: var(--openbot-text-secondary);
   -webkit-text-fill-color: currentColor;
 }
 
-/* The plain line draws a label as Grok Bot does: each new step label rises 5px into place in 350ms,
-   with no exit, and a soft light runs over it in 60 steps. */
-.agent-activity-entry[data-plain="true"]:not([data-waiting="true"]) .agent-activity-label {
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--openbot-text-primary) 40%, transparent) 0%,
-    color-mix(in srgb, var(--openbot-text-primary) 40%, transparent) 25%,
-    var(--openbot-text-primary) 60%,
-    color-mix(in srgb, var(--openbot-text-primary) 40%, transparent) 75%,
-    color-mix(in srgb, var(--openbot-text-primary) 40%, transparent) 100%
-  );
-  background-size: 200% 100%;
-  background-clip: text;
-  -webkit-background-clip: text;
-  animation:
-    agent-activity-label-enter 350ms cubic-bezier(0.2, 0.8, 0.3, 1) backwards,
-    agent-activity-label-shine 2.2s steps(60, end) infinite;
+.agent-activity-entry[data-waiting="true"] .agent-activity-shine {
+  display: none;
 }
 
-.agent-activity-entry[data-plain="true"][data-waiting="true"] .agent-activity-label {
+.agent-activity-entry[data-plain="true"] .agent-activity-label {
   animation: agent-activity-label-enter 350ms cubic-bezier(0.2, 0.8, 0.3, 1) backwards;
+}
+
+.agent-activity-entry[data-plain="true"]:not([data-waiting="true"]) .agent-activity-label {
+  -webkit-text-fill-color: color-mix(in srgb, var(--openbot-text-primary) 40%, transparent);
+}
+
+.agent-activity-entry[data-plain="true"] .agent-activity-shine {
+  left: calc(-150% + 100% / 30);
+  width: 200%;
+  -webkit-mask-image: linear-gradient(90deg, transparent 25%, var(--openbot-text-primary) 60%, transparent 75%);
+  mask-image: linear-gradient(90deg, transparent 25%, var(--openbot-text-primary) 60%, transparent 75%);
+  animation: agent-activity-plain-shine-window 1.1s steps(30, end) -0.8125s infinite;
+}
+
+.agent-activity-entry[data-plain="true"] .agent-activity-shine-text {
+  width: 50%;
+  margin-left: calc(75% - 100% / 60);
+  -webkit-text-fill-color: var(--openbot-text-primary);
+  animation: agent-activity-plain-shine-text 1.1s steps(30, end) -0.8125s infinite;
+}
+
+@keyframes agent-activity-plain-shine-window {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes agent-activity-plain-shine-text {
+  to {
+    transform: translateX(-200%);
+  }
 }
 
 @keyframes agent-activity-label-enter {
   from {
     opacity: 0;
     transform: translateY(5px);
-  }
-}
-
-@keyframes agent-activity-label-shine {
-  from {
-    background-position: 200% 0;
-  }
-  to {
-    background-position: -200% 0;
   }
 }
 
@@ -806,9 +853,17 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .agent-activity-shine {
+    display: none;
+  }
+
   .agent-activity-entry[data-plain="true"] .agent-activity-label,
   .agent-activity-entry[data-plain="true"]:not([data-waiting="true"]) .agent-activity-label {
     animation: agent-activity-label-fade 120ms ease-out backwards;
+  }
+
+  .agent-activity-entry[data-plain="true"]:not([data-waiting="true"]) .agent-activity-label {
+    -webkit-text-fill-color: var(--openbot-text-primary);
   }
 }
 
@@ -838,31 +893,18 @@
 }
 
 .chat-action-marker-summary {
-  /* The reveal's own timings. They sit above the `--openbot-duration-*` scale,
-     which tops out at an overlay fade: this is a panel of rows that has to read
-     as unrolling, and the palette has no token for that. */
   --chat-action-history-open: 340ms;
-  /* The shared eases are quint curves: `--openbot-ease-in-out` holds the panel
-     almost still for 50ms and then moves 25px in two frames, which reads as a
-     lurch in everything below it. This one spreads the distance evenly and
-     settles, so the messages under the marker travel at one speed. */
+
   --chat-action-history-ease: cubic-bezier(0.4, 0, 0.2, 1);
-  /* The close is shorter than the open: leaving needs no reading time, and a
-     long collapse holds the messages below in motion for no reason. */
+
   --chat-action-history-close: 200ms;
-  /* The close curve decelerates from the first frame. The open's ease holds the
-     panel almost still for the first 20ms, which reads as a click the panel did
-     not answer, and then drops the box fast. */
+
   --chat-action-history-close-ease: cubic-bezier(0.32, 0.08, 0.24, 1);
-  /* The rows have to stay faintly visible until the box is nearly shut. A
-     shorter fade empties the panel at the halfway point and leaves blank space
-     closing on its own. */
+
   --chat-action-history-lift: 170ms;
-  /* How much of the box's bottom edge dissolves while it closes. One row's
-     worth, so the edge takes a row out at a time. */
+
   --chat-action-history-fade: 22px;
   --chat-action-history-entry: 260ms;
-  /* Each state waits this much longer than the one above it. */
   --chat-action-history-stagger: 60ms;
   display: flex;
   min-width: 0;
@@ -876,7 +918,6 @@
   color: var(--openbot-text-muted);
 }
 
-/* The link to the routine's own thread, where the run's answer and work are. */
 .ui-button.chat-action-routine-thread {
   flex: 0 0 auto;
   color: var(--openbot-text-muted);
@@ -890,12 +931,6 @@
   transform: rotate(180deg);
 }
 
-/* The panel is a single grid track, so `0fr` to `1fr` animates the list's real
-   height with no measured pixel value - the same technique as `.t-acc` in
-   transitions.css. The height has to move for the row below to follow it; a
-   paint-only reveal leaves the space behind and drops it in one step at the end.
-   A `from` or `to` alone leaves the other end on the element's own style, so
-   these rules stay the single source of the resting state. */
 .chat-action-history-panel {
   display: grid;
   width: 100%;
@@ -906,9 +941,6 @@
   animation: chat-action-history-open var(--chat-action-history-open) var(--chat-action-history-ease);
 }
 
-/* The close runs the same track backwards and holds `0fr` until the panel leaves
-   the tree, so the messages below travel the whole distance under one curve
-   instead of standing still and then closing the gap in a single step. */
 .chat-action-history-panel[data-state="closed"] {
   animation: chat-action-history-close var(--chat-action-history-close) var(--chat-action-history-close-ease) forwards;
 }
@@ -925,29 +957,20 @@
   }
 }
 
-/* On the way in the box grows under rows that are still fading up, so its edge
-   never cuts anything solid. */
 .chat-action-history-panel[data-state="open"] .chat-action-history {
   animation: chat-action-history-settle var(--chat-action-history-open) var(--openbot-ease-out);
 }
 
-/* The rows fade out just before the box finishes closing, so the clip edge never
-   cuts through anything solid and the panel is never an empty box shrinking on
-   its own. The panel leaves the tree on the collapse's end, not on this one's. */
 .chat-action-history-panel[data-state="closed"] .chat-action-history {
   animation: chat-action-history-lift var(--chat-action-history-lift) var(--openbot-ease-out) forwards;
 }
 
-/* No fade on the way in: the rows already carry their own, and stacking a second
-   one over them washes the whole panel out. */
 @keyframes chat-action-history-settle {
   from {
     transform: translateY(-25%);
   }
 }
 
-/* The lift stays small on the way out: the collapsing box already carries the
-   rows upward, and a longer travel makes them outrun it and arrive early. */
 @keyframes chat-action-history-lift {
   to {
     transform: translateY(-8%);
@@ -955,19 +978,11 @@
   }
 }
 
-/* `min-height: 0` lets the track win over the list's content height, and the
-   clip keeps the rows inside the shrinking box. */
 .chat-action-history-clip {
   min-height: 0;
   overflow: hidden;
 }
 
-/* The closing box passes its edge over rows that are still readable and cuts
-   them through the middle of the glyphs. The mask softens that edge, so a row
-   dissolves as the edge reaches it instead of being sliced. Below the fade
-   distance the whole list is inside the gradient and leaves on its own. The way
-   in needs none of this: there the box grows ahead of rows that are still
-   arriving. */
 .chat-action-history-panel[data-state="closed"] .chat-action-history-clip {
   -webkit-mask-image: linear-gradient(
     to bottom,
@@ -1001,9 +1016,6 @@
   color: var(--openbot-text-secondary);
 }
 
-/* `backwards` holds the entry hidden through its delay, so a late state never
-   shows at full strength before its turn. The exit leaves the rows alone: the
-   list fades as one piece. */
 .chat-action-history-panel[data-state="open"] .chat-action-history-entry {
   animation: chat-action-history-entry-in var(--chat-action-history-entry) var(--openbot-ease-out) backwards;
 }
@@ -1016,7 +1028,6 @@
   animation-delay: calc(var(--chat-action-history-stagger) * 2);
 }
 
-/* The stagger stops growing here: a long run should not open in slow motion. */
 .chat-action-history-panel[data-state="open"] .chat-action-history-entry:nth-child(n + 4) {
   animation-delay: calc(var(--chat-action-history-stagger) * 3);
 }
@@ -1133,8 +1144,6 @@ button.chat-action-target:active,
   color: var(--openbot-text-muted);
 }
 
-/* The members of a routing row, as one list: each name keeps its pill, and the list's own words sit
-   between them. In a narrow pane the list wraps at a separator rather than cutting a name. */
 .chat-action-routing-targets {
   display: inline-flex;
   min-width: 0;
@@ -1143,8 +1152,6 @@ button.chat-action-target:active,
   justify-content: center;
 }
 
-/* The pill's own padding stands after each name, so the separator moves back by that padding: the
-   comma then follows the name as it does in text. */
 .chat-action-routing-separator {
   margin-inline-start: calc(-1 * var(--openbot-space-1-5));
   white-space: pre;
@@ -1155,7 +1162,6 @@ button.chat-action-target:active,
   animation: message-bubble-in 280ms cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
 }
 
-/* Markers without a target pill keep the same optical label-to-time rhythm. */
 .chat-action-marker-unavailable .chat-action-marker-label,
 .chat-action-marker-context-reset .chat-action-marker-label,
 .chat-action-marker-model-switch .chat-action-marker-label,
@@ -1218,7 +1224,16 @@ button.chat-action-target:active,
   color: var(--openbot-text-primary);
 }
 
-/* The open text of an agent message reads as a chat message under its centred marker. */
+.chat-action-marker-reason {
+  display: -webkit-box;
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
 .chat-action-message-text {
   align-self: stretch;
   margin-block: var(--openbot-space-2);
@@ -1258,14 +1273,12 @@ button.chat-action-target:active,
   margin-inline-start: -6px;
 }
 
-/* An open group lists each message as its own marker, centred like the row that holds them. */
 .chat-action-group-list {
   padding-inline: 0;
   border-inline-start: 0;
   text-align: center;
 }
 
-/* Only the group's own rows: a routine run in an open group keeps the layout of its own history. */
 .chat-action-group-list > .chat-action-history-entry {
   display: block;
 }
@@ -1274,9 +1287,6 @@ button.chat-action-target:active,
   width: 100%;
 }
 
-/* A group of routine runs reads "routine · 3 runs · 17:15–18:45". In a narrow chat the count, the
-   time and the toggle move together to a second line, so the routine keeps its whole name. The dots
-   are decoration only. */
 .chat-action-marker-routine-run-group > .chat-action-marker-summary > .chat-action-marker-content {
   flex-wrap: wrap;
   justify-content: center;
@@ -1295,8 +1305,6 @@ button.chat-action-target:active,
   margin-inline-end: var(--openbot-space-1);
 }
 
-/* The shared .ui-action-menu item rule outranks a single class, so the grid template and the
- * truncation below have to be compounded to reach the row. */
 .ui-action-menu.chat-action-agent-menu {
   min-width: 220px;
   max-width: min(320px, calc(100vw - var(--openbot-space-4)));
@@ -1327,7 +1335,6 @@ button.chat-action-target:active,
   white-space: nowrap;
 }
 
-/* The files of an update sit at the start edge, where an agent's own files sit. */
 .chat-action-attachments {
   margin-top: var(--openbot-space-2);
 }
@@ -1350,12 +1357,6 @@ button.chat-action-target:active,
   letter-spacing: -0.15px;
 }
 
-/*
- * Bubbles grow with the chat column, between a minimum and a maximum, so a big screen shows more of a
- * reply and a narrow pane is not wasted. A percentage refers to the message row. An agent reply, code,
- * and a table use the wide width; a person's message uses the narrow width, and leaves a gap at the
- * other side on a narrow pane.
- */
 :root {
   --message-wide-bubble-width: min(100%, max(720px, 70%), 1200px);
   --message-narrow-bubble-width: min(92%, max(420px, 50%), 800px);
@@ -1365,10 +1366,14 @@ button.chat-action-target:active,
   max-width: var(--message-wide-bubble-width);
 }
 
-/* An image keeps its size in a person's bubble too: the bubble does not shrink to the text. */
 .message-entry .ui-bubble:has(.image-generation) {
   width: min(420px, 100%);
   max-width: min(420px, 100%);
+}
+
+.message-entry .ui-bubble:has(.media-generation) {
+  width: min(480px, 100%);
+  max-width: min(480px, 100%);
 }
 
 .message-entry .ui-bubble:has(.image-gallery) {
@@ -1377,7 +1382,7 @@ button.chat-action-target:active,
 }
 
 .message-entry-agent
-  .ui-bubble-variant-ghost:has(:is(.image-generation, .image-gallery, .message-code-block, .message-data-table-scroll))
+  .ui-bubble-variant-ghost:has(:is(.image-generation, .media-generation, .image-gallery))
   > .ui-bubble-content {
   width: 100%;
 }
@@ -1386,17 +1391,34 @@ button.chat-action-target:active,
   width: 100%;
 }
 
-.image-generation {
+.image-generation,
+.media-generation {
   display: grid;
   min-width: 0;
   justify-items: start;
-  gap: 14px;
+  gap: 10px;
+  margin: 0;
 }
 
 .message-image-attachments {
   display: grid;
   min-width: 0;
   gap: 10px;
+}
+
+.media-generation-stage {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  aspect-ratio: var(--media-generation-ratio);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-control);
+  isolation: isolate;
+}
+
+.image-generation-state {
+  position: absolute;
+  inset: 0;
 }
 
 .image-generation-stage {
@@ -1433,14 +1455,6 @@ button.chat-action-target:active,
   opacity: 0;
 }
 
-/* The canvas above rests at `opacity: 0` once the image arrives, but the glow
- * inside it keeps two infinite keyframes on `mask-size` and `mask-position`,
- * and the compositor can take neither. One finished image in the history
- * therefore costs a style recalculation and a repaint every frame for as long
- * as the conversation is open. A profile of an idle window measured 60 style
- * recalculations a second with no script running at all. The reduced-motion
- * block at the end of this file already stops these keyframes for the same
- * element, so this only makes the finished state agree with it. */
 .image-generation-ready .image-generation-glow {
   animation: none;
 }
@@ -1455,22 +1469,9 @@ button.chat-action-target:active,
 }
 
 .image-generation-failure-mark {
-  display: grid;
-  width: 54px;
-  height: 54px;
-  place-items: center;
-  border: 2px solid var(--openbot-danger);
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-danger-soft);
-  box-shadow: 0 0 0 5px var(--openbot-danger-soft);
+  width: 28px;
+  height: 28px;
   color: var(--openbot-danger);
-}
-
-/* Was a 40px U+00D7 sized off a type token, which is why the scale carried a step no
- * copy in the app used. */
-.image-generation-failure-mark > svg {
-  width: var(--openbot-control-xl);
-  height: var(--openbot-control-xl);
   stroke-width: var(--openbot-icon-stroke);
 }
 
@@ -1505,30 +1506,46 @@ button.chat-action-target:active,
     image-generation-breathe 1.9s cubic-bezier(0.66, 0, 0.34, 1) infinite;
 }
 
-.image-generation-resolution {
+.media-generation-chip {
+  display: flex;
   position: absolute;
   z-index: 1;
   top: 8px;
   inset-inline-end: 8px;
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-bg-surface);
-  padding: 2px 7px;
+  padding: 2px 8px;
   color: var(--openbot-text-muted);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--openbot-font-mono);
   font-size: var(--openbot-text-sm);
   white-space: nowrap;
 }
 
-.image-generation-meta {
-  display: flex;
-  width: min(100%, 420px);
-  flex-direction: column;
-  align-items: flex-start;
+.media-generation-chip:empty {
+  display: none;
+}
+
+.image-generation-spec + .image-generation-spec::before {
+  margin-inline: 0.4em;
+  content: "·";
+}
+
+.media-generation-meta {
+  display: grid;
+  width: 100%;
+  min-width: 0;
   gap: 2px;
+  font-size: var(--openbot-text-md);
+  line-height: 18px;
   text-align: start;
 }
 
-.image-generation-label {
+.media-generation-label {
+  color: var(--openbot-text-primary);
+  font-weight: 550;
+}
+
+.media-generation-label[data-shine] {
   background: linear-gradient(
     90deg,
     var(--openbot-text-primary) 0%,
@@ -1541,35 +1558,32 @@ button.chat-action-target:active,
   background-size: 300% 100%;
   background-clip: text;
   color: transparent;
-  font-size: var(--openbot-text-lg);
-  font-weight: 550;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-}
-
-/* The shimmer says "still working", so it stops once the image has arrived or
-   failed. Left unscoped it also ran on "Image generation failed" and on plain
-   attached images, and it animates `background-position` under
-   `background-clip: text` - a main-thread text repaint per frame that no
-   compositor can take - once per image message, for the life of the thread. */
-.image-generation:not(.image-generation-ready, .image-generation-failed) .image-generation-label {
   animation: image-generation-shine 2.25s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
 }
 
-.image-generation-prompt {
-  overflow: hidden;
+.media-generation-specs {
   color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-md);
-  line-height: 18px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-weight: 400;
 }
 
-.image-generation-error {
+.media-generation-specs::before {
+  margin-inline: 0.4em;
+  content: "·";
+}
+
+.media-generation-prompt {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--openbot-text-muted);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.media-generation-error {
   max-width: 100%;
-  color: var(--openbot-danger);
-  font-size: var(--openbot-text-sm);
-  line-height: 17px;
+  color: var(--openbot-danger-text);
 }
 
 .image-generation-preview {
@@ -1593,39 +1607,9 @@ button.chat-action-target:active,
   object-fit: contain;
 }
 
-.image-generation-preview:focus-visible,
-.image-generation-hover-download:focus-visible {
-  outline: 2px solid var(--openbot-border-focus);
+.image-generation-preview:focus-visible {
+  outline: 1px solid var(--openbot-border-focus);
   outline-offset: 2px;
-}
-
-.image-generation-hover-download {
-  position: absolute;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  inset-inline-end: 10px;
-  bottom: 10px;
-  border: 1px solid var(--openbot-border-strong);
-  border-radius: var(--openbot-radius-pill);
-  background: var(--openbot-bg-glass);
-  padding: 5px 10px;
-  color: var(--openbot-text-primary);
-  cursor: pointer;
-  backdrop-filter: blur(12px) saturate(1.15);
-  -webkit-backdrop-filter: blur(12px) saturate(1.15);
-  font-size: var(--openbot-text-sm);
-  font-weight: 650;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(4px);
-  transition:
-    background-color var(--openbot-duration-hover) ease,
-    color var(--openbot-duration-hover) ease,
-    border-color var(--openbot-duration-hover) ease,
-    opacity var(--openbot-duration-hover) ease,
-    transform var(--openbot-duration-hover) ease;
 }
 
 .image-generation-download-icon {
@@ -1634,17 +1618,207 @@ button.chat-action-target:active,
   flex: 0 0 auto;
 }
 
-.image-generation-stage:hover .image-generation-hover-download,
-.image-generation-stage:focus-within .image-generation-hover-download {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(0);
+.media-generation-actions {
+  display: flex;
+  position: absolute;
+  z-index: 2;
+  top: 8px;
+  inset-inline-end: 8px;
+  gap: 2px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-media-control-surface);
+  padding: 2px;
+  color: var(--openbot-media-control-text);
+  opacity: 0;
+  transition: opacity var(--openbot-duration-hover) ease;
 }
 
-.image-generation-hover-download:hover {
-  border-color: var(--openbot-border-focus);
-  background: var(--openbot-bg-glass);
-  color: var(--openbot-text-primary);
+.image-generation-stage:is(:hover, :focus-within) .media-generation-actions {
+  opacity: 1;
+}
+
+.media-generation-player {
+  position: absolute;
+  inset: 0;
+}
+
+.media-generation-player[popover]:not(:popover-open) {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.media-generation-player:popover-open {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  overflow: hidden;
+  border: 0;
+  padding: 0;
+  background: var(--openbot-bg-control);
+  color: inherit;
+  -webkit-app-region: no-drag;
+}
+
+.media-generation-player:popover-open::backdrop {
+  background: transparent;
+}
+
+.media-generation-player video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: var(--openbot-bg-control);
+}
+
+.ui-button.media-generation-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 52px;
+  height: 52px;
+  translate: -50% -50%;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-media-control-surface);
+  color: var(--openbot-media-control-text);
+  backdrop-filter: blur(12px);
+  transition: background-color var(--openbot-duration-hover) ease;
+}
+
+.ui-button.media-generation-play:hover:not(:disabled) {
+  background: var(--openbot-media-control-surface-hover);
+  color: var(--openbot-media-control-text);
+}
+
+.ui-button.media-generation-play > svg {
+  width: 22px;
+  height: 22px;
+  margin-inline-start: 2px;
+  fill: currentColor;
+}
+
+.media-generation-wait {
+  display: grid;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 52px;
+  height: 52px;
+  translate: -50% -50%;
+  place-items: center;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-media-control-surface);
+  color: var(--openbot-media-control-text);
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+  animation: media-generation-wait-in var(--openbot-duration-hover) ease 250ms both;
+}
+
+.media-generation-player .ui-spinner {
+  width: 22px;
+  height: 22px;
+  border-width: 2px;
+  border-color: var(--openbot-media-control-track);
+  border-top-color: currentColor;
+}
+
+@keyframes media-generation-wait-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.media-generation-bar {
+  display: flex;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(to top, var(--openbot-media-control-scrim), var(--openbot-transparent));
+  padding: 28px 8px 6px;
+  color: var(--openbot-media-control-text);
+  opacity: 0;
+  transition: opacity var(--openbot-duration-hover) ease;
+}
+
+.media-generation-player:is(:hover, :focus-within) .media-generation-bar {
+  opacity: 1;
+}
+
+.media-generation-bar .ui-button,
+.media-generation-actions .ui-button {
+  color: var(--openbot-media-control-text);
+}
+
+.media-generation-bar .ui-button:hover:not(:disabled),
+.media-generation-actions .ui-button:hover:not(:disabled) {
+  background: var(--openbot-media-control-hover);
+  color: var(--openbot-media-control-text);
+}
+
+.media-generation-bar .ui-button > svg {
+  width: 16px;
+  height: 16px;
+}
+
+.media-generation-bar .ui-button:first-child > svg {
+  fill: currentColor;
+}
+
+.media-generation-seek {
+  flex: 1;
+  min-width: 0;
+  margin-inline: 4px;
+}
+
+.media-generation-seek .ui-seek-slider-track,
+.media-generation-seek .ui-seek-slider-picture {
+  width: 100%;
+  height: 16px;
+}
+
+.media-generation-seek .ui-seek-slider-thumb {
+  background: var(--openbot-media-control-text);
+}
+
+.media-generation-seek-fill {
+  width: 100%;
+  height: 3px;
+  align-self: center;
+  border-radius: var(--openbot-radius-pill);
+  background: linear-gradient(
+    90deg,
+    var(--openbot-media-control-text) var(--media-generation-seek),
+    var(--openbot-media-control-track) var(--media-generation-seek)
+  );
+  transition: height var(--openbot-duration-hover) ease;
+}
+
+.media-generation-seek .ui-seek-slider-track:hover .media-generation-seek-fill {
+  height: 5px;
+}
+
+.media-generation-time {
+  margin-inline-end: 4px;
+  color: var(--openbot-media-control-muted);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 @keyframes image-generation-morph {
@@ -1741,7 +1915,6 @@ button.chat-action-target:active,
   }
 }
 
-/* A failed send, beside the time under the bubble. A send in flight leaves it empty. */
 .pending-send-status {
   display: flex;
   flex-wrap: wrap;
@@ -1780,11 +1953,6 @@ button.chat-action-target:active,
   margin-inline-end: var(--openbot-space-1);
 }
 
-/*
- * The reader's own actions stand before the bubble, in the same line. The stack takes the width of
- * the bubble, not the line, so the actions fit beside it. A message with images keeps the full
- * line, and its actions go under it.
- */
 .message-entry-user.message-entry-actions-beside .message-stack:not(:has(.message-media-before)) {
   width: auto;
   max-width: min(80%, 720px);
@@ -1799,12 +1967,6 @@ button.chat-action-target:active,
   order: -1;
 }
 
-/*
- * A run of messages by one sender reads as one block: where two bubbles of the run meet, their
- * corners on the sender's side are small, at the start for an agent and at the end for the reader.
- * Only a row that the timeline groups with the row above it, and that starts with its message (no
- * marker or steps above it), joins the bubble above.
- */
 .virtual-chat-row[data-grouped="sender"]
   > .message-entry-agent:first-child
   .message-shell
@@ -1835,4 +1997,50 @@ button.chat-action-target:active,
   > .ui-bubble:last-child
   > .ui-bubble-content {
   border-end-end-radius: var(--openbot-radius-sm);
+}
+
+.media-stage-details {
+  display: flex;
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  left: 0;
+  align-items: baseline;
+  background: linear-gradient(to bottom, var(--openbot-media-control-scrim), var(--openbot-transparent));
+  padding: 10px 14px 28px;
+  color: var(--openbot-media-control-muted);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--openbot-duration-hover) ease;
+  white-space: nowrap;
+}
+
+.media-stage-details:empty {
+  display: none;
+}
+
+.media-generation-stage:is(:hover, :focus-within) > .media-stage-details {
+  opacity: 1;
+}
+
+.media-stage-details .image-generation-spec {
+  flex: none;
+}
+
+.media-stage-details .image-generation-spec:first-child {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  margin-inline-end: 12px;
+  color: var(--openbot-media-control-text);
+  font-weight: 560;
+  text-overflow: ellipsis;
+}
+
+.media-stage-details .image-generation-spec:nth-child(2)::before {
+  content: none;
 }

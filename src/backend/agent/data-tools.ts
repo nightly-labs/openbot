@@ -39,15 +39,6 @@ export const DATA_TOOL_DEFINITIONS = [
   },
 ];
 
-/**
- * Answers the four shared-data tools, and `null` for any other tool so the caller keeps walking its
- * chain.
- *
- * Every refusal comes back as a tool result rather than a thrown error. A SQL syntax error, a
- * statement the engine refused, a deadline, and "you did not create this table" are all things the
- * model can act on in its next call; a throw reaches it as an opaque JSON-RPC fault it can only give
- * up on.
- */
 export const handleDataTool = Effect.fn("DataTools.handle")(function* (
   tool: string,
   args: unknown,
@@ -58,10 +49,10 @@ export const handleDataTool = Effect.fn("DataTools.handle")(function* (
   if (!tables) return openBotToolFailure("Shared data is unavailable.");
 
   switch (tool) {
-    case "list_tables":
-      return openBotToolResult({
-        tables: yield* tables.list().pipe(Effect.mapError((cause) => new ToolOperationFailed({ cause }))),
-      });
+    case "list_tables": {
+      const listed = yield* tables.list().pipe(Effect.mapError((cause) => new ToolOperationFailed({ cause })));
+      return listed.ok ? openBotToolResult({ tables: listed.value }) : openBotToolFailure(listed.message);
+    }
     case "delete_table": {
       const input = yield* toolStep(() => tableNameSchema.parse(args));
       const removed = yield* tables
@@ -87,10 +78,6 @@ export const handleDataTool = Effect.fn("DataTools.handle")(function* (
   }
 });
 
-/**
- * `truncated` alone does not tell the model how much it is missing or what to do next, and a model
- * that cannot tell a capped result from a complete one reports the capped count as the answer.
- */
 function readResult(
   result: AgentDatabaseQueryResult,
 ): AgentDatabaseQueryResult | (AgentDatabaseQueryResult & { note: string }) {
