@@ -41,6 +41,7 @@ import {
   modifierMask,
   namedKey,
   type PointerPoint,
+  printableKeyCode,
   SHIFT_MODIFIER,
 } from "./browser-cdp-input";
 import {
@@ -471,7 +472,7 @@ export class BrowserCdpEngine {
               : yield* this.#callOnNode(
                   send,
                   node.backendNodeId,
-                  `function(input) { return this.isConnected && this.ownerDocument === document && location.protocol === 'https:' && (!input || (this.localName === 'input' && !this.disabled && !this.readOnly && ['password','text','tel','number'].includes(this.type))) ? location.origin : false; }`,
+                  `function(input) { return this.isConnected && this.ownerDocument === document && (location.protocol === 'https:' || location.protocol === 'http:') && (!input || (this.localName === 'input' && !this.disabled && !this.readOnly && ['password','text','tel','number'].includes(this.type))) ? location.origin : false; }`,
                   [input],
                   node.sessionId,
                   contextId,
@@ -2540,11 +2541,22 @@ export class BrowserCdpEngine {
           }
           if (input.type === "key") {
             if (input.action === "char") {
-              yield* send("Input.dispatchKeyEvent", { type: "char", modifiers: input.modifiers, text: input.text });
+              yield* send("Input.dispatchKeyEvent", {
+                type: "char",
+                modifiers: input.modifiers,
+                key: input.key,
+                code: input.code,
+                text: input.text,
+              });
               return;
             }
             const { text, ...keyCodes } = namedKey(input.key);
-            const character = input.action === "down" && (input.modifiers & ~SHIFT_MODIFIER) === 0 ? text : undefined;
+            const unmodified = (input.modifiers & ~SHIFT_MODIFIER) === 0;
+            const character = input.action === "down" && unmodified ? text : undefined;
+            const printableCode =
+              (unmodified || input.action === "up") && keyCodes.windowsVirtualKeyCode === undefined
+                ? printableKeyCode(input.key, input.code)
+                : undefined;
             const selectAll =
               input.action === "down" &&
               shortcutLetter(input.key, input.code) === "a" &&
@@ -2556,6 +2568,7 @@ export class BrowserCdpEngine {
               key: input.key,
               code: input.code,
               ...keyCodes,
+              ...(printableCode === undefined ? {} : { windowsVirtualKeyCode: printableCode }),
               ...(character === undefined ? {} : { text: character, unmodifiedText: character }),
               ...(selectAll ? { commands: ["selectAll"] } : {}),
             });

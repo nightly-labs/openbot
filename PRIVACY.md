@@ -1045,8 +1045,9 @@ no review reads are deleted after 30 days. Turning the setting off deletes all r
   Vault file, or, where Windows does not allow links, a copy of the key that is readable only by the user
   and follows the same rules. API keys are redacted from logs, exports and diagnostics. A password that the
   user types into the secure sign-in card goes to the Vault only while Save to Vault is checked. On a
-  joined server, only an owner or admin can check it, the box starts unchecked, and the password goes
-  to that server's Vault, not to the Vault of the computer where it was typed. The
+  joined server, the box starts checked, any member can save, and the password goes to that server's
+  Vault, not to the Vault of the computer where it was typed. All agents of that server can then sign
+  in with it. Only an owner or admin can show it in the server's Vault. The
   first card fill on a site waits for the server owner's approval; team members and messaging
   services cannot give it. The card then keeps that site and the origins of its card frames, and
   later fills there need no approval; the user can remove a site in the card. The

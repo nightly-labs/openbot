@@ -108,9 +108,9 @@ export const PROVIDERS_COLLECTION: ContentCollection<"providers"> = {
     },
     {
       slug: "custom-agents",
-      title: "ACP Agent GUI: Run Goose, Qwen Code and GitHub Copilot CLI in OpenBot",
+      title: "ACP Agent GUI: Run Goose, Qwen Code and Oh My Pi in OpenBot",
       description:
-        "Run any Agent Client Protocol agent in OpenBot on macOS, Windows or Linux, such as Goose, Qwen Code or GitHub Copilot CLI. Give it a team and an app on your phone.",
+        "Run any Agent Client Protocol agent in OpenBot on macOS, Windows or Linux, such as Goose, Qwen Code or Oh My Pi. Give it a team and an app on your phone.",
       publishedAt: "2026-10-24",
       author: NEWS_AUTHOR,
     },
