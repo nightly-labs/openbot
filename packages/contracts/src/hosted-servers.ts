@@ -363,8 +363,8 @@ export interface CreateHostedServerInput {
    */
   license?: LicenseOrder;
   /**
-   * The buyer, a consumer in the EU, asks that the hosting service begin before the 14-day withdrawal period
-   * ends, and accepts what that means for a withdrawal. Absent: the buyer did not ask, or an older client.
+   * The buyer, a consumer in the EU, the United Kingdom or Turkey, asks that the hosting service begin before the
+   * 14-day withdrawal period ends, and accepts what that means for a withdrawal. Absent: the buyer did not ask, or an older client.
    */
   earlyStart?: true;
 }

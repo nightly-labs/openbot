@@ -4,7 +4,7 @@ import {
   type BillingPlanId,
   isOpenBillingStatus,
 } from "@openbot/contracts/billing";
-import { type BillingDetails, isEuConsumer } from "@openbot/contracts/billing-details";
+import { type BillingDetails, isWithdrawalConsumer } from "@openbot/contracts/billing-details";
 import type {
   HostedServerCatalog,
   HostedServerCatalogPlan,
@@ -144,7 +144,7 @@ interface AddServerState {
   order: CreateHostedServerInput | null;
   /**
    * The web pricing page order that the pricing page starts with, when the account must give its country first, or
-   * when a consumer in the EU must ask for the early start of the server.
+   * when a consumer with a right of withdrawal must ask for the early start of the server.
    */
   pageOrder: PricingOrder | null;
   /** The plans with their prices, for the order form of the pricing page. */
@@ -309,10 +309,11 @@ function AddServerSession(
     draft.server = resumed ?? null;
     draft.paid = resume?.paid ?? false;
     // An order with no billing country cannot pay, so the pricing page asks for the country first. A consumer in the
-    // EU must ask on the pricing page that the server begin before the withdrawal period ends; the dialog cannot ask.
+    // EU, the United Kingdom or Turkey must ask on the pricing page that the server begin before the withdrawal
+    // period ends; the dialog cannot ask.
     const needsCountry = untrack(() => props.billingDetails) !== undefined && !details?.country;
     const order = resume ? null : (untrack(() => props.order) ?? null);
-    const needsPage = needsCountry || (isEuConsumer(details) && order?.server != null);
+    const needsPage = needsCountry || (isWithdrawalConsumer(details) && order?.server != null);
     draft.order = needsPage ? null : dialogOrderOf(order, licenseState);
     draft.pageOrder = needsPage ? order : null;
     draft.licenseOffer = licenseOfferOf(licenseState);
@@ -472,7 +473,7 @@ function AddServerSession(
     interval: BillingInterval,
     currency: BillingCurrency,
     license: LicenseOrder | null,
-    /** The early start request of a consumer in the EU, from the pricing page. */
+    /** The early start request of a consumer with a right of withdrawal, from the pricing page. */
     earlyStart: boolean,
   ): Promise<CreatedHostedServer> {
     const choice = license

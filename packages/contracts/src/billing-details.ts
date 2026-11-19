@@ -319,12 +319,19 @@ export function isEuVatCountry(country: string): boolean {
   return EU_VAT_COUNTRY_SET.has(country);
 }
 
+/** The countries outside the EU where a consumer also has a 14-day right of withdrawal. */
+const OTHER_WITHDRAWAL_COUNTRIES = new Set(["GB", "TR"]);
+
 /**
- * A buyer in the EU with no VAT ID is a consumer, with a 14-day right of withdrawal. A hosting service begins at
- * once only when the consumer asks for it. A saved VAT ID is one that the EU VAT system confirmed.
+ * A buyer in the EU, the United Kingdom or Turkey with no VAT ID is a consumer, with a 14-day right of withdrawal.
+ * A hosting service begins at once only when the consumer asks for it. A saved VAT ID is one that the EU VAT system
+ * confirmed; a buyer outside the EU cannot save one.
  */
-export function isEuConsumer(details: { country: string | null; vatId: string | null } | null | undefined): boolean {
-  return details?.country != null && isEuVatCountry(details.country) && !details.vatId?.trim();
+export function isWithdrawalConsumer(
+  details: { country: string | null; vatId: string | null } | null | undefined,
+): boolean {
+  if (details?.country == null || details.vatId?.trim()) return false;
+  return isEuVatCountry(details.country) || OTHER_WITHDRAWAL_COUNTRIES.has(details.country);
 }
 
 /** The prefix of an EU VAT ID of `country`: its ISO code, or EL for Greece. */

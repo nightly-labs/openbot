@@ -90,7 +90,7 @@ export const VAT_METADATA = {
 } as const;
 
 /**
- * The time (ISO 8601) when a consumer in the EU asked that the hosting service begin before the 14-day
+ * The time (ISO 8601) when a consumer with a right of withdrawal asked that the hosting service begin before the 14-day
  * withdrawal period ends. It is on the Checkout session and on the subscription, as the record of the request.
  */
 export const EARLY_START_METADATA = "openbot_early_start_at";

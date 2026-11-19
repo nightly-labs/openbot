@@ -1,5 +1,5 @@
 import { BILLING_PLANS, type BillingCurrency, type BillingPlanId } from "@openbot/contracts/billing";
-import { isEuConsumer } from "@openbot/contracts/billing-details";
+import { isWithdrawalConsumer } from "@openbot/contracts/billing-details";
 import type { HostedServerCatalogPlan } from "@openbot/contracts/hosted-servers";
 import { LICENSE_MAX_USERS, type LicenseTier, type PricingOrder } from "@openbot/contracts/license";
 import {
@@ -95,7 +95,10 @@ export interface HostedPricingPageProps {
 
 /** What the buyer asked for with the order, in addition to the Terms. */
 export interface OrderConsent {
-  /** A consumer in the EU asks that the hosting service begin before the 14-day withdrawal period ends. */
+  /**
+   * A consumer in the EU, the United Kingdom or Turkey asks that the hosting service begin before the 14-day
+   * withdrawal period ends.
+   */
   earlyStart: boolean;
 }
 
@@ -118,7 +121,7 @@ export function HostedPricingPage(props: HostedPricingPageProps) {
   const [accepted, setAccepted] = createSignal(false);
   // A server order that the server limit blocks cannot go on, so the page does not ask for the request.
   const earlyStartAsked = () =>
-    order().server !== null && props.serverLimit == null && isEuConsumer(props.billingDetails);
+    order().server !== null && props.serverLimit == null && isWithdrawalConsumer(props.billingDetails);
   // The box starts clear each time it shows, as the law asks: the consumer must tick it.
   const [earlyStart, setEarlyStart] = createSignal(false);
   createEffect(earlyStartAsked, (asked) => {
