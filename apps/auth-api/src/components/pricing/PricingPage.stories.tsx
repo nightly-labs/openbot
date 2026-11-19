@@ -37,7 +37,7 @@ function WithRouter(props: { children: () => JSX.Element }) {
   return (
     <RouterContextProvider router={router}>
       {() => (
-        <SiteTextProvider chrome={{ lang: "en", locale: "en", text: siteText(translateFor("en")) }}>
+        <SiteTextProvider chrome={{ lang: "en", dir: "ltr", locale: "en", text: siteText(translateFor("en")) }}>
           {props.children()}
         </SiteTextProvider>
       )}

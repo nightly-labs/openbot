@@ -553,19 +553,21 @@ export function startHubSignal(network: AgentNetwork, style: HubSignalStyle, at:
   return { style, at, reach, pulses, returns, end };
 }
 
+const WORD_SEGMENTER = new Intl.Segmenter(undefined, { granularity: "word" });
+
 function wrapText(context: CanvasRenderingContext2D, text: string, width: number): string[] {
   const lines: string[] = [];
   let line = "";
-  for (const word of text.split(" ")) {
-    const candidate = line ? `${line} ${word}` : word;
-    if (line && context.measureText(candidate).width > width) {
-      lines.push(line);
-      line = word;
+  for (const { segment } of WORD_SEGMENTER.segment(text)) {
+    const candidate = line + segment;
+    if (line.trim() && context.measureText(candidate.trimEnd()).width > width) {
+      lines.push(line.trimEnd());
+      line = segment.trimStart();
     } else {
       line = candidate;
     }
   }
-  if (line) lines.push(line);
+  if (line.trim()) lines.push(line.trimEnd());
   return lines;
 }
 

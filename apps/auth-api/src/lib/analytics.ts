@@ -28,7 +28,7 @@ import { MARKETPLACE_TAB_ROUTES } from "./marketplace-routes";
 import { MOBILE_APPS } from "./mobile-apps";
 import { PRICING_ROUTE } from "./pricing-page";
 import { PRIVACY_POLICY_ROUTE } from "./privacy-policy";
-import { pagePaths } from "./site-paths";
+import { localizedPagePath, TRANSLATED_SITE_LOCALES } from "./site-paths";
 import { TEAMS_ROUTE } from "./teams-page";
 import { TERMS_ROUTE } from "./terms";
 
@@ -224,12 +224,11 @@ const LINK_DESTINATIONS = new Map<string, LandingDestination>([
   [OPENBOT_LINKS.contact, "contact"],
   [TEAMS_ROUTE, "teams"],
   [PRICING_ROUTE, "pricing"],
-  [pagePaths("/contact").pl, "contact"],
-  [pagePaths("/teams").pl, "teams"],
-  [pagePaths("/pricing").pl, "pricing"],
-  [pagePaths("/contact").pt, "contact"],
-  [pagePaths("/teams").pt, "teams"],
-  [pagePaths("/pricing").pt, "pricing"],
+  ...TRANSLATED_SITE_LOCALES.flatMap((locale) => [
+    [localizedPagePath(locale, "/contact"), "contact"] as const,
+    [localizedPagePath(locale, "/teams"), "teams"] as const,
+    [localizedPagePath(locale, "/pricing"), "pricing"] as const,
+  ]),
   [OPENBOT_LINKS.x, "x"],
   [OPENBOT_LINKS.threads, "threads"],
   [OPENBOT_LINKS.linkedin, "linkedin"],
