@@ -92,6 +92,7 @@ async function open() {
           effort: request.effort ?? "medium",
         }),
       generateMedia: () => Effect.succeed(PICTURE),
+      filePath: (attachmentId) => Effect.succeed(join(directory, `${attachmentId}.png`)),
       notify: () => {},
       connectionOn: () => false,
       post: () => Effect.die(new Error("No post runs in this test.")),
