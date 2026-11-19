@@ -798,14 +798,14 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
         .min(1)
         .max(1000)
         .describe(
-          "In one to three plain sentences, in the user's language. For a bug: what went wrong and what the user expected, with the exact error text. For an idea: what the user wants OpenBot to do.",
+          "In one to three plain sentences, in English, also when the user writes another language. For a bug: what went wrong and what the user expected, with the exact error text. For an idea: what the user wants OpenBot to do.",
         ),
       details: z
         .string()
         .min(1)
         .max(1000)
         .describe(
-          "For a bug: what the user did before it, as short numbered steps. For an idea: the problem that it solves. Leave it out when you do not know.",
+          "In English. For a bug: what the user did before it, as short numbered steps. For an idea: the problem that it solves. Leave it out when you do not know.",
         )
         .optional(),
       type: z.enum(FEATURE_REQUEST_TYPES).describe("Ideas only. Your choice from the chat.").optional(),
