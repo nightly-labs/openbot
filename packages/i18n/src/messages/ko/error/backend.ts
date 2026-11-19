@@ -18,6 +18,7 @@ export const messages = {
   "error.backend.browserViewLimit": "이 호스트에서 열린 브라우저 보기가 너무 많아요.",
   "error.backend.browserViewEnded": "이 페이지의 실시간 보기가 종료되었어요.",
   "error.backend.browserViewFailed": "이 페이지의 실시간 보기에 실패했어요.",
+  "error.backend.browserViewNoFrame": "서버의 페이지가 표시되지 않았어요. 이 보기를 닫고 다시 열어 주세요.",
   "error.backend.windowTemporarilyUnavailable": "OpenBot 창을 일시적으로 사용할 수 없어요.",
   "error.backend.windowUnavailable": "OpenBot 창을 사용할 수 없어요.",
   "error.backend.sunshineApiHttp": "Sunshine API가 HTTP {status}(으)로 실패했어요.",

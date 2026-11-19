@@ -18,6 +18,8 @@ export const messages = {
   "error.backend.browserViewLimit": "Er zijn te veel browserweergaven open op deze host.",
   "error.backend.browserViewEnded": "De live weergave van deze pagina is beëindigd.",
   "error.backend.browserViewFailed": "De live weergave van deze pagina is mislukt.",
+  "error.backend.browserViewNoFrame":
+    "De pagina op de server werd niet getoond. Sluit deze weergave en open hem opnieuw.",
   "error.backend.windowTemporarilyUnavailable": "Het venster van OpenBot is tijdelijk niet beschikbaar.",
   "error.backend.windowUnavailable": "Het venster van OpenBot is niet beschikbaar.",
   "error.backend.sunshineApiHttp": "Sunshine-API is mislukt met HTTP {status}.",

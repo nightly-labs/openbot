@@ -16,6 +16,7 @@ export const messages = {
   "error.backend.browserViewLimit": "Bu ana makinede çok fazla tarayıcı görünümü açık.",
   "error.backend.browserViewEnded": "Bu sayfanın canlı görünümü sona erdi.",
   "error.backend.browserViewFailed": "Bu sayfanın canlı görünümü başarısız oldu.",
+  "error.backend.browserViewNoFrame": "Sunucudaki sayfa görünmedi. Bu görünümü kapatıp yeniden açın.",
   "error.backend.windowTemporarilyUnavailable": "OpenBot penceresi geçici olarak kullanılamıyor.",
   "error.backend.windowUnavailable": "OpenBot penceresi kullanılamıyor.",
   "error.backend.sunshineApiHttp": "Sunshine API HTTP {status} ile başarısız oldu.",

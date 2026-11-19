@@ -15,6 +15,8 @@ export const messages = {
   "error.backend.browserViewLimit": "このホストで開いているブラウザービューが多すぎます。",
   "error.backend.browserViewEnded": "このページのライブビューは終了しました。",
   "error.backend.browserViewFailed": "このページのライブビューは失敗しました。",
+  "error.backend.browserViewNoFrame":
+    "サーバー上のページが表示されませんでした。このビューを閉じて、もう一度開いてください。",
   "error.backend.windowTemporarilyUnavailable": "OpenBot ウィンドウは一時的に使用できません。",
   "error.backend.windowUnavailable": "OpenBot ウィンドウを使用できません。",
   "error.backend.sunshineApiHttp": "Sunshine API が HTTP {status} で失敗しました。",
