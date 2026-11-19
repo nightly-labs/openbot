@@ -197,6 +197,12 @@ export interface AcpFlavor {
    */
   modelSetUnsaved?(error: RequestError): boolean;
   /**
+   * The session option that holds the model. The agent takes a model only as its value and refuses
+   * `session/set_model`. A model goes to this option also before the session publishes it, and also
+   * when the option does not list the model.
+   */
+  modelConfigId?: string;
+  /**
    * A `session/set_config_option` failure after which the session already has the new value. The
    * agent changes the session first and then fails to save the value as its default.
    */
@@ -1042,7 +1048,11 @@ const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
   // client has a total timeout of the server's `timeout`, 120 s by default, and it ignores progress.
   // A session server cannot set that timeout, so a question card closed with "Transport closed"
   // before the user answered (#11049).
-  "kiro-cli": { ...CUSTOM_ACP_FLAVOR, mcpToolCallLimitMs: 120_000 },
+  // Kiro CLI 3 refuses `session/set_model` with -32603 "[PersistenceClassification]" and takes the
+  // model only as its `model` option. Its `session/new` has no such option, and the option that
+  // follows lists only `auto`, or only the current model after `session/load`. Each turn that set a
+  // model failed with Kiro's internal error (#12478).
+  "kiro-cli": { ...CUSTOM_ACP_FLAVOR, mcpToolCallLimitMs: 120_000, modelConfigId: "model" },
 };
 
 /**
