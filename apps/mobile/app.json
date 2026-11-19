@@ -45,6 +45,7 @@
       "./plugins/with-workspace-bundle-inputs",
       "./plugins/with-update-channel",
       "./plugins/with-app-icons",
+      "./plugins/with-android-view-preallocation-off",
       "expo-router",
       "expo-video",
       [
