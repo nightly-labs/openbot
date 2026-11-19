@@ -1,5 +1,45 @@
 [
   {
+    "version": "0.74.0",
+    "date": "2026-11-19",
+    "notices": [
+      "Aktualisiere auch jeden verbundenen Server auf diese Version. Auf einem Server funktionieren kleine Kopien der Bilder auf dem Workflow-Canvas, benutzerdefinierte Videolängen und Agenten, die eine Anfrage ohne „Weiter“ abschließen, nur, wenn der Server diese Version hat.",
+      "Unter Linux: Wenn OpenBot nach dem Update immer noch langsam ist, lösche die Datei `~/.config/OpenBot/gpu-crash.json` und starte OpenBot neu.",
+      "Wenn du für einen Mistral-Agenten unter Anbietereinstellungen Denken festgelegt hast, wähle die Stufe im Menü Aufwand erneut aus und setze die alte Zeile Denken zurück."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Teile deinen Einladungslink unter Einstellungen > Invite friends. Der Tab zeigt dein Guthaben und die Freunde, die beigetreten sind. Ein Freund erhält 10 % Rabatt auf jede Zahlung, und du erhältst 10 % jeder bezahlten Rechnung deines Freundes als Guthaben.",
+          "Lege Knoten eines Workflow-Canvas in eine Gruppe. Wähle sie aus und drücke Gruppieren (⌘G). Klappe eine Gruppe zu einer einzigen Stapelkarte zusammen, und drücke Gruppierung aufheben (⇧⌘G), um sie zu beenden.",
+          "Gib einem Videoschritt auf dem Workflow-Canvas jede Länge, die sein Sunra- oder Higgsfield-Modell unterstützt. Wähle im Menü Länge die Option Eigene und nutze den Schieberegler.",
+          "Öffne den Marketplace über die Zeile Apps in den Einstellungen eines Agenten. Verbinde eine App, oder füge mit Eigene hinzufügen deinen eigenen MCP-Server hinzu.",
+          "Wenn du dich auf einem neuen Computer anmeldest und dein Konto bereits Server hat, zeigt der erste Schritt sie an. Öffne einen Server, um mit seinen Agenten und Chats weiterzumachen."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Agenten schließen deine Anfrage ohne „Weiter“ von dir ab. Wenn ein Teil der Anfrage nicht fertig ist, macht der Agent mit diesem Teil weiter, höchstens 3 Mal. Eine Frage, die deine Wahl oder Freigabe braucht, hält den Agenten weiterhin an.",
+          "Tabs der Seitenleiste behalten ihren Titel und eine einheitliche Breite. Wenn die Tabs nicht passen, scrollt die Zeile, und ein Menü am Ende der Zeile listet die anderen Tabs auf. Ein Klick mit der mittleren Maustaste schließt einen Tab.",
+          "Auf einem verbundenen Server werden die Bilder des Workflow-Canvas viel schneller angezeigt. Der Canvas erhält eine kleine Kopie jedes Bildes, und das volle Bild öffnet sich im Viewer.",
+          "Ein Thread sieht jetzt wie der Chat des Agenten aus. Nachrichten desselben Absenders wirken als ein Block, und die Schritte einer Antwort werden daneben angezeigt."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Ein Claude- oder ChatGPT-Agent bleibt nicht mehr stundenlang bei „In Arbeit“ hängen, wenn der Anbieter nicht mehr antwortet. Nach 15 Minuten ohne Ausgabe (60 Minuten, während ein Werkzeug läuft) beendet OpenBot den Durchlauf, und die wartenden Nachrichten laufen weiter.",
+          "Wenn „Mein Claude-Code-Setup verwenden“ ausgeschaltet ist, laden Claude-Agenten deine globalen Claude-Code-Anweisungen und -Regeln nicht mehr. Jeder Durchlauf ist schneller und kostet weniger. Um sie zu behalten, schalte „Mein Claude-Code-Setup verwenden“ ein.",
+          "Deine Agenten arbeiten weiter, während OpenBot ein Update für einen Anbieter herunterlädt. Ein Download, der eine Minute lang keine Daten erhält, stoppt, und er wird beim nächsten Versuch dort fortgesetzt, wo er aufgehört hat.",
+          "Agenten senden Nachrichten wieder direkt an die anderen Agenten ihres Teams. Vorher musste eine Karte jede Übergabe bestätigen, und die Arbeit stand still, bis du zugestimmt hast.",
+          "Ein Agent mit automatischen Ersatzmodellen wechselt in mehr Fällen zu seinem nächsten Ersatzmodell, zum Beispiel nach einer Ratenbegrenzung oder wenn Gemini die Verbindung zu Google verliert."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.73.0",
     "date": "2026-11-18",
     "notices": [
