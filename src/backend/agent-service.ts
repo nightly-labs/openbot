@@ -308,6 +308,7 @@ import { channelSync, toChannelOperationError } from "./channel-effects";
 import { type ChannelImageFile, ChannelImages } from "./channel-images";
 import { ChannelRoutineScheduler } from "./channel-routine-scheduler";
 import { ChannelService } from "./channel-service";
+import { claudeSandboxMissing } from "./claude-workspace-sandbox";
 import type { BundledProviderExecutables } from "./cli";
 import type { ConversationMarkerExclusions } from "./conversation-read-store";
 import type { CrmHandle } from "./crm/crm";
@@ -4055,21 +4056,20 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           throw new AgentSettingsRefused(sourceText("error.agent.modelProviderMismatch"));
         }
         // Refuse Workspace only now, not at the next turn, when this computer cannot confine the
-        // provider's own process: the agent then could not start until the user gives it more access.
-        // A requested move to such a provider is refused too while the agent keeps Workspace only, also
-        // when it was queued for the next turn.
+        // provider's own process or Claude cannot make its sandbox: the agent then could not start
+        // until the user gives it more access. A requested move to such a provider is refused too while
+        // the agent keeps Workspace only, also when it was queued for the next turn.
         const confinedProvider = requestedProvider ?? (previous ? providerForAgent(previous) : undefined);
         const providerMove =
           (move === null || move === "next-turn") &&
           previous !== undefined &&
           confinedProvider !== providerForAgent(previous);
-        if (
+        const workspaceRefusal =
           (input.access ?? (providerMove ? previous?.access : undefined)) === "workspace" &&
-          confinedProvider !== undefined &&
-          workspaceOnlyUnavailable(confinedProvider)
-        ) {
-          throw new AgentSettingsRefused(sourceText("error.agent.workspaceOnlyMacOnly"));
-        }
+          confinedProvider !== undefined
+            ? workspaceOnlyRefusal(confinedProvider)
+            : null;
+        if (workspaceRefusal !== null) throw new AgentSettingsRefused(workspaceRefusal);
         if (requestedProvider && previous && requestedProvider !== providerForAgent(previous)) {
           if (!input.model || !input.provider) {
             throw new Error("Changing provider requires an atomic provider and model selection.");
@@ -4598,7 +4598,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       (choice) =>
         !sameAgentModelChoice(choice, current) &&
         this.#usageLimitReady(choice) &&
-        !(workspaceAccessEnforced(agent) && workspaceOnlyUnavailable(choice.provider)),
+        !(workspaceAccessEnforced(agent) && workspaceOnlyRefusal(choice.provider) !== null),
     );
   }
 
@@ -7848,9 +7848,19 @@ function logUnlistedEndpoints(
   });
 }
 
-/** Whether Workspace only cannot run on `provider` here: its own process needs a sandbox that this computer lacks. */
-function workspaceOnlyUnavailable(provider: AgentProvider): boolean {
-  return agentProviderDescriptor(provider).workspaceEnforcement === "confined-process" && !canConfineProcesses();
+/**
+ * Why Workspace only cannot run on `provider` here, or null when it can: its own process needs a
+ * sandbox that this computer lacks, or Claude cannot make its sandbox (`claudeSandboxMissing`).
+ */
+function workspaceOnlyRefusal(provider: AgentProvider): string | null {
+  if (agentProviderDescriptor(provider).workspaceEnforcement === "confined-process") {
+    return canConfineProcesses() ? null : sourceText("error.agent.workspaceOnlyMacOnly");
+  }
+  if (provider !== "claude") return null;
+  const missing = claudeSandboxMissing();
+  if (missing === null) return null;
+  logger.warn("Workspace only is not available for Claude: Claude cannot make its sandbox here.", { reason: missing });
+  return sourceText("error.agent.claudeNoSandbox");
 }
 
 function usageLimitOf(choice: AgentModelChoice): UsageLimitKey {
