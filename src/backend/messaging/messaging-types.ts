@@ -268,6 +268,11 @@ export interface MessagingAdapter {
    * more than one written form (a WhatsApp phone number). The id as it is when no listed place matches.
    */
   placeId?(placeId: string): string;
+  /**
+   * The person and the conversation of a direct chat, for a platform where an agent can post to a
+   * person first (WhatsApp). Their reply then reaches the agent that posted. Null for a group.
+   */
+  directChat?(target: MessageTarget): { userId: string; threadKey: string } | null;
   /** The roles a person can have in this workspace, highest first, for a platform with role lists. */
   roles?(): Effect.Effect<Array<{ id: string; name: string }>, MessagingAdapterError>;
   mention(userId: string): string;

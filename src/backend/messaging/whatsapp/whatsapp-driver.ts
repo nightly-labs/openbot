@@ -458,6 +458,13 @@ class WhatsAppAdapter implements MessagingAdapter {
     return saved ? userJid(saved) : placeId;
   }
 
+  /** The person of a direct chat, whose reply to an agent's post goes to that agent. */
+  directChat(target: MessageTarget): { userId: string; threadKey: string } | null {
+    if (isJidGroup(target.platformChannelId)) return null;
+    const userId = userPart(target.platformChannelId);
+    return userId ? { userId, threadKey: WHATSAPP_DIRECT_THREAD } : null;
+  }
+
   /** WhatsApp notifies a person for `@<number>` when the post also lists them; `post` does that. */
   mention(userId: string): string {
     return /^[0-9]+$/u.test(userId) ? `@${userId}` : userId;

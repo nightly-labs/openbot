@@ -1459,11 +1459,24 @@ export class MessagingService {
     // In a thread that an agent's post pinged people in, a reply without a mention counts only from a
     // pinged person: the first one starts the conversation. Other threads need a link, as before.
     // A first reply with a mention, which comes only as `app_mention`, also gets the post that pinged its author.
+    // On WhatsApp, the first reply of a person that an agent's post wrote to directly gets that post. The
+    // owner's own chat is not a reply: it stays with the orchestrator and keeps its setup text.
     const pings =
-      live.record.platform === "slack" && !message.isDirect && (message.requiresLink || !existing)
+      (live.record.platform === "slack" && !message.isDirect && (message.requiresLink || !existing)) ||
+      (live.record.platform === "whatsapp" &&
+        message.isDirect &&
+        !existing &&
+        message.authorId !== live.identity.botUserId)
         ? store.pings(live.record.connectionId, message.platformChannelId, message.threadKey)
         : [];
     const ping = pings.find((candidate) => candidate.userId === message.authorId) ?? null;
+    // With no orchestrator, that WhatsApp reply goes to the agent that posted, which still exists.
+    const poster =
+      live.record.platform === "whatsapp" &&
+      ping &&
+      this.#agents.listAgents().some((agent) => agent.id === ping.agentId)
+        ? ping.agentId
+        : null;
     // Before the dedup key: a reply with a mention also arrives as `app_mention`, which must still run.
     if (message.requiresLink && (pings.length ? !ping : !existing)) return;
     const dedupKey = `${live.record.connectionId}:${message.dedupKey}`;
@@ -1594,8 +1607,8 @@ export class MessagingService {
       if (workflows !== "none") return;
     }
     // A conversation keeps its agent. A new one goes to the workspace's orchestrator, which asks its
-    // teammates; without one, nothing answers.
-    const agentId = existing?.agentId ?? this.#orchestrator(live.record);
+    // teammates; without one, only a reply to an agent's WhatsApp post has an agent: the one that posted.
+    const agentId = existing?.agentId ?? this.#orchestrator(live.record) ?? poster;
     if (!agentId) {
       // On WhatsApp, only the owner can add the orchestrator, and only in their own chat do they write
       // as the number. A contact or a group that the owner allowed gets no setup text from their number.
@@ -1721,7 +1734,8 @@ export class MessagingService {
 
   /** Who the orchestrator reads as the author of a post that pinged a person: the agent that posted it. */
   #pingAuthor(record: MessagingConnectionRecord, agentId: string): string {
-    if (agentId === this.#orchestrator(record)) return "OpenBot, a post of yours";
+    // With no orchestrator, the agent that posted gets the reply itself.
+    if (agentId === (this.#orchestrator(record) ?? agentId)) return "OpenBot, a post of yours";
     const name = this.#agents.listAgents().find((agent) => agent.id === agentId)?.name;
     return name ? `OpenBot, a post by your teammate ${name}` : "OpenBot";
   }
@@ -1893,6 +1907,19 @@ export class MessagingService {
     const botUserId = live.identity.botUserId;
     const pinged =
       live.record.platform === "slack" ? slackPingedUsers(text).filter((userId) => userId !== botUserId) : [];
+    // The person of a WhatsApp direct chat: their reply reaches this agent, or tells the orchestrator who posted.
+    const direct = live.adapter.directChat?.(target) ?? null;
+    const directPing = (posted: string) =>
+      direct
+        ? {
+            ping: {
+              userIds: [direct.userId],
+              text: posted,
+              platformChannelId: target.platformChannelId,
+              threadKey: direct.threadKey,
+            },
+          }
+        : {};
     // Files without text or embeds are the post: an empty text post before them would fail.
     if (!text.trim() && !embeds.length && files.length) {
       const result = yield* Effect.result(live.adapter.upload(target, files));
@@ -1914,6 +1941,7 @@ export class MessagingService {
         posted: true as const,
         ...(uploaded.firstId ? { messageId: uploaded.firstId } : {}),
         ...(uploaded.skipped.length ? { skippedFiles: uploaded.skipped } : {}),
+        ...directPing(`Files: ${sentFiles.join(", ")}`),
       };
     }
     // One file takes the text as its caption: apart, the text can go missing while the file arrives.
@@ -1927,7 +1955,11 @@ export class MessagingService {
         };
       if (captioned.success) {
         live.adapter.rememberPost?.(target, captioned.success, `${text}\nFiles: ${single.name}`);
-        return { posted: true as const, messageId: captioned.success };
+        return {
+          posted: true as const,
+          messageId: captioned.success,
+          ...directPing(`${text}\nFiles: ${single.name}`),
+        };
       }
     }
     const posted = yield* (
@@ -1939,7 +1971,7 @@ export class MessagingService {
         posted: true as const,
         messageId,
         ...(guildId ? { url: `https://discord.com/channels/${guildId}/${target.platformChannelId}/${messageId}` } : {}),
-        ...(pinged.length ? { ping: { userIds: pinged, text } } : {}),
+        ...(pinged.length ? { ping: { userIds: pinged, text } } : directPing(text)),
       })),
       Effect.catch((failure) =>
         Effect.succeed({

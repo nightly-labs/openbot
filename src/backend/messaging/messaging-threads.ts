@@ -118,6 +118,17 @@ export interface MessagingHistory {
 export type MessagingPostFailure = "gone" | "not-running" | "refused" | "unknown";
 
 /**
+ * Who a post reaches by name: the people that a Slack post pinged, or the person of a WhatsApp direct
+ * chat, with the redacted text. A direct chat gives its own place and conversation key.
+ */
+interface MessagingPostPing {
+  userIds: string[];
+  text: string;
+  platformChannelId?: string;
+  threadKey?: string;
+}
+
+/**
  * What the platform side gives the outbound tools. Each answer is the result, or an error text
  * that is safe to show the agent.
  */
@@ -142,11 +153,10 @@ export interface MessagingOutbound {
         messageId: string;
         url?: string;
         skippedFiles?: string[];
-        /** The people that a Slack post pinged, and its redacted text. */
-        ping?: { userIds: string[]; text: string };
+        ping?: MessagingPostPing;
       }
     /** A post of files alone. Slack and Discord do not give the id of an upload. */
-    | { posted: true; messageId?: string; skippedFiles?: string[]; ping?: undefined }
+    | { posted: true; messageId?: string; skippedFiles?: string[]; ping?: MessagingPostPing }
     | { error: string; failure: Exclude<MessagingPostFailure, "gone"> }
   >;
   /** A Discord output of a workflow: a reply, a post or a reaction. */
@@ -578,11 +588,12 @@ export class MessagingThreads {
     if ("error" in answer) return openBotToolFailure(answer.error);
     if (!("posted" in answer) || !answer.ping) return openBotToolResult(answer);
     const { ping, ...result } = answer;
-    if (ping && call.tool === "messaging_post")
+    const threadKey = call.tool === "messaging_post" ? (ping.threadKey ?? call.replyTo ?? result.messageId) : null;
+    if (call.tool === "messaging_post" && threadKey)
       yield* this.recordPings({
         connectionId: record.connectionId,
-        platformChannelId: call.place,
-        threadKey: call.replyTo ?? result.messageId,
+        platformChannelId: ping.platformChannelId ?? call.place,
+        threadKey,
         userIds: ping.userIds,
         agentId,
         text: ping.text,
@@ -592,7 +603,8 @@ export class MessagingThreads {
 
   /**
    * Records the people that a Slack post pinged, so that a reply of theirs reaches the orchestrator
-   * without a mention. A thread that a person opened with a mention hears everyone, so a ping there
+   * without a mention, and the person of a WhatsApp direct post, so that their reply names the agent
+   * that posted. A thread that a person opened with a mention hears everyone, so a ping there
    * changes nothing. The post is sent already, so a failure only logs: a reply then needs a mention.
    */
   readonly recordPings = Effect.fn("MessagingThreads.recordPings")(function* (
@@ -611,7 +623,7 @@ export class MessagingThreads {
     }).pipe(
       Effect.catch((failure) =>
         Effect.sync(() =>
-          logger.warn("A Slack ping was not recorded.", {
+          logger.warn("A ping was not recorded.", {
             error: failure.cause instanceof Error ? failure.cause.name : "unknown",
           }),
         ),

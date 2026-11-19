@@ -72,6 +72,9 @@ const OWNER_LID = "777001";
 const FRIEND = "48600100300";
 const STRANGER = "48600100400";
 const LID_FRIEND = "48600100500";
+/** Contacts that an agent writes to first, as a routine writes to leads. */
+const LEAD = "48600100600";
+const OTHER_LEAD = "48600100700";
 /** A Brazilian mobile number as people type it, and the older form that its WhatsApp account keeps. */
 const BRAZIL_TYPED = "5531988887777";
 const BRAZIL_ACCOUNT = "553188887777";
@@ -531,6 +534,44 @@ async function readHistory(
   return JSON.parse(text);
 }
 
+/** A `messaging_post` of an agent, as its turn or a routine calls it. */
+async function postAs(agents: AgentService, agentId: string, place: string, text: string): Promise<void> {
+  const result = await runCauseEffect(
+    agents.messaging.outboundTool(
+      agentId,
+      { threadId: `thread-${agentId}`, turnId: `turn-${agentId}` },
+      "messaging_post",
+      { connection: connectionId(agents), place, text },
+      () => Effect.succeed([]),
+    ),
+  );
+  assert.ok(result.success, result.contentItems[0]?.text);
+}
+
+/** A first reply of a lead to an agent's post: its conversation, and the prompt that its agent reads. */
+async function leadReply(
+  agents: AgentService,
+  mailbox: MailboxStore,
+  lead: string,
+  agentId: string,
+  post: string,
+): Promise<{ agentId: string; prompt: string }> {
+  const messaging = agents.messaging;
+  const jid = `${lead}@s.whatsapp.net`;
+  await postAs(agents, agentId, `+${lead}`, post);
+  assert.ok(phone.textsTo(jid).includes(post), "The agent's post did not reach the lead.");
+  const reply = message({ chat: jid, text: "Yes, please send it." });
+  phone.current().receive([reply]);
+  await until(() => received(agents, jid, reply.key.id ?? ""), "the lead's reply in a mailbox");
+  const link = messaging.store.linkByKey(connectionId(agents), jid, "dm");
+  assert.ok(link, "No conversation for the lead's reply.");
+  const request = mailbox.unresolvedMessagingDeliveries(link.linkId)[0];
+  assert.ok(request, "No request waits in the lead's chat.");
+  const prepared = await runCauseEffect(messaging.prepare({ delivery: request.delivery, managedAttachments: [] }));
+  assert.equal(phone.textsTo(jid).length, 1, "OpenBot wrote more than the agent's post to the lead.");
+  return { agentId: link.agentId, prompt: prepared?.text ?? "" };
+}
+
 /** A saved message older than 90 days, with a copy of its file, which the next start deletes. */
 const OLD_ID = "IN-OLD";
 let oldCopy = "";
@@ -665,12 +706,60 @@ try {
       return { contactPosts: 0 };
     });
 
+    await step("no orchestrator: a lead's reply to an agent's post reaches that agent (#9978)", async () => {
+      await runCauseEffect(messaging.addWhatsAppSender(OWNER, { id: LEAD, kind: "contact", name: "Lead" }));
+      const sales = await runCauseEffect(
+        agents.createAgentProfile({
+          name: "Sales",
+          description: "Writes to leads.",
+          avatarSeed: "sales",
+          avatarHue: null,
+        }),
+      );
+      const post = "Hello, do you still need the offer?";
+      const reply = await leadReply(agents, mailbox, LEAD, sales.id, post);
+      assert.equal(reply.agentId, sales.id, "The reply did not reach the agent that posted.");
+      assert.ok(reply.prompt.includes(`OpenBot, a post of yours: ${post}`), "The agent does not see its own post.");
+      await runCauseEffect(messaging.removeWhatsAppSender(OWNER, LEAD));
+      // The owner's own chat is not a reply to a post there: it keeps the setup text, and no agent takes it.
+      await postAs(agents, sales.id, OWNER_JID, "Your morning report.");
+      const notices = () => phone.textsTo(OWNER_JID).filter((text) => text.includes("No agent can answer")).length;
+      const before = notices();
+      phone.current().receive([message({ chat: OWNER_JID, fromMe: true, text: "Thanks, and the leads?" })]);
+      await until(() => notices() > before, "the setup text in the owner's own chat");
+      assert.equal(
+        agents.messaging.store.linkByKey(connectionId(agents), OWNER_JID, "dm"),
+        null,
+        "An agent's post took the owner's own chat.",
+      );
+      return { agent: "Sales", ownChat: "setup text" };
+    });
+
     await step("orchestrator: one WhatsApp Orchestrator answers new conversations", async () => {
       const added = await runCauseEffect(messaging.addWhatsAppOrchestrator({}));
       const agent = agents.listAgents().find((candidate) => candidate.id === added.agentId);
       assert.equal(agent?.name, "WhatsApp Orchestrator");
       assert.equal(connection(messaging)?.orchestratorAgentId, added.agentId);
       return { agentId: added.agentId };
+    });
+
+    await step("orchestrator: a lead's reply to a teammate's post names the teammate (#9978)", async () => {
+      await runCauseEffect(messaging.addWhatsAppSender(OWNER, { id: OTHER_LEAD, kind: "contact", name: "Lead" }));
+      const sales = agents.listAgents().find((agent) => agent.name === "Sales");
+      assert.ok(sales, "No Sales agent.");
+      const post = "Hello, the offer is ready.";
+      const reply = await leadReply(agents, mailbox, OTHER_LEAD, sales.id, post);
+      assert.equal(
+        reply.agentId,
+        connection(messaging)?.orchestratorAgentId,
+        "The orchestrator lost the conversation.",
+      );
+      assert.ok(
+        reply.prompt.includes(`OpenBot, a post by your teammate Sales: ${post}`),
+        "The orchestrator does not know which teammate wrote to the lead.",
+      );
+      await runCauseEffect(messaging.removeWhatsAppSender(OWNER, OTHER_LEAD));
+      return { agent: "WhatsApp Orchestrator", teammate: "Sales" };
     });
 
     await step("own chat: the owner's message reaches the orchestrator and gets 👀", async () => {
@@ -1838,6 +1927,7 @@ try {
         [`${STRANGER}@s.whatsapp.net`]: STRANGER,
         [`${LID_FRIEND}@s.whatsapp.net`]: LID_FRIEND,
         [`${BRAZIL_ACCOUNT}@s.whatsapp.net`]: BRAZIL_ACCOUNT,
+        [`${OTHER_LEAD}@s.whatsapp.net`]: OTHER_LEAD,
         [GROUP]: FRIEND,
       };
       for (const link of agents.messaging.store.links(orchestrator ?? ""))
