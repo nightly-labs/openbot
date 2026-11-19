@@ -6,13 +6,12 @@ import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { createOpenBotLogger } from "@openbot/logging";
 import { z } from "zod";
+import { hostingCopy, MACHINE_HOSTING, prepareScript } from "./pool-machine";
 
 const logger = createOpenBotLogger("pool-archive-e2e");
-const HOSTING = resolve(import.meta.dirname);
 const LEASEWEB_API = "https://api.leaseweb.com/publicCloud/v1/vps";
 const LEASEWEB_ACCOUNTS = ["NL", "DE", "US", "AU", "SG"];
 const IMAGE = "UBUNTU_26_04_64BIT";
-const MACHINE_HOSTING = "/root/openbot-hosting";
 const MACHINE_ARCHIVE = "/var/tmp/openbot-e2e-archive.tar";
 const IMPORT_TRACE = "/var/tmp/openbot-e2e-import.trace";
 const AUTH_API = "https://openbot-auth-api-test.internal9671.workers.dev";
@@ -297,23 +296,6 @@ async function newestRelease() {
   return { version, url: asset.browser_download_url, sha256 };
 }
 
-function hostingCopy() {
-  const archive = execFileSync(
-    "tar",
-    ["-czf", "-", "--no-xattrs", "--exclude=*.ts", "-C", resolve(HOSTING, ".."), "hosting"],
-    {
-      maxBuffer: 16 * 1024 * 1024,
-    },
-  );
-  return `set -euo pipefail
-rm -rf ${MACHINE_HOSTING}
-install -d -m 0700 ${MACHINE_HOSTING}
-base64 -d <<'OPENBOT_HOSTING' | tar -xz --no-same-owner --strip-components=1 -C ${MACHINE_HOSTING}
-${archive.toString("base64")}
-OPENBOT_HOSTING
-`;
-}
-
 async function restart(machine: Vps) {
   const bootId = "cat /proc/sys/kernel/random/boot_id";
   const before = remote(machine, bootId).trim();
@@ -330,11 +312,7 @@ async function restart(machine: Vps) {
 async function preparePool(machine: Vps, release: { url: string; sha256: string }, keys: string) {
   await reinstall(machine);
   const password = await rootPassword(machine);
-  const script = `${hostingCopy()}
-bash ${MACHINE_HOSTING}/move-from-boat.sh prepare lsw-${machine.id} 1000 1000 '${release.url}' ${release.sha256} '${AUTH_API}'
-bash ${MACHINE_HOSTING}/leaseweb-bootstrap.sh '${keys}'
-`;
-  remote(machine, "bash -s", { input: script, password });
+  remote(machine, "bash -s", { input: prepareScript(machine.id, release, AUTH_API, keys), password });
   await restart(machine);
   remote(machine, "bash -s", { input: hostingCopy() });
 }
