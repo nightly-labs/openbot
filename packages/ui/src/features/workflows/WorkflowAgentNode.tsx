@@ -162,9 +162,7 @@ export function AgentNode(props: { id: string; agentId?: string; task?: string }
             agent={agent()}
             removed={agentId() !== "" && !agent()}
             disabled={locked()}
-            onChange={(choice) =>
-              board.setFields(props.id, { agentId: choice.id, model: choice.model, provider: choice.provider })
-            }
+            onChange={(choice) => board.setFields(props.id, { agentId: choice.id, provider: choice.provider })}
           />
           <Show when={agent()}>{(found) => <AgentModel agent={found()} />}</Show>
         </div>
