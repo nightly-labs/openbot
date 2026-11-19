@@ -411,7 +411,7 @@ export const messages = {
   "error.backend.popupLoadFailed": "Açılır pencere yüklenemedi. Orijinal sayfadan oturum açmayı tekrar deneyin.",
   "error.backend.browserTabNotFound": "Tarayıcı sekmesi bulunamadı.",
   "error.backend.authActive": "Kimlik doğrulaması zaten etkin.",
-  "error.backend.authHttpsRequired": "Güvenli kimlik doğrulaması HTTPS gerektirir.",
+  "error.backend.authWebPageRequired": "Güvenli kimlik doğrulaması HTTP/HTTPS gerektirir.",
   "error.backend.authDigitsRange": "Kimlik doğrulama kodları 4–12 basamak gerektirir.",
   "error.backend.authExpired": "Kimlik doğrulama isteğinin süresi doldu.",
   "error.backend.authDigitsRequired": "İstenen basamak sayısını girin.",

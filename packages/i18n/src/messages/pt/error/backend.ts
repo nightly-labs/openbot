@@ -438,7 +438,7 @@ export const messages = {
   "error.backend.popupLoadFailed": "Não foi possível carregar o pop-up. Tente entrar novamente pela página original.",
   "error.backend.browserTabNotFound": "Aba do navegador não encontrada.",
   "error.backend.authActive": "A autenticação já está ativa.",
-  "error.backend.authHttpsRequired": "A autenticação segura exige HTTPS.",
+  "error.backend.authWebPageRequired": "A autenticação segura exige HTTP/HTTPS.",
   "error.backend.authDigitsRange": "Os códigos de autenticação exigem de 4 a 12 dígitos.",
   "error.backend.authExpired": "A solicitação de autenticação expirou.",
   "error.backend.authDigitsRequired": "Digite a quantidade de dígitos solicitada.",

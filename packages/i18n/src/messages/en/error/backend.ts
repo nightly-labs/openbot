@@ -424,7 +424,7 @@ export const messages = defineMessages("error.backend", {
   "error.backend.popupLoadFailed": "The popup could not load. Retry sign-in from the original page.",
   "error.backend.browserTabNotFound": "Browser tab not found.",
   "error.backend.authActive": "Authentication is already active.",
-  "error.backend.authHttpsRequired": "Secure authentication requires HTTPS.",
+  "error.backend.authWebPageRequired": "Secure authentication requires HTTP or HTTPS.",
   "error.backend.authDigitsRange": "Authentication codes require 4–12 digits.",
   "error.backend.authExpired": "Authentication request expired.",
   "error.backend.authDigitsRequired": "Enter the requested number of digits.",

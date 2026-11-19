@@ -754,7 +754,7 @@ export const messages = {
   "mobile.server.vault.import": "استيراد كلمات المرور من ملف CSV",
   "mobile.server.vault.importing": "جارٍ الاستيراد…",
   "mobile.server.vault.importFooter":
-    "استخدم ملف تصدير لكلمات المرور من متصفح أو مدير كلمات مرور. يضيف {host} بيانات تسجيل الدخول فيه. ويتخطى الصف الذي ليس HTTPS أو بلا كلمة مرور أو المحفوظ مسبقًا. يحذف هذا الهاتف نسخته من الملف بعد قراءته.",
+    "استخدم ملف تصدير لكلمات المرور من متصفح أو مدير كلمات مرور. يضيف {host} بيانات تسجيل الدخول فيه. ويتخطى الصف ذا العنوان غير المدعوم أو بلا كلمة مرور أو المحفوظ مسبقًا. يحذف هذا الهاتف نسخته من الملف بعد قراءته.",
   "mobile.server.vault.importResult": "المضاف: {imported}. المتخطّى: {skipped}.",
   "mobile.server.vault.importTooLarge": "هذا الملف أكبر من أن يُرسل من هاتف. استورده في OpenBot على {host}.",
   "mobile.server.vault.importReadFailed": "تعذّرت قراءة الملف.",
@@ -768,7 +768,8 @@ export const messages = {
   "mobile.server.vault.saveFailed": "تعذّر حفظ العنصر. أعد المحاولة.",
   "mobile.server.vault.gone": "لم يعد هذا العنصر في الخزنة.",
   "mobile.server.vault.website": "موقع الويب",
-  "mobile.server.vault.websiteHint": "عنوان HTTPS. لا يملأ الوكلاء بيانات تسجيل الدخول هذه إلا على هذا الموقع.",
+  "mobile.server.vault.websiteHint":
+    "عنوان موقع ويب، مثل example.com. لا يملأ الوكلاء بيانات تسجيل الدخول هذه إلا على هذا الموقع.",
   "mobile.server.vault.username": "اسم المستخدم",
   "mobile.server.vault.password": "كلمة المرور",
   "mobile.server.vault.notes": "ملاحظات",
