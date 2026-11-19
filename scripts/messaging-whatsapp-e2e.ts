@@ -721,7 +721,18 @@ try {
       assert.equal(reply.agentId, sales.id, "The reply did not reach the agent that posted.");
       assert.ok(reply.prompt.includes(`OpenBot, a post of yours: ${post}`), "The agent does not see its own post.");
       await runCauseEffect(messaging.removeWhatsAppSender(OWNER, LEAD));
-      return { agent: "Sales" };
+      // The owner's own chat is not a reply to a post there: it keeps the setup text, and no agent takes it.
+      await postAs(agents, sales.id, OWNER_JID, "Your morning report.");
+      const notices = () => phone.textsTo(OWNER_JID).filter((text) => text.includes("No agent can answer")).length;
+      const before = notices();
+      phone.current().receive([message({ chat: OWNER_JID, fromMe: true, text: "Thanks, and the leads?" })]);
+      await until(() => notices() > before, "the setup text in the owner's own chat");
+      assert.equal(
+        agents.messaging.store.linkByKey(connectionId(agents), OWNER_JID, "dm"),
+        null,
+        "An agent's post took the owner's own chat.",
+      );
+      return { agent: "Sales", ownChat: "setup text" };
     });
 
     await step("orchestrator: one WhatsApp Orchestrator answers new conversations", async () => {

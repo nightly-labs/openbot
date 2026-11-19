@@ -1459,10 +1459,14 @@ export class MessagingService {
     // In a thread that an agent's post pinged people in, a reply without a mention counts only from a
     // pinged person: the first one starts the conversation. Other threads need a link, as before.
     // A first reply with a mention, which comes only as `app_mention`, also gets the post that pinged its author.
-    // On WhatsApp, the first reply of a person that an agent's post wrote to directly gets that post.
+    // On WhatsApp, the first reply of a person that an agent's post wrote to directly gets that post. The
+    // owner's own chat is not a reply: it stays with the orchestrator and keeps its setup text.
     const pings =
       (live.record.platform === "slack" && !message.isDirect && (message.requiresLink || !existing)) ||
-      (live.record.platform === "whatsapp" && message.isDirect && !existing)
+      (live.record.platform === "whatsapp" &&
+        message.isDirect &&
+        !existing &&
+        message.authorId !== live.identity.botUserId)
         ? store.pings(live.record.connectionId, message.platformChannelId, message.threadKey)
         : [];
     const ping = pings.find((candidate) => candidate.userId === message.authorId) ?? null;
