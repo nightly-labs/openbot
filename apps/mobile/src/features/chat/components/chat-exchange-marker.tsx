@@ -77,15 +77,15 @@ export function ChatExchangeMarker({
     return { key: id ?? legacyName ?? name, agent, name };
   });
   const [only] = participants;
-  if (participants.length === 1 && only) {
+  if (participants.length <= 1) {
     return (
       <AgentLine
-        agent={only.agent}
+        agent={only?.agent}
         linked={routing}
         icon={icon}
         label={label}
-        name={only.name}
-        nameIcon={only.agent ? <AgentThumbnail agent={only.agent} /> : null}
+        name={only?.name}
+        nameIcon={only?.agent ? <AgentThumbnail agent={only.agent} /> : null}
       />
     );
   }
@@ -169,12 +169,12 @@ function AgentLine({
   linked: boolean;
   icon: ReactNode;
   label?: string;
-  name: string;
+  name?: string;
   nameIcon?: ReactNode;
 }) {
   const { t } = useText();
   const colors = useActivityColors();
-  const accessibilityLabel = label ? `${label}, ${name}` : name;
+  const accessibilityLabel = [label, name].filter(Boolean).join(", ");
   if (!linked || !agent)
     return (
       <ChatActivityLine
