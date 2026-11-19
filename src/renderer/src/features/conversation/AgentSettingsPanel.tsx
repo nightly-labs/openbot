@@ -90,6 +90,8 @@ interface AgentSettingsPanelProps
   onOpenApps?: (() => void) | undefined;
   onWidthChange: (width: number) => void;
   skillSelectionRequest?: { skillId: string } | null | undefined;
+  /** The user closed the skills dialog. The owner clears `skillSelectionRequest`. */
+  onSkillsClosed?: (() => void) | undefined;
   /**
    * The instruction file in the agent's workspace: on this computer, or on a joined server through
    * `agent-instructions-v1` for an owner or admin.
@@ -497,8 +499,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     },
   );
 
-  // The request stays set after the dialog closes, and it is read again at each activity of the agent.
-  // The memo opens the dialog again only for a new request.
+  // The request is read again at each activity of the agent, so the memo opens the dialog again only
+  // for a new request. The user's close clears the request, so a panel that mounts again does not open it.
   const skillSelectionRequest = createMemo(() => props.skillSelectionRequest);
   createEffect(skillSelectionRequest, (request) => {
     if (request)
@@ -803,11 +805,12 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                 }
               : undefined
           }
-          onOpenChange={(open) =>
+          onOpenChange={(open) => {
             setDraft((state) => {
               state.skills.open = open;
-            })
-          }
+            });
+            if (!open) props.onSkillsClosed?.();
+          }}
           onCountChange={(count) =>
             setDraft((state) => {
               state.skills.count = count;

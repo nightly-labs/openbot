@@ -134,6 +134,10 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     setSkillSettingsRequest({ agentId, skillId: skill.skillId });
     setActiveRightPanel("settings", agentId);
   }
+  /** The user closed the skills dialog, so the panel does not open it again when it mounts again. */
+  function clearSkillSettingsRequest(agentId: string): void {
+    setSkillSettingsRequest((current) => (current?.agentId === agentId ? null : current));
+  }
   const [instructionsSettingsRequest, setInstructionsSettingsRequest] = createSignal<{ agentId: string } | null>(null);
   /** Opens Settings > Instructions of the chat's agent. A new object opens the page again. */
   function openInstructionsSettings(agentId: string): void {
@@ -778,6 +782,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   return {
     skillSettingsRequest,
     openSkillSettings,
+    clearSkillSettingsRequest,
     instructionsSettingsRequest,
     openInstructionsSettings,
     agentSettingRowRequest,
