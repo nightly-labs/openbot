@@ -537,6 +537,7 @@ export class OnePasswordConnectorService implements PasswordVault {
         { concurrency: "unbounded" },
       );
       if (generation !== this.#generation) return null;
+      if (items.length > 0) this.#readWorked(generation);
       return items
         .filter(({ item }) => savedFor(item.websites, origin))
         .map(({ login, item }) => ({
@@ -562,6 +563,7 @@ export class OnePasswordConnectorService implements PasswordVault {
       if (!login) return null;
       const client = yield* this.#clientForToken();
       const item = yield* onePasswordCall(() => client.items.get(login.vaultId, login.id));
+      this.#readWorked(generation);
       // The index can be minutes old: the item's websites as 1Password holds them now decide.
       if (generation !== this.#generation || !savedFor(item.websites, origin)) return null;
       const value =
@@ -817,6 +819,7 @@ export class OnePasswordConnectorService implements PasswordVault {
       const index = yield* this.#buildIndex(yield* this.#clientForToken());
       if (generation === this.#generation) {
         this.#index = index;
+        this.#readError = null;
         // The page shows the vault names and the login count from this list.
         this.#emitStatus();
       }
@@ -846,24 +849,32 @@ export class OnePasswordConnectorService implements PasswordVault {
   }
 
   /**
-   * Runs a read of the stored connection. While its reads fail, the status shows why, so the page does
-   * not show only a working connection; the next read that works removes the text. A read that started
-   * before Disconnect or a new connection changes nothing.
+   * Runs a read of the stored connection. When it fails, the status shows why, so the page does not
+   * show only a working connection. Only a call to 1Password that works removes the text
+   * (`#readWorked`), not an answer from the cached list. A read that started before Disconnect or a
+   * new connection changes nothing.
    */
   #reported<A>(read: Effect.Effect<A, OnePasswordOperationError>): Effect.Effect<A, OnePasswordOperationError> {
     return Effect.suspend(() => {
       const generation = this.#generation;
-      const report = (text: string | null) =>
-        Effect.sync(() => {
-          if (generation !== this.#generation || this.#readError === text) return;
-          this.#readError = text;
-          this.#emitStatus();
-        });
       return read.pipe(
-        Effect.tapError(({ cause }) => report(readErrorText(cause))),
-        Effect.tap(() => report(null)),
+        Effect.tapError(({ cause }) =>
+          Effect.sync(() => {
+            const text = readErrorText(cause);
+            if (generation !== this.#generation || this.#readError === text) return;
+            this.#readError = text;
+            this.#emitStatus();
+          }),
+        ),
       );
     });
+  }
+
+  /** A call to 1Password worked, so the read error of this connection is gone. */
+  #readWorked(generation: number): void {
+    if (generation !== this.#generation || this.#readError === null) return;
+    this.#readError = null;
+    this.#emitStatus();
   }
 
   readonly #buildIndex = Effect.fn("OnePasswordConnector.buildIndex")(function* (
