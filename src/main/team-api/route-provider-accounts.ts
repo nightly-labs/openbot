@@ -1,5 +1,13 @@
 import { isString } from "@openbot/contracts/runtime-values";
 import {
+  PROVIDER_ACCOUNT_CODE_CAPABILITY,
+  PROVIDER_ACCOUNT_CODE_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-account-code-v1";
+import {
+  PROVIDER_ACCOUNT_KEYS_CAPABILITY,
+  PROVIDER_ACCOUNT_KEYS_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-account-keys-v1";
+import {
   PROVIDER_ACCOUNT_MODELS_CAPABILITY,
   PROVIDER_ACCOUNT_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-account-models-v1";
@@ -12,6 +20,7 @@ import {
   PROVIDER_ACCOUNTS_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { redactText, registerSecretValue } from "@openbot/logging";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { parseProviderId } from "../ipc/app-inputs";
 import type { TeamApiProviderAccounts } from "./dependencies";
@@ -21,13 +30,6 @@ import { readJson, requireAdmin } from "./request-helpers";
 
 const ROUTES: ReadonlySet<string> = new Set(Object.values(PROVIDER_ACCOUNTS_ROUTES));
 
-/**
- * The accounts of this host's providers, managed from a joined server. Frozen by
- * `provider-accounts-v1`. `requireAdmin` runs on every route.
- *
- * An account sign-in opens its page in a private tab of this host's browser, and the administrator
- * signs in through its live view. No route carries the page's link or a credential.
- */
 export async function routeProviderAccounts(
   context: TeamApiRequestContext,
   accounts: TeamApiProviderAccounts | undefined,
@@ -37,7 +39,6 @@ export async function routeProviderAccounts(
   if (!accounts || !capabilities.has(PROVIDER_ACCOUNTS_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.providersUnsupported"));
   requireAdmin(member);
-  // `readJson` has already run the body through the `provider-accounts-v1` codec.
   const body = await readJson(request);
   const accountId = isString(body.accountId) ? body.accountId : null;
   switch (url.pathname) {
@@ -72,10 +73,6 @@ export async function routeProviderAccounts(
   }
 }
 
-/**
- * The models that each account after the first serves and the provider's own sign-in does not.
- * Frozen by `provider-account-models-v1`. `requireAdmin` runs on the route.
- */
 export async function routeProviderAccountModels(
   context: TeamApiRequestContext,
   accounts: TeamApiProviderAccounts | undefined,
@@ -90,10 +87,6 @@ export async function routeProviderAccountModels(
 
 const POOL_ROUTES: ReadonlySet<string> = new Set(Object.values(PROVIDER_ACCOUNT_POOL_ROUTES));
 
-/**
- * The account pool of each of this host's providers. Frozen by `provider-account-pool-v1`.
- * `requireAdmin` runs on every route.
- */
 export async function routeProviderAccountPool(
   context: TeamApiRequestContext,
   accounts: TeamApiProviderAccounts | undefined,
@@ -104,11 +97,73 @@ export async function routeProviderAccountPool(
     throw new HttpError(400, sourceText("error.team.providersUnsupported"));
   requireAdmin(member);
   if (url.pathname === PROVIDER_ACCOUNT_POOL_ROUTES.list) return json(200, accounts.pools());
-  // `readJson` has already run the body through the `provider-account-pool-v1` codec.
   const body = await readJson(request);
   const leftOut = Array.isArray(body.leftOut) ? body.leftOut.filter(isString) : [];
   await runCauseEffect(accounts.setPool(parseProviderId(body.provider), body.enabled === true, leftOut));
   return json(200, {});
+}
+
+export async function routeProviderAccountKeys(
+  context: TeamApiRequestContext,
+  accounts: TeamApiProviderAccounts | undefined,
+): Promise<RouteOutcome> {
+  const { method, url, capabilities, member, request, json } = context;
+  if (method !== "POST" || url.pathname !== PROVIDER_ACCOUNT_KEYS_ROUTES.connect) return "unmatched";
+  if (!accounts || !capabilities.has(PROVIDER_ACCOUNT_KEYS_CAPABILITY))
+    throw new HttpError(400, sourceText("error.team.providersUnsupported"));
+  requireAdmin(member);
+  const body = await readJson(request);
+  const key = isString(body.key) ? body.key.trim() : "";
+  if (!key) throw new HttpError(400, "key is invalid.");
+  registerSecretValue(key);
+  try {
+    await runCauseEffect(
+      accounts.connectKey(parseProviderId(body.provider), isString(body.accountId) ? body.accountId : null, key),
+    );
+  } catch (error) {
+    if (error instanceof Error) throw new HttpError(409, redactText(error.message));
+    throw error;
+  }
+  return json(200, {});
+}
+
+const CODE_ROUTES: ReadonlySet<string> = new Set(Object.values(PROVIDER_ACCOUNT_CODE_ROUTES));
+
+export async function routeProviderAccountCode(
+  context: TeamApiRequestContext,
+  accounts: TeamApiProviderAccounts | undefined,
+): Promise<RouteOutcome> {
+  const { method, url, capabilities, member, request, json } = context;
+  if (method !== "POST" || !CODE_ROUTES.has(url.pathname)) return "unmatched";
+  if (!accounts || !capabilities.has(PROVIDER_ACCOUNT_CODE_CAPABILITY))
+    throw new HttpError(400, sourceText("error.team.providersUnsupported"));
+  requireAdmin(member);
+  const body = await readJson(request);
+  const provider = parseProviderId(body.provider);
+  const accountId = isString(body.accountId) ? body.accountId : null;
+  if (url.pathname === PROVIDER_ACCOUNT_CODE_ROUTES.status)
+    return json(200, accounts.codeSignInStatus(provider, requiredAccount(accountId)));
+  if (url.pathname === PROVIDER_ACCOUNT_CODE_ROUTES.submit) {
+    const code = isString(body.code) ? body.code : "";
+    if (code) registerSecretValue(code);
+    try {
+      accounts.submitCodeSignIn(provider, requiredAccount(accountId), code);
+    } catch (error) {
+      if (error instanceof Error) throw new HttpError(409, redactText(error.message));
+      throw error;
+    }
+    return json(200, {});
+  }
+  if (url.pathname === PROVIDER_ACCOUNT_CODE_ROUTES.cancel) {
+    await runCauseEffect(accounts.cancelCodeSignIn(provider, requiredAccount(accountId)));
+    return json(200, {});
+  }
+  try {
+    return json(200, await runCauseEffect(accounts.startCodeSignIn(provider, accountId)));
+  } catch (error) {
+    if (error instanceof Error) throw new HttpError(409, redactText(error.message));
+    throw error;
+  }
 }
 
 function requiredAccount(accountId: string | null): string {

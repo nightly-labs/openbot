@@ -1,28 +1,3 @@
-// Frozen optional browser-proxies-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: an owner or admin of a
-// server can list, add, change and delete the saved proxies of that host's named browser profiles,
-// and choose the proxy of each named profile, or none (the proxy settings of the host). An address
-// is `scheme://[user[:password]@]host[:port]` with the scheme socks5, http or https. The password goes
-// to the host only in a save request; the host keeps it encrypted and never sends it back, and a list
-// says only that one is saved. A change of a proxy also sends `previousAddress`, the address without
-// the password that the admin changed; when the proxy has a different address now, the host refuses
-// the change. A change with `keepPassword` true has no password in its address and keeps the saved
-// password. A delete sends the profiles that the admin saw use the proxy; when different profiles use
-// it now, the host refuses the delete. A change of a profile's proxy, or of a proxy that profiles use,
-// closes the tabs of those profiles. A delete moves its profiles to the host's proxy settings.
-// `failure` says why the last page load through the proxy failed: `unreachable` (the proxy did not
-// answer or could not reach the site) or `signIn` (the proxy refused the saved sign-in); null when it
-// did not fail. A change of it sends
-// `browser-profiles-changed` (`browser-profiles-events-v1`), as each change through these routes
-// does. A list also has the computers of members (`computers`): each one sends the pages of its
-// profiles through the OpenBot desktop app of that member (`browser-egress-v1`). `online` is true
-// while that app shares its connection, and `mine` is true for the computer of the member who asks.
-// Only `computer` adds one, and only the computer of the member who sends it: no member can add
-// the computer of another. The delete and profile routes take a computer id as they take a proxy
-// id. A member cannot use these routes;
-// `requireAdmin` on the host is the only gate. Bounds and meaning do not follow IPC changes; widening
-// any of it needs a second capability string.
 import {
   type AdminDecoder,
   adminRoute,

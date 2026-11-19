@@ -60,20 +60,17 @@ export function isAgentApproval(value: unknown): value is AgentApproval {
   );
 }
 
+export interface ReadPendingApprovalInput {
+  agentId: string;
+  requestId: string | number;
+}
+
 export interface RespondToApprovalInput {
   requestId: string | number;
   decision: "accept" | "decline";
 }
 
-/**
- * Which agents answer approvals without asking: the "Full access" permission level.
- *
- * This belongs to the computer that runs the agent, not to the approval, and is never carried over
- * the Team API: the released adapters freeze an approval response to `accept` or `decline`. A
- * remote host answers the approvals of its own Full access agents, so they never reach a client.
- */
 export interface ApprovalAutomationPreference {
-  /** Default for agents without an explicit choice. */
   defaultAutoApprove: boolean;
   autoApproveOverrides: Record<string, boolean>;
 }
@@ -97,9 +94,17 @@ export function agentAutoApprovalEnabled(preference: ApprovalAutomationPreferenc
   return preference.autoApproveOverrides[agentId] === true;
 }
 
-/** `sign-in-blocked`: the site refused the sign-in from the host's address. */
 export const BROWSER_TAKEOVER_REASONS = ["sign-in-blocked"] as const;
 export type BrowserTakeoverReason = (typeof BROWSER_TAKEOVER_REASONS)[number];
+
+export const BROWSER_VAULT_SKIP_REASONS = [
+  "agent-script",
+  "field-kind",
+  "login-choice",
+  "no-secret",
+  "vault-unreadable",
+] as const;
+export type BrowserVaultSkipReason = (typeof BROWSER_VAULT_SKIP_REASONS)[number];
 
 export interface BrowserTakeoverRequest {
   requestId: string | number;
@@ -109,6 +114,7 @@ export interface BrowserTakeoverRequest {
   tabId: string;
   secret?: BrowserSecretRequest;
   reason?: BrowserTakeoverReason;
+  vaultSkip?: BrowserVaultSkipReason;
 }
 
 export function isBrowserTakeoverRequest(value: unknown): value is BrowserTakeoverRequest {
@@ -120,7 +126,8 @@ export function isBrowserTakeoverRequest(value: unknown): value is BrowserTakeov
     isIdentifier(value.turnId) &&
     isIdentifier(value.tabId) &&
     (value.secret === undefined || isBrowserSecretRequest(value.secret)) &&
-    (value.reason === undefined || isOneOf(BROWSER_TAKEOVER_REASONS, value.reason))
+    (value.reason === undefined || isOneOf(BROWSER_TAKEOVER_REASONS, value.reason)) &&
+    (value.vaultSkip === undefined || isOneOf(BROWSER_VAULT_SKIP_REASONS, value.vaultSkip))
   );
 }
 

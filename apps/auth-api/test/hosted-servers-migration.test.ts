@@ -49,7 +49,6 @@ describe("hosted servers migration", () => {
     );
     expect(() => database.exec("UPDATE hosted_servers SET last_wake_reason = 'timer'")).toThrow();
     expect(() => database.exec("UPDATE hosted_servers SET desired_state = 'asleep'")).toThrow();
-    // A paid sandbox never loses its row: the owner cannot be removed while the row exists.
     expect(() => database.exec("DELETE FROM users WHERE id = 'user-1'")).toThrow();
     expect(database.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
     expect(database.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });

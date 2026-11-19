@@ -1,9 +1,3 @@
-// Where the local provider scan looks, and the rows the user hid. Main reads it at each scan, so it
-// is held in memory after `load`.
-//
-// The file holds addresses and folder paths, never a key. A file that this build cannot read is not
-// replaced: a newer build may have written it, so writes are refused until it is readable again.
-
 import {
   DEFAULT_PROVIDER_DETECTION_SETTINGS,
   isProviderDetectionSettings,
@@ -36,7 +30,6 @@ export class ProviderDetectionSettingsStore {
     this.#path = path;
   }
 
-  /** A missing file is a first run. Bad JSON or another version keeps the defaults, read only. */
   load(): Effect.Effect<void, PreferenceFileFailure> {
     return Effect.gen({ self: this }, function* () {
       const loaded = yield* Effect.result(
@@ -61,7 +54,6 @@ export class ProviderDetectionSettingsStore {
     return copy(this.#settings);
   }
 
-  /** Writes are chained, so a queued write never lands before the one that came before it. */
   readonly set = Effect.fn("ProviderDetectionSettings.set")(function* (
     this: ProviderDetectionSettingsStore,
     settings: ProviderDetectionSettings,

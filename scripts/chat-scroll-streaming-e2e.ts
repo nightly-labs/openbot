@@ -1,17 +1,3 @@
-// Checks that the reader can scroll away from a reply that is still arriving, and from new messages
-// that arrive in a burst, in a running Storybook that renders the real agent chat and channel chat
-// against the preview mock. Read-only. Pass the URL that `bun run storybook` reports:
-// `bun scripts/chat-scroll-streaming-e2e.ts --storybook=http://localhost:6006 [--stories=burst,channel]`.
-// The chat must follow new content while the reader is at the bottom, also after a sideways swipe, stay
-// at the bottom across growth while a turn runs, hold still after a short scroll up and after a long
-// one, follow again when the reader goes back to the bottom, hold still after a scroll up with the
-// arrow key, and hold still after a smooth jump up from the bottom with the scroll rail. In a burst, the jump button must count the new messages and return to the latest one, a
-// message the reader sends while scrolled up must return the chat to the bottom, and a focus move to a
-// control above the view, as Tab or a screen reader makes, must hold the chat still. A focus that
-// returns to a control above the view without a scroll, as a closed dialog or menu gives it, must not
-// stop the follow.
-// It checks histories of 40 rows, which the chats draw whole, and of 120, which they virtualize.
-// Writes .openbot-build/chat-scroll-streaming-e2e/report.json and one screenshot per story.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -24,9 +10,7 @@ const REPLY = '[data-chat-search-message="reading-history-reply"]';
 
 interface StoryCase {
   id: string;
-  /** An element that must hold still; by default the top row on the screen. */
   anchor?: string;
-  /** The composer of a burst story, for the checks of the jump button and of a send. */
   composer?: string;
 }
 
@@ -43,13 +27,11 @@ const STORIES: StoryCase[] = [
 
     composer: AGENT_COMPOSER,
   },
-  // A channel draws its rows in the same view, with an author header for each run.
   { id: "conversation-channel--streaming-while-reading-history", anchor: REPLY },
   { id: "conversation-channel--streaming-while-reading-long-history", anchor: REPLY },
   { id: "conversation-channel--reply-burst-while-reading-history", composer: AGENT_COMPOSER },
   { id: "conversation-channel--reply-burst-while-reading-long-history", composer: AGENT_COMPOSER },
 ];
-/* Enough growth for several reveal steps of a reply, several resizes of the thinking line, or several new rows. */
 const GROWTH = 400;
 const TOLERANCE = 2;
 const storybook = option("storybook");
@@ -105,7 +87,6 @@ interface Report {
 
 const report: Report = { stories: {}, passed: false };
 
-/* The anchor is the given element, or the row with this index. */
 function position(page: Page, story: StoryCase, anchorIndex?: string): Promise<Position> {
   return page.evaluate(
     ({ scrollSelector, anchor, index }) => {
@@ -127,7 +108,6 @@ function position(page: Page, story: StoryCase, anchorIndex?: string): Promise<P
   );
 }
 
-/* The index of the first row whose bottom is on the screen. */
 function topRowIndex(page: Page): Promise<string | undefined> {
   return page.evaluate((scrollSelector) => {
     const scroll = document.querySelector<HTMLElement>(scrollSelector);
@@ -138,7 +118,6 @@ function topRowIndex(page: Page): Promise<string | undefined> {
   }, SCROLL);
 }
 
-/* The chat grows by itself; this waits for it to grow, then for the next two frames to paint. */
 async function waitForGrowth(page: Page, story: StoryCase): Promise<void> {
   const from = (await position(page, story)).scrollHeight;
   await page.waitForFunction(
@@ -151,10 +130,6 @@ async function waitForGrowth(page: Page, story: StoryCase): Promise<void> {
   );
 }
 
-/*
- * An input, then the scroll event that moves the chat in its direction. A scroll event that the chat's
- * own follow queued before the input can arrive first.
- */
 async function scrollWith(page: Page, up: boolean, input: () => Promise<void>): Promise<void> {
   const scrolled = page.evaluate(
     ({ scrollSelector, towardTop }) => {
@@ -211,10 +186,6 @@ async function assertFollows(page: Page, story: StoryCase, name: string): Promis
   return result;
 }
 
-/*
- * While a turn runs, growth must not bounce the chat off the bottom. The sampling stops after about 30
- * seconds of frames, as `waitForGrowth` does, so a chat that stops growing fails and writes the report.
- */
 async function assertStaysAtBottom(page: Page, story: StoryCase): Promise<BottomHold> {
   const { samples, grew } = await page.evaluate(
     ({ scrollSelector, growth }) => {
@@ -259,11 +230,6 @@ async function assertStaysAtBottom(page: Page, story: StoryCase): Promise<Bottom
   return { samples: samples.length, maxRemaining, minScrollTopDelta };
 }
 
-/*
- * Focus on the last control above the view that does not have the focus, then two painted frames. Tab
- * or a screen reader scrolls to the control; a closed dialog or menu gives the focus back with
- * `preventScroll`.
- */
 async function focusAbove(page: Page, preventScroll = false): Promise<void> {
   await page.evaluate(
     ({ scrollSelector, preventScroll }) => {
@@ -281,7 +247,6 @@ async function focusAbove(page: Page, preventScroll = false): Promise<void> {
   );
 }
 
-/* A jump with the scroll rail to the fifth section from the end, then the frames until the smooth scroll stops. */
 async function railJump(page: Page): Promise<void> {
   await page.evaluate((scrollSelector) => {
     const scroll = document.querySelector<HTMLElement>(scrollSelector);
@@ -319,30 +284,22 @@ async function checkStory(page: Page, story: StoryCase, result: StoryResult): Pr
   assert.ok(box, `${story.id}: the conversation has no box.`);
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
 
-  // At the bottom, the chat follows new content.
   result.follows = await assertFollows(page, story, "new content at the bottom");
 
-  // A sideways swipe with a small vertical delta, as a trackpad sends, does not stop the follow.
   await page.mouse.wheel(-60, -1);
   result.followsAfterSidewaysSwipe = await assertFollows(page, story, "new content after a sideways swipe");
 
-  // While the turn still runs, further growth must keep the chat at the bottom.
   result.staysAtBottom = await assertStaysAtBottom(page, story);
 
-  // A short scroll up, less than the distance that counted as the bottom, holds the chat still.
-  // A longer scroll up holds it still too. Both are measured before either is checked.
   result.shortScrollUp = await holds(page, story, () => wheel(page, -40));
   result.longScrollUp = await holds(page, story, () => longScrollUp(page));
   await page.screenshot({ path: resolve(OUT, `${story.id.replace("conversation-", "")}.png`) });
   assertHolds(story.id, "a short scroll up", result.shortScrollUp);
   assertHolds(story.id, "a long scroll up", result.longScrollUp);
 
-  // Back at the bottom, the chat follows again.
   await wheel(page, 100_000);
   result.followsAgain = await assertFollows(page, story, "new content again at the bottom");
 
-  // A click on a row leaves the focus on the page; the arrow key then scrolls the chat up. The content
-  // keeps growing, so the click goes to a point and does not wait for a row to stop moving.
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   result.arrowKeyScrollUp = await holds(page, story, () =>
     scrollWith(page, true, () => page.keyboard.press("ArrowUp")),
@@ -350,7 +307,6 @@ async function checkStory(page: Page, story: StoryCase, result: StoryResult): Pr
   assertHolds(story.id, "a scroll up with the arrow key", result.arrowKeyScrollUp);
 
   if (!story.composer) return;
-  // The jump button counts the messages that arrive while the reader is away, and returns to the latest.
   const firstCount = await newMessageCount(page);
   await waitForGrowth(page, story);
   result.newMessageCounts = [firstCount, await newMessageCount(page)];
@@ -362,27 +318,19 @@ async function checkStory(page: Page, story: StoryCase, result: StoryResult): Pr
   await page.locator(".scroll-to-latest-button").click();
   result.followsAfterJump = await assertFollows(page, story, "new content after the jump to the latest message");
 
-  // A message the reader sends while scrolled up returns the chat to the bottom.
   await longScrollUp(page);
   await page.locator(story.composer).click();
   await page.keyboard.type("Thanks, keep going.");
   await page.keyboard.press("Enter");
   result.followsAfterSend = await assertFollows(page, story, "new content after a send");
 
-  // A focus that returns to a control above the view without a scroll does not stop the follow.
   await focusAbove(page, true);
   result.followsAfterFocusReturn = await assertFollows(page, story, "new content after a focus return");
 
-  // A focus move to a control above the view scrolls the chat with no reader input; the chat holds still.
   result.focusAbove = await holds(page, story, () => focusAbove(page));
   assertHolds(story.id, "a focus move up", result.focusAbove);
 }
 
-/*
- * A smooth jump up from the bottom with the scroll rail holds the chat at the section. Its first scroll
- * events are still near the bottom. The other checks turn smooth scrolling off, which makes this jump
- * instant, so it runs in a second browser.
- */
 async function checkRailJump(page: Page, story: StoryCase, result: StoryResult): Promise<void> {
   await openStory(page, story);
   result.followsBeforeRailJump = await assertFollows(page, story, "new content before a rail jump");
@@ -401,7 +349,6 @@ try {
   )) {
     const result: StoryResult = {};
     report.stories[story.id] = result;
-    // Each story is checked, so one run shows every chat that fails.
     try {
       await checkStory(page, story, result);
       await checkRailJump(smoothPage, story, result);

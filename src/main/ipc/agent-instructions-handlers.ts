@@ -1,6 +1,3 @@
-// The instruction file at the root of an agent's workspace. On a joined server the host reads and
-// saves it through `agent-instructions-v1`, and the host answers only an owner or admin.
-
 import { parseSaveAgentInstructionsInput } from "@openbot/contracts/ipc";
 import {
   AGENT_INSTRUCTIONS_CAPABILITY,

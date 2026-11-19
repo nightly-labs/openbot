@@ -1,20 +1,3 @@
-// Smoke test of a real OpenBot Codex agent thread with the prompt settings that `thread-lifecycle.ts`
-// sends. Runs the real `codex app-server` with a copy of the user's Codex login (see
-// `codex-agent-harness.ts`), on GPT-6 Luna, in a temporary git workspace. One thread runs these turns:
-//   1. the core tools: update_plan, a shell command and apply_patch,
-//   2. a subagent: Codex reports the spawn as `subAgentActivity` items,
-//   3. a skill that Codex lists (`skill-creator`),
-//   4. a deferred OpenBot tool: tool_search finds it and tool_call runs it. The smoke answers both,
-//      as the OpenBot tool router does,
-//   5. a direct browser tool: `openbot_browser.list_tabs` with no tool_search or tool_call. The smoke
-//      answers it with a fixed tab,
-//   6. a web search with Codex's own inline search (a `webSearch` item),
-//   7. a git commit.
-// The checks also confirm, from the thread's rollout file, that the first request declares `web__run`,
-// the direct browser tools `open`, `list_tabs` and `run_script`, and no `request_plugin_install`, that the OpenBot catalog does not name `openbot.web_search`, and
-// that the prompt lists none of the unfit skills.
-// Costs a few GPT-6 Luna turns. `bun run smoke:codex-agent`; `--model=<id>`
-// replaces GPT-6 Luna. Writes .openbot-build/codex-agent-smoke/report.json.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -107,13 +90,11 @@ interface TurnLog {
   error?: string;
 }
 
-/** True when `label` has the type of `expected` and holds the text after its first colon. */
 function matches(label: string, expected: string): boolean {
   const [type = "", ...rest] = expected.split(":");
   return label.split(":")[0] === type && label.includes(rest.join(":"));
 }
 
-/** A short label of an item: its type, and the tool or the command. A `tool_call` adds the tool that it calls. */
 function itemLabel(item: DynamicRecord): string {
   const type = getString(item, "type") ?? "?";
   if (type === "commandExecution") return `${type}:${(getString(item, "command") ?? "").slice(0, 200)}`;
@@ -122,13 +103,8 @@ function itemLabel(item: DynamicRecord): string {
   return tool ? `${type}:${tool}${called ? `:${called}` : ""}` : type;
 }
 
-/** The tools of the browser namespace that the model called directly. */
 const browserCalls: string[] = [];
 
-/**
- * Answers `tool_search` and `tool_call` as the OpenBot tool router does, with the fixed echo tool added,
- * and a direct `openbot_browser.list_tabs` with one fixed tab.
- */
 async function answerTool(params: DynamicRecord): Promise<{ text: string; success: boolean }> {
   if (getString(params, "namespace") === BROWSER_NAMESPACE) {
     const tool = getString(params, "tool") ?? "";
@@ -145,7 +121,6 @@ async function answerTool(params: DynamicRecord): Promise<{ text: string; succes
       success: true,
     };
   if (call.tool === "tool_call" && named) return { text: ECHO_TEXT, success: true };
-  // The catalog of a Codex agent has no `openbot.web_search`, so no call reaches the search.
   return answerCatalogTool(call, () => Promise.reject(new Error("A Codex agent has no openbot.web_search.")));
 }
 

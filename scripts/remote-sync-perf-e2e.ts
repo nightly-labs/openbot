@@ -1,36 +1,3 @@
-// Measures how fast a remote client gets the user into the workspace, and which requests it sends to
-// the host before and after that point. It is the baseline for lazy sync.
-//
-// Start this worktree's stack with `OPENBOT_DEV_SYNC_PROFILE=1 bun run dev:test-client` (never
-// `--shared`). Add `OPENBOT_DEV_ICE_TRANSPORT_POLICY=relay` to make the host use TURN relay
-// candidates only. Then run
-// `bun run perf:remote [--runs=5] [--label=<name>] [--clients=web,desktop,desktop-start] [--api=<url>]
-//  [--compare=<old report.json>] [--browser-executable=<path>] [--host-id=<id>] [--allow-mutations]
-//  [--latency=<ms>]`.
-// Add `OPENBOT_DEV_CLIENT_TRANSPORT=webrtc` to the stack to make the test client reach the host over
-// Signal and WebRTC, as a user does, and `OPENBOT_DEV_RTT_MS=<ms>`, equal to `--latency`, to add the
-// round trip to its data channel and account service reads.
-//
-// - web: signs in to `${api}/app` as the dev host user once, then opens `/app` in a new browser
-//   context for each run. A recorder in the page collects each request to the host. A new seed gives
-//   the host a new id, and the account keeps the old host; `--host-id` selects the new one.
-//   `web` runs start with no saved workspace frame; `web-warm` runs start with the frame of the
-//   first load, as a user who comes back does. `--latency` adds that many milliseconds to each
-//   document and fetch request of the page and to each WebSocket round trip (signaling), not to
-//   module files, and half of it to each data-channel message in each direction.
-// - desktop: reads the test-client app that is running. The first sample is its cold start: the
-//   connect spans of `logs/trace.ndjson`, the request file that main writes with
-//   `OPENBOT_DEV_SYNC_PROFILE=1`, and the renderer marks. With `--allow-mutations`, each further run
-//   reloads the renderer; main keeps its connection, so a reload measures the renderer gate only.
-// - desktop-start: with `--allow-mutations`, each run restarts only the test client
-//   (`bun run dev:restart-client`) while the host stays live. The origin is the start of the new main
-//   process, from the first line of its request file. Its Signal socket does not get the latency.
-//
-// `frameMs` is the time to the `workspace-frame` mark: the saved frame shows, read-only, before the
-// host answers. A request that ends before the `workspace-ready` mark is a gate request. The others are background
-// requests. A run settles at the end of the last request before a pause of `SETTLE_GAP_MS`.
-// Writes .openbot-build/remote-sync-perf/<label>/report.json, waterfall.md and, with --compare,
-// comparison.md. Records hold route templates, never ids; the script stops when a route holds a UUID.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
@@ -73,6 +40,8 @@ const allowMutations = process.argv.includes("--allow-mutations");
 const latencyMs = Number(argument("latency") ?? "0");
 assert.ok(Number.isInteger(latencyMs) && latencyMs >= 0, "--latency takes a whole number of milliseconds.");
 const FRAME_KEY_PREFIX = "openbot:remote-frame:";
+const TIMEZONE_CHECK_KEY_PREFIX = "openbot:routine-timezone-checked:";
+const TIMEZONE_CHECK_WAIT_MS = 30_000;
 
 type Client = "web" | "web-warm" | "desktop-cold" | "desktop-reload" | "desktop-start";
 type StorageState = Awaited<ReturnType<BrowserContext["storageState"]>>;
@@ -84,20 +53,15 @@ interface Mark {
 
 interface Run {
   client: Client;
-  /** Epoch time of navigation start, or of process start for a cold desktop sample. */
   origin: number;
-  /** Epoch time the client began to connect: the `connect-start` mark, or the first connect span. */
   connectAt: number | null;
   marks: Mark[];
-  /** Desktop main connect phases, in milliseconds after the origin. */
   connectPhases: Record<string, number>;
   requests: RemoteRequestRecord[];
-  /** Selected ICE candidate types, `local/remote`. Web only. */
   candidates: string | null;
 }
 
 interface RunMetrics {
-  /** The saved workspace frame shows. Null when the client had no frame. */
   frameMs: number | null;
   ttiMs: number;
   ttiFromConnectMs: number | null;
@@ -118,14 +82,10 @@ interface Report {
   createdAt: string;
   commit: string;
   runs: number;
-  /** Added round trip, `--latency`: the web page's HTTP, WebSocket and data channel. */
   latencyMs: number;
-  /** `OPENBOT_DEV_RTT_MS` of each desktop-start run, from its request file. */
   desktopRoundTripMs: number[];
-  /** The failure codes of each client and how often each came. */
   failures: Record<string, Record<string, number>>;
   candidates: Record<string, string[]>;
-  /** The request transports of each client: `webrtc`, or `http` for a test client without a WebRTC membership. */
   transports: Record<string, string[]>;
   metrics: Record<string, Spread>;
   routes: Record<string, RouteRow[]>;
@@ -142,12 +102,9 @@ interface RouteRow {
 declare global {
   interface Window {
     __syncPerfPeers?: RTCPeerConnection[];
-    /** What the page sink collected: the records, and the requests in flight. */
     __syncPerfSink?: { records: RemoteRequestRecord[]; open: number };
   }
 }
-
-// ---------------------------------------------------------------- shared
 
 const literal = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const bytes = (record: RemoteRequestRecord) => record.requestBytes + record.responseBytes;
@@ -157,7 +114,6 @@ function markAt(run: Run, name: string): number | null {
   return run.marks.find((mark) => mark.name === name)?.at ?? null;
 }
 
-/** The end of the last request before the first pause of `SETTLE_GAP_MS` after `from`. */
 function settledAt(requests: readonly RemoteRequestRecord[], from: number): number {
   let busyUntil = from;
   for (const record of [...requests].sort((left, right) => left.startedAt - right.startedAt)) {
@@ -167,7 +123,6 @@ function settledAt(requests: readonly RemoteRequestRecord[], from: number): numb
   return busyUntil;
 }
 
-/** The longest chain of requests where each one starts after the one before it ended. */
 function criticalDepth(requests: readonly RemoteRequestRecord[]): number {
   const sorted = [...requests].sort((left, right) => left.endedAt - right.endedAt);
   const depth: number[] = [];
@@ -184,15 +139,12 @@ function criticalDepth(requests: readonly RemoteRequestRecord[]): number {
   return longest;
 }
 
-// Counts each repeat of a method and route template. A template has no ids, so one read for each of
-// several ids (such as `GET /v1/agents/:id/queue`) counts as repeats too; read the route table.
 function duplicates(requests: readonly RemoteRequestRecord[]): number {
   const seen = new Map<string, number>();
   for (const record of requests) seen.set(routeKey(record), (seen.get(routeKey(record)) ?? 0) + 1);
   return [...seen.values()].reduce((sum, count) => sum + count - 1, 0);
 }
 
-/** The requests of one run, split at the gate. Requests after the settle point are left out. */
 function split(run: Run): { gate: RemoteRequestRecord[]; background: RemoteRequestRecord[]; settled: number } {
   const ready = markAt(run, "workspace-ready");
   assert.ok(ready !== null, `${run.client}: no workspace-ready mark.`);
@@ -254,7 +206,6 @@ function routeTable(client: Client, sample: readonly Run[]): RouteRow[] {
     .sort((left, right) => right.gate - left.gate || right.count - left.count);
 }
 
-/** A text timeline of one run, each request marked as gate or background. */
 function waterfall(run: Run): string {
   const { gate, background } = split(run);
   const gated = new Set(gate);
@@ -305,17 +256,12 @@ function isRequestRecord(value: unknown): value is RemoteRequestRecord {
   );
 }
 
-// ---------------------------------------------------------------- web
-
-/** Signs in to the web client with the code that the development account service shows. */
 async function signIn(page: Page): Promise<void> {
   await page.goto(`${api}/app`);
   await page.getByRole("textbox", { name: english("account.login.email"), exact: true }).fill(DEV_HOST_EMAIL);
   const send = page.getByRole("button", { name: english("account.login.sendCode"), exact: true });
   const prefix = english("account.login.developmentCode", { code: "" });
   const notice = page.getByText(new RegExp(`^${literal(prefix)}`));
-  // A test client that signs in as the host user (`OPENBOT_DEV_CLIENT_TRANSPORT=webrtc`) can start
-  // the account service's wait between codes. Send again until the code shows.
   const deadline = Date.now() + WAIT_MS;
   await send.click();
   while (!(await notice.isVisible()) && Date.now() < deadline) {
@@ -329,13 +275,11 @@ async function signIn(page: Page): Promise<void> {
   });
   const code = (await notice.innerText()).slice(prefix.length).replaceAll("-", "").trim();
   assert.ok(code.length > 0, "The account service showed no development code.");
-  // The code field takes the focus when it shows.
   await page.keyboard.type(code);
 }
 
 const SELECTED_SERVER_PREFIX = "openbot.web.selected-server:";
 
-/** Writes the host choice that the web client keeps for the account, then opens `/app` again. */
 async function selectHost(page: Page, id: string): Promise<void> {
   await page.waitForFunction(
     (prefix) => Object.keys(localStorage).some((key) => key.startsWith(prefix)),
@@ -355,7 +299,6 @@ async function instrument(context: BrowserContext): Promise<void> {
   await context.addInitScript((halfTrip: number) => {
     const collected: NonNullable<Window["__syncPerfSink"]> = { records: [], open: 0 };
     window.__syncPerfSink = collected;
-    // The recorder of `@openbot/team-client/sync-profile` finds this sink by its global name.
     globalThis.__openbotSyncProfile = {
       started() {
         collected.open += 1;
@@ -375,10 +318,7 @@ async function instrument(context: BrowserContext): Promise<void> {
       }
     };
     if (halfTrip <= 0) return;
-    // Half of the round trip each way. Equal delays keep the order of the messages. A send on a
-    // channel that is not open goes at once, so the client still gets the error it expects.
     const channel = RTCDataChannel.prototype;
-    // One native signature for each kind of payload: `send` is overloaded.
     const sendText: (this: RTCDataChannel, data: string) => void = channel.send;
     const sendBlob: (this: RTCDataChannel, data: Blob) => void = channel.send;
     const sendBuffer: (this: RTCDataChannel, data: ArrayBuffer) => void = channel.send;
@@ -441,7 +381,6 @@ async function instrument(context: BrowserContext): Promise<void> {
   }, latencyMs / 2);
 }
 
-/** The records and the count of requests in flight that the page sink holds. */
 async function readSink(page: Page): Promise<{ records: RemoteRequestRecord[]; open: number }> {
   const sink = await page.evaluate(() => window.__syncPerfSink ?? null);
   assert.ok(sink, "The page has no sync profile sink.");
@@ -459,7 +398,6 @@ function readMarks(page: Page): Promise<Mark[]> {
   );
 }
 
-/** Reads `read` until `ready` accepts two readings in a row. The app pushes no event to a script. */
 async function settle<T>(page: Page, what: string, read: () => Promise<T>, ready: (value: T) => boolean): Promise<T> {
   const deadline = Date.now() + WAIT_MS;
   let streak = 0;
@@ -491,10 +429,6 @@ function selectedCandidates(page: Page): Promise<string | null> {
   });
 }
 
-/**
- * Writes `<name>.png` once the saved frame shows, the artifact of a warm start. It tells whether the
- * host had answered before the screenshot: then the image shows loaded data, not the frame.
- */
 async function captureFrame(page: Page, name: string): Promise<void> {
   const shown = await page
     .waitForFunction((mark) => performance.getEntriesByName(mark).length > 0, `${MARK_PREFIX}workspace-frame`, {
@@ -520,17 +454,12 @@ async function captureFrame(page: Page, name: string): Promise<void> {
 
 const delay = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
 
-/**
- * Adds `--latency` to each page request and each WebSocket message. Module and style files keep their
- * time: the dev server sends hundreds of them, where a release build sends a few.
- */
 async function addLatency(context: BrowserContext): Promise<void> {
   const delayed = new Set(["document", "fetch", "xhr"]);
   await context.route("**/*", async (route) => {
     if (delayed.has(route.request().resourceType())) await delay(latencyMs);
     await route.fallback();
   });
-  // Half of the round trip each way. Equal delays keep the order of the messages.
   await context.routeWebSocket(/.*/, (socket) => {
     const server = socket.connectToServer();
     socket.onMessage((message) => void delay(latencyMs / 2).then(() => server.send(message)));
@@ -538,7 +467,6 @@ async function addLatency(context: BrowserContext): Promise<void> {
   });
 }
 
-/** The state with no saved workspace frame: a first visit, or a cleared browser. */
 function withoutFrames(state: StorageState): StorageState {
   return {
     ...state,
@@ -593,7 +521,6 @@ async function webRuns(): Promise<Run[]> {
     const page = await first.newPage();
     await signIn(page);
     if (hostId) await selectHost(page, hostId);
-    // The frame is saved when the panels answer, so the warm state waits for `panels-ready`.
     await page
       .waitForFunction(
         (names) => names.every((name) => performance.getEntriesByName(name).length > 0),
@@ -606,13 +533,18 @@ async function webRuns(): Promise<Run[]> {
         const seen = (await readMarks(page)).map((mark) => mark.name).join(", ") || "none";
         throw new Error(`The web client did not reach panels-ready. Marks: ${seen}.`, { cause: error });
       });
-    // The session stays in memory: the state holds the sign-in cookie, so it is not written to disk.
+    await page
+      .waitForFunction(
+        (prefix) => Object.keys(localStorage).some((key) => key.startsWith(prefix)),
+        TIMEZONE_CHECK_KEY_PREFIX,
+        { timeout: TIMEZONE_CHECK_WAIT_MS, polling: POLL_MS },
+      )
+      .catch(() => logger.warn("The web client saved no routine time-zone check. Warm runs read the routines again."));
     const warm = await first.storageState();
     await first.close();
     assert.ok(hasFrame(warm), "The web client saved no workspace frame.");
     const cold = withoutFrames(warm);
     const result: Run[] = [];
-    // Cold and warm runs take turns, so a slow period of the host falls on both.
     for (let index = 0; index < runs; index += 1) {
       result.push(await webRun(browser, "web", cold));
       result.push(await webRun(browser, "web-warm", warm, index === 0));
@@ -623,8 +555,6 @@ async function webRuns(): Promise<Run[]> {
     await browser.close();
   }
 }
-
-// ---------------------------------------------------------------- desktop
 
 interface TraceLine {
   at: number;
@@ -653,7 +583,6 @@ function readTrace(path: string): TraceLine[] {
 interface SyncFile {
   records: RemoteRequestRecord[];
   open: number;
-  /** The first line: when the main process started, and its `OPENBOT_DEV_RTT_MS`. */
   process: { startedAt: number; roundTripMs: number } | null;
 }
 
@@ -661,7 +590,6 @@ function readSyncFile(path: string): SyncFile {
   const records: RemoteRequestRecord[] = [];
   let started = 0;
   let processLine: SyncFile["process"] = null;
-  // The new process empties the file and writes it again, so a read can find it empty for a moment.
   const text = existsSync(path) ? readFileSync(path, "utf8") : "";
   for (const line of text.split("\n")) {
     if (!line) continue;
@@ -675,7 +603,6 @@ function readSyncFile(path: string): SyncFile {
   return { records, open: started - records.length, process: processLine };
 }
 
-/** The process start from `ps`, to one second, for a request file without its first line. */
 function processStart(pid: number): number {
   const text = execFileSync("ps", ["-o", "lstart=", "-p", String(pid)], { encoding: "utf8" }).trim();
   const at = Date.parse(text);
@@ -701,7 +628,6 @@ function testClientInstance(): DevInstanceRecord {
   return instance;
 }
 
-/** Calls `read` until it gives a value. A restart has no event that a script can wait for. */
 async function poll<T>(what: string, read: () => T | null | Promise<T | null>): Promise<T> {
   const deadline = Date.now() + WAIT_MS;
   for (;;) {
@@ -712,7 +638,6 @@ async function poll<T>(what: string, read: () => T | null | Promise<T | null>): 
   }
 }
 
-/** The connect spans of main after `origin`, each phase once, in milliseconds after `origin`. */
 function connectPhasesAfter(
   userData: string,
   origin: number,
@@ -730,7 +655,6 @@ function connectPhasesAfter(
 
 const desktopRoundTrips: number[] = [];
 
-/** Restarts only the test client, then times its start until the workspace is ready and quiet. */
 async function desktopStartRun(capture: boolean): Promise<Run> {
   const previous = testClientInstance();
   const requestedAt = Date.now();
@@ -808,7 +732,6 @@ async function desktopRuns(): Promise<Run[]> {
     state.file.open === 0 && state.marks.some((mark) => mark.name === "workspace-ready");
   try {
     const result: Run[] = [];
-    // The cold sample: the start of the running process.
     const navigation = await page.evaluate(() => {
       const entry = performance.getEntriesByType("navigation")[0];
       return entry && "type" in entry ? String(entry.type) : "";
@@ -838,7 +761,6 @@ async function desktopRuns(): Promise<Run[]> {
       });
       for (let index = 0; index < runs; index += 1) {
         const before = readSyncFile(syncPath).records.length;
-        // `commit`, not `load`: the frame can show and go before the load event.
         await page.reload({ waitUntil: "commit" });
         if (index === 0) await captureFrame(page, "desktop-frame");
         const state = await settle(page, "the desktop renderer settles", readState, settled);
@@ -859,8 +781,6 @@ async function desktopRuns(): Promise<Run[]> {
     await session.close();
   }
 }
-
-// ---------------------------------------------------------------- report
 
 function summarize(sample: readonly Run[]): Record<string, Spread> {
   const values = new Map<string, number[]>();
@@ -883,7 +803,6 @@ function summarize(sample: readonly Run[]): Record<string, Spread> {
   return result;
 }
 
-/** The run whose TTI is the median of its client. */
 function medianRun(sample: readonly Run[]): Run | undefined {
   const sorted = [...sample].sort((left, right) => measure(left).ttiMs - measure(right).ttiMs);
   return sorted[Math.floor((sorted.length - 1) / 2)];
@@ -935,7 +854,6 @@ function comparison(before: Report, after: Report): string {
   return lines.join("\n");
 }
 
-/** The phases of a client in median order, each with the time since the step before it. */
 function stepTable(client: Client, sample: readonly Run[]): string {
   const values = new Map<string, number[]>();
   for (const run of sample)

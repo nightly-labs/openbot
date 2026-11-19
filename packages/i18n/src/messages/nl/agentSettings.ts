@@ -149,8 +149,6 @@ export const messages = {
   "agentSettings.runtime.accessLabel": "Toegang van agent",
   "agentSettings.runtime.busyMessage": "Tijdens werk",
   "agentSettings.runtime.busyMessageLabel": "Berichten terwijl de agent werkt",
-  "agentSettings.runtime.taskLimit": "Parallelle threads",
-  "agentSettings.runtime.taskLimitLabel": "Threads die tegelijk draaien",
   "agentSettings.runtime.workingDirectory": "Werkmap",
   "agentSettings.runtime.notAvailable": "Nog niet beschikbaar",
   "agentSettings.runtime.fullAccessNote":
@@ -169,9 +167,6 @@ export const messages = {
   "agentSettings.busyMessage.steer": "Bijsturen",
   "agentSettings.busyMessage.steerUnsupported":
     "{provider} kan een lopende beurt niet bijsturen. Berichten die je stuurt terwijl hij werkt, wachten in de wachtrij.",
-  "agentSettings.taskLimit.default": "Standaard ({count})",
-  "agentSettings.taskLimit.oneTurn":
-    "{provider} voert één beurt tegelijk uit. De threads van deze agent wachten op elkaar.",
   "agentSettings.notificationLevel.title": "Meld mij",
   "agentSettings.notificationLevel.server": "Serverstandaard ({level})",
   "agentSettings.notificationLevel.note":
@@ -202,6 +197,8 @@ export const messages = {
   "agentSettings.fullAccess.confirm": "Volledige toegang toestaan",
   "agentSettings.fullAccess.askConfirm": "Eerst vragen gebruiken",
   "agentSettings.links.usage": "Gebruik",
+  "agentSettings.links.apps": "Apps",
+  "agentSettings.links.appsScope": "Alle agents",
   "agentSettings.links.memories": "Herinneringen",
   "agentSettings.links.memoriesCount": { one: "{count} opgeslagen", other: "{count} opgeslagen" },
   "agentSettings.links.skills": "Vaardigheden",

@@ -2,13 +2,10 @@ import type { MobileTextKey, MobileTranslate } from "@openbot/i18n/mobile";
 import type { ExpoSpeechRecognitionErrorCode } from "expo-speech-recognition";
 import { localeName } from "./language-names";
 
-/** `starting` covers the permission prompt; `stopping` waits for the final result. */
 export type DictationPhase = "idle" | "starting" | "listening" | "stopping";
 
 export interface DictationTranscript {
-  /** Final segments. Android continuous mode ends a segment at each pause. */
   committed: string[];
-  /** The newest partial result, replaced by each result until it is final. */
   interim: string;
 }
 
@@ -23,14 +20,15 @@ export function applyDictationResult(
   return { committed: text ? [...transcript.committed, text] : transcript.committed, interim: "" };
 }
 
-/** The scripts that write no space between words, and their full-width punctuation, such as "。". */
+export function isRepeatedFinal(transcript: DictationTranscript, result: { isFinal: boolean; text: string }): boolean {
+  const text = result.text.trim();
+  if (!result.isFinal || !text || transcript.interim || transcript.committed.length === 0) return false;
+  return text === transcript.committed.at(-1) || text === joinSegments(transcript.committed);
+}
+
 const NO_SPACE_SCRIPT =
   /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\u3000-\u303f\uff01-\uff60]/u;
 
-/**
- * Joins segments with a space, except between two characters of a script that writes none. The
- * phone's recognizer, Qwen3-ASR and ElevenLabs can each end a Chinese segment at a pause.
- */
 export function joinSegments(segments: readonly string[]): string {
   let text = "";
   for (const segment of segments) {
@@ -46,7 +44,6 @@ export function spokenText(transcript: DictationTranscript): string {
   return joinSegments([...transcript.committed, transcript.interim]);
 }
 
-/** The draft the user sees: what was there before the mic, then the speech. */
 export function dictationDraft(base: string, spoken: string): string {
   if (!spoken) return base;
   if (!base.trim()) return spoken;
@@ -55,20 +52,12 @@ export function dictationDraft(base: string, spoken: string): string {
 
 const normalizeLocale = (locale: string) => locale.replace(/_/g, "-").toLowerCase();
 
-/** Language and region, without a script: "zh-Hant-HK" becomes "zh-hk". */
 function localeKey(locale: string): { language: string; region: string | null } {
   const [language = "", ...rest] = normalizeLocale(locale).split("-");
   const region = rest.find((part) => /^([a-z]{2}|\d{3})$/.test(part)) ?? null;
   return { language, region };
 }
 
-/**
- * The recognizer takes a locale it lists, and iOS rejects any other. Walk the
- * user's languages in order, and take the first one the recognizer supports:
- * the same region if listed, else the language's home region (pl-PL, de-DE),
- * else US English for English, else the first listed. A Polish speaker with
- * Polish second in the list still gets Polish when the first is not supported.
- */
 export function pickRecognitionLocale(preferred: readonly string[], supported: readonly string[]): string {
   const listed = supported.map((locale) => ({ locale, ...localeKey(locale) }));
   for (const wanted of preferred.map(localeKey)) {
@@ -80,22 +69,15 @@ export function pickRecognitionLocale(preferred: readonly string[], supported: r
       sameLanguage[0];
     if (match) return match.locale;
   }
-  // No list, as on Android 12: the recognizer takes the first language as given.
   return preferred[0] ?? "en-US";
 }
 
-/** A locale by name, such as "Polish (Poland)", so a speaker can find it. */
 function recognitionLocaleLabel(locale: string, t: MobileTranslate): string {
   return localeName(locale, t) ?? locale;
 }
 
-/**
- * The choices for the dictation language setting, by name. A stored locale the
- * recognizer no longer lists stays visible, so the picker shows what is set.
- */
 export function dictationLanguageOptions(
   supported: readonly string[],
-  /** Null for the automatic choice. */
   selected: string | null,
   t: MobileTranslate,
 ): { value: string; label: string }[] {
@@ -115,7 +97,6 @@ export function hasRecognitionLocale(locale: string, locales: readonly string[])
 export interface DictationNotice {
   title: MobileTextKey;
   message: MobileTextKey;
-  /** The user can only change this permission in the device settings. */
   openSettings?: boolean;
 }
 
@@ -130,7 +111,6 @@ export const dictationFailedNotice: DictationNotice = {
   message: "mobile.chat.dictation.tryAgain",
 };
 
-/** Null when the stop needs no message: the user stopped it, or said nothing. */
 export function dictationNotice(code: ExpoSpeechRecognitionErrorCode): DictationNotice | null {
   switch (code) {
     case "aborted":
@@ -148,8 +128,6 @@ export function dictationNotice(code: ExpoSpeechRecognitionErrorCode): Dictation
       return { title: "mobile.chat.dictation.stopped", message: "mobile.chat.dictation.networkNeeded" };
     case "busy":
       return { title: "mobile.chat.dictation.stopped", message: "mobile.chat.dictation.busy" };
-    // iOS also reports recognizer failures, such as a damaged language model,
-    // as audio-capture, so do not blame the microphone.
     case "audio-capture":
       return { title: "mobile.chat.dictation.stopped", message: "mobile.chat.dictation.failed" };
     default:
@@ -157,47 +135,28 @@ export function dictationNotice(code: ExpoSpeechRecognitionErrorCode): Dictation
   }
 }
 
-/**
- * An on-device recognizer can fail before it hears anything, for example with a
- * damaged or missing language model. The system service can still work, so
- * those failures try once more without on-device recognition. Other errors,
- * such as an unsupported language or no network, would fail the same way again.
- * iOS can still choose an installed model when on-device is not required, so
- * this helps mainly on Android.
- */
 export function retriesWithSystemService(code: ExpoSpeechRecognitionErrorCode): boolean {
   return ["audio-capture", "service-not-allowed", "client", "unknown"].includes(code);
 }
 
 export interface ComposerControlsInput {
   disabled: boolean;
-  /** Text or attachments. */
   hasDraft: boolean;
-  /** A send or an attachment preparation is in progress. */
   busy: boolean;
-  /** A turn is running and this surface can stop it. */
   canStop: boolean;
   stopping: boolean;
   voiceAvailable: boolean;
 }
 
-/**
- * The one control at the end of the composer, and what it does now. The voice
- * mode replaces it with its own round button while it is open.
- */
 export interface ComposerAction {
   mode: "send" | "stop" | "dictate";
   pressable: boolean;
   spinner: boolean;
-  /** Filled with the action colour. */
   primed: boolean;
 }
 
 export function composerAction(input: ComposerControlsInput): ComposerAction {
   const empty = !input.hasDraft && !input.busy;
-  // A draft still sends while the agent works: the host queues it. So stop only
-  // takes the control when there is nothing to send. It wins over the mic: a
-  // running turn must stay easy to stop.
   if (empty && input.canStop) {
     return { mode: "stop", pressable: !input.disabled && !input.stopping, spinner: input.stopping, primed: true };
   }

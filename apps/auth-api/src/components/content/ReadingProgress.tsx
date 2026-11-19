@@ -1,6 +1,5 @@
 import { createSignal, createTrackedEffect, For, Show } from "solid-js";
 
-/** Where the reader's eye is taken to be, as a share of the viewport height from its top. */
 const READING_LINE = 0.3;
 
 interface ReadingSection {
@@ -8,7 +7,6 @@ interface ReadingSection {
   label: string;
 }
 
-/** Where each section starts and ends, in document coordinates. Read again only when the layout changes. */
 interface ReadingGeometry {
   top: number;
   bottom: number;
@@ -17,28 +15,11 @@ interface ReadingGeometry {
 }
 
 export interface ReadingProgressProps {
-  /** The element whose `h2` headings divide the page into sections. */
   article: () => HTMLElement | undefined;
-  /** The name of the part above the first heading. */
   title: string;
-  /**
-   * Read as a dependency. A link to a related article keeps the page mounted and only changes the
-   * route parameter, so without it the rail would keep the sections of the previous article.
-   */
   slug: string;
 }
 
-/**
- * How far the reader is, one segment per section.
- *
- * On a wide screen it is a rail on the right edge. Each segment is as long as its section and fills
- * while the reader is in it. A pointer or keyboard focus opens it into a list of the section titles,
- * and each title is a link to its heading. On a narrow screen there is no room beside the text, so a
- * line across the top of the viewport shows the same progress.
- *
- * The sections come from the rendered headings, so the prose bodies need no list of their own. A
- * heading with no `id` gets one from its text, which also makes the section a link that can be shared.
- */
 export function ReadingProgress(props: ReadingProgressProps) {
   const [sections, setSections] = createSignal<ReadingSection[]>([]);
   const [lengths, setLengths] = createSignal<number[]>([]);
@@ -55,7 +36,6 @@ export function ReadingProgress(props: ReadingProgressProps) {
     let geometry: ReadingGeometry | undefined;
     let headings: HTMLElement[] = [];
 
-    // Reads the layout. Scrolling does not change it, so a scroll only does the arithmetic below.
     const layout = () => {
       const top = article.getBoundingClientRect().top + window.scrollY;
       const bottom = top + article.offsetHeight;
@@ -70,10 +50,6 @@ export function ReadingProgress(props: ReadingProgressProps) {
       const { top, bottom, starts, ends } = geometry;
       const viewport = window.innerHeight;
       const line = viewport * READING_LINE;
-      // The reader is at a line near the top of the viewport, which is where a heading that a section
-      // link opens comes to rest. The footer usually lets the whole article scroll past that line. When
-      // the page is too short for that, the part that cannot reach the line is added over the last
-      // screen of scrolling, so the last section still fills.
       const lastScroll = document.documentElement.scrollHeight - viewport;
       const unreachable = Math.max(0, bottom - (lastScroll + line));
       const position =
@@ -87,8 +63,6 @@ export function ReadingProgress(props: ReadingProgressProps) {
           starts.findLastIndex((start) => position >= start),
         ),
       );
-      // Out of the way over the title and the artwork, and again once the last section is full and the
-      // footer takes over.
       const firstHeading = starts[1] ?? bottom;
       setVisible(window.scrollY + viewport * 0.6 > firstHeading && position < bottom);
     };
@@ -106,12 +80,9 @@ export function ReadingProgress(props: ReadingProgressProps) {
     const onScroll = () => schedule(false);
     const onResize = () => schedule(true);
 
-    // The first read waits one frame, for the body of a newly opened article to be in the document.
     frame = requestAnimationFrame(() => {
       frame = 0;
       headings = Array.from(article.querySelectorAll<HTMLElement>("h2"));
-      // A shared section link can name a heading that has no id in the served page. The browser
-      // found nothing to open, so open it once the heading has its id.
       const fragment = window.location.hash.slice(1);
       const unopened = fragment !== "" && !document.getElementById(fragment);
       const taken = new Set<string>();
@@ -126,7 +97,6 @@ export function ReadingProgress(props: ReadingProgressProps) {
 
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onResize, { passive: true });
-    // An image that loads or a question that opens moves every heading under it.
     const resizes = globalThis.ResizeObserver ? new ResizeObserver(onResize) : undefined;
     resizes?.observe(article);
 

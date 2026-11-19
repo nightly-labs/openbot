@@ -1,8 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about RevenueCat here is taken from revenuecat.com/docs. Each page used is in
-// `sources`. Check the sources again, and move `checkedAt`, whenever this file changes.
-
 export const REVENUECAT_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

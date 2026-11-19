@@ -23,14 +23,11 @@ const READY = {
 };
 const MACHINE_TOKEN = "machine-token-of-the-server-on-this-computer";
 
-/** A child that reports ready at once and exits when it is asked to stop. */
 class ReadyChild extends ChildProcess {
-  /** What the parent wrote to standard input and to fd 3. */
   readonly input: { stdin: string[]; control: string[] } = { stdin: [], control: [] };
   readonly #stdin = new PassThrough();
   readonly #stdout = new PassThrough();
   readonly #stderr = new PassThrough();
-  /** fd 3, the control pipe on Windows. */
   readonly #control = new PassThrough();
   override readonly stdio: ChildProcess["stdio"] = [this.#stdin, this.#stdout, this.#stderr, this.#control, undefined];
 
@@ -69,7 +66,7 @@ function summary(input: LocalServerAttachInput): ServerSummary {
     name: READY.serverName,
     role: "owner",
     state: "online",
-    active: input.select,
+    active: false,
     thisComputer: true,
   };
 }
@@ -151,7 +148,6 @@ describe("servers on this computer", () => {
     expect(spawned[0]?.args.join(" ")).not.toContain(secret);
     expect(await readFile(join(root, LOCAL_SERVERS_FILE), "utf8")).not.toContain(secret);
 
-    // A login failure that repeats the password reaches the log as the cause of a failed start.
     const { promise: failed, resolve } = Promise.withResolvers<void>();
     const second = servers(
       (input) => Effect.fail(new RemoteWorkflowError({ cause: new Error(`Login refused for ${input.password}`) })),
@@ -185,7 +181,6 @@ describe("servers on this computer", () => {
       );
       await Effect.runPromise(local.load());
       await Effect.runPromise(local.initialize());
-      // A create from another device answers after the registration.
       await Effect.runPromise(local.create(READY.serverName, "device"));
       expect(local.list().servers).toEqual([{ serverId: READY.serverId, name: READY.serverName, published: true }]);
       await Effect.runPromise(local.stop());

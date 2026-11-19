@@ -1,5 +1,3 @@
-// Frozen payloads for the additive agent-profile-generation capability. These bounds and keys
-// belong to its first wire version, independently of the current IPC profile model.
 import { isDynamicRecord, isString } from "../runtime-values";
 import { isUuidV4 } from "../validation";
 import { decodeTeamProtocolV1HttpResponse, type TeamProtocolV1JsonObject } from "./v1";
@@ -66,7 +64,6 @@ export function decodeProfileV1Request(generate: boolean, value: unknown): TeamP
 export function decodeProfileV1Response(generate: boolean, value: unknown): TeamProtocolV1JsonObject {
   if (generate) return decodeProfileV1Draft(value, true);
   if (!isDynamicRecord(value)) throw new Error("Invalid profile v1 response.");
-  // Agent and sidebar fields retain their already frozen v1 representations and projections.
   return {
     agent: decodeTeamProtocolV1HttpResponse("PATCH", "/v1/agents/profile-saved", 200, value.agent),
     layout: decodeTeamProtocolV1HttpResponse("GET", "/v1/sidebar-layout", 200, value.layout),

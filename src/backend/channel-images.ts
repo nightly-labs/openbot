@@ -20,10 +20,6 @@ export interface ChannelImageFile {
   version: string;
 }
 
-/**
- * The images that readers upload for channels, one file for each version, beside the agent
- * avatars. A channel id can hold any character, so its folder is a hash of the id.
- */
 export class ChannelImages {
   constructor(readonly root: string) {}
 
@@ -37,7 +33,6 @@ export class ChannelImages {
     };
   }
 
-  /** Writes a new version and returns its URL. The caller stores the URL, then removes the old file. */
   readonly write = Effect.fn("ChannelImages.write")(function* (
     this: ChannelImages,
     channelId: string,
@@ -56,7 +51,6 @@ export class ChannelImages {
     return { path, url: channelImageUrl(channelId, version, image.mimeType) };
   });
 
-  /** A file that stays behind costs only disk space, so a failed removal is not an error. */
   remove(path: string): Effect.Effect<void> {
     return Effect.promise(() => rm(path, { force: true }).catch(() => undefined));
   }

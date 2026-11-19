@@ -1,13 +1,3 @@
-// Frozen optional agent-fast-mode-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: a member of a server reads the
-// fast mode of an agent with view access to it, and changes it with manage access, as the member
-// changes its model and reasoning effort on the released agent route. Fast mode asks the provider for its fast service tier on each
-// turn of a model that has one; another model runs at standard speed. `fastMode` is null until someone
-// sets it: the host then sends no tier, and the provider keeps its own. A change applies from the next
-// turn. The `models` route lists, for a member, the models of the host that have a fast tier, with the
-// tier id that the host sends (`fastServiceTier`, such as Codex `priority`); the released model list
-// does not carry it. Widening any of it needs a second capability string.
 import {
   adminRoute,
   boolean,

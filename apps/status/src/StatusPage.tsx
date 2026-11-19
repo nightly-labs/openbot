@@ -34,14 +34,12 @@ import "./status.css";
 
 export const ISSUES_URL = "https://github.com/nightly-labs/openbot/issues?q=label%3Astatus";
 const SITE_URL = "https://openbot.run";
-/** A scheduled run can start late, but a check older than this means that the checks stopped. */
 const LATE_CHECK_MS = 30 * 60_000;
 
 type Range = 30 | 90;
 
 export interface StatusPageProps {
   status: StatusFile;
-  /** The time that the page shows the status for. */
   now: string;
 }
 
@@ -103,7 +101,6 @@ function ServiceTags(props: { ids: readonly ServiceId[] }) {
   );
 }
 
-/** "Oct 11, 07:10 – 08:05 UTC · 55 min", or "Started Oct 16, 09:12 UTC · 53 min so far" while it is open. */
 function incidentWhen(incident: Incident, now: string) {
   if (incident.kind === "maintenance" && Date.parse(incident.startedAt) > Date.parse(now)) {
     return `Scheduled ${formatDayTime(incident.startedAt)}${incident.resolvedAt ? ` – ${formatTime(incident.resolvedAt)}` : ""}`;
@@ -118,7 +115,6 @@ function incidentWhen(incident: Incident, now: string) {
   return `${range} · ${formatDuration(incident.startedAt, incident.resolvedAt)}`;
 }
 
-/** Newest first, grouped by month. */
 function byMonth(incidents: readonly Incident[]) {
   const months: { label: string; incidents: Incident[] }[] = [];
   for (const incident of [...incidents].sort((a, b) => b.startedAt.localeCompare(a.startedAt))) {
@@ -137,7 +133,6 @@ function checkedText(checkedAt: string | null, now: string) {
   return Date.parse(now) - Date.parse(checkedAt) > LATE_CHECK_MS ? `${text} · Checks are late` : text;
 }
 
-/** The overall state, then each service with its daily bars, then past incidents by month. */
 export function StatusPage(props: StatusPageProps) {
   const [range, setRange] = createSignal<Range>(90);
   const incidents = () => props.status.incidents;
@@ -301,7 +296,6 @@ function DayBars(props: { days: readonly StatusDay[]; name: string; range: Range
     const index = hover();
     return index === null ? undefined : props.days[index];
   };
-  /** The hovered bar's centre as a fraction of the row. The tooltip shifts by the same fraction of its own width, so it stays inside the row. */
   const tooltipAt = () => ((hover() ?? 0) + 0.5) / props.days.length;
 
   return (

@@ -10,6 +10,7 @@ export const messages = {
   "mobile.share.content": "Paylaşılacak",
   "mobile.share.footer":
     "Sohbet, bu içerik mesaj alanında olacak şekilde açılır. Siz gönderene kadar hiçbir şey gönderilmez.",
+  "mobile.share.sendFooter": "OpenBot bunu ajana gönderir, sonra sohbeti açar.",
   "mobile.share.lastUsed": "Son kullanılan",
   "mobile.share.noAgents": "Ajan yok",
   "mobile.share.chooseAgent": "Bir ajan seçin",

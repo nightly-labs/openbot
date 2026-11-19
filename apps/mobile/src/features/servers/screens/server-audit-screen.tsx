@@ -37,7 +37,6 @@ import { useText } from "@/shared/lib/text";
 
 type Tone = "success" | "danger" | "accent";
 
-/** The icon and its tone for one change, as on desktop: green adds, red takes away, blue changes. */
 function changeMark(change: ServerAuditChange): { Icon: typeof Crown; tone: Tone } {
   switch (change.kind) {
     case "member-joined":
@@ -59,7 +58,6 @@ function changeMark(change: ServerAuditChange): { Icon: typeof Crown; tone: Tone
   }
 }
 
-/** Less access is red, chat is green and full control is orange, as on desktop. */
 const LEVEL_CLASS = {
   none: "text-danger-text",
   view: "text-foreground",
@@ -109,10 +107,6 @@ function AuditLine({ parts }: { parts: readonly AuditPart[] }) {
   );
 }
 
-/**
- * Server sheet > Server settings > Audit log (`server-audit-v1`): the changes to the members, roles and
- * agent access of the server, newest first, with a filter by kind and a search. Owners and admins only.
- */
 export function ServerAuditScreen() {
   const { t, format, errorMessage } = useText();
   const { theme } = useUniwind();
@@ -164,15 +158,12 @@ export function ServerAuditScreen() {
 
   const agent = (agentId: string) => agents.find((item) => item.serverId === serverId && item.id === agentId);
   return (
-    // The native header holds the search field, which the Android blur header cannot draw.
     <SettingsContent androidNativeHeader>
       <Stack.SearchBar
         placeholder={t("mobile.server.audit.search")}
         autoCapitalize="none"
         hideWhenScrolling={false}
-        // In a sheet, the header and its back button stay while the search has focus.
         hideNavigationBar={false}
-        // The native Android search view draws black icons and text in both themes.
         {...(isAndroid
           ? { headerIconColor: String(foreground), textColor: String(foreground), hintTextColor: String(muted) }
           : {})}
@@ -217,7 +208,6 @@ export function ServerAuditScreen() {
               supportingText={actor ? `${actor} · ${time}` : time}
               leading={
                 change.kind === "agent-level" ? (
-                  // A deleted agent keeps a face made from its ID, as on desktop.
                   <BloubAvatar
                     agentId={change.agent.id}
                     serverId={serverId}

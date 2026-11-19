@@ -14,9 +14,10 @@ import ImagePlus from "lucide-react-native/icons/image-plus";
 import RotateCcw from "lucide-react-native/icons/rotate-ccw";
 import Trash2 from "lucide-react-native/icons/trash";
 import { type ReactNode, useRef, useState } from "react";
-import { Pressable, View } from "react-native";
-import { HUE_LABELS } from "@/features/agents/components/agent-appearance-picker";
+import { View } from "react-native";
+import { ChoiceCell, HUE_LABELS } from "@/features/agents/components/agent-appearance-picker";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
+import { SaveError } from "@/shared/components/save-error";
 import { haptics } from "@/shared/lib/haptics";
 import { pickAvatarPhoto } from "@/shared/lib/pick-avatar-photo";
 import { useText } from "@/shared/lib/text";
@@ -27,15 +28,8 @@ import { ChannelAvatar, ChannelIconTile } from "./channel-avatar";
 const PREVIEW_SIZE = 88;
 const ICON_COLUMNS = 5;
 const COLOR_COLUMNS = 5;
-/** The crop screen shows the rounded square of a channel picture. */
 const CROP_CORNER_RATIO = 0.3;
 
-/**
- * The picture of a channel, as the desktop channel settings edit it: an uploaded image, or an icon on
- * a colour. A choice saves at once. An icon replaces the image, and the reset gives the channel its
- * member faces back. The icon is saved first, and the image goes after it, so a failed step does not
- * lose the image.
- */
 export function ChannelPictureEditor({
   channel,
   serverId,
@@ -55,7 +49,6 @@ export function ChannelPictureEditor({
   const lock = useRef(false);
   const icon = knownChannelIcon(channel.icon);
   const hasImage = Boolean(channel.imageUrl);
-  // The image hides the icon, so no icon or colour shows as chosen while there is one.
   const chosen = hasImage ? null : icon;
   const hue: AvatarHue = icon?.hue ?? DEFAULT_CHANNEL_ICON_HUE;
   const off = disabled || busy;
@@ -76,7 +69,6 @@ export function ChannelPictureEditor({
       setBusy(false);
     }
   }
-  /** Saves the stored draft with another icon. Unsaved edits of the form stay in the form. */
   function saveIcon(next: ChannelDraft["icon"]) {
     return store.command(serverId, {
       type: "save",
@@ -189,16 +181,11 @@ export function ChannelPictureEditor({
           ))}
         </View>
       </PictureSection>
-      {error ? (
-        <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
-          {error}
-        </Typography.Paragraph>
-      ) : null}
+      <SaveError error={error} />
     </View>
   );
 }
 
-/** A group of the editor, as the groups of the agent appearance editor. */
 function PictureSection({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
     <View className="gap-2">
@@ -241,47 +228,5 @@ function IconAction({
     >
       <Icon color={String(color)} size={small ? 18 : 20} />
     </Button>
-  );
-}
-
-/** One choice of a grid. The chosen one has a light fill that shows on the grouped card in both themes. */
-function ChoiceCell({
-  columns,
-  label,
-  checked,
-  disabled,
-  onPress,
-  children,
-}: {
-  columns: number;
-  label: string;
-  checked: boolean;
-  disabled: boolean;
-  onPress: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <Pressable
-      style={{ width: `${100 / columns}%` as const }}
-      className="aspect-square p-0.5"
-      accessibilityRole="radio"
-      accessibilityLabel={label}
-      accessibilityState={{ checked, disabled }}
-      disabled={disabled}
-      onPress={() => {
-        if (checked) return;
-        void haptics.selection();
-        onPress();
-      }}
-    >
-      {({ pressed }) => (
-        <View
-          className={`flex-1 items-center justify-center rounded-xl ${checked ? "bg-foreground/10" : ""}`}
-          style={{ opacity: pressed && !checked ? 0.6 : disabled ? 0.5 : 1 }}
-        >
-          {children}
-        </View>
-      )}
-    </Pressable>
   );
 }

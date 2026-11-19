@@ -1,26 +1,25 @@
 import { type LibraryFolder, libraryFolderBranch } from "@openbot/contracts/ipc";
-import { createEffect, createStore } from "solid-js";
+import { createEffect, createMemo, createStore } from "solid-js";
 import { agentKey, canHoldFolder, childFolders } from "./library-folders-view";
 
-/** How far the pointer moves before a press becomes a drag. A shorter move stays a click. */
+const LANDED_MS = 900;
 const DRAG_START_PX = 6;
-/** How long a drag stays on a collapsed row before the row shows its folders. */
-const DRAG_OPEN_MS = 600;
-/** The part of a folder row, at its top and at its bottom, that puts a dragged folder before or after it. */
+const DRAG_OPEN_MS = 700;
 const LINE_ZONE = 0.28;
-/** The class on `<html>` while a drag is on. */
 const DRAGGING_CLASS = "library-dragging";
 const FILE_SOURCE = ".library-folder-tile-main, .library-picture, .library-file-card, .file-row-main";
-const FOLDER_SOURCE = ".library-row-main";
+const FOLDER_SOURCE = ".library-row-main, .library-folder-card-main";
+const SCROLL_EDGE_PX = 48;
+const SCROLL_STEP_PX = 14;
 
-/** What the pointer drags. Files of more than one agent have no agent, so no row takes them. */
 export type LibraryDragItem =
   | { kind: "files"; agentId: string | null; ids: string[]; label: string }
   | { kind: "folder"; agentId: string; folderId: string; label: string };
 
-/** Where a drop goes: into a folder (or to the top level of the agent), or on a line between two folders. */
 export type LibraryDropTarget =
-  | { kind: "into"; agentId: string; folderId: string | null }
+  | { kind: "into"; agentId: string; folderId: string | null; goes: boolean }
+  | { kind: "new"; agentId: string; parentId: string | undefined }
+  | { kind: "out"; agentId: string }
   | {
       kind: "line";
       agentId: string;
@@ -32,37 +31,54 @@ export type LibraryDropTarget =
 
 export type LibraryDropMark = "into" | "before" | "after";
 
+type LibraryDropBlock = "agent" | "mixed";
+
 interface LibraryFolderDragOptions {
-  /** A press can start a drag now. */
   enabled: () => boolean;
   folders: () => readonly LibraryFolder[];
-  /** The viewer can change the folders of the agent. A folder of another agent does not move. */
   organizes: (agentId: string) => boolean;
-  /** The id of the folder that shows a file, if it is in one. */
   folderIdOfFile: (fileId: string) => string | undefined;
-  /** The folder list under an agent (`agentKey`) or a folder (its id) does not show. */
   isCollapsed: (key: string) => boolean;
-  /** The files that a press on this file drags: the file, or the selection that it is part of. */
   fileItem: (fileId: string) => LibraryDragItem | null;
   onDrop: (item: LibraryDragItem, target: LibraryDropTarget) => void;
-  /** A drag stayed on a collapsed row. */
   onOpen: (key: string) => void;
+  onGo: (agentId: string, folderId: string | null) => void;
 }
 
 interface DragState {
   item: LibraryDragItem | null;
   target: LibraryDropTarget | null;
+  blocked: LibraryDropBlock | null;
+  spring: string | null;
+  landed: string | null;
   x: number;
   y: number;
 }
 
+interface DragProbe {
+  target: LibraryDropTarget | null;
+  blocked: LibraryDropBlock | null;
+  spring: string | null;
+}
+
+const NO_PROBE: DragProbe = { target: null, blocked: null, spring: null };
+
+function landedKey(agentId: string | null, folderId: string | null): string {
+  return agentId === null ? "out" : `${agentId}\n${folderId ?? ""}`;
+}
+
 function dropKey(target: LibraryDropTarget | null): string {
   if (!target) return "";
-  if (target.kind === "into") return `into ${target.agentId} ${target.folderId ?? ""}`;
+  if (target.kind === "into") return `into ${target.agentId} ${target.folderId ?? ""} ${target.goes}`;
+  if (target.kind === "new") return `new ${target.agentId} ${target.parentId ?? ""}`;
+  if (target.kind === "out") return `out ${target.agentId}`;
   return `line ${target.rowId} ${target.edge}`;
 }
 
-/** The pointer goes up on the element that it went down on, so the browser sends a click. A drag is not a click. */
+function probeKey(probe: DragProbe): string {
+  return `${dropKey(probe.target)}|${probe.blocked ?? ""}|${probe.spring ?? ""}`;
+}
+
 function swallowNextClick(): void {
   const stop = (event: MouseEvent) => {
     event.stopPropagation();
@@ -72,18 +88,23 @@ function swallowNextClick(): void {
   setTimeout(() => window.removeEventListener("click", stop, true), 0);
 }
 
-/**
- * Drags files to a folder or an agent row, and drags a folder to a new position or into a folder of
- * the same agent. A file tile or a list row is a file source; a folder row is a folder source and a
- * target. Rows carry `data-library-agent` and, for a folder, `data-library-folder`. Touch scrolls,
- * so only a mouse or a pen drags. Escape stops the drag.
- */
 export function createLibraryFolderDrag(options: LibraryFolderDragOptions) {
-  const [state, setState] = createStore<DragState>({ item: null, target: null, x: 0, y: 0 });
+  const [state, setState] = createStore<DragState>({
+    item: null,
+    target: null,
+    blocked: null,
+    spring: null,
+    landed: null,
+    x: 0,
+    y: 0,
+  });
   let press: { item: LibraryDragItem; x: number; y: number } | null = null;
   let dragging: LibraryDragItem | null = null;
-  let dropAt: LibraryDropTarget | null = null;
+  let opened: { agentId: string; folderId: string | null } | null = null;
+  let probed: DragProbe = NO_PROBE;
   let pressOnItem = false;
+  let scrollFrame = 0;
+  let landedTimer: ReturnType<typeof setTimeout> | undefined;
 
   const folderById = (id: string | null | undefined) =>
     id ? options.folders().find((folder) => folder.id === id) : undefined;
@@ -98,21 +119,65 @@ export function createLibraryFolderDrag(options: LibraryFolderDragOptions) {
     return { kind: "folder", agentId: folder.agentId, folderId: folder.id, label: folder.name };
   }
 
-  function dropTargetAt(item: LibraryDragItem, x: number, y: number): LibraryDropTarget | null {
-    const row = document.elementFromPoint(x, y)?.closest("[data-library-agent]");
+  function probeAt(item: LibraryDragItem, x: number, y: number): DragProbe {
+    const under = document.elementFromPoint(x, y);
+    const spring = under?.closest("[data-library-spring]")?.getAttribute("data-library-spring") ?? null;
+    if (under?.closest("[data-library-out]")) {
+      if (item.kind !== "files") return NO_PROBE;
+      if (item.agentId === null) return { target: null, blocked: "mixed", spring: null };
+      const inFolder = item.ids.some((id) => options.folderIdOfFile(id) !== undefined);
+      return { target: inFolder ? { kind: "out", agentId: item.agentId } : null, blocked: null, spring: null };
+    }
+    const row = under?.closest("[data-library-agent]");
     const agentId = row?.getAttribute("data-library-agent");
-    if (!row || !agentId || agentId !== item.agentId) return null;
+    if (!row || !agentId) {
+      if (opened && under?.closest("[data-library-here]"))
+        return { target: openedTarget(item, opened), blocked: null, spring: null };
+      return { target: null, blocked: null, spring: spring && options.isCollapsed(spring) ? spring : null };
+    }
+    if (agentId !== item.agentId)
+      return { target: null, blocked: item.agentId === null ? "mixed" : "agent", spring: null };
+    return { target: dropTargetIn(item, row, agentId, y), blocked: null, spring: null };
+  }
+
+  function openedTarget(
+    item: LibraryDragItem,
+    place: { agentId: string; folderId: string | null },
+  ): LibraryDropTarget | null {
+    const into: LibraryDropTarget = { kind: "into", agentId: place.agentId, folderId: place.folderId, goes: false };
+    if (item.kind === "files") {
+      const moves = item.ids.some((id) => options.folderIdOfFile(id) !== (place.folderId ?? undefined));
+      return moves ? into : null;
+    }
+    const moved = folderById(item.folderId);
+    if (!moved || (moved.parentId ?? null) === place.folderId) return null;
+    if (place.folderId === null) return into;
+    const folders = options.folders();
+    if (libraryFolderBranch(folders, moved.id).has(place.folderId)) return null;
+    return canHoldFolder(folders, place.folderId, moved.id) ? into : null;
+  }
+
+  function dropTargetIn(item: LibraryDragItem, row: Element, agentId: string, y: number): LibraryDropTarget | null {
+    const newParent = row.getAttribute("data-library-new");
+    if (newParent !== null) {
+      return item.kind === "files" ? { kind: "new", agentId, parentId: newParent || undefined } : null;
+    }
     const folders = options.folders();
     const folder = folderById(row.getAttribute("data-library-folder"));
+    const only = row.getAttribute("data-library-drop");
+    const goes = only === "go";
     if (item.kind === "files") {
       const moves = item.ids.some((id) => options.folderIdOfFile(id) !== folder?.id);
-      return moves ? { kind: "into", agentId, folderId: folder?.id ?? null } : null;
+      return moves ? { kind: "into", agentId, folderId: folder?.id ?? null, goes } : null;
     }
     const moved = folderById(item.folderId);
     if (!moved) return null;
-    // The agent row: the folder goes to the top level.
-    if (!folder) return moved.parentId === undefined ? null : { kind: "into", agentId, folderId: null };
+    if (!folder) return moved.parentId === undefined ? null : { kind: "into", agentId, folderId: null, goes };
     if (libraryFolderBranch(folders, moved.id).has(folder.id)) return null;
+    if (only !== null) {
+      if (folder.id === moved.parentId || !canHoldFolder(folders, folder.id, moved.id)) return null;
+      return { kind: "into", agentId, folderId: folder.id, goes };
+    }
     const box = row.getBoundingClientRect();
     const part = (y - box.top) / box.height;
     const siblings = childFolders(folders, agentId, folder.parentId);
@@ -129,7 +194,6 @@ export function createLibraryFolderDrag(options: LibraryFolderDragOptions) {
         edge: "before",
       };
     }
-    // Below an open folder come its own folders, so a line there would not show where the folder goes.
     const open =
       !options.isCollapsed(folder.id) &&
       childFolders(folders, agentId, folder.id).some((child) => child.id !== moved.id);
@@ -146,7 +210,41 @@ export function createLibraryFolderDrag(options: LibraryFolderDragOptions) {
       };
     }
     if (folder.id === moved.parentId || !canHoldFolder(folders, folder.id, moved.id)) return null;
-    return { kind: "into", agentId, folderId: folder.id };
+    return { kind: "into", agentId, folderId: folder.id, goes: false };
+  }
+
+  function showProbe(next: DragProbe): boolean {
+    if (probeKey(next) === probeKey(probed)) return false;
+    probed = next;
+    return true;
+  }
+
+  function retarget(): void {
+    if (!dragging || !showProbe(probeAt(dragging, state.x, state.y))) return;
+    setState((draft) => {
+      draft.target = probed.target;
+      draft.blocked = probed.blocked;
+      draft.spring = probed.spring;
+    });
+  }
+
+  function scrollStep(): void {
+    scrollFrame = 0;
+    if (!dragging) return;
+    const list = document.elementFromPoint(state.x, state.y)?.closest<HTMLElement>("[data-library-autoscroll]");
+    if (list) {
+      const box = list.getBoundingClientRect();
+      const top = state.y - box.top;
+      const bottom = box.bottom - state.y;
+      const depth = top < SCROLL_EDGE_PX ? top - SCROLL_EDGE_PX : bottom < SCROLL_EDGE_PX ? SCROLL_EDGE_PX - bottom : 0;
+      const step = Math.round((depth / SCROLL_EDGE_PX) * SCROLL_STEP_PX);
+      if (step !== 0) {
+        const before = list.scrollTop;
+        list.scrollTop = before + step;
+        if (list.scrollTop !== before) retarget();
+      }
+    }
+    scrollFrame = requestAnimationFrame(scrollStep);
   }
 
   function endDrag(): void {
@@ -156,14 +254,19 @@ export function createLibraryFolderDrag(options: LibraryFolderDragOptions) {
     window.removeEventListener("blur", endDrag);
     window.removeEventListener("keydown", onDragKey, true);
     document.documentElement.classList.remove(DRAGGING_CLASS);
+    cancelAnimationFrame(scrollFrame);
+    scrollFrame = 0;
     const shown = dragging !== null;
     press = null;
     dragging = null;
-    dropAt = null;
+    opened = null;
+    probed = NO_PROBE;
     if (!shown) return;
     setState((draft) => {
       draft.item = null;
       draft.target = null;
+      draft.blocked = null;
+      draft.spring = null;
     });
   }
 
@@ -190,44 +293,82 @@ export function createLibraryFolderDrag(options: LibraryFolderDragOptions) {
       dragging = item;
       document.documentElement.classList.add(DRAGGING_CLASS);
       window.addEventListener("keydown", onDragKey, true);
+      scrollFrame = requestAnimationFrame(scrollStep);
     }
-    const next = dropTargetAt(item, event.clientX, event.clientY);
-    const moved = dropKey(next) !== dropKey(dropAt);
-    dropAt = next;
+    const moved = showProbe(probeAt(item, event.clientX, event.clientY));
     setState((draft) => {
       if (starts) draft.item = item;
-      if (moved) draft.target = next;
+      if (moved) {
+        draft.target = probed.target;
+        draft.blocked = probed.blocked;
+        draft.spring = probed.spring;
+      }
       draft.x = event.clientX;
       draft.y = event.clientY;
     });
   }
 
+  function land(item: LibraryDragItem, target: LibraryDropTarget): void {
+    let key: string | null = null;
+    if (target.kind === "into") key = landedKey(target.agentId, target.folderId);
+    else if (target.kind === "out") key = landedKey(null, null);
+    else if (target.kind === "line" && item.kind === "folder") key = landedKey(item.agentId, item.folderId);
+    if (key === null) return;
+    clearTimeout(landedTimer);
+    setState((draft) => {
+      draft.landed = key;
+    });
+    landedTimer = setTimeout(() => {
+      setState((draft) => {
+        draft.landed = null;
+      });
+    }, LANDED_MS);
+  }
+
   function onDragEnd(): void {
     const item = dragging;
-    const target = dropAt;
+    const target = probed.target;
     endDrag();
     if (!item) return;
     swallowNextClick();
-    if (target) options.onDrop(item, target);
+    if (!target) return;
+    options.onDrop(item, target);
+    land(item, target);
   }
 
   function onDragKey(event: KeyboardEvent): void {
     if (event.key !== "Escape") return;
-    // The page's Escape would end the selection too; this Escape only stops the drag.
     event.preventDefault();
     event.stopPropagation();
     endDrag();
     window.addEventListener("pointerup", swallowNextClick, { once: true });
   }
 
-  // A collapsed row shows its folders when a drag stays on it.
   createEffect(
     () => {
       const target = state.target;
       if (target?.kind !== "into") return null;
+      if (target.goes) return { go: true, agentId: target.agentId, folderId: target.folderId, key: "" };
       const key = target.folderId ?? agentKey(target.agentId);
-      return options.isCollapsed(key) ? key : null;
+      return options.isCollapsed(key) ? { go: false, agentId: target.agentId, folderId: target.folderId, key } : null;
     },
+    (wait) => {
+      if (wait === null) return;
+      const timer = setTimeout(() => {
+        if (!wait.go) {
+          options.onOpen(wait.key);
+          return;
+        }
+        opened = { agentId: wait.agentId, folderId: wait.folderId };
+        options.onGo(wait.agentId, wait.folderId);
+        requestAnimationFrame(retarget);
+      }, DRAG_OPEN_MS);
+      return () => clearTimeout(timer);
+    },
+  );
+
+  createEffect(
+    () => state.spring,
     (key) => {
       if (key === null) return;
       const timer = setTimeout(() => options.onOpen(key), DRAG_OPEN_MS);
@@ -235,29 +376,48 @@ export function createLibraryFolderDrag(options: LibraryFolderDragOptions) {
     },
   );
 
+  const draggedBranch = createMemo((): ReadonlySet<string> => {
+    const item = state.item;
+    return item?.kind === "folder" ? libraryFolderBranch(options.folders(), item.folderId) : new Set();
+  });
+
   return {
-    /** The dragged item, its target and the pointer position while a drag is on. */
     state,
-    /**
-     * Listens on the element that holds the sources. The capture phase runs before the listener of the
-     * marquee, which asks `pressOnItem`. Returns the cleanup.
-     */
     attach(root: HTMLElement): () => void {
       root.addEventListener("pointerdown", onPress, true);
       return () => {
         root.removeEventListener("pointerdown", onPress, true);
+        clearTimeout(landedTimer);
         endDrag();
       };
     },
-    /** The last press was on a file or a folder that can be dragged. */
     pressOnItem: () => pressOnItem,
-    /** How the row of an agent (`folderId` null) or of a folder shows the drop. */
     dropMark(agentId: string, folderId: string | null): LibraryDropMark | undefined {
       const target = state.target;
-      if (!target) return undefined;
+      if (!target || target.kind === "new" || target.kind === "out") return undefined;
       if (target.kind === "line") return target.rowId === folderId ? target.edge : undefined;
       return target.agentId === agentId && target.folderId === folderId ? "into" : undefined;
     },
+    newMark(agentId: string, parentId: string | undefined): "into" | undefined {
+      const target = state.target;
+      return target?.kind === "new" && target.agentId === agentId && target.parentId === parentId ? "into" : undefined;
+    },
+    outMark: (): "into" | undefined => (state.target?.kind === "out" ? "into" : undefined),
+    outOff: (): "" | undefined => {
+      const item = state.item;
+      if (!item) return undefined;
+      if (item.kind !== "files" || item.agentId === null) return "";
+      return item.ids.some((id) => options.folderIdOfFile(id) !== undefined) ? undefined : "";
+    },
+    dropOff(agentId: string | undefined, folderId?: string): "" | undefined {
+      const item = state.item;
+      if (!item) return undefined;
+      if (agentId === undefined || agentId !== item.agentId) return "";
+      return folderId !== undefined && draggedBranch().has(folderId) ? "" : undefined;
+    },
+    landed: (agentId: string, folderId: string | null): "" | undefined =>
+      state.landed === landedKey(agentId, folderId) ? "" : undefined,
+    landedOut: (): "" | undefined => (state.landed === landedKey(null, null) ? "" : undefined),
     draggedFolder: (folderId: string) =>
       state.item?.kind === "folder" && state.item.folderId === folderId ? "" : undefined,
     draggedFile: (fileId: string) => (state.item?.kind === "files" && state.item.ids.includes(fileId) ? "" : undefined),

@@ -1,6 +1,7 @@
 import type { AvatarColor } from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
 import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
+import { CHAT_BUBBLE_STYLES, ownMessageAuthor } from "@openbot/ui/features/conversation/own-bubble";
 import { CHAT_COLOR_PRESETS } from "@openbot/ui/features/settings/ChatColorPicker";
 import { For } from "solid-js";
 import { fn } from "storybook/test";
@@ -55,11 +56,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * A chat color tints the bubble. Code, quotes, tables and file chips in a tinted bubble take the
- * same tint. The first rows have no color: the reader's and the agent's bubbles stay grey, and
- * another person's bubble takes their name colour.
- */
 export const TintedContent: Story = {
   render: () => (
     <main class="foundation-story">
@@ -94,7 +90,6 @@ export const TintedContent: Story = {
   ),
 };
 
-/** Each preset of the chat color picker, on the reader's own bubble. */
 export const Presets: Story = {
   render: () => (
     <main class="foundation-story" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 24px">
@@ -112,6 +107,35 @@ export const Presets: Story = {
             agents={STORY_AGENTS}
             {...callbacks}
           />
+        )}
+      </For>
+    </main>
+  ),
+};
+
+export const BubbleStyles: Story = {
+  render: () => (
+    <main class="foundation-story" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 24px">
+      <For each={CHAT_BUBBLE_STYLES}>
+        {(style) => (
+          <div>
+            <For each={STORY_AGENTS}>
+              {(agent) => (
+                <ChatMessageRow
+                  message={{
+                    id: `bubble-style-${style}-${agent.id}`,
+                    author: "you",
+                    body: `${style} with ${agent.name}: \`code\` and **bold**`,
+                    time: "10:03",
+                    kind: "text",
+                  }}
+                  author={ownMessageAuthor({ name: "You", style, agent, chatColor: undefined })}
+                  agents={STORY_AGENTS}
+                  {...callbacks}
+                />
+              )}
+            </For>
+          </div>
         )}
       </For>
     </main>

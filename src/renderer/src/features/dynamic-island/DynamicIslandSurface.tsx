@@ -16,21 +16,26 @@ import { dynamicIslandPort } from "./dynamic-island-port";
 
 const DEFAULT_NOTCH_WIDTH = 192;
 const DEFAULT_NOTCH_HEIGHT = 32;
-/**
- * Linux gives no pointer moves to a window that lets the pointer through. There the window shape is
- * the island and its hover band: the pointer goes to the apps outside them, and nothing outside shows.
- */
 const SHAPED_WINDOW = currentDevicePlatform() === "linux";
-/** The parts of the island that take the pointer while it is not in use. */
 const SHAPE_PARTS = ".dynamic-island-shell, .dynamic-island-hover-zone";
+const SHAPE_TARGET = ".dynamic-island-shell .dynamic-island-size-target";
+const MOTION_ROOM = 2;
+
+type ShapeBox = { x: number; y: number; width: number; height: number };
+
+function boxAround(boxes: readonly ShapeBox[]): ShapeBox {
+  const left = Math.min(...boxes.map((box) => box.x));
+  const top = Math.min(...boxes.map((box) => box.y));
+  const right = Math.max(...boxes.map((box) => box.x + box.width));
+  const bottom = Math.max(...boxes.map((box) => box.y + box.height));
+  return { x: left, y: top, width: right - left, height: bottom - top };
+}
 
 export function DynamicIslandSurface() {
   const { t } = useText();
   const query = new URLSearchParams(window.location.search);
   const displayMode = query.get("display") === "island" ? "island" : "notch";
   const variant = readAppVariant(query.get("variant"));
-  // The main process names a notch only on a MacBook that has one. Without it, the island draws its
-  // own gap, which follows the width setting.
   const queryNotchWidth = query.get("notch-width");
   const initialNotchSize: DynamicIslandNotchSize | undefined =
     queryNotchWidth === null
@@ -45,50 +50,60 @@ export function DynamicIslandSurface() {
     ...DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
   });
   const [viewState, setViewState] = createSignal<DynamicIslandViewState>("compact");
-  // A failed action keeps the panel open with this message, so an Approve that did not reach the
-  // agent does not look like it worked.
   const [actionError, setActionError] = createSignal<UserErrorDetails>();
-  // Each action and each clear starts a new generation, so a late failure does not show on another panel.
   let actionGeneration = 0;
   let pointerInside = false;
   let focusInside = false;
-  // A reply field was pressed. The panel is not focusable by default, so main makes it key only until
-  // the focus leaves the island. A focus change inside the island keeps it key: when the panel stops
-  // being key, its blur collapses the island before a click on an option lands.
   let keyboardInside = false;
   let queuedPresentation: DynamicIslandPresentation | undefined;
   let anchor: HTMLFieldSetElement | undefined;
   let sentShape: string | undefined;
-  let shapeFrame: number | undefined;
-  // The island motion writes each new size and state to the DOM, and each write gives the window its
-  // new shape. A ResizeObserver is not used: the motion resizes the shell in its own observer callback,
-  // and the browser then reports an observer loop error. No timer runs.
+  let motionBox: ShapeBox | undefined;
+  const followedMotions = new WeakSet<Animation>();
+  let shapeStopped = false;
   const shapeObserver = SHAPED_WINDOW ? new MutationObserver(() => followShape()) : undefined;
   const visible = () => presentation().mode !== "idle" || preference().idleVisible;
 
-  /** Linux: tells main the parts of the window that take the pointer. Only a change is sent. */
-  function syncShape(): Element[] {
-    const parts = visible() && anchor?.isConnected ? [...anchor.querySelectorAll(SHAPE_PARTS)] : [];
-    const shape = windowShape(parts.map((part) => part.getBoundingClientRect()));
+  function sendShape(parts: readonly ShapeBox[]): void {
+    const shape = windowShape(parts);
     const key = JSON.stringify(shape);
-    if (key !== sentShape) {
-      sentShape = key;
-      void dynamicIslandPort()
-        .dynamicIsland.setInputRegion(shape)
-        .catch(() => undefined);
-    }
-    return parts;
+    if (key === sentShape) return;
+    sentShape = key;
+    void dynamicIslandPort()
+      .dynamicIsland.setInputRegion(shape)
+      .catch(() => undefined);
   }
 
-  /** Sends the shape, and again on each frame while a part moves. The frames stop with the motion. */
   function followShape(): void {
-    if (!shapeObserver || shapeFrame !== undefined) return;
-    const parts = syncShape();
-    if (!parts.some((part) => part.getAnimations().some((motion) => motion.playState === "running"))) return;
-    shapeFrame = requestAnimationFrame(() => {
-      shapeFrame = undefined;
-      followShape();
-    });
+    if (!shapeObserver || shapeStopped) return;
+    const parts = visible() && anchor?.isConnected ? [...anchor.querySelectorAll(SHAPE_PARTS)] : [];
+    const still: ShapeBox[] = [];
+    const moving: ShapeBox[] = [];
+    for (const part of parts) {
+      const motions = part.getAnimations().filter((motion) => motion.playState === "running");
+      (motions.length > 0 ? moving : still).push(part.getBoundingClientRect());
+      for (const motion of motions) {
+        if (followedMotions.has(motion)) continue;
+        followedMotions.add(motion);
+        motion.finished.then(followShape, followShape);
+      }
+    }
+    if (moving.length === 0) {
+      motionBox = undefined;
+      sendShape(still);
+      return;
+    }
+    const target = anchor?.querySelector(SHAPE_TARGET)?.getBoundingClientRect();
+    motionBox = boxAround([...(motionBox ? [motionBox] : []), ...moving, ...(target ? [target] : [])]);
+    sendShape([
+      ...still,
+      {
+        x: motionBox.x - MOTION_ROOM,
+        y: motionBox.y - MOTION_ROOM,
+        width: motionBox.width + MOTION_ROOM * 2,
+        height: motionBox.height + MOTION_ROOM * 2,
+      },
+    ]);
   }
 
   function observeShape(element: HTMLFieldSetElement): void {
@@ -133,7 +148,6 @@ export function DynamicIslandSurface() {
   }
 
   function changeViewState(next: DynamicIslandViewState, reason: DynamicIslandStateChangeReason): void {
-    // The pointer can leave while the user types a reply. Escape, Close and a click outside still collapse.
     if (reason === "hover-exit" && keyboardInside && isTextField(document.activeElement)) return;
     if (reason === "pointer" || reason === "keyboard" || reason === "escape") performHaptic();
     setViewState(next);
@@ -203,7 +217,6 @@ export function DynamicIslandSurface() {
     endFocusInteraction();
   }
 
-  /** A press on a reply field asks main for key input, then puts the caret in the field. */
   async function requestKeyboard(event: PointerEvent): Promise<void> {
     const field = event.target;
     if (!isTextField(field)) return;
@@ -219,7 +232,6 @@ export function DynamicIslandSurface() {
     return ++actionGeneration;
   }
 
-  /** Resolves `false` when the action failed. */
   async function perform(action: DynamicIslandAction): Promise<boolean> {
     performHaptic();
     const generation = clearActionError();
@@ -274,7 +286,7 @@ export function DynamicIslandSurface() {
       stopGeometry();
       window.removeEventListener("blur", close);
       window.removeEventListener("resize", followShape);
-      if (shapeFrame !== undefined) cancelAnimationFrame(shapeFrame);
+      shapeStopped = true;
       shapeObserver?.disconnect();
     };
   });
@@ -305,6 +317,7 @@ export function DynamicIslandSurface() {
             widthPercent={preference().widthPercent}
             heightPercent={preference().heightPercent}
             extendedHoverArea
+            idleInsideNotch
             inlineReply
             onStateChange={changeViewState}
             onAction={perform}
@@ -336,7 +349,6 @@ function interactionLocksPresentation(
   interacting: boolean,
   typing: boolean,
 ): boolean {
-  // While the user types a reply, a new card must not take the draft to another agent.
   if (!interacting || !(typing || isCriticalPresentation(current))) return false;
   return presentationIdentity(current) !== presentationIdentity(next);
 }

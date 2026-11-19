@@ -1,7 +1,6 @@
 import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/kind";
 
-/** The sentence for each kind `classifyUserError` decides. `@openbot/user-errors` owns the mapping. */
 export const messages = {
   "error.kind.network": "无法连接，请检查网络后重试。",
   "error.kind.timeout": "请求超时。重试前请先确认该操作是否已完成。",
@@ -14,4 +13,5 @@ export const messages = {
   "error.kind.permission": "你没有权限完成该操作，请向所有者申请访问权限。",
   "error.kind.rateLimit": "请求过于频繁，请稍等片刻后重试。",
   "error.kind.service": "服务暂时不可用，请稍等片刻后重试。",
+  "error.kind.interrupted": "回答结束前连接已断开。请重新发送消息。",
 } as const satisfies PartialTranslation<typeof source>;

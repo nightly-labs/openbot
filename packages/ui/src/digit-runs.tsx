@@ -3,9 +3,7 @@ import { createMemo, For, Show } from "solid-js";
 import { hasRightToLeftLetter } from "./content-direction";
 
 interface DigitRun {
-  /** Digits and the separators between them, or the words and spaces around them. */
   readonly text: string;
-  /** The position of the first character in the formatted value. */
   readonly start: number;
   readonly number: boolean;
 }
@@ -25,17 +23,6 @@ function digitRuns(text: string): { runs: DigitRun[]; rightToLeft: boolean } {
   return { runs: rightToLeft ? runs.reverse() : runs, rightToLeft };
 }
 
-/**
- * The characters of a formatted value in a `t-digit-group`. Each digit is a box of its own, so that
- * it can roll, and the text direction algorithm does not order boxes: in a right-to-left page they
- * came out in reverse, "US$0.004" as "$SU 400.0". The group lays its runs out left to right, in the
- * order they show in. A number keeps its digits left to right; a value with right-to-left words,
- * such as "7.6 ث", puts its runs in reverse, so it reads from the right. A word stays in one piece,
- * so that its letters join.
- *
- * `digit` renders each character of a number, with its position in `text`. `word` renders a word
- * run; without it, the words stay still.
- */
 export function DigitRuns(props: {
   text: string;
   digit: (character: () => string, index: () => number) => JSX.Element;

@@ -1,10 +1,3 @@
-// Runs inside a throwaway Electron page during `vite build`. Bundled to a single
-// classic script by content-images.ts and injected with `executeJavaScript`, so
-// it must not rely on module loading, the network, or anything on the page.
-//
-// Workers have no WebGL, so the card artwork cannot be produced at request time.
-// This is the one place that turns the shared gradient description into pixels.
-
 import { APP_LOGO_CORNER, APP_LOGO_EYE_POINTS, APP_LOGO_SIZE } from "@openbot/brand/app-logo-shape";
 import { getShaderColorFromString, meshGradientFragmentShader, ShaderMount } from "@paper-design/shaders";
 import type { ContentImageJob, ContentImageLockup, ContentImageMark } from "./content-images";
@@ -17,22 +10,15 @@ declare global {
   }
 }
 
-/** `--openbot-bg-canvas`, as the RGB channels of the scrim. */
 const SCRIM_COLOR = "26, 26, 26";
 const TITLE_MAX_LINES = 3;
-/** Under a lockup or a row of marks there is room for two lines. */
 const TITLE_MAX_LINES_WITH_LOCKUP = 2;
-/** `--openbot-logo-production` and `--openbot-logo-eye`. */
 const LOGO_BACKGROUND = "#d6adf2";
 const LOGO_EYE = "#040007";
 const FONT_FAMILY = '"Inter Variable", Inter, system-ui, sans-serif';
 
 window.openBotContentImage = { render: renderContentImage };
 
-/**
- * Lossy, for the artwork only: a smooth gradient loses nothing a reader can see,
- * and the file is about 3% of the PNG. Bump `GENERATOR_VERSION` when this changes.
- */
 const WEBP_QUALITY = 0.9;
 
 async function renderContentImage(job: ContentImageJob): Promise<string> {
@@ -45,20 +31,13 @@ async function renderContentImage(job: ContentImageJob): Promise<string> {
     host,
     meshGradientFragmentShader,
     articleGradientUniforms(gradient, getShaderColorFromString),
-    // Without this the colour buffer is undefined by the time toDataURL reads it,
-    // which shows up as an image that is empty on some machines and correct on
-    // others.
     { preserveDrawingBuffer: true },
     0,
     gradient.frame,
   );
 
   try {
-    // The mount sizes its canvas from a ResizeObserver callback, so nothing can
-    // be read back until that callback has run at least once.
     await waitForCanvas(mount.canvasElement);
-    // Draws synchronously at exactly this frame, which is what makes two runs of
-    // the build produce the same bytes.
     mount.setFrame(gradient.frame);
 
     const canvas = document.createElement("canvas");
@@ -67,8 +46,6 @@ async function renderContentImage(job: ContentImageJob): Promise<string> {
     const context = canvas.getContext("2d");
     if (!context) throw new Error("Paper shaders: a 2D canvas context is not available.");
 
-    // The shader canvas is rendered at twice the output size, so this draw is a
-    // supersample rather than a stretch.
     context.drawImage(mount.canvasElement, 0, 0, job.width, job.height);
     if (job.title && job.withTitle) {
       drawScrim(context, job);
@@ -98,10 +75,6 @@ async function waitForCanvas(canvas: HTMLCanvasElement): Promise<void> {
   }
 }
 
-/**
- * A scrim only over the lower half. The gradient stays readable as artwork and
- * the text keeps its contrast whatever colours the title happened to draw.
- */
 function drawScrim(context: CanvasRenderingContext2D, job: ContentImageJob): void {
   const scrim = context.createLinearGradient(0, job.height * 0.3, 0, job.height);
   scrim.addColorStop(0, `rgba(${SCRIM_COLOR}, 0)`);
@@ -121,8 +94,6 @@ function drawTitle(context: CanvasRenderingContext2D, job: ContentImageJob): voi
   const maxLines = job.lockup || job.markRow ? TITLE_MAX_LINES_WITH_LOCKUP : TITLE_MAX_LINES;
   const lines = wrapText(context, job.title, width - padding * 2, maxLines);
 
-  // The block is anchored to the bottom, so a one-line and a three-line title
-  // both sit on the same baseline and the set reads as one series.
   const lastBaseline = height - padding;
   const firstBaseline = lastBaseline - (lines.length - 1) * lineHeight;
 
@@ -137,11 +108,6 @@ function drawTitle(context: CanvasRenderingContext2D, job: ContentImageJob): voi
   context.fillText(job.eyebrow, padding, firstBaseline - lineHeight);
 }
 
-/**
- * The lockup from the top of a comparison page: one frosted plate with both marks,
- * split by a hairline with "vs" on it. It sits at the top left, over the title,
- * on the same left edge.
- */
 function drawLockup(context: CanvasRenderingContext2D, job: ContentImageJob, lockup: ContentImageLockup): void {
   const unit = job.width / 1200;
   const logoSize = 128 * unit;
@@ -171,7 +137,6 @@ function drawLockup(context: CanvasRenderingContext2D, job: ContentImageJob, loc
   context.fillText(lockup.left?.name ?? "OpenBot", left + logoSize / 2, nameBaseline);
   context.fillText(lockup.rivalName, right + logoSize / 2, nameBaseline);
 
-  // The hairline, broken around "vs".
   const center = x + padX + column + vsMargin + vsWidth / 2;
   const middle = y + plateHeight / 2;
   const vsSize = 20 * unit;
@@ -192,7 +157,6 @@ function drawLockup(context: CanvasRenderingContext2D, job: ContentImageJob, loc
   context.textBaseline = "alphabetic";
 }
 
-/** The roundup's lockup: one frosted plate with the mark of every app in a row, at the same place. */
 function drawMarkRow(
   context: CanvasRenderingContext2D,
   job: ContentImageJob,
@@ -203,7 +167,6 @@ function drawMarkRow(
   const gap = 20 * unit;
   const x = Math.round(job.width * 0.06);
   const y = 64 * unit;
-  // As large as fits in the width of the title, and no larger than the lockup's marks.
   const available = job.width - x * 2 - pad * 2 - gap * (marks.length - 1);
   const size = Math.min(128 * unit, available / marks.length);
   drawPlate(context, job, x, y, pad * 2 + size * marks.length + gap * (marks.length - 1), pad * 2 + size);
@@ -212,7 +175,6 @@ function drawMarkRow(
   });
 }
 
-/** The frosted plate under the marks, with a hairline edge. */
 function drawPlate(
   context: CanvasRenderingContext2D,
   job: ContentImageJob,
@@ -224,8 +186,6 @@ function drawPlate(
   const unit = job.width / 1200;
   const radius = 24 * unit;
 
-  // The frost: what is under the plate, blurred. A copy, because a canvas that
-  // draws itself through a filter reads the pixels it is writing.
   const under = document.createElement("canvas");
   under.width = job.width;
   under.height = job.height;
@@ -253,7 +213,6 @@ function drawMark(context: CanvasRenderingContext2D, mark: ContentImageMark, x: 
   else drawRivalMark(context, mark, x, y, size);
 }
 
-/** `AppLogo`: the rounded square and the two scribbled eyes. */
 function drawOpenBotMark(context: CanvasRenderingContext2D, x: number, y: number, size: number): void {
   context.save();
   context.translate(x, y);
@@ -307,11 +266,6 @@ function roundedRect(
   context.roundRect(x, y, width, height, radius);
 }
 
-/**
- * Greedy wrap. The last allowed line absorbs the rest of the words and is cut
- * with an ellipsis, so an unexpectedly long title degrades instead of running
- * off the bottom of the image.
- */
 function wrapText(context: CanvasRenderingContext2D, text: string, maxWidth: number, maxLines: number): string[] {
   const words = text.split(/\s+/u).filter(Boolean);
   const lines: string[] = [];

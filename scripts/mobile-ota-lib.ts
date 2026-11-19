@@ -1,6 +1,3 @@
-// The parts of an over-the-air update of the mobile app that `scripts/mobile-ota.ts` and
-// `scripts/mobile-ota-e2e.ts` share: the manifest of an exported bundle, its signature, and the
-// objects in the bucket that `apps/mobile-updates` reads. See apps/mobile/README.md#over-the-air-updates.
 import { execFile } from "node:child_process";
 import { createHash, createSign, createVerify, randomUUID, X509Certificate } from "node:crypto";
 import { readFile } from "node:fs/promises";
@@ -22,26 +19,21 @@ import {
   updateKey,
 } from "../apps/mobile-updates/src/protocol";
 
-/** The bucket, as the publish commands use it. Production is R2; the E2E script uses a local bucket. */
 export interface UpdateStore {
   read(key: string): Promise<string | null>;
   exists(key: string): Promise<boolean>;
   write(key: string, body: Uint8Array | string, contentType: string): Promise<void>;
 }
 
-/** One binary: the phones of a channel and platform that have one runtime version. */
 export interface UpdateScope {
   channel: string;
   platform: UpdatePlatform;
   runtimeVersion: string;
 }
 
-/** A bundle or an asset of `expo export`. */
 interface ExportedFile {
   path: string;
-  /** SHA-256, base64url. The phone checks each download with it. */
   hash: string;
-  /** MD5, hex. Metro names an asset so, and the app finds a downloaded asset by this name. */
   key: string;
   contentType: string;
   fileExtension: string;
@@ -52,7 +44,6 @@ export interface ExportedUpdate {
   assets: ExportedFile[];
 }
 
-/** The fields of a manifest that a later publish of the same bundle needs. */
 interface ManifestFields {
   readonly [key: string]: unknown;
   id: string;
@@ -62,10 +53,6 @@ interface ManifestFields {
 const HISTORY_LENGTH = 50;
 const run = promisify(execFile);
 
-/**
- * The runtime version of the checkout that has `mobileDir`: the hash of all that the native build
- * of one platform reads. The store build of the same commit has the same value.
- */
 export async function fingerprint(platform: UpdatePlatform, mobileDir: string): Promise<string> {
   const bin = join(mobileDir, "..", "..", "node_modules", ".bin", "expo-updates");
   const { stdout } = await run(bin, ["fingerprint:generate", "--platform", platform], {
@@ -115,7 +102,6 @@ async function exportedFile(exportDir: string, relativePath: string, extension: 
     path,
     hash: createHash("sha256").update(bytes).digest("base64url"),
     key: createHash("md5").update(bytes).digest("hex"),
-    // The client names the launch bundle itself and takes any type for it.
     contentType:
       extension === null ? "application/javascript" : (CONTENT_TYPES[extension] ?? "application/octet-stream"),
     fileExtension: extension === null ? ".bundle" : `.${extension}`,
@@ -127,10 +113,6 @@ function isObject(value: unknown): value is { readonly [key: string]: unknown } 
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/**
- * The files of one platform in the folder that `expo export` wrote. `metadata.json` lists the
- * bundle and each asset, also the files of DOM components.
- */
 export async function readExport(exportDir: string, platform: UpdatePlatform): Promise<ExportedUpdate> {
   const metadata = JSON.parse(await readFile(join(exportDir, "metadata.json"), "utf8"));
   const files = isObject(metadata) && isObject(metadata.fileMetadata) ? metadata.fileMetadata[platform] : null;
@@ -157,16 +139,11 @@ function manifestAsset(file: ExportedFile, assetBaseUrl: string) {
   };
 }
 
-/**
- * The manifest text of one update, as the Expo Updates protocol defines it. `expoClient` is the
- * public app config: the app reads `Constants.expoConfig` from it while it runs the update.
- */
 function buildManifest(input: {
   id: string;
   createdAt: string;
   runtimeVersion: string;
   update: ExportedUpdate;
-  /** Such as `https://updates.openbot.run/assets`. */
   assetBaseUrl: string;
   expoClient: object;
   commit: string;
@@ -183,13 +160,11 @@ function buildManifest(input: {
   });
 }
 
-/** The `expo-signature` value of `text`: an RSA PKCS #1 v1.5 signature of its SHA-256. */
 export function signText(text: string, privateKeyPem: string): string {
   const signature = createSign("RSA-SHA256").update(text, "utf8").sign(privateKeyPem, "base64");
   return `sig="${signature}", keyid="${SIGNING_KEY_ID}", alg="${SIGNING_ALGORITHM}"`;
 }
 
-/** True when the certificate in the binary accepts `signature` for `text`, as the phone checks it. */
 export function verifySignature(text: string, signature: string, certificatePem: string): boolean {
   const fields = new Map<string, string>();
   for (const match of signature.matchAll(/(\w+)="([^"]*)"/gu)) {
@@ -257,7 +232,6 @@ async function writePointer(
   return pointer;
 }
 
-/** The update that all phones of the pointer have or get: the full rollout, or the base of a part rollout. */
 function settledUpdateId(pointer: UpdatePointer | null): string | null {
   if (pointer?.target.kind !== "update") return null;
   return pointer.target.rollout === 100 ? pointer.target.id : pointer.target.baseId;
@@ -269,14 +243,9 @@ async function writeUpdate(store: UpdateStore, update: StoredUpdate): Promise<vo
 
 export interface SigningKeys {
   privateKeyPem: string;
-  /** The certificate in `apps/mobile`, which the binary has. Each signature is checked with it first. */
   certificatePem: string;
 }
 
-/**
- * Uploads the files of an exported bundle, writes its signed manifest, and then points the binary
- * at it. The pointer changes last, so a phone never gets a manifest whose files are not there.
- */
 export async function publishUpdate(
   store: UpdateStore,
   input: {
@@ -311,7 +280,6 @@ export async function publishUpdate(
   );
   let uploaded = 0;
   for (const file of [input.update.launch, ...input.update.assets]) {
-    // The name of an object is the hash of its bytes, so an object that exists is the same file.
     if (await store.exists(assetKey(file.hash))) continue;
     await store.write(assetKey(file.hash), await readFile(file.path), file.contentType);
     uploaded += 1;
@@ -347,7 +315,6 @@ function assertRollout(rollout: number): void {
   }
 }
 
-/** Changes the percentage of phones that get the current update. The other phones keep its base. */
 export async function changeRollout(
   store: UpdateStore,
   scope: UpdateScope,
@@ -370,11 +337,6 @@ function manifestFields(text: string): ManifestFields {
   return { ...value, id: value.id, createdAt: value.createdAt };
 }
 
-/**
- * Takes the current update back. A phone accepts only an update that is newer than the one it runs,
- * so the earlier bundle is published again with a new ID and a new date. With no earlier update, or
- * with `toEmbedded`, a signed directive sends each phone back to the bundle in its binary.
- */
 export async function rollBack(
   store: UpdateStore,
   input: { scope: UpdateScope; toEmbedded: boolean; keys: SigningKeys; now?: Date },
@@ -428,7 +390,6 @@ export async function rollBack(
   return { pointer, republished };
 }
 
-/** A store build that `release-ios.yml` or `release-android.yml` recorded as a tag. */
 export interface StoreBuild {
   platform: UpdatePlatform;
   version: string;
@@ -443,7 +404,6 @@ export function storeBuildTag(build: Omit<StoreBuild, "commit">): string {
   return `${STORE_BUILD_TAG_PREFIX}${build.platform}/${build.version}/${build.build}/${build.runtimeVersion}`;
 }
 
-/** The store builds in the output of `git ls-remote --tags <remote> "refs/tags/mobile-build/*"`. */
 export function parseStoreBuilds(lsRemote: string): StoreBuild[] {
   const builds: StoreBuild[] = [];
   for (const line of lsRemote.split("\n")) {
@@ -459,16 +419,6 @@ export function parseStoreBuilds(lsRemote: string): StoreBuild[] {
   return builds.sort((a, b) => Number(b.build) - Number(a.build));
 }
 
-/**
- * The binaries that a rollout change or a rollback must reach: those that have an update now. They
- * come from the recorded store builds, not from the checkout. After a native change is on `main`,
- * the checkout has another runtime version than the binaries in the stores, and an update must
- * still be easy to take back.
- *
- * A platform with no update is in `skipped`, so a change for all platforms still reaches the
- * platform that has one. With `runtime`, the one platform and that runtime version are the scope;
- * a build of a channel with no tags, such as `preview`, needs it.
- */
 export async function liveUpdateScopes(
   store: UpdateStore,
   input: { channel: string; platforms: readonly UpdatePlatform[]; runtime: string | null; builds: StoreBuild[] },
@@ -511,7 +461,6 @@ export async function liveUpdateScopes(
   return { scopes, skipped };
 }
 
-/** The update that the server gives a phone of `scope`, as a phone asks for it. Null for no update. */
 export async function probeManifest(
   serverUrl: string,
   scope: UpdateScope,
@@ -525,7 +474,6 @@ export async function probeManifest(
         "expo-protocol-version": "1",
         "expo-runtime-version": scope.runtimeVersion,
         "expo-channel-name": scope.channel,
-        // A phone with a bundle from the server, so the answer also shows a rollback to the binary.
         "expo-current-update-id": "00000000-0000-4000-8000-000000000000",
         "expo-embedded-update-id": "00000000-0000-4000-8000-000000000001",
       },
@@ -550,7 +498,6 @@ interface MultipartPart {
   body: string;
 }
 
-/** The parts of a `multipart/mixed` answer of the update server. */
 export function multipartParts(contentType: string, body: string): MultipartPart[] {
   const boundary = /boundary=([^;]+)/u.exec(contentType)?.[1];
   if (!boundary) return [];

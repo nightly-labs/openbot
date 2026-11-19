@@ -1,7 +1,7 @@
 import { avatarHeadColor, avatarStyleForSeed } from "@openbot/brand/bloub-avatar";
 import { type AvatarMood, avatarMoodIsBusy, avatarMoodPresentation } from "@openbot/brand/bloub-avatar-motion";
 import type { AvatarColor, AvatarHue } from "@openbot/contracts/ipc";
-import { Canvas, createPicture, Picture } from "@shopify/react-native-skia";
+import { Canvas, Picture } from "@shopify/react-native-skia";
 import { Image } from "expo-image";
 import { memo, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { PixelRatio, View } from "react-native";
@@ -21,7 +21,7 @@ import Animated, {
 import { scheduleOnRN } from "react-native-worklets";
 import { usePlushFrame } from "@/features/agents/components/use-plush-frame";
 import { loadedPlushArt, loadPlushArt, plushPixels } from "@/features/agents/model/plush/plush-assets";
-import { drawPlush, type PlushArt } from "@/features/agents/model/plush/plush-draw";
+import { type PlushArt, recordPlush } from "@/features/agents/model/plush/plush-draw";
 import { PLUSH_BODY_SCALE } from "@/features/agents/model/plush/plush-felt";
 import { plushGeometry } from "@/features/agents/model/plush/plush-frames";
 import {
@@ -30,13 +30,13 @@ import {
   plushPictureName,
   savedPlushPicture,
 } from "@/features/agents/model/plush/plush-picture";
-import { useAgentActivity, useAgentListActivity } from "@/features/workspace/components/use-agent-activity";
+import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
 import {
   DISCONNECTED_APPEARANCE,
   useConnectionAppearance,
 } from "@/features/workspace/components/use-connection-appearance";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
-import { agentActivityMood, type MobileAgentActivity } from "@/features/workspace/model/agent-activity";
+import { agentActivityMood } from "@/features/workspace/model/agent-activity";
 import { showsOnline } from "@/features/workspace/model/server-status";
 import { useMotionPreference } from "@/shared/lib/motion";
 import { useScreenFocusedWhile } from "@/shared/lib/use-screen-focused-while";
@@ -45,47 +45,43 @@ import { AgentPhoto, type AgentPhotoProps } from "./agent-photo";
 interface BloubAvatarProps extends AgentPhotoProps {
   agentId: string;
   hue: AvatarHue | null;
-  /** The agent's `avatarColor`. It wins over `hue`. */
   color?: AvatarColor | null;
   seed: string;
   size?: number;
   animateIdle?: boolean;
-  /** Turns the orbit rings around an agent photo while the agent works. A plush shows its felt dots. */
+  paused?: boolean;
   rings?: boolean;
-  /** The face also shows the work and the waits of the agent's side threads, as the home list does. */
-  withThreads?: boolean;
 }
 
-/**
- * How a new body or colour comes in. `cut` swaps it at once: lists and grids use it, so that a
- * recycled row or many choices do not animate. `pop` shrinks the old plush away and springs the new
- * one out, as the desktop does in the agent editor.
- */
 type PlushTransition = "pop" | "cut";
 
-export function BloubAvatar({ withThreads = false, ...props }: BloubAvatarProps) {
-  return withThreads ? <ListBloubAvatar {...props} /> : <ChatBloubAvatar {...props} />;
+export function BloubAvatar({
+  activityMood,
+  ...props
+}: BloubAvatarProps & {
+  activityMood?: AvatarMood;
+}) {
+  if (activityMood !== undefined) return <LiveBloubAvatar {...props} activityMood={activityMood} />;
+  return <ChatBloubAvatar {...props} />;
 }
 
-function ChatBloubAvatar(props: Omit<BloubAvatarProps, "withThreads">) {
-  return <LiveBloubAvatar {...props} activity={useAgentActivity(props.agentId)} />;
-}
-
-function ListBloubAvatar(props: Omit<BloubAvatarProps, "withThreads">) {
-  return <LiveBloubAvatar {...props} activity={useAgentListActivity(props.agentId)} />;
+function ChatBloubAvatar(props: BloubAvatarProps) {
+  return <LiveBloubAvatar {...props} activityMood={agentActivityMood(useAgentActivity(props.agentId))} />;
 }
 
 function LiveBloubAvatar({
   agentId,
   serverId: hostId,
+  avatarUrl,
   hue,
   color = null,
   seed,
   size = 54,
   animateIdle = true,
+  paused = false,
   rings = false,
-  activity,
-}: Omit<BloubAvatarProps, "withThreads"> & { activity: MobileAgentActivity | undefined }) {
+  activityMood,
+}: BloubAvatarProps & { activityMood: AvatarMood }) {
   const serverId = useMobileWorkspaceSelector(
     (workspace) => hostId ?? workspace.agents.find((agent) => agent.id === agentId)?.serverId,
   );
@@ -96,14 +92,16 @@ function LiveBloubAvatar({
     <BloubAvatarPreview
       agentId={agentId}
       serverId={serverId}
+      avatarUrl={avatarUrl}
       hue={hue}
       color={color}
       seed={seed}
       size={size}
       animateIdle={animateIdle}
+      paused={paused}
       rings={rings}
       disconnected={disconnected}
-      mood={disconnected ? "idle" : agentActivityMood(activity)}
+      mood={disconnected ? "idle" : activityMood}
     />
   );
 }
@@ -131,6 +129,7 @@ export const BloubAvatarPreview = memo(function BloubAvatarPreview(
         size={size}
         mood={props.mood}
         animateIdle={props.animateIdle}
+        paused={props.paused}
         disconnected={props.disconnected}
         transition={props.transition}
       />
@@ -138,12 +137,6 @@ export const BloubAvatarPreview = memo(function BloubAvatarPreview(
   );
 });
 
-/**
- * The felt plush of an agent. A still plush is a picture drawn once and shown by the image view, so a
- * long list costs no drawing surface per row. A plush that moves draws its frames with Skia on the UI
- * thread; it keeps its canvas once it has moved, so a face that settles does not flash. A seed of the
- * flat style shows the flat face of the desktop instead.
- */
 const PlushAvatar = memo(function PlushAvatar({
   seed,
   hue,
@@ -151,6 +144,7 @@ const PlushAvatar = memo(function PlushAvatar({
   size,
   mood = "idle",
   animateIdle = true,
+  paused = false,
   disconnected = false,
   transition = "cut",
 }: {
@@ -160,12 +154,12 @@ const PlushAvatar = memo(function PlushAvatar({
   size: number;
   mood?: AvatarMood;
   animateIdle?: boolean;
+  paused?: boolean;
   disconnected?: boolean;
   transition?: PlushTransition;
 }) {
-  // Reduced motion, or the Settings switch for faces, holds the face at rest.
   const facesMove = useMotionPreference("agentFaces");
-  const wantsMotion = facesMove && !disconnected && (avatarMoodIsBusy(mood) || animateIdle);
+  const wantsMotion = facesMove && !paused && !disconnected && (avatarMoodIsBusy(mood) || animateIdle);
   const focused = useScreenFocusedWhile(wantsMotion);
   const animate = wantsMotion && focused;
   const [live, setLive] = useState(animate);
@@ -174,7 +168,6 @@ const PlushAvatar = memo(function PlushAvatar({
   const appearance = useConnectionAppearance(disconnected);
   const appearanceStyle = useAnimatedStyle(() => ({ opacity: appearance.get().opacity }));
   const saturation = useDerivedValue(() => appearance.get().saturation);
-  // The fur and the felt decor reach past the avatar box, as on the desktop.
   const drawn = size * PLUSH_BODY_SCALE;
   const pixels = plushPixels(drawn, PixelRatio.get());
   const picture = (
@@ -197,7 +190,6 @@ const PlushAvatar = memo(function PlushAvatar({
         ]}
       >
         {avatarStyleForSeed(shown.seed) === "flat" ? (
-          // A flat face holds its picture, as the desktop does. A busy agent breathes.
           <FlatBreath amount={animate ? avatarMoodPresentation(mood).breathe : 0} size={drawn}>
             {picture}
           </FlatBreath>
@@ -221,7 +213,6 @@ const PlushAvatar = memo(function PlushAvatar({
   );
 });
 
-/** One breath of the desktop: the scale goes from `1 - amount` to `1 + amount` and back in 2.6 s. */
 const BREATH_MS = 1300;
 
 function FlatBreath({ amount, size, children }: { amount: number; size: number; children: ReactNode }) {
@@ -243,7 +234,6 @@ function FlatBreath({ amount, size, children }: { amount: number; size: number; 
   return <Animated.View style={[{ width: size, height: size }, style]}>{children}</Animated.View>;
 }
 
-/** The old plush shrinks away, the new one springs out. `cut`, or reduced motion, swaps at once. */
 function usePlushPop(seed: string, hue: AvatarHue | null, color: AvatarColor | null, pop: boolean) {
   const [shown, setShown] = useState({ seed, hue, color });
   const target = useRef({ seed, hue, color });
@@ -293,7 +283,6 @@ function usePlushArt(
       (art) => {
         if (current) setLoaded({ key, art });
       },
-      // Without its pictures the plush keeps the still picture.
       () => undefined,
     );
     return () => {
@@ -326,19 +315,8 @@ function PlushCanvas({
 }) {
   const geometry = useMemo(() => plushGeometry(seed, mood), [seed, mood]);
   const art = usePlushArt(seed, hue, color, pixels);
-  // The frames are sampled only when there is a plush to draw them on.
   const frame = usePlushFrame(geometry, animate && art !== null);
-  const picture = useDerivedValue(
-    () =>
-      createPicture(
-        (canvas) => {
-          const current = frame.get();
-          if (art && current) drawPlush(canvas, current, art, size, saturation.get());
-        },
-        { width: size, height: size },
-      ),
-    [art, frame, saturation, size],
-  );
+  const picture = useDerivedValue(() => recordPlush(frame.get(), art, size, saturation.get()));
   if (!art) return fallback;
   return (
     <Canvas accessibilityElementsHidden accessible={false} pointerEvents="none" style={{ width: size, height: size }}>
@@ -347,7 +325,6 @@ function PlushCanvas({
   );
 }
 
-/** The saved still picture of a plush. It is drawn the first time it shows. */
 function usePlushPicture(spec: PlushPictureSpec): string | null {
   const name = plushPictureName(spec);
   const known = savedPlushPicture(spec);
@@ -377,8 +354,6 @@ function PlushPicture({
   crossfade = false,
 }: PlushPictureSpec & { size: number; crossfade?: boolean }) {
   const drawn = usePlushPicture({ seed, hue, color, mood, pixels, saturation });
-  // While a new face of the same agent is drawn, the face on screen stays. A recycled row of another
-  // agent clears it.
   const identity = `${seed}|${hue ?? ""}|${color ?? ""}`;
   const last = useRef<{ identity: string; uri: string } | null>(null);
   if (drawn) last.current = { identity, uri: drawn };
@@ -395,8 +370,6 @@ function PlushPicture({
   );
 }
 
-// Choices show the same idle pose without mounting animation clocks or drawing surfaces for every
-// item in the picker.
 export const BloubAvatarThumbnail = memo(function BloubAvatarThumbnail(
   props: Omit<BloubAvatarProps, "agentId"> & AgentPhotoProps & { disconnected?: boolean },
 ) {
@@ -407,7 +380,6 @@ export const BloubAvatarThumbnail = memo(function BloubAvatarThumbnail(
   );
 });
 
-// Draws the still plush without the photo lookup, for pickers that never show a photo.
 export const AvatarThumbnail = memo(function AvatarThumbnail({
   seed,
   hue,
@@ -417,7 +389,6 @@ export const AvatarThumbnail = memo(function AvatarThumbnail({
   animateColor = false,
 }: Omit<BloubAvatarProps, "agentId"> & {
   disconnected?: boolean;
-  /** Fades to a new colour, for a picker where the colour changes in place. */
   animateColor?: boolean;
 }) {
   const drawn = size * PLUSH_BODY_SCALE;
