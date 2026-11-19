@@ -59,7 +59,6 @@ const INSTALLED: Record<ManagedProviderId, string> = {
   mistral: "3.1.0",
 };
 
-/** Only Claude has a newer runtime: the quiet rows are half of what the flow has to show. */
 const AVAILABLE: Record<ManagedProviderId, string | null> = {
   codex: "0.149.1",
   claude: "2.1.250",
@@ -76,7 +75,6 @@ const AVAILABLE: Record<ManagedProviderId, string | null> = {
   mistral: null,
 };
 
-/** Fast enough to finish in a couple of seconds, slow enough to read. */
 const PROGRESS_STEP = 8;
 const PROGRESS_INTERVAL = 120;
 const FINISHING_DELAY = 500;
@@ -99,25 +97,9 @@ function readyRuntimes(): Record<ManagedProviderId, ProviderRuntimeStatus> {
   };
 }
 
-/**
- * The update flow with main simulated locally, the same way `onboarding-fixture.tsx`
- * simulates a download: local signals, a `setInterval` progress tick and per-provider timer
- * cleanup. `mock-openbot.ts` still stubs `providerRuntimes` inert, and no contract carries
- * `availableVersion` yet, so props are the only honest source for these states today.
- */
-function ProviderUpdateFlow(props: {
-  controls?: boolean;
-  /** The first update fails with this message instead of the short default. */
-  failure?: string;
-  /** Two other notifications open beside the update, so the stack has something to make room for. */
-  companions?: boolean;
-  /** Each update first waits this long for the provider's turn to end, as main reports it. */
-  waitMs?: number;
-}) {
+function ProviderUpdateFlow(props: { controls?: boolean; failure?: string; companions?: boolean; waitMs?: number }) {
   const [runtimes, setRuntimes] = createSignal(readyRuntimes());
   const [provider, setProvider] = createSignal<AgentProviderId>("claude");
-  // One update fails, and the flag is spent when it does, so the Retry after it succeeds. The
-  // playground puts the switch under the reader.
   const [failNext, setFailNext] = createSignal(untrack(() => props.failure !== undefined));
   const failToggleId = createUniqueId();
   const timers = new Set<number>();
@@ -151,16 +133,10 @@ function ProviderUpdateFlow(props: {
     const update = updates().find((update) => update.provider === id);
     if (update) showProviderUpdateToast(update, () => startUpdate(id));
     running.add(id);
-    const waitMs = props.waitMs;
-    if (waitMs === undefined) {
-      runDownload(id);
-      return;
-    }
-    setRuntime(id, { phase: "downloading", progress: 0, message: sourceText("status.provider.updateWaiting") });
-    timers.add(window.setTimeout(() => runDownload(id), waitMs));
+    runDownload(id, props.waitMs);
   }
 
-  function runDownload(id: ManagedProviderId): void {
+  function runDownload(id: ManagedProviderId, waitMs?: number): void {
     setRuntime(id, { phase: "downloading", progress: 0, message: null });
     let progress = 0;
     const interval = window.setInterval(() => {
@@ -178,17 +154,24 @@ function ProviderUpdateFlow(props: {
       setRuntime(id, { phase: "downloading", progress });
       if (progress < 100) return;
       clearTimers();
-      setRuntime(id, { phase: "finishing", progress: 100 });
-      timers.add(
-        window.setTimeout(() => {
-          setRuntime(id, { phase: "ready", progress: 100, version: AVAILABLE[id] ?? INSTALLED[id] });
-        }, FINISHING_DELAY),
-      );
+      const finish = () => {
+        setRuntime(id, { phase: "finishing", progress: 100, message: null });
+        timers.add(
+          window.setTimeout(() => {
+            setRuntime(id, { phase: "ready", progress: 100, version: AVAILABLE[id] ?? INSTALLED[id] });
+          }, FINISHING_DELAY),
+        );
+      };
+      if (waitMs === undefined) {
+        finish();
+        return;
+      }
+      setRuntime(id, { phase: "downloading", progress: 100, message: sourceText("status.provider.updateWaiting") });
+      timers.add(window.setTimeout(finish, waitMs));
     }, PROGRESS_INTERVAL);
     timers.add(interval);
   }
 
-  /** The reverse state: the runtime the user already had is still installed and still usable. */
   function cancelUpdate(id: AgentProviderId): void {
     if (!isManagedRuntimeProvider(id)) return;
     clearTimers();
@@ -197,11 +180,6 @@ function ProviderUpdateFlow(props: {
     dismissProviderUpdateToast(id);
   }
 
-  /**
-   * Put every runtime back on the version it started from, so the offer can be watched more than
-   * once without reloading the page. Clearing `announced` is what lets the toast fire again, and
-   * the offer replaces whatever holds the same toast id, so nothing has to be dismissed by hand.
-   */
   function replayFlow(): void {
     clearTimers();
     running.clear();
@@ -209,8 +187,6 @@ function ProviderUpdateFlow(props: {
     setRuntimes(readyRuntimes());
   }
 
-  // The snapshot is the trigger, so the announcement is an effect on it. In the app the same two
-  // calls sit in `applyProviderRuntimeSnapshot`, which main already drives.
   createEffect(
     () => updates(),
     (next) => {
@@ -313,45 +289,27 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Drive it yourself. Nothing runs on its own here: the offer arrives on mount and the update starts
- * only when you press Update, on the notification or in the row's actions menu. "Offer the update again" puts
- * Claude back on the version it started from, so the whole flow can be watched more than once, and
- * the switch beside it interrupts the next run to make the Retry path reachable.
- */
 export const Playground: Story = {
   render: () => <ProviderUpdateFlow controls />,
 };
 
-/** The offer, on both surfaces at once. */
 export const UpdateAvailable: Story = {};
 
-/** Press Update: Claude runs a turn, so the update waits for it on both surfaces, then downloads. */
 export const WaitsForTurn: Story = {
   render: () => <ProviderUpdateFlow controls waitMs={3_000} />,
 };
 
-/**
- * Text that `userErrorMessage` lets through: under its length limit, with no path or stack trace,
- * and with an address that has no place to break.
- */
 const LONG_FAILURE =
   "OpenBot could not update the Claude CLI. The registry at https://registry.npmjs.org/@anthropic-ai/claude-code/-/claude-code-2.1.250.tgz answered with a checksum that does not match the published package, so the download stopped before it replaced the version you have.";
 
-/**
- * Press Update: the download fails with a long reason. The reason stops after three lines, and
- * "Show details" opens the rest. Retry and the close control stay clear of the text.
- */
 export const LongFailure: Story = {
   render: () => <ProviderUpdateFlow controls failure={LONG_FAILURE} />,
 };
 
-/** The same failure with two other notifications open. Hover the stack, then open the details. */
 export const LongFailureStacked: Story = {
   render: () => <ProviderUpdateFlow controls companions failure={LONG_FAILURE} />,
 };
 
-/** The same failure at the narrow width where the toasts take the full window. */
 export const LongFailureNarrow: Story = {
   globals: { viewport: "toastNarrow" },
   render: () => <ProviderUpdateFlow controls companions failure={LONG_FAILURE} />,

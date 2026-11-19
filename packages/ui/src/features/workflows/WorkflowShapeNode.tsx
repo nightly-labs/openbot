@@ -1,5 +1,3 @@
-/** A shape on the canvas, with words at its centre. It has no ports, and a run skips it. */
-
 import type { AppTextKey } from "@openbot/i18n";
 import { Shapes, Textarea } from "@openbot/ui";
 import { Show, untrack } from "solid-js";
@@ -21,7 +19,6 @@ import {
   useTextField,
 } from "./workflow-node-parts";
 
-/** The shapes, with the size that each one gets when the user places it. */
 export const SHAPES: readonly { value: ShapeKind; label: AppTextKey; size: { width: number; height: number } }[] = [
   { value: "rectangle", label: "workflow.shape.rectangle", size: { width: 208, height: 128 } },
   { value: "circle", label: "workflow.shape.circle", size: { width: 144, height: 144 } },
@@ -35,14 +32,12 @@ export const SHAPES: readonly { value: ShapeKind; label: AppTextKey; size: { wid
 export const shapeSize = (shape: ShapeKind) =>
   SHAPES.find((option) => option.value === shape)?.size ?? { width: 208, height: 128 };
 
-/** A five-point star in a 100 by 100 box. */
 const STAR = Array.from({ length: 10 }, (_, index) => {
   const reach = index % 2 === 0 ? 1 : 0.4;
   const angle = -Math.PI / 2 + (index * Math.PI) / 5;
   return `${(50 + 50 * reach * Math.cos(angle)).toFixed(1)},${(55 + 55 * reach * Math.sin(angle)).toFixed(1)}`;
 }).join(" ");
 
-/** The corners of the shapes that CSS cannot draw, in a 100 by 100 box that stretches to the node. */
 const POLYGONS: Partial<Record<ShapeKind, string>> = {
   diamond: "50,0 100,50 50,100 0,50",
   triangle: "50,0 100,100 0,100",
@@ -50,11 +45,6 @@ const POLYGONS: Partial<Record<ShapeKind, string>> = {
   star: STAR,
 };
 
-/**
- * The fill and the outline of a shape, in `--wfn-shape`. A rectangle, a circle and an oval are a
- * box with a radius. The other shapes are a polygon that stretches to the box, and the outline
- * keeps its width.
- */
 export function ShapeSurface(props: { shape: ShapeKind; color: CanvasColor }) {
   return (
     <Show
@@ -77,7 +67,6 @@ export function ShapeSurface(props: { shape: ShapeKind; color: CanvasColor }) {
   );
 }
 
-/** A shape as a 24px line icon, for a shape button and the shape menu. */
 export function ShapeIcon(props: { shape: ShapeKind }) {
   const outline = () => {
     switch (props.shape) {
@@ -116,7 +105,6 @@ export function ShapeIcon(props: { shape: ShapeKind }) {
   );
 }
 
-/** A shape on the canvas, with words at its centre. It has no ports, and a run skips it. */
 export function ShapeNode(props: { id: string; shape?: ShapeKind; color?: CanvasColor; text?: string }) {
   const { t } = useText();
   const id = () => props.id;

@@ -29,10 +29,13 @@ export const messages = {
   "billing.status.paused": "متوقف مؤقتًا",
   "billing.otherServers": "خوادم أخرى",
   "billing.action.menu": "إجراءات خطة {server}",
-  "billing.action.change": "تغيير الخطة",
+  "billing.action.addStorage": "إضافة مساحة تخزين",
   "billing.action.cancel": "إلغاء الخطة",
   "billing.action.renew": "تجديد الخطة",
   "billing.action.updatePayment": "تحديث طريقة الدفع",
+  "billing.storage.title": "مساحة أكبر لـ {server}",
+  "billing.storage.add": "إضافة {size}",
+  "billing.storage.failed": "تعذّرت إضافة مساحة التخزين.",
   "billing.lifecycle.cancelRenewal": "إلغاء التجديد",
   "billing.lifecycle.cancelTitle": "إلغاء تجديد {name}؟",
   "billing.lifecycle.cancelDescription":
@@ -246,4 +249,10 @@ export const messages = {
     other:
       "في ترخيصك {count} مستخدم، وهو الحد الأقصى. تواصل معنا للحصول على ترخيص أكبر. لا يمكن لأشخاص جدد الانضمام إلى خوادمك.",
   },
+  "billing.details.country": "بلد الفوترة",
+  "billing.details.countryPlaceholder": "اختر بلدًا",
+  "billing.details.vatId": "رقم ضريبة القيمة المضافة في الاتحاد الأوروبي (اختياري)",
+  "billing.details.vatIdInvalid": "هذا ليس رقم ضريبة القيمة المضافة للبلد المختار.",
+  "billing.details.countryMissing": "اختر بلد الفوترة.",
+  "billing.details.saveFailed": "تعذّر حفظ بيانات الفوترة",
 } as const satisfies PartialTranslation<typeof source>;

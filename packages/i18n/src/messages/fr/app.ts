@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/app";
 
 export const messages = {
-  // The app shell, shared state, and shared controls without a feature of their own.
   "app.loading": "Chargement d’OpenBot",
   "app.leftPanel.resize": "Redimensionner la barre latérale gauche",
   "app.host.thisMac": "Ce Mac",
@@ -11,7 +10,6 @@ export const messages = {
   "app.action.unavailable": "Action indisponible",
   "app.error.actionFailed": "Impossible de terminer l’action. Réessayez.",
   "app.errorStatus.queueLoad": "Impossible de charger les messages en file d’attente",
-  "app.errorStatus.waitsLoad": "Impossible de charger les attentes en cours",
   "app.errorStatus.answer": "Impossible d’envoyer votre réponse",
   "app.errorStatus.approval": "Impossible d’envoyer votre décision",
   "app.errorStatus.browserTakeover": "Impossible de terminer la prise de contrôle du navigateur",
@@ -57,6 +55,8 @@ export const messages = {
   "app.rail.workflows": "Workflows",
   "app.rail.usage": "Utilisation",
   "app.rail.library": "Bibliothèque",
+  "app.rail.providers": "Fournisseurs",
+  "app.rail.crm": "CRM",
   "app.rail.marketplace": "Marketplace",
   "app.rail.settings": "Réglages",
   "app.rail.settingsNotice": "Réglages. {notice}",
@@ -96,6 +96,11 @@ export const messages = {
   "app.socialFollow.redditTitle": "Comment j’utilise OpenBot",
   "app.rail.usageRings": "Utilisation de {name} : {windows}. Ouvrir l’utilisation",
   "app.rail.customAgentUsage": "Utilisation de {name}. Ouvrir l’utilisation",
+  "app.rail.moreUsage": {
+    one: "{count} autre compte. Ouvrir l’utilisation",
+    other: "{count} autres comptes. Ouvrir l’utilisation",
+  },
+  "app.rail.moreUsageCount": "+{count}",
   "app.rail.mediaCredits": "{name} : {credits} crédits restants. Ouvrir {name}",
   "app.rail.mediaCreditsQuota": "{name} : {credits} crédits d’équipe restants sur {quota}. Ouvrir {name}",
   "app.rail.mediaCreditsMeta": "Crédits",
@@ -106,6 +111,7 @@ export const messages = {
   "app.settingsPage.searchPlaceholder": "Rechercher dans les réglages…",
   "app.settingsPage.results": "Résultats de recherche des réglages",
   "app.settingsPage.noResults": "Aucun réglage correspondant.",
+  "app.settingsPage.marketplaceApps": "Connecteurs et serveurs MCP",
   "app.settingsPage.resultCount": {
     one: "{count} réglage correspondant.",
     other: "{count} réglages correspondants.",

@@ -1,9 +1,3 @@
-/**
- * Browser profiles: named, persistent browser sessions on the computer that runs the agents. Each
- * agent uses one of them, its own session, or the shared session. The name is only a label; the
- * random id names the Chromium partition, so a rename does not move data.
- */
-
 import { type AvatarHue, isAvatarHue } from "./ipc-agent-identity";
 import { integerInRange, isIdentifier } from "./ipc-bounded-values";
 import { type DynamicRecord, isDynamicRecord, isString } from "./runtime-values";
@@ -13,11 +7,6 @@ export const BROWSER_PROFILE_LIMIT = 100;
 
 const BROWSER_PROFILE_ID = /^[0-9a-f]{32}$/u;
 
-/**
- * The colors that a new profile gets, in order: the first one with the fewest profiles. Neighbors
- * are far apart on the color wheel, so the first profiles are easy to tell apart. Red is last,
- * because it also marks errors.
- */
 export const BROWSER_PROFILE_HUES = [215, 30, 150, 320, 55, 185, 245, 0] as const satisfies readonly AvatarHue[];
 
 export function nextBrowserProfileHue(used: readonly AvatarHue[]): AvatarHue {
@@ -32,21 +21,14 @@ export function isBrowserProfileId(value: unknown): value is string {
   return isString(value) && BROWSER_PROFILE_ID.test(value);
 }
 
-/** The trimmed name, or null when it is empty or too long. */
 export function browserProfileName(value: unknown): string | null {
   if (!isString(value)) return null;
   const name = value.trim();
   return name.length > 0 && name.length <= BROWSER_PROFILE_NAME_MAX ? name : null;
 }
 
-/**
- * The session that the browser tabs of one agent use. `shared`: the session of every agent and of
- * the user. `agent`: a session of this agent only. `profile`: a named profile that other agents can
- * also use.
- */
 export type AgentBrowserProfile = { kind: "shared" } | { kind: "agent" } | { kind: "profile"; profileId: string };
 
-/** The choice that the stored agent fields give. A named profile comes before the agent session. */
 export function agentBrowserProfile(agent: {
   ownBrowserSession?: boolean | undefined;
   browserProfileId?: string | undefined;
@@ -71,26 +53,20 @@ export function isAgentBrowserProfile(value: unknown): value is AgentBrowserProf
 export interface BrowserProfileSummary {
   id: string;
   name: string;
-  /** The color of the profile's labels. */
   hue: AvatarHue;
-  /** The agents that use the profile. */
   agentIds: string[];
-  /** The open tabs in the profile. */
   tabCount: number;
 }
 
-/** The named profiles of one computer, and the agents that use its shared session. */
 export interface BrowserProfileList {
   profiles: BrowserProfileSummary[];
   sharedAgentIds: string[];
 }
 
-/** A new name, a new color, or both. */
 export type UpdateBrowserProfileInput = {
   profileId: string;
 } & ({ name: string; hue?: AvatarHue } | { name?: string; hue: AvatarHue });
 
-/** Which data to clear: a named profile, or the session of one agent. */
 export type ClearBrowserDataInput = { profileId: string } | { agentId: string };
 
 export interface UpdateAgentBrowserProfileInput {
@@ -98,12 +74,9 @@ export interface UpdateAgentBrowserProfileInput {
   profile: AgentBrowserProfile;
 }
 
-/** The profile of one open tab. A tab in the shared session has no entry. */
 export interface BrowserTabProfile {
   tabId: string;
-  /** Null for the session of one agent: it has no name. */
   name: string | null;
-  /** Null for the session of one agent: it has no color. */
   hue: AvatarHue | null;
 }
 
@@ -143,7 +116,6 @@ export function decodeBrowserTabProfiles(value: unknown): BrowserTabProfile[] {
   if (!Array.isArray(value)) throw new Error("Invalid browser tab profiles.");
   return value.map((entry): BrowserTabProfile => {
     if (!isDynamicRecord(entry) || !isIdentifier(entry.tabId)) throw new Error("Invalid browser tab profile.");
-    // The session of one agent has neither a name nor a color; a named profile has both.
     if (entry.name === null && entry.hue === null) return { tabId: entry.tabId, name: null, hue: null };
     const name = browserProfileName(entry.name);
     if (name === null || !isAvatarHue(entry.hue)) throw new Error("Invalid browser tab profile.");
@@ -151,7 +123,6 @@ export function decodeBrowserTabProfiles(value: unknown): BrowserTabProfile[] {
   });
 }
 
-/** The answer of the `browser-profiles-v1` tab route, `{ tabs }`. */
 export function decodeHostBrowserTabProfiles(value: unknown): BrowserTabProfile[] {
   if (!isDynamicRecord(value)) throw new Error("Invalid browser tab profiles.");
   return decodeBrowserTabProfiles(value.tabs);

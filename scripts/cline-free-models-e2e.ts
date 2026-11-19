@@ -1,13 +1,3 @@
-// Lists and selects Cline's free models end to end on the real Cline driver, with a fake `cline --acp`
-// that answers as Cline 3.0.73 does: a provider option of the model category comes before the model
-// option, the model option does not list the `cline-free/*` or `cline-pass/*` models, and the agent
-// takes any model value. Cline's recommended-models endpoint is answered in this process. Checks that
-// the picker gets the ClinePass models with a "(ClinePass)" name and the free models with a "(free)"
-// name, that a listed, a free and a ClinePass model each reach the session through the `model`
-// option, that a free model moves the session to the `cline` provider and a ClinePass model to the
-// `cline-pass` provider (#8587), that a list that cannot be read gives the last good one, then the
-// bundled one (in which a ClinePass model still runs), and that an empty free tier is kept.
-// `bun scripts/cline-free-models-e2e.ts`. Writes .openbot-build/cline-free-models-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -22,7 +12,6 @@ import { installFakeAgent, readJsonl, runTurn, startThread, stopClients } from "
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/cline-free-models-e2e");
 
-// The shape of Cline's answer on 2026-10-19, with one id that `isAgentModel` refuses.
 const RECOMMENDED = {
   recommended: [{ id: "anthropic/claude-sonnet-5.5", name: "claude-sonnet-5.5", description: "", tags: ["NEW"] }],
   free: [
@@ -58,7 +47,6 @@ const report: Report = { passed: false };
 const clients: AgentClient[] = [];
 process.env.FAKE_LOG = log;
 
-// Cline's endpoint, answered here: `status` 200 with `RECOMMENDED`, or the error status set below.
 let status = 200;
 let free: { id: string; name: string; description: string; tags: string[] }[] = RECOMMENDED.free;
 const requests: NonNullable<Report["requests"]> = [];
@@ -99,7 +87,6 @@ try {
   await installFakeAgent(executable, "cline");
   const cli: AgentCliInfo = { executable, version: "3.0.73", source: "managed" };
 
-  // 1. The picker gets the CLI's models, then Cline's free ones with a "(free)" name.
   const client = open(cli);
   const listed = (await listModels(client)).map((model) => ({ id: model.model ?? "", name: model.displayName ?? "" }));
   assert.deepEqual(
@@ -121,13 +108,9 @@ try {
   report.listed = listed;
   report.requests = requests;
 
-  // 2. A listed, a free and a ClinePass model each reach the session through the `model` option, not
-  // `provider`. The session starts on `cline-pass`: a listed model keeps it, a free one moves it to
-  // `cline`, and a ClinePass one moves it to `cline-pass`.
   await rm(log, { force: true });
   const thread = await startThread(client, { model: "openai/gpt-6-astra", cwd: workspace });
   report.turns = [];
-  // A listed model after the free one sets the session's own provider back.
   for (const [model, provider, providerChange] of [
     ["openai/gpt-6-astra", "cline-pass", false],
     ["cline-free/minimax-m3.1-flash", "cline", true],
@@ -152,7 +135,6 @@ try {
     report.turns.push({ model, set, sessionProvider: prompt?.provider ?? null, sessionModel: prompt?.model ?? null });
   }
 
-  // 3. A list that cannot be read keeps the last good one.
   status = 503;
   const lastGood = (await listModels(client))
     .map((model) => model.model ?? "")
@@ -164,8 +146,6 @@ try {
   );
   report.lastGood = lastGood;
 
-  // 4. With no good read yet, the bundled ClinePass models and free tier are listed, and a saved
-  // ClinePass model still reaches the session.
   const fresh = open(cli);
   const bundledIds = (await listModels(fresh)).map((model) => model.model ?? "");
   assert.ok(bundledIds.includes("cline-pass/glm-5.3"), "With no good read, the bundled ClinePass models are listed.");
@@ -191,7 +171,6 @@ try {
   );
   report.bundled = bundled;
 
-  // 5. An empty free tier is an answer: the picker does not keep the old free models.
   status = 200;
   free = [];
   const ended = (await listModels(client)).map((model) => model.model ?? "");

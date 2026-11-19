@@ -1,13 +1,3 @@
-// Checks the panes of the desktop side panel after #4805 (one pane registry). Drives the real `App`
-// in the `App/Playground` story of a running Storybook: the launcher and the Add menu list the panes
-// in registry order, each pane opens from them, a closed tab gives its place to the tab next to it,
-// collapse and reopen keep the tabs, Maximize and Restore, each agent keeps its own tabs, the side
-// question opens from the composer and its question is deleted on close, and the pane list shows when
-// the last tab closes.
-//
-// `bun scripts/side-panel-panes-e2e.ts --storybook=<url> [--browser-executable=<path>]`
-// Writes .openbot-build/side-panel-panes-e2e/report.json and a screenshot of each state, and exits
-// non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -15,8 +5,7 @@ import { chromium, type Page } from "playwright-core";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/side-panel-panes-e2e");
 const STORY = "app--playground";
-/** The panes that the Chief agent of the story lists, in the order of `SIDE_PANEL_PANES`. */
-const LISTED = ["Browser", "Files", "Agent settings", "Voice"];
+const LISTED = ["Browser", "Files", "Agent settings"];
 const WAIT_MS = 15_000;
 
 function option(name: string): string | undefined {
@@ -36,10 +25,8 @@ const report: { passed: boolean; checks: typeof checks; errors: string[]; error?
   errors: [],
 };
 
-/** The tab names of the panes. The Browser pane adds the tabs of its pages to the same tab list. */
-const PANE_NAMES = ["Browser", "Files", "Agent settings", "Voice", "Side question"];
+const PANE_NAMES = ["Browser", "Files", "Agent settings", "Side question"];
 
-/** The pane tabs of the side panel, as "Name" or "Name*" for the selected tab. */
 function paneTabs(page: Page): Promise<string[]> {
   return page.evaluate(
     (names) =>
@@ -50,7 +37,6 @@ function paneTabs(page: Page): Promise<string[]> {
   );
 }
 
-/** Waits until the pane tabs are `expected`, and returns the tabs at the end of the wait. */
 async function tabsBecome(page: Page, expected: string[]): Promise<string[]> {
   await page
     .waitForFunction(
@@ -104,7 +90,6 @@ try {
   const toggle = page.locator(".conversation-header .side-panel-toggle");
   await toggle.waitFor({ timeout: 60_000 });
 
-  // The launcher lists the panes that this chat can open, in registry order.
   await toggle.click();
   await page.locator(".side-panel-launcher").waitFor();
   const launcher = (await page.locator(".side-panel-launch").allInnerTexts()).map((text) => text.trim());
@@ -118,7 +103,6 @@ try {
   );
   await shot(page, "launcher");
 
-  // A pane opens from the launcher, and the others from the Add menu.
   await page.getByRole("button", { name: "Open Files" }).click();
   check("launcher: opens Files", same(await tabsBecome(page, ["Files*"]), ["Files*"]));
   const addMenu = await addPane(page, "Agent settings");
@@ -138,36 +122,31 @@ try {
   check("Add: opens Browser", same(withBrowser, ["Files", "Agent settings", "Browser*"]), withBrowser);
   await shot(page, "three-panes");
 
-  // A click on a tab selects its pane.
   await page.getByRole("tab", { name: "Files" }).click();
   const filesSelected = await tabsBecome(page, ["Files*", "Agent settings", "Browser"]);
   check("tab: a click selects its pane", same(filesSelected, ["Files*", "Agent settings", "Browser"]), filesSelected);
 
-  // The selected tab closes, and the tab next to it shows.
   await closeTab(page, "Files");
   const afterClose = await tabsBecome(page, ["Agent settings*", "Browser"]);
   check("close: the tab next to the closed tab shows", same(afterClose, ["Agent settings*", "Browser"]), afterClose);
-  // A tab that is not selected closes, and the selection stays.
   await closeTab(page, "Browser");
   const afterOther = await tabsBecome(page, ["Agent settings*"]);
   check("close: the selection stays when another tab closes", same(afterOther, ["Agent settings*"]), afterOther);
 
-  // Collapse and reopen keep the tabs and the selection.
-  await addPane(page, "Voice");
-  await tabsBecome(page, ["Agent settings", "Voice*"]);
+  await addPane(page, "Files");
+  await tabsBecome(page, ["Agent settings", "Files*"]);
   await page.getByRole("tab", { name: "Agent settings" }).click();
-  await tabsBecome(page, ["Agent settings*", "Voice"]);
+  await tabsBecome(page, ["Agent settings*", "Files"]);
   await toggle.click();
   await page.locator(".side-panel-header").waitFor({ state: "detached", timeout: WAIT_MS });
   await toggle.click();
-  const reopened = await tabsBecome(page, ["Agent settings*", "Voice"]);
+  const reopened = await tabsBecome(page, ["Agent settings*", "Files"]);
   check(
     "collapse: reopening shows the same tabs and selection",
-    same(reopened, ["Agent settings*", "Voice"]),
+    same(reopened, ["Agent settings*", "Files"]),
     reopened,
   );
 
-  // Maximize and Restore.
   await page.getByRole("button", { name: "Maximize side panel" }).click();
   const maximized = await page.getByRole("button", { name: "Restore side panel" }).getAttribute("aria-pressed");
   await shot(page, "maximized");
@@ -178,28 +157,47 @@ try {
     restored,
   });
 
-  // Each agent has its own tabs. An agent change closes Agent settings and Files (`resetPanelsForAgent`),
-  // so Voice shows during the change.
-  await page.getByRole("tab", { name: "Voice" }).click();
-  await tabsBecome(page, ["Agent settings", "Voice*"]);
+  await page.getByRole("tab", { name: "Files" }).click();
+  await tabsBecome(page, ["Agent settings", "Files*"]);
   await selectAgent(page, "Research");
   const researchBefore = await tabsBecome(page, []);
-  await toggle.click();
+  const researchLauncher = await page
+    .locator(".side-panel-launcher")
+    .waitFor({ timeout: WAIT_MS })
+    .then(() => true)
+    .catch(() => false);
+  check("agents: the panel stays open when another agent opens", researchLauncher);
   await page.getByRole("button", { name: "Open Browser" }).click();
   await tabsBecome(page, ["Browser*"]);
   await selectAgent(page, "Chief");
-  const chief = await tabsBecome(page, ["Agent settings", "Voice*"]);
+  const chief = await tabsBecome(page, ["Agent settings", "Files*"]);
   await selectAgent(page, "Research");
   const research = await tabsBecome(page, ["Browser*"]);
   await selectAgent(page, "Chief");
-  await tabsBecome(page, ["Agent settings", "Voice*"]);
+  await tabsBecome(page, ["Agent settings", "Files*"]);
   check(
     "agents: each agent keeps its own tabs",
-    researchBefore.length === 0 && same(chief, ["Agent settings", "Voice*"]) && same(research, ["Browser*"]),
+    researchBefore.length === 0 && same(chief, ["Agent settings", "Files*"]) && same(research, ["Browser*"]),
     { researchBefore, chief, research },
   );
 
-  // The side question opens from the composer. Closing its tab deletes the question.
+  await toggle.click();
+  await page.locator(".side-panel-header").waitFor({ state: "detached", timeout: WAIT_MS });
+  await selectAgent(page, "Research");
+  await page.waitForFunction(() => document.activeElement?.getAttribute("aria-label") === "Message Research", null, {
+    timeout: WAIT_MS,
+  });
+  const researchClosed = (await page.locator(".side-panel-header").count()) === 0;
+  await toggle.click();
+  const researchReopened = await tabsBecome(page, ["Browser*"]);
+  await selectAgent(page, "Chief");
+  const chiefOpen = await tabsBecome(page, ["Agent settings", "Files*"]);
+  check(
+    "agents: the panel stays closed when another agent opens",
+    researchClosed && same(researchReopened, ["Browser*"]) && same(chiefOpen, ["Agent settings", "Files*"]),
+    { researchClosed, researchReopened, chiefOpen },
+  );
+
   const composerAdd = page.getByRole("button", { name: "Add to prompt" });
   await composerAdd.click();
   const sideQuestionItem = page.getByRole("menuitem", { name: "Side question" });
@@ -209,35 +207,34 @@ try {
     .catch(() => false);
   if (sideQuestionListed) {
     await sideQuestionItem.click();
-    const withQuestion = await tabsBecome(page, ["Agent settings", "Voice", "Side question*"]);
+    const withQuestion = await tabsBecome(page, ["Agent settings", "Files", "Side question*"]);
     const box = page.getByRole("textbox", { name: "Ask a side question" });
     await box.fill("Which file did the agent change?");
     check(
       "side question: opens from the composer, and is not in the launcher",
-      same(withQuestion, ["Agent settings", "Voice", "Side question*"]),
+      same(withQuestion, ["Agent settings", "Files", "Side question*"]),
       withQuestion,
     );
     await shot(page, "side-question");
     await closeTab(page, "Side question");
-    const afterQuestion = await tabsBecome(page, ["Agent settings", "Voice*"]);
+    const afterQuestion = await tabsBecome(page, ["Agent settings", "Files*"]);
     await composerAdd.click();
     await sideQuestionItem.click();
-    await tabsBecome(page, ["Agent settings", "Voice", "Side question*"]);
+    await tabsBecome(page, ["Agent settings", "Files", "Side question*"]);
     const draftAfterClose = (await box.innerText()).trim();
     check(
       "side question: closing the tab deletes the question",
-      same(afterQuestion, ["Agent settings", "Voice*"]) && draftAfterClose === "",
+      same(afterQuestion, ["Agent settings", "Files*"]) && draftAfterClose === "",
       { afterQuestion, draftAfterClose },
     );
     await closeTab(page, "Side question");
-    await tabsBecome(page, ["Agent settings", "Voice*"]);
+    await tabsBecome(page, ["Agent settings", "Files*"]);
   } else {
     await page.keyboard.press("Escape");
     check("side question: the composer lists it", false);
   }
 
-  // With no tab, the panel lists the panes.
-  await closeTab(page, "Voice");
+  await closeTab(page, "Files");
   await tabsBecome(page, ["Agent settings*"]);
   await page.locator(".side-panel-tab-select").first().focus();
   await page.keyboard.press("Delete");

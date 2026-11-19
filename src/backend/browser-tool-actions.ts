@@ -10,19 +10,13 @@ export interface BrowserDynamicToolHooks {
   onUploadTargetResolved?: (inputId: string, documentId: string) => void;
   onUploadAssigned?: (inputId: string, documentId: string) => void;
   onUploadOperationStarted?: (completion: Fiber.Fiber<void, BrowserOperationError>) => void;
-  /** A person controls the tab. The caller waits for the release and gives the result of the tool call. */
   onUserControl?: (tabId: string) => Effect.Effect<DynamicToolResult>;
-  /** The saved cards that `fill_card` types. With none, `fill_card` fills nothing. */
   cardVault?: BrowserCardVault | undefined;
 }
 
-/** The saved cards that `fill_card` types, and the owner's approval of each page that they go to. */
 export interface BrowserCardVault {
-  /** The values to type, or null when no such card is saved. */
   secret(cardId: string): VaultCardSecret | null;
-  /** Whether the owner let agents fill `cardId` on the HTTPS `page` into fields of each of `frames`. */
   approved(cardId: string, page: string, frames: readonly string[]): boolean;
-  /** Asks the owner and keeps the approval. False when the owner declined or nobody answered. */
   approve(cardId: string, page: string, frames: readonly string[]): Effect.Effect<boolean, BrowserOperationError>;
 }
 
@@ -43,7 +37,6 @@ interface BrowserInputAction {
   ): Effect.Effect<void, BrowserOperationError>;
 }
 
-/** Owns typed input dispatch. The host owns tab authorization, queues, focus, and deadlines. */
 export function browserInputAction(call: BrowserInputCall, hooks: BrowserDynamicToolHooks): BrowserInputAction {
   switch (call.tool) {
     case "click": {
@@ -66,9 +59,6 @@ export function browserInputAction(call: BrowserInputCall, hooks: BrowserDynamic
     }
     case "type": {
       const { args } = call;
-      // Without a target the text goes to whatever the page has focused, where there is no value to
-      // replace and no selection to append to. Accepting `mode` there would report a replacement
-      // that never happened.
       if (!args.target && args.mode) throw new Error("type mode requires a target.");
       return {
         name: "type",

@@ -1,4 +1,3 @@
-/** Wait for native autocorrection/IME commit, and consume each send request once. */
 export function createComposerSendGate() {
   let editing = false;
   let pending = false;

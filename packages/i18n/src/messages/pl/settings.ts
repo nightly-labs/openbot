@@ -19,9 +19,17 @@ export const messages = {
   "settings.interfaceFont.title": "Czcionka interfejsu",
   "settings.interfaceFont.description": "Czcionka menu, czatów i ustawień.",
   "settings.interfaceFont.default": "Domyślna (Inter)",
+  "settings.interfaceFont.defaultSystem": "Czcionka systemu",
   "settings.codeFont.title": "Czcionka kodu",
   "settings.codeFont.description": "Czcionka kodu, terminali i ścieżek plików.",
   "settings.codeFont.default": "Domyślna",
+  "settings.motion.title": "Ruch",
+  "settings.backgroundBlur.title": "Rozmycie tła",
+  "settings.backgroundBlur.description":
+    "Rozmycie za menu i oknami dialogowymi. Na komputerze bez GPU jest na początku wyłączone.",
+  "settings.movingFaces.title": "Ruchome twarze agentów",
+  "settings.movingFaces.description":
+    "Twarze agentów mrugają i się ruszają. Na komputerze bez GPU są na początku nieruchome.",
   "settings.logoColor.title": "Kolor logo",
   "settings.logoColor.description": "Widoczny w Docku, na pasku zadań i w Dynamic Island.",
   "settings.logoColor.buildNote": "Ta kompilacja ma własny kolor logo. Wybór dotyczy wersji wydanej.",
@@ -41,6 +49,19 @@ export const messages = {
   "settings.chatBackground.light": "Tło czatu w motywie Jasny",
   "settings.chatBackground.dark": "Tło czatu w motywie Ciemny",
   "settings.chatBackground.default": "Domyślne",
+  "settings.chatBackdrop.title": "Tło okna",
+  "settings.chatBackdrop.description":
+    "Scena, obraz lub GIF za całym oknem na tym urządzeniu. Poproś agenta o scenę, a potem wybierz „Użyj jako tła” przy jego odpowiedzi.",
+  "settings.chatBackdrop.none": "Brak",
+  "settings.chatBackdrop.pond": "Staw z karpiami koi",
+  "settings.chatBackdrop.jellyfish": "Meduzy",
+  "settings.chatBackdrop.sunset": "Retro zachód słońca",
+  "settings.chatBackdrop.snowfall": "Opady śniegu",
+  "settings.chatBackdrop.fireflies": "Świetliki",
+  "settings.chatBackdrop.upload": "Prześlij obraz…",
+  "settings.chatBackdrop.uploadRefused": "Użyj obrazu PNG, JPEG, GIF, WebP lub AVIF o rozmiarze do 20 MB.",
+  "settings.chatBackdrop.saveFailed": "Tło nie zostało zapisane.",
+  "settings.chatBackdrop.removeFailed": "Tło nie zostało usunięte.",
   "settings.chatColor.title": "Kolor czatu",
   "settings.chatColor.description": "Barwi dymki twoich wiadomości. Widzą go też osoby na twoich serwerach.",
   "settings.chatColor.yours": "Twój kolor czatu",
@@ -60,6 +81,11 @@ export const messages = {
   "settings.chatColor.red": "Czerwony",
   "settings.chatColor.green": "Zielony",
   "settings.chatColor.blue": "Niebieski",
+  "settings.bubbleStyle.title": "Twoje dymki",
+  "settings.bubbleStyle.description": "W czacie z agentem twoje dymki mają kolor agenta. Widzisz to tylko ty.",
+  "settings.bubbleStyle.solid": "Pełny",
+  "settings.bubbleStyle.tint": "Odcień",
+  "settings.bubbleStyle.classic": "Klasyczny",
   "settings.appBehavior.title": "Działanie aplikacji",
   "settings.conversations.title": "Rozmowy",
   "settings.launchAtLogin.title": "Uruchamiaj OpenBot po zalogowaniu",
@@ -97,7 +123,7 @@ export const messages = {
   "settings.sendShortcut.description":
     "Wybierz klawisze, które wysyłają wiadomość na tym urządzeniu i w tej przeglądarce.",
   "settings.chatOrder.description":
-    "Wybierz, gdzie pasek boczny pokazuje nieprzeczytane czaty na tym urządzeniu. Ręcznie wyłącza grupę Nieprzeczytane.",
+    "Wybierz, jak pasek boczny sortuje czaty na tym urządzeniu. Ręcznie i Ostatnia aktywność wyłączają grupę Nieprzeczytane.",
   "settings.sendShortcut.enter": "Enter wysyła",
   "settings.sendShortcut.modEnterMac": "⌘Enter wysyła",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter wysyła",
@@ -286,7 +312,7 @@ export const messages = {
   "settings.analytics.webDescription":
     "Włączone: metadane użycia i niezawodności trafiają do samodzielnie hostowanej analityki OpenBot wraz z ID konta i adresem e-mail. Wyłączone: te same metadane trafiają tylko z losowym ID instalacji. Czaty, pliki i prompty nigdy nie są wysyłane. To ustawienie dotyczy tej przeglądarki.",
   "settings.tab.general.title": "Ogólne",
-  "settings.tab.general.description": "Określ, jak OpenBot działa na tym komputerze.",
+  "settings.tab.general.description": "Określ, jak działają czaty i co udostępnia OpenBot.",
   "settings.tab.agents.title": "Agenci",
   "settings.tab.agents.description":
     "Wybierz, co mogą robić agenci na tym komputerze, gdy nie ustawisz tego dla agenta.",
@@ -312,6 +338,14 @@ export const messages = {
   "settings.tab.billing.description": "Licencja, plany serwerów, metoda płatności i faktury.",
   "settings.tab.hostedServers.title": "Hostowane serwery",
   "settings.tab.hostedServers.description": "Twórz serwery OpenBot, które działają, gdy ten komputer jest wyłączony.",
+  "settings.tab.appearance.description": "Wybierz motyw, kolory, język i czcionki.",
+  "settings.tab.appBehavior.description": "Określ, jak OpenBot uruchamia się i działa na tym komputerze.",
+  "settings.appearance.colorsTitle": "Kolory",
+  "settings.appearance.textTitle": "Język i tekst",
+  "settings.appBehavior.startTitle": "Uruchamianie i zamykanie",
+  "settings.appBehavior.backgroundTitle": "W tle",
+  "settings.sections.group.account": "Konto",
+  "settings.sections.group.thisComputer": "Ten komputer",
   "settings.sections.label": "Sekcje ustawień",
   "settings.panel.resize": "Zmień rozmiar prawego panelu",
   "settings.preferences.loadFailed": "Nie udało się wczytać ustawień.",
@@ -446,7 +480,6 @@ export const messages = {
   "settings.profile.share.copyFailed": "Nie udało się skopiować obrazu.",
   "settings.profile.share.createFailed": "Nie udało się utworzyć obrazu.",
   "settings.profile.share.fileName": "openbot-activity.png",
-  // The text in the image to share.
   "settings.profile.share.caption": "Moje ostatnie pół roku z OpenBot",
   "settings.profile.activity.title": "Aktywność na tym komputerze",
   "settings.profile.activity.activeDays": {
@@ -458,7 +491,6 @@ export const messages = {
   "settings.profile.activity.empty": "Brak aktywności",
   "settings.profile.activity.loading": "Wczytywanie aktywności…",
   "settings.profile.activity.loadFailed": "Nie udało się wczytać aktywności.",
-  // {tokens} is a short number, such as 1.2M.
   "settings.profile.activity.heatmapLabel": {
     one: "Tokeny: {tokens}, {count} aktywny dzień w ostatnim roku",
     few: "Tokeny: {tokens}, {count} aktywne dni w ostatnim roku",
@@ -651,7 +683,6 @@ export const messages = {
   "settings.hostedServers.plan.standard.summary": "Dla małego zespołu z codziennymi rutynami.",
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Dla wielu agentów i intensywnej pracy w przeglądarce.",
-  // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "Dyktowanie",
   "settings.voice.model.parakeet.description": "Szybki. Sam rozpoznaje język mowy, w 25 językach europejskich.",
   "settings.voice.model.parakeetUnified.description":
@@ -680,6 +711,10 @@ export const messages = {
   "settings.voice.language.parakeetUnifiedEnglishOnly":
     "Parakeet Unified rozpoznaje tylko angielski. Aby ustawić język, użyj Whisper, Cohere lub ElevenLabs.",
   "settings.voice.language.automatic": "Automatycznie",
+  "settings.voice.pause.title": "Pauza przed wysłaniem",
+  "settings.voice.pause.description":
+    "W rozmowie głosowej OpenBot wysyła Twoje słowa, gdy przestaniesz mówić na tak długo. Wybierz dłuższą pauzę, jeśli mówisz wolno lub zatrzymujesz się, by pomyśleć. Głos na żywo Codex sam rozpoznaje koniec.",
+  "settings.voice.pause.seconds": "{seconds} s",
   "settings.voice.loadFailed": "Nie udało się odczytać modeli głosu.",
   "settings.voice.saveFailed": "Nie udało się zapisać ustawienia głosu. Spróbuj ponownie.",
   "settings.voice.downloadFailed": "Nie udało się rozpocząć pobierania. Spróbuj ponownie.",
@@ -775,6 +810,13 @@ export const messages = {
   "settings.transfer.import.lede": "Wybierz plik wyeksportowany z innego serwera. Jego nazwa kończy się na .zip.",
   "settings.transfer.import.choose": "Wybierz plik…",
   "settings.transfer.import.reading": "Odczytywanie pliku…",
+  "settings.transfer.upload.label": "Wysyłanie na serwer",
+  "settings.transfer.upload.sending": "Wysyłanie pliku…",
+  "settings.transfer.upload.sent": "Wysłano {sent} z {total}",
+  "settings.transfer.upload.serverReading": "Serwer odczytuje plik…",
+  "settings.transfer.upload.etaSoon": "Mniej niż minuta do końca",
+  "settings.transfer.upload.etaMinutes": "Jeszcze około {minutes} min",
+  "settings.transfer.upload.etaHours": "Jeszcze około {hours} godz. {minutes} min",
   "settings.transfer.import.openFailed": "Nie udało się otworzyć pliku",
   "settings.transfer.import.contains": "Ten plik zawiera",
   "settings.transfer.import.source": "OpenBot {version} · eksport: {date}",
@@ -826,13 +868,17 @@ export const messages = {
   "settings.transfer.copy.noAgents": "Ten serwer nie ma agentów.",
   "settings.transfer.copy.new": "Nowy",
   "settings.transfer.copy.notCopied":
-    "Ich kanały i folder współdzielony też są kopiowane. Klucze API, logowania, konektory i historia czatów nie są kopiowane. Skonfiguruj je ponownie na drugim serwerze.",
+    "Ich kanały, przepływy rutyn, przepływy pracy i folder współdzielony też są kopiowane. Klucze API, logowania, konektory i historia czatów nie są kopiowane. Skonfiguruj je ponownie na drugim serwerze.",
   "settings.transfer.copy.submit": {
     one: "Kopiuj {count} agenta",
     few: "Kopiuj {count} agentów",
     many: "Kopiuj {count} agentów",
     other: "Kopiuj {count} agenta",
   },
+  "settings.transfer.copy.duplicatesTitle": "Skopiować zduplikowanych agentów?",
+  "settings.transfer.copy.duplicatesDescription":
+    "{server} ma już agentów o tych nazwach: {names}. Kopiowanie doda drugiego agenta dla każdego z nich. Każda kopia to osobny agent z własnymi czatami, plikami i wspomnieniami.",
+  "settings.transfer.copy.duplicatesConfirm": "Kopiuj duplikaty",
   "settings.transfer.copy.copying": "Kopiowanie…",
   "settings.transfer.copy.done": {
     one: "Skopiowano {count} agenta na {server}.",

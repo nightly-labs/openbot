@@ -24,6 +24,12 @@ export const messages = {
   "error.remote.testActive": "Um teste de área de trabalho remota está ativo. Tente novamente quando terminar.",
   "error.remote.screenRecordingDenied":
     "O computador anfitrião não permitiu que o OpenBot grave a tela. Conceda a permissão de gravação de tela no computador anfitrião e tente novamente.",
+  "error.remote.windowsSessionDisconnected":
+    "A sessão do Windows no computador anfitrião está desconectada, então não há tela para compartilhar. Entre no Windows na tela do computador anfitrião e tente novamente.",
+  "error.remote.streamTooSlowLowerQuality":
+    "A conexão com o computador anfitrião está lenta demais para a imagem. Tente novamente: a próxima conexão usará uma qualidade mais baixa.",
+  "error.remote.streamTooSlow":
+    "A conexão com o computador anfitrião está lenta demais para a imagem. Use uma rede mais rápida e tente novamente.",
   "error.remote.teamSessionExpired": "A sessão da equipe expirou.",
   "error.remote.finishTestBeforeSwitch": "Conclua o teste de área de trabalho remota antes de trocar de tela.",
   "error.remote.displayNotFound": "Tela remota não encontrada.",
@@ -84,10 +90,14 @@ export const messages = {
   "error.remote.ownerOnlyRemove": "Somente o proprietário pode remover este servidor.",
   "error.remote.requestTimeout": "O tempo da solicitação remota esgotou.",
   "error.remote.requestFailed": "A solicitação remota falhou.",
-  "error.remote.pinnedKeyMissing": "O computador anfitrião remoto não tem uma chave de dispositivo fixada.",
+  "error.remote.hostKeyMissing":
+    "O OpenBot não pode verificar este servidor porque a chave de segurança dele está ausente ou mudou. Peça ao proprietário do servidor para verificá-lo.",
+  "error.remote.connectionNotStarted":
+    "O OpenBot não conseguiu iniciar a conexão com este servidor. Se isso continuar, feche o OpenBot e abra-o novamente.",
   "error.remote.hostDidNotConnect": "O computador anfitrião WebRTC não se conectou.",
   "error.remote.connectionCancelled": "A conexão remota foi cancelada.",
-  "error.remote.hostDisconnected": "O computador anfitrião WebRTC se desconectou.",
+  "error.remote.hostDisconnected":
+    "A conexão com o servidor foi perdida. Verifique se a ação foi concluída e tente novamente.",
   "error.remote.eventGap": "Há uma lacuna na sequência de eventos do computador anfitrião.",
   "error.remote.malformedKnownEvent": "O computador anfitrião retornou um evento conhecido malformado.",
   "error.remote.fileTransportIsStopped": "O transporte de arquivos WebRTC está parado.",
@@ -155,6 +165,7 @@ export const messages = {
   "error.remote.attachmentRejected": "O computador anfitrião rejeitou o anexo.",
   "error.remote.attachmentTooLarge": "Os anexos devem ter no máximo 10 MB.",
   "error.remote.attachmentBusy": "Aguarde o anexo atual terminar.",
+  "error.remote.attachmentChanged": "O arquivo mudou ou não está disponível. Selecione-o novamente.",
   "error.remote.uploadTimeout": "O tempo para enviar o anexo esgotou.",
   "error.remote.hostSessionActive": "O computador anfitrião já tem uma sessão remota ativa.",
   "error.remote.tooManyConnections": "Há conexões remotas ativas demais.",
@@ -186,6 +197,8 @@ export const messages = {
   "error.remote.iceFailed":
     "Não foi possível estabelecer uma conexão direta com o computador anfitrião. Um firewall, VPN ou proxy pode bloqueá-la.",
   "error.remote.iceDisconnected": "A conexão direta com o computador anfitrião foi perdida.",
+  "error.remote.webrtcBlocked":
+    "Este dispositivo bloqueia a conexão de que o OpenBot precisa. Se o Modo de Isolamento estiver ativado, desative-o para o OpenBot em Ajustes > Privacidade e Segurança > Modo de Isolamento.",
   "error.remote.directoryUnreachable": "O OpenBot não conseguiu acessar o serviço do OpenBot. Verifique sua conexão.",
   "error.remote.directoryTimeout": "O serviço do OpenBot não respondeu a tempo. Tente novamente.",
   "error.remote.inviteAlreadyUsed": "Este convite já foi usado. Peça um novo convite.",
@@ -210,6 +223,9 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "Atualize este servidor no computador para excluir canais.",
   "error.remote.historyRefreshFailed": "A mensagem foi enviada, mas não foi possível atualizar o histórico do chat.",
   "error.remote.taskHistoryRefreshFailed": "A tarefa foi alterada, mas não foi possível atualizar o histórico do chat.",
+  "error.remote.serverNotLoaded": "O OpenBot não conseguiu carregar o servidor. Tente novamente.",
+  "error.remote.localServerNotStarted":
+    "O servidor neste computador não iniciou. Tente novamente. Se ele não iniciar, reinicie o OpenBot neste computador.",
   "error.remote.localServerAccountRemovalFailed":
     "O servidor foi excluído no computador dele, mas a conta ainda o mostra. Exclua de novo para removê-lo da conta.",
 } as const satisfies PartialTranslation<typeof source>;

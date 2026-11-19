@@ -29,10 +29,13 @@ export const messages = {
   "billing.status.paused": "מושהה",
   "billing.otherServers": "שרתים אחרים",
   "billing.action.menu": "פעולות תוכנית עבור {server}",
-  "billing.action.change": "שינוי תוכנית",
+  "billing.action.addStorage": "הוספת אחסון",
   "billing.action.cancel": "ביטול תוכנית",
   "billing.action.renew": "חידוש תוכנית",
   "billing.action.updatePayment": "עדכון אמצעי תשלום",
+  "billing.storage.title": "יותר מקום ל-{server}",
+  "billing.storage.add": "הוספת {size}",
+  "billing.storage.failed": "לא ניתן היה להוסיף אחסון.",
   "billing.lifecycle.cancelRenewal": "ביטול החידוש",
   "billing.lifecycle.cancelTitle": "לבטל את החידוש של {name}?",
   "billing.lifecycle.cancelDescription":
@@ -212,4 +215,10 @@ export const messages = {
     other:
       "ברישיון שלך יש {count} משתמשים, המקסימום. יש ליצור קשר לקבלת רישיון גדול יותר. אנשים חדשים לא יוכלו להצטרף לשרתים שלך.",
   },
+  "billing.details.country": "מדינת החיוב",
+  "billing.details.countryPlaceholder": "בחירת מדינה",
+  "billing.details.vatId": "מספר מע״מ באיחוד האירופי (לא חובה)",
+  "billing.details.vatIdInvalid": "זה לא מספר מע״מ של המדינה שנבחרה.",
+  "billing.details.countryMissing": "יש לבחור את מדינת החיוב.",
+  "billing.details.saveFailed": "לא ניתן לשמור את פרטי החיוב",
 } as const satisfies PartialTranslation<typeof source>;

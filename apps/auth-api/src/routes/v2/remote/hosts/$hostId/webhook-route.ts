@@ -10,8 +10,6 @@ import {
   requestRemoteControlPlane,
 } from "../../../../../server/request-auth";
 
-// The host proves its machine token, as it does for a Signal ticket. The returned ticket names
-// only route IDs that this host registered in D1.
 export const Route = createFileRoute("/v2/remote/hosts/$hostId/webhook-route")({
   server: {
     handlers: {

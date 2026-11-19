@@ -1,99 +1,66 @@
 import type { SpeechAudio, SpeechLanguage } from "@openbot/contracts/ipc";
 import { createStore } from "solid-js";
 import { speechPort } from "./speech-port";
-import { speechParts } from "./speech-text";
+import { partBudget, SpeechParts } from "./speech-text";
 
-/**
- * How many level samples a speaking waveform keeps, and how often a new one arrives. There are as many
- * as the voice player has bars, so that all of its bars move while a reply is read.
- */
 export const SPEECH_LEVEL_COUNT = 40;
 const SPEECH_LEVEL_INTERVAL_MS = 80;
-/** The loudness of synthesized speech that fills the waveform. The model output is normalized. */
 const SPEECH_FULL_RMS = 0.12;
 
-/**
- * Whose words a reading reads: the agent on its server, and its message when the reading started
- * from one. Agent ids repeat across servers.
- */
 export interface SpeechSource {
   serverId: string;
   agentId: string;
   messageId: string | null;
 }
 
-/** What is read aloud now, for the speaking bar, the voice pane and the message that plays. */
 export interface SpeechReading {
-  /** Null for a text of no agent, such as the voice sample in Settings. */
   serverId: string | null;
   agentId: string | null;
   messageId: string | null;
-  /** The part that plays now, or the first part while it is synthesized. */
   part: string;
-  /** The loudness of the voice, oldest first, from 0 to 1. */
   levels: number[];
   paused: boolean;
-  /** For a recording: its length, in seconds. Null for a reading, which is synthesized as it plays. */
   duration: number | null;
-  /** How far the recording or the reading played, in seconds. */
   elapsed: number;
 }
 
-/** A recording of a spoken message, decoded for playback, and its shape for the waveform. */
 export interface VoiceRecordingSummary {
   duration: number;
-  /** The loudness of each slice of the recording, from 0 to 1. */
   peaks: number[];
 }
 
-/** How many bars the waveform of a recording has. */
 const RECORDING_PEAK_COUNT = 40;
-/**
- * How many replies keep their audio after a full reading, and how long they can be together, in
- * seconds. One minute of speech is about 10 MB. A reply that is dropped is synthesized again when
- * it plays, and a reply longer than this limit is never kept.
- */
 const SPOKEN_AUDIO_LIMIT = 12;
 const SPOKEN_AUDIO_SECONDS = 3 * 60;
-/**
- * How many recordings stay decoded for playback. A decoded recording can be 20 MB; its waveform
- * stays after it is dropped, and a new play decodes it again.
- */
 const DECODED_RECORDING_LIMIT = 4;
+const SYNTHESIS_AHEAD_SECONDS = 30;
 
-/** An agent on one server. Agent ids repeat across servers. */
 export type SpeechAgent = Pick<SpeechSource, "serverId" | "agentId">;
 
-/** One text that is read aloud. Stopping it ends the part that plays and skips the rest. */
 interface Reading {
   stopped: boolean;
-  /** The agent whose words it reads, or null for a recording or a text of no agent. */
   agent: SpeechAgent | null;
-  /** A hold paused it, so the end of the hold plays it again. */
   held: boolean;
-  /** A plain copy of the paused state, because a store read can lag behind its write. */
   paused: boolean;
-  /** A reply plays at the speed that the user chose; the user's own recording plays at normal speed. */
   reply: boolean;
-  /** The element that plays the buffer of now, and the function that ends its play. */
   element: HTMLAudioElement | undefined;
   finish: (() => void) | undefined;
   stopMeter: (() => void) | undefined;
-  /** Set by a seek before the buffer plays: the position the recording plays from. */
   seekTo: number | undefined;
-  /** For a reading: the length of the parts that played before the part that plays now. */
   before: number;
-  /** For a reading: the audio of the parts that played, kept to play the message again. */
   played: AudioBuffer[];
-  /** For a reading: it asked for its last part, so the host is free for the next reading. */
   lastPartAsked: boolean;
+  askNext: (() => void) | undefined;
 }
 
-/** A text that is read aloud after the reading of now. */
+interface SpokenPart {
+  audio: SpeechAudio;
+  synthesisMs: number | undefined;
+}
+
 export interface UpcomingReading {
   text: string;
   language: SpeechLanguage;
-  /** The synthesis of its first part, once it started. */
   first?: Promise<SpeechAudio>;
 }
 
@@ -101,50 +68,36 @@ let audioContext: AudioContext | undefined;
 let analyser: AnalyserNode | undefined;
 let reading: Reading | undefined;
 let upcoming: UpcomingReading | undefined;
-/** The agent whose readings stay paused until `releaseSpeech`. */
 let heldAgent: SpeechAgent | undefined;
-/** The speed of replies. A change applies to the reply that plays now. */
 let replyRate = 1;
 const [state, setState] = createStore<{
   reading: SpeechReading | null;
   recordings: Record<string, VoiceRecordingSummary>;
-  /** Recordings that the user deleted, for example in Storage: their file is gone. */
   goneRecordings: Record<string, true>;
-  /** The duration and waveform of each message that was read aloud to its end. */
   spokenReplies: Record<string, VoiceRecordingSummary>;
 }>({ reading: null, recordings: {}, goneRecordings: {}, spokenReplies: {} });
 const decoded = new Map<string, Promise<AudioBuffer>>();
-/** The audio of the messages in `spokenReplies`, oldest first. It is not saved, so a reload loses it. */
 const spokenAudio = new Map<string, AudioBuffer>();
 
-/** The reading that plays now, or null. */
 export function speechReading(): SpeechReading | null {
   return state.reading;
 }
 
-/** The duration and waveform of a recording, once `loadRecording` decoded it. */
 export function recordingSummary(url: string): VoiceRecordingSummary | undefined {
   return state.recordings[url];
 }
 
-/** True when a load of the recording found no file, because the user deleted it. */
 export function recordingGone(url: string): boolean {
   return state.goneRecordings[url] === true;
 }
 
-/** The duration and waveform of a message, once a reading of it played to its end. */
 export function spokenReply(messageId: string): VoiceRecordingSummary | undefined {
   return state.spokenReplies[messageId];
 }
 
-/**
- * Decodes a recording once, for its waveform and for playback. A failure is forgotten, so the next
- * call tries again.
- */
 export function loadRecording(url: string): Promise<AudioBuffer> {
   const known = decoded.get(url);
   if (known) {
-    // The newest use goes last, so the oldest is dropped first.
     decoded.delete(url);
     decoded.set(url, known);
     return known;
@@ -191,22 +144,16 @@ function recordingPeaks(buffer: AudioBuffer): number[] {
   return peaks.map((peak) => peak / loudest);
 }
 
-/**
- * Sets the speed of replies, where 1 is normal speed. The pitch of the voice stays the same. The reply
- * that plays now changes speed at once; the user's own recordings always play at normal speed.
- */
 export function setReplyPlaybackRate(rate: number): void {
   replyRate = rate;
   if (reading?.reply && reading.element) setRate(reading.element, rate);
 }
 
 function setRate(element: HTMLAudioElement, rate: number): void {
-  // A new source resets `playbackRate` to `defaultPlaybackRate`, so both change.
   element.defaultPlaybackRate = rate;
   element.playbackRate = rate;
 }
 
-/** Pauses the reading that plays now. It holds its place until `resumeSpeech`. */
 export function pauseSpeech(): void {
   if (!reading || reading.paused) return;
   reading.paused = true;
@@ -221,6 +168,7 @@ export function resumeSpeech(): void {
   if (!own?.paused) return;
   own.paused = false;
   if (own.element) startElement(own, own.element);
+  own.askNext?.();
   setState((draft) => {
     if (draft.reading) draft.reading.paused = false;
   });
@@ -230,10 +178,6 @@ function sameAgent(first: SpeechAgent | null | undefined, second: SpeechAgent | 
   return !!first && !!second && first.serverId === second.serverId && first.agentId === second.agentId;
 }
 
-/**
- * Pauses the reading of this agent, and each reading of it that starts, until `releaseSpeech`. The
- * user can speak over the agent; their words decide if its reply goes on.
- */
 export function holdSpeech(agent: SpeechAgent): void {
   heldAgent = agent;
   if (!reading || reading.paused || !sameAgent(reading.agent, agent)) return;
@@ -241,7 +185,6 @@ export function holdSpeech(agent: SpeechAgent): void {
   pauseSpeech();
 }
 
-/** Ends the hold of this agent. When `resume` is true, the reading that the hold paused plays on. */
 export function releaseSpeech(agent: SpeechAgent, resume: boolean): void {
   if (!sameAgent(heldAgent, agent)) return;
   heldAgent = undefined;
@@ -251,7 +194,6 @@ export function releaseSpeech(agent: SpeechAgent, resume: boolean): void {
   if (resume) resumeSpeech();
 }
 
-/** Moves the recording that plays now to a position, in seconds. A paused recording stays paused. */
 export function seekSpeech(seconds: number): void {
   const own = reading;
   const duration = state.reading?.duration;
@@ -264,11 +206,6 @@ export function seekSpeech(seconds: number): void {
   else own.seekTo = to;
 }
 
-/**
- * Sets the text that is read after the reading of now, or none. Its first part is synthesized while
- * the reading of now plays its last part, so that it plays without a wait. The host synthesizes one
- * part at a time, so it does not start earlier: the reading of now would wait for it.
- */
 export function setUpcomingReading(next: UpcomingReading | undefined): void {
   upcoming = next;
   if (reading?.lastPartAsked) prepareUpcoming();
@@ -277,14 +214,12 @@ export function setUpcomingReading(next: UpcomingReading | undefined): void {
 function prepareUpcoming(): void {
   const next = upcoming;
   if (!next || next.first) return;
-  const first = speechParts(next.text, next.language)[0];
+  const first = new SpeechParts(next.text, next.language).next();
   if (first === undefined) return;
   next.first = speechPort().voice.speak({ text: first, language: next.language });
-  // A reading that stops before this part plays never reads its answer.
   next.first.catch(() => undefined);
 }
 
-/** Ends the reading that plays now, if there is one. */
 export function stopSpeech(): void {
   if (!reading) return;
   end(reading);
@@ -301,22 +236,12 @@ function end(own: Reading): void {
   });
 }
 
-/** How a reading ended, for analytics. */
 export interface ReadAloudResult {
-  /** All parts played; false when a new reading or `stopSpeech` ended it. */
   completed: boolean;
-  /** From the call to the first part that plays, or null when none played. */
   firstAudioMs: number | null;
-  /** The length of the parts that played or started to play. */
   seconds: number;
 }
 
-/**
- * Reads a text aloud in parts, and synthesizes each part while the part before it plays. A new
- * reading, or `stopSpeech`, ends this one; the answer then comes at once. A failed part ends the
- * reading with its error. `prepared` is the upcoming reading of this text, whose first part can be
- * synthesized already.
- */
 export async function readAloud(
   text: string,
   language: SpeechLanguage,
@@ -326,11 +251,10 @@ export async function readAloud(
   const calledAt = performance.now();
   const result: ReadAloudResult = { completed: false, firstAudioMs: null, seconds: 0 };
   stopSpeech();
-  const parts = speechParts(text, language, replyRate);
-  const first = parts[0];
+  const parts = new SpeechParts(text, language, replyRate);
+  const first = parts.next();
   if (first === undefined) return result;
   const own = newReading(true, source);
-  // A reading of an agent on hold waits for the end of the hold.
   if (sameAgent(own.agent, heldAgent)) {
     own.paused = true;
     own.held = true;
@@ -349,30 +273,63 @@ export async function readAloud(
   });
   const voice = speechPort().voice;
   const preparedFirst = prepared?.text === text && prepared.language === language ? prepared.first : undefined;
-  // A prepared part that failed is asked for again, as it was before the reading started.
-  let next: Promise<SpeechAudio> | undefined = preparedFirst
-    ? preparedFirst.catch(() => voice.speak({ text: first, language }))
-    : voice.speak({ text: first, language });
+  const ask = (part: string): Promise<SpokenPart> => {
+    const askedAt = performance.now();
+    return voice.speak({ text: part, language }).then((audio) => ({ audio, synthesisMs: performance.now() - askedAt }));
+  };
+  const queue: Promise<SpokenPart & { text: string; seconds: number }>[] = [];
+  let ahead = 0;
+  let asking = false;
+  let lastPart = first;
+  let lastSynthesisMs: number | undefined;
+  const enqueue = (part: string, spoken: Promise<SpokenPart>) => {
+    asking = true;
+    const ready = spoken.then((answer) => {
+      const seconds = answer.audio.pcm.byteLength / 2 / answer.audio.sampleRate;
+      ahead += seconds;
+      asking = false;
+      lastSynthesisMs = answer.synthesisMs;
+      own.askNext?.();
+      return { ...answer, text: part, seconds };
+    });
+    ready.catch(() => undefined);
+    queue.push(ready);
+  };
+  const askNext = (playing = 0) => {
+    if (own.stopped || own.paused || own.lastPartAsked || asking || ahead >= SYNTHESIS_AHEAD_SECONDS) return;
+    const budget =
+      lastSynthesisMs === undefined ? undefined : partBudget(lastPart, ahead + playing, lastSynthesisMs, replyRate);
+    const following = parts.next(budget);
+    if (following === undefined) {
+      own.lastPartAsked = true;
+      prepareUpcoming();
+      return;
+    }
+    lastPart = following;
+    enqueue(following, ask(following));
+  };
+  own.askNext = () => {
+    const element = own.element;
+    askNext(element ? element.duration - element.currentTime || 0 : 0);
+  };
+  enqueue(
+    first,
+    preparedFirst
+      ? preparedFirst.then((audio) => ({ audio, synthesisMs: undefined })).catch(() => ask(first))
+      : ask(first),
+  );
   try {
-    for (let index = 1; next; index += 1) {
-      const audio = await next;
+    for (let next = queue.shift(); next; next = queue.shift()) {
+      const { audio, text: current, seconds } = await next;
       if (own.stopped) return result;
-      const part = parts[index - 1];
-      if (part !== undefined)
-        setState((draft) => {
-          if (!draft.reading) return;
-          draft.reading.part = part;
-        });
-      const following = parts[index];
-      next = following === undefined ? undefined : voice.speak({ text: following, language });
-      // A reading that stops before this part plays never reads its answer.
-      next?.catch(() => undefined);
-      if (!next) {
-        own.lastPartAsked = true;
-        prepareUpcoming();
-      }
+      ahead -= seconds;
+      askNext(seconds);
+      setState((draft) => {
+        if (!draft.reading) return;
+        draft.reading.part = current;
+      });
       result.firstAudioMs ??= Math.round(performance.now() - calledAt);
-      result.seconds += audio.pcm.byteLength / 2 / audio.sampleRate;
+      result.seconds += seconds;
       await play(own, audio);
       if (own.stopped) return result;
     }
@@ -385,10 +342,6 @@ export async function readAloud(
   }
 }
 
-/**
- * Plays the user's own recording of a spoken message from a position, in seconds, with the same
- * waveform as a reading. It has no agent, so the speaking bar and the voice pane do not show it.
- */
 export async function playRecording(messageId: string, url: string, from = 0): Promise<void> {
   stopSpeech();
   const own = newReading(false);
@@ -416,10 +369,6 @@ export async function playRecording(messageId: string, url: string, from = 0): P
   }
 }
 
-/**
- * Plays the kept audio of a message that was read aloud to its end, from a position, in seconds.
- * Returns false when no audio is kept, so the caller reads the message again.
- */
 export function playSpokenReply(messageId: string, from = 0): boolean {
   const buffer = spokenAudio.get(messageId);
   if (!buffer) return false;
@@ -441,7 +390,6 @@ export function playSpokenReply(messageId: string, from = 0): boolean {
   return true;
 }
 
-/** Plays a buffer from a position, or from the position of a seek before the buffer played. */
 async function playSeekable(own: Reading, buffer: AudioBuffer, from: number): Promise<void> {
   let offset = Math.min(own.seekTo ?? from, buffer.duration);
   for (;;) {
@@ -452,7 +400,6 @@ async function playSeekable(own: Reading, buffer: AudioBuffer, from: number): Pr
   }
 }
 
-/** Joins the parts of a full reading, so that the message can play again without synthesis. */
 function keepSpokenAudio(messageId: string, parts: AudioBuffer[]): void {
   const first = parts[0];
   if (!audioContext || !first || parts.some((part) => part.sampleRate !== first.sampleRate)) return;
@@ -467,7 +414,6 @@ function keepSpokenAudio(messageId: string, parts: AudioBuffer[]): void {
     channel.set(part.getChannelData(0), at);
     at += part.length;
   }
-  // A reply longer than the whole limit is not kept: it is read again when it plays.
   if (joined.duration > SPOKEN_AUDIO_SECONDS) return;
   spokenAudio.delete(messageId);
   spokenAudio.set(messageId, joined);
@@ -501,6 +447,7 @@ function newReading(reply: boolean, agent: SpeechAgent | null = null): Reading {
     before: 0,
     played: [],
     lastPartAsked: false,
+    askNext: undefined,
   };
   reading = own;
   return own;
@@ -519,16 +466,10 @@ async function play(own: Reading, audio: SpeechAudio): Promise<void> {
   own.played.push(buffer);
 }
 
-/**
- * Plays a buffer from a position, in seconds, until it ends or the reading ends. An audio element
- * plays it, because only an element keeps the pitch of the voice at a different speed. Its output
- * goes through the analyser for the waveform.
- */
 async function playBuffer(own: Reading, buffer: AudioBuffer, offset = 0): Promise<void> {
   audioContext ??= new AudioContext();
   const context = audioContext;
   if (context.state === "suspended") await context.resume();
-  // A seek while the clock resumed plays from the new position instead.
   if (own.stopped || own.seekTo !== undefined) return;
   if (!analyser) {
     analyser = context.createAnalyser();
@@ -551,7 +492,6 @@ async function playBuffer(own: Reading, buffer: AudioBuffer, offset = 0): Promis
       element.removeEventListener("error", failed);
       element.pause();
       node.disconnect();
-      // Without a source, the element lets go of the media it loaded.
       element.removeAttribute("src");
       element.load();
       URL.revokeObjectURL(url);
@@ -561,7 +501,6 @@ async function playBuffer(own: Reading, buffer: AudioBuffer, offset = 0): Promis
       }
       resolve();
     };
-    // A part that cannot play ends the reading, so that a reply is not kept as read to its end.
     const failed = () => {
       finish();
       end(own);
@@ -570,15 +509,10 @@ async function playBuffer(own: Reading, buffer: AudioBuffer, offset = 0): Promis
     element.addEventListener("error", failed);
     own.element = element;
     own.finish = finish;
-    // A paused reading starts this buffer when it resumes.
     if (!own.paused) startElement(own, element);
   });
 }
 
-/**
- * Starts or resumes an element. A pause before the start cancels it; any other failure, such as a
- * format that cannot play, ends the reading.
- */
 function startElement(own: Reading, element: HTMLAudioElement): void {
   element.play().catch((error: unknown) => {
     if (error instanceof DOMException && error.name === "AbortError") return;
@@ -586,7 +520,6 @@ function startElement(own: Reading, element: HTMLAudioElement): void {
   });
 }
 
-/** A 16-bit PCM WAV file of a buffer, which an audio element can play. */
 function wavFile(buffer: AudioBuffer): ArrayBuffer {
   const channels = buffer.numberOfChannels;
   const bytes = buffer.length * channels * 2;
@@ -607,8 +540,6 @@ function wavFile(buffer: AudioBuffer): ArrayBuffer {
   file.setUint16(34, 16, true);
   ascii(36, "data");
   file.setUint32(40, bytes, true);
-  // A typed array is about four times faster than DataView writes for a long reply. WAV samples are
-  // little-endian, as are the CPUs that Electron runs on.
   const pcm = new Int16Array(file.buffer, 44, buffer.length * channels);
   for (let channel = 0; channel < channels; channel += 1) {
     const samples = buffer.getChannelData(channel);
@@ -620,21 +551,17 @@ function wavFile(buffer: AudioBuffer): ArrayBuffer {
   return file.buffer;
 }
 
-/** Samples the loudness of the voice for the waveform while a reading plays. */
 function startMeter(own: Reading, output: AnalyserNode): () => void {
   const samples = new Float32Array(output.fftSize);
   let shown = 0;
   const timer = setInterval(() => {
-    // A paused reading keeps its waveform and its position.
     if (own.paused || own.seekTo !== undefined) return;
-    // Between two parts, nothing plays and the position holds.
     const element = own.element;
     const elapsed = element ? own.before + element.currentTime : undefined;
     output.getFloatTimeDomainData(samples);
     let sum = 0;
     for (const sample of samples) sum += sample * sample;
     const level = Math.min(1, Math.sqrt(sum / samples.length) / SPEECH_FULL_RMS);
-    // Rise quickly with a word and fall back gently, as the recording waveform does.
     shown += (level - shown) * (level > shown ? 0.7 : 0.45);
     const value = shown;
     setState((draft) => {

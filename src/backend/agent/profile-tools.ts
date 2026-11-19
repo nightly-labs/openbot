@@ -8,6 +8,7 @@ import {
   type AgentSummary,
   AVATAR_HUES,
   AVATAR_SEED_PATTERN,
+  type AvatarHue,
   agentComputerUseEnabled,
   isAvatarHue,
   isProviderAccountId,
@@ -16,6 +17,19 @@ import {
 } from "@openbot/contracts/ipc";
 import { z } from "zod";
 
+const AVATAR_HUE_NAMES = {
+  0: "red",
+  30: "orange",
+  55: "yellow",
+  100: "lime",
+  150: "green",
+  185: "cyan",
+  215: "blue",
+  245: "indigo",
+  280: "violet",
+  320: "magenta",
+} as const satisfies Record<AvatarHue, string>;
+
 const profileFields = {
   name: z.string().trim().min(1).max(INPUT_LIMITS.agentName),
   title: z.string().max(INPUT_LIMITS.agentTitle),
@@ -23,17 +37,15 @@ const profileFields = {
     .string()
     .max(INPUT_LIMITS.agentDescription)
     .describe(`A short summary of the agent's work, at most ${INPUT_LIMITS.agentDescription} characters.`),
-  avatarSeed: z
-    .string()
-    .regex(AVATAR_SEED_PATTERN, "Invalid avatar seed.")
-    .describe("1-128 lowercase letters, digits, colons or hyphens."),
-  // A number schema, not z.literal: Gemini rejects a request whose tool schema has a non-string enum.
+  avatarSeed: z.string().regex(AVATAR_SEED_PATTERN, "Invalid avatar seed."),
   avatarHue: z
     .number()
     .int()
     .refine(isAvatarHue, "Invalid avatar hue.")
     .nullable()
-    .describe(`One of ${AVATAR_HUES.join(", ")}, or null for an automatic hue.`),
+    .describe(
+      `Color, only ${AVATAR_HUES.map((hue) => `${hue} ${AVATAR_HUE_NAMES[hue]}`).join(", ")}, or null for automatic. Else use the nearest.`,
+    ),
 };
 
 export const createAgentToolSchema = z
@@ -46,7 +58,7 @@ export const createAgentToolSchema = z
     provider: z
       .enum(AGENT_PROVIDERS)
       .describe(
-        "Provider for the new agent. Omit provider and model to give it your own provider and model. See list_models.",
+        "Provider for the new agent. Omit provider and model for your provider, model and account. See list_models.",
       )
       .optional(),
     model: z
@@ -80,6 +92,30 @@ export const listModelsToolSchema = z
 
 const providerAccountId = z.string().refine(isProviderAccountId, "Use an account id from list_models.");
 
+const backupModelToolSchema = z
+  .object({
+    provider: z.enum(AGENT_PROVIDERS),
+    model: z.string().trim().min(1).max(INPUT_LIMITS.modelName).describe("Model id from list_models."),
+    providerAccountId: providerAccountId
+      .describe("Account id from list_models. Omit it for the provider's own sign-in.")
+      .optional(),
+  })
+  .strict();
+
+const backupModelsToolSchema = z
+  .object({
+    automatic: z
+      .boolean()
+      .describe(
+        "true: when a usage limit holds a message, or a provider error fails a turn before it did work, the agent moves at once to the first ready model in order. false: it asks in the chat first.",
+      ),
+    order: z
+      .array(backupModelToolSchema)
+      .max(AGENT_BACKUP_MODEL_LIMIT)
+      .describe("The backup models to try, first to last. They use the agent's reasoning effort where they can."),
+  })
+  .strict();
+
 export const updateProfileToolSchema = z
   .object({
     agentId: z.string().trim().min(1).max(INPUT_LIMITS.identifier),
@@ -94,7 +130,7 @@ export const updateProfileToolSchema = z
       .min(1)
       .max(INPUT_LIMITS.path)
       .describe(
-        "Local PNG, JPEG, or WebP file, up to 512 KB. Resize or compress a copy with your available tools first if needed. Use an absolute path or a path relative to your workspace. Do not combine with avatarSeed or avatarHue.",
+        "Local PNG, JPEG, or WebP image up to 512 KB, absolute or relative to your workspace. It replaces the generated face; never use it for a color. Not with avatarSeed.",
       )
       .optional(),
     provider: z
@@ -111,32 +147,10 @@ export const updateProfileToolSchema = z
     providerAccountId: providerAccountId
       .nullable()
       .describe(
-        "Account id from list_models for the agent's provider, or null for the provider's own sign-in. A provider change without it uses the new provider's own sign-in. A provider, account or custom-agent change while the agent works is saved as pendingRuntime and applies before its next turn.",
+        "Account id from list_models ('default' is the provider's own sign-in), or null for it (also after a provider change). A runtime change during work waits as pendingRuntime for the next turn. With pooled accounts, a named account stays until a limit; null gives it to the pool.",
       )
       .optional(),
-    backupModels: z
-      .object({
-        automatic: z
-          .boolean()
-          .describe(
-            "true: when a usage limit holds a message, or a provider error fails a turn before it did work, the agent moves at once to the first ready model in order. false: it asks in the chat first.",
-          ),
-        order: z
-          .array(
-            z
-              .object({
-                provider: z.enum(AGENT_PROVIDERS),
-                model: z.string().trim().min(1).max(INPUT_LIMITS.modelName).describe("Model id from list_models."),
-                providerAccountId: providerAccountId
-                  .describe("Account id from list_models. Omit it for the provider's own sign-in.")
-                  .optional(),
-              })
-              .strict(),
-          )
-          .max(AGENT_BACKUP_MODEL_LIMIT)
-          .describe("The backup models to try, first to last. They use the agent's reasoning effort where they can."),
-      })
-      .strict()
+    backupModels: backupModelsToolSchema
       .nullable()
       .describe(
         "Replaces the agent's backup models. null removes them: the agent asks in the chat, with no saved order.",
@@ -154,7 +168,6 @@ export const updateProfileToolSchema = z
   })
   .strict();
 
-/** One `update_agents` call reaches at most this many agents. */
 const UPDATE_AGENTS_LIMIT = 100;
 
 const updateProfileFields = updateProfileToolSchema.shape;
@@ -194,12 +207,11 @@ export const PROFILE_TOOL_NAMES: ReadonlySet<string> = new Set([
   "create_agent",
   "update_profile",
   "update_agents",
+  "set_browser_profile",
+  "set_commit_co_author",
+  "delete_agent",
 ]);
 
-/**
- * Only the user can widen what an agent may do. An agent can restrict itself or a teammate, and a
- * request for the value the agent already has changes nothing.
- */
 export function widensAgentSettings(
   target: AgentSummary,
   access: AgentAccess | undefined,
@@ -210,7 +222,6 @@ export function widensAgentSettings(
   );
 }
 
-/** Only a restriction is written, so a user change between the check and this write is never undone. */
 export function restrictionInput(
   access: AgentAccess | undefined,
   computerUse: boolean | undefined,
@@ -218,15 +229,11 @@ export function restrictionInput(
   return { ...(access === "workspace" ? { access } : {}), ...(computerUse === false ? { computerUse } : {}) };
 }
 
-/**
- * Describe a failed profile tool call. Schema failures omit submitted instructions and unknown field
- * names. A schema parsed with `reportInput` gives the checked value, so a trimmed field reports its
- * trimmed length. `unsupportedFields` gives the text for an object at `path` that has fields the tool
- * does not take.
- */
+const UNSUPPORTED_PROFILE_FIELDS = "Remove unsupported profile fields.";
+
 export function profileToolErrorMessage(
   error: unknown,
-  unsupportedFields: (path: readonly PropertyKey[]) => string = () => "Remove unsupported profile fields.",
+  unsupportedFields: (path: readonly PropertyKey[]) => string = () => UNSUPPORTED_PROFILE_FIELDS,
 ): string {
   if (!(error instanceof z.ZodError)) return error instanceof Error ? error.message : String(error);
   const details = error.issues.map((issue) => {
@@ -238,4 +245,26 @@ export function profileToolErrorMessage(
     return `${field}: ${issue.message}`;
   });
   return `${details.join(" ")} Correct the arguments and retry.`;
+}
+
+const PROFILE_TOOL_FIELDS: ReadonlyMap<string, readonly string[]> = new Map([
+  ["create_agent", Object.keys(createAgentToolSchema.shape)],
+  ["update_profile", Object.keys(updateProfileToolSchema.shape)],
+  ["update_agents", Object.keys(updateAgentsToolSchema.shape)],
+]);
+const BACKUP_MODELS_FIELDS = Object.keys(backupModelsToolSchema.shape).join(", ");
+const BACKUP_MODEL_FIELDS = Object.keys(backupModelToolSchema.shape).join(", ");
+
+export function profileAgentToolErrorMessage(tool: string, error: unknown): string {
+  return profileToolErrorMessage(error, (path) => {
+    const toolFields = path.length === 0 ? PROFILE_TOOL_FIELDS.get(tool) : undefined;
+    if (toolFields) return `${UNSUPPORTED_PROFILE_FIELDS} ${tool} takes only: ${toolFields.join(", ")}.`;
+    if (tool !== "update_profile" || path[0] !== "backupModels") return UNSUPPORTED_PROFILE_FIELDS;
+    const entryFields = `Each backupModels.order entry takes only: ${BACKUP_MODEL_FIELDS}.`;
+    if (path.length === 1)
+      return `${UNSUPPORTED_PROFILE_FIELDS} backupModels takes only: ${BACKUP_MODELS_FIELDS}. ${entryFields}`;
+    if (path.length === 3 && path[1] === "order" && typeof path[2] === "number")
+      return `${UNSUPPORTED_PROFILE_FIELDS} ${entryFields}`;
+    return UNSUPPORTED_PROFILE_FIELDS;
+  });
 }

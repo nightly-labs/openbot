@@ -23,6 +23,7 @@ import { listenLoopback } from "./listen-loopback";
 import { desktopCall, desktopFailure, desktopSync, type RemoteDesktopOperationError } from "./remote-desktop-effects";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
 import { forwardDiagnosticLines, stopRemoteProcess } from "./remote-diagnostics";
+import { windowsShortPath } from "./windows-short-path";
 
 export class SunshineApiError extends Schema.TaggedError<SunshineApiError>()("SunshineApiError", {
   status: Schema.Int,
@@ -35,10 +36,6 @@ export class SunshineApiError extends Schema.TaggedError<SunshineApiError>()("Su
 
 export type RemoteRuntimeStartStage = "sunshine" | "moonlight" | "pairing";
 
-/**
- * A start that failed, with the part that failed. The gateway turns the stage into the reason a
- * member reads; the cause stays in the host's diagnostics.
- */
 export class RemoteRuntimeStartError extends Error {
   constructor(
     readonly stage: RemoteRuntimeStartStage,
@@ -50,13 +47,7 @@ export class RemoteRuntimeStartError extends Error {
 }
 
 const MOONLIGHT_STREAMER_SLOTS = 4;
-// First candidate for Sunshine's base port. Sunshine derives its whole port family from this one
-// `port` value, so every OpenBot instance must claim a disjoint family: two macOS users share one
-// network namespace, and a second Sunshine bound to the same ports fails to start.
 const SUNSHINE_DEFAULT_BASE_PORT = 47_989;
-// Offsets Sunshine applies to the base port (GameStream HTTPS, HTTP, Web UI HTTPS, video, control,
-// audio, RTSP setup). The family spans base - 5 through base + 21; allocations stay clear of each
-// other by that whole span, not just the two API ports.
 const SUNSHINE_PORT_FAMILY_OFFSETS = [-5, 0, 1, 9, 10, 11, 21];
 const SUNSHINE_PORT_FAMILY_MIN_OFFSET = -5;
 const SUNSHINE_PORT_FAMILY_MAX_OFFSET = 21;
@@ -68,17 +59,9 @@ const READINESS_ATTEMPT_TIMEOUT_MS = 5_000;
 const SUNSHINE_START_ATTEMPTS = 3;
 const MOONLIGHT_WEBRTC_RANGE_SIZE = 32;
 const MOONLIGHT_WEBRTC_RANGE_START = 40_000;
-// Sunshine keeps running when the operating system refuses it screen capture: it prints this, fails
-// to find a display or an encoder, and then serves its API normally. Nothing else distinguishes a
-// host that will never produce a frame from one that is about to, so watching its own output is what
-// turns a member's session hanging at "connecting" into an error naming what the host owner must do.
 const SUNSHINE_SCREEN_CAPTURE_DENIED = "No screen capture permission";
-// Enough of what a stream has already printed to keep the marker findable when reads split it.
 const SUNSHINE_DIAGNOSTIC_OVERLAP = SUNSHINE_SCREEN_CAPTURE_DENIED.length;
 
-// One watcher per stream, because a chunk boundary falls wherever the pipe happened to fill and the
-// marker is longer than some of Sunshine's lines. Carrying the accumulated end forward -- rather
-// than the last chunk -- is what survives a marker spread over three reads.
 function createScreenCaptureDenialWatcher(): (message: string) => boolean {
   let printed = "";
   return (message) => {
@@ -115,16 +98,9 @@ export interface MoonlightWebRtcPortRange {
   max: number;
 }
 
-// Base ports claimed by live runtimes in this process. Two runtimes started together would both
-// probe the same free ports before either Sunshine binds, so the registry is what keeps their
-// allocations apart; the bind probes below are what keeps them apart from other processes and
-// other macOS users.
 const claimedSunshineBasePorts = new Set<number>();
-// Hold one TCP listener at the first port of each fixed UDP range for its whole lifetime.
-// The kernel makes this reservation exclusive across processes and macOS users. Media uses UDP.
 const webRtcReservations = new Map<number, ReturnType<typeof createTcpServer>>();
 
-/** Reserve a Sunshine base port whose whole port family is free on loopback. */
 const allocateSunshineBasePort = Effect.fn("RemoteDesktop.allocateSunshineBasePort")(function* () {
   let candidate = SUNSHINE_DEFAULT_BASE_PORT;
   for (
@@ -161,7 +137,6 @@ function releaseSunshineBasePort(basePort: number): void {
   claimedSunshineBasePorts.delete(basePort);
 }
 
-/** Reserve a block of consecutive UDP ports for one Moonlight WebRTC streamer. */
 const allocateWebRtcPortRange = Effect.fn("RemoteDesktop.allocateWebRtcPortRange")(function* () {
   const size = MOONLIGHT_WEBRTC_RANGE_SIZE;
   for (let min = MOONLIGHT_WEBRTC_RANGE_START; min + size - 1 <= 65_535; min += size) {
@@ -305,7 +280,6 @@ const sunshineDisplaysSchema = Schema.Struct({
     Schema.Struct({
       id: Schema.NonEmptyString,
       name: Schema.NonEmptyString,
-      // A Windows host also reports where the display starts, in physical pixels.
       x: Schema.optionalKey(Schema.Int),
       y: Schema.optionalKey(Schema.Int),
     }),
@@ -328,7 +302,6 @@ interface MoonlightRequestInit {
 }
 
 export interface SunshineMoonlightRuntimeState {
-  /** Private local credential; never send it to clients or diagnostics. */
   authHeader: string;
   baseUrl: string;
   hostId: number;
@@ -346,12 +319,10 @@ interface SunshineMoonlightRuntimeOptions {
   platform: "darwin" | "win32" | "linux";
   credentials: { username: string; password: string };
   getDisplays: () => RemoteDesktopDisplay[];
-  /** Where a display from `getDisplays` starts, in physical pixels. Only a Windows host supplies it. */
   getDisplayScreenOrigin?: ((displayId: string) => { x: number; y: number } | undefined) | undefined;
   getIceServers: () => Effect.Effect<RemoteDesktopIceServer[], RemoteDesktopOperationError>;
   spawnProcess?: RemoteRuntimeSpawn;
   onDiagnostic?: ((source: "sunshine" | "moonlight", message: string) => void) | undefined;
-  /** Called when Sunshine or Moonlight Web exits after the runtime started. */
   onExit?: (source: "sunshine" | "moonlight") => void;
   allocateSunshineBasePort?: () => Effect.Effect<number, RemoteDesktopOperationError>;
   allocateMoonlightPort?: () => Effect.Effect<number, RemoteDesktopOperationError>;
@@ -371,7 +342,6 @@ export class SunshineMoonlightRuntime {
   readonly #moonlightHeader = `X-OpenBot-Remote-${randomBytes(32).toString("hex")}`;
   #selectedDisplayId: string | null = null;
   readonly #lifecycle = new LifecycleGate<SunshineMoonlightRuntimeState, RemoteDesktopOperationError>();
-  /** Set by a stop that arrives while a start runs. The start then opens nothing more and fails. */
   #stopRequested = false;
   #sunshineBasePort: number | null = null;
   #ownsSunshineAllocation = false;
@@ -408,7 +378,6 @@ export class SunshineMoonlightRuntime {
     return this.#state ? { ...this.#state } : null;
   }
 
-  /** Whether Sunshine has said, since it was last started, that it may not record this screen. */
   screenCaptureDenied(): boolean {
     return this.#screenCaptureDenied;
   }
@@ -470,11 +439,8 @@ export class SunshineMoonlightRuntime {
     if (!this.#state) return;
     yield* this.#writeSunshineConfigEffect();
     const sunshine = this.#sunshine;
-    // Clear before waiting so the exit watcher recognizes an intended stop.
     this.#sunshine = null;
     if (sunshine) yield* stopRemoteProcess(sunshine);
-    // Reuse the already allocated ports: Moonlight paired against this Sunshine HTTP port, so a
-    // reallocation here would orphan every existing pairing.
     yield* this.#startSunshineOnceEffect();
     if (this.#state) this.#state = { ...this.#state, selectedDisplayId: displayId };
   }).bind(this);
@@ -531,8 +497,6 @@ export class SunshineMoonlightRuntime {
     return port;
   }
 
-  // A stop that interrupts the start is not a start failure. A process that has already ended names
-  // the stage, because a pairing call to a Sunshine that has exited fails too.
   #failStart(stage: RemoteRuntimeStartStage): (error: RemoteDesktopOperationError) => RemoteDesktopOperationError {
     return (error) => {
       if (this.#stopRequested) return error;
@@ -601,7 +565,6 @@ export class SunshineMoonlightRuntime {
           Effect.mapError(this.#failStart("pairing")),
         );
         yield* desktopSync(() => this.#throwIfStopRequested());
-        // An exit during pairing precedes the exit watcher becoming active.
         if (childEnded(this.#sunshine) || childEnded(this.#moonlight)) {
           return yield* this.#failStart("pairing")(
             desktopFailure(new Error("A remote desktop process exited during pairing.")),
@@ -630,9 +593,6 @@ export class SunshineMoonlightRuntime {
     );
   });
 
-  // The fields are cleared before the wait: a start that is still running can spawn a process during
-  // it, and clearing them after would lose that process without stopping it.
-
   readonly #stopChildrenEffect = Effect.fn("SunshineMoonlightRuntime.stopChildren")(function* (
     this: SunshineMoonlightRuntime,
   ): Effect.fn.Return<void, RemoteDesktopOperationError> {
@@ -651,30 +611,23 @@ export class SunshineMoonlightRuntime {
   ): Effect.fn.Return<void, RemoteDesktopOperationError> {
     const basePort = this.#sunshineBasePort;
     if (basePort === null) return yield* desktopFailure(new Error("Sunshine ports have not been allocated yet."));
+    const directory = windowsShortPath(this.#options.stateDirectory);
     const values = [
       "sunshine_name = OpenBot Remote Desktop",
-      // The base port: every other Sunshine port (GameStream HTTP/HTTPS, Web UI HTTPS, video,
-      // audio, control, RTSP setup) is offset from this one, so a per-instance base keeps the
-      // whole family disjoint from other OpenBot instances on this machine.
       `port = ${basePort}`,
       "upnp = disabled",
       "stream_audio = disabled",
       "origin_web_ui_allowed = pc",
       "address_family = ipv4",
       "bind_address = 127.0.0.1",
-      `credentials_file = ${join(this.#options.stateDirectory, "sunshine-credentials.json")}`,
-      `file_state = ${join(this.#options.stateDirectory, "sunshine-state.json")}`,
-      `file_apps = ${join(this.#options.stateDirectory, "sunshine-apps.json")}`,
-      `pkey = ${join(this.#options.stateDirectory, "sunshine-key.pem")}`,
-      `cert = ${join(this.#options.stateDirectory, "sunshine-cert.pem")}`,
-      `log_path = ${join(this.#options.stateDirectory, "sunshine.log")}`,
+      `credentials_file = ${join(directory, "sunshine-credentials.json")}`,
+      `file_state = ${join(directory, "sunshine-state.json")}`,
+      `file_apps = ${join(directory, "sunshine-apps.json")}`,
+      `pkey = ${join(directory, "sunshine-key.pem")}`,
+      `cert = ${join(directory, "sunshine-cert.pem")}`,
+      `log_path = ${join(directory, "sunshine.log")}`,
       ...(this.#selectedDisplayId ? [`output_name = ${this.#selectedDisplayId}`] : []),
-      // The Linux runtime is built with X11 capture and no hardware encoder, so Sunshine does not
-      // probe the others.
       ...(this.#options.platform === "linux" ? ["capture = x11", "encoder = software"] : []),
-      // The macOS tray changes its status item from the pairing and stream threads, and macOS 27 stops
-      // a process that changes AppKit off the main thread. OpenBot runs its own main loop and pairing
-      // UI, so the tray has no use.
       ...(this.#options.platform === "darwin" ? ["system_tray = disabled"] : []),
     ];
     yield* desktopCall(() =>
@@ -750,7 +703,7 @@ export class SunshineMoonlightRuntime {
     );
     const contents =
       this.#options.platform === "win32"
-        ? "@powershell.exe -NoProfile -NonInteractive -Command \"Invoke-RestMethod -Headers @{Authorization=('Bearer ' + $env:OPENBOT_ICE_HELPER_TOKEN)} -Uri $env:OPENBOT_ICE_HELPER_URL | ConvertTo-Json -Compress\"\r\n"
+        ? "@powershell.exe -NoProfile -NonInteractive -Command \"(Invoke-WebRequest -UseBasicParsing -Headers @{Authorization=('Bearer ' + $env:OPENBOT_ICE_HELPER_TOKEN)} -Uri $env:OPENBOT_ICE_HELPER_URL).Content\"\r\n"
         : `#!/bin/sh\nprintf 'header = "Authorization: Bearer %s"\\nurl = "%s"\\n' "$OPENBOT_ICE_HELPER_TOKEN" "$OPENBOT_ICE_HELPER_URL" | /usr/bin/curl --fail --silent --show-error --config -\n`;
     yield* desktopCall(() => writeFile(path, contents, { mode: 0o700 }));
     if (this.#options.platform !== "win32") yield* desktopCall(() => chmod(path, 0o700));
@@ -759,8 +712,6 @@ export class SunshineMoonlightRuntime {
   readonly #setSunshineCredentialsEffect = Effect.fn("SunshineMoonlightRuntime.setSunshineCredentials")(function* (
     this: SunshineMoonlightRuntime,
   ): Effect.fn.Return<void, RemoteDesktopOperationError> {
-    // Matches pinned Sunshine http::save_user_creds and util::Hex (reversed SHA-256,
-    // uppercase). Do not pass the plaintext password through globally visible argv.
     const salt = randomBytes(16).toString("hex");
     const password = sunshinePasswordHash(this.#options.credentials.password, salt);
     const path = join(this.#options.stateDirectory, "sunshine-credentials.json");
@@ -771,10 +722,6 @@ export class SunshineMoonlightRuntime {
     );
     if (this.#options.platform !== "win32") yield* desktopCall(() => chmod(path, 0o600));
   });
-
-  // Probing a free family and starting Sunshine cannot be atomic, so a rival process can take
-  // the ports in between. On failure the claim is released and the next disjoint family is tried;
-  // Moonlight only starts after this succeeds, so reallocating here never orphans a pairing.
 
   readonly #startSunshineWithRetryEffect = Effect.fn("SunshineMoonlightRuntime.startSunshineWithRetry")(function* (
     this: SunshineMoonlightRuntime,
@@ -803,12 +750,11 @@ export class SunshineMoonlightRuntime {
   readonly #startSunshineOnceEffect = Effect.fn("SunshineMoonlightRuntime.startSunshineOnce")(function* (
     this: SunshineMoonlightRuntime,
   ): Effect.fn.Return<void, RemoteDesktopOperationError> {
-    // A restart is how a newly granted permission takes effect, so the verdict is this process's
-    // alone -- carrying the previous one over would keep reporting a grant the user has already made.
     this.#screenCaptureDenied = false;
+    const executable = windowsShortPath(this.#options.paths.sunshine);
     this.#sunshine = yield* desktopSync(() =>
-      this.#spawn(this.#options.paths.sunshine, [join(this.#options.stateDirectory, "sunshine.conf")], {
-        cwd: dirname(this.#options.paths.sunshine),
+      this.#spawn(executable, [join(windowsShortPath(this.#options.stateDirectory), "sunshine.conf")], {
+        cwd: dirname(executable),
         env: { ...process.env, ...agentDisplayEnvironment(this.#options.platform), OPENBOT_REMOTE_SETUP: "1" },
         stdio: ["ignore", "pipe", "pipe"],
         windowsHide: true,
@@ -877,8 +823,6 @@ export class SunshineMoonlightRuntime {
         "moonlight",
         `OpenBot: found ${hosts.length} local Moonlight hosts for streamer slot ${slot}.\n`,
       );
-      // Stored hosts keep their original port. Recreate the managed endpoint before pairing,
-      // including when another user claimed this runtime's previous port after restart.
       for (const previous of endpointChanged ? hosts : []) {
         const deleted = yield* moonlightHttpResponseEffect(
           baseUrl,
@@ -946,11 +890,6 @@ export class SunshineMoonlightRuntime {
       sunshineDisplaysSchema,
     );
     const local = this.#options.getDisplays();
-    // Sunshine also lists outputs that have no monitor: an X server with a dummy driver has 16, and
-    // only one is connected. Electron lists only connected monitors, so an output with no match is
-    // not a screen to show, and its size is unknown.
-    // Windows ids are device ids that Electron does not know, and the two lists can have a different
-    // order, so a Windows display is found by where it starts.
     const displays = native.displays.flatMap((display, index) => {
       const metadata =
         local.find((candidate) => candidate.id === display.id) ??
@@ -1134,16 +1073,11 @@ export class SunshineMoonlightRuntime {
     );
   });
 
-  // After a start, nothing waits on these processes. One that exits on its own would leave a runtime
-  // that still reports itself started, and every new session would wait for a stream that never comes.
   #watchExit(child: ChildProcess, source: "sunshine" | "moonlight"): void {
-    // A file that is not there gives `error` and no `exit`. With no listener, Node throws it as an
-    // uncaught exception. The child then counts as ended, so the readiness wait of the start fails.
     child.on("error", (error) => {
       this.#options.onDiagnostic?.(source, `OpenBot: ${source} had a process error (${error.message}).\n`);
     });
     child.once("exit", (code, signal) => {
-      // A stop clears the field before it waits. A start in progress fails its own readiness wait.
       if ((source === "sunshine" ? this.#sunshine : this.#moonlight) !== child || !this.#state) return;
       this.#state = null;
       this.#options.onDiagnostic?.(source, `OpenBot: ${source} exited unexpectedly (${signal ?? `code ${code}`}).\n`);
@@ -1153,8 +1087,6 @@ export class SunshineMoonlightRuntime {
 
   #pipeDiagnostics(process: ChildProcess, source: "sunshine" | "moonlight"): void {
     for (const stream of [process.stdout, process.stderr]) {
-      // Sunshine writes to both streams and they interleave, so each keeps its own carry-over: one
-      // shared between them would join a line neither printed and miss the one that matters.
       const saidCaptureDenied = createScreenCaptureDenialWatcher();
       stream?.on("data", (chunk) => {
         if (source === "sunshine" && saidCaptureDenied(chunk.toString("utf8"))) this.#screenCaptureDenied = true;
@@ -1440,7 +1372,6 @@ const waitForHttpEffect = Effect.fn("RemoteDesktop.waitForHttp")(function* (
   return yield* desktopFailure(new Error(sourceText("error.backend.moonlightWebNotReady")));
 });
 
-/** Keep each readiness attempt inside the original overall deadline. */
 function readinessAttemptTimeout(deadline: number): number {
   return Math.max(1, Math.min(READINESS_ATTEMPT_TIMEOUT_MS, deadline - Date.now()));
 }
@@ -1465,7 +1396,6 @@ function moonlightSlotUser(slot: number): string {
   return `openbot-remote-slot-${slot}`;
 }
 
-/** Pinned Sunshine http::save_user_creds / util::Hex encoding. */
 function sunshinePasswordHash(password: string, salt: string): string {
   return createHash("sha256")
     .update(password + salt)

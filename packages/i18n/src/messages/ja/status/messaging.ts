@@ -3,7 +3,7 @@ import type { messages as source } from "../../en/status/messaging";
 
 export const messages = {
   "status.messaging.working": "対応しています…",
-  "status.messaging.queued": "待機中: OpenBot は別のリクエストを処理しています。回答はここに届きます。",
+  "status.messaging.queued": "待機中: 前のリクエストの完了を待っています。回答はここに届きます。",
   "status.messaging.busy": "待機中のリクエストが多すぎます。しばらくしてからもう一度お試しください。",
   "status.messaging.failed": "OpenBot はこのリクエストを完了できませんでした。詳細は OpenBot のホストにあります。",
   "status.messaging.noAnswer": "OpenBot はテキストの回答を返さずに終了しました。",
@@ -13,6 +13,7 @@ export const messages = {
   "status.messaging.stopped": "停止しました。",
   "status.messaging.stop": "停止",
   "status.messaging.approvalTitle": "OpenBot が続行の承認を求めています。",
+  "status.messaging.approvalTitleTeammate": "チームメイトの {agent} が続行の承認を求めています。",
   "status.messaging.approvalCommand": "コマンドを実行",
   "status.messaging.approvalFileChange": "ファイルを変更",
   "status.messaging.approvalPermissions": "追加の権限を取得",
@@ -53,6 +54,10 @@ export const messages = {
     "👋 *OpenBot が接続しました*\n\nここに書いてエージェントに依頼できます。WhatsApp Orchestrator が答えるか、適切なエージェントに仕事を渡します。\n\n依頼を止めるには *stop* と送ってください。",
   "status.messaging.whatsappWelcomeDedicated":
     "👋 *OpenBot が接続しました*\n\nOpenBot で許可した人がこの番号に書けるようになりました。新しい人にはコードが届きます。OpenBot の「リクエスト」で承認してください。\n\n依頼を止めるには *stop* と送ってください。",
+  "status.messaging.whatsappOtherOpenBot":
+    "この WhatsApp 番号には別の OpenBot もリンクされているため、回答が 2 件届くことがあります。直すには、スマートフォンの WhatsApp で「リンク済みデバイス」を開き、使っていない OpenBot をログアウトしてください。",
+  "status.messaging.whatsappPaused":
+    "短時間にメッセージが多すぎたため、OpenBot はここで 10 分間応答を止めています。この番号に別の OpenBot もリンクされている場合は、スマートフォンの WhatsApp で「リンク済みデバイス」を開き、使っていない OpenBot をログアウトしてください。",
   "status.messaging.whatsappOrchestratorName": "WhatsApp Orchestrator",
   "status.messaging.whatsappOrchestratorTitle": "WhatsApp で回答し、チームに依頼します",
 } as const satisfies PartialTranslation<typeof source>;

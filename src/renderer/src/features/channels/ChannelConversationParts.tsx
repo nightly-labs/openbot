@@ -1,9 +1,3 @@
-/*
- * The parts of the conversation view that only a channel has: its title, its settings, the work that
- * stopped, and the first screen of an empty channel. The view draws them in its slots and passes no
- * data, so each part reads the open channel from `useChannels()`.
- */
-
 import type { ChannelPage } from "@openbot/contracts/ipc";
 import { Button, ErrorReference } from "@openbot/ui";
 import { SettingsPanel, SettingsPanelContent, SettingsPanelHeader } from "@openbot/ui/components/SettingsPanel";
@@ -11,7 +5,7 @@ import { ChannelAvatar } from "@openbot/ui/features/channels/ChannelAvatar";
 import { ChannelStoppedTasks } from "@openbot/ui/features/channels/ChannelStoppedTasks";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createStore, For, Show } from "solid-js";
-import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
+import { createSidePanelWidth, readSidePanelWidth, saveSidePanelWidth } from "../../components/side-panel-width";
 import { AgentMemoriesSettings } from "../conversation/AgentMemoriesSettings";
 import { AgentRoutinesSettings } from "../conversation/AgentRoutinesSettings";
 import type { ConversationChannelSettingsPaneProps } from "../conversation/conversation-types";
@@ -22,17 +16,11 @@ import { ChannelEditor } from "./ChannelEditor";
 import { stoppedChannelTasks } from "./channel-conversation-rows";
 import { useChannels } from "./channels-context";
 
-/** Where the routines of a channel are kept, as for an agent. */
 export interface ChannelRoutineHost {
-  /** The host is this computer, so it keeps the routine settings that the released Team API drops. */
   localHost: () => boolean;
-  /** The host saves the routines that run once: this computer, or a joined host with `routines-once-v1`. */
   onceSchedule: () => boolean;
-  /** The desktop server whose event API this window may manage: owner, admin or this computer. */
   eventsServerId: () => string | undefined;
-  /** Whether the `eventsServerId` host has `routine-recovery-v1`. */
   routineRecovery: () => boolean;
-  /** Whether the `eventsServerId` host sends a test event to a webhook routine. */
   webhookTests: () => boolean;
   webhookSenderSecret: () => boolean;
 }
@@ -45,7 +33,6 @@ function useOpenChannel(channelId: string) {
   };
 }
 
-/** The failure of the last channel command, with a Retry that sends it again. */
 export function ChannelErrorNotice() {
   const channels = useChannels();
   const { t, sourceText } = useText();
@@ -146,11 +133,9 @@ export function ChannelAboveComposer(props: { channelId: string }) {
       recipientAgentId: null,
     });
   const onCancel = () => (channels.taskCancelSupported() ? cancelTask : undefined);
-  /** Why queued requests do not start, once for each reason. */
   const waitNotes = (current: ChannelPage) => [
     ...new Set(
       (current.waits ?? []).flatMap((wait) => {
-        // An agent that this view does not know yet has no name to show.
         const agent = channels.agents().find((item) => item.id === wait.agentId)?.name;
         if (!agent) return [];
         return wait.reason === "agent-busy"
@@ -186,22 +171,16 @@ export function ChannelAboveComposer(props: { channelId: string }) {
   );
 }
 
-/**
- * The channel settings in the settings pane of the view. Memories and routines live here rather than
- * in `ChannelEditor`, because each of their pages covers the whole pane: its own header replaces the
- * pane header, as in the agent settings.
- */
 export function ChannelSettingsPane(
   props: ConversationChannelSettingsPaneProps & { channelId: string; routines: ChannelRoutineHost },
 ) {
   const channels = useChannels();
   const { t } = useText();
   const runtime = () => channels.port();
-  const [panelWidth, setPanelWidth] = createSettingsPanelWidth();
+  const [panelWidth, setPanelWidth] = createSidePanelWidth();
   createEffect(panelWidth, (width) => {
     props.onWidthChange(width);
   });
-  // An archived channel takes no edit, so its settings close.
   const page = useOpenChannel(props.channelId);
   createEffect(
     () => page()?.channel.archived === true,
@@ -214,8 +193,6 @@ export function ChannelSettingsPane(
     routines: { open: false, count: 0 },
   });
   const channelName = createMemo(() => page()?.channel.name ?? "");
-  // Memoised on the name alone: a port rebuilt on every revision would drop and remake its event
-  // subscription each time a message arrives.
   const memoriesPort = createMemo(() => channelMemoriesPort(props.channelId, channelName(), runtime().agent));
   const routinesPort = createMemo(() => {
     const legacy = channelRoutinesPort(
@@ -237,8 +214,6 @@ export function ChannelSettingsPane(
         : undefined);
     return eventApi ? eventRoutinesPort({ kind: "channel", id: props.channelId }, eventApi, legacy) : legacy;
   });
-  // The settings rows show both counts before either view opens, so the pane loads them and follows
-  // the events that those views follow.
   createEffect(memoriesPort, (port) => {
     const load = () => {
       void port.list().then((entries) => {
@@ -263,7 +238,8 @@ export function ChannelSettingsPane(
   });
   return (
     <SettingsPanel
-      onResizeEnd={saveSettingsPanelWidth}
+      onResizeEnd={saveSidePanelWidth}
+      preferredWidth={readSidePanelWidth}
       id="channel-side-panel"
       label={t("channel.panel.label")}
       width={panelWidth()}

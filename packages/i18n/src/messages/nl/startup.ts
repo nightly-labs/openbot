@@ -20,6 +20,10 @@ export const messages = {
   "startup.newerDataDownload": "OpenBot downloaden",
   "startup.newerDataGuide": "Gids openen",
   "startup.newerDataQuit": "Stoppen",
+  "startup.newerDataLoopTitle": "De nieuwste OpenBot opende niet",
+  "startup.newerDataLoopBody":
+    "Een nieuwere versie van OpenBot heeft je gegevens opgeslagen, en deze versie ({version}) kan ze niet openen. OpenBot {loopVersion} stopte meerdere keren achter elkaar voordat het opende, dus het wordt niet opnieuw geïnstalleerd.\n\nInstalleer een versie nieuwer dan {loopVersion} zodra er een beschikbaar is. Open de gids voor hulp.\n\nJe lokale gegevens zijn niet gereset of overschreven.",
+  "startup.newerDataReleases": "Versies tonen",
   "startup.recoveryWindowTitle": "OpenBot-herstel",
   "startup.recoveryTitle": "OpenBot is niet geopend",
   "startup.recoveryBody": {
@@ -29,8 +33,11 @@ export const messages = {
   },
   "startup.recoveryHint":
     "Probeer het opnieuw, of installeer de laatste versie die wel opende. Exporteer voor hulp de diagnose en stuur het bestand mee met je melding.",
+  "startup.recoveryHintLatest":
+    "OpenBot vond geen eerdere versie die je gegevens kan openen. Probeer het opnieuw, of installeer de nieuwste versie. Exporteer voor hulp de diagnose en stuur het bestand mee met je melding.",
   "startup.recoveryRetry": "Opnieuw",
   "startup.recoveryPreviousVersion": "Vorige versie downloaden",
+  "startup.recoveryLatestVersion": "Nieuwste versie downloaden",
   "startup.recoveryExportDiagnostics": "Diagnose exporteren",
   "startup.recoveryOpenDataFolder": "Gegevensmap openen",
   "startup.recoveryQuit": "Stoppen",

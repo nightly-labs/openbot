@@ -1,7 +1,3 @@
-// Starts the real `ProviderRuntime` with two providers on fake CLIs, Pi (the provider that chat uses)
-// and Codex, and checks the order of a launch: Pi starts first and alone, chat is ready before the
-// Codex process starts, and Codex is available when the start ends.
-// `bun scripts/provider-launch-order-e2e.ts`. Writes .openbot-build/provider-launch-order-e2e/report.json.
 import assert from "node:assert/strict";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -21,7 +17,6 @@ import {
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/provider-launch-order-e2e");
 
-// Each fake writes one line when its provider process starts. A `--version` check writes nothing.
 const FAKE_PI = `#!${process.execPath}
 const fs = require("node:fs");
 if (process.argv.includes("--version")) {
@@ -69,13 +64,9 @@ require("node:readline").createInterface({ input: process.stdin }).on("line", (l
 
 interface Report {
   passed: boolean;
-  /** The provider processes, in the order in which they started. */
   processOrder?: string[];
-  /** The processes that had started when chat became ready. */
   startedAtChatReady?: string[];
-  /** The Codex row when chat became ready. */
   codexAtChatReady?: string | null;
-  /** The Codex row at each call of the ready hook, which settles the turns of a restart. */
   codexAtReadyHook?: (string | null)[];
   atEnd?: { phase: string; pi: string | null; codex: string | null };
   error?: string;
@@ -97,7 +88,6 @@ process.env.FAKE_LAUNCH_LOG = log;
 const started = async () => (await readFile(log, "utf8").catch(() => "")).split("\n").filter(Boolean);
 
 const store = new AgentStore(join(root, "profile"), join(root, "home"), new OpenBotDatabase(join(root, "profile")));
-/** Set at the first status event that says chat is ready. */
 const chatReady: Promise<{ started: string[]; codex: string | null }>[] = [];
 const codexAtReadyHook: (string | null)[] = [];
 const providers = new ProviderRuntime({

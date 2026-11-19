@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/host";
 
 export const messages = {
-  // Errors from host setup, publishing, and host maintenance.
   "error.host.iceServersMissing": "Remote Signal ICE sunucularını sağlamadı.",
   "error.host.keyRotationUnavailable": "Bu sunucu, hesap hizmeti olmadan anahtarını değiştiremez.",
   "error.host.keyRotationRefused":
@@ -20,6 +19,7 @@ export const messages = {
   "error.host.publishFailed": "Bu OpenBot yayımlanamadı.",
   "error.host.mobileConnectPublishFailed": "Bu OpenBot Mobile Connect için yayımlanamadı.",
   "error.host.mobileConnectHostChanged": "Mobile Connect ana makinesi değişti. Tekrar deneyin.",
+  "error.host.mobileConnectHostMismatch": "Hesabınızda bu sunucu için farklı bir anahtar var. Tekrar deneyin.",
   "error.host.noServer": "Bu bilgisayarda değiştirilecek bir sunucu yok.",
   "error.host.identityLocalOnly": "Sunucu adı ve logosu yalnızca onu çalıştıran bilgisayarda değiştirilebilir.",
   "error.host.timezoneInvalid": "Bu saat dilimi bilinmiyor.",

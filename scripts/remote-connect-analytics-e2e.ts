@@ -1,16 +1,3 @@
-// Drives the real remote connect trace into the real host analytics, with a capture in place of the
-// OpenPanel client, and checks the `system_remote_connect` events:
-//   1. A first connection sends one `connected` event with each phase time and the hosted start wait.
-//   2. The first failed attempt after a connection sends one `failed` event with its last phase.
-//   3. Later failed attempts send nothing, and the next connection counts them.
-//   4. A cancel sends nothing and starts a new wait, so the next failure is sent again.
-//   5. An old attempt that ends after a newer one began does not stop the newer one.
-//   6. No event carries a host id, and each one has the host surface and its generation.
-// The analytics queue sends in order, so a last connection to another host shows that no other event
-// was sent before it.
-//
-// Run: bun run test:remote-connect-analytics
-// It writes .openbot-build/remote-connect-analytics-e2e/report.json and exits non-zero on a failure.
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -93,7 +80,6 @@ async function run() {
   };
   const remoteEvents = () => sent.filter((event) => event.name === "system_remote_connect");
 
-  // 1. The first connection, after a hosted start of 61.234 s.
   connect(HOST, "ok", "ok", 61_234);
   await sentCount(1);
   const first = remoteEvents()[0]?.properties ?? {};
@@ -112,7 +98,6 @@ async function run() {
   );
   check("the hosted start wait has two significant digits", first.hosted_start_wait_ms === 61_000, first);
 
-  // 2. The first failure after the connection: a stored session, then an error.
   const stored = trace.begin(HOST);
   trace.mark(HOST, "session", "stored");
   trace.fail(HOST, stored, "error");
@@ -131,7 +116,6 @@ async function run() {
     failed,
   );
 
-  // 3. Two more failures send nothing. The next connection counts all three.
   for (let attempt = 0; attempt < 2; attempt += 1) {
     trace.fail(HOST, trace.begin(HOST), "error");
   }
@@ -149,7 +133,6 @@ async function run() {
     retried,
   );
 
-  // 4. A cancel sends nothing and ends the wait: the next failure is the first one again.
   trace.fail(OTHER_HOST, trace.begin(OTHER_HOST), "cancelled");
   trace.fail(OTHER_HOST, trace.begin(OTHER_HOST), "error");
   await sentCount(4);
@@ -160,8 +143,6 @@ async function run() {
     afterCancel,
   );
 
-  // 5. A last connection to a new host. An old attempt ends with a cancel after the new one began.
-  // The queue is in order, so nothing else was sent.
   const old = trace.begin(LAST_HOST);
   connect(LAST_HOST, "ok", "ok", undefined, () => trace.fail(LAST_HOST, old, "cancelled"));
   await sentCount(5);

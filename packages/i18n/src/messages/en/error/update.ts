@@ -1,12 +1,12 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.update", {
-  // Updater state the user reads.
   "error.update.unsupported": "Updates are available in installed desktop builds.",
   "error.update.notReady": "An update is not ready to install.",
   "error.update.restartFailed": "OpenBot could not restart to install the update.",
   "error.update.downloadStalled": "The update download stopped responding. Try again.",
   "error.update.installFailed": "Could not install the update. Quit and reopen OpenBot, then try again.",
+  "error.update.notInstalled": "The last restart did not install the update. Restart to try again.",
   "error.update.downloadFailed": "Could not download the update. Try again.",
   "error.update.checkFailed": "Could not check for updates. Try again.",
   "error.update.checkStalled": "The update check stopped responding. Try again.",
@@ -25,7 +25,10 @@ export const messages = defineMessages("error.update", {
   "error.update.siblingCheckFailed": "Could not verify other OpenBot sessions. Try again before installing.",
   "error.update.readOnlyLocation":
     "OpenBot cannot install updates from this location. Quit OpenBot. In Finder, drag OpenBot into the Applications folder (if it is already there, drag it out and back in). Then open OpenBot and install the update again.",
-  // A joined server's admin reads these from the host.
+  "error.update.appImageMissing":
+    "OpenBot cannot install the update because its AppImage file was moved, renamed or replaced. Quit OpenBot, then open the AppImage file again.",
+  "error.update.appImageReadOnly":
+    "OpenBot cannot install updates in the folder of its AppImage file. Quit OpenBot, move the AppImage file to a folder in your home folder, then open it and install the update again.",
   "error.update.remoteDisabled": "Updates from server admins are turned off on this computer.",
   "error.update.restartStarted": "OpenBot is already restarting to install the update.",
   "error.update.alreadyRestarting": "OpenBot is already restarting.",

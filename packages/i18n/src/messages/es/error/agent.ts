@@ -12,6 +12,18 @@ export const messages = {
     "La herramienta no se ejecutó. En tool_call, arguments debe ser un objeto JSON, no texto. Envía la llamada de nuevo con arguments como objeto.",
   "error.agent.toolCallDiscoveryTool":
     "La herramienta no se ejecutó. tool_call no puede ejecutar openbot.tool_search ni openbot.tool_describe. Llámalas directamente con los mismos argumentos.",
+  "error.agent.toolCallEnvelopeKeys":
+    "La herramienta no se ejecutó. tool_call solo acepta name y arguments. Pon los argumentos de la herramienta en arguments, como objeto, y vuelve a enviar la llamada.",
+  "error.agent.toolCallMissingName":
+    "La herramienta no se ejecutó. El tool_call no tiene name. Pon en name el nombre calificado que da tool_search, como openbot.history_read, y envía la llamada otra vez.",
+  "error.agent.toolCallUnknownTool":
+    "La herramienta no se ejecutó. tool_call no encontró ninguna herramienta con este nombre. Usa el nombre calificado exacto que da tool_search, como openbot_browser.snapshot.",
+  "error.agent.toolCallUnknownToolSuggest":
+    "La herramienta no se ejecutó. tool_call no encontró ninguna herramienta con este nombre. Es posible que el nombre calificado sea {name}. Si lo es, vuelve a enviar la llamada con ese nombre.",
+  "error.agent.toolDescribeUnknownNames":
+    "tool_describe no encontró ninguna herramienta de OpenBot llamada {names}. Solo describe las herramientas de OpenBot y del navegador que lista openbot.tool_search, no las herramientas MCP.",
+  "error.agent.toolDescribeDiscoveryNames":
+    "Llama a {names} directamente. tool_describe no describe las herramientas de búsqueda.",
   "error.agent.routineScheduleArgumentsInvalid":
     "La programación de la rutina no es válida: {detail} Corrige la programación y vuelve a intentarlo. openbot.tool_describe da el esquema.",
   "error.agent.approvalWhileDeleting": "No se puede conceder la aprobación mientras se elimina el agente.",
@@ -54,6 +66,8 @@ export const messages = {
   "error.agent.modelNotListed": "El modelo «{model}» no está disponible. Modelos disponibles: {models}.",
   "error.agent.providerNotListed":
     "No hay ningún modelo de {provider} disponible ahora. Llama a list_models para ver los modelos disponibles.",
+  "error.agent.creatorModelNotListed":
+    "Tu modelo «{model}» no está ahora en la lista de modelos, así que el nuevo agente no puede empezar con él. Inténtalo de nuevo en unos segundos, o indica en provider y model un modelo que muestre list_models.",
   "error.agent.reasoningEffortUnsupported":
     "El modelo «{model}» no admite el nivel de razonamiento «{effort}». Niveles admitidos: {efforts}.",
   "error.agent.reasoningEffortNotConfigurable":
@@ -91,10 +105,17 @@ export const messages = {
   "error.agent.endpointRemoved": "Se eliminó el endpoint que usaba este agente. Elige otro modelo para él.",
   "error.agent.turnStalled":
     "{provider} dejó de responder, así que OpenBot terminó este turno. Envía el mensaje de nuevo o elige otro modelo.",
+  "error.agent.promptCancelled": "{provider} canceló este mensaje antes de que empezara. Envía el mensaje de nuevo.",
   "error.agent.toolLoopStopped":
     "{provider} repitió muchas veces un paso fallido, así que OpenBot detuvo este turno. Envía el mensaje de nuevo o elige otro modelo.",
+  "error.agent.answerCutOff":
+    "El agente se detuvo antes de terminar su respuesta, así que la respuesta no está completa. Envía el mensaje de nuevo.",
   "error.agent.compactionConnectionLost":
     "La conexión se detuvo mientras el agente compactaba su contexto, así que la tarea se detuvo. Comprueba tu conexión a internet y envía un mensaje para continuar.",
+  "error.agent.compactionConnectionLostAddress":
+    "La conexión se detuvo mientras el agente compactaba su contexto, así que la tarea se detuvo. Comprueba tu conexión a internet y que {variable}, en Variables de los ajustes de {provider}, sea la dirección API de tu servicio de modelos (suele terminar en /v1). Luego envía un mensaje.",
+  "error.agent.compactionLoopStopped":
+    "{provider} compactó el contexto una y otra vez, y cada vez quedó demasiado lleno para continuar, así que OpenBot detuvo este turno. Desactiva los servidores MCP o el uso del ordenador que este agente no necesita y luego envía un mensaje. Si tú o el agente cambiasteis cuándo compacta {provider}, deshaz ese cambio.",
   "error.agent.selectedGone": "El agente seleccionado ya no existe.",
   "error.agent.profileEndpointsChanged":
     "Los endpoints personalizados cambiaron durante la generación. Inténtalo de nuevo.",
@@ -110,6 +131,10 @@ export const messages = {
   "error.agent.deletionBusy": "La eliminación del agente ya está en curso.",
   "error.agent.stopBeforeDelete": "Detén el agente y cancela sus mensajes en cola antes de eliminarlo.",
   "error.agent.deleteIncomplete": "No se pudieron eliminar todos los datos del agente. Intenta eliminarlo de nuevo.",
+  "error.agent.deleteFolderInUse":
+    "El trabajo de otro agente todavía usa la carpeta de este agente. Vuelve a eliminarlo cuando ese trabajo termine o después de reiniciar OpenBot.",
+  "error.agent.deleteWhenFolderFree":
+    "El trabajo de otro agente todavía usa la carpeta de este agente. OpenBot elimina este agente cuando ese trabajo termine.",
   "error.agent.duplicationBusy": "Este agente ya se está duplicando.",
   "error.agent.waitBeforeDuplicate": "Espera a que el agente termine y vacía su cola antes de duplicarlo.",
   "error.agent.saveOtherAgent": "Este guardado pertenece a otro agente.",
@@ -149,14 +174,22 @@ export const messages = {
     "Este servidor tiene poca memoria disponible. Tu mensaje espera en la cola y se iniciará cuando se libere memoria.",
   "error.agent.workspaceOnlyToolMissing":
     "Solo espacio de trabajo requiere {tool}, que OpenBot no encontró. Instálalo o elige Acceso completo en los ajustes del agente.",
+  "error.agent.codexSandboxUnavailable":
+    "«Solo espacio de trabajo» necesita el sandbox de Codex, que Codex no puede iniciar en este ordenador, así que los comandos del agente fallan. Elige Preguntar antes o Acceso completo en los ajustes del agente.",
   "error.agent.claudeSandboxUnavailable":
     "«Solo espacio de trabajo» necesita el sandbox de Claude, que Claude no puede iniciar en este ordenador: {reason}. Elige Acceso completo u otro proveedor en los ajustes del agente.",
+  "error.agent.claudeNoSandbox":
+    "Claude no puede usar un sandbox en este ordenador, así que «Solo espacio de trabajo» no funciona con él. Elige Acceso completo u otro proveedor en los ajustes del agente.",
+  "error.agent.claudeSandboxBlocked":
+    "«Solo espacio de trabajo» necesita el sandbox de Claude, que Claude no puede iniciar en este ordenador, así que los comandos del agente fallan. Elige Acceso completo u otro proveedor en los ajustes del agente.",
   "error.agent.screenCaptureOff":
     "La captura de pantalla está desactivada para este agente. El usuario puede activar el uso del equipo en los ajustes del agente.",
   "error.agent.screenCaptureUnavailable": "La captura de pantalla no está disponible en este equipo.",
   "error.agent.screenCaptureShared":
     "La captura de pantalla no funciona en una conversación de Slack, Discord o Telegram, porque otras personas reciben sus archivos.",
   "error.agent.screenCaptureDeclined": "El usuario no permitió esta captura de pantalla. No se capturó nada.",
+  "error.agent.mcpToolDeclined":
+    "El usuario no permitió esta llamada a la herramienta MCP. La herramienta no se ejecutó.",
   "error.agent.screenCaptureWindowMissing":
     "Esa ventana no está abierta ahora. Llama a list_capture_sources para obtener los ID de ventana actuales.",
   "error.agent.screenCaptureDisplayMissing":

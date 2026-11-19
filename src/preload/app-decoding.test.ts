@@ -100,7 +100,6 @@ const codeSent = {
   resendAvailableAt: 1,
 } satisfies CentralAuthState;
 
-// Each value is what main sends, typed as its contract, so it must come back unchanged.
 const voiceServer = {
   address: "http://studio.local:8000/v1",
   hasApiKey: true,
@@ -329,6 +328,11 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
     decodeUpdateStatus,
     { ...updateStatus, phase: "up-to-date", stagedVersion: "0.68.0" } satisfies UpdateStatus,
   ],
+  [
+    "update status below the minimum version",
+    decodeUpdateStatus,
+    { ...updateStatus, phase: "downloading", requiredVersion: "0.70.0" } satisfies UpdateStatus,
+  ],
   ["update preference", decodeUpdatePreference, { autoDownload: true, allowRemoteUpdates: true, autoInstall: false }],
   ["notification preference", decodeNotificationPreference, { desktopNotifications: true, messagePreview: false }],
   [
@@ -351,7 +355,6 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
   ["custom agents", decodeCustomAgents, [customAgent, { ...customAgent, id: "qwen", resolvedCommand: null }]],
   ["a custom agent with a usage prompt", decodeCustomAgents, [{ ...customAgent, usagePrompt: "/usage" }]],
   [
-    // The released acp-registry-v1 install codec keeps only the fields that it knew.
     "a registry install result with no usage prompt",
     decodeCustomAgentResult,
     {
@@ -401,7 +404,6 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
     decodeAppInfo,
     { name: "OpenBot", version: "1.0.0", platform: "darwin", variant: "production", hourCycle: "h24" },
   ],
-  // The key never comes back to the renderer, so a record that carries one fails closed.
   ["a voice server with its key", decodeVoiceServerSettings, { ...voiceServer, apiKey: "sk-secret" }],
   [
     "a voice server that dictates with no model",
@@ -535,6 +537,11 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
   ["update status in an unknown phase", decodeUpdateStatus, { ...updateStatus, phase: "done" }],
   ["update status with an unknown failure", decodeUpdateStatus, { ...updateStatus, errorCode: "boom" }],
   ["update status with a staged release that is not text", decodeUpdateStatus, { ...updateStatus, stagedVersion: 68 }],
+  [
+    "update status with a minimum version that is not text",
+    decodeUpdateStatus,
+    { ...updateStatus, requiredVersion: 70 },
+  ],
   ["update preference without a switch", decodeUpdatePreference, null],
   ["notification preference without a switch", decodeNotificationPreference, { desktopNotifications: "yes" }],
   ["opened notification without an agent", decodeNotificationOpenedEvent, { serverId: "local", threadId: null }],
@@ -546,10 +553,8 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
   ["opened workflow notification without a workflow", decodeWorkflowNotificationOpenedEvent, { serverId: "local" }],
   ["a chat window without an agent", decodeChatWindowTargets, [{ serverId: "local" }]],
   ["chat windows that are not a list", decodeChatWindowTargets, { serverId: "local", agentId: "agent-1" }],
-  // A scan row never carries a credential, so one that does is refused with the whole list.
   ["a detected server with a key", decodeDetectedModelServers, [{ ...detectedServer, apiKey: "sk-x" }]],
   ["a detected server with headers", decodeDetectedModelServers, [{ ...detectedServer, headers: [] }]],
-  // A custom agent summary never carries an environment value, so one that does is refused with the whole list.
   ["a custom agent with its environment", decodeCustomAgents, [{ ...customAgent, env: [] }]],
   ["a custom agent with its ciphertext", decodeCustomAgents, [{ ...customAgent, secret: "c2VhbGVk" }]],
   ["a custom agent with a value", decodeCustomAgents, [{ ...customAgent, value: "sk-x" }]],
@@ -600,8 +605,6 @@ describe("app decoding", () => {
 
 const AGENT_ID = "0f8fad5b-d9cb-469f-a165-70867728950e";
 
-// A Marketplace link began in a URL a web page chose. Only an agent id or a skill slug of the right
-// form reaches the renderer, with no other field; anything else is no link at all.
 describe("pending Marketplace listing", () => {
   it.each([
     ["an agent", { kind: "agent", id: AGENT_ID }],
@@ -636,9 +639,6 @@ describe("pending Marketplace listing", () => {
   });
 });
 
-// The storage of a hosted server comes from the account server, and a client shows it as a number of
-// GB. Only a whole number of 1 or more reaches the renderer. Another value is left out, so the server
-// and its plan still show, with the storage of the plan table.
 describe("server storage", () => {
   const server = {
     deletionScheduledAt: null,

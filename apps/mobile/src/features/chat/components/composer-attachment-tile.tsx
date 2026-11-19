@@ -10,8 +10,6 @@ import type { ChatAttachment } from "./use-chat-attachments";
 
 const ATTACHMENT_TILE_SIZE = 112;
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
-// A new file grows in from slightly smaller, never from nothing; a removed one shrinks as it fades.
-// The rest of the row then slides into the space, so the order the user chose stays readable.
 const TILE_ENTER = new Keyframe({
   0: { opacity: 0, transform: [{ scale: 0.9 }] },
   100: { opacity: 1, transform: [{ scale: 1 }], easing: EASE_OUT },
@@ -32,11 +30,6 @@ export function localPreviewUri(item: Pick<ChatAttachment, "mimeType" | "uri" | 
   return item.uri ?? `data:${item.mimeType};base64,${item.base64}`;
 }
 
-/**
- * One file waiting in the composer. Tapping it opens its preview, where it can be replaced or
- * removed on its own. No native menu here: a SwiftUI menu inside the composer's glass makes iOS
- * morph the whole composer into the menu.
- */
 export function ComposerAttachmentTile({
   item,
   index,
@@ -121,8 +114,6 @@ export function ComposerAttachmentTile({
         accessibilityState={{ disabled }}
         disabled={disabled}
         hitSlop={8}
-        // A HeroUI icon button fills a quarter of the tile here. The badge has to read as an
-        // overlay on the file, not a control beside it, so it keeps its 44 pt target through hitSlop.
         className="absolute top-1.5 right-1.5 size-7 items-center justify-center rounded-full"
         style={{ backgroundColor: raised }}
         onPress={onRemove}

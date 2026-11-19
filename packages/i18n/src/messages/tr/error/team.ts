@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/team";
 
 export const messages = {
-  // Errors that the Team API and the team store send to clients.
   "error.team.ownerNotLinked": "Bu ana makine bir OpenBot sahibi hesabına bağlı değil.",
   "error.team.ownerEmailRequired": "Bu ana makineyi oluşturan OpenBot e-postası ile oturum açın.",
   "error.team.hostNotConfigured": "Ekip ana makinesi yapılandırılmamış.",
@@ -53,6 +52,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "Çok fazla oturum açma denemesi. Daha sonra tekrar deneyin.",
   "error.team.clientUpdateRequired": "Bu ana makineye bağlanmadan önce bu OpenBot istemcisini güncelleyin.",
   "error.team.hostUpdateRequired": "Bağlanmadan önce ana makinedeki OpenBot'u güncelleyin.",
+  "error.team.serverSafeMode": "OpenBot bu sunucuda başlamadığı için sunucu güvenli moddadır.",
+  "error.team.serverSafeModeNewerDatabase":
+    "Bu sunucudaki OpenBot {version}, verilerini açamıyor çünkü onları daha yeni bir OpenBot sürümü kaydetti. Sunucudaki daha yeni bir OpenBot sürümü bunu düzeltir.",
+  "error.team.serverSafeModeStartFailed":
+    "Bu sunucudaki OpenBot {version}, birçok kez başlatılamadıktan sonra durdu. Sunucudaki daha yeni bir OpenBot sürümü bunu düzeltir.",
   "error.team.sidebarLayoutUnavailable": "Kenar çubuğu düzeni kullanılamıyor.",
   "error.team.providersUnsupported": "Sağlayıcı ayarları bu bağlantı tarafından desteklenmiyor.",
   "error.team.providerNotManaged": "OpenBot bu sağlayıcının CLI aracını yönetmiyor.",
@@ -72,14 +76,19 @@ export const messages = {
   "error.team.agentColorsUnsupported": "Ajan renkleri bu bağlantı tarafından desteklenmiyor.",
   "error.team.chatColorsUnsupported": "Sohbet renkleri bu bağlantı tarafından desteklenmiyor.",
   "error.team.routineRunPlaceUnsupported": "Bu bağlantı bir rutinin nerede çalıştığını değiştiremez.",
+  "error.team.routinePauseReasonsUnsupported": "Bu bağlantı bir rutinin neden duraklatıldığını gösteremez.",
+  "error.team.activeQueuesUnsupported": "Bu bağlantı tüm ajanların kuyruklarını gösteremez.",
   "error.team.routinesOnceUnsupported": "Bu bağlantı bir kez çalışan rutinleri kaydedemez.",
   "error.team.routineRunCommandUnsupported": "Bu bağlantı bir rutinin çalıştırma komutunu veremez.",
   "error.team.threadQueueUnsupported": "Bu bağlantı bir yan konunun kuyruğunu gösteremez.",
+  "error.team.threadRequestsUnsupported": "Bu bağlantı bir yan konunun diğer ajanlara gönderdiği istekleri gösteremez.",
   "error.team.hostTurnLimitsUnsupported":
     "Bu bağlantı sunucunun mesaj dizisi sınırlarını gösteremez veya değiştiremez.",
   "error.team.usageLimitUnsupported": "Bu bağlantı ajanların kullanım sınırlarını gösteremez veya değiştiremez.",
   "error.team.hermesImportUnsupported": "Bu bağlantı sunucudan Hermes profillerini içe aktaramaz.",
   "error.team.providerDetectionUnsupported": "Bu bağlantı sunucunun model sunucularını ve ajanlarını bulamaz.",
+  "error.team.providerModelSourceUnsupported":
+    "Bu bağlantı bir sağlayıcının modellerinin nereden geldiğini gösteremez.",
   "error.team.routineFlowStopUnsupported": "Bu bağlantı bir rutin çalıştırmasını durduramaz.",
   "error.team.sidebarFoldersUnsupported": "Klasör içinde klasör bu bağlantı tarafından desteklenmiyor.",
   "error.team.libraryFoldersUnsupported": "Kitaplık klasörleri bu bağlantı tarafından desteklenmiyor.",
@@ -128,6 +137,7 @@ export const messages = {
   "error.team.promptCacheTtlUnsupported": "Bu bağlantı istem önbelleği süresini desteklemiyor.",
   "error.team.claudeUserSetupUnsupported": "Bu bağlantı Claude Code kurulumu anahtarını desteklemiyor.",
   "error.team.claudeCompactWindowUnsupported": "Bu bağlantı Claude sıkıştırma boyutunu desteklemiyor.",
+  "error.team.providerEnvironmentUnsupported": "Bu bağlantı sağlayıcı değişkenlerini desteklemiyor.",
   "error.team.modelVisibilityUnsupported": "Bu bağlantı model listesini desteklemiyor.",
   "error.team.providerDefaultUnsupported": "Bu bağlantı varsayılan sağlayıcıyı desteklemiyor.",
   "error.team.attachmentNameRequired": "Güvenli bir ek adı gereklidir.",
@@ -179,6 +189,7 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "Bu bağlantı sunucu kişiliğini desteklemiyor.",
   "error.team.agentWaitsUnsupported": "Bu bağlantı açık beklemeleri desteklemiyor.",
   "error.team.pendingApprovalUnsupported": "Bu bağlantı onay isteğinin tamamını okumayı desteklemiyor.",
+  "error.team.phoneFeedbackUnsupported": "Bu bağlantı telefon uygulamasından rapor göndermeyi desteklemiyor.",
   "error.team.messagePinsUnsupported": "Bu bağlantı sabitlenen mesajları desteklemiyor.",
   "error.team.queuedMessageThreadUnsupported":
     "Bu bağlantı kuyruktaki bir mesajı yeni bir ileti dizisi olarak çalıştırmayı desteklemiyor.",

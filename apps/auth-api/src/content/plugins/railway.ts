@@ -1,8 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Railway here is taken from docs.railway.com and railway.com. Each page
-// used is in `sources`. Check the sources again, and move `checkedAt`, whenever this file changes.
-
 export const RAILWAY_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

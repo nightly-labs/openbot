@@ -1,30 +1,35 @@
 import type { AppAppearancePreference, ChatBackgroundColor } from "@openbot/contracts/app-appearance";
 
 type Scheme = "light" | "dark";
+type ChatBackgroundPreference = Pick<AppAppearancePreference, "chatBackgroundLight" | "chatBackgroundDark">;
 
 const SCHEMES: readonly Scheme[] = ["light", "dark"];
 
-function colorOf(
-  preference: Pick<AppAppearancePreference, "chatBackgroundLight" | "chatBackgroundDark">,
-  scheme: Scheme,
-) {
-  return scheme === "light" ? preference.chatBackgroundLight : preference.chatBackgroundDark;
+let colors: ChatBackgroundPreference = { chatBackgroundLight: null, chatBackgroundDark: null };
+let backdrop = false;
+
+function colorOf(scheme: Scheme): ChatBackgroundColor | null {
+  if (backdrop) return null;
+  return scheme === "light" ? colors.chatBackgroundLight : colors.chatBackgroundDark;
 }
 
-/**
- * Sets the chat background of each scheme on the root element, or removes it for null.
- * `styles/chat-background.css` shows the one of the scheme that the window shows, in conversations
- * only. The preload let only `#rrggbb` through, so each value is a color.
- */
-export function applyChatBackground(
-  preference: Pick<AppAppearancePreference, "chatBackgroundLight" | "chatBackgroundDark">,
-): void {
+function render(): void {
   const root = document.documentElement;
   for (const scheme of SCHEMES) {
-    const color: ChatBackgroundColor | null = colorOf(preference, scheme);
+    const color = colorOf(scheme);
     const property = `--openbot-chat-background-${scheme}`;
     if (color === null) root.style.removeProperty(property);
     else root.style.setProperty(property, color);
     root.toggleAttribute(`data-openbot-chat-background-${scheme}`, color !== null);
   }
+}
+
+export function applyChatBackground(preference: ChatBackgroundPreference): void {
+  colors = { chatBackgroundLight: preference.chatBackgroundLight, chatBackgroundDark: preference.chatBackgroundDark };
+  render();
+}
+
+export function hideChatBackgroundForBackdrop(hidden: boolean): void {
+  backdrop = hidden;
+  render();
 }

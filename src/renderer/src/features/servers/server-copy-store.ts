@@ -4,29 +4,27 @@ import type {
   CopyAgentsPhase,
   CopyAgentsServer,
 } from "@openbot/ui/features/transfer/CopyAgentsDialog";
+import type { TransferUploadState } from "@openbot/ui/features/transfer/InstanceTransferView";
 import { currentText } from "@openbot/ui/text";
-import { createEffect, createStore, untrack } from "solid-js";
+import { createEffect, createStore, onCleanup, untrack } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 
-export type ServerCopyCalls = Pick<OpenBotDesktopApi["instanceTransfer"], "summary" | "copy">;
+export type ServerCopyCalls = Pick<OpenBotDesktopApi["instanceTransfer"], "summary" | "copy"> &
+  Partial<Pick<OpenBotDesktopApi["instanceTransfer"], "onUploadProgress">>;
 
 interface ServerCopyState {
   fromId: string;
   toId: string | null;
   fromAgents: CopyAgentsAgent[] | null;
   toAgents: CopyAgentsAgent[] | null;
-  /** The load error of each side. A load of one side keeps the error of the other. */
   fromError: string | null;
   toError: string | null;
   phase: CopyAgentsPhase;
+  progress: TransferUploadState | null;
   result: InstanceTransferResult | null;
   error: string | null;
 }
 
-/**
- * Server settings > Transfer > Copy to another server. It starts from the server of the settings,
- * to the first other server. A choice of the server on the other side swaps the two.
- */
 export function createServerCopyStore(
   serverId: string,
   servers: () => readonly CopyAgentsServer[],
@@ -40,9 +38,19 @@ export function createServerCopyStore(
     fromError: null,
     toError: null,
     phase: "idle",
+    progress: null,
     result: null,
     error: null,
   });
+  let copyingTo: string | null = null;
+
+  const stopProgress = calls.onUploadProgress?.(({ serverId: target, sent, total }) => {
+    if (target !== copyingTo || state.phase !== "copying") return;
+    setState((draft) => {
+      draft.progress = { sent, total };
+    });
+  });
+  if (stopProgress) onCleanup(stopProgress);
 
   function load(side: "from" | "to", id: string | null): void {
     setState((draft) => {
@@ -59,7 +67,6 @@ export function createServerCopyStore(
       .summary(id)
       .then((summary) =>
         setState((draft) => {
-          // A later choice of the server replaces this answer.
           if ((side === "from" ? draft.fromId : draft.toId) !== id) return;
           if (side === "from") draft.fromAgents = summary.agents;
           else draft.toAgents = summary.agents;
@@ -100,9 +107,9 @@ export function createServerCopyStore(
     });
   }
 
-  /** A new pair of servers starts a new copy. The result of the last copy names the old destination. */
   function reset(draft: ServerCopyState): void {
     draft.phase = "idle";
+    draft.progress = null;
     draft.result = null;
     draft.error = null;
   }
@@ -112,8 +119,10 @@ export function createServerCopyStore(
   function copy(agentIds: string[]): void {
     const toId = state.toId;
     if (!toId || agentIds.length === 0) return;
+    copyingTo = toId;
     setState((draft) => {
       draft.phase = "copying";
+      draft.progress = null;
       draft.error = null;
     });
     void calls
@@ -122,6 +131,7 @@ export function createServerCopyStore(
         desktopAnalytics.track("server_transfer_action", { action: "copy", result: "succeeded" });
         setState((draft) => {
           draft.phase = "done";
+          draft.progress = null;
           draft.result = result;
         });
         load("to", toId);
@@ -134,6 +144,7 @@ export function createServerCopyStore(
         });
         setState((draft) => {
           draft.phase = "idle";
+          draft.progress = null;
           draft.error = message(error, "settings.transfer.copy.failed");
         });
       });

@@ -20,33 +20,19 @@ import {
 } from "./VaultPanel";
 
 export interface VaultRequestCardProps {
-  /** A `request_vault_item` kind, or `apiKey` for `request_api_key`. */
   kind: VaultItemKind;
-  /** What the agent asks for, in its own words. */
   title: string;
-  /** The agent that asks. Absent when the app does not know it. */
   agentName?: string | undefined;
-  /** The fields that the agent filled in. A secret field is never one of them. An API key has its `name`. */
   prefill: Readonly<Record<string, string>>;
-  /** Only for an API key: who can use it. */
   scope?: VaultRequestScope | undefined;
-  /** Only for an API key: the agent's hint for the key, such as sk-…. */
   keyPlaceholder?: string | undefined;
   status: UiBlockStatus;
-  /** The item that the user saved. */
   saved?: UiVaultSavedItem | undefined;
-  /** The values of the saved item that are not secret, for its summary line. */
+  closedOutcome?: string | undefined;
   values?: Readonly<Record<string, UiBlockValue>> | undefined;
-  /** Why the last answer failed, such as a skip that did not go through. */
   error?: string | undefined;
-  /** The answer is on its way. */
   busy?: boolean | undefined;
-  /**
-   * Saves the item, with the chosen option of `scope` for an API key. A failure stays in the dialog, so
-   * the user can correct a value. Absent in the history.
-   */
   onSave?: ((input: VaultSaveInput, scope?: string) => Promise<void>) | undefined;
-  /** Closes the request with nothing saved. */
   onSkip?: (() => void) | undefined;
   elementRef?: ((element: HTMLElement | undefined) => void) | undefined;
 }
@@ -100,21 +86,14 @@ function SavedLogo(props: { kind: VaultItemKind; saved: UiVaultSavedItem; values
   );
 }
 
-/**
- * The chat card of an agent's request for a Vault item or an API key: what the item is for, and a
- * button that opens the Vault dialog with the fields that the agent filled in. The user types the
- * secrets, which go to the Vault and never into the chat. Once saved, the card shows the item.
- */
 export function VaultRequestCard(props: VaultRequestCardProps) {
   const { t } = useText();
   const [dialogOpen, setDialogOpen] = createSignal(false);
   onCleanup(() => props.elementRef?.(undefined));
   const pending = () => props.status === "pending";
 
-  // The host saves an API key before the request closes, but keeps no item in the block for it.
   const saved = () => props.status === "answered" && (props.saved !== undefined || props.kind === "apiKey");
 
-  /** The summary line of the saved item: for an API key, its name and who can use it. */
   const savedDetail = (saved: UiVaultSavedItem | undefined) => {
     switch (props.kind) {
       case "apiKey":
@@ -144,7 +123,6 @@ export function VaultRequestCard(props: VaultRequestCardProps) {
   };
 
   const subtitle = () => {
-    // The agent reads an API key from a file, so the card does not say that the agent never sees it.
     if (pending() && props.kind === "apiKey") return t("vault.request.apiKeyPrivate");
     if (pending())
       return props.agentName
@@ -167,7 +145,7 @@ export function VaultRequestCard(props: VaultRequestCardProps) {
           </Show>
         </span>
       }
-      outcome={saved() ? t("vault.request.saved") : undefined}
+      outcome={saved() ? t("vault.request.saved") : props.status === "closed" ? props.closedOutcome : undefined}
       outcomeBadge
       inlineActions
       busy={props.busy}

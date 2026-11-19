@@ -6,6 +6,7 @@ import type { BitwardenConnectorStatus, BitwardenHostConnectInput } from "@openb
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, registerSecretValue, toLogValue } from "@openbot/logging";
 import { Effect, Exit, Schema, Scope, Semaphore } from "effect";
+import { cliSpawnTarget } from "../backend/cli";
 import { causeHelpers } from "../backend/effect-boundary";
 import {
   type PasswordVault,
@@ -14,6 +15,7 @@ import {
   websiteMatchesOrigin,
   websiteUrl,
 } from "../backend/password-vault";
+import { stopWindowsProcessTree } from "../backend/windows-process-tree";
 import type { BitwardenConnectorRecord, BitwardenConnectorStore } from "./bitwarden-connector-store";
 
 const logger = createOpenBotLogger("bitwarden-connector");
@@ -55,12 +57,10 @@ const itemSchema = Schema.Struct({
 type Item = typeof itemSchema.Type;
 interface Session {
   executable: string;
-  /** `BW_SESSION`, and for a host connection its own `BITWARDENCLI_APPDATA_DIR`. */
   env: Record<string, string>;
   folderId: string;
   abort: AbortController;
 }
-/** Runs `bw` with `env` added to the few variables it inherits. */
 export type BitwardenCliRunner = (
   executable: string,
   args: string[],
@@ -68,20 +68,23 @@ export type BitwardenCliRunner = (
   signal: AbortSignal,
 ) => Promise<string>;
 
-/** What a connection made through `bitwarden-connector-v1` needs on this computer. */
 export interface BitwardenHostOptions {
   store: BitwardenConnectorStore;
-  /** The CLI data of the host connection, apart from the user's own `bw` configuration. */
   dataDirectory: string;
-  /** Installs OpenBot's copy of `bw` when none is on the PATH, or null when there is no build for this computer. */
   installCli: ((signal: AbortSignal) => Effect.Effect<string, PasswordVaultError>) | null;
 }
 
 function failure(): PasswordVaultError {
   return new PasswordVaultError({ cause: new Error(sourceText("error.connector.bitwardenFailed")) });
 }
+function cliMissing(): PasswordVaultError {
+  return new PasswordVaultError({ cause: new Error(sourceText("error.connector.bitwardenCliMissing")) });
+}
 
-/** No shell, inherited credentials, or command output in an error. */
+export class BitwardenKeyIdBackfillError extends Error {}
+
+const CLI_TIMEOUT_MS = 30_000;
+
 const runBitwardenCli: BitwardenCliRunner = (executable, args, extra, signal) => {
   const env: NodeJS.ProcessEnv = { BITWARDENCLI_INTERACTIVE: "false" };
   for (const name of [
@@ -90,6 +93,8 @@ const runBitwardenCli: BitwardenCliRunner = (executable, args, extra, signal) =>
     "APPDATA",
     "LOCALAPPDATA",
     "SystemRoot",
+    "ComSpec",
+    "PATHEXT",
     "TEMP",
     "TMP",
     "TMPDIR",
@@ -99,35 +104,85 @@ const runBitwardenCli: BitwardenCliRunner = (executable, args, extra, signal) =>
     if (process.env[name]) env[name] = process.env[name];
   }
   Object.assign(env, extra);
+  const target = cliSpawnTarget(executable, args);
+  const wrapper = target.windowsVerbatimArguments;
   return new Promise((resolve, reject) => {
-    execFile(
-      executable,
-      args,
-      { env, signal, timeout: 30_000, maxBuffer: 8 * 1024 * 1024, windowsHide: true },
-      (error, stdout) => {
-        if (error) reject(new Error(sourceText("error.connector.bitwardenFailed")));
-        else resolve(stdout);
+    const child = execFile(
+      target.command,
+      target.args,
+      {
+        env,
+        ...(wrapper ? {} : { signal, timeout: CLI_TIMEOUT_MS }),
+        maxBuffer: 8 * 1024 * 1024,
+        windowsHide: true,
+        windowsVerbatimArguments: wrapper,
+      },
+      (error, stdout, stderr) => {
+        clearTimeout(timer);
+        signal.removeEventListener("abort", stop);
+        if (!error) resolve(stdout);
+        else if (stderr.includes("KeyIdBackfillError"))
+          reject(new BitwardenKeyIdBackfillError(sourceText("error.connector.bitwardenFailed")));
+        else reject(new Error(sourceText("error.connector.bitwardenFailed")));
       },
     );
+    const stop = () => Effect.runFork(stopWindowsProcessTree(child).pipe(Effect.ignore));
+    const timer = wrapper ? setTimeout(stop, CLI_TIMEOUT_MS).unref() : undefined;
+    if (!wrapper) return;
+    if (signal.aborted) stop();
+    else signal.addEventListener("abort", stop, { once: true });
   });
 };
 
-async function findCli(): Promise<string> {
-  const name = process.platform === "win32" ? "bw.exe" : "bw";
-  const directories = [...(process.env.PATH ?? "").split(delimiter), "/opt/homebrew/bin", "/usr/local/bin"];
+async function firstCli(names: string[], directories: string[]): Promise<string | null> {
   for (const directory of new Set(directories.filter(isAbsolute))) {
-    try {
-      const path = await realpath(join(directory, name));
-      await access(path, constants.X_OK);
-      return path;
-    } catch {
-      /* Try the next installation directory. */
+    for (const name of names) {
+      try {
+        const path = await realpath(join(directory, name));
+        await access(path, constants.X_OK);
+        return path;
+      } catch {}
     }
   }
-  throw new Error(sourceText("error.connector.bitwardenFailed"));
+  return null;
 }
 
-/** An `https:` server address without a trailing slash, or null. `bw status` reports it as it was set. */
+const WINDOWS_PATH_KEYS = [
+  "HKCU\\Environment",
+  "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment",
+];
+
+async function currentWindowsPathFolders(): Promise<string[]> {
+  const reg = join(process.env.SystemRoot ?? "C:\\Windows", "System32", "reg.exe");
+  const values = await Promise.all(
+    WINDOWS_PATH_KEYS.map(
+      (key) =>
+        new Promise<string>((resolve) => {
+          execFile(reg, ["query", key, "/v", "Path"], { timeout: 5_000, windowsHide: true }, (error, stdout) => {
+            resolve(error ? "" : (/^\s*Path\s+REG_(?:EXPAND_)?SZ\s+(.*)$/imu.exec(stdout)?.[1] ?? ""));
+          });
+        }),
+    ),
+  );
+  const folders = values
+    .flatMap((value) => value.split(";"))
+    .map((folder) => folder.trim().replace(/%([^%]+)%/gu, (text, name: string) => process.env[name] ?? text));
+  const { LOCALAPPDATA, ProgramFiles } = process.env;
+  if (LOCALAPPDATA) folders.push(join(LOCALAPPDATA, "Microsoft", "WinGet", "Links"));
+  if (ProgramFiles) folders.push(join(ProgramFiles, "WinGet", "Links"));
+  return folders;
+}
+
+async function findCli(): Promise<string> {
+  const names = process.platform === "win32" ? ["bw.exe", "bw.cmd"] : ["bw"];
+  const directories = [...(process.env.PATH ?? "").split(delimiter), "/opt/homebrew/bin", "/usr/local/bin"];
+  const found =
+    (await firstCli(names, directories)) ??
+    (process.platform === "win32" ? await firstCli(names, await currentWindowsPathFolders()) : null);
+  if (found) return found;
+  throw new Error(sourceText("error.connector.bitwardenCliMissing"));
+}
+
 function serverAddress(value: string): string | null {
   try {
     const url = new URL(value.trim());
@@ -138,10 +193,6 @@ function serverAddress(value: string): string | null {
   }
 }
 
-/**
- * Bitwarden's default and base domain rules (`null`, `0`) compare the registrable domain, and its
- * host rule (`1`) compares the host, as Bitwarden does. Only HTTPS pages match.
- */
 function matches(item: Item, folderId: string, origin: string): boolean {
   if (
     item.type !== 1 ||
@@ -159,27 +210,17 @@ function matches(item: Item, folderId: string, origin: string): boolean {
   );
 }
 
-/**
- * Owns one CLI session. It reads only logins in the folder the user shared. A session key that the
- * user pastes stays in memory only. A host connection (`bitwarden-connector-v1`) signs in with an API
- * key and unlocks with the master password, both kept in the encrypted store, so the host unlocks
- * again after a restart or an idle timeout.
- */
 export class BitwardenConnectorService implements PasswordVault {
   readonly #run: BitwardenCliRunner;
   readonly #find: () => Promise<string>;
   readonly #host: BitwardenHostOptions | null;
   readonly #running = new Set<Promise<string>>();
   readonly #queue = Semaphore.makeUnsafe(1);
-  /** One unlock from the stored record at a time; the others wait for its session. */
   readonly #unlocking = Semaphore.makeUnsafe(1);
-  /** Owns the host sign-in that runs after `connectWithApiKey` answers. Dispose stops it. */
   readonly #scope = Scope.makeUnsafe();
   readonly #listeners = new Set<(status: BitwardenConnectorStatus) => void>();
   #session: Session | null = null;
-  /** The host sign-in that runs, and the server it signs in to. */
   #connecting: { abort: AbortController; serverUrl: string } | null = null;
-  /** The unlock from the stored record that runs. */
   #unlockAbort: AbortController | null = null;
   #error: string | null = null;
   #timer: ReturnType<typeof setTimeout> | undefined;
@@ -193,7 +234,6 @@ export class BitwardenConnectorService implements PasswordVault {
     this.#host = options.host ?? null;
   }
 
-  /** Reads the stored host connection. A file that cannot be read is logged and treated as no connection. */
   readonly load = Effect.fn("BitwardenConnector.load")(function* (this: BitwardenConnectorService) {
     const error = yield* this.#host ? this.#host.store.load() : Effect.succeed(null);
     if (error) logger.warn("The Bitwarden connection file could not be read.", { cause: toLogValue(error) });
@@ -221,9 +261,8 @@ export class BitwardenConnectorService implements PasswordVault {
     yield* this.disconnect();
     const attempt = this.#attempt;
     registerSecretValue(key);
-    const executable = yield* Effect.tryPromise({ try: this.#find, catch: failure });
+    const executable = yield* Effect.tryPromise({ try: this.#find, catch: cliMissing });
     const session: Session = { executable, env: { BW_SESSION: key }, folderId: "", abort: new AbortController() };
-    // Keep the pending session so disconnect can cancel the CLI while connect is waiting.
     if (attempt !== this.#attempt) return this.status();
     this.#session = session;
     return yield* this.#openFolder(session).pipe(
@@ -232,11 +271,6 @@ export class BitwardenConnectorService implements PasswordVault {
     );
   }).bind(this);
 
-  /**
-   * Starts the host sign-in and answers `connecting` at once: a download of `bw` and the first sync
-   * can take longer than a Team API request may wait. The record is stored only after the vault
-   * opened and the shared folder was found.
-   */
   readonly connectWithApiKey = Effect.fn("BitwardenConnector.connectWithApiKey")(function* (
     this: BitwardenConnectorService,
     input: BitwardenHostConnectInput,
@@ -276,7 +310,6 @@ export class BitwardenConnectorService implements PasswordVault {
             logger.warn("Unable to connect Bitwarden with an API key", { cause: toLogValue(cause) });
             this.#error = hostError(cause);
             yield* this.#dropSession();
-            // `bw login` can have worked before a later step failed: remove its signed-in data.
             yield* Effect.promise(() => Promise.allSettled([...this.#running]));
             if (this.#connecting === attempt)
               yield* vaultCall(() => rm(host.dataDirectory, { recursive: true, force: true })).pipe(Effect.ignore);
@@ -295,11 +328,9 @@ export class BitwardenConnectorService implements PasswordVault {
     return this.status();
   }).bind(this);
 
-  /** Stops access, forgets a stored host connection, and removes the host's CLI data. */
   readonly disconnect = Effect.fn("BitwardenConnector.disconnect")(function* (this: BitwardenConnectorService) {
     yield* this.#stop();
     this.#error = null;
-    // A stopped `bw` can still write its data file; remove the folder after it exits.
     yield* Effect.promise(() => Promise.allSettled([...this.#running]));
     const host = this.#host;
     if (host) {
@@ -310,7 +341,6 @@ export class BitwardenConnectorService implements PasswordVault {
     return this.status();
   }).bind(this);
 
-  /** Stops access and the host sign-in, then waits for the child processes to finish. The stored connection stays. */
   readonly dispose = Effect.fn("BitwardenConnector.dispose")(function* (this: BitwardenConnectorService) {
     yield* this.#stop();
     yield* Scope.close(this.#scope, Exit.void);
@@ -372,7 +402,6 @@ export class BitwardenConnectorService implements PasswordVault {
     return value;
   }).bind(this);
 
-  /** The open session, or a new one from the stored host connection, or null when there is neither. */
   readonly #ready = Effect.fn("BitwardenConnector.ready")(function* (
     this: BitwardenConnectorService,
   ): Effect.fn.Return<Session | null, PasswordVaultError> {
@@ -383,7 +412,6 @@ export class BitwardenConnectorService implements PasswordVault {
         if (this.#session?.folderId) return this.#session;
         const record = this.#host?.store.read();
         if (this.#connecting || !record) return null;
-        // `#stop` aborts it, so a stopped unlock neither reports an error nor touches a newer session.
         const abort = new AbortController();
         this.#unlockAbort = abort;
         return yield* this.#unlock(record, abort.signal).pipe(
@@ -405,11 +433,6 @@ export class BitwardenConnectorService implements PasswordVault {
     );
   }).bind(this);
 
-  /**
-   * Signs in to `record.serverUrl` when the host's CLI data is signed out or names another server,
-   * unlocks, and opens the shared folder. The API key and the master password go to `bw` only in its
-   * environment, never in its arguments.
-   */
   readonly #unlock = Effect.fn("BitwardenConnector.unlock")(function* (
     this: BitwardenConnectorService,
     record: BitwardenConnectorRecord,
@@ -441,9 +464,18 @@ export class BitwardenConnectorService implements PasswordVault {
           BW_CLIENTSECRET: record.clientSecret,
         });
       }
-      const key = (yield* this.#call(session, ["unlock", "--passwordenv", "BW_PASSWORD", "--raw"], {
+      const unlock = this.#call(session, ["unlock", "--passwordenv", "BW_PASSWORD", "--raw"], {
         BW_PASSWORD: record.masterPassword,
-      })).trim();
+      });
+      const key = (yield* unlock.pipe(
+        Effect.catchIf(
+          ({ cause }) => cause instanceof BitwardenKeyIdBackfillError,
+          () => {
+            logger.info("The Bitwarden CLI failed its user key id backfill. Unlocking again.");
+            return unlock;
+          },
+        ),
+      )).trim();
       if (!key) return yield* failure();
       registerSecretValue(key);
       session.env = { ...env, BW_SESSION: key };
@@ -454,7 +486,6 @@ export class BitwardenConnectorService implements PasswordVault {
     );
   }).bind(this);
 
-  /** Syncs and finds the one folder named "Shared with OpenBot". */
   readonly #openFolder = Effect.fn("BitwardenConnector.openFolder")(function* (
     this: BitwardenConnectorService,
     session: Session,
@@ -466,21 +497,16 @@ export class BitwardenConnectorService implements PasswordVault {
       catch: failure,
     });
     const shared = folders.filter((folder) => folder.name === "Shared with OpenBot");
-    if (shared.length !== 1 || !shared[0]?.id) return yield* failure();
+    if (shared.length !== 1 || !shared[0]?.id)
+      return yield* new PasswordVaultError({ cause: new Error(sourceText("error.connector.bitwardenFolderMissing")) });
     session.folderId = shared[0].id;
     this.#error = null;
     this.#touch();
     this.#emit();
   }).bind(this);
 
-  /**
-   * Runs a read of the open session. While its reads fail, the status shows the error, so the page
-   * does not show a working connection; the next read that works removes the error. A stored host
-   * connection also ends the session, so the next read unlocks again.
-   */
   #reported<A>(session: Session, read: Effect.Effect<A, PasswordVaultError>): Effect.Effect<A, PasswordVaultError> {
     return read.pipe(
-      // The caller logs the failure.
       Effect.tapError(({ cause }) =>
         Effect.suspend(() => {
           if (this.#session !== session) return Effect.void;
@@ -499,7 +525,6 @@ export class BitwardenConnectorService implements PasswordVault {
     );
   }
 
-  /** Ends the session and the host sign-in in memory. The stored connection stays. */
   #stop(): Effect.Effect<void> {
     return Effect.suspend(() => {
       this.#connecting?.abort.abort();
@@ -509,7 +534,6 @@ export class BitwardenConnectorService implements PasswordVault {
       return this.#dropSession();
     });
   }
-  /** Ends the session and stops its CLI calls. A sign-in that runs keeps its state. */
   #dropSession(): Effect.Effect<void> {
     return Effect.sync(() => {
       this.#attempt++;
@@ -539,7 +563,8 @@ export class BitwardenConnectorService implements PasswordVault {
           this.#running.add(pending);
           return pending.finally(() => this.#running.delete(pending));
         },
-        catch: failure,
+        catch: (error) =>
+          error instanceof BitwardenKeyIdBackfillError ? new PasswordVaultError({ cause: error }) : failure(),
       });
       if (this.#session !== session) return yield* failure();
       this.#touch();
@@ -548,7 +573,6 @@ export class BitwardenConnectorService implements PasswordVault {
     (operation) => this.#queue.withPermit(operation),
   ).bind(this);
 
-  /** After 8 hours with no vault use the session ends. A stored host connection unlocks again on the next use. */
   #touch(): void {
     clearTimeout(this.#timer);
     this.#timer = setTimeout(() => {
@@ -570,7 +594,6 @@ function registerRecord(record: BitwardenConnectorRecord): void {
   registerSecretValue(record.masterPassword, { allowShort: true });
 }
 
-/** The install failure names itself; every other host failure gets one sentence about the inputs. */
 function hostError(cause: unknown): string {
   const install = sourceText("error.connector.bitwardenCliInstallFailed");
   return cause instanceof Error && cause.message === install

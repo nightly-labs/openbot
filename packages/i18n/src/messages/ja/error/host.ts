@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/host";
 
 export const messages = {
-  // Errors from host setup, publishing, and host maintenance.
   "error.host.iceServersMissing": "Remote Signal が ICE サーバーを提供していません。",
   "error.host.keyRotationUnavailable": "このサーバーはアカウントサービスなしではキーを変更できません。",
   "error.host.keyRotationRefused":
@@ -20,6 +19,8 @@ export const messages = {
   "error.host.publishFailed": "この OpenBot を公開できませんでした。",
   "error.host.mobileConnectPublishFailed": "この OpenBot を Mobile Connect 用に公開できませんでした。",
   "error.host.mobileConnectHostChanged": "Mobile Connect のホストが変わりました。再試行してください。",
+  "error.host.mobileConnectHostMismatch":
+    "アカウントにはこのサーバーの別のキーが登録されています。再試行してください。",
   "error.host.noServer": "このコンピューターには変更できるサーバーがありません。",
   "error.host.identityLocalOnly": "サーバーの名前とロゴは、サーバーを実行しているコンピューターでのみ変更できます。",
   "error.host.timezoneInvalid": "このタイムゾーンは不明です。",

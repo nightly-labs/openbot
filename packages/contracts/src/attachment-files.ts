@@ -2,22 +2,12 @@ export const IMAGE_ATTACHMENT_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp",
 
 export const MEDIA_ATTACHMENT_EXTENSIONS = ["mp3", "mov"] as const;
 
-/**
- * Audio that a host with `any-file-attachments` takes as an opaque file, and that the chat still plays
- * by its name. They are not in `MEDIA_ATTACHMENT_EXTENSIONS`: an older remote host refuses them.
- */
-const NAMED_AUDIO_EXTENSIONS = ["m4a", "wav", "aac"] as const;
+const NAMED_AUDIO_EXTENSIONS = ["m4a", "wav", "aac", "ogg", "oga", "opus", "flac"] as const;
 
 export const ARCHIVE_ATTACHMENT_EXTENSIONS = ["zip"] as const;
 
-/** MP4 came after `media-attachments`, so a remote host advertises it with its own capability. */
 export const MP4_ATTACHMENT_EXTENSIONS = ["mp4"] as const;
 
-/**
- * SVG came after the other types, so a remote host advertises it with its own capability. An SVG is
- * a `file` attachment, not an `image` one: providers take only raster image blocks, so the agent gets
- * the path and reads the SVG text.
- */
 export const SVG_ATTACHMENT_EXTENSIONS = ["svg"] as const;
 
 export const CONTEXT_ATTACHMENT_EXTENSIONS = [
@@ -97,14 +87,6 @@ export const ATTACHMENT_FILE_EXTENSIONS = [
   ...CONTEXT_ATTACHMENT_EXTENSIONS,
 ] as const;
 
-/**
- * The attachment types that the desktop app opens with the default app of the operating system:
- * images, audio, video, documents and plain text. The operating system can run other types when
- * it opens them, for example a script on Windows, or a page in a browser. The old Office formats
- * (doc, xls, ppt) can hold macros. The desktop app shows those files in the file manager and does
- * not open them. The file name can come from another member or from a remote host, so it is not
- * trusted.
- */
 export const OPENABLE_ATTACHMENT_EXTENSIONS = [
   ...IMAGE_ATTACHMENT_EXTENSIONS,
   ...MEDIA_ATTACHMENT_EXTENSIONS,
@@ -126,10 +108,6 @@ export const OPENABLE_ATTACHMENT_EXTENSIONS = [
   "log",
 ] as const;
 
-/**
- * What a host accepts beyond the base list. An older remote host rejects EML, MP3, MOV, ZIP, MP4, and
- * SVG. A host with `anyFile` also takes a file whose name has no known type, as an opaque `file`.
- */
 export interface AttachmentSupport {
   eml: boolean;
   media: boolean;
@@ -139,7 +117,6 @@ export interface AttachmentSupport {
   anyFile: boolean;
 }
 
-/** The extensions of the picker filter for a host without `anyFile`. A host with it gets no filter. */
 export function supportedAttachmentExtensions(support: Omit<AttachmentSupport, "anyFile">): string[] {
   return ATTACHMENT_FILE_EXTENSIONS.filter(
     (extension) =>
@@ -174,26 +151,16 @@ export function isSupportedAttachmentName(name: string): boolean {
 
 const OPENABLE_EXTENSIONS = new Set<string>(OPENABLE_ATTACHMENT_EXTENSIONS);
 
-/** Whether the desktop app can open this file with the default app. See `OPENABLE_ATTACHMENT_EXTENSIONS`. */
 export function isOpenableAttachmentName(name: string): boolean {
   const extension = attachmentFileExtension(name);
   return extension !== null && OPENABLE_EXTENSIONS.has(extension);
 }
 
-/**
- * The raster image type for a local preview of a file, or null. The type comes from the name, not
- * from the file, so a preview is never a type that a browser runs as a page (HTML, SVG).
- */
 export function rasterImageMimeType(name: string): string | null {
   const extension = attachmentFileExtension(name);
   return IMAGE_ATTACHMENT_EXTENSIONS.some((image) => image === extension) ? attachmentMimeTypeForName(name) : null;
 }
 
-/**
- * The name check for a surface that picks files for one host, such as mobile. Without `anyFile`, it
- * accepts the same files as the desktop picker filter that `supportedAttachmentExtensions` builds for
- * that host.
- */
 export function isSupportedAttachmentNameFor(name: string, support: AttachmentSupport): boolean {
   if (!isSupportedAttachmentName(name)) return support.anyFile;
   const extension = attachmentFileExtension(name);
@@ -205,11 +172,6 @@ export function isSupportedAttachmentNameFor(name: string, support: AttachmentSu
   return true;
 }
 
-/**
- * The one rejection message for a file that a remote host without `any-file-attachments` refuses.
- * The desktop upload handlers in `src/main/ipc/attachment-handlers.ts` and the web client throw it.
- * A user must not read two different sentences for the same refused file.
- */
 export function assertSupportedAttachmentName(name: string): void {
   if (isSupportedAttachmentName(name)) return;
   throw new Error(
@@ -238,6 +200,12 @@ export function attachmentMimeTypeForName(name: string) {
       return "audio/wav";
     case "aac":
       return "audio/aac";
+    case "ogg":
+    case "oga":
+    case "opus":
+      return "audio/ogg";
+    case "flac":
+      return "audio/flac";
     case "mov":
       return "video/quicktime";
     case "mp4":
@@ -246,8 +214,6 @@ export function attachmentMimeTypeForName(name: string) {
       return "application/zip";
     case "pdf":
       return "application/pdf";
-    // An SVG attachment keeps this type for its preview, but it is a `file` attachment, not an
-    // `image` one (see `SVG_ATTACHMENT_EXTENSIONS`).
     case "svg":
       return "image/svg+xml";
     case "eml":
@@ -275,6 +241,9 @@ export function attachmentMimeTypeForName(name: string) {
     case "md":
     case "markdown":
       return "text/markdown";
+    case "html":
+    case "htm":
+      return "text/html";
     case "json":
     case "jsonl":
     case "ipynb":
@@ -284,11 +253,6 @@ export function attachmentMimeTypeForName(name: string) {
   }
 }
 
-/**
- * The media kinds a browser can play. Attachments keep `previewKind: "none"` on the wire, because
- * the released Team API v1-v4 validators accept only image, pdf, text, and none. The renderer reads
- * the MIME type instead, which is already a free string in those protocols.
- */
 export function playableMediaKind(mimeType: string): "audio" | "video" | null {
   if (mimeType.startsWith("audio/")) return "audio";
   if (mimeType.startsWith("video/")) return "video";

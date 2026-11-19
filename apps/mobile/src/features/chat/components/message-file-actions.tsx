@@ -10,16 +10,12 @@ import type { MenuAction } from "@/shared/components/menu-view";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { copiesToClipboard, savesToPhotos, useAttachmentFiles } from "./attachment-preview";
+import { useMediaDownloads } from "./use-media-file";
 
 const ICON_SIZE = 22;
 const ALL = "all";
 const ALL_PHOTOS = "all-photos";
 
-/**
- * Copy, Share and Save for the files of one message, in the message sheet. A message with one file
- * acts on it at once. A message with more files opens a menu that names each file, so the reader
- * sees which file an action takes. Each action runs when the sheet has closed.
- */
 export function MessageFileActions({
   serverId,
   attachments,
@@ -29,11 +25,13 @@ export function MessageFileActions({
   serverId: string;
   attachments: readonly AttachmentSummary[];
   iconColor: string;
-  /** Closes the sheet and runs the action after it, so a share sheet or a picker shows over the chat. */
   afterSheet: (action: () => void) => void;
 }) {
   const { t } = useText();
   const files = useAttachmentFiles(serverId, attachments);
+  const downloads = useMediaDownloads(serverId, attachments);
+  const waits = (attachment: AttachmentSummary) => downloads.has(attachment.id);
+  const anyWaits = downloads.size > 0;
   const single = attachments.length === 1 ? attachments[0] : undefined;
   const copyable = attachments.filter(copiesToClipboard);
   const photos = attachments.filter(savesToPhotos);
@@ -49,7 +47,6 @@ export function MessageFileActions({
           succeed,
         ),
     );
-  /** One menu entry for each file, under a header. */
   const eachFile = (image: (attachment: AttachmentSummary) => MenuAction["image"]): MenuAction => ({
     title: t("mobile.chat.message.oneFile"),
     displayInline: true,
@@ -57,13 +54,14 @@ export function MessageFileActions({
       id: attachment.id,
       title: attachment.name,
       image: image(attachment),
+      attributes: { disabled: waits(attachment) },
     })),
   });
 
   return (
     <SettingsSection>
       {single && copiesToClipboard(single) ? (
-        <Row icon={<Copy size={ICON_SIZE} color={iconColor} />} onPress={() => copy(single)}>
+        <Row icon={<Copy size={ICON_SIZE} color={iconColor} />} disabled={waits(single)} onPress={() => copy(single)}>
           {savesToPhotos(single) ? t("mobile.chat.message.copyImage") : t("mobile.chat.message.copyText")}
         </Row>
       ) : !single && copyable.length > 0 ? (
@@ -74,6 +72,7 @@ export function MessageFileActions({
             id: attachment.id,
             title: attachment.name,
             image: savesToPhotos(attachment) ? "photo" : "doc.text",
+            attributes: { disabled: waits(attachment) },
           }))}
           onAction={(id) => {
             const attachment = byId.get(id);
@@ -83,7 +82,11 @@ export function MessageFileActions({
       ) : null}
 
       {single ? (
-        <Row icon={<Share size={ICON_SIZE} color={iconColor} />} onPress={() => afterSheet(files.shareAll)}>
+        <Row
+          icon={<Share size={ICON_SIZE} color={iconColor} />}
+          disabled={waits(single)}
+          onPress={() => afterSheet(files.shareAll)}
+        >
           {t("mobile.chat.message.share")}
         </Row>
       ) : (
@@ -91,7 +94,12 @@ export function MessageFileActions({
           icon={<Share size={ICON_SIZE} color={iconColor} />}
           label={t("mobile.chat.message.share")}
           actions={[
-            { id: ALL, title: t("mobile.chat.message.shareAll"), image: "square.and.arrow.up.on.square" },
+            {
+              id: ALL,
+              title: t("mobile.chat.message.shareAll"),
+              image: "square.and.arrow.up.on.square",
+              attributes: { disabled: anyWaits },
+            },
             eachFile(() => "square.and.arrow.up"),
           ]}
           onAction={(id) => {
@@ -103,7 +111,11 @@ export function MessageFileActions({
       )}
 
       {single ? (
-        <Row icon={<Download size={ICON_SIZE} color={iconColor} />} onPress={() => save(single)}>
+        <Row
+          icon={<Download size={ICON_SIZE} color={iconColor} />}
+          disabled={waits(single)}
+          onPress={() => save(single)}
+        >
           {savesToPhotos(single) ? t("mobile.chat.message.saveToPhotos") : t("mobile.chat.message.saveToFiles")}
         </Row>
       ) : (
@@ -111,17 +123,22 @@ export function MessageFileActions({
           icon={<Download size={ICON_SIZE} color={iconColor} />}
           label={t("mobile.chat.message.save")}
           actions={[
-            { id: ALL, title: t("mobile.chat.message.saveAllToFiles"), image: "folder" },
+            {
+              id: ALL,
+              title: t("mobile.chat.message.saveAllToFiles"),
+              image: "folder",
+              attributes: { disabled: anyWaits },
+            },
             ...(photos.length > 0
               ? [
                   {
                     id: ALL_PHOTOS,
                     title: t("mobile.chat.message.saveImagesToPhotos", { count: photos.length }),
                     image: "photo.on.rectangle" as const,
+                    attributes: { disabled: photos.some(waits) },
                   },
                 ]
               : []),
-            // An image goes to Photos and another file to Files, as the icon shows.
             eachFile((attachment) => (savesToPhotos(attachment) ? "photo" : "folder")),
           ]}
           onAction={(id) => {
@@ -136,15 +153,24 @@ export function MessageFileActions({
   );
 }
 
-function Row({ icon, onPress, children }: { icon: ReactNode; onPress: () => void; children: string }) {
+function Row({
+  icon,
+  disabled = false,
+  onPress,
+  children,
+}: {
+  icon: ReactNode;
+  disabled?: boolean;
+  onPress: () => void;
+  children: string;
+}) {
   return (
-    <SettingsRow leading={icon} disclosure={false} onPress={onPress}>
+    <SettingsRow leading={icon} disclosure={false} disabled={disabled} onPress={onPress}>
       <Typography>{children}</Typography>
     </SettingsRow>
   );
 }
 
-/** A row that opens a native menu, as Send to channel does. */
 function MenuRow({
   icon,
   label,

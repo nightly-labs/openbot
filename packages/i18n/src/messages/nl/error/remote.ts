@@ -22,6 +22,12 @@ export const messages = {
   "error.remote.testActive": "Er loopt een test van extern bureaublad. Probeer het opnieuw als die klaar is.",
   "error.remote.screenRecordingDenied":
     "De host heeft OpenBot niet toegestaan het scherm op te nemen. Geef toestemming voor schermopname op de host en probeer het opnieuw.",
+  "error.remote.windowsSessionDisconnected":
+    "De Windows-sessie op de host is verbroken, dus er is geen scherm om te delen. Meld je aan bij Windows op het scherm van de host en probeer het opnieuw.",
+  "error.remote.streamTooSlowLowerQuality":
+    "De verbinding met de host is te traag voor het beeld. Probeer het opnieuw: de volgende verbinding gebruikt een lagere kwaliteit.",
+  "error.remote.streamTooSlow":
+    "De verbinding met de host is te traag voor het beeld. Gebruik een sneller netwerk en probeer het opnieuw.",
   "error.remote.teamSessionExpired": "De teamsessie is verlopen.",
   "error.remote.finishTestBeforeSwitch": "Rond de test van extern bureaublad af voordat je van beeldscherm wisselt.",
   "error.remote.displayNotFound": "Extern beeldscherm niet gevonden.",
@@ -82,10 +88,14 @@ export const messages = {
   "error.remote.ownerOnlyRemove": "Alleen de eigenaar kan deze server verwijderen.",
   "error.remote.requestTimeout": "Het externe verzoek duurde te lang.",
   "error.remote.requestFailed": "Het externe verzoek is mislukt.",
-  "error.remote.pinnedKeyMissing": "De externe host heeft geen vastgezette apparaatsleutel.",
+  "error.remote.hostKeyMissing":
+    "OpenBot kan deze server niet controleren, omdat de beveiligingssleutel ontbreekt of is gewijzigd. Vraag de eigenaar van de server om de server te controleren.",
+  "error.remote.connectionNotStarted":
+    "OpenBot kon de verbinding met deze server niet starten. Als dit blijft gebeuren, sluit OpenBot af en open het opnieuw.",
   "error.remote.hostDidNotConnect": "De WebRTC-host heeft geen verbinding gemaakt.",
   "error.remote.connectionCancelled": "De externe verbinding is geannuleerd.",
-  "error.remote.hostDisconnected": "De verbinding met de WebRTC-host is verbroken.",
+  "error.remote.hostDisconnected":
+    "De verbinding met de server is verbroken. Controleer of de actie is voltooid en probeer het dan opnieuw.",
   "error.remote.eventGap": "De volgorde van events van de host heeft een gat.",
   "error.remote.malformedKnownEvent": "De host gaf een misvormd bekend event terug.",
   "error.remote.fileTransportIsStopped": "Het WebRTC-bestandstransport is gestopt.",
@@ -152,6 +162,7 @@ export const messages = {
   "error.remote.attachmentRejected": "De host heeft de bijlage geweigerd.",
   "error.remote.attachmentTooLarge": "Bijlagen mogen maximaal 10 MB zijn.",
   "error.remote.attachmentBusy": "Wacht tot de huidige bijlage klaar is.",
+  "error.remote.attachmentChanged": "Het bestand is gewijzigd of niet beschikbaar. Selecteer het opnieuw.",
   "error.remote.uploadTimeout": "Het uploaden van de bijlage duurde te lang.",
   "error.remote.hostSessionActive": "De host heeft al een actieve externe sessie.",
   "error.remote.tooManyConnections": "Te veel actieve externe verbindingen.",
@@ -182,6 +193,8 @@ export const messages = {
   "error.remote.iceFailed":
     "Er kon geen directe verbinding met de host worden gemaakt. Een firewall, VPN of proxy kan deze blokkeren.",
   "error.remote.iceDisconnected": "De directe verbinding met de host is verbroken.",
+  "error.remote.webrtcBlocked":
+    "Dit apparaat blokkeert de verbinding die OpenBot nodig heeft. Als de isolatiemodus aan staat, zet die dan uit voor OpenBot via Instellingen > Privacy en beveiliging > Isolatiemodus.",
   "error.remote.directoryUnreachable": "OpenBot kan de OpenBot-service niet bereiken. Controleer je verbinding.",
   "error.remote.directoryTimeout": "De OpenBot-service reageerde niet op tijd. Probeer het opnieuw.",
   "error.remote.inviteAlreadyUsed": "Deze uitnodiging is al gebruikt. Vraag om een nieuwe uitnodiging.",
@@ -205,6 +218,9 @@ export const messages = {
   "error.remote.channelDeleteUnsupported": "Werk deze desktopserver bij om kanalen te verwijderen.",
   "error.remote.historyRefreshFailed": "Het bericht is verstuurd, maar de chatgeschiedenis kon niet worden vernieuwd.",
   "error.remote.taskHistoryRefreshFailed": "De taak is gewijzigd, maar de chatgeschiedenis kon niet worden vernieuwd.",
+  "error.remote.serverNotLoaded": "OpenBot kon de server niet laden. Probeer het opnieuw.",
+  "error.remote.localServerNotStarted":
+    "De server op deze computer is niet gestart. Probeer het opnieuw. Start hij niet, start OpenBot dan opnieuw op deze computer.",
   "error.remote.localServerAccountRemovalFailed":
     "De server is op zijn computer verwijderd, maar het account toont hem nog. Verwijder hem opnieuw om hem uit het account te halen.",
 } as const satisfies PartialTranslation<typeof source>;

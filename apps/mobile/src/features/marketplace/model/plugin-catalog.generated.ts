@@ -45,13 +45,22 @@ export type MobilePluginAuthFlow =
 
 type MobilePluginServer =
   | { name: string; transport: "http"; url: string; earlierUrls?: string[]; auth?: MobilePluginAuthFlow[] }
-  | { name: string; transport: "stdio"; command: string; args: string[]; auth?: MobilePluginAuthFlow[] };
+  | {
+      name: string;
+      transport: "stdio";
+      command: string;
+      args: string[];
+      env?: Record<string, string>;
+      auth?: MobilePluginAuthFlow[];
+    };
 
 export interface MobilePluginApp {
   id: string;
   name: string;
   description: string;
   server: MobilePluginServer;
+  /** The app drives Apple apps, so it runs only on a host that is a Mac. */
+  needsMac?: true;
 }
 
 export interface MobilePlugin {
@@ -209,7 +218,7 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
       "Obsidian lets agents search, read and write the notes in your vault, so the vault can be their memory. The local server connects to the Local REST API plugin in the Obsidian app on this computer. The plugin's API key is passed to the local server as one environment variable. Keep Obsidian open while agents use it.",
     category: "productivity",
     creatorName: "Obsidian",
-    version: "1.0.0",
+    version: "1.1.0",
     prompts: [
       { id: "prompt-recall", text: "What do my notes say about the decisions on this project?" },
       { id: "prompt-save", text: "Save this decision as a new note in my vault." },
@@ -229,6 +238,7 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
           transport: "stdio",
           command: "npx",
           args: ["-y", "obsidian-mcp-server@3.7.2"],
+          env: { OBSIDIAN_BASE_URL: "https://127.0.0.1:27124" },
           auth: [
             {
               id: "obsidian-key",
@@ -239,7 +249,7 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
                   id: "token",
                   label: "API key",
                   env: "OBSIDIAN_API_KEY",
-                  hint: 'In Obsidian, open Settings > Local REST API. Copy the API key and turn on "Enable non-encrypted (HTTP) server".',
+                  hint: "In Obsidian, open Settings > Local REST API and copy the API key.",
                 },
               ],
               docsUrl: "https://github.com/coddingtonbear/obsidian-local-rest-api",
@@ -720,6 +730,7 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
         description:
           "Mail, Calendar, Contacts, Reminders, Notes, Messages and Safari, over the local mcp-icloud server. Needs macOS and Automation access.",
         server: { name: "apple-apps", transport: "stdio", command: "npx", args: ["-y", "mcp-icloud@2.1.4"] },
+        needsMac: true,
       },
     ],
   },
@@ -752,6 +763,39 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
           transport: "http",
           url: "https://mcp.sentry.dev/mcp",
           auth: [{ id: "sentry-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+  },
+  {
+    slug: "appsignal",
+    name: "AppSignal",
+    tagline: "Errors, performance and logs",
+    description:
+      "AppSignal lets agents search error incidents and stack traces, find slow actions and traces, read logs, metrics, check-ins and uptime monitors, and build dashboards. Each user signs in to their own AppSignal account through the browser. The sign-in gives all read and write tools, so agents can also change the state, severity and assignee of an incident and add notes.",
+    category: "coding",
+    creatorName: "AppSignal",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-new-errors", text: "Which new errors did my production app get since the last deploy?" },
+      { id: "prompt-slow-actions", text: "Which actions were the slowest this week, and why?" },
+      { id: "prompt-uptime", text: "Did any uptime monitor or check-in fail in the last 24 hours?" },
+    ],
+    websiteUrl: "https://www.appsignal.com",
+    privacyPolicyUrl: "https://www.appsignal.com/privacy-policy",
+    termsUrl: "https://www.appsignal.com/terms",
+    featured: false,
+    apps: [
+      {
+        id: "app-appsignal-mcp",
+        name: "AppSignal",
+        description:
+          "Error incidents, performance, logs, metrics and dashboards, over AppSignal's MCP server with browser sign-in.",
+        server: {
+          name: "appsignal",
+          transport: "http",
+          url: "https://appsignal.com/api/mcp",
+          auth: [{ id: "appsignal-oauth", kind: "link", label: "Sign in" }],
         },
       },
     ],
@@ -1064,6 +1108,39 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
               docsLabel: "Create a key",
             },
           ],
+        },
+      },
+    ],
+  },
+  {
+    slug: "cloud66",
+    name: "Cloud 66",
+    tagline: "Applications, deploys and servers",
+    description:
+      "Cloud 66 lets agents list accounts, applications, servers and clouds, read deployments and their logs, start deployments, manage deployment profiles, and create Deploy v3 clusters. Each user signs in to their own Cloud 66 account through the browser and selects the permissions on the consent page. Agents cannot do more than the user's Cloud 66 role permits. Deploying and creating servers can cost money. To delete an application or a deployment profile, or to add a cloud, Cloud 66 asks the agent to show a confirmation link. When the chat cannot show it, do these actions in the Cloud 66 dashboard.",
+    category: "coding",
+    creatorName: "Cloud 66",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-applications", text: "Which applications are in my Cloud 66 accounts?" },
+      { id: "prompt-failed-deploy", text: "Why did the last deployment of my app fail? Read its logs." },
+      { id: "prompt-deploy", text: "Deploy my staging application and tell me when it is done." },
+    ],
+    websiteUrl: "https://www.cloud66.com",
+    privacyPolicyUrl: "https://www.cloud66.com/privacy",
+    termsUrl: "https://www.cloud66.com/terms",
+    featured: false,
+    apps: [
+      {
+        id: "app-cloud66-mcp",
+        name: "Cloud 66",
+        description:
+          "Applications, deployments, servers, clouds and clusters, over Cloud 66's MCP server with browser sign-in.",
+        server: {
+          name: "cloud66",
+          transport: "http",
+          url: "https://app.cloud66.com/mcp",
+          auth: [{ id: "cloud66-oauth", kind: "link", label: "Sign in" }],
         },
       },
     ],
@@ -1449,10 +1526,10 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     name: "Omnisend",
     tagline: "Email and SMS marketing",
     description:
-      "Omnisend lets agents read campaign and form reports, find contacts and segments, and create and edit campaigns, automations, email templates, forms and products. Each user signs in to their own Omnisend account through the browser and selects the access level on the consent screen. With write access, agents can also send campaigns and delete data. Select read-only access when agents only need reports.",
+      "Omnisend lets agents read campaign and form reports, find contacts and segments, and create and edit campaigns, automations, email templates, forms and products. Each user connects with an API key from their own Omnisend account. Agents can do what the key allows, which can include sending campaigns and deleting data.",
     category: "automation",
     creatorName: "Omnisend",
-    version: "1.0.0",
+    version: "1.1.0",
     prompts: [
       { id: "prompt-last-campaign", text: "How did last week's campaigns perform compared to the week before?" },
       { id: "prompt-segment", text: "How many contacts are in the VIP segment, and how did it change this month?" },
@@ -1467,12 +1544,28 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
         id: "app-omnisend-mcp",
         name: "Omnisend",
         description:
-          "Campaigns, automations, contacts, segments, forms and reports, over Omnisend's MCP server with browser sign-in.",
+          "Campaigns, automations, contacts, segments, forms and reports, over Omnisend's MCP server with an API key.",
         server: {
           name: "omnisend",
           transport: "http",
           url: "https://mcp.omnisend.com/mcp",
-          auth: [{ id: "omnisend-oauth", kind: "link", label: "Sign in" }],
+          auth: [
+            {
+              id: "omnisend-key",
+              kind: "key",
+              label: "API key",
+              fields: [
+                {
+                  id: "api-key",
+                  label: "API key",
+                  header: "X-Api-Key",
+                  hint: "In Omnisend, open Store settings > API keys and create a key.",
+                },
+              ],
+              docsUrl: "https://app.omnisend.com/integrations/api-keys",
+              docsLabel: "Create a key",
+            },
+          ],
         },
       },
     ],
@@ -4517,10 +4610,10 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     name: "HighLevel",
     tagline: "CRM and marketing workspace",
     description:
-      "HighLevel lets agents read and update contacts, conversations, opportunities, and calendars in the signed-in HighLevel sub-account. Each user signs in to their own HighLevel account through the browser.",
+      "HighLevel lets agents read and update contacts, conversations, opportunities, and calendars in one HighLevel sub-account. Each user connects with a Private Integration token and the location ID of their own sub-account.",
     category: "productivity",
     creatorName: "HighLevel",
-    version: "1.0.0",
+    version: "1.1.0",
     prompts: [
       { id: "prompt-new-leads", text: "List the contacts that were added this week." },
       { id: "prompt-pipeline", text: "Summarize the opportunities in my sales pipeline by stage." },
@@ -4535,12 +4628,36 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
         id: "app-highlevel-mcp",
         name: "HighLevel",
         description:
-          "Contact, conversation, opportunity, and calendar access, over HighLevel's MCP server with browser sign-in.",
+          "Contact, conversation, opportunity, and calendar access, over HighLevel's MCP server with a Private Integration token.",
         server: {
           name: "highlevel",
           transport: "http",
           url: "https://services.leadconnectorhq.com/mcp",
-          auth: [{ id: "highlevel-oauth", kind: "link", label: "Sign in" }],
+          auth: [
+            {
+              id: "highlevel-key",
+              kind: "key",
+              label: "Private Integration token",
+              fields: [
+                {
+                  id: "token",
+                  label: "Private Integration token",
+                  header: "Authorization",
+                  prefix: "Bearer ",
+                  placeholder: "pit-…",
+                  hint: "In your HighLevel sub-account, open Settings > Private Integrations and create a token.",
+                },
+                {
+                  id: "location-id",
+                  label: "Location ID",
+                  header: "locationId",
+                  hint: "In your HighLevel sub-account, open Settings > Business Profile and copy the Location ID.",
+                },
+              ],
+              docsUrl: "https://marketplace.gohighlevel.com/docs/Authorization/PrivateIntegrationsToken/index.html",
+              docsLabel: "Create a token",
+            },
+          ],
         },
       },
     ],
@@ -4606,6 +4723,57 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
           transport: "http",
           url: "https://mcp.hostinger.com",
           auth: [{ id: "hostinger-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+  },
+  {
+    slug: "hubspot",
+    name: "HubSpot",
+    tagline: "CRM records, deals and notes",
+    description:
+      "HubSpot lets agents search and read contacts, companies, deals and tickets, and create or update records, associations, notes and tasks. HubSpot's own local server runs with a service key from your HubSpot account. The scopes of the key set what agents can read and change. The server has no delete tools.",
+    category: "productivity",
+    creatorName: "HubSpot",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-deals", text: "Summarize my open deals by stage and amount." },
+      { id: "prompt-contact", text: "What do we know about the contacts at this company?" },
+      { id: "prompt-note", text: "Add a note about today's call to this contact in HubSpot." },
+    ],
+    websiteUrl: "https://www.hubspot.com",
+    privacyPolicyUrl: "https://legal.hubspot.com/privacy-policy",
+    termsUrl: "https://legal.hubspot.com/terms-of-service",
+    featured: false,
+    apps: [
+      {
+        id: "app-hubspot-mcp",
+        name: "HubSpot",
+        description:
+          "CRM search, record and association updates, notes and tasks, over HubSpot's local MCP server with a service key.",
+        server: {
+          name: "hubspot",
+          transport: "stdio",
+          command: "npx",
+          args: ["-y", "@hubspot/mcp-server@0.4.0"],
+          auth: [
+            {
+              id: "hubspot-key",
+              kind: "key",
+              label: "Service key",
+              fields: [
+                {
+                  id: "token",
+                  label: "Service key",
+                  env: "PRIVATE_APP_ACCESS_TOKEN",
+                  hint: "In HubSpot, open Development > Keys > Service keys, create a key with the CRM scopes you need, and copy it. A private app access token also works.",
+                },
+              ],
+              docsUrl:
+                "https://developers.hubspot.com/docs/apps/developer-platform/build-apps/authentication/account-service-keys",
+              docsLabel: "Create a key",
+            },
+          ],
         },
       },
     ],
@@ -7557,10 +7725,10 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     name: "Tessie",
     tagline: "Tesla vehicle data",
     description:
-      "Tessie lets agents read the state of the user's Tesla vehicles, such as battery, charging, location, and drive history, and send vehicle commands that the account allows. Each user signs in to their own Tessie account through the browser.",
+      "Tessie lets agents read the state of the user's Tesla vehicles, such as battery, charging, location, and drive history, and send vehicle commands that the account allows. Each user connects with an access token from their own Tessie account. The token can control the vehicles, so give it only to agents that you trust.",
     category: "other",
     creatorName: "Tessie",
-    version: "1.0.0",
+    version: "1.1.0",
     prompts: [
       { id: "prompt-battery", text: "What is my car's battery level and range right now?" },
       { id: "prompt-drives", text: "Summarize my drives from last week, with distance and energy used." },
@@ -7575,12 +7743,29 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
         id: "app-tessie-mcp",
         name: "Tessie",
         description:
-          "Vehicle state, drive history, and vehicle commands, over Tessie's MCP server with browser sign-in.",
+          "Vehicle state, drive history, and vehicle commands, over Tessie's MCP server with an access token.",
         server: {
           name: "tessie",
           transport: "http",
           url: "https://mcp.tessie.com",
-          auth: [{ id: "tessie-oauth", kind: "link", label: "Sign in" }],
+          auth: [
+            {
+              id: "tessie-key",
+              kind: "key",
+              label: "Access token",
+              fields: [
+                {
+                  id: "token",
+                  label: "Access token",
+                  header: "Authorization",
+                  prefix: "Bearer ",
+                  hint: "In Tessie, open Settings > Developer and create an access token.",
+                },
+              ],
+              docsUrl: "https://dash.tessie.com/settings/developer",
+              docsLabel: "Create a token",
+            },
+          ],
         },
       },
     ],

@@ -1,15 +1,3 @@
-/**
- * The imperative half of the sidebar's drag&drop: the pointer pipeline, the slot caches, the
- * auto-scroll and the resolve path that decides what a drop would land on.
- *
- * `dragSession`, `dragTarget` and the slot caches are plain locals because the pipeline reads its
- * own writes inside one tick, and neither a signal nor a store publishes a write before the next
- * flush. The reactive half the rows render from is `drag-state-store`, and this file is handed only
- * its writers: anything deciding where a drag lands takes the source from `dragSession`, and taking
- * it from `drag.source` instead would bring back exactly the one-frame staleness this split exists
- * to avoid. `commitSidebarDrop` is passed that source for the same reason.
- */
-
 import type { TeamPresenceMember } from "@openbot/contracts/ipc";
 import { createBoundedDragPreview } from "../../components/createBoundedDragPreview";
 import type { createScrollFades } from "../../components/createScrollFades";
@@ -43,27 +31,24 @@ export interface SidebarDragEngineDeps {
   chatPinnedItems: () => SidebarPinnedItem[];
   assignedSectionId: (chatId: string) => string;
   commitSidebarDrop: (source: SidebarDragSource, target: SidebarDropTarget | null) => void;
-  /** Read on the resolve path, so it is a predicate over the pin count - never a read of the source. */
   canPinDraggedItem: () => boolean;
   dragState: SidebarDragWriters;
   filteredChatsBySection: () => Map<string, SidebarChatItem[]>;
   orderedPeople: () => TeamPresenceMember[];
   getAgentList: () => HTMLElement | undefined;
-  /** Which kind of chat an id names, or null when it names none: only a known chat can be pinned. */
   chatKind: (chatId: string) => "agent" | "channel" | null;
   props: SidebarProps;
   scrollFades: ReturnType<typeof createScrollFades>;
   sectionAcceptsChat: (sectionId: string) => boolean;
-  /** The folder rules for a dragged folder. Null when the host keeps sections flat. */
   folders: () => SidebarDragFolders | null;
-  /** Whether a section is closed, so a drag that rests on it can open it. */
   sectionIsCollapsed: (sectionId: string) => boolean;
   visiblePinnedKeys: () => string[];
   visibleSectionIds: () => string[];
 }
 
-/** A drag that rests this long on a closed folder opens it. */
 const SPRING_OPEN_MS = 700;
+
+const DRAG_AIM_DISTANCE_PX = 6;
 
 export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
   const {
@@ -97,6 +82,8 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
 
   let dragPoint: SidebarDragPoint | null = null;
 
+  let dragOrigin: SidebarDragPoint | null = null;
+
   let dragTarget: SidebarDropTarget | null = null;
 
   let dragTargetFrame: number | null = null;
@@ -121,6 +108,7 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
     stopSpringOpen();
     dragSession = null;
     dragPoint = null;
+    dragOrigin = null;
     dragTarget = null;
     dragTargetFrame = null;
     dragScrollFrame = null;
@@ -141,7 +129,6 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
     springOpen = null;
   }
 
-  /** Waits to open the closed section that the drag now aims at, and forgets any other. */
   function updateSpringOpen(target: SidebarDropTarget | null): void {
     const sectionId = target?.kind === "section" || target?.kind === "section-into" ? target.sectionId : null;
     if (!sectionId || !deps.sectionIsCollapsed(sectionId)) {
@@ -159,7 +146,6 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
     };
   }
 
-  /** A section that opens or closes during a drag moves the rows under it: measure them again. */
   function remeasureAfterTransition(event: TransitionEvent): void {
     if (!dragSession || event.propertyName !== "grid-template-rows") return;
     measureSidebarDragTargets();
@@ -173,11 +159,6 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
     return true;
   }
 
-  /**
-   * Resets the caches and both drag-start scroll tops before anything can fail, then measures. The
-   * early return matters: with no list there are no slots, but `dragGeometry` keeps its previous
-   * value, and `resolveSidebarDropTarget` rejects every point once that becomes `{list: null}`.
-   */
   function measureSidebarDragTargets(): void {
     sectionDragSlots = new Map();
     chatDragSlots = new Map();
@@ -226,7 +207,6 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
     window.addEventListener("blur", stopSidebarDragging, { once: true });
   }
 
-  /** One drag for both row kinds: `chatId` is an agent id or a channel id. */
   function startChatDragging(event: DragEvent & { currentTarget: HTMLElement }, chatId: string): void {
     if (deps.props.compact) return;
     startNativeItemDragging(event, {
@@ -258,11 +238,6 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
     });
   }
 
-  /**
-   * The imperative half of the drag, snapshotted for the pure resolver. The three scroll deltas stay
-   * separate because `dragSession.startScrollTop` is set on its own: they hold the same number
-   * today, and one shared field would hide the day they stop.
-   */
   function sidebarDragWorld(session: SidebarDragSession): SidebarDragWorld {
     const scrollTop = deps.getAgentList()?.scrollTop ?? 0;
     return {
@@ -281,21 +256,17 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
     };
   }
 
-  function resolveSidebarDropTarget(point: SidebarDragPoint): SidebarDropTarget | null {
-    const session = dragSession;
-    return session ? sidebarDropTargetAt(sidebarDragWorld(session), point) : null;
+  function pointerIsAtDragOrigin(point: SidebarDragPoint): boolean {
+    if (!dragOrigin) return false;
+    return Math.hypot(point.clientX - dragOrigin.clientX, point.clientY - dragOrigin.clientY) < DRAG_AIM_DISTANCE_PX;
   }
 
-  /**
-   * Which rows shift, and by how much, for the target now in flight. The source comes from
-   * `dragSession` rather than from `drag.source`: this runs in the same tick as the target write
-   * that drives it, and a store publishes a write only at the next flush.
-   *
-   * One computation for all four regions - see `reorderOffsets`. The guards below are the only part
-   * that stays per-region, because each one names a different pairing of source and target that can
-   * be hovered but not reordered: a tile being pinned from the list, an agent aimed at another
-   * section, a person aimed at an agent.
-   */
+  function resolveSidebarDropTarget(point: SidebarDragPoint): SidebarDropTarget | null {
+    const session = dragSession;
+    if (!session || pointerIsAtDragOrigin(point)) return null;
+    return sidebarDropTargetAt(sidebarDragWorld(session), point);
+  }
+
   function sidebarDragOffsets(target: SidebarDropTarget | null): Record<string, DragOffset> {
     const source = dragSession?.source;
     if (!source || !target) return {};
@@ -315,7 +286,6 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
         if (source.kind !== "chat") return {};
         const sourceSlot = chatDragSlots.get(source.id);
         const targetSlot = chatDragSlots.get(target.target.chatId);
-        // A chat only pushes its own neighbours: aimed at another section it is a move, not a reorder.
         if (!sourceSlot || !targetSlot || sourceSlot.sectionId !== targetSlot.sectionId) return {};
         const chatIds = (filteredChatsBySection().get(sourceSlot.sectionId) ?? []).map((item) => item.id);
         return reorderOffsets(
@@ -340,8 +310,6 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
         );
       }
       case "section-order": {
-        // Folders in folders draw a drop line and move no rows: the folder's new place can be far
-        // from the one it leaves, in another folder.
         if (source.kind !== "section" || deps.folders()) return {};
         return reorderOffsets(
           visibleSectionIds(),
@@ -395,6 +363,7 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
       dragScrollSpeed = 0;
       return;
     }
+    dragOrigin = null;
     applySidebarDropTarget(resolveSidebarDropTarget(dragPoint));
     scrollFades.measure();
     dragScrollFrame = requestAnimationFrame(runSidebarDragAutoScroll);
@@ -426,6 +395,7 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
       chatKind(dragSession.source.id) !== null
     ) {
       const activeSession = dragSession;
+      dragOrigin = dragPoint;
       dragState.setEmptyPinnedDropVisible(true);
       queueMicrotask(() => {
         if (dragSession !== activeSession) return;
@@ -434,6 +404,7 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
       });
     }
     const point = { clientX: event.clientX, clientY: event.clientY };
+    if (!pointerIsAtDragOrigin(point)) dragOrigin = null;
     if (pointInRect(point, dragGeometry.list)) {
       event.preventDefault();
       if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
@@ -470,7 +441,6 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
     stopSidebarDragging();
   }
 
-  /** The pointer left the list. Still inside it means a child boundary, not a leave. */
   function handleListDragLeave(event: DragEvent): void {
     const point = { clientX: event.clientX, clientY: event.clientY };
     if (pointInRect(point, dragGeometry.list)) return;

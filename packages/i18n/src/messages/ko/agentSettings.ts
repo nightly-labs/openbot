@@ -189,6 +189,8 @@ export const messages = {
   "agentSettings.fullAccess.confirm": "전체 접근 허용",
   "agentSettings.fullAccess.askConfirm": "먼저 묻기 사용",
   "agentSettings.links.usage": "사용량",
+  "agentSettings.links.apps": "앱",
+  "agentSettings.links.appsScope": "모든 에이전트",
   "agentSettings.links.memories": "메모리",
   "agentSettings.links.memoriesCount": { other: "{count}개 저장됨" },
   "agentSettings.links.skills": "스킬",

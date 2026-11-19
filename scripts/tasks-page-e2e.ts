@@ -1,12 +1,3 @@
-// Checks the Tasks page in this worktree's running dev app. It starts one task with a short real
-// provider turn, so start the app with `bun run dev` (never `--shared`), and pass an agent whose provider
-// is signed in: `bun scripts/tasks-page-e2e.ts --allow-mutations --agent=<agent id>`.
-//
-// It opens the page from the page rail, starts the task from the page composer, and opens it from the
-// Undo line. After the turn it checks that the task is in Needs you, that the panel shows the answer,
-// and that a follow-up from the panel runs a second turn. Then Archive moves the task to Archived,
-// Restore moves it back, Escape closes the panel, and Open in chat opens the task as a thread tab.
-// At the end it deletes the task. Writes .openbot-build/tasks-page-e2e/report.json and screenshots.
 import assert from "node:assert/strict";
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
@@ -110,7 +101,6 @@ try {
     await tasksPage.locator(".tasks-page-composer").getByRole("textbox").first().click();
     await page.keyboard.insertText(PROMPT);
     await button(english("conversation.tasks.page.start")).click();
-    // The Undo line names the task; Open starts it at once and opens its panel.
     await tasksPage.getByRole("button", { name: english("conversation.tasks.page.undo"), exact: true }).waitFor({
       timeout: UI_WAIT_MS,
     });
