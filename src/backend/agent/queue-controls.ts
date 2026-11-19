@@ -279,10 +279,6 @@ export class QueueControls {
       this.#mailboxSync.emitQueue(agent.id);
       return yield* new QueueOperationFailed({ cause: new SteerUnsupportedError() });
     }
-    // The turn can end while Codex answers the steer (#12470). The chat state read before the request
-    // then still names that turn as active, and publishing it would keep the ended turn running in the
-    // chat. Only the turn events change the active turn, so the code after the request reads the chat
-    // again.
     const liveSnapshot = () => this.#conversation.ensureSnapshot(agent.id, publicThreadId);
     yield* this.#mailbox.markSteering(input.deliveryId, turnId).pipe(toQueueOperationFailed);
     this.#mailboxSync.emitQueue(agent.id);
