@@ -285,7 +285,7 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function routineLocalTime(scheduledFor: string, timeZone: string | undefined): string[] {
+export function routineLocalTime(scheduledFor: string, timeZone: string | undefined): string[] {
   const date = new Date(scheduledFor);
   if (!timeZone || Number.isNaN(date.getTime())) return [];
   let parts: Intl.DateTimeFormatPart[];
