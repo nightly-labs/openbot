@@ -297,6 +297,8 @@ export const messages = {
     "{provider} не может запустить MCP-сервер {name}, потому что сервер не ответил вовремя. Начните новый чат, чтобы попробовать снова.",
   "error.backend.mcpServerUnavailableInProvider":
     "{provider} не может запустить MCP-сервер {name}, потому что сервер сейчас недоступен. Подождите несколько минут, затем начните новый чат, чтобы попробовать снова.",
+  "error.backend.mcpServerUnreachableInProvider":
+    "{provider} не может подключиться к MCP-серверу {name}. Откройте {name} в разделе Каталог, Приложения и проверьте, что адрес указан верно и сервер запущен. Затем начните новый чат, чтобы попробовать снова.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot не смог запустить локальное подключение для входа на этот сервер. Перезапустите OpenBot и повторите попытку.",
   "error.backend.mcpOAuthSignInNeeded":

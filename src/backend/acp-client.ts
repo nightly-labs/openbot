@@ -2834,7 +2834,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       return;
     }
     const kind = mcpProviderFailureKind(reason);
-    if (kind === "failed") {
+    if (kind !== "sign_in" && kind !== "timeout") {
       this.#reportFailedMcpServer(thread.cwd, name, sourceText("error.backend.mcpServerFailedToStart", { reason }));
       return;
     }

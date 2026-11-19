@@ -319,6 +319,8 @@ export const messages = {
     "{provider} konnte den MCP-Server {name} nicht starten, weil der Server nicht rechtzeitig geantwortet hat. Starte einen neuen Chat, um es erneut zu versuchen.",
   "error.backend.mcpServerUnavailableInProvider":
     "{provider} konnte den MCP-Server {name} nicht starten, weil der Server gerade nicht erreichbar ist. Warte ein paar Minuten und starte dann einen neuen Chat, um es erneut zu versuchen.",
+  "error.backend.mcpServerUnreachableInProvider":
+    "{provider} konnte den MCP-Server {name} nicht erreichen. Öffne {name} unter Marketplace, Apps und prüfe, ob die Adresse stimmt und der Server läuft. Starte dann einen neuen Chat, um es erneut zu versuchen.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot konnte die lokale Anmeldeverbindung für diesen Server nicht starten. Starte OpenBot neu und versuche es dann erneut.",
   "error.backend.mcpOAuthSignInNeeded":

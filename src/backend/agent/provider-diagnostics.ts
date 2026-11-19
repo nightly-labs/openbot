@@ -13,18 +13,20 @@ export function isMcpSessionClosingDiagnostic(message: string): boolean {
   return /\bsession is closing \(process scope already reclaimed\)/u.test(message);
 }
 
-export type McpProviderFailureKind = "sign_in" | "timeout" | "unavailable" | "failed";
+export type McpProviderFailureKind = "sign_in" | "timeout" | "unavailable" | "unreachable" | "failed";
 
 export function mcpProviderFailureKind(message: string): McpProviderFailureKind {
   if (isMcpSignInDiagnostic(message)) return "sign_in";
   if (isMcpTimeoutDiagnostic(message)) return "timeout";
-  return isMcpUnavailableDiagnostic(message) ? "unavailable" : "failed";
+  if (isMcpUnavailableDiagnostic(message)) return "unavailable";
+  return isMcpUnreachableDiagnostic(message) ? "unreachable" : "failed";
 }
 
 export const MCP_PROVIDER_FAILURE_TEXT = {
   sign_in: "error.backend.mcpServerSignInForProvider",
   timeout: "error.backend.mcpServerTimedOutInProvider",
   unavailable: "error.backend.mcpServerUnavailableInProvider",
+  unreachable: "error.backend.mcpServerUnreachableInProvider",
   failed: "error.backend.mcpServerFailedInProvider",
 } as const;
 
@@ -35,9 +37,13 @@ function isMcpTimeoutDiagnostic(message: string): boolean {
 function isMcpUnavailableDiagnostic(message: string): boolean {
   return (
     /\bHTTP\W{0,3}5\d\d\b/.test(message) ||
-    /\bstatus(?:\s+code)?\W{0,3}5\d\d\b|\bservice unavailable\b|\bbad gateway\b|\bgateway time-?out\b|\berror sending request\b|\bconnection refused\b|\bconnection reset\b|\bECONNREFUSED\b|\bECONNRESET\b|\bENOTFOUND\b|\bEAI_AGAIN\b|\bEHOSTUNREACH\b|\bENETUNREACH\b|\bdns error\b|\bfailed to lookup address\b|\bno route to host\b|\bnetwork is unreachable\b/i.test(
-      message,
-    )
+    /\bstatus(?:\s+code)?\W{0,3}5\d\d\b|\bservice unavailable\b|\bbad gateway\b|\bgateway time-?out\b/i.test(message)
+  );
+}
+
+function isMcpUnreachableDiagnostic(message: string): boolean {
+  return /\berror sending request\b|\bconnection (?:refused|reset)\b|\bECONNREFUSED\b|\bECONNRESET\b|\bENOTFOUND\b|\bEAI_AGAIN\b|\bEHOSTUNREACH\b|\bENETUNREACH\b|\bdns error\b|\bfailed to lookup address\b|\bno route to host\b|\bnetwork is unreachable\b/i.test(
+    message,
   );
 }
 

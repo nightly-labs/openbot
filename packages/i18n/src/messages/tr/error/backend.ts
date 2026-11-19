@@ -291,6 +291,8 @@ export const messages = {
     "{provider}, {name} MCP sunucusunu başlatamadı, çünkü sunucu zamanında yanıt vermedi. Yeniden denemek için yeni bir sohbet başlatın.",
   "error.backend.mcpServerUnavailableInProvider":
     "{provider}, {name} MCP sunucusunu başlatamadı, çünkü sunucu şu anda kullanılamıyor. Birkaç dakika bekleyin, ardından yeniden denemek için yeni bir sohbet başlatın.",
+  "error.backend.mcpServerUnreachableInProvider":
+    "{provider}, {name} MCP sunucusuna ulaşamadı. Pazaryeri, Uygulamalar bölümünde {name} öğesini açın ve adresin doğru olduğunu ve sunucunun çalıştığını kontrol edin. Ardından yeniden denemek için yeni bir sohbet başlatın.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot bu sunucu için yerel oturum açma bağlantısını başlatamadı. OpenBot'u yeniden başlatın ve tekrar deneyin.",
   "error.backend.mcpOAuthSignInNeeded":

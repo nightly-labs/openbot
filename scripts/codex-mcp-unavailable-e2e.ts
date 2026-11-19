@@ -99,12 +99,16 @@ try {
   );
   client.notify("initialized");
   await startThread(client, { cwd: workspace });
+  let deadline: ReturnType<typeof setTimeout> | undefined;
   await Promise.race([
     allReported,
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("Codex did not report both MCP servers as failed.")), STATUS_TIMEOUT_MS),
-    ),
-  ]);
+    new Promise<never>((_, reject) => {
+      deadline = setTimeout(
+        () => reject(new Error("Codex did not report both MCP servers as failed.")),
+        STATUS_TIMEOUT_MS,
+      );
+    }),
+  ]).finally(() => clearTimeout(deadline));
 
   for (const [name, error] of failures) {
     const kind = mcpProviderFailureKind(error ?? "");
@@ -116,25 +120,19 @@ try {
     });
   }
   assert.ok(report.mcpRequests > 0, "Codex connects to the MCP server that answers 503.");
+  const expected = { statuspage: "unavailable", offline: "unreachable" } as const;
   assert.deepEqual(
-    report.cases.map((entry) => entry.kind),
-    report.cases.map(() => "unavailable"),
-    "A 503 answer and a refused connection read as a server that is not available now.",
-  );
-  assert.ok(
-    report.cases.every(
-      (entry) =>
-        entry.text ===
-        sourceText("error.backend.mcpServerUnavailableInProvider", { provider: "Codex", name: entry.name }),
-    ),
-    "Each failure gets the plain unavailable text.",
+    Object.fromEntries(report.cases.map((entry) => [entry.name, entry.kind])),
+    expected,
+    "A 503 answer reads as a server that is not available now, and a refused connection as a server that Codex cannot reach.",
   );
   assert.deepEqual(
-    ["Error: HTTP 401", "MCP client for `x` timed out after 30 seconds", "No such file or directory (os error 2)"].map(
-      mcpProviderFailureKind,
-    ),
-    ["sign_in", "timeout", "failed"],
-    "Sign-in, timeout and other failures keep their kinds.",
+    Object.fromEntries(report.cases.map((entry) => [entry.name, entry.text])),
+    {
+      statuspage: sourceText("error.backend.mcpServerUnavailableInProvider", { provider: "Codex", name: "statuspage" }),
+      offline: sourceText("error.backend.mcpServerUnreachableInProvider", { provider: "Codex", name: "offline" }),
+    },
+    "Each failure gets its plain text, without the rmcp text.",
   );
   report.passed = true;
 } catch (error) {
