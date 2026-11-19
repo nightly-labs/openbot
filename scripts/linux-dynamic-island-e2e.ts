@@ -4,8 +4,10 @@
 // 3. The pointer on the island expands it.
 // 4. Text typed in the inline reply is sent with Return.
 // 5. A click on Approve answers an approval request.
-// 6. A switch to another workspace keeps the island on the screen.
-// 7. With the pointer away, an idle island keeps its greeting and its logo still: it uses little CPU and
+// 6. A multi-question card keeps its answers when the island shuts and opens again, and when another
+//    agent's card comes first for a time. A prompt that ended keeps no answers.
+// 7. A switch to another workspace keeps the island on the screen.
+// 8. With the pointer away, an idle island keeps its greeting and its logo still: it uses little CPU and
 //    does not send a new shape. The pointer on the island changes the greetings again. The greeting
 //    emoji draws in color on a desktop with no emoji font.
 //
@@ -118,6 +120,53 @@ const APPROVAL: DynamicIslandPresentation = {
     },
   },
 };
+const FIRST_QUESTION = "Which branch gets the pull request?";
+const SECOND_QUESTION = "Who reviews the pull request?";
+const QUESTION: DynamicIslandPresentation = {
+  serverId: "local",
+  mode: "question",
+  remainingCount: 0,
+  item: {
+    requestId: "request-2",
+    agent: AGENT,
+    title: "Ada asks",
+    detail: null,
+    questions: [
+      {
+        id: "target",
+        header: "Target",
+        question: FIRST_QUESTION,
+        isSecret: false,
+        options: [
+          { label: "main", description: "The default branch" },
+          { label: "release", description: "The release branch" },
+        ],
+      },
+      {
+        id: "review",
+        header: "Review",
+        question: SECOND_QUESTION,
+        isSecret: false,
+        options: [
+          { label: "Ada", description: "The agent" },
+          { label: "Me", description: "The user" },
+        ],
+      },
+    ],
+  },
+};
+const OTHER_QUESTION: DynamicIslandPresentation = {
+  serverId: "local",
+  mode: "question",
+  remainingCount: 1,
+  item: {
+    requestId: "request-3",
+    agent: { ...AGENT, id: "agent-2", name: "Bo", avatarSeed: "agent-2" },
+    title: "Bo asks",
+    detail: null,
+    questions: [{ id: "deploy", header: "Deploy", question: "Deploy now?", isSecret: false, options: null }],
+  },
+};
 const WORKING: DynamicIslandPresentation = {
   serverId: "local",
   mode: "working",
@@ -135,7 +184,13 @@ const IslandInfoSchema = Schema.Struct({
 });
 type IslandInfo = typeof IslandInfoSchema.Type;
 const StatsSchema = Schema.Struct({
-  actions: Schema.Array(Schema.Struct({ type: Schema.String, text: Schema.optional(Schema.String) })),
+  actions: Schema.Array(
+    Schema.Struct({
+      type: Schema.String,
+      text: Schema.optional(Schema.String),
+      answers: Schema.optional(Schema.Record(Schema.String, Schema.Array(Schema.String))),
+    }),
+  ),
   regions: Schema.Array(Schema.Struct({ at: Schema.Number, rects: Schema.Array(RectSchema) })),
   interactive: Schema.Array(
     Schema.Struct({ at: Schema.Number, interactive: Schema.Boolean, keyboard: Schema.Boolean }),
@@ -275,15 +330,45 @@ try {
   );
   steps.push({ step: "click on Approve answers the request" });
 
-  // 6. Another workspace.
+  // 6. A multi-question card keeps its answers when the island shuts and opens again, also after the card
+  // of another agent comes first for a time. A prompt that ended keeps none: the same request again starts
+  // at the first question.
   await leave(app, desktop);
-  await checkOtherWorkspace(session, desktop, island.xid, "05-workspace-2");
+  await showQuestion(app);
+  await hoverOpen(app, desktop, island);
+  assert.equal(await questionText(app), FIRST_QUESTION, "the card opens at the first question");
+  await answerFirstQuestion(app, desktop, island);
+  await leave(app, desktop);
+  await showQuestion(app);
+  await hoverOpen(app, desktop, island);
+  assert.equal(await questionText(app), FIRST_QUESTION, "a prompt that ended keeps no answers");
+  await answerFirstQuestion(app, desktop, island);
+  await leave(app, desktop);
+  await app.publish(OTHER_QUESTION);
+  await until(async () => await islandTextIncludes(app, "Bo"), "the question of the other agent");
+  await app.publish(QUESTION);
+  await until(async () => !(await islandTextIncludes(app, "Bo")), "the question again");
+  await hoverOpen(app, desktop, island);
+  const reopened = await questionText(app);
+  screenshot(session, "05-question-reopened");
+  assert.equal(reopened, SECOND_QUESTION, "the card opens again at the unanswered question");
+  const secondOption = centreOf(await screenBoxOf(app, island, optionByLabel("Me"), "the Me option"));
+  desktop.move(secondOption.x, secondOption.y);
+  desktop.click();
+  await until(async () => (await app.stats()).actions.some((action) => action.type === "answer-prompt"), "the answers");
+  const answered = (await app.stats()).actions.find((action) => action.type === "answer-prompt");
+  assert.deepEqual(answered?.answers, { target: ["release"], review: ["Me"] }, "the card sends both answers");
+  steps.push({ step: "a multi-question card keeps its answers", detail: answered?.answers });
+
+  // 7. Another workspace.
+  await leave(app, desktop);
+  await checkOtherWorkspace(session, desktop, island.xid, "06-workspace-2");
   steps.push({ step: "all workspaces" });
 
-  // 7. CPU with the pointer away: an agent at work, then idle.
+  // 8. CPU with the pointer away: an agent at work, then idle.
   await app.publish(WORKING);
   await sleep(2_000);
-  screenshot(session, "06-working");
+  screenshot(session, "07-working");
   cpu.working = await cpuOf(island.mainPid, IDLE_SECONDS);
   await app.publish(IDLE);
   await until(
@@ -301,7 +386,7 @@ try {
   assert.ok(greetingColorPixels > 100, `the greeting emoji has colors (${greetingColorPixels} pixels)`);
   steps.push({ step: "greeting emoji in color", detail: { pixels: greetingColorPixels } });
   await settle(app);
-  screenshot(session, "07-idle");
+  screenshot(session, "08-idle");
   // The screenshot and the change to idle end before the measure.
   await settle(app);
   // The greeting changes and the blinks of the logo.
@@ -328,7 +413,7 @@ try {
     `steady idle CPU ${steadyPercent.toFixed(2)}% is under ${IDLE_CPU_LIMIT_PERCENT}% (all: ${usage.percent.toFixed(2)}%)`,
   );
 
-  // 8. The pointer on the idle island: the greetings change and the logo blinks again.
+  // 9. The pointer on the idle island: the greetings change and the logo blinks again.
   const idleShell = centreOf(await screenBox(app, island, ".dynamic-island-shell"));
   desktop.move(idleShell.x, idleShell.y);
   await until(
@@ -440,6 +525,53 @@ async function settle(app: App): Promise<void> {
 /** A script that gives the box of the first button whose text is `text`. */
 function buttonByText(text: string): string {
   return `[...document.querySelectorAll('button')].find((button) => button.textContent?.trim() === ${JSON.stringify(text)})`;
+}
+
+/** Shows the idle island, then the question card: the card that comes after the end of another prompt. */
+async function showQuestion(app: App): Promise<void> {
+  await app.publish(IDLE);
+  await until(
+    async () =>
+      await app.eval(
+        "island",
+        "document.querySelector('.dynamic-island-surface-idle-greeting') !== null",
+        decodeBoolean,
+      ),
+    "the idle island",
+  );
+  await app.publish(QUESTION);
+  await until(async () => await islandTextIncludes(app, "Ada"), "the question");
+}
+
+function islandTextIncludes(app: App, text: string): Promise<boolean> {
+  return app.eval(
+    "island",
+    `document.querySelector('[data-slot="dynamic-island"]')?.textContent?.includes(${JSON.stringify(text)}) === true`,
+    decodeBoolean,
+  );
+}
+
+/** Answers the first question of the open card and waits for the second question. */
+async function answerFirstQuestion(app: App, desktop: Desktop, island: IslandInfo): Promise<void> {
+  const option = centreOf(await screenBoxOf(app, island, optionByLabel("release"), "the release option"));
+  desktop.move(option.x, option.y);
+  desktop.click();
+  await until(async () => (await questionText(app)) === SECOND_QUESTION, "the second question");
+  await settle(app);
+}
+
+/** A script that gives the option button of the island question card whose label is `label`. */
+function optionByLabel(label: string): string {
+  return `[...document.querySelectorAll('.dynamic-island-surface-question-option-copy strong')].find((strong) => strong.textContent?.trim() === ${JSON.stringify(label)})?.closest('button')`;
+}
+
+/** The question that the island question card shows. */
+function questionText(app: App): Promise<string> {
+  return app.eval(
+    "island",
+    "document.querySelector('.dynamic-island-surface-question-panel .ui-dynamic-island-identity-description')?.textContent?.trim() ?? ''",
+    decodeString,
+  );
 }
 
 function screenBox(app: App, island: IslandInfo, selector: string): Promise<Rect> {
