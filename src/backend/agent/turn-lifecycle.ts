@@ -93,6 +93,8 @@ import type { ProviderRuntime } from "./provider-runtime";
 import {
   answeredRequestId,
   isNoUpdateAnswer,
+  isNoUpdateToolCall,
+  quietRunStepsMessage,
   quietTeammateDelivery,
   quietTeammateTurnDelivery,
   settleQuietChannelTurn,
@@ -358,6 +360,7 @@ export class TurnLifecycle {
   readonly #refusedRetries = new Set<string>();
   readonly #sessionFailures = new Map<string, number>();
   readonly #noUpdateTurns = new Set<string>();
+  readonly #noUpdateSteps = new Map<string, Set<string>>();
   readonly #quietTurns = new Set<string>();
   readonly #followUpTurns = new Set<string>();
   readonly #quietChannelTurns = new Set<string>();
@@ -525,6 +528,7 @@ export class TurnLifecycle {
     this.#waitingThreads.clear();
     this.#itemTurns.clear();
     this.#traces.clear();
+    this.#noUpdateSteps.clear();
     this.#observedCompactions.clear();
     this.#compactionFailures.clear();
     for (const timer of this.#compactionDeadlines.values()) clearTimeout(timer);
@@ -563,6 +567,7 @@ export class TurnLifecycle {
           .some(({ delivery }) => delivery.status === "starting" || delivery.status === "running")
       ) {
         this.#traces.drop(turnId);
+        this.#noUpdateSteps.delete(turnId);
         this.#instructions.dropTurn(turn.agentId, turnId);
         this.#browser.endControl(this.#conversation.publicThreadId(turn.agentId, turn.threadId), turnId);
         const failover = this.#failoverTurns.get(turnId);
@@ -1764,6 +1769,8 @@ export class TurnLifecycle {
       this.#markEnded(turnId);
       this.#completingTurns.add(turnId);
       const trace = this.#traces.take(turnId, new Date().toISOString());
+      const noUpdateSteps = this.#noUpdateSteps.get(turnId);
+      this.#noUpdateSteps.delete(turnId);
       const noUpdateCalled = this.#noUpdateTurns.delete(turnId);
       const quietChannelRun = this.#quietChannelTurns.has(turnId);
       this.#quietEmptyAnswers.delete(turnId);
@@ -2218,6 +2225,15 @@ export class TurnLifecycle {
         const paths = answerFilePaths(latestAssistant.text);
         if (paths.length > 0) yield* this.#hooks.attachAnswerFiles(agentId, snapshot, latestAssistant, paths);
       }
+      const quietRunSteps =
+        trace &&
+        quiet &&
+        quietTurn &&
+        deliveries.some(({ delivery }) => delivery.sender.kind === "routine") &&
+        traceMessage(snapshot.messages, turnId) === undefined
+          ? quietRunStepsMessage(turnId, trace, noUpdateSteps)
+          : null;
+      if (quietRunSteps) snapshot.messages.push(quietRunSteps);
       if (trace) this.#attachTrace(snapshot.messages, agentId, turnId, trace);
       const memoryLine = memoryChangesMessage(turnId, memoryChanges, (text) => this.#hooks.redactMcp(text));
       if (memoryLine) snapshot.messages.push(memoryLine);
@@ -2352,6 +2368,7 @@ export class TurnLifecycle {
     this.#markEnded(turnId);
     this.#instructions.dropTurn(agentId, turnId);
     const trace = this.#traces.take(turnId, new Date().toISOString());
+    this.#noUpdateSteps.delete(turnId);
     const deliveries = yield* turnStep(() => this.#mailbox.findDeliveriesByTurn(agentId, turnId)).pipe(
       Effect.catchCause((cause) => report(cause).pipe(Effect.as([]))),
     );
@@ -2983,6 +3000,8 @@ export class TurnLifecycle {
   ): void {
     if (!isString(item.id)) return;
     if (isToolItem(item)) {
+      if (isNoUpdateToolCall(item))
+        this.#noUpdateSteps.set(turnId, (this.#noUpdateSteps.get(turnId) ?? new Set()).add(item.id));
       const failed = completed && toolFailed(item);
       this.#traces.observe(turnId, item.id, "tool", {
         completed,
