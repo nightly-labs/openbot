@@ -363,7 +363,11 @@ const systemTimezone =
     ? applyServerTimezone(join(app.getPath("userData"), SERVER_TIMEZONE_PREFERENCE_FILE), process.env)
     : localTimezone;
 app.enableSandbox();
-if (process.platform === "win32") app.setAppUserModelId("app.openbot.desktop");
+// Windows: the taskbar shows the icon of a Start menu shortcut with the window's app ID. A dev run is
+// the Electron binary; with the installed app's ID, its Electron shortcut put the Electron icon on
+// the installed OpenBot's taskbar button.
+if (process.platform === "win32")
+  app.setAppUserModelId(app.isPackaged ? "app.openbot.desktop" : "app.openbot.desktop.dev");
 // Windows #11233: a start from a Microsoft Store app kept the data in that app's folder. Start again
 // outside it, before the single-instance lock and before any file goes into `userData`. `process.exit`,
 // as for a second launch: the new process must be able to take the lock.
