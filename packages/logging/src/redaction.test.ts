@@ -6,6 +6,7 @@ import {
   redactSecrets,
   redactText,
   redactValue,
+  registerPublicValues,
   registerSecretValue,
   resolveLogLevel,
   toLogValue,
@@ -387,34 +388,36 @@ describe("registerSecretValue", () => {
     expect(redactText("sign in with acmeshop")).toBe("sign in with [redacted]");
   });
 
-  it("masks a short saved value only as a whole word, so ids that contain it stay readable", () => {
+  it("keeps a public model id that contains a short saved value, and masks the value elsewhere", () => {
     registerSecretValue("claude", { allowShort: true });
+    registerPublicValues(["claude-opus-5-5", "claude-sonnet-5-5", "claude"]);
 
-    const models = '{"defaultModel":"claude-opus-5-5","models":[{"id":"claude_sonnet","name":"Claude Opus 5.5"}]}';
+    const models = '{"defaultModel":"claude-opus-5-5","models":[{"id":"claude-sonnet-5-5","name":"Claude Opus 5.5"}]}';
     expect(redactText(models)).toBe(models);
-    expect(redactText("Available models: claude-opus-5-5, claude.v2, …")).toBe(
-      "Available models: claude-opus-5-5, claude.v2, …",
+    expect(redactText("Available models: claude-opus-5-5, claude-sonnet-5-5, …")).toBe(
+      "Available models: claude-opus-5-5, claude-sonnet-5-5, …",
     );
-    expect(redactText("sign in with claude.")).toBe("sign in with [redacted]");
-    expect(redactText("pw=claude; retry")).toBe("pw=[redacted]; retry");
-    expect(redactText('{"saved":"claude"}')).not.toContain("claude");
-    expect(redactText("https://user:claude@db.example.com/x")).not.toContain("claude");
+    expect(redactText("The model is claude-opus-5-5.")).toBe("The model is claude-opus-5-5.");
+    expect(redactText('{"provider":"claude"}')).not.toContain("claude");
+    for (const text of [
+      "claude-opus-5-6",
+      "sshpass -pclaude ssh h",
+      'out="typed:\\nclaude\\n"',
+      "next=%2Flogin%3Fpw%3Dclaude%26x",
+      "my password is claude.Then",
+      "pw=claude-1",
+      "pw: claude_",
+      "https://user:claude@db.example.com/x",
+    ]) {
+      expect(redactText(text)).not.toContain("claude");
+    }
   });
 
-  it("keeps a turn id that contains a short saved value", () => {
-    registerSecretValue("a1b2", { allowShort: true });
+  it("masks a saved value that ends where a public id ends", () => {
+    registerSecretValue("sonnet-5-5.", { allowShort: true });
+    registerPublicValues(["claude-sonnet-5-5"]);
 
-    expect(redactText("turn 9f3c0d2e-a1b2-77de-8a10-55aa66bb77cc done")).toBe(
-      "turn 9f3c0d2e-a1b2-77de-8a10-55aa66bb77cc done",
-    );
-    expect(redactText("code a1b2 rejected")).toBe("code [redacted] rejected");
-  });
-
-  it("masks a long saved value that starts inside a skipped short one", () => {
-    registerSecretValue("zz", { allowShort: true });
-    registerSecretValue("zlongsecret9");
-
-    expect(redactText("got x-zzlongsecret9 back")).toBe("got [redacted] back");
+    expect(redactText("pw=claude-sonnet-5-5.")).not.toContain("sonnet-5-5");
   });
 
   it("keeps a value that cannot be URL-encoded masked, without throwing", () => {

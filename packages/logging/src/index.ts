@@ -45,14 +45,23 @@ const MIN_REGISTERED_SECRET_LENGTH = 8;
 const RULE_WORD =
   /password|passwd|passphrase|secret|token|credential|authorization|cookie|api[_-]?key|private[_-]?key|signing[_-]?key|bearer|basic|digest|headers|keys?/iu;
 const TOKEN_CHARACTER = /[A-Za-z0-9._~+/@%-]/u;
-const WORD_CHARACTER = /[A-Za-z0-9_]/u;
-const WORD_JOINER = /[.-]/u;
 const URL_HOST = /(?<![A-Za-z0-9+.-])(https?:\/\/(?:[^\s/?#@]*@)?)([\p{L}\p{N}.-]+)/giu;
 const VALUE_MARKER = "__openbot_registered_value__";
 const LABEL_MARKER = "__openbot_registered_secret_authorization";
 const MARKERS = new RegExp(`${VALUE_MARKER}|${LABEL_MARKER}`, "gu");
 const registeredSecrets = new Set<string>();
 let registeredSecretPattern: RegExp | null = null;
+const publicValues = new Set<string>();
+
+export function registerPublicValues(values: Iterable<string>): void {
+  for (const value of values) if (value) publicValues.add(value);
+}
+
+function isPublicToken(token: string, secret: string): boolean {
+  return [token, token.replace(/\.+$/u, "")].some(
+    (candidate) => candidate.length > secret.length && candidate.includes(secret) && publicValues.has(candidate),
+  );
+}
 
 export function registerSecretValue(value: string, options: { allowShort?: boolean } = {}): void {
   registerSecretValues([value], options);
@@ -104,16 +113,6 @@ function redact(value: string, emails: boolean, keepUnscanned = false): string {
   return marked === value ? redacted : redacted.replace(MARKERS, "[redacted]");
 }
 
-function continuesWord(value: string, next: number, step: 1 | -1): boolean {
-  const character = value.charAt(next);
-  if (WORD_CHARACTER.test(character)) return true;
-  return WORD_JOINER.test(character) && WORD_CHARACTER.test(value.charAt(next + step));
-}
-
-function isInsideLongerWord(value: string, start: number, end: number): boolean {
-  return continuesWord(value, start - 1, -1) || continuesWord(value, end, 1);
-}
-
 function markRegisteredSecrets(value: string): string {
   const pattern = registeredSecretPattern;
   if (!pattern) return value;
@@ -123,10 +122,6 @@ function markRegisteredSecrets(value: string): string {
   for (let match = pattern.exec(value); match !== null; match = pattern.exec(value)) {
     let start = match.index;
     let end = start + match[0].length;
-    if (match[0].length < MIN_REGISTERED_SECRET_LENGTH && isInsideLongerWord(value, start, end)) {
-      pattern.lastIndex = start + 1;
-      continue;
-    }
     if (hosts === undefined) hosts = value.includes("://") ? urlHosts(value) : null;
     if (hosts?.subarray(start, end).every((flag) => flag === HOST)) continue;
     const previous = ranges.at(-1);
@@ -134,6 +129,7 @@ function markRegisteredSecrets(value: string): string {
     while (start > floor && !hosts?.[start - 1] && TOKEN_CHARACTER.test(value.charAt(start - 1))) start -= 1;
     if (previous && end <= previous.end) continue;
     while (end < value.length && !hosts?.[end] && TOKEN_CHARACTER.test(value.charAt(end))) end += 1;
+    if (isPublicToken(value.slice(start, end), match[0])) continue;
     if (previous && start <= previous.end) previous.end = end;
     else ranges.push({ start, end });
   }
