@@ -531,6 +531,7 @@ export const messages = {
   "mobile.chat.queue.cancelUpload": "Cancelar subida en cola",
   "mobile.chat.queue.waitingTitle": "Esperando al agente",
   "mobile.chat.queue.repliesTitle": "Esperando respuestas",
+  "mobile.chat.queue.providerRestart": "Esperando a que {provider} se reinicie",
   "mobile.chat.queue.replyState.asked": "Solicitada",
   "mobile.chat.queue.replyState.working": "Trabajando",
   "mobile.chat.queue.replyState.replied": "Respondida",

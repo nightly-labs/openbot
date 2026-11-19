@@ -87,6 +87,7 @@ import type {
   ProviderCodeLoginStart,
   ProviderUsageResets,
   QueuedMessageReceipt,
+  QueueHold,
   QueueSnapshot,
   ReadAgentTaskAroundInput,
   ReadAgentTaskPageInput,
@@ -1026,7 +1027,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               .map((agent) => agent.id),
           );
           this.#retryHeldMoves();
+          this.#emitProviderQueues(provider);
         },
+        onProviderHeld: (provider) => this.#emitProviderQueues(provider),
         onAccountsChanged: () => this.#retryHeldMoves(),
         onProvidersUnready: () => this.#refreshHeldAgents(),
       },
@@ -1220,7 +1223,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       hooks: {
         emit: (event) => this.#emit(event),
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
-        queueHold: (agentId) => (this.#tasks.oneTurnAtATime(agentId) ? this.channels.queueHold(agentId) : null),
+        queueHold: (agentId) =>
+          (this.#tasks.oneTurnAtATime(agentId) ? this.channels.queueHold(agentId) : null) ??
+          this.#providerRestartHold(agentId),
         threadRequestsChanged: (agentId) => this.#tasks.changed(agentId),
       },
     });
@@ -5760,6 +5765,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#mailbox
       .listActiveQueues(agentIds, this.#turn.failedTurns())
       .map((queue) => this.#mailboxSync.withHold(queue));
+  }
+
+  #emitProviderQueues(provider: AgentProvider): void {
+    for (const agent of this.#store.list())
+      if (providerForAgent(agent) === provider && this.#mailbox.queuedDeliveryIds(agent.id).length)
+        this.#mailboxSync.emitQueue(agent.id);
+  }
+
+  #providerRestartHold(agentId: string): QueueHold | null {
+    const agent = this.#store.get(agentId);
+    const provider = agent ? providerForAgent(agent) : null;
+    return provider && this.#providers.isReplacingCli(provider) ? { reason: "provider-restart", provider } : null;
   }
 
   listWaits(agentId: string): AgentWaitsSnapshot {

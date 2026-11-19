@@ -59,7 +59,7 @@ export function createActivityStore(deps: ActivityStoreDeps) {
   });
   const heldByOwnChannelWork = createMemo(() => {
     const hold = deps.props.queue?.hold;
-    if (!hold || hold.agentId !== deps.props.agent?.id) return null;
+    if (hold?.reason !== "channel-task" || hold.agentId !== deps.props.agent?.id) return null;
     return deps.props.activeTurnId ? null : hold;
   });
   const activeActivityId = createMemo(() => {

@@ -526,6 +526,7 @@ export const messages = {
   "mobile.chat.queue.cancelUpload": "ביטול ההעלאה בתור",
   "mobile.chat.queue.waitingTitle": "ממתין לסוכן",
   "mobile.chat.queue.repliesTitle": "ממתין לתשובות",
+  "mobile.chat.queue.providerRestart": "ממתין להפעלה מחדש של {provider}",
   "mobile.chat.queue.replyState.asked": "נשאל",
   "mobile.chat.queue.replyState.working": "עובד",
   "mobile.chat.queue.replyState.replied": "השיב",

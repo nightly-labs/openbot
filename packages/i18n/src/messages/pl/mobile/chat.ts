@@ -616,6 +616,7 @@ export const messages = {
   "mobile.chat.queue.cancelUpload": "Anuluj przesyłanie z kolejki",
   "mobile.chat.queue.waitingTitle": "Oczekiwanie na agenta",
   "mobile.chat.queue.repliesTitle": "Oczekiwanie na odpowiedzi",
+  "mobile.chat.queue.providerRestart": "Oczekiwanie na ponowne uruchomienie {provider}",
   "mobile.chat.queue.replyState.asked": "Zapytano",
   "mobile.chat.queue.replyState.working": "Pracuje",
   "mobile.chat.queue.replyState.replied": "Odpowiedziano",
