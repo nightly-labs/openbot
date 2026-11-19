@@ -124,6 +124,8 @@ export const messages = {
   "error.agent.deleteIncomplete": "Ajan verileri tamamen kaldırılamadı. Ajanı silmeyi tekrar deneyin.",
   "error.agent.deleteFolderInUse":
     "Başka bir ajanın işi bu ajanın klasörünü hâlâ kullanıyor. Bu iş bittiğinde veya OpenBot'u yeniden başlattıktan sonra ajanı tekrar silin.",
+  "error.agent.deleteWhenFolderFree":
+    "Başka bir ajanın işi bu ajanın klasörünü hâlâ kullanıyor. Bu iş bittiğinde OpenBot bu ajanı siler.",
   "error.agent.duplicationBusy": "Bu ajan zaten kopyalanıyor.",
   "error.agent.waitBeforeDuplicate": "Ajanı kopyalamadan önce bitmesini ve kuyruğunu temizlemesini bekleyin.",
   "error.agent.saveOtherAgent": "Bu kayıt başka bir ajana ait.",

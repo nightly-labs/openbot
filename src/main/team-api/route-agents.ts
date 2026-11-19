@@ -393,4 +393,8 @@ function refusedPromptAnswer(error: unknown): never {
   return inactiveAsConflict(error);
 }
 
-const DELETE_REFUSALS = () => [sourceText("error.agent.stopBeforeDelete"), sourceText("error.agent.deletionBusy")];
+const DELETE_REFUSALS = () => [
+  sourceText("error.agent.stopBeforeDelete"),
+  sourceText("error.agent.deletionBusy"),
+  sourceText("error.agent.deleteWhenFolderFree"),
+];
