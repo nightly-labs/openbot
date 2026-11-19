@@ -140,6 +140,7 @@ const LABEL_FIELD: Partial<Record<WorkflowNodeKind, string>> = {
   image: "prompt",
 };
 const LABEL_CHARS = 40;
+const STEP_MODEL_FIELDS = ["provider", "model", "effort"] as const;
 
 const CARD_SIZE: Record<WorkflowNodeKind, { width: number; height: number }> = {
   trigger: { width: 320, height: 210 },
@@ -337,6 +338,15 @@ function checkTriggerEvent(node: WorkflowNode, op: number): void {
   refuse(`Op ${op}: the ${trigger} trigger ${given}. Set event to one of: ${events.join(", ")}.`);
 }
 
+function checkAgentStepModel(kind: WorkflowNodeKind, patch: WorkflowOp["fields"], op: number): void {
+  if (kind !== "agent") return;
+  const given = STEP_MODEL_FIELDS.filter((name) => patch?.[name] !== undefined && patch[name] !== null);
+  if (given.length > 0)
+    refuse(
+      `Op ${op}: an agent step runs on its agent's model, so it has no ${given.join(", ")}. For another model, add an llm step.`,
+    );
+}
+
 function checkedSchedule(value: WorkflowOp["schedule"]) {
   if (value === undefined) return undefined;
   if (!isRoutineSchedule(value)) refuse("The schedule is not a valid routine schedule.");
@@ -395,6 +405,7 @@ function applyWorkflowOps(
       case "add": {
         if (!op.kind) refuse(`Op ${n}: add needs kind.`);
         if (op.ref !== undefined && ids[op.ref] !== undefined) refuse(`Op ${n}: ref ${op.ref} is already used.`);
+        checkAgentStepModel(op.kind, op.fields, n);
         const id = `${op.kind}-${crypto.randomUUID()}`;
         const fields = withRepositoryList(op.kind, mergeFields(newNodeFields(op.kind), op.fields), op.fields, n);
         checkAgent(fields, n);
@@ -415,6 +426,7 @@ function applyWorkflowOps(
       }
       case "update": {
         const node = resolve(op.node, n);
+        checkAgentStepModel(node.kind, op.fields, n);
         const fields = withRepositoryList(node.kind, mergeFields(node.fields, op.fields), op.fields, n);
         checkAgent(fields, n);
         const scheduled = checkedSchedule(op.schedule);

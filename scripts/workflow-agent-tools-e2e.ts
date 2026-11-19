@@ -422,6 +422,18 @@ try {
     !badAgent.ok && JSON.stringify(badAgent.value).includes("agent-gone"),
     badAgent.value,
   );
+  const badModel = await call("failure-model", "edit_workflow", {
+    workflowId,
+    ops: [{ op: "update", node: ids.news, fields: { provider: "grok", model: "grok-4.7" } }],
+  });
+  const newsAfterModel = (await runCauseEffect(workflows.get(workflowId))).graph.nodes.find(
+    (node) => node.id === ids.news,
+  );
+  check(
+    "a model on an agent step is refused, with the llm step as the way, and is not saved",
+    !badModel.ok && JSON.stringify(badModel.value).includes("llm step") && newsAfterModel?.fields.model !== "grok-4.7",
+    badModel.value,
+  );
   const lockedDetail = await runCauseEffect(workflows.get(workflowId));
   const saved = await runCauseEffect(
     workflows.saveGraph({
