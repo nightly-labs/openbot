@@ -62,8 +62,12 @@
   max-width: 320px;
 }
 
-/* Models: one compact row for each model, with a scroll for the long lists of OpenCode. */
+/*
+ * Models: one compact row for each model, with a scroll for the long lists of OpenCode. The column
+ * cannot grow past the card, so a long name (Devin's Fusion models) is cut and the switch stays in view.
+ */
 .provider-settings-models.settings-modal-card {
+  grid-template-columns: minmax(0, 1fr);
   max-height: 360px;
   padding: 0;
   overflow-y: auto;
