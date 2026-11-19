@@ -5,6 +5,7 @@ export const messages = {
   "error.attachment.notFound": "未找到该附件。",
   "error.attachment.fileTooLarge": "某个文件超过了 100 MB 上限。",
   "error.attachment.namedFileTooLarge": "{name} 超过了 100 MB 上限。",
+  "error.attachment.emptyFile": "{name} 为空，或 OpenBot 无法读取。请重新保存文件，然后再次附加。",
   "error.attachment.totalTooLarge": "附件总量超过了 250 MB 上限。",
   "error.attachment.unavailable": "该文件已不可用。",
   "error.attachment.tooMany": "最多只能选择 {limit} 个文件。",

@@ -5,6 +5,8 @@ export const messages = {
   "error.attachment.notFound": "O anexo não foi encontrado.",
   "error.attachment.fileTooLarge": "Um arquivo excede o limite de 100 MB.",
   "error.attachment.namedFileTooLarge": "{name} excede o limite de 100 MB.",
+  "error.attachment.emptyFile":
+    "{name} está vazio ou o OpenBot não consegue lê-lo. Salve o arquivo de novo e anexe-o novamente.",
   "error.attachment.totalTooLarge": "Os anexos excedem o limite total de 250 MB.",
   "error.attachment.unavailable": "Este arquivo não está mais disponível.",
   "error.attachment.tooMany": "Escolha no máximo {limit} arquivos.",

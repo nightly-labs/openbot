@@ -5,6 +5,8 @@ export const messages = {
   "error.attachment.notFound": "La pièce jointe est introuvable.",
   "error.attachment.fileTooLarge": "Un fichier dépasse la limite de 100 Mo.",
   "error.attachment.namedFileTooLarge": "{name} dépasse la limite de 100 Mo.",
+  "error.attachment.emptyFile":
+    "{name} est vide ou OpenBot ne peut pas le lire. Enregistrez à nouveau le fichier, puis joignez-le à nouveau.",
   "error.attachment.totalTooLarge": "Les pièces jointes dépassent la limite totale de 250 Mo.",
   "error.attachment.unavailable": "Ce fichier n’est plus disponible.",
   "error.attachment.tooMany": "Choisissez au maximum {limit} fichiers.",
