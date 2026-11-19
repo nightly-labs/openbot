@@ -1,11 +1,3 @@
-/*
- * Workflow node components: the node chrome, the step and control nodes, ports, connections, the
- * result strip, the picker menus and the asset library. The values follow the Higgsfield canvas
- * measurements: the card is one step lighter than the canvas, an inner field is one step lighter
- * than the card, and every edge is a 1px ring, not a shadow. The canvas, its HUD and the story frame
- * keep their own styles.
- */
-
 :where(.wfn-stage, .wfn-menu, .wfn-popover) {
   --wfn-card: var(--openbot-bg-canvas);
   --wfn-field: var(--openbot-bg-surface-raised);
@@ -18,25 +10,16 @@
   --wfn-radius-card: calc(var(--openbot-radius-lg) + var(--openbot-space-1));
   --wfn-small: calc(var(--openbot-text-sm) - 1px);
   --wfn-tiny: calc(var(--openbot-text-sm) - 2px);
-  /* Ten pixels: one step over the control radius, so a row sits concentric in its menu. */
   --wfn-radius-row: calc(var(--openbot-radius-sm) + var(--openbot-space-1));
   --wfn-radius-run: calc(var(--openbot-radius-md) + 2px);
-  /* The Title size: 40px, one step over the display size. */
   --wfn-text-title: calc(var(--openbot-text-display) * 1.25);
-  /* Focus is a neutral 1px ring, not the accent halo of the shared token. */
   --openbot-focus-ring: 0 0 0 1px var(--openbot-text-muted);
 }
 
-/*
- * The light palette puts a raised surface only a little above the canvas, so a field on a card
- * almost disappears. There the card is the light surface, and a field is one step darker.
- */
 :root[data-openbot-color-scheme="light"] :where(.wfn-stage, .wfn-menu, .wfn-popover) {
   --wfn-card: var(--openbot-bg-surface);
   --wfn-field: var(--openbot-bg-control-hover);
 }
-
-/* ---------------------------------------------------------------- Node */
 
 .wfn-node {
   position: relative;
@@ -101,8 +84,6 @@
   overflow: hidden;
 }
 
-/* --------------------------------------------------------------- Field */
-
 .wfn-field {
   display: grid;
   gap: var(--openbot-space-2);
@@ -144,7 +125,6 @@
   color: var(--openbot-text-muted);
 }
 
-/* The field box shows the focus, so the shared accent outline goes. */
 .wfn-stage .wfn-input:focus-visible {
   outline: none;
   box-shadow: none;
@@ -171,7 +151,6 @@
   line-height: var(--openbot-leading-sm);
 }
 
-/* Why a failed run stopped, in place of its result. The Failed mark and the results carry the colour. */
 .wfn-field-result p[data-failed] {
   color: var(--openbot-text-muted);
 }
@@ -186,7 +165,6 @@
   font-weight: var(--openbot-weight-semibold);
 }
 
-/* A pill in a field: an agent, a model. Flat until hover, as the Higgsfield model button. */
 .wfn-stage .wfn-pill {
   gap: var(--openbot-space-1-5);
   min-width: 0;
@@ -200,12 +178,10 @@
   font-weight: var(--openbot-weight-medium);
 }
 
-/* A long model name gives up its room first and ends with "…", so it stays in the field. */
 .wfn-stage .wfn-model-pill {
   flex-shrink: 1;
 }
 
-/* An agent next to a model keeps its full name, but leaves 96px: the model logo, a few letters and the arrow. */
 .wfn-stage .wfn-agent-pill:has(+ .wfn-model-pill) {
   max-width: calc(100% - 96px - var(--openbot-space-2));
 }
@@ -236,7 +212,6 @@
   color: var(--openbot-text-muted);
 }
 
-/* A provider logo is a filled mark, so it overrides the outline paint of the menu icons. */
 .wfn-pill > svg.wfn-model-logo,
 .wfn-menu.ui-action-menu [role="menuitem"] > svg.wfn-model-logo {
   flex: none;
@@ -260,8 +235,6 @@
   border-radius: var(--wfn-radius-run);
   font-weight: var(--openbot-weight-semibold);
 }
-
-/* --------------------------------------------------------------- Ports */
 
 .wfn-ports {
   position: absolute;
@@ -312,11 +285,6 @@
   color: var(--openbot-bg-canvas);
 }
 
-/*
- * The port name shows next to the port on hover, as the Higgsfield "Text" chip. The text box is
- * trimmed to the capitals, so a name with no descender is at the vertical centre. The chip keeps
- * its height of one line and 2px above and below.
- */
 .wfn-port-chip {
   position: absolute;
   top: 50%;
@@ -348,13 +316,6 @@
   opacity: 1;
 }
 
-/* ------------------------------------------------------------- Toolbar */
-
-/*
- * The toolbar keeps its screen size at every zoom, as the results strip does. Its shape follows the
- * Infeld IconActionList: a round bar of round icon buttons, muted until the pointer or the focus is
- * on them. Each name shows in a tooltip. A ring, not a shadow, sets it off the canvas.
- */
 .wfn-toolbar {
   position: absolute;
   bottom: calc(100% + var(--openbot-space-3) / var(--wfn-scale, 1));
@@ -375,10 +336,6 @@
   backdrop-filter: var(--wfn-glass-blur);
 }
 
-/*
- * Above the node, the toolbar can cover a node that is near. Then it goes under the node, and under the
- * results strip when the node shows one: 8px gap, 52px strip, 8px gap, as the canvas measures it.
- */
 .wfn-toolbar[data-side="below"] {
   top: calc(100% + var(--openbot-space-3) / var(--wfn-scale, 1));
   bottom: auto;
@@ -389,7 +346,6 @@
   top: calc(100% + (8px + 52px + var(--openbot-space-2)) / var(--wfn-scale, 1));
 }
 
-/* The fill shows the focus, as the hover does, so the toolbar has no focus ring. */
 .wfn-stage .wfn-toolbar :is(.ui-button, .wfn-toolbar-select) {
   border-radius: var(--openbot-radius-pill);
   box-shadow: none;
@@ -412,7 +368,6 @@
   height: var(--openbot-icon-md);
 }
 
-/* Delete takes the danger colour under the pointer or the focus, as are the nodes and the lines that it removes. */
 .wfn-stage .wfn-toolbar .wfn-tool-action[data-tone="danger"]:is(:hover, :focus-visible) {
   background: color-mix(in srgb, var(--openbot-danger) 16%, transparent);
   color: var(--openbot-danger-text);
@@ -425,7 +380,6 @@
   background: var(--wfn-ring-strong);
 }
 
-/* A node with no actions of its own and no Duplicate starts its toolbar with Lock. */
 .wfn-toolbar-separator:first-child {
   display: none;
 }
@@ -442,8 +396,6 @@
   height: var(--openbot-icon-xs);
   color: var(--openbot-text-muted);
 }
-
-/* ---------------------------------------------------------------- Text */
 
 .wfn-text {
   width: auto;
@@ -487,8 +439,6 @@
   box-shadow: none;
 }
 
-/* --------------------------------------------------------------- Media */
-
 .wfn-media {
   display: block;
   width: 100%;
@@ -501,7 +451,6 @@
   inset: 0;
 }
 
-/* A picture that the host still sends: the card pulses where the picture comes. */
 .wfn-media-loading {
   position: absolute;
   inset: 0;
@@ -525,11 +474,6 @@
   stroke-width: 1.25;
 }
 
-/*
- * The glass layer on an image: hidden at rest, shown on hover, focus or selection. It never grows
- * past the card, as on Higgsfield: the prompt stops at three lines and scrolls, and on a short card
- * it gives up more of its height.
- */
 .wfn-overlay {
   position: absolute;
   inset: auto 0 0;
@@ -584,7 +528,6 @@
   color: var(--openbot-text-primary);
 }
 
-/* The specs of a media step sit on the right of the bar, next to the collapse button. */
 .wfn-media-specs {
   display: inline-flex;
   gap: var(--openbot-space-1);
@@ -592,7 +535,6 @@
   margin-left: auto;
 }
 
-/* On a picture or video, the collapse button has the same box as the specs next to it. */
 .wfn-stage .wfn-media-overlay .wfn-collapse {
   width: var(--openbot-control-xs);
   height: var(--openbot-control-xs);
@@ -607,14 +549,12 @@
   height: var(--openbot-icon-xs);
 }
 
-/* The dots of the chat frame fill the card at its final size while the model works. */
 .wfn-generating,
 .wfn-generating .image-generation-canvas {
   position: absolute;
   inset: 0;
 }
 
-/* While the model works, the panel stays in view, so Stop is always one press away. */
 .wfn-node:has(.wfn-generating) .wfn-overlay {
   opacity: 1;
   translate: 0 0;
@@ -635,21 +575,10 @@
   font-weight: var(--openbot-weight-medium);
 }
 
-/*
- * A video uses the chat player. While it is paused, the card keeps the glass panel to change the
- * step, and the play button over the frame starts it. While it plays, and in full screen, the player
- * bar takes the bottom of the card.
- */
 .wfn-node .media-generation-player:not([data-playing], :popover-open) .media-generation-bar {
   display: none;
 }
 
-/*
- * When the canvas zooms out, the bar keeps its size on the screen, so Pause, Mute and Full screen
- * stay easy to hit. It grows to at most twice its size in the card; below 50% zoom it gets smaller
- * again. Thus a pixel in the bar is a pixel on the screen from 50% to 100% zoom. The bar uses the full
- * width of the card.
- */
 .wfn-node .media-generation-player:not(:popover-open) .media-generation-bar {
   --wfn-bar-zoom: clamp(1, 1 / var(--wfn-scale, 1), 2);
 
@@ -661,7 +590,6 @@
   padding: 20px 6px 4px;
 }
 
-/* In a narrow card the time goes, so the position keeps space. The slider gives the time to a screen reader. */
 @container wfn-video-bar (width < 300px) {
   .wfn-node .media-generation-time {
     display: none;
@@ -673,7 +601,6 @@
   pointer-events: none;
 }
 
-/* The length of a clip, on its top right, as in the chat player. */
 .wfn-clip-length {
   position: absolute;
   top: var(--openbot-space-2);
@@ -713,12 +640,13 @@
   height: var(--openbot-icon-xs);
 }
 
-/* The spinner takes the place of the play icon, so the pill keeps its width. */
+.wfn-run-pill .wfn-run-credits-icon {
+  fill: currentcolor;
+}
+
 .wfn-stage .wfn-run-pill[aria-busy="true"] svg {
   display: none;
 }
-
-/* --------------------------------------------------------------- Asset */
 
 .wfn-stage .wfn-asset-trigger {
   display: grid;
@@ -733,18 +661,15 @@
   cursor: pointer;
 }
 
-/* A taller asset card stretches its file button, and the file row stays in the middle. */
 .wfn-node[data-kind="asset"] .wfn-card {
   align-content: stretch;
 }
 
-/* An image asset with a height the user set fills the card and crops the image. */
 .wfn-node[data-height] .wfn-card[data-media] {
   aspect-ratio: auto;
   height: var(--wfn-height);
 }
 
-/* A picture with clear pixels shows whole, never cropped. */
 .wfn-node .wfn-card[data-media][data-clear] .wfn-media {
   object-fit: contain;
 }
@@ -765,10 +690,6 @@
   box-shadow: 0 0 0 1px var(--openbot-text-muted);
 }
 
-/*
- * A picture with clear pixels: no fill and no ring, so the canvas and its lines show through it.
- * The ring comes back on hover, so the edge of the node shows.
- */
 .wfn-stage .wfn-card[data-clear],
 .wfn-stage .wfn-card[data-clear] .wfn-asset-trigger:not([data-dropping]) {
   background: transparent;
@@ -778,7 +699,6 @@
   box-shadow: none;
 }
 
-/* A file from the computer over the card: the card takes the hover fill. */
 .wfn-stage .wfn-asset-trigger[data-dropping] {
   background: var(--wfn-hover);
 }
@@ -880,8 +800,6 @@
   line-height: var(--openbot-leading-sm);
 }
 
-/* ------------------------------------------------------ Menus, library */
-
 .wfn-menu {
   --ui-menu-bg: var(--wfn-glass);
   --ui-menu-panel-shadow: 0 0 0 1px var(--wfn-ring-strong);
@@ -891,13 +809,6 @@
   backdrop-filter: var(--wfn-glass-blur);
 }
 
-/* ------------------------------------------------------------- Picker */
-
-/*
- * Every choice list on the canvas has this one style: a search field over a divider, group
- * headings, and rows with an icon tile, the name and small chips. The panel, the row and the tile
- * radii are concentric.
- */
 .wfn-picker.ui-action-menu {
   --ui-menu-radius: var(--wfn-radius-card);
 
@@ -941,10 +852,6 @@
   color: var(--openbot-text-muted);
 }
 
-/*
- * The field takes the focus each time the menu opens, so a focus colour on the divider would always
- * show. The caret shows where typing goes, as in the shared search select.
- */
 .wfn-picker .wfn-picker-field:focus-visible {
   outline: none;
   box-shadow: none;
@@ -959,7 +866,6 @@
   scrollbar-width: none;
 }
 
-/* An action list groups its rows in a fieldset, which has the group role. */
 fieldset.wfn-picker-group {
   min-width: 0;
   margin: 0;
@@ -1008,7 +914,6 @@ fieldset.wfn-picker-group {
   background: var(--wfn-ring-strong);
 }
 
-/* The tile holds the mark of a choice: a logo, an avatar, a swatch or a sample. */
 .wfn-picker-tile {
   display: grid;
   flex: none;
@@ -1023,10 +928,6 @@ fieldset.wfn-picker-group {
   transition: color var(--openbot-duration-fast) var(--openbot-ease-out);
 }
 
-/*
- * A node kind in an add menu is only its icon in the colour of the kind, with no tile, so the
- * twelve kinds fit in short rows. A kind with no colour of its own has a neutral icon.
- */
 .wfn-picker-tile[data-kind] {
   --wfn-kind: var(--openbot-text-secondary);
 
@@ -1037,7 +938,6 @@ fieldset.wfn-picker-group {
   color: var(--wfn-kind);
 }
 
-/* The add menu is a little taller than the other lists, so all its kinds show with no scroll. */
 .wfn-picker.ui-action-menu:has(.wfn-picker-tile[data-kind]) {
   max-height: min(560px, var(--kb-popper-content-available-height, 560px));
 }
@@ -1060,7 +960,6 @@ fieldset.wfn-picker-group {
   stroke-width: var(--openbot-icon-stroke);
 }
 
-/* A provider logo is a filled mark. */
 .wfn-picker.ui-action-menu .wfn-picker-tile > svg.wfn-model-logo,
 .wfn-picker.ui-action-menu .wfn-picker-chip > svg.wfn-model-logo {
   fill: currentcolor;
@@ -1072,7 +971,6 @@ fieldset.wfn-picker-group {
   height: var(--openbot-icon-md);
 }
 
-/* An avatar has its own shape, so it has no tile box. The offset centres the face, as elsewhere. */
 .wfn-picker-tile:has(> .agent-avatar),
 .wfn-picker-row[data-checked] .wfn-picker-tile:has(> .agent-avatar) {
   overflow: visible;
@@ -1091,7 +989,6 @@ fieldset.wfn-picker-group {
   font-size: var(--openbot-text-lg);
 }
 
-/* A text size shows "Aa" at a size that grows with the choice. */
 .wfn-picker-tile > .wfn-font-sample[data-step="1"] {
   font-size: var(--openbot-text-sm);
 }
@@ -1104,7 +1001,6 @@ fieldset.wfn-picker-group {
   font-size: var(--openbot-text-3xl);
 }
 
-/* An aspect ratio shows its frame. The longer side is one icon long. */
 .wfn-picker-aspect {
   width: calc(var(--openbot-icon-md) * var(--wfn-aspect-w));
   height: calc(var(--openbot-icon-md) * var(--wfn-aspect-h));
@@ -1112,12 +1008,10 @@ fieldset.wfn-picker-group {
   border-radius: var(--openbot-radius-xs);
 }
 
-/* A custom size has no fixed shape, so its frame is dashed. */
 .wfn-picker-aspect[data-custom] {
   border-style: dashed;
 }
 
-/* An effort shows five bars. The bars up to the level are lit. */
 .wfn-picker-meter {
   display: flex;
   align-items: flex-end;
@@ -1185,7 +1079,6 @@ fieldset.wfn-picker-group {
   padding: 0 var(--openbot-space-1-5);
   border-radius: var(--openbot-radius-xs);
   background: var(--wfn-hover);
-  /* Muted text on the chip's own fill is under 4.5:1 in the light theme. */
   color: var(--openbot-text-secondary);
   font-size: var(--wfn-small);
   font-variant-numeric: tabular-nums;
@@ -1214,10 +1107,6 @@ fieldset.wfn-picker-group {
   text-align: center;
 }
 
-/*
- * The model picker keeps the layout of the one in the conversation header: a rail of provider logos
- * on the left, and the panel of the chosen provider. The panel has the picker style.
- */
 .wfn-model-picker.wfn-picker.ui-action-menu {
   width: min(360px, calc(100vw - var(--openbot-space-4)));
   max-width: none;
@@ -1243,7 +1132,6 @@ fieldset.wfn-picker-group {
   display: flex;
 }
 
-/* The panel radius less the rail padding, so the tab and the panel corners are concentric. */
 .wfn-model-tab {
   display: grid;
   place-items: center;
@@ -1268,7 +1156,6 @@ fieldset.wfn-picker-group {
   box-shadow: inset 0 0 0 1px var(--wfn-ring-strong);
 }
 
-/* The shared accent focus outline goes; a neutral ring inside the tab shows the focus. */
 .wfn-model-picker .wfn-model-tab:focus-visible {
   outline: none;
   box-shadow: inset 0 0 0 1px var(--openbot-text-muted);
@@ -1313,10 +1200,6 @@ fieldset.wfn-picker-group {
   list-style: none;
 }
 
-/*
- * The model picker of an image or video step. It keeps one size for every tab and every search, so
- * the panel does not move. The rail scrolls when the host has many accounts.
- */
 .wfn-media-picker.wfn-picker.ui-action-menu {
   height: min(400px, var(--kb-popper-content-available-height, 400px));
 }
@@ -1338,12 +1221,10 @@ fieldset.wfn-picker-group {
   min-height: 0;
 }
 
-/* The tab of all models has a line icon, not a filled logo. */
 .wfn-model-tab > svg.wfn-media-all-mark {
   fill: none;
 }
 
-/* The number of an account, at the corner of its logo, as on the rail of the agent model picker. */
 .wfn-media-rail .wfn-model-tab {
   position: relative;
   flex: none;
@@ -1369,9 +1250,20 @@ fieldset.wfn-picker-group {
   line-height: 1;
 }
 
-/* The pill of a media step names the account that pays, muted, as the first text to shorten. */
 .wfn-field-foot > .wfn-media-pill {
+  position: relative;
+  flex-shrink: 1;
   min-width: 0;
+}
+
+.wfn-stage .wfn-media-pill > .wfn-media-account-badge {
+  inset-inline: 13px auto;
+  bottom: -2px;
+  min-width: 11px;
+  height: 11px;
+  padding: 0 2px;
+  overflow: visible;
+  font-size: var(--openbot-glyph-sm);
 }
 
 .wfn-media-pill-name {
@@ -1391,7 +1283,6 @@ fieldset.wfn-picker-group {
   align-items: center;
   gap: var(--openbot-space-2);
   min-height: calc(var(--openbot-control-md) + var(--openbot-space-2));
-  /* With the list padding, the name starts on the line of the heading and the search icon. */
   padding-block: var(--openbot-space-1);
   padding-inline: var(--openbot-space-1-5) var(--openbot-space-2);
   border-radius: var(--wfn-radius-row);
@@ -1421,7 +1312,6 @@ fieldset.wfn-picker-group {
   backdrop-filter: var(--wfn-glass-blur);
 }
 
-/* A custom size: the width and the height side by side. */
 .ui-popover-menu-surface.wfn-popover.wfn-size-popover {
   width: 240px;
 }
@@ -1437,12 +1327,10 @@ fieldset.wfn-picker-group {
   gap: var(--openbot-space-1);
 }
 
-/* A custom length: one slider over the lengths of the model. */
 .ui-popover-menu-surface.wfn-popover.wfn-length-popover {
   width: 240px;
 }
 
-/* The title of a popover, with one action at the end, such as Upload. */
 .wfn-popover-head {
   display: flex;
   gap: var(--openbot-space-2);
@@ -1451,7 +1339,6 @@ fieldset.wfn-picker-group {
   margin-block: calc(var(--openbot-space-1) * -1);
 }
 
-/* The action has the size of the title text. */
 .wfn-popover-head .ui-button {
   font-size: var(--openbot-text-sm);
 }
@@ -1467,7 +1354,6 @@ fieldset.wfn-picker-group {
   gap: var(--openbot-space-3);
 }
 
-/* Filter pills, as the Higgsfield library: a full pill, light text at half strength until active. */
 .wfn-popover .wfn-library-tabs {
   padding: 0;
   background: transparent;
@@ -1484,7 +1370,6 @@ fieldset.wfn-picker-group {
   background: var(--wfn-ring-strong);
 }
 
-/* The search field: the quiet fill of the node fields, and the same 1px ring on focus. */
 .wfn-library-search {
   display: flex;
   gap: var(--openbot-space-1-5);
@@ -1523,7 +1408,6 @@ fieldset.wfn-picker-group {
   box-shadow: none;
 }
 
-/* The scroll area: the shared fades mask its edges, and the native bar gives way to the thumb. */
 .wfn-scroll {
   position: relative;
 }
@@ -1554,7 +1438,6 @@ fieldset.wfn-picker-group {
   text-wrap: pretty;
 }
 
-/* The thumb sits in the popover padding, so it never covers a tile. The track is 12px for the pointer. */
 .wfn-scroll-track {
   position: absolute;
   top: 0;
@@ -1587,7 +1470,6 @@ fieldset.wfn-picker-group {
   background: color-mix(in srgb, var(--openbot-text-primary) 40%, transparent);
 }
 
-/* One full column: a short name must not shrink the thumb. */
 .wfn-popover .wfn-library-tile {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -1603,7 +1485,6 @@ fieldset.wfn-picker-group {
   box-shadow: inset 0 0 0 1px var(--openbot-text-primary);
 }
 
-/* An inset ring, so the scroll area does not clip it, in the text colour and not the accent. */
 .wfn-popover .wfn-library-tile:focus-visible {
   outline: none;
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--openbot-text-primary) 40%, transparent);
@@ -1637,27 +1518,15 @@ fieldset.wfn-picker-group {
   }
 }
 
-/* ---------------------------------------------------------- Connections */
-
 .wfn-stage :is(.wfn-node, .wfn-text) {
   z-index: 1;
 }
 
-/*
- * The ports sit outside the card, so a near node that comes later can cover them. A selected or
- * focused node with ports goes above the other nodes until the selection ends. The saved order stays.
- * A node that can take the open connection goes up too. The node that the connection starts from
- * stays down while it is open, so it does not cover a target port in either order.
- */
 .wfn-stage .wfn-node:has(> .wfn-ports):is([data-selected], :focus-within),
 .wfn-stage .wfn-node:has(.wfn-port[data-target]) {
   z-index: 2;
 }
 
-/*
- * The reference lines of a hovered or selected asset draw again in a layer above the other nodes. The
- * asset and the nodes that it connects to go above that layer, so the lines end under their ports.
- */
 .wfn-edges-focus {
   z-index: 2;
 }
@@ -1670,10 +1539,6 @@ fieldset.wfn-picker-group {
   z-index: 1;
 }
 
-/*
- * The other nodes fade a little, so the asset and its references stay clear on a full board. The node
- * fades, not its slot: an opacity on the slot traps the z-index of the node in it.
- */
 .wfn-stage .wfn-slot[data-dim] > :is(.wfn-node, .wfn-text) {
   opacity: 0.9;
 }
@@ -1702,17 +1567,14 @@ fieldset.wfn-picker-group {
   --wfn-edge: color-mix(in srgb, var(--openbot-text-primary) 72%, transparent);
 }
 
-/* The reference lines of the focused asset are solid, in the highlight colour. */
 .wfn-edge[data-focus] {
   --wfn-edge: var(--openbot-chart-storage-downloads);
 }
 
-/* A selected edge is solid and bright, like the selected node ring. */
 .wfn-edge[data-selected] {
   --wfn-edge: var(--openbot-text-primary);
 }
 
-/* The focus layer draws a focused line, so its copy under the nodes does not show a second comet. */
 .wfn-edges:not(.wfn-edges-focus) > .wfn-edge[data-focus] > :is(.wfn-edge-line, .wfn-edge-comet) {
   visibility: hidden;
 }
@@ -1729,7 +1591,6 @@ fieldset.wfn-picker-group {
   stroke-linecap: round;
 }
 
-/* A connected edge is a thin dashed line, as on the Higgsfield canvas. */
 .wfn-edge-line {
   stroke-width: 1.5;
   stroke-dasharray: 5 5;
@@ -1758,7 +1619,6 @@ fieldset.wfn-picker-group {
   }
 }
 
-/* The comet carries the answer of a done step into the step that runs now. */
 .wfn-edge-comet {
   stroke: var(--openbot-text-primary);
   stroke-width: 3;
@@ -1791,7 +1651,6 @@ fieldset.wfn-picker-group {
   transition: color var(--openbot-duration-hover) var(--openbot-ease-out);
 }
 
-/* On a port that can take it, the line snaps to the port and turns solid. */
 .wfn-edge-draft[data-state="ok"] {
   color: var(--openbot-text-primary);
   stroke-dasharray: none;
@@ -1801,16 +1660,11 @@ fieldset.wfn-picker-group {
   color: var(--openbot-danger);
 }
 
-/* A line back to an earlier node can end here too: it makes a loop. */
 .wfn-edge-draft[data-state="loop"] {
   color: var(--openbot-warning);
   stroke-dasharray: none;
 }
 
-/*
- * Why the line cannot end here, or that it makes a loop, next to the pointer. It keeps its screen
- * size at every zoom.
- */
 .wfn-draft-reason {
   position: absolute;
   z-index: 3;
@@ -1832,11 +1686,6 @@ fieldset.wfn-picker-group {
   color: var(--openbot-warning-text);
 }
 
-/*
- * The remove button of a connection sits on the line at the point nearest to the pointer, and keeps
- * its screen size at every zoom. It takes the danger colour, and so does the line while the pointer is on it.
- * It stays above a raised node.
- */
 .wfn-edge-actions {
   position: absolute;
   z-index: 3;
@@ -1876,7 +1725,6 @@ fieldset.wfn-picker-group {
   }
 }
 
-/* A connected port stays visible; while you connect, the ports that cannot take the line dim. */
 .wfn-stage .wfn-port[data-connected] {
   opacity: 1;
 }
@@ -1897,17 +1745,12 @@ fieldset.wfn-picker-group {
   opacity: 1;
 }
 
-/* A hidden port waits at half size, so it grows in when it shows, as on Higgsfield. */
 .wfn-stage
   .wfn-node:not(:hover, :focus-within, [data-selected])
   .wfn-port:not([data-connected], [data-armed], [data-target], [data-dim], [data-refused], [data-missing]) {
   scale: 0.5;
 }
 
-/*
- * A step that runs: a faint ring, and a bright arc that goes round the edge of the card, as a comet
- * goes along an edge. The arc is a conic gradient in a 1px frame over the ring; it has no glow.
- */
 .wfn-node[data-status="running"] .wfn-card {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--openbot-text-primary) 16%, transparent);
 }
@@ -1918,7 +1761,6 @@ fieldset.wfn-picker-group {
   z-index: 1;
   inset: -1.5px;
   padding: 1.5px;
-  /* Resolved here, so the ring follows the card radius of each node size. */
   --wfn-radius-ring: calc(var(--wfn-radius-card) + 1.5px);
   border-radius: var(--wfn-radius-ring);
   background: conic-gradient(
@@ -1949,7 +1791,6 @@ fieldset.wfn-picker-group {
   }
 }
 
-/* The time of the run, at the end of the label row. When the run ends, it fades out after a moment. */
 .wfn-run-time {
   display: inline-flex;
   gap: var(--openbot-space-1);
@@ -1970,7 +1811,6 @@ fieldset.wfn-picker-group {
   animation: wfn-run-time-out 1.8s var(--openbot-ease-out) forwards;
 }
 
-/* A failed step keeps its mark until it runs again. */
 .wfn-run-time[data-failed] {
   color: var(--openbot-danger-text);
 }
@@ -1986,9 +1826,6 @@ fieldset.wfn-picker-group {
   }
 }
 
-/* Lines that pulse in the result field stand for the result that the run makes. Each line takes the
-   height of one line of text (8 + 8 = 16 px), so a result of three lines does not change the size of
-   the card. */
 .wfn-result-pending {
   display: grid;
   gap: var(--openbot-space-2);
@@ -2010,7 +1847,6 @@ fieldset.wfn-picker-group {
   animation-delay: 240ms;
 }
 
-/* When there is a last result, the lines cover it and it keeps its space. */
 .wfn-result-body {
   position: relative;
 }
@@ -2026,7 +1862,6 @@ fieldset.wfn-picker-group {
   overflow: hidden;
 }
 
-/* An image step that runs: a soft light goes across the picture, or across the empty frame. */
 .wfn-node[data-status="running"] .wfn-card[data-media]::after {
   content: "";
   position: absolute;
@@ -2052,9 +1887,6 @@ fieldset.wfn-picker-group {
   }
 }
 
-/* --------------------------------------------------------------- Canvas */
-
-/* The spring goes a little past its end and comes back. The palette has no spring ease. */
 .wfn-art-layer {
   --wfn-art-spring: cubic-bezier(0.34, 1.35, 0.64, 1);
   transform-box: fill-box;
@@ -2132,7 +1964,6 @@ fieldset.wfn-picker-group {
   stop-color: transparent;
 }
 
-/* A cut in the bar colour around each layer keeps the layers apart without a shadow. */
 .wfn-art-cut {
   stroke: color-mix(in srgb, var(--openbot-bg-surface-raised) 75%, var(--wfn-card));
   stroke-width: 2;
@@ -2146,7 +1977,6 @@ fieldset.wfn-picker-group {
   stroke-linejoin: round;
 }
 
-/* The pen and the eraser change places with a small zoom, as the icon of the other mode. */
 .wfn-tool-art [data-layer="eraser"],
 .wfn-tool-art[data-eraser] [data-layer="pen"] {
   opacity: 0;
@@ -2158,7 +1988,6 @@ fieldset.wfn-picker-group {
   scale: 1;
 }
 
-/* At rest the layers at the back turn a little, so the stack reads as a stack. */
 .wfn-tool-art [data-layer="back"] {
   rotate: -10deg;
 }
@@ -2172,9 +2001,6 @@ fieldset.wfn-picker-group {
   padding-inline-start: var(--openbot-space-4);
 }
 
-/* ------------------------------------------------------------ Minimap */
-
-/* Shortcut keys, in tooltips and in menus. */
 .wfn-keys {
   display: inline-flex;
   gap: 2px;
@@ -2197,7 +2023,6 @@ fieldset.wfn-picker-group {
   align-items: center;
 }
 
-/* The canvas tooltips have the 1px ring of the HUD and no shadow. */
 .ui-tooltip.wfn-tooltip {
   border-radius: var(--openbot-radius-md);
   box-shadow: 0 0 0 1px var(--openbot-border-strong);
@@ -2208,9 +2033,6 @@ fieldset.wfn-picker-group {
   padding-inline-end: var(--openbot-space-1-5);
 }
 
-/* The results of the selected step, oldest first, under its card, as on the Higgsfield canvas. The
- * result on view is larger and has a full ring in the colour of its kind. The strip keeps its screen
- * size at every zoom, as the selection frame does. */
 .wfn-strip {
   position: absolute;
   top: calc(100% + 8px / var(--wfn-scale, 1));
@@ -2230,8 +2052,6 @@ fieldset.wfn-picker-group {
     calc(var(--wfn-snap-y, 0px) / var(--wfn-scale, 1));
 }
 
-/* Seven results fit. More scroll, and the arrows move through all of them. The list is the offset
- * parent of its items, so the strip can scroll the result on view to the middle. */
 .wfn-strip-list {
   position: relative;
   display: flex;
@@ -2296,7 +2116,6 @@ fieldset.wfn-picker-group {
   object-fit: cover;
 }
 
-/* A failed run has no result, so its item shows a cross in place of an image or a number. */
 .wfn-strip-item[data-failed] {
   color: var(--openbot-danger-text);
 }
@@ -2331,7 +2150,6 @@ fieldset.wfn-picker-group {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  /* The arc stops and becomes a full ring; the light on an image stays at the centre. */
   .wfn-node[data-status="running"] .wfn-card-frame::before {
     background: color-mix(in srgb, var(--openbot-text-primary) 56%, transparent);
     animation: none;
@@ -2347,24 +2165,16 @@ fieldset.wfn-picker-group {
   }
 }
 
-/* ------------------------------------------------------------ Selection */
-
 .wfn-card-frame {
   position: relative;
   display: grid;
 }
 
-/*
- * Selection is a neutral ring 3px outside the card, not a colour: the kind colours and the run ring
- * keep their meaning. An outline follows the card radius, so the ring stays concentric. The canvas
- * sets --wfn-scale, so the ring and the grip keep their size at every zoom.
- */
 .wfn-node {
   --wfn-select-line: calc(1.5px / var(--wfn-scale, 1));
   --wfn-select-gap: calc(3px / var(--wfn-scale, 1));
 }
 
-/* A height that changes at once, as a reset or an undo, eases to its place, as the width does. */
 .wfn-node .wfn-card {
   outline: var(--wfn-select-line) solid transparent;
   outline-offset: var(--wfn-select-gap);
@@ -2393,17 +2203,12 @@ fieldset.wfn-picker-group {
   outline-offset: var(--wfn-select-gap);
 }
 
-/*
- * The resize grips: every corner and side resizes, but only the bottom-right corner shows a mark, a
- * short arc on the ring, concentric with the card (card radius + gap). So the card edge stays calm.
- */
 .wfn-grip {
   --wfn-grip-size: calc(18px / var(--wfn-scale, 1));
   --wfn-grip-line: calc(3px / var(--wfn-scale, 1));
   --wfn-grip-out: calc(var(--wfn-select-gap) + var(--wfn-select-line) / 2 + var(--wfn-grip-line) / 2);
   --wfn-grip-radius: calc(var(--wfn-radius-card) + var(--wfn-grip-out));
   --wfn-grip-arc: var(--wfn-grip-line) solid var(--wfn-grip-color, transparent);
-  /* The band of a side, centred on the selection ring. */
   --wfn-grip-band: calc(12px / var(--wfn-scale, 1));
   --wfn-grip-band-out: calc(var(--wfn-grip-out) * -1 - var(--wfn-grip-band) / 2);
 
@@ -2415,14 +2220,12 @@ fieldset.wfn-picker-group {
   transition: border-color var(--openbot-duration-fast) var(--openbot-ease-out);
 }
 
-/* A larger target than the arc. */
 .wfn-grip::after {
   position: absolute;
   inset: calc(-6px / var(--wfn-scale, 1));
   content: "";
 }
 
-/* The top corners and the bottom-left corner have no mark: the cursor shows the resize. */
 .wfn-grip[data-corner="nw"] {
   top: calc(var(--wfn-grip-out) * -1);
   left: calc(var(--wfn-grip-out) * -1);
@@ -2446,7 +2249,6 @@ fieldset.wfn-picker-group {
   left: calc(var(--wfn-grip-out) * -1);
 }
 
-/* A side has no mark: the selection ring is the edge, and the cursor shows the resize. */
 .wfn-grip[data-side] {
   z-index: 1;
   width: auto;
@@ -2485,12 +2287,10 @@ fieldset.wfn-picker-group {
   left: var(--wfn-grip-band-out);
 }
 
-/* The ports sit over the side bands, so a press on a port connects and does not resize. */
 .wfn-ports {
   z-index: 1;
 }
 
-/* A text node is small and has no card, so its ring and grip are lighter and shorter. */
 .wfn-text .wfn-grip {
   --wfn-grip-size: calc(12px / var(--wfn-scale, 1));
   --wfn-grip-line: calc(2px / var(--wfn-scale, 1));
@@ -2507,10 +2307,6 @@ fieldset.wfn-picker-group {
   --wfn-grip-color: var(--openbot-text-primary);
 }
 
-/*
- * While a Delete control points at nodes, or the confirmation is open, the nodes that go have a danger
- * ring, and their connections take it too.
- */
 .wfn-node[data-doomed] .wfn-card {
   outline-color: var(--openbot-danger);
 }
@@ -2540,12 +2336,10 @@ fieldset.wfn-picker-group {
   cursor: nesw-resize;
 }
 
-/* A step with a height that the user set gives the extra room to its task. */
 .wfn-node[data-height] .wfn-card:has(> .wfn-field-task) {
   grid-template-rows: 1fr;
 }
 
-/* A locked node shows a lock after its label and takes no drag. */
 .wfn-node[data-locked] :is(.wfn-label, .wfn-card) {
   cursor: default;
 }
@@ -2564,7 +2358,6 @@ fieldset.wfn-picker-group {
   width: 100%;
 }
 
-/* The ring of a selected node shows the focus from the keyboard too. */
 .wfn-node:focus-visible {
   outline: none;
 }
@@ -2572,8 +2365,6 @@ fieldset.wfn-picker-group {
 .wfn-node:not(.wfn-text):focus-visible:not([data-selected]) .wfn-card {
   outline-color: color-mix(in srgb, var(--openbot-text-primary) 40%, transparent);
 }
-
-/* ------------------------------------------------------------ Run status */
 
 .wfn-hud-spin {
   animation: wfn-spin 1s linear infinite;
@@ -2606,15 +2397,6 @@ fieldset.wfn-picker-group {
   }
 }
 
-/* ---------------------------------------------------------- Scroll fades */
-
-/*
- * Content that scrolls fades out at an edge where more of it is. Each fade grows over the first or the
- * last fade size of the scroll, so an edge at the start or the end stays sharp. The ranges are lengths,
- * not parts of the scroll range: content that fits gets no fade, also where the engine puts a timeline
- * with no scroll range at its end. A browser without scroll timelines shows no fade: there the animation
- * runs on the clock, ends at once, and keeps the start fade on content that does not scroll.
- */
 @property --wfn-fade-start {
   syntax: "<length>";
   inherits: false;
@@ -2677,8 +2459,6 @@ fieldset.wfn-picker-group {
   }
 }
 
-/* ---------------------------------------------------------------- Size */
-
 .wfn-node[data-kind="trigger"],
 .wfn-node[data-kind="output"] {
   --wfn-width: 280px;
@@ -2694,15 +2474,11 @@ fieldset.wfn-picker-group {
   --wfn-height: 240px;
 }
 
-/* The edge of a rectangle, the selection ring and the resize arc share one radius, so they stay
- * concentric. */
 .wfn-node[data-kind="shape"] {
   --wfn-width: 208px;
   --wfn-height: 128px;
   --wfn-radius-card: var(--openbot-radius-md);
 }
-
-/* --------------------------------------------------------------- Kinds */
 
 :is(.wfn-menu-icon, .wfn-picker-tile, .wfn-node, .wfn-minimap-node)[data-kind="trigger"] {
   --wfn-kind: var(--openbot-file-yellow);
@@ -2728,9 +2504,6 @@ fieldset.wfn-picker-group {
   --wfn-kind: var(--openbot-text-secondary);
 }
 
-/* -------------------------------------------------------------- Fields */
-
-/* A pill alone on its row keeps its own width. */
 .wfn-stage .wfn-block-field > .wfn-pill {
   justify-self: start;
 }
@@ -2739,7 +2512,6 @@ fieldset.wfn-picker-group {
   justify-content: flex-start;
 }
 
-/* The model of a condition starts its row, and the effort ends it, as in an LLM step. */
 .wfn-block-field > .wfn-condition-foot {
   justify-content: space-between;
 }
@@ -2750,8 +2522,6 @@ fieldset.wfn-picker-group {
   gap: var(--openbot-space-2);
 }
 
-/* -------------------------------------------------------- Setting rows */
-
 .wfn-github-mark {
   flex: none;
   width: var(--openbot-icon-xs);
@@ -2759,7 +2529,6 @@ fieldset.wfn-picker-group {
   fill: currentcolor;
 }
 
-/* The settings of a card: a list of full-width rows on the field colour. */
 .wfn-settings {
   --wfn-settings-gap: 2px;
 
@@ -2770,15 +2539,12 @@ fieldset.wfn-picker-group {
   background: var(--wfn-field);
 }
 
-/* The type or target is the first row; its settings follow under a hairline. The margin less the grid gap
-   puts the hairline midway between two rows. */
 .wfn-settings-head:not(:last-child) {
   padding-bottom: var(--openbot-space-1);
   border-bottom: 1px solid var(--wfn-ring);
   margin-bottom: calc(var(--openbot-space-1) - var(--wfn-settings-gap));
 }
 
-/* The last event closes the settings under a hairline. */
 .wfn-settings-foot {
   padding-top: var(--openbot-space-1);
   border-top: 1px solid var(--wfn-ring);
@@ -2794,7 +2560,6 @@ fieldset.wfn-picker-group {
   margin: var(--openbot-space-1);
 }
 
-/* A control of its own layout among the rows, such as the schedule picker or a webhook secret. */
 .wfn-settings-block {
   padding: var(--openbot-space-1) var(--openbot-space-2);
 }
@@ -2850,7 +2615,6 @@ fieldset.wfn-picker-group {
   font-weight: var(--openbot-weight-medium);
 }
 
-/* Tags wrap to more lines; one value ends with "…". */
 .wfn-row-value:has(> .wfn-tag) {
   flex-wrap: wrap;
 }
@@ -2880,12 +2644,10 @@ fieldset.wfn-picker-group {
   transition: opacity var(--openbot-duration-hover) var(--openbot-ease-out);
 }
 
-/* A setting row shows its arrow on hover, so the values read as one column. The type row always shows it. */
 :is(.wfn-settings, .wfn-settings-foot) > .wfn-row:not(:hover, :focus-visible, [aria-expanded="true"]) .wfn-row-arrow {
   opacity: 0;
 }
 
-/* The type row has no name: its icon sits on a tile of the kind colour, as in the add menu. */
 .wfn-settings-head .wfn-row {
   grid-template-columns: minmax(0, 1fr) auto;
   min-height: 40px;
@@ -2910,7 +2672,6 @@ fieldset.wfn-picker-group {
   color: var(--wfn-kind);
 }
 
-/* A row that the user types in: the field fills the value and arrow columns, with no border of its own. */
 .wfn-row[data-input]:focus-within {
   cursor: text;
   box-shadow: inset 0 0 0 1px var(--wfn-ring-strong);
@@ -2930,7 +2691,6 @@ fieldset.wfn-picker-group {
   box-shadow: none;
 }
 
-/* An address to copy, such as the URL of a webhook. */
 .wfn-row-code {
   display: block;
   overflow: hidden;
@@ -2941,7 +2701,6 @@ fieldset.wfn-picker-group {
   white-space: nowrap;
 }
 
-/* A value in a list row, such as a label. A GitHub label has its own colour on a tint of it. */
 .wfn-tag {
   display: inline-flex;
   align-items: center;
@@ -2958,7 +2717,6 @@ fieldset.wfn-picker-group {
   white-space: nowrap;
 }
 
-/* A long name ends with "…" inside its tag, so the tag stays in the value column. */
 .wfn-tag-text {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2970,7 +2728,6 @@ fieldset.wfn-picker-group {
   height: var(--openbot-icon-xs);
 }
 
-/* A repository that sends no events. */
 .wfn-tag[data-warning] {
   color: var(--openbot-warning-text);
 }
@@ -2981,7 +2738,6 @@ fieldset.wfn-picker-group {
   color: color-mix(in srgb, var(--wfn-tone) 80%, var(--openbot-text-primary));
 }
 
-/* The colour of a label in its menu. */
 .wfn-dot {
   width: 10px;
   height: 10px;
@@ -2989,7 +2745,6 @@ fieldset.wfn-picker-group {
   background: var(--wfn-tone);
 }
 
-/* A value with a count tag at its end, such as the events row: the text ends with "…", the tag stays. */
 .wfn-row-value[data-one-line] {
   flex-wrap: nowrap;
 }
@@ -3002,9 +2757,6 @@ fieldset.wfn-picker-group {
   flex: none;
 }
 
-/* ------------------------------------------------------------ Branches */
-
-/* Each branch row holds its output port on the right edge of the card, as a node holds its output. */
 .wfn-branch {
   position: relative;
   display: flex;
@@ -3042,7 +2794,6 @@ fieldset.wfn-picker-group {
   translate: 0 -50%;
 }
 
-/* The name of a branch rides on its line, at the middle. */
 .wfn-edge-label {
   position: absolute;
   z-index: 1;
@@ -3059,10 +2810,11 @@ fieldset.wfn-picker-group {
   translate: -50% -50%;
 }
 
-/*
- * A loop shows where it goes back under its nodes. With no condition to end it, it takes the warning
- * colour: the run repeats it until the user stops the run.
- */
+.wfn-edge-count {
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+}
+
 .wfn-edge-loop {
   position: absolute;
   z-index: 1;
@@ -3088,19 +2840,11 @@ fieldset.wfn-picker-group {
 }
 
 .wfn-edge-loop[data-endless] {
-  /* The soft warning is translucent, so the card under it hides the line. */
   background: linear-gradient(var(--openbot-warning-soft) 0 0), var(--wfn-card);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--openbot-warning) 45%, transparent);
   color: var(--openbot-warning-text);
 }
 
-/* ---------------------------------------------------------------- Note */
-
-/*
- * A note is coloured paper, as on Higgsfield. The paper keeps the hue of the note colour at a fixed
- * lightness, so a note is the same pastel in the dark and the light theme, where the palette
- * darkens each colour for text. A 1px edge in a deeper tint frames it.
- */
 :is(.wfn-node, .wfn-ghost)[data-kind="note"] {
   --wfn-note-paper: oklch(from var(--wfn-note) 0.88 calc(c * 0.5) h);
   --wfn-note-edge: oklch(from var(--wfn-note) 0.76 calc(c * 0.6) h);
@@ -3165,7 +2909,6 @@ fieldset.wfn-picker-group {
   user-select: none;
 }
 
-/* The font menu shows each font in itself. */
 .wfn-font-sample {
   font-size: var(--openbot-text-md);
   font-weight: var(--openbot-weight-semibold);
@@ -3184,8 +2927,6 @@ fieldset.wfn-picker-group {
   background: var(--wfn-swatch);
   box-shadow: inset 0 0 0 1px var(--wfn-ring-strong);
 }
-
-/* -------------------------------------------------------------- States */
 
 .wfn-alert {
   display: flex;
@@ -3231,12 +2972,10 @@ fieldset.wfn-picker-group {
   color: var(--openbot-success-text);
 }
 
-/* The last answer stays in its place while the step runs again, so the card does not change size. */
 .wfn-alert[data-stale] {
   opacity: 0.5;
 }
 
-/* Before the first answer, a line that pulses holds the place of the answer at the same height. */
 .wfn-alert[data-pending] {
   background: var(--wfn-field);
 }
@@ -3257,12 +2996,10 @@ fieldset.wfn-picker-group {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--openbot-warning) 64%, transparent);
 }
 
-/* A required input with no line stays visible, in the colour of the other ports. */
 .wfn-stage .wfn-port[data-missing]:not([data-target], [data-armed]) {
   opacity: 1;
 }
 
-/* An agent that the user deleted. */
 .wfn-stage .wfn-pill[data-missing] {
   color: var(--openbot-warning-text);
 }
@@ -3275,15 +3012,11 @@ fieldset.wfn-picker-group {
   color: var(--openbot-text-muted);
 }
 
-/* ----------------------------------------------------------- Long text */
-
-/* Long text scrolls inside its field, so the node keeps its layout. */
 .wfn-stage :is(.wfn-field-task, .wfn-field-fill, .wfn-field-system, .wfn-block-field) .wfn-input {
   max-height: 200px;
   overflow-y: auto;
 }
 
-/* A card with a height that the user set gives all its room to the main field. */
 .wfn-stage .wfn-node[data-height] :is(.wfn-field-task, .wfn-field-fill) .wfn-input {
   max-height: none;
 }
@@ -3299,9 +3032,6 @@ fieldset.wfn-picker-group {
   flex: none;
 }
 
-/* --------------------------------------------------------------- Shape */
-
-/* A shape has no label. The lock badge of a locked shape sits above its top-left corner. */
 .wfn-label[data-bare] {
   position: absolute;
   bottom: 100%;
@@ -3319,7 +3049,6 @@ fieldset.wfn-picker-group {
   box-shadow: none;
 }
 
-/* The outline of the shape shows the hover, not the ring of the card. */
 .wfn-stage .wfn-node[data-kind="shape"]:not([data-selected]) .wfn-card-frame:hover .wfn-card {
   box-shadow: none;
 }
@@ -3350,7 +3079,6 @@ svg.wfn-shape-surface {
   stroke-linejoin: round;
 }
 
-/* In the light theme, ink is near the darkest tone. A Default shape takes a soft fill and a thinner edge there. */
 :root[data-openbot-color-scheme="light"] span.wfn-shape-surface[data-color="ink"] {
   background: color-mix(in srgb, var(--wfn-shape) 5%, transparent);
   box-shadow: inset 0 0 0 1.5px var(--wfn-shape);
@@ -3361,7 +3089,6 @@ svg.wfn-shape-surface {
   stroke-width: 1.5;
 }
 
-/* The words sit at the centre of the shape, and the field grows with them. */
 .wfn-stage .wfn-shape-input {
   position: relative;
   width: 100%;
@@ -3392,7 +3119,6 @@ svg.wfn-shape-surface {
   }
 }
 
-/* The emoji of a Discord or Telegram reaction, in the place of an icon. */
 .wfn-emoji {
   display: inline-flex;
   flex: none;
@@ -3400,14 +3126,6 @@ svg.wfn-shape-surface {
   width: var(--openbot-icon-xs);
 }
 
-/* ------------------------------------------------------------ Presence */
-
-/*
- * Another person's cursor: a soft arrowhead with a notch, and a name in the colour of the person's
- * avatar. A ring in paper colour keeps both apart from any canvas or node under them. It is in world
- * pixels, so it pans and zooms with the canvas, and it keeps its screen size at every zoom, as the
- * remove button of a connection does. The cursor eases between two places from the presence feed.
- */
 .wfn-peer-cursor {
   position: absolute;
   top: 0;
@@ -3425,15 +3143,10 @@ svg.wfn-shape-surface {
   animation: wfn-fade-in var(--openbot-duration-normal) var(--openbot-ease-out);
 }
 
-/* The cursor of an agent glides from node to node and fades out when the play of its change ends. */
 .wfn-peer-cursor[data-leaving] {
   opacity: 0;
 }
 
-/*
- * While the canvas plays an agent's change, a node or connection that the agent has not reached yet
- * is hidden. It keeps its size, so the view fits the whole change. One that just showed grows in.
- */
 .wfn-slot[data-build="unbuilt"],
 .wfn-edge[data-build="unbuilt"],
 .wfn-edge-label[data-build="unbuilt"] {
@@ -3456,7 +3169,6 @@ svg.wfn-shape-surface {
   }
 }
 
-/* The ring is the stroke under the fill, so half of it shows outside the arrow. */
 .wfn-peer-arrow {
   flex: none;
   width: 19px;
@@ -3480,7 +3192,6 @@ svg.wfn-shape-surface {
   white-space: nowrap;
 }
 
-/* The name sits under the arrow, a little to the right of its point. */
 .wfn-peer-name {
   margin: 17px 0 0 -11px;
   padding: 2px var(--openbot-space-2);
@@ -3489,7 +3200,6 @@ svg.wfn-shape-surface {
   font-weight: var(--openbot-weight-bold);
 }
 
-/* The node that another person selected has a ring in that person's colour, and their name under it. */
 .wfn-slot[data-peer] .wfn-node:not([data-selected]) .wfn-card {
   outline-color: var(--wfn-peer);
 }
@@ -3510,15 +3220,10 @@ svg.wfn-shape-surface {
   animation: wfn-fade-in var(--openbot-duration-normal) var(--openbot-ease-out);
 }
 
-/* Your own selection comes first: the results strip of the node takes the place of the tag. */
 .wfn-slot:has(> [data-selected]) .wfn-peer-tag {
   display: none;
 }
 
-/*
- * The avatars of the people on the canvas: round, each on a tint of its cursor colour. The button and
- * your own avatar have the same 32px box, and the avatar is centred in it. A photo fills the circle.
- */
 .wfn-stage .wfn-hud-button.wfn-presence-person,
 .wfn-presence-self {
   display: grid;
@@ -3537,7 +3242,6 @@ svg.wfn-shape-surface {
   background: color-mix(in srgb, var(--wfn-peer, var(--openbot-text-primary)) 16%, transparent);
 }
 
-/* The generated face fills its circle. The bar button rule would make it the size of an icon. */
 .wfn-stage .wfn-hud-presence .wfn-presence-person .person-avatar-generated > svg {
   width: 100%;
   height: 100%;
@@ -3547,13 +3251,11 @@ svg.wfn-shape-surface {
   display: none;
 }
 
-/* The person you follow has a ring in their colour around the avatar. */
 .wfn-presence-person[aria-pressed="true"] .person-avatar {
   outline: 2px solid var(--wfn-peer);
   outline-offset: 0;
 }
 
-/* While you follow a person, a frame in their colour holds the view, with their name at the top. */
 .wfn-follow-frame {
   position: absolute;
   inset: 0;
@@ -3592,9 +3294,6 @@ svg.wfn-shape-surface {
   }
 }
 
-/* ------------------------------------------------------- Media inputs */
-
-/* The pictures that come in sit above the description. */
 .wfn-panel[data-inputs] {
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
@@ -3639,7 +3338,6 @@ svg.wfn-shape-surface {
   height: var(--openbot-icon-sm);
 }
 
-/* The mark of a frame, along the bottom of its picture. */
 .wfn-media-input-badge {
   position: absolute;
   inset: auto 0 0;

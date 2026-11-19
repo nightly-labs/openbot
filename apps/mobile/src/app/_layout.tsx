@@ -81,10 +81,7 @@ installNotificationHandler();
 const UniwindGestureHandlerRootView = withUniwind(GestureHandlerRootView);
 const lightTheme = { ...DefaultTheme, fonts: navigationFonts };
 
-// The sign-in screen and the app replace each other with this fade (iOS). After sign-in the stage
-// covers both, so the fade only shows when the user signs out.
 const SESSION_FADE_MS = 300;
-// A launch that takes longer than this shows what it waits for.
 const SLOW_LAUNCH_MS = 700;
 
 function RootNavigator() {
@@ -92,15 +89,12 @@ function RootNavigator() {
   const { loading, session } = useMobileSession();
   const pathname = usePathname();
   const segments = useSegments();
-  // The screen goes to the support log by its route name, such as `chat/[agentId]`: a report then
-  // shows where the user was. Never the path: it has the IDs of agents and chats.
   const screen = segments.filter((segment) => !segment.startsWith("(")).join("/") || "start";
   useEffect(() => {
     supportLog.add("info", "app", `Screen: ${screen}`);
   }, [screen]);
   const { setLoadingLabel, isLoaderPresent } = useAppLoadingOverlay();
   const appearanceReady = useAppearance((state) => state.ready);
-  // Motion choices are read before the first screen, so no screen starts an animation that Settings turned off.
   const motionReady = useMotionPreferences((state) => state.ready);
   const preferencesReady = appearanceReady && motionReady;
   const busy = loading || !preferencesReady;
@@ -111,8 +105,6 @@ function RootNavigator() {
   );
   const reducedMotion = useReducedMotion();
 
-  // The stage takes over from the native splash with the same block and eyes. When the launch is
-  // slow, the eyes start to think and the status shows under them.
   const [slow, setSlow] = useState(false);
   useEffect(() => {
     if (covered) {
@@ -136,9 +128,6 @@ function RootNavigator() {
   );
   const blocked = covered || isLoaderPresent;
 
-  // A quick action stays on the app icon after the session ends, such as one that another device revoked.
-  // The share extension keeps its copy of the session and the share sheet its agents, so both go too,
-  // with the agents of the shortcuts and the agent pictures of the notifications.
   useEffect(() => {
     if (loading || session) return;
     resetQuickActions();
@@ -150,8 +139,6 @@ function RootNavigator() {
 
   useLayoutEffect(() => {
     if (loading || !session || (pathname !== "/" && pathname !== "/connected")) setLoadingLabel(null);
-    // The splash covers account loading on its own. Keep the loader down until ConnectedScreen
-    // reports the workspace state.
   }, [loading, pathname, session, setLoadingLabel]);
 
   return (
@@ -173,10 +160,7 @@ function RootNavigator() {
                   headerTransparent: isIOS,
                 }}
               >
-                {/* A blocked route redirects. Without `redirectTo`, Expo Router uses the first open route, the
-                    `(app)` group, whose URL is `/`, and `/` is the blocked sign-in screen. */}
                 <Stack.Protected guard={!session} redirectTo="/connected">
-                  {/* Signing out goes back, so it fades like signing in instead of sliding forward. */}
                   <Stack.Screen
                     name="index"
                     options={{ animation: "fade", animationDuration: SESSION_FADE_MS, headerShown: false }}
@@ -221,22 +205,16 @@ export default function RootLayout() {
   const heroConfig = useMemo(() => (animations ? {} : { animation: "disable-all" as const }), [animations]);
   const canvas = String(useCSSVariable("--openbot-bg-native-canvas"));
   const bloub = useBloubColors();
-  // The reload screen of a direction restart has the color of the splash.
   const splashColor = useRef("");
   splashColor.current = bloub.dark ? bloub.dimBody : bloub.body;
-  // React Navigation paints its near-black dark background behind screens during transitions.
   const darkTheme = useMemo(
     () => ({ ...DarkTheme, colors: { ...DarkTheme.colors, background: canvas }, fonts: navigationFonts }),
     [canvas],
   );
-  // Android shows the window background behind the system bars. Without this it keeps the light splash color.
-  // iOS shows the window background behind sheets, so it keeps its default.
   useEffect(() => {
     if (!isAndroid) return;
     void SystemUI.setBackgroundColorAsync(canvas).catch(() => undefined);
   }, [canvas]);
-  // A locked phone does not open the settings, and a failed read keeps a default. So a start in the
-  // background reads them when the user first opens the app.
   useEffect(() => {
     void untilForeground().then(() => {
       void loadAppearance().catch(() => undefined);
@@ -261,9 +239,6 @@ export default function RootLayout() {
       void loadVoiceServer().catch(() => undefined);
       supertonicModel.check();
       checkRecognitionModels();
-      // The layout direction follows the app language. A start with the other direction, such as the
-      // first start or a start after the phone language changed, asks for a restart. A failed read
-      // keeps the default language, which still sets the direction.
       void loadAppLanguage()
         .catch(() => undefined)
         .then(() => offerLayoutRestart(splashColor.current, () => undefined));
@@ -273,8 +248,6 @@ export default function RootLayout() {
 
   return (
     <UniwindGestureHandlerRootView className="flex-1">
-      {/* The app draws under the system bars and pads with safe area insets. Expo Go on Android does not
-          report edge-to-edge, and without these props the keyboard provider pads the whole app. */}
       <KeyboardProvider
         preload={false}
         statusBarTranslucent={isAndroid}
@@ -283,7 +256,6 @@ export default function RootLayout() {
       >
         <QueryClientProvider client={queryClient}>
           <HeroUINativeProvider config={heroConfig}>
-            {/* Off in Settings reduces every animation that follows the system Reduce Motion setting. */}
             {animations ? null : <ReducedMotionConfig mode={ReduceMotion.Always} />}
             <ThemeProvider value={colorScheme === "dark" ? darkTheme : lightTheme}>
               <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />

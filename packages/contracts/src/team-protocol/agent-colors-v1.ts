@@ -1,13 +1,3 @@
-// Frozen optional agent-colors-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: a member reads the exact
-// colour of each agent that the member can see, and sets the colour of an agent with manage access to
-// it, as for its avatar on the released agent update route. A colour is `#rrggbb` in lower case. It is
-// any colour, so a new preset or a brand colour needs no new capability. The host also keeps the
-// nearest released `avatarHue` on the agent, which peers without this capability draw. `color: null`
-// removes the colour. A change of `avatarHue` on the released agent route without a colour removes the
-// colour too. Each change sends `agent-colors-changed` with the whole list. Bounds and meaning do not
-// follow IPC changes; widening any of it needs a second capability string.
 import { isDynamicRecord } from "../runtime-values";
 import {
   type AdminDecoder,
@@ -50,14 +40,12 @@ export const AGENT_COLORS_CODECS: ReadonlyMap<string, OptionalRouteCodec> = new 
   ],
 ]);
 
-/** The agents that have a colour. An agent that is not in the list draws its `avatarHue`. */
 export interface AgentColorsSnapshot {
   agents: { agentId: string; color: `#${string}` }[];
 }
 
 export type AgentColorsEvent = { type: "agent-colors-changed" } & AgentColorsSnapshot;
 
-/** Decodes a snapshot that the read or set route returns. */
 export function decodeAgentColorsSnapshot(input: unknown): AgentColorsSnapshot {
   const decoded = snapshot(input);
   if (!isDynamicRecord(decoded) || !Array.isArray(decoded.agents)) throw new Error("Invalid agent colors.");

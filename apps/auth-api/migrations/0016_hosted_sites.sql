@@ -1,4 +1,3 @@
--- Hosted sites control-plane schema.
 CREATE TABLE hosted_sites (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

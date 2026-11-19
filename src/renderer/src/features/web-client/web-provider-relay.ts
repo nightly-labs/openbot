@@ -1,10 +1,3 @@
-// The relayed provider sign-ins of the browser client (`sign-in-relay-v1`). The host starts the sign-in
-// of its CLI and opens no page. This browser opens the page when the user asks, and the user pastes the
-// address that the browser shows at the end: a web page cannot listen for the callback. Only its query
-// goes to the host. A device page returns nowhere, so the user only opens it. The sign-in of an account
-// after the first starts on its own route (`provider-account-relay-v1` or `-v2`) and then runs as the
-// others do.
-
 import {
   type AgentProviderId,
   loopbackCallback,
@@ -28,18 +21,15 @@ import {
 import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
 import { Effect } from "effect";
 
-/** How often the host is asked how the sign-in is. */
 const POLL_MS = 1_000;
 
 interface RelayedSignIn {
   flowId: string;
   page: McpSignInRelayPage | null;
   url: string | null;
-  /** `null` for a page that returns nowhere. */
   state: string | null;
   result: { error: string | null } | null;
   stopped: boolean;
-  /** A pasted address went to the host, which completes the sign-in: nothing waits for a paste. */
   accepted: boolean;
 }
 
@@ -62,7 +52,6 @@ export function webProviderRelay(
   const run = <T>(effect: Effect.Effect<T, TeamAdminRequestError>) =>
     runTeamEffect(effect.pipe(Effect.mapError((error) => error.cause)));
 
-  /** Reads the host's status until the sign-in ended, and keeps the page once the host has it. */
   async function follow(entry: RelayedSignIn, send: TeamApiRequest): Promise<void> {
     while (!entry.stopped) {
       const status = await run(signInRelayStatus(send, entry.flowId));
@@ -82,7 +71,6 @@ export function webProviderRelay(
     }
   }
 
-  /** Starts the flow that `start` opens on the host, in place of any relayed sign-in of `provider`. */
   async function startRelay(
     provider: AgentProviderId,
     serverId: string,
@@ -133,7 +121,6 @@ export function webProviderRelay(
       if (!entry) return { page: null, result: { error: sourceText("error.mcp.relayEnded") } };
       return { page: entry.result || entry.accepted ? null : entry.page, result: entry.result };
     },
-    // No await comes before `window.open`: a browser blocks a page that the user's click did not open.
     openRelaySignIn: async (provider, serverId) => {
       const entry = waiting(provider, serverId);
       window.open(entry.url ?? "", "_blank", "noopener");
@@ -143,9 +130,7 @@ export function webProviderRelay(
       if (entry.state === null) throw new Error(sourceText("error.mcp.relayAddressInvalid"));
       const query = relayCallbackQuery(address, entry.state);
       if (query === null) throw new Error(sourceText("error.mcp.relayAddressInvalid"));
-      // The host already completes the sign-in: a second grant would change nothing.
       if (entry.accepted) return;
-      // The page stays while the host takes the grant, so the form can show why a send failed.
       const status = await run(completeSignInRelay(request(serverId), entry.flowId, query));
       entry.accepted = true;
       if (status.result) entry.result = { error: status.result.error ?? null };
@@ -161,10 +146,6 @@ export function webProviderRelay(
   };
 }
 
-/**
- * Keeps the page that the host's sign-in opened, or answers why it cannot open here. The host chose
- * it, so only a web page opens, and a page that returns to a loopback address must carry `state`.
- */
 function takePage(entry: RelayedSignIn, address: string): string | null {
   const page = URL.parse(address);
   if (page?.protocol !== "https:") return sourceText("error.backend.mcpSignInNotWebPage");

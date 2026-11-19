@@ -1,6 +1,3 @@
-/* The publish dialog and the install dialog of an agent template. Both are one centred card: the
- * agent's identity on top, its content below, and the actions in a footer on the right. */
-
 .agent-template-dialog {
   position: relative;
   display: flex;
@@ -148,7 +145,6 @@
   gap: var(--openbot-space-1);
 }
 
-/* The instructions as Markdown, at the body size of the dialog. Headings stay below the agent's name. */
 .agent-template-prose {
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-md);
@@ -201,7 +197,6 @@
   white-space: pre-wrap;
 }
 
-/* Back, the row chevrons and the closed skill chevron follow the reading direction. */
 .agent-template-row > svg[class~="lucide-chevron-right"]:dir(rtl),
 .agent-template-skill-toggle > svg[class~="lucide-chevron-right"]:dir(rtl),
 .agent-template-detail-header .ui-icon-button > svg[class~="lucide-arrow-left"]:dir(rtl) {

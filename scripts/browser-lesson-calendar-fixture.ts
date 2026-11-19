@@ -1,8 +1,3 @@
-// A weekly lesson calendar for the ambiguous-target checks (#4264). Five lessons share the layout
-// attribute `data-mh="event-7"` and a "Register" button, as on the calendar in the issue; only their
-// date, time, title and location tell them apart. The server records each registration, so a check
-// can prove which lesson an action booked and that nothing booked twice.
-
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 export interface FixtureLesson {
@@ -78,7 +73,6 @@ function lessonById(id: string): FixtureLesson {
   return lesson;
 }
 
-/** The lesson that the checks ask for: the only Thursday 18:00 Yoga Flow in Studio B. */
 export const TARGET_LESSON = lessonById("L-1044");
 
 function escapeHtml(text: string): string {
@@ -133,7 +127,6 @@ function page(): string {
 </html>`;
 }
 
-/** The calendar's routes on a loopback server, and the registrations it recorded. */
 export class LessonCalendar {
   readonly registrations: string[] = [];
 
@@ -141,7 +134,6 @@ export class LessonCalendar {
     this.registrations.length = 0;
   }
 
-  /** Answers `/calendar` and `/register`. False for any other path. */
   handle(request: IncomingMessage, response: ServerResponse): boolean {
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
     if (url.pathname === "/calendar") {

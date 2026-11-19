@@ -6,10 +6,6 @@ import { createDigitRoll } from "../../digit-roll";
 import { useText } from "../../text";
 import { rendererDuration } from "../conversation/activity-timing";
 
-// `--panel-close-dur` is a calc() on the island itself, so it cannot be read off
-// the document root the way `rendererDuration` reads a token. Sum the two tokens
-// it is built from; keep this in step with `--panel-close-dur` in
-// account-update-island.css.
 function islandCloseDuration(): number {
   return rendererDuration("--openbot-duration-slow", 200) + rendererDuration("--openbot-duration-normal", 160);
 }
@@ -17,9 +13,7 @@ function islandCloseDuration(): number {
 interface AccountUpdateIslandProps {
   updateStatus: UpdateStatus;
   errorMessage?: string | null;
-  /** Runs the action of the button, which it gets so that it can show where the action starts. */
   onUpdateAction: (button: HTMLButtonElement) => Promise<void>;
-  /** Gets the action button, so that an update that starts without a click can show where it starts. */
   actionRef?: (button: HTMLButtonElement) => void;
 }
 
@@ -64,20 +58,13 @@ export function AccountUpdateIsland(props: AccountUpdateIslandProps) {
     return formatErrorMessage(message, t("account.update.failedRetry"));
   });
   const failed = createMemo(() => Boolean(props.errorMessage) || phase() === "error");
-  // The island is a single nowrap line that ellipsizes, so it can only carry a failure short enough
-  // to read at a glance. A failed check found no update, which leaves it nothing to offer beyond a
-  // sentence it would cut in half - that belongs in the Updates settings, where the text wraps. A failed
-  // download or install keeps the island: an update is in play and the action that retries it is here.
   const open = createMemo(
     () => isUpdateActivePhase(phase()) || (failed() && props.updateStatus.errorCode !== "check_failed"),
   );
   const downloading = createMemo(() => phase() === "downloading");
   const busy = createMemo(() => actionPending() || isUpdateBusyPhase(phase()));
-  // Host-managed tenants watch the status but never act on it.
   const managed = createMemo(() => props.updateStatus.managedByHost === true);
   const ready = createMemo(() => !failed() && (phase() === "ready" || phase() === "installing"));
-  // A "ready" status with a message: the last restart did not install this update. Like a failure, the
-  // island shows a short label and keeps the full sentence for its title.
   const notInstalledMessage = createMemo(() =>
     phase() === "ready" && !managed() && props.updateStatus.message?.trim()
       ? formatErrorMessage(props.updateStatus.message, t("account.update.notInstalled"))
@@ -117,11 +104,6 @@ export function AccountUpdateIsland(props: AccountUpdateIslandProps) {
     },
   );
 
-  // Closed, the island is `opacity: 0` but still a composited layer carrying a
-  // 12px backdrop-filter and a spinner on an infinite `ui-spin`. That rotation
-  // invalidates the backdrop every frame, so an island nobody can see measured
-  // ~10% of a core, forever. Keep it out of the DOM instead, held only for as
-  // long as the slide-out needs it.
   const [present, setPresent] = createSignal(false);
   createEffect(
     () => open(),

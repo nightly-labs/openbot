@@ -7,20 +7,13 @@ const WorkspacePreferences = Schema.Struct({
   pinned: Schema.mutableKey(Schema.mutable(Schema.Array(Schema.String))),
   pinnedChannels: Schema.mutableKey(Schema.optional(Schema.mutable(Schema.Array(Schema.String)))),
   hiddenChannels: Schema.mutableKey(Schema.optional(Schema.mutable(Schema.Array(Schema.String)))),
-  /** The workflows that the mobile drawer shows under Workflows. An older app keeps reading the file. */
   pinnedWorkflows: Schema.mutableKey(Schema.optional(Schema.mutable(Schema.Array(Schema.String)))),
-  /** The sidebar sections that the user closed on this phone. An older app keeps reading the file. */
   collapsedSections: Schema.mutableKey(Schema.optional(Schema.mutable(Schema.Array(Schema.String)))),
-  /**
-   * The agent and channel pins in the order of the last list that the host gave (`sidebar-pins-v1`).
-   * Absent until the first read from a host that keeps the pins. An older app keeps reading the file.
-   */
   pinOrder: Schema.mutableKey(
     Schema.optional(
       Schema.mutable(Schema.Array(Schema.Struct({ kind: Schema.Literals(["agent", "channel"]), id: Schema.String }))),
     ),
   ),
-  /** True while a pin change of this phone has not reached the host. */
   pinsPending: Schema.mutableKey(Schema.optional(Schema.Boolean)),
 });
 export type RemoteWorkspacePreferences = typeof WorkspacePreferences.Type;
@@ -37,7 +30,6 @@ export function createWorkspacePreferences(
 ) {
   const scope = remoteHostFingerprint(JSON.stringify([new URL(apiUrl).origin, userId]));
   const key = (hostId: string) => `openbot.workspace.v1.${scope}.${remoteHostFingerprint(hostId)}`;
-  // Keep the cache in this store: mobile reads can otherwise make a Keychain call for every message.
   const cache = new Map<string, RemoteWorkspacePreferences>();
   const read = Effect.fn("WorkspacePreferences.read")(function* (hostId: string) {
     const cached = cache.get(hostId);

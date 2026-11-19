@@ -20,10 +20,6 @@ import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
-/**
- * Makes a server on the computer of `serverId`, beside that computer's own server (`local-servers-v1`).
- * The computer registers it for the account, so it then shows in the server list as any other server.
- */
 export function CreateLocalServerScreen() {
   const { t, errorDetails } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
@@ -47,7 +43,6 @@ export function CreateLocalServerScreen() {
   const pending = useRef(false);
   const trimmed = name.trim();
   const nameTooShort = trimmed.length < INPUT_LIMITS.serverNameMin;
-  // A create cannot be stopped on the computer; the sheet stays until the answer arrives.
   usePreventRemove(creating, () => {});
   const createdServer = created ? servers.find((server) => server.id === created.serverId) : undefined;
 

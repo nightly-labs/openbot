@@ -1,15 +1,3 @@
-/**
- * "Needs you": every agent or channel that waits for an answer, an approval or a browser takeover,
- * above the sections. It is not a section of the layout. It has no id, no drag target and no
- * collapse, so a chat returns to its own section when the wait ends.
- *
- * "Unread" works the same way, under "Needs you", when the user sorts the chats with "Unread in a
- * group". Its count is neutral: the warning colour belongs to waits. A right click on its heading
- * turns the group off or changes the order, as Settings > Conversations does.
- *
- * The compact sidebar has no room for the heading; the rows keep their order and their badges.
- */
-
 import { CheckCheck, ContextMenu, EyeOff } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { For, Match, Show, Switch } from "solid-js";
@@ -36,8 +24,6 @@ export function SidebarWaitingGroup() {
 export function SidebarUnreadGroup() {
   const { chatIsUnread, props, unreadChats } = useSidebarScope();
   const { t } = useText();
-  // The open chat stays in the group after the user reads it while the pointer is over the list. It
-  // is not unread, so it is not counted.
   const count = () => unreadChats().filter((chat) => chatIsUnread(chat.id)).length;
   return (
     <SidebarChatGroup
@@ -78,10 +64,6 @@ function SidebarChatGroup(props: {
   title: string;
   label: string;
   class?: string;
-  /**
-   * Wraps the `header` element, for a group whose heading has a menu. `heading` makes a new node at
-   * each call, so each branch of the wrapper has its own.
-   */
   heading?: (heading: () => JSX.Element) => JSX.Element;
 }) {
   const heading = () => (

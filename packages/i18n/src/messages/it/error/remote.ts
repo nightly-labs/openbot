@@ -23,6 +23,8 @@ export const messages = {
     "L'host non ha consentito a OpenBot di registrare lo schermo. Concedi la registrazione dello schermo sull'host, poi riprova.",
   "error.remote.windowsSessionDisconnected":
     "La sessione Windows dell'host è disconnessa, quindi non c'è uno schermo da condividere. Accedi a Windows dallo schermo dell'host, poi riprova.",
+  "error.remote.macScreenLocked":
+    "Il Mac è bloccato, quindi non può condividere lo schermo. Sblocca il Mac dal suo schermo, poi riprova.",
   "error.remote.streamTooSlowLowerQuality":
     "La connessione all'host è troppo lenta per l'immagine. Riprova: la prossima connessione userà una qualità più bassa.",
   "error.remote.streamTooSlow":
@@ -189,6 +191,8 @@ export const messages = {
   "error.remote.iceFailed":
     "Non è stato possibile stabilire una connessione diretta con l'host. Un firewall, una VPN o un proxy possono bloccarla.",
   "error.remote.iceDisconnected": "La connessione diretta con l'host è andata persa.",
+  "error.remote.webrtcBlocked":
+    "Questo dispositivo blocca la connessione di cui OpenBot ha bisogno. Se la modalità di isolamento è attiva, disattivala per OpenBot in Impostazioni > Privacy e sicurezza > Modalità di isolamento.",
   "error.remote.directoryUnreachable":
     "OpenBot non è riuscito a raggiungere il servizio OpenBot. Controlla la connessione.",
   "error.remote.directoryTimeout": "Il servizio OpenBot non ha risposto in tempo. Riprova.",

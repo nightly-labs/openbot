@@ -1,4 +1,3 @@
-/* CRM page: a header with the tabs and the tools, then the sheets. The drawer slides over the sheets. */
 .crm-page {
   display: flex;
   min-width: 0;
@@ -30,7 +29,6 @@
   width: min(240px, 20vw);
 }
 
-/* The tabs have no bar: only the pill marks the open tab. */
 .crm-top .ui-sliding-tabs {
   gap: var(--openbot-space-1);
   padding: 0;
@@ -50,7 +48,6 @@
   flex: none;
 }
 
-/* The open tab has a 1px ring, not a shadow. */
 .crm-top .ui-sliding-tabs-pill {
   top: 0;
   box-shadow: inset 0 0 0 1px var(--openbot-border);
@@ -86,7 +83,6 @@
   color: var(--openbot-danger-text);
 }
 
-/* Filters */
 .crm-bar {
   display: flex;
   flex-wrap: wrap;
@@ -121,7 +117,6 @@
   --agent-avatar-optical-offset: -2px;
 }
 
-/* Agent access */
 .crm-review-button {
   gap: var(--openbot-space-2);
 }
@@ -148,7 +143,6 @@
   font-weight: var(--openbot-weight-semibold);
 }
 
-/* Shared bits */
 .crm-count {
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
@@ -197,7 +191,6 @@
   font-weight: var(--openbot-weight-semibold);
 }
 
-/* Empty states */
 .crm-empty {
   display: flex;
   max-width: 420px;
@@ -225,7 +218,6 @@
   color: var(--openbot-text-secondary);
 }
 
-/* Review */
 .crm-review-button[aria-pressed="true"] {
   background: var(--openbot-bg-control-active);
 }
@@ -297,7 +289,6 @@
   height: var(--openbot-icon-xs);
 }
 
-/* Side panel */
 .crm-side {
   display: flex;
   width: 400px;
@@ -374,10 +365,6 @@
   margin: 0;
 }
 
-/*
- * A value, its edit button, its input and its select have one box: 32px high, with the text 11px from
- * the left (1px border and 10px padding). So a field does not move when the user edits it.
- */
 .crm-fields {
   --crm-field-height: 32px;
   --crm-field-inset: 10px;
@@ -482,7 +469,6 @@
   color: var(--openbot-text-muted);
 }
 
-/* Form */
 .crm-form.ui-confirm-dialog {
   width: min(560px, calc(100vw - var(--openbot-space-8)));
   max-width: none;
@@ -584,7 +570,6 @@
   border-bottom: 1px solid var(--openbot-border);
 }
 
-/* Filters: the number of customers shown, one chip per filter, then "Add filter". */
 .crm-filters {
   display: flex;
   min-width: 0;
@@ -648,11 +633,6 @@
   color: var(--openbot-text-muted);
 }
 
-/*
- * The filter menu looks as the agent menu of the Tasks page: a filled search row with the focus, and
- * the rows under it. The list is as high as its rows, up to the space under the trigger, and eases
- * its height when a search changes the rows. A fixed width keeps the panel still while typing.
- */
 .crm-filter-menu.ui-action-menu {
   --crm-filter-max: min(420px, calc(100dvh - 16px), var(--kb-popper-content-available-height, 420px));
 
@@ -678,7 +658,6 @@
   cursor: text;
 }
 
-/* The icon takes the width of a row tick, so the text starts where the names start. */
 .crm-filter-search > svg {
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-sm);
@@ -687,7 +666,6 @@
   stroke-width: var(--openbot-icon-stroke);
 }
 
-/* The field takes the focus each time the menu opens, so it shows no border or focus ring. */
 .crm-filter-search .crm-filter-search-input,
 .crm-filter-search .crm-filter-search-input:focus-visible {
   min-width: 0;
@@ -737,7 +715,6 @@
   font-weight: var(--openbot-weight-semibold);
 }
 
-/* In a search of all fields, the field of each value. */
 .crm-filter-field {
   flex: none;
   color: var(--openbot-text-muted);
@@ -786,10 +763,8 @@
   bottom: 0;
   display: flex;
   max-width: 100%;
-  /* The shadow falls on the sheet at the left. */
   box-shadow: -16px 0 40px var(--openbot-shadow-dialog);
-  /* Ease-in-out in both directions: an ease-out close moves half of the way in the first frames, so
-     the panel looks as if it disappears. */
+
   transition:
     transform var(--openbot-duration-overlay) var(--openbot-ease-in-out),
     visibility 0s;
@@ -809,12 +784,10 @@
   height: 100%;
 }
 
-/* The side panel body shows no scroll bar; its edges fade. */
 .crm-drawer .crm-side-body {
   scrollbar-width: none;
 }
 
-/* An edge of the panel body with more content behind it fades out. */
 .crm-drawer .crm-side-body:is(.scroll-fade-top, .scroll-fade-bottom) {
   --crm-side-fade-top: 0px;
   --crm-side-fade-bottom: 0px;
@@ -849,7 +822,6 @@
   }
 }
 
-/* Middle-click autoscroll: the marker shows the point that the scroll speed counts from. */
 .crm-autoscroll-marker {
   position: fixed;
   z-index: 1000;
@@ -879,7 +851,6 @@
   user-select: none;
 }
 
-/* Customer panel */
 .crm-pay-list {
   display: flex;
   flex-direction: column;
@@ -906,10 +877,6 @@
   flex: 1 1 auto;
 }
 
-/* Sheet */
-/* The sheet and its scroll bar. The script sets the sizes of the header (head), the totals (foot),
-   the rows between them (body), the fixed columns at the left (start) and the actions at the right
-   (end), and the size and the place of the scroll bar thumb. */
 .crm-sheet-frame {
   --crm-sheet-bg: var(--openbot-bg-canvas);
   --crm-sheet-head: 0px;
@@ -935,9 +902,7 @@
   overflow: auto;
   overscroll-behavior: contain;
   background-color: var(--crm-sheet-bg);
-  /* No browser scroll bars: an edge with more content behind it fades out, and the bar under the
-     totals scrolls to the side. A data-fade attribute marks each edge that has more content behind
-     it. An edge without its attribute keeps the opaque colour, so it does not fade. */
+
   scrollbar-width: none;
   --crm-sheet-fade: var(--openbot-space-8);
   --crm-sheet-opaque: var(--openbot-text-primary);
@@ -985,8 +950,7 @@
 
 .crm-sheet {
   min-width: 100%;
-  /* A table grows past this height when it has more rows. A short list fills the box, and the free
-     height goes to the fill row, the only row without a set height. */
+
   height: 100%;
   border-collapse: separate;
   border-spacing: 0;
@@ -1017,7 +981,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* The header and the totals stay in view. */
 .crm-sheet thead th {
   position: sticky;
   z-index: 2;
@@ -1028,7 +991,6 @@
 
 .crm-sheet tfoot td {
   position: sticky;
-  /* The line above the totals. The last row and the fill row have no bottom line. */
   border-top: 1px solid var(--openbot-border);
   z-index: 2;
   bottom: 0;
@@ -1038,7 +1000,6 @@
   font-size: var(--openbot-text-sm);
 }
 
-/* The row numbers and the first column stay at the left; the actions stay at the right. */
 .crm-sheet .crm-sheet-index {
   position: sticky;
   z-index: 1;
@@ -1066,7 +1027,6 @@
   text-align: right;
 }
 
-/* The filter row stays under the header. */
 .crm-sheet thead td {
   position: sticky;
   z-index: 2;
@@ -1079,9 +1039,6 @@
   z-index: 3;
 }
 
-/* Rows */
-/* A section with a percentage height takes all free table height,
-so data rows keep their height. */
 .crm-sheet .crm-sheet-fill {
   height: 100%;
 }
@@ -1108,7 +1065,6 @@ so data rows keep their height. */
   --crm-sheet-tint: var(--openbot-bg-control-active);
 }
 
-/* The tick of a payment shows in place of its number. */
 .crm-sheet-pick {
   position: absolute;
   display: grid;
@@ -1129,9 +1085,6 @@ so data rows keep their height. */
   visibility: hidden;
 }
 
-/* Column headers: one button opens the sort and hide menu. */
-/* The resize handle is the right edge of a header cell. Its line shows on hover,
-on focus and while dragged. */
 .crm-sheet-head > .crm-sheet-resizer {
   position: absolute;
   top: 0;
@@ -1176,7 +1129,6 @@ on focus and while dragged. */
   text-overflow: ellipsis;
 }
 
-/* The lock after the label of a column that agents do not see. */
 .crm-sheet-head-lock {
   width: var(--openbot-icon-xs);
   height: var(--openbot-icon-xs);
@@ -1190,7 +1142,6 @@ on focus and while dragged. */
   flex: 0 0 auto;
 }
 
-/* Cells */
 .crm-sheet-name {
   display: flex;
   min-width: 0;
@@ -1255,7 +1206,6 @@ on focus and while dragged. */
   font-weight: var(--openbot-weight-regular);
 }
 
-/* Suggestion cards: customer and time, one sentence, then the agent and the two actions. */
 .crm-suggestion.crm-card {
   gap: var(--openbot-space-1-5);
 }
@@ -1270,7 +1220,6 @@ on focus and while dragged. */
   font-size: var(--openbot-text-sm);
 }
 
-/* The icon shows the kind of change: paid, new date, split, plan or new customer. */
 .crm-suggestion-title {
   display: flex;
   min-width: 0;
@@ -1286,7 +1235,6 @@ on focus and while dragged. */
   color: var(--openbot-text-secondary);
 }
 
-/* Customer panel: name, actions, and the money at a glance. */
 .crm-identity {
   display: flex;
   flex-direction: column;
@@ -1366,12 +1314,10 @@ on focus and while dragged. */
   grid-template-columns: 112px minmax(0, 1fr);
 }
 
-/* Field values line up with the section headings; the edit button padding goes into the label column. */
 .crm-side .crm-field dd {
   margin-inline-start: calc(var(--openbot-space-2) * -1);
 }
 
-/* Long values, such as an address, wrap and do not cut off. One line is as high as the input that edits it. */
 .crm-side .crm-inline.ui-button {
   height: auto;
   min-height: var(--crm-field-height);
@@ -1385,7 +1331,6 @@ on focus and while dragged. */
   overflow-wrap: anywhere;
 }
 
-/* A select in the panel fields looks like the other values until the pointer is on it or it is open. */
 .crm-side .crm-fields .crm-select:not(:hover, :focus-visible, [data-expanded]) {
   border-color: transparent;
   background: transparent;
@@ -1395,7 +1340,6 @@ on focus and while dragged. */
   white-space: normal;
 }
 
-/* Tags: chips in the sheet, and the picker in the customer panel. */
 .crm-tags {
   display: inline-flex;
   min-width: 0;
@@ -1444,7 +1388,6 @@ on focus and while dragged. */
   justify-content: flex-start;
 }
 
-/* The status badge opens the status menu. The chevron shows on hover, on focus and while the menu is open. */
 .crm-status-trigger {
   display: inline-flex;
   max-width: 100%;
@@ -1497,7 +1440,6 @@ on focus and while dragged. */
   padding-inline: calc(var(--crm-field-inset) - 1px);
 }
 
-/* The same check as in the app menus. */
 .crm-menu-option .ui-menu-check > svg {
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
@@ -1505,7 +1447,6 @@ on focus and while dragged. */
   stroke-width: 2.5;
 }
 
-/* Columns that agents do not see. */
 .crm-field dt:has(.crm-private-mark) {
   display: flex;
   align-items: center;
@@ -1516,7 +1457,6 @@ on focus and while dragged. */
   color: var(--openbot-text-muted);
 }
 
-/* Payment source: Stripe keeps the rows it made. */
 .crm-source-dot {
   width: 6px;
   height: 6px;
@@ -1568,7 +1508,6 @@ on focus and while dragged. */
   font-size: var(--openbot-text-sm);
 }
 
-/* Drag a column by its header. The header follows the pointer; a line down the sheet shows where the column goes. */
 .crm-sheet thead th.crm-sheet-head[data-dragging] {
   z-index: 4;
   background: var(--openbot-bg-control);
@@ -1583,7 +1522,6 @@ on focus and while dragged. */
   pointer-events: none;
 }
 
-/* While the user drags the edge of a column, a line down the sheet shows where the column ends. */
 .crm-drop-line.crm-resize-line {
   width: 1px;
   background: var(--openbot-border-strong);
@@ -1593,7 +1531,6 @@ on focus and while dragged. */
   z-index: 4;
 }
 
-/* Filter row: a text field for each text column, a range for each number column. */
 .crm-sheet-filters-icon {
   width: var(--openbot-icon-xs);
   height: var(--openbot-icon-xs);
@@ -1662,7 +1599,6 @@ on focus and while dragged. */
   padding: var(--openbot-space-2);
 }
 
-/* No rows: the message shows in the free space between the header and the totals. */
 .crm-sheet-empty {
   position: absolute;
   top: var(--crm-sheet-head);
@@ -1675,8 +1611,6 @@ on focus and while dragged. */
   pointer-events: none;
 }
 
-/* The scroll bar under the totals. It runs under the columns that scroll and shows only when the
-   sheet is wider than its box. */
 .crm-sheet-bar {
   display: none;
   height: 14px;
@@ -1722,7 +1656,6 @@ on focus and while dragged. */
   user-select: none;
 }
 
-/* Agent access: a list that can hold many agents; it scrolls in the popover. */
 .crm-access-list {
   display: flex;
   max-height: min(360px, 50vh);
@@ -1776,14 +1709,12 @@ on focus and while dragged. */
   font-size: var(--openbot-text-sm);
 }
 
-/* A total with more than one currency shows one line for each. */
 .crm-sheet-total-lines {
   display: inline-flex;
   flex-direction: column;
   align-items: flex-start;
 }
 
-/* Split payment form: one row for each part. */
 .crm-split {
   display: flex;
   flex-direction: column;
@@ -1804,7 +1735,6 @@ on focus and while dragged. */
   display: flex;
 }
 
-/* On a 13-inch MacBook (1280px), the avatars and the wide tab padding leave too little space for the search field. */
 @media (max-width: 1400px) {
   .crm-top {
     gap: var(--openbot-space-3);
@@ -1819,7 +1749,6 @@ on focus and while dragged. */
   }
 }
 
-/* Connectors: one row each, with its app icon and, when connected, its last sync. */
 .crm-source-title {
   display: flex;
   align-items: center;

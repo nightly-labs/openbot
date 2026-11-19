@@ -1,6 +1,3 @@
-// The Vault items of this computer, encrypted at rest by the operating system. The file holds one
-// envelope; its record is the whole Vault, so a change rewrites the file atomically.
-
 import { readFile, rm } from "node:fs/promises";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result, Schema, Semaphore } from "effect";
@@ -11,26 +8,16 @@ import type { SecretCipher } from "./provider-credential-store";
 
 const { io: vaultCall, sync: vaultDecode } = causeHelpers(PasswordVaultError);
 
-/** The name of the agent that added an item. Absent when the user added it. */
 const addedBy = Schema.optionalKey(Schema.String);
 
-/**
- * The ids of the agents that can use an item. Absent means every agent. A build before agent scope
- * drops the key on its next write, so the item is then for every agent again.
- */
 const agents = Schema.optionalKey(Schema.Array(Schema.String));
 
 const loginSchema = Schema.Struct({
   id: Schema.String,
-  /** An `https:` address or a host name, as the user typed it. */
   website: Schema.String,
   username: Schema.String,
   password: Schema.String,
   notes: Schema.String,
-  /**
-   * The two-step (TOTP) key, as `normalizeTwoStepKey` writes it. Absent when the login has none. A
-   * build before two-step codes drops it on its next write.
-   */
   twoStepKey: Schema.optionalKey(Schema.String),
   addedBy,
   agents,
@@ -40,17 +27,11 @@ const cardSchema = Schema.Struct({
   id: Schema.String,
   label: Schema.String,
   nameOnCard: Schema.String,
-  /** Digits only. */
   number: Schema.String,
   expMonth: Schema.Number,
   expYear: Schema.Number,
-  /** Digits only, or "" when the user did not save one. */
   securityCode: Schema.String,
   billingContactId: Schema.NullOr(Schema.String),
-  /**
-   * The HTTPS pages where the owner let agents fill this card, each with the origins of the frames that
-   * got its fields. A fill anywhere else waits for the owner's approval. Absent when there is none.
-   */
   fillSites: Schema.optionalKey(
     Schema.Array(Schema.Struct({ page: Schema.String, frames: Schema.Array(Schema.String) })),
   ),
@@ -76,10 +57,6 @@ const contactSchema = Schema.Struct({
 
 const apiKeySchema = Schema.Struct({
   id: Schema.String,
-  /**
-   * An environment variable name. It is unique among the keys for every agent; keys for chosen agents
-   * can share it when they share no agent.
-   */
   name: Schema.String,
   key: Schema.String,
   notes: Schema.String,
@@ -91,7 +68,6 @@ const recordSchema = Schema.Struct({
   logins: Schema.Array(loginSchema),
   cards: Schema.Array(cardSchema),
   contacts: Schema.Array(contactSchema),
-  // Absent in a file that a build before API keys wrote. Such a build drops the key on its next write.
   apiKeys: Schema.Array(apiKeySchema).pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
 });
 
@@ -103,20 +79,14 @@ export type VaultRecord = typeof recordSchema.Type;
 
 const EMPTY_VAULT_RECORD: VaultRecord = { logins: [], cards: [], contacts: [], apiKeys: [] };
 
-/** `version` is checked: an envelope that this build cannot read is reported as unreadable. */
 const envelopeSchema = Schema.Struct({ version: Schema.Literal(1), record: Schema.String });
 
-/** Thousands of items fit; a larger file is not one that this app wrote. */
 const MAX_VAULT_ENVELOPE_BYTES = 4 * 1024 * 1024;
 
 function unreadable() {
   return new PasswordVaultError({ cause: new Error(sourceText("error.vault.unreadable")) });
 }
 
-/**
- * Reads and writes the Vault file. The decrypted record is kept in memory only. Writes run one at a
- * time, because the settings page and an import can change the Vault together.
- */
 export class VaultStore {
   readonly #path: string;
   readonly #cipher: SecretCipher;
@@ -128,7 +98,6 @@ export class VaultStore {
     this.#cipher = cipher;
   }
 
-  /** Reads the file. False when the file is there but cannot be read; the file is then kept as it is. */
   load(): Effect.Effect<boolean> {
     return Effect.gen({ self: this }, function* () {
       this.#record = EMPTY_VAULT_RECORD;
@@ -143,10 +112,6 @@ export class VaultStore {
     return this.#record;
   }
 
-  /**
-   * Makes the next record from the current one and stores it. The record changes only after the
-   * write. An error that `change` throws fails the update; the same record back writes nothing.
-   */
   update(change: (current: VaultRecord) => VaultRecord): Effect.Effect<VaultRecord, PasswordVaultError> {
     return this.#serialize(
       Effect.gen({ self: this }, function* () {
@@ -164,7 +129,6 @@ export class VaultStore {
     );
   }
 
-  /** Removes the file and forgets every item. */
   clear(): Effect.Effect<void, PasswordVaultError> {
     return this.#serialize(
       Effect.gen({ self: this }, function* () {

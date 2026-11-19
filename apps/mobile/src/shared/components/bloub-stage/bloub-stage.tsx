@@ -22,18 +22,12 @@ import { useBloubStage } from "./bloub-stage-context";
 import type { BloubMood, BloubStageRequest } from "./bloub-stage-store";
 import { StageBackButton } from "./stage-back-button";
 
-// Over a camera, the block fades once it has mostly covered the screen; it comes back at once.
 const CLEAR_DELAY_MS = 300;
 const VEIL = { duration: 360, easing: SPLASH_EASE_OUT };
 const STATUS_GAP = 32;
-// Joy on a header: the lower edge stretches down by this much and settles, like squeezed felt.
 const JELLY_STRETCH = 16;
-// Android 12 and later show the splash icon only inside a 192 dp circle in a 288 dp square. At full
-// size the tip of the left eye is 117.5 pt from the middle, so the Android splash draws the eyes at
-// this scale. Keep the Android `imageWidth` in app.json equal to 240 times this value.
 const ANDROID_SPLASH_EYES_SCALE = 0.78;
 
-/** The text on a covering block: a title under the eyes, or a status line at the bottom. */
 function StageCaption({
   request,
   height,
@@ -46,7 +40,6 @@ function StageCaption({
   height: number;
   insets: EdgeInsets;
   textColor: string;
-  /** The text under a title is a little lighter. The status line keeps full strength. */
   textOpacity: number;
   reduced: boolean;
 }) {
@@ -133,26 +126,13 @@ function StageBack({
         label={back.label}
         color={overCamera ? "#ffffff" : eyeColor}
         disabled={back.disabled}
-        // The store keeps the newest callback on the shown request.
         onPress={() => request.back?.onPress()}
       />
     </Animated.View>
   );
 }
 
-/**
- * The lilac block with the eyes. It is the splash, the app loader and the sign-in header: one
- * block whose lower edge moves. Only transforms, opacity and colors animate, all on the UI thread.
- * The block is taller than the screen by its corner radius, so a cover hides the round corners.
- */
-export function BloubStage({
-  nativeSplashHidden,
-  onLayout,
-}: {
-  /** False while the native splash still shows over the stage. */
-  nativeSplashHidden: boolean;
-  onLayout?: () => void;
-}) {
+export function BloubStage({ nativeSplashHidden, onLayout }: { nativeSplashHidden: boolean; onLayout?: () => void }) {
   const { store, lift, gazeX, gazeY, look } = useBloubStage();
   const active = useSyncExternalStore(store.subscribe, store.active);
   const request = active?.request ?? null;
@@ -165,8 +145,6 @@ export function BloubStage({
   const height = size.height;
   const top = insets.top;
   const shape = request?.shape ?? null;
-  // The splash asks for the stage in the first commit. Until a request comes, the stage stays
-  // covered as the native splash is, so the first frame never starts to roll up.
   const [shown, setShown] = useState(false);
   useEffect(() => {
     if (request) setShown(true);
@@ -181,22 +159,17 @@ export function BloubStage({
   const clear = shape?.kind === "clear";
   const mood: BloubMood = request?.mood ?? "idle";
   const titled = shape?.kind === "cover" && Boolean(request?.caption?.title);
-  // The loader tone stays while the block rolls up, so the color does not change as it leaves. The
-  // app starts with the splash, which is a loader.
   const [loaderTone, setLoaderTone] = useState(true);
   useEffect(() => {
     if (request) setLoaderTone(Boolean(request.loader));
   }, [request]);
   const dimmed = dark && loaderTone;
 
-  // The app starts covered, as the native splash does.
   const edge = useSharedValue(height + BLOUB_RADIUS);
   const veil = useSharedValue(1);
   const glow = useSharedValue(0);
   const raise = useSharedValue(0);
   const moodScale = useSharedValue(1);
-  // The Android splash draws the eyes smaller (see ANDROID_SPLASH_EYES_SCALE). The eyes start at
-  // that size and grow to full size once the native splash is gone, so the handover does not jump.
   const splashScale = useSharedValue(isAndroid ? ANDROID_SPLASH_EYES_SCALE : 1);
   const dim = useSharedValue(dimmed ? 1 : 0);
 
@@ -219,7 +192,6 @@ export function BloubStage({
     veil.set(clear ? withDelay(reduced ? 0 : CLEAR_DELAY_MS, withTiming(0, VEIL)) : withTiming(1, VEIL));
   }, [clear, reduced, veil]);
   useEffect(() => {
-    // The bright and the dim block cross-fade when a loader and a screen hand over.
     dim.set(withTiming(dimmed ? 1 : 0, { duration: reduced ? 160 : 300, easing: SPLASH_EASE_OUT }));
   }, [dim, dimmed, reduced]);
   useEffect(() => {
@@ -227,21 +199,17 @@ export function BloubStage({
     splashScale.set(withTiming(1, { duration: reduced ? 160 : 520, easing: SPLASH_EASE_OUT }));
   }, [nativeSplashHidden, reduced, splashScale]);
   useEffect(() => {
-    // The native splash is flat. The light of the gradient comes in after it.
     glow.set(withTiming(1, { duration: 600, easing: SPLASH_EASE_OUT }));
   }, [glow]);
   useEffect(() => {
-    // A title sits under the eyes, so they move up; the scanner frame sits a little above the middle.
     const offset = titled ? -0.08 * height : mood === "frame" || mood === "found" ? -0.026 * height : 0;
     raise.set(reduced ? offset : withTiming(offset, BLOUB_MOVE));
     moodScale.set(reduced ? 1 : withTiming(mood === "found" ? 0.9 : 1, { duration: 300, easing: SPLASH_EASE_OUT }));
   }, [height, mood, moodScale, raise, reduced, titled]);
-  // Another owner starts with eyes that look ahead.
   const activeId = active?.id;
   useEffect(() => {
     if (activeId !== undefined) look(0, 0);
   }, [activeId, look]);
-  // The status bar keeps the dark style until the block that rolls up has left it.
   const [statusStyle, setStatusStyle] = useState<"light" | "dark" | null>(request ? "dark" : null);
   const wantedStatus = request ? (clear || dimmed ? "light" : "dark") : null;
   useEffect(() => {
@@ -258,7 +226,6 @@ export function BloubStage({
     opacity: veil.get(),
     transform: [{ translateY: edge.get() - lift.get() - span }],
   }));
-  // The gradient stays still on the screen while the block's edge moves over it.
   const glowStyle = useAnimatedStyle(() => ({
     opacity: glow.get(),
     transform: [{ translateY: span - (edge.get() - lift.get()) }],
@@ -290,7 +257,6 @@ export function BloubStage({
     >
       {statusStyle ? <StatusBar style={statusStyle} /> : null}
       <View
-        // A cover keeps touches from the screen below; a header or a camera lets them through.
         pointerEvents={shape?.kind === "cover" ? "auto" : "none"}
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
@@ -340,7 +306,6 @@ export function BloubStage({
           request={request}
           height={height}
           insets={insets}
-          // The text has the color of the eyes. The dim dark block needs it at more strength.
           textColor={eyeColor}
           textOpacity={dimmed ? 0.85 : 0.62}
           reduced={reduced}

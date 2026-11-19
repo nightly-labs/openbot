@@ -57,7 +57,6 @@ const EASE_IN_OUT = Easing.bezier(0.77, 0, 0.175, 1);
 const TRANSITION_DURATION = 320;
 
 export function AgentPinTransitionProvider({ children }: PropsWithChildren) {
-  // Read when a pin changes, so the rows that use this context do not render for every workspace update.
   const workspace = useMobileWorkspaceReader();
   const containerRef = useRef<ViewInstance>(null);
   const avatarRefs = useRef(new Map<string, Partial<Record<AgentAvatarLocation, ViewInstance>>>()).current;

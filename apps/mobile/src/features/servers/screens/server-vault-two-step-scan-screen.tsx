@@ -8,11 +8,6 @@ import { headerTitleFont } from "@/shared/lib/app-font";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
-/**
- * Setup, step 2 (optional): the camera reads the QR code that the site shows, for example on a
- * computer. It is the scanner of the invite links, so the camera permission, the return from the
- * background and a wrong code work as there. A code with a two-step key goes on to the check step.
- */
 export function ServerVaultTwoStepScanScreen() {
   const { t } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
@@ -33,11 +28,9 @@ export function ServerVaultTwoStepScanScreen() {
         if (!parseTwoStepKey(data)) throw new Error(t("mobile.server.vault.twoStep.qrNoKey"));
         setKeyText(data);
         void haptics.notification("success");
-        // The check step takes the place of the camera, so Back from it goes to the key page.
         router.replace({ pathname: "/server-settings/vault-two-step-check", params: { serverId } });
       }}
       renderOverlay={(camera) => (
-        // White over the camera; the theme color over the permission page.
         <Stack.Screen
           options={{
             headerTintColor: camera ? "white" : String(foreground),

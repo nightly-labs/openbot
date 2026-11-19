@@ -13,12 +13,6 @@ function isOnline(servers: readonly { id: string; state: string }[], serverId: s
   return servers.some((server) => server.id === serverId && server.state === "online");
 }
 
-/**
- * Loads what the home list shows of the side threads of the agents on `serverId`, as the agents' own
- * marks: the read marks of each agent's open threads, so an agent with an unread thread shows as
- * unread, and, when the server comes back, the list of each agent with a thread that ran, so that the
- * agent does not stay at work. The task events keep both current while the server is there.
- */
 export function useHomeThreadState(serverId: string, agentIds: readonly string[]): void {
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();
@@ -29,7 +23,6 @@ export function useHomeThreadState(serverId: string, agentIds: readonly string[]
 
   useAgentThreadUnreadCounts(serverId, agentIds);
 
-  // A running thread can end while the server is away, and the list would show its agent at work.
   useEffect(() => {
     if (!tasksEnabled) return;
     const lists = queryClient.getQueriesData<AgentTasksSnapshot>({

@@ -1,21 +1,3 @@
-// Measures what the Codex features that OpenBot agents do not use cost in each request. Runs the
-// real `codex app-server` with a copy of the user's Codex login (see `codex-agent-harness.ts`), on
-// GPT-6 Luna, with OpenBot's thread configuration and dynamic tools, in a temporary git workspace.
-// `current` is the configuration that `thread-lifecycle.ts` sends; `base` is the same without
-// `codexPromptSettings`; each other variant adds settings to `current`. Each variant runs these
-// turns, each in a new thread:
-//   1. a one-word reply: its one request is the fixed prefix of every request plus a short message,
-//   2. a small task with tools, which makes two or more requests.
-// Each variant runs `--runs` times (default 3) and the report gives the median. The account's
-// ChatGPT plugins load before each thread starts, so each run lists the same skills.
-//
-// The `user-set` setup writes a `config.toml` that sets `features.tool_suggest` and enables
-// `openai-docs`, and checks that OpenBot keeps `openai-docs` but still turns `tool_suggest` off. Both
-// setups check, from the rollout file of the reply thread, that `current` drops
-// `request_plugin_install` and the unfit skills, and keeps `web__run` and all other skills.
-//
-// Costs a few dozen GPT-6 Luna turns. `bun run bench:codex-prompt-settings`; `--variant=<name>` runs
-// one variant; `--runs=<n>`; `--model=<id>`. Writes .openbot-build/codex-prompt-settings-bench/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, realpath } from "node:fs/promises";
@@ -54,16 +36,10 @@ const USER_CONFIG = [
 
 interface Variant {
   name: string;
-  /** False leaves out `codexPromptSettings`. */
   promptSettings: boolean;
-  /** Settings added to the thread configuration. */
   config: DynamicRecord;
 }
 
-/**
- * Features measured as references on top of `current`. On 2026-11-07 the user kept the skill
- * descriptions, image generation and Codex's own web search (`bun run bench:codex-web-search`).
- */
 const REFERENCES: Variant[] = [
   { name: "web-search-off", promptSettings: true, config: { web_search: "disabled" } },
   { name: "omit-skill-descriptions", promptSettings: true, config: { "features.omit_skill_descriptions": true } },
@@ -79,9 +55,7 @@ const VARIANTS: Variant[] = [
 interface TurnReport {
   step: string;
   requests: RequestUsage[];
-  /** Input tokens of the first request: the prompt that each request repeats. */
   firstRequestInput: number;
-  /** Input tokens over all requests of the turn. */
   totalInput: number;
 }
 
@@ -116,7 +90,6 @@ const report: {
   runs: RunReport[];
   medians: Array<{ variant: string; setup: string; reply: number; task: number; taskRequests: number }>;
   checks: Record<string, string>;
-  /** The listing lines of the reply request that `current` drops. */
   dropped: Record<string, string[]>;
   passed: boolean;
   error?: string;
@@ -162,7 +135,6 @@ async function runVariant(
 
 const setups: Array<{ setup: RunReport["setup"]; config: string; variants: Variant[]; runs: number }> = [
   { setup: "plain", config: "", variants, runs: RUNS },
-  // One run is enough to check what OpenBot keeps of the user's settings.
   {
     setup: "user-set",
     config: USER_CONFIG,
@@ -229,8 +201,6 @@ try {
         assert.ok(!listsSkill(current.context, skill), `current still lists ${skill}.`);
       report.checks["user-set"] = "openai-docs kept; tool_suggest and other unfit skills dropped";
     }
-    // Only the unfit skills leave the listing. A skill line is `- <name>: <description>`; the skill
-    // root lines (- `r4` = ...) are numbered again when a root loses all its skills.
     const skillNames = (context: string) =>
       context
         .split("\n")

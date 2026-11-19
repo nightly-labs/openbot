@@ -1,9 +1,3 @@
-/**
- * The scrolling list itself. This element is the one `measureSidebarDragSlots` queries, so its ref
- * is the rail the whole drag pipeline runs on: `setAgentListElement` hands it to the engine and to
- * the scroll fades in that order.
- */
-
 import { Bot, Button, CheckCheck, ContextMenu, FolderPlus, Hash } from "@openbot/ui";
 import { For, Show } from "solid-js";
 import { useText } from "../../text";

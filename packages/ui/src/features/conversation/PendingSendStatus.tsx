@@ -5,27 +5,16 @@ import { Show } from "solid-js";
 
 export interface PendingSendStatusProps {
   state: "waiting" | "sending" | "failed";
-  /** Why the send failed, when the host or the connection said. */
   error?: string | null;
-  /** The support reference of the failure, when it has one. */
   errorReference?: string | null;
-  /** The composer shows the update notice; keep recovery actions without a second error. */
   updateRequired?: boolean;
-  /** The host drops a repeated send of this message, so Retry cannot store it twice. */
   retrySafe: boolean;
-  /** Edit needs an empty composer, so the failed message replaces nothing the user wrote. */
   canEdit: boolean;
   onRetry: () => void;
   onEdit: () => void;
   onDismiss: () => void;
 }
 
-/**
- * The delivery status beside the time of a message the host has not stored yet. A send in flight
- * shows nothing; only a failure shows. The status text is a polite live region that stays while the
- * send runs, so a reader hears the failure without moving focus. A message whose repeat the host
- * cannot detect offers no Retry: the first send may have arrived.
- */
 export function PendingSendStatus(props: PendingSendStatusProps): JSX.Element {
   const { t } = useText();
   const failed = () => props.state === "failed";

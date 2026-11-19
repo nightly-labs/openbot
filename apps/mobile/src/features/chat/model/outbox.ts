@@ -3,23 +3,13 @@ import { isBoolean, isDynamicRecord, isString } from "@openbot/contracts/runtime
 import type { ChatMessage } from "./chat-messages";
 import type { ImageDimensions } from "./image-dimensions";
 
-/**
- * Where an outbox message goes. A channel message keeps the member it names at its start, as the
- * person saw the channel when they wrote it.
- */
 export type OutboxTarget =
   | { kind: "agent"; serverId: string; agentId: string }
   | { kind: "channel"; serverId: string; channelId: string; recipientAgentId: string | null };
 
-/**
- * `waiting` has not reached the host: the server is offline, or an earlier message of the chat
- * goes first. `sent` has a host receipt and stays until the chat draws the host's own row.
- */
 type OutboxState = "waiting" | "sending" | "failed" | "sent";
 
-/** A file of an outbox message. Its bytes are in a file of this phone, named `fileName`. */
 export interface OutboxFile {
-  /** Starts with `mobile-draft-attachment-`, so a preview reads the local file and never the host. */
   id: string;
   name: string;
   mimeType: string;
@@ -29,43 +19,29 @@ export interface OutboxFile {
 }
 
 export interface OutboxMessage {
-  /** The `clientMessageId` of an agent message, and the `operationId` of a channel message. */
   clientMessageId: string;
   target: OutboxTarget;
   text: string;
   replyToMessageId: string | null;
   files: OutboxFile[];
   createdAt: string;
-  /** When the first request that can store the message started. Null: the host never received it. */
   firstAttemptAt: string | null;
-  /** Whether the host answers a repeat of that request with its first receipt and stores nothing. */
   repeatSafe: boolean;
   state: OutboxState;
-  /** The host's id for a sent agent message. */
   messageId: string | null;
-  /** Why the last attempt failed, in the reader's language. */
   error: string | null;
-  /** The person stopped its upload. The chat puts it back in the composer. */
   returned: boolean;
-  /** The person chose Edit and did not send the change. It waits for Retry, Edit or Cancel. */
   stopped: boolean;
 }
 
-/**
- * How long Retry of an agent message stays safe. The host answers a repeated `clientMessageId` for
- * a day after it stored the message; half of that leaves room for a clock that differs from the
- * host's. A channel keeps the receipt of an operation with the channel history.
- */
 const OUTBOX_RETRY_WINDOW_MS = 12 * 60 * 60 * 1000;
 
-/** The prefix of a pending row's id. The host never stored this id, so the row has no actions. */
 const OUTBOX_ROW_PREFIX = "outbox:";
 
 export function outboxRowId(message: Pick<OutboxMessage, "clientMessageId">): string {
   return `${OUTBOX_ROW_PREFIX}${message.clientMessageId}`;
 }
 
-/** The row a message draws in its chat until the host's own row replaces it. */
 export function outboxChatMessage(
   message: OutboxMessage,
   previewUri: (file: OutboxFile) => string | null,
@@ -92,7 +68,6 @@ export function outboxChatMessage(
   };
 }
 
-/** One chat's key. The order of messages with the same key is their send order. */
 export function outboxChatKey(target: { kind: "agent" | "channel"; serverId: string; id: string }): string {
   return `${target.kind}:${target.serverId}:${target.id}`;
 }
@@ -105,20 +80,17 @@ export function outboxTargetKey(target: OutboxTarget): string {
   });
 }
 
-/** Whether a send of this message cannot store it twice. */
 export function outboxRetrySafe(message: OutboxMessage, now: number): boolean {
   if (message.firstAttemptAt === null) return true;
   if (!message.repeatSafe) return false;
   return message.target.kind === "channel" || now - Date.parse(message.firstAttemptAt) < OUTBOX_RETRY_WINDOW_MS;
 }
 
-/** The file this phone keeps. A message that the host may have stored is gone from it on load. */
 export interface PersistedOutbox {
   version: 1;
   messages: OutboxMessage[];
 }
 
-/** The messages of a saved outbox that this phone can read, and whether it dropped any. */
 export interface DecodedOutbox {
   messages: OutboxMessage[];
   dropped: boolean;
@@ -221,7 +193,6 @@ function decodeOutboxMessage(value: unknown): OutboxMessage | null {
     !isNullableString(value.messageId) ||
     !isNullableString(value.error) ||
     !isBoolean(value.returned) ||
-    // Outboxes saved before Edit kept the message have no `stopped`.
     !(value.stopped === undefined || isBoolean(value.stopped))
   )
     return null;

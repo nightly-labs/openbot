@@ -10,7 +10,6 @@ export const messages = {
   "error.backend.webhookRouteUnavailable": "公共 Webhook 路由尚未就绪。请检查主机连接后重试。",
   "error.backend.webhookTestUnavailable": "主机现在无法接收测试事件。请确认它已登录，然后重试。",
   "error.backend.webhookTestFailed": "测试事件没有送达该自动化任务，请重试。",
-  // Errors that the backend services send: channels, messages, routines, memories, MCP, browser and remote desktop.
   "error.backend.browserViewRemoteOnly": "浏览器实时视图仅适用于远程主机。",
   "error.backend.browserViewUnsupported": "该远程主机不支持浏览器实时视图。",
   "error.backend.browserViewLimit": "这台主机上打开的浏览器视图过多。",
@@ -332,6 +331,8 @@ export const messages = {
   "error.backend.apiKeySaveFailed": "OpenBot 无法保存 API 密钥，请重试。",
   "error.backend.apiKeyNotAllowed": "只有服务器所有者或管理员可以输入 API 密钥。",
   "error.backend.apiKeySaving": "API 密钥正在保存中。",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot 无法读取 API 密钥。请输入不超过 8,000 个字符的密钥，并选择谁可以使用它。",
   "error.backend.vaultItemNotAllowed": "只有服务器所有者或管理员可以向保险库添加项目。",
   "error.backend.vaultItemSaving": "该保险库项目正在保存中。",
   "error.backend.authRequestInactive": "该安全验证请求已不再有效。",
@@ -384,7 +385,6 @@ export const messages = {
     "该 MCP 服务器的登录服务器已变更，因此 OpenBot 没有把登录应用发送给它。若该变更正确，请移除登录应用后重新添加。",
   "error.backend.mcpSignInAppNoServer": "请先把该 MCP 服务器保存为 URL 服务器，再添加登录应用。",
   "error.backend.mcpSignInAppUnavailable": "该电脑无法保存登录应用。",
-  // Tasks: conversations of one agent that run beside its own chat.
   "error.backend.taskMoveRefused": "只有你单独发给该助手的消息才能作为任务运行。",
   "error.backend.taskNotFound": "该任务不可用。",
   "error.backend.taskClosed": "该任务已关闭，请重新打开后再发送消息。",

@@ -1,14 +1,3 @@
-// The release gate for the translated "What's new" notes. The desktop dialog shows
-// `src/renderer/src/features/updates/whats-new/<locale>.json` in the app language and the English
-// text for each release that a file does not have. See docs/RELEASING.md#post-update-notes.
-//
-//   bun scripts/whats-new-translations.ts [<version>]
-//
-// It checks that each translation has the shape of its English release, and, with a version that
-// the English file has, that every language translates it.
-//
-// No package imports: `release.yml` runs this before `bun install`.
-
 import { readFileSync } from "node:fs";
 import { TRANSLATED_LOCALES } from "../packages/i18n/src/locale";
 
@@ -48,7 +37,6 @@ function isRelease(value: unknown): value is Release {
   );
 }
 
-/** The releases of `file`, or the problem that stops them from being read. */
 function readReleases(file: string): Release[] | string {
   let value: unknown;
   try {
@@ -62,11 +50,9 @@ function readReleases(file: string): Release[] | string {
   return value.filter(isRelease);
 }
 
-/** The counts that a translation keeps: one notice for each notice, one item for each item. */
 const shape = (release: Release) =>
   [release.notices.length, ...release.groups.map((group) => `${group.type}:${group.items.length}`)].join(" ");
 
-/** What stops the translated notes from shipping. Empty when they are ready. */
 export function whatsNewTranslationProblems(version?: string): string[] {
   const english = readReleases(ENGLISH_FILE);
   if (typeof english === "string") return [english];

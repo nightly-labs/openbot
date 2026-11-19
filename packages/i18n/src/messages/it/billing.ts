@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/billing";
 
 export const messages = {
-  // The Billing tab in Settings and the Billing dialog in the web client.
   "billing.title": "Fatturazione",
   "billing.description": "Ogni server ha il suo piano. Il pagamento è gestito da Stripe.",
   "billing.loading": "Caricamento della fatturazione…",
@@ -20,9 +19,7 @@ export const messages = {
   "billing.plan.standard": "Standard",
   "billing.plan.pro": "Pro",
   "billing.server.unnamed": "Server senza nome",
-  // For example "Standard · 50 GB".
   "billing.server.summary": "{plan} · {size} GB",
-  // {amount} is a formatted price, for example "€40".
   "billing.server.price.month": "{amount} / mese",
   "billing.server.price.year": "{amount} / anno",
   "billing.server.renews": "Si rinnova il {date}",
@@ -80,7 +77,6 @@ export const messages = {
   "billing.lifecycle.deleted": "{name} è stato eliminato. Il suo abbonamento è terminato.",
   "billing.lifecycle.label": "Anteprima del design · Solo azioni di prova",
   "billing.lifecycle.reset": "Reimposta l'anteprima",
-  // The commercial license of the account, above the server plans.
   "billing.license.title": "Licenza",
   "billing.license.description": "Per il lavoro in un'azienda. Non include un server.",
   "billing.license.loadFailed": "Impossibile caricare la licenza.",
@@ -99,16 +95,13 @@ export const messages = {
   "billing.license.buy.confirm": "Procedi al pagamento",
   "billing.license.trial.until": "Gratis fino al {date}",
   "billing.license.trial.confirm": "Inizia la prova gratuita",
-  // {used} people use the license; it is paid for {users}.
   "billing.license.work.used": "{used} di {users} utenti",
   "billing.license.tier.starter.title": "Licenza Starter",
   "billing.license.tier.team.title": "Licenza Team",
   "billing.license.starter.inUse": "{used} persone usano i tuoi server. Starter è per 1 utente.",
   "billing.license.users.label": "Utenti",
   "billing.license.line.base": { one: "Primo utente", other: "Primi {count} utenti" },
-  // For example "3 more users × €15".
   "billing.license.line.extra": "{extra} in più × {price}",
-  // {currency} is a currency code, for example "EUR".
   "billing.license.total.month": "/ mese, {currency}",
   "billing.license.total.year": "/ anno, {currency}",
   "billing.license.contact.action": "Contattaci",
@@ -126,7 +119,6 @@ export const messages = {
   "billing.license.overLimitOneUser":
     "{used} persone usano la licenza, ma è per 1 utente. Passa a Team perché le nuove persone possano unirsi.",
   "billing.license.covered.title": "Coperto da una licenza",
-  // {owners} is a list of names, for example "Ana and Jan".
   "billing.license.covered.description": "Il lavoro sui server di {owners} è coperto dalla loro licenza.",
   "billing.license.change.title": "Modifica utenti",
   "billing.license.change.description": "Ora: {users} utenti, {amount} al mese. Gli agenti IA non sono utenti.",
@@ -153,7 +145,6 @@ export const messages = {
   "billing.license.cancel.descriptionNow":
     "La licenza termina alla fine del periodo pagato. I tuoi server non sono interessati.",
   "billing.license.cancel.keep": "Mantieni licenza",
-  // The order form: a hosted server and a license in one order. The pricing page and Billing show it.
   "billing.order.billing": "Periodo di fatturazione",
   "billing.order.currency": "Valuta",
   "billing.order.monthly": "Mensile",
@@ -206,7 +197,6 @@ export const messages = {
   "billing.order.cta.license": "Acquista una licenza",
   "billing.order.cta.download": "Scarica",
   "billing.order.cta.keepComputer": "Resta su questo computer",
-  // Shown before an invite that makes the license too small.
   "billing.license.invite.title": "Aggiungere un utente alla licenza?",
   "billing.license.invite.description": "Questo invito aggiunge 1 utente alla tua licenza: {price} in più al mese.",
   "billing.license.invite.confirm": "Aggiungi e invita",

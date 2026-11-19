@@ -22,7 +22,7 @@ import { loadElevenLabsVoices, useElevenLabsVoices } from "../model/elevenlabs-v
 import type { ReplyVoiceChoice } from "../model/reply-voice";
 import { useSupertonicModel } from "../model/supertonic-model";
 import { saveVoiceSettings, useVoiceSettings } from "../model/voice-settings";
-import { gptLiveVoiceLabel, supertonicVoiceLabel } from "./voice-settings-screen";
+import { ChoiceRow, gptLiveVoiceLabel, supertonicVoiceLabel } from "./voice-settings-screen";
 
 interface VoiceOption {
   id: string;
@@ -33,7 +33,6 @@ interface VoiceOption {
   select: () => Promise<void>;
 }
 
-/** Play or Stop for one voice. It is apart from the row, so a press plays the voice and does not choose it. */
 function PreviewButton({
   label,
   playing,
@@ -57,14 +56,9 @@ function PreviewButton({
   );
 }
 
-/**
- * The voices of GPT live voice, and Automatic, which lets OpenAI choose. OpenAI speaks them, so the
- * phone has no sample to play.
- */
 function GptLiveVoiceChoice() {
   const { t } = useText();
   const chosen = useVoiceSettings((state) => state.gptLiveVoice);
-  const accent = String(useCSSVariable("--openbot-accent"));
   const choose = (voice: CodexLiveVoice | null) => {
     if (voice === chosen) return;
     void haptics.selection();
@@ -75,32 +69,23 @@ function GptLiveVoiceChoice() {
       <Stack.Screen options={{ title: t("mobile.settings.voice.gptLive.title") }} />
       <SettingsSection footer={t("mobile.settings.voice.gptLive.choiceFooter")}>
         {[null, ...CODEX_LIVE_VOICES].map((voice) => (
-          <SettingsRow
+          <ChoiceRow
             key={voice ?? "automatic"}
             checked={voice === chosen}
-            disclosure={false}
-            trailing={voice === chosen ? <Check size={18} color={accent} strokeWidth={2} /> : null}
+            label={gptLiveVoiceLabel(voice, t)}
             onPress={() => choose(voice)}
-          >
-            <Typography.Paragraph>{gptLiveVoiceLabel(voice, t)}</Typography.Paragraph>
-          </SettingsRow>
+          />
         ))}
       </SettingsSection>
     </SettingsContent>
   );
 }
 
-/** The voice list of the engine in the route: GPT live voice, Supertonic 3 or ElevenLabs. */
 export function VoiceChoiceScreen() {
   const { engine } = useLocalSearchParams<{ engine?: string }>();
   return engine === "gpt-live" ? <GptLiveVoiceChoice /> : <VoiceList elevenLabs={engine === "elevenlabs"} />;
 }
 
-/**
- * The voices of one engine, as a list: a long ElevenLabs name such as "George - Warm, Captivating
- * Storyteller" shows its description on its own line instead of pushing the row apart. A press
- * chooses the voice; the button at the end plays a sample of it.
- */
 function VoiceList({ elevenLabs }: { elevenLabs: boolean }) {
   const { t } = useText();
   const settings = useVoiceSettings();
@@ -170,7 +155,6 @@ function VoiceList({ elevenLabs }: { elevenLabs: boolean }) {
               supportingText={option.description ?? undefined}
               trailing={
                 <View className="flex-row items-center gap-1">
-                  {/* A slot of the same width on every row, so the play buttons stay in one column. */}
                   <View className="w-6 items-center">
                     {option.selected ? <Check size={18} color={accent} strokeWidth={2} /> : null}
                   </View>

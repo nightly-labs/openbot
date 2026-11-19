@@ -47,7 +47,5 @@ export function writeChannelSelection(
       else delete selections[accountId];
     }
     target.setItem(CHANNEL_SELECTION_STORAGE_KEY, JSON.stringify(selections));
-  } catch {
-    // A local display preference must not block channel navigation.
-  }
+  } catch {}
 }

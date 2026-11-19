@@ -7,6 +7,7 @@ export const messages = {
   "queue.attachment": "Allegato",
   "queue.hold.named": "In attesa - {name} sta lavorando in {channel}",
   "queue.hold.unnamed": "In attesa - questo agente sta lavorando in {channel}",
+  "queue.hold.providerRestart": "In attesa - {provider} si riavvia quando le attività in corso sono finite",
   "queue.item.label": "Messaggio in coda {position}: {preview}",
   "queue.item.labelEditing": "Messaggio in coda {position}, in modifica: {preview}",
   "queue.item.editing": "In modifica",
