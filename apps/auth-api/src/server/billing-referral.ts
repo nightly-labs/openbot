@@ -44,10 +44,11 @@ interface CreditRow {
   amount: number;
   reversed_amount: number;
   balance_transaction_id: string | null;
+  queued_at: number | null;
 }
 
 const CREDIT_COLUMNS =
-  "invoice_id, referrer_user_id, referred_user_id, source_currency, currency, amount, reversed_amount, balance_transaction_id";
+  "invoice_id, referrer_user_id, referred_user_id, source_currency, currency, amount, reversed_amount, balance_transaction_id, queued_at";
 
 type Failure = BillingError | BillingOperationError;
 
@@ -356,7 +357,13 @@ export class BillingReferral {
     reversal: PaymentReversal,
     payment: { invoiceId: string; total: number | null; totalExcludingTax: number | null },
   ): Effect.fn.Return<void, Failure> {
-    const credit = yield* this.#creditRow(payment.invoiceId);
+    let credit = yield* this.#creditRow(payment.invoiceId);
+    // A queued credit keeps its amount until Stripe accepts it, because its idempotency key is fixed. It goes
+    // to Stripe first, and the refund then takes the share back from the Stripe credit.
+    if (credit && credit.queued_at !== null && credit.balance_transaction_id === null) {
+      yield* this.#send(credit);
+      credit = yield* this.#creditRow(payment.invoiceId);
+    }
     if (!credit || !isOneOf(BILLING_CURRENCIES, credit.source_currency)) return;
     if (!isOneOf(BILLING_CURRENCIES, credit.currency)) return;
     const share = referralShare(withoutTax(reversal.amount, payment.total, payment.totalExcludingTax));

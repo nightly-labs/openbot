@@ -143,11 +143,12 @@ export function requestHostedSiteService(): HostedSiteService {
   );
 }
 
-/** The billing service, or null when this deployment has no Stripe key. */
+/** The invite codes and invite records of accounts. It needs no Stripe key. */
 export function requestReferrals(): Referrals {
   return new Referrals({ database: requireWorkerBindings(env).DB });
 }
 
+/** The billing service, or null when this deployment has no Stripe key. */
 export function requestBillingService(): BillingService | null {
   return requestHostedBilling().billing;
 }

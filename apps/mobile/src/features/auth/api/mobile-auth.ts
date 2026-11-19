@@ -170,8 +170,10 @@ export async function startMobileEmailSignIn(email: string, requestId: string): 
   };
 }
 
-/** Verifies the code and saves the new session. The session is a mobile session with no host. */
-/** `referralCode` is the invite code that the person typed. The account server uses it only for a new account. */
+/**
+ * Verifies the code and saves the new session. The session is a mobile session with no host.
+ * `referralCode` is the invite code that the person typed. The account server uses it only for a new account.
+ */
 export async function verifyMobileEmailCode(
   challengeId: string,
   code: string,

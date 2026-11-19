@@ -728,6 +728,11 @@ export class StripeClient {
        */
       taxRateIds: readonly string[];
       paymentMethodId: string | null;
+      /**
+       * A coupon on each invoice, such as the invite discount. Sent only when there is one, so the retry of
+       * an older split keeps the body of its idempotency key.
+       */
+      couponId?: string;
       metadata: Readonly<Record<string, string>>;
     },
     idempotencyKey: string,
@@ -745,6 +750,7 @@ export class StripeClient {
     if (input.automaticTax) body.set("automatic_tax[enabled]", "true");
     for (const [index, id] of input.taxRateIds.entries()) body.set(`default_tax_rates[${index}]`, id);
     if (input.paymentMethodId) body.set("default_payment_method", input.paymentMethodId);
+    if (input.couponId) body.set("discounts[0][coupon]", input.couponId);
     for (const [key, value] of Object.entries(input.metadata)) body.set(`metadata[${key}]`, value);
     return yield* this.#requestEffect("POST", "/v1/subscriptions", body, subscriptionSchema, idempotencyKey);
   }).bind(this);

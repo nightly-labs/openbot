@@ -208,10 +208,13 @@ export class Referrals {
       const creditRows = yield* billingCall(() =>
         this.#database
           .prepare(
+            // Credit after the second payment that waits for the minimum is in the account's `ready` total
+            // only. `pending` of a friend is the credit that waits for the friend's second payment.
             `SELECT referred_user_id AS id, currency, balance_transaction_id IS NULL AS waiting,
                SUM(amount - reversed_amount) AS amount
              FROM referral_credits
              WHERE referrer_user_id = ?1 AND referred_user_id IN (SELECT value FROM json_each(?2))
+               AND (balance_transaction_id IS NOT NULL OR released_at IS NULL)
              GROUP BY referred_user_id, currency, waiting`,
           )
           .bind(userId, JSON.stringify(rows.map((row) => row.id)))

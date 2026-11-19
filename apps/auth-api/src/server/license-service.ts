@@ -654,8 +654,13 @@ export class LicenseService {
       const vatTreatmentMark = subscription.metadata[VAT_METADATA.treatment];
       const listed = yield* this.#stripeCall(() => dependencies.stripe.listCustomerSubscriptions(customerId));
       const readAt = dependencies.now();
+      const made = listed.find(
+        (candidate) => candidate.metadata[LICENSE_METADATA.orderSubscription] === subscription.id,
+      );
+      // The invite discount of the order's Checkout stays on the license after the split.
+      const referralCouponId = made || !this.#referralCoupon ? null : yield* this.#referralCoupon(ownerId);
       const license =
-        listed.find((candidate) => candidate.metadata[LICENSE_METADATA.orderSubscription] === subscription.id) ??
+        made ??
         (yield* this.#stripeCall(() =>
           dependencies.stripe
             .createSubscription(
@@ -669,6 +674,7 @@ export class LicenseService {
                 automaticTax: subscription.automatic_tax?.enabled === true,
                 taxRateIds: (subscription.default_tax_rates ?? []).map((rate) => rate.id),
                 paymentMethodId: subscriptionPaymentMethodId(subscription),
+                ...(referralCouponId ? { couponId: referralCouponId } : {}),
                 metadata: {
                   [BILLING_METADATA.userId]: ownerId,
                   ...licenseMetadata(licensePlanFromPrice(price)),
