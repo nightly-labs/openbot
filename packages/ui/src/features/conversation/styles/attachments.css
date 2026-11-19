@@ -312,8 +312,10 @@
   display: none;
 }
 
-/* An upright video keeps its shape and stays as high as a wide one is wide. */
+/* An upright video keeps its shape and stays as high as a wide one is wide. The player covers the
+   frame and gives it no width, so the frame sets its own width. Else a short text makes it narrow. */
 .message-attachment[data-player="video"] .attachment-media-player {
-  max-width: calc(480px * (var(--media-generation-ratio)));
+  width: min(480px, calc(480px * (var(--media-generation-ratio))));
+  max-width: 100%;
   border-radius: var(--openbot-radius-lg);
 }
