@@ -1,4 +1,5 @@
 import { parseBillingSessionUrl, parseBillingState } from "@openbot/contracts/billing";
+import { parseBillingDetails } from "@openbot/contracts/billing-details";
 import {
   PRICING_ORDER_PARAMS,
   type PricingOrder,
@@ -6,22 +7,28 @@ import {
   parseLicenseState,
   parsePricingOrder,
 } from "@openbot/contracts/license";
+import { readPromotionCode } from "@openbot/contracts/promotion-code";
+import { parseReferralState } from "@openbot/contracts/referral";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import type { BillingDetailsCalls } from "@openbot/ui/features/billing/BillingDetailsFields";
 import type { BillingCalls } from "@openbot/ui/features/billing/billing-store";
 import type { LicenseCalls } from "@openbot/ui/features/billing/license-store";
+import type { ReferralCalls } from "@openbot/ui/features/referral/referral-store";
 import { currentText } from "@openbot/ui/text";
 
 const REQUEST_TIMEOUT_MS = 15_000;
 
-/**
- * The Billing dialog calls for a signed-in browser. They use the `/api/browser/v1/me/billing...`
- * operations. The page goes only to a Stripe Customer Portal URL.
- */
 export function createWebBillingCalls(
   accountFetch: typeof fetch,
   navigate: (url: string) => void = (url) => window.location.assign(url),
-): BillingCalls {
+): BillingCalls & BillingDetailsCalls {
   const request = browserRequest(accountFetch);
+
+  async function details(body?: string) {
+    const value = await request("v1/me/billing/details", parseBillingDetails, body, "PUT");
+    if (!value) throw new Error(currentText().sourceText("error.billing.invalidResponse"));
+    return value;
+  }
 
   async function openStripe(path: string, body: string): Promise<void> {
     const url = await request(path, parseBillingSessionUrl, body);
@@ -41,13 +48,11 @@ export function createWebBillingCalls(
       if (!state) throw new Error(currentText().sourceText("error.billing.invalidResponse"));
       return state;
     },
+    getDetails: () => details(),
+    setDetails: (value) => details(JSON.stringify(value)),
   };
 }
 
-/**
- * The license calls for a signed-in browser, through the `/api/browser/v1/me/license...` operations.
- * Checkout goes only to a Stripe Checkout URL.
- */
 export function createWebLicenseCalls(
   accountFetch: typeof fetch,
   navigate: (url: string) => void = (url) => window.location.assign(url),
@@ -63,7 +68,8 @@ export function createWebLicenseCalls(
   return {
     getState: () => state("v1/me/license"),
     async openCheckout(checkout) {
-      const url = await request("v1/me/license/checkout", parseLicenseCheckoutUrl, JSON.stringify(checkout));
+      const body = JSON.stringify({ ...checkout, ...savedPromotionCode() });
+      const url = await request("v1/me/license/checkout", parseLicenseCheckoutUrl, body);
       if (!url) throw new Error(currentText().sourceText("error.billing.notStripePage"));
       navigate(url);
     },
@@ -73,12 +79,33 @@ export function createWebLicenseCalls(
   };
 }
 
-/** GET without a body, POST with one. Returns the decoded response, or null when it does not decode. */
+export function createWebReferralCalls(accountFetch: typeof fetch): ReferralCalls {
+  const request = browserRequest(accountFetch);
+  return {
+    async getState(page) {
+      const query = new URLSearchParams({ filter: page.filter, page: String(page.page) });
+      const state = await request(`v1/me/referrals?${query.toString()}`, parseReferralState);
+      if (!state) throw new Error(currentText().sourceText("error.billing.invalidResponse"));
+      return state;
+    },
+  };
+}
+
+export function savedPromotionCode(): { promotionCode?: string } {
+  const code = readPromotionCode(() => window.localStorage, Date.now());
+  return code ? { promotionCode: code } : {};
+}
+
 function browserRequest(accountFetch: typeof fetch) {
-  return async <T>(path: string, decode: (value: unknown) => T | null, body?: string): Promise<T | null> => {
+  return async <T>(
+    path: string,
+    decode: (value: unknown) => T | null,
+    body?: string,
+    method: "POST" | "PUT" = "POST",
+  ): Promise<T | null> => {
     const post = body !== undefined;
     const response = await accountFetch(`/api/browser/${path}`, {
-      method: post ? "POST" : "GET",
+      method: post ? method : "GET",
       credentials: "same-origin",
       cache: "no-store",
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -99,21 +126,14 @@ function errorMessage(value: unknown): string {
   return currentText().t("webClient.error.requestFailed");
 }
 
-/** The Customer Portal returns to `/app?billing=portal`. */
 export const WEB_APP_BILLING_PARAM = "billing";
 
-/** The pricing page sends `/app?start=server` or `/app?start=license`, with the order of its form. */
 const WEB_APP_START_PARAM = "start";
-/**
- * What a pricing page button opens: the add server dialog or Billing, where the license is. With the order, the
- * dialog fills it in and goes on to Checkout. An old link has no order.
- */
 export interface WebAppStart {
   kind: "server" | "license";
   order: PricingOrder | null;
 }
 
-/** Reads the pricing page link and removes it from the URL, so a reload does not buy again. */
 export function takeWebAppStart(url: URL): WebAppStart | null {
   const start = url.searchParams.get(WEB_APP_START_PARAM);
   if (start === null) return null;

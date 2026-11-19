@@ -4,45 +4,66 @@ import type {
   CopyAgentsPhase,
   CopyAgentsServer,
 } from "@openbot/ui/features/transfer/CopyAgentsDialog";
+import type { TransferUploadState } from "@openbot/ui/features/transfer/InstanceTransferView";
 import { currentText } from "@openbot/ui/text";
-import { createEffect, createStore, untrack } from "solid-js";
+import { createEffect, createStore, onCleanup, untrack } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 
-export type ServerCopyCalls = Pick<OpenBotDesktopApi["instanceTransfer"], "summary" | "copy">;
+export type ServerCopyCalls = Pick<OpenBotDesktopApi["instanceTransfer"], "summary" | "copy"> &
+  Partial<Pick<OpenBotDesktopApi["instanceTransfer"], "onUploadProgress">>;
 
 interface ServerCopyState {
   fromId: string;
   toId: string | null;
   fromAgents: CopyAgentsAgent[] | null;
   toAgents: CopyAgentsAgent[] | null;
-  /** The load error of each side. A load of one side keeps the error of the other. */
   fromError: string | null;
   toError: string | null;
   phase: CopyAgentsPhase;
+  progress: TransferUploadState | null;
   result: InstanceTransferResult | null;
   error: string | null;
 }
 
-/**
- * Server settings > Transfer > Copy to another server. It starts from the server of the settings,
- * to the first other server. A choice of the server on the other side swaps the two.
- */
+interface RunningCopy {
+  fromId: string;
+  toId: string;
+  result: Promise<InstanceTransferResult>;
+}
+
+const runningCopies = new Map<string, RunningCopy>();
+
 export function createServerCopyStore(
   serverId: string,
   servers: () => readonly CopyAgentsServer[],
   calls: ServerCopyCalls,
 ) {
+  const running = runningCopies.get(serverId);
   const [state, setState] = createStore<ServerCopyState>({
-    fromId: serverId,
-    toId: untrack(servers).find((server) => server.id !== serverId)?.id ?? null,
+    fromId: running?.fromId ?? serverId,
+    toId: running?.toId ?? untrack(servers).find((server) => server.id !== serverId)?.id ?? null,
     fromAgents: null,
     toAgents: null,
     fromError: null,
     toError: null,
-    phase: "idle",
+    phase: running ? "copying" : "idle",
+    progress: null,
     result: null,
     error: null,
   });
+  let copyingTo: string | null = running?.toId ?? null;
+  let disposed = false;
+  onCleanup(() => {
+    disposed = true;
+  });
+
+  const stopProgress = calls.onUploadProgress?.(({ serverId: target, sent, total }) => {
+    if (target !== copyingTo || state.phase !== "copying") return;
+    setState((draft) => {
+      draft.progress = { sent, total };
+    });
+  });
+  if (stopProgress) onCleanup(stopProgress);
 
   function load(side: "from" | "to", id: string | null): void {
     setState((draft) => {
@@ -59,7 +80,6 @@ export function createServerCopyStore(
       .summary(id)
       .then((summary) =>
         setState((draft) => {
-          // A later choice of the server replaces this answer.
           if ((side === "from" ? draft.fromId : draft.toId) !== id) return;
           if (side === "from") draft.fromAgents = summary.agents;
           else draft.toAgents = summary.agents;
@@ -100,43 +120,65 @@ export function createServerCopyStore(
     });
   }
 
-  /** A new pair of servers starts a new copy. The result of the last copy names the old destination. */
   function reset(draft: ServerCopyState): void {
     draft.phase = "idle";
+    draft.progress = null;
     draft.result = null;
     draft.error = null;
   }
 
   const loadError = () => state.fromError ?? state.toError;
 
+  function followCopy(copying: RunningCopy): void {
+    const settled = () => {
+      if (disposed) return false;
+      if (runningCopies.get(serverId) === copying) runningCopies.delete(serverId);
+      return true;
+    };
+    void copying.result.then(
+      (result) => {
+        if (!settled()) return;
+        setState((draft) => {
+          draft.phase = "done";
+          draft.progress = null;
+          draft.result = result;
+        });
+        load("to", copying.toId);
+      },
+      (error: unknown) => {
+        if (!settled()) return;
+        setState((draft) => {
+          draft.phase = "idle";
+          draft.progress = null;
+          draft.error = message(error, "settings.transfer.copy.failed");
+        });
+      },
+    );
+  }
+
+  if (running) followCopy(running);
+
   function copy(agentIds: string[]): void {
     const toId = state.toId;
     if (!toId || agentIds.length === 0) return;
+    copyingTo = toId;
     setState((draft) => {
       draft.phase = "copying";
+      draft.progress = null;
       draft.error = null;
     });
-    void calls
-      .copy({ fromServerId: state.fromId, agentIds }, toId)
-      .then((result) => {
-        desktopAnalytics.track("server_transfer_action", { action: "copy", result: "succeeded" });
-        setState((draft) => {
-          draft.phase = "done";
-          draft.result = result;
-        });
-        load("to", toId);
-      })
-      .catch((error: unknown) => {
+    const copying = { fromId: state.fromId, toId, result: calls.copy({ fromServerId: state.fromId, agentIds }, toId) };
+    runningCopies.set(serverId, copying);
+    void copying.result.then(
+      () => desktopAnalytics.track("server_transfer_action", { action: "copy", result: "succeeded" }),
+      () =>
         desktopAnalytics.track("server_transfer_action", {
           action: "copy",
           result: "failed",
           failure_code: "copy_failed",
-        });
-        setState((draft) => {
-          draft.phase = "idle";
-          draft.error = message(error, "settings.transfer.copy.failed");
-        });
-      });
+        }),
+    );
+    followCopy(copying);
   }
 
   return { state, loadError, setFrom, setTo, copy };

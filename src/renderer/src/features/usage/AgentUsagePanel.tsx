@@ -38,15 +38,12 @@ import { createPageHeaderFrame } from "../window/page-header-frame";
 import { type UsagePort, usagePort } from "./usage-port";
 
 interface AgentUsagePanelProps {
-  /** The agent the usage starts on; with none, the usage of all agents. */
   agentId?: string | undefined;
   agentName?: string;
   serverId: string;
   hostName: string;
   onBack: () => void;
-  /** The web client reads the host through its own connection. The default is the desktop bridge. */
   port?: UsagePort;
-  /** The machine use of the server, before the filters. The desktop app shows it to owners and admins. */
   machine?: JSX.Element;
 }
 interface UsageState {
@@ -60,9 +57,7 @@ interface UsageState {
   serverId: string;
 }
 
-/** The report range for a period. With no agent, the report is for all agents. */
 function usageRange(days: number, agentId: string | undefined): HostAnalyticsInput {
-  // `analyticsRange` needs an agent id; the panel keeps only the dates it computes.
   const { startDate, endDate, timeZone } = analyticsRange("", days);
   return agentId === undefined ? { startDate, endDate, timeZone } : { startDate, endDate, timeZone, agentId };
 }
@@ -81,13 +76,6 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
     serverId: props.serverId,
   });
   let generation = 0;
-  /**
-   * A refresh nobody asked for keeps the report on screen. Clearing `result` unmounts
-   * `AgentUsageReport`, which returns on the next response with its breakdown back to
-   * Agent and scrolled to the total - and a turn completes while the report is open
-   * often enough that this is the common case, not the rare one. Only a request the
-   * user made may blank the body: the first load, a filter change, Refresh.
-   */
   async function load(range = state.range, background = false): Promise<void> {
     const request = ++generation;
     const serverId = props.serverId;
@@ -99,7 +87,6 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
       });
     try {
       const [result, agents] = await Promise.all([
-        // Electron cannot clone the Solid store proxy across the context bridge.
         port().agent.getHostAnalytics({ ...range }, serverId),
         port().agent.listAgents(serverId),
       ]);
@@ -111,11 +98,6 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
           draft.phase = result ? "ready" : "unsupported";
         });
     } catch (error) {
-      // A background refresh that fails leaves the last good report where it is rather
-      // than replacing it with an error the user cannot act on; the next turn retries.
-      // Only while a report is on screen, though: a background request that overtakes the
-      // first load takes the generation with it, so the foreground response is discarded
-      // too, and a silent failure would leave the panel on Loading with no Retry.
       if (background && state.result) return;
       if (request === generation && props.serverId === serverId && state.range.agentId === agentId)
         setState((draft) => {
@@ -135,7 +117,6 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
       });
     },
   );
-  // One view for each report the user asks for: the first one, and each filter or period change.
   createEffect(
     () => [state.range.agentId, props.serverId, state.period] as const,
     ([agentId, , range]) => {
@@ -171,8 +152,6 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
       reconnect();
     };
   });
-  // The filter and the per-agent table both name an agent by id, and props.agentName only
-  // names the panel's own agent, so it must not label another agent's row.
   const agentLabel = (id: string): UsageAgentLabel => {
     if (id === WORKFLOWS_USAGE_ID) return { name: t("usage.panel.workflows"), provider: "" };
     const agent = state.agents.find((candidate) => candidate.id === id);
@@ -306,7 +285,6 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
               metric={state.metric}
               agentLabel={agentLabel}
               onReady={() => {
-                // Start each loaded report at its total, after the tabs settle their initial selection.
                 if (reportBody) reportBody.scrollTop = 0;
               }}
             />
@@ -317,8 +295,6 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
   );
 }
 
-// The header filters share one chip dropdown so the metric and period read as the
-// same kind of control as the agent picker beside them.
 function UsageSelect<Value extends string>(props: {
   label: string;
   options: readonly Value[];

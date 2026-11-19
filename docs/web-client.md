@@ -111,8 +111,8 @@ mock. The separate web preview implements the browser runtime with that same moc
   serves `agent-publish-v1`; the host publishes with its own account. A plugin app
   that needs a browser sign-in is installed on the host computer, as for a desktop remote admin.
 - Join, marketplace, shared agent, server settings, global search and channel creation use the
-  shared views in `src/renderer/src/WorkspaceOverlayViews.tsx`, as desktop does. An open overlay or
-  toast suspends the browser view, as on desktop.
+  shared views in `src/renderer/src/WorkspaceOverlayViews.tsx`, as desktop does. An open overlay
+  suspends the browser view, as on desktop. A toast does not.
 - `/app` accepts three links: `?agent=<id>` from a shared agent page, the four invitation fields from
   the `/join` page, and `?plugin=<slug>` from a plugin page. The client removes the fields after it
   reads them, so the invitation secret does not stay in the address bar or history. A link opens the

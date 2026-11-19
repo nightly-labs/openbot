@@ -1,20 +1,3 @@
-// Checks a Codex turn whose own compaction loses the connection (#5822). Runs the real agent service
-// on a temporary profile with a fake Codex app-server. The current message names its turns in
-// `<<TURNS[...]TURNS>>`: each element is one turn of the thread. "ok" answers. "fail" starts a
-// compaction and fails with Codex's text for a refused connection. "stall" starts a compaction and
-// then sends nothing, as Codex 0.167.0 did when the connection stopped answering. "loop" compacts
-// again after each step, as Codex does when a compaction leaves the session above its own limit (#8985).
-// Checks:
-//   1. A compaction that fails on the connection continues the turn once, with a note and not the
-//      message again. No error shows, and the request completes.
-//   2. A compaction that sends nothing is stopped at the compaction run deadline, and the turn
-//      continues once. Without the deadline, the turn showed "Compacting context" until a Stop.
-//   3. A second failure in the same request does not continue again. The error shows in plain words,
-//      not Codex's text.
-//   4. A turn that compacts again and again with no growth is stopped after its third compaction. It
-//      does not continue, and the error says what to do.
-// No provider, account or network is used. `bun run test:codex-midturn-compaction`.
-// Writes .openbot-build/codex-midturn-compaction-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -34,10 +17,8 @@ const fakeCodex = join(root, "codex");
 const fakeLog = join(root, "codex.jsonl");
 const NOTE_MARKER = "OpenBot note, not a message from the user";
 const CODEX_ERROR = "Error running remote compact task: Connection failed: error sending request";
-// A compaction may start in 200 ms, and a started compaction runs for 2 s at most.
 const COMPACTION_TIMEOUT_MS = 200;
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -65,11 +46,8 @@ const config = { config: { mcp_servers: {} }, layers: [{ name: { type: "user", f
 let buffer = "";
 let threads = 0;
 let count = 0;
-/** The turns that each thread has still to run, from the message that named them. */
 const scripts = new Map();
-/** The turns that stall in a compaction, until a \`turn/interrupt\`. */
 const stalled = new Set();
-/** The turns that compact again after each step, until a \`turn/interrupt\` or 20 compactions. */
 const looping = new Set();
 process.stdout.on("error", (error) => {
   if (error.code === "EPIPE") process.exit(0);
@@ -82,7 +60,6 @@ const compaction = (threadId, turnId) => {
   write({ method: "item/started", params: { threadId, turnId, item } });
 };
 const run = (threadId, turnId, kind) => {
-  // A small context, so OpenBot does not compact the thread by itself.
   const tokenUsage = { total: { totalTokens: 30000 }, last: { totalTokens: 30000 }, modelContextWindow: 100000 };
   write({ method: "thread/tokenUsage/updated", params: { threadId, turnId, tokenUsage } });
   const work = { type: "commandExecution", id: "command-" + turnId, command: "ls", status: "completed", aggregatedOutput: "" };
@@ -114,7 +91,6 @@ const run = (threadId, turnId, kind) => {
       setTimeout(() => {
         if (!looping.has(turnId)) return;
         write({ method: "item/completed", params: { threadId, turnId, item } });
-        // The compaction leaves 60% of the window, which is still above this fake's own limit.
         const usage = { total: { totalTokens: 60000 }, last: { totalTokens: 60000 }, modelContextWindow: 100000 };
         write({ method: "thread/tokenUsage/updated", params: { threadId, turnId, tokenUsage: usage } });
         setTimeout(again, 10);
@@ -217,7 +193,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service, its database or the fake's log. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -272,7 +247,6 @@ service.on("event", (event) => events.push(event));
 const ended = (status: string | undefined) =>
   status === "completed" || status === "failed" || status === "interrupted" || status === "cancelled";
 
-/** Sends one request to a new agent and answers what OpenBot did with it. */
 async function request(name: string, script: FakeTurn[]) {
   const agent = await runCauseEffect(
     service.createAgent({

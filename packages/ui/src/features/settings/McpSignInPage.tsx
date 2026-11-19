@@ -1,16 +1,3 @@
-/**
- * A joined server's sign-in page, on that host's browser and drawn here.
- *
- * The grant comes back on an address the host listens on, and only a browser on the host can reach
- * it. So the host opens the server's page in its own browser, and this client shows it as the live
- * view any host tab has: the user signs in there, the server sends the browser back to the host, and
- * the host keeps what it gets. Nothing comes back through this client, so the web client signs in
- * the same way the desktop does.
- *
- * The page runs in a session of its own on the host, so the sign-in leaves no cookies where agents
- * browse.
- */
-
 import { Alert, AlertDescription, Button, CopyButton, Field, Input, ShieldCheck, Text } from "@openbot/ui";
 import { createSignal, Show } from "solid-js";
 import { useText } from "../../text";
@@ -18,15 +5,12 @@ import BrowserLiveView, { type BrowserViewRuntime } from "../browser/BrowserLive
 import { WizardDialog } from "./IntegrationLayout";
 import { McpConnectMark } from "./McpConnectShell";
 
-/** The host tab with the sign-in page, and the way to watch it. */
 export interface McpSignInPageSource {
   runtime: BrowserViewRuntime;
   tabId: string;
-  /** Whether the host pastes and copies for a live view, so a password manager's copy works. */
   clipboard: boolean;
 }
 
-/** The page itself, at the shape of the host's frame. */
 export function McpSignInPage(props: { page: McpSignInPageSource }) {
   const [shape, setShape] = createSignal("4 / 3");
   return (
@@ -42,7 +26,6 @@ export function McpSignInPage(props: { page: McpSignInPageSource }) {
   );
 }
 
-/** The line under the page: where the sign-in stays. */
 export function McpSignInPageNote(props: { hostName: string }) {
   const { t } = useText();
   return (
@@ -56,20 +39,13 @@ export function McpSignInPageNote(props: { hostName: string }) {
 }
 
 export interface McpSignInPageDialogProps {
-  /** The server the sign-in is for, as its row names it. */
   name: string;
-  /** The icon of the server, when its listing has one. */
   iconUrl?: string | null | undefined;
   hostName: string;
   page: McpSignInPageSource;
-  /**
-   * Stops the sign-in. The dialog stays until the wait ends, and the caller removes it then, the
-   * same as when the host took the grant.
-   */
   onCancel: () => void;
 }
 
-/** The page in its own dialog, for the MCP list. It is there for as long as the sign-in waits. */
 export function McpSignInPageDialog(props: McpSignInPageDialogProps) {
   const { t } = useText();
   const [cancelling, setCancelling] = createSignal(false);
@@ -96,7 +72,6 @@ export function McpSignInPageDialog(props: McpSignInPageDialogProps) {
   );
 }
 
-/** The one button of a sign-in that waits: it stops the sign-in. */
 function CancelSignIn(props: { cancelling: boolean; onCancel: () => void }) {
   const { t } = useText();
   return (
@@ -106,48 +81,31 @@ function CancelSignIn(props: { cancelling: boolean; onCancel: () => void }) {
   );
 }
 
-/** A relayed sign-in that waits in the user's own browser (`sign-in-relay-v1`). */
 export interface McpSignInRelaySource {
-  /** The host name of the sign-in page, so the user can check it before they sign in. */
   authorizeHost: string;
-  /** The whole address of the page, for the copy button. `null` shows no button. */
   url: string | null;
-  /** Whether this computer takes the callback. When it does not, only a pasted address ends the sign-in. */
   listening: boolean;
-  /** Whether a pasted address can end the sign-in. A device page returns nowhere, so it has no field. */
   pasteable: boolean;
 }
 
 export interface McpSignInRelayActions {
-  /**
-   * Opens the page. The desktop app already opened it when the sign-in started, so there this opens it
-   * again. A browser blocks a page that no click opened, so the web client opens it only here. A
-   * rejection is shown under the field.
-   */
   onOpen: () => void | Promise<void>;
-  /** Sends the address that the browser shows. A rejection is shown under the field. */
   onPaste: (address: string) => Promise<void>;
 }
 
 export interface McpSignInRelayDialogProps extends McpSignInRelayActions {
   name: string;
-  /** The icon of the server, when its listing has one. */
   iconUrl?: string | null | undefined;
   hostName: string;
   page: McpSignInRelaySource;
   onCancel: () => void;
 }
 
-/** What the dialog of a relayed sign-in says, as its page asks for. */
 export function relayDescriptionKey(page: McpSignInRelaySource) {
   if (!page.pasteable) return "mcp.signIn.relayDeviceDescription";
   return page.listening ? "mcp.signIn.relayDescription" : "mcp.signIn.relayOpenDescription";
 }
 
-/**
- * The open button and the address field of a relayed sign-in. A page that returns nowhere has no
- * field, so only a failed open shows under the button.
- */
 export function McpSignInRelayControls(props: McpSignInRelayActions & { page: McpSignInRelaySource }) {
   const { t, errorMessage } = useText();
   const [address, setAddress] = createSignal("");
@@ -176,7 +134,6 @@ export function McpSignInRelayControls(props: McpSignInRelayActions & { page: Mc
   };
   return (
     <>
-      {/* The link also works in another browser or on another device: the host waits for the sign-in. */}
       <div class="mcp-sign-in-relay-open">
         <Button type="button" onClick={() => void openPage()}>
           {t("mcp.signIn.relayOpen")}
@@ -216,11 +173,6 @@ export function McpSignInRelayControls(props: McpSignInRelayActions & { page: Mc
   );
 }
 
-/**
- * A joined server's sign-in that the host started and the user finishes in their own browser. The
- * callback comes back to this computer, which sends it to the host. The address field is for a
- * browser that cannot reach this computer's listener, such as the web client's.
- */
 export function McpSignInRelayDialog(props: McpSignInRelayDialogProps) {
   const { t } = useText();
   const [cancelling, setCancelling] = createSignal(false);

@@ -20,22 +20,16 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The agent has the command. The loader waits in the icon tile. */
 export const Waiting: Story = {};
 
-/** The new server signed in. Its logo is in the tile, with a spinner on its corner. */
 export const Starting: Story = { args: { step: "starting", server: SERVER } };
 
-/** The new server is online. */
 export const Connected: Story = { args: { step: "connected", server: SERVER } };
 
-/** The server signed in earlier, but it is not online now. */
 export const Offline: Story = { args: { step: "offline", server: SERVER } };
 
-/** Nobody used the command before it expired. */
 export const Expired: Story = { args: { step: "expired" } };
 
-/** The reveal as the chat shows it: the server signs in after 3 s and connects after 6 s. */
 export const Reveal: Story = {
   render: (args) => {
     const [step, setStep] = createSignal<ServerInstallCardStep>("waiting");

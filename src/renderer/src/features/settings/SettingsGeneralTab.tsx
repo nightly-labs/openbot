@@ -43,7 +43,9 @@ import { useI18n } from "../../i18n-context";
 import { useInterfaceSizeChoice } from "../../interface-size";
 import { useLayout } from "../../layout";
 import { useLogoColorChoice } from "../../logo-color";
+import { ChatBackdropSetting } from "./ChatBackdropSetting";
 import { ExternalLinkSelect } from "./ExternalLinkSelect";
+import { MotionSwitches } from "./MotionSwitches";
 
 const interfaceSizeOptions = [...APP_INTERFACE_SIZES];
 const quitGuardOptions = [...QUIT_GUARDS];
@@ -54,18 +56,13 @@ const QUIT_GUARD_LABEL = {
 } as const satisfies Record<QuitGuard, AppTextKey>;
 
 interface SettingsGeneralTabProps {
-  /** The page that shows: General, Appearance or App behavior. The three pages edit the same preferences. */
   part: "general" | "appearance" | "app-behavior";
   value: GeneralSettingsValue;
-  /** The device with the keyboard, naming ⌘ or Ctrl in the shortcut option. */
   platform?: "darwin" | "win32" | "linux" | undefined;
-  /** A dev or preview build keeps its own logo color, so the logo color row says so. */
   variant: AppVariant;
-  /** The dialog element the Select popovers portal into, captured when the tab was created. */
   selectMount: HTMLElement | undefined;
   onUpdateSetting: <Key extends keyof GeneralSettingsValue>(key: Key, value: GeneralSettingsValue[Key]) => void;
   onUpdateSettings: (patch: Partial<GeneralSettingsValue>) => void;
-  /** The chat color of the account, or null for none. */
   chatColor: AvatarColor | null;
   onSetChatColor: (color: AvatarColor | null) => Promise<void>;
 }
@@ -73,7 +70,6 @@ interface SettingsGeneralTabProps {
 export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
   const i18n = useI18n();
   const layout = useLayout();
-  /** macOS always keeps running after the window closes. There the switch moves OpenBot from the Dock to the menu bar. */
   const backgroundRow = () =>
     props.platform === "darwin"
       ? ({ title: "settings.menuBar.title", description: "settings.menuBar.description" } as const)
@@ -254,7 +250,6 @@ export function SettingsGeneralTab(props: SettingsGeneralTabProps) {
   );
 }
 
-/** The Appearance page. Only this page reads the fonts of the computer and the appearance preferences. */
 function AppearanceRows(props: SettingsGeneralTabProps) {
   const i18n = useI18n();
   const appearance = useAppearanceChoice();
@@ -346,6 +341,15 @@ function AppearanceRows(props: SettingsGeneralTabProps) {
               />
             </ItemActions>
           </Item>
+          <Item data-settings-row="settings.chatBackdrop.title" class="settings-modal-row">
+            <ItemContent>
+              <ItemTitle>{i18n.t("settings.chatBackdrop.title")}</ItemTitle>
+              <ItemDescription>{i18n.t("settings.chatBackdrop.description")}</ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <ChatBackdropSetting mount={props.selectMount} />
+            </ItemActions>
+          </Item>
         </ItemGroup>
       </SettingsSection>
       <SettingsSection title={i18n.t("settings.appearance.textTitle")}>
@@ -382,7 +386,6 @@ function AppearanceRows(props: SettingsGeneralTabProps) {
               </Select>
             </ItemActions>
           </Item>
-          {/* Local only, on a joined server too: the list is the fonts of this computer. */}
           <Item data-settings-row="settings.interfaceFont.title" class="settings-modal-row">
             <ItemContent>
               <ItemTitle id={interfaceFontTitleId}>{i18n.t("settings.interfaceFont.title")}</ItemTitle>
@@ -416,6 +419,11 @@ function AppearanceRows(props: SettingsGeneralTabProps) {
               />
             </ItemActions>
           </Item>
+        </ItemGroup>
+      </SettingsSection>
+      <SettingsSection title={i18n.t("settings.motion.title")}>
+        <ItemGroup class="settings-modal-card">
+          <MotionSwitches />
         </ItemGroup>
       </SettingsSection>
     </>

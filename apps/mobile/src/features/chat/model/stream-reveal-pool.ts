@@ -5,7 +5,6 @@ interface Reveal {
 
 const STREAM_WORD_INTERVAL_MS = 32;
 
-/** Bounds native animated nodes; bursts catch up instead of delaying the answer. */
 export function createStreamRevealPool(limit = 4) {
   const waiting = new Set<Reveal>();
   const active = new Set<Reveal>();
@@ -14,8 +13,6 @@ export function createStreamRevealPool(limit = 4) {
     if (timer !== null || waiting.size === 0) return;
     timer = setTimeout(() => {
       timer = null;
-      // Never wait for an animation callback to admit the next word. A busy RN
-      // runtime can deliver that callback late even though its UI fade has finished.
       if (active.size >= limit) {
         const oldest = active.values().next().value;
         if (oldest) {
@@ -60,7 +57,6 @@ export function createStreamRevealPool(limit = 4) {
   };
 }
 
-/** Completed text is a single prefix; only a bounded suffix needs React reveal nodes. */
 export function streamRevealWindow(body: string, baseline: string, enabled: boolean, limit = 14) {
   if (!enabled || !body.startsWith(baseline)) return { prefix: body, words: [] };
   const words = Array.from(body.slice(baseline.length).matchAll(/\s*\S+\s*|\s+/gu), (match) => ({

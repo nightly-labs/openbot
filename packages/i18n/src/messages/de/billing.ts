@@ -149,7 +149,6 @@ export const messages = {
   "billing.license.cancel.descriptionNow":
     "Die Lizenz endet mit dem bezahlten Zeitraum. Deine Server sind nicht betroffen.",
   "billing.license.cancel.keep": "Lizenz behalten",
-  // The order form: a hosted server and a license in one order. The pricing page and Billing show it.
   "billing.order.billing": "Abrechnungszeitraum",
   "billing.order.currency": "Währung",
   "billing.order.monthly": "Monatlich",
@@ -213,4 +212,10 @@ export const messages = {
     other:
       "Deine Lizenz hat {count} Nutzer, das Maximum. Kontaktiere uns für eine größere Lizenz. Neue Personen können deinen Servern nicht beitreten.",
   },
+  "billing.details.country": "Rechnungsland",
+  "billing.details.countryPlaceholder": "Land wählen",
+  "billing.details.vatId": "EU-USt-IdNr. (optional)",
+  "billing.details.vatIdInvalid": "Das ist keine USt-IdNr. des gewählten Landes.",
+  "billing.details.countryMissing": "Wähle dein Rechnungsland.",
+  "billing.details.saveFailed": "Rechnungsdaten konnten nicht gespeichert werden",
 } as const satisfies PartialTranslation<typeof source>;

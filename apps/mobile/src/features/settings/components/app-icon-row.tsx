@@ -8,7 +8,6 @@ import { SettingsRow, SettingsSection } from "@/features/settings/components/set
 import { APP_ICON_LABELS, appIconLook, loadAppIcon, useAppIcon } from "@/features/settings/model/app-icon";
 import { useText } from "@/shared/lib/text";
 
-/** Opens the app icon picker. Hidden when the phone or the build cannot change the icon. */
 export function AppIconSection() {
   const { t } = useText();
   const { value, ready } = useAppIcon();

@@ -1,7 +1,6 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.connector", {
-  // The built-in GitHub connection: the device flow, the token refresh and the stored file.
   "error.connector.githubUnavailable": "This build of OpenBot has no GitHub App.",
   "error.connector.githubDenied": "The GitHub sign-in was refused.",
   "error.connector.githubCodeExpired": "The GitHub code expired. Connect GitHub again.",
@@ -21,16 +20,22 @@ export const messages = defineMessages("error.connector", {
   "error.connector.linkNoCard": "The Link account has no card. Add a card in Link.",
   "error.connector.linkFileUnreadable": "The Link connection file is unreadable.",
   "error.connector.linkFileTooLarge": "The Link connection file is too large.",
-  // The 1Password connection: the CLI that creates the service account, the token and the stored file.
   "error.connector.onePasswordCliMissing":
     "OpenBot cannot find the 1Password CLI. Install it and turn on its integration in the 1Password app, or use a service account token.",
   "error.connector.onePasswordCliInstallFailed":
     "OpenBot could not install the 1Password CLI. Check the connection to the internet, then try again.",
   "error.connector.onePasswordCliSignedOut":
     "The 1Password CLI is not signed in. Turn on its integration in the 1Password app, then connect again.",
+  "error.connector.onePasswordAppUnreachable":
+    "OpenBot cannot reach the 1Password app. Open 1Password and unlock it. In Settings > Developer, make sure that “Integrate with 1Password CLI” is on. Then try again.",
   "error.connector.onePasswordCliFailed": "The 1Password CLI failed: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "Your 1Password account does not let you create the shared vault or a service account. Ask an owner or administrator of the account for this permission, or ask them for a service account token and click “Use token”.",
   "error.connector.onePasswordUnexpected": "1Password sent an unexpected answer: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password did not accept the service account token.",
+  "error.connector.onePasswordUnreachable":
+    "OpenBot cannot reach 1Password. Check the internet connection, then try again.",
+  "error.connector.onePasswordRateLimited": "1Password received too many requests. Wait a few minutes, then try again.",
   "error.connector.onePasswordNoVault":
     "The service account cannot read a vault. Give it access to a vault, then try again.",
   "error.connector.onePasswordFileUnreadable": "The 1Password connection file is unreadable.",
@@ -56,6 +61,8 @@ export const messages = defineMessages("error.connector", {
     "Could not install the Proton Pass CLI. Check the network connection, then connect again.",
   "error.connector.protonPassPlan":
     "Your Proton plan does not allow the Proton Pass CLI. Change the plan, then connect again.",
+  "error.connector.protonPassPlanMissing":
+    "Your Proton plan does not include the Proton Pass CLI. It needs a Proton plan that includes Pass Plus. Change the plan, then connect again.",
   "error.connector.protonPassExpired": "The Proton Pass access ended. Connect again.",
   "error.connector.protonPassKeyInvalid": "Enter a Proton Pass access key that starts with pst_.",
   "error.connector.protonPassExtraPassword": "The extra password is not correct. Enter it again.",

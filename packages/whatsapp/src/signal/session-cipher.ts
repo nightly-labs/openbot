@@ -1,7 +1,3 @@
-// Double Ratchet encryption and decryption of pairwise messages (`msg` and `pkmsg`)
-// (signal.org/docs/specifications/doubleratchet), with the WhatsApp interop rules: PN is the last
-// counter of the old chain, the MAC has 8 bytes and covers both 33-byte identity keys.
-
 import { aesCbcDecrypt, aesCbcEncrypt, bytesEqual, concatBytes, constantTimeEqual, hmacSha256 } from "./crypto";
 import { sharedKey, withKeyType } from "./curve";
 import { MessageCounterError } from "./errors";
@@ -28,7 +24,6 @@ import {
 } from "./session-record";
 
 export interface LocalParty {
-  /** 33-byte identity public key. */
   identityKey: Uint8Array;
   registrationId: number;
   newKeyPair: KeyPairSource;
@@ -39,7 +34,6 @@ export interface EncryptedMessage {
   ciphertext: Uint8Array;
 }
 
-/** Encrypts on the current state of `record` and advances its sending chain. */
 export function encryptMessage(record: SessionRecord, local: LocalParty, plaintext: Uint8Array): EncryptedMessage {
   const state = record.states[0];
   if (!state?.sending) throw new Error("No open session to encrypt with");
@@ -70,10 +64,6 @@ export function encryptMessage(record: SessionRecord, local: LocalParty, plainte
   };
 }
 
-/**
- * Decrypts a `msg`. Tries the current state, then the archived states from newest; the state that
- * works becomes current. `record` changes only on success.
- */
 export function decryptSignalMessage(record: SessionRecord, local: LocalParty, serialized: Uint8Array): Uint8Array {
   const message = decodeSignalMessage(serialized);
   const errors: unknown[] = [];
@@ -95,11 +85,6 @@ export function decryptSignalMessage(record: SessionRecord, local: LocalParty, s
   );
 }
 
-/**
- * Decrypts a `pkmsg`. A state with the same base key is used again; else `buildState` makes a
- * responder state, which becomes current after the decryption succeeds. `record` changes only on
- * success. `createdState` tells the caller to delete the one-time prekey.
- */
 export async function decryptPreKeySignalMessage(
   record: SessionRecord,
   local: LocalParty,
@@ -121,7 +106,6 @@ export async function decryptPreKeySignalMessage(
   return { plaintext, createdState: true };
 }
 
-/** Decrypts on one state and changes it. Callers give a copy. */
 function decryptOnState(state: SessionState, local: LocalParty, message: ParsedSignalMessage): Uint8Array {
   let chain = state.receiving.find((candidate) => bytesEqual(candidate.ratchetKey, message.ratchetKey));
   if (!chain) chain = ratchetStep(state, local, message);
@@ -133,14 +117,12 @@ function decryptOnState(state: SessionState, local: LocalParty, message: ParsedS
   return plaintext;
 }
 
-/** DH ratchet step for a message with a new ratchet key. Returns the new receiving chain. */
 function ratchetStep(state: SessionState, local: LocalParty, message: ParsedSignalMessage): ReceivingChain {
   const remoteRatchetKey = state.remoteRatchetKey;
   const previous = remoteRatchetKey
     ? state.receiving.find((candidate) => bytesEqual(candidate.ratchetKey, remoteRatchetKey))
     : undefined;
   if (previous?.chainKey) {
-    // Keep the keys of the old chain up to PN, then close it.
     if (message.previousCounter >= previous.nextIndex) deriveUpTo(previous, message.previousCounter);
     previous.chainKey = undefined;
   }
@@ -165,7 +147,6 @@ function ratchetStep(state: SessionState, local: LocalParty, message: ParsedSign
   return chain;
 }
 
-/** Returns the message key seed for `counter` and removes it from the chain. */
 function takeMessageKey(chain: ReceivingChain, counter: number): Uint8Array {
   if (counter >= chain.nextIndex) deriveUpTo(chain, counter);
   const seed = chain.skipped.get(counter);
@@ -174,7 +155,6 @@ function takeMessageKey(chain: ReceivingChain, counter: number): Uint8Array {
   return seed;
 }
 
-/** Derives and keeps the message keys of `chain` up to and including `index`. */
 function deriveUpTo(chain: ReceivingChain, index: number): void {
   if (!chain.chainKey) throw new MessageCounterError();
   if (index - (chain.nextIndex - 1) > MAX_FORWARD_JUMP) {
@@ -188,7 +168,6 @@ function deriveUpTo(chain: ReceivingChain, index: number): void {
     chain.nextIndex += 1;
   }
   chain.chainKey = chainKey;
-  // Keep only the newest keys. The key for `index` is the newest, so it stays.
   for (const oldest of chain.skipped.keys()) {
     if (chain.skipped.size <= MAX_SKIPPED_MESSAGE_KEYS) break;
     chain.skipped.delete(oldest);

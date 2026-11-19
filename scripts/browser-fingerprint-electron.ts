@@ -10,10 +10,6 @@ import { BrowserHost } from "../src/backend/browser-host";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import type { DynamicToolCallParams, DynamicToolResult } from "../src/backend/protocol";
 
-// Opens agent tabs in the real BrowserHost with the tab preload, and checks the values that bot
-// checks (sannysoft, CreepJS, BrowserScan) read: the outer size of a hidden tab, `window.chrome` in
-// the page and in a new frame, and the key and pointer events of the agent's input.
-
 const argument = (name: string) => {
   const value = process.argv.find((item) => item.startsWith(`--${name}=`))?.slice(name.length + 3);
   if (!value) throw new Error(`Missing ${name}.`);
@@ -38,7 +34,6 @@ const pageEventSchema = z.object({
   type: z.string(),
   target: z.string(),
   trusted: z.boolean(),
-  // Key events have no position, and pointer events have no key.
   key: z.string().optional(),
   code: z.string().optional(),
   keyCode: z.number().optional(),
@@ -61,8 +56,6 @@ const values: {
   shownClick?: ClickValues;
   webgl?: { real: Array<[string, string] | null>; tab: Array<[string, string] | null> };
 } = {};
-// On Linux, the GPU switches of a server (`configureLinuxGpu` in src/main/linux-gpu-mode.ts): CI has
-// no GPU, so WebGL runs on SwiftShader as on a server.
 if (process.platform === "linux") {
   app.commandLine.appendSwitch("disable-gpu-compositing");
   app.commandLine.appendSwitch("enable-unsafe-swiftshader");
@@ -207,7 +200,6 @@ async function main(): Promise<void> {
       assert.equal(maskedToString, "function toString() { [native code] }");
       recordCase("replaced-functions-read-as-native");
 
-      // A lie check gives a replaced function a receiver that makes it throw, and reads the stack.
       const stacks = await page(
         contents,
         `[
@@ -222,8 +214,6 @@ async function main(): Promise<void> {
       );
       recordCase("replaced-function-errors-have-native-stacks");
 
-      // V8 stops its cyclic-prototype check at a Proxy, so a bot check that gives a function a
-      // prototype that inherits from itself finds a replaced function when no error comes.
       const cyclic = await page(
         contents,
         `[
@@ -249,8 +239,6 @@ async function main(): Promise<void> {
       assert.deepEqual(cyclic, Array(4).fill("Cyclic __proto__ value"));
       recordCase("replaced-functions-refuse-cyclic-prototypes");
 
-      // A server renders WebGL on SwiftShader, which bot checks read as headless Chrome. A window
-      // with no tab preload shows the real renderer.
       const readGpu = `(() => ['webgl', 'webgl2'].map((kind) => {
         const gl = document.createElement('canvas').getContext(kind);
         const info = gl?.getExtension('WEBGL_debug_renderer_info');
@@ -275,7 +263,6 @@ async function main(): Promise<void> {
       assert.deepEqual(getParameterSource, Array(2).fill("function getParameter() { [native code] }"));
       const { real, tab } = values.webgl;
       if (process.platform === "linux") {
-        // The server GPU switches above keep WebGL on a computer with no GPU.
         assert(
           real.every((names) => names !== null),
           "A Linux server has no WebGL.",
@@ -294,12 +281,9 @@ async function main(): Promise<void> {
     }
 
     {
-      // While the DevTools Runtime domain is on, Chromium formats each console argument, and a page
-      // sees that through `Error.prepareStackTrace`. The agent's evaluate must not turn it on.
       await call("evaluate", {
         tabId,
         expression: `(() => {
-          // V8 formats a stack only when something reads it, so a call here is DevTools reading it.
           let reads = 0;
           const error = new Error('probe');
           Error.prepareStackTrace = (formatted) => {
@@ -340,7 +324,6 @@ async function main(): Promise<void> {
     }
 
     {
-      // The fpCollect HEADCHR_IFRAME check reads the window of a srcdoc frame before it loads.
       const frames = await page(
         contents,
         `(async () => {
@@ -371,8 +354,6 @@ async function main(): Promise<void> {
       assert.equal(frames.openbot, "undefinedundefined", "The tab page can reach window.openbot or require.");
       recordCase("page-has-no-openbot-bridge");
 
-      // A lie check reads the functions of one frame with the toString of another frame. The frame
-      // is read after it loads, so its own preload ran first.
       const crossFrame = await page(
         contents,
         `new Promise((resolve) => {
@@ -441,7 +422,6 @@ async function main(): Promise<void> {
       assert.equal(await page(contents, "document.getElementById('other').value", z.string()), mixed);
       recordCase("text-with-no-us-key-is-inserted");
 
-      // A code editor adds a closing bracket for a typed opening bracket, so this text is inserted.
       await takeEvents(contents);
       const code = "if (x) {";
       await call("type", { tabId, target: { kind: "css", selector: "#long" }, text: code });
@@ -472,8 +452,6 @@ async function main(): Promise<void> {
     };
 
     {
-      // A tab with no frames acknowledges each pointer move late. The path is cut short, so the
-      // click waits no longer than the single move that it used before.
       const hidden = await click();
       timings.hiddenClickMs = hidden.elapsed;
       values.hiddenClick = { moves: hidden.moves.length, holdMs: hidden.holdMs };

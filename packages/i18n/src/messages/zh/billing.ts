@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/billing";
 
 export const messages = {
-  // The Billing tab in Settings and the Billing dialog in the web client.
   "billing.title": "账单",
   "billing.description": "每个服务器有自己的套餐，付款由 Stripe 处理。",
   "billing.loading": "正在加载账单…",
@@ -20,9 +19,7 @@ export const messages = {
   "billing.plan.standard": "标准版",
   "billing.plan.pro": "专业版",
   "billing.server.unnamed": "未命名服务器",
-  // For example "Standard · 50 GB".
   "billing.server.summary": "{plan} · {size} GB",
-  // {amount} is a formatted price, for example "€40".
   "billing.server.price.month": "{amount} / 月",
   "billing.server.price.year": "{amount} / 年",
   "billing.server.renews": "{date} 续费",
@@ -77,7 +74,6 @@ export const messages = {
   "billing.lifecycle.deleted": "{name} 已删除，其订阅已结束。",
   "billing.lifecycle.label": "设计预览 · 仅模拟操作",
   "billing.lifecycle.reset": "重置预览",
-  // The commercial license of the account, above the server plans.
   "billing.license.title": "许可证",
   "billing.license.description": "用于公司内的工作，不包含服务器。",
   "billing.license.loadFailed": "无法加载许可证。",
@@ -96,16 +92,13 @@ export const messages = {
   "billing.license.buy.confirm": "继续付款",
   "billing.license.trial.until": "{date} 前免费",
   "billing.license.trial.confirm": "开始免费试用",
-  // {used} people use the license; it is paid for {users}.
   "billing.license.work.used": "{used}/{users} 位用户",
   "billing.license.tier.starter.title": "入门版许可证",
   "billing.license.tier.team.title": "团队版许可证",
   "billing.license.starter.inUse": "有 {used} 人在使用你的服务器。入门版仅限 1 位用户。",
   "billing.license.users.label": "用户",
   "billing.license.line.base": { other: "前 {count} 位用户" },
-  // For example "3 more users × €15".
   "billing.license.line.extra": "另外 {extra} 位 × {price}",
-  // {currency} is a currency code, for example "EUR".
   "billing.license.total.month": "/ 月，{currency}",
   "billing.license.total.year": "/ 年，{currency}",
   "billing.license.contact.action": "联系我们",
@@ -121,7 +114,6 @@ export const messages = {
     "有 {used} 人在使用该许可证，但它只包含 {users} 位用户。在你为许可证增加用户之前，新成员无法加入。",
   "billing.license.overLimitOneUser": "有 {used} 人在使用该许可证，但它只包含 1 位用户。请改为团队版，以便新成员加入。",
   "billing.license.covered.title": "已由许可证覆盖",
-  // {owners} is a list of names, for example "Ana and Jan".
   "billing.license.covered.description": "在 {owners} 的服务器上工作已由他们的许可证覆盖。",
   "billing.license.change.title": "更改用户数",
   "billing.license.change.description": "当前：{users} 位用户，每月 {amount}。AI 助手不算用户。",
@@ -143,12 +135,10 @@ export const messages = {
   "billing.license.cancel.description": "许可证在 {date} 之前保持有效，之后结束。你的服务器不受影响。",
   "billing.license.cancel.descriptionNow": "许可证在付费周期结束时结束。你的服务器不受影响。",
   "billing.license.cancel.keep": "保留许可证",
-  // The order form: a hosted server and a license in one order. The pricing page and Billing show it.
   "billing.order.billing": "计费周期",
   "billing.order.currency": "货币",
   "billing.order.monthly": "按月",
   "billing.order.yearly": "按年",
-  // {percent} is a whole number, such as 20.
   "billing.order.yearlySaving": "按年 −{percent}%",
   "billing.order.server.title": "托管服务器",
   "billing.order.server.summary": "我们为你的团队运行 OpenBot。",
@@ -159,9 +149,7 @@ export const messages = {
   "billing.order.server.bestFor.starter": "最适合个人",
   "billing.order.server.bestFor.standard": "最适合小团队",
   "billing.order.server.bestFor.pro": "最适合大量浏览器操作",
-  // {size} is a whole number of gigabytes.
   "billing.order.server.storage": "{size} GB 存储",
-  // {speed} is how many times faster than the Starter server, such as 2.
   "billing.order.server.speed": "{speed}× 速度",
   "billing.order.license.title": "许可证",
   "billing.order.license.summary": "用于在工作中使用 OpenBot。",
@@ -170,7 +158,6 @@ export const messages = {
   "billing.order.license.starter": "入门版许可证",
   "billing.order.license.team": "团队版许可证",
   "billing.order.license.bundleSaving": "搭配服务器 −{percent}%",
-  // {included} is the number of members in the base price. {price} is the monthly price of one more member.
   "billing.order.license.teamDetail": "含 {included} 人，每多 1 人 +{price}",
   "billing.order.license.serverMembers": { other: "你的服务器有 {count} 名成员" },
   "billing.order.license.members": "团队版许可证成员",
@@ -178,18 +165,15 @@ export const messages = {
   "billing.order.license.more": "增加成员",
   "billing.order.memberCount": { other: "{count} 名成员" },
   "billing.order.summary.title": "你的套餐",
-  // {plan} is a server plan name, such as Standard.
   "billing.order.summary.server": { other: "{plan}服务器，最多 {count} 名成员" },
   "billing.order.summary.starterLicense": "入门版许可证，1 名成员",
   "billing.order.summary.license": { other: "团队版许可证，{count} 名成员" },
-  // {percent} is a whole number, such as 20.
   "billing.order.summary.yearlyDiscount": "按年折扣（{percent}%）",
   "billing.order.summary.bundleDiscount": "组合折扣",
   "billing.order.summary.personal": "在你自己的电脑上个人使用",
   "billing.order.summary.total": "总计",
   "billing.order.unit.month": "/ 月",
   "billing.order.unit.monthBilledYearly": "/ 月，按年计费",
-  // The unit beside the total for a visitor in the EU: the prices do not include VAT.
   "billing.order.unit.monthExclVat": "/ 月，不含增值税",
   "billing.order.unit.monthBilledYearlyExclVat": "/ 月，按年计费，不含增值税",
   "billing.order.unit.free": "永久免费",
@@ -197,7 +181,6 @@ export const messages = {
   "billing.order.cta.license": "购买许可证",
   "billing.order.cta.download": "下载",
   "billing.order.cta.keepComputer": "继续用这台电脑",
-  // Shown before an invite that makes the license too small.
   "billing.license.invite.title": "将用户添加到许可证？",
   "billing.license.invite.description": "该邀请会为你的许可证增加 1 位用户：每月多 {price}。",
   "billing.license.invite.confirm": "添加用户并邀请",
@@ -207,4 +190,10 @@ export const messages = {
   "billing.license.invite.max": {
     other: "你的许可证已有 {count} 位用户，已达上限。如需更大的许可证，请联系我们。新成员无法加入你的服务器。",
   },
+  "billing.details.country": "账单国家/地区",
+  "billing.details.countryPlaceholder": "选择国家/地区",
+  "billing.details.vatId": "欧盟增值税号（可选）",
+  "billing.details.vatIdInvalid": "这不是所选国家/地区的增值税号。",
+  "billing.details.countryMissing": "请选择账单国家/地区。",
+  "billing.details.saveFailed": "无法保存账单信息",
 } as const satisfies PartialTranslation<typeof source>;

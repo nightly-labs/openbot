@@ -4,7 +4,7 @@ import { Link } from "@tanstack/solid-router";
 import { For, Show } from "solid-js";
 import { ANDROID_APK_AVAILABLE } from "../../lib/android-apk";
 import { DOWNLOAD_PLATFORM_ORDER, DOWNLOAD_PLATFORMS } from "../../lib/download-platforms";
-import { EXTERNAL_LINK_REL, OPENBOT_ANDROID_APK_LINK } from "../../lib/landing-links";
+import { EXTERNAL_LINK_REL, OPENBOT_ALTERNATE_DOWNLOAD_LINKS, OPENBOT_ANDROID_APK_LINK } from "../../lib/landing-links";
 import { MOBILE_APP_ORDER, MOBILE_APPS } from "../../lib/mobile-apps";
 import { createLandingReveal } from "./createLandingReveal";
 import { LandingIcon } from "./LandingIcon";
@@ -12,7 +12,6 @@ import { useLandingText } from "./LandingText";
 
 interface DownloadCardContentProps {
   action?: string;
-  /** Links of the card's own, in place of `action`, for a card that is not one link. */
   actions?: JSX.Element;
   description: string;
   platform: PlatformLogoVariant | MobilePlatformLogoVariant;
@@ -67,9 +66,8 @@ export function DownloadSection() {
         </header>
 
         <div class="landing-download-grid">
-          <a
+          <div
             class="landing-download-card"
-            href={macos.href}
             data-download-platform="macos"
             data-state="available"
             data-revealed={revealState()}
@@ -79,9 +77,23 @@ export function DownloadSection() {
               status={text().available}
               title={macos.label}
               description={macos.description}
-              action={text().desktop.macos}
+              actions={
+                <>
+                  <a class="landing-download-action landing-download-card-link" href={macos.href}>
+                    {text().desktop.macos}
+                    <LandingIcon name="arrow-up-right" class="landing-download-arrow" />
+                  </a>
+                  <a
+                    class="landing-download-action landing-download-action-alternate"
+                    href={OPENBOT_ALTERNATE_DOWNLOAD_LINKS.macos}
+                  >
+                    {text().intelMac}
+                    <LandingIcon name="download" class="landing-download-action-icon" />
+                  </a>
+                </>
+              }
             />
-          </a>
+          </div>
 
           <a
             class="landing-download-card"
@@ -99,8 +111,6 @@ export function DownloadSection() {
             />
           </a>
 
-          {/* The hero selector already offers Linux and /download/linux/latest resolves an AppImage, so the
-              card is the same link the other two are. A non-clickable card here contradicted both. */}
           <a
             class="landing-download-card"
             href={linux.href}
@@ -122,8 +132,6 @@ export function DownloadSection() {
           <For each={MOBILE_APP_ORDER}>
             {(platform) => {
               const app = MOBILE_APPS[platform];
-              // Android has two downloads while a version has an APK. A link cannot contain a link,
-              // so the card is a box: the Google Play link covers it, and the APK link is on top.
               if (platform === "android" && ANDROID_APK_AVAILABLE)
                 return (
                   <div
@@ -149,7 +157,7 @@ export function DownloadSection() {
                             <LandingIcon name="arrow-up-right" class="landing-download-arrow" />
                           </a>
                           <a
-                            class="landing-download-action landing-download-action-apk"
+                            class="landing-download-action landing-download-action-alternate"
                             href={OPENBOT_ANDROID_APK_LINK}
                           >
                             {text().apk}
@@ -183,9 +191,6 @@ export function DownloadSection() {
           </For>
         </div>
 
-        {/* The cards start the download, so the pages that explain each installer get their own
-            links. They are also how a crawler finds those pages from the home page. The phone apps
-            are a separate group after a rule, as their cards are a separate row. */}
         <p class="landing-download-pages">
           {text().pages}
           <For each={DOWNLOAD_PLATFORM_ORDER}>

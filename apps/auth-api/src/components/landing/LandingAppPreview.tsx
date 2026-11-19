@@ -29,9 +29,7 @@ function markPreviewTiming(name: (typeof LANDING_PREVIEW_MARKS)[keyof typeof LAN
 
 export interface LandingAppPreviewProps {
   ref?: (element: HTMLElement) => void;
-  /** Called once, when the preview has loaded and can appear. */
   onReady?: () => void;
-  /** The loaded preview appears when this resolves. */
   revealAfter?: Promise<void>;
 }
 

@@ -8,7 +8,6 @@ export interface ReplyPlayback {
   enabled: boolean;
   complete: boolean;
   onWord: (word: string, index: number) => void;
-  /** The complete reply showed its remaining words at once. */
   onFlush: () => void;
   onComplete: () => void;
 }
@@ -42,8 +41,6 @@ export function useReplyPlayback(plan: ReturnType<typeof createReplyReveal>, pla
     const started = Date.now();
     const tick = () => {
       const words = currentPlan.current.words;
-      // The host already has the whole reply, as desktop shows it. After a short start of
-      // playback, do not make the reader wait for the rest.
       if (
         callbacks.current?.complete &&
         Date.now() - started >= REPLY_FLUSH_AFTER_MS &&
@@ -62,8 +59,6 @@ export function useReplyPlayback(plan: ReturnType<typeof createReplyReveal>, pla
           if (played) callbacks.current.onComplete();
           return;
         }
-        // Keep one clock while the provider streams. Incoming chunks must not
-        // reset the next reveal and starve playback during rapid updates.
         timer = setTimeout(tick, 32);
         return;
       }

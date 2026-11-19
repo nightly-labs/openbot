@@ -9,13 +9,6 @@ import { Effect, Result, Semaphore } from "effect";
 import { isMissingFileError } from "../backend/file-errors";
 import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } from "./preference-file";
 
-/**
- * How long this server asks the provider to keep the prompt cache of its agents. A Claude process
- * reads it when it starts, so a change applies to the next process, not to a running turn.
- *
- * A file that is missing, unreadable as JSON or names a value that is not a choice reads as the
- * default. Writes are chained for the reason `update-preference-store.ts` chains its own.
- */
 export class PromptCacheTtlPreferenceStore {
   readonly #path: string;
   #ttl: PromptCacheTtl = DEFAULT_PROMPT_CACHE_TTL.ttl;
@@ -40,7 +33,6 @@ export class PromptCacheTtlPreferenceStore {
     });
   }
 
-  /** Runs after a save that changes the time, from this computer or a joined server, so every client reads it again. */
   onChange(listener: () => void): void {
     this.#changed = listener;
   }
@@ -63,7 +55,6 @@ export class PromptCacheTtlPreferenceStore {
         ),
       )
       .pipe(
-        // After the permit, and only for a new time: the clients read it again.
         Effect.tap((changed) =>
           Effect.sync(() => {
             if (changed) this.#changed();

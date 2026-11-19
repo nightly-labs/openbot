@@ -1,10 +1,12 @@
 import type { AgentPromptResolution, ConversationQuestionPrompt } from "@openbot/contracts/ipc";
 import {
   type ConversationUiBlock,
+  UI_BLOCK_LIMITS,
   UI_BLOCK_SUBMIT_ACTION_ID,
   UI_CHOICE_QUESTION_ID,
   UI_CHOICE_VALUES_KEY,
   UI_CONFIRM_ACTION_QUESTION_ID,
+  UI_CONFIRM_EDIT_ACTION_ID,
   type UiAction,
   type UiActionStyle,
   type UiBlockResponse,
@@ -12,6 +14,8 @@ import {
   type UiConfirmBlock,
   type UiConfirmField,
   uiBlockAnswersFromResponse,
+  uiConfirmAnswersWithPreview,
+  uiConfirmPreviewEditable,
 } from "@openbot/contracts/ui-blocks";
 import { router } from "expo-router";
 import { Button, Typography } from "heroui-native";
@@ -21,16 +25,17 @@ import X from "lucide-react-native/icons/x";
 import { type ReactNode, useEffect, useState } from "react";
 import { AccessibilityInfo, View } from "react-native";
 import { useCSSVariable } from "uniwind";
+import { useChatCardSurface } from "@/features/chat/components/chat-bubble-fill";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { storeCodePreview } from "@/features/chat/model/code-preview-store";
 import { promptAnswerLabel } from "@/features/chat/model/question-prompt";
+import { SheetFormField } from "@/shared/components/sheet-form-field";
+import { useSecondsUntil } from "@/shared/lib/countdown";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
-/** How long a held button is held when the block is dangerous and gives no time, as on desktop. */
 const DEFAULT_HOLD_MS = 800;
-/** The height at which a long draft stops, in points. "Show all" opens the rest in the card. */
 const PREVIEW_MAX_HEIGHT = 240;
 
 const BUTTON_VARIANT = {
@@ -40,7 +45,6 @@ const BUTTON_VARIANT = {
   danger: "danger",
 } as const satisfies Record<UiActionStyle, "primary" | "tertiary" | "ghost" | "danger">;
 
-/** A countdown of a minute or more, as m:ss or h:mm:ss. */
 function countdownClock(totalSeconds: number): string {
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -52,16 +56,11 @@ function actionStyle(action: UiAction): UiActionStyle {
   return action.style ?? "secondary";
 }
 
-/** The confirm block of a prompt, when the prompt holds its fallback questions. */
 export function confirmBlockOf(prompt: ConversationQuestionPrompt, uiBlock: ConversationUiBlock | undefined) {
   const spec = uiBlock?.spec;
   return spec?.type === "confirm" && prompt.questions[0]?.id === UI_CONFIRM_ACTION_QUESTION_ID ? spec : null;
 }
 
-/**
- * The choice block of a prompt that the fallback question cannot show as options: a block with more
- * than one answer, or more options than a question holds. A short single choice stays a question.
- */
 export function choiceBlockOf(prompt: ConversationQuestionPrompt, uiBlock: ConversationUiBlock | undefined) {
   const spec = uiBlock?.spec;
   const question = prompt.questions[0];
@@ -69,7 +68,6 @@ export function choiceBlockOf(prompt: ConversationQuestionPrompt, uiBlock: Conve
   return spec.multiple || !question.options?.length ? spec : null;
 }
 
-/** The text of a question. An agent can write Markdown in it, such as a link. */
 export function QuestionText({ question, variant }: { question: string; variant: "title" | "body" | "secondary" }) {
   const secondaryColor = useCSSVariable("--openbot-text-secondary");
   return (
@@ -85,7 +83,6 @@ export function QuestionText({ question, variant }: { question: string; variant:
   );
 }
 
-/** Sending, offline and failure lines under a form. */
 export function PromptStatus({ controller, canSend }: { controller: QuestionPromptController; canSend: boolean }) {
   const { t } = useText();
   const { pending, failedAnswers, disabled, submit } = controller;
@@ -117,18 +114,8 @@ export function PromptStatus({ controller, canSend }: { controller: QuestionProm
 
 const PREVIEW_CLIP = { maxHeight: PREVIEW_MAX_HEIGHT };
 const MAX_KNOWN_CUT_OFF = 100;
-/**
- * Whether each draft that a card showed was cut off. The list draws a card again each time its row
- * scrolls into view; the card then has "Show all" from its first layout and keeps one height.
- */
 const knownCutOff = new Map<string, boolean>();
 
-/**
- * A long draft stops at a fixed height. It does not scroll, so the chat is the only part that
- * scrolls. "Show all" opens the whole draft on the document screen, as a Markdown file opens; it is
- * there only when the text is cut off. The card does not grow in place: the chat list places its
- * rows from JS, so a row that changes height moves the chat.
- */
 function ConfirmPreview({ markdown, title }: { markdown: string; title: string }) {
   const { t } = useText();
   const [cutOff, setCutOff] = useState(() => knownCutOff.get(markdown) ?? false);
@@ -191,10 +178,6 @@ function FieldRow({ index, label, children }: { index: number; label: string; ch
   );
 }
 
-/**
- * The title, the lines and the draft of a confirm. A select line shows its options as chips while
- * the card waits; `selectValue` gives the shown or answered option.
- */
 export function ConfirmBody({
   spec,
   compact = false,
@@ -202,10 +185,11 @@ export function ConfirmBody({
   onSelect,
   disabled = false,
   closed = false,
+  previewEditor,
 }: {
   spec: UiConfirmBlock;
   compact?: boolean;
-  /** The card has an answer or expired. As on desktop, only an open card shows its danger. */
+  previewEditor?: ReactNode;
   closed?: boolean;
   selectValue: (field: Extract<UiConfirmField, { select: string }>) => string;
   onSelect?: (select: string, option: string) => void;
@@ -256,12 +240,12 @@ export function ConfirmBody({
           )}
         </View>
       ) : null}
-      {spec.preview && !compact ? <ConfirmPreview markdown={spec.preview} title={spec.title} /> : null}
+      {previewEditor ??
+        (spec.preview && !compact ? <ConfirmPreview markdown={spec.preview} title={spec.title} /> : null)}
     </View>
   );
 }
 
-/** The shown option of a select line: the answer, the options of a closed card, or the default. */
 export function answeredSelect(
   prompt: ConversationQuestionPrompt,
   resolution: AgentPromptResolution | null,
@@ -270,12 +254,10 @@ export function answeredSelect(
   return (field: Extract<UiConfirmField, { select: string }>) => {
     const question = prompt.questions.find((item) => item.id === field.select);
     if (resolution?.status === "answered" && question) return promptAnswerLabel(question, resolution, t);
-    // Nobody chose: a closed card lists the options, and an open one shows the default, the first.
     return resolution ? field.options.join(", ") : (field.options[0] ?? "");
   };
 }
 
-/** Whether VoiceOver or TalkBack is on, and stays current when the person turns it on or off. */
 function useScreenReaderEnabled(): boolean {
   const [enabled, setEnabled] = useState(false);
   useEffect(() => {
@@ -292,50 +274,31 @@ function useScreenReaderEnabled(): boolean {
   return enabled;
 }
 
-/** Whole seconds until `at`, counted down once a second. Zero without a time or after it. */
-function useSecondsLeft(at: string | undefined): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const deadline = at ? Date.parse(at) : Number.NaN;
-    if (!Number.isFinite(deadline)) return;
-    setNow(Date.now());
-    // The timer stops at the deadline: after it the label shows the plain action until the host answers.
-    const timer = setInterval(() => {
-      const current = Date.now();
-      setNow(current);
-      if (current >= deadline) clearInterval(timer);
-    }, 1_000);
-    return () => clearInterval(timer);
-  }, [at]);
-  return at ? Math.max(0, Math.ceil((Date.parse(at) - now) / 1_000)) : 0;
-}
-
-/**
- * A confirm waiting for an answer. An action that needs a second step (`confirm: true`), and the
- * primary and danger buttons of a dangerous block, are only held to press, so a stray tap cannot
- * confirm. Desktop asks again in the card for `confirm: true`; on a phone the hold is that step.
- * With VoiceOver or TalkBack, which cannot hold a button easily, a tap asks again in the card instead. The action that the host
- * presses when nobody answers counts down.
- * Only a host with `ui-block-auto-answer-v1` sends that time.
- */
 export function ChatConfirmPrompt({
   spec,
   uiBlock,
   controller,
   canSend,
+  canEditPreview = false,
 }: {
   spec: UiConfirmBlock;
   uiBlock: ConversationUiBlock | undefined;
   controller: QuestionPromptController;
   canSend: boolean;
+  canEditPreview?: boolean;
 }) {
   const { t } = useText();
+  const card = useChatCardSurface();
   const muted = useThemeColor("muted");
   const { disabled, submit } = controller;
   const autoAnswer = uiBlock?.state.autoAnswer?.done ? undefined : uiBlock?.state.autoAnswer;
-  const secondsLeft = useSecondsLeft(autoAnswer?.at);
+  const secondsLeft = useSecondsUntil(autoAnswer?.at ? Date.parse(autoAnswer.at) : 0);
   const [selected, setSelected] = useState<Record<string, string>>({});
   const [confirming, setConfirming] = useState<UiAction>();
+  const [draft, setDraft] = useState<string>();
+  const blankDraft = draft !== undefined && !draft.trim();
+  const opensEditor = (action: UiAction) =>
+    canEditPreview && uiConfirmPreviewEditable(spec) && action.id === UI_CONFIRM_EDIT_ACTION_ID;
   const screenReader = useScreenReaderEnabled();
   const holdMs = spec.confirmHold ?? DEFAULT_HOLD_MS;
   const holdsPrimary = spec.danger === true || spec.confirmHold !== undefined;
@@ -345,21 +308,25 @@ export function ChatConfirmPrompt({
     selected[field.select] ?? field.options[0] ?? "";
 
   function respond(action: UiAction): void {
-    if (disabled) return;
+    if (disabled || blankDraft) return;
     setConfirming(undefined);
+    if (opensEditor(action)) {
+      setDraft(spec.preview);
+      return;
+    }
     const values: Record<string, string> = {};
     for (const field of spec.fields ?? []) if ("select" in field) values[field.select] = selectValue(field);
     const response: UiBlockResponse = Object.keys(values).length
       ? { actionId: action.id, values }
       : { actionId: action.id };
-    void submit(uiBlockAnswersFromResponse(spec, response));
+    void submit(uiConfirmAnswersWithPreview(spec, response, draft));
   }
 
   return (
     <View className="w-full gap-2.5" accessibilityLabel={t("mobile.chat.question.form")}>
       <View
-        className="max-w-[92%] flex-row items-start gap-2 self-start rounded-[20px] bg-control/60 px-4 py-3"
-        style={{ borderCurve: "circular" }}
+        className={`max-w-[92%] flex-row items-start gap-2 self-start rounded-[20px] ${card.fillClass} px-4 py-3`}
+        style={card.style}
       >
         <View className="min-w-0 flex-1 pt-1">
           <ConfirmBody
@@ -367,6 +334,21 @@ export function ChatConfirmPrompt({
             selectValue={selectValue}
             disabled={disabled}
             onSelect={(select, option) => setSelected((current) => ({ ...current, [select]: option }))}
+            previewEditor={
+              draft === undefined ? undefined : (
+                <SheetFormField
+                  label={t("mobile.chat.question.preview")}
+                  hideLabel
+                  multiline
+                  tall
+                  autoFocus
+                  editable={!disabled}
+                  maxLength={UI_BLOCK_LIMITS.preview}
+                  value={draft}
+                  onChangeText={setDraft}
+                />
+              )
+            }
           />
         </View>
         {autoAnswer ? null : (
@@ -392,7 +374,7 @@ export function ChatConfirmPrompt({
               size="sm"
               variant={BUTTON_VARIANT[actionStyle(confirming)]}
               className="rounded-full"
-              isDisabled={disabled}
+              isDisabled={disabled || blankDraft}
               onPress={() => {
                 void haptics.selection();
                 respond(confirming);
@@ -409,6 +391,7 @@ export function ChatConfirmPrompt({
         <>
           <View className="flex-row flex-wrap gap-2">
             {spec.actions.map((action) => {
+              if (draft !== undefined && opensEditor(action)) return null;
               const held = isHeld(action);
               return (
                 <Button
@@ -416,7 +399,7 @@ export function ChatConfirmPrompt({
                   size="sm"
                   variant={BUTTON_VARIANT[actionStyle(action)]}
                   className="rounded-full"
-                  isDisabled={disabled}
+                  isDisabled={disabled || blankDraft}
                   accessibilityHint={held && !screenReader ? t("mobile.chat.question.holdHint") : undefined}
                   delayLongPress={held ? holdMs : undefined}
                   onLongPress={
@@ -428,7 +411,6 @@ export function ChatConfirmPrompt({
                       : undefined
                   }
                   onPress={() => {
-                    // A tap on a held button only says that it must be held; the hint under the buttons says how.
                     if (held && !screenReader) return void haptics.notification("warning");
                     void haptics.selection();
                     if (held || action.confirm === true) setConfirming(action);
@@ -461,10 +443,6 @@ export function ChatConfirmPrompt({
   );
 }
 
-/**
- * A choice that a question cannot show as options: several answers, or a long list. Each option
- * toggles; "Send" sends the selected options once.
- */
 export function ChatChoicePrompt({
   spec,
   controller,
@@ -475,6 +453,7 @@ export function ChatChoicePrompt({
   canSend: boolean;
 }) {
   const { t } = useText();
+  const card = useChatCardSurface();
   const [muted, accent] = useThemeColor(["muted", "accent"]);
   const { disabled, submit } = controller;
   const [picked, setPicked] = useState<string[]>(() =>
@@ -490,8 +469,8 @@ export function ChatChoicePrompt({
 
   return (
     <View
-      className="w-full max-w-[92%] self-start gap-1 rounded-[20px] bg-control/60 px-4 py-3"
-      style={{ borderCurve: "circular" }}
+      className={`w-full max-w-[92%] self-start gap-1 rounded-[20px] ${card.fillClass} px-4 py-3`}
+      style={card.style}
       accessibilityLabel={t("mobile.chat.question.form")}
     >
       <View className="flex-row items-center gap-2">

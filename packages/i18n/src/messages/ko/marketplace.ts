@@ -83,6 +83,7 @@ export const messages = {
   "marketplace.app.partialTitle": "{name}이(가) 완료되지 않았어요",
   "marketplace.app.partialDescription": "일부 앱 또는 스킬이 설치되지 않았어요. 다시 연결하면 설치돼요.",
   "marketplace.app.notConnected": "연결 안 됨",
+  "marketplace.app.paused": "일시 중지됨",
   "marketplace.app.custom": "MCP 서버",
   "marketplace.app.githubTagline": "저장소, 이슈, 풀 리퀘스트",
   "marketplace.app.onePasswordTagline": "공유한 로그인 정보로 사이트에 로그인",
@@ -128,6 +129,7 @@ export const messages = {
     "{host}의 OpenBot 버전이 오래되어 앱을 연결할 수 없습니다. {host}의 OpenBot을 업데이트하거나 소유자에게 업데이트를 요청하세요.",
   "marketplace.app.blocked.member":
     "{host}에서는 소유자나 관리자만 앱을 연결할 수 있습니다. 이들에게 {name} 연결을 요청하거나, 멤버도 앱을 연결할 수 있도록 {host}의 OpenBot 업데이트를 요청하세요.",
+  "marketplace.app.blocked.mac": "{name}은(는) OpenBot을 실행하는 Mac에서만 작동합니다.",
   "marketplace.app.connectAgain": "다시 연결",
   "marketplace.app.automation.askOnInstall": "설치할 때 macOS에 접근 요청",
   "marketplace.app.automation.title": "Apple 앱 접근",
@@ -363,8 +365,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.recall": "이 프로젝트의 결정 사항에 대해 내 노트에는 뭐라고 적혀 있어?",
   "marketplace.plugin.obsidian.prompt.save": "이 결정을 내 보관함에 새 노트로 저장해 줘.",
   "marketplace.plugin.obsidian.prompt.log": "오늘 한 작업 요약을 내 작업 로그 노트에 추가해 줘.",
-  "marketplace.plugin.obsidian.hint.apiKey":
-    'Obsidian에서 Settings > Local REST API를 여세요. API 키를 복사하고 "Enable non-encrypted (HTTP) server"를 켜세요.',
+  "marketplace.plugin.obsidian.hint.apiKey": "Obsidian에서 Settings > Local REST API를 열고 API 키를 복사하세요.",
   "marketplace.plugin.resend.tagline": "트랜잭션 이메일",
   "marketplace.plugin.resend.description":
     "Resend를 사용하면 에이전트가 API 하나로 트랜잭션 이메일을 보내고 전송 상태를 확인할 수 있어요. Resend 대시보드의 API 키는 환경 변수 하나로 로컬 서버에 전달돼요.",
@@ -374,13 +375,14 @@ export const messages = {
   "marketplace.plugin.resend.prompt.template": "새 플로우에 맞는 비밀번호 재설정 이메일 초안을 작성해 줘.",
   "marketplace.plugin.omnisend.tagline": "이메일 및 SMS 마케팅",
   "marketplace.plugin.omnisend.description":
-    "Omnisend를 사용하면 에이전트가 캠페인과 양식 보고서를 읽고, 연락처와 세그먼트를 찾고, 캠페인, 자동화, 이메일 템플릿, 양식, 상품을 만들고 수정할 수 있습니다. 각 사용자는 브라우저에서 자신의 Omnisend 계정에 로그인하고 동의 화면에서 액세스 수준을 선택합니다. 쓰기 액세스가 있으면 에이전트가 캠페인을 보내고 데이터를 삭제할 수도 있습니다. 에이전트에게 보고서만 필요하면 읽기 전용 액세스를 선택하세요.",
+    "Omnisend를 사용하면 에이전트가 캠페인과 양식 보고서를 읽고, 연락처와 세그먼트를 찾고, 캠페인, 자동화, 이메일 템플릿, 양식, 상품을 만들고 수정할 수 있습니다. 각 사용자는 자신의 Omnisend 계정에서 받은 API 키로 연결합니다. 에이전트는 키가 허용하는 작업을 할 수 있으며, 여기에는 캠페인 발송과 데이터 삭제가 포함될 수 있습니다.",
   "marketplace.plugin.omnisend.app":
-    "캠페인, 자동화, 연락처, 세그먼트, 양식, 보고서. 브라우저 로그인으로 Omnisend MCP 서버를 통해 사용합니다.",
+    "캠페인, 자동화, 연락처, 세그먼트, 양식, 보고서. API 키로 Omnisend MCP 서버를 통해 사용합니다.",
   "marketplace.plugin.omnisend.prompt.lastCampaign": "지난주 캠페인 성과는 그 전 주와 비교해 어땠어?",
   "marketplace.plugin.omnisend.prompt.segment": "VIP 세그먼트에 연락처가 몇 개 있고, 이번 달에 어떻게 바뀌었어?",
   "marketplace.plugin.omnisend.prompt.draftCampaign": "새 컬렉션용 캠페인 초안을 작성해 줘. 단, 보내지는 마.",
   "marketplace.plugin.postiz.tagline": "소셜 미디어 예약",
+  "marketplace.plugin.omnisend.hint.apiKey": "Omnisend에서 Store settings > API keys를 열고 키를 만드세요.",
   "marketplace.plugin.postiz.description":
     "Postiz를 사용하면 에이전트가 소셜 미디어 채널을 나열하고 X, LinkedIn, Instagram, TikTok 등 30개 이상의 네트워크에서 게시물 초안 작성, 예약, 게시를 할 수 있습니다. 미디어를 업로드하고 AI 이미지와 동영상을 만들 수도 있습니다. 브라우저에서 Postiz 계정에 로그인하거나 Postiz의 Settings › Developers에서 API 키를 붙여 넣으세요. 모든 Postiz 클라우드 요금제에 API 액세스가 포함됩니다. 에이전트가 게시물을 바로 게시할 수 있으므로 승인하기 전에 각 게시물을 검토하세요.",
   "marketplace.plugin.postiz.app":

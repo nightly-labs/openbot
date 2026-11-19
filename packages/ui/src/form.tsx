@@ -11,13 +11,11 @@ interface ControlOptions {
 
 export interface FieldContextValue {
   controlId: string;
-  /* A field that only names its control leaves the rest unset. */
   describedBy?: string | undefined;
   invalid?: boolean;
   required?: boolean;
 }
 
-/** Lets a custom field frame hand its control an id for label association. */
 export const FieldContext = createContext<FieldContextValue | null>(null);
 
 interface TextControlOptions extends ControlOptions {
@@ -28,7 +26,6 @@ interface TextControlOptions extends ControlOptions {
 
 export type InputProps = ComponentProps<"input"> & TextControlOptions;
 
-/** Input types where a keystroke edits the text. Password is not here: bind() skips it. */
 const TYPED_INPUT_TYPES = new Set<string>(["text", "search", "email", "url", "tel", "number"]);
 
 export function Input(props: InputProps): JSX.Element {
@@ -51,7 +48,6 @@ export function Input(props: InputProps): JSX.Element {
     "defaultValue",
   );
   const describedBy = () => [local["aria-describedby"], field?.describedBy].filter(Boolean).join(" ") || undefined;
-  // A text field plays a keystroke cue. A radio plays select when its value changes.
   const typeCue = () => {
     const type = local.type;
     return type === undefined || (typeof type === "string" && TYPED_INPUT_TYPES.has(type)) ? "" : undefined;

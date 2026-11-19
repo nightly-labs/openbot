@@ -117,6 +117,7 @@ export const messages = {
   "marketplace.app.partialTitle": "{name} אינו שלם",
   "marketplace.app.partialDescription": "חלק מהאפליקציות או המיומנויות שלו לא הותקנו. חיבור מחדש יתקין אותן.",
   "marketplace.app.notConnected": "לא מחובר",
+  "marketplace.app.paused": "מושהה",
   "marketplace.app.custom": "שרת MCP",
   "marketplace.app.githubTagline": "מאגרים, בעיות ו-pull requests",
   "marketplace.app.onePasswordTagline": "התחברות לאתרים עם פרטי כניסה משותפים",
@@ -161,6 +162,7 @@ export const messages = {
     "ב-{host} פועלת גרסה ישנה של OpenBot שלא יכולה לחבר אפליקציות. עדכנו את OpenBot ב-{host}, או בקשו מהבעלים לעדכן אותה.",
   "marketplace.app.blocked.member":
     "רק בעלים או מנהל של {host} יכולים לחבר שם אפליקציות. בקשו מאחד מהם לחבר את {name}, או לעדכן את OpenBot ב-{host} כדי שחברים יוכלו לחבר אפליקציות.",
+  "marketplace.app.blocked.mac": "{name} פועל רק ב-Mac שמריץ את OpenBot.",
   "marketplace.app.connectAgain": "חיבור מחדש",
   "marketplace.app.automation.askOnInstall": "בקשת גישה מ-macOS בהתקנה",
   "marketplace.app.automation.title": "גישה לאפליקציות של Apple",
@@ -382,8 +384,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.recall": "מה ההערות שלי אומרות על ההחלטות בפרויקט הזה?",
   "marketplace.plugin.obsidian.prompt.save": "שמור את ההחלטה הזו כהערה חדשה בכספת שלי.",
   "marketplace.plugin.obsidian.prompt.log": "הוסף סיכום של עבודת היום להערה Work log שלי.",
-  "marketplace.plugin.obsidian.hint.apiKey":
-    'ב-Obsidian, יש לפתוח Settings > Local REST API. יש להעתיק את מפתח ה-API ולהפעיל את "Enable non-encrypted (HTTP) server".',
+  "marketplace.plugin.obsidian.hint.apiKey": "ב-Obsidian, יש לפתוח Settings > Local REST API ולהעתיק את מפתח ה-API.",
   "marketplace.plugin.resend.tagline": "אימייל טרנזקציוני",
   "marketplace.plugin.resend.description":
     "Resend מאפשר לסוכנים לשלוח אימייל טרנזקציוני ולבדוק מסירה דרך API אחד. מפתח API מלוח הבקרה של Resend מועבר לשרת המקומי כמשתנה סביבה אחד.",
@@ -393,13 +394,14 @@ export const messages = {
   "marketplace.plugin.resend.prompt.template": "נסח אימייל לאיפוס סיסמה עבור התהליך החדש.",
   "marketplace.plugin.omnisend.tagline": "שיווק באימייל וב-SMS",
   "marketplace.plugin.omnisend.description":
-    "Omnisend מאפשר לסוכנים לקרוא דוחות קמפיינים וטפסים, למצוא אנשי קשר ופלחים וליצור ולערוך קמפיינים, אוטומציות, תבניות אימייל, טפסים ומוצרים. כל משתמש מתחבר לחשבון Omnisend שלו דרך הדפדפן ובוחר את רמת הגישה במסך ההסכמה. עם גישת כתיבה סוכנים יכולים גם לשלוח קמפיינים ולמחוק נתונים. יש לבחור גישה לקריאה בלבד כשהסוכנים צריכים רק דוחות.",
+    "Omnisend מאפשר לסוכנים לקרוא דוחות קמפיינים וטפסים, למצוא אנשי קשר ופלחים וליצור ולערוך קמפיינים, אוטומציות, תבניות אימייל, טפסים ומוצרים. כל משתמש מתחבר עם מפתח API מחשבון Omnisend שלו. סוכנים יכולים לעשות את מה שהמפתח מתיר, כולל שליחת קמפיינים ומחיקת נתונים.",
   "marketplace.plugin.omnisend.app":
-    "קמפיינים, אוטומציות, אנשי קשר, פלחים, טפסים ודוחות, דרך שרת MCP של Omnisend עם התחברות בדפדפן.",
+    "קמפיינים, אוטומציות, אנשי קשר, פלחים, טפסים ודוחות, דרך שרת MCP של Omnisend עם מפתח API.",
   "marketplace.plugin.omnisend.prompt.lastCampaign": "איך הקמפיינים של השבוע שעבר הצליחו בהשוואה לשבוע שלפניו?",
   "marketplace.plugin.omnisend.prompt.segment": "כמה אנשי קשר יש בפלח VIP, ואיך זה השתנה החודש?",
   "marketplace.plugin.omnisend.prompt.draftCampaign": "נסח קמפיין לקולקציה החדשה, אבל אל תשלח אותו.",
   "marketplace.plugin.postiz.tagline": "תזמון פוסטים ברשתות חברתיות",
+  "marketplace.plugin.omnisend.hint.apiKey": "ב-Omnisend, יש לפתוח את Store settings > API keys וליצור מפתח.",
   "marketplace.plugin.postiz.description":
     "Postiz מאפשר לסוכנים להציג את ערוצי הרשתות החברתיות שלך, ולכתוב טיוטות, לתזמן ולפרסם פוסטים ביותר מ-30 רשתות, כמו X,‏ LinkedIn,‏ Instagram ו-TikTok. סוכנים יכולים גם להעלות מדיה וליצור תמונות וסרטונים בבינה מלאכותית. התחבר לחשבון Postiz שלך בדפדפן, או הדבק את מפתח ה-API מ-Settings › Developers ב-Postiz. כל תוכניות הענן של Postiz כוללות גישה ל-API. סוכנים יכולים לפרסם פוסט מיד, לכן בדוק כל פוסט לפני שתאשר אותו.",
   "marketplace.plugin.postiz.app":

@@ -1,19 +1,10 @@
-// The Antigravity agent of `antigravity-steer-e2e.ts`. It steers as `agy acp` 1.5.8 did in a live
-// probe: a prompt that arrives while another prompt of the session is open answers the open one with
-// `end_turn` at once, echoes the new message as `user_message_chunk`, and the work goes on under the
-// new prompt. A `work` prompt opens one tool call and stays open. A steer that starts with `more`
-// also stays open; another steer ends the tool call and answers with its text. Each other prompt
-// answers at once. An `ask` prompt asks for a permission and answers with the outcome. A `daemon`
-// prompt starts a daemon command and answers while it runs, as `agy acp` 1.5.x does for a dev server.
-// `FAKE_VERSION` sets the version in `agentInfo`. A session id holds the process id.
 import { type AcpPeer, type AcpRequest, logEntry, serveFakeAcpAgent } from "../acp-agent";
 
 const MODELS = { availableModels: [{ modelId: "gemini-fake", name: "Gemini Fake" }], currentModelId: "gemini-fake" };
-/** The prompt that is open, by session. */
 const open = new Map<string, AcpRequest>();
+const waiting = new Set<string>();
 let sessions = 0;
 let replies = 0;
-/** The peer of the last request, for `session/cancel`, which is a notification. */
 let lastPeer: AcpPeer | undefined;
 
 function promptText(request: AcpRequest): string {
@@ -52,6 +43,14 @@ serveFakeAcpAgent(
       const previous = open.get(sessionId);
       lastPeer = peer;
       logEntry({ event: "prompt", sessionId, text, steer: previous !== undefined });
+      if (waiting.has(sessionId)) {
+        logEntry({ event: "refused", sessionId, text });
+        peer.fail(request, {
+          code: -32603,
+          message: `Can't add this prompt to session ${sessionId}: the running prompt is waiting for a permission or question answer; answer it or send session/cancel, then send this prompt again`,
+        });
+        return;
+      }
       if (previous) {
         open.delete(sessionId);
         answer(peer, previous);
@@ -84,6 +83,41 @@ serveFakeAcpAgent(
             peer.say(sessionId, `asked: ${outcome}`);
             answer(peer, request);
           });
+        return;
+      }
+      if (text === "hold") {
+        open.set(sessionId, request);
+        waiting.add(sessionId);
+        const toolCall = {
+          toolCallId: "tool-hold",
+          title: "touch b.txt",
+          kind: "execute" as const,
+          status: "pending" as const,
+        };
+        peer.update(sessionId, { sessionUpdate: "tool_call", ...toolCall });
+        setTimeout(
+          () => {
+            void peer
+              .ask("session/request_permission", {
+                sessionId,
+                toolCall,
+                options: [{ optionId: "allow", name: "Allow", kind: "allow_once" }],
+              })
+              .then(() => {
+                waiting.delete(sessionId);
+                if (open.get(sessionId) !== request) return;
+                open.delete(sessionId);
+                peer.update(sessionId, {
+                  sessionUpdate: "tool_call_update",
+                  toolCallId: "tool-hold",
+                  status: "completed",
+                });
+                peer.say(sessionId, "held: done");
+                answer(peer, request);
+              });
+          },
+          Number(process.env.FAKE_HOLD_MS ?? 2000),
+        );
         return;
       }
       if (text === "daemon") {

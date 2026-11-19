@@ -117,9 +117,14 @@ export const messages = {
   "provider.picker.download": "Download di {name}",
   "provider.picker.search": "Cerca modelli",
   "provider.picker.noMatches": "Nessun modello corrisponde alla ricerca.",
+  "provider.picker.workspaceOnlyUnavailable":
+    "Questi modelli non funzionano con «Solo workspace» su Windows e Linux. Per usarli, cambia «Permessi» nelle impostazioni dell'agente.",
   "provider.picker.olderModels": "Modelli precedenti",
   "provider.picker.olderModelsList": "Modelli {name} precedenti",
   "provider.picker.noModels": "{name} non ha modelli disponibili.",
+  "provider.picker.endpointModelsInCustom":
+    "{name} esegue i tuoi endpoint personalizzati. I loro modelli sono nella scheda Personalizzato.",
+  "provider.picker.showCustomModels": "Mostra modelli",
   "provider.picker.museNoModels":
     "Muse non ha inviato modelli per questo account. Muse potrebbe non essere disponibile nel paese in cui viene eseguito questo agente. Scegli un modello di un altro provider.",
   "provider.picker.customEmpty":
@@ -147,6 +152,8 @@ export const messages = {
   "provider.picker.selectEffort": "Seleziona l'impegno",
   "provider.picker.custom": "Personalizzato",
   "provider.picker.cliReady": "{cli} pronto",
+  "provider.picker.modelSourceProvider": "Usa {name} dalle impostazioni di {cli}",
+  "provider.picker.modelSourceCatalog": "Usa un elenco di modelli dalle impostazioni di {cli}",
   "provider.status.signInRequired": "Accesso richiesto",
   "provider.model.free": "Gratuito",
   "provider.model.new": "Nuovo",
@@ -213,6 +220,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "Impossibile riconnettersi.",
   "provider.account.add": "Aggiungi account",
   "provider.account.addLabel": "Aggiungi un altro account {name}",
+  "provider.account.addWithCode": "Aggiungi account con codice",
   "provider.account.count": { one: "{count} account", other: "{count} account" },
   "provider.account.numbered": "Account {number}",
   "provider.account.apiKey": "Chiave API",
@@ -262,6 +270,8 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · scaricata da OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Non in uso: {version} · installata da te",
   "provider.settings.otherVersionDownloaded": "Non in uso: {version} · scaricata da OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "Alcuni modelli richiedono un componente che manca in questa versione. Scarica la versione di OpenBot per usarli.",
   "provider.settings.useInstalledVersion": "Usa quella installata",
   "provider.settings.useDownloadedVersion": "Usa quella di OpenBot",
   "provider.settings.cache": "Cache",
@@ -285,6 +295,29 @@ export const messages = {
   "provider.settings.compactWindowDefault": "Predefinito di Claude Code",
   "provider.settings.compactWindowTokens": "{size} token",
   "provider.settings.compactWindowLoadFailed": "Impossibile caricare la dimensione di compattazione di questo server.",
+  "provider.settings.environment": "Ambiente",
+  "provider.settings.environmentVariables": "Variabili",
+  "provider.settings.environmentDescription":
+    "Chiavi API, URL di base e altre impostazioni che riceve ogni processo di {name}. Una modifica si applica quando finiscono i turni in corso.",
+  "provider.settings.environmentCodexHint":
+    "OPENAI_BASE_URL, con OPENAI_API_KEY come chiave, invia le richieste ai modelli di ChatGPT a quell’indirizzo.",
+  "provider.settings.environmentShellNote": "I comandi che gli agenti eseguono possono leggere questi valori.",
+  "provider.settings.environmentAdd": "Aggiungi variabile",
+  "provider.settings.environmentNamePlaceholder": "VARIABLE_NAME",
+  "provider.settings.environmentValuePlaceholder": "Valore",
+  "provider.settings.environmentSaved": "Salvata",
+  "provider.settings.environmentSensitive": "Sensibile",
+  "provider.settings.environmentNameLabel": "Nome della variabile {index}",
+  "provider.settings.environmentValueLabel": "Valore di {name}",
+  "provider.settings.environmentSensitiveLabel": "Tieni {name} segreta",
+  "provider.settings.environmentRemoveLabel": "Rimuovi {name}",
+  "provider.settings.environmentUnnamed": "variabile {index}",
+  "provider.settings.environmentPending":
+    "Il salvataggio riavvia {name} quando finiscono i turni in corso. I valori sensibili restano sul server.",
+  "provider.settings.environmentDone": "Salvato. {name} si riavvia quando finiscono i turni in corso.",
+  "provider.settings.environmentDiscard": "Annulla",
+  "provider.settings.environmentSave": "Salva",
+  "provider.settings.environmentLoadFailed": "Impossibile caricare le variabili di {name}.",
   "provider.settings.models": "Modelli",
   "provider.settings.modelsDescription": {
     one: "{shown} di {count} modello appare nel selettore dei modelli.",

@@ -10,7 +10,6 @@ const OUTCOME_TEXT = {
   interrupted: "conversation.tasks.state.interrupted",
 } as const satisfies Record<AgentTaskOutcome, AppTextKey>;
 
-/** What a running task waits for from the person, if anything. */
 export type AgentTaskWait = "approval" | "answer" | undefined;
 
 function taskMarkState(task: AgentTask): TaskMarkState {
@@ -19,10 +18,6 @@ function taskMarkState(task: AgentTask): TaskMarkState {
   return task.outcome === "completed" ? "done" : "failed";
 }
 
-/**
- * The state of a task in a few words: that a running task waits for the person, what it does now,
- * else how its last turn ended.
- */
 export function agentTaskStatus(task: AgentTask, t: TextValue["t"], wait?: AgentTaskWait): string {
   if (task.state === "running" && wait === "approval") return t("conversation.tasks.state.waitingApproval");
   if (task.state === "running" && wait === "answer") return t("conversation.tasks.state.waitingAnswer");
@@ -32,10 +27,6 @@ export function agentTaskStatus(task: AgentTask, t: TextValue["t"], wait?: Agent
   return t(OUTCOME_TEXT[task.outcome]);
 }
 
-/**
- * The state glyph of a task, with its state as the accessible name. `decorative` hides it where the
- * state is already in the text beside it.
- */
 export function AgentTaskMark(props: { task: AgentTask; decorative?: boolean; wait?: AgentTaskWait }) {
   const { t } = useText();
   return (

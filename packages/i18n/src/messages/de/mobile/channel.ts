@@ -83,6 +83,34 @@ export const messages = {
   "mobile.channel.form.deleteBody":
     "Dies stoppt den Kanal. Sein Verlauf bleibt unter „Gelöschte Kanäle“ nur zur Ansicht erhalten. Dort kannst du ihn wiederherstellen. Die zugehörigen Agenten bleiben erhalten.",
   "mobile.channel.form.delete": "Kanal löschen",
+  "mobile.channel.newConversation.title": "Neue Unterhaltung",
+  "mobile.channel.newConversation.starting": "Neue Unterhaltung wird gestartet…",
+  "mobile.channel.newConversation.footer":
+    "Die Mitglieder vergessen die früheren Nachrichten. Die Kanaleinstellungen bleiben.",
+  "mobile.channel.newConversation.confirmTitle": "Eine neue Unterhaltung in {name} starten?",
+  "mobile.channel.newConversation.confirmBody":
+    "Die Mitglieder vergessen die früheren Nachrichten dieses Kanals. Die Nachrichten bleiben über einer Trennlinie sichtbar. Mitglieder, Anweisungen, Erinnerungen und Routinen ändern sich nicht.",
+  "mobile.channel.newConversation.confirm": "Neue Unterhaltung starten",
+  "mobile.channel.newConversation.failed": "Die neue Unterhaltung konnte nicht gestartet werden",
+  "mobile.channel.newConversation.failedBody": "Der Host konnte keine neue Unterhaltung starten.",
+  "mobile.channel.compact.title": "Kontext komprimieren",
+  "mobile.channel.compact.compacting": "Komprimierung wird gestartet…",
+  "mobile.channel.compact.footer":
+    "Die Mitglieder behalten eine kurze Zusammenfassung ihrer Kanalsitzung und verbrauchen weniger Tokens.",
+  "mobile.channel.compact.started":
+    "Komprimierung gestartet. Die Anbieter der Mitglieder kürzen den Kontext auf dem Host.",
+  "mobile.channel.compact.failed": "Der Kanalkontext konnte nicht komprimiert werden",
+  "mobile.channel.compact.failedBody": "Der Host konnte den Kontext nicht komprimieren.",
+  "mobile.channel.deleteHistory.title": "Verlauf löschen",
+  "mobile.channel.deleteHistory.deleting": "Verlauf wird gelöscht…",
+  "mobile.channel.deleteHistory.footer":
+    "Die Nachrichten werden gelöscht, und die Mitglieder vergessen sie. Die Kanaleinrichtung bleibt.",
+  "mobile.channel.deleteHistory.confirmTitle": "Verlauf von {name} löschen?",
+  "mobile.channel.deleteHistory.confirmBody":
+    "Alle Nachrichten und Dateien dieses Kanals werden aus OpenBot gelöscht, und die Mitglieder vergessen sie. Das lässt sich nicht rückgängig machen. Mitglieder, Anweisungen, Erinnerungen, Routinen und Aufgaben ändern sich nicht.",
+  "mobile.channel.deleteHistory.confirm": "Verlauf löschen",
+  "mobile.channel.deleteHistory.failed": "Der Verlauf konnte nicht gelöscht werden",
+  "mobile.channel.deleteHistory.failedBody": "Der Host konnte den Verlauf nicht löschen.",
   "mobile.channel.form.unavailable":
     "Verbinde dich mit einem Desktop-Server, der Kanäle unterstützt, um Änderungen vorzunehmen.",
   "mobile.channel.form.invalidName": "Gib einen gültigen Kanalnamen ein.",

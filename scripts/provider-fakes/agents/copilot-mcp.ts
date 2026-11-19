@@ -1,6 +1,3 @@
-// The GitHub Copilot agent of `copilot-mcp-relay-e2e.ts`. As GitHub Copilot CLI 1.0.105 does, it
-// advertises only http and sse MCP servers and starts no stdio server of a session
-// (github/copilot-cli#3889). It lists the tools of each http server and logs them.
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
@@ -11,10 +8,6 @@ type SessionServer = NonNullable<AcpParams["mcpServers"]>[number];
 const MODELS = [{ modelId: "copilot-fake", name: "Copilot Fake" }];
 let count = 0;
 
-/**
- * The SDK transport classes declare their handlers and `sessionId` as `T | undefined`, which
- * `exactOptionalPropertyTypes` does not accept as a `Transport`. This one forwards to such a class.
- */
 function asTransport(inner: StreamableHTTPClientTransport): Transport {
   const transport: Transport = {
     start: () => {

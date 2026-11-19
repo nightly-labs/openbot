@@ -10,7 +10,6 @@ export const messages = {
     "Gönderenin tam imza gizli anahtarını yapıştırın. 16 ile 1024 karakter arasıdır ve boşluk içermez.",
   "error.backend.webhookRouteUnavailable":
     "Herkese açık webhook yolu hazır değil. Ana makine bağlantısını kontrol edin ve tekrar deneyin.",
-  // Errors that the backend services send: channels, messages, routines, memories, MCP, browser and remote desktop.
   "error.backend.browserViewRemoteOnly": "Canlı tarayıcı görünümü yalnızca uzak bir ana makine içindir.",
   "error.backend.browserViewUnsupported": "Bu uzak ana makine canlı tarayıcı görünümünü desteklemiyor.",
   "error.backend.browserViewLimit": "Bu ana makinede çok fazla tarayıcı görünümü açık.",
@@ -90,6 +89,7 @@ export const messages = {
   "error.backend.channelCompactNotSupported":
     "Bu kanalın hiçbir üyesi istek üzerine sıkıştıramaz. Bunu destekleyen üyeler, bağlamları neredeyse dolduğunda otomatik olarak sıkıştırır.",
   "error.backend.channelArchived": "Mesaj göndermeden veya görevleri değiştirmeden önce bu kanalı geri yükleyin.",
+  "error.backend.channelArchiveRunning": "Bu kanaldaki devam eden işi durdurun, ardından kanalı silin.",
   "error.backend.channelReferenceUnavailable": "Referans verilen kanal mesajı kullanılamıyor.",
   "error.backend.channelTaskNotFound": "Kanal görevi bulunamadı.",
   "error.backend.channelTaskComplete": "Bu görev zaten tamamlandı.",
@@ -122,6 +122,8 @@ export const messages = {
   "error.backend.memoryGone": "Bu bellek artık mevcut değil.",
   "error.backend.routineGone": "Bu rutin artık mevcut değil.",
   "error.backend.routineRunGone": "Bu rutin çalıştırması artık mevcut değil.",
+  "error.backend.routineRunFailedNoReason":
+    "Çalıştırma bir hatayla durdu, ancak bir neden gelmedi. Ajanın ne yaptığını görmek için çalıştırmayı açın.",
   "error.backend.turnNotStarted": "Sağlayıcı bu turu başlatmadı.",
   "error.backend.routineResultConnectionOff": "Bu mesajlaşma bağlantısı kapalı veya kaldırılmış. Başka bir yer seçin.",
   "error.backend.routineResultNoDelivery": "Bu çalıştırmanın yeniden gönderilecek bir yanıtı yok.",
@@ -239,11 +241,19 @@ export const messages = {
   "error.backend.mcpServerInvalid": "OpenBot bu MCP sunucusu yapılandırmasını kaydedemiyor.",
   "error.backend.mcpServerNoAnswer": "Sunucu {seconds} saniye içinde yanıt vermedi.",
   "error.backend.mcpSignInNotAccepted": "Sunucu bu oturum açmayı kabul etmedi.",
+  "error.backend.mcpSignInAccountRefused":
+    "Sunucu, oturum açtığınız hesabı reddetti. Bu hesabın hizmeti kullanabildiğini kontrol edin. Başka bir hesap kullanmak için oturumu kapatıp yeniden açın.",
   "error.backend.mcpSignInClientRefused":
     "Oturum açma sunucusu, oturum açma tamamlanırken OpenBot'u kabul etmedi. Yeniden oturum açın: OpenBot sunucuya yeniden kaydolur.",
+  "error.backend.mcpSignInAppRefused":
+    "Oturum açma sunucusu bu sunucunun oturum açma uygulamasını kabul etmedi. Oturum açma uygulamasının istemci kimliğini ve istemci gizli anahtarını kontrol edip yeniden oturum açın.",
   "error.backend.mcpCommandNotFound": "Komut bulunamadı: {command}",
+  "error.backend.mcpProviderLimit":
+    "Bu ajan yalnızca sınırlı sayıda MCP sunucusu kullanabilir. Bu sunucuyu kullanmak için ajanın ihtiyaç duymadığı bir MCP sunucusunu kapatın.",
   "error.backend.mcpRegistrationRefused":
     "Oturum açma sunucusu OpenBot'u henüz bir uygulama olarak kabul etmiyor. Hesabınız bunun nedeni değildir. Yerel bir MCP sunucusu gibi bağlanmanın başka bir yolunu kullanın.",
+  "error.backend.mcpRegistrationUnavailable":
+    "Oturum açma sunucusu OpenBot'u uygulama olarak kaydedemiyor. Hesabınız bunun nedeni değildir. Bağlanmak için bu sunucuyu Pazaryeri, Uygulamalar bölümünde kaydedin, ardından ona bir oturum açma uygulaması ekleyin.",
   "error.backend.mcpSignInAbandonedGeneric": "Oturum açma yarıda bırakıldı.",
   "error.backend.mcpSignInForgotten": "MCP oturum açma işlemi çalışırken unutuldu.",
   "error.backend.mcpSignInAbandoned": "MCP oturum açma işlemi yarıda bırakıldı.",
@@ -256,6 +266,7 @@ export const messages = {
     "Bu sunucu oturum açılmasını istiyor ve OpenBot yalnızca https üzerinden oturum açar. URL'yi {url} olarak değiştirin.",
   "error.backend.mcpSignInCancelled": "Oturum açma iptal edildi.",
   "error.backend.mcpSignInTimedOut": "Oturum açma tarayıcıda tamamlanmadı.",
+  "error.backend.mcpSignInRefused": "Oturum açma sayfası erişimi reddetti. Yeniden oturum açın.",
   "error.backend.mcpSignInResponseTimedOut": "Oturum açma yanıtı zamanında gelmedi.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot bu sunucunun oturum açma bilgilerini okuyamadı. Sunucu adresini denetleyin ve yeniden deneyin.",
@@ -263,17 +274,27 @@ export const messages = {
     "Oturum açma sunucusu OpenBot'un okuyamadığı bir yanıt gönderdi. Hizmet size bir API anahtarı veya belirteç veriyorsa bunu bu sunucunun ayarlarına ekleyin, ardından bağlantıyı yeniden test edin.",
   "error.backend.mcpServerExited":
     "Sunucu yanıt vermeden durdu. Hatasını görmek için komutu bir terminalde çalıştırın.",
+  "error.backend.mcpServerExitedWithOutput": "Sunucu yanıt vermeden durdu. Yazdığı: {detail}",
   "error.backend.mcpServerFailedToStart": "Sunucu başlamadı: {reason}",
+  "error.backend.mcpServerStartAbandoned":
+    "{provider}, sunucu başlamadan beklemeyi bıraktı. Bu yüzden ajanları bu sunucunun araçlarını almıyor.",
+  "error.backend.mcpServerStoppedDuringCall": "MCP sunucusu bu çağrıya yanıt vermeden durdu.",
   "error.backend.mcpToolSchemaRefused":
     "Sunucunun {tool} aracının giriş biçimini bu sağlayıcı okuyamıyor. Diğer sağlayıcılardaki ajanlar sunucuyu almaya devam ediyor.",
   "error.backend.mcpServerSignInForProvider":
-    "{provider}, {name} MCP sunucusunu kullanamadı, çünkü sunucu oturum açmanızı istiyor. MCP ayarlarını açın ve Oturum aç'ı seçin.",
+    "{provider}, {name} MCP sunucusunu kullanamadı, çünkü sunucu oturum açmanızı istiyor. Pazaryeri, Uygulamalar bölümünde {name} öğesini açın ve Oturum aç'ı seçin.",
   "error.backend.mcpServerFailedForProvider":
-    "{provider}, {name} MCP sunucusunu başlatamadı. Nedeni görmek için MCP ayarlarını açın ve Bağlantıyı test et'i seçin.",
+    "{provider}, {name} MCP sunucusunu başlatamadı. Nedeni görmek için Pazaryeri, Uygulamalar bölümünde {name} öğesini açın ve Bağlantıyı test et'i seçin.",
+  "error.backend.mcpServerFailedInProvider":
+    "{provider}, {name} MCP sunucusunu başlatamadı. Araçları {provider} için kullanılamıyor. {provider} sunucuyu kendisi başlatır, bu yüzden OpenBot'taki bağlantı testi başarılı olabilir. Yeniden denemek için yeni bir sohbet başlatın.",
+  "error.backend.mcpServerTimedOutInProvider":
+    "{provider}, {name} MCP sunucusunu başlatamadı, çünkü sunucu zamanında yanıt vermedi. Yeniden denemek için yeni bir sohbet başlatın.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot bu sunucu için yerel oturum açma bağlantısını başlatamadı. OpenBot'u yeniden başlatın ve tekrar deneyin.",
   "error.backend.mcpOAuthSignInNeeded":
     "Bu MCP sunucusundaki oturum sona erdi. Kullanıcının OpenBot'ta yeniden oturum açması gerekiyor.",
+  "error.backend.mcpOAuthRenewalFailed":
+    "OpenBot bu MCP sunucusundaki oturumu şu anda yenileyemedi. Oturum korunuyor ve sonraki istek yeniden deneyecek. Bu hata sürerse kullanıcı OpenBot'ta sunucudan çıkış yapıp yeniden giriş yapabilir.",
   "error.backend.mcpServerUnreachable": "OpenBot sunucuya ulaşamadı. URL'yi ve ağınızı kontrol edin.",
   "error.backend.mcpLocalServerOff":
     "Bu bilgisayarda {address} adresinde yanıt veren bir sunucu yok. Sunucuyu başlatın veya onu çalıştıran uygulamada açın, ardından tekrar deneyin.",
@@ -330,11 +351,15 @@ export const messages = {
   "error.backend.promptInactive": "Bu istem artık etkin değil.",
   "error.backend.promptAnswerMismatch": "Bir istem yanıtı etkin bir soruyla eşleşmiyor.",
   "error.backend.approvalInactive": "Bu onay artık etkin değil.",
+  "error.backend.feedbackNeedsPhone":
+    "Bu raporu yalnızca OpenBot telefon uygulaması gönderebilir, çünkü telefonun sürümünü ve destek günlüğünü ekler. Bu sohbeti telefonda açın. Bu mesajı orada görürseniz telefon uygulamasını güncelleyin.",
   "error.backend.takeoverInactive": "Bu tarayıcı devralması artık etkin değil.",
   "error.backend.authSubmitting": "Kimlik doğrulama gönderimi zaten devam ediyor.",
   "error.backend.apiKeySaveFailed": "OpenBot API anahtarını kaydedemedi. Yeniden deneyin.",
   "error.backend.apiKeyNotAllowed": "API anahtarını yalnızca sunucu sahibi veya bir yönetici girebilir.",
   "error.backend.apiKeySaving": "API anahtarı zaten kaydediliyor.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot API anahtarını okuyamadı. En fazla 8.000 karakterlik bir anahtar girin ve onu kimin kullanabileceğini seçin.",
   "error.backend.authRequestInactive": "Bu güvenli kimlik doğrulama isteği artık etkin değil.",
   "error.backend.secureAuthUnavailable": "Güvenli kimlik doğrulaması kullanılamıyor.",
   "error.backend.browserUrlRequired": "Bir tarayıcı URL'si gereklidir.",
@@ -387,6 +412,8 @@ export const messages = {
     "Sunucu {status} yanıtı verdi. API anahtarını veya diğer kimlik bilgilerini denetleyin.",
   "error.backend.mcpServerHttpUrl":
     "Sunucu {status} yanıtı verdi. URL'yi denetleyin. Bağlantı yanlış, süresi dolmuş veya silinmiş olabilir.",
+  "error.backend.mcpServerBearerKey":
+    "Bu sunucu oturum açma değil, API anahtarı kullanır. Başlıklar altında anahtarı Authorization, değeri ise Bearer, bir boşluk ve API anahtarınız olarak ayarlayın.",
   "error.backend.mcpSignInAppUrl": "Oturum açma uygulaması için geçerli bir sunucu URL'si gerekir.",
   "error.backend.mcpSignInAppClientId": "Oturum açma uygulamasının istemci kimliğini girin.",
   "error.backend.mcpSignInAppIssuerChanged":
@@ -409,6 +436,7 @@ export const messages = {
   "error.backend.branchSourceBusy": "Bu sohbeti dallandırmadan önce geçerli turu durdurun.",
   "error.backend.branchMessageNotFound": "Yalnızca ajanın tamamlanmış bir yanıtından dallandırabilirsiniz.",
   "error.backend.branchRemoteUnsupported": "Dallar yalnızca bu bilgisayardaki ajanlar için kullanılabilir.",
+  "error.backend.feedbackWithdrawRemoteUnsupported": "Bu raporu kaldırmak için ajandan kaldırmasını isteyin.",
   "error.backend.threadMoveRefused":
     "Yeni bir mesaj dizisinde yalnızca, doğrudan ve tek başına bu ajana gönderdiğiniz bir mesaj çalışabilir.",
   "error.backend.taskTitleRequired": "Göreve kısa bir başlık verin.",

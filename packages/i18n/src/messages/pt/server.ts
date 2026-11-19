@@ -47,6 +47,7 @@ export const messages = {
   "server.compatibility.updateHostTitle": "Atualize o OpenBot em {name}",
   "server.compatibility.unsafeDataTitle": "O computador anfitrião retornou dados inseguros",
   "server.compatibility.cannotConnectTitle": "Não é possível conectar a {name}",
+  "server.compatibility.safeModeTitle": "{name} não inicia",
   "server.compatibility.updateClientDescription":
     "Este app só aceita protocolos mais antigos que os do computador anfitrião. Atualize este app e tente novamente.",
   "server.compatibility.updateHostDescription":
@@ -116,6 +117,7 @@ export const messages = {
   "server.local.create": "Criar servidor",
   "server.local.creating": "Criando servidor…",
   "server.local.createFailed": "Não foi possível criar o servidor.",
+  "server.local.createFailedRetry": "Algo deu errado. Tente novamente. Se falhar de novo, reinicie o OpenBot.",
   "server.local.limitReached":
     "Você pode ter no máximo {limit} servidores neste computador. Exclua um para criar outro.",
   "server.local.deleteConfirmTitle": "Excluir {name}?",
@@ -256,9 +258,6 @@ export const messages = {
   "server.settings.membersDescription": "Publique este servidor, convide pessoas e gerencie o acesso.",
   "server.settings.desktopTitle": "Área de trabalho remota",
   "server.settings.desktopDescription": "Configure ou conecte-se à área de trabalho deste servidor.",
-  "server.settings.mcpTitle": "MCP",
-  "server.settings.mcpDescription":
-    "Conecte servidores MCP e escolha quais deles os agentes deste servidor podem usar.",
   "server.settings.storageTitle": "Armazenamento",
   "server.settings.storageDescription": "Veja o que o OpenBot mantém no disco deste servidor e libere espaço.",
   "server.settings.hostedSitesTitle": "Sites",
@@ -302,13 +301,18 @@ export const messages = {
   "server.settings.copyFailedTitle": "Falha ao copiar",
   "server.settings.copyFailed": "O OpenBot não conseguiu copiar este valor.",
   "server.settings.unavailableTitle": "Configurações do servidor indisponíveis",
-  "server.settings.unsavedMcpChanges": "Alterações de MCP não salvas",
   "server.settings.reset": "Redefinir",
   "server.settings.unsavedChanges": "Alterações não salvas",
   "server.settings.changesNotSaved": "Alterações não salvas",
   "server.settings.group.agents": "Agentes",
   "server.settings.group.people": "Pessoas",
   "server.settings.group.server": "Servidor",
+  "server.settings.experimentalTitle": "Experimental",
+  "server.settings.experimentalDescription": "Ative recursos que ainda não estão prontos.",
+  "server.settings.experimentalFeatures": "Recursos",
+  "server.settings.experimentalCrm": "CRM",
+  "server.settings.experimentalCrmDescription":
+    "Mostra a página do CRM a proprietários e administradores, permite que os agentes leiam o CRM e sincroniza o Stripe. Ao desativar, os dados ficam.",
   "server.settings.agentDefaultsTitle": "Padrões dos agentes",
   "server.settings.threadsCard": "Tópicos e fuso horário",
   "server.settings.memoryTitle": "Memória",
@@ -347,7 +351,7 @@ export const messages = {
     "Escolha o que os agentes deste servidor podem fazer quando você não define isso para um agente.",
   "server.settings.timezone": "Fuso horário",
   "server.settings.timezoneDescription":
-    "As novas rotinas usam este fuso horário quando a mensagem não informa o fuso horário do remetente.",
+    "As novas rotinas usam este fuso horário quando a mensagem não informa o fuso horário do remetente. Em um servidor, o navegador também o usa após a próxima reinicialização.",
   "server.settings.timezoneAutomatic": "Automático ({zone})",
   "server.settings.timezoneLoadFailed": "Não foi possível carregar o fuso horário do servidor.",
   "server.settings.turnLimit": "Tópicos ao mesmo tempo",

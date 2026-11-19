@@ -29,9 +29,11 @@ import {
   type ThreadItem,
 } from "../protocol";
 import {
+  GEMINI_INVALID_ARGUMENT,
   isImageCountDiagnostic,
   isImageTooLargeDiagnostic,
   isImageTooSmallDiagnostic,
+  isImageUnreadableDiagnostic,
   isRequestBodyLimitDiagnostic,
   isUnreadableContentDiagnostic,
 } from "./provider-diagnostics";
@@ -41,31 +43,11 @@ import { BUILTIN_TOOL_CATALOG } from "./tool-catalog";
 export function isNonActionableCodexWarning(message: string): boolean {
   return (
     message.startsWith("Skill descriptions were shortened to fit") ||
-    // Codex sends this when it changes transport, and the same turn continues over HTTPS
-    // (`codex-rs/core/src/responses_retry.rs`). A final failure comes as an `error` (#2559).
     message.startsWith("Falling back from WebSockets to HTTPS transport.") ||
-    // Codex sends this on each thread start when the user turned on a feature such as
-    // `async_compaction` in `config.toml` (`codex-rs/features/src/lib.rs`). The turn continues, and
-    // the text has the config path, so the banner replaced it with "could not continue".
     message.startsWith("Under-development features enabled:") ||
-    // Codex sends this on each session start when its config asks for a tier, such as `priority`,
-    // that the model does not list (`codex-rs/core/src/session/mod.rs`). Codex leaves the tier out
-    // and the turn continues at the standard speed, so the banner showed a false error (#6827).
     message.startsWith("Configured service tier ") ||
-    // Codex sends this once at start when it cannot update a marketplace from `config.toml`, such as
-    // a Git source on a computer without Git (`codex-rs/core-plugins/src/manager.rs`). It has no
-    // thread, the chat works, and the plugins stay at their version, so it showed a false
-    // "Provider error" toast (#6976). The text covers `marketplace `name`:` and `marketplaces:`.
     message.startsWith("Codex could not update marketplace") ||
-    // Codex sends this on `thread/resume` when the last turn of the thread used another model
-    // (`codex-rs/core/src/session/mod.rs`). OpenBot changes the model on purpose: the user picked a
-    // new one, or a backup model ran. The turn continues, but the red banner looked like a failure and
-    // told the user to switch back (#8135).
     message.startsWith("This session was recorded with model ") ||
-    // Codex sends this on each session start when the user's own or a project's `config.toml` sets
-    // `features.multi_agent` (`codex-rs/config/src/loader/mod.rs`). A session setting from OpenBot
-    // does not stop it, because Codex reads only those two layers. The chat works, but a red banner
-    // asked the user to edit the Codex file (#8763).
     message.startsWith("`[features].multi_agent` is deprecated.")
   );
 }
@@ -74,21 +56,10 @@ export function isArchivedThreadError(error: unknown): boolean {
   return error instanceof AppServerError && /\bis archived\b/i.test(error.message);
 }
 
-/**
- * The Codex process has no saved rollout for this unloaded thread in its `CODEX_HOME`: the thread
- * never saved a turn, or it belongs to another provider account. Codex 0.163.0 answers
- * `thread/turns/list` with this error then, and with the history of a thread that has a rollout.
- */
 export function isCodexMissingRollout(error: unknown): boolean {
   return error instanceof AppServerError && error.code === -32600 && error.message.startsWith("thread not loaded:");
 }
 
-/**
- * The first turn of a new thread starts and is not saved yet, so there is no history to read now.
- * Codex 0.165.0 answers `thread/turns/list` with `is not materialized yet` then, and while that
- * turn is saved, with one of the `is not supported yet` errors (#3609). Unlike a missing rollout,
- * the history is readable once the turn is saved.
- */
 export function isCodexRolloutPending(error: unknown): boolean {
   if (!(error instanceof AppServerError)) return false;
   if (error.code === -32600) return error.message.includes(" is not materialized yet");
@@ -98,10 +69,6 @@ export function isCodexRolloutPending(error: unknown): boolean {
   );
 }
 
-/**
- * Codex has no rollout for this id. A new session is the recovery. Codex 0.163.0 answers
- * `thread/resume` with `no rollout found`, and `turn/start` on an unloaded thread with `thread not found`.
- */
 function isCodexMissingThreadError(error: unknown): boolean {
   return (
     error instanceof AppServerError &&
@@ -109,11 +76,6 @@ function isCodexMissingThreadError(error: unknown): boolean {
   );
 }
 
-/**
- * Codex refused `turn/start` because a compaction turn runs on the thread. Codex 0.160.1 answers a
- * `NotSubmitted` input with this internal error, so the input did not reach the turn and the caller
- * can queue it again for when the compaction ends.
- */
 export function isCodexCompactionRefusal(error: unknown): boolean {
   return (
     error instanceof AppServerError &&
@@ -122,36 +84,35 @@ export function isCodexCompactionRefusal(error: unknown): boolean {
   );
 }
 
-/**
- * Another Codex app that uses the same Codex folder, such as the Codex desktop app, has this thread
- * open and holds its writer lock. Codex refuses `thread/resume` with this error then, and the lock
- * stays until that app closes the thread (#6666). A new session would split the chat from the one
- * that app shows, so the session stays.
- */
 export function isCodexThreadInUse(error: unknown): boolean {
   return (
     error instanceof AppServerError && error.code === -32600 && error.message.includes("already has an active writer")
   );
 }
 
-/**
- * The provider refused the session's own history. Grok keeps the `encrypted_content` of each
- * reasoning item in its session and sends it back on every request, and xAI accepts it only from
- * the caller it was issued to. After a sign-in to another account or a new API key, each turn of
- * that session fails the same way, so only a new session, given the OpenBot transcript, recovers.
- */
 function isForeignReasoningError(message: string): boolean {
   return /\bencrypted_content\b.*\bnot issued to this caller\b/i.test(message);
 }
 
-/**
- * OpenCode's model gateway answers a request that it does not accept with one generic 400 that
- * names no field. A session that grew too long for its model, often after the agent moved to
- * another model on the same session, fails each turn this way, and OpenCode does not compact it
- * (#2351). Venice answers "Invalid request parameters", and OpenCode keeps only that text of its
- * reply, also when the session holds more images than Venice accepts (#6702). Only a new session,
- * given the OpenBot transcript, recovers.
- */
+function isBlankHistoryText(message: string): boolean {
+  return /\btext content blocks must (?:contain non-whitespace text|be non-empty)\b/i.test(message);
+}
+
+function isCodexUnstoredItem(provider: AgentProvider, message: string): boolean {
+  return provider === "codex" && /\bItems are not persisted when `?store`? is set to false\b/i.test(message);
+}
+
+function isCodexBareBadRequest(provider: AgentProvider, message: string): boolean {
+  return (
+    provider === "codex" &&
+    /^(?:[^{]*\b400 Bad Request:\s*)?\{\s*"detail"\s*:\s*"Bad Request"\s*\}(?:,\s*url:.*)?$/.test(message.trim())
+  );
+}
+
+function isCodexRefusedAudio(provider: AgentProvider, message: string): boolean {
+  return provider === "codex" && /\bAudio input is not (?:available|supported)\b/i.test(message);
+}
+
 function isRejectedOpenCodeRequest(provider: AgentProvider, message: string): boolean {
   return (
     provider === "opencode" &&
@@ -159,12 +120,16 @@ function isRejectedOpenCodeRequest(provider: AgentProvider, message: string): bo
   );
 }
 
-/**
- * OpenCode 2.2.5 to 2.3.0 compacts a chat near its model's window with a summary from the model. A
- * weak local model can answer with a tool call or with no summary headings, and OpenCode then fails
- * the turn. The session stays too long, so each later turn compacts and fails again (#6006). Only a
- * new session, given the OpenBot transcript, recovers.
- */
+function isRejectedAntigravityRequest(provider: AgentProvider, message: string): boolean {
+  return provider === "antigravity" && GEMINI_INVALID_ARGUMENT.test(message);
+}
+
+function isClearedAntigravityHistory(provider: AgentProvider, message: string): boolean {
+  return (
+    provider === "antigravity" && /\bno renderable messages\b|\ball steps in trajectory are cleared\b/i.test(message)
+  );
+}
+
 function isFailedOpenCodeCompaction(provider: AgentProvider, message: string): boolean {
   return (
     provider === "opencode" &&
@@ -174,50 +139,49 @@ function isFailedOpenCodeCompaction(provider: AgentProvider, message: string): b
   );
 }
 
-/**
- * Muse stores a failed MCP startup audit in the session, and `session/resume` cannot clear it. Each
- * later turn of that session fails in milliseconds, even after the failed server is removed
- * (#2369). Only a new session, given the OpenBot transcript, recovers.
- */
+function isUnsendableOpenCodeMedia(provider: AgentProvider, message: string): boolean {
+  return (
+    provider === "opencode" &&
+    /\bMedia strings must be base64\b|\bLocal file references must be read with Media\.file\b/i.test(message)
+  );
+}
+
 function isMuseMcpStartupFault(provider: AgentProvider, message: string): boolean {
   return provider === "muse" && /\bMCP startup audit failed\b/i.test(message);
 }
 
-/**
- * OpenBot names a new Claude session before the CLI writes it, and a first turn that stops before
- * that write, such as on a terms prompt, leaves a session that does not exist. The CLI then refuses
- * each resume of it, and so does a session file lost with a changed config folder (#5365).
- */
 function isMissingClaudeSession(provider: AgentProvider, message: string): boolean {
   return provider === "claude" && /\bNo conversation found with session ID\b/.test(message);
 }
 
-/**
- * Claude Code compacts a session that is too long for the model before it gives up, and then ends
- * each later turn of that session with this text, also after a restart (#6596).
- */
 function isClaudeContextOverflow(provider: AgentProvider, message: string): boolean {
   return provider === "claude" && /^Prompt is too long\b/.test(message);
 }
 
-/**
- * The failure to show when the provider refused the session's own history, or null when it did
- * not. Each turn of a refused session fails the same way, so the caller closes the session.
- */
 export function refusedSessionFailure(provider: AgentProvider, message: string): string | null {
   if (isForeignReasoningError(message))
     return sourceText("error.provider.foreignReasoning", { provider: providerLabel(provider) });
+  if (isBlankHistoryText(message))
+    return sourceText("error.provider.blankHistoryText", { provider: providerLabel(provider) });
+  if (isCodexUnstoredItem(provider, message)) return sourceText("error.provider.codexHistoryItemMissing");
+  if (isCodexBareBadRequest(provider, message))
+    return sourceText("error.provider.codexRequestRefused", { provider: providerLabel(provider) });
+  if (isCodexRefusedAudio(provider, message)) return sourceText("error.provider.codexAudioRefused");
   if (isImageTooSmallDiagnostic(message))
     return sourceText("error.provider.imageTooSmall", { provider: providerLabel(provider) });
   if (isImageTooLargeDiagnostic(message))
     return sourceText("error.provider.imageTooLarge", { provider: providerLabel(provider) });
   if (isImageCountDiagnostic(message))
     return sourceText("error.provider.imageCountLimit", { provider: providerLabel(provider) });
+  if (isImageUnreadableDiagnostic(message) || isUnsendableOpenCodeMedia(provider, message))
+    return sourceText("error.provider.imageUnreadable", { provider: providerLabel(provider) });
   if (isRequestBodyLimitDiagnostic(message))
     return sourceText("error.provider.requestTooLarge", { provider: providerLabel(provider) });
   if (provider === "opencode" && isUnreadableContentDiagnostic(message))
     return sourceText("error.provider.opencodeUnreadableContent");
   if (isRejectedOpenCodeRequest(provider, message)) return sourceText("error.provider.opencodeSessionRejected");
+  if (isRejectedAntigravityRequest(provider, message)) return sourceText("error.provider.antigravitySessionRejected");
+  if (isClearedAntigravityHistory(provider, message)) return sourceText("error.provider.antigravityHistoryUnreadable");
   if (isFailedOpenCodeCompaction(provider, message)) return sourceText("error.provider.opencodeCompactionFailed");
   if (isMuseMcpStartupFault(provider, message)) return sourceText("error.provider.museMcpStartupFault");
   if (isMissingClaudeSession(provider, message)) return sourceText("error.provider.claudeSessionMissing");
@@ -226,11 +190,8 @@ export function refusedSessionFailure(provider: AgentProvider, message: string):
 }
 
 export function isMissingProviderSessionError(error: unknown, provider: AgentProvider): boolean {
-  // ACP clients convert confirmed missing-session responses before this boundary.
-  // Provider diagnostics can mention missing resources without proving that this session is gone.
   if (error instanceof RequestError) return false;
   if (provider === "claude") return error instanceof MissingClaudeSessionError;
-  // Pi and the key-only providers that run in the Pi CLI.
   if (error instanceof MissingPiSessionError) return true;
   if (provider === "codex") return isCodexMissingThreadError(error);
   if (
@@ -286,7 +247,6 @@ export function toThreadItem(value: DynamicRecord): ThreadItem | null {
   return type ? { ...value, type } : null;
 }
 
-/** What a tool step was, in the closed set product analytics reports. */
 type ToolUsageKind =
   | "command"
   | "file_change"
@@ -299,10 +259,6 @@ type ToolUsageKind =
   | "subagent"
   | "other";
 
-/**
- * One finished tool step. `server` and `tool` are the provider's raw names, not yet safe to send:
- * the main process keeps them only for OpenBot's own servers and catalog plugins.
- */
 export interface ToolUsage {
   kind: ToolUsageKind;
   server?: string;
@@ -310,7 +266,6 @@ export interface ToolUsage {
   failed: boolean;
 }
 
-/** A tool step and the turn it ran in. */
 export interface ToolUsageSignal extends ToolUsage {
   agentId: string;
   turnId: string;
@@ -356,12 +311,6 @@ const ACP_TOOL_KINDS = new Map<string, ToolUsageKind>([
   ["fetch", "web_fetch"],
 ]);
 
-/**
- * Classifies a completed tool item for analytics, or answers `null` for an item that is not a tool.
- *
- * Codex names its item types; Claude names a built-in tool or `mcp__<server>__<tool>`; an ACP agent
- * sends a free-text title, so only its `toolKind` enum is read and the title never is.
- */
 export function toolUsage(item: ThreadItem): ToolUsage | null {
   const status = getString(item, "status");
   const failed = status === "failed" || status === "declined";
@@ -389,13 +338,10 @@ export function toolUsage(item: ThreadItem): ToolUsage | null {
   if (claudeKind) return { kind: claudeKind, failed };
   const mcp = /^mcp__(.+?)__(.+)$/u.exec(name);
   if (!mcp?.[1] || !mcp[2]) return { kind: "other", failed };
-  // A server name can contain `__`, so `mcp__openbot__acme__list` does not show where the server
-  // name stops. Such a step keeps no names: a user's server must never pass as a built-in one.
   if (mcp[2].includes("__")) return { kind: "mcp", failed };
   return { kind: "mcp", server: mcp[1], tool: mcp[2], failed };
 }
 
-/** The built-in tool that a `tool_call` bridge item calls. A name outside the catalog is model text and stays out. */
 function bridgedTool(item: ThreadItem) {
   const name = bridgedToolName(item);
   return name ? BUILTIN_TOOL_CATALOG.find((entry) => entry.name === name) : undefined;
@@ -403,12 +349,7 @@ function bridgedTool(item: ThreadItem) {
 
 const TOOL_RESULT_PROGRESS = sourceText("status.agent.toolResultReviewing");
 
-/**
- * The OpenBot tool that an item calls, or null for any other tool: a Codex, Pi or Muse item names
- * it, a Claude item names it `mcp__openbot__<tool>`, and a `tool_call` bridge item names it in its
- * arguments. A tool of another MCP server with the same name is not OpenBot's.
- */
-function openBotTool(item: ThreadItem): string | null {
+export function openBotTool(item: ThreadItem): string | null {
   const bridged = bridgedToolName(item);
   if (bridged) return bridged.startsWith("openbot.") ? bridged.slice("openbot.".length) : null;
   if (item.type === "toolCall") return /^mcp__openbot__(.+)$/u.exec(getString(item, "name") ?? "")?.[1] ?? null;
@@ -416,11 +357,6 @@ function openBotTool(item: ThreadItem): string | null {
   return item.type === "dynamicToolCall" || item.type === "mcpToolCall" ? getString(item, "tool") : null;
 }
 
-/**
- * The OpenBot browser tool that an item calls, or null for any other tool: a `tool_call` bridge item
- * names it in its arguments, a Codex item names its namespace, and a Claude item names it
- * `mcp__openbot_browser__<tool>` (`claudeBridgedToolName`).
- */
 function browserTool(item: ThreadItem): string | null {
   const bridged = bridgedTool(item);
   if (bridged) return bridged.namespace === OPENBOT_BROWSER_NAMESPACE ? bridged.tool : null;
@@ -431,7 +367,6 @@ function browserTool(item: ThreadItem): string | null {
   return getString(item, "tool");
 }
 
-/** The text of a running browser step. Its completed text is the same for each tool. */
 function browserProgressText(tool: string): string {
   switch (tool) {
     case "open":
@@ -454,10 +389,6 @@ function browserProgressText(tool: string): string {
   }
 }
 
-/**
- * The agents that a `send_message` item went to. A bridge item holds the tool's arguments in its own
- * arguments, and some providers send them as JSON text.
- */
 function messageRecipients(item: ThreadItem): string[] {
   let value = bridgedToolName(item) ? getRecord(item, "arguments")?.arguments : item.arguments;
   if (isString(value)) {
@@ -473,21 +404,18 @@ function messageRecipients(item: ThreadItem): string[] {
     .slice(0, INPUT_LIMITS.messageRecipients);
 }
 
-/** What the trace keeps of a tool step: its shell command, and the agents that an OpenBot message went to. */
 export function toolTraceDetail(item: ThreadItem): { command: string | null; recipientAgentIds: string[] | null } {
   const command = getString(item, "command");
   const recipients = openBotTool(item) === "send_message" ? messageRecipients(item) : [];
   return { command, recipientAgentIds: recipients.length > 0 ? recipients : null };
 }
 
-/** Whether a finished tool item failed: its status says so, or its command ended with an exit code other than 0. */
 export function toolFailed(item: ThreadItem): boolean {
   const status = getString(item, "status");
   const exitCode = item.exitCode;
   return status === "failed" || status === "declined" || (typeof exitCode === "number" && exitCode !== 0);
 }
 
-/** The fields that hold the text of a tool result, in the order a failure is read from them. */
 const RESULT_TEXT_KEYS = [
   "error",
   "aggregatedOutput",
@@ -500,7 +428,6 @@ const RESULT_TEXT_KEYS = [
   "result",
 ] as const;
 
-/** The readable text in a provider's tool result. Records and lists are read a few levels deep. */
 function resultText(value: unknown, depth = 0): string | null {
   if (depth > 4) return null;
   if (isString(value)) return value.trim() || null;
@@ -516,25 +443,13 @@ function resultText(value: unknown, depth = 0): string | null {
   return null;
 }
 
-/**
- * The part of a failed result that is redacted. It is much longer than the kept text, so a secret
- * that this first cut divides stays out of the kept text, and a large output is not read in full.
- */
 const FAILURE_WINDOW = CONVERSATION_TRACE_TEXT_LIMIT * 16;
 
-/** Whether a tool step runs a shell command: a Codex command, a command tool, or Pi's `bash` tool. */
 function isShellCommand(item: ThreadItem): boolean {
-  return (
-    toolUsage(item)?.kind === "command" ||
-    (item.type === "dynamicToolCall" && !getString(item, "namespace") && getString(item, "tool") === "bash")
-  );
+  const tool = item.type === "dynamicToolCall" && !getString(item, "namespace") ? getString(item, "tool") : undefined;
+  return toolUsage(item)?.kind === "command" || tool === "bash" || tool === "powershell";
 }
 
-/**
- * The error text of a tool step that failed, for the step's "Show error" output. `redact` runs before
- * the cut, because a cut through a secret leaves a part that no rule recognizes. A command keeps the
- * end of its output, where the error is; other tools keep the start.
- */
 export function toolFailureText(item: ThreadItem, redact: (text: string) => string): string | null {
   if (getString(item, "status") !== "failed") return null;
   const raw = resultText(item);
@@ -544,13 +459,11 @@ export function toolFailureText(item: ThreadItem, redact: (text: string) => stri
   const text = redact(window).trim();
   const limit = CONVERSATION_TRACE_TEXT_LIMIT;
   if (text.length <= limit) return text || null;
-  // A cut between the two halves of a surrogate pair leaves half a character, which goes.
   return tail
     ? `…${text.slice(1 - limit).replace(/^[\uDC00-\uDFFF]/u, "")}`
     : `${text.slice(0, limit - 1).replace(/[\uD800-\uDBFF]$/u, "")}…`;
 }
 
-/** Whether an item is a tool step: a tool call, a command, a file change, a web search or a computer action. */
 export function isToolItem(item: ThreadItem): boolean {
   return /(tool.*call|commandexecution|filechange|websearch|computeraction)/u.test(item.type.toLowerCase());
 }
@@ -571,14 +484,9 @@ export function toolProgressText(item: ThreadItem, completed: boolean): string |
     .filter(isString)
     .join(" ")
     .toLowerCase();
-  // Before the generic words below, because a driver tool such as `get_window_state` matches them.
-  // The completed text is what the user reads while the model decides the next action, so a long
-  // wait after it is the model, not the driver.
   if (getString(item, "server") === COMPUTER_USE_MCP_SERVER_NAME || descriptor.includes(COMPUTER_USE_MCP_SERVER_NAME)) {
     return sourceText(completed ? "status.computerUse.progressDeciding" : "status.computerUse.progressActing");
   }
-  // OpenBot's own memory and skill tools, before the generic words too. A memory search reports what
-  // it found itself, while it runs, so its end adds no line.
   const openBot = openBotTool(item);
   if (openBot === "search_memories" || openBot === "list_memories") {
     return completed ? null : sourceText("status.agent.memoriesSearching");
@@ -586,24 +494,22 @@ export function toolProgressText(item: ThreadItem, completed: boolean): string |
   if (openBot === "remember" || openBot === "forget_memory" || openBot === "set_memory_inclusion") {
     return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.memoriesUpdating");
   }
+  if (openBot === "set_backdrop") return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.backdropSetting");
   if (openBot === "read_local_skill") return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.skillReading");
-  // Its name has `send`, a word of the agent words below.
   if (openBot === "send_feedback") return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.feedbackSending");
+  if (openBot === "withdraw_feedback")
+    return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.feedbackWithdrawing");
   const skill = getString(item, "name") === "Skill" ? getString(item, "skill") : null;
   if (skill) return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.skillUsing", { name: skill });
   if (descriptor.includes("capture_screen")) {
     return sourceText(completed ? "status.agent.screenCaptureReviewing" : "status.agent.screenCaptureProgress");
   }
-  // Before the generic words too: each browser tool name contains `browser`, which is a web search word.
   const browser = browserTool(item);
   if (browser !== null) {
     return completed ? sourceText("status.agent.browserReviewing") : browserProgressText(browser);
   }
-  // The model's own label of the step, such as "Show folder sizes in home", tells the user more than
-  // the generic words below. It can quote a path or a value, so it is redacted like the trace's command.
   const description = completed ? null : getString(item, "description")?.trim();
   if (description) return redactText(description);
-  // Next, a label from what the step does, such as "Reading main.ts…", for a provider that sends no label.
   const label = completed ? null : stepLabel(item);
   if (label) return label;
   if (/(search|browser|fetch|navigate|open_url|web)/u.test(descriptor)) {
@@ -623,8 +529,6 @@ export function toolProgressText(item: ThreadItem, completed: boolean): string |
   if (/(agent|delegate|message|send)/u.test(descriptor)) {
     return completed ? sourceText("status.agent.agentResponseReviewing") : sourceText("status.agent.agentCoordinating");
   }
-  // Last, so that a command with a title such as "Run the tests" keeps the text above. A command that
-  // never returns then reads as a command, not as an unknown step (#5485). Pi names its shell tool `bash`.
   if (!completed && isShellCommand(item)) {
     return sourceText("status.agent.commandRunningUnnamed");
   }
@@ -644,7 +548,6 @@ const TOOL_USAGE_ACTIVITIES: Readonly<Record<ToolUsageKind, AgentStepActivity>> 
   other: "working",
 };
 
-/** OpenBot tools that only read: memories, skills and chat history. */
 const READING_OPENBOT_TOOLS = new Set([
   "search_memories",
   "list_memories",
@@ -653,10 +556,6 @@ const READING_OPENBOT_TOOLS = new Set([
   "history_read",
 ]);
 
-/**
- * What a tool step does, for the `activity` of its `turn-progress` event, or null for an item that is
- * not a tool step. An ended step is `reviewing`: the model now reads its result.
- */
 export function toolActivity(item: ThreadItem, completed: boolean): AgentStepActivity | null {
   if (!isToolItem(item)) return null;
   if (completed) return "reviewing";
@@ -668,7 +567,6 @@ export function toolActivity(item: ThreadItem, completed: boolean): AgentStepAct
   return TOOL_USAGE_ACTIVITIES[toolUsage(item)?.kind ?? "other"];
 }
 
-/** The provider account after the first that an agent runs on, or null for the provider's own sign-in. */
 export function agentProviderAccount(agent: { providerAccountId?: string | undefined }): string | null {
   const accountId = agent.providerAccountId;
   return accountId && accountId !== DEFAULT_PROVIDER_ACCOUNT_ID ? accountId : null;

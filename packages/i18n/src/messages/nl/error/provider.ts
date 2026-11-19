@@ -12,6 +12,9 @@ export const messages = {
     "{provider} is zijn aanmelding kwijt, dus OpenBot heeft het proces beëindigd. Stuur je bericht opnieuw.",
   "error.provider.acpRefusedUntilRestart":
     "{provider} heeft een bericht geweigerd, dus OpenBot heeft het proces beëindigd. Stuur je bericht opnieuw.",
+  "error.provider.acpServerLost": "{provider} heeft de verbinding verloren. Stuur je bericht opnieuw.",
+  "error.provider.acpServerLostEnded":
+    "{provider} heeft de verbinding verloren, dus OpenBot heeft het proces beëindigd.",
   "error.provider.acpSettingsTimedOut": "{provider} reageerde niet op tijd. Probeer het zo opnieuw.",
   "error.provider.acpPlanUsedUp":
     "{provider} meldt dat je abonnement op is. Kies een ander model of upgrade je {provider}-abonnement.",
@@ -45,6 +48,14 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "Er zijn te veel adressen of mappen.",
   "error.provider.credentialFileUnreadable": "Het bestand met inloggegevens van de aanbieder is onleesbaar.",
   "error.provider.credentialFileTooLarge": "Het bestand met inloggegevens van de aanbieder is te groot.",
+  "error.provider.environmentNameInvalid":
+    "{name} is geen geldige variabelenaam. Gebruik letters, cijfers en _, en begin niet met een cijfer.",
+  "error.provider.environmentNameReserved": "OpenBot stelt {name} in voor deze provider. Verwijder deze variabele.",
+  "error.provider.environmentNameDuplicate": "{name} staat meer dan één keer in de lijst.",
+  "error.provider.environmentValueTooLong": "De waarde van {name} is te lang.",
+  "error.provider.environmentTooMany": "Een provider kan hoogstens {limit} variabelen hebben.",
+  "error.provider.environmentSecretsTooLarge":
+    "De gevoelige waarden zijn samen te lang. Sla kortere of minder waarden op.",
   "error.provider.archiveSpecialFile": "Het runtime-archief bevat een link of speciaal bestand.",
   "error.provider.archiveUnsafePath": "Het runtime-archief bevat een onveilig pad.",
   "error.provider.runtimeSpecialFile": "De runtime bevat een link of speciaal bestand.",
@@ -74,6 +85,8 @@ export const messages = {
   "error.provider.runtimeUpdateIncomplete": "De update van de runtime is niet voltooid.",
   "error.provider.downloadHttp": "Download van de runtime is mislukt met HTTP {status}.",
   "error.provider.downloadNoData": "Download van de runtime gaf geen gegevens.",
+  "error.provider.downloadStalled":
+    "De download is gestopt omdat er een minuut lang geen gegevens binnenkwamen. Controleer de internetverbinding en probeer het opnieuw.",
   "error.provider.downloadSize": "De download van de runtime heeft een onverwachte grootte.",
   "error.provider.downloadIntegrity": "De download van de runtime heeft de integriteitscontrole niet doorstaan.",
   "error.provider.runtimeReplacing":
@@ -163,12 +176,21 @@ export const messages = {
     "{provider} reageerde niet op tijd. De computer is misschien bezet. OpenBot probeert het opnieuw.",
   "error.provider.cliTimedOutRefresh":
     "{provider} reageerde niet op tijd. De computer is misschien bezet. Vernieuw de aanbieders om het opnieuw te proberen.",
+  "error.provider.stoppedBeforeStart": "{provider} stopte voordat dit bericht begon. Stuur het bericht opnieuw.",
+  "error.provider.sessionStartTimedOut":
+    "{provider} opende niet op tijd een nieuwe chat, dus dit bericht is niet begonnen. Open op de computer waarop OpenBot draait Aanbieders, kies {provider} en klik op Herstarten. Probeer het daarna opnieuw.",
+  "error.provider.serviceUnreachable":
+    "{provider} kan geen verbinding maken met zijn service. Controleer je internetverbinding. OpenBot probeert het opnieuw.",
+  "error.provider.serviceUnreachableRefresh":
+    "{provider} kan geen verbinding maken met zijn service. Controleer je internetverbinding en vernieuw daarna de aanbieders.",
   "error.provider.acpStartTimedOut":
     "{provider} was niet binnen {seconds} s klaar met starten. De computer is misschien bezet.",
   "error.provider.acpModelsTimedOut":
     "{provider} gaf de modellen niet binnen {seconds} s. De computer is misschien bezet.",
   "error.provider.startStopped":
     "{provider} is meerdere keren achter elkaar niet gestart, dus OpenBot probeert het niet meer. Vernieuw de aanbieders om het opnieuw te proberen.",
+  "error.provider.startPaused":
+    "{provider} is meerdere keren achter elkaar niet gestart. OpenBot probeert het opnieuw bij het volgende bericht of de volgende routine. Vernieuw de providers om het nu te proberen.",
   "error.provider.tempDiskSpace":
     "{provider} heeft minstens 1 GB vrije schijfruimte nodig om te starten. Maak ruimte vrij en vernieuw daarna de aanbieders.",
   "error.provider.noCodeSignIn": "Bij {provider} kun je niet inloggen met een code.",
@@ -179,6 +201,8 @@ export const messages = {
   "error.provider.codeLoginRefused": "De aanbieder heeft de code niet geaccepteerd. Start het inloggen opnieuw.",
   "error.provider.codeLoginUnsupported":
     "Deze server kan niet inloggen met een geplakte code. Log in op de servercomputer, in de browser daar.",
+  "error.provider.claudeLoginNotSaved":
+    "Claude kan de aanmelding niet opslaan op de Mac. Start de Mac waarop OpenBot draait opnieuw op en verbind Claude daarna opnieuw.",
   "error.provider.cliBusyRetry":
     "De {provider} CLI werkt aan een beurt. Wacht tot die klaar is en probeer het opnieuw.",
   "error.provider.cliSigningIn":
@@ -202,14 +226,24 @@ export const messages = {
     "OpenCode heeft geen inlog voor de modelaanbieder “{provider}”. Kies een model met het label Gratis, of verbind de aanbieder: plak een OpenCode Go-sleutel in de OpenCode-instellingen, of voer `opencode auth login` uit in een terminal. Probeer het daarna opnieuw.",
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode heeft geen inlog voor de aanbieder van dit model. Kies een model met het label Gratis, of verbind de aanbieder: plak een OpenCode Go-sleutel in de OpenCode-instellingen, of voer `opencode auth login` uit in een terminal. Probeer het daarna opnieuw.",
+  "error.provider.opencodeProviderRefused":
+    "De modelaanbieder \"{provider}\" heeft het verzoek geweigerd. OpenCode heeft een sleutel voor deze aanbieder, dus je netwerk kan de oorzaak zijn: sommige aanbieders blokkeren VPN's, proxy's of bepaalde landen. Zet de VPN uit of gebruik een ander netwerk en probeer het opnieuw. Als de fout blijft, is de sleutel mogelijk onjuist: voer `opencode auth login` uit in een terminal en voer de sleutel opnieuw in.",
   "error.provider.opencodeFreeModelRefused":
     "OpenCode heeft dit gratis model geweigerd. Sommige gratis modellen zijn niet in elk land beschikbaar. Kies een ander model met het label Gratis, of plak een OpenCode Go-sleutel in de OpenCode-instellingen en kies een OpenCode Go-model.",
   "error.provider.customEndpointKeyRefused":
     "Het endpoint “{provider}” heeft zijn API-sleutel of headers geweigerd. Voer ze opnieuw in bij Serverinstellingen → Aanbieders en probeer het daarna opnieuw.",
+  "error.provider.customEndpointAccessRefused":
+    "Het endpoint “{provider}” heeft het verzoek geweigerd. Zijn API-sleutel of headers kunnen onjuist zijn, of zijn account mag dit model niet gebruiken. Controleer ze bij Serverinstellingen → Aanbieders of kies een ander model. Probeer het daarna opnieuw.",
   "error.provider.customEndpointKeyMissing":
     "Het endpoint “{provider}” heeft een API-sleutel nodig. Voeg de sleutel toe bij Serverinstellingen → Aanbieders en probeer het daarna opnieuw.",
+  "error.provider.customEndpointEffortRefused":
+    "Het endpoint “{provider}” heeft het redeneerniveau van dit model geweigerd. Bewerk “{provider}” bij Serverinstellingen → Aanbieders. Houd bij Redeneerniveau alleen de niveaus die dit model accepteert, of kies Geen redenering. Probeer het daarna opnieuw.",
   "error.provider.opencodeKeyExpired":
     "Je OpenCode-API-sleutel is verlopen. Maak een nieuwe sleutel in OpenCode Console, plak hem in de OpenCode-instellingen en probeer het opnieuw.",
+  "error.provider.opencodeKeyRefused":
+    "OpenCode Go heeft je opgeslagen API-sleutel geweigerd. De sleutel is misschien verlopen. Maak een nieuwe sleutel in OpenCode Console, plak hem in de OpenCode-instellingen en probeer het opnieuw.",
+  "error.provider.opencodeGoRequestRefused":
+    "OpenCode Go heeft het verzoek geweigerd. Een nieuwe API-sleutel lost dit niet op. Je OpenCode Go-abonnement is misschien niet actief, of OpenCode Go blokkeert misschien je netwerk: sommige diensten blokkeren vpn's, proxy's of bepaalde landen. Controleer in OpenCode Console of je abonnement actief is, of zet de vpn uit, en probeer het opnieuw. Je kunt ook een ander model kiezen.",
   "error.provider.opencodeServiceFailure":
     "OpenCode kon deze beurt niet voltooien, omdat de lokale service is mislukt. Probeer het opnieuw. Blijft de fout, verbind OpenCode dan opnieuw in Instellingen.",
   "error.provider.opencodeRateLimited":
@@ -220,16 +254,26 @@ export const messages = {
     "De modelaanbieder van OpenCode meldde een ongeldig uploadverzoek. Kies een ander model en ga verder. Controleer opgeslagen routines voordat je ze opnieuw maakt.\n{detail}",
   "error.provider.opencodeUnreadableContent":
     "Dit model kan een bestand of afbeelding in deze chat niet lezen. OpenBot heeft een nieuwe OpenCode-sessie gestart met de chatgeschiedenis. Stuur je bericht opnieuw zonder het bestand, of kies een model dat bestanden kan lezen. Heb je dit model aan een eigen aanbieder toegevoegd, schakel dan in de instellingen bij ‘Accepteert’ ‘Afbeeldingen’ uit.",
+  "error.provider.opencodeOutOfMemory":
+    "De modelserver heeft niet genoeg geheugen voor deze chat. Begin een nieuwe chat, of laad het model met een kleinere contextlengte en vul hetzelfde venster in bij de providerinstellingen in OpenBot.",
   "error.provider.opencodeContextTooSmall":
     "Deze chat past niet in het contextvenster van het model. Laad het model in Ollama of LM Studio met een grotere contextlengte, en vul hetzelfde venster in bij de providerinstellingen in OpenBot. Of kies een groter model.",
   "error.provider.opencodeFreeLimit":
     "De gratis OpenCode-modellen hebben hun gebruikslimiet bereikt. Alle gratis modellen delen deze limiet. Plak een OpenCode Go-sleutel in de OpenCode-instellingen om door te gaan, of kies een model van een andere aanbieder.",
   "error.provider.opencodeProviderFailed":
     "De modelaanbieder had een storing aan zijn kant. Het ligt niet aan je verbinding. Probeer het later opnieuw of kies een ander model.\n{detail}",
+  "error.provider.opencodeModelUnavailable":
+    "Dit model is niet beschikbaar voor je. Kies een ander model voor deze agent.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "Het antwoord van het model werd afgebroken of was ongeldig. Stuur je bericht opnieuw of kies een ander model.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "Het antwoord van het model was drie keer langer dan de outputlimiet, dus de beurt is gestopt. Kies een lager denkniveau of een ander model en stuur je bericht opnieuw.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "Het antwoord van het model was drie keer langer dan de outputlimiet, dus de beurt is gestopt. Open in Instellingen Eigen aanbieder, klik bij dit endpoint op Bewerken en stel een grotere Max. output in voor dit model. Of kies een lager denkniveau of een ander model.",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode kon de redenering van dit model bij dit denkniveau niet lezen. Kies een lager denkniveau of een ander model en stuur je bericht dan opnieuw.",
+  "error.provider.opencodeModelNotServed":
+    "De modelaanbieder biedt dit model nu niet aan je account aan. Kies een ander model en stuur je bericht daarna opnieuw.",
   "error.provider.opencodeNetwork":
     "OpenCode kon geen verbinding maken met de modelaanbieder. Controleer de netwerkverbinding van de computer waarop OpenBot draait en probeer het opnieuw.\n{detail}",
   "error.provider.codexStateBusy":
@@ -248,6 +292,11 @@ export const messages = {
     "Het OpenCode-model beëindigde de beurt na het redeneren, zonder antwoord. Probeer het opnieuw, of kies een ander model.",
   "error.provider.acpNoAnswer":
     "{provider} beëindigde de beurt zonder antwoord. Stuur het bericht opnieuw, of begin een nieuwe chat.",
+  "error.provider.noAnswerAfterSteps":
+    "{provider} voerde enkele stappen uit en beëindigde de beurt daarna zonder antwoord. Vraag de agent wat hij deed voordat je hetzelfde verzoek opnieuw stuurt.",
+  "error.provider.acpRefusedNoReason": "{provider} stopte zonder antwoord. Stuur het bericht opnieuw.",
+  "error.provider.channelNoAnswer":
+    "{provider} beëindigde de beurt zonder antwoord. Klik in het kanaal op Doorgaan om de taak opnieuw uit te voeren, of op Opnieuw toewijzen om hem aan een ander lid te geven.",
   "error.provider.chatgptPageFailed": "OpenBot kon de verbindingspagina van ChatGPT niet openen.",
   "error.provider.noneReady": "Er is geen agentaanbieder klaar.",
   "error.provider.claudeTurnActive": "Wacht op de actieve Claude-beurt voordat je de context vernieuwt.",
@@ -274,12 +323,24 @@ export const messages = {
     "Gemini kan dit model nu niet gebruiken. Kies een ander model en probeer het opnieuw.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "De Gemini-service van Google heeft het verzoek niet voltooid. Probeer het over een paar minuten opnieuw.\n{detail}",
+  "error.provider.antigravitySignInRefused":
+    "Google heeft de Gemini-aanmelding voor dit verzoek niet geaccepteerd. Stuur je bericht opnieuw. Blijft de fout, verbind Gemini dan opnieuw in Instellingen.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini heeft dit verzoek geweigerd. Kies een ander model en stuur je bericht opnieuw. Mislukt het weer, start dan een nieuwe chat.\n{detail}",
+  "error.provider.antigravityNetwork":
+    "Gemini heeft de verbinding met Google verloren. Stuur je bericht opnieuw. ({cause})",
+  "error.provider.antigravitySessionRejected":
+    "Gemini heeft dit verzoek geweigerd zonder de oorzaak te geven. Een item in de chatgeschiedenis kan de oorzaak zijn, zoals een afbeelding die de agent heeft geopend. OpenBot heeft een nieuwe Gemini-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Blijft de fout, kies dan een ander model.",
+  "error.provider.antigravityHistoryUnreadable":
+    "Gemini kon de opgeslagen geschiedenis van deze chat niet lezen. OpenBot heeft een nieuwe Gemini-sessie met de chatgeschiedenis gestart. Stuur je bericht opnieuw.",
   "error.provider.antigravityLocationUnsupported":
     "Google staat Gemini niet toe vanaf de netwerklocatie van de computer waarop deze agent draait. Gebruik Gemini op een andere computer, of kies een andere aanbieder voor deze agent.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini is de verbinding met zijn agent kwijtgeraakt en is gestopt. Stuur een bericht om verder te gaan.",
+  "error.provider.grokServiceFailure":
+    "De Grok-service is druk of heeft een fout. Probeer het over een paar minuten opnieuw of kies een ander model.",
+  "error.provider.grokConnectionFailed":
+    "Grok kan geen verbinding maken met zijn service. Controleer je internetverbinding en stuur het bericht daarna opnieuw.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "Op een Windows-host opent Gemini de Google-pagina op de host zelf. Verbind Gemini op de hostcomputer.",
   "error.provider.cursorArchivePath": "Het Cursor-archief bevat een onverwacht bestand.",
@@ -289,6 +350,8 @@ export const messages = {
   "error.provider.cursorNotStarted": "De Cursor-agent is gevonden, maar de versie kan niet worden gelezen.",
   "error.provider.cursorVersionUnreadable": "Kan de versie van de Cursor-agent niet lezen.",
   "error.provider.cursorSignIn": "Log in met Cursor of stel CURSOR_API_KEY in om Cursor te gebruiken.",
+  "error.provider.cursorSignInUnusable":
+    "Cursor kon met je aanmelding geen verbinding maken met zijn server. Controleer je internetverbinding en log daarna opnieuw in bij Cursor.",
   "error.provider.clineArchivePath": "Het Cline-archief heeft een onverwacht pad.",
   "error.provider.clinePackageMismatch": "Het Cline-pakket komt niet overeen met de runtimecatalogus.",
   "error.provider.clineChecksum": "Checksum van de Cline-runtime komt niet overeen.",
@@ -315,9 +378,11 @@ export const messages = {
   "error.provider.hermesSignIn":
     "Log in met Nous Portal of voer `hermes setup` uit in een terminal om Hermes te gebruiken.",
   "error.provider.hermesTurnFailed":
-    "Hermes kon deze beurt niet afmaken. Als het antwoord een reden geeft, volg die dan. Zo niet, dan is een MCP-server van deze agent misschien niet beschikbaar: controleer hem in Serverinstellingen › MCP en stuur je bericht opnieuw.",
+    "Hermes kon deze beurt niet afmaken. Als het antwoord een reden geeft, volg die dan. Zo niet, dan is een MCP-server van deze agent misschien niet beschikbaar: controleer hem in Marktplaats, Apps, en stuur je bericht opnieuw.",
   "error.provider.hermesRefused":
     "Hermes heeft dit bericht geweigerd voordat het begon. Stuur het opnieuw. Als Hermes elk bericht weigert, start OpenBot dan opnieuw op de computer waarop deze agent draait.",
+  "error.provider.hermesConnectionLost":
+    "Hermes heeft tijdens dit bericht de verbinding verloren en weet dus niet of het werk klaar is. Controleer wat de agent heeft gedaan voordat je het bericht opnieuw stuurt.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot kon dit model niet gebruiken: het model accepteerde de denkinstelling niet. Selecteer een ander model voor deze agent en verstuur je bericht opnieuw.",
   "error.provider.usageLimitReached": "Het account heeft de gebruikslimiet bereikt.",
@@ -325,14 +390,28 @@ export const messages = {
     "Deze chat is te lang geworden voor Claude. OpenBot heeft een nieuwe Claude Code-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.claudeApiKeyNoCredit":
     "De Anthropic-API-sleutel heeft geen API-tegoed. Een Claude-abonnement betaalt geen verzoeken met een API-sleutel. Voeg tegoed toe in de Anthropic Console, of log bij Instellingen in bij Claude en kies het Claude-account in het modelmenu van de agent.",
+  "error.provider.claudeAccountNoCredit":
+    "Het tegoed van je Claude-account is te laag. Sommige verzoeken, zoals de snelle modus, gebruiken gebruikstegoed, ook als je Claude-abonnement nog gebruik over heeft. Voeg gebruikstegoed toe in je Claude-account, of kies een ander model in het modelmenu van de agent.",
+  "error.provider.claudeServiceBlocked":
+    "De Claude-dienst heeft dit verzoek geblokkeerd. Meestal is dit een kort probleem bij Claude, geen probleem met je account. Stuur het bericht over een paar minuten opnieuw.",
   "error.provider.foreignReasoning":
     "{provider} heeft het eerdere redeneren in deze chat niet geaccepteerd, omdat een ander account of een andere API-sleutel het heeft ontvangen. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
+  "error.provider.blankHistoryText":
+    "Het model heeft deze chat niet geaccepteerd, omdat de opgeslagen geschiedenis een leeg bericht bevat. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
+  "error.provider.codexHistoryItemMissing":
+    "Codex kon deze chat niet voortzetten, omdat een item in de opgeslagen geschiedenis ontbreekt. OpenBot heeft een nieuwe Codex-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
+  "error.provider.codexRequestRefused":
+    "{provider} heeft het verzoek voor deze chat geweigerd zonder de oorzaak te geven. Dit kan gebeuren in een lange chat met veel afbeeldingen. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
+  "error.provider.codexAudioRefused":
+    "Dit model kan geen audio beluisteren, dus het accepteerde het geluid in deze chat niet. OpenBot heeft een nieuwe Codex-sessie gestart met de chatgeschiedenis. Stuur je verzoek opnieuw en vraag de agent om zonder het geluid te werken om verder te gaan. Kies in het modelmenu van de agent een model dat audio kan beluisteren om geluid te controleren.",
   "error.provider.imageTooSmall":
     "Het model accepteerde een afbeelding in deze chat niet, omdat de afbeelding te klein is. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.imageTooLarge":
     "Het model accepteerde een afbeelding in deze chat niet, omdat de afbeelding te groot is. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.imageCountLimit":
     "Het model accepteerde deze chat niet, omdat de chat te veel afbeeldingen bevat. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
+  "error.provider.imageUnreadable":
+    "Het model kon een afbeelding in deze chat niet lezen. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Stuurde je een afbeelding, stuur dan een andere.",
   "error.provider.requestTooLarge":
     "Deze chat is te groot geworden om naar het model te sturen. Afbeeldingen in de chat zijn vaak de oorzaak. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.opencodeSessionRejected":
@@ -454,12 +533,17 @@ export const messages = {
   "error.provider.nativeNotStarted": "De {provider} CLI kon niet starten.",
   "error.provider.nativeVersionUnreadable": "De versie van de {provider} CLI kon niet worden gelezen.",
   "error.provider.piSessionBusy": "Wacht tot de huidige Pi-beurt klaar is.",
+  "error.provider.acpSessionBusy": "{provider} rondt nog een gestopte beurt af. Probeer het zo opnieuw.",
+  "error.provider.acpModelNotOffered":
+    "{provider} biedt {model} nu niet aan. Kies een ander model voor deze agent en probeer het opnieuw.",
   "error.provider.piStopped": "Pi draait niet. Verbind Pi en probeer het opnieuw.",
   "error.provider.piSessionMissing": "Het Pi-sessiebestand is niet beschikbaar op deze computer.",
   "error.provider.piResumeCancelled": "Pi heeft het hervatten van de sessie geannuleerd. Probeer het opnieuw.",
   "error.provider.piSessionIdentity": "Pi gaf een andere sessie terug. De opgeslagen sessie is niet vervangen.",
   "error.provider.piExtensionFailed":
     "Pi is gestopt omdat een extensie niet kon worden geladen. Verwijder of werk deze extensie bij en probeer het opnieuw. {detail}",
+  "error.provider.piThreadStopped":
+    "Pi is onverwacht gestopt voordat deze beurt klaar was. Stuur een bericht om verder te gaan.",
   "error.provider.piModelInvalid": "Kies een Pi-model dat de aanbieder bevat.",
   "error.provider.piToolInvalid": "De tool gaf een ongeldig resultaat terug.",
   "error.provider.piSignIn": "Gebruik /login in Pi op de hostcomputer. Sluit Pi als het inloggen klaar is.",

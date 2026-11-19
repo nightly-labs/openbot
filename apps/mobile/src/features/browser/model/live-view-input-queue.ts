@@ -1,12 +1,7 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { BrowserViewInput } from "@openbot/contracts/team-protocol/browser-view-v1";
-import { clamp } from "./live-view-geometry";
+import { clamp } from "@/shared/lib/worklet-math";
 
-/**
- * Input on its way to the peer page. A finger reports a move many times per frame of the screen,
- * so moves and scroll steps wait for the next frame and go as one: the newest move, and the sum of
- * the scroll. A press, a release or a key goes at once, after what waited before it.
- */
 export function createLiveViewInputQueue(
   send: (inputs: BrowserViewInput[]) => void,
   nextFrame: (callback: () => void) => () => void,

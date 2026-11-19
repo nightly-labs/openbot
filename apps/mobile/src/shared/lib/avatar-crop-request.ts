@@ -6,7 +6,6 @@ export interface AvatarCropSource {
   height: number;
 }
 
-/** A square in the source image's pixels. */
 export interface AvatarCrop {
   originX: number;
   originY: number;
@@ -16,15 +15,12 @@ export interface AvatarCrop {
 
 export interface AvatarCropRequest {
   source: AvatarCropSource;
-  /** The shape the crop screen shows: the corner radius as a part of the side. 0.5 is a circle. */
   cornerRatio: number;
   resolve: (crop: AvatarCrop | null) => void;
 }
 
-// The crop screen is a route, so the photo and the answer pass through here, not through params.
 let pending: AvatarCropRequest | null = null;
 
-/** Opens the crop screen and resolves with the chosen square, or null when the user goes back. */
 export function requestAvatarCrop(
   source: AvatarCropSource,
   route: Href,

@@ -1,29 +1,28 @@
+import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
+  type AgentAccess,
   MCP_TRANSPORTS,
+  type McpKeyValue,
   type McpServerConfig,
   type McpSignInState,
   mcpConfigErrors,
   normalizeMcpConfig,
+  workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import { isSecretName, registerSecretValues } from "@openbot/logging";
 import { Effect } from "effect";
 import { z } from "zod";
 import type { McpSignInOffer } from "../mcp-oauth-provider";
-import type { McpProbeOutcome } from "../mcp-probe";
+import type { McpProbeOutcome, McpToolArguments, McpToolCallResult } from "../mcp-probe";
+import { providerMcpServerName } from "../mcp-provider-shapes";
+import { redactMcpSecrets } from "../mcp-redaction";
+import type { DynamicToolResult } from "../protocol";
 import type { McpGateway, McpGatewayFailed } from "./mcp-gateway";
 import { profileToolErrorMessage } from "./profile-tools";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "./routine-tools";
 import { ToolOperationFailed, toolStep } from "./tool-operation";
-
-/**
- * The MCP tools: an agent adds, changes, tests, turns on or off, and removes the MCP servers of its
- * OpenBot server when the user asks. A server applies to every agent there, so each change waits
- * for the user's approval as other tools do, and an agent with Full access is answered for.
- *
- * No value of a header or of the environment goes in or out: a key stays in Server settings, where
- * the user enters it. A sign-in is handed to the user with a card in the conversation.
- */
 
 const serverName = z
   .string()
@@ -48,25 +47,41 @@ const saveMcpServerToolSchema = z.strictObject({
     .optional()
     .describe("The arguments of a stdio server. They replace the arguments it had."),
   workingDirectory: z.string().max(INPUT_LIMITS.path).optional(),
+  headers: z
+    .array(
+      z.strictObject({
+        name: z.string().trim().min(1).max(INPUT_LIMITS.mcpEnvName),
+        value: z.string().max(INPUT_LIMITS.mcpHeaderValue),
+      }),
+    )
+    .max(INPUT_LIMITS.mcpHeaders)
+    .optional()
+    .describe(
+      "Headers that the user gave, such as Authorization: Bearer <token>. Each sets or replaces the header of its name; an empty value removes it.",
+    ),
   enabled: z.boolean().optional().describe("A new server is on unless this is false."),
+});
+
+const headerValuesArgument = z.looseObject({
+  headers: z.array(z.looseObject({ name: z.string(), value: z.string() })),
 });
 
 const namedServerSchema = z.strictObject({ name: serverName });
 const setEnabledSchema = z.strictObject({ name: serverName, enabled: z.boolean() });
 
-const MCP_SCOPE = "Every agent on this OpenBot server gets the tools of an enabled MCP server.";
+const MCP_SCOPE = "The user selects which agents get each server, in Marketplace, Apps.";
 const MCP_APPROVAL =
   "The user's request is the permission: call the tool without asking first. OpenBot asks the user to approve when your access needs it.";
 
 export const MCP_SERVER_TOOL_DEFINITIONS = [
   {
     name: "list_mcp_servers",
-    description: `List the MCP servers of this OpenBot server: name, transport, on or off, address or command, the names of its headers and environment variables, and whether it is signed in. Values are never shown. ${MCP_SCOPE} Read-only.`,
+    description: `List the MCP servers of this OpenBot server: name, transport, on or off, address or command, the names of its headers and environment variables, sign-in, and forYou: you get its tools when it is on. Values are never shown. ${MCP_SCOPE} Read-only.`,
     shape: {},
   },
   {
     name: "save_mcp_server",
-    description: `Add an MCP server, or change one by its name, only when the user asks for it. ${MCP_SCOPE} ${MCP_APPROVAL} Then OpenBot connects to the server and saves it when it answers or needs only a sign-in or a key. The result is ready with its tools, needs_sign_in (a Sign in card is in the conversation: wait for the user), needs_key (the user enters the key in Server settings, MCP; never ask for a key in the chat), or the error. Headers and environment values are not set here: a stdio server that cannot start without a key in its environment is added by the user in Server settings, MCP. A server that holds keys keeps its transport, address origin, command, arguments and folder. New tools reach the agents from their next turn.`,
+    description: `Add an MCP server, or change one by its name, only when the user asks for it. ${MCP_SCOPE} ${MCP_APPROVAL} Then OpenBot connects to the server and saves it when it answers or needs only a sign-in or a key. The result is ready with its tools, needs_sign_in (a Sign in card is in the conversation: wait for the user), needs_key (save again with the key in headers when the user gave it; else the user enters it in Marketplace, Apps; never ask for a key in the chat), or the error. Put a key that the user gave in headers, never in the address. Environment values are not set here: a stdio server that cannot start without a key in its environment is added by the user in Marketplace, Apps. A server keeps the keys it holds only on its transport, address origin, command, arguments and folder. New tools reach the agents from their next turn.`,
     shape: saveMcpServerToolSchema.shape,
   },
   {
@@ -95,84 +110,110 @@ export function isMcpServerTool(tool: string): tool is McpServerToolName {
   return MCP_SERVER_TOOL_NAMES.has(tool);
 }
 
-/** The MCP servers of this OpenBot server, as the agent service holds them. */
 export interface AgentMcpServers {
   list(): McpServerConfig[];
-  /** The servers that OpenBot gives the agents itself and no row holds: the GitHub connection, Computer Use. */
   builtIn(): readonly McpServerConfig[];
   signIns(): McpSignInState[];
+  signInFailure(config: McpServerConfig): string | null;
   save(config: McpServerConfig): Effect.Effect<unknown, ToolOperationFailed>;
   setEnabled(mcpServerId: string, enabled: boolean): Effect.Effect<unknown, ToolOperationFailed>;
   remove(mcpServerId: string): Effect.Effect<unknown, ToolOperationFailed>;
-  /**
-   * A silent test: stored sign-ins only, never a browser. `tested`: the agent asked for this test,
-   * so a saved server with new tools refreshes the sessions.
-   */
   inspect(config: McpServerConfig, tested?: boolean): Effect.Effect<McpProbeOutcome, ToolOperationFailed>;
-  /** What Sign in would do for an http server that answered without a sign-in. Public documents only. */
   signInOffer(config: McpServerConfig): Effect.Effect<McpSignInOffer>;
-  /** Masks the MCP secret values in a text that goes back to the agent. */
   redact(text: string): string;
+  forAgent(agentId: string): McpServerConfig[];
+  allowsAgent(mcpServerId: string, agentId: string): boolean;
+  callTool(
+    config: McpServerConfig,
+    name: string,
+    args: McpToolArguments,
+  ): Effect.Effect<{ result: McpToolCallResult } | { error: string }, ToolOperationFailed>;
 }
 
-/**
- * The gateway as the MCP tools reach it. A failure keeps its cause, which says what to correct.
- * `prepareTest` is what a test waits for first, as the Test button does: the managed tool runtimes.
- */
+export function mcpFallbackRunsServer(config: McpServerConfig, agent: { access?: AgentAccess | undefined }): boolean {
+  return config.transport === "http" || !workspaceAccessEnforced(agent);
+}
+
+export function findAgentMcpTool(
+  configs: readonly McpServerConfig[],
+  name: string,
+): { config: McpServerConfig; tool: string } | null {
+  let found: { config: McpServerConfig; tool: string; length: number } | null = null;
+  for (const config of configs) {
+    const provider = providerMcpServerName(config.name);
+    for (const server of [config.name, provider, `openbot_${provider}`]) {
+      const prefix = `${server}.`;
+      if (!name.startsWith(prefix) || name.length === prefix.length) continue;
+      if (!found || prefix.length > found.length)
+        found = { config, tool: name.slice(prefix.length), length: prefix.length };
+    }
+  }
+  return found && { config: found.config, tool: found.tool };
+}
+
+export function mcpToolCallResponse(answer: McpToolCallResult): DynamicToolResult {
+  const decoded = CallToolResultSchema.safeParse(answer);
+  if (!decoded.success) return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(answer) }] };
+  const result = decoded.data;
+  const contentItems: DynamicToolResult["contentItems"] = result.content.map((item) =>
+    item.type === "text"
+      ? { type: "inputText", text: item.text }
+      : item.type === "image"
+        ? { type: "inputImage", imageUrl: `data:${item.mimeType};base64,${item.data}` }
+        : { type: "inputText", text: JSON.stringify(item) },
+  );
+  if (contentItems.length === 0)
+    contentItems.push({ type: "inputText", text: JSON.stringify(result.structuredContent ?? {}) });
+  return { success: result.isError !== true, contentItems };
+}
+
 export function mcpServersFromGateway(
   gateway: McpGateway,
   prepareTest?: (config: McpServerConfig) => Effect.Effect<void, unknown>,
+  forAgent: (agentId: string) => McpServerConfig[] = () => [],
+  allowsAgent: (mcpServerId: string, agentId: string) => boolean = () => true,
 ): AgentMcpServers {
   const toToolFailure = Effect.mapError(
     (failure: McpGatewayFailed) => new ToolOperationFailed({ cause: failure.cause }),
   );
+  const prepared = (config: McpServerConfig) =>
+    (prepareTest?.(config) ?? Effect.void).pipe(Effect.mapError((cause) => new ToolOperationFailed({ cause })));
   return {
     list: () => gateway.list(),
     builtIn: () => gateway.builtIn(),
     signIns: () => gateway.signIns(),
+    signInFailure: (config) => gateway.signInFailure(config.url),
     save: (config) => gateway.save({ config }).pipe(toToolFailure),
     setEnabled: (mcpServerId, enabled) => gateway.setEnabled({ mcpServerId, enabled }).pipe(toToolFailure),
     remove: (mcpServerId) => gateway.remove({ mcpServerId }).pipe(toToolFailure),
     inspect: (config, tested) =>
-      (prepareTest?.(config) ?? Effect.void).pipe(
-        Effect.mapError((cause) => new ToolOperationFailed({ cause })),
-        Effect.andThen(gateway.inspect(config, tested).pipe(toToolFailure)),
-      ),
+      prepared(config).pipe(Effect.andThen(gateway.inspect(config, tested).pipe(toToolFailure))),
     signInOffer: (config) => gateway.signInOffer(config),
     redact: (text) => gateway.redact(text),
+    forAgent,
+    allowsAgent,
+    callTool: (config, name, args) =>
+      prepared(config).pipe(Effect.andThen(gateway.callTool(config, name, args).pipe(toToolFailure))),
   };
 }
 
 export interface McpServerToolCall {
   tool: McpServerToolName;
+  agentId: string;
   arguments: unknown;
-  /**
-   * Asks the user to approve the change that `reason` states. `cwd` is the folder a stdio server
-   * starts in, when it names one. True when it is approved.
-   */
   approve(reason: string, cwd?: string | null): Effect.Effect<boolean, ToolOperationFailed>;
-  /** Shows the user the card that signs in to a saved http server. */
+  keysFromPerson(values: readonly string[]): Effect.Effect<boolean>;
   requestSignIn(config: McpServerConfig): Effect.Effect<void, ToolOperationFailed>;
 }
 
-/**
- * Runs one MCP tool. A failure is a result the agent can correct, such as a name in use or an
- * argument out of range, with the MCP secrets masked.
- */
 export const handleMcpServerTool = (servers: AgentMcpServers, call: McpServerToolCall) =>
   asToolResult(servers, runMcpServerTool(servers, call));
 
-/** A saved server that a Marketplace app installs, with the listing's steps to start a local one. */
 export interface MarketplaceAppServer {
   config: McpServerConfig;
   setupSteps: readonly string[];
 }
 
-/**
- * The state of a Marketplace app that is already saved, for an agent that would suggest it. Its
- * card would only say Connected, so the agent gets what the user must do: a sign-in puts its card in
- * the conversation, and a local server that does not answer comes with the listing's steps.
- */
 export const marketplaceAppStatus = (
   servers: AgentMcpServers,
   app: MarketplaceAppServer,
@@ -189,7 +230,7 @@ const runMarketplaceAppStatus = Effect.fn("McpServerTools.marketplaceAppStatus")
     return openBotToolResult({
       status: "disabled",
       server,
-      next: "The app is installed and turned off. Tell the user to turn it on in Server settings, MCP, or call openbot.set_mcp_server_enabled when the user asks.",
+      next: "The app is installed and turned off. Tell the user to turn it on in Marketplace, Apps, or call openbot.set_mcp_server_enabled when the user asks.",
     });
   const outcome = yield* servers.inspect(config);
   if (outcome.error === null)
@@ -211,7 +252,6 @@ const runMarketplaceAppStatus = Effect.fn("McpServerTools.marketplaceAppStatus")
   return yield* report(servers, { requestSignIn }, config, outcome, false);
 });
 
-/** A failure is a result the agent can correct, with the MCP secrets masked. */
 function asToolResult(
   servers: AgentMcpServers,
   effect: Effect.Effect<OpenBotToolResponse, ToolOperationFailed>,
@@ -232,7 +272,10 @@ const runMcpServerTool = Effect.fn("McpServerTools.handle")(function* (
       const signIns = servers.signIns();
       return openBotToolResult({
         servers: [
-          ...servers.list().map((config) => describeServer(config, signIns)),
+          ...servers.list().map((config) => ({
+            ...describeServer(config, signIns),
+            forYou: servers.allowsAgent(config.id, call.agentId),
+          })),
           ...servers.builtIn().map(describeBuiltInServer),
         ],
       });
@@ -241,18 +284,15 @@ const runMcpServerTool = Effect.fn("McpServerTools.handle")(function* (
       const { name } = yield* toolStep(() => namedServerSchema.parse(call.arguments));
       const config = yield* findServer(servers, name);
       const outcome = yield* servers.inspect(config, true);
-      // A server can list its tools to anyone and want a sign-in only to run one: the test passes
-      // and those tools fail. Only a test the agent asks for reads the metadata, not each search.
       const offer = outcome.error === null ? yield* servers.signInOffer(config) : "none";
-      // A Sign in card that can only fail would come back after each test (#8827).
       if (offer === "refused")
         return openBotToolResult({
           status: "ready",
           server: describeServer(config, servers.signIns()),
           toolCount: outcome.toolCount,
           tools: outcome.tools,
-          error: sourceText("error.backend.mcpRegistrationRefused"),
-          next: "The tools that need a sign-in fail, and a sign-in cannot fix it. Tell the user what the error says, in plain words. Do not offer a Sign in card or ask the user to sign in.",
+          error: sourceText("error.backend.mcpRegistrationUnavailable"),
+          next: "The tools that need a sign-in fail until the user adds a sign-in app to this server. Tell the user what the error says, in plain words. Do not offer a Sign in card or ask the user to sign in before the sign-in app is there.",
         });
       if (offer === "offered") {
         yield* call.requestSignIn(config);
@@ -267,24 +307,34 @@ const runMcpServerTool = Effect.fn("McpServerTools.handle")(function* (
       return yield* report(servers, call, config, outcome, false);
     }
     case "save_mcp_server": {
+      registerHeaderSecrets(call.arguments);
       const input = yield* toolStep(() => saveMcpServerToolSchema.parse(call.arguments));
       const existing = servers.list().find((config) => config.name === input.name);
       const config = normalizeMcpConfig(mergeServer(existing, input));
-      // A configuration the store would refuse is corrected before the user is asked about it.
       const errors = mcpConfigErrors(config);
       const invalid = errors.name ?? errors.command ?? errors.url;
       if (invalid) return openBotToolFailure(invalid);
-      // The keys of a row were given for its server. A change that points them at another server, or
-      // that drops them with the other transport, is the user's to make in Server settings.
-      if (existing && holdsKeys(existing) && serverMoves(existing, config))
+      const headers = input.headers ?? [];
+      if (headers.length > 0 && config.transport !== "http")
+        return openBotToolFailure(sourceText("error.agent.mcpServerHeadersNeedHttp", { name: config.name }));
+      const givenKeys = headers.flatMap(({ value }) => (value ? [value] : []));
+      if (givenKeys.length > 0 && !(yield* call.keysFromPerson(givenKeys)))
+        return openBotToolFailure(sourceText("error.agent.mcpServerHeadersNeedPerson", { name: config.name }));
+      if (
+        existing &&
+        holdsKeys({ ...existing, headers: unreplacedHeaders(existing.headers, headers) }) &&
+        serverMoves(existing, config)
+      )
         return openBotToolFailure(sourceText("error.agent.mcpServerKeysMove", { name: existing.name }));
       const key = existing ? "status.agent.mcpServerChange" : "status.agent.mcpServerAdd";
-      // The command line can quote a key the user typed: the reason also reaches Slack and the phone.
-      const reason = servers.redact(sourceText(key, { name: config.name, target: serverTarget(config) }));
+      const change = sourceText(key, { name: config.name, target: serverTarget(config) });
+      const reason = servers.redact(
+        headers.length > 0
+          ? `${change} ${sourceText("status.agent.mcpServerHeaders", { names: headerNames(headers) })}`
+          : change,
+      );
       if (!(yield* call.approve(reason, config.transport === "stdio" ? config.workingDirectory || null : null)))
         return openBotToolFailure(sourceText("error.agent.mcpServerDeclined"));
-      // A server that is off goes to no agent, so it is saved without a test. A test starts another
-      // copy of a stdio server, which a server that allows one copy refuses while an agent runs it (#7531).
       if (!config.enabled) {
         yield* servers.save(config);
         const saved = servers.list().find((candidate) => candidate.name === config.name) ?? config;
@@ -294,12 +344,13 @@ const runMcpServerTool = Effect.fn("McpServerTools.handle")(function* (
           appliesFrom: "the next turn of each agent",
         });
       }
-      // A server that does not answer is not saved, so no agent is given a broken entry. A server that
-      // needs a sign-in or a key is saved: the sign-in and the key belong to a saved row.
       const outcome = yield* servers.inspect(config);
       if (outcome.error !== null && outcome.needs === null)
         return openBotToolFailure(
-          servers.redact(sourceText("error.agent.mcpServerNotSaved", { error: outcome.error })),
+          redactMcpSecrets(
+            servers.redact(sourceText("error.agent.mcpServerNotSaved", { error: outcome.error })),
+            config,
+          ),
         );
       yield* servers.save(config);
       return yield* report(servers, call, config, outcome, true);
@@ -327,7 +378,6 @@ const runMcpServerTool = Effect.fn("McpServerTools.handle")(function* (
 const findServer = (servers: AgentMcpServers, name: string) => {
   const config = servers.list().find((candidate) => candidate.name === name);
   if (config) return Effect.succeed(config);
-  // A built-in server is not a row: its connection in OpenBot turns it on and off.
   const key = servers.builtIn().some((candidate) => candidate.name === name)
     ? "error.agent.mcpServerBuiltIn"
     : "error.agent.mcpServerUnknown";
@@ -335,13 +385,17 @@ const findServer = (servers: AgentMcpServers, name: string) => {
 };
 
 const SIGN_IN_NEXT =
-  "A Sign in card is in this conversation. Tell the user, end your turn, and test again when the user says it is done.";
+  "A Sign in card is in this conversation. Only the user sees it: do not check it, and do not test again in this turn. Tell the user to press Sign in on it, end your turn, and test again when the user says it is done. Another needs_sign_in means only that the sign-in is not done; it is not an OpenBot fault. If the user sees no card, tell them to sign in from Marketplace, Apps, the server's page, and end your turn. Do not send openbot.send_feedback about the card unless the user asks for it, or says that the sign-in there failed too.";
 
-/**
- * A silent test of each saved http server that a tool search names and that has no sign-in on this
- * computer. A provider that reaches such a server tries its own sign-in and fails, so the search is
- * where the agent looks for its tools. A server that needs a sign-in gets its card; others are left out.
- */
+function signInNeeded(servers: AgentMcpServers, config: McpServerConfig, when = "") {
+  const failure = servers.signInFailure(config);
+  if (failure === null) return { next: `${when}${SIGN_IN_NEXT}` };
+  return {
+    lastSignInError: servers.redact(failure),
+    next: `${when}The user's last sign-in to this server failed with lastSignInError. Tell the user this reason in plain words first. ${SIGN_IN_NEXT}`,
+  };
+}
+
 export const searchSignIns = Effect.fn("McpServerTools.searchSignIns")(function* (
   servers: AgentMcpServers,
   named: readonly McpServerConfig[],
@@ -352,7 +406,6 @@ export const searchSignIns = Effect.fn("McpServerTools.searchSignIns")(function*
   const candidates = named.filter(
     (config) => config.enabled && config.transport === "http" && !signedIn.has(config.id),
   );
-  // Each probe can wait for its whole deadline, so the search waits for the slowest server only.
   const found = yield* Effect.forEach(
     candidates,
     (config) =>
@@ -363,7 +416,7 @@ export const searchSignIns = Effect.fn("McpServerTools.searchSignIns")(function*
         return {
           status: "needs_sign_in",
           server: describeServer(config, signIns),
-          next: `When the user's request needs this server: ${SIGN_IN_NEXT}`,
+          ...signInNeeded(servers, config, "When the user's request needs this server: "),
         };
       }),
     { concurrency: "unbounded" },
@@ -371,16 +424,13 @@ export const searchSignIns = Effect.fn("McpServerTools.searchSignIns")(function*
   return found.filter((entry) => entry !== null);
 });
 
-/** What a test found, in words the agent acts on. A sign-in also puts its card in the conversation. */
 const report = Effect.fnUntraced(function* (
   servers: AgentMcpServers,
   call: Pick<McpServerToolCall, "requestSignIn">,
   config: McpServerConfig,
   outcome: McpProbeOutcome,
-  /** The server was just saved, so the agents get it from their next turn. */
   justSaved: boolean,
 ): Effect.fn.Return<OpenBotToolResponse, ToolOperationFailed> {
-  // By name: a new row has its id only once it is saved.
   const saved = servers.list().find((candidate) => candidate.name === config.name) ?? config;
   const server = describeServer(saved, servers.signIns());
   if (outcome.error === null)
@@ -397,7 +447,7 @@ const report = Effect.fnUntraced(function* (
     return openBotToolResult({
       status: "needs_sign_in",
       server,
-      next: SIGN_IN_NEXT,
+      ...signInNeeded(servers, saved),
     });
   }
   if (outcome.needs === "key")
@@ -405,14 +455,12 @@ const report = Effect.fnUntraced(function* (
       status: "needs_key",
       server,
       error,
-      next: "Ask the user to enter the key in Server settings, MCP. Do not ask for the key in the chat.",
+      next: "When the user gave the key, call openbot.save_mcp_server again with it in headers, such as Authorization: Bearer <token>. Otherwise ask the user to enter the key with Edit on the server's page in Marketplace, Apps. Do not ask for the key in the chat or show it.",
     });
   return openBotToolResult({ status: "error", server, error });
 });
 
-/** A new server from the input, or the saved one with the input over it. Headers and environment stay. */
 function mergeServer(existing: McpServerConfig | undefined, input: z.infer<typeof saveMcpServerToolSchema>) {
-  // A new row carries an empty id: the store gives it one.
   const base: McpServerConfig = existing ?? {
     id: "",
     name: input.name,
@@ -426,7 +474,6 @@ function mergeServer(existing: McpServerConfig | undefined, input: z.infer<typeo
     url: "",
     headers: [],
   };
-  // An address or a command alone says which transport the agent means.
   const transport = input.transport ?? (input.url ? "http" : input.command ? "stdio" : base.transport);
   return {
     ...base,
@@ -436,18 +483,43 @@ function mergeServer(existing: McpServerConfig | undefined, input: z.infer<typeo
     command: input.command ?? base.command,
     args: input.args ?? base.args,
     workingDirectory: input.workingDirectory ?? base.workingDirectory,
+    headers: mergeHeaders(base.headers, input.headers),
   } satisfies McpServerConfig;
 }
 
-/** A built-in server by name only: its address is OpenBot's own, and it has no headers or variables. */
+type HeaderInput = NonNullable<z.infer<typeof saveMcpServerToolSchema>["headers"]>;
+
+const sameHeader = (left: string, right: string) => left.trim().toLowerCase() === right.trim().toLowerCase();
+
+function registerHeaderSecrets(input: unknown): void {
+  const raw = headerValuesArgument.safeParse(input);
+  if (raw.success)
+    registerSecretValues(raw.data.headers.filter(({ name }) => isSecretName(name)).map(({ value }) => value));
+}
+
+function unreplacedHeaders(saved: readonly McpKeyValue[], input: HeaderInput): McpKeyValue[] {
+  return saved.filter((pair) => !input.some(({ name }) => sameHeader(name, pair.key)));
+}
+
+function mergeHeaders(saved: readonly McpKeyValue[], input: HeaderInput | undefined): McpKeyValue[] {
+  if (!input) return [...saved];
+  const latest = input.filter(
+    (header, index) => !input.slice(index + 1).some(({ name }) => sameHeader(name, header.name)),
+  );
+  return [
+    ...unreplacedHeaders(saved, input),
+    ...latest.flatMap(({ name, value }) => (value ? [{ key: name, value }] : [])),
+  ];
+}
+
+function headerNames(input: HeaderInput): string {
+  return [...new Set(input.map(({ name }) => name))].join(", ");
+}
+
 function describeBuiltInServer(config: McpServerConfig) {
   return { name: config.name, transport: config.transport, enabled: true, builtIn: true };
 }
 
-/**
- * One server without a secret: an address without its query, which can hold a key, and a command
- * without its arguments. Headers and variables by name only.
- */
 function describeServer(config: McpServerConfig, signIns: readonly McpSignInState[]) {
   if (config.transport === "http") {
     const signIn = signIns.find((state) => state.mcpServerId === config.id);
@@ -476,10 +548,6 @@ function holdsKeys(config: McpServerConfig): boolean {
   return config.headers.length > 0 || config.env.length > 0 || config.envPassthrough.length > 0;
 }
 
-/**
- * Whether the change gives the row's keys to another server: another transport, origin, or program.
- * For stdio the arguments and the folder choose the program too, as `npx -y <package>` does.
- */
 function serverMoves(saved: McpServerConfig, next: McpServerConfig): boolean {
   if (saved.transport !== next.transport) return true;
   if (saved.transport === "stdio")
@@ -493,7 +561,6 @@ function serverMoves(saved: McpServerConfig, next: McpServerConfig): boolean {
   return new URL(saved.url).origin !== new URL(next.url).origin;
 }
 
-/** What the approval names: the address without its query, or the whole command line the server runs. */
 function serverTarget(config: McpServerConfig): string {
   if (config.transport === "http") return addressWithoutQuery(config.url);
   const line = [config.command, ...config.args].join(" ");

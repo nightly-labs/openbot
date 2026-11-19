@@ -14,7 +14,6 @@ export interface MessageDeletionOptions {
   tasks: AgentTasks;
 }
 
-/** The event that records the delete of one shown message. */
 const MESSAGE_DELETED_EVENT = "conversation.message-deleted";
 
 interface DeletionTarget {
@@ -25,14 +24,6 @@ interface DeletionTarget {
   message: ConversationMessage;
 }
 
-/**
- * Owns the delete of one shown message from an agent's own chat or from a side thread. It checks who
- * may delete the message and that no running work uses it, removes the mailbox copy with its files,
- * then records the delete with the conversation change, so no later sync, import or replay brings the
- * message back. The provider session can still hold the message: OpenBot does not change it.
- *
- * It never imports the agent service facade.
- */
 export class MessageDeletion {
   readonly #store: AgentStore;
   readonly #mailbox: MailboxStore;
@@ -46,10 +37,6 @@ export class MessageDeletion {
     this.#tasks = options.tasks;
   }
 
-  /**
-   * The mailbox copy goes first. When the conversation write fails after it, the message still shows,
-   * and a second delete completes the work: the mailbox step then has nothing to remove.
-   */
   readonly delete = Effect.fn("MessageDeletion.delete")(function* (
     this: MessageDeletion,
     input: DeleteConversationMessageInput,
@@ -64,9 +51,6 @@ export class MessageDeletion {
     const mailbox = yield* this.#mailbox.deleteShownMessage(agentId, message.id);
     if (mailbox === "busy") return yield* new MessageDeleteRefused({ reason: "busy" });
     yield* storedSync(() => {
-      // A turn can start while the mailbox step waits, so the write keeps the current active turn.
-      // The read also loads the chat again when main evicted it, so the delete is published.
-      // When the agent moved to another chat during the wait, the stored row of this thread decides.
       const current = taskId ? this.#tasks.read(agentId, taskId) : this.#conversation.ensureSnapshot(agentId, threadId);
       const activeTurnId =
         current.threadId === threadId
@@ -87,14 +71,12 @@ export class MessageDeletion {
     });
   }, Effect.uninterruptible);
 
-  /** The thread and the shown message that the input names, or null when no shown message has the id. */
   #target(input: DeleteConversationMessageInput): DeletionTarget | null {
     const agent = this.#store.list().find((candidate) => candidate.id === input.agentId);
     if (!agent) return null;
     const taskId = input.taskId ?? null;
     let snapshot: ConversationSnapshot;
     if (taskId) {
-      // An archived thread keeps its messages, so they can be deleted too.
       if (!this.#tasks.has(agent.id, taskId)) return null;
       snapshot = this.#tasks.read(agent.id, taskId);
     } else {
@@ -109,7 +91,6 @@ export class MessageDeletion {
     return message ? { agentId: agent.id, threadId, taskId, snapshot, message } : null;
   }
 
-  /** A message of the running turn, a message that streams, and a message that waits or runs in the queue. */
   #busy(snapshot: ConversationSnapshot, message: ConversationMessage): boolean {
     if (message.status === "streaming") return true;
     if (snapshot.activeTurnId !== null && message.turnId === snapshot.activeTurnId) return true;
@@ -123,10 +104,6 @@ function isActiveStatus(status: string): boolean {
   return status === "queued" || status === "starting" || status === "running";
 }
 
-/**
- * Whether this person sent the message. A null member is the user of this computer, whose messages
- * carry no member. A routine's message has the user's author, but no person sent it.
- */
 function sentBy(message: ConversationMessage, memberId: string | null): boolean {
   return message.author === "user" && message.source !== "routine" && (message.senderMember?.id ?? null) === memberId;
 }

@@ -7,11 +7,6 @@ import {
   requestAgentMarketplace,
 } from "../../../../../server/request-auth";
 
-/**
- * The agent a shared link names. Unlike `GET /v1/marketplace/agents/:id`, which a released desktop
- * reads as "approved", it also returns an agent that waits for its first review, marked `pending`.
- * Add uses this answer, so no cache keeps a pending agent after a rejection.
- */
 export const Route = createFileRoute("/v1/marketplace/agents/$agentId/listing")({
   server: {
     handlers: {

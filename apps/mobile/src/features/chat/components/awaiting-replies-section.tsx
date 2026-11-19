@@ -20,12 +20,6 @@ const STATE_KEYS = {
   failed: "mobile.chat.queue.replyState.failed",
 } as const satisfies Record<AwaitingReplyState, MobileTextKey>;
 
-/**
- * The teammates this agent asked, and the answers that wait for its next turn. An answer is not
- * the user's message, so edit and reorder do not apply to it; its row opens the steer action.
- * A teammate that waits for the person names the wait, and its button opens its chat.
- * When no teammate still works, the person can hide the rows, as on desktop.
- */
 export function AwaitingRepliesSection({
   rows,
   agents,
@@ -38,21 +32,17 @@ export function AwaitingRepliesSection({
   agents: readonly MobileAgent[];
   self: MobileAgent | undefined;
   onHide: () => void;
-  /** Opens the steer action of an answer. Absent while no turn runs. */
   onOpenReply: ((deliveryId: string) => void) | undefined;
-  /** Opens the chat of a teammate that waits for the person, where the person can answer it. */
   onOpenAgent: (agentId: string) => void;
 }) {
   const { t } = useText();
   const [secondaryColor, primaryColor] = useCSSVariable(["--openbot-text-grouped-secondary", "--openbot-text-primary"]);
   const secondary = String(secondaryColor);
   if (rows.length === 0) return null;
-  // The host holds the answers until every teammate of the request is done.
   const pending = rows.some((row) => row.state === "asked" || row.state === "working");
   const name = self?.name ?? t("mobile.chat.queue.replyAgentFallback");
   const agentName = (agentId: string) =>
     agents.find((candidate) => candidate.id === agentId)?.name ?? t("mobile.chat.queue.replyAgentFallback");
-  // The rows list a wait first, so the first row names the teammate that needs the person.
   const needsYou = rows[0]?.wait ? rows[0] : undefined;
   return (
     <>
@@ -98,7 +88,6 @@ export function AwaitingRepliesSection({
                     </Button>
                   ) : null
                 ) : row.state === "working" ? (
-                  // Like the desktop block and the chat activity row: a teammate at work moves.
                   <View className="flex-row items-center gap-2" accessible accessibilityLabel={t(STATE_KEYS.working)}>
                     <Spinner size="sm" color={secondary} />
                     <ThinkingTextGradient

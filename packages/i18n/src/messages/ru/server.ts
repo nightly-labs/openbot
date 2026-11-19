@@ -48,6 +48,7 @@ export const messages = {
   "server.compatibility.updateHostTitle": "Обновите OpenBot на {name}",
   "server.compatibility.unsafeDataTitle": "Хост вернул небезопасные данные",
   "server.compatibility.cannotConnectTitle": "Не удаётся подключиться к {name}",
+  "server.compatibility.safeModeTitle": "{name} не запускается",
   "server.compatibility.updateClientDescription":
     "Это приложение поддерживает только более старые протоколы, чем хост. Обновите приложение и повторите попытку.",
   "server.compatibility.updateHostDescription":
@@ -118,6 +119,8 @@ export const messages = {
   "server.local.create": "Создать сервер",
   "server.local.creating": "Создание сервера…",
   "server.local.createFailed": "Не удалось создать сервер.",
+  "server.local.createFailedRetry":
+    "Что-то пошло не так. Повторите попытку. Если ошибка повторится, перезапустите OpenBot.",
   "server.local.limitReached":
     "На этом компьютере может быть не больше {limit} серверов. Удалите один, чтобы создать новый.",
   "server.local.deleteConfirmTitle": "Удалить {name}?",
@@ -260,9 +263,6 @@ export const messages = {
   "server.settings.membersDescription": "Публикуйте сервер, приглашайте людей и управляйте доступом.",
   "server.settings.desktopTitle": "Рабочий стол",
   "server.settings.desktopDescription": "Настройте рабочий стол этого сервера или подключитесь к нему.",
-  "server.settings.mcpTitle": "MCP",
-  "server.settings.mcpDescription":
-    "Подключайте серверы MCP и выбирайте, какие из них могут использовать агенты этого сервера.",
   "server.settings.storageTitle": "Хранилище",
   "server.settings.storageDescription": "Посмотрите, что OpenBot хранит на диске этого сервера, и освободите место.",
   "server.settings.hostedSitesTitle": "Сайты",
@@ -306,13 +306,18 @@ export const messages = {
   "server.settings.copyFailedTitle": "Не удалось скопировать",
   "server.settings.copyFailed": "OpenBot не удалось скопировать это значение.",
   "server.settings.unavailableTitle": "Настройки сервера недоступны",
-  "server.settings.unsavedMcpChanges": "Несохранённые изменения MCP",
   "server.settings.reset": "Сбросить",
   "server.settings.unsavedChanges": "Несохранённые изменения",
   "server.settings.changesNotSaved": "Изменения не сохранены",
   "server.settings.group.agents": "Агенты",
   "server.settings.group.people": "Люди",
   "server.settings.group.server": "Сервер",
+  "server.settings.experimentalTitle": "Экспериментальные",
+  "server.settings.experimentalDescription": "Включите функции, которые ещё не готовы.",
+  "server.settings.experimentalFeatures": "Функции",
+  "server.settings.experimentalCrm": "CRM",
+  "server.settings.experimentalCrmDescription":
+    "Показывать страницу CRM владельцам и администраторам, разрешить агентам читать CRM и синхронизировать Stripe. При выключении данные сохраняются.",
   "server.settings.agentDefaultsTitle": "Настройки агентов по умолчанию",
   "server.settings.threadsCard": "Ветки и часовой пояс",
   "server.settings.memoryTitle": "Память",
@@ -351,7 +356,7 @@ export const messages = {
     "Выберите, что могут делать агенты на этом сервере, если вы не задали это для агента.",
   "server.settings.timezone": "Часовой пояс",
   "server.settings.timezoneDescription":
-    "Новые регулярные задачи используют этот часовой пояс, если в сообщении нет часового пояса отправителя.",
+    "Новые регулярные задачи используют этот часовой пояс, если в сообщении нет часового пояса отправителя. На сервере браузер тоже использует его после следующего перезапуска.",
   "server.settings.timezoneAutomatic": "Автоматически ({zone})",
   "server.settings.timezoneLoadFailed": "Не удалось загрузить часовой пояс сервера.",
   "server.settings.turnLimit": "Ветки одновременно",

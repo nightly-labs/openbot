@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/app";
 
 export const messages = {
-  // The app shell, shared state, and shared controls without a feature of their own.
   "app.loading": "Chargement d’OpenBot",
   "app.leftPanel.resize": "Redimensionner la barre latérale gauche",
   "app.host.thisMac": "Ce Mac",
@@ -56,6 +55,8 @@ export const messages = {
   "app.rail.workflows": "Workflows",
   "app.rail.usage": "Utilisation",
   "app.rail.library": "Bibliothèque",
+  "app.rail.providers": "Fournisseurs",
+  "app.rail.crm": "CRM",
   "app.rail.marketplace": "Marketplace",
   "app.rail.settings": "Réglages",
   "app.rail.settingsNotice": "Réglages. {notice}",
@@ -110,6 +111,7 @@ export const messages = {
   "app.settingsPage.searchPlaceholder": "Rechercher dans les réglages…",
   "app.settingsPage.results": "Résultats de recherche des réglages",
   "app.settingsPage.noResults": "Aucun réglage correspondant.",
+  "app.settingsPage.marketplaceApps": "Connecteurs et serveurs MCP",
   "app.settingsPage.resultCount": {
     one: "{count} réglage correspondant.",
     other: "{count} réglages correspondants.",

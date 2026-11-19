@@ -1,23 +1,31 @@
-import type { WorkflowMediaCreditBalance, WorkflowMediaCredits } from "@openbot/contracts/ipc";
+import type {
+  WorkflowCatalogProvider,
+  WorkflowMediaCredits,
+  WorkflowMediaServiceAccount,
+} from "@openbot/contracts/ipc";
 import type { MediaCreditsRailRow } from "@openbot/ui/features/window/PageRail";
-import { createEffect, createSignal, onCleanup } from "solid-js";
+import { createEffect, createSignal, onCleanup, untrack } from "solid-js";
 
-/** A brand name: it is not translated. */
-const SUNRA_NAME = "Sunra";
+const MEDIA_SERVICE_NAMES: Readonly<Record<WorkflowCatalogProvider, string>> = {
+  sunra: "Sunra",
+  higgsfield: "Higgsfield",
+};
 
-/**
- * The Sunra credits of one server while the Canvas page shows it. `server` is the id of that server,
- * or null while the page does not show. The credits are read when the page opens on a server, and
- * again when the window comes back to the front: a run, or a person in the browser, can spend them.
- * A failed read keeps the last answer.
- */
+export const mediaServiceAccountName = (account: WorkflowMediaServiceAccount) =>
+  account.name ?? MEDIA_SERVICE_NAMES[account.provider];
+
+const [mediaStepsEnded, setMediaStepsEnded] = createSignal(0);
+
+export function noteMediaStepEnded(): void {
+  setMediaStepsEnded((count) => count + 1);
+}
+
 export function createWorkflowMediaCredits(
   server: () => string | null,
   read: (serverId: string) => Promise<WorkflowMediaCredits>,
 ) {
-  const [credits, setCredits] = createSignal<WorkflowMediaCreditBalance | null>(null);
+  const [credits, setCredits] = createSignal<WorkflowMediaCredits | null>(null);
   let current: string | null = null;
-  /** Each read has a number. An answer for an older read, or for another server, is dropped. */
   let request = 0;
   const refresh = () => {
     const serverId = current;
@@ -26,7 +34,7 @@ export function createWorkflowMediaCredits(
     const sent = request;
     read(serverId).then(
       (answer) => {
-        if (sent === request) setCredits(answer.sunra);
+        if (sent === request) setCredits(answer);
       },
       () => undefined,
     );
@@ -37,15 +45,46 @@ export function createWorkflowMediaCredits(
     setCredits(null);
     refresh();
   });
+  let ended = untrack(mediaStepsEnded);
+  createEffect(mediaStepsEnded, (count) => {
+    if (count === ended) return;
+    ended = count;
+    refresh();
+  });
   window.addEventListener("focus", refresh);
   onCleanup(() => {
     current = null;
     request += 1;
     window.removeEventListener("focus", refresh);
   });
-  /** The rail rows of the credits: Sunra, when it told them. */
   return (): MediaCreditsRailRow[] => {
-    const sunra = credits();
-    return sunra ? [{ provider: "sunra", name: SUNRA_NAME, ...sunra }] : [];
+    const answer = credits();
+    if (!answer) return [];
+    if (answer.accounts) {
+      const accounts = answer.accounts;
+      return accounts.flatMap((account) => {
+        if (!account.credits) return [];
+        const service = accounts.filter((entry) => entry.provider === account.provider);
+        return [
+          {
+            key: `${account.provider}:${account.id}`,
+            provider: account.provider,
+            name: mediaServiceAccountName(account),
+            ...account.credits,
+            ...(service.length > 1 ? { number: service.indexOf(account) + 1 } : {}),
+          },
+        ];
+      });
+    }
+    const rows: MediaCreditsRailRow[] = [];
+    if (answer.sunra) rows.push({ key: "sunra", provider: "sunra", name: MEDIA_SERVICE_NAMES.sunra, ...answer.sunra });
+    if (answer.higgsfield)
+      rows.push({
+        key: "higgsfield",
+        provider: "higgsfield",
+        name: MEDIA_SERVICE_NAMES.higgsfield,
+        ...answer.higgsfield,
+      });
+    return rows;
   };
 }

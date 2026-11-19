@@ -36,7 +36,6 @@ function raise(): void {
   });
 }
 
-/** The toast after a confirmed agent delete. The bar empties in 8 s, and stops while the pointer is on the toast. */
 export const AfterDelete: Story = {
   render: () => {
     onCleanup(() => toast.dismiss());

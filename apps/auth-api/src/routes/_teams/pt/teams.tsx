@@ -5,7 +5,6 @@ import { sitePageHead } from "../../../lib/site-page-head";
 import { LOCALIZED_PAGE_PATHS } from "../../../lib/site-paths";
 import { TEAMS_ROUTE, TEAMS_SOCIAL_IMAGE_PATH } from "../../../lib/teams-page";
 
-// The Teams page in Brazilian Portuguese, whatever the language of the request.
 export const Route = createFileRoute("/_teams/pt/teams")({
   loader: () => loadSitePage("pt", teamsPageText),
   head: ({ match, loaderData }) => {

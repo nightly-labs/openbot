@@ -12,12 +12,6 @@ import {
   LEFT_PANEL_STORAGE_KEY,
 } from "./layout-constants";
 
-/**
- * The drag handle between the left column and the conversation. The one place
- * that turns a width into the compact state, which is why the thresholds are
- * read here and not in `layout.tsx`: the context owns whether the sidebar is
- * compact, the gesture owns when to say so.
- */
 export function WorkspaceLeftPanelResizer() {
   const layout = useLayout();
   const { t } = useText();

@@ -215,4 +215,10 @@ export const messages = {
     other:
       "ברישיון שלך יש {count} משתמשים, המקסימום. יש ליצור קשר לקבלת רישיון גדול יותר. אנשים חדשים לא יוכלו להצטרף לשרתים שלך.",
   },
+  "billing.details.country": "מדינת החיוב",
+  "billing.details.countryPlaceholder": "בחירת מדינה",
+  "billing.details.vatId": "מספר מע״מ באיחוד האירופי (לא חובה)",
+  "billing.details.vatIdInvalid": "זה לא מספר מע״מ של המדינה שנבחרה.",
+  "billing.details.countryMissing": "יש לבחור את מדינת החיוב.",
+  "billing.details.saveFailed": "לא ניתן לשמור את פרטי החיוב",
 } as const satisfies PartialTranslation<typeof source>;

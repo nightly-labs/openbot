@@ -1,11 +1,6 @@
 import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/common";
 
-/**
- * Short words with no context of their own: a button or a menu item that means the same thing on
- * every screen. A word whose translation can change with the screen gets a key in that screen's
- * area instead, even when the English is the same.
- */
 export const messages = {
   "common.cancel": "取消",
   "common.save": "保存",
@@ -32,4 +27,8 @@ export const messages = {
   "common.download": "下载",
   "common.removing": "移除中…",
   "common.sending": "发送中…",
+  "common.scrollLeft": "向左滚动",
+  "common.scrollRight": "向右滚动",
+  "common.scrollUp": "向上滚动",
+  "common.scrollDown": "向下滚动",
 } as const satisfies PartialTranslation<typeof source>;

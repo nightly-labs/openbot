@@ -1,9 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Airtable here is taken from airtable.com and the airtable-mcp-server
-// repository on github.com. Each page used is in `sources`. Check the sources again, and move
-// `checkedAt`, whenever this file changes.
-
 export const AIRTABLE_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

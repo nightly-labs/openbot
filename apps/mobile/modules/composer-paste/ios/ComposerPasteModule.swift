@@ -20,26 +20,45 @@ final class ComposerPasteView: ExpoView {
   func pasteFiles() -> Bool {
     let providers = UIPasteboard.general.itemProviders.filter { PastedItem.isFile($0.registeredTypeIdentifiers) }
     guard !providers.isEmpty else { return false }
-    let total = providers.count
-    let copies = PastedCopies(count: total)
-    let group = DispatchGroup()
-    for (index, provider) in providers.enumerated() {
-      guard let type = PastedItem.representation(provider.registeredTypeIdentifiers, extensions) else { continue }
-      let name = PastedItem.name(provider.suggestedName, type)
-      group.enter()
-      _ = provider.loadFileRepresentation(forTypeIdentifier: type.identifier) { url, _ in
-        // iOS deletes this file when the handler returns, so the copy is made here.
-        copies.set(index, url.flatMap { PastedItem.copy($0, name: name) })
-        group.leave()
-      }
-    }
-    group.notify(queue: .main) { [weak self] in
-      let files = copies.files
-      MainActor.assumeIsolated {
-        self?.onPasteFiles(["files": files, "failed": total - files.count])
-      }
+    PastedItem.copyFiles(providers, extensions) { [weak self] result in
+      self?.onPasteFiles(result)
     }
     return true
+  }
+}
+
+/// Wraps the chat. A drop of photos, videos or other files from another app, such as the screenshot
+/// preview, is copied to temporary files and sent to JavaScript, as a paste in the composer is.
+final class ChatDropView: ExpoView, UIDropInteractionDelegate {
+  let onDropFiles = EventDispatcher()
+  var extensions: Set<String> = []
+  /// While false, a drop is refused, so the drag shows that the chat does not take it.
+  var enabled = true
+
+  required init(appContext: AppContext? = nil) {
+    super.init(appContext: appContext)
+    addInteraction(UIDropInteraction(delegate: self))
+  }
+
+  func dropInteraction(_ interaction: UIDropInteraction, canHandle session: UIDropSession) -> Bool {
+    enabled && session.items.contains { PastedItem.isFile($0.itemProvider.registeredTypeIdentifiers) }
+  }
+
+  func dropInteraction(_ interaction: UIDropInteraction, sessionDidUpdate session: UIDropSession) -> UIDropProposal {
+    UIDropProposal(operation: enabled ? .copy : .forbidden)
+  }
+
+  func dropInteraction(_ interaction: UIDropInteraction, performDrop session: UIDropSession) {
+    let providers = session.items.map(\.itemProvider).filter { PastedItem.isFile($0.registeredTypeIdentifiers) }
+    guard !providers.isEmpty else { return }
+    PastedItem.copyFiles(providers, extensions) { [weak self] result in
+      guard let self else {
+        // The chat closed during the copy, so no code reads the copies.
+        PastedItem.delete(result)
+        return
+      }
+      self.onDropFiles(result)
+    }
   }
 }
 
@@ -66,6 +85,34 @@ private final class PastedCopies: @unchecked Sendable {
 }
 
 private enum PastedItem {
+  /// Copies the files of the items and calls `done` on the main thread with the copies, in item
+  /// order, and the count of items that could not be copied.
+  static func copyFiles(
+    _ providers: [NSItemProvider],
+    _ extensions: Set<String>,
+    done: @escaping @MainActor ([String: Any]) -> Void
+  ) {
+    let total = providers.count
+    let copies = PastedCopies(count: total)
+    let group = DispatchGroup()
+    for (index, provider) in providers.enumerated() {
+      guard let type = representation(provider.registeredTypeIdentifiers, extensions) else { continue }
+      let fileName = name(provider.suggestedName, type)
+      group.enter()
+      _ = provider.loadFileRepresentation(forTypeIdentifier: type.identifier) { url, _ in
+        // iOS deletes this file when the handler returns, so the copy is made here.
+        copies.set(index, url.flatMap { copy($0, name: fileName) })
+        group.leave()
+      }
+    }
+    group.notify(queue: .main) {
+      let files = copies.files
+      MainActor.assumeIsolated {
+        done(["files": files, "failed": total - files.count])
+      }
+    }
+  }
+
   /// Photos, videos and documents are files. Text stays text, also in a rich format, and a link alone stays a link.
   static func isFile(_ identifiers: [String]) -> Bool {
     let types = identifiers.compactMap { UTType($0) }
@@ -112,6 +159,15 @@ private enum PastedItem {
       return nil
     }
     return ["uri": target.absoluteString, "name": name]
+  }
+
+  /// Deletes the copies of a result of `copyFiles`.
+  static func delete(_ result: [String: Any]) {
+    for file in result["files"] as? [[String: String]] ?? [] {
+      if let uri = file["uri"], let url = URL(string: uri) {
+        try? FileManager.default.removeItem(at: url)
+      }
+    }
   }
 
   /// Reads only the formats of the items. iOS does not show a paste notice for this.
@@ -210,6 +266,9 @@ public class ComposerPasteModule: Module {
   public func definition() -> ModuleDefinition {
     Name("OpenBotComposerPaste")
 
+    /// A build before the `ChatDrop` view does not have it, so the app shows the chat without it.
+    Constant("chatDrop") { true }
+
     OnCreate {
       _ = ComposerPaste.installed
     }
@@ -219,6 +278,19 @@ public class ComposerPasteModule: Module {
 
       Prop("extensions") { (view: ComposerPasteView, extensions: [String]) in
         view.extensions = Set(extensions.map { $0.lowercased() })
+      }
+    }
+
+    View(ChatDropView.self) {
+      ViewName("ChatDrop")
+      Events("onDropFiles")
+
+      Prop("extensions") { (view: ChatDropView, extensions: [String]) in
+        view.extensions = Set(extensions.map { $0.lowercased() })
+      }
+
+      Prop("enabled") { (view: ChatDropView, enabled: Bool) in
+        view.enabled = enabled
       }
     }
   }
