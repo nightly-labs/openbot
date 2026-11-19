@@ -133,7 +133,7 @@ import { AgentSettingsRefused } from "./agent-settings-refused";
 import { type ApprovalAutomationPolicy, NO_APPROVAL_AUTOMATION } from "./approval-automation";
 import type { AttachmentGateway } from "./attachment-gateway";
 import type { AttentionRegistry, CodexSubagentParent } from "./attention-registry";
-import { loadAvatarFile } from "./avatar-file";
+import { type AvatarImageDecoder, loadAvatarFile } from "./avatar-file";
 import {
   type AgentBrowserProfiles,
   agentBrowserProfileView,
@@ -454,6 +454,7 @@ export interface OpenBotToolRouterOptions {
   screenCapture?: ScreenCaptureHost | null | undefined;
   videoReader?: VideoReaderHost | null | undefined;
   fitImage?: ImageFitter | null | undefined;
+  avatarDecoder?: AvatarImageDecoder | null | undefined;
   mcpServers?: AgentMcpServers | null | undefined;
   marketplaceAppServer?: ((appId: string) => MarketplaceAppServer | null) | undefined;
   githubConnected?: (() => boolean) | undefined;
@@ -504,6 +505,7 @@ export class OpenBotToolRouter {
   readonly #screenCapture: ScreenCaptureHost | null;
   readonly #videoReader: VideoReaderHost | null;
   readonly #fitImage: ImageFitter | null;
+  readonly #avatarDecoder: AvatarImageDecoder | null;
   readonly #mcpServers: AgentMcpServers | null;
   readonly #marketplaceAppServer: (appId: string) => MarketplaceAppServer | null;
   readonly #githubConnected: () => boolean;
@@ -570,6 +572,7 @@ export class OpenBotToolRouter {
     this.#screenCapture = options.screenCapture ?? null;
     this.#videoReader = options.videoReader ?? null;
     this.#fitImage = options.fitImage ?? null;
+    this.#avatarDecoder = options.avatarDecoder ?? null;
     this.#mcpServers = options.mcpServers ?? null;
     this.#marketplaceAppServer = options.marketplaceAppServer ?? (() => null);
     this.#githubConnected = options.githubConnected ?? (() => false);
@@ -1871,6 +1874,7 @@ export class OpenBotToolRouter {
       return yield* handleChannelAgentTool(params, senderAgentId, {
         channels: this.#channels,
         listAgents: () => this.#hooks.listAgents(),
+        decodeAvatar: this.#avatarDecoder,
         taskChannelId: channelId,
       });
     }
@@ -2675,11 +2679,15 @@ export class OpenBotToolRouter {
     }
     const target = yield* this.#captureApprovalReason(host, capture);
     if (typeof target !== "string") return target;
+    const promptsForPermission = yield* host.promptsForPermission();
     const channelName = channelId ? this.#channels.store.get(channelId).name : null;
-    const reason =
-      channelName === null
-        ? target
-        : `${target} ${sourceText("status.agent.screenCaptureChannel", { channel: channelName })}`;
+    const reason = [
+      target,
+      promptsForPermission ? sourceText("status.agent.screenCapturePermissionNext") : null,
+      channelName === null ? null : sourceText("status.agent.screenCaptureChannel", { channel: channelName }),
+    ]
+      .filter((part) => part !== null)
+      .join(" ");
     const decision = yield* this.#attention.awaitToolApproval(
       client,
       request,
@@ -2695,7 +2703,7 @@ export class OpenBotToolRouter {
         grantRoot: null,
         permissions: null,
       },
-      { alwaysAsk: channelId !== null },
+      { alwaysAsk: channelId !== null || promptsForPermission },
     );
     if (decision !== "accept") return openBotToolFailure(sourceText("error.agent.screenCaptureDeclined"));
     const image = yield* Effect.result(host.capture(capture));
@@ -2739,8 +2747,29 @@ export class OpenBotToolRouter {
             Effect.map((decision) => decision === "accept"),
             toToolOperationFailed,
           ),
+      keysFromPerson: (values) => this.#keysFromPerson(agentId, params.turnId, threadId, values),
       requestSignIn: (config) => toolStep(() => this.#postMcpSignInCard(agentId, threadId, params.turnId, config)),
     });
+  });
+
+  readonly #keysFromPerson = Effect.fn("OpenBotToolRouter.keysFromPerson")(function* (
+    this: OpenBotToolRouter,
+    agentId: string,
+    turnId: string,
+    threadId: string,
+    values: readonly string[],
+  ) {
+    if (this.#messaging.store.linkForThread(threadId)) return false;
+    const channelId = this.#channels.store.channelForThread(threadId);
+    if (!channelId) return this.#requestedByPerson(agentId, turnId, threadId);
+    for (const value of values) {
+      const token = value.trim().split(/\s+/u).at(-1) ?? value;
+      const holds = yield* this.#channels
+        .localRequestHolds(channelId, agentId, turnId, token)
+        .pipe(Effect.catch(() => Effect.succeed(false)));
+      if (!holds) return false;
+    }
+    return true;
   });
 
   readonly #searchSignIns = Effect.fn("OpenBotToolRouter.searchSignIns")(function* (
@@ -2909,17 +2938,17 @@ export class OpenBotToolRouter {
       const { x, y, width, height } = capture.region;
       return sourceText("status.agent.screenCaptureRegion", { x, y, width, height });
     }
-    const listed = yield* Effect.result(host.listSources());
-    if (Result.isFailure(listed)) return captureFailure(listed.failure);
-    const sources = listed.success;
     if (capture.target === "window") {
-      const window = sources.windows.find(({ id }) => id === capture.windowId);
+      const listed = yield* Effect.result(host.listSources());
+      if (Result.isFailure(listed)) return captureFailure(listed.failure);
+      const window = listed.success.windows.find(({ id }) => id === capture.windowId);
       if (!window) return openBotToolFailure(sourceText("error.agent.screenCaptureWindowMissing"));
       return sourceText("status.agent.screenCaptureWindow", { name: window.name });
     }
+    const displays = yield* host.listDisplays();
     const display = capture.displayId
-      ? sources.displays.find(({ id }) => id === capture.displayId)
-      : sources.displays.find(({ primary }) => primary);
+      ? displays.find(({ id }) => id === capture.displayId)
+      : displays.find(({ primary }) => primary);
     if (capture.displayId && !display) return openBotToolFailure(sourceText("error.agent.screenCaptureDisplayMissing"));
     return display?.name
       ? sourceText("status.agent.screenCaptureDisplay", { name: display.name })
@@ -3222,7 +3251,7 @@ export class OpenBotToolRouter {
       const image =
         avatarPath === undefined
           ? undefined
-          : yield* loadAvatarFile(avatarPath, sender.workspacePath).pipe(toToolOperationFailed);
+          : yield* loadAvatarFile(avatarPath, sender.workspacePath, this.#avatarDecoder).pipe(toToolOperationFailed);
       const input: UpdateAgentInput = {
         agentId,
         ...(fields.name === undefined ? {} : { name: fields.name }),

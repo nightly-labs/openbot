@@ -482,6 +482,7 @@ export function createScrollStore(deps: ScrollStoreDeps) {
 
   return {
     scrollFades,
+    shownMessages,
     virtualScrollMargin,
     showScrollToLatest,
     setShowScrollToLatest,

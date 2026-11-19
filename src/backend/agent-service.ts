@@ -87,6 +87,7 @@ import type {
   ProviderCodeLoginStart,
   ProviderUsageResets,
   QueuedMessageReceipt,
+  QueueHold,
   QueueSnapshot,
   ReadAgentTaskAroundInput,
   ReadAgentTaskPageInput,
@@ -194,6 +195,7 @@ import {
   type LocalAttentionResponse,
   type PromptResponder,
 } from "./agent/attention-registry";
+import type { AvatarImageDecoder } from "./agent/avatar-file";
 import { backgroundModel, withBackgroundEffort } from "./agent/background-model";
 import { BootRecovery } from "./agent/boot-recovery";
 import type { AgentBrowserProfiles } from "./agent/browser-profile-tool";
@@ -226,7 +228,7 @@ import {
 import type { ImageFitter } from "./agent/image-reader";
 import { InstructionsChanges } from "./agent/instructions-changes";
 import type { AgentLibraryFolders } from "./agent/library-folder-tools";
-import { LiveVoice, type LiveVoiceOwner, type LiveVoiceReply } from "./agent/live-voice";
+import { LiveVoice, type LiveVoiceOwner, type LiveVoiceRelayed, type LiveVoiceReply } from "./agent/live-voice";
 import { MailboxSync } from "./agent/mailbox-sync";
 import { type GitHubConnectorSource, McpGateway, type TestMcpServerOptions } from "./agent/mcp-gateway";
 import { type MarketplaceAppServer, mcpFallbackRunsServer, mcpServersFromGateway } from "./agent/mcp-tools";
@@ -414,6 +416,7 @@ export interface AgentServiceOptions {
   screenCapture?: ScreenCaptureHost | null;
   videoReader?: VideoReaderHost | null;
   fitImage?: ImageFitter | null;
+  avatarDecoder?: AvatarImageDecoder | null;
   prepareMcpTest?: (config: McpServerConfig) => Effect.Effect<void, unknown>;
   mcpAgentAccess?: (mcpServerId: string, agentId: string | null) => boolean;
   marketplaceAppServer?: (appId: string) => MarketplaceAppServer | null;
@@ -472,6 +475,7 @@ export interface AgentServiceOptions {
 }
 
 const USER_SEND_RETRY_WINDOW_MS = 24 * 60 * 60 * 1000;
+const LIVE_VOICE_RELAYED_LIMIT = 50;
 
 function userSendKey(sender: ConversationMessageSender | undefined, agentId: string, clientMessageId: string): string {
   return `user-send:${createHash("sha256")
@@ -548,6 +552,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #drain: DrainScheduler;
   readonly #sessionSettings: SessionSettings;
   readonly #liveVoice: LiveVoice;
+  readonly #liveVoiceRelayed = new Map<string, LiveVoiceRelayed>();
   readonly #queue: QueueControls;
   readonly #attachments: AttachmentGateway;
   readonly #browserUploads: BrowserUploads;
@@ -1027,7 +1032,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               .map((agent) => agent.id),
           );
           this.#retryHeldMoves();
+          this.#emitProviderQueues(provider);
         },
+        onProviderHeld: (provider) => this.#emitProviderQueues(provider),
         onAccountsChanged: () => this.#retryHeldMoves(),
         onProvidersUnready: () => this.#refreshHeldAgents(),
       },
@@ -1221,7 +1228,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       hooks: {
         emit: (event) => this.#emit(event),
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
-        queueHold: (agentId) => (this.#tasks.oneTurnAtATime(agentId) ? this.channels.queueHold(agentId) : null),
+        queueHold: (agentId) =>
+          (this.#tasks.oneTurnAtATime(agentId) ? this.channels.queueHold(agentId) : null) ??
+          this.#providerRestartHold(agentId),
         threadRequestsChanged: (agentId) => this.#tasks.changed(agentId),
       },
     });
@@ -1649,6 +1658,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
         redactMcp: (text) => this.#mcp.redact(text),
         tagReferences: (agentId, threadId) => this.#tagReferences(agentId, threadId),
+        liveVoiceRelayed: (deliveryId) => this.#liveVoiceRelayed.get(deliveryId) ?? null,
         isStopping: () => this.#stopping,
         isDeleting: (agentId) => this.#removal.deleting().has(agentId),
         servesModel: (model, provider) => this.#endpoints.serves(model, provider),
@@ -1666,7 +1676,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         followPendingRuntime: (agentId) => this.#startPendingRuntime(agentId),
         followUsageLimit: (agentId) => {
           if (this.#startPendingRuntime(agentId)) return true;
-          if (!this.#usageLimitMove(agentId)) return false;
+          if (!this.#usageLimitMove(agentId)) return this.#returnCheckPending(agentId);
           Effect.runFork(
             this.#followUsageLimit(agentId).pipe(
               Effect.tap((moved) =>
@@ -1713,8 +1723,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         return agent;
       },
       relay: (agent) => this.#liveVoiceRelay(agent),
-      send: (agentId, text, sender) =>
-        this.sendMessage({ agentId, text }, sender).pipe(
+      send: (agentId, relayed, sender) =>
+        this.#sendUserMessage(
+          { agentId, text: relayed.shown },
+          sender,
+          undefined,
+          undefined,
+          false,
+          false,
+          relayed,
+        ).pipe(
           Effect.flatMap((receipt) => {
             const deliveryId = receipt.deliveries[0]?.id;
             return deliveryId
@@ -1749,6 +1767,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           return this.#tasks.threadForDelivery(deliveryId);
         },
         tagReferences: (agentId, threadId) => this.#tagReferences(agentId, threadId),
+        liveVoiceRelayed: (deliveryId) => this.#liveVoiceRelayed.get(deliveryId) ?? null,
       },
     });
     this.#turn = new TurnLifecycle({
@@ -1787,6 +1806,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         poolHasOtherAccount: (agentId) => this.#poolHasOtherAccount(agentId),
         mayContinueOnBackup: (agentId) => this.#mayContinueStoppedWork(agentId),
         requeueChannelDelivery: (deliveryId, continueWork) => this.#requeueChannelDelivery(deliveryId, continueWork),
+        keepChannelDelivery: (deliveryId) => this.channels.keepForRetry(deliveryId),
         quietRoutineDelivery: (deliveryId) => this.#routines.quietRunForDelivery(deliveryId),
         closeRoutineSession: (externalThreadId, archive) => this.#threads.closeRoutineThread(externalThreadId, archive),
         conversationTurnEnded: (agentId, sideThreadId, counts, memoryCommitted) =>
@@ -1918,6 +1938,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.setCommitCoAuthor === undefined ? {} : { setCommitCoAuthor: options.setCommitCoAuthor }),
       ...(options.screenCapture === undefined ? {} : { screenCapture: options.screenCapture }),
       ...(options.videoReader === undefined ? {} : { videoReader: options.videoReader }),
+      ...(options.avatarDecoder === undefined ? {} : { avatarDecoder: options.avatarDecoder }),
       ...(options.fitImage === undefined ? {} : { fitImage: options.fitImage }),
       mcpServers: mcpServersFromGateway(
         this.#mcp,
@@ -3864,7 +3885,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             : reasoningEffort,
       };
     };
-    if (agent.usageLimitReturn && this.#usageLimitReady(agent.usageLimitReturn))
+    if (
+      agent.usageLimitReturn &&
+      this.#usageLimitReady(agent.usageLimitReturn) &&
+      this.#usageLimits.returnConfirmed(usageLimitOf(agent.usageLimitReturn))
+    )
       return {
         input: {
           ...move(agent.usageLimitReturn, agent.usageLimitReturn.reasoningEffort),
@@ -3880,6 +3905,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (!this.#hasWaitingWork(agentId)) return null;
     const next = this.#usageLimitBackup(agentId, this.#queuedContinuation(agentId));
     return next ? { input: { ...move(next), leaveUsageLimit: true }, move: failed ? "provider-error" : null } : null;
+  }
+
+  #returnCheckPending(agentId: string): boolean {
+    const returnTo = this.#store.get(agentId)?.usageLimitReturn;
+    return returnTo !== undefined && this.#usageLimits.returnPending(usageLimitOf(returnTo));
   }
 
   #hasWaitingWork(agentId: string): boolean {
@@ -5428,6 +5458,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       concurrency: "unbounded",
       discard: true,
     });
+    this.#tasks.dispose();
     yield* this.#warmGenerations.dispose();
     yield* Fiber.join(channelStop);
     yield* this.#mcp.close();
@@ -5750,6 +5781,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#mailbox
       .listActiveQueues(agentIds, this.#turn.failedTurns())
       .map((queue) => this.#mailboxSync.withHold(queue));
+  }
+
+  #emitProviderQueues(provider: AgentProvider): void {
+    for (const agent of this.#store.list())
+      if (providerForAgent(agent) === provider && this.#mailbox.queuedDeliveryIds(agent.id).length)
+        this.#mailboxSync.emitQueue(agent.id);
+  }
+
+  #providerRestartHold(agentId: string): QueueHold | null {
+    const agent = this.#store.get(agentId);
+    const provider = agent ? providerForAgent(agent) : null;
+    return provider && this.#providers.isReplacingCli(provider) ? { reason: "provider-restart", provider } : null;
   }
 
   listWaits(agentId: string): AgentWaitsSnapshot {
@@ -6219,6 +6262,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     idempotencyKey?: string,
     welcome = false,
     agentSetup = false,
+    relayed?: LiveVoiceRelayed,
   ) {
     const validateRecipient = yield* lifecycleStep("prepare message delivery", () =>
       this.#mailbox.prepareDelivery([input.agentId]),
@@ -6271,6 +6315,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         operation: "send message",
         cause: new Error(sourceText("error.agent.queuedMessageCreateFailed")),
       });
+    if (relayed) {
+      this.#liveVoiceRelayed.set(delivery.delivery.id, relayed);
+      for (const deliveryId of this.#liveVoiceRelayed.keys()) {
+        if (this.#liveVoiceRelayed.size <= LIVE_VOICE_RELAYED_LIMIT) break;
+        this.#liveVoiceRelayed.delete(deliveryId);
+      }
+    }
     if (task && this.#tasks.threadId(task.taskId) === null) {
       yield* this.cancelQueuedMessage(agent.id, delivery.delivery.id);
       if (idempotencyKey) this.#mailbox.forgetIdempotencyKey(idempotencyKey);

@@ -172,6 +172,10 @@ export const messages = {
   "error.agent.mcpServerNotSaved": "שרת ה-MCP לא הגיב, ולכן לא נשמר. {error}",
   "error.agent.mcpServerKeysMove":
     "שרת ה-MCP {name} מחזיק מפתחות עבור השרת הנוכחי שלו. יש לבקש מהמשתמש לשנות את הכתובת, הפקודה, הארגומנטים או שיטת ההעברה שלו בחנות, אפליקציות, {name}.",
+  "error.agent.mcpServerHeadersNeedHttp":
+    "שרת ה-MCP {name} מריץ פקודה מקומית, ולכן אינו מקבל כותרות. בקש מהמשתמש להזין את המפתחות שלו בחנות, אפליקציות, {name}.",
+  "error.agent.mcpServerHeadersNeedPerson":
+    "רק המשתמש של OpenBot זה, בצ'אט איתך, יכול לתת את המפתחות של שרת ה-MCP {name}. בקש מהמשתמש להזין אותם בחנות, אפליקציות, {name}.",
   "error.agent.mcpServerBuiltIn":
     "{name} הוא חלק מ-OpenBot, ולכן כלי ה-MCP לא יכולים לבדוק, להפעיל, לכבות או להסיר אותו. המשתמש שולט בו במחשב שמריץ את OpenBot: חיבור GitHub בחנות, אפליקציות, GitHub, ושליטה במחשב בהגדרות, שליטה במחשב.",
   "error.agent.mcpServerUnknown": "אין שרת MCP בשם {name}. אפשר לקרוא ל-list_mcp_servers כדי לראות את השמות.",
@@ -183,6 +187,8 @@ export const messages = {
     "האזור אינו בתוך תצוגה אחת. יש להשתמש בנקודות שולחן עבודה בתוך גבולות תצוגה אחת מתוך list_capture_sources.",
   "error.agent.screenCapturePermissionMissing":
     "ל-OpenBot אין הרשאת Screen Recording. יש לבקש מהמשתמש לפתוח את System Settings > Privacy & Security > Screen & System Audio Recording, להפעיל את OpenBot, ואז לצאת מ-OpenBot ולפתוח אותו שוב.",
+  "error.agent.screenCaptureListPermission":
+    "ל-OpenBot עדיין אין הרשאת Screen Recording, ולכן הוא לא יכול להציג את רשימת החלונות. כדי לצלם תצוגה, יש לקרוא ל-capture_screen עם target screen. המשתמש מאשר קודם את הצילום, ואז macOS עשוי לבקש מהמשתמש את ההרשאה.",
   "error.agent.screenCaptureEmptyWindows":
     "Windows החזירה תמונה ריקה. יש לבקש מהמשתמש לבטל את נעילת המחשב ולסגור תוכן מוגן. גם מדיניות של הארגון יכולה לחסום צילום מסך.",
   "error.agent.screenCaptureFailed": "צילום המסך נכשל. יש לנסות שוב.",

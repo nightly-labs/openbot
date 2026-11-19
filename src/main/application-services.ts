@@ -1308,11 +1308,13 @@ export async function createApplicationServices({
   let crmHandle: CrmHandle | null = null;
   const browser = new BrowserHost(mainWindow, store.downloadsRoot, join(app.getPath("userData"), BROWSER_STATE_FILE), {
     memoryLow: () => (hostMemory?.level() ?? "ok") !== "ok",
+    ...(hostMemory ? { tabLimit: () => hostMemory.browserTabLimit() } : {}),
     browserProfile: (agentId) => {
       const agent = store.list().find((candidate) => candidate.id === agentId);
       return agent ? agentBrowserProfile(agent) : { kind: "shared" };
     },
     profileExists: (profileId) => browserProfileStore.get(profileId) !== undefined,
+    agentChat: (threadId) => store.ownsThread(threadId),
     profileProxy: (profileId) => browserProxyConnection(browserProxyStore, browserProxyCipher, profileId),
     onProxyStatusChanged: () => browserProxyStatusChanged(),
     computerExit: (memberId) => browserEgress.exit(memberId),
@@ -1953,6 +1955,7 @@ export async function createApplicationServices({
     browser,
     finishCheck: true,
     visualPreview: new ChatVisualPreviewer(),
+    avatarDecoder: (bytes) => !nativeImage.createFromBuffer(Buffer.from(bytes)).isEmpty(),
     setCommitCoAuthor: (enabled) => agentDefaultsSettings.update({ commitCoAuthor: enabled }),
     clearPictureBackground: (bytes) => {
       const picture = nativeImage.createFromBuffer(Buffer.from(bytes));
@@ -2559,7 +2562,7 @@ export async function createApplicationServices({
     read: () => machineAlertMetrics.read(),
     display: () => machineMetrics.read(),
     store: machineAlertStore,
-    members: () => teamStore.listMembers(),
+    members: () => (teamStore.configured ? teamStore.listMembers() : []),
     onError: (message, error) => logger.warn(message, toLogValue(error)),
   });
   teardown.push(TEARDOWN_ORDER.machineAlerts, "the machine alert check", () => machineAlerts.close());
@@ -3294,6 +3297,7 @@ export async function createApplicationServices({
       }),
     remoteDesktopStateDirectory: join(app.getPath("userData"), "remote-desktop-runtime"),
     getRemoteDesktopRuntimeCredentials: () => Effect.succeed(remoteDesktopRuntimeCredentials),
+    remoteDesktopScreenLocked: () => powerMonitor.getSystemIdleState(1) === "locked",
     getRemoteDesktopDisplays: () => {
       const primaryId = screen.getPrimaryDisplay().id;
       return screen.getAllDisplays().map((display, index) => ({
