@@ -1,7 +1,8 @@
 import { isAttachmentSummary } from "@openbot/contracts/ipc";
-import { isBoolean, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { createEffect, type Store } from "solid-js";
 import { readRestoreLastWorkspace } from "../../restore-workspace-preference";
+import type { RightPanelMode } from "./conversation-types";
 import { filePreviewKey, type SidePanelFile, type SidePanelState, type SidePanelsState } from "./stores/panels-store";
 
 const SIDE_PANEL_FILES_STORAGE_KEY = "openbot:side-panel-files";
@@ -21,9 +22,12 @@ export function readStoredSidePanels(): StoredSidePanels {
   }
 }
 
-export function writeSidePanelsOnChange(panels: Store<SidePanelsState>, shown: () => boolean): void {
+export function writeSidePanelsOnChange(
+  panels: Store<SidePanelsState>,
+  rightPanels: () => Record<string, RightPanelMode>,
+): void {
   createEffect(
-    () => storableSidePanels(panels.side, shown()),
+    () => storableSidePanels(panels.side, rightPanels()),
     (value) => {
       try {
         window.localStorage.setItem(SIDE_PANEL_FILES_STORAGE_KEY, value);
@@ -33,7 +37,7 @@ export function writeSidePanelsOnChange(panels: Store<SidePanelsState>, shown: (
   );
 }
 
-function storableSidePanels(side: Record<string, SidePanelState>, shown: boolean): string {
+function storableSidePanels(side: Record<string, SidePanelState>, rightPanels: Record<string, RightPanelMode>): string {
   const owners = Object.fromEntries(
     Object.entries(side).flatMap(([ownerId, state]) => {
       const files = state.files.flatMap((file) =>
@@ -44,7 +48,9 @@ function storableSidePanels(side: Record<string, SidePanelState>, shown: boolean
       return [[ownerId, { files, file }]];
     }),
   );
-  return JSON.stringify({ shown: shown && Object.keys(owners).length > 0, owners });
+  const shownOwner =
+    Object.keys(owners).find((ownerId) => rightPanels[ownerId] === "file-preview" && owners[ownerId]?.file) ?? null;
+  return JSON.stringify({ shownOwner, owners });
 }
 
 function isStorableSource(source: SidePanelFile["source"]): boolean {
@@ -61,7 +67,8 @@ function decodeStoredSidePanels(value: unknown): StoredSidePanels {
       return state ? [[ownerId, state]] : [];
     }),
   );
-  return { shown: isBoolean(value.shown) && value.shown && Object.keys(side).length > 0, side };
+  const shown = isString(value.shownOwner) && Boolean(side[value.shownOwner]?.file);
+  return { shown, side };
 }
 
 function decodeOwner(value: unknown): SidePanelState | null {
@@ -69,7 +76,7 @@ function decodeOwner(value: unknown): SidePanelState | null {
   const files = value.files.flatMap((item: unknown): SidePanelFile[] => {
     if (!isDynamicRecord(item) || !isString(item.name)) return [];
     const source = decodeSource(item.source);
-    if (!source) return [];
+    if (!source || !isStorableSource(source)) return [];
     const key = filePreviewKey(source);
     return [{ key, name: item.name, folder: source.kind === "workspace-folder", source, unavailable: false }];
   });
