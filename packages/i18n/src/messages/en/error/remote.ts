@@ -88,7 +88,9 @@ export const messages = defineMessages("error.remote", {
     "OpenBot cannot verify this server because its security key is missing or changed. Ask the server owner to check the server.",
   "error.remote.connectionNotStarted":
     "OpenBot could not start the connection to this server. If this continues, quit OpenBot and open it again.",
-  "error.remote.hostDidNotConnect": "The WebRTC host did not connect.",
+  "error.remote.connectionServiceUnreachable":
+    "This computer cannot reach the OpenBot connection service. Check its internet connection. OpenBot connects again automatically.",
+  "error.remote.serverAnswerTimeout": "The server did not answer in time. OpenBot connects again automatically.",
   "error.remote.connectionCancelled": "The remote connection was cancelled.",
   "error.remote.hostDisconnected":
     "The connection to the server was lost. Check whether the action finished, then try again.",

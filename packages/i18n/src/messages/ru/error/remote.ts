@@ -91,7 +91,9 @@ export const messages = {
     "OpenBot не может проверить этот сервер: его ключ безопасности отсутствует или изменился. Попросите владельца сервера проверить сервер.",
   "error.remote.connectionNotStarted":
     "OpenBot не удалось начать подключение к этому серверу. Если проблема повторяется, закройте OpenBot и откройте его снова.",
-  "error.remote.hostDidNotConnect": "Хост WebRTC не подключился.",
+  "error.remote.connectionServiceUnreachable":
+    "Этот компьютер не может подключиться к сервису соединений OpenBot. Проверьте его подключение к интернету. OpenBot подключится снова автоматически.",
+  "error.remote.serverAnswerTimeout": "Сервер не ответил вовремя. OpenBot подключится снова автоматически.",
   "error.remote.connectionCancelled": "Удалённое подключение отменено.",
   "error.remote.hostDisconnected":
     "Соединение с сервером прервано. Проверьте, выполнено ли действие, и повторите попытку.",

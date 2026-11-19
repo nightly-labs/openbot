@@ -91,7 +91,9 @@ export const messages = {
     "OpenBot nie może zweryfikować tego serwera, ponieważ brakuje jego klucza bezpieczeństwa lub klucz się zmienił. Poproś właściciela serwera o sprawdzenie serwera.",
   "error.remote.connectionNotStarted":
     "OpenBot nie mógł nawiązać połączenia z tym serwerem. Jeśli problem się powtarza, zamknij OpenBot i otwórz go ponownie.",
-  "error.remote.hostDidNotConnect": "Host WebRTC nie połączył się.",
+  "error.remote.connectionServiceUnreachable":
+    "Ten komputer nie może połączyć się z usługą połączeń OpenBot. Sprawdź jego połączenie z internetem. OpenBot połączy się ponownie automatycznie.",
+  "error.remote.serverAnswerTimeout": "Serwer nie odpowiedział na czas. OpenBot połączy się ponownie automatycznie.",
   "error.remote.connectionCancelled": "Zdalne połączenie zostało anulowane.",
   "error.remote.hostDisconnected":
     "Połączenie z serwerem zostało przerwane. Sprawdź, czy działanie się zakończyło, i spróbuj ponownie.",
