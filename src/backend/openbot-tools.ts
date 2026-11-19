@@ -788,17 +788,13 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
         .describe(
           "bug: something in OpenBot does not work. idea: a feature request or another change that the user wants.",
         ),
-      title: z
-        .string()
-        .min(1)
-        .max(200)
-        .describe("A short summary in plain English, without a prefix: the feature and the symptom."),
+      title: z.string().min(1).max(200).describe("A short summary in English, no prefix: the feature and the symptom."),
       text: z
         .string()
         .min(1)
         .max(1000)
         .describe(
-          "In one to three plain sentences, in English, also when the user writes another language. For a bug: what went wrong and what the user expected, with the exact error text. For an idea: what the user wants OpenBot to do.",
+          "In one to three plain sentences, always in English. For a bug: what went wrong and what the user expected, with the exact error text. For an idea: what the user wants OpenBot to do.",
         ),
       details: z
         .string()
