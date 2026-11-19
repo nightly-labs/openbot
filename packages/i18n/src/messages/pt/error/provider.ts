@@ -280,6 +280,8 @@ export const messages = {
     "O Linux parou o provedor porque o OpenBot tem um limite de CPU em tempo real igual a 0. O limite vem do seu sistema. Instale e inicie o rtkit (`rtkit-daemon`), execute `systemctl --user restart xdg-desktop-portal` e depois reinicie o OpenBot. Reiniciar apenas o xdg-desktop-portal não resolve enquanto o rtkit estiver ausente.",
   "error.provider.cpuUnsupported":
     "O processador deste computador não consegue executar este provedor. Use outro provedor.",
+  "error.provider.windowsBlocked":
+    "As configurações de segurança do Windows, como o Controle Inteligente de Aplicativos, impediram que este provedor iniciasse. Use outro provedor.",
   "error.provider.opencodeDatabaseNewer":
     "O OpenCode não conseguiu abrir o banco de dados porque uma versão mais recente do OpenCode o alterou. Atualize o OpenCode para a versão 2 ou posterior e tente novamente.",
   "error.provider.opencodeNoAnswer":

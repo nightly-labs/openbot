@@ -271,6 +271,8 @@ export const messages = {
     "Linux остановил провайдера, потому что у OpenBot ограничение процессорного времени реального времени равно 0. Это ограничение задаёт ваша система. Установите и запустите rtkit (`rtkit-daemon`), выполните `systemctl --user restart xdg-desktop-portal`, затем перезапустите OpenBot. Один перезапуск xdg-desktop-portal не поможет, пока rtkit не установлен.",
   "error.provider.cpuUnsupported":
     "Процессор этого компьютера не может запустить этого провайдера. Используйте другого провайдера.",
+  "error.provider.windowsBlocked":
+    "Параметры безопасности Windows, например интеллектуальное управление приложениями, не дали запустить этого провайдера. Используйте другого провайдера.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode не смог открыть свою базу данных, потому что её изменила более новая версия OpenCode. Обновите OpenCode до версии 2 или новее и повторите попытку.",
   "error.provider.opencodeNoAnswer":
