@@ -68,29 +68,19 @@ import {
 } from "../model/viewer-page-script";
 import { startViewerProxy, type ViewerProxy, type ViewerRoute } from "../model/viewer-proxy";
 
-/** As on desktop: room for Moonlight's own WebRTC timeout and for the host to start its stream. */
 const STREAM_READY_TIMEOUT_MS = 60_000;
-/**
- * A new display restarts the host's stream: the viewer reports the old stream's end, then loads
- * again. A switch that shows no picture in this time failed.
- */
 const DISPLAY_SWITCH_MS = 30_000;
 const KEEP_AWAKE_TAG = "remote-desktop";
-/** The floating controls are 48 points, 8 points from the safe area, as in the chat and the browser. */
 const CONTROL_SIZE = 48;
 const CONTROL_OFFSET = 8;
 const KEY_HEIGHT = 40;
-/** A key with an icon is round, so the icons of the bar line up. */
 const ICON_KEY_WIDTH = 48;
 const TITLE_HEIGHT = isIOS ? NATIVE_BAR_HEIGHT : CONTROL_SIZE;
 const TITLE_MAX_WIDTH = 220;
-/** The hidden field is emptied past this length, so its text never grows with a long session. */
 const KEYBOARD_FIELD_MAX_LENGTH = 256;
-/** A paste goes as key presses, so it is kept short. */
 const PASTE_MAX_LENGTH = 2_000;
 const NOTICE_MS = 2_200;
 
-// The choices of this app run. A new stream starts with them.
 let chosenQuality: ViewerQuality = "smooth";
 let chosenTouchMode: ViewerTouchMode = "trackpad";
 
@@ -100,10 +90,6 @@ type Phase =
   | { type: "failed"; message: string }
   | { type: "paused" };
 
-/**
- * The viewer's own state. A failure keeps the page. While the display changes, the old stream's end
- * is kept as `lastError`, and shows only when the new stream does not come.
- */
 type ViewerStatus =
   | { kind: "connecting" }
   | { kind: "switching"; display: string; lastError: string | null }
@@ -148,19 +134,15 @@ export function RemoteDesktopScreen() {
   const [modifiers, setModifiers] = useState<ReadonlySet<Modifier>>(new Set());
   const [touchMode, setTouchMode] = useState<ViewerTouchMode>(chosenTouchMode);
   const [notice, setNotice] = useState<string | null>(null);
-  // The library gives `WebView` the props `WebViewProps & P` with `P = undefined`, which is `never`.
   const webView = useRef<WebView<object>>(null);
   const keyboardField = useRef<TextInputInstance>(null);
   const typed = useRef("");
-  // The open session and proxy, so a later start, a return to the background and the end close them.
   const running = useRef<{ proxy: ViewerProxy | null; sessionId: string | null; generation: number }>({
     proxy: null,
     sessionId: null,
     generation: 0,
   });
 
-  // The unlock prompt shows: on Android 9 and 10 it is an activity of its own, and the app reads as
-  // in the background. A session that passes it has unlocked once, so Retry does not ask again.
   const unlocking = useRef(false);
   const unlocked = useRef(false);
   const scriptFor = useCallback(
@@ -185,7 +167,6 @@ export function RemoteDesktopScreen() {
 
   const start = useCallback(
     async (unlock: boolean) => {
-      // The generation is read before the wait: a second start during the wait makes this one old.
       const stopping = stop();
       const generation = running.current.generation;
       await stopping;
@@ -198,7 +179,6 @@ export function RemoteDesktopScreen() {
       if (!canControlComputer(serverId))
         return setPhase({ type: "failed", message: t("mobile.server.remoteDesktop.unsupported") });
       if (unlock) {
-        // The phone's owner, not only a person who holds an unlocked phone, controls the computer.
         unlocking.current = true;
         const result = await checkDeviceUnlock(
           t("mobile.server.remoteDesktop.unlockPrompt"),
@@ -262,8 +242,6 @@ export function RemoteDesktopScreen() {
     [stop, canControlComputer, remoteDesktopConnection, serverId, t, scriptFor],
   );
 
-  // Starts once, and ends the session when the screen closes. The workspace gives new functions on
-  // its renders, so the effect reads the newest ones and does not run again for them.
   const lifecycle = useRef({ start, stop });
   lifecycle.current = { start, stop };
   useEffect(() => {
@@ -271,20 +249,17 @@ export function RemoteDesktopScreen() {
     return () => void lifecycle.current.stop();
   }, []);
 
-  // The stream ends when the app leaves the foreground: the phone cannot hold it, and nobody sees it.
   useEffect(() => {
     if (appForeground || unlocking.current || phase.type === "paused" || phase.type === "failed") return;
     void stop();
     setPhase({ type: "paused" });
   }, [appForeground, phase.type, stop]);
 
-  // The app switcher shows a picture of the app. A cover keeps the computer's screen out of it.
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => setCovered(state !== "active"));
     return () => subscription.remove();
   }, []);
 
-  // The phone stays on, and on Android no screenshot or screen recording shows the computer.
   useEffect(() => {
     void activateKeepAwakeAsync(KEEP_AWAKE_TAG).catch(() => undefined);
     void remoteViewerProxyNative?.setSecure(true).catch(() => undefined);
@@ -296,7 +271,6 @@ export function RemoteDesktopScreen() {
 
   const viewing = phase.type === "viewing" ? phase : null;
   const sessionId = viewing?.session.id ?? null;
-  // A stream that shows no picture in time failed: the host says nothing more when its stream never starts.
   useEffect(() => {
     if (!sessionId || (viewer.kind !== "connecting" && viewer.kind !== "switching")) return;
     const switching = viewer.kind === "switching";
@@ -328,7 +302,6 @@ export function RemoteDesktopScreen() {
   const ready = viewing !== null && viewer.kind === "connected";
   const call = (script: string) => webView.current?.injectJavaScript(script);
 
-  // The page sends its stats while the stats sheet is open, and again after it loads again.
   const statsOpen = useRemoteDesktopStatsOpen();
   useEffect(() => {
     if (!statsOpen || !ready) return;
@@ -358,7 +331,6 @@ export function RemoteDesktopScreen() {
     const change = typedChange(before, after);
     for (let index = 0; index < change.backspaces; index += 1) call(viewerCall("key", "Backspace", "Backspace"));
     if (change.text) call(viewerCall("type", change.text));
-    // A held modifier is for one shortcut, such as Cmd+C.
     if (change.text || change.backspaces > 0) releaseModifiers();
   };
   const toggleKeyboard = () => {
@@ -466,7 +438,6 @@ export function RemoteDesktopScreen() {
       const generation = running.current.generation;
       const previous = viewing.session.selectedDisplayId;
       setViewer({ kind: "switching", display: display.label, lastError: null });
-      // The page loads again for the new display, and asks for a stream of that display's size.
       setPhase({
         ...viewing,
         script: scriptFor(display),
@@ -474,7 +445,6 @@ export function RemoteDesktopScreen() {
       });
       void selectRemoteDesktopDisplay(connection, displayId).catch((error: unknown) => {
         if (running.current.generation !== generation) return;
-        // The host kept the display it had, so the phone shows that one as chosen again.
         setPhase((current) =>
           current.type === "viewing"
             ? { ...current, session: { ...current.session, selectedDisplayId: previous } }
@@ -490,7 +460,6 @@ export function RemoteDesktopScreen() {
       if (quality === chosenQuality) return;
       void haptics.selection();
       chosenQuality = quality;
-      // Moonlight reads its stream size and rate only when it starts.
       void start(false);
     }
   };
@@ -564,9 +533,6 @@ export function RemoteDesktopScreen() {
               key={viewing.session.id}
               source={{ uri: viewing.url }}
               injectedJavaScriptBeforeContentLoaded={viewing.script}
-              // Only the viewer's own loopback address loads. The page has no `onMessage`, so it cannot call the app.
-              // Every origin passes the list, so the handler below decides each load: the library opens a
-              // URL that fails the list in another app, and the host's page must not open links or apps.
               originWhitelist={["*"]}
               onShouldStartLoadWithRequest={(request) => request.url.startsWith(viewing.url.split("/v1/")[0] ?? "")}
               onOpenWindow={() => undefined}
@@ -600,7 +566,6 @@ export function RemoteDesktopScreen() {
                   variant="secondary"
                   onPress={() => {
                     void haptics.impact("soft");
-                    // After the app was in the background the phone asks again; a retry does not.
                     void start(status.action === "reconnect" || !unlocked.current);
                   }}
                 >
@@ -631,7 +596,6 @@ export function RemoteDesktopScreen() {
               style={{ bottom: controlBottom, height: keyboardShown ? KEY_HEIGHT : CONTROL_SIZE }}
             >
               {keyboardShown ? (
-                // The keys that a phone keyboard does not have, above the keyboard.
                 <ScrollView
                   horizontal
                   keyboardShouldPersistTaps="always"
@@ -721,7 +685,6 @@ export function RemoteDesktopScreen() {
       </KeyboardAvoidingView>
 
       {isIOS ? (
-        // The native bar, as on the browser screen.
         <>
           <Stack.Toolbar placement="left">
             <Stack.Toolbar.Button icon="chevron.backward" accessibilityLabel={t("common.back")} onPress={goBack} />
@@ -785,10 +748,8 @@ export function RemoteDesktopScreen() {
         </View>
       )}
 
-      {/* The app switcher takes its picture of the app under this cover. */}
       {covered ? <View pointerEvents="none" className="absolute inset-0 z-30 bg-background" /> : null}
 
-      {/* The phone keyboard types into this field. What changes in it goes to the computer. */}
       <TextInput
         ref={keyboardField}
         accessibilityLabel={t("mobile.server.remoteDesktop.keyboardField")}
@@ -815,7 +776,6 @@ export function RemoteDesktopScreen() {
           }
         }}
         onKeyPress={(event: TextInputKeyPressEvent) => {
-          // Backspace in an empty field changes no text, so the change handler never hears it.
           if (event.nativeEvent.key === "Backspace" && typed.current === "") pressKey("Backspace", "Backspace");
         }}
       />
@@ -823,7 +783,6 @@ export function RemoteDesktopScreen() {
   );
 }
 
-/** A glass circle of the control size, as the browser draws one. The menu owns the touch. */
 function GlassCircle({
   liquidGlass,
   fallbackBackground,

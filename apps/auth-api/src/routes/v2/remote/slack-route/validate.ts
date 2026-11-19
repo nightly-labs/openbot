@@ -25,8 +25,6 @@ const slackRouteSchema = z.object({
     .max(SLACK_ROUTE_TEAMS_LIMIT),
 });
 
-// Signal asks this while it starts: it lost the revocations it had in memory, so it accepts from a
-// route ticket only the workspaces that D1 still links to that host with the same link.
 export const Route = createFileRoute("/v2/remote/slack-route/validate")({
   server: {
     handlers: {

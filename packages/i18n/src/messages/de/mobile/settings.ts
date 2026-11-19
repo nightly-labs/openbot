@@ -292,6 +292,7 @@ export const messages = {
   "mobile.settings.conversations.media": "Fotos und Dateien",
   "mobile.settings.conversations.swipeLeft": "Wischen nach links im Agent-Chat",
   "mobile.settings.conversations.swipeRight": "Wischen nach rechts im Agent-Chat",
+  "mobile.settings.conversations.swipeQuestion": "Nebenfrage",
   "mobile.settings.conversations.swipeThreads": "Threads",
   "mobile.settings.conversations.swipeBrowser": "Browser",
   "mobile.settings.conversations.swipeOff": "Aus",
@@ -589,7 +590,7 @@ export const messages = {
   "mobile.settings.shortcuts.card.locked.title": "OpenBot ist gesperrt",
   "mobile.settings.shortcuts.card.locked.action": "OpenBot öffnen",
   "mobile.settings.shortcuts.footer":
-    "Send Message in der Kurzbefehle-App sendet an diesen Agenten. Die App öffnet sich nicht.",
+    "Send Message in der Kurzbefehle-App sendet an diesen Agenten. Die App öffnet sich nicht. Open Agent öffnet seinen Chat.",
   "mobile.settings.shortcuts.send.sent": "Gesendet",
   "mobile.settings.shortcuts.send.failed": "OpenBot konnte das nicht senden.",
   "mobile.settings.shortcuts.send.unconfirmed": "Keine Antwort vom Server. Die Nachricht kann im Chat sein.",

@@ -11,56 +11,33 @@ import { mediaWritten, originalMediaFile } from "../model/media-store";
 
 let folderCleared = false;
 
-/**
- * The folder of the files that a message names. Such a file can change on the host under the same
- * path, so it stays on this phone only for the launch that showed it: the first file of a launch
- * removes the files of the launch before. Attachments are kept between launches in the media store.
- */
 function mediaFolder() {
   const folder = new Directory(Paths.cache, "chat-media");
   if (!folderCleared) {
     folderCleared = true;
-    // Earlier versions kept attachments here, and videos in a folder of their own.
     for (const old of [folder, new Directory(Paths.cache, "chat-videos")]) {
       try {
         if (old.exists) old.delete();
-      } catch {
-        // The system clears the cache folder itself when it needs the space.
-      }
+      } catch {}
     }
   }
   return folder;
 }
 
-/** A folder name from a server id. */
 const segment = (value: string) => value.replace(/[^\w.-]/gu, "_").replace(/^\.+/u, "_");
-/** A file name with no folder separators, control characters or leading dots. */
 const fileName = (name: string) => name.replace(/[/\\\p{Cc}]/gu, "_").replace(/^\.+/u, "_") || "file";
 
-/** Where a host attachment is kept on this phone, between launches. */
 export const mediaFile = originalMediaFile;
 
-/**
- * The place of a file that a message names, in the folder of downloaded files. `key` names the file
- * on the host, so a second open writes over the copy of the first one and adds no copy.
- */
 export function messageFileCopy(serverId: string, key: string, name: string) {
-  // FNV-1a: a host path can be longer than a folder name may be.
   let hash = 0x811c9dc5;
   for (let index = 0; index < key.length; index += 1) hash = Math.imul(hash ^ key.charCodeAt(index), 0x01000193);
   const folder = `message-file-${(hash >>> 0).toString(36)}`;
   return new File(mediaFolder(), segment(serverId), folder, fileName(name));
 }
 
-/** The writes that run now, by file. */
 const mediaWrites = new Map<string, Promise<void>>();
 
-/**
- * Writes the Base64 of a host file to its place in the folder of downloaded files. The write is not
- * `writeSync`: that decodes and writes megabytes on the JS thread, which also places the chat rows.
- * Two readers of one host file, such as its card and Share, get the same write: a second write to
- * the path would cut the file while the first reader has it.
- */
 export function writeMediaFile(file: File, base64: string): Promise<void> {
   const running = mediaWrites.get(file.uri);
   if (running) return running;
@@ -72,7 +49,6 @@ export function writeMediaFile(file: File, base64: string): Promise<void> {
   return write;
 }
 
-/** The bytes that have arrived of each host file that downloads now. A file is here from when the host opens it. */
 const useDownloadedBytes = create<{ bytes: ReadonlyMap<string, number> }>(() => ({ bytes: new Map() }));
 
 const downloadKey = (serverId: string, attachmentId: string) => `${serverId}\n${attachmentId}`;
@@ -86,14 +62,11 @@ function setDownloadedBytes(key: string, received: number | null) {
   });
 }
 
-/** The bytes of a host file that have arrived, or null while it does not download. */
 export function useMediaDownloadedBytes(serverId: string, attachmentId: string) {
   return useDownloadedBytes((state) => state.bytes.get(downloadKey(serverId, attachmentId)) ?? null);
 }
 
-/** The IDs of the attachments whose card downloads them now. Their file is not on the phone yet. */
 export function useMediaDownloads(serverId: string, attachments: readonly AttachmentSummary[]): ReadonlySet<string> {
-  // A string, so the component renders again only when the set changes.
   const ids = useDownloadedBytes((state) =>
     attachments
       .filter((attachment) => state.bytes.has(downloadKey(serverId, attachment.id)))
@@ -103,11 +76,6 @@ export function useMediaDownloads(serverId: string, attachments: readonly Attach
   return useMemo(() => new Set(ids ? ids.split("\n") : []), [ids]);
 }
 
-/**
- * A host file as a local file. A file from an earlier download, also of an earlier launch, is used
- * again when it is whole, so it plays without a connection.
- * `enabled` is false while the card passes in a fast fling, or until the user asks for the file.
- */
 export function useMediaFile(serverId: string, attachment: AttachmentSummary, enabled: boolean) {
   const { downloadAttachment } = useMobileWorkspaceActions();
   return useQuery({
@@ -117,11 +85,9 @@ export function useMediaFile(serverId: string, attachment: AttachmentSummary, en
       const file = mediaFile(serverId, attachment);
       if (file.exists && file.size === attachment.size) return file.uri;
       const key = downloadKey(serverId, attachment.id);
-      // The time of each step, in the support log: the bytes, the hand-over from the peer page, the write.
       const started = Date.now();
       let arrived: number | null = null;
       try {
-        // An empty file has no progress to show.
         const progress =
           attachment.size > 0
             ? {
@@ -144,7 +110,6 @@ export function useMediaFile(serverId: string, attachment: AttachmentSummary, en
         );
         return file.uri;
       } finally {
-        // The query gives the file a moment later; the card keeps its last count until then.
         setDownloadedBytes(key, null);
       }
     },

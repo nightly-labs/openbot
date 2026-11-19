@@ -5,19 +5,14 @@ export interface DimensionStorage {
   write(text: string): void;
 }
 
-// The host sends no image size, so an image is only measured once it has downloaded. A size the
-// phone has measured before is kept across launches: the chat then reserves the real shape at
-// once, and a history image does not resize, and push the messages around it, as it loads.
 const LIMIT = 500;
 const SAVE_DELAY_MS = 1_000;
-// A draft ID names a different file in every composer session, so its size is never saved.
 const DRAFT_PREFIX = "mobile-draft-attachment-";
 
 function isDimension(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value > 0 && value <= 100_000;
 }
 
-/** The saved entries a later launch can trust, oldest first. Anything else is dropped. */
 function decodeSavedSizes(value: unknown): [string, ImageDimensions][] {
   if (!Array.isArray(value)) return [];
   return value.slice(-LIMIT).flatMap((entry): [string, ImageDimensions][] => {
@@ -29,11 +24,6 @@ function decodeSavedSizes(value: unknown): [string, ImageDimensions][] {
   });
 }
 
-/**
- * Image sizes by attachment ID, most recent last, with at most 500 kept. It reads its storage on
- * first use and writes it a second after the last change. Storage that fails to read or write
- * only costs the saved sizes, never the chat.
- */
 export function createImageDimensionCache(storage: DimensionStorage) {
   const sizes = new Map<string, ImageDimensions>();
   let loaded = false;
@@ -57,9 +47,7 @@ export function createImageDimensionCache(storage: DimensionStorage) {
       .map(([id, size]) => [id, size.width, size.height]);
     try {
       storage.write(JSON.stringify(entries));
-    } catch {
-      // The sizes stay in memory for this launch.
-    }
+    } catch {}
   }
 
   return {

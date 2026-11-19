@@ -80,8 +80,8 @@ windows, its OS dialogs or its native notifications.
   handler, and each client: the desktop with a joined server, the web client
   (`src/renderer/src/features/web-client/`), and mobile (`apps/mobile`) when the action fits a phone.
 - Do not add a `remote` branch that always throws or returns empty data, or a `kind === "local"`
-  gate, for a feature that can work on a server. When a part must stay local, write the reason at
-  the gate and in the PR.
+  gate, for a feature that can work on a server. When a part must stay local, write the reason in
+  the PR.
 - Gate the client on the host capability. Hide the action while the host does not have it; do not
   show an action that then fails. A host in the support window keeps working without the feature.
 - Test the host route through the Team API (as `scripts/team-api-routes-e2e.ts` does), not only the
@@ -146,6 +146,24 @@ are designed for a computer screen only.
   do not add to it.
 - Put a phone feature in `apps/mobile`. [Joined servers](#joined-servers) says when one is needed.
 - The public site (`apps/auth-api` pages other than `/app`) stays responsive: phone visitors read it.
+
+## Comments
+
+Never add comments to code or configuration files. This includes line, block, doc (JSDoc and
+TSDoc), JSX, HTML, CSS, SQL, YAML and shell comments. Do not keep a comment in a line that you
+change. Show intent with names, types and small functions. Put the reason for a change in the
+commit message, the PR description or `docs/`.
+
+Only these remain, because a tool reads them: license headers, shebangs, `/// <reference>`,
+`@vitest-environment`, `@ts-expect-error`, `biome-ignore`, `#__PURE__`, `# shellcheck`,
+`# syntax=`, JSDoc types in plain `.js` files, file headers that a generator writes, the
+`// scope:` line of each GritQL rule, the `// flag` markers of lint fixtures, the help text of
+`scripts/install-server.sh`, and the `# openbot-boat-pre-stop:` marker. Comments that are data
+in a string stay too, such as a sample file or a task for a model.
+
+These files keep their comments: vendored code, fixtures, released schemas, released migrations
+(`check:migrations` compares them byte for byte), and the native build inputs of `apps/mobile`
+(a change makes a new runtime version, see `apps/mobile/AGENTS.md`).
 
 ## Interface text
 

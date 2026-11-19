@@ -20,12 +20,6 @@ import { createEffect, createSignal, createStore, For, onSettled, Show, snapshot
 import { useChannels } from "./channels-context";
 import { emptyChannelDraft, matchesAgentSearch, toggleChannelMember } from "./channels-draft";
 
-/**
- * Creation asks for the two things that cannot be guessed - a name and the agents - and leaves the
- * purpose and the lead to Channel settings. The lead is the first selected member until settings
- * changes it. Create is the one button here: unlike settings, there is nothing to save into until
- * the channel exists.
- */
 export function ChannelCreateDialog() {
   const channels = useChannels();
   const { t, sourceText } = useText();
@@ -34,8 +28,6 @@ export function ChannelCreateDialog() {
   const [draft, setDraft] = createStore<ChannelDraft>(emptyChannelDraft());
   const [view, setView] = createStore({ search: "" });
   const filtered = () => agentList().filter((agent) => matchesAgentSearch(agent, view.search));
-  // `.t-resize` tweens between two explicit heights, so the list gets its measured content height
-  // after every filter change. The stylesheet's `max-height` still caps how tall it can grow.
   let listBody: HTMLDivElement | undefined;
   const [listHeight, setListHeight] = createSignal<string>();
   const listFades = createScrollFades();
@@ -45,8 +37,6 @@ export function ChannelCreateDialog() {
     () => {
       const height = listBody?.getBoundingClientRect().height;
       if (height) setListHeight(`${height}px`);
-      // A filter changes what overflows without always changing the element's own height, which
-      // is the one case the bound resize observer cannot see.
       listFades.remeasure();
     },
   );
@@ -131,8 +121,6 @@ export function ChannelCreateDialog() {
                   <div ref={listBody} class="channel-picker-body">
                     <For each={filtered()}>
                       {(agent) => (
-                        // The label stays the outer element, so pointing anywhere on the row
-                        // selects the agent, and the row still names the checkbox it holds.
                         <label class="channel-picker-entry" for={`channel-member-${agent.id}`}>
                           <ChannelMemberRow
                             agent={agent}

@@ -23,6 +23,13 @@ export const messages = {
   "settings.codeFont.title": "Czcionka kodu",
   "settings.codeFont.description": "Czcionka kodu, terminali i ścieżek plików.",
   "settings.codeFont.default": "Domyślna",
+  "settings.motion.title": "Ruch",
+  "settings.backgroundBlur.title": "Rozmycie tła",
+  "settings.backgroundBlur.description":
+    "Rozmycie za menu i oknami dialogowymi. Na komputerze bez GPU jest na początku wyłączone.",
+  "settings.movingFaces.title": "Ruchome twarze agentów",
+  "settings.movingFaces.description":
+    "Twarze agentów mrugają i się ruszają. Na komputerze bez GPU są na początku nieruchome.",
   "settings.logoColor.title": "Kolor logo",
   "settings.logoColor.description": "Widoczny w Docku, na pasku zadań i w Dynamic Island.",
   "settings.logoColor.buildNote": "Ta kompilacja ma własny kolor logo. Wybór dotyczy wersji wydanej.",
@@ -473,7 +480,6 @@ export const messages = {
   "settings.profile.share.copyFailed": "Nie udało się skopiować obrazu.",
   "settings.profile.share.createFailed": "Nie udało się utworzyć obrazu.",
   "settings.profile.share.fileName": "openbot-activity.png",
-  // The text in the image to share.
   "settings.profile.share.caption": "Moje ostatnie pół roku z OpenBot",
   "settings.profile.activity.title": "Aktywność na tym komputerze",
   "settings.profile.activity.activeDays": {
@@ -485,7 +491,6 @@ export const messages = {
   "settings.profile.activity.empty": "Brak aktywności",
   "settings.profile.activity.loading": "Wczytywanie aktywności…",
   "settings.profile.activity.loadFailed": "Nie udało się wczytać aktywności.",
-  // {tokens} is a short number, such as 1.2M.
   "settings.profile.activity.heatmapLabel": {
     one: "Tokeny: {tokens}, {count} aktywny dzień w ostatnim roku",
     few: "Tokeny: {tokens}, {count} aktywne dni w ostatnim roku",
@@ -678,7 +683,6 @@ export const messages = {
   "settings.hostedServers.plan.standard.summary": "Dla małego zespołu z codziennymi rutynami.",
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Dla wielu agentów i intensywnej pracy w przeglądarce.",
-  // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "Dyktowanie",
   "settings.voice.model.parakeet.description": "Szybki. Sam rozpoznaje język mowy, w 25 językach europejskich.",
   "settings.voice.model.parakeetUnified.description":
@@ -869,6 +873,10 @@ export const messages = {
     many: "Kopiuj {count} agentów",
     other: "Kopiuj {count} agenta",
   },
+  "settings.transfer.copy.duplicatesTitle": "Skopiować zduplikowanych agentów?",
+  "settings.transfer.copy.duplicatesDescription":
+    "{server} ma już agentów o tych nazwach: {names}. Kopiowanie doda drugiego agenta dla każdego z nich. Każda kopia to osobny agent z własnymi czatami, plikami i wspomnieniami.",
+  "settings.transfer.copy.duplicatesConfirm": "Kopiuj duplikaty",
   "settings.transfer.copy.copying": "Kopiowanie…",
   "settings.transfer.copy.done": {
     one: "Skopiowano {count} agenta na {server}.",

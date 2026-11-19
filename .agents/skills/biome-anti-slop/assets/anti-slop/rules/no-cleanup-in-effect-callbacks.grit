@@ -2,15 +2,6 @@ language js(typescript)
 
 // scope: global
 
-// `onCleanup` in the second callback of a Solid 2 effect. That callback runs
-// from the effect queue with no owner, so `onCleanup` only warns and the
-// cleanup never runs: a listener, timer or stream outlives every rerun and the
-// component itself (#1866). The callback returns its cleanup instead.
-//
-// The first callback has an owner, so `onCleanup` there is correct. So is one
-// inside a `createRoot` or `runWithOwner` that the callback starts, because
-// that call supplies the owner. A type argument changes the call node, so the
-// typed spellings are listed too.
 `onCleanup($_)` as $cleanup where {
   $cleanup <: within or {
     `createEffect($_, $apply)`,

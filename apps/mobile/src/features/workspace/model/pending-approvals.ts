@@ -1,29 +1,18 @@
 import type { AgentApproval, AgentEvent, AgentRuntimeApproval, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { approvalIsCut, keepWholeApprovals, reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
 
-/**
- * An approval that an agent waits on. The `approval` event carries the whole request. A runtime
- * snapshot carries a short copy, and marks it `truncated` when it cut a command, path or reason.
- */
 export type PendingApproval = AgentApproval | AgentRuntimeApproval;
 
-/** The host has no such request now: another client answered it, or its turn ended. */
 export class InactiveRequestError extends Error {}
 
 function sameRequest(left: string | number, right: string | number) {
   return String(left) === String(right);
 }
 
-/** True when the phone shows less than the host asks about, so it must not offer Allow. */
 export function approvalIsPartial(approval: PendingApproval): boolean {
   return approvalIsCut(approval);
 }
 
-/**
- * Folds one host event into the approvals of one server, in the order they arrived. A snapshot is
- * the current state. For an entry that the snapshot cut, it keeps the whole copy that an earlier
- * event delivered for the same request.
- */
 export function reducePendingApprovals(
   current: readonly PendingApproval[],
   event: AgentEvent | TeamRealtimeEvent,
@@ -55,7 +44,6 @@ function withoutRequest(current: readonly PendingApproval[], requestId: string |
   return next.length === current.length ? current : next;
 }
 
-/** Removes one answered or stale approval from the approvals of its server. */
 export function dropApproval(
   byServer: Record<string, readonly PendingApproval[]>,
   serverId: string,

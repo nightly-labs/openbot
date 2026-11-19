@@ -3,10 +3,6 @@ import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { useMobileWorkspace, useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 
-/**
- * The host's storage (`storage-v1`), as the Storage page and its Files page show it. Both pages read
- * one query, so a deletion on the Files page shows on the Storage page.
- */
 export function useServerStorage(serverId: string) {
   const { canReadServerStorage } = useMobileWorkspace();
   const { loadServerStorage, readKeptLibrary, keepLibrary } = useMobileWorkspaceActions();
@@ -25,7 +21,6 @@ export function useServerStorage(serverId: string) {
       return usage;
     },
   });
-  // The list of the last open, from this phone. It shows while the host measures, or when it cannot answer.
   const kept = useQuery({
     queryKey: queryKeys.serverKeptLibrary(queryScope, serverId),
     enabled: available,
@@ -36,9 +31,7 @@ export function useServerStorage(serverId: string) {
   return {
     available,
     query,
-    /** The host's answer, or the list that this phone kept from the last answer. */
     usage: query.data ?? kept.data ?? undefined,
-    /** The host caches a scan. A retry, a deletion or a clear measures again, as on desktop. */
     async rescan(): Promise<void> {
       await queryClient.fetchQuery({
         queryKey,
@@ -54,10 +47,6 @@ export function useServerStorage(serverId: string) {
   };
 }
 
-/**
- * The disk of a hosted server, read when the Storage page opens and after each measurement, as on
- * desktop. The page shows what the plan has left, not the free space of the whole disk.
- */
 export function useServerDisk(serverId: string, enabled: boolean) {
   const { loadServerDisk } = useMobileWorkspaceActions();
   const queryScope = useQueryScope();

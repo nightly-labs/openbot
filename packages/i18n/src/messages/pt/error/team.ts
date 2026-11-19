@@ -55,6 +55,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "Muitas tentativas de login. Tente novamente mais tarde.",
   "error.team.clientUpdateRequired": "Atualize este cliente OpenBot antes de conectar a este computador anfitrião.",
   "error.team.hostUpdateRequired": "Atualize o OpenBot no computador anfitrião antes de conectar.",
+  "error.team.serverSafeMode": "Este servidor está no modo de segurança porque o OpenBot não inicia nele.",
+  "error.team.serverSafeModeNewerDatabase":
+    "O OpenBot {version} neste servidor não consegue abrir os dados porque uma versão mais recente do OpenBot os salvou. Uma versão mais recente do OpenBot no servidor resolve isso.",
+  "error.team.serverSafeModeStartFailed":
+    "O OpenBot {version} neste servidor parou depois de falhar ao iniciar muitas vezes. Uma versão mais recente do OpenBot no servidor resolve isso.",
   "error.team.sidebarLayoutUnavailable": "A organização da barra lateral está indisponível.",
   "error.team.providersUnsupported": "Esta conexão não oferece suporte às configurações de provedores.",
   "error.team.providerNotManaged": "O OpenBot não gerencia a CLI deste provedor.",
@@ -142,7 +147,6 @@ export const messages = {
   "error.team.providerDefaultUnsupported": "Esta conexão não oferece suporte ao provedor padrão.",
   "error.team.attachmentNameRequired": "É necessário informar um nome seguro para o anexo.",
   "error.team.attachmentNotFound": "Anexo não encontrado.",
-  "error.team.attachmentPreviewUnsupported": "O servidor não consegue criar uma cópia menor deste arquivo.",
   "error.team.sharedFileTooLarge": "O arquivo compartilhado excede o limite de 100 MB.",
   "error.team.workspaceFileTooLarge": "O arquivo do espaço de trabalho excede o limite de 100 MB.",
   "error.team.browserViewUnavailable": "A visualização ao vivo do navegador está indisponível.",

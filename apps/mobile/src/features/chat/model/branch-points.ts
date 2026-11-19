@@ -5,18 +5,12 @@ import {
 } from "@openbot/contracts/ipc";
 import { type ChatMessage, sortedConversationMessages } from "./chat-messages";
 
-/** The stored message of a chat row: a marker row has the id of its message after a prefix. */
 const ROW_PREFIXES = ["exchange:", "context-reset:", "routine:"];
 function rowMessageId(row: ChatMessage): string {
   const prefix = ROW_PREFIXES.find((value) => row.id.startsWith(value));
   return prefix ? row.id.slice(prefix.length) : row.id;
 }
 
-/**
- * The row that the "Branched from" line follows: the last shown row of the copied messages. The last
- * copied message can be a row that the chat does not show, such as a thought, so the line goes after
- * the last row at or before it. Null when the conversation does not have the message.
- */
 export function branchDividerRowId(
   messages: readonly ConversationMessage[],
   rows: readonly ChatMessage[],
@@ -29,7 +23,6 @@ export function branchDividerRowId(
   return rows.findLast((row) => row.kind !== "thinking" && copied.has(rowMessageId(row)))?.id ?? null;
 }
 
-/** A finished answer of the agent, with a bubble. A branch copies the conversation through such a message. */
 function branchable(message: ConversationMessage): boolean {
   return (
     message.author === "assistant" &&
@@ -47,12 +40,6 @@ function branchable(message: ConversationMessage): boolean {
   );
 }
 
-/**
- * The messages that show "Branch from here", as on desktop: the last answer of the agent in each
- * finished turn. A message of the person, or an answer of another turn, ends a turn. The last answer
- * counts only when its turn does not run and no message after it streams. A queued message is not
- * in the chat yet, so it does not end a turn.
- */
 export function branchPointIds(
   messages: readonly ConversationMessage[],
   activeTurnId: string | null,

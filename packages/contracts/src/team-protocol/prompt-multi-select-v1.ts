@@ -2,30 +2,12 @@ import { isBoolean, isDynamicRecord, isString } from "../runtime-values";
 import { eventConversationKey } from "./conversation-plan-v4";
 import type { TeamProtocolV7BaseJsonObject, TeamProtocolV7BaseJsonValue } from "./v7-base";
 
-/**
- * Frozen optional prompt-multi-select-v1 contract: a question that takes more than one option. It adds
- * `multiSelect: true` beside the frozen keys of an `AgentPromptQuestion` in:
- *
- * - the `questionPrompt.questions` of each message in `messages` and `references` of
- *   `GET /v1/agents/:agentId/conversation` and `GET /v1/agents/:agentId/conversation-page`, and of the
- *   `snapshot` of a `conversation` event and the `page` of a `conversation-page` event;
- * - the `questions` of a `prompt` event;
- * - the `questions` of each `pendingPrompts` item in the `snapshot` of a `runtime-snapshot` event.
- *
- * The host adds it only for a client that advertises the capability, on protocol 7 or 8, so the wire of
- * every released client stays as it was. Such a client shows the question as a single choice, and its
- * one answer is valid for a multi-select question. A host without the capability never sends
- * `multiSelect`, so a client accepts it whenever it is present. A present value that is not a boolean
- * fails closed. Only `true` goes out. Widening any of it needs a second capability string.
- */
 export const TEAM_PROMPT_MULTI_SELECT_CAPABILITY = "prompt-multi-select-v1";
 
-/** The events whose payload can carry prompt questions. */
 export function eventHasPromptQuestions(type: unknown): boolean {
   return type === "prompt" || type === "runtime-snapshot" || eventConversationKey(type) !== null;
 }
 
-/** `projected` with the multi-select flag of each question of `source`. The projection keeps the order. */
 function withQuestionsMultiSelect(
   projected: TeamProtocolV7BaseJsonValue[],
   source: unknown,
@@ -39,7 +21,6 @@ function withQuestionsMultiSelect(
   });
 }
 
-/** `projected` with the multi-select flags of the question prompt of each message of `source`. */
 export function withConversationPromptMultiSelect(
   projected: TeamProtocolV7BaseJsonValue,
   source: unknown,
@@ -76,7 +57,6 @@ export function withConversationPromptMultiSelect(
   return result;
 }
 
-/** `projected` with the multi-select flags of the prompt questions of the event `source`. */
 export function withEventPromptMultiSelect(
   projected: TeamProtocolV7BaseJsonValue,
   source: unknown,

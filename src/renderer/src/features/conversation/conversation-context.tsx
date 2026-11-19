@@ -28,7 +28,7 @@ import { usePlatform } from "../../platform";
 import { createScopeGuard } from "../../scope-lifetime";
 import { createSimpleContext } from "../../simple-context";
 import { useTurns } from "../../turns";
-import { useUiErrors } from "../../ui-errors";
+import { isConnectionDrop, useUiErrors } from "../../ui-errors";
 import { useAuth } from "../account/account-context";
 import { useAgentTasks } from "../agent-tasks/agent-tasks-context";
 import { useAgentReadTracking } from "../agents/agent-read-tracking";
@@ -64,10 +64,6 @@ import { noteSocialFollowMessageSent } from "./social-follow-prompt";
 type ConversationDeltaEvent = Extract<AgentEvent, { type: "conversation-delta" }>;
 
 const LATEST_PAGE_SIZE = 50;
-/**
- * How much of a snapshot an agent that is not open converts. Commentary of one turn becomes one
- * message and queued messages none, so a page needs more than a page of the thread.
- */
 const INACTIVE_SNAPSHOT_TAIL = LATEST_PAGE_SIZE * 4;
 
 function trimToLatestPage(conversation: ConversationState): void {
@@ -76,7 +72,6 @@ function trimToLatestPage(conversation: ConversationState): void {
   const removedById = new Map(
     conversation.messages.slice(0, -LATEST_PAGE_SIZE).map((message) => [message.id, message]),
   );
-  // A kept reply keeps the quote of an original that the trim removes, as a page from the host gives it.
   const references: Record<string, AgentMessage> = {};
   for (const message of kept) {
     const originalId = message.replyToMessageId;
@@ -88,12 +83,10 @@ function trimToLatestPage(conversation: ConversationState): void {
   conversation.page = { hasOlder: true, olderCursor: null };
 }
 
-/** A chat with no cursor of its own for its older messages: it has no page yet, or it was trimmed. */
 function lacksOlderCursor(page: ConversationPageInfo | undefined): boolean {
   return !page || (page.hasOlder && !page.olderCursor);
 }
 
-/** The originals that a page's replies quote, as the chat shows them. */
 function pageReferences(page: ConversationPage): Record<string, AgentMessage> {
   return Object.fromEntries(
     Object.entries(page.references).map(([id, message]) => [id, toAgentMessage(message, page.agentId)]),
@@ -109,7 +102,6 @@ interface ConversationState {
   page?: ConversationPageInfo;
   windowMode?: "latest" | "around";
   references?: Record<string, AgentMessage>;
-  /** The originals that a host page says are deleted, by id. */
   missingReferences?: Record<string, true>;
   olderLoading?: boolean;
   olderError?: string | null;
@@ -117,18 +109,6 @@ interface ConversationState {
   recentReply?: boolean;
 }
 
-/**
- * Owns each agent's transcript, page window, read state, and reply indicators
- * inside the existing keyed server scope. Other domains use commands to apply
- * or remove a conversation. Turn and prompt updates stay in these commands
- * because they must agree with the transcript that resolved them.
- *
- * Reads are serialized per conversation. Only the matching automatic read can
- * replace its optimistic state. A failed read leaves a retry marker.
- * The three read-tracking collections belong to `agent-read-tracking.tsx`:
- * their server-qualified requests and retry markers must survive a server
- * switch. Page requests and cached conversation records end with this scope.
- */
 const Conversation = createSimpleContext({
   name: "Conversation",
   init: () => {
@@ -171,7 +151,6 @@ const Conversation = createSimpleContext({
       const auth = centralAuth();
       return auth.status === "signed_in" ? auth.user.id : null;
     });
-    // A read fails while no one is signed in. After a sign-in, its error no longer holds (#9796).
     createEffect(signedInAccount, (account, previous) => {
       if (account && previous !== undefined && account !== previous)
         clearUiErrors(currentText().t("chat.errorStatus.readState"));
@@ -179,11 +158,9 @@ const Conversation = createSimpleContext({
 
     const [conversations, writeConversations] = createStore<Record<string, ConversationState>>({});
     const rawAgentMessageBodies = new Map<string, string>();
-    /** The streamed text that arrived since the last frame, in arrival order. */
     let queuedDeltas: ConversationDeltaEvent[] = [];
     let cancelDeltaFrame: (() => void) | undefined;
 
-    /** Each change of the conversations applies the queued text first, so the changes keep their order. */
     function setConversations(update: (current: Record<string, ConversationState>) => void): void {
       flushConversationDeltas();
       writeConversations(update);
@@ -196,13 +173,11 @@ const Conversation = createSimpleContext({
       });
     }
 
-    // These maps are read projections for the sidebar and Dynamic Island.
     const unreadReplies = createMemo(() =>
       Object.fromEntries(
         Object.entries(conversations).map(([id, conversation]) => [id, conversation.read?.unreadCount ?? 0]),
       ),
     );
-    /** The unread replies of each agent's own chat and of its open side threads. */
     const agentUnreadReplies = createMemo(() => {
       const counts = { ...unreadReplies() };
       for (const [id, count] of Object.entries(agentTasks.unreadTotals())) counts[id] = (counts[id] ?? 0) + count;
@@ -218,15 +193,10 @@ const Conversation = createSimpleContext({
     const agentChatsRetriedOnOpen = new Set<string>();
     const conversationPageRequests = new Map<string, number>();
     const conversationReadOperations = new Map<string, Promise<void>>();
-    /** The chats that the user marked unread. They stay unread until the user opens them again. */
     const heldUnreadAgentChats = new Set<string>();
 
     let cancelConversationFrame: (() => void) | undefined;
 
-    /**
-     * Runs `run` at the next frame. A hidden or minimized window gets no frames, but the agent dock above
-     * other apps shows these chats, so there a timer runs it.
-     */
     function onNextFrame(run: () => void): () => void {
       if (document.visibilityState === "hidden") {
         const timer = setTimeout(run);
@@ -236,7 +206,6 @@ const Conversation = createSimpleContext({
       return () => cancelAnimationFrame(frame);
     }
 
-    /** The key of the wait in an agent's own chat: the conversations here are those chats. */
     function ownChatAttentionKey(agentId: string): string {
       const agent = agentList().find((candidate) => candidate.id === agentId);
       return attentionKey(agentId, agent?.threadId ?? null);
@@ -264,8 +233,6 @@ const Conversation = createSimpleContext({
         sequence: activeServer()?.connectionSequence,
       }),
       (next, previous) => {
-        // Each provider status update gives a new source, also when these values do not change. A read
-        // of the latest page replaces the older pages that the reader scrolled up to load.
         if (
           previous &&
           next.agentId === previous.agentId &&
@@ -312,9 +279,13 @@ const Conversation = createSimpleContext({
             const markReadOnOpen = agentChatsToMarkRead.delete(trackingKey);
             if (markReadOnOpen && (page.readState?.unreadCount ?? 0) > 0) {
               void markAgentMessagesRead(agentId, page.messages.at(-1)?.id ?? null, serverId).catch((error) =>
-                appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId),
+                reportAutomaticReadFailure(agentId, error, serverId),
               );
-            } else if (agentChatsToRetryRead.has(trackingKey) && (page.readState?.unreadCount ?? 0) > 0) {
+            } else if (
+              agentChatsToRetryRead.has(trackingKey) &&
+              (page.readState?.unreadCount ?? 0) > 0 &&
+              isAgentChatReadable(agentId)
+            ) {
               const latestIncomingMessage = latestIncomingConversationMessage(page.messages);
               if (latestIncomingMessage) autoMarkAgentMessageRead(agentId, latestIncomingMessage.id);
             }
@@ -346,17 +317,10 @@ const Conversation = createSimpleContext({
       agentChatsRetriedOnOpen.delete(agentId);
     }
 
-    // The snapshot text is a preview capped at `AGENT_RUNTIME_TEXT_LIMIT`. It does not replace the
-    // raw body of a streamed message: the next delta would append to the preview, not to the text.
-    // Main adds text to a message before it sends the buffered delta, so the preview can hold text
-    // that the first delta also holds. A message added from the preview starts with an empty raw body.
     function applyRuntimeMessages(messages: AgentRuntimeSnapshot["latestMessages"]): void {
-      // The draft includes pending page writes from this event batch. Outside
-      // the setter, store keys can precede their committed conversation values.
       setConversations((current) => {
-        // Most snapshots repeat messages that are loaded. Only a new message, or an agent that is not
-        // open and holds more than a page, has work.
         const pending = messages.filter((message) => {
+          if (current[message.agentId]?.windowMode === "around") return false;
           const loaded = current[message.agentId]?.messages;
           if (!loaded?.some((candidate) => candidate.id === message.id)) return true;
           return message.agentId !== activeAgentId() && loaded.length > LATEST_PAGE_SIZE;
@@ -404,7 +368,6 @@ const Conversation = createSimpleContext({
 
     function requestConversationRead(agentId: string, explicit = false): void {
       const trackingKey = agentConversationKey(activeServerId(), agentId);
-      // Only an open of the chat ends Mark unread: focus does not, and neither does a new message.
       if (explicit) heldUnreadAgentChats.delete(trackingKey);
       else if (heldUnreadAgentChats.has(trackingKey)) return;
       if (explicit) autoReadAgentMessages.delete(trackingKey);
@@ -438,7 +401,6 @@ const Conversation = createSimpleContext({
     function applyPendingConversations(): void {
       cancelConversationFrame?.();
       cancelConversationFrame = undefined;
-      // Text that came after a snapshot applies that snapshot first.
       flushConversationDeltas();
       const snapshots = [...pendingConversationSnapshots.values()];
       pendingConversationSnapshots.clear();
@@ -447,12 +409,6 @@ const Conversation = createSimpleContext({
       }
     }
 
-    // A rail page, such as Usage or Settings, covers the workspace content, so the chat under it is not the
-    // pane the user is looking at. Both readers of this predicate use it to decide whether a
-    // message may be marked read, and a message read behind the page was never seen.
-    //
-    // An open channel is the same case: `WorkspaceShell` keeps the agent selected under it, so a
-    // reply that arrives while the channel is on screen must stay unread.
     function isAgentChatOpen(agentId: string): boolean {
       return (
         !agentSetupOpen() &&
@@ -471,24 +427,22 @@ const Conversation = createSimpleContext({
       );
     }
 
-    /**
-     * The fallback for an open whose page never arrived: mark whatever the user
-     * can actually see.
-     *
-     * It is skipped when an optimistic read already names the same boundary,
-     * because that read is the same request - either still in flight or already
-     * settled - and asking again would only chain a second identical call behind
-     * it. The two arrive together whenever a live event advances the chat while
-     * the open's page is still on the wire, which is a race, not a rare case.
-     */
     function markLatestVisibleAgentMessageRead(agentId: string, serverId: string): void {
       flushConversationDeltas();
       const latestMessageId = latestVisibleAgentMessageId(conversations[agentId]?.messages);
       if (!latestMessageId) return;
       if (autoReadAgentMessages.get(agentConversationKey(serverId, agentId))?.messageId === latestMessageId) return;
       void markAgentMessagesRead(agentId, latestMessageId, serverId).catch((error) =>
-        appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId),
+        reportAutomaticReadFailure(agentId, error, serverId),
       );
+    }
+
+    function reportAutomaticReadFailure(agentId: string, error: unknown, serverId: string): void {
+      if (isConnectionDrop(error)) {
+        agentChatsToRetryRead.add(agentConversationKey(serverId, agentId));
+        return;
+      }
+      appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId);
     }
 
     function refreshAgentReadStateAfterFailure(
@@ -537,9 +491,6 @@ const Conversation = createSimpleContext({
         tracked: autoReadAgentMessages.get(trackingKey),
         optimisticallyClearUnread,
         explicitlyOpened: explicitlyOpenedAgentChatId() === agentId,
-        // Read, not consumed: the flag is spent below, on the one path that asks
-        // main. It can only be set on that path anyway - a set flag is what stops
-        // the decision being `deferred` - so spending it later changes nothing.
         retryingRead: agentChatsToRetryRead.has(trackingKey),
       });
       if (decision.kind === "deferred") return;
@@ -566,30 +517,21 @@ const Conversation = createSimpleContext({
           conversations[agentId]?.revision ?? -1,
           decision.rollbackState,
         );
-        appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId);
+        reportAutomaticReadFailure(agentId, error, serverId);
       });
     }
 
-    /**
-     * Queues streamed text. Each frame applies the queued text once per message, so a fast stream does
-     * not make a full message body and a new message object for each delta.
-     */
     function applyConversationDelta(event: ConversationDeltaEvent) {
       queuedDeltas.push(event);
       cancelDeltaFrame ??= onNextFrame(flushConversationDeltas);
     }
 
-    /** Whether a delta changes the conversation now: an applied or waiting snapshot can already hold it. */
     function deltaApplies(event: ConversationDeltaEvent): boolean {
       if (event.revision <= (conversations[event.agentId]?.revision ?? -1)) return false;
       const pendingSnapshot = pendingConversationSnapshots.get(event.agentId);
       return !pendingSnapshot || event.revision > pendingSnapshot.revision;
     }
 
-    /**
-     * Applies the queued text in arrival order. The next deltas of the same message join the first one
-     * that applies: each of them has a higher revision, so each would apply after it.
-     */
     function flushConversationDeltas(): void {
       cancelDeltaFrame?.();
       cancelDeltaFrame = undefined;
@@ -628,7 +570,6 @@ const Conversation = createSimpleContext({
         conversation.revision = event.revision;
         if (conversation.loaded !== true) conversation.loaded = true;
         const messages = conversation.messages;
-        // A streamed message is near the end, so the search starts there.
         const existing = messages.findLast((message) => message.id === event.messageId);
         const thinking = existing
           ? undefined
@@ -689,14 +630,10 @@ const Conversation = createSimpleContext({
       const initialLoad = conversations[agentId]?.loaded !== true;
       const inactive = agentId !== activeAgentId();
       const windowMode = conversations[agentId]?.windowMode ?? "latest";
-      // A snapshot carries the latest part of the thread. An agent that is not open shows none of it,
-      // and opening it reads the latest page again, so only the tail is converted and kept. A window
-      // around an older message, from a search, converts the whole snapshot.
       const sourceMessages =
         inactive && windowMode === "latest" && snapshot.messages.length > INACTIVE_SNAPSHOT_TAIL
           ? snapshot.messages.slice(-INACTIVE_SNAPSHOT_TAIL)
           : snapshot.messages;
-      // A snapshot that comes after the turn's end event can still name the turn as active.
       const activeTurnId = completedTurnByAgent.get(agentId) === snapshot.activeTurnId ? null : snapshot.activeTurnId;
       updateConversation(agentId, (conversation) => {
         conversation.revision = snapshot.revision;
@@ -708,7 +645,6 @@ const Conversation = createSimpleContext({
           previous,
           windowedSnapshotMessages(previous, allMappedMessages, {
             mode: windowMode,
-            // Main also cuts a snapshot by size, so a window with older pages takes it as a tail too.
             capped:
               snapshot.messages.length >= CONVERSATION_SNAPSHOT_MESSAGE_LIMIT || conversation.page?.hasOlder === true,
           }),
@@ -717,8 +653,6 @@ const Conversation = createSimpleContext({
         const next = mappedMessages.map((mapped) => {
           const existing = previousById.get(mapped.id);
           if (!existing) return createStoredMessage({ ...mapped, animate: !initialLoad });
-          // A turn's thinking message gets its progress updates as changes, and each one enters as the
-          // message did, so a change keeps the message's entrance.
           if (!agentMessagesEqual(existing, mapped))
             updateStored(existing, existing.animate === undefined ? mapped : { ...mapped, animate: existing.animate });
           return existing;
@@ -780,19 +714,12 @@ const Conversation = createSimpleContext({
       }
     }
 
-    /**
-     * A page that streamed text overtook is not applied, but the place of the older messages that it
-     * gives is still right. A chat with no place of its own, such as a chat trimmed while it was not
-     * open, takes it: without it, a scroll up loads nothing (#11240). The chat keeps its own, newer
-     * copy of each message, and gets only the page's messages before its first one.
-     */
     function keepOlderHistoryPlace(page: ConversationPage): void {
       const conversation = conversations[page.agentId];
       if (!conversation || !lacksOlderCursor(conversation.page)) return;
       const mapped = toAgentMessages(page.messages, page.agentId);
       const first = conversation.messages[0];
       const start = first ? mapped.findIndex((message) => message.id === first.id) : -1;
-      // The chat must meet the page, or the place would leave a gap that the reader does not see.
       if (start === -1 && !conversation.messages.some((message) => message.id === mapped[0]?.id)) return;
       const older = mapped
         .slice(0, Math.max(start, 0))
@@ -831,15 +758,8 @@ const Conversation = createSimpleContext({
             updateStored(stored, stored.animate === undefined ? message : { ...message, animate: stored.animate });
           return stored;
         });
-        // A delta that came before this page can show a commentary item as its own message. The page
-        // groups that item under its turn's thinking message, so the loaded copy goes.
         const pageItemIds = new Set(page.messages.map((message) => message.id));
-        // A latest page is the end of the thread. The loaded messages can reach further back, and
-        // their cursor of the older pages stays. Two cases must not join end to end, because the
-        // messages between would be out of view with no sign: a window around an old message keeps
-        // its place, and loaded messages that the page does not meet give way to the page.
         const mappedIds = new Set(pageMessages.map((message) => message.id));
-        // A chat with no page yet, or a trimmed one, has no cursor of its own, so it takes the page's.
         const trimmed = lacksOlderCursor(conversation.page);
         const tail = merge === "latest" && page.pageInfo.hasOlder && !trimmed;
         const keepsWindow = tail && conversation.windowMode === "around";
@@ -851,8 +771,6 @@ const Conversation = createSimpleContext({
             )
           : mergeConversationPage(kept, pageMessages, apart ? "replace" : merge);
         const first = conversation.messages[0];
-        // The loaded messages start before the page, so the cursor of the older pages is still theirs.
-        // A window that starts in the page dropped the page's messages before it, so it keeps its cursor too.
         const keepsOlder = keepsWindow || (tail && first !== undefined && !mappedIds.has(first.id));
         conversation.references = {
           ...(merge === "replace" ? {} : conversation.references),
@@ -886,10 +804,8 @@ const Conversation = createSimpleContext({
       return true;
     }
 
-    /** The reads of loaded open requests that a latest page left out. A change during a read reads it again. */
     const openExchangeReads = new Map<string, { again: boolean }>();
 
-    /** Puts the host's current copy of one loaded request in place. The rest of the chat stays as it is. */
     function refreshOpenExchange(agentId: string, messageId: string): void {
       const key = agentMessageKey(agentId, messageId);
       const running = openExchangeReads.get(key);
@@ -903,7 +819,6 @@ const Conversation = createSimpleContext({
         try {
           while (read.again && scopeIsCurrent()) {
             read.again = false;
-            // The page around the request holds its whole turn at least, with the request as the host has it.
             const page = await conversationPort().agent.readConversationPage({
               agentId,
               anchor: { type: "around", messageId },
@@ -919,12 +834,9 @@ const Conversation = createSimpleContext({
             });
           }
         } finally {
-          // In the same step as the last check, so a later page starts a new read and is not lost.
           openExchangeReads.delete(key);
         }
-      })()
-        // The next latest page reads it again.
-        .catch(() => undefined);
+      })().catch(() => undefined);
     }
 
     async function loadOlderAgentMessages(agentId = activeAgent()?.id): Promise<void> {
@@ -981,7 +893,6 @@ const Conversation = createSimpleContext({
       }
     }
 
-    /** The side thread messages of the agent that have the `@` query. A message of the agent's own chat names no thread. */
     function searchAgentThreadMessages(agentId: string, query: string): Promise<ComposerThreadMessageMatch[]> {
       return collectThreadMessageMatches((cursor) =>
         conversationPort().agent.searchConversationMessages({
@@ -1067,7 +978,6 @@ const Conversation = createSimpleContext({
       );
     }
 
-    /** The failure goes back to the pending message, which shows it with Retry. */
     async function sendMessageToAgent(
       agentId: string,
       body: string,
@@ -1105,9 +1015,8 @@ const Conversation = createSimpleContext({
         noteAgentMessageSent();
         noteSocialFollowMessageSent();
         const messageId = receipt.deliveries[0]?.id ?? receipt.messageId;
-        // The pending message does not wait for read state: it is the user's own message.
         markAgentMessagesRead(agentId, messageId, serverId).catch((error: unknown) => {
-          appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId);
+          reportAutomaticReadFailure(agentId, error, serverId);
         });
         return { messageId };
       } catch (error) {
@@ -1134,11 +1043,9 @@ const Conversation = createSimpleContext({
       if (!agentId || !scopeIsCurrent()) return;
       flushConversationDeltas();
       const requestKey = agentConversationKey(serverId, agentId);
-      // Automatic reads stop before this for a chat marked unread, so this read is the user's.
       heldUnreadAgentChats.delete(requestKey);
       const conversationAtStart = conversations[agentId];
       const visibleMessageIdAtStart = latestVisibleAgentMessageId(conversations[agentId]?.messages);
-      // The same boundary as an automatic read. A chat with no message the host counts reads through its newest message.
       const boundary =
         throughMessageId ??
         visibleMessageIdAtStart ??
@@ -1158,7 +1065,6 @@ const Conversation = createSimpleContext({
             serverId,
           );
           agentChatsToRetryRead.delete(requestKey);
-          // The read is saved now, so an earlier failure to save it no longer holds.
           clearUiErrors(currentText().t("chat.errorStatus.readState"), requestKey);
           flushConversationDeltas();
           const nextState = isAgentChatReadable(agentId)
@@ -1191,7 +1097,7 @@ const Conversation = createSimpleContext({
                 latestVisibleMessageId !== visibleMessageIdAtStart
               ) {
                 void markAgentMessagesRead(agentId, latestVisibleMessageId, serverId).catch((error) =>
-                  appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId),
+                  reportAutomaticReadFailure(agentId, error, serverId),
                 );
               }
             });
@@ -1205,10 +1111,6 @@ const Conversation = createSimpleContext({
       }
     }
 
-    /**
-     * Marks an agent message and the messages after it unread. The open chat stays open and moves its
-     * NEW line to that message; the next open of the chat marks it read again.
-     */
     async function markAgentMessagesUnread(
       agentId: string,
       fromMessageId: string,
@@ -1220,7 +1122,6 @@ const Conversation = createSimpleContext({
         .catch(() => undefined)
         .then(async () => {
           const state = await conversationPort().agent.markConversationUnread({ agentId, fromMessageId }, serverId);
-          // A finished automatic read would otherwise apply its read state again.
           autoReadAgentMessages.delete(requestKey);
           if (scopeIsCurrent()) applyConversationReadState(agentId, state);
         });
@@ -1235,7 +1136,6 @@ const Conversation = createSimpleContext({
       }
     }
 
-    /** The pinned messages of an agent on the active server, Pin or Unpin on one message, and their changes. */
     const messagePins: ConversationMessagePins = {
       list: (agentId) => conversationPort().agent.listPinnedMessages(agentId, activeServerId()),
       set: (input) => conversationPort().agent.setMessagePinned(input, activeServerId()),
@@ -1252,12 +1152,6 @@ const Conversation = createSimpleContext({
       },
     };
 
-    /**
-     * Deletes a message of an agent's chat, or of one of its side threads with `taskId`. The host
-     * publishes the change, but a merge of the latest page keeps the loaded messages that the page
-     * does not hold, so the chat removes the message itself. A reply that quotes it shows the original
-     * as deleted. A failure throws to the dialog that asked.
-     */
     async function deleteAgentMessage(
       agentId: string,
       messageId: string,
@@ -1280,10 +1174,6 @@ const Conversation = createSimpleContext({
       });
     }
 
-    /**
-     * Marks an agent's chat read through its newest message, which may not be loaded yet, and its side
-     * threads read. The sidebar badge also counts the side threads, such as a routine's thread.
-     */
     async function markAgentChatRead(agentId: string, serverId = activeServerId()): Promise<void> {
       const reportFailure = (error: unknown) =>
         appendUiError(agentId, error, currentText().t("chat.errorStatus.readState"), serverId);
@@ -1303,17 +1193,11 @@ const Conversation = createSimpleContext({
       ]);
     }
 
-    /** Marks each unread agent chat read, as `markAgentChatRead` does. */
     async function markAllAgentMessagesRead(): Promise<void> {
       const serverId = activeServerId();
-      // Only listed agents: a read of an id the host no longer knows creates that agent again.
       await Promise.all(agentList().map((agent) => markAgentChatRead(agent.id, serverId)));
     }
 
-    /**
-     * Marks the newest agent reply of a chat unread, from the sidebar. The reply may not be loaded yet,
-     * so this reads the latest page. The chat stays unread until the user opens it again.
-     */
     async function markAgentChatUnread(agentId: string, serverId = activeServerId()): Promise<void> {
       try {
         const page = await conversationPort().agent.readConversationPage(
@@ -1351,8 +1235,6 @@ const Conversation = createSimpleContext({
       setPresentedPromptResolutions((current) => ({ ...current, [agentId]: requestKey }));
     }
 
-    // A frame asked for before the window hid comes only when it shows again, so the change of
-    // visibility applies what waits for it.
     document.addEventListener("visibilitychange", applyPendingConversations);
     onCleanup(() => {
       document.removeEventListener("visibilitychange", applyPendingConversations);
@@ -1398,7 +1280,6 @@ const Conversation = createSimpleContext({
       markAgentChatUnread,
       markAllAgentMessagesRead,
       presentPromptResolution,
-      // See `AppProviders`: a chat window sends no typing state.
       setTeamTyping: chatWindow ? () => undefined : notifyTeamTyping,
     };
   },

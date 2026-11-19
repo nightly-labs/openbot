@@ -56,6 +56,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "Zu viele Anmeldeversuche. Versuche es später erneut.",
   "error.team.clientUpdateRequired": "Aktualisiere diesen OpenBot-Client, bevor du dich mit diesem Host verbindest.",
   "error.team.hostUpdateRequired": "Aktualisiere OpenBot auf dem Host, bevor du dich verbindest.",
+  "error.team.serverSafeMode": "Dieser Server ist im abgesicherten Modus, weil OpenBot darauf nicht startet.",
+  "error.team.serverSafeModeNewerDatabase":
+    "OpenBot {version} auf diesem Server kann seine Daten nicht öffnen, weil eine neuere OpenBot-Version sie gespeichert hat. Ein neueres OpenBot-Release auf dem Server behebt das.",
+  "error.team.serverSafeModeStartFailed":
+    "OpenBot {version} auf diesem Server wurde angehalten, nachdem der Start mehrmals fehlgeschlagen ist. Ein neueres OpenBot-Release auf dem Server behebt das.",
   "error.team.sidebarLayoutUnavailable": "Die Anordnung der Seitenleiste ist nicht verfügbar.",
   "error.team.providersUnsupported": "Diese Verbindung unterstützt keine Anbietereinstellungen.",
   "error.team.providerNotManaged": "OpenBot verwaltet die CLI dieses Anbieters nicht.",
@@ -147,7 +152,6 @@ export const messages = {
   "error.team.providerDefaultUnsupported": "Diese Verbindung unterstützt den Standardanbieter nicht.",
   "error.team.attachmentNameRequired": "Ein sicherer Anhangsname ist erforderlich.",
   "error.team.attachmentNotFound": "Anhang nicht gefunden.",
-  "error.team.attachmentPreviewUnsupported": "Der Server kann keine kleinere Kopie dieser Datei erstellen.",
   "error.team.sharedFileTooLarge": "Die geteilte Datei überschreitet die Grenze von 100 MB.",
   "error.team.workspaceFileTooLarge": "Die Arbeitsbereichsdatei überschreitet die Grenze von 100 MB.",
   "error.team.browserViewUnavailable": "Die Live-Browseransicht ist nicht verfügbar.",

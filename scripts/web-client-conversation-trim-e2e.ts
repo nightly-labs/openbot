@@ -1,11 +1,3 @@
-// Checks that the web client releases the older pages of a conversation that is not open, and that
-// the whole history still loads with no gap when the user opens it again (plan 007). Drives the real
-// web workspace in the `Web/Workspace/LongConversation` story of a running Storybook, with the bench
-// host of `src/renderer/src/preview/bench-web-runtime.ts` and its 160 seeded messages.
-//
-// `bun scripts/web-client-conversation-trim-e2e.ts --storybook=<url> [--browser-executable=<path>]`
-// Writes .openbot-build/web-client-conversation-trim-e2e/report.json and reopened-top.png (the reopened
-// conversation at its oldest message), and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -54,7 +46,6 @@ async function visible(page: Page, text: string): Promise<boolean> {
     .catch(() => false);
 }
 
-/** Scrolls the open conversation up until `top` shows. Returns the texts seen on the way. */
 async function scrollToTop(
   page: Page,
   watch: string[],
@@ -74,7 +65,6 @@ async function scrollToTop(
 }
 
 async function openAgent(page: Page, name: string): Promise<void> {
-  // The chat list names each agent button "<name>, <role>. <preview>".
   await page
     .getByRole("navigation", { name: "Chat list" })
     .getByRole("button", { name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")},`) })
@@ -117,7 +107,6 @@ try {
   check("the second scroll reaches the oldest message, with no gap", second.reachedTop, second);
   check("a middle page loads during the second scroll", second.seen.includes("Question 100:"), second);
 
-  // A short conversation gets more than one page of messages while it is not open.
   await openAgent(page, other);
   await openAgent(page, open);
   await page.evaluate('globalThis.openbotWebBench.append(60, "Later")');

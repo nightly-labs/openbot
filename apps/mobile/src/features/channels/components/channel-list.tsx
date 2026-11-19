@@ -21,7 +21,7 @@ import {
   useMobileWorkspaceReader,
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
-import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
+import { canToggleChatPin } from "@/features/workspace/model/agent-pins";
 import { showsOnline } from "@/features/workspace/model/server-status";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { type MenuAction, type MenuComponentRef, MenuView } from "@/shared/components/menu-view";
@@ -39,7 +39,7 @@ function useChannelMenuActions(channel: ChannelSummary, serverId: string) {
   const sectionMenu = useChatSectionMenu(serverId, channel.id);
   const isPinned = useMobileWorkspaceSelector(({ pinnedChannelIds }) => pinnedChannelIds.includes(channel.id));
   const canPin = useMobileWorkspaceSelector(({ pinnedAgentIds, pinnedChannelIds }) =>
-    canToggleAgentPin([...pinnedAgentIds, ...pinnedChannelIds], channel.id),
+    canToggleChatPin(pinnedAgentIds, pinnedChannelIds, channel.id),
   );
   const online = useMobileWorkspaceSelector(({ servers }) =>
     servers.some((server) => server.id === serverId && showsOnline(server)),
@@ -48,7 +48,6 @@ function useChannelMenuActions(channel: ChannelSummary, serverId: string) {
     ({ servers }) => servers.find((server) => server.id === serverId)?.role === "member",
   );
   const canDelete = online && !isMember && !channel.archived;
-  // The host refuses to delete a channel while a task runs there: the user stops it first.
   const deleteBlocked = channel.activeTasks > 0;
   const deleting = useRef(false);
   const handlePin = (withHaptic = true) => toggleChannelPinAnimated(channel, serverId, { haptic: withHaptic });
@@ -106,7 +105,6 @@ function useChannelMenuActions(channel: ChannelSummary, serverId: string) {
   };
 }
 
-/** The chat link of a channel on iOS, with its context menu. Android uses `ChannelAndroidMenu`. */
 function ChannelContextMenuLink({
   channel,
   serverId,
@@ -163,7 +161,6 @@ function ChannelContextMenuLink({
   );
 }
 
-/** The long-press menu of a channel on Android. It opens when it mounts, as `AgentAndroidMenu` does. */
 function ChannelAndroidMenu({
   channel,
   serverId,
@@ -176,7 +173,6 @@ function ChannelAndroidMenu({
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   return (
     <View
-      // The open menu draws in a portal. The row under it keeps its touches.
       pointerEvents="none"
       style={StyleSheet.absoluteFill}
       onLayout={({ nativeEvent }) => setSize({ width: nativeEvent.layout.width, height: nativeEvent.layout.height })}
@@ -259,13 +255,11 @@ function OpenChannelMenu({
         handlers[nativeEvent.event]?.();
       }}
     >
-      {/* The anchor of the menu: the size of the row it covers. */}
       <View style={size} />
     </MenuView>
   );
 }
 
-/** A channel in the home list, or in the pinned grid, with the look and menus of an agent chat. */
 export const ChannelListRow = memo(function ChannelListRow({
   channel,
   serverId,
@@ -287,12 +281,11 @@ export const ChannelListRow = memo(function ChannelListRow({
   const { toggleChannelPinAnimated } = useAgentPinTransition();
   const isPinned = useMobileWorkspaceSelector(({ pinnedChannelIds }) => pinnedChannelIds.includes(channel.id));
   const pinBlocked = useMobileWorkspaceSelector(
-    ({ pinnedAgentIds, pinnedChannelIds }) => !canToggleAgentPin([...pinnedAgentIds, ...pinnedChannelIds], channel.id),
+    ({ pinnedAgentIds, pinnedChannelIds }) => !canToggleChatPin(pinnedAgentIds, pinnedChannelIds, channel.id),
   );
   const disconnected = useMobileWorkspaceSelector(
     ({ servers }) => !servers.some((server) => server.id === serverId && showsOnline(server)),
   );
-  // Each long press mounts the Android menu again, so it opens even if an earlier one did not close.
   const [menuKey, setMenuKey] = useState(0);
   const drag = useChatDrag(pinned ? "pin" : "row", () => ({
     chat: { kind: "channel", id: channel.id },

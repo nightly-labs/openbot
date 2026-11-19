@@ -1,16 +1,3 @@
-/**
- * What a tag in a message names. `mcp` is one of the host's MCP servers: a tag is a hint for the
- * model, in the same way a skill tag is, and it changes no tool the provider is given. `quote` is
- * text the user selected in a message of the same chat: its name is that text and its id is the
- * message id. A quote of a file that the side panel shows has a file quote id in place of the
- * message id (see `fileQuoteId`). `tab` is a browser tab of the agent, by tab id, and `thread` is
- * one of its side threads, by task id. Both stay in the message as a name: the provider reads the
- * current title and state of each when the message is delivered.
- *
- * An app that predates a kind does not match its marker, so it shows the marker text rather than
- * the name. Message bodies are stored as written, so an older app reading a newer message is a
- * real case, and it stays readable.
- */
 export type ChatTagKind = "agent" | "skill" | "mcp" | "quote" | "tab" | "thread";
 
 export interface ChatTagReference {
@@ -23,28 +10,14 @@ export interface ChatTagReference {
 
 const CHAT_TAG_REFERENCE_PATTERN = /@\[([^\]\r\n]+)\]\((agent|skill|mcp|quote|tab|thread)(\+uri)?:([^)\r\n]+)\)/gu;
 
-/*
- * Quoted text is any text, and Markdown reads the marker as a link. A bracket, a backslash, a
- * backtick or an angle bracket in it could end the link early or open a span past its end.
- */
 const UNSAFE_QUOTE_NAME = /[[\]\\`<\r\n]/u;
 
-/**
- * Encoded, a long passage could pass the message limit. At 9 encoded characters each, this many
- * stays far below it, and the start of the passage is enough to find it again.
- */
 const QUOTE_TEXT_LIMIT = 2000;
 
-/** The quoted text that a quote tag keeps. Code points keep a surrogate pair whole. */
 export function limitedQuoteText(text: string): string {
   return Array.from(text).slice(0, QUOTE_TEXT_LIMIT).join("").trimEnd();
 }
 
-/**
- * A passage of a workspace file, a shared file or an attachment. The lines start at 1 and include
- * the last. An attachment has no path on the agent's computer, so its quote names it by its id and
- * file name.
- */
 export type FileQuoteTarget = (
   | { source: "workspace" | "shared"; path: string }
   | { source: "attachment"; attachmentId: string; name: string }
@@ -52,10 +25,6 @@ export type FileQuoteTarget = (
 
 const FILE_QUOTE_ID = /^(workspace|shared|attachment)-file:(.+?)(?:#L(\d+)(?:-(\d+))?)?$/u;
 
-/**
- * The id of a quote of a file passage, for example `workspace-file:docs/plan.md#L12-18` or
- * `attachment-file:<attachment id>/notes.md#L3`.
- */
 export function fileQuoteId(target: FileQuoteTarget): string {
   const lines = target.lines;
   const suffix = !lines ? "" : lines.end > lines.start ? `#L${lines.start}-${lines.end}` : `#L${lines.start}`;
@@ -63,7 +32,6 @@ export function fileQuoteId(target: FileQuoteTarget): string {
   return `${target.source}-file:${file}${suffix}`;
 }
 
-/** The file passage that a quote id names, or null for a quote of a message. */
 export function fileQuoteTarget(id: string): FileQuoteTarget | null {
   const match = FILE_QUOTE_ID.exec(id);
   const file = match?.[2];
@@ -76,13 +44,8 @@ export function fileQuoteTarget(id: string): FileQuoteTarget | null {
   return { source: "attachment", attachmentId: file.slice(0, slash), name: file.slice(slash + 1), lines };
 }
 
-/**
- * The most characters of a tab or thread title that a tag keeps. The provider reads the current
- * title when the message is delivered, so the tag needs only enough to show what it names.
- */
 const REFERENCE_NAME_LIMIT = 80;
 
-/** The name of a tab or thread tag: one line, at most `REFERENCE_NAME_LIMIT` characters. */
 export function referenceName(name: string): string {
   const characters = Array.from(name.replace(/\s+/gu, " ").trim());
   return characters.length > REFERENCE_NAME_LIMIT
@@ -94,7 +57,6 @@ export function referenceName(name: string): string {
 }
 
 export function serializeChatTagReference(kind: ChatTagKind, name: string, id: string): string {
-  // A quote, a page title and a thread title are any text, so they get the strict rule.
   const unsafeName = kind === "quote" || kind === "tab" || kind === "thread" ? UNSAFE_QUOTE_NAME : /[\]\r\n]/u;
   if (name && id && !unsafeName.test(name) && !/[)\r\n]/u.test(id)) return `@[${name}](${kind}:${id})`;
   return `@[${encodeChatTagComponent(name)}](${kind}+uri:${encodeChatTagComponent(id)})`;
@@ -110,22 +72,10 @@ export function chatTagReferences(value: string): ChatTagReference[] {
   }));
 }
 
-/**
- * Addresses a message to every member of a channel. It is plain text, not a tag, so a client of
- * any version can write it and an app that predates it shows the same text.
- */
 export const EVERYONE_MENTION = "@everyone";
 
-/* `@everyone` is an address only as a whole word: "@everyone's notes" names no one. */
 const ADDRESS_SEPARATORS = /^(?:[\s,]|and\b|&|@everyone(?![\p{L}\p{N}_'’-]))*/iu;
 
-/**
- * Whom a message opens by addressing, as a reader addresses several people: "@A @B, @C what do
- * you think?" or "@everyone ideas?". Spaces, commas and "and" may separate them. A tag after the
- * first other word is a reference in the text, not an address. A quote is not a word: the composer
- * puts a quote where the caret is, often before the mention, so "<quote> @A why?" still asks A.
- * `end` is where the address and the quotes in it stop.
- */
 export function leadingAddress(value: string): { mentions: ChatTagReference[]; everyone: boolean; end: number } {
   const mentions: ChatTagReference[] = [];
   let end = 0;
@@ -146,13 +96,6 @@ function chatTagKind(value: string | undefined): ChatTagKind {
   return "agent";
 }
 
-/**
- * The text with each marker as words. `resolveName` gives the current name of an agent, skill or
- * MCP server. For a quote, a tab or a thread it gives the whole replacement: a one-line preview uses
- * it to keep the quote out of a block quote, and a provider prompt uses it to add the id and state
- * of a tab or a thread. Without it, a tab or a thread is its name. `fileHeadings` names the file and lines above a file quote. Only a
- * provider prompt asks for it: the heading is English, and a person reads the other results.
- */
 export function expandChatTagReferences(
   value: string,
   resolveName?: (reference: ChatTagReference) => string | undefined,
@@ -187,12 +130,6 @@ export function expandChatTagReferences(
   );
 }
 
-/**
- * A quote is a Markdown block quote on its own lines, so the provider reads it as quoted text and
- * the words after it as the user's answer to it. A quote of a file names the file and its lines
- * first, so the agent can find the passage. `text` holds offsets in `value`, so each quote costs
- * only the length of its own marker, also in a long message with many quotes.
- */
 function expandedQuote(
   quoted: string,
   file: FileQuoteTarget | null,
@@ -203,7 +140,6 @@ function expandedQuote(
 ): string {
   const lines = quoted.split(/\r?\n/u).map((line) => (line.trim() ? `> ${line}` : ">"));
   const quote = (file ? [fileQuoteHeading(file), ...lines] : lines).join("\n");
-  // A quote just before this one already ends with a blank line.
   const afterQuote = text.quoteEnd >= 0 && /^[^\S\r\n]*$/u.test(value.slice(text.quoteEnd, start));
   const separated = start <= text.first || value.startsWith("\n\n", start - 2) || afterQuote;
   const prefix = separated ? "" : value[start - 1] === "\n" ? "\n" : "\n\n";
@@ -211,11 +147,9 @@ function expandedQuote(
   return `${prefix}${quote}${suffix}`;
 }
 
-/* The words stay in English: they are for the model, as the selection instructions are. */
 function fileQuoteHeading(file: FileQuoteTarget): string {
   const name = file.source === "attachment" ? file.name : file.path;
   const quotedName = name.includes("`") ? name : `\`${name}\``;
-  // A shared path starts at the shared folder that the agent's instructions name.
   const kind = file.source === "attachment" ? "the attached file " : file.source === "shared" ? "the shared file " : "";
   const from = `From ${kind}${quotedName}`;
   const lines = file.lines;
@@ -223,7 +157,6 @@ function fileQuoteHeading(file: FileQuoteTarget): string {
   return lines.end > lines.start ? `${from}, lines ${lines.start}-${lines.end}:` : `${from}, line ${lines.start}:`;
 }
 
-/** What the provider reads in place of a marker. A name alone would not say what it names. */
 function expandedChatTag(kind: "agent" | "skill" | "mcp", name: string): string {
   if (kind === "agent") return `@${name}`;
   return kind === "mcp" ? `${name} (MCP server)` : `${name} (skill)`;

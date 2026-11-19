@@ -6,9 +6,6 @@ import { migration as compactionMigration } from "./migrations/0064-provider-his
 import type * as Registry from "./migrations/registry";
 import { LATEST_SCHEMA_VERSION, migrateOpenBotDatabase, NewerDatabaseError } from "./openbot-database-schema";
 
-// Failure modes: the marker changes or loses a row of any table; a failed upgrade leaves the marker;
-// a newer or incomplete history is accepted; a database at version 64 opens in a release that does not
-// know compacted provider history items. These fixtures cover each.
 const databases: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of databases.splice(0)) db.close();
@@ -39,7 +36,6 @@ function migrateToCompactionMarker(db: DatabaseSync): void {
   else migrateOpenBotDatabase(db);
 }
 
-/** A memory, and from schema 29 on an imported Codex turn with its staged item in full. */
 function seed(db: DatabaseSync, version: number): void {
   db.prepare(`INSERT INTO projection_agent_memories
     (memory_id, agent_id, text, normalized_text, origin, source_turn_id, created_at, updated_at, last_event_sequence)
@@ -61,7 +57,6 @@ function seed(db: DatabaseSync, version: number): void {
 
 type Contents = Record<string, Record<string, SQLOutputValue>[]>;
 
-/** Every row of every table, by table name. */
 function contents(db: DatabaseSync): Contents {
   const tables = db
     .prepare(
@@ -81,7 +76,6 @@ function markers(db: DatabaseSync) {
   return db.prepare("SELECT version FROM schema_migrations WHERE version = 64").all();
 }
 
-/** Later migrations add tables, so the fixtures stop at version 64 unless they test the latest. */
 function expectHealthy(db: DatabaseSync, version = 64): void {
   expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
@@ -95,7 +89,6 @@ describe("provider history compaction marker migration", () => {
     (version) => {
       const db = databaseAt(version);
       seed(db, version);
-      // The earlier migrations run first; the rows and the schema after them are what v64 must keep.
       if (version < 63) migrateUpTo(db, 63);
       const before = contents(db);
       const schemaBefore = schema(db);
@@ -137,11 +130,6 @@ describe("provider history compaction marker migration", () => {
     expect(markers(db)).toEqual([]);
   });
 
-  // A release before compaction knows only the migrations of its tag (`released-schemas/releases.json`):
-  // up to 63 for v0.72.0 (`openbot-database-schema.ts:1043,1050` at that tag). It throws
-  // `NewerDatabaseError` for a newer database before it reads a row (`:1196`, `:1204-1205`). Here the
-  // schema module of this build runs with only those migrations. Without migration 64 in the registry,
-  // the database stays at 63 and that build opens it.
   it("makes a release before compaction refuse a database with a compacted item", async () => {
     const olderNewest = Math.max(
       ...releasedDatabaseCases()

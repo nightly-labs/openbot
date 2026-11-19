@@ -8,25 +8,14 @@ import {
 } from "@openbot/contracts/ipc";
 import { chatTranscript, promptJson } from "./side-question";
 
-/** The tool steps that a review or a note reads, failed steps and the step after them first. */
 const WORK_STEP_LIMIT = 80;
 const WORK_STEP_CHARACTERS = 300;
-/**
- * The most characters of a cleared chat that the note repeats. The agent writes the skill from it,
- * so the newest part counts most: it holds the correction or the method that worked.
- */
 const CLEARED_CHAT_CHARACTERS = 24_000;
 
-/** The skill suggestions in the messages, oldest first. */
 export function skillSuggestionMessages(messages: readonly ConversationMessage[]): ConversationMessage[] {
   return messages.filter((message) => skillSuggestionTarget(message) !== null);
 }
 
-/**
- * True when a skill line after the suggestion at `index` shows the skill that it asks for. A new
- * skill counts when it has the suggested name, or when the agent made it in answer to the first user
- * message after the suggestion: only that message carries the suggestion to the agent.
- */
 export function skillSuggestionSaved(messages: readonly ConversationMessage[], index: number): boolean {
   const suggestion = messages[index];
   const target = suggestion ? skillSuggestionTarget(suggestion) : null;
@@ -47,22 +36,16 @@ export function skillSuggestionSaved(messages: readonly ConversationMessage[], i
   return false;
 }
 
-/** Two skill names that differ only in case or outer spaces are the same name. */
 function sameSkillName(a: string, b: string | undefined): boolean {
   return b !== undefined && a.trim().toLowerCase() === b.trim().toLowerCase();
 }
 
-/** One tool step of a turn, as a review or a note reads it. */
 export interface WorkStep {
   step: string;
   failed?: true;
   error?: string;
 }
 
-/**
- * The tool steps of the turns, in their order. When there are more than the limit, the failed steps
- * and the step after each come first, then the latest others.
- */
 export function workSteps(messages: readonly ConversationMessage[]): WorkStep[] {
   const all = messages.flatMap((message) =>
     (message.trace?.steps ?? []).flatMap((step): WorkStep[] => {
@@ -88,15 +71,6 @@ export function workSteps(messages: readonly ConversationMessage[]): WorkStep[] 
   return all.filter((_, index) => kept.has(index));
 }
 
-/**
- * The note for the user's first message after a skill suggestion. The suggestion is not in the
- * provider's history, so without it the agent cannot know what the user agrees to. A later user
- * message gets no note: the user answered the question, or passed it over. A suggestion that the
- * host saved from the Save button gets no note either.
- *
- * A clear between the reviewed chat and this message took that chat from the provider, as when the
- * clear started the review. Then the note repeats the chat, so the agent writes the skill from it.
- */
 export function pendingSkillSuggestionNote(
   delivery: Pick<QueueDelivery, "id" | "sender">,
   messages: readonly ConversationMessage[],
@@ -111,7 +85,6 @@ export function pendingSkillSuggestionNote(
     if (isContextResetMarker(message)) clearedAt = index;
     const target = skillSuggestionTarget(message);
     if (target) {
-      // The user pressed Save and the host wrote the skill, so there is nothing to agree to.
       if (skillSuggestionSaved(messages, index)) return null;
       const chat = clearedChat(messages, clearedAt ?? clearBefore(messages, index));
       return skillSuggestionNote(target, message.text, chat ? clearedChatBlocks(agentName, chat) : []);
@@ -120,11 +93,6 @@ export function pendingSkillSuggestionNote(
   return null;
 }
 
-/**
- * The chat that the review of the suggestion at `index` read: the chat that a clear right before the
- * suggestion ended, or else the chat before it, back to the last clear. The lines of the suggestion's
- * own review are not part of it.
- */
 export function reviewedChat(messages: readonly ConversationMessage[], index: number): ConversationMessage[] {
   const turnId = messages[index]?.turnId;
   const cleared = clearedChat(messages, clearBefore(messages, index));
@@ -138,7 +106,6 @@ export function reviewedChat(messages: readonly ConversationMessage[], index: nu
   return messages.slice(start, index).filter((message) => turnId === undefined || message.turnId !== turnId);
 }
 
-/** The clear right before the suggestion, after the last message of the chat it reviewed. */
 function clearBefore(messages: readonly ConversationMessage[], suggestion: number): number | null {
   for (let index = suggestion - 1; index >= 0; index -= 1) {
     const message = messages[index];
@@ -149,7 +116,6 @@ function clearBefore(messages: readonly ConversationMessage[], suggestion: numbe
   return null;
 }
 
-/** The chat that the clear at `clearedAt` ended: back to the clear before it. */
 function clearedChat(messages: readonly ConversationMessage[], clearedAt: number | null) {
   if (clearedAt === null) return null;
   const cleared = (index: number) => {

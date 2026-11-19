@@ -10,11 +10,13 @@ import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressa
 import { useChatRowBackground } from "@/features/agents/components/chat-list-pane-context";
 import { ChannelAvatar } from "@/features/channels/components/channel-avatar";
 import {
+  agentListWaitReason,
+  useAgentListActivity,
   useAgentListUnreadCount,
   useAgentListUnreadThreads,
-  useAgentListWaitReason,
 } from "@/features/workspace/components/use-agent-activity";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
+import { agentActivityMood } from "@/features/workspace/model/agent-activity";
 import type { MobileSidebarItem } from "@/features/workspace/model/sidebar-layout";
 import { useBarTop } from "@/shared/lib/native-bar";
 import { useText } from "@/shared/lib/text";
@@ -28,10 +30,6 @@ type RailEntry =
   | { kind: "channel"; key: string; channel: ChannelSummary }
   | { kind: "divider"; key: string };
 
-/**
- * The avatars in the order of the list: the pinned chats, then each section. A section or the waiting
- * group starts with a divider; the first one has a divider only below the pins.
- */
 function railEntries(
   pinnedAgents: readonly MobileAgent[],
   pinnedChannels: readonly ChannelSummary[],
@@ -64,7 +62,8 @@ const RailAgent = memo(function RailAgent({ agent }: { agent: MobileAgent }) {
   const unreadCount = useAgentListUnreadCount(agent.id);
   const unreadThreads = useAgentListUnreadThreads(agent.id);
   const openLabel = t("mobile.agent.list.open", { name: agent.name });
-  const waitReason = useAgentListWaitReason(agent.id);
+  const activity = useAgentListActivity(agent.id);
+  const waitReason = agentListWaitReason(activity);
   return (
     <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id } }} asChild>
       <ChatLinkPressable
@@ -91,10 +90,11 @@ const RailAgent = memo(function RailAgent({ agent }: { agent: MobileAgent }) {
             hue={agent.avatarHue}
             color={agent.avatarColor}
             seed={agent.avatarSeed}
+            avatarUrl={agent.avatarUrl}
             size={AVATAR_SIZE}
             animateIdle={false}
             rings
-            withThreads
+            activityMood={agentActivityMood(activity)}
           />
           {waitReason ? (
             <AgentWaitBadge reason={waitReason} size={16} />
@@ -142,11 +142,6 @@ function RailDivider() {
   return <View className="my-1.5 h-px w-8 bg-border" />;
 }
 
-/**
- * The chat list pane collapsed to the avatars of its chats, in the order of the list: the pinned chats,
- * then each section. The detail column gets the room. A divider marks where the pins and each section
- * start; the names show in the accessibility labels.
- */
 export function ChatListRail({
   header,
   pinnedAgents,
@@ -156,7 +151,6 @@ export function ChatListRail({
   channelAgents,
   headerHeight,
 }: {
-  /** The button that opens the servers, as the bar of the full list has. */
   header: ReactNode;
   pinnedAgents: readonly MobileAgent[];
   pinnedChannels: readonly ChannelSummary[];
@@ -176,8 +170,6 @@ export function ChatListRail({
       <View className="items-center justify-center" style={{ marginTop: barTop, height: headerHeight }}>
         {header}
       </View>
-      {/* Virtualized: the rail stays mounted under the full list, so it renders only the avatars
-          near the screen, however many chats the server has. */}
       <FlatList
         className="flex-1"
         data={entries}
@@ -197,8 +189,6 @@ export function ChatListRail({
         contentContainerClassName="items-center gap-1"
         contentContainerStyle={{ paddingTop: 8, paddingBottom: insets.bottom + 16 }}
         showsVerticalScrollIndicator={false}
-        // Android clips off-screen rows by default. With Fabric, a clipped row that mounts again can
-        // crash with "The specified child already has a parent". iOS does not clip by default.
         removeClippedSubviews={false}
       />
     </View>

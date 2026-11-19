@@ -295,6 +295,7 @@ export const messages = {
   "mobile.settings.conversations.media": "Zdjęcia i pliki",
   "mobile.settings.conversations.swipeLeft": "Przesunięcie w lewo w czacie agenta",
   "mobile.settings.conversations.swipeRight": "Przesunięcie w prawo w czacie agenta",
+  "mobile.settings.conversations.swipeQuestion": "Pytanie poboczne",
   "mobile.settings.conversations.swipeThreads": "Wątki",
   "mobile.settings.conversations.swipeBrowser": "Przeglądarka",
   "mobile.settings.conversations.swipeOff": "Wyłączone",
@@ -600,7 +601,7 @@ export const messages = {
   "mobile.settings.shortcuts.card.locked.title": "OpenBot jest zablokowany",
   "mobile.settings.shortcuts.card.locked.action": "Otwórz OpenBot",
   "mobile.settings.shortcuts.footer":
-    "Send Message w aplikacji Skróty wysyła do tego agenta. Aplikacja się nie otwiera.",
+    "Send Message w aplikacji Skróty wysyła do tego agenta. Aplikacja się nie otwiera. Open Agent otwiera jego czat.",
   "mobile.settings.shortcuts.send.sent": "Wysłano",
   "mobile.settings.shortcuts.send.failed": "OpenBot nie mógł tego wysłać.",
   "mobile.settings.shortcuts.send.unconfirmed": "Brak odpowiedzi serwera. Wiadomość może być w czacie.",

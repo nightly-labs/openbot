@@ -1,9 +1,7 @@
-/* Sonner gives an unstyled toast no width, so the host takes the toaster width. */
 .social-follow-toast-host {
   width: var(--width);
 }
 
-/* The raised toast surface with the 1px ring only, as the GitHub star toast. */
 .social-follow-toast {
   position: relative;
   display: grid;
@@ -18,7 +16,6 @@
   font-family: var(--openbot-font-sans);
 }
 
-/* The plush hops in after the card, leans toward a network under the pointer, and bounces on thanks. */
 .social-follow-toast-plush {
   position: relative;
   display: inline-flex;
@@ -52,7 +49,6 @@
 .social-follow-toast-copy {
   display: grid;
   gap: var(--openbot-space-0-5);
-  /* The close control sits on the corner, mostly outside the card, so the title keeps a small space. */
   padding-inline-end: var(--openbot-space-1);
 }
 
@@ -75,7 +71,6 @@
   animation: social-follow-rise var(--openbot-duration-overlay) var(--openbot-ease-out) both;
 }
 
-/* The network row: filled round chips, aligned with the text. Seven chips fit in the text column. */
 .social-follow-networks {
   display: flex;
   flex-wrap: wrap;
@@ -117,8 +112,6 @@
   animation-delay: 340ms;
 }
 
-/* The follow request: one main button with the network mark, below the thanks. It uses the shared
-   toast button row, but starts at the words, not at the end edge. */
 .social-follow-toast .social-follow-toast-follow {
   justify-content: flex-start;
   margin-inline-end: 0;
@@ -152,7 +145,6 @@
   flex: none;
 }
 
-/* Thanks: three hearts float up from the plush once. */
 .social-follow-hearts {
   position: absolute;
   inset: 0;

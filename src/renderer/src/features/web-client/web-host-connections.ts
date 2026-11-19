@@ -10,8 +10,7 @@ import {
 import { guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
-import { teamWebRtcClientProtocol } from "@openbot/contracts/team-protocol/current";
-import { decodeTeamProtocolSupportV10 } from "@openbot/contracts/team-protocol/v10";
+import { SERVER_SAFE_MODE_CAPABILITY } from "@openbot/contracts/team-protocol/server-safe-mode-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import { agentEventCanNotify } from "@openbot/team-client/agent-notifications";
 import type { RemoteTeamHost } from "@openbot/team-client/remote-directory";
@@ -26,6 +25,7 @@ import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
 import { currentText } from "@openbot/ui/text";
 import { referenceFrom } from "@openbot/user-errors";
 import { Effect } from "effect";
+import { readWebHostCompatibility } from "./web-host-compatibility";
 import {
   type acquireWebHostLock,
   decodeWebHostTabMessage,
@@ -33,21 +33,17 @@ import {
   type WebHostTabMessage,
 } from "./web-host-lock";
 
-/** After another tab asks for a host, this tab does not ask for its lock again for this long. */
 const RELEASED_HOST_REST_MS = 30_000;
 
 type Peer = ReturnType<typeof createRemoteTeamPeer>;
 type PeerActions = Parameters<typeof createRemoteTeamPeer>[0];
 
-/** A live status connection that the opened host takes over, with the host's tab lock. */
 interface WebHostHandover {
   peer: Peer;
-  /** Set `current` to the opened host's actions: the status connection no longer hears the peer. */
   actions: PeerActions;
   releaseLock: () => void;
 }
 
-/** A host request that failed. `reference` names the status or the transport failure. */
 export class WebHostRequestError extends Error {
   constructor(
     message: string,
@@ -64,20 +60,14 @@ interface HostEntry {
   peer: Peer | null;
   actions: PeerActions | null;
   recovery: ReturnType<typeof createRemoteConnectionRecovery> | null;
-  /** The connect command in progress. Its bootstrap can still end the session after `dispose`. */
   connecting: Promise<unknown> | null;
-  /** Session ends in progress. The peer starts some without waiting, for example after a protocol error. */
   endingSessions: Set<Promise<void>>;
   incompatible: boolean;
-  /** The capabilities of the host, or null until it has answered on this connection. */
   capabilities: readonly string[] | null;
-  /** The host's agents, for the name and the notification switch of an event's agent. */
   agents: ClientAgentSummary[];
-  /** Counts `agents-changed` events, so a list read that started before one is dropped. */
   agentsRevision: number;
 }
 
-/** The events of a host that this tab has not opened that a notification can show or withdraw. */
 export type WebHostNotice = Extract<
   AgentEvent,
   {
@@ -92,7 +82,6 @@ export type WebHostNotice = Extract<
   }
 >;
 
-/** Whether a host event can show a notification, or resolves the request of one. */
 export function isWebHostNotice(event: AgentEvent | TeamRealtimeEvent): event is WebHostNotice {
   return (
     agentEventCanNotify(event) || event.type === "agent-input-resolved" || event.type === "browser-takeover-resolved"
@@ -100,36 +89,18 @@ export function isWebHostNotice(event: AgentEvent | TeamRealtimeEvent): event is
 }
 
 export interface WebHostConnections {
-  /** The hosts of the account. Every host that this tab has not opened gets a status connection. */
   setHosts(hosts: readonly RemoteTeamHost[]): void;
-  /** The host this tab opens, or null. Resolves when its status connection has ended. */
   select(hostId: string | null): Promise<void>;
-  /**
-   * Takes the online status connection of a host that this tab opens, with its lock, so the open needs
-   * no new session or path. Returns null when the host has no online status connection. Call before `select`.
-   */
   handOver(hostId: string): WebHostHandover | null;
-  /** Whether this tab holds the lock of the opened host. Only then does it speak for that host. */
   holdSelected(hostId: string, held: boolean): void;
-  /** The state of the opened host, for the other tabs. */
   reportSelected(hostId: string, state: WebHostState): void;
   refresh(): void;
-  /**
-   * The user's own level for each agent of a host that this tab has not opened. A host without
-   * `agent-notification-levels-v1` has none. Rejects while the host has no connection.
-   */
   agentNotificationLevels(hostId: string): Promise<AgentNotificationLevelsSnapshot>;
-  /**
-   * The agents and the user's own levels of a host that this tab has not opened, for the notification
-   * settings. `levels` is null on a host without `agent-notification-levels-v1`.
-   */
   notificationSettings(hostId: string): Promise<WebHostNotificationSettings>;
-  /** Sets the user's own level for one agent of a host that this tab has not opened. */
   setAgentNotificationLevel(
     hostId: string,
     input: SetAgentNotificationLevelInput,
   ): Promise<AgentNotificationLevelsSnapshot>;
-  /** Sets the user's own level of a host that this tab has not opened, for all of their devices. */
   setOwnServerNotificationLevel(
     hostId: string,
     level: ServerNotificationLevel | null,
@@ -137,34 +108,21 @@ export interface WebHostConnections {
   dispose(): Promise<void>;
 }
 
-/** What the notification settings show for one host. `levels` is null when the host keeps none. */
 export interface WebHostNotificationSettings {
   agents: ClientAgentSummary[];
   levels: AgentNotificationLevelsSnapshot | null;
 }
 
-/**
- * One status connection for each host that this tab has not opened, as the mobile app keeps one for
- * each server. A connection holds the host's tab lock, so one browser has at most one peer for each
- * host; the tabs share one logical session for it. Other tabs learn the state from the channel.
- */
 export function createWebHostConnections(options: {
   accountId: string;
   channel: BroadcastChannel;
   actions: Pick<RemoteTeamPeerActions, "getBootstrap" | "endSession">;
   createPeer: typeof createRemoteTeamPeer;
-  /**
-   * The opened host's peer options apart from `waitForHost`, so a status connection can become it. A
-   * status connection also waits for the host, as the opened host does.
-   */
-  peerOptions?: Pick<NonNullable<Parameters<typeof createRemoteTeamPeer>[1]>, "hostProtocols">;
+  peerOptions?: Pick<NonNullable<Parameters<typeof createRemoteTeamPeer>[1]>, "hostProtocols" | "clientProtocol">;
   acquireHostLock: typeof acquireWebHostLock;
-  /** Throws when the host identity differs from the pinned one. */
   pinHostKey(host: RemoteTeamHost): void;
   onState(hostId: string, state: WebHostState): void;
-  /** The host revoked the session. The membership may have ended. */
   onSessionRevoked(): void;
-  /** An event of a host this tab has not opened, with the host's agents, for a notification. */
   onNotice?(hostId: string, event: WebHostNotice, agents: ClientAgentSummary[]): void;
 }): WebHostConnections {
   const { channel } = options;
@@ -179,9 +137,7 @@ export function createWebHostConnections(options: {
   function post(message: WebHostTabMessage): void {
     try {
       channel.postMessage(message);
-    } catch {
-      // A closed channel only costs the other tabs a state.
-    }
+    } catch {}
   }
   function setState(hostId: string, state: WebHostState, local = true): void {
     if (states.get(hostId) === state) return;
@@ -224,7 +180,6 @@ export function createWebHostConnections(options: {
 
   function connect(entry: HostEntry): void {
     const { host } = entry;
-    // The peer's code goes with its text, so the recovery keeps both.
     const failed = (message: string | null | undefined, reference: string | undefined) =>
       new WebHostRequestError(message ?? currentText().t("webClient.error.connectionUnavailable"), reference ?? null);
     const actions: PeerActions = {
@@ -241,18 +196,14 @@ export function createWebHostConnections(options: {
         },
         async onConnectionUpdate(update) {
           if (entries.get(host.hostId) !== entry) return;
-          // A resync can follow lost events, an `agents-changed` among them.
           if (update.state === "online" && update.resync && !entry.incompatible && options.onNotice)
             void readAgents(entry);
-          // Signal holds the attempt until the host connects. The attempt continues, so the recovery
-          // reports no state for this wait.
           if (update.hostOffline) setState(host.hostId, "offline");
           if (update.state !== "offline") return;
           if (update.code === "session_revoked") options.onSessionRevoked();
           if (update.code === "protocol_error") entry.recovery?.suspend(failed(update.message, update.reference));
           else entry.recovery?.offline(failed(update.message, update.reference));
         },
-        // A status connection shows no workspace. It reads only the events that a notification needs.
         async onTeamEvent(_hostId, event) {
           if (entries.get(host.hostId) !== entry) return;
           if (event.type === "agents-changed") {
@@ -262,10 +213,6 @@ export function createWebHostConnections(options: {
         },
       },
     };
-    // Signal holds the attempt while the host is offline, as for the opened host. Without the hold,
-    // each attempt failed at once, and the recovery asked for a new ticket five times in each
-    // 70 seconds for as long as the tab stayed open. The held attempt asks for a ticket only when
-    // the host can be on another Signal machine, at most each 5 minutes.
     const peer = options.createPeer(actions, { ...options.peerOptions, waitForHost: true });
     entry.actions = actions;
     entry.peer = peer;
@@ -288,21 +235,24 @@ export function createWebHostConnections(options: {
         entry.connecting = connecting;
         const connected = await connecting;
         if (!connected.ok) throw failed(connected.error, connected.reference);
-        const response = await peer.execute({
-          id: crypto.randomUUID(),
-          type: "request",
-          method: "GET",
-          path: TEAM_API_ROUTES.compatibility,
-          body: {},
+        const { support, negotiated } = await readWebHostCompatibility(async () => {
+          const response = await peer.execute({
+            id: crypto.randomUUID(),
+            type: "request",
+            method: "GET",
+            path: TEAM_API_ROUTES.compatibility,
+            body: {},
+          });
+          if (!response.ok || (response.status ?? 500) >= 400)
+            throw failed(
+              response.error,
+              response.status === undefined
+                ? response.reference
+                : (referenceFrom("http", response.status) ?? undefined),
+            );
+          return response.body;
         });
-        if (!response.ok || (response.status ?? 500) >= 400)
-          throw failed(
-            response.error,
-            response.status === undefined ? response.reference : (referenceFrom("http", response.status) ?? undefined),
-          );
-        const support = decodeTeamProtocolSupportV10(response.body);
-        // The same rule as opening the host, so the rail and the open agree.
-        if (teamWebRtcClientProtocol(support.protocol).update) {
+        if (negotiated.update || support.capabilities.includes(SERVER_SAFE_MODE_CAPABILITY)) {
           entry.incompatible = true;
           recovery.suspend();
         } else {
@@ -328,11 +278,9 @@ export function createWebHostConnections(options: {
       },
     );
     entry.recovery = recovery;
-    // Unlike mobile, a hidden tab keeps retrying: it holds the lock, so no other tab can take its place.
     recovery.setActive(true);
   }
 
-  /** A Team API request on the status connection of a host. Throws while the host has no connection. */
   function hostRequest(hostId: string): { entry: HostEntry; request: TeamApiRequest } {
     const entry = entries.get(hostId);
     const peer = entry?.peer;
@@ -350,7 +298,6 @@ export function createWebHostConnections(options: {
     return { entry, request };
   }
 
-  /** The status stays online without the list. Notifications then wait for the next `agents-changed`. */
   async function readAgents(entry: HostEntry): Promise<void> {
     const revision = entry.agentsRevision;
     try {
@@ -362,12 +309,9 @@ export function createWebHostConnections(options: {
         body: {},
       });
       if (entries.get(entry.host.hostId) !== entry || !response?.ok || (response.status ?? 500) >= 400) return;
-      // An `agents-changed` that arrived during the read is newer than the read.
       if (entry.agentsRevision !== revision) return;
       entry.agents = guardedListDecoder(isClientAgentSummary, "teammates")(response.body);
-    } catch {
-      // As above: the status does not depend on the list.
-    }
+    } catch {}
   }
 
   async function stop(hostId: string): Promise<void> {
@@ -378,8 +322,6 @@ export function createWebHostConnections(options: {
     entry.recovery?.dispose();
     try {
       await entry.peer?.dispose();
-      // A bootstrap that was still pending ends its session when it returns. The tab that asked for the
-      // host would reuse that session, so the lock waits for it.
       await entry.connecting?.catch(() => undefined);
       await Promise.allSettled([...entry.endingSessions]);
     } finally {
@@ -416,7 +358,6 @@ export function createWebHostConnections(options: {
     } else if (message.type === "state") {
       if (!holds(message.hostId)) setState(message.hostId, message.state, false);
     } else if ((message.type === "release" || message.type === "take") && entries.has(message.hostId)) {
-      // Also leave the queue: a queued request here would take the lock before the tab that asked.
       restingUntil.set(message.hostId, Date.now() + RELEASED_HOST_REST_MS);
       const timer = setTimeout(() => {
         restTimers.delete(timer);
@@ -442,7 +383,6 @@ export function createWebHostConnections(options: {
       selected = hostId === null ? null : { hostId, state: "connecting", held: false };
       if (hostId !== null) await stop(hostId);
       if (previous !== hostId) {
-        // Its status connection reports again once it holds the lock.
         if (previous) {
           states.delete(previous);
           options.onState(previous, "unknown");
@@ -455,7 +395,6 @@ export function createWebHostConnections(options: {
       const { peer, actions, releaseLock } = entry ?? {};
       if (!entry || !peer || !actions || !releaseLock || !entry.capabilities || states.get(hostId) !== "online")
         return null;
-      // The peer keeps its session and path. Its own session ends still finish before it reconnects.
       entries.delete(hostId);
       entry.stop.abort();
       entry.recovery?.dispose();
@@ -469,7 +408,6 @@ export function createWebHostConnections(options: {
     reportSelected(hostId, state) {
       if (selected?.hostId !== hostId || selected.state === state) return;
       selected.state = state;
-      // A tab whose open failed does not hold the host, so another tab speaks for it.
       if (selected.held) post({ type: "state", hostId, state });
     },
     refresh() {
@@ -482,7 +420,6 @@ export function createWebHostConnections(options: {
     },
     async notificationSettings(hostId) {
       const { entry, request } = hostRequest(hostId);
-      // The status connection reads the list once; a read that failed then is made again here.
       if (entry.agents.length === 0) await readAgents(entry);
       const levels = entry.capabilities?.includes(AGENT_NOTIFICATION_LEVELS_CAPABILITY)
         ? await runTeamEffect(listAgentNotificationLevels(request).pipe(Effect.mapError((error) => error.cause)))

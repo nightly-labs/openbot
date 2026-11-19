@@ -1,14 +1,3 @@
-// Checks that the compaction of old thread events (`ThreadEventCompaction`) keeps each replay the same.
-// Before #8166 and #8794, each conversation update wrote every message of the thread again. Each case
-// writes such old events, and new writes between compaction batches, to two databases on a temporary
-// profile. One database compacts between the writes and at the end; the other does not. Then both
-// rebuild the thread from its events (`rebuildThreadProjection`), and the case compares the chats, the
-// message, turn, activity and thread rows, and the other keys of each event payload. A second run of
-// the compaction must find nothing more to drop. No app, provider, account or network is started.
-//
-// Run: bun scripts/thread-event-compaction-e2e.ts
-// Writes .openbot-build/thread-event-compaction-e2e/report.json and exits non-zero on a failure.
-
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -64,38 +53,26 @@ function queued(id: string, minute: number, position: number): ConversationMessa
 
 interface OldUpdate {
   removed?: string[];
-  /** Absent: the key is not in the payload. */
   activeTurnId?: string | null;
   eventType?: string;
   detail?: DynamicRecord;
 }
 
 interface Context {
-  /** An event as a release before #8166 wrote it: the payload as given, no projection write. */
   raw(eventType: string, payload: DynamicRecord): void;
-  /** An old conversation update: every message of the thread again. */
   update(messages: ConversationMessage[], input?: OldUpdate): void;
-  /** A conversation write of this release, which can supersede the previous update. */
   write(changedMessages: ConversationMessage[], activeTurnId?: string | null): void;
-  /** A person deletes messages. This scrubs them from the earlier events. */
   remove(messageIds: string[], activeTurnId?: string | null): void;
-  /** One batch of compaction, only in the compacted database. */
   compactBatch(): void;
 }
 
 interface Case {
   name: string;
-  /** The rewritten events of the compacted database must be at least this many. */
   minimumRewritten: number;
-  /**
-   * The case writes old events after a compaction started. A release with compaction never does, so
-   * the first run leaves them, and a second run compacts them; a third run must find nothing.
-   */
   oldEventsLater?: true;
   run(context: Context): void;
 }
 
-/** The messages a..(count) in order, with the message at `edited` changed. */
 function thread(count: number, edited = -1, editText = "Edited"): ConversationMessage[] {
   return Array.from({ length: count }, (_, index) =>
     message(`m${index}`, index, index === edited ? { text: editText } : {}),
@@ -104,7 +81,6 @@ function thread(count: number, edited = -1, editText = "Edited"): ConversationMe
 
 const cases: Case[] = [
   {
-    // The common old shape: each update has every message, and most of them did not change.
     name: "whole-thread updates",
     minimumRewritten: 38,
     run: ({ update }) => {
@@ -113,7 +89,6 @@ const cases: Case[] = [
     },
   },
   {
-    // The first event has no state before it, so it keeps all its messages, also a repeated id.
     name: "no state before the first event, repeated ids",
     minimumRewritten: 1,
     run: ({ update }) => {
@@ -131,14 +106,12 @@ const cases: Case[] = [
         thread(4).filter((entry) => entry.id !== "m1"),
         { removed: ["m1"] },
       );
-      // Removed and changed in one event: the replay removes it, then adds it at the end.
       update([...thread(4).filter((entry) => entry.id !== "m2"), message("m2", 2)], { removed: ["m2"] });
       update(thread(4));
       update([...thread(4), message("m4", 4)]);
     },
   },
   {
-    // A queue moves the position and the time of the queued messages; each update has the whole queue.
     name: "queued deliveries with a moving time",
     minimumRewritten: 10,
     run: ({ update }) => {
@@ -163,7 +136,6 @@ const cases: Case[] = [
       update(thread(3), { activeTurnId: null });
       update(thread(3), { activeTurnId: "turn-1", detail: { turnId: "turn-1" } });
       update(thread(3), { activeTurnId: "turn-1" });
-      // No key: the event keeps one message, so it stays on the same branch of the replay.
       update(thread(3));
       update([...thread(3), message("m3", 3, { turnId: "turn-1" })], { activeTurnId: "turn-1" });
       update([...thread(3), message("m3", 3, { turnId: "turn-1" })], {
@@ -219,7 +191,6 @@ const cases: Case[] = [
         streamedMessage: message("s", 3, { text: "Half done", status: "streaming", turnId: "turn-1" }),
         activeTurnId: "turn-1",
       });
-      // The older text of the streamed message: the replay must keep this change.
       update([...thread(2), message("s", 3, { text: "Hal", status: "streaming", turnId: "turn-1" })], {
         activeTurnId: "turn-1",
       });
@@ -248,18 +219,14 @@ const cases: Case[] = [
     minimumRewritten: 2,
     run: ({ update }) => {
       update([message("a", 1, { senderAgentId: "agent-b" }), message("b", 2)]);
-      // Leaves out a key: a replay keeps the earlier value, so the item changes nothing.
       update([message("a", 1), message("b", 2)]);
-      // The same values in another key order: a replay keeps the stored order, so this changes nothing.
       const { text, ...rest } = message("b", 2);
       update([message("a", 1), { text, ...rest }]);
-      // A new key at the end changes the stored message.
       update([message("a", 1), message("b", 2, { itemType: "agentMessage" })]);
       update([message("a", 1), message("b", 2, { itemType: "agentMessage" })]);
     },
   },
   {
-    // More than one batch, with new writes, a superseded update and a delete between the batches.
     name: "writes between batches",
     minimumRewritten: 250,
     oldEventsLater: true,
@@ -292,7 +259,6 @@ async function openSide(root: string): Promise<Side> {
     store.createAgent({ name: "Writer", description: "Gets old events", avatarSeed: "compaction", avatarHue: null }),
   );
   const threadId = store.ensureThreadIdNow(agent.id);
-  // A write makes the thread row. Its event goes, so the first old event has no state before it.
   database.persistConversationChanges({
     agentId: agent.id,
     threadId,
@@ -317,7 +283,6 @@ function compactBatch(side: Side): boolean {
 function context(side: Side, compacts: boolean): Context {
   const db = side.database.connection;
   const raw = (eventType: string, payload: DynamicRecord) => {
-    // A whole snapshot names its agent and thread.
     const snapshot = payload.snapshot;
     const value =
       snapshot && typeof snapshot === "object"
@@ -355,7 +320,6 @@ function context(side: Side, compacts: boolean): Context {
       });
     },
     remove: (messageIds, activeTurnId = null) => {
-      // The delete reads the shown order from the projection, as it does in the app.
       side.database.rebuildThreadProjection(side.threadId);
       side.database.persistConversationChanges({
         agentId: side.agentId,
@@ -392,15 +356,12 @@ function events(side: Side): EventRow[] {
   }));
 }
 
-/** The rows a replay writes, without the random activity ids and the time of the replay. */
 function replayRows(side: Side) {
   const db = side.database.connection;
   const all = (sql: string) => databaseRows(db.prepare(sql).all(side.threadId));
   return {
     messages: all("SELECT * FROM projection_thread_messages WHERE thread_id = ? ORDER BY ordinal"),
     turns: all("SELECT * FROM projection_turns WHERE thread_id = ? ORDER BY turn_id"),
-    // The time of an activity is the time of its event. A write of this release takes the clock time,
-    // which differs between the two sides, so this compares the time with the event's own time.
     activities: all(
       `SELECT a.turn_id, a.activity_type, a.payload_json, a.last_event_sequence,
               a.created_at = e.occurred_at AS same_time
@@ -412,12 +373,10 @@ function replayRows(side: Side) {
   };
 }
 
-/** A value with the ids of the side's agent and thread replaced, so the two sides compare. */
 function neutral<Value>(side: Side, value: Value): Value {
   return JSON.parse(JSON.stringify(value).replaceAll(side.threadId, "THREAD").replaceAll(side.agentId, "AGENT"));
 }
 
-/** Each event the two logs share has the same keys, and the compacted items are a subsequence. */
 function otherKeysKept(fullSide: Side, full: EventRow[], compactedSide: Side, compacted: EventRow[]): string | null {
   const bySequence = new Map(full.map((event) => [event.sequence, event]));
   for (const event of compacted) {
@@ -463,7 +422,6 @@ async function runCase(test: Case): Promise<CaseReport> {
     const rowsMatch = isDeepStrictEqual(neutral(compacted, replayRows(compacted)), neutral(full, replayRows(full)));
     const keyDifference = otherKeysKept(full, fullEvents, compacted, compactedEvents);
 
-    // A second run, as after a kill: the compacted events have nothing more to drop.
     compacted.database.connection.prepare("DELETE FROM thread_event_compaction").run();
     const first = compacted.totals.rewritten;
     while (compactBatch(compacted)) {}

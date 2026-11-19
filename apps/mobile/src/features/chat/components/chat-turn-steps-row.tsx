@@ -4,7 +4,6 @@ import { type MobileText, useText } from "@/shared/lib/text";
 import type { TurnStepsSummary } from "../model/turn-thinking";
 import { ACTIVITY_ICON_SIZE, ChatActivityLine } from "./chat-activity-line";
 
-/** "12s" or "1m 04s". */
 export function turnDuration(seconds: number, { t, format }: Pick<MobileText, "t" | "format">): string {
   const total = Math.max(0, Math.round(seconds));
   if (total < 60) return t("mobile.chat.thinking.seconds", { seconds: format.number(total) });
@@ -14,10 +13,6 @@ export function turnDuration(seconds: number, { t, format }: Pick<MobileText, "t
   });
 }
 
-/**
- * The row above a finished answer, or of a finished turn with no answer: how long the turn took and
- * its step count. It stays on the answer it belongs to. It opens the steps where a sheet can show them.
- */
 export function ChatTurnStepsRow({
   summary,
   muted,
@@ -25,7 +20,6 @@ export function ChatTurnStepsRow({
 }: {
   summary: TurnStepsSummary;
   muted: ColorValue;
-  /** Absent where no sheet can show the steps, such as a channel. */
   onPress: (() => void) | undefined;
 }) {
   const text = useText();

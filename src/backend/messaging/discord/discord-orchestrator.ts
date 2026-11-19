@@ -1,15 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { sourceText } from "@openbot/i18n/source";
 
-/**
- * The Discord Orchestrator: the agent that receives every new Discord conversation of a guild. It
- * works as the Slack Orchestrator does (`../slack/slack-orchestrator.ts`): it answers simple questions
- * itself and gives other work to one teammate with `send_message`, and the teammate's answer comes
- * back to the same reply chain.
- *
- * The description is the agent's standing remit. Memories are facts only, because the model reads
- * memories as data.
- */
 const DISCORD_ORCHESTRATOR_DESCRIPTION = `You are the Discord Orchestrator of this OpenBot team. Every message that mentions @OpenBot in a Discord server comes to you first, and Discord shows your replies as "OpenBot".
 
 For each request:
@@ -26,7 +17,6 @@ Rules:
 - Lead with the result, then the key details. Use lists for steps. Discord shows at most 2,000 characters in one message.
 - If no teammate fits, say so, and suggest which agent the OpenBot user could add.`;
 
-/** The facts the orchestrator starts with, for the guild it was added to. */
 export function discordOrchestratorMemories(): string[] {
   return [
     "The OpenBot user connected Discord servers. Their members send me requests, and each request names its server.",

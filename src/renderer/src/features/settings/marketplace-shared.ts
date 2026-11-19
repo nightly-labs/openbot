@@ -3,10 +3,6 @@ import { MarketplaceHomeCache } from "@openbot/ui/features/marketplace/marketpla
 import { currentText } from "@openbot/ui/text";
 import type { MarketplaceCalls } from "./marketplace-calls";
 
-/*
- * The overview caches outlive the dialog, so opening it again does not ask again. Each one belongs to
- * one list function, so a story or a test that replaces the API never reads another one's answer.
- */
 const skillHomeCaches = new WeakMap<
   MarketplaceCalls["skills"]["list"],
   MarketplaceHomeCache<MarketplaceSkillSummary>

@@ -46,18 +46,32 @@ export interface ChannelState {
   pages: ReadonlyMap<string, ChannelPage>;
   supported: boolean;
   canDelete: boolean;
-  /** The host takes `cancel` for a stopped task (`channel-task-cancel-v1`). */
   canCancelTasks: boolean;
-  /** The host takes a channel icon and image (`channel-picture-v1`). */
   canSetPicture: boolean;
-  /** The host takes "New conversation", "Compact context" and "Delete history" (`chat-history-v1`). */
   canUseContextActions: boolean;
   loading: boolean;
-  /** The host list has loaded at least once, or the host has no channels to list. */
   listed: boolean;
-  /** The last load failure. A screen renders it in the interface language. */
   error: { cause: unknown } | null;
 }
+type ChannelFlags = Omit<ChannelState, "channels" | "pages">;
+const FLAG_KEYS: readonly (keyof ChannelFlags)[] = [
+  "supported",
+  "canDelete",
+  "canCancelTasks",
+  "canSetPicture",
+  "canUseContextActions",
+  "loading",
+  "listed",
+  "error",
+];
+function sameFlags(a: ChannelFlags, b: ChannelFlags) {
+  return FLAG_KEYS.every((key) => a[key] === b[key]);
+}
+export interface ChannelView extends ChannelFlags {
+  summary: ChannelSummary | undefined;
+  page: ChannelPage | undefined;
+}
+const CHANGE_READ_INTERVAL_MS = 250;
 const EMPTY: ChannelState = {
   channels: [],
   pages: new Map(),
@@ -80,17 +94,22 @@ interface Entry {
   valid: boolean;
   writes: number;
   historyWaiters: Map<string, Set<(success: boolean) => void>>;
+  views: Map<string, ChannelView>;
+  changeTimer: ReturnType<typeof setTimeout> | null;
+  changeReadAt: number;
+  changeMissed: boolean;
 }
 
 export class ChannelHistoryRefreshError extends Error {}
 
-/** Channel events are invalidations. Keep one read in flight and one trailing read per host. */
 export class MobileChannelStore {
   private entries = new Map<string, Entry>();
   private listeners = new Map<string, Set<() => void>>();
   private active = true;
   setActive(active: boolean) {
     this.active = active;
+    if (!active) return;
+    for (const [serverId, entry] of this.entries) if (entry.changeMissed) this.readChanges(serverId, entry);
   }
   retainServers(ids: string[]) {
     const available = new Set(ids);
@@ -116,6 +135,10 @@ export class MobileChannelStore {
         valid: true,
         writes: 0,
         historyWaiters: new Map(),
+        views: new Map(),
+        changeTimer: null,
+        changeReadAt: 0,
+        changeMissed: false,
       };
       this.entries.set(serverId, entry);
     }
@@ -124,10 +147,9 @@ export class MobileChannelStore {
   get(serverId: string) {
     return this.entry(serverId).state;
   }
-  /**
-   * The state once the host list has loaded or failed, or after `timeoutMs` with what the phone has.
-   * A notification tap at a cold start comes before the server connects.
-   */
+  peek(serverId: string): ChannelState | undefined {
+    return this.entries.get(serverId)?.state;
+  }
   whenListed(serverId: string, timeoutMs: number): Promise<ChannelState> {
     const entry = this.entry(serverId);
     if (entry.state.listed || entry.state.error) return Promise.resolve(entry.state);
@@ -151,21 +173,21 @@ export class MobileChannelStore {
       entry.listeners.delete(listener);
     };
   }
+  channelView(serverId: string, channelId: string): ChannelView {
+    const entry = this.entry(serverId);
+    const { channels, pages, ...flags } = entry.state;
+    const summary = channels.find((channel) => channel.id === channelId);
+    const page = pages.get(channelId);
+    const cached = entry.views.get(channelId);
+    if (cached && cached.summary === summary && cached.page === page && sameFlags(cached, flags)) return cached;
+    const view = { ...flags, summary, page };
+    entry.views.set(channelId, view);
+    return view;
+  }
   private publish(entry: Entry, patch: Partial<ChannelState>) {
     if (!entry.valid) return;
     const next = { ...entry.state, ...patch };
-    if (
-      next.channels === entry.state.channels &&
-      next.pages === entry.state.pages &&
-      next.supported === entry.state.supported &&
-      next.canDelete === entry.state.canDelete &&
-      next.canCancelTasks === entry.state.canCancelTasks &&
-      next.canSetPicture === entry.state.canSetPicture &&
-      next.canUseContextActions === entry.state.canUseContextActions &&
-      next.loading === entry.state.loading &&
-      next.listed === entry.state.listed &&
-      next.error === entry.state.error
-    )
+    if (next.channels === entry.state.channels && next.pages === entry.state.pages && sameFlags(next, entry.state))
       return;
     entry.state = next;
     for (const listener of entry.listeners) listener();
@@ -179,14 +201,9 @@ export class MobileChannelStore {
       canCancelTasks: capabilities.includes(CHANNEL_TASK_CANCEL_CAPABILITY),
       canSetPicture: capabilities.includes(CHANNEL_PICTURE_CAPABILITY),
       canUseContextActions: capabilities.includes(CHAT_HISTORY_CAPABILITY),
-      // A host without channels has its whole list already: none. A kept copy goes.
       ...(supported ? {} : { listed: true, channels: [], pages: new Map() }),
     });
   }
-  /**
-   * Shows the channels that the phone kept, before the host connects. A list that the host already
-   * gave stays. The state stays not `listed`, so a wait for the host list still waits for it.
-   */
   restore(serverId: string, capabilities: readonly string[], channels: ChannelSummary[], pages: ChannelPage[]) {
     const entry = this.entry(serverId);
     if (entry.state.listed || entry.state.channels.length || !capabilities.includes(CHANNEL_CHATS_CAPABILITY)) return;
@@ -201,10 +218,8 @@ export class MobileChannelStore {
       pages: new Map(pages.filter((page) => ids.has(page.channel.id)).map((page) => [page.channel.id, page])),
     });
   }
-  /** The channels as the phone keeps them: the list, and the last 50 messages of each loaded history. */
   cachedChannels(serverId: string): { channels: ChannelSummary[]; pages: ChannelPage[] } | null {
     const state = this.entries.get(serverId)?.state;
-    // Before the first host list, a phone with no kept channels has nothing to keep.
     if (!state?.supported || (!state.listed && !state.channels.length)) return null;
     return {
       channels: state.channels,
@@ -220,6 +235,8 @@ export class MobileChannelStore {
     if (!entry) return;
     this.publish(entry, EMPTY);
     entry.valid = false;
+    if (entry.changeTimer) clearTimeout(entry.changeTimer);
+    entry.changeTimer = null;
     for (const id of entry.historyWaiters.keys()) this.finishHistory(entry, id, false);
     this.entries.delete(serverId);
   }
@@ -235,7 +252,7 @@ export class MobileChannelStore {
       if (count) entry.observed.set(channelId, count);
       else {
         entry.observed.delete(channelId);
-        // Match single chats: keep short windows for reopening while offline.
+        entry.views.delete(channelId);
         if ((entry.state.pages.get(channelId)?.messages.length ?? 0) > 50) {
           const pages = new Map(entry.state.pages);
           const current = entry.state.pages.get(channelId);
@@ -248,12 +265,40 @@ export class MobileChannelStore {
       }
     };
   }
+  changed(serverId: string, channelId: string) {
+    const entry = this.entry(serverId);
+    if (!this.active || !entry.state.supported) return;
+    if (entry.observed.has(channelId)) entry.readChannels.add(channelId);
+    if (entry.changeTimer) return;
+    const wait = entry.changeReadAt + CHANGE_READ_INTERVAL_MS - Date.now();
+    if (wait <= 0) {
+      this.readChanges(serverId, entry);
+      return;
+    }
+    entry.changeTimer = setTimeout(() => {
+      entry.changeTimer = null;
+      if (entry.valid) this.readChanges(serverId, entry);
+    }, wait);
+  }
+  private readChanges(serverId: string, entry: Entry) {
+    if (!this.active) {
+      entry.changeMissed = true;
+      return;
+    }
+    entry.changeMissed = false;
+    if (!entry.state.supported) return;
+    entry.changeReadAt = Date.now();
+    void this.read(serverId, entry);
+  }
   refresh(serverId: string, channelId?: string): Promise<void> {
     const entry = this.entry(serverId);
     if (!this.active || !entry.state.supported) return Promise.resolve();
     for (const id of entry.observed.keys()) {
       if (!channelId || channelId === id) entry.readChannels.add(id);
     }
+    return this.read(serverId, entry);
+  }
+  private read(serverId: string, entry: Entry): Promise<void> {
     if (entry.pending) {
       entry.dirty = true;
       return entry.pending;
@@ -284,7 +329,6 @@ export class MobileChannelStore {
               return;
             }
             const stableChannels = replaceEqualDeep(entry.state.channels, channels);
-            // A local deletion can already match this list while its saved pin still needs cleanup.
             this.onList?.(serverId, stableChannels);
             const ids = new Set(channels.map((channel) => channel.id));
             listedIds = ids;
@@ -320,7 +364,6 @@ export class MobileChannelStore {
             }
             this.finishHistory(entry, id, true);
           };
-          // Publish history as soon as it arrives; a slow sidebar request must not block opening a chat.
           const results = await Promise.allSettled([
             list(),
             ...readChannels.map((id) =>
@@ -366,17 +409,12 @@ export class MobileChannelStore {
       const waiters = entry.historyWaiters.get(channelId) ?? new Set();
       waiters.add(finish);
       entry.historyWaiters.set(channelId, waiters);
-      // Only the required history read holds up a send, not the list or trailing event refreshes.
       void this.refresh(serverId, channelId).then(
         () => finish(false),
         () => finish(false),
       );
     });
   }
-  /**
-   * Takes a message that a member deleted out of the loaded page. A latest page keeps the older
-   * loaded messages, so the host's change event alone leaves it shown.
-   */
   removeMessage(serverId: string, channelId: string, messageId: string) {
     const entry = this.entry(serverId);
     const page = entry.state.pages.get(channelId);
@@ -420,8 +458,6 @@ export class MobileChannelStore {
         !item.message.questionPrompt.resolution,
     );
     const prompt = message?.message.questionPrompt;
-    // A question with no open row in the page shows from the host's request, and the host refuses an
-    // answer when it no longer waits (#10178). The screen shows no card for a row that has its answer.
     if (!page || page.channel.archived) throw new Error(sourceText("error.remote.formUnavailable"));
     await this.request(
       "POST",
@@ -433,7 +469,6 @@ export class MobileChannelStore {
       },
       serverId,
     );
-    // A successful answer stays resolved even if the history refresh loses connection.
     const current = entry.state.pages.get(channelId);
     if (entry.valid && current && message && prompt) {
       const pages = new Map(entry.state.pages);
@@ -472,7 +507,6 @@ export class MobileChannelStore {
       serverId,
     );
     if (entry.valid && command.type === "read") {
-      // A read receipt changes unread state, not channel history or its revision.
       const channels = entry.state.channels.map((channel) =>
         channel === unreadChannel &&
         channel.unreadCount !== 0 &&
@@ -485,8 +519,6 @@ export class MobileChannelStore {
     }
     if (entry.valid) {
       this.applyChannel(entry, result);
-      // A send waits for the history of an open channel, so its row replaces the phone's own. A channel
-      // that no screen shows reads its history when it opens.
       if (options?.waitForRefresh && command.type === "send" && entry.observed.has(result.id))
         await this.refreshHistory(serverId, result.id);
       else if (
@@ -501,7 +533,6 @@ export class MobileChannelStore {
     }
     return result;
   }
-  /** Shows a channel that the host answered, unless the phone already has a later revision. */
   private applyChannel(entry: Entry, result: Channel) {
     entry.writes += 1;
     const previous = entry.state.channels.find((channel) => channel.id === result.id);
@@ -513,10 +544,6 @@ export class MobileChannelStore {
         : [...entry.state.channels, summary],
     });
   }
-  /**
-   * Sets or removes the uploaded image of a channel (`channel-picture-v1`). The host gives the image a
-   * new version, so the phone reads the new file.
-   */
   async setImage(serverId: string, channelId: string, image: RemoteFileUpload | null) {
     const entry = this.entry(serverId);
     if (!entry.state.canSetPicture) throw new Error(sourceText("error.remote.channelsUnsupported"));
@@ -528,17 +555,11 @@ export class MobileChannelStore {
       serverId,
       image ?? undefined,
     );
-    // The phone keeps the image it sent, so the new version shows without a download.
     if (image && result.imageUrl)
       saveChannelImage(serverId, channelId, result.imageUrl, `data:${image.mimeType};base64,${image.base64}`);
-    // The answer is the whole channel, so no list read follows. The host event refreshes the rest.
     if (entry.valid) this.applyChannel(entry, result);
     return result;
   }
-  /**
-   * The image of a channel as a `file://` URI, or as a data URL when the phone cannot save it. A
-   * version that this phone has saved needs no request.
-   */
   async image(serverId: string, channelId: string, imageUrl: string): Promise<string> {
     const saved = savedChannelImage(serverId, channelId, imageUrl);
     if (saved) return saved;
@@ -562,7 +583,6 @@ export class MobileChannelStore {
     );
     return saveChannelImage(serverId, channelId, imageUrl, dataUrl);
   }
-  /** Reads each unread channel's latest page for its boundary, since a summary has no sequence. */
   async markAllRead(serverId: string, operationId: () => string) {
     const entry = this.entry(serverId);
     if (!entry.state.supported) return;
@@ -579,7 +599,6 @@ export class MobileChannelStore {
         });
       }),
     );
-    // A receipt clears only a channel with loaded history, so the list gives the host's unread counts.
     await this.refresh(serverId);
     const failure = results.find((result) => result.status === "rejected");
     if (failure) throw failure.reason;
@@ -644,15 +663,12 @@ export class MobileChannelStore {
   async discard(serverId: string, attachmentId: string) {
     await this.request("DELETE", TEAM_API_ROUTES.attachment(attachmentId), () => undefined, undefined, serverId);
   }
-  /** "New conversation": the members forget the earlier messages. The host writes a marker; the messages stay. */
   async clearContext(serverId: string, channelId: string) {
     await this.contextAction(serverId, CHAT_HISTORY_ROUTES.channelClear, channelId);
   }
-  /** Compacts the channel session of each member now. The messages stay. */
   async compactContext(serverId: string, channelId: string) {
     await this.contextAction(serverId, CHAT_HISTORY_ROUTES.channelCompact, channelId, false);
   }
-  /** "Delete history": the messages go, and the members forget them. Owners and admins only. */
   async deleteHistory(serverId: string, channelId: string) {
     await this.contextAction(serverId, CHAT_HISTORY_ROUTES.channelDelete, channelId);
   }
@@ -668,9 +684,7 @@ export class MobileChannelStore {
       );
     await this.request("POST", path, () => undefined, { channelId }, serverId);
     if (!changesHistory) return;
-    // A read that started before the change must not bring the earlier page back.
     entry.writes += 1;
-    // A latest page keeps the older loaded messages next to it, so a deleted history drops the page.
     if (path === CHAT_HISTORY_ROUTES.channelDelete && entry.state.pages.has(channelId)) {
       const pages = new Map(entry.state.pages);
       pages.delete(channelId);

@@ -1,4 +1,3 @@
-/* Browser cards use captured images; only the expanded view owns a live surface. */
 .browser-preview-sidebar[hidden] {
   display: none;
 }
@@ -142,9 +141,6 @@
   opacity: 1;
 }
 
-/* The code or the password the agent asks for: the site, the value and Submit. The inner parts are glass
-   in both variants; the timeline card is a block, and the island has a denser glass of its own, so that
-   the page under it does not show through as dark shapes behind the code. */
 .browser-secret-card {
   --otp-slot-border: var(--openbot-glass-border);
   --otp-slot-background: var(--openbot-glass-surface);
@@ -154,7 +150,6 @@
   color: var(--openbot-text-primary);
 }
 
-/* The site is never cut: the user checks it before the value goes there. */
 .browser-secret-card .ui-block-subtitle {
   overflow-wrap: anywhere;
 }
@@ -220,7 +215,6 @@
   line-height: var(--openbot-leading-md);
 }
 
-/* The site is never cut: the user checks it before the value goes there. */
 .browser-secret-heading p {
   margin: 0;
   overflow-wrap: anywhere;
@@ -240,7 +234,6 @@
   gap: var(--openbot-space-1-5);
 }
 
-/* Below the focus and error borders of the field, which are one class strong. */
 :where(.browser-secret-password) > input {
   border-color: var(--openbot-glass-border);
   background: var(--openbot-glass-surface);
@@ -262,7 +255,6 @@
   font-weight: var(--openbot-weight-medium);
 }
 
-/* Under the label, past the box. */
 .browser-secret-save-hint {
   margin: 0;
   padding-inline-start: calc(var(--openbot-icon-sm) + var(--openbot-space-1-5));
@@ -300,7 +292,6 @@
   font-size: var(--openbot-text-sm);
 }
 
-/* The note keeps a readable width; the buttons go to the next row first. */
 .browser-secret-card .ui-block-card-footer > .browser-secret-private {
   flex: 1 1 12rem;
 }

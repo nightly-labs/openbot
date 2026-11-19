@@ -15,7 +15,6 @@ function storyServer(kind: (typeof STORY_SERVERS)[number]["kind"]) {
 export const STORY_LOCAL_SERVER = storyServer("local");
 export const STORY_REMOTE_SERVER = storyServer("remote");
 
-/** The props of the real Server settings for this computer, without its optional sections. */
 export const serverSettingsArgs = () =>
   ({
     open: true,
@@ -47,14 +46,12 @@ export const serverSettingsArgs = () =>
     onRecheckScreenRecording: fn(async () => undefined),
   }) satisfies Omit<ServerSettingsModalProps, "page">;
 
-/** The real Server settings page, with a preview `window.openbot` for the panels that read it. */
 export function ServerSettingsStory(props: {
   settings: Omit<ServerSettingsModalProps, "page">;
   hostUpdate?: HostUpdateStatus;
   hostRelease?: HostReleaseStatus;
 }) {
   const previous = window.openbot;
-  // Storybook passes the args as a store, and the mock copies its options with `structuredClone`.
   const hostStatus = props.settings.hostStatus;
   const mock = createMockOpenBot({
     ...(hostStatus ? { hostStatus: snapshot(hostStatus) } : {}),
@@ -66,7 +63,6 @@ export function ServerSettingsStory(props: {
     mock.dispose();
     window.openbot = previous;
   });
-  // The app updates the server list when a look is saved; the story keeps the last saved look.
   const [appearance, setAppearance] = createSignal<ServerAppearance | null | undefined>(undefined);
   const server = () => {
     const saved = appearance();

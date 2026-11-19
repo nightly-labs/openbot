@@ -241,6 +241,8 @@ export const messages = {
     "הסוכן הזה יכול להשתמש רק במספר מוגבל של שרתי MCP. כדי להשתמש בשרת הזה, כבו שרת MCP שהסוכן לא צריך.",
   "error.backend.mcpRegistrationRefused":
     "שרת ההתחברות עדיין אינו מקבל את OpenBot כאפליקציה. החשבון שלך אינו הסיבה. יש להשתמש בדרך חיבור אחרת, כמו שרת MCP מקומי.",
+  "error.backend.mcpRegistrationUnavailable":
+    "שרת ההתחברות אינו יכול לרשום את OpenBot כאפליקציה. החשבון שלך אינו הסיבה. כדי להתחבר, יש לשמור את השרת הזה בחנות, אפליקציות, ואחר כך להוסיף לו אפליקציית התחברות.",
   "error.backend.mcpSignInAbandonedGeneric": "ההתחברות ננטשה.",
   "error.backend.mcpSignInForgotten": "התחברות ה-MCP נשכחה בזמן שהיא רצה.",
   "error.backend.mcpSignInAbandoned": "התחברות ה-MCP ננטשה.",
@@ -252,6 +254,7 @@ export const messages = {
     "השרת הזה דורש התחברות, ו-OpenBot מתחבר רק דרך https. יש לשנות את הכתובת ל-{url}.",
   "error.backend.mcpSignInCancelled": "ההתחברות בוטלה.",
   "error.backend.mcpSignInTimedOut": "ההתחברות לא הושלמה בדפדפן.",
+  "error.backend.mcpSignInRefused": "דף ההתחברות דחה את הגישה. התחבר שוב.",
   "error.backend.mcpSignInResponseTimedOut": "תשובת ההתחברות לא הגיעה בזמן.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot לא הצליח לקרוא את פרטי ההתחברות של השרת הזה. יש לבדוק את כתובת השרת ולנסות שוב.",

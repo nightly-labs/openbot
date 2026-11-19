@@ -6,6 +6,7 @@ import { classifyFailure } from "@openbot/telemetry";
 import { toast } from "@openbot/ui";
 import type { AgentProfile } from "@openbot/ui/data";
 import { BROWSER_NEW_TAB_URL, browserAddressUrl } from "@openbot/ui/features/browser/browser-suggestions";
+import { MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, untrack } from "solid-js";
 import { actionToast } from "../../../action-toast";
@@ -29,7 +30,6 @@ export interface BrowserTakeoverResolutionState {
   signInBlocked?: { server: string; signingIn: boolean } | undefined;
 }
 
-/** A sign-in on this computer for a tab of a remote server's browser. Main keeps the session. */
 export interface LocalSignIn {
   tabId: string;
   url: string;
@@ -59,7 +59,6 @@ function canonicalBrowserUrl(url: string): string {
 interface BrowserPanels {
   activeRightPanel: () => RightPanelMode;
   setActiveRightPanel: (mode: RightPanelMode, agentId?: string) => void;
-  /** Closes the Browser tab of the side panel, also from the full view or picture in picture. */
   closeBrowserPane: () => void;
 }
 
@@ -77,17 +76,13 @@ export interface BrowserStoreDeps {
   >;
   browserAddress: () => string;
   setBrowserAddress: (address: string) => void;
-  /** A chat window asked the main window to show this page of a browser takeover. */
   takeoverPageRequest: () => { agentId: string; tabId: string } | null;
   setTakeoverPageRequest: (request: null) => void;
-  /** `cause` is the failure behind `error`. The banner shows its code. */
   setComposerError: (error: string | null, targetOverride?: ConversationTarget, cause?: unknown) => void;
   panels: BrowserPanels;
 }
 
 export function createBrowserStore(deps: BrowserStoreDeps) {
-  // A memo of the store: `browserEnabled` can be a compiled memo, and an effect callback that calls
-  // `activateBrowserTab` must not create one.
   const browserInteractionAvailable = createMemo(
     () => deps.props.browserEnabled !== false && !deps.props.browserVisibilitySuspended,
   );
@@ -96,20 +91,15 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     browserInteractionAvailable() && deps.panels.activeRightPanel() === "browser-expanded";
   const browserPipOpen = () => browserInteractionAvailable() && deps.panels.activeRightPanel() === "browser-pip";
   const screenOpen = () => browserSidebarOpen() || browserExpandedOpen() || browserPipOpen();
-  /** All tabs of the server. The full view lists them; the side panel lists only the agent's. */
   const allBrowserTabs = createMemo(() => (deps.props.browserEnabled === false ? [] : deps.props.browserTabs));
   const ownsTab = (agent: Pick<AgentProfile, "id" | "threadId">, tab: BrowserTab) =>
     tab.ownerAgentId ? tab.ownerAgentId === agent.id : Boolean(agent.threadId && tab.ownerThreadId === agent.threadId);
   const tabsOwnedBy = (agent: Pick<AgentProfile, "id" | "threadId">) =>
     allBrowserTabs().filter((tab) => ownsTab(agent, tab));
-  /** The agent of a tab. A tab of an old agent run has only the thread. */
   const browserTabOwner = (tab: BrowserTab) => deps.props.agents.find((agent) => ownsTab(agent, tab));
-  /** A channel is read once, when the view opens. */
   const channel = untrack(() => deps.props.channel);
-  /** The agent or the channel on screen: the side panel keeps its tabs and its pending opens apart. */
   const viewId = () => deps.props.agent?.id ?? channel?.id ?? null;
   const viewOwner = () => ({ agentId: deps.props.agent?.id ?? null, threadId: deps.props.agent?.threadId ?? null });
-  /** The side panel tabs: the agent's, or in a channel the tabs of its members' threads there. */
   const browserTabs = createMemo(() => {
     const agent = deps.props.agent;
     if (agent) return tabsOwnedBy(agent);
@@ -140,9 +130,6 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       }
     },
   );
-  // Main shows one tab for every agent and client. When another one moves it, this conversation
-  // takes back the tab it last showed, not its first tab, so the user's choice is kept. When that
-  // tab is closed, the tab that slid into its place in this agent's strip takes over.
   const lastShownTabs = new Map<string, { id: string; index: number }>();
   const activeBrowserTab = createMemo(() => {
     const tabs = browserTabs();
@@ -159,8 +146,6 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
   });
   const browserTakeoverTab = createMemo(() => {
     const tabId = deps.props.browserTakeover?.tabId;
-    // A channel has no agent of its own, so it finds the tab among all tabs. Main already checked that the
-    // agent of the request owns it.
     return tabId ? allBrowserTabs().find((tab) => tab.id === tabId) : undefined;
   });
   const [browserTakeoverPreview, setBrowserTakeoverPreview] = createSignal<BrowserTakeoverPreviewState>({
@@ -172,10 +157,9 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
   createEffect(
     () => ({
       request: deps.props.browserTakeover,
-      tab: browserTakeoverTab(),
       suspended: deps.props.browserVisibilitySuspended,
     }),
-    ({ request, tab, suspended }) => {
+    ({ request, suspended }) => {
       if (!request || request.secret || suspended) {
         browserTakeoverPreviewKey = null;
         browserTakeoverPreviewGeneration += 1;
@@ -184,19 +168,13 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       }
 
       const requestKey = String(request.requestId);
-      if (!tab) {
-        if (browserTakeoverPreviewKey !== requestKey) {
-          setBrowserTakeoverPreview({ status: "loading", preview: null });
-        }
-        return;
-      }
       if (browserTakeoverPreviewKey === requestKey) return;
 
       browserTakeoverPreviewKey = requestKey;
       const generation = ++browserTakeoverPreviewGeneration;
       setBrowserTakeoverPreview({ status: "loading", preview: null });
       void conversationRuntime(deps.props)
-        .browser.capturePreview(tab.id)
+        .browser.capturePreview(request.tabId)
         .then((preview) => {
           if (browserTakeoverPreviewGeneration !== generation) return;
           setBrowserTakeoverPreview({ status: "ready", preview });
@@ -208,7 +186,6 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     },
   );
   const latestMessageMarker = createMemo(() => {
-    // An open side thread has its own messages, so a result card there goes with them, not with the chat.
     const threads = deps.props.threads;
     if (threads?.open !== undefined)
       return `thread:${threads.open?.id ?? "new"}:${threads.conversation?.revision ?? 0}`;
@@ -230,11 +207,6 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     const resolution = untrack(browserTakeoverResolution);
     if (resolution && resolution.messageMarker !== messageMarker) setBrowserTakeoverResolution(null);
   });
-  /**
-   * The tab that the takeover card opened in the full view. The view covers the chat, so when the step on
-   * that tab ends there, the chat shows again with the page beside it (#9979). A view that the user opened
-   * on their own stays open.
-   */
   let takeoverFullViewTabId: string | null = null;
   createEffect(
     () => deps.panels.activeRightPanel() === "browser-expanded",
@@ -253,7 +225,6 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       messageMarker: latestMessageMarker(),
       signInBlocked: blockedTakeoverSignIn(),
     } satisfies BrowserTakeoverResolutionState;
-    // The takeover of an open side thread: a failure shows where the person answered, not in the agent's chat.
     const sideThread = request.threadId === deps.props.threads?.open?.threadId;
     const completed = await deps.props.onRespondToBrowserTakeover(
       decision,
@@ -269,7 +240,6 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
         : undefined,
     );
     if (completed && latestMessageMarker() === resolution.messageMarker) setBrowserTakeoverResolution(resolution);
-    // The user can be on another tab of the full view by now. Then that page stays.
     if (
       completed &&
       takeoverFullViewTabId === request.tabId &&
@@ -279,7 +249,6 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       deps.panels.setActiveRightPanel("browser");
     return completed;
   };
-  // The browser pane closes with its last tab. A switch to an agent with no tabs closes nothing.
   let previousBrowserTabs: { owner: string; count: number } = { owner: "", count: 0 };
   createEffect(
     () => ({
@@ -291,20 +260,12 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       const previous = previousBrowserTabs;
       previousBrowserTabs = { owner, count };
       if (!enabled || previous.owner !== owner || previous.count === 0 || count > 0) return;
-      // Untracked: the close reads the side panel and writes the panel mode, which must not run this effect again.
-      // The mode, not `screenOpen`: a tab can close while a dialog suspends the browser view.
       const mode = untrack(deps.panels.activeRightPanel);
       if (mode === "browser" || mode === "browser-expanded" || mode === "browser-pip")
         untrack(deps.panels.closeBrowserPane);
     },
   );
 
-  /**
-   * A takeover request used to expand the browser over the conversation the moment it arrived,
-   * which took the window away from whatever the user was reading for a step they may not want to
-   * start yet. The card carries the page preview instead, and pressing that preview is what opens
-   * the page -- the same gesture as a preview card in the browser sidebar.
-   */
   function openBrowserTakeoverTab(tab = browserTakeoverTab()) {
     if (!tab) return;
     if (browserTabs().some((entry) => entry.id === tab.id)) {
@@ -313,16 +274,26 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       takeoverFullViewTabId = tab.id;
       return;
     }
-    // A tab that this view does not list, such as a channel member's tab of another thread, opens in the chat
-    // of the agent that owns it. That chat mounts a new store, so main shows the tab first.
     const owner = browserTabOwner(tab);
-    if (!owner || !browserInteractionAvailable() || closingBrowserTabIds.has(tab.id)) return;
-    deps.props.onActivateBrowserTab(tab.id);
-    deps.panels.setActiveRightPanel("browser-expanded", owner.id);
-    deps.props.onSelectAgent(owner.id);
+    if (owner && showTabInAgentChat(tab, owner.id)) deps.props.onSelectAgent(owner.id);
   }
 
-  /** False when a press of the page would do nothing: this view does not have the tab, or cannot show it. */
+  function showTabInAgentChat(tab: BrowserTab, agentId: string): boolean {
+    if (!browserInteractionAvailable() || closingBrowserTabIds.has(tab.id)) return false;
+    deps.props.onActivateBrowserTab(tab.id);
+    deps.panels.setActiveRightPanel("browser-expanded", agentId);
+    return true;
+  }
+
+  function openWaitingAgent(agentId: string) {
+    const wait = deps.props.agentWaits?.[agentId];
+    const tabId =
+      wait?.kind === "waiting" && wait.reason === "takeover" ? deps.props.agentTakeoverTabIds?.[agentId] : undefined;
+    const tab = tabId ? allBrowserTabs().find((entry) => entry.id === tabId) : undefined;
+    if (tab) showTabInAgentChat(tab, agentId);
+    deps.props.onSelectAgent(agentId, MAIN_THREAD_ID);
+  }
+
   const canOpenBrowserTakeoverTab = () => {
     const tab = browserTakeoverTab();
     if (!tab) return false;
@@ -330,8 +301,6 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     return browserTabOwner(tab) !== undefined && browserInteractionAvailable() && !closingBrowserTabIds.has(tab.id);
   };
 
-  // A chat window shows no browser, so its card asks the main window to open the page. The view of the
-  // agent opens it when the tab is in its list, as a press of the page here would.
   createEffect(
     () => {
       const request = deps.takeoverPageRequest();
@@ -341,30 +310,25 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     (tab) => {
       if (!tab) return;
       deps.setTakeoverPageRequest(null);
-      // Untracked: the open reads the tabs and the panel, which must not run this effect again.
       untrack(() => openBrowserTakeoverTab(tab));
     },
   );
 
   const [localSignIn, setLocalSignIn] = createSignal<LocalSignIn | null>(null);
-  /** Only the desktop app opens a window on this computer, and only for a web page of a remote server. */
   const canSignInLocally = (tab: BrowserTab | undefined) =>
     !deps.props.runtime &&
     deps.props.server?.kind === "remote" &&
     serverSupportsCapability(deps.props.server, "browser-sign-in") &&
     webHost(tab?.url) !== null;
 
-  /** A tab that this view does not list opens in the owner's chat and this store unmounts, so only that chat signs in. */
   const canSignInTakeoverLocally = () => {
     const tab = browserTakeoverTab();
     return tab !== undefined && browserTabs().some((entry) => entry.id === tab.id) && canSignInLocally(tab);
   };
 
-  /** The web client cannot send a sign-in from this device, so a page that refused the server needs the desktop app (#9783). */
   const takeoverNeedsDesktopSignIn = () =>
     deps.props.runtime !== undefined && deps.props.browserTakeover?.reason === "sign-in-blocked";
 
-  /** The agent found that the takeover page refused the sign-in from the server, and this computer can sign in. */
   function blockedTakeoverSignIn() {
     const tab = browserTakeoverTab();
     if (deps.props.browserTakeover?.reason !== "sign-in-blocked" || !tab || !canSignInTakeoverLocally())
@@ -376,13 +340,11 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     setLocalSignIn((current) => (current?.tabId === tabId ? { ...current, ...change } : current));
   }
 
-  /** The window opens on this computer, or comes to the front when it is open. */
   function openLocalSignInWindow(tabId: string, url: string) {
     updateLocalSignIn(tabId, { windowOpen: true, error: undefined });
     waitForLocalSignIn(tabId, url);
   }
 
-  /** The request ends when the person closes the window, or when the site in it looks signed in. */
   function waitForLocalSignIn(tabId: string, url: string) {
     conversationPort()
       .browser.openLocalSignIn({ tabId, url })
@@ -407,7 +369,6 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     openLocalSignInWindow(tabId, tab.url);
   }
 
-  /** The takeover card starts it: the page opens in the full view, where the dialog of the sign-in is. */
   function signInTakeoverTabLocally() {
     const tab = browserTakeoverTab();
     if (!tab) return;
@@ -415,11 +376,6 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     startLocalSignIn(tab.id);
   }
 
-  /**
-   * Sends the sign-in to the server tab. Done sends it as it is. The window sends it with `check`
-   * when the site looks signed in: then the window stays open while the server tab shows a sign-in
-   * step, and the wait starts again.
-   */
   async function finishLocalSignIn(check = false) {
     const current = localSignIn();
     if (!current || current.pending) return;
@@ -429,7 +385,6 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     try {
       const result = await conversationPort().browser.finishLocalSignIn({ send: true, check });
       if (!result?.signedIn) {
-        // Without a result main has no sign-in left, so the window must open again.
         updateLocalSignIn(current.tabId, {
           pending: false,
           windowOpen: result !== null && (check || current.windowOpen),
@@ -443,7 +398,6 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       }
       setLocalSignIn(null);
       toast.success(t("browser.signIn.sent", { site: current.site, server }));
-      // The agent waits for the person on this tab. The host loaded the page again, so it can continue.
       if (deps.props.browserTakeover?.tabId === current.tabId) void respondToBrowserTakeover("complete");
     } catch (error) {
       updateLocalSignIn(current.tabId, { pending: false, error: errorMessage(error, t("browser.signIn.failed")) });
@@ -460,7 +414,6 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
 
   const agentsByThreadId = createMemo(() => new Map(deps.props.agents.map((agent) => [agent.threadId, agent])));
 
-  // Single pass, no copy and no localeCompare sort per evaluation.
   const newestSession = (sessions: readonly BrowserControlSession[]) => {
     let acting: BrowserControlSession | undefined;
     let newest: BrowserControlSession | undefined;
@@ -505,19 +458,15 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     return control ? agentsByThreadId().get(control.threadId) : undefined;
   };
 
-  /** Opens the address in the shown tab, or in a new tab. Resolves with the new tab, if one opened. */
   async function openBrowserAddress(address = deps.browserAddress(), newTab = false): Promise<BrowserTab | undefined> {
     if (!browserInteractionAvailable()) return;
     const value = address.trim();
     if (!value) return;
-    // In a channel, a new tab goes to the member that can use the browser there.
     const owner = channel && !deps.props.agent ? channel.browserOwner() : viewOwner();
     const targetAgentId = deps.props.agent?.id;
     const target = targetAgentId ? { agentId: targetAgentId, serverId: deps.props.server?.id ?? "local" } : undefined;
     const analytics = desktopAnalytics.scope();
     const url = browserAddressUrl(value);
-    // A host that cannot move an existing tab to an address gets a new tab for it instead: the
-    // released navigate route carries a direction only.
     const canNavigateCurrentTab = serverSupportsCapability(deps.props.server, TEAM_BROWSER_NAVIGATION_CAPABILITY);
     const currentTab = newTab || !canNavigateCurrentTab ? undefined : activeBrowserTab();
     if (currentTab) {
@@ -525,14 +474,12 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       try {
         await conversationRuntime(deps.props).browser.navigate({ tabId: currentTab.id, url });
       } catch (error) {
-        // A proxy that stopped the page load has its own message, with its name.
         const text = currentText();
         deps.setComposerError(text.errorMessage(error, text.t("browser.error.openAddress")), target, error);
       }
       return;
     }
     if (!owner) {
-      // A channel that gives the browser to no member, or whose browser member has no thread here yet.
       deps.setComposerError(currentText().t("browser.error.channelNoBrowserMember"), target);
       return;
     }
@@ -613,10 +560,6 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     deps.props.onActivateBrowserTab(tabId);
   }
 
-  /**
-   * Makes the tab the one that its owner shows. The conversation of the owner then activates it when it
-   * opens, so the switch to the owner's chat does not bring back the tab that the owner showed last.
-   */
   function showBrowserTabOf(agent: Pick<AgentProfile, "id" | "threadId">, tabId: string) {
     if (!browserInteractionAvailable() || closingBrowserTabIds.has(tabId)) return false;
     const index = tabsOwnedBy(agent).findIndex((tab) => tab.id === tabId);
@@ -687,10 +630,8 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     }
   }
 
-  /** The tabs that the user took in this view. Only the full view shows the control that gives them back. */
   const takenBrowserTabIds = new Set<string>();
 
-  /** The owning agent's browser calls on this tab wait until the release. */
   async function takeBrowserControl(tabId: string) {
     if (await setBrowserControl(tabId, "take")) takenBrowserTabIds.add(tabId);
   }
@@ -699,7 +640,6 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     if (await setBrowserControl(tabId, "release")) takenBrowserTabIds.delete(tabId);
   }
 
-  // The user leaves the full view: the agents get their pages back, so no tab waits with no control in sight.
   let fullViewWasOpen = false;
   createEffect(browserExpandedOpen, (open) => {
     const closed = fullViewWasOpen && !open;
@@ -712,9 +652,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     }
   });
 
-  /** Whether the host took the request. */
   async function setBrowserControl(tabId: string, action: "take" | "release"): Promise<boolean> {
-    // The user gives back a tab of any agent; the user takes only a tab of this agent.
     const tabs = action === "take" ? browserTabs() : allBrowserTabs();
     if (!browserInteractionAvailable() || closingBrowserTabIds.has(tabId) || !tabs.some((tab) => tab.id === tabId)) {
       return false;
@@ -736,12 +674,6 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     }
   }
 
-  /**
-   * The teach view of the full browser. `ready`: the user can go to the page of the task, and nothing is
-   * recorded. `recording`: the host records the steps on `tabId`, and `controlled` says whether the host
-   * said that the user controls the tab. The host ends the recording when the control ends, so the teach
-   * view ends after that. `agentId` is the agent that learns: the steps must not go to another chat.
-   */
   type BrowserTeachState =
     | { phase: "ready"; pending: boolean }
     | {
@@ -766,13 +698,10 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       if (!state) return;
       const { current, controlled, moved, open } = state;
       if (current.phase === "ready") {
-        // Only the full view has the teach bar.
         if (!open) setTeach(null);
         return;
       }
       if (moved) {
-        // The user went to another agent, for example with a tab of that agent. Save would send the
-        // steps to the wrong chat, so the recording is discarded and the tab goes back.
         takenBrowserTabIds.delete(current.tabId);
         setTeach(null);
         void conversationRuntime(deps.props)
@@ -791,17 +720,12 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       ? { phase: current.phase, pending: current.pending }
       : { phase: current.phase, pending: current.pending, tabId: current.tabId, startedAt: current.startedAt };
   };
-  /**
-   * The user can show a task to this agent. The host must record the steps and give the tab to the user.
-   * A phone does not have this action: the user shows a task of many steps on a desktop page.
-   */
   const canTeachBrowserTask = () =>
     browserInteractionAvailable() &&
     Boolean(deps.props.agent) &&
     serverSupportsCapability(deps.props.server, BROWSER_TEACH_CAPABILITY) &&
     serverSupportsCapability(deps.props.server, BROWSER_USER_CONTROL_CAPABILITY);
 
-  /** Opens the full view on a tab of this agent, with the teach bar. The recording starts from the bar. */
   async function openBrowserTeach() {
     if (!canTeachBrowserTask() || teach()) return;
     const tab = activeBrowserTab() ?? (await openBrowserAddress(BROWSER_NEW_TAB_URL, true));
@@ -810,12 +734,10 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     setTeach({ phase: "ready", pending: false });
   }
 
-  /** Ends the teach view before a recording starts. */
   function closeBrowserTeach() {
     if (teach()?.phase === "ready") setTeach(null);
   }
 
-  /** Gives the shown tab to the user and starts the recording of the steps. */
   async function startBrowserTeach() {
     const tab = activeBrowserTab();
     const current = teach();
@@ -841,11 +763,6 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     }
   }
 
-  /**
-   * Ends the recording and gives the tab back. Resolves with the steps of a saved recording in which the
-   * user did a step. A saved recording closes the full view, so the user sees the chat where the agent
-   * gets the steps, or the notice that the recording has no steps.
-   */
   async function stopBrowserTeach(save: boolean): Promise<BrowserTeachStep[] | undefined> {
     const current = teach();
     if (current?.phase !== "recording" || current.pending) return undefined;
@@ -859,8 +776,6 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       setTeach(null);
       if (!save) return undefined;
       deps.panels.setActiveRightPanel("none");
-      // The first step is the page where the recording started. With no step after it, the user showed
-      // nothing, so the agent gets no message.
       if (steps.length > 1) return steps;
       toast(currentText().t("browser.error.teachEmpty"));
       return undefined;
@@ -891,6 +806,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     browserTakeoverResolution,
     respondToBrowserTakeover,
     openBrowserTakeoverTab,
+    openWaitingAgent,
     canOpenBrowserTakeoverTab,
     localSignIn: {
       state: localSignIn,

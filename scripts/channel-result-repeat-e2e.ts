@@ -1,13 +1,3 @@
-// Checks that a member reply that repeats its channel result does not stay at streaming (#3673), in
-// this worktree's running dev app with real provider turns. Start the app with `bun run dev` (never
-// `--shared`), then run `bun scripts/channel-result-repeat-e2e.ts --allow-mutations`. It needs two
-// visible agents and a signed-in OpenCode. When no agent runs on OpenCode, it moves one to the free
-// OpenCode model for the check and gives it its provider back.
-//
-// OpenCode starts the final answer with no text, so the channel shows the reply before its text
-// equals the result. Each turn calls `channel_result` and then repeats the result. It checks that
-// no reply of the ended turn is still at streaming. It makes its own
-// channel and deletes it. Writes .openbot-build/channel-result-repeat-e2e/report.json.
 import assert from "node:assert/strict";
 import { DEVELOPMENT_FREE_DEFAULT } from "@openbot/contracts/development-defaults";
 import type { AgentSummary, ChannelPage } from "@openbot/contracts/ipc";
@@ -34,7 +24,6 @@ const { page } = session;
 const client = new ChannelClient(page);
 let restore: AgentSummary | null = null;
 
-/** Did the task after the first `count` tasks end? An earlier task that ended does not count. */
 const ended = (count: number) => (channel: ChannelPage) => {
   const state = channel.tasks[count]?.state;
   return state === "completed" || state === "failed" || state === "paused" || state === "cancelled";
@@ -86,7 +75,6 @@ try {
   try {
     await client.cleanup();
   } finally {
-    // The agent gets its provider back also when the clean-up fails.
     if (restore)
       await client.update(restore.id, { provider: restore.provider, model: restore.model }).catch(() => undefined);
     writeReport("channel-result-repeat-e2e", report);

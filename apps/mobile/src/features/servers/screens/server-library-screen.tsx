@@ -47,14 +47,11 @@ import { isAndroid, longPressDelay } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 
-/** The side room of the grid, the same as the big title. */
 const PADDING = 20;
 const GAP = 6;
-/** A cell is never smaller than this, so a wide window shows more columns, not larger tiles. */
 const TILE_MIN = 104;
 const MIN_COLUMNS = 3;
 const TILE_RADIUS = 10;
-/** A file card larger than this on both sides is the large square of a block. */
 const LARGE_CARD_SIZE = 160;
 
 const TYPE_LABEL = {
@@ -76,25 +73,10 @@ const TYPE_ICON: Record<FileType, LucideIcon> = {
   other: FileIcon,
 };
 
-/**
- * A picture that the image viewer shows: an image that the phone can download. As on desktop, a
- * failed image is a file card. An image that is too large for the phone is a file card too.
- */
 function isLibraryPicture(file: StoredFileRow): boolean {
   return isViewableImage(file) && file.status !== "failed";
 }
 
-/**
- * Server drawer > Library: the files and pictures of every agent and chat of the server, newest
- * first, as the desktop Library shows them. A picture opens in the image viewer of the chat, and a
- * swipe goes through the pictures of the filter. Another file opens on the preview screen, or in the
- * share sheet when the phone cannot show it.
- *
- * On a host with `library-folders-v1`, the folder capsule at the bottom chooses the place: all files,
- * an agent, a folder, or the files of deleted agents. A file moves into a folder from its menu. The
- * host sends `library-folders-changed` after each change, so a change on the desktop, on another
- * phone or by an agent shows here at once.
- */
 export function ServerLibraryScreen() {
   const { t, errorMessage } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
@@ -109,13 +91,10 @@ export function ServerLibraryScreen() {
   const insets = useSafeAreaInsets();
   const dimensions = useWindowDimensions();
   const blurTarget = useRef<ViewInstance>(null);
-  // The window until the screen measures itself: beside the chat list pane, the screen is narrower.
   const [width, setWidth] = useState(dimensions.width - insets.left - insets.right);
   const [type, setType] = useState<FileTypeFilter>("all");
   const [refreshing, setRefreshing] = useState(false);
 
-  // As on desktop, a file that is gone from the disk does not show. Until the host answers, the list
-  // is the one this phone kept from the last open.
   const files = useMemo(() => (usage?.files ?? []).filter((file) => file.status !== "missing"), [usage]);
   const removedFilesExist = useMemo(() => files.some((file) => fromRemovedAgent(file, living)), [files, living]);
   const storedPlace = useLibraryPlace(serverId);
@@ -125,7 +104,6 @@ export function ServerLibraryScreen() {
   );
   const placeFiles = useMemo(() => filesOfPlace(files, place, snapshot, living), [files, place, snapshot, living]);
   const counts = useMemo(() => fileTypeCounts(placeFiles), [placeFiles]);
-  // A type that a new measurement leaves empty is no longer selected.
   const selected = counts[type] > 0 ? type : "all";
   const shown = useMemo(
     () => queryFiles(placeFiles, { search: "", type: selected, sort: "newest" }),
@@ -142,7 +120,6 @@ export function ServerLibraryScreen() {
   const canDelete = server ? canAdministerServer(server.role) : false;
   const agentName = (agentId: string | null) =>
     agentId ? agents.find((agent) => agent.id === agentId && agent.serverId === serverId)?.name : undefined;
-  // The page title is the place; the caption is the server, or the agent and the folders above a folder.
   const folderPath = place.kind === "folder" && snapshot ? libraryFolderPath(snapshot.folders, place.folderId) : [];
   const placeAgent = place.kind === "agent" || place.kind === "folder" ? (agentName(place.agentId) ?? "") : "";
   const title =
@@ -168,11 +145,9 @@ export function ServerLibraryScreen() {
       ? placeAgentId
       : null;
 
-  // An agent can save a file into a folder before this phone's scan lists the file: scan again once.
   const knownFileIds = useMemo(() => new Set((query.data?.files ?? []).map((file) => file.id)), [query.data]);
   const rescannedRevision = useRef<number | null>(null);
   useEffect(() => {
-    // A cut list does not hold every file, so a missing file is no reason to scan again.
     if (!snapshot || !query.data || query.data.truncated || rescannedRevision.current === snapshot.revision) return;
     if (!Object.keys(snapshot.placement).some((fileId) => !knownFileIds.has(fileId))) return;
     rescannedRevision.current = snapshot.revision;
@@ -224,26 +199,17 @@ export function ServerLibraryScreen() {
         <AndroidBlurTarget target={blurTarget} surface="sheet">
           <Animated.FlatList
             className="flex-1"
-            // The side insets (the iPhone Duo rail, the landscape cutout) go outside the list. With
-            // `always`, iOS would also inset the content by them.
             style={{ marginLeft: insets.left, marginRight: insets.right }}
             alwaysBounceVertical={false}
             contentInsetAdjustmentBehavior={scroll.ownsInset ? "never" : "always"}
             contentContainerClassName="pb-safe-offset-5"
-            // Without a content inset from iOS, the content starts below the transparent header. The
-            // last tiles scroll above the folder capsule.
             contentContainerStyle={{
               ...(scroll.ownsInset ? { paddingTop: scroll.headerHeight } : null),
               ...(snapshot ? { paddingBottom: capsuleRoom } : null),
             }}
             scrollEventThrottle={16}
             showsVerticalScrollIndicator={false}
-            // Android clips off-screen rows by default. With Fabric, a clipped row that mounts again can
-            // crash with "The specified child already has a parent". iOS does not clip by default.
             removeClippedSubviews={false}
-            // Each tile downloads its picture when it mounts. The default window mounts about ten
-            // screens below the one on screen, so a large Library downloaded hundreds of pictures at
-            // once. This window mounts two screens to each side.
             initialNumToRender={4}
             maxToRenderPerBatch={4}
             windowSize={5}
@@ -258,7 +224,6 @@ export function ServerLibraryScreen() {
               ) : undefined
             }
             data={note ? [] : blocks}
-            // The large tile of a block is the one file that only this block has.
             keyExtractor={(block, index) => shown[block.tiles[0]?.index ?? -1]?.id ?? String(index)}
             renderItem={({ item: block }) => (
               <View style={{ height: block.height, marginHorizontal: PADDING, marginBottom: GAP }}>
@@ -327,7 +292,6 @@ export function ServerLibraryScreen() {
   );
 }
 
-/** The type filters, as on desktop: All, and each type that has files, with its count. */
 function TypeFilters({
   counts,
   value,
@@ -355,7 +319,6 @@ function TypeFilters({
             size="md"
             variant="secondary"
             color="default"
-            // The selected type is black on light and white on dark, not the accent color.
             style={active ? { backgroundColor: String(foreground) } : undefined}
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
@@ -413,10 +376,6 @@ function LibraryNote({
   );
 }
 
-/**
- * One tile of the bento grid: a picture, or a card with the type, the name and the chat of a file.
- * A long press opens its menu: Show in chat, Share, and Delete for an owner or admin.
- */
 function LibraryTile({
   file,
   serverId,
@@ -432,16 +391,13 @@ function LibraryTile({
   width: number;
   height: number;
   canDelete: boolean;
-  /** The file's agent has folders that this person organizes. */
   canMove: boolean;
-  /** The chat of the file, or its agent when it is in no chat. */
   source: string | undefined;
   onChanged: () => void;
 }) {
   const { t } = useText();
   const { theme } = useUniwind();
   const menu = useRef<MenuComponentRef | null>(null);
-  // The picture tile reads the same download, so the share sheet does not download it again.
   const attachment = useAttachmentFile(serverId, file, false);
   const preview = useAttachmentPreview(serverId, file);
   const { deleting, confirmDelete } = useStoredFileDelete(serverId, file, onChanged);
@@ -474,7 +430,6 @@ function LibraryTile({
     else if (action === "move") router.push({ pathname: "/library-folders", params: { serverId, fileId: file.id } });
     else if (action === "delete") confirmDelete();
     else if (action === "showInChat" && agentId && messageId)
-      // As on desktop and in search, a file opens the message that carries it.
       router.push({ pathname: "/chat/[agentId]", params: { agentId, messageId } });
   }
 
@@ -542,7 +497,6 @@ function FileCard({
     "--openbot-file-default-soft",
   ]);
   const Icon = TYPE_ICON[fileTypeOf(file)];
-  // The large square of a block shows a larger icon and more of the name.
   const large = width > LARGE_CARD_SIZE && height > LARGE_CARD_SIZE;
   const iconBox = large ? 44 : 32;
   return (

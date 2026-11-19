@@ -147,7 +147,6 @@ export const messages = {
     "Lisans {date} tarihine kadar etkin kalır. Ardından sona erer. Sunucularınız etkilenmez.",
   "billing.license.cancel.descriptionNow": "Lisans, ödenen dönemin sonunda sona erer. Sunucularınız etkilenmez.",
   "billing.license.cancel.keep": "Lisansı koru",
-  // The order form: a hosted server and a license in one order. The pricing page and Billing show it.
   "billing.order.billing": "Faturalandırma dönemi",
   "billing.order.currency": "Para birimi",
   "billing.order.monthly": "Aylık",

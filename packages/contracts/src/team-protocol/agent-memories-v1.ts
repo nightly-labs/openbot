@@ -1,6 +1,3 @@
-// Frozen optional agent-memories-v1 contract. A member can read the memories of a visible agent.
-// Pages use ascending memory ids, so editing or deleting a memory cannot shift the next page.
-// The old GET route and the 2 MiB frame limit are unchanged. Each page fits even with JSON escaping.
 import {
   adminRoute,
   boolean,

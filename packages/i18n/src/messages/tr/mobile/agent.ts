@@ -234,6 +234,13 @@ export const messages = {
     "Mevcut gizli anahtar çalışmayı durdurur. Ana makine onu kullanan istekleri reddeder.",
   "mobile.agent.webhook.rotateConfirm": "Yeniden oluştur",
   "mobile.agent.webhook.rotateFailed": "Gizli anahtar yeniden oluşturulamadı. Tekrar deneyin.",
+  "mobile.agent.webhook.giveToAgent": "İmzalama gizli anahtarını {name} ajanına ver",
+  "mobile.agent.webhook.giveTitle": "{name} ajanına yeni bir imzalama gizli anahtarı verilsin mi?",
+  "mobile.agent.webhook.giveBody":
+    "Mevcut gizli anahtar çalışmayı durdurur. {name} yeni gizli anahtarı API anahtarı olarak kaydeder ve gönderene ekleyebilir.",
+  "mobile.agent.webhook.giveConfirm": "Ver",
+  "mobile.agent.webhook.giveFailed": "İmzalama gizli anahtarı ajana verilemedi. Tekrar deneyin.",
+  "mobile.agent.webhook.given": "{name} yeni imzalama gizli anahtarını aldı.",
   "mobile.agent.webhook.activity": "Etkinlik",
   "mobile.agent.webhook.activityFailed": "Etkinlik yüklenemedi. Tekrar deneyin.",
   "mobile.agent.webhook.activity.ignored": "Yok sayıldı",

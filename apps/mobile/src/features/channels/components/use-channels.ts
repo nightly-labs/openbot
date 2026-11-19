@@ -16,10 +16,21 @@ export function useChannels(serverId: string, channelId?: string) {
   return { ...state, store: channelStore };
 }
 
-/**
- * Only the channel list of a server. The list keeps its identity while it stays the same, so a
- * message page that changes, such as on each event of a channel reply, does not render the caller again.
- */
+export function useChannel(serverId: string, channelId: string) {
+  const { channelStore } = useMobileWorkspaceActions();
+  const subscribe = useCallback(
+    (listener: () => void) => channelStore.subscribe(serverId, listener),
+    [channelStore, serverId],
+  );
+  const snapshot = useCallback(
+    () => channelStore.channelView(serverId, channelId),
+    [channelStore, serverId, channelId],
+  );
+  const view = useSyncExternalStore(subscribe, snapshot);
+  useEffect(() => channelStore.observe(serverId, channelId), [channelStore, serverId, channelId]);
+  return { ...view, store: channelStore };
+}
+
 export function useChannelList(serverId: string) {
   const { channelStore } = useMobileWorkspaceActions();
   const subscribe = useCallback(

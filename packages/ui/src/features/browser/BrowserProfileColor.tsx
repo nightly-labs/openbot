@@ -5,15 +5,10 @@ import { AVATAR_HUE_CHOICES, avatarHueSwatch } from "../../bloub-avatar";
 import { useText } from "../../text";
 import { AVATAR_HUE_LABEL } from "../agents/avatar-hue-label";
 
-/** The color of a named profile, as the labels of its tabs show it. */
 export function browserProfileColor(hue: AvatarHue): string {
   return avatarHueSwatch(hue);
 }
 
-/**
- * The color mark of a profile. The shared profile is gray, which no named profile can be. The name
- * beside it says the same, so screen readers skip it.
- */
 export function BrowserProfileDot(props: { hue: AvatarHue | "shared" }) {
   return (
     <span
@@ -24,12 +19,10 @@ export function BrowserProfileDot(props: { hue: AvatarHue | "shared" }) {
   );
 }
 
-/** The color of one profile in its settings: the dot opens the colors that agents also use. */
 export function BrowserProfileColorMenu(props: {
   name: string;
   hue: AvatarHue;
   disabled: boolean;
-  /** Where the menu opens. Absent means the document body. */
   mount?: HTMLElement | undefined;
   onChange: (hue: AvatarHue) => void;
 }) {

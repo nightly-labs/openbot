@@ -13,7 +13,6 @@ interface PromptState {
   pending: boolean;
   failedAnswers: Record<string, string[]> | null;
   resolution: AgentPromptResolution | null;
-  /** The person chose to answer the current question with the chat composer. */
   replyInChat: boolean;
 }
 
@@ -38,7 +37,6 @@ export function useQuestionPrompt(
 ) {
   const scope = JSON.stringify([agentId, message?.id]);
   const [stored, setState] = useState(() => initialState(scope));
-  // A new form never inherits drafts (especially private answers) from its predecessor.
   const state = stored.scope === scope ? stored : initialState(scope);
   if (stored.scope !== scope) setState(state);
   const submitting = useRef(new Set<string>());
@@ -51,7 +49,6 @@ export function useQuestionPrompt(
     setState((current) => (current.scope === scope ? { ...current, ...change } : current));
   }
 
-  /** Sends all answers at once. A failure rejects, so the caller can show the host's reason. */
   async function send(answers: Record<string, string[]>): Promise<void> {
     if (disabled || !prompt || submitting.current.has(scope))
       throw new Error(currentText().t("mobile.chat.question.sendFailed"));
@@ -86,8 +83,6 @@ export function useQuestionPrompt(
       drafts: { ...state.drafts, [question.id]: "" },
       failedAnswers: null,
       index: next ?? state.index,
-      // The choice to answer in the chat belongs to one question. The next question asks again,
-      // so a later message does not answer a question the person did not choose to answer.
       replyInChat: false,
     });
     if (next === null) void submit(answers);

@@ -99,4 +99,6 @@ export const messages = {
     "{name}: z argumentów lub adresu usunięto wartości, które mogą zawierać sekret. Wpisz je ponownie w Ustawieniach.",
   "error.import.transferSharedKept":
     "Liczba plików z folderu współdzielonego, które już tu są: {number}. Zostają bez zmian.",
+  "error.import.transferPartSkipped":
+    "Nie udało się zaimportować części pliku. Pozostałe części są na tym serwerze, więc nie importuj pliku ponownie.",
 } as const satisfies PartialTranslation<typeof source>;

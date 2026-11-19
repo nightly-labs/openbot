@@ -11,7 +11,6 @@ import { isPeerHiddenProvider } from "./provider-visibility";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin } from "./request-helpers";
 
-/** The provider that a new agent of this server starts on, read and set from a joined server. Frozen by `provider-default-v1`. */
 export async function routeProviderDefault(
   context: TeamApiRequestContext,
   admin: TeamApiAdmin | undefined,
@@ -27,7 +26,6 @@ export async function routeProviderDefault(
     throw new HttpError(400, sourceText("error.team.providerDefaultUnsupported"));
   requireAdmin(member);
   const body = await readJson(request);
-  // A provider that the client's protocol does not show is no choice for it: it reads none, and cannot set it.
   const visible = (current: ProviderDefaultSetting): ProviderDefaultSetting =>
     isPeerHiddenProvider(current.provider, context.protocol) ? { provider: null, model: null } : current;
   if (url.pathname === PROVIDER_DEFAULT_ROUTES.settings) return json(200, visible(await runCauseEffect(setting.get())));

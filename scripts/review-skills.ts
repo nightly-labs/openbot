@@ -31,7 +31,6 @@ if (command === "list") {
           .trim()
       : undefined;
   if (command === "reject" && !note) throw new Error("Rejecting a skill requires --note <reason>.");
-  // The card belongs to the listing's approved version, so it needs the skill id of this version.
   const skillId = command === "approve" ? await submissionSkillId(targetId) : null;
   const response = await fetch(new URL(`/v1/skills/admin/submissions/${encodeURIComponent(targetId)}`, apiUrl), {
     method: "POST",
@@ -57,7 +56,6 @@ if (command === "list") {
   });
   if (!response.ok) throw new Error(await response.text());
   process.stdout.write(`${rest[0] === "on" ? "Verified" : "Unverified"} ${targetId}.\n`);
-  // The card shows the shield after the name.
   await refreshCardAfterReview(api, "skill", targetId);
 } else if (command === "card" && targetId) {
   await runCardCommand(api, "skill", [targetId], outDirectoryArgument(rest));

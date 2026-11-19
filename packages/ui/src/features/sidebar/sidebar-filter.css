@@ -1,5 +1,3 @@
-/* The filter button beside New, its menu, and what the list shows when no chat matches. */
-
 .sidebar-filter-button svg {
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
@@ -10,7 +8,6 @@
   color: var(--openbot-text-primary);
 }
 
-/* A filter is set. */
 .sidebar-filter-dot {
   position: absolute;
   inset-block-start: 3px;
@@ -21,7 +18,6 @@
   background: var(--openbot-text-primary);
 }
 
-/* The menus keep the edge and the top highlight of the shared menu, but not its drop shadow. */
 .sidebar-filter-menu-content.ui-action-menu {
   --ui-menu-panel-shadow: inset 0 1px 0 var(--ui-menu-highlight), 0 0 0 1px var(--ui-menu-edge);
 }
@@ -30,7 +26,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* A submenu row ends with its chevron. A count or a badge sits just before it, not in the middle. */
 .sidebar-filter-menu-content .sidebar-filter-sub-chevron {
   margin-inline-start: auto;
   color: var(--openbot-text-muted);

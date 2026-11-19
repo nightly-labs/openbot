@@ -23,20 +23,14 @@ export class WhatsAppConnectFailed extends Schema.TaggedError<WhatsAppConnectFai
   cause: Schema.Defect(),
 }) {}
 
-/** How long a link waits for the phone. WhatsApp shows about six QR codes in that time. */
 const LINK_TIMEOUT_MS = 3 * 60_000;
-/** How long adding a contact waits for WhatsApp to name the form of its number. */
 const REGISTERED_NUMBER_TIMEOUT_MS = 5_000;
 
 const IDLE: WhatsAppLinkState = { status: "idle", qr: null, code: null, workspaceId: null, error: null };
 
-/** What the messaging service does for a link: makes the connection, and starts it with its values. */
 export interface WhatsAppConnectHooks {
-  /** The connection of the number, new or the one it had (which stops). Returns its id. */
   prepare(workspaceId: string, workspaceName: string): Effect.Effect<string, MessagingOperationFailed>;
-  /** Saves the values of the connection and starts it. */
   finish(connectionId: string, values: Record<string, string>): Effect.Effect<void, MessagingOperationFailed>;
-  /** Runs an operation in the service's scope; a failure is only logged. */
   dispatch(operation: Effect.Effect<void, MessagingOperationFailed>): void;
 }
 
@@ -56,12 +50,6 @@ interface RunningLink {
   finishing: boolean;
 }
 
-/**
- * The WhatsApp half of the messaging service: the link of a new number, and who may give work through
- * each linked number. A link pairs a new device in a new store, which becomes the connection's store
- * when the link finishes; a failed link deletes it, so it leaves nothing. The sender settings live in `openbot.db` (allowed
- * senders) and in the connection's stored values (own number); pairing requests are in memory.
- */
 export class WhatsAppConnect implements WhatsAppPolicy {
   readonly #runtime: WhatsAppRuntime;
   readonly #store: MessagingStore;
@@ -85,7 +73,6 @@ export class WhatsAppConnect implements WhatsAppPolicy {
     return this.#state;
   }
 
-  /** Starts a link: a QR code to scan, or a pairing code for the given phone. An earlier link ends. */
   readonly startLink = Effect.fn("WhatsAppConnect.startLink")(function* (
     this: WhatsAppConnect,
     input: StartWhatsAppLinkInput,
@@ -113,7 +100,6 @@ export class WhatsAppConnect implements WhatsAppPolicy {
           this.#state = { ...this.#state, qr };
           return;
         }
-        // A pairing code is asked once the socket is ready to show a QR code.
         if (codeRequested || !input.phoneNumber) return;
         codeRequested = true;
         this.#hooks.dispatch(
@@ -147,8 +133,6 @@ export class WhatsAppConnect implements WhatsAppPolicy {
     this.#state = IDLE;
   });
 
-  // The sender policy, read by the transport for each message.
-
   rules(workspaceId: string): WhatsAppSenderRules {
     const record = this.#store.connectionForWorkspace("whatsapp", workspaceId);
     if (!record) return { ownNumber: true, contacts: new Map(), groups: new Set() };
@@ -173,7 +157,6 @@ export class WhatsAppConnect implements WhatsAppPolicy {
     return record ? { connectionId: record.connectionId, store: this.#history } : null;
   }
 
-  /** The settings of each linked number, for the overview. */
   accounts(): WhatsAppAccount[] {
     return this.#store
       .connections()
@@ -188,7 +171,6 @@ export class WhatsAppConnect implements WhatsAppPolicy {
       }));
   }
 
-  /** Allows a contact or a group that the user typed or selected. */
   readonly addSender = Effect.fn("WhatsAppConnect.addSender")(function* (
     this: WhatsAppConnect,
     workspaceId: string,
@@ -197,10 +179,6 @@ export class WhatsAppConnect implements WhatsAppPolicy {
     yield* this.#allowSender(workspaceId, sender, true);
   });
 
-  /**
-   * Saves the sender. With `typed`, a contact whose number has no WhatsApp account, such as a number
-   * without its country code, is refused: posts to it would reach nobody.
-   */
   #allowSender(
     workspaceId: string,
     sender: WhatsAppSender,
@@ -215,13 +193,6 @@ export class WhatsAppConnect implements WhatsAppPolicy {
     });
   }
 
-  /**
-   * The form of a contact's number that WhatsApp has, so that posts reach the contact. With `typed`,
-   * it fails when WhatsApp answers that no form has an account. The number as it was typed when the
-   * number is not connected, when WhatsApp does not answer in time, when WhatsApp names an account in
-   * a form that OpenBot does not know, or, without `typed`, when the number has only one form or no
-   * form has an account.
-   */
   #registeredNumber(
     connectionId: string,
     number: string,
@@ -234,7 +205,6 @@ export class WhatsAppConnect implements WhatsAppPolicy {
       Effect.map((jids) => {
         if (!jids) return number;
         const form = forms.find((candidate) => jids.includes(userJid(candidate)));
-        // Only an answer with no account refuses the number: an account in another form still exists.
         return form ?? (typed && jids.length === 0 ? null : number);
       }),
       Effect.timeoutOrElse({ duration: REGISTERED_NUMBER_TIMEOUT_MS, orElse: () => Effect.succeed(number) }),
@@ -254,7 +224,6 @@ export class WhatsAppConnect implements WhatsAppPolicy {
     this.#store.removeAllowedSender(connectionId, senderId);
   });
 
-  /** Approves a person, who then gets one line in WhatsApp, or ends the request without an answer. */
   readonly answerRequest = Effect.fn("WhatsAppConnect.answerRequest")(function* (
     this: WhatsAppConnect,
     workspaceId: string,
@@ -265,7 +234,6 @@ export class WhatsAppConnect implements WhatsAppPolicy {
     const request = this.#requests.take(workspaceId, code);
     if (!request) return yield* failure("error.messaging.whatsappRequestEnded");
     if (!approve) return;
-    // The person wrote to this number, so the account exists: only the Brazilian form is looked up.
     yield* this.#allowSender(workspaceId, { id: request.senderId, kind: "contact", name: request.name }, false);
     const handle = this.#handle(connectionId);
     if (handle)
@@ -283,7 +251,6 @@ export class WhatsAppConnect implements WhatsAppPolicy {
     const values = this.#credentials.get(connectionId);
     if (!values) return yield* failure("error.messaging.whatsappNotConnected");
     yield* this.#credentials.set(connectionId, { ...values, ownNumber: ownNumber ? "1" : "0" });
-    // An owner's personal number answers nobody it does not know.
     if (ownNumber) this.#requests.clear(workspaceId);
   });
 
@@ -326,12 +293,10 @@ export class WhatsAppConnect implements WhatsAppPolicy {
     return list;
   });
 
-  /** Forgets the requests of a number that was disconnected. */
   forget(workspaceId: string): void {
     this.#requests.clear(workspaceId);
   }
 
-  /** The device is linked: its store becomes the connection's, and the connection starts. */
   readonly #finish = Effect.fn("WhatsAppConnect.finish")(function* (
     this: WhatsAppConnect,
     link: RunningLink,
@@ -354,15 +319,11 @@ export class WhatsAppConnect implements WhatsAppPolicy {
         whatsappStoreKey: Buffer.from(key).toString("base64"),
         storeId: link.storeId,
         ownNumber: ownNumber ? "1" : "0",
-        // A number that links again keeps these settings, as it keeps its allowed senders.
         ...(earlier?.workingMessage === "0" ? { workingMessage: "0" } : {}),
         ...(earlier?.statusReactions === "0" ? { statusReactions: "0" } : {}),
       });
-      // The number's earlier device was replaced by this link, so its keys go, but only once the new
-      // link is saved: a failed save keeps the device that worked before.
       if (previous && previous !== link.storeId) this.#runtime.delete(previous);
     }).pipe(
-      // A link that cannot become a connection leaves no socket and no store.
       Effect.onError(() =>
         Effect.gen({ self: this }, function* () {
           yield* link.handle.session.stop();
@@ -372,8 +333,6 @@ export class WhatsAppConnect implements WhatsAppPolicy {
       ),
     );
     this.#state = { ...IDLE, status: "linked", workspaceId: identity.number };
-    // A first message in the owner's own chat, so the chat shows at the top of WhatsApp. It is an own
-    // post, so the transport does not read it as a request.
     this.#hooks.dispatch(
       link.handle.session
         .send(userJid(identity.number), {
@@ -388,7 +347,6 @@ export class WhatsAppConnect implements WhatsAppPolicy {
     );
   });
 
-  /** Ends `link` as failed. A late failure of a link that was cancelled or replaced does nothing. */
   #fail(link: RunningLink, error: NonNullable<WhatsAppLinkState["error"]>): Effect.Effect<void> {
     return Effect.gen({ self: this }, function* () {
       if (this.#link !== link) return;
@@ -397,10 +355,6 @@ export class WhatsAppConnect implements WhatsAppPolicy {
     });
   }
 
-  /**
-   * Ends the link. A failed link stops its socket and deletes its store; a finished one keeps both, and
-   * the connection goes on with the same socket.
-   */
   #end(link: RunningLink, discard: boolean): Effect.Effect<void> {
     return Effect.gen({ self: this }, function* () {
       if (this.#link === link) this.#link = null;
@@ -412,7 +366,6 @@ export class WhatsAppConnect implements WhatsAppPolicy {
     });
   }
 
-  /** The open store of a connection, by the store id in its values. */
   #handle(connectionId: string): WhatsAppConnectionHandle | null {
     const storeId = this.#credentials.get(connectionId)?.storeId;
     return storeId ? this.#runtime.get(storeId) : null;
@@ -423,24 +376,17 @@ export class WhatsAppConnect implements WhatsAppPolicy {
     return values ? whatsAppCredentials(values).ownNumber : true;
   }
 
-  /**
-   * True when a post to this chat shows as a message of the owner: the owner's personal number, in a
-   * chat that is not the owner's "Message yourself" chat. The workspace id of a number is its phone
-   * number, and the own chat goes by that number.
-   */
   postsAsOwner(connectionId: string, platformChannelId: string): boolean {
     const record = this.#store.connection(connectionId);
     if (record?.platform !== "whatsapp" || !this.#ownNumber(connectionId)) return false;
     return platformChannelId.split("@")[0] !== record.workspaceId;
   }
 
-  /** True unless the owner turned off the "Working on it…" post of this number. */
   workingMessage(connectionId: string): boolean {
     const values = this.#credentials.get(connectionId);
     return values ? whatsAppCredentials(values).workingMessage : true;
   }
 
-  /** True unless the owner turned off the status reactions of this number. */
   statusReactions(connectionId: string): boolean {
     const values = this.#credentials.get(connectionId);
     return values ? whatsAppCredentials(values).statusReactions : true;
@@ -468,10 +414,6 @@ function failure(key: WhatsAppErrorKey): Effect.Effect<never, WhatsAppConnectFai
   return Effect.fail(failureError(key));
 }
 
-/**
- * The name that the settings keep for a contact, or empty. An approved pairing request without a
- * profile name saved only the number, which must not hide the profile name that WhatsApp sends later.
- */
 function savedName(name: string): string {
   const trimmed = name.trim();
   return /^[0-9]+$/u.test(trimmed) ? "" : trimmed;

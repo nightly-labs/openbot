@@ -4,16 +4,9 @@ import { withTransaction } from "../database/sqlite-transaction";
 import type { OpenBotDatabase } from "../openbot-database";
 import type { ContextEntry, HistoryFilter, InboundFile } from "./messaging-types";
 
-/** The context of one conversation has at most this many earlier messages; the prompt keeps fewer. */
 const CONTEXT_MESSAGES = 200;
-/** A search uses at most this many words; more words find fewer messages, not other ones. */
 const QUERY_WORDS = 8;
 
-/**
- * The messages that a connection saw, in `projection_messaging_history`, for a platform that sends no
- * history to this computer (WhatsApp). The rows of one connection go when it disconnects, and each
- * row goes 90 days after it arrived (`prune`).
- */
 export class MessagingHistoryStore {
   readonly #database: OpenBotDatabase;
 
@@ -21,10 +14,6 @@ export class MessagingHistoryStore {
     this.#database = database;
   }
 
-  /**
-   * Saves one message. `authorId` is the platform's id of its author, which an edit or a delete must
-   * match. False when the message was saved before.
-   */
   save(
     connectionId: string,
     platformChannelId: string,
@@ -56,10 +45,6 @@ export class MessagingHistoryStore {
     return Number(result.changes) > 0;
   }
 
-  /**
-   * The messages of one conversation after `afterId` and before `beforeId`, oldest first: the newest
-   * of them when there are more. A missing `afterId` reads from the start, a missing `beforeId` to the end.
-   */
   between(
     connectionId: string,
     platformChannelId: string,
@@ -92,12 +77,6 @@ export class MessagingHistoryStore {
     );
   }
 
-  /**
-   * The newest messages of one conversation, or of the whole chat for null, by the time they were
-   * sent, oldest first. A filter keeps only the messages sent before its time whose text or author has
-   * each of its words. A read does not stop inside one second: a message sent in the same second as the
-   * oldest one it gives comes too, so a next read with `before` = that time misses none of them.
-   */
   recent(
     connectionId: string,
     platformChannelId: string,
@@ -115,8 +94,6 @@ export class MessagingHistoryStore {
       conditions.push("sent_at < ?");
       values.push(filter.before);
     }
-    // The words are compared in JavaScript, as the chat state does: SQLite's LIKE ignores the case of
-    // ASCII letters only, and "Łódź" must find "łódź".
     const rows = this.#database.connection
       .prepare(
         `SELECT message_id, author_name, text, sent_at, files_json FROM projection_messaging_history
@@ -135,10 +112,6 @@ export class MessagingHistoryStore {
     return found.reverse();
   }
 
-  /**
-   * Records where the copy of a message's file is, and its real size, which the size limit counts.
-   * False when the message or its file is gone.
-   */
   saveFilePath(
     connectionId: string,
     platformChannelId: string,
@@ -163,12 +136,10 @@ export class MessagingHistoryStore {
     return Number(result.changes) > 0;
   }
 
-  /** The path of the saved copy of a message's file, or null when there is none. */
   savedFile(connectionId: string, platformChannelId: string, messageId: string, fileId: string): string | null {
     return this.#files(connectionId, platformChannelId, messageId)?.find((file) => file.id === fileId)?.path ?? null;
   }
 
-  /** Deletes the messages of every connection that arrived before `savedBefore`. Returns the paths of their files. */
   prune(savedBefore: string): string[] {
     return filePaths(
       this.#database.connection
@@ -177,10 +148,6 @@ export class MessagingHistoryStore {
     );
   }
 
-  /**
-   * Deletes one message that its author deleted for everyone. A delete from a different author changes
-   * nothing: the sender chooses the id of the message. Returns the paths of its files.
-   */
   forgetMessage(connectionId: string, platformChannelId: string, messageId: string, authorId: string): string[] {
     return filePaths(
       this.#database.connection
@@ -193,7 +160,6 @@ export class MessagingHistoryStore {
     );
   }
 
-  /** Replaces the text of a message that its author changed. A change from a different author does nothing. */
   editMessage(
     connectionId: string,
     platformChannelId: string,
@@ -209,10 +175,6 @@ export class MessagingHistoryStore {
       .run(text, connectionId, platformChannelId, messageId, authorId);
   }
 
-  /**
-   * Keeps the saved copies of a connection's files under `maxBytes`: the copies of the oldest
-   * messages go first, and their messages keep only the names of the files. Returns the paths that go.
-   */
   trimFiles(connectionId: string, maxBytes: number): string[] {
     const db = this.#database.connection;
     return withTransaction(db, () => {
@@ -240,7 +202,6 @@ export class MessagingHistoryStore {
     });
   }
 
-  /** Deletes every message of a connection. Returns the paths of their files. */
   forget(connectionId: string): string[] {
     return filePaths(
       this.#database.connection
@@ -262,7 +223,6 @@ export class MessagingHistoryStore {
   }
 }
 
-/** True when the message was sent before the filter's time and has each word of its query. */
 export function matchesHistoryFilter(entry: ContextEntry, filter: HistoryFilter): boolean {
   if (filter.before && !(Date.parse(entry.sentAt) < Date.parse(filter.before))) return false;
   const haystack = `${entry.authorName}\n${entry.text}`.toLocaleLowerCase();
@@ -273,7 +233,6 @@ function queryWords(query: string | undefined): string[] {
   return (query ?? "").split(/\s+/u).filter(Boolean).slice(0, QUERY_WORDS);
 }
 
-/** Rows read newest first, as entries oldest first. */
 function entries(rows: unknown): ContextEntry[] {
   return databaseRows(rows).map(entry).reverse();
 }
@@ -289,7 +248,6 @@ function entry(row: DynamicRecord): ContextEntry {
   };
 }
 
-/** The bytes of the saved copies of a message's files. */
 function savedBytes(files: readonly InboundFile[]): number {
   return files.reduce((sum, file) => sum + (file.path ? file.size : 0), 0);
 }
@@ -300,7 +258,6 @@ function filePaths(rows: unknown): string[] {
   );
 }
 
-/** The files of a row. A file that does not decode is left out: it cannot be downloaded or opened. */
 function decodeFiles(json: string): InboundFile[] {
   let parsed: unknown;
   try {

@@ -36,10 +36,8 @@ const SCENE_LABELS = {
   fireflies: "mobile.settings.appearance.backdrop.fireflies",
 } as const satisfies Record<ChatBackdropScene, MobileTextKey>;
 
-/** The size of the round picture of each choice. */
 const DOT = 28;
 
-/** The file extension of a picked photo, from its name or type. */
 function photoExtension(asset: ImagePicker.ImagePickerAsset): string {
   const fromName = /\.([a-z0-9]{2,5})$/iu.exec(asset.fileName ?? asset.uri)?.[1];
   if (fromName) return fromName.toLowerCase();
@@ -57,11 +55,6 @@ function Dot({ children }: { children: ReactNode }) {
   );
 }
 
-/**
- * Settings › Appearance › Backdrop: the scene behind Home and the chats on this phone, as the desktop
- * window backdrop: the choices, how strong the scene is and See-through bubbles. The preview at the
- * top of Appearance (`AppearancePreview`) shows them.
- */
 export function ChatBackdropSection({ dark }: { dark: boolean }) {
   const { t } = useText();
   const ready = useChatBackdrop((state) => state.ready);
@@ -122,7 +115,6 @@ export function ChatBackdropSection({ dark }: { dark: boolean }) {
       ),
       onPress: () => choose(scene),
     })),
-    // An agent page needs the web view; an old Android build without it does not offer the page.
     ...(agentPage && HtmlPage
       ? [
           {
@@ -157,7 +149,6 @@ export function ChatBackdropSection({ dark }: { dark: boolean }) {
           )}
         </Dot>
       ),
-      // The chosen photo opens the library again, so the reader can change it.
       onPress: () => {
         if (photo && choice !== "photo") choose("photo");
         else void pickPhoto().catch(fail);
@@ -194,7 +185,6 @@ export function ChatBackdropSection({ dark }: { dark: boolean }) {
             step={0.05}
             disabled={!ready || choice === "none"}
             label={t("mobile.settings.appearance.backdrop.strength")}
-            // The preview and the chats follow the finger; the value is saved when it lifts.
             onChange={previewChatBackdropStrength}
             onChangeEnd={(next) => {
               void saveChatBackdrop({ strength: next }).catch(fail);
@@ -214,7 +204,6 @@ export function ChatBackdropSection({ dark }: { dark: boolean }) {
         <SettingsRow>
           <SettingsSwitch
             value={seeThrough}
-            // Bubbles are solid with no backdrop, so the switch waits until a backdrop shows.
             disabled={!messageColorReady || choice === "none"}
             label={t("mobile.settings.appearance.seeThroughBubbles")}
             dark={dark}

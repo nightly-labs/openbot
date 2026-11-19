@@ -20,20 +20,11 @@ interface ShareExtensionSyncProps {
   apiUrl: string;
   userId: string;
   sessionToken: string;
-  /** In the order of the app's server list, with the default server first. */
   servers: readonly MobileServer[];
-  /** False while the account directory loads, when the servers can be out of date. */
   serversReady: boolean;
   agents: readonly MobileAgent[];
 }
 
-/**
- * Keeps the data of the iOS share extension current, so it can send a share without the app: the
- * session, the servers and their agents, the app lock, and the extension's text in the app's language.
- * An online server has loaded all its agents. A server that did not load keeps the agents that the
- * app saw last, so the extension still offers them. As in the app's share sheet, a hidden agent is
- * offered too: hiding takes an agent out of the chat list, not out of reach.
- */
 export function ShareExtensionSync({
   apiUrl,
   userId,
@@ -74,7 +65,6 @@ export function ShareExtensionSync({
       "mobile.share.extension.send": t("mobile.share.extension.send"),
       "mobile.share.extension.footer": t("mobile.share.extension.footer"),
       "mobile.share.extension.message": t("mobile.share.extension.message"),
-      // The extension puts the agent's name in place of `{name}`.
       "mobile.share.extension.sending": t("mobile.share.extension.sending", { name: "{name}" }),
       "mobile.share.extension.sent": t("mobile.share.extension.sent", { name: "{name}" }),
       "mobile.share.extension.failed": t("mobile.share.extension.failed"),
@@ -88,8 +78,6 @@ export function ShareExtensionSync({
 
   const directory = useMemo((): ShareExtensionDirectory | null => {
     if (!serversReady) return null;
-    // The paired desktop (`kind: "local"`) connects as every other server does. Only a server
-    // without a key, such as the placeholder before the directory loads, cannot be reached.
     const reachable = servers.filter((server) => server.publicKey);
     const offeredAgents: ShareExtensionAgent[] = [];
     for (const server of reachable) {
@@ -125,12 +113,10 @@ export function ShareExtensionSync({
 
   useEffect(() => {
     if (!directory) {
-      // The lock must reach the extension also while the servers load.
       if (locked) lockShareExtension();
       return;
     }
     writeShareExtensionDirectory(directory, agents);
-    // The share sheet must not offer an agent that is gone or on a server the account left.
     const next = new Set(directory.agents.map((agent) => shareConversationId(agent.serverId, agent.id)));
     forgetShareTargets([...offered.current].filter((id) => !next.has(id)));
     offered.current = next;

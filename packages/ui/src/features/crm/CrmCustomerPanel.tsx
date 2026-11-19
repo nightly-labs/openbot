@@ -355,7 +355,6 @@ export function CrmCustomerPanel(props: { crm: CrmViewModel; customer: CrmCustom
               onChange={(value) => update({ method: value === "none" ? null : value })}
             />
             <Show when={props.customer.method === "stripe" || props.customer.stripeCustomerId !== ""}>
-              {/* The source links the customer by this id, so it does not change while it is linked. */}
               <Show when={props.customer.source === null} fallback={staticField("stripeCustomerId")}>
                 {field("stripeCustomerId")}
               </Show>
@@ -412,7 +411,7 @@ export function CrmCustomerPanel(props: { crm: CrmViewModel; customer: CrmCustom
               </dd>
             </div>
             <div class="crm-field">
-              <dt>{t("crm.customer.since")}</dt>
+              <dt>{t("crm.customer.added")}</dt>
               <dd class="crm-static">
                 {format.date(new Date(props.customer.createdAt), { month: "long", year: "numeric" })}
               </dd>

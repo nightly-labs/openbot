@@ -6,7 +6,6 @@ import { type Accessor, createEffect, untrack } from "solid-js";
 import type { UsagePort } from "../usage/usage-port";
 import type { WebWorkspace } from "./web-client-context";
 
-/** The usage report's calls on the connected host. The report reads the server list again when the host is online. */
 export function createWebUsagePort(
   workspace: Pick<WebWorkspace, "state" | "runtime" | "onHostEvent">,
   hostRequest: (serverId?: string) => TeamApiRequest,

@@ -88,6 +88,8 @@ export const messages = {
   "error.provider.runtimeUpdateIncomplete": "L'aggiornamento del runtime non è stato completato.",
   "error.provider.downloadHttp": "Download del runtime non riuscito con HTTP {status}.",
   "error.provider.downloadNoData": "Il download del runtime non ha restituito dati.",
+  "error.provider.downloadStalled":
+    "Il download si è interrotto perché non sono arrivati dati per un minuto. Controlla la connessione a internet, poi riprova.",
   "error.provider.downloadSize": "Il download del runtime ha una dimensione inattesa.",
   "error.provider.downloadIntegrity": "Il download del runtime non ha superato il controllo di integrità.",
   "error.provider.runtimeReplacing": "Impossibile installare il runtime perché un'altra istanza lo sta sostituendo.",
@@ -178,6 +180,10 @@ export const messages = {
     "{provider} non ha risposto in tempo. Il computer potrebbe essere occupato. OpenBot riproverà.",
   "error.provider.cliTimedOutRefresh":
     "{provider} non ha risposto in tempo. Il computer potrebbe essere occupato. Aggiorna i provider per riprovare.",
+  "error.provider.stoppedBeforeStart":
+    "{provider} si è fermato prima che questo messaggio iniziasse. Invia di nuovo il messaggio.",
+  "error.provider.sessionStartTimedOut":
+    "{provider} non ha aperto una nuova chat in tempo, quindi questo messaggio non è iniziato. Sul computer che esegue OpenBot, apri Provider, seleziona {provider} e fai clic su Riavvia. Poi riprova.",
   "error.provider.serviceUnreachable":
     "{provider} non riesce a connettersi al suo servizio. Controlla la connessione a internet. OpenBot riproverà.",
   "error.provider.serviceUnreachableRefresh":
@@ -188,6 +194,8 @@ export const messages = {
     "{provider} non ha elencato i suoi modelli entro {seconds} s. Il computer potrebbe essere occupato.",
   "error.provider.startStopped":
     "{provider} non si è avviato più volte di seguito, quindi OpenBot ha smesso di provare. Aggiorna i provider per riprovare.",
+  "error.provider.startPaused":
+    "{provider} non si è avviato più volte di seguito. OpenBot riproverà con il prossimo messaggio o la prossima routine. Per riprovare ora, aggiorna i provider.",
   "error.provider.tempDiskSpace":
     "{provider} ha bisogno di almeno 1 GB di spazio libero su disco per avviarsi. Libera spazio, poi aggiorna i provider.",
   "error.provider.noCodeSignIn": "Non si può accedere a {provider} con un codice.",
@@ -227,12 +235,16 @@ export const messages = {
     "OpenCode ha rifiutato questo modello gratuito. Alcuni modelli gratuiti non sono disponibili in tutti i paesi. Scegli un altro modello con l'etichetta Gratuito, oppure incolla una chiave OpenCode Go nelle impostazioni di OpenCode e scegli un modello OpenCode Go.",
   "error.provider.customEndpointKeyRefused":
     'L\'endpoint "{provider}" ha rifiutato la sua chiave API o le sue intestazioni. Inseriscile di nuovo in Impostazioni server → Provider, poi riprova.',
+  "error.provider.customEndpointAccessRefused":
+    'L\'endpoint "{provider}" ha rifiutato la richiesta. La sua chiave API o le sue intestazioni potrebbero essere errate, oppure il suo account non può usare questo modello. Controllale in Impostazioni server → Provider o scegli un altro modello. Poi riprova.',
   "error.provider.customEndpointKeyMissing":
     'L\'endpoint "{provider}" ha bisogno di una chiave API. Aggiungi la chiave in Impostazioni server → Provider, poi riprova.',
   "error.provider.opencodeKeyExpired":
     "La tua chiave API di OpenCode è scaduta. Crea una nuova chiave in OpenCode Console, incollala nelle impostazioni di OpenCode, poi riprova.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go ha rifiutato la tua chiave API salvata. La chiave potrebbe essere scaduta. Crea una nuova chiave in OpenCode Console, incollala nelle impostazioni di OpenCode, poi riprova.",
+  "error.provider.opencodeGoRequestRefused":
+    "OpenCode Go ha rifiutato la richiesta. Una nuova chiave API non risolve il problema. Il tuo piano OpenCode Go potrebbe non essere attivo, oppure OpenCode Go potrebbe bloccare la tua rete: alcuni servizi bloccano VPN, proxy o alcuni paesi. Verifica che il piano sia attivo in OpenCode Console o disattiva la VPN, poi riprova. Puoi anche scegliere un altro modello.",
   "error.provider.opencodeServiceFailure":
     "OpenCode non ha potuto completare questo turno perché il suo servizio locale è andato in errore. Riprova. Se l'errore continua, riconnetti OpenCode in Impostazioni.",
   "error.provider.opencodeRateLimited":
@@ -243,6 +255,8 @@ export const messages = {
     "Il provider del modello di OpenCode ha segnalato una richiesta di caricamento non valida. Scegli un altro modello e continua. Controlla le routine salvate prima di ricrearle.\n{detail}",
   "error.provider.opencodeUnreadableContent":
     "Questo modello non può leggere un file o un'immagine in questa chat. OpenBot ha avviato una nuova sessione OpenCode con la cronologia della chat. Invia di nuovo il messaggio senza il file, oppure scegli un modello che legge i file. Se hai aggiunto questo modello a un provider personalizzato, deseleziona «Immagini» in «Accetta» nelle sue impostazioni.",
+  "error.provider.opencodeOutOfMemory":
+    "Il server del modello ha esaurito la memoria per questa chat. Avvia una nuova chat, oppure carica il modello con un contesto più corto e inserisci la stessa finestra nelle impostazioni del suo provider in OpenBot.",
   "error.provider.opencodeContextTooSmall":
     "Questa chat non entra nella finestra di contesto del modello. In Ollama o LM Studio, carica il modello con un contesto più lungo e inserisci la stessa finestra nelle impostazioni del suo provider in OpenBot. Oppure scegli un modello più grande.",
   "error.provider.opencodeFreeLimit":
@@ -255,6 +269,8 @@ export const messages = {
     "La risposta del modello si è interrotta o non era valida. Invia di nuovo il messaggio o scegli un altro modello.\n{detail}",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode non è riuscito a leggere il ragionamento di questo modello con questo impegno. Seleziona un impegno minore o un altro modello, poi invia di nuovo il messaggio.",
+  "error.provider.opencodeModelNotServed":
+    "Il provider del modello ora non offre questo modello al tuo account. Scegli un altro modello, poi invia di nuovo il messaggio.",
   "error.provider.opencodeNetwork":
     "OpenCode non è riuscito a connettersi al provider del modello. Controlla la connessione di rete del computer che esegue OpenBot, poi riprova.\n{detail}",
   "error.provider.codexStateBusy":
@@ -273,6 +289,9 @@ export const messages = {
     "Il modello OpenCode ha terminato il turno dopo il ragionamento, senza risposta. Riprova o scegli un altro modello.",
   "error.provider.acpNoAnswer":
     "{provider} ha terminato il turno senza risposta. Invia di nuovo il messaggio o avvia una nuova chat.",
+  "error.provider.noAnswerAfterSteps":
+    "{provider} ha eseguito alcuni passaggi, poi ha chiuso il turno senza risposta. Chiedi all'agente cosa ha fatto prima di inviare di nuovo la stessa richiesta.",
+  "error.provider.acpRefusedNoReason": "{provider} si è fermato senza risposta. Invia di nuovo il messaggio.",
   "error.provider.chatgptPageFailed": "OpenBot non è riuscito ad aprire la pagina di connessione di ChatGPT.",
   "error.provider.noneReady": "Nessun provider di agenti è pronto.",
   "error.provider.claudeTurnActive": "Attendi il turno attivo di Claude prima di aggiornare il suo contesto.",
@@ -303,6 +322,8 @@ export const messages = {
     "Google non ha accettato l'accesso a Gemini per questa richiesta. Invia di nuovo il messaggio. Se l'errore continua, riconnetti Gemini in Impostazioni.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini ha rifiutato questa richiesta. Scegli un altro modello, poi invia di nuovo il messaggio. Se non funziona ancora, inizia una nuova chat.\n{detail}",
+  "error.provider.antigravityNetwork":
+    "Gemini ha perso la connessione con Google. Invia di nuovo il messaggio. ({cause})",
   "error.provider.antigravitySessionRejected":
     "Gemini ha rifiutato questa richiesta senza indicarne la causa. Può dipendere da un elemento della cronologia della chat, come un’immagine aperta dall’agente. OpenBot ha avviato una nuova sessione Gemini con la cronologia della chat. Riprova. Se l’errore continua, scegli un altro modello.",
   "error.provider.antigravityHistoryUnreadable":
@@ -324,6 +345,8 @@ export const messages = {
   "error.provider.cursorNotStarted": "L'agente di Cursor è stato trovato, ma non è possibile leggerne la versione.",
   "error.provider.cursorVersionUnreadable": "Impossibile leggere la versione dell'agente di Cursor.",
   "error.provider.cursorSignIn": "Accedi con Cursor o imposta CURSOR_API_KEY per usare Cursor.",
+  "error.provider.cursorSignInUnusable":
+    "Cursor non è riuscito a connettersi al suo server con il tuo accesso. Controlla la connessione a Internet, poi accedi di nuovo a Cursor.",
   "error.provider.clineArchivePath": "L'archivio di Cline ha un percorso inatteso.",
   "error.provider.clinePackageMismatch": "Il pacchetto di Cline non corrisponde al catalogo dei runtime.",
   "error.provider.clineChecksum": "Checksum del runtime di Cline non corrispondente.",
@@ -363,16 +386,20 @@ export const messages = {
     "Questa chat è diventata troppo lunga per Claude. OpenBot ha avviato una nuova sessione di Claude Code con la cronologia della chat. Riprova.",
   "error.provider.claudeApiKeyNoCredit":
     "La chiave API di Anthropic non ha credito API. Un piano Claude non paga le richieste fatte con una chiave API. Aggiungi credito nella Anthropic Console, oppure accedi a Claude nelle Impostazioni e seleziona l'account Claude nel menu dei modelli dell'agente.",
+  "error.provider.claudeAccountNoCredit":
+    "Il saldo crediti del tuo account Claude è troppo basso. Alcune richieste, come la modalità veloce, usano crediti di utilizzo anche se il tuo piano Claude non è esaurito. Aggiungi crediti nel tuo account Claude, oppure scegli un altro modello nel menu dei modelli dell'agente.",
   "error.provider.claudeServiceBlocked":
     "Il servizio di Claude ha bloccato questa richiesta. Di solito è un breve problema di Claude, non del tuo account. Invia di nuovo il messaggio tra qualche minuto.",
   "error.provider.foreignReasoning":
     "{provider} non ha accettato il ragionamento precedente in questa chat, perché lo ha ricevuto un altro account o un'altra chiave API. OpenBot ha avviato una nuova sessione di {provider} con la cronologia della chat. Riprova.",
+  "error.provider.blankHistoryText":
+    "Il modello non ha accettato questa chat, perché la sua cronologia salvata contiene un messaggio vuoto. OpenBot ha avviato una nuova sessione di {provider} con la cronologia della chat. Riprova.",
   "error.provider.codexHistoryItemMissing":
     "Codex non ha potuto continuare questa chat, perché manca un elemento nella sua cronologia salvata. OpenBot ha avviato una nuova sessione di Codex con la cronologia della chat. Riprova.",
   "error.provider.codexRequestRefused":
     "{provider} ha rifiutato la richiesta di questa chat senza indicarne la causa. Può succedere in una chat lunga con molte immagini. OpenBot ha avviato una nuova sessione {provider} con la cronologia della chat. Riprova.",
   "error.provider.codexAudioRefused":
-    "Il modello non ha accettato l'audio in questa chat. OpenBot ha avviato una nuova sessione Codex con la cronologia della chat. Riprova.",
+    "Questo modello non può ascoltare l'audio, quindi non ha accettato il suono di questa chat. OpenBot ha avviato una nuova sessione Codex con la cronologia della chat. Per continuare, invia di nuovo la richiesta e chiedi all'agente di lavorare senza il suono. Per controllare il suono, scegli nel menu dei modelli dell'agente un modello che può ascoltare l'audio.",
   "error.provider.imageTooSmall":
     "Il modello non ha accettato un'immagine in questa chat perché l'immagine è troppo piccola. OpenBot ha avviato una nuova sessione {provider} con la cronologia della chat. Riprova.",
   "error.provider.imageTooLarge":

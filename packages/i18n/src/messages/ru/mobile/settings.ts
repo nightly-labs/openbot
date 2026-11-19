@@ -295,6 +295,7 @@ export const messages = {
   "mobile.settings.conversations.media": "Фото и файлы",
   "mobile.settings.conversations.swipeLeft": "Свайп влево в чате агента",
   "mobile.settings.conversations.swipeRight": "Свайп вправо в чате агента",
+  "mobile.settings.conversations.swipeQuestion": "Побочный вопрос",
   "mobile.settings.conversations.swipeThreads": "Ветки",
   "mobile.settings.conversations.swipeBrowser": "Браузер",
   "mobile.settings.conversations.swipeOff": "Выкл.",
@@ -600,7 +601,7 @@ export const messages = {
   "mobile.settings.shortcuts.card.locked.title": "OpenBot заблокирован",
   "mobile.settings.shortcuts.card.locked.action": "Открыть OpenBot",
   "mobile.settings.shortcuts.footer":
-    "Send Message в приложении «Команды» отправляет этому агенту. Приложение не открывается.",
+    "Send Message в приложении «Команды» отправляет этому агенту. Приложение не открывается. Open Agent открывает его чат.",
   "mobile.settings.shortcuts.send.sent": "Отправлено",
   "mobile.settings.shortcuts.send.failed": "OpenBot не смог это отправить.",
   "mobile.settings.shortcuts.send.unconfirmed": "Сервер не ответил. Сообщение может быть в чате.",

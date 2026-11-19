@@ -54,6 +54,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "Слишком много попыток входа. Повторите попытку позже.",
   "error.team.clientUpdateRequired": "Обновите этот клиент OpenBot, прежде чем подключаться к этому хосту.",
   "error.team.hostUpdateRequired": "Обновите OpenBot на хосте, прежде чем подключаться.",
+  "error.team.serverSafeMode": "Этот сервер находится в безопасном режиме, потому что OpenBot на нём не запускается.",
+  "error.team.serverSafeModeNewerDatabase":
+    "OpenBot {version} на этом сервере не может открыть свои данные, потому что их сохранила более новая версия OpenBot. Более новый выпуск OpenBot на сервере устранит проблему.",
+  "error.team.serverSafeModeStartFailed":
+    "OpenBot {version} на этом сервере остановлен после многих неудачных запусков. Более новый выпуск OpenBot на сервере устранит проблему.",
   "error.team.sidebarLayoutUnavailable": "Структура боковой панели недоступна.",
   "error.team.providersUnsupported": "Это подключение не поддерживает настройки провайдеров.",
   "error.team.providerNotManaged": "OpenBot не управляет CLI этого провайдера.",
@@ -138,7 +143,6 @@ export const messages = {
   "error.team.providerDefaultUnsupported": "Это подключение не поддерживает провайдера по умолчанию.",
   "error.team.attachmentNameRequired": "Нужно безопасное имя вложения.",
   "error.team.attachmentNotFound": "Вложение не найдено.",
-  "error.team.attachmentPreviewUnsupported": "Сервер не может создать уменьшенную копию этого файла.",
   "error.team.sharedFileTooLarge": "Общий файл превышает лимит 100 МБ.",
   "error.team.workspaceFileTooLarge": "Файл рабочего пространства превышает лимит 100 МБ.",
   "error.team.browserViewUnavailable": "Просмотр браузера в реальном времени недоступен.",

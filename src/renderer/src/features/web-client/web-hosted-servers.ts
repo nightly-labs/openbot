@@ -16,11 +16,6 @@ import { savedPromotionCode } from "./web-billing";
 const REQUEST_TIMEOUT_MS = 15_000;
 const SERVER_CLAIMS_PATH = "v2/server-claims";
 
-/**
- * The hosted server calls for a signed-in browser: the add server dialog and the server list in
- * Billing. They use the `/api/browser/v2/hosting/...` operations. The page goes only to a Stripe
- * Checkout URL, which the contract parser checks.
- */
 export function createWebHostedServerCalls(
   accountFetch: typeof fetch,
   navigate: (url: string) => void = (url) => window.location.assign(url),
@@ -30,7 +25,6 @@ export function createWebHostedServerCalls(
     init: { method?: "POST" | "DELETE"; body?: string; headers?: Record<string, string> } = {},
   ): Promise<Response> {
     const post = init.body !== undefined;
-    // A server claim is an account operation, not a hosted server one.
     const url = path === SERVER_CLAIMS_PATH ? `/api/browser/${path}` : `/api/browser/v2/hosting/${path}`;
     const response = await accountFetch(url, {
       method: init.method ?? (post ? "POST" : "GET"),
@@ -57,7 +51,6 @@ export function createWebHostedServerCalls(
     return decoded;
   }
 
-  /** Goes to the payment page, when the server has one. The page leaves the app. */
   function open(checkout: HostedServerCheckout): HostedServerSummary {
     if (checkout.checkoutUrl) navigate(checkout.checkoutUrl);
     return checkout.server;
@@ -101,14 +94,9 @@ function errorMessage(value: unknown): string {
   return currentText().t("webClient.error.requestFailed");
 }
 
-/**
- * Stripe Checkout returns to `/app?hosting=checkout&hosted_server=<id>`, with `&cancelled=1` when the user
- * went back. The server field is not `server`: an invitation link uses that name, and its reader removes it first.
- */
 const WEB_APP_HOSTING_PARAM = "hosting";
 const WEB_APP_HOSTED_SERVER_PARAM = "hosted_server";
 
-/** The server of a return from Stripe Checkout. The query is removed after it is read. */
 export function takeHostingReturn(): AddServerResume | null {
   const url = new URL(window.location.href);
   if (url.searchParams.get(WEB_APP_HOSTING_PARAM) !== "checkout") return null;

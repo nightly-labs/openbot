@@ -56,7 +56,6 @@ const EFFORT_LABEL = {
   ultra: "mobile.agent.runtime.effort.ultra",
 } as const satisfies Record<AgentReasoningEffort, MobileTextKey>;
 
-/** The longest text of a field that `workflows-v1` carries. */
 const FIELD_LIMIT = 20_000;
 
 const text = (node: WorkflowNode, name: string) => {
@@ -64,7 +63,6 @@ const text = (node: WorkflowNode, name: string) => {
   return typeof value === "string" ? value : "";
 };
 
-/** The text of a step: its task, prompt, question or text, in one field. */
 function TextField({
   node,
   name,
@@ -90,7 +88,6 @@ function TextField({
   );
 }
 
-/** The agents of the server, one of which does an agent step. */
 function AgentChoice({ node, agents }: { node: WorkflowNode; agents: readonly MobileAgent[] }) {
   const { t } = useText();
   const accent = String(useCSSVariable("--openbot-accent"));
@@ -130,10 +127,6 @@ function AgentChoice({ node, agents }: { node: WorkflowNode; agents: readonly Mo
   );
 }
 
-/**
- * The model of a model step or a condition, and its effort. Without a model, the host uses its
- * preferred model, as the desktop does for a step whose model is gone.
- */
 function ModelChoice({ node, serverId }: { node: WorkflowNode; serverId: string }) {
   const { t } = useText();
   const { theme } = useUniwind();
@@ -166,7 +159,6 @@ function ModelChoice({ node, serverId }: { node: WorkflowNode; serverId: string 
             label={t("mobile.workflow.step.model")}
             options={[
               { value: "", label: t("mobile.workflow.step.defaultModel") },
-              // A model that the host does not list now stays a choice, so the picker shows it.
               ...(value && !current ? [{ value, label: model }] : []),
               ...options.map((option) => ({ value: `${option.provider}:${option.id}`, label: option.name })),
             ]}
@@ -211,7 +203,6 @@ const SHOWN_TARGET_LABEL = {
   discord: "mobile.workflow.output.discord",
 } as const satisfies Record<string, MobileTextKey>;
 
-/** The output targets that act as the host's GitHub App or messaging bot, with the fields a new one stores. */
 const HOST_TARGETS = ["github", "discord", "telegram", "slack"];
 const TARGET_DEFAULTS = {
   github: GITHUB_OUTPUT_DEFAULTS,
@@ -219,12 +210,6 @@ const TARGET_DEFAULTS = {
   slack: SLACK_OUTPUT_DEFAULTS,
 } as const;
 
-/**
- * Where an output sends its result. The phone does not choose a messaging place, an OpenBot channel or a
- * Discord server: only the computer that runs OpenBot chooses them. An owner or admin adds a GitHub
- * output on a host that runs it, and a Telegram or Slack output on a host that has a linked chat or
- * workspace, as on desktop.
- */
 function OutputChoice({ node, draft }: { node: WorkflowNode; draft: WorkflowDraft }) {
   const { t } = useText();
   const accent = String(useCSSVariable("--openbot-accent"));
@@ -248,8 +233,6 @@ function OutputChoice({ node, draft }: { node: WorkflowNode; draft: WorkflowDraf
       setFields(node.id, { target: "notify", connectionId: undefined, placeId: undefined });
       return;
     }
-    // A GitHub, Discord, Telegram or Slack output keeps an `action`, so a change from one to another writes
-    // the defaults again.
     setFields(node.id, {
       target: next,
       ...(node.fields.action === undefined || HOST_TARGETS.includes(target) ? TARGET_DEFAULTS[next] : {}),
@@ -305,7 +288,6 @@ function OutputChoice({ node, draft }: { node: WorkflowNode; draft: WorkflowDraf
   );
 }
 
-/** The editor sheet > a step: its settings, and where it goes in the workflow. */
 export function WorkflowStepScreen() {
   const { t } = useText();
   const { nodeId } = useLocalSearchParams<{ nodeId: string }>();

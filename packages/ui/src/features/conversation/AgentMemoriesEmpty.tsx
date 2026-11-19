@@ -4,7 +4,6 @@ import { createMemo, createSignal, For, onSettled } from "solid-js";
 import { useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
 
-/** One sample memory, in the order that the list adds them. */
 interface SampleMemory {
   text: AppTextKey;
   origin: "automatic" | "manual";
@@ -17,16 +16,12 @@ const SAMPLE_MEMORIES: SampleMemory[] = [
   { text: "memory.sample.confirm", origin: "manual" },
 ];
 
-/** The list adds one row on each step. One more step clears it, and the loop starts again. */
 const STEP_MS = 3000;
 const CYCLE = SAMPLE_MEMORIES.length + 1;
-/** The handwriting speed and the pause before it starts, in milliseconds. */
 const WRITE_START_MS = 500;
 const MS_PER_CHAR = 30;
 const LINE_GAP_MS = 140;
-/** A long memory writes faster: its writing ends at this time, so its meta line shows before the next step. */
 const WRITE_END_MS = 2600;
-/** A line of handwriting breaks before this width. A wide character, such as a kanji, counts as two. */
 const LINE_WIDTH = 46;
 const DAY_MS = 86_400_000;
 
@@ -42,17 +37,11 @@ export interface AgentMemoriesEmptyProps {
   onAdd: () => void;
 }
 
-/**
- * The memories dialog before its first memory. A faint copy of the real list fills in from the top:
- * the newest memory writes itself in handwriting, and when the next one comes, it becomes a typed
- * row. Nothing in the list can be opened, and a reader hears only the pitch.
- */
 export function AgentMemoriesEmpty(props: AgentMemoriesEmptyProps) {
   const { t } = useText();
   const [step, setStep] = createSignal(0);
   const [still, setStill] = createSignal(false);
   onSettled(() => {
-    // Less motion keeps one frame with the full list.
     if (prefersReducedMotion()) {
       setStill(true);
       setStep(SAMPLE_MEMORIES.length - 1);
@@ -113,10 +102,6 @@ export function AgentMemoriesEmpty(props: AgentMemoriesEmptyProps) {
   );
 }
 
-/**
- * One row with the real row styles. The row button and the delete button are inert copies: spans
- * with the button classes. The handwriting folds away when the row is dry, and the typed text opens.
- */
 function SampleRow(props: { memory: SampleMemory; age: number }) {
   const { t, format } = useText();
   const text = () => t(props.memory.text);
@@ -133,7 +118,6 @@ function SampleRow(props: { memory: SampleMemory; age: number }) {
     });
     return { delays, perChar, end: WRITE_START_MS + written * perChar + gaps };
   });
-  // The newest sample is from today, and each one before it is a day older.
   const date = () => format.date(new Date(Date.now() - props.age * DAY_MS), { dateStyle: "medium" });
   return (
     <span class="agent-memory-row agent-memories-empty-row">
@@ -176,7 +160,6 @@ function SampleRow(props: { memory: SampleMemory; age: number }) {
   );
 }
 
-/** Breaks a memory into short lines at a word, so each line writes itself in turn. */
 function handLines(text: string): string[] {
   const lines: string[] = [];
   let line = "";
@@ -193,7 +176,6 @@ function handLines(text: string): string[] {
       add(word, " ");
       continue;
     }
-    // A language with no spaces, such as Japanese, breaks between characters.
     let first = true;
     for (const char of word) {
       add(char, first ? " " : "");

@@ -16,6 +16,8 @@ export const messages = {
   "error.messaging.telegramUnsupported": "이 컴퓨터는 Telegram에 연결할 수 없어요.",
   "error.messaging.telegramRelayUnavailable":
     "OpenBot이 이 컴퓨터에서 Telegram에 연결할 수 없어요. 로그인하고 이 컴퓨터에 이름을 지정한 다음 다시 시도해 주세요.",
+  "error.messaging.telegramRelayUnreachable":
+    "OpenBot이 이 컴퓨터에서 서비스에 연결할 수 없어요. 인터넷 연결, VPN, 프록시 또는 방화벽을 확인한 다음 다시 시도해 주세요.",
   "error.messaging.telegramServiceUnavailable":
     "지금은 OpenBot이 Telegram을 연결할 수 없어요. 나중에 다시 시도해 주세요.",
   "error.messaging.whatsappNotConnected": "이 WhatsApp 번호가 연결되어 있지 않아요.",

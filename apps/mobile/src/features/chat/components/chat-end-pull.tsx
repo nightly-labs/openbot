@@ -1,7 +1,7 @@
 import { avatarHeadColor, avatarHueSwatch } from "@openbot/brand/bloub-avatar";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
-import { useCallback, useEffect, useId, useMemo, useRef } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { View } from "react-native";
 import { GestureStateManager, type PanGestureConfig, usePanGesture } from "react-native-gesture-handler";
 import Animated, {
@@ -27,43 +27,16 @@ import { useText } from "@/shared/lib/text";
 import type { ChatTarget } from "../model/chat-target";
 import type { ChatMotion } from "./use-chat-motion";
 
-/**
- * The list moves this far past its end before the ring starts: a short pull only moves the list, and
- * makes room above the message field, so the ring does not cover the last message. The iOS bounce
- * resists more than the Android pull, so iOS starts the ring sooner.
- */
-const PULL_DEAD_ZONE = isIOS ? 28 : 56;
-/** After the dead zone, the list moves this much further while the ring fills. */
+const PULL_DEAD_ZONE = isIOS ? 37 : 56;
 const PULL_DISTANCE = 48;
-/**
- * Android does not bounce past the end, so the list moves up with the finger under this resistance,
- * as an iOS bounce does. The ring is full at the same moved distance as on iOS, which the finger
- * reaches after about 160 dp: the finger moves the list almost one to one at first.
- */
 const ANDROID_BAND = 320;
 const ANDROID_BAND_FACTOR = 0.95;
-/**
- * An upward drag of this many points at the end of the list starts the Android pull. It must be less
- * than the touch slop of the Android scroll view, 8 dp: when the scroll view takes the touch, it
- * cancels the pull.
- */
 const ANDROID_START = 6;
-/**
- * A drag starts to move within this time. A finger that rests longer first is a touch and hold, such
- * as on a message, and its small drift is no pull.
- */
 const ANDROID_HOLD_MS = 350;
-/** The finger moved this far: it drags, it does not rest. */
 const ANDROID_MOVE = 2;
-/** A drag down or sideways of this many points is a scroll or a swipe: no pull. */
 const ANDROID_CANCEL = 12;
 const ANDROID_SETTLE = { duration: 350, dampingRatio: 1, reduceMotion: ReduceMotion.System };
-/** The pull ticks at each part of its distance, and gives a heavy tap when it is full. */
 const PULL_STEPS = 12;
-/**
- * A full pull stays full until the reader pulls back under this share of it. A finger that stops at
- * the threshold often rolls back a little as it lifts, and that must not undo the pull.
- */
 const DISARM_AT = 0.8;
 const RESET = { duration: 200, reduceMotion: ReduceMotion.System };
 
@@ -79,18 +52,9 @@ const POP_DOWN = { duration: 260, dampingRatio: 0.6, reduceMotion: ReduceMotion.
 function pullHaptic(step: number) {
   if (step >= PULL_STEPS) void haptics.impact("heavy");
   else if (step > 0) void haptics.selection();
-  // The reader pulled back from a full pull: a release now does nothing.
   else void haptics.impact("soft");
 }
 
-/**
- * A pull past the latest message of a chat. A ring above the message field fills while the reader
- * pulls, and a release with a full ring runs `onOpen`. The pull counts only from the place where the
- * list reached its end, as Legend List reports it: a touch or a scroll in the history is no pull. iOS
- * reads how far the list then bounces past its end. Android does not bounce, so a pan of the list
- * measures the pull there, and starts only at the end of the list. `gesture` is that pan: give it to
- * the list as `pullGesture`.
- */
 export function useChatEndPull({
   motion,
   enabled,
@@ -100,7 +64,6 @@ export function useChatEndPull({
   enabled: boolean;
   onOpen: () => void;
 }) {
-  /** The pull, 0 to 1. */
   const progress = useSharedValue(0);
   const armed = useSharedValue(false);
   const on = useSharedValue(enabled);
@@ -111,18 +74,12 @@ export function useChatEndPull({
   openAction.current = onOpen;
   const open = useCallback(() => openAction.current(), []);
   const { dragging, atEnd, scrollOffset } = motion;
-  /** Android: how far the list moves up with the pull. Attach it to the list as `pullShift`. */
   const shift = useSharedValue(0);
-  /** Android: the first touch of this drag, and the finger's travel when the pull started. */
   const touchStart = useSharedValue({ x: 0, y: 0, at: 0, moving: false });
   const pullStart = useSharedValue(0);
-  /** Android: the pull has started. Its finger can then move sideways or back down freely. */
   const pulling = useSharedValue(false);
-  /** The scroll offset where this drag reached the end of the list. Null while it is not at the end. */
   const endOffset = useSharedValue<number | null>(null);
 
-  // Worklets: they run on the UI thread, from the scroll and from the pan.
-  /** Takes how far the list has moved past its end, in points. */
   const update = useCallback(
     (moved: number) => {
       "worklet";
@@ -133,8 +90,6 @@ export function useChatEndPull({
       const nowArmed = next >= 1 || (wasArmed && next >= DISARM_AT);
       progress.set(next);
       armed.set(nowArmed);
-      // A tick for each part, the heavy tap once when the pull becomes full, and a soft tap when the
-      // reader pulls back from it.
       if (nowArmed && !wasArmed) scheduleOnRN(pullHaptic, PULL_STEPS);
       else if (wasArmed && !nowArmed) scheduleOnRN(pullHaptic, 0);
       else if (step > previousStep && step < PULL_STEPS) scheduleOnRN(pullHaptic, step);
@@ -146,14 +101,12 @@ export function useChatEndPull({
     const opening = armed.get() && on.get();
     armed.set(false);
     endOffset.set(null);
-    // The sheet takes the place of the ring at once. A pull that does not open empties the ring.
     if (opening) {
       scheduleOnRN(open);
       progress.set(0);
     } else if (progress.get() > 0) progress.set(withTiming(0, RESET));
   }, [armed, on, open, progress, endOffset]);
 
-  // iOS: the bounce past the end while the finger is on the list. The release is the end of the drag.
   useAnimatedReaction(
     () => (isIOS && dragging.get() ? { offset: scrollOffset.get(), end: atEnd.get() } : null),
     (current, previous) => {
@@ -162,13 +115,11 @@ export function useChatEndPull({
         return;
       }
       if (!previous) {
-        // A new drag: it is no pull until it moves past the end.
         armed.set(false);
         endOffset.set(null);
       }
       if (!on.get()) return;
       if (!current.end) {
-        // Back in the history: a later return to the end starts the pull again from there.
         endOffset.set(null);
         if (progress.get() > 0) update(0);
         return;
@@ -182,15 +133,9 @@ export function useChatEndPull({
     },
   );
 
-  // Android. A hook gesture, not `Gesture.Pan()`: gesture handler cancels the older gestures when a
-  // native scroll view takes the touch, and the list does that at its end too. A hook gesture stays,
-  // and takes the touch from the list when it starts. The memoized config keeps the gesture object
-  // stable, so its callbacks need the worklet directive.
   const config = useMemo<PanGestureConfig>(
     () => ({
       enabled: isAndroid,
-      // At the end of the list, an upward drag is the pull, and it starts before the scroll view can
-      // take the touch. Elsewhere the list scrolls.
       manualActivation: true,
       onTouchesDown: (event) => {
         "worklet";
@@ -205,13 +150,11 @@ export function useChatEndPull({
       onTouchesMove: (event) => {
         "worklet";
         const touch = event.allTouches[0];
-        // Only the start of the drag decides between a pull, a scroll and a swipe.
         if (!touch || pulling.get()) return;
         const start = touchStart.get();
         const up = start.y - touch.absoluteY;
         const side = touch.absoluteX - start.x;
         if (!start.moving && Math.hypot(up, side) > ANDROID_MOVE) {
-          // A finger that rested before it moved holds a message or a control: leave the touch to it.
           if (Date.now() - start.at > ANDROID_HOLD_MS) {
             GestureStateManager.fail(event.handlerTag);
             return;
@@ -247,14 +190,8 @@ export function useChatEndPull({
   return { progress, armed, gesture, shift };
 }
 
-/** The most member colors in the gradient of a channel's ring. */
 const MAX_RING_COLORS = 4;
 
-/**
- * The colors of the ring, as the picture in it. An agent: its color. A channel with a picture: the
- * text color, white on dark and black on light. A channel with an icon: the icon's color. Else the
- * colors of the member faces, as a gradient, with the lead agent first.
- */
 function ringColors(target: ChatTarget, leadAgentId: string | null, foreground: string, accent: string): string[] {
   if (target.kind === "agent") return [avatarHeadColor(target.avatarSeed, target.avatarHue, target.avatarColor)];
   if (target.imageUrl) return [foreground];
@@ -267,12 +204,6 @@ function ringColors(target: ChatTarget, leadAgentId: string | null, foreground: 
   return colors.length ? colors.slice(0, MAX_RING_COLORS) : [accent];
 }
 
-/**
- * The ring of the pull past the latest message, above the message field, with the name of what a
- * release opens under it. It fills around the picture of the agent or the channel, in its colors, and
- * the picture pops when the pull is full. Screen readers skip it: the name in the header opens the
- * same info.
- */
 export function ChatEndPullRing({
   pull: { progress, armed },
   target,
@@ -280,7 +211,6 @@ export function ChatEndPullRing({
 }: {
   pull: Pick<ReturnType<typeof useChatEndPull>, "progress" | "armed">;
   target: ChatTarget;
-  /** The lead agent of a channel: its color comes first in the gradient. */
   leadAgentId?: string | null;
 }) {
   const { t } = useText();
@@ -295,6 +225,13 @@ export function ChatEndPullRing({
     [target],
   );
   const pop = useSharedValue(1);
+  const [pulling, setPulling] = useState(false);
+  useAnimatedReaction(
+    () => progress.get() > 0,
+    (now, previous) => {
+      if (now !== previous) scheduleOnRN(setPulling, now);
+    },
+  );
   useAnimatedReaction(
     () => armed.get(),
     (now, previous) => {
@@ -350,6 +287,7 @@ export function ChatEndPullRing({
               color={target.avatarColor}
               seed={target.avatarSeed}
               size={AVATAR_SIZE}
+              paused={!pulling}
             />
           ) : (
             <ChannelAvatar

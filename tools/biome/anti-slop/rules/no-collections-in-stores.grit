@@ -2,14 +2,6 @@ language js(typescript)
 
 // scope: global
 
-// A `Map` or `Set` in a store's initial value. `isWrappable` rejects platform
-// objects, so the store serves the collection raw and mutating it notifies
-// nothing - only replacing the whole property does.
-//
-// A type argument changes the shape of the call node, and every store in this
-// repository is written `createStore<T>({...})`, so all four spellings have to
-// be listed or the rule walks past every site it exists for. The second
-// argument is the `{ shallow: true }` options object.
 or {
   `new Map($...)`,
   `new Set($...)`,
