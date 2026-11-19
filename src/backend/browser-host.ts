@@ -1469,7 +1469,10 @@ export class BrowserHost {
         true,
       );
       const fieldOrigin = entry.origin;
-      if (fieldOrigin !== url.origin && !websiteMatchesOrigin({ url: url.origin, autofill: "anywhere" }, fieldOrigin))
+      if (
+        fieldOrigin !== url.origin &&
+        (url.protocol === "http:" || !websiteMatchesOrigin({ url: url.origin, autofill: "anywhere" }, fieldOrigin))
+      )
         return yield* browserFailure(
           new Error("The field target is in a frame of another site. Use browser takeover for this form."),
         );
