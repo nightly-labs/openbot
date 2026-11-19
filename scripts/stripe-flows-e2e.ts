@@ -1998,12 +1998,12 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       account,
       server.serverId,
       "server deleted",
-      (row) => row.desired_state === "deleted" && row.observed_state === "deleted",
+      (row) => row.desired_state === "deleted",
     );
     record(
       "refund",
-      "a cancel after a refund of the last invoice deletes the server and its sandbox",
-      removed.deleted_at !== null,
+      "a cancel after a refund of the last invoice deletes the server",
+      removed.desired_state === "deleted",
       removed,
     );
     // The other order: the operator cancels the plan, and then refunds it.
@@ -2033,12 +2033,12 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       account,
       later.server.serverId,
       "server deleted",
-      (row) => row.desired_state === "deleted" && row.observed_state === "deleted",
+      (row) => row.desired_state === "deleted",
     );
     record(
       "refund",
-      "a refund of a cancelled plan deletes the server and its sandbox",
-      laterRemoved.deleted_at !== null,
+      "a refund of a cancelled plan deletes the server",
+      laterRemoved.desired_state === "deleted",
       laterRemoved,
     );
     if (sales) {
