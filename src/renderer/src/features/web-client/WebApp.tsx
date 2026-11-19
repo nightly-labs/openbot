@@ -40,6 +40,7 @@ import { WindowBackdropBubbles } from "../window/backdrop-bubbles";
 import { keepCachedWorkflows } from "../workflows/workflow-cache";
 import { WebLanguageStep } from "./WebLanguageStep";
 import { phoneAppScreenWanted, WebPhoneAppScreen } from "./WebPhoneAppScreen";
+import { WebSlowLoadNotice } from "./WebSlowLoadNotice";
 import type { WebWorkspace } from "./WebWorkspace";
 import { createWebAccountCalls } from "./web-account";
 import { deleteSavedAgentPictures } from "./web-agent-pictures";
@@ -81,6 +82,9 @@ class CompanySignInRequired extends Error {}
 
 /** Longer than the time that the account service gives an email send, as on desktop. */
 const EMAIL_START_TIMEOUT_MS = 35_000;
+
+/** A session check with no answer in this time shows "Try again", as the server list does after 15 s. */
+const SESSION_CHECK_TIMEOUT_MS = 15_000;
 
 /** The life of a sign-in code. After it, the account service has no send to answer for. */
 const EMAIL_START_KEY_LIFE_MS = 10 * 60_000;
@@ -324,7 +328,7 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
       | { email: string }
       | { challengeId: string | null; code: string; firstTouch?: FirstTouch }
       | Record<string, never>,
-    send?: { idempotencyKey: string; signal: AbortSignal },
+    send?: { idempotencyKey?: string; signal: AbortSignal },
   ) {
     const response = await accountFetch(`/api/browser/${path}`, {
       method: body ? "POST" : "GET",
@@ -334,7 +338,7 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
         ? {
             "Content-Type": "application/json",
             "X-OpenBot-Browser": "1",
-            ...(send ? { "Idempotency-Key": send.idempotencyKey } : {}),
+            ...(send?.idempotencyKey ? { "Idempotency-Key": send.idempotencyKey } : {}),
           }
         : {},
       ...(body ? { body: JSON.stringify(body) } : {}),
@@ -418,8 +422,17 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
     const generation = sessionGeneration;
     // The workspace code loads beside the session check, not after it.
     void loadWorkspace().catch(() => undefined);
+    // Without a time limit, a request that gets no answer keeps the start screen with no way out.
+    const limit = new AbortController();
+    let timedOut = false;
+    const timer = window.setTimeout(() => {
+      timedOut = true;
+      limit.abort();
+    }, SESSION_CHECK_TIMEOUT_MS);
     try {
-      const session = await request("session");
+      const session = await request("session", undefined, { signal: limit.signal }).finally(() =>
+        window.clearTimeout(timer),
+      );
       markRemoteSync("session");
       const account = await showAccount(accountFrom(session));
       markRemoteSync("workspace-code");
@@ -435,14 +448,21 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
         // Signed in, the workspace stays usable. Signed out, the login screen offers a retry, as on desktop.
         if (state.account)
           toast.error(
-            text.sourceText(error instanceof Error ? error.message : text.t("webClient.login.sessionFailed")),
+            timedOut
+              ? text.sourceText(sourceText("error.auth.sessionTimeout"))
+              : text.sourceText(error instanceof Error ? error.message : text.t("webClient.login.sessionFailed")),
             { report: { operation: "other", source: "system", cause_code: classifyFailure(error) } },
           );
         else
           setState((draft) => {
             draft.login = {
               status: "error",
-              issue: { code: "auth_api_unavailable", message: sourceText("error.auth.serviceUnavailable") },
+              issue: {
+                code: "auth_api_unavailable",
+                message: timedOut
+                  ? sourceText("error.auth.sessionTimeout")
+                  : sourceText("error.auth.serviceUnavailable"),
+              },
             };
           });
       }
@@ -727,6 +747,10 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
                 void loadWorkspace().catch(() => undefined);
               }}
             />
+          </Show>
+          {/* The session check has a time limit, but the workspace code it waits for has none. */}
+          <Show when={!state.loaded}>
+            <WebSlowLoadNotice />
           </Show>
         </div>
       </NotificationObserver>

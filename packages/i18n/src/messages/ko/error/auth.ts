@@ -5,6 +5,7 @@ export const messages = {
   // Errors from the OpenBot account service.
   "error.auth.serviceUnavailable":
     "OpenBot이 계정 서비스에 연결하지 못했어요. API가 실행 중인지 확인한 후 다시 시도해 주세요.",
+  "error.auth.sessionTimeout": "OpenBot이 제시간에 응답하지 않았습니다. 인터넷 연결을 확인한 다음 다시 시도하세요.",
   "error.auth.networkBlocked":
     "이 네트워크의 방화벽 또는 프록시가 OpenBot의 {host} 접속을 막았어요. 네트워크 관리자에게 {host} 허용을 요청한 후 다시 시도해 주세요.",
   "error.auth.signInFirst": "먼저 OpenBot에 로그인해 주세요.",
