@@ -34,8 +34,17 @@ describe("redactMcpRecord", () => {
   });
 
   it("redacts a secret key before a known value changes its name", () => {
-    const record = { refresh_token: "abc123def456", mode: "token auth" };
-    expect(redactMcpRecord(record, ["token"])).toEqual({ "refresh_•••": "[redacted]", mode: "••• auth" });
+    const record = { refresh_token: "abc123def456", mode: "h_token auth" };
+    expect(redactMcpRecord(record, ["h_token"])).toEqual({ "refres•••": "[redacted]", mode: "••• auth" });
+  });
+
+  // A local server ignores its key, so the provider's name can be the key. Masking it hid the name in
+  // each answer (#12580).
+  it("keeps a plain word and still masks a key-shaped value", () => {
+    const record = { item: { type: "agentMessage", text: "Provider `magpie` (Magpie), key mg-7Kq2x" } };
+    expect(redactMcpRecord(record, ["magpie", "Magpie", "mg-7Kq2x"])).toEqual({
+      item: { type: "agentMessage", text: "Provider `magpie` (Magpie), key •••" },
+    });
   });
 
   it("redacts the whole token around a registered secret", () => {

@@ -62,10 +62,19 @@ export function redactMcpRecord(record: unknown, values: Iterable<string>): LogV
  */
 const CONFIG_LITERALS = new Set(["true", "false", "null", "none"]);
 
+/**
+ * One plain word, such as `magpie` or `Gateway`. A local model server ignores its key, so a user can
+ * type the provider's name as the key, and masking it changed that name to `•••` in each answer
+ * (#12580). A real key has digits, symbols or mixed case. The shared rules still hide a word after a
+ * label, such as `password=word`, and an MCP value of 8 or more characters under a secret name
+ * (`registerMcpSecretValues`).
+ */
+const PLAIN_WORD = /^[A-Za-z][a-z]*$/u;
+
 function maskValues(text: string, values: Iterable<string>): string {
   let result = text;
   for (const value of values) {
-    if (value.length < 4 || CONFIG_LITERALS.has(value.toLowerCase())) continue;
+    if (value.length < 4 || CONFIG_LITERALS.has(value.toLowerCase()) || PLAIN_WORD.test(value)) continue;
     result = result.split(value).join(MASK);
   }
   return result;
