@@ -405,7 +405,7 @@ async function b2Request(
 ) {
   const response = await fetch(presign(b2, method, objectKey, parameters, 900), {
     method,
-    body,
+    body: body ?? null,
     signal: AbortSignal.timeout(120_000),
   });
   const text = method === "HEAD" ? "" : await response.text();
