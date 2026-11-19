@@ -219,7 +219,8 @@ that vendor's app. A key the user types, or the grant of a browser sign-in, goes
 own host over the encrypted Team channel.
 Mobile properties include app version/build, iOS or Android, result, timing, bounded connection stage,
 counts, coarse attachment size buckets, and provider/model/reasoning metadata where available.
-Mobile never sends scanned QR values, install-referrer URLs or route identifiers. It does not
+Mobile does not read the Android install referrer from Google Play. It never sends scanned QR values,
+install-referrer URLs or route identifiers. It does not
 emit host lifecycle events again. Agent/host token and cost reports remain separate local data.
 
 Analytics events do not contain message or direct-message text, prompts, replies, generated content,
@@ -1150,6 +1151,10 @@ on desktop. The phone does not store the viewer's files, the screen, or the conn
 sheet shows; Copy in that sheet puts them on the phone's clipboard only when the user taps it. It asks for Face ID, Touch ID
 or the phone unlock before a session, ends the session when the app leaves the foreground, and on
 Android does not allow screenshots or screen recording of the screen while it is open.
+
+On Android, the phone app turns off Content Capture for its window. The system's content capture
+service, such as Android System Intelligence, does not get the text of the app's screens, such as chat
+messages. Accessibility services and autofill do not change.
 
 Agents, conversations, queues, direct messages, attachments, browser data, prompts, approvals, and
 Remote Desktop data remain on the host. The central account service does not copy them into D1 or

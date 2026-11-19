@@ -100,6 +100,21 @@ index 6f935c145068b68e0233faa668cc70f8c411169f..7e01fc6ddfc89dad6a2b98dd775ba1c7
 +        const val FRAGMENT_MANAGER_EXECUTING_MESSAGE = "FragmentManager is already executing transactions"
 +    }
  }
+diff --git a/android/src/main/java/com/swmansion/rnscreens/bottomsheet/SheetDelegate.kt b/android/src/main/java/com/swmansion/rnscreens/bottomsheet/SheetDelegate.kt
+index 800407998ed12d559a6fde732dde1a6ae8b3f172..036aebd158228cd0990e646195967a29509b96dd 100644
+--- a/android/src/main/java/com/swmansion/rnscreens/bottomsheet/SheetDelegate.kt
++++ b/android/src/main/java/com/swmansion/rnscreens/bottomsheet/SheetDelegate.kt
+@@ -51,7 +51,9 @@ class SheetDelegate(
+         get() = screen.fragment as ScreenStackFragment
+ 
+     private fun requireDecorView(): View =
+-        checkNotNull(screen.reactContext.currentActivity) { "[RNScreens] Attempt to access activity on detached context" }
++        checkNotNull(screen.fragment?.activity ?: screen.reactContext.currentActivity) {
++            "[RNScreens] Attempt to access activity on detached context"
++        }
+             .window.decorView
+ 
+     private var viewToRestoreFocus: View? = null
 diff --git a/ios/RNSScreenStack.mm b/ios/RNSScreenStack.mm
 index 5da11964f5932cb44e1131c44a2480803c0a62b5..a04b4678830bb5ea16984486072eacadd1430adf 100644
 --- a/ios/RNSScreenStack.mm
