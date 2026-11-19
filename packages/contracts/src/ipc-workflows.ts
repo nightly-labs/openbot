@@ -749,6 +749,7 @@ export const WORKFLOW_RUNTIME_FIELDS: Readonly<Record<WorkflowNodeKind, readonly
     "firstFrame",
     "lastFrame",
     "voice",
+    "options",
   ],
 };
 

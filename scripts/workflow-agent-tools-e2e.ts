@@ -642,14 +642,14 @@ try {
     runRead.parse(triggerRun.value).steps.some((step) => step.nodeId === ids.start && step.output === triggerInput),
     triggerRun.value,
   );
-  const badModel = await call("failure-media-model", "edit_workflow", {
+  const badMediaModel = await call("failure-media-model", "edit_workflow", {
     workflowId,
     ops: [{ op: "add", kind: "image", fields: { prompt: "A poster", model: "no-such-model" } }],
   });
   check(
     "an image node with an unknown model is refused with the models to use",
-    !badModel.ok && JSON.stringify(badModel.value).includes("gpt-image"),
-    badModel.value,
+    !badMediaModel.ok && JSON.stringify(badMediaModel.value).includes("gpt-image"),
+    badMediaModel.value,
   );
   const videoModel = await call("failure-media-kind", "edit_workflow", {
     workflowId,

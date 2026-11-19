@@ -738,6 +738,7 @@ jobs:
       - name: Run the provider image MIME E2E test
         if: ${{ !cancelled() }}
         run: bun run test:provider-image-mime
+
       - name: Run the workflow step settings E2E test
         if: ${{ !cancelled() }}
         run: bun run test:workflow-step-settings

@@ -5,6 +5,7 @@ import {
   type WorkflowNodeKind,
   type WorkflowStepSettings,
   type WorkflowStepSource,
+  workflowMediaOptions,
 } from "@openbot/contracts/ipc";
 import type { AppTranslate } from "@openbot/i18n";
 import { Button, CopyButton, Popover, Skeleton, SlidersHorizontal } from "@openbot/ui";
@@ -12,6 +13,7 @@ import type { JSX } from "@solidjs/web";
 import { createSignal, createStore, For, Match, onSettled, Show, Switch } from "solid-js";
 import { useText } from "../../text";
 import { PORT_NAME, useBoard, type WfnBoard, type WfnFields, type WfnResult } from "./workflow-board";
+import { optionNameKey, optionValueKey, readableName } from "./workflow-media-step";
 import type { WorkflowCatalogs } from "./workflow-model";
 import { EFFORT_LABEL, modelOption } from "./workflow-model-pills";
 import { PortIcon, resultName, resultTime, ToolAction } from "./workflow-node-parts";
@@ -115,11 +117,33 @@ function settingLines(
         return line(key, t("workflow.video.resolution"), value);
       case "voice":
         return line(key, t("workflow.video.voice"), value);
+      case "options":
+        return mediaOptionLines(t, settings, imageModel());
       default:
         return [];
     }
   };
   return WORKFLOW_RUNTIME_FIELDS[kind].flatMap(named);
+}
+
+function mediaOptionLines(
+  t: AppTranslate,
+  settings: WorkflowFields,
+  model: WorkflowCatalogs["imageModels"][number] | undefined,
+): SettingLine[] {
+  return workflowMediaOptions(settings, model).flatMap((chosen) => {
+    const option = model?.options?.find((entry) => entry.name === chosen.name);
+    if (!option) return [];
+    const nameKey = optionNameKey(option);
+    const valueKey = optionValueKey(chosen.value);
+    return [
+      {
+        key: `options.${chosen.name}`,
+        label: nameKey ? t(nameKey) : readableName(chosen.name),
+        value: valueKey ? t(valueKey) : readableName(chosen.value),
+      },
+    ];
+  });
 }
 
 function restoredFields(kind: WorkflowNodeKind, settings: WorkflowFields): WfnFields {
