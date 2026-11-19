@@ -1329,6 +1329,116 @@ fieldset.wfn-picker-group {
   backdrop-filter: var(--wfn-glass-blur);
 }
 
+.ui-popover-menu-surface.wfn-popover.wfn-step-settings {
+  max-height: min(560px, calc(100vh - var(--openbot-space-8)));
+  overflow-y: auto;
+}
+
+.wfn-step-settings-head {
+  display: flex;
+  gap: var(--openbot-space-2);
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.wfn-step-settings-when,
+.wfn-step-settings-note {
+  margin: 0;
+  font-size: var(--openbot-text-sm);
+  color: var(--openbot-text-muted);
+}
+
+.wfn-step-settings-loading {
+  height: 96px;
+}
+
+.wfn-step-settings-list {
+  display: grid;
+  gap: var(--openbot-space-2);
+  margin: 0;
+}
+
+.wfn-step-setting {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: var(--openbot-space-2);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.wfn-step-setting[data-long] {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--openbot-space-1);
+}
+
+.wfn-step-setting dt {
+  color: var(--openbot-text-muted);
+}
+
+.wfn-step-setting dd {
+  margin: 0;
+  color: var(--openbot-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.wfn-step-setting[data-long] dd {
+  max-height: 120px;
+  padding: var(--openbot-space-2);
+  overflow-y: auto;
+  border-radius: var(--wfn-radius-row);
+  background: var(--wfn-field);
+  white-space: pre-wrap;
+}
+
+.wfn-step-sources {
+  display: grid;
+  gap: var(--openbot-space-2);
+}
+
+.wfn-step-sources-title {
+  margin: 0;
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.wfn-step-sources ul {
+  display: grid;
+  gap: var(--openbot-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wfn-step-source {
+  display: grid;
+  gap: var(--openbot-space-1);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.wfn-step-source-head {
+  display: flex;
+  gap: var(--openbot-space-2);
+  align-items: center;
+  color: var(--openbot-text-muted);
+}
+
+.wfn-step-source-picture {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--wfn-radius-row);
+  object-fit: cover;
+}
+
+.wfn-step-source-text {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--openbot-text-primary);
+  white-space: pre-wrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
 .wfn-popover-head {
   display: flex;
   gap: var(--openbot-space-2);

@@ -91,6 +91,13 @@ export const messages = {
   "workflow.node.result.runFailed": "Запуск {run} завершился ошибкой",
   "workflow.node.result.hint": "{name} · {time}",
   "workflow.node.result.label": "Результат {number}: {name}, {time}",
+  "workflow.node.settings.open": "Настройки",
+  "workflow.node.settings.openLabel": "Показать настройки этого результата",
+  "workflow.node.settings.title": "Настройки результата",
+  "workflow.node.settings.inputs": "Входные данные",
+  "workflow.node.settings.notRecorded": "У этого результата нет сохранённых настроек.",
+  "workflow.node.settings.failed": "Не удалось показать настройки.",
+  "workflow.node.settings.use": "Использовать эти настройки",
 
   "workflow.prompt.title": "Промпт",
   "workflow.prompt.name": "промпт",

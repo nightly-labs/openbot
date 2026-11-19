@@ -76,6 +76,13 @@ export const messages = {
   "workflow.node.result.runFailed": "실행 {run} 실패",
   "workflow.node.result.hint": "{name} · {time}",
   "workflow.node.result.label": "결과 {number}: {name}, {time}",
+  "workflow.node.settings.open": "설정",
+  "workflow.node.settings.openLabel": "이 결과의 설정 보기",
+  "workflow.node.settings.title": "결과 설정",
+  "workflow.node.settings.inputs": "입력",
+  "workflow.node.settings.notRecorded": "이 결과에는 저장된 설정이 없습니다.",
+  "workflow.node.settings.failed": "설정을 표시할 수 없습니다.",
+  "workflow.node.settings.use": "이 설정 사용",
 
   "workflow.prompt.title": "프롬프트",
   "workflow.prompt.name": "프롬프트",

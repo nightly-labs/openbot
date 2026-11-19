@@ -79,6 +79,13 @@ export const messages = {
   "workflow.node.result.runFailed": "{run}. çalıştırma başarısız oldu",
   "workflow.node.result.hint": "{name} · {time}",
   "workflow.node.result.label": "Sonuç {number}: {name}, {time}",
+  "workflow.node.settings.open": "Ayarlar",
+  "workflow.node.settings.openLabel": "Bu sonucun ayarlarını göster",
+  "workflow.node.settings.title": "Sonuç ayarları",
+  "workflow.node.settings.inputs": "Girdiler",
+  "workflow.node.settings.notRecorded": "Bu sonucun kayıtlı ayarı yok.",
+  "workflow.node.settings.failed": "Ayarlar gösterilemiyor.",
+  "workflow.node.settings.use": "Bu ayarları kullan",
 
   "workflow.prompt.title": "İstem",
   "workflow.prompt.name": "istem",

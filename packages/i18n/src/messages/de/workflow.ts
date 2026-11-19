@@ -79,6 +79,13 @@ export const messages = {
   "workflow.node.result.runFailed": "Lauf {run} fehlgeschlagen",
   "workflow.node.result.hint": "{name} · {time}",
   "workflow.node.result.label": "Ergebnis {number}: {name}, {time}",
+  "workflow.node.settings.open": "Einstellungen",
+  "workflow.node.settings.openLabel": "Einstellungen dieses Ergebnisses zeigen",
+  "workflow.node.settings.title": "Einstellungen des Ergebnisses",
+  "workflow.node.settings.inputs": "Eingaben",
+  "workflow.node.settings.notRecorded": "Für dieses Ergebnis sind keine Einstellungen gespeichert.",
+  "workflow.node.settings.failed": "Die Einstellungen können nicht angezeigt werden.",
+  "workflow.node.settings.use": "Diese Einstellungen verwenden",
 
   "workflow.prompt.title": "Prompt",
   "workflow.prompt.name": "Prompt",

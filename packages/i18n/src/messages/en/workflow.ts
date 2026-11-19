@@ -78,6 +78,13 @@ export const messages = defineMessages("workflow", {
   "workflow.node.result.runFailed": "Run {run} failed",
   "workflow.node.result.hint": "{name} · {time}",
   "workflow.node.result.label": "Result {number}: {name}, {time}",
+  "workflow.node.settings.open": "Settings",
+  "workflow.node.settings.openLabel": "Show the settings of this result",
+  "workflow.node.settings.title": "Result settings",
+  "workflow.node.settings.inputs": "Inputs",
+  "workflow.node.settings.notRecorded": "This result has no saved settings.",
+  "workflow.node.settings.failed": "Cannot show the settings.",
+  "workflow.node.settings.use": "Use these settings",
 
   "workflow.prompt.title": "Prompt",
   "workflow.prompt.name": "prompt",

@@ -1,3 +1,4 @@
+import type { WorkflowStepSettings } from "@openbot/contracts/ipc";
 import { Toaster } from "@openbot/ui";
 import { AgentNode } from "@openbot/ui/features/workflows/WorkflowAgentNode";
 import { ApprovalNode } from "@openbot/ui/features/workflows/WorkflowApprovalNode";
@@ -324,6 +325,63 @@ export const ImageManyResults: Story = {
       }}
     >
       <ImageNode id="filled" prompt="Hero image for the Atlas comparison page, one product window" />
+    </NodeGallery>
+  ),
+};
+
+const BRIEF = "Atlas launched on 22 Oct at €12 a seat, with a Slack connector";
+const REFERENCE = "story-reference-picture";
+
+const SAVED_SETTINGS: Record<string, WorkflowStepSettings> = {
+  "llm-saved": {
+    settings: {
+      provider: "codex",
+      model: "gpt-5.6-luna",
+      effort: "high",
+      prompt: "Summarize the research in 3 lines for the market team",
+      system: "You write for busy readers. Use short sentences and no adjectives.",
+    },
+    sources: [{ from: "brief", type: "text", stepId: "brief-result", attachmentId: null }],
+  },
+  "image-saved": {
+    settings: {
+      media: "image",
+      model: "gpt-image",
+      account: "a0123456789abcdef",
+      prompt: "Hero image for the Atlas comparison page, one product window",
+      aspect: "16:9",
+      background: "solid",
+    },
+    sources: [{ from: "reference", type: "image", stepId: null, attachmentId: REFERENCE }],
+  },
+};
+
+const SAVED_CATALOGS: WorkflowCatalogs = {
+  ...STORY_CATALOGS,
+  mediaPreview: (attachmentId) => (attachmentId === REFERENCE ? STORY_IMAGES[1]?.previewUrl : undefined),
+  stepSettings: async (stepId) => SAVED_SETTINGS[stepId] ?? { settings: null, sources: null },
+};
+
+export const ResultSettings: Story = {
+  name: "Result settings",
+  render: () => (
+    <NodeGallery
+      selected="summary"
+      catalogs={SAVED_CATALOGS}
+      edges={[{ id: "brief-summary", from: "brief", to: "summary", type: "text" }]}
+      results={{
+        brief: [{ id: "brief-result", at: todayAt(9, 10), value: BRIEF }],
+        summary: [
+          { id: "llm-old", at: todayAt(8, 2), value: LLM_RESULT },
+          { id: "llm-saved", at: todayAt(9, 14), value: LLM_RESULT },
+        ],
+        hero: [{ id: "image-saved", at: todayAt(9, 20), value: STORY_IMAGES[0]?.name ?? "" }],
+      }}
+      fields={{ summary: { provider: "codex", model: "gpt-6-luna", effort: "low" } }}
+    >
+      <PromptNode id="brief" text={BRIEF} />
+      <LlmNode id="summary" prompt="Summarize the research in 3 lines" />
+      <ImageNode id="hero" prompt="Hero image for the Atlas comparison page" />
     </NodeGallery>
   ),
 };

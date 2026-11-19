@@ -19,6 +19,7 @@ import {
   useTextField,
   type WfProvider,
 } from "./workflow-node-parts";
+import { StepSettingsAction } from "./workflow-step-settings";
 
 export function LlmNode(props: { id: string; prompt?: string; system?: string }) {
   const board = useBoard();
@@ -66,7 +67,11 @@ export function LlmNode(props: { id: string; prompt?: string; system?: string })
       kind="llm"
       inputs={["text", "image", "file"]}
       output="text"
-      toolbar={<NodeToolbar id={props.id} name={t("workflow.llm.name")} locked={locked()} onLock={setLocked} />}
+      toolbar={
+        <NodeToolbar id={props.id} name={t("workflow.llm.name")} locked={locked()} onLock={setLocked}>
+          <StepSettingsAction id={props.id} kind="llm" />
+        </NodeToolbar>
+      }
     >
       <Field class="wfn-field-task">
         <Textarea

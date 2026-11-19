@@ -342,6 +342,7 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
     mediaTransparentSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY) && has(WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY),
     mediaSizeSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY) && has(WORKFLOWS_MEDIA_SIZE_CAPABILITY),
     agentFilesSupported: () => has(WORKFLOWS_AGENT_FILES_CAPABILITY),
+    stepSettingsSupported: () => has(WORKFLOWS_STEP_SETTINGS_CAPABILITY),
     mediaUrl,
     mediaPreviewUrl(attachmentId) {
       const previews = options.previewMedia;

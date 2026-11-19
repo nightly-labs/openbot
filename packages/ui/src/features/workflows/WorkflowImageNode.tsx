@@ -22,6 +22,7 @@ import {
 } from "./workflow-media-step";
 import { download, NodeShell, NodeToolbar, ToolAction, type WfnInputPort } from "./workflow-node-parts";
 import { CardPicture, CardPictureLoading } from "./workflow-picture";
+import { StepSettingsAction } from "./workflow-step-settings";
 
 function aspectRatio(aspect: Aspect): string {
   return aspect.replace(":", " / ");
@@ -155,6 +156,7 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
         style={{ "--wfn-aspect": frameRatio().css, "--wfn-width": cardWidth(frameRatio().value) }}
         toolbar={
           <NodeToolbar id={props.id} name={text("name")} locked={step.locked()} onLock={step.setLocked}>
+            <StepSettingsAction id={props.id} kind="image" />
             <Show when={kind() === "image" && shownUrl()}>
               <ToolAction
                 text={t("workflow.node.toolbar.view")}

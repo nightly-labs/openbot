@@ -696,6 +696,62 @@ export interface WorkflowStep {
   endedAt: string | null;
 }
 
+export const WORKFLOW_RUNTIME_FIELDS: Readonly<Record<WorkflowNodeKind, readonly string[]>> = {
+  trigger: [
+    "trigger",
+    "timezone",
+    "repositories",
+    "event",
+    "filters",
+    "labels",
+    "titleText",
+    "branch",
+    "connectionId",
+    "placeId",
+    "roles",
+    "text",
+  ],
+  agent: ["agentId", "task"],
+  llm: ["provider", "model", "effort", "prompt", "system"],
+  condition: ["rule", "provider", "model", "effort"],
+  approval: ["question"],
+  output: [
+    "target",
+    "connectionId",
+    "placeId",
+    "channelId",
+    "repository",
+    "item",
+    "action",
+    "labels",
+    "labelsFrom",
+    "person",
+    "reason",
+    "title",
+    "emoji",
+  ],
+  prompt: ["text"],
+  text: ["text"],
+  note: ["text"],
+  shape: ["text"],
+  asset: ["fileId"],
+  image: [
+    "media",
+    "model",
+    "account",
+    "prompt",
+    "aspect",
+    "width",
+    "height",
+    "background",
+    "duration",
+    "resolution",
+    "firstFrame",
+    "lastFrame",
+    "voice",
+  ],
+};
+
 export interface WorkflowStepSource {
   from: string;
   type: WorkflowPortType;
