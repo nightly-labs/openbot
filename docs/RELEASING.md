@@ -609,11 +609,13 @@ The workflow:
 
 1. verifies the tag matches `package.json`;
 2. installs and verifies the pinned remote desktop runtime without CMake or Cargo;
-3. runs the complete offline repository check;
+3. runs the complete offline repository check on its own macOS runner, in parallel with the builds;
 4. builds signed and notarized ARM64 DMG and ZIP artifacts plus a separately signed/notarized Host PKG on a GitHub Apple silicon runner,
-   and signed and notarized x64 DMG and ZIP artifacts on a GitHub Intel runner (`macos-15-intel`). Each
+   and signed and notarized x64 DMG and ZIP artifacts on a second Apple silicon runner. That job
+   installs the x64 Bun and Node (`architecture: x64` of `.github/actions/setup-bun`), which run
+   under Rosetta, so every script sees `process.arch` `x64` as on an Intel Mac. Each
    architecture builds on its own runner, because the voice runtime and the remote desktop runtime
-   are prepared for the architecture of the build machine. The Host PKG is ARM64 only.
+   are prepared for the architecture of the build toolchain. The Host PKG is ARM64 only.
    When `hdiutil create` fails with "Device not configured" or "Resource busy", or a network
    connection drops, the app build of each architecture starts again, up to 3 attempts, because
    these runner errors are not caused by the app;
@@ -646,8 +648,8 @@ Before a tag, run the release path without publishing:
 gh workflow run release.yml --ref <branch> -f mode=dry-run
 ```
 
-The dry run runs the tag validation (without the tag and `main` checks), the Windows, Linux and
-Docker builds, and all their verification steps. It does not run the macOS job or the publish jobs,
+The dry run runs the tag validation (without the tag and `main` checks), the repository check, the
+Windows, Linux and Docker builds, and all their verification steps. It does not run the macOS job or the publish jobs,
 and it makes no attestation: the macOS job needs the `release` secrets, which only tag runs receive,
 and an attestation of this public repository is a public Sigstore record. Use `-f mode=host-signing` on a
 tag ref to check the macOS Host signing keychain, and `-f mode=windows-signing` on a tag ref to check

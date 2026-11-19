@@ -19,6 +19,12 @@ inputs:
       or `none` for a job that must install later - after a secret check, a cache
       restore, or a platform toolchain.
     default: frozen
+  architecture:
+    description: >-
+      Empty for the runner's own architecture. `x64` on an Apple silicon runner
+      installs the x64 Bun and Node, which run under Rosetta, so the job builds
+      and checks the x64 macOS app as an Intel runner does.
+    default: ""
 
 runs:
   using: composite
@@ -26,19 +32,37 @@ runs:
     # A typo in `install` would otherwise silently drop `--ignore-scripts` or
     # skip the install, and the job would fail somewhere less obvious.
     - name: Validate inputs
+      id: toolchain
       shell: bash
       env:
         INSTALL: ${{ inputs.install }}
+        ARCHITECTURE: ${{ inputs.architecture }}
+        BUN_VERSION: 1.4.2
       run: |
         case "$INSTALL" in
           frozen | ignore-scripts | none) ;;
           *) echo "install must be frozen, ignore-scripts or none (got '$INSTALL')." >&2; exit 1 ;;
         esac
+        echo "bun_version=$BUN_VERSION" >> "$GITHUB_OUTPUT"
+        case "$ARCHITECTURE" in
+          "") ;;
+          x64)
+            if [[ "$RUNNER_OS" != macOS || "$RUNNER_ARCH" != ARM64 ]]; then
+              echo "architecture x64 is only for an Apple silicon runner (got $RUNNER_OS $RUNNER_ARCH)." >&2
+              exit 1
+            fi
+            /usr/bin/arch -x86_64 /usr/bin/true
+            echo "bun_download_url=https://github.com/oven-sh/bun/releases/download/bun-v$BUN_VERSION/bun-darwin-x64-baseline.zip" >> "$GITHUB_OUTPUT"
+            echo "node_architecture=x64" >> "$GITHUB_OUTPUT"
+            ;;
+          *) echo "architecture must be empty or x64 (got '$ARCHITECTURE')." >&2; exit 1 ;;
+        esac
 
     - name: Set up Bun
       uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
       with:
-        bun-version: 1.4.2
+        bun-version: ${{ steps.toolchain.outputs.bun_version }}
+        bun-download-url: ${{ steps.toolchain.outputs.bun_download_url }}
 
     - name: Set up Node
       uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -46,6 +70,16 @@ runs:
         # `.nvmrc` and nothing else. An overridable version input is the drift
         # this action exists to remove, one level down.
         node-version-file: .nvmrc
+        architecture: ${{ steps.toolchain.outputs.node_architecture }}
+
+    - name: Require the requested architecture
+      if: inputs.architecture != ''
+      shell: bash
+      env:
+        ARCHITECTURE: ${{ inputs.architecture }}
+      run: |
+        test "$(bun -p process.arch)" = "$ARCHITECTURE"
+        test "$(node -p process.arch)" = "$ARCHITECTURE"
 
     - name: Install dependencies
       if: inputs.install != 'none'
