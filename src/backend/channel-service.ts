@@ -1938,11 +1938,7 @@ export class ChannelService {
     const skipped = task && current && this.hooks.skipAtLimit?.(task) ? this.#skippedTasks(task) : null;
     if (continueWork) {
       if (!task || !current || skipped) return false;
-      this.store.update(this.store.get(assignment.channelId), {
-        assignments: [{ ...assignment, state: "queued", turnId: null }],
-        tasks: [{ ...task, state: "queued", error: null }],
-      });
-      this.publish(assignment.channelId);
+      this.#keepAssignment(assignment, task);
       return true;
     }
     this.store.update(this.store.get(assignment.channelId), {
@@ -1955,6 +1951,26 @@ export class ChannelService {
     yield* this.#forkEvent(this.#releaseHeldAgents([assignment.agentId]));
     return true;
   });
+
+  keepForRetry(deliveryId: string): Effect.Effect<boolean> {
+    return Effect.sync(() => {
+      const assignment = this.store.assignmentForDelivery(deliveryId);
+      if (!assignment || !activeAssignment(assignment) || assignment.pendingRevision !== null) return false;
+      const task = this.store.tasks(assignment.channelId).find((item) => item.id === assignment.taskId);
+      if (task?.revision !== assignment.taskRevision || (task.state !== "queued" && task.state !== "running"))
+        return false;
+      this.#keepAssignment(assignment, task);
+      return true;
+    });
+  }
+
+  #keepAssignment(assignment: ChannelAssignment, task: ChannelTask): void {
+    this.store.update(this.store.get(assignment.channelId), {
+      assignments: [{ ...assignment, state: "queued", turnId: null }],
+      tasks: [{ ...task, state: "queued", error: null }],
+    });
+    this.publish(assignment.channelId);
+  }
 
   ownsWaitingWork(agentId: string): boolean {
     return this.#waitingWork(agentId).length > 0;

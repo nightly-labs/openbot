@@ -283,6 +283,8 @@ export const messages = {
   "error.provider.noAnswerAfterSteps":
     "{provider} wykonał kilka kroków, a potem zakończył turę bez odpowiedzi. Zanim wyślesz tę samą prośbę ponownie, zapytaj agenta, co zrobił.",
   "error.provider.acpRefusedNoReason": "{provider} zatrzymał się bez odpowiedzi. Wyślij wiadomość ponownie.",
+  "error.provider.channelNoAnswer":
+    "{provider} zakończył turę bez odpowiedzi. Na kanale kliknij Dalej, aby uruchomić zadanie ponownie, albo Przekaż, aby dać je innemu członkowi.",
   "error.provider.chatgptPageFailed": "Nie udało się otworzyć strony połączenia ChatGPT.",
   "error.provider.noneReady": "Żaden dostawca agentów nie jest gotowy.",
   "error.provider.claudeTurnActive": "Zaczekaj na zakończenie aktywnej tury Claude, zanim odświeżysz jego kontekst.",

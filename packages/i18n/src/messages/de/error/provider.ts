@@ -298,6 +298,8 @@ export const messages = {
   "error.provider.noAnswerAfterSteps":
     "{provider} hat einige Schritte ausgeführt und den Durchgang dann ohne Antwort beendet. Frag den Agenten, was er getan hat, bevor du dieselbe Anfrage noch einmal sendest.",
   "error.provider.acpRefusedNoReason": "{provider} hat ohne Antwort aufgehört. Sende die Nachricht erneut.",
+  "error.provider.channelNoAnswer":
+    "{provider} hat den Durchlauf ohne Antwort beendet. Klicke im Kanal auf „Weiter“, um die Aufgabe erneut auszuführen, oder auf „Neu zuweisen“, um sie einem anderen Mitglied zu geben.",
   "error.provider.chatgptPageFailed": "OpenBot konnte die ChatGPT-Verbindungsseite nicht öffnen.",
   "error.provider.noneReady": "Kein Agentenanbieter ist bereit.",
   "error.provider.claudeTurnActive":

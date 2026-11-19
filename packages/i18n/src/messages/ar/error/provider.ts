@@ -264,6 +264,8 @@ export const messages = {
   "error.provider.noAnswerAfterSteps":
     "نفّذ {provider} بعض الخطوات، ثم أنهى الدور بدون إجابة. اسأل الوكيل عمّا فعله قبل أن ترسل الطلب نفسه مرة أخرى.",
   "error.provider.acpRefusedNoReason": "توقف {provider} بدون إجابة. أرسل الرسالة مرة أخرى.",
+  "error.provider.channelNoAnswer":
+    "أنهى {provider} الدور بدون إجابة. في القناة، انقر على «متابعة» لتشغيل المهمة مرة أخرى، أو على «إعادة الإسناد» لإعطائها لعضو آخر.",
   "error.provider.chatgptPageFailed": "تعذّر على OpenBot فتح صفحة ربط ChatGPT.",
   "error.provider.noneReady": "لا يوجد مزوّد وكلاء جاهز.",
   "error.provider.claudeTurnActive": "انتظر انتهاء دور Claude النشط قبل تحديث سياقه.",

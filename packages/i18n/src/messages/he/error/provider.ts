@@ -266,6 +266,8 @@ export const messages = {
   "error.provider.noAnswerAfterSteps":
     "{provider} ביצע כמה צעדים ואז סיים את התור בלי תשובה. יש לשאול את הסוכן מה הוא עשה לפני שליחת אותה בקשה שוב.",
   "error.provider.acpRefusedNoReason": "{provider} עצר בלי תשובה. יש לשלוח את ההודעה שוב.",
+  "error.provider.channelNoAnswer":
+    "{provider} סיים את התור בלי תשובה. בערוץ, יש ללחוץ על המשך כדי להריץ את המשימה שוב, או על הקצאה מחדש כדי לתת אותה לחבר אחר.",
   "error.provider.chatgptPageFailed": "OpenBot לא הצליח לפתוח את דף החיבור של ChatGPT.",
   "error.provider.noneReady": "אין ספק סוכנים מוכן.",
   "error.provider.claudeTurnActive": "יש להמתין לפעולה הפעילה של Claude לפני רענון ההקשר שלו.",

@@ -304,6 +304,8 @@ export const messages = {
   "error.provider.noAnswerAfterSteps":
     "{provider} a effectué quelques étapes, puis a terminé le tour sans réponse. Demandez à l'agent ce qu'il a fait avant d'envoyer à nouveau la même demande.",
   "error.provider.acpRefusedNoReason": "{provider} s’est arrêté sans réponse. Renvoyez le message.",
+  "error.provider.channelNoAnswer":
+    "{provider} a terminé le tour sans réponse. Dans le canal, cliquez sur Continuer pour relancer la tâche, ou sur Réattribuer pour la confier à un autre membre.",
   "error.provider.chatgptPageFailed": "OpenBot n’a pas pu ouvrir la page de connexion ChatGPT.",
   "error.provider.noneReady": "Aucun fournisseur d’agent n’est prêt.",
   "error.provider.claudeTurnActive": "Attendez la fin du tour Claude actif avant d’actualiser son contexte.",

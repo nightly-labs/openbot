@@ -934,10 +934,17 @@ of the turn, also with no backup model. A backup model then runs the turn again,
 error. With no backup, a turn that only teammate results started runs once more on the same model.
 A thread turn does the same: a backup model runs it again, and with no backup it runs once more on
 the same model (#8503, #8406). So
-does the turn of an external chat conversation, such as WhatsApp (#8573); a channel task does not.
+does the turn of an external chat conversation, such as WhatsApp (#8573).
 `MessagingThreads` keeps the conversation's status post while the turn's messages wait in the queue,
-so the conversation gets no "Stopped." before the answer. The turn did no step, so it repeats
-nothing. A second empty run, or an empty turn from the person, shows the error.
+so the conversation gets no "Stopped." before the answer. A channel task's empty turn runs once more
+in its session too, from any sender, also a person: the channel keeps the task's assignment
+(`ChannelService.keepForRetry`), as `requeueForLimit` keeps it for a backup, but with no limit rule,
+so a routine set to skip at a limit keeps its run. Only a turn of one request runs again this way.
+When a backup model would take the turn in the agent's own chat, the run again is on that backup.
+Before, the task stopped until the person clicked Continue (#11425). The turn did no step, so it
+repeats nothing. A second empty run, or an empty turn from the person outside a channel, shows the
+error. A Codex channel task shows `error.provider.channelNoAnswer`, which names Continue and Reassign
+on its card.
 A turn that a failed sign-in or a provider that does not answer ended after work started continues
 on the backup model, with the work steps of the turn, as after a usage limit, when the agent is set
 to switch without asking (#8406).
