@@ -16,6 +16,14 @@ private const val ALIAS_PREFIX = "AppIcon"
 
 class UnknownIconException(id: String) : CodedException("The app has no icon \"$id\"")
 
+/**
+ * The app icon of the launcher. `plugins/with-app-icons.js` gives `MainActivity` one launcher alias
+ * for each desktop logo color (`packages/contracts/src/app-logo-color.ts`), such as `.AppIconGreen`,
+ * and `.AppIconDefault` for the main icon. The launcher shows the enabled alias. Some launchers close
+ * the app when its launcher activity changes, so the change waits until no activity of the app shows.
+ * A system dialog, the share sheet or a picker over the app pauses it but does not hide it, so the
+ * change does not wait for a pause. All calls run on the main thread.
+ */
 class AppIconModule : Module() {
   private var pending: String? = null
   private val started = mutableSetOf<Int>()
@@ -24,6 +32,7 @@ class AppIconModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("OpenBotAppIcon")
 
+    /** The ID of the selected variant, also when it waits for the background. */
     AsyncFunction("getIcon") {
       val context = context() ?: return@AsyncFunction null
       pending ?: current(context)
@@ -46,6 +55,7 @@ class AppIconModule : Module() {
   private fun listen(context: Context) {
     if (callbacks != null) return
     val application = context as? Application ?: return
+    // JavaScript calls `setIcon` from a screen that shows.
     appContext.currentActivity?.let { started.add(System.identityHashCode(it)) }
     val next = object : Application.ActivityLifecycleCallbacks {
       override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
@@ -79,6 +89,7 @@ class AppIconModule : Module() {
 
   private fun context(): Context? = appContext.reactContext?.applicationContext
 
+  /** The launcher aliases by variant ID, with the disabled ones. */
   private fun aliases(context: Context): Map<String, ComponentName> {
     val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setPackage(context.packageName)
     @Suppress("DEPRECATION")
@@ -112,6 +123,7 @@ class AppIconModule : Module() {
     val aliases = aliases(context)
     val next = aliases[id] ?: return
     val manager = context.packageManager
+    // The new alias comes first, so the app always has a launcher entry.
     manager.setComponentEnabledSetting(next, PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP)
     for ((other, component) in aliases) {
       if (other == id) continue

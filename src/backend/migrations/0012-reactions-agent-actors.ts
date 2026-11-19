@@ -2,6 +2,9 @@ import type { DatabaseSync } from "node:sqlite";
 import type { OpenBotMigration } from "./migration";
 import { isDynamicRecord } from "./runtime-values";
 
+// The actor column is part of the primary key, so the table is rebuilt rather than altered. There are no
+// indexes and no foreign keys in either direction, so foreign keys stay on: switching them off here could
+// only hide a real violation raised by the same transaction.
 function migrateReactionsForAgentActors(db: DatabaseSync): void {
   const columns = db.prepare("PRAGMA table_info(projection_reactions)").all();
   if (columns.some((column) => isDynamicRecord(column) && column.name === "actor_agent_id")) return;

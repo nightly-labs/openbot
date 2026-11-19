@@ -1,3 +1,13 @@
+/**
+ * The page that the iOS share extension runs in a hidden web view. It sends one share to one agent
+ * without the app: it opens a peer to the host, uploads the files, sends the message, and closes the
+ * peer. The app's peer runs in a web view too, because WebRTC is there. `plugins/with-share-target.js`
+ * bundles this file at prebuild; Metro does not load it.
+ *
+ * The native side does every request to the account service, so the page has no CORS rules to meet,
+ * and it gives each file only when the page asks for it, so one file at a time is in memory.
+ */
+
 import { isQueuedMessageReceipt } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
@@ -15,11 +25,13 @@ import {
   type RemoteTeamPeerActions,
 } from "@openbot/team-client/remote-peer";
 
+/** What the extension asks the page to send. The extension has checked the values. */
 interface ShareSendRequest {
   apiUrl: string;
   sessionToken: string;
   hostId: string;
   hostPublicKey: string;
+  /** A hosted server can sleep. The page then asks it to start and waits for it. */
   hosted: boolean;
   agentId: string;
   text: string;
@@ -28,6 +40,12 @@ interface ShareSendRequest {
   timezone: string;
 }
 
+/**
+ * `stage` names the step that failed, for the support line of the extension. `error` is the English
+ * text of the failure; the extension shows its own localized text. `unconfirmed`: the message request
+ * went out, and no answer came, so the message can be in the chat. The extension must not offer to
+ * send it again.
+ */
 type ShareSendResult =
   | { ok: true }
   | { ok: false; stage: string; error: string; reference: string | null; unconfirmed: boolean };
@@ -43,12 +61,17 @@ type NativeMessage =
   | { type: "file"; index: number };
 
 declare global {
+  /** The page's globals: the handler that `ShareSender.swift` registers, and the function it calls. */
   interface Window {
     webkit?: { messageHandlers?: { openbot?: { postMessage(message: NativeMessage): Promise<unknown> } } };
     openbotShareSend?: (request: ShareSendRequest) => Promise<ShareSendResult>;
   }
 }
 
+/**
+ * How long the connection and the uploads can take before the extension offers the app. A hosted
+ * server can take this long to start. The message request has its own wait, so it is never cut.
+ */
 const PREPARE_DEADLINE_MS = 90_000;
 const MESSAGE_TIMEOUT_MS = 30_000;
 
@@ -63,6 +86,7 @@ class ShareStageError extends Error {
   }
 }
 
+/** Sends a message to the extension and reads its reply with `decode`. */
 async function postNative<T>(message: NativeMessage, decode: (reply: unknown) => T): Promise<T> {
   const handler = window.webkit?.messageHandlers?.openbot;
   if (!handler) throw new Error("The share extension bridge is missing.");
@@ -101,6 +125,7 @@ function whenNotAborted<T>(promise: Promise<T>, signal: AbortSignal | null): Pro
   });
 }
 
+/** A fetch that the extension runs with URLSession. It answers only the account service of the share. */
 const nativeFetch: typeof fetch = async (input, init) => {
   const url = input instanceof Request ? input.url : String(input);
   const body = init?.body;
@@ -109,6 +134,7 @@ const nativeFetch: typeof fetch = async (input, init) => {
     { type: "fetch", url, method: init?.method ?? "GET", headers: headerRecord(init?.headers), body: body ?? null },
     decodeFetchReply,
   );
+  // The native request cannot stop, but the caller's timeout must still end its wait.
   const answer = await whenNotAborted(reply, init?.signal ?? null);
   const empty = answer.status === 204 || answer.status === 205 || answer.status === 304;
   return new Response(empty ? null : answer.body, { status: answer.status, headers: answer.headers });
@@ -157,8 +183,12 @@ async function send(request: ShareSendRequest): Promise<void> {
     current: {
       getBootstrap: (hostId, clientPublicKey, existingSessionId) =>
         runTeamEffect(directory.createBootstrap(hostId, clientPublicKey, existingSessionId)),
+      // The page uses the account session of the app, so the account service gives it the app's
+      // session on the host. To end it would end the app's session too: the host then has no phone
+      // for notifications and Live Activities until the app opens again. So the page never ends it.
       endSession: async () => undefined,
       onConnectionUpdate: async (update) => {
+        // Signal holds the attempt while a hosted server is offline. A start request wakes it, as the app does.
         if (!update.hostOffline || !request.hosted || wakeRequested) return;
         wakeRequested = true;
         const wake = new URL(`/v2/hosting/servers/${encodeURIComponent(request.hostId)}/wake`, request.apiUrl);
@@ -242,20 +272,25 @@ async function send(request: ShareSendRequest): Promise<void> {
         attachmentDraftIds: draftIds,
         replyToMessageId: null,
         timezone: request.timezone,
+        // A host with this capability stores a repeat of the message once.
         ...(capabilities.includes(TEAM_MESSAGE_CLIENT_ID_CAPABILITY)
           ? { clientMessageId: request.clientMessageId }
           : {}),
       },
       timeoutMs: MESSAGE_TIMEOUT_MS,
     }).catch((error: unknown) => {
+      // A refusal from the host is an answer: the message is not in the chat.
       if (error instanceof ShareStageError && error.reference?.startsWith("http/")) throw error;
       const { error: message, reference } = failure(error);
       throw new ShareStageError("message", message, reference, true);
     });
+    // The host answered, so it can have stored the message.
     if (!isQueuedMessageReceipt(receipt)) {
       throw new ShareStageError("message", "The host returned an invalid receipt.", null, true);
     }
   } catch (error) {
+    // The drafts of a message that the host refused, or that never went, are discarded, as the app does.
+    // A message without an answer can use them, so they stay.
     if (!(error instanceof ShareStageError && error.unconfirmed)) {
       for (const draftId of draftIds) {
         await teamRequest("discard", { method: "DELETE", path: TEAM_API_ROUTES.attachment(draftId) }).catch(

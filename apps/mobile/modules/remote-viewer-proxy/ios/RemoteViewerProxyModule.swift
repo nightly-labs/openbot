@@ -6,6 +6,7 @@ import Network
 private let maxHeadBytes = 32 * 1024
 private let maxBodyBytes = 2 * 1024 * 1024
 private let maxMessageBytes = 1024 * 1024
+/// Another app on the phone can also connect to the loopback port. These limits keep it small.
 private let maxPeers = 128
 private let readTimeout: TimeInterval = 30
 private let responseTimeout: TimeInterval = 60
@@ -26,6 +27,7 @@ final class ListenException: Exception, @unchecked Sendable {
   }
 }
 
+/// Tells if a start promise is settled. Only the server queue reads and writes it.
 private final class Settled {
   var done = false
 }
@@ -46,6 +48,7 @@ private final class Peer {
   var bodyLength = 0
   var requestId: String?
   var socketId: String?
+  /// The opcode of the message that continuation frames add to, or 0.
   var fragmentOpcode: UInt8 = 0
   var fragments: [UInt8] = []
 
@@ -60,6 +63,8 @@ private struct Pending {
   let timeout: DispatchWorkItem
 }
 
+/// A loopback HTTP/1.1 and WebSocket server. It only reads the framing. JavaScript answers each request
+/// and each socket message. All state and all methods belong to `queue`.
 final class RemoteViewerServer {
   private let queue: DispatchQueue
   private let emit: (String, [String: Any?]) -> Void
@@ -92,6 +97,7 @@ final class RemoteViewerServer {
     let settled = Settled()
     listener.stateUpdateHandler = { [weak self, weak listener] state in
       guard let self, let listener, self.listener === listener else {
+        // A stop or a new start came first.
         if !settled.done {
           settled.done = true
           promise.reject(ListenException())
@@ -167,6 +173,8 @@ final class RemoteViewerServer {
     closeSocket(peer, code: sendableCloseCode(code), reason: truncated(reason, bytes: 123))
   }
 
+  // MARK: - Connections
+
   private func accept(_ connection: NWConnection) {
     guard listener != nil, peers.count < maxPeers, isLoopback(connection.endpoint) else {
       connection.cancel()
@@ -186,6 +194,7 @@ final class RemoteViewerServer {
     connection.start(queue: queue)
     peer.deadline = schedule(readTimeout) { [weak self, weak peer] in
       guard let self, let peer, peer.phase == .head || peer.phase == .body else { return }
+      // A browser can open a spare connection and send nothing on it.
       if peer.buffer.isEmpty && peer.phase == .head {
         self.drop(peer)
       } else {
@@ -230,6 +239,8 @@ final class RemoteViewerServer {
     }
   }
 
+  /// Ends the connection. A WebSocket that did not report its close yet reports 1006. A last frame goes
+  /// out before the connection closes, or the connection closes after a short time.
   private func drop(_ peer: Peer, lastFrame: [UInt8]? = nil) {
     guard peer.phase != .closed else { return }
     peer.phase = .closed
@@ -255,6 +266,8 @@ final class RemoteViewerServer {
     queue.asyncAfter(deadline: .now() + seconds, execute: item)
     return item
   }
+
+  // MARK: - HTTP
 
   private func readHead(_ peer: Peer) {
     guard let end = headEnd(peer.buffer) else {
@@ -331,6 +344,7 @@ final class RemoteViewerServer {
     writeResponse(peer, status: status, headers: headers, body: Data(), head: false)
   }
 
+  /// Sends one response and closes the connection.
   private func writeResponse(_ peer: Peer, status: Int, headers: [String: String], body: Data, head: Bool) {
     guard peer.phase != .closed, peer.phase != .responding else { return }
     peer.phase = .responding
@@ -363,6 +377,8 @@ final class RemoteViewerServer {
       }
     )
   }
+
+  // MARK: - WebSocket
 
   private func upgradeSocket(_ peer: Peer) {
     guard peer.method == "GET", let key = peer.headers["sec-websocket-key"],
@@ -397,6 +413,7 @@ final class RemoteViewerServer {
       peer.phase = .webSocket
       self.sockets[socketId] = peer
       self.emit("onSocketOpen", ["socketId": socketId, "target": peer.target])
+      // The page can send frames before it reads the 101.
       self.readFrames(peer)
       if peer.phase == .webSocket || peer.phase == .closing { self.receive(peer) }
     })
@@ -486,6 +503,7 @@ final class RemoteViewerServer {
   }
 
   private func closeReceived(_ peer: Peer, payload: [UInt8]) {
+    // The page answered the close that the server sent.
     if peer.phase == .closing { return drop(peer) }
     var code = 1005
     var reason = ""
@@ -505,11 +523,14 @@ final class RemoteViewerServer {
     }
   }
 
+  /// A frame that breaks the protocol ends the socket at once.
   private func fail(_ peer: Peer, code: Int) {
     if peer.phase == .closing { return drop(peer) }
     closeSocket(peer, code: code, reason: "", wait: false)
   }
 
+  /// Reports the close once, sends a close frame, and ends the connection after the page answers or after
+  /// a short time.
   private func closeSocket(_ peer: Peer, code: Int, reason: String, wait: Bool = true) {
     guard peer.phase == .webSocket else { return }
     report(peer, code: code, reason: reason)
@@ -549,6 +570,8 @@ final class RemoteViewerServer {
   }
 }
 
+// MARK: - Helpers
+
 private func isLoopback(_ endpoint: NWEndpoint) -> Bool {
   guard case let .hostPort(host, _) = endpoint else { return false }
   switch host {
@@ -561,6 +584,7 @@ private func isLoopback(_ endpoint: NWEndpoint) -> Bool {
   }
 }
 
+/// The index after the first empty line, or nil.
 private func headEnd(_ bytes: [UInt8]) -> Int? {
   guard bytes.count >= 4 else { return nil }
   for index in 0...(bytes.count - 4)
@@ -570,6 +594,7 @@ private func headEnd(_ bytes: [UInt8]) -> Int? {
   return nil
 }
 
+/// An HTTP token, such as a header name.
 private func isToken<S: StringProtocol>(_ value: S) -> Bool {
   !value.isEmpty
     && value.unicodeScalars.allSatisfy { scalar in
@@ -582,11 +607,13 @@ private func validCloseCode(_ code: Int) -> Bool {
   (1000...1014).contains(code) && code != 1004 && code != 1005 && code != 1006 || (3000...4999).contains(code)
 }
 
+/// The same rule as the desktop proxy: a reserved code cannot cross the socket, and an abnormal close stays a failure.
 private func sendableCloseCode(_ code: Int) -> Int {
   if code == 1005 { return 1000 }
   return validCloseCode(code) ? code : 1011
 }
 
+/// One unmasked server frame with the FIN bit.
 private func encodeFrame(opcode: UInt8, payload: [UInt8]) -> [UInt8] {
   var frame: [UInt8] = [0x80 | opcode]
   let count = payload.count
@@ -608,6 +635,7 @@ private func closePayload(code: Int, reason: String) -> [UInt8] {
   [UInt8((code >> 8) & 0xFF), UInt8(code & 0xFF)] + Array(reason.utf8)
 }
 
+/// Cuts the text at a character boundary so that its UTF-8 form has at most `bytes` bytes.
 private func truncated(_ text: String, bytes: Int) -> String {
   var result = String.UnicodeScalarView()
   var count = 0
@@ -649,6 +677,7 @@ private func reasonPhrase(_ status: Int) -> String {
 
 public class RemoteViewerProxyModule: Module {
   private let queue = DispatchQueue(label: "run.openbot.remoteviewerproxy", qos: .userInitiated)
+  /// Only `queue` creates and uses it.
   private lazy var server = RemoteViewerServer(queue: queue) { [weak self] name, body in
     self?.sendEvent(name, body)
   }
@@ -658,11 +687,13 @@ public class RemoteViewerProxyModule: Module {
 
     Events("onRequest", "onSocketOpen", "onSocketMessage", "onSocketClose")
 
+    /// Stops an earlier server, then listens on 127.0.0.1 on a free port, and returns the port.
     AsyncFunction("start") { (token: String, promise: Promise) in
       self.server.start(token: token, promise: promise)
     }
     .runOnQueue(queue)
 
+    /// Closes the listener, every connection and every socket.
     AsyncFunction("stop") {
       self.server.stop()
     }
@@ -683,6 +714,7 @@ public class RemoteViewerProxyModule: Module {
     }
     .runOnQueue(queue)
 
+    /// Android only. iOS has no flag that keeps a view out of screenshots.
     AsyncFunction("setSecure") { (_: Bool) in }
 
     OnDestroy {

@@ -26,6 +26,8 @@ export const AGENT_MEMORY_SELECTION_SCHEMA_SQL = `
   END;
 `;
 
+// Frozen copies of `databaseRows`, `requiredStringColumn` and the memory budget and format of
+// `@openbot/contracts/agent-memory-context`, as this migration shipped them.
 const AGENT_MEMORY_CONTEXT_BUDGET_BYTES = 8192;
 
 interface SelectedMemory {

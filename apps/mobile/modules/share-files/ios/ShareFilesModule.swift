@@ -9,6 +9,7 @@ final class NoPresenterException: Exception, @unchecked Sendable {
   override var reason: String { "No screen can show the share sheet" }
 }
 
+/// One share sheet with many files. `expo-sharing` takes one file only.
 public class ShareFilesModule: Module {
   public func definition() -> ModuleDefinition {
     Name("OpenBotShareFiles")
@@ -19,6 +20,7 @@ public class ShareFilesModule: Module {
         throw NoPresenterException()
       }
       let controller = UIActivityViewController(activityItems: urls, applicationActivities: nil)
+      // The sheet calls this once when it closes, whatever the user chose.
       controller.completionWithItemsHandler = { _, _, _, _ in promise.resolve(nil) }
       if let popover = controller.popoverPresentationController {
         popover.sourceView = presenter.view

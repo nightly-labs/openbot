@@ -11,6 +11,11 @@ import org.json.JSONObject
 import java.io.File
 import java.io.Serializable
 
+/**
+ * The content of an agent notification, with the agent picture as its large icon. All other fields
+ * are the ones of `content`, so the text, the sound, the data and a tap do not change. Without a
+ * picture that Android can read, the notification shows the icon of `content`, as before.
+ */
 internal class AgentNotificationContent(
   private val content: NotificationContent,
   private val avatarPath: String,
@@ -40,11 +45,17 @@ internal class AgentNotificationContent(
   }
 }
 
+/**
+ * The agent pictures that the app writes into its files folder, with an index of the agent of each
+ * file (`notification-avatars.ts`).
+ */
 internal object NotificationAvatars {
   private const val INDEX_FILE = "notification-avatars.json"
   private const val AVATAR_FOLDER = "notification-avatars"
+  /** 64 dp at 3x, the size of the large icon. A larger photo is read at a smaller scale. */
   private const val MAX_PIXELS = 192
 
+  /** The picture of the agent, or null when the app wrote none. */
   fun file(context: Context, serverId: String, agentId: String): File? =
     try {
       val index = File(context.filesDir, INDEX_FILE)
@@ -57,6 +68,7 @@ internal object NotificationAvatars {
           .mapNotNull { agents.optJSONObject(it) }
           .firstOrNull { it.optString("serverId") == serverId && it.optString("id") == agentId }
           ?.optString("avatar")
+          // The index names a picture in the folder only.
           ?.takeIf { it.isNotEmpty() && !it.contains('/') && it != ".." }
           ?.let { File(File(context.filesDir, AVATAR_FOLDER), it) }
           ?.takeIf { it.isFile }

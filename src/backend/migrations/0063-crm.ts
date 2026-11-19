@@ -1,5 +1,29 @@
 import type { OpenBotMigration } from "./migration";
 
+// Shared by migration v63 and the separate new-database schema. IF NOT EXISTS, because this text is
+// both the migration and the tail of the latest schema. The INSERT OR IGNORE of the built-in
+// statuses is in the same text, so both paths have them once.
+//
+// The CRM of this computer or server: the statuses, tags and customers, the plans that the customers
+// bought, their payments, what happened to each customer, and the changes that agents propose. An
+// owner or admin writes it directly; an agent only adds a pending proposal. Configuration and records
+// that a person keeps, written directly, so there is no event and no projection.
+//
+// - `crm_counters` gives the customer and invoice numbers. Each number is the counter + 1 and the
+//   counter never goes down, so a deleted customer or payment never gives its number again.
+// - `crm_customers.search_text` is a JSON object of the normalized text fields (lower case, no
+//   accents). A search reads only the fields it may read, so an agent never matches a private value.
+// - Amounts are whole minor units of the customer's ISO 4217 currency. Times are ISO 8601 text, due
+//   dates and plan dates are `YYYY-MM-DD`.
+// - A deleted customer deletes its tags, plans, payments, activity and proposals. A deleted plan keeps
+//   its payments (paid ones are history); they lose the plan. A built-in status has no label: the
+//   client shows its catalog name. The application refuses to rename or delete one.
+// - `crm_sources` holds a connected payment source (Stripe). Its key is not here: the host keeps it
+//   encrypted in its user data folder. A customer, plan or payment that a source made or linked has
+//   its `source_ref` (such as `stripe:in_…`); `source_id` is set while the source is connected, and a
+//   row with it is read-only for people and agents. A disconnect sets `source_id` to NULL and keeps
+//   `source_ref`, so a new connect links the same rows again. `crm_source_ignored` holds the refs of
+//   linked customers that a person deleted, so a sync does not import them again.
 export const CRM_SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS crm_counters (
     name TEXT NOT NULL PRIMARY KEY CHECK(name IN ('customer', 'payment')),
@@ -153,5 +177,7 @@ export const CRM_SCHEMA_SQL = `
 export const migration: OpenBotMigration = {
   version: 63,
   name: "crm",
+  // Only creates tables and their indexes, and adds the three built-in statuses, so no foreign-key
+  // pause and no vacuum. No CRM data was saved before it, so the other tables start empty.
   up: (db) => db.exec(CRM_SCHEMA_SQL),
 };

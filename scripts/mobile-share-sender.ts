@@ -1,3 +1,11 @@
+// Builds the page that the iOS share extension runs in a hidden web view to send a share without the
+// app (`apps/mobile/src/features/share/extension/share-sender.ts`).
+//
+//   bun scripts/mobile-share-sender.ts <output.html>
+//
+// `apps/mobile/plugins/with-share-target.js` runs it at prebuild, and EAS has Bun for the build. The
+// page is one HTML file with the script inline, so the extension needs one resource only.
+
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -6,6 +14,8 @@ const ROOT = resolve(import.meta.dirname, "..");
 const logger = createOpenBotLogger("mobile-share-sender");
 const ENTRY = resolve(ROOT, "apps/mobile/src/features/share/extension/share-sender.ts");
 
+// The sender shows no text: the extension shows its own. `sourceText` keeps its English, and the
+// translations that only `localizeSourceText` reads stay out of the page. They are most of its size.
 const WITHOUT_SOURCE_TRANSLATIONS: Bun.BunPlugin = {
   name: "share-sender-without-source-translations",
   setup(build) {
@@ -16,6 +26,10 @@ const WITHOUT_SOURCE_TRANSLATIONS: Bun.BunPlugin = {
   },
 };
 
+/**
+ * The page can open the Signal socket and nothing else. Every account service request goes through
+ * the extension, which checks its address.
+ */
 const CONTENT_SECURITY_POLICY = "default-src 'none'; script-src 'unsafe-inline'; connect-src wss: ws:";
 
 async function main(): Promise<void> {
@@ -35,6 +49,7 @@ async function main(): Promise<void> {
   }
   const [bundle] = result.outputs;
   if (!bundle) throw new Error("The share sender page has no output.");
+  // An inline script ends at the first `</script`, wherever it is.
   const script = (await bundle.text()).replaceAll("</script", "<\\/script");
   const html = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${CONTENT_SECURITY_POLICY}"></head><body><script>${script}</script></body></html>\n`;
   mkdirSync(dirname(resolve(output)), { recursive: true });

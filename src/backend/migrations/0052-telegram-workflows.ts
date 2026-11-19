@@ -1,6 +1,14 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { OpenBotMigration } from "./migration";
 
+// Migration v52: Telegram triggers of workflows. The text below is the migration; the latest schema takes
+// the run source line of migration 53, so do not edit it after release.
+//
+// `workflow_runs` gets `telegram` in its source CHECK. SQLite cannot change a CHECK in place, so the
+// migration rebuilds the table, as migrations 49 and 50 did; its rows keep their run ids, so the steps,
+// output deliveries and GitHub rows that point to them stay as they are. A Telegram trigger has no table
+// of its own: the run payload keeps the message that started it, and a Telegram output's post or
+// reaction is a row of `workflow_output_deliveries`.
 const V52_WORKFLOW_RUN_SOURCE_SQL =
   "source TEXT NOT NULL CHECK(source IN ('manual', 'schedule', 'webhook', 'github', 'discord', 'telegram')),";
 
@@ -10,6 +18,10 @@ const V52_WORKFLOW_RUN_INDEXES_SQL = `
     ON workflow_runs(status) WHERE status IN ('running', 'approval', 'stopping');
 `;
 
+/**
+ * Migration 52. The caller pauses foreign keys: the old table is dropped while steps point to its runs,
+ * and the new one takes its name and every run id.
+ */
 function addTelegramWorkflows(db: DatabaseSync): void {
   db.exec(`
     CREATE TABLE workflow_runs_v52 (
@@ -48,6 +60,8 @@ function addTelegramWorkflows(db: DatabaseSync): void {
 export const migration: OpenBotMigration = {
   version: 52,
   name: "telegram-workflows",
+  // Rebuilds the run table again to add the Telegram run source, as migration 50 did, so foreign keys
+  // pause and run ids do not change. Few rows, so no vacuum. No table is added.
   disableForeignKeys: true,
   up: addTelegramWorkflows,
 };

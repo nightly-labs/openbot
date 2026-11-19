@@ -26,25 +26,34 @@ import java.io.OutputStream
 import java.util.UUID
 import java.util.concurrent.Executors
 
+/** The types that a keyboard can insert as files. A paste of any clip goes to the listener. */
 private val FILE_TYPES = arrayOf("image/*", "video/*", "audio/*", "application/*", "text/*", "message/*")
 
 private val copier = Executors.newSingleThreadExecutor()
 
+/**
+ * Wraps the chat composer field. The React Native field pastes text only, so a paste or keyboard
+ * insert of photos, videos or other files in it is copied to the cache and sent to JavaScript.
+ * Enter on a hardware keyboard sends the draft. Shift+Enter adds a line break.
+ */
 class ComposerPasteView(context: Context, appContext: AppContext) : ExpoView(context, appContext) {
   private val onPasteFiles by EventDispatcher()
   private val onSubmitKey by EventDispatcher()
 
   private val submitKey = View.OnKeyListener { field, keyCode, event ->
     if (!isSubmitKey(keyCode, event) || field !is EditText || !field.isEnabled) return@OnKeyListener false
+    // The key down sends. The key up of the same key must not add a line break after it.
     if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
       onSubmitKey(mapOf("text" to field.text.toString()))
     }
     true
   }
 
+  /** The largest file that the app attaches. The copy thread reads it. */
   @Volatile var maxBytes = Long.MAX_VALUE - 1
 
   private val receiver = OnReceiveContentListener { _, payload ->
+    // A clip item with a content address is a file. Text, and a link as text, stay for the field.
     val split = payload.partition { item -> item.uri?.scheme == ContentResolver.SCHEME_CONTENT }
     split.first?.let { copyFiles(it) }
     split.second
@@ -72,6 +81,7 @@ class ComposerPasteView(context: Context, appContext: AppContext) : ExpoView(con
     }
   }
 
+  /** Enter and Ctrl+Enter from a hardware keyboard. A screen keyboard adds a line break, as before. */
   private fun isSubmitKey(keyCode: Int, event: KeyEvent): Boolean {
     if (keyCode != KeyEvent.KEYCODE_ENTER && keyCode != KeyEvent.KEYCODE_NUMPAD_ENTER) return false
     if ((event.flags and KeyEvent.FLAG_SOFT_KEYBOARD) != 0 || event.device?.isVirtual != false) return false
@@ -82,20 +92,28 @@ class ComposerPasteView(context: Context, appContext: AppContext) : ExpoView(con
   private fun copyFiles(files: ContentInfoCompat) {
     val clip = files.clip
     val uris = (0 until clip.itemCount).mapNotNull { clip.getItemAt(it).uri }
+    // The address can stop working when the keyboard or the clip changes, so the copy starts now.
     copyUris(this, uris, maxBytes) { onPasteFiles(it) }
   }
 }
 
+/**
+ * Wraps the chat. A drop of photos, videos or other files from another app, such as in split
+ * screen, is copied to the cache and sent to JavaScript, as a paste in the composer is.
+ */
 class ChatDropView(context: Context, appContext: AppContext) : ExpoView(context, appContext) {
   private val onDropFiles by EventDispatcher()
 
   @Volatile var maxBytes = Long.MAX_VALUE - 1
+  /** While false, the chat refuses a drop. `enabled` would clash with `View.setEnabled`. */
   var dropEnabled = true
 
   init {
     setOnDragListener { _, event ->
       when (event.action) {
         DragEvent.ACTION_DRAG_STARTED -> dropEnabled && hasFile(event.clipDescription)
+        // The chat can close the composer during the drag. A drop with no file is refused, so
+        // the other app does not show it as done.
         DragEvent.ACTION_DROP -> dropEnabled && drop(event)
         else -> true
       }
@@ -113,6 +131,7 @@ class ChatDropView(context: Context, appContext: AppContext) : ExpoView(context,
 
   private fun drop(event: DragEvent): Boolean {
     val clip = event.clipData ?: return false
+    // The permission keeps the addresses of another app readable until the copy ends.
     val permissions = appContext.currentActivity?.requestDragAndDropPermissions(event)
     val uris = (0 until clip.itemCount).mapNotNull { clip.getItemAt(it).uri }
       .filter { it.scheme == ContentResolver.SCHEME_CONTENT }
@@ -130,6 +149,10 @@ class ChatDropView(context: Context, appContext: AppContext) : ExpoView(context,
 
 private val mainThread = Handler(Looper.getMainLooper())
 
+/**
+ * Copies the files on the copy thread, then calls `done` on the main thread. `View.post` waits for
+ * the view to attach again, so a chat closed during the copy never released the drop permission.
+ */
 private fun copyUris(view: View, uris: List<Uri>, maxBytes: Long, done: (Map<String, Any>) -> Unit) {
   val context = view.context
   copier.execute {
@@ -151,6 +174,7 @@ private fun copyFile(context: Context, uri: Uri, maxBytes: Long): Map<String, St
   val target = File(context.cacheDir, "openbot-paste-${UUID.randomUUID()}$suffix")
   val input = resolver.openInputStream(uri) ?: error("The pasted file cannot be read.")
   try {
+    // One byte over the limit is enough for JavaScript to refuse the file with its name.
     input.use { source -> target.outputStream().use { sink -> copyAtMost(source, sink, maxBytes + 1) } }
   } catch (error: Exception) {
     target.delete()
@@ -179,6 +203,7 @@ class ComposerPasteModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("OpenBotComposerPaste")
 
+    // A build before the `ChatDrop` view does not have it, so the app shows the chat without it.
     Constant("chatDrop") { true }
 
     View(ComposerPasteView::class) {

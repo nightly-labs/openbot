@@ -5,9 +5,25 @@ import Foundation
   internal import OpenBotShortcuts
 #endif
 
+// The shortcuts of OpenBot: List Agents, Send Message and Open Agent.
+//
+// They run without the JavaScript of the app. iOS runs a shortcut in the background, also when the
+// app is not in memory, and there the app has no window and React Native does not run. List Agents
+// reads the file that the app wrote, and Send Message sends from native code (`ShortcutSend.swift`).
+//
+// The snippets that show the cards need iOS 26 (`SnippetIntent`), so an older iOS has no shortcuts.
+//
+// iOS reads the names and the phrases of the shortcuts when the app is built, so they are English
+// here and not from the `@openbot/i18n` catalog. The text of the cards is from the catalog: the app
+// writes it to `shortcuts.json`.
+
+/// Why a shortcut cannot run now. The card names the reason and has one button.
 enum ShortcutNotice: String {
+  /// The app wrote no data: no session, or it has not opened since it got shortcuts.
   case setUp
+  /// The user has not chosen the agent that gets the shortcut messages.
   case noAgent
+  /// The app lock is on, so the app must open and ask for it.
   case locked
 
   static func current(_ directory: ShortcutDirectory?) -> ShortcutNotice? {
@@ -26,6 +42,7 @@ struct ListAgentsIntent: AppIntent {
 
   func perform() async throws -> some IntentResult & ReturnsValue<[String]> & ShowsSnippetIntent {
     let directory = ShortcutDirectory.read()
+    // The names are behind the app lock, as in the app.
     if directory == nil || directory?.locked == true {
       let notice: ShortcutNotice = directory == nil ? .setUp : .locked
       return .result(value: [], snippetIntent: ShortcutCardSnippetIntent(notice: notice))
@@ -61,6 +78,8 @@ struct SendMessageIntent: AppIntent {
     }
     let text = message.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !text.isEmpty else { throw $message.needsValueError("What should it say?") }
+    // The intent returns when the server has the message. iOS suspends the app soon after an
+    // intent returns, so a send that continued after it would not end.
     guard let directory, let agent = directory.agent,
       let server = directory.server(of: agent),
       let session = ShortcutSession.read(for: directory)
@@ -72,6 +91,9 @@ struct SendMessageIntent: AppIntent {
   }
 }
 
+/// Opens the chat of the agent that the user chose in Settings > Shortcuts. With no agent, it opens
+/// Settings > Shortcuts, and with no data from the app, the home screen. A locked app asks for the
+/// lock before the chat shows.
 @available(iOS 26.0, *)
 struct OpenAgentIntent: AppIntent {
   static let title: LocalizedStringResource = "Open Agent"
@@ -93,18 +115,23 @@ struct OpenAgentIntent: AppIntent {
   }
 }
 
+/// Opens the app: the chat of an agent, or Settings > Shortcuts. JavaScript takes the request when
+/// its screens show, so it also waits for an app that starts now.
 @available(iOS 26.0, *)
 struct OpenOpenBotIntent: AppIntent {
   static let title: LocalizedStringResource = "Open OpenBot"
   static let isDiscoverable = false
   static let supportedModes: IntentModes = .foreground(.immediate)
 
+  /// `chat`, `settings` or `home`.
   @Parameter(title: "Screen")
   var screen: String?
 
   @Parameter(title: "Agent")
   var agentId: String?
 
+  /// A message that the shortcut could not send, for the composer of the chat, with the server of
+  /// the agent.
   @Parameter(title: "Text")
   var text: String?
 

@@ -2,6 +2,8 @@ import type { DatabaseSync } from "node:sqlite";
 import type { OpenBotMigration } from "./migration";
 import { type DynamicRecord, isDynamicRecord, isNumber, isString } from "./runtime-values";
 
+// This is the frozen compatibility schema for every database that predates v8.
+// Future schema changes must update LATEST_SCHEMA_SQL and append a migration without editing this SQL.
 export const BASELINE_V8_SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS schema_migrations (
     version INTEGER PRIMARY KEY,

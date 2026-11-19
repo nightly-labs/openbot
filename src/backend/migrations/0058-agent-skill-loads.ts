@@ -1,5 +1,13 @@
 import type { OpenBotMigration } from "./migration";
 
+// Shared by migration v58 and the separate new-database schema. IF NOT EXISTS throughout.
+//
+// One row for each time an agent loaded a skill, for the Skill tab of the usage report. The CLI loads
+// the skill itself, so a row comes from the finished tool step that read its SKILL.md or called the
+// Skill tool. `tokens` is an estimate from the size of that SKILL.md, null when the file was not found;
+// `estimated_cost_usd` prices those tokens as input of the turn's model, null when the model has no
+// list price. Like the other usage rows, a row stays when its conversation is deleted and goes with
+// its agent.
 export const AGENT_SKILL_LOADS_SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS agent_usage_skill_loads (
     agent_id TEXT NOT NULL,
@@ -21,5 +29,7 @@ export const AGENT_SKILL_LOADS_SCHEMA_SQL = `
 export const migration: OpenBotMigration = {
   version: 58,
   name: "agent-skill-loads",
+  // Only creates a table and its indexes, so no foreign-key pause and no vacuum. No skill load was
+  // recorded before it, so the table starts empty and no usage row changes.
   up: (db) => db.exec(AGENT_SKILL_LOADS_SCHEMA_SQL),
 };

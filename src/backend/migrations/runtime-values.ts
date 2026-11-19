@@ -1,3 +1,6 @@
+// Row checks for the migrations, frozen like them, so a change to `@openbot/contracts/runtime-values`
+// does not change a released migration. Their input is SQLite rows and `JSON.parse` values.
+
 export interface DynamicRecord {
   readonly [key: string]: unknown;
 }

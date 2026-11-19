@@ -1,5 +1,8 @@
 import type { OpenBotMigration } from "./migration";
 
+// IF NOT EXISTS throughout, because this text is both migration 15 and the tail of the latest
+// schema. A database built from the latest schema and then replayed forward - which is how a
+// test fakes an older version - meets its own tables.
 export const ANALYTICS_SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS agent_usage_records (
     agent_id TEXT NOT NULL,

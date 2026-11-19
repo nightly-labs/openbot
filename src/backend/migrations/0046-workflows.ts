@@ -1,5 +1,46 @@
 import type { OpenBotMigration } from "./migration";
 
+// Shared by migration v46 and the separate new-database schema. IF NOT EXISTS throughout, because
+// this text is both the migration and the tail of the latest schema.
+//
+// A workflow is a graph that the user draws on the Workflows page: trigger, prompt, model, agent,
+// condition, approval and output steps, joined by typed edges. The rows are written directly, not
+// through `database.dispatch`: a step holds the text one step gave another, and the event log is
+// never deleted from.
+//
+// Agent ids carry no foreign key, as in every other table keyed by an agent: `hardDeleteAgent`
+// clears the agent of a node by hand and keeps the step history.
+//
+// `workflows`: one graph. `graph_revision` goes up on each saved change; a save names the revision
+// it started from, so a stale editor gets a conflict instead of overwriting newer work.
+// `strokes_json` holds the freehand drawing, which no step reads. `next_run_number` numbers runs.
+//
+// `workflow_nodes` and `workflow_edges`: the graph. `position` keeps the order the editor sent, and
+// the order of a node's incoming edges is the order of its inputs. `fields_json` holds the node's
+// fields; `schedule_json` is set only on a schedule trigger. `branch` is set only on an edge out of a
+// condition.
+//
+// `workflow_versions`: graph snapshots for the version history. `kind` is `auto` for a save, `restore`
+// for the state before a restore, and `run` for the graph a run started from.
+//
+// `workflow_triggers`: one row per trigger node. `next_due_at` is the next schedule occurrence.
+// `workflow_trigger_webhooks` holds the relay
+// route of a webhook trigger; a removed route goes to `projection_webhook_route_revocations`.
+// `workflow_webhook_receipts` records each received delivery once, so a repeat is a no-op. An ignored
+// delivery is `busy` (a run was open) or `refused` (the run could not start).
+//
+// `workflow_runs`: one run. `trigger_node_id` is null for a run the user started without a trigger.
+// `graph_json` is the graph the run started from, so an edit during the run does not change it.
+// `idempotency_key` is the request id of a manual run, or `workflow:<node>:<scheduled for>` and
+// `webhook:<node>:<delivery>` for the others. It is unique in its workflow only, so a copy of a
+// workflow, which keeps the node ids, starts its own runs.
+//
+// `workflow_steps`: one attempt of one step node. `run_id` is null for a step the user ran alone.
+// `delivery_id` and `turn_id` belong to an agent step, whose answer comes from that turn.
+//
+// `workflow_output_deliveries`: one output step's post to a messaging place, with the same status
+// machine as `routine_result_deliveries`: `sending` is set before the post, and a restart finds it
+// `uncertain`.
 export const WORKFLOW_SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS workflows (
     workflow_id TEXT PRIMARY KEY,
@@ -157,10 +198,13 @@ export const WORKFLOW_SCHEMA_SQL = `
   );
 `;
 
+// The run source line of `WORKFLOW_SCHEMA_SQL`. The latest schema replaces it with the line of migration 53.
 export const V46_WORKFLOW_RUN_SOURCE_SQL = "source TEXT NOT NULL CHECK(source IN ('manual', 'schedule', 'webhook')),";
 
 export const migration: OpenBotMigration = {
   version: 46,
   name: "workflows",
+  // Only creates tables, so no foreign-key pause and no vacuum. No one has a workflow yet, and agents,
+  // routines and routine flows stay as they were.
   up: (db) => db.exec(WORKFLOW_SCHEMA_SQL),
 };

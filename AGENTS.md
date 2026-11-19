@@ -151,9 +151,15 @@ change. Show intent with names, types and small functions. Put the reason for a 
 commit message, the PR description or `docs/`.
 
 Only these remain, because a tool reads them: license headers, shebangs, `/// <reference>`,
-`@vitest-environment`, `@ts-expect-error`, `#__PURE__`, JSDoc types in plain `.js` files, file
-headers that a generator writes, and the `// flag` markers of lint fixtures. Vendored code, fixtures
-and released schemas keep their comments.
+`@vitest-environment`, `@ts-expect-error`, `biome-ignore`, `#__PURE__`, `# shellcheck`,
+`# syntax=`, JSDoc types in plain `.js` files, file headers that a generator writes, the
+`// scope:` line of each GritQL rule, the `// flag` markers of lint fixtures, the help text of
+`scripts/install-server.sh`, and the `# openbot-boat-pre-stop:` marker. Comments that are data
+in a string stay too, such as a sample file or a task for a model.
+
+These files keep their comments: vendored code, fixtures, released schemas, released migrations
+(`check:migrations` compares them byte for byte), and the native build inputs of `apps/mobile`
+(a change makes a new runtime version, see `apps/mobile/AGENTS.md`).
 
 ## Interface text
 

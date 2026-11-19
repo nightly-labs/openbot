@@ -18,6 +18,8 @@ android {
   }
 }
 
+// Expo links `expo-notifications` as a project when it builds it from source, and otherwise as the
+// prebuilt artifact of its `local-maven-repo`, at the version of its package.
 def expoNotificationsDependency() {
   def project = rootProject.findProject(':expo-notifications')
   if (project != null) return project
@@ -31,5 +33,6 @@ def expoNotificationsDependency() {
 
 dependencies {
   implementation expoNotificationsDependency()
+  // The version that `expo-notifications` uses.
   implementation 'com.google.firebase:firebase-messaging:25.0.1'
 }

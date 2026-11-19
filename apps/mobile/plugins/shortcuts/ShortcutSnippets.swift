@@ -2,6 +2,10 @@ import AppIntents
 import SwiftUI
 import UIKit
 
+// The cards that iOS shows below the Dynamic Island for a shortcut. iOS draws the card surface. A
+// button runs an intent that opens the app.
+
+/// A snippet keeps its place on the screen, so the list shows this many agents and names the rest.
 private let listedAgents = 5
 
 private func shortcutAccent(_ hex: String?) -> Color {
@@ -33,6 +37,8 @@ private struct AgentAvatar: View {
   }
 }
 
+// MARK: - Agent list
+
 @available(iOS 26.0, *)
 struct AgentListSnippetIntent: SnippetIntent {
   static let title: LocalizedStringResource = "OpenBot Agents"
@@ -47,6 +53,7 @@ struct AgentListSnippetIntent: SnippetIntent {
 private struct AgentListView: View {
   let directory: ShortcutDirectory?
 
+  /// The agent of the shortcuts comes first.
   private var agents: [ShortcutDirectory.Agent] {
     guard let directory else { return [] }
     guard let first = directory.agent else { return directory.agents }
@@ -94,14 +101,19 @@ private struct AgentListView: View {
   }
 }
 
+// MARK: - Send result and notices
+
+/// The result of Send Message, or the reason why a shortcut cannot run.
 @available(iOS 26.0, *)
 struct ShortcutCardSnippetIntent: SnippetIntent {
   static let title: LocalizedStringResource = "OpenBot Shortcut"
   static let isDiscoverable = false
 
+  /// A `ShortcutNotice`.
   @Parameter(title: "Notice")
   var notice: String?
 
+  /// A `ShortcutSendOutcome`, with the message that it is for.
   @Parameter(title: "Outcome")
   var outcome: String?
 
@@ -158,6 +170,8 @@ private struct SendResultView: View {
     }
   }
 
+  /// A message that did not go opens in the composer of the chat, where the user sends it. A
+  /// message that can be in the chat does not: a second send would repeat it.
   private var action: (label: String, intent: OpenOpenBotIntent) {
     outcome == .failed
       ? (
@@ -235,6 +249,7 @@ private struct NoticeView: View {
     }
   }
 
+  /// Where the button goes: the place that fixes the reason.
   private var destination: OpenOpenBotIntent {
     switch notice {
     case .noAgent: return OpenOpenBotIntent(screen: "settings")

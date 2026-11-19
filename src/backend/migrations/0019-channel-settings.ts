@@ -2,6 +2,13 @@ import type { DatabaseSync } from "node:sqlite";
 import { migrateProviderSessionsForOpencode } from "./0017-provider-sessions-opencode";
 import type { OpenBotMigration } from "./migration";
 
+// Shared by migration v19 and the separate new-database schema. A separate constant, and a new
+// version rather than an edit to CHANNEL_SCHEMA_SQL: a database that already ran 18 - every
+// development profile on this branch - would otherwise never meet these tables.
+//
+// Every table mirrors its agent twin in the v8 baseline column for column, because one store
+// implementation serves both owners. The two UNIQUE constraints on the run table are what make one
+// fire produce one run; without them a missed re-arm degrades silently into duplicate work.
 export const CHANNEL_SETTINGS_SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS projection_channel_memories (
     memory_id TEXT PRIMARY KEY,
@@ -75,6 +82,10 @@ function migrateChannelSettings(db: DatabaseSync): void {
 export const migration: OpenBotMigration = {
   version: 19,
   name: "channel-settings",
+  // The pre-merge channel branch used versions 17 and 18 for channel storage and settings. Those
+  // versions were never shipped, but a development profile can still have both markers while
+  // retaining the old provider-session constraint. Repair that table before adding the settings
+  // projections so the profile also receives the main branch's migration 17 behavior.
   disableForeignKeys: true,
   up: migrateChannelSettings,
 };

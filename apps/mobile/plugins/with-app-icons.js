@@ -2,6 +2,21 @@ const { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } = r
 const { join, resolve } = require("node:path");
 const { IOSConfig, withAndroidManifest, withDangerousMod, withXcodeProject } = require("expo/config-plugins");
 
+// The app icons that the user can select in Settings > Appearance > App icon (`modules/app-icon`).
+// They are the logo colors of the desktop app (`packages/contracts/src/app-logo-color.ts`): the body
+// color with the released eyes. The default color is the main icon of `app.json`.
+//
+// iOS: each other color is a copy of the main Icon Composer file (`ios.icon`) with that body color.
+// In dark mode the icon keeps the dark body of the main icon, and the eyes take the color. Xcode
+// compiles each file named in `ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES`, and
+// `UIApplication.setAlternateIconName` selects it.
+//
+// Android: the launcher shows the enabled `activity-alias` of `MainActivity`, so the main activity
+// loses its launcher filter and each color gets an alias. `MainActivity` keeps its other filters, so
+// links and notifications open it directly. The other colors draw the foreground of the main adaptive
+// icon on the body color, as the desktop icons do.
+
+// Node 24 strips the types of the contracts file. It has no imports.
 const {
   APP_LOGO_COLORS,
   APP_LOGO_COLOR_HEX,
@@ -15,6 +30,7 @@ const pascal = (id) => id.charAt(0).toUpperCase() + id.slice(1);
 /** @param {string} id */
 const iosIconName = (id) => `AppIcon${pascal(id)}`;
 
+/** The colors other than the main icon, in the order of the desktop picker. */
 function alternateColors() {
   return APP_LOGO_COLORS.filter((color) => color !== DEFAULT_APP_LOGO_COLOR).map((id) => {
     if (!/^[a-z][a-z0-9]*$/.test(id)) throw new Error(`with-app-icons: bad color id "${id}"`);
@@ -31,6 +47,7 @@ function channels(hex, factor = 1) {
 /** @param {number[]} rgb */
 const displayP3 = (rgb) => `display-p3:${rgb.map((channel) => channel.toFixed(5)).join(",")},1.00000`;
 
+/** The Icon Composer document of a color: the main document with that body and dark-mode eyes. */
 function variantIconJson(main, hex) {
   const document = structuredClone(main);
   const fills = document["fill-specializations"] ?? [];
@@ -118,6 +135,7 @@ function androidDrawables({ id, hex }) {
   <monochrome android:drawable="@mipmap/ic_launcher_monochrome" />
 </adaptive-icon>
 `;
+  // Android 7 has no adaptive icons: the layers show as one square image.
   const legacy = `<?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
   <item android:drawable="@drawable/${name}_background" />
@@ -158,6 +176,7 @@ const withAndroidAppIcons = (config) => {
     const aliases = (application["activity-alias"] ?? []).filter(
       (alias) => !alias.$["android:name"].startsWith(ALIAS_PREFIX),
     );
+    // `default` is the main icon. The module reads the alias names back as IDs.
     for (const id of ["default", ...alternateColors().map((color) => color.id)]) {
       const main = id === "default";
       const icon = main ? "@mipmap/ic_launcher" : `@drawable/${drawableName(id)}`;

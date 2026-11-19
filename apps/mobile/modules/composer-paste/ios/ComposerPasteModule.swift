@@ -7,11 +7,16 @@ private typealias PasteFunction = @convention(c) (AnyObject, Selector, Any?) -> 
 private typealias CanPerformFunction = @convention(c) (AnyObject, Selector, Selector, Any?) -> Bool
 private typealias KeyCommandsFunction = @convention(c) (AnyObject, Selector) -> NSArray?
 
+/// Wraps the chat composer field. The React Native field pastes text only, so a paste of photos,
+/// videos or other files in it is copied to temporary files and sent to JavaScript.
+/// Return on a hardware keyboard sends the draft. Shift-Return adds a line break.
 final class ComposerPasteView: ExpoView {
   let onPasteFiles = EventDispatcher()
   let onSubmitKey = EventDispatcher()
+  /// The file extensions that the app attaches. An item in more than one format is copied in one of these.
   var extensions: Set<String> = []
 
+  /// Copies the files on the pasteboard and sends them. Returns false when there is no file, so the field pastes the text.
   func pasteFiles() -> Bool {
     let providers = UIPasteboard.general.itemProviders.filter { PastedItem.isFile($0.registeredTypeIdentifiers) }
     guard !providers.isEmpty else { return false }
@@ -22,9 +27,12 @@ final class ComposerPasteView: ExpoView {
   }
 }
 
+/// Wraps the chat. A drop of photos, videos or other files from another app, such as the screenshot
+/// preview, is copied to temporary files and sent to JavaScript, as a paste in the composer is.
 final class ChatDropView: ExpoView, UIDropInteractionDelegate {
   let onDropFiles = EventDispatcher()
   var extensions: Set<String> = []
+  /// While false, a drop is refused, so the drag shows that the chat does not take it.
   var enabled = true
 
   required init(appContext: AppContext? = nil) {
@@ -45,6 +53,7 @@ final class ChatDropView: ExpoView, UIDropInteractionDelegate {
     guard !providers.isEmpty else { return }
     PastedItem.copyFiles(providers, extensions) { [weak self] result in
       guard let self else {
+        // The chat closed during the copy, so no code reads the copies.
         PastedItem.delete(result)
         return
       }
@@ -53,6 +62,7 @@ final class ChatDropView: ExpoView, UIDropInteractionDelegate {
   }
 }
 
+/// The copies of one paste, in pasteboard order. The item handlers run on other threads.
 private final class PastedCopies: @unchecked Sendable {
   private let lock = NSLock()
   private var slots: [[String: String]?]
@@ -75,6 +85,8 @@ private final class PastedCopies: @unchecked Sendable {
 }
 
 private enum PastedItem {
+  /// Copies the files of the items and calls `done` on the main thread with the copies, in item
+  /// order, and the count of items that could not be copied.
   static func copyFiles(
     _ providers: [NSItemProvider],
     _ extensions: Set<String>,
@@ -88,6 +100,7 @@ private enum PastedItem {
       let fileName = name(provider.suggestedName, type)
       group.enter()
       _ = provider.loadFileRepresentation(forTypeIdentifier: type.identifier) { url, _ in
+        // iOS deletes this file when the handler returns, so the copy is made here.
         copies.set(index, url.flatMap { copy($0, name: fileName) })
         group.leave()
       }
@@ -100,6 +113,7 @@ private enum PastedItem {
     }
   }
 
+  /// Photos, videos and documents are files. Text stays text, also in a rich format, and a link alone stays a link.
   static func isFile(_ identifiers: [String]) -> Bool {
     let types = identifiers.compactMap { UTType($0) }
     if types.contains(where: { $0.conforms(to: .image) || $0.conforms(to: .audiovisualContent) }) { return true }
@@ -110,6 +124,8 @@ private enum PastedItem {
     type.conforms(to: .data) && !type.conforms(to: .url)
   }
 
+  /// The formats of an item come best first, and Photos gives HEIC before JPEG. So the first format
+  /// that the app attaches is taken, and a text format only when the item has no other.
   static func representation(_ identifiers: [String], _ extensions: Set<String>) -> UTType? {
     let types = identifiers.compactMap { UTType($0) }.filter(isContent)
     let ordered = types.filter { !$0.conforms(to: .text) } + types.filter { $0.conforms(to: .text) }
@@ -119,6 +135,7 @@ private enum PastedItem {
     return attachable ?? ordered.first
   }
 
+  /// The name of the copied item, with the extension of the format that is copied.
   static func name(_ suggested: String?, _ type: UTType) -> String {
     var stem = (suggested ?? "").replacingOccurrences(of: "/", with: "_").trimmingCharacters(in: .whitespaces)
     let suggestedExtension = (stem as NSString).pathExtension
@@ -144,6 +161,7 @@ private enum PastedItem {
     return ["uri": target.absoluteString, "name": name]
   }
 
+  /// Deletes the copies of a result of `copyFiles`.
   static func delete(_ result: [String: Any]) {
     for file in result["files"] as? [[String: String]] ?? [] {
       if let uri = file["uri"], let url = URL(string: uri) {
@@ -152,6 +170,7 @@ private enum PastedItem {
     }
   }
 
+  /// Reads only the formats of the items. iOS does not show a paste notice for this.
   static func pasteboardHasFile() -> Bool {
     (UIPasteboard.general.types(forItemSet: nil) ?? []).contains(where: isFile)
   }
@@ -168,6 +187,8 @@ private extension UIView {
   }
 }
 
+/// Changes the multiline React Native field class one time. A field outside a `ComposerPasteView`
+/// keeps its behavior.
 private enum ComposerPaste {
   static let installed: Void = {
     guard let field = NSClassFromString("RCTUITextView") else { return }
@@ -180,6 +201,7 @@ private enum ComposerPaste {
       }
       method_setImplementation(method, imp_implementationWithBlock(replacement))
     }
+    // The submit key sends the text of the field to JavaScript.
     let submitBlock: @convention(block) (UITextView, Any?) -> Void = { view, _ in
       MainActor.assumeIsolated { view.composerPasteTarget?.onSubmitKey(["text": view.text ?? ""]) }
     }
@@ -189,6 +211,7 @@ private enum ComposerPaste {
       let original = unsafeBitCast(method_getImplementation(method), to: KeyCommandsFunction.self)
       let replacement: @convention(block) (UITextView) -> NSArray? = { view in
         let commands = original(view, keyCommands)
+        // `NSArray` is not Sendable, so only the added commands leave the main actor block.
         let added: [UIKeyCommand]? = MainActor.assumeIsolated {
           view.composerPasteTarget == nil ? nil : submitCommands()
         }
@@ -200,7 +223,9 @@ private enum ComposerPaste {
     let canPerform = #selector(UIResponder.canPerformAction(_:withSender:))
     if let method = ownMethod(field, canPerform) {
       let original = unsafeBitCast(method_getImplementation(method), to: CanPerformFunction.self)
+      // The field shows Paste only for text. Paste also shows when the pasteboard has a file.
       let replacement: @convention(block) (UITextView, Selector, Any?) -> Bool = { view, action, sender in
+        // While an input method composes text, Return goes to the field and ends the composition.
         if action == submit {
           return MainActor.assumeIsolated {
             view.isEditable && view.composerPasteTarget != nil && view.markedTextRange == nil
@@ -215,17 +240,21 @@ private enum ComposerPaste {
     }
   }()
 
+  /// The selector of the submit key. The field class gets it as a new method.
   private static let submit = NSSelectorFromString("openBotComposerSubmit:")
 
+  /// Return and Command-Return send. Other modifiers, such as Shift, keep the line break of the field.
   @MainActor
   private static func submitCommands() -> [UIKeyCommand] {
     [UIKeyModifierFlags(), .command].map { modifiers in
       let command = UIKeyCommand(input: "\r", modifierFlags: modifiers, action: submit)
+      // Without this, the text system takes Return before the command.
       command.wantsPriorityOverSystemBehavior = true
       return command
     }
   }
 
+  /// The method of the class itself. The inherited method is added first, so UITextView does not change.
   private static func ownMethod(_ cls: AnyClass, _ selector: Selector) -> Method? {
     guard let inherited = class_getInstanceMethod(cls, selector) else { return nil }
     class_addMethod(cls, selector, method_getImplementation(inherited), method_getTypeEncoding(inherited))
@@ -237,6 +266,7 @@ public class ComposerPasteModule: Module {
   public func definition() -> ModuleDefinition {
     Name("OpenBotComposerPaste")
 
+    /// A build before the `ChatDrop` view does not have it, so the app shows the chat without it.
     Constant("chatDrop") { true }
 
     OnCreate {

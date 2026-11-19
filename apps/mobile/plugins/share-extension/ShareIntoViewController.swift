@@ -2,7 +2,17 @@ import Intents
 import SwiftUI
 import UIKit
 
+/// The OpenBot share extension. It sends a share to the chosen agent without the app. The share
+/// sheet also offers the agents that got messages last (`INSendMessageIntent`); a tap on one opens
+/// this sheet with that agent selected.
+///
+/// When the extension cannot send by itself, the app takes the share as before: the payloads go into
+/// the App Group defaults of expo-sharing and the app opens. That happens with no saved data, the app
+/// lock on, a share that one message cannot hold, or a failed send that the user gives to the app.
+///
+/// `plugins/with-share-target.js` puts this file in place of expo-sharing's controller of the same name.
 class ShareIntoViewController: UIViewController {
+  // Only these two crash the extension, because only a wrong config plugin causes them.
   private var hostAppScheme: String {
     guard let scheme = Bundle.main.object(forInfoDictionaryKey: "MainTargetUrlScheme") as? String else {
       fatalError("The share extension has no MainTargetUrlScheme in Info.plist.")
@@ -92,6 +102,7 @@ class ShareIntoViewController: UIViewController {
       return
     }
     model.phase = .sending(agent.name)
+    // A swipe would end the extension in the middle of the send.
     isModalInPresentation = true
     let sender = ShareSender(container: view, apiUrl: session.apiUrl, files: content.files)
     self.sender = sender
@@ -127,6 +138,7 @@ class ShareIntoViewController: UIViewController {
     }
   }
 
+  /// The share sheet offers the agents that get messages most often first, as the app's messages do.
   private func donate(_ agent: ShareDirectory.Agent, avatar: Data?) {
     let recipient = INPerson(
       personHandle: INPersonHandle(value: agent.conversationId, type: .unknown),
@@ -152,14 +164,19 @@ class ShareIntoViewController: UIViewController {
     interaction.donate(completion: nil)
   }
 
+  // MARK: - Finish
+
+  /// Sent, or dropped by the user: the copies of the share go.
   private func cancel() {
     ShareContent.removeFiles(ShareContent.payloadFiles(payloads) + (content?.madeFiles ?? []))
     complete()
   }
 
+  /// The app takes the share, as it did before the extension could send.
   private func openApp() {
     guard !finished else { return }
     ShareContent.removeFiles(content?.madeFiles ?? [])
+    // The app puts the text payloads in the message field in this order, so the user's words go first.
     let message = model?.message.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     let typed = message.isEmpty ? [] : [SharePayload(type: .text, value: message, mimeType: "text/plain", metadata: nil)]
     guard let defaults = UserDefaults(suiteName: appGroupId), let encoded = try? JSONEncoder().encode(typed + payloads) else {
@@ -167,6 +184,7 @@ class ShareIntoViewController: UIViewController {
     }
     defaults.set(encoded, forKey: SHARE_INTO_DEFAULTS_KEY)
     guard let url = URL(string: "\(hostAppScheme)://expo-sharing") else { return complete() }
+    // expo-sharing opens the app through the responder chain. Apps that do this pass App Store review.
     var responder: UIResponder? = self
     while let current = responder {
       if let application = current as? UIApplication {

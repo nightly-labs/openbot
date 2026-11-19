@@ -3,6 +3,11 @@ import ImageIO
 import UIKit
 import UniformTypeIdentifiers
 
+/// Reads what another app shared into the payloads of expo-sharing (`ShareProtocol.swift`). The files
+/// are copied into the App Group, so the app can take the same payloads when the extension cannot send.
+/// This is expo-sharing's `ShareIntoViewController.swift`, with one change: an item is read as an
+/// image before it is read as a web link. An image from a web page also carries its address, so
+/// Safari's "Share" on an image sent only the address.
 enum ShareInput {
   static func payloads(_ items: [NSExtensionItem], appGroupId: String) async -> [SharePayload] {
     var results: [SharePayload] = []
@@ -15,6 +20,7 @@ enum ShareInput {
   }
 
   private static func parse(_ provider: NSItemProvider, appGroupId: String) async -> SharePayload? {
+    // The image goes first, as Messages sends it. The address stays the fallback when the image does not load.
     if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier),
       let image = await file(provider, type: .image, utType: .image, appGroupId: appGroupId)
     {
@@ -92,6 +98,8 @@ enum ShareInput {
     }
   }
 
+  /// The folder of the shared copies. A shared file keeps its name, so it must not go in the App Group
+  /// root, where it could take the place of the app's own data, such as `share-extension.json`.
   private static func itemFolder(appGroupId: String) -> URL? {
     guard let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId) else {
       return nil
@@ -144,15 +152,20 @@ enum ShareInput {
   }
 }
 
+/// The share as the extension sends it, with the limits of the app (`share-screen.tsx`, `incoming-share.ts`).
 struct ShareContent {
+  /// The limits of one message (`packages/contracts/src/input-limits.ts`, `MOBILE_ATTACHMENT_BYTES`).
   static let maxFiles = 10
   static let maxFileBytes = 10 * 1024 * 1024
   static let maxTextLength = 100_000
 
   let text: String
   let files: [ShareSender.File]
+  /// The JPEG copies of HEIC photos. The payloads keep the originals for the app.
   let madeFiles: [URL]
 
+  /// Nil when the app must take the share: a file it cannot read, or more than one message can hold.
+  /// The app tells the user what is wrong.
   static func prepare(_ payloads: [SharePayload]) -> ShareContent? {
     var seen = Set<String>()
     let lines = payloads
@@ -175,7 +188,9 @@ struct ShareContent {
         .replacingOccurrences(of: "\\", with: "_")
       if name.isEmpty { name = "shared-file" }
       var fileURL = url
+      // HEIC is not an attachment type. As the app does, the share sends a JPEG copy.
       if ["heic", "heif"].contains(url.pathExtension.lowercased()) {
+        // ImageIO writes the JPEG from the file without a second bitmap; the extension has little memory.
         let copy = url.deletingPathExtension().appendingPathExtension("share.jpg")
         guard
           let source = CGImageSourceCreateWithURL(url as CFURL, nil),
@@ -204,6 +219,7 @@ struct ShareContent {
     for url in urls { try? FileManager.default.removeItem(at: url) }
   }
 
+  /// The App Group copies of the payloads. The app removes them itself when it takes the share.
   static func payloadFiles(_ payloads: [SharePayload]) -> [URL] {
     payloads.compactMap { payload in
       guard payload.type != .text && payload.type != .url, let url = URL(string: payload.value), url.isFileURL else {

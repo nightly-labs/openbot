@@ -20,17 +20,30 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
 
+/** The sample rate of the microphone audio for Parakeet and ElevenLabs. */
 internal const val CAPTURE_SAMPLE_RATE = 16_000
+/** One frame of the level meter and of the audio sent to JavaScript: 100 ms. */
 private const val FRAME_SAMPLES = 1_600
+/** The loudness that counts as speech, as on desktop. */
 private const val SPEECH_LOUDNESS = 0.3
+/** Speech for this long starts a segment; silence for this long after it ends the segment. */
 private const val SPEECH_START_FRAMES = 3
 private const val SEGMENT_END_FRAMES = 7
+/** A segment this long ends even while the user speaks, so one decode stays short. */
 private const val MAXIMUM_SEGMENT_SAMPLES = 25 * CAPTURE_SAMPLE_RATE
+/** Silence before speech is kept for this long, so the first word is not cut. */
 private const val LEADING_SILENCE_SAMPLES = 4_800
+/** How often the words of the current segment are recognized again while the user speaks. */
 private const val INTERIM_FRAMES = 10
 
+/** The speech models of the phone in sherpa-onnx. */
 internal enum class RecognizerModel { PARAKEET, QWEN3_ASR }
 
+/**
+ * A speech model of the phone in sherpa-onnx. Parakeet TDT 0.6B v3 is the speech recognizer of
+ * desktop; Qwen3-ASR 0.6B also hears Chinese mixed with English. Both find the spoken language
+ * themselves. Only the recognition executor uses it.
+ */
 internal class OfflineSpeechRecognizer(val directory: String, val model: RecognizerModel, threads: Int) {
   private val recognizer: OfflineRecognizer
 
@@ -49,6 +62,8 @@ internal class OfflineSpeechRecognizer(val directory: String, val model: Recogni
         provider = "cpu",
         modelType = "nemo_transducer",
       )
+      // The tokenizer files are in the model directory itself. The export holds 512 positions: a
+      // segment of 25 s takes about 330 of them, and its words fit in the rest.
       RecognizerModel.QWEN3_ASR -> OfflineModelConfig(
         qwen3Asr = OfflineQwen3AsrModelConfig(
           convFrontend = file("conv_frontend.onnx"),
@@ -87,6 +102,7 @@ internal class OfflineSpeechRecognizer(val directory: String, val model: Recogni
   fun release() = recognizer.release()
 }
 
+/** The samples of the current segment, without a copy for each frame. */
 private class SampleBuffer {
   private var samples = FloatArray(16 * FRAME_SAMPLES)
   var size = 0
@@ -98,6 +114,7 @@ private class SampleBuffer {
     size += frame.size
   }
 
+  /** Keeps only the newest `count` samples. */
   fun keepLast(count: Int) {
     if (size <= count) return
     samples.copyInto(samples, 0, size - count, size)
@@ -111,10 +128,12 @@ private class SampleBuffer {
   }
 }
 
+/** The loudness above the room noise, as the desktop voice conversation measures it, in dB. */
 private class LoudnessMeter {
   private var noise = Double.POSITIVE_INFINITY
   private var peak = Double.NEGATIVE_INFINITY
 
+  /** From 0 (the room noise) to 1 (the loudest speech so far). */
   fun loudness(frame: FloatArray): Double {
     var sum = 0.0
     for (sample in frame) sum += sample.toDouble() * sample
@@ -128,6 +147,11 @@ private class LoudnessMeter {
   }
 }
 
+/**
+ * The microphone at 16 kHz mono. In `transcribe` mode it cuts the speech into segments at the user's
+ * pauses and recognizes each one with the loaded recognizer; in `stream` mode it sends the audio. All state
+ * belongs to `executor`; a reader thread hands it the frames.
+ */
 internal class SpeechCapture(
   private val executor: ExecutorService,
   private val recognition: ExecutorService,
@@ -143,12 +167,14 @@ internal class SpeechCapture(
   private var spoke = false
   private var framesSinceInterim = 0
   private var interimRunning = false
+  /** Each start, finish and cancel makes the work of the session before it stale. */
   @Volatile private var session = 0
   var mode: String? = null
     private set
 
   class PermissionException : Exception()
 
+  /** Runs on `executor`. The caller checked the microphone permission. */
   @SuppressLint("MissingPermission")
   fun start(mode: String) {
     stopRecord()
@@ -191,6 +217,7 @@ internal class SpeechCapture(
     }, "openbot-speech-capture").apply { start() }
   }
 
+  /** Runs on `executor`. Recognizes the speech that is left, then sends the end after it. */
   fun finish() {
     val current = mode ?: return
     stopRecord()
@@ -203,6 +230,7 @@ internal class SpeechCapture(
     }
   }
 
+  /** Runs on `executor`. No event follows. */
   fun cancel() {
     stopRecord()
     session += 1
@@ -210,6 +238,7 @@ internal class SpeechCapture(
     reset()
   }
 
+  /** Runs on `executor`. The microphone stopped without a finish. */
   fun fail(code: String) {
     if (mode == null) return
     stopRecord()
@@ -232,12 +261,14 @@ internal class SpeechCapture(
   }
 
   private fun stopRecord() {
+    // The reader sees the new session, or a read error from the stopped record, and ends.
     val current = record ?: return
     record = null
     session += 1
     try {
       current.stop()
     } catch (error: IllegalStateException) {
+      // It never started.
     }
     reader?.join(500)
     reader = null
@@ -273,6 +304,7 @@ internal class SpeechCapture(
     }
   }
 
+  /** Recognizes the segment once more and sends it as final; the next words start a new segment. */
   private fun commit() {
     val samples = segment.toArray()
     val own = session
@@ -283,6 +315,7 @@ internal class SpeechCapture(
     }
   }
 
+  /** Shows the words of the segment so far. One runs at a time, so a slow phone skips some. */
   private fun interim() {
     val samples = segment.toArray()
     val own = session
@@ -292,6 +325,7 @@ internal class SpeechCapture(
       val text = decode(samples)
       executor.execute {
         interimRunning = false
+        // A final text of this segment can be on its way already; it is sent after this one.
         if (own == session && mode == "transcribe") send("onCaptureText", mapOf("text" to text, "final" to false))
       }
     }

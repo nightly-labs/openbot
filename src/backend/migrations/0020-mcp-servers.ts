@@ -1,5 +1,18 @@
 import type { OpenBotMigration } from "./migration";
 
+// Shared by migration v20 and the separate new-database schema. IF NOT EXISTS throughout, because
+// this text is both the migration and the tail of the latest schema.
+//
+// The table is deliberately not keyed by a server id. This database holds the configuration of this
+// machine's host; a remote server's list lives in that host's own database and is read over the
+// wire. "Per server" is realised by routing, not by a column that would always read `local`.
+//
+// The arrays are JSON text rather than child tables: the app always reads a record whole, and the
+// row order the user typed is meaningful. `CHECK(json_valid(...))` follows
+// `projection_channel_routine_triggers.schedule_json`.
+//
+// The unique name is load-bearing, not cosmetic. All four providers key MCP servers by name, so two
+// rows sharing one name would silently collapse into one server at spawn.
 export const MCP_SERVERS_SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS projection_mcp_servers (
     mcp_server_id TEXT PRIMARY KEY,
@@ -24,5 +37,6 @@ export const MCP_SERVERS_SCHEMA_SQL = `
 export const migration: OpenBotMigration = {
   version: 20,
   name: "mcp-servers",
+  // Only creates a table, so no foreign-key pause and no vacuum.
   up: (db) => db.exec(MCP_SERVERS_SCHEMA_SQL),
 };

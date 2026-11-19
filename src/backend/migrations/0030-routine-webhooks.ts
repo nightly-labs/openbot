@@ -1,5 +1,6 @@
 import type { OpenBotMigration } from "./migration";
 
+/** Webhook triggers and received deliveries for routines. */
 export const WEBHOOK_SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS projection_routine_webhooks (
     routine_id TEXT PRIMARY KEY REFERENCES projection_agent_routines(routine_id) ON DELETE CASCADE,
@@ -47,5 +48,6 @@ export const WEBHOOK_SCHEMA_SQL = `
 export const migration: OpenBotMigration = {
   version: 30,
   name: "routine-webhooks",
+  // Only creates tables, so no foreign-key pause and no vacuum. Existing routines and runs stay as they are.
   up: (db) => db.exec(WEBHOOK_SCHEMA_SQL),
 };
