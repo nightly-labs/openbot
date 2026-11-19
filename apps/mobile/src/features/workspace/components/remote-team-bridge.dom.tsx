@@ -20,27 +20,12 @@ import {
 
 type BridgeJson = Parameters<DOMImperativeFactory[string]>[0];
 
-/** The native side's handle on this page. A command crosses as JSON and is read again here. */
 export type RemoteTeamBridgeHandle = {
   browserView: (command: BridgeJson) => void;
-  /** A command for a socket of the remote desktop viewer. */
   remoteDesktop: (command: BridgeJson) => void;
-  /**
-   * Team commands to run: each new one, and all outstanding ones again when the page says it is
-   * ready. A command whose ID the page has already had does not run again.
-   */
   teamCommands: (commands: BridgeJson) => void;
-  /**
-   * The foreground state, before the commands that follow it. The `active` prop arrives through a
-   * render, so a `connect` sent at a return to the app ran before it and failed as in the background.
-   */
   setActive: (active: BridgeJson) => void;
-  /**
-   * The native side saw the phone move to another network, such as from Wi-Fi to mobile data. The
-   * WebView's `online` event does not fire for that move, and the old path and socket can be dead.
-   */
   networkChanged: (value: BridgeJson) => void;
-  /** The user cancelled the upload in progress. The peer stops it and tells the host. */
   cancelUpload: (value: BridgeJson) => void;
 };
 
@@ -48,20 +33,14 @@ interface RemoteTeamBridgeProps extends RemoteTeamPeerActions {
   ref?: Ref<RemoteTeamBridgeHandle>;
   active: boolean;
   onCommandResult: (result: RemoteTeamCommandResult) => Promise<void>;
-  /** The page can take commands. It calls this once per load, after its handle is registered. */
   onReady?: () => Promise<void>;
   onBrowserViewEvent?: (event: BrowserViewBridgeEvent) => Promise<void>;
   onRemoteDesktopEvent?: (event: RemoteDesktopRelayEvent) => Promise<void>;
   dom?: import("expo/dom").DOMProps;
 }
 
-/**
- * How many command IDs the page keeps. The native side sends the outstanding commands again when the
- * page is ready, and its first commands can arrive before that, or finish before the repeat comes.
- */
 const KNOWN_COMMAND_LIMIT = 1_000;
 
-/** The host's own error text for a refused request, such as a view the host cannot open. */
 function requestError(body: unknown): string {
   return isDynamicRecord(body) && isString(body.error) && body.error
     ? body.error
@@ -86,7 +65,6 @@ export default function RemoteTeamBridge({
   const actions = useRef<RemoteTeamPeerActions>(callbacks);
   actions.current = {
     ...callbacks,
-    // Both read the desktop channel. Each one takes only the frames of its own streams.
     onHostStreamData: (data) => {
       browserView.current?.receive(data);
       remoteDesktop.current?.receive(data);
@@ -100,7 +78,6 @@ export default function RemoteTeamBridge({
     },
   };
   const runtime = useRef<ReturnType<typeof createRemoteTeamPeer> | null>(null);
-  // The workspace speaks protocol 10 with a host of protocol 10, and protocol 9 with an older host.
   if (!runtime.current) runtime.current = createRemoteTeamPeer(actions, { clientProtocol: TEAM_WEB_CLIENT_PROTOCOL });
   const peer = runtime.current;
   if (!browserView.current)
@@ -139,7 +116,6 @@ export default function RemoteTeamBridge({
         const { command, commandId } = decodeRemoteTeamCommand(value);
         if (commandId === null || knownCommandIds.has(commandId)) continue;
         knownCommandIds.add(commandId);
-        // A set keeps insertion order, so the first ID is the oldest.
         if (knownCommandIds.size > KNOWN_COMMAND_LIMIT)
           for (const oldest of knownCommandIds) {
             knownCommandIds.delete(oldest);
@@ -151,7 +127,6 @@ export default function RemoteTeamBridge({
     };
   }
   const teamCommands = runCommands.current;
-  // The handle and the first prop both send the state. A repeated state must not run a second return.
   const appliedActive = useRef<boolean | null>(null);
   const applyActive = useRef<((value: unknown) => void) | null>(null);
   if (!applyActive.current)
@@ -179,8 +154,6 @@ export default function RemoteTeamBridge({
     [views, desktopStreams, teamCommands, setActive, networkChanged, cancelUpload],
   );
 
-  // After the handle effect above, so the native side knows the handle before it sends the commands.
-  // In Expo Go on Android `onReady` arrives with the second props; see expo-go-dom.ts.
   const readySent = useRef(false);
   useEffect(() => {
     if (!onReady || readySent.current) return;
@@ -188,13 +161,10 @@ export default function RemoteTeamBridge({
     void onReady();
   }, [onReady]);
 
-  // The first state of a page that loads. After it, the handle sends each state before its commands,
-  // and a prop render that arrives later carries an older state.
   useEffect(() => {
     if (appliedActive.current === null) setActive(active);
   }, [active, setActive]);
 
-  // The WebView has no network details, but it sends `online` when the phone gets a network again.
   useEffect(() => {
     const restore = () => peer.networkRestored();
     window.addEventListener("online", restore);

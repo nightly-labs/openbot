@@ -10,7 +10,6 @@ export const messages = {
     "Gönderenin tam imza gizli anahtarını yapıştırın. 16 ile 1024 karakter arasıdır ve boşluk içermez.",
   "error.backend.webhookRouteUnavailable":
     "Herkese açık webhook yolu hazır değil. Ana makine bağlantısını kontrol edin ve tekrar deneyin.",
-  // Errors that the backend services send: channels, messages, routines, memories, MCP, browser and remote desktop.
   "error.backend.browserViewRemoteOnly": "Canlı tarayıcı görünümü yalnızca uzak bir ana makine içindir.",
   "error.backend.browserViewUnsupported": "Bu uzak ana makine canlı tarayıcı görünümünü desteklemiyor.",
   "error.backend.browserViewLimit": "Bu ana makinede çok fazla tarayıcı görünümü açık.",

@@ -41,7 +41,6 @@ export const PROPOSAL_ICON: Record<CrmProposedChange["kind"], typeof UsersRound>
   "payment-split": Split,
 };
 
-/** The names of the fields that a customer change can set. */
 const PATCH_FIELD_KEY: Record<keyof CrmCustomerPatch, AppTextKey> = {
   ...FIELD_KEY,
   statusId: "crm.field.status",
@@ -76,7 +75,6 @@ function isEvery(value: string): value is CrmEvery {
   return Object.hasOwn(EVERY_KEY, value);
 }
 
-/** The text key of a field name that an activity entry gives, or undefined for a field the page does not know. */
 function fieldKey(keys: Record<string, AppTextKey>, field: string): AppTextKey | undefined {
   return Object.hasOwn(keys, field) ? keys[field] : undefined;
 }
@@ -85,7 +83,6 @@ function isPatchField(value: string): value is keyof CrmCustomerPatch {
   return Object.hasOwn(PATCH_FIELD_KEY, value);
 }
 
-/** The sentences of the CRM page: money, due dates, proposals and activity. */
 export function useCrmText(crm: CrmViewModel) {
   const { t, format } = useText();
 
@@ -104,7 +101,6 @@ export function useCrmText(crm: CrmViewModel) {
     return undefined;
   };
 
-  /** How far the due date is: "Due tomorrow", "3 days late". */
   const due = (dueOn: string) => {
     const days = daysBetween(crm.today(), dueOn);
     if (days < 0) return t("crm.due.late", { count: -days });
@@ -113,7 +109,6 @@ export function useCrmText(crm: CrmViewModel) {
     return t("crm.due.inDays", { count: days });
   };
 
-  /** How a paid payment came in: "On time" or "3 days late". */
   const timing = (payment: CrmPayment) => {
     const late = daysLate(payment, crm.today());
     return late === 0 ? t("crm.timing.onTime") : t("crm.due.late", { count: late });
@@ -132,7 +127,6 @@ export function useCrmText(crm: CrmViewModel) {
     });
   };
 
-  /** One sentence that says what the proposal changes. */
   const proposal = (item: CrmProposal): string => {
     const change = item.change;
     switch (change.kind) {
@@ -219,7 +213,6 @@ export function useCrmText(crm: CrmViewModel) {
     }
   };
 
-  /** The name of who made a change: the agent, the person, or the owner. */
   const actor = (entry: CrmActivity) => {
     if (entry.actor.kind === "agent")
       return crm.agent(entry.actor.id)?.name ?? entry.actor.name ?? t("crm.actor.agent");
@@ -243,7 +236,6 @@ export function useCrmText(crm: CrmViewModel) {
     return key ? t(key) : field;
   };
 
-  /** One sentence that says what an activity entry did. */
   const activity = (entry: CrmActivity): string => {
     const name = actor(entry);
     const text = (key: string) => detailText(entry, key);

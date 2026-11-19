@@ -1,6 +1,3 @@
-// Owner or admin links, and the peer calls that a link token can make.
-// A member session never reaches the peer paths: the server handles them before the auth gate.
-
 import type { IncomingMessage } from "node:http";
 import { ATTACHMENT_LIMITS } from "@openbot/contracts/input-limits";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
@@ -48,7 +45,6 @@ function asReachCause(error: unknown): never {
   throw error;
 }
 
-/** Member routes. A host without the service leaves the path unmatched so an older host stays quiet. */
 export async function routeRemoteAgentBridge(
   context: TeamApiRequestContext,
   admin: TeamApiAdmin | undefined,

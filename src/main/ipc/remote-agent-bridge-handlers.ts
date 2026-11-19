@@ -1,5 +1,3 @@
-// Desktop calls for a link to another server. A joined server uses the same routes over the Team API.
-
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import {
   REMOTE_AGENT_BRIDGE_CAPABILITY,

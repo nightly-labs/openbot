@@ -31,7 +31,6 @@ export type TeamProtocolV7BaseCurrentEventDecodeResult =
 
 export function decodeTeamProtocolV7BaseCurrentEvent(value: unknown): TeamProtocolV7BaseCurrentEventDecodeResult {
   if (isDynamicRecord(value) && value.type === "turn-progress") {
-    // `turn-progress` bypasses the frozen codec, so it needs the vocabulary swap applied by hand.
     const wireValue: TeamProtocolV7BaseJsonValue = JSON.parse(JSON.stringify(value));
     const current = toCurrentAgentKeys(wireValue);
     return isAgentEvent(current) ? { kind: "known", event: current } : { kind: "invalid", type: value.type };
@@ -45,9 +44,6 @@ export function decodeTeamProtocolV7BaseCurrentEvent(value: unknown): TeamProtoc
       withEventConversationPlans(
         restoreBrowserSecretMetadata(toCurrentAgentKeys(decodedValue), value),
         value,
-        // A host sends a UI block only under ui-blocks-v1, the subagents only under subagents-v1, a
-        // video request only under video-generation-v1, and a multi-select flag only under
-        // prompt-multi-select-v1, so a present one is always kept.
         value,
         value,
         value,
@@ -71,11 +67,9 @@ export function encodeTeamProtocolV7BaseCurrentEvent(
     subagents?: boolean;
     promptMultiSelect?: boolean;
     videoGeneration?: boolean;
-    /** Protocol 7 does not send `remoteSender`. */
     remoteSender?: boolean;
   } = {},
 ): string | null {
-  // `turn-progress` bypasses the frozen codec, so it needs the vocabulary swap applied by hand.
   if (event.type === "turn-progress") return JSON.stringify(toWireAgentKeys(JSON.parse(JSON.stringify(event))));
   const currentValue: TeamProtocolV7BaseJsonValue = JSON.parse(JSON.stringify(event));
   const wireValue = toWireAgentKeys(currentValue);
@@ -86,8 +80,6 @@ export function encodeTeamProtocolV7BaseCurrentEvent(
   const promptMultiSelect = options.promptMultiSelect === true && eventHasPromptQuestions(event.type);
   if (!encoded || (!options.preserveBrowserSecrets && !eventConversationKey(event.type) && !promptMultiSelect))
     return encoded;
-  // The block, the subagents and the video request go as written: the key swap would rename a
-  // response value under a field id such as `agentId`.
   const withPlans = withEventConversationPlans(
     JSON.parse(encoded),
     wireValue,
@@ -99,13 +91,6 @@ export function encodeTeamProtocolV7BaseCurrentEvent(
   return JSON.stringify(options.preserveBrowserSecrets ? restoreBrowserSecretMetadata(output, wireValue) : output);
 }
 
-/**
- * Puts the plans and the senders of a conversation event beside its frozen projection, the UI blocks
- * of `uiBlockSource` when it is not null, the subagents of `subagentSource` when it is not null, and
- * the video requests of `videoSource` when it is not null. See `withConversationPlans`,
- * `withConversationSenders`, `withConversationUiBlocks`, `withConversationSubagents` and
- * `withConversationVideoGeneration`.
- */
 function withEventConversationPlans(
   projected: TeamProtocolV7BaseJsonValue,
   source: unknown,
@@ -164,7 +149,6 @@ export function encodeTeamProtocolV7BaseCurrentHttpResponse(
   options: { preserveSemanticTags?: boolean } = {},
 ): string {
   const currentValue: TeamProtocolV7BaseJsonValue = JSON.parse(JSON.stringify(value));
-  // The installed-skills route bypasses the frozen codec, so it needs the vocabulary swap by hand.
   const wireValue = toWireAgentKeysForRequestPath(path, currentValue);
   if (status < 400 && isInstalledSkillsRoute(method, path)) return JSON.stringify(wireValue);
   const downconvertedValue = options.preserveSemanticTags ? wireValue : downconvertCurrentTags(wireValue);

@@ -8,14 +8,6 @@ interface InstallRow {
   marker: SkillMarker;
 }
 
-/**
- * Joins consecutive installs of one skill revision into one row, so an agent that installs a skill
- * for many agents does not fill the chat with equal rows. The row keeps the id of the first install,
- * so it stays the same row while installs join. The stored messages stay unchanged.
- *
- * A group stops at the first unread message and at a new day, so the unread divider and the day
- * separator keep a row of their own.
- */
 export function groupSkillInstallMarkers(
   messages: readonly AgentMessage[],
   firstUnreadMessageId?: string | null,

@@ -8,7 +8,6 @@ import { matches, timeAgo } from "./crm-model";
 import type { CrmViewModel } from "./crm-state";
 import { PROPOSAL_ICON, useCrmText } from "./crm-text";
 
-/** The button can show this many avatars of the agents that work on the CRM. */
 const AVATARS_SHOWN = 3;
 
 function ChangeIcon(props: { proposal: CrmProposal }) {
@@ -19,7 +18,6 @@ function ChangeIcon(props: { proposal: CrmProposal }) {
   );
 }
 
-/** Approve and reject buttons. They are off while the decision goes to the host. */
 function useDecision(crm: CrmViewModel, proposal: () => CrmProposal) {
   const [busy, setBusy] = createSignal(false);
   const decide = async (approve: boolean) => {
@@ -74,7 +72,6 @@ function ProposalCard(props: { crm: CrmViewModel; proposal: CrmProposal }) {
   );
 }
 
-/** A proposal about the open customer, at the top of the customer drawer. */
 export function PendingProposal(props: { crm: CrmViewModel; proposal: CrmProposal }) {
   const { t } = useText();
   const text = useCrmText(props.crm);
@@ -98,7 +95,6 @@ export function PendingProposal(props: { crm: CrmViewModel; proposal: CrmProposa
   );
 }
 
-/** The changes that agents suggest, newest first, and the agents that can work on the CRM. */
 export function ReviewPanel(props: { crm: CrmViewModel }) {
   const { t } = useText();
   const crm = props.crm;
@@ -149,7 +145,6 @@ export function ReviewPanel(props: { crm: CrmViewModel }) {
   );
 }
 
-/** Opens the review panel. It shows some of the agents that work on the CRM and the number of suggestions. */
 export function ReviewButton(props: { crm: CrmViewModel }) {
   const { t } = useText();
   const crm = props.crm;

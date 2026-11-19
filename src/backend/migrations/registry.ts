@@ -59,7 +59,6 @@ import { migration as migration0065 } from "./0065-thread-event-compaction";
 import { migration as migration0066 } from "./0066-remote-agent-bridge";
 import type { OpenBotMigration } from "./migration";
 
-/** Every migration, in order. A new migration is a new file with the next version, added at the end. */
 export const MIGRATIONS: readonly OpenBotMigration[] = [
   migration0008,
   migration0009,

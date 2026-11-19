@@ -388,12 +388,14 @@ export const messages = {
     "De Claude-dienst heeft dit verzoek geblokkeerd. Meestal is dit een kort probleem bij Claude, geen probleem met je account. Stuur het bericht over een paar minuten opnieuw.",
   "error.provider.foreignReasoning":
     "{provider} heeft het eerdere redeneren in deze chat niet geaccepteerd, omdat een ander account of een andere API-sleutel het heeft ontvangen. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
+  "error.provider.blankHistoryText":
+    "Het model heeft deze chat niet geaccepteerd, omdat de opgeslagen geschiedenis een leeg bericht bevat. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.codexHistoryItemMissing":
     "Codex kon deze chat niet voortzetten, omdat een item in de opgeslagen geschiedenis ontbreekt. OpenBot heeft een nieuwe Codex-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.codexRequestRefused":
     "{provider} heeft het verzoek voor deze chat geweigerd zonder de oorzaak te geven. Dit kan gebeuren in een lange chat met veel afbeeldingen. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.codexAudioRefused":
-    "Het model accepteerde geen audio in deze chat. OpenBot heeft een nieuwe Codex-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
+    "Dit model kan geen audio beluisteren, dus het accepteerde het geluid in deze chat niet. OpenBot heeft een nieuwe Codex-sessie gestart met de chatgeschiedenis. Stuur je verzoek opnieuw en vraag de agent om zonder het geluid te werken om verder te gaan. Kies in het modelmenu van de agent een model dat audio kan beluisteren om geluid te controleren.",
   "error.provider.imageTooSmall":
     "Het model accepteerde een afbeelding in deze chat niet, omdat de afbeelding te klein is. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.imageTooLarge":

@@ -16,7 +16,6 @@ interface LinkRow {
   peerName: string;
 }
 
-/** Server settings > Linked servers. An owner or admin creates an invite or pastes one. */
 export function ServerRemoteAgentsScreen() {
   const { t, errorMessage } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();

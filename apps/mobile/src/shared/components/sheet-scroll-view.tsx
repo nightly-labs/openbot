@@ -29,14 +29,8 @@ interface SheetScrollViewProps extends PropsWithChildren {
   keyboardDismissMode?: ScrollViewProps["keyboardDismissMode"];
   keyboardShouldPersistTaps?: ScrollViewProps["keyboardShouldPersistTaps"];
   showsVerticalScrollIndicator?: boolean;
-  /** False stops the scroll that keeps a focused field and the content above the keyboard. */
   keyboardAware?: boolean;
-  /**
-   * Android: keeps the native header, without the blur header, for a page that puts native header
-   * content in it that the custom header cannot draw, such as a `Stack.SearchBar`.
-   */
   androidNativeHeader?: boolean;
-  /** The scroll view, for a screen that keeps its newest content in view. */
   scrollRef?: Ref<KeyboardAwareScrollViewRef>;
   onScroll?: ScrollViewProps["onScroll"];
   onContentSizeChange?: ScrollViewProps["onContentSizeChange"];
@@ -63,13 +57,8 @@ export function SheetScrollView({
   const headerShown = useContext(HeaderShownContext);
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
-  // A sheet as wide as the window (a phone in landscape, the iPhone Duo rail) keeps its content clear
-  // of the side insets. A sheet that is a card in the middle (iPad) is clear of them already.
   const [sheetWidth, setSheetWidth] = useState<number | null>(null);
   const sideInsets = sheetWidth === null || sheetWidth >= windowWidth - 1;
-  // Android 12 and later: the page draws its own header in place of the native one, over a blur of the
-  // content, which scrolls under it as under the iOS header. The stack measures that header, so the
-  // content clears exactly its height. Earlier versions keep the opaque native header and the fade.
   const androidBlurHeader = ANDROID_BLUR && headerShown && !header && headerOverlaysContent && !androidNativeHeader;
   const blurTarget = useRef<ViewInstance>(null);
   const navigation = useContext(NavigationContext);
@@ -87,20 +76,12 @@ export function SheetScrollView({
         />
       ),
     });
-    // A page that shows other content after this scroll view gets the native header of its stack back.
     return () => navigation.setOptions({ header: undefined, headerTransparent: false });
   }, [androidBlurHeader, navigation]);
   const nativeHeader = isIOS && headerShown && !header;
   const stickyEdge = scrollEdgeEffect && !nativeHeader;
-  // Android draws no blur at the sheet edge. A sticky header gets the opaque sheet color instead.
   const showCustomEdge = stickyEdge && isIOS;
-  // Android: the content fades in the sheet color below the opaque native header, or at the top of a
-  // sheet without a header. iOS draws its blur in the same cases.
   const androidFade = isAndroid && !header && (headerShown || scrollEdgeEffect) && !androidBlurHeader;
-  // Android: the sheet finds its scroll view only when it lays out, so nested scrolling is on from
-  // the first render. A drag that starts on the list then goes to the list, and at the top of the list
-  // a downward drag moves the sheet. A list that cannot scroll never takes the drag, so the content is
-  // always 1 point taller than the list.
   const [viewportHeight, setViewportHeight] = useState(0);
   const androidScrollProps = isAndroid
     ? {

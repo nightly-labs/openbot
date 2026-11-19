@@ -77,7 +77,6 @@ export const messages = {
   "server.join.account": "账号",
   "server.join.emailBound": "该邀请仅对其邮箱收件人有效。",
   "server.join.unknownDate": "未知",
-  // The dialog that the plus button on the server rail opens. {price} is a formatted amount, such as "€20".
   "server.add.title": "在外部服务器上 7×24 小时运行 OpenBot",
   "server.add.description":
     "OpenBot 服务器让你的助手和自动化任务持续运行，即使电脑关机也不受影响。基础设施与维护由我们负责，无需任何技术配置即可使用。",
@@ -86,26 +85,19 @@ export const messages = {
   "server.add.billing.monthly": "按月",
   "server.add.billing.yearly": "按年",
   "server.add.billing.save": "省 {percent}%",
-  // The switch left of the billing period, when the account has no license. Work adds a license to the server.
   "server.add.use.label": "用途",
   "server.add.use.personal": "个人",
   "server.add.use.work": "工作",
-  // The row under the plans that sets the users of the license. It is disabled for personal use.
   "server.add.license.people": "工作人数",
   "server.add.license.minimum": { other: "目前有 {count} 人在使用你的服务器，因此不能选择更少。" },
-  // On each plan that the people fit, for work. {percent} is a whole number, such as 20.
   "server.add.license.bundle": "组合 −{percent}%",
-  // The plan summary for work. {license} is the license line, such as "Team license, 5 members".
   "server.add.license.included": "包含{license}",
   "server.add.license.includedTrial": "包含{license}，{date} 前免费",
   "server.add.billedMonthly": "按月计费",
   "server.add.billedYearly": "每年计费 {price}",
-  // {amount} is a formatted amount, such as "€120". It follows the yearly price.
   "server.add.yearlySaving": "省 {amount}",
-  // Visually hidden. It comes before the struck-through monthly price on yearly billing.
   "server.add.regularPrice": "原价 {price}",
   "server.add.choosePlan": "选择{plan}",
-  // The footer under the plans, for needs that the plans do not cover.
   "server.add.custom.title": "需要更高性能或定制方案？",
   "server.add.custom.description": "可提供专属基础设施、额外存储，或按你的工作流定制的功能。",
   "server.add.custom.action": "联系我们",
@@ -140,19 +132,14 @@ export const messages = {
   "server.install.setUpWithAgent": "用代理设置",
   "server.install.sshAgentPrompt":
     "通过 SSH 连接到我的 Linux 服务器，并在上面把 OpenBot 安装为服务器。\n\nSSH 地址（user@host）：",
-  // Shown over the plans when the account has the maximum number of hosted servers. The plans are disabled.
   "server.add.limit.title": "该账号的服务器数量已达上限",
   "server.add.limit.description": {
     one: "一个账号最多拥有 {count} 个付费服务器。如需添加，请先删除一个。",
     other: "一个账号最多拥有 {count} 个付费服务器。如需添加，请先删除一个。",
   },
-  // Opens the list of the account's hosted servers, where the user can delete one.
   "server.add.limit.manage": "管理服务器",
-  // The offer of a hosted server after a new routine that depends on the user's computer.
   "server.upsell.modal.title": "电脑休眠时，自动化任务会停止",
-  // {name} is the routine.
   "server.upsell.modal.description": "{name} 只在你的电脑开机时运行。OpenBot 服务器可让它全天候运行。",
-  // Labels in the small picture above the modal text: a laptop and a server, each with a status.
   "server.upsell.modal.computer": "你的电脑",
   "server.upsell.modal.server": "OpenBot 服务器",
   "server.upsell.modal.running": "运行中",
@@ -160,7 +147,6 @@ export const messages = {
   "server.upsell.notice.title.local": { other: "{count} 个自动化任务需要这台电脑保持开机" },
   "server.upsell.notice.title.remote": { other: "{count} 个自动化任务需要 {server} 保持开机" },
   "server.upsell.notice.description": "OpenBot 服务器可全天候运行它们。",
-  // One line under the notice that the user's computer is offline.
   "server.upsell.offline": "OpenBot 服务器始终在线，自动化任务会持续运行。",
   "server.upsell.seePlans": "查看套餐",
   "server.upsell.notNow": "暂不",
@@ -168,13 +154,11 @@ export const messages = {
   "server.upgrade.description": "{server} 的可用空间所剩无几。升级后，你的智能体可以不间断地继续工作。",
   "server.upgrade.used": "已使用 {used}，共 {total}",
   "server.hosted.progressTitle": "正在配置 {name}",
-  // The setup waits for the first payment on the Stripe page in the browser.
   "server.hosted.paymentTitle": "请在浏览器中完成付款",
   "server.hosted.paymentDescription": "Stripe 确认付款后即开始配置。",
   "server.hosted.openPayment": "再次打开支付页面",
   "server.hosted.openingPayment": "正在打开…",
   "server.hosted.paymentFailed": "无法打开支付页面。",
-  // The name of a new server. {number} is a number, such as 2.
   "server.hosted.defaultName": "云服务器",
   "server.hosted.defaultNameNumbered": "云服务器 {number}",
   "server.hosted.step.create": "创建机器",
@@ -234,7 +218,6 @@ export const messages = {
   "server.rail.mute": "静音服务器",
   "server.rail.notificationSettings": "通知设置",
   "server.rail.settings": "服务器设置",
-  // The last items of the server menu. Leave is for a joined server; restart and delete are for a hosted server that the user owns.
   "server.rail.remove": "移除服务器",
   "server.rail.restart": "重启服务器",
   "server.rail.leave": "离开服务器",
@@ -417,7 +400,6 @@ export const messages = {
   "server.settings.reachable": "可在公网访问，仅受邀者可以登录。",
   "server.settings.notReachable": "公网不可访问，已有成员和邀请仍然有效。",
   "server.settings.notPublished": "无法从网络访问。",
-  // A name for a server that the user publishes before naming it. {name} is the first word of the account name.
   "server.settings.generatedName": "{name} 的服务器",
   "server.settings.hostKeyTitle": "服务器密钥",
   "server.settings.hostKeyRotate": "更换服务器密钥",
@@ -562,7 +544,6 @@ export const messages = {
   "server.invite.pendingTitle": "待处理的邀请",
   "server.invite.pendingCount": "{total} 个待处理",
   "server.invite.noPending": "没有待处理的邀请。",
-  // The empty pending list. {word} is the one handwritten word of the title.
   "server.invite.emptyTitle": "发出第一份{word}。",
   "server.invite.emptyWord": "邀请",
   "server.invite.neverExpires": { one: "永不过期 · {count} 次加入", other: "永不过期 · {count} 次加入" },
@@ -605,7 +586,6 @@ export const messages = {
   "server.settings.providersDescription": "管理运行该服务器那台电脑的 AI 服务商。",
   "server.settings.providersSwitchNote": "切换到 {name} 以管理它的 AI 服务商。",
   "server.settings.providersSwitch": "切换到该服务器",
-  // Server Settings > Updates: the OpenBot update of a joined server's host. {name} is the server.
   "server.settings.updatesTitle": "更新",
   "server.settings.updatesDescription": "更新运行该服务器那台电脑上的 OpenBot。",
   "server.update.hostTitle": "{name} 上的 OpenBot",
@@ -613,9 +593,7 @@ export const messages = {
   "server.update.status.idle": "检查更新以获取最新版本。",
   "server.update.status.checking": "正在检查更新…",
   "server.update.status.available": "{version} 可安装。",
-  // {progress} is a percent, such as 42%.
   "server.update.status.downloading": "正在下载 {version} · {progress}",
-  // Before the host knows the size, or while it waits to start the download.
   "server.update.status.downloadingUnknown": "正在下载 {version}…",
   "server.update.status.ready": "{version} 已下载。",
   "server.update.status.installing": "{name} 正在重启以安装更新。",
@@ -660,7 +638,6 @@ export const messages = {
   "server.update.restarting": "正在重启…",
   "server.update.loadFailed": "{name} 的更新状态加载失败。",
   "server.update.hostAction": "更新主机",
-  // The update dialog: the download, the restart and the server back online.
   "server.update.dialog.offerTitle": "将 {name} 更新到 OpenBot {version}",
   "server.update.dialog.offerDescription": "{name} 当前使用 OpenBot {current}。它会先下载更新，然后重启。",
   "server.update.dialog.offerReadyDescription":
@@ -697,10 +674,8 @@ export const messages = {
   "server.update.dialog.cancelRestart": "取消重启",
   "server.update.dialog.later": "稍后",
   "server.update.dialog.hide": "隐藏",
-  // The notice of an update whose dialog the user hid.
   "server.update.dialog.hiddenTitle": "{name} 的更新",
   "server.update.dialog.show": "显示",
-  // The work that a restart waits for, in "Waiting for {reasons}".
   "server.update.reason.agentTurn": "助手轮次",
   "server.update.reason.queuedDelivery": "排队消息",
   "server.update.reason.drainTask": "后台助手工作",
@@ -714,7 +689,6 @@ export const messages = {
   "server.update.reason.updateOperation": "另一个更新步骤",
   "server.update.reason.initialization": "OpenBot 启动过程",
   "server.update.reason.other": "其他工作",
-  // A notice to every member when a joined server restarts into an update. {name} is the server.
   "server.restartNotice.waitingTitle": "{name} 将重启以安装更新",
   "server.restartNotice.waitingVersionTitle": "{name} 将重启以安装 OpenBot {version}",
   "server.restartNotice.waitingDescription": "重启会等待助手空闲。你会短暂断开，随后 OpenBot 会自动重新连接。",

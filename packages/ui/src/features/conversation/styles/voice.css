@@ -1,5 +1,3 @@
-/* Spoken replies: the speaking bar above the composer, and the voice conversation pill at the top of the chat. */
-
 .speaking-bar {
   display: flex;
   width: min(560px, 100%);
@@ -22,7 +20,6 @@
   }
 }
 
-/* The face is drawn low in its own box; the app lifts it by the same share. */
 .speaking-bar-avatar {
   --agent-avatar-optical-offset: calc(28px * -0.14);
 
@@ -49,10 +46,6 @@
   white-space: nowrap;
 }
 
-/*
- * A recording whose message box a page covers: a bar at the bottom of the window, over the page.
- * Below menus and dialogs, so a menu or a dialog that opens on the page still covers it.
- */
 .covered-voice-recording {
   position: fixed;
   z-index: calc(var(--openbot-layer-dropdown) - 1);
@@ -107,19 +100,12 @@
   line-height: var(--openbot-leading-sm);
 }
 
-/*
- * A voice conversation: a pill below the top edge of the chat, over the messages. It comes out of the
- * edge as liquid. The dock spans the chat column and lets clicks through, so the messages beside the
- * pill stay usable.
- */
 .voice-pill-dock {
-  /* The liquid has the window frame colour, so the pill comes out of the frame, as the agent dock does. */
   --voice-pill-fill: var(--window-solid-frame, var(--openbot-bg-frame));
   --agent-avatar-outline: var(--voice-pill-fill);
 
   position: absolute;
   z-index: 3;
-  /* On the top line of the chat card, so the drop covers it where it comes out. */
   top: calc(var(--left-header-height, 38px) - 1px);
   inset-inline: 0;
   display: flex;
@@ -130,33 +116,17 @@
   pointer-events: none;
 }
 
-/*
- * The messages that scroll under the pill blur and darken into the canvas, most at the top of the
- * chat. Each layer blurs more and stops higher, so the blur gets weaker step by step and the band
- * has no edge. The band is short: it stops a little below the pill, so the messages stay readable.
- */
 .voice-pill-blur {
   position: absolute;
   z-index: -1;
-  /*
-   * It starts below the top line of the chat card, so the header and the line stay sharp. It ends
-   * below the pill and follows it: VoicePill.tsx sets how far the pill is above its place at rest.
-   */
+
   inset-block: 1px calc(-1 * var(--openbot-space-6) - var(--voice-pill-drop, 0px));
   inset-inline: 0;
-  /*
-   * The chat can reach the rounded top corners of the card; the band does not paint past them. Each
-   * layer takes the corners, as a rounded `overflow: hidden` here makes Chromium drop the masks of
-   * the layers: then the strongest blur covers the band and stops on a hard line.
-   */
+
   border-start-start-radius: var(--openbot-radius-card);
   border-start-end-radius: var(--openbot-radius-card);
 }
 
-/*
- * The layers fade in and out with the pill (VoicePill.tsx sets the open progress). The band itself
- * keeps full opacity: below it, Chromium blurs nothing behind the layers.
- */
 .voice-pill-blur::before,
 .voice-pill-blur > div {
   position: absolute;
@@ -175,7 +145,6 @@
   );
 }
 
-/* Each step doubles the blur and its fade overlaps the next, so no step shows as a line. */
 .voice-pill-blur > div:nth-child(1) {
   backdrop-filter: blur(1px);
   mask-image: linear-gradient(to bottom, var(--openbot-text-primary) 40%, transparent);
@@ -213,7 +182,6 @@
   position: absolute;
 }
 
-/* The liquid (VoicePill.tsx): the frame above the edge, the neck and the pill, under the goo filter. */
 .voice-pill-liquid {
   position: absolute;
   inset-inline: 0;
@@ -236,19 +204,16 @@
   opacity: 0;
 }
 
-/* The pill again, without the filter, so its shape stays exact at rest. */
 .voice-pill-shape {
   pointer-events: none;
 }
 
-/* The content of the pill. It shows when the pill is almost full. */
 .voice-pill {
   position: relative;
   display: flex;
   width: max-content;
   max-width: 100%;
   align-items: center;
-  /* The distance from the top edge at rest. The liquid reads it, so the goo lets the pill come off. */
   margin-top: var(--openbot-space-3);
   gap: var(--openbot-space-2);
   padding-block: var(--openbot-space-1);
@@ -258,7 +223,6 @@
   transform-origin: top center;
 }
 
-/* The face is drawn low in its own box; the app lifts it by the same share. */
 .voice-pill-avatar {
   --agent-avatar-optical-offset: calc(28px * -0.14);
 
@@ -268,12 +232,10 @@
   transition: opacity var(--openbot-duration-normal) ease;
 }
 
-/* A muted microphone: the agent's face dims until the user speaks again. */
 .voice-pill[data-muted] .voice-pill-avatar {
   opacity: 0.5;
 }
 
-/* The waveform keeps its width while it is empty, so the buttons do not move. */
 .voice-pill-waveform {
   width: 69px;
   flex: 0 0 auto;
@@ -284,10 +246,6 @@
   color: var(--openbot-accent);
 }
 
-/*
- * The actions are those of the toolbar of a canvas node (workflow-nodes.css): round, secondary text
- * until the pointer or the focus is on them, then a light fill and no ring, and a small press.
- */
 .voice-pill-button {
   flex: 0 0 auto;
   border-radius: var(--openbot-radius-pill);
@@ -313,7 +271,6 @@
   height: var(--openbot-icon-md);
 }
 
-/* A muted microphone takes the danger colour, as Delete does on the canvas. */
 .voice-pill .voice-pill-button[aria-pressed="true"] {
   color: var(--openbot-danger-text);
 }
@@ -323,14 +280,12 @@
   color: var(--openbot-danger-text);
 }
 
-/* The tooltip of a canvas control: a 1px ring and no shadow. */
 .ui-tooltip.voice-pill-tooltip {
   border-radius: var(--openbot-radius-md);
   box-shadow: 0 0 0 1px var(--openbot-border-strong);
   font-weight: var(--openbot-weight-medium);
 }
 
-/* The speed is text: the size of the player time, and the same width of each digit. */
 .voice-pill-speed {
   width: auto;
   padding-inline: var(--openbot-space-1-5);
@@ -349,7 +304,6 @@
   transition: opacity var(--openbot-duration-fast) var(--openbot-ease-out);
 }
 
-/* While the pill flows back into the top edge, the error fades out. The blur follows the pill. */
 .voice-pill-dock[data-closing] > .voice-pill-error {
   opacity: 0;
 }
@@ -364,7 +318,6 @@
   }
 }
 
-/* Under a message of a spoken turn: plays the user's recording, or reads the reply aloud again. */
 .voice-player {
   display: flex;
   align-items: center;
@@ -415,7 +368,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* A pill of fixed width, so that it does not move when its speed changes. */
 .voice-player-speed {
   flex: none;
   width: calc(var(--openbot-space-6) * 2);

@@ -9,10 +9,6 @@ import { readJson, requireAdmin, stringField } from "./request-helpers";
 
 const ROUTES: ReadonlySet<string> = new Set(Object.values(DISCORD_ACCESS_ROUTES));
 
-/**
- * Which Discord roles can use OpenBot in each Discord server of this host, read and set from a joined
- * server. Frozen by `discord-access-v1`. `requireAdmin` runs on every route.
- */
 export async function routeDiscordAccess(
   context: TeamApiRequestContext,
   connectors: TeamApiConnectors | undefined,
@@ -22,7 +18,6 @@ export async function routeDiscordAccess(
   if (!connectors || !capabilities.has(DISCORD_ACCESS_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.discordAccessUnsupported"));
   requireAdmin(member);
-  // `readJson` has already run the body through the `discord-access-v1` codec.
   const body = await readJson(request);
   const { messaging } = connectors;
   const workspaceId = stringField(body, "workspaceId", false, 128);

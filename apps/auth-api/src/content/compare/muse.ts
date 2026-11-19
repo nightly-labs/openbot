@@ -1,11 +1,6 @@
 import { OPENBOT_LINKS } from "../../lib/landing-links";
 import { type Comparison, OPENBOT_TEXT } from "./comparison";
 
-// Every statement about Muse here is taken from Meta's own pages, and each page used
-// is in `sources`. Where Meta states nothing, the text says so. Check them again, and
-// move `checkedAt`, whenever this file changes. Statements about OpenBot follow its
-// privacy notes and the remote connection that `remote/README.md` describes.
-
 export const MUSE_COMPARISON: Comparison = {
   rival: { name: "Muse", mark: "muse" },
   answer:

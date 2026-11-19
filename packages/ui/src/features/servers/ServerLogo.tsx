@@ -2,7 +2,6 @@ import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-app
 import { createEffect, createSignal, Show } from "solid-js";
 import { ServerPlushLogo } from "../../server-plush-logo";
 
-/** A server logo, or the server's plush when there is no logo or it does not load. */
 export function ServerLogo(props: {
   serverId: string;
   url: string | null;

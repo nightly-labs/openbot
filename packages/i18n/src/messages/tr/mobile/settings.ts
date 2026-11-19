@@ -284,6 +284,7 @@ export const messages = {
   "mobile.settings.conversations.media": "Fotoğraflar ve dosyalar",
   "mobile.settings.conversations.swipeLeft": "Ajan sohbetinde sola kaydır",
   "mobile.settings.conversations.swipeRight": "Ajan sohbetinde sağa kaydır",
+  "mobile.settings.conversations.swipeQuestion": "Yan soru",
   "mobile.settings.conversations.swipeThreads": "Mesaj dizileri",
   "mobile.settings.conversations.swipeBrowser": "Tarayıcı",
   "mobile.settings.conversations.swipeOff": "Kapalı",

@@ -1,7 +1,3 @@
-/*
- * The agent menu of the Tasks page and of the Library: a search field and the agents under it.
- */
-
 .agent-picker-avatar.agent-avatar {
   --agent-avatar-optical-offset: -2px;
 
@@ -14,12 +10,6 @@
   color: var(--openbot-text-primary);
 }
 
-/*
- * The agent menu: a search field and the agents under it. A server can have more agents than the
- * window has rows, so the list fits the space left under the trigger and scrolls. The panel keeps the
- * menu padding on all sides, so the field and the rows have the same inset and concentric corners.
- * A fixed width keeps the panel still while a search changes the names.
- */
 .agent-picker-menu.ui-action-menu {
   --agent-picker-max: min(420px, calc(100dvh - 16px), var(--kb-popper-content-available-height, 420px));
 
@@ -37,11 +27,6 @@
   gap: var(--ui-menu-padding);
 }
 
-/*
- * The search field looks as the one in the model picker: a filled row with the radius of a menu row.
- * The field takes the focus each time the menu opens, so it shows no focus ring; the caret shows
- * where typing goes.
- */
 .agent-picker-search {
   display: flex;
   height: var(--openbot-control-md);
@@ -54,7 +39,6 @@
   cursor: text;
 }
 
-/* The icon takes the width of a row avatar, so the text starts where the names start. */
 .agent-picker-search > svg {
   width: 18px;
   height: var(--openbot-icon-sm);
@@ -86,11 +70,6 @@
   color: var(--openbot-text-muted);
 }
 
-/*
- * The list is as high as its rows, up to what the panel has left under the field. A search that
- * adds or removes rows eases the height, so the panel does not jump. The edge fades come from the
- * shared .scroll-fade-* masks, so the list shows no scroll bar.
- */
 .agent-picker-list {
   height: min(
     calc(var(--agent-picker-rows, 0) * var(--openbot-control-md)),
@@ -111,7 +90,6 @@
   display: none;
 }
 
-/* A row looks as a row of the other menus. */
 .agent-picker-option {
   display: flex;
   height: var(--openbot-control-md);
@@ -148,7 +126,6 @@
   font-weight: var(--openbot-weight-semibold);
 }
 
-/* The empty text starts where the names start, and fades in after the list closes. */
 .agent-picker-empty {
   margin: 0;
   padding: var(--openbot-space-1) var(--ui-menu-inset) var(--openbot-space-1-5)
@@ -164,7 +141,6 @@
   }
 }
 
-/* A number of the agent, such as its files, at the end of the row. */
 .agent-picker-count {
   flex: none;
   margin-inline-start: auto;

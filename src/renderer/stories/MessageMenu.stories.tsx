@@ -36,7 +36,6 @@ const onMarkUnread = fn();
 const onBranch = fn();
 const onDelete = fn();
 
-/** A message row with the action row and the right-click menu, as the timeline draws it. */
 function MenuRow(props: { message: AgentMessage; channel?: boolean; busy?: boolean }) {
   const [state, setState] = createStore<{
     reaction: MessageReaction | undefined;
@@ -58,7 +57,6 @@ function MenuRow(props: { message: AgentMessage; channel?: boolean; busy?: boole
     onReply,
     onCopy,
   };
-  /** Only the last answer of a turn in an agent chat branches. */
   const branch = () => (own() || props.channel ? undefined : onBranch);
   const readAloud = () =>
     own()
@@ -130,10 +128,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Right-click a message, or press Shift+F10 in its action row. React opens a submenu. The last
- * answer of a turn also has Branch from here, and an agent message has Mark unread. Delete is last.
- */
 export const AgentChat: Story = {
   render: () => (
     <main class="foundation-story">
@@ -143,7 +137,6 @@ export const AgentChat: Story = {
   ),
 };
 
-/** While a turn runs, Branch shows but is disabled. */
 export const TurnRuns: Story = {
   render: () => (
     <main class="foundation-story">
@@ -152,7 +145,6 @@ export const TurnRuns: Story = {
   ),
 };
 
-/** A channel message has no reactions and no branch, so the menu leaves them out. */
 export const Channel: Story = {
   render: () => (
     <main class="foundation-story">

@@ -401,12 +401,14 @@ export const messages = {
     "Claude のサービスがこのリクエストをブロックしました。通常は Claude 側の一時的な問題で、アカウントの問題ではありません。数分後にもう一度メッセージを送信してください。",
   "error.provider.foreignReasoning":
     "別のアカウントまたは API キーが受け取ったため、{provider} はこのチャットの以前の推論を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
+  "error.provider.blankHistoryText":
+    "保存された履歴に空のメッセージがあるため、モデルはこのチャットを受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
   "error.provider.codexHistoryItemMissing":
     "保存された履歴の項目が見つからないため、Codex はこのチャットを続行できませんでした。OpenBot はチャット履歴を引き継いだ新しい Codex セッションを開始しました。もう一度お試しください。",
   "error.provider.codexRequestRefused":
     "{provider} がこのチャットのリクエストを拒否しましたが、原因は示されていません。画像の多い長いチャットで起こることがあります。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
   "error.provider.codexAudioRefused":
-    "モデルはこのチャットの音声を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい Codex セッションを開始しました。もう一度お試しください。",
+    "このモデルは音声を聞けないため、このチャットの音声を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい Codex セッションを開始しました。続けるには、リクエストをもう一度送信し、音声を使わずに作業するようエージェントに頼んでください。音声を確認するには、エージェントのモデルメニューで音声を聞けるモデルを選択してください。",
   "error.provider.imageTooSmall":
     "画像が小さすぎるため、モデルはこのチャットの画像を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
   "error.provider.imageTooLarge":

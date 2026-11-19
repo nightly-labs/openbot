@@ -11,13 +11,6 @@ import type { MentionSkill } from "../components/chat-composer";
 
 const NO_SKILLS: readonly MentionSkill[] = [];
 
-/**
- * What the composer of one agent's chat offers after `@` and in Use skill or app: the skills the user
- * gave the agent, that are on and not broken, then the enabled MCP apps of the server, as the desktop
- * composer offers them. Agent info > Skills and the server's MCP page read the same keys, so a skill or
- * an app added there or from the Marketplace shows here. The host lists its apps only to an owner or
- * admin, so a member is offered skills alone.
- */
 export function useAgentMentionSkills(agentId: string, serverId: string, online: boolean): readonly MentionSkill[] {
   const manage = useMobileWorkspaceSelector((workspace) => workspace.canManageAgentSkills(serverId));
   const { loadAgentSkills } = useMobileWorkspaceActions();
@@ -32,8 +25,6 @@ export function useAgentMentionSkills(agentId: string, serverId: string, online:
   return useMemo(() => {
     const tools: MentionSkill[] = [
       ...(skills.data ?? [])
-        // A member's list gets a skill that has a problem from `skill-problems-v1`. The phone has no
-        // note for it yet, so it keeps that list as before; an admin's list always had those skills.
         .filter(
           (skill) =>
             skill.enabled !== false && skill.state !== "needs-repair" && (manage || skill.problem === undefined),

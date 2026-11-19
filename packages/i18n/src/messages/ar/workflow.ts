@@ -77,7 +77,6 @@ export const messages = {
   "workflow.node.locked": "مقفل",
   "workflow.node.missingInput": "صِل مدخلًا لتشغيل هذه الخطوة.",
   "workflow.node.run": "تشغيل",
-  "workflow.node.runPrice": "تشغيل · {credits}",
   "workflow.node.runPriceLabel": "تشغيل. السعر بالأرصدة: {credits}",
   "workflow.node.running": "قيد التشغيل",
   "workflow.node.stop": "إيقاف",

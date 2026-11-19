@@ -295,6 +295,7 @@ export const messages = {
   "mobile.settings.conversations.media": "Фото и файлы",
   "mobile.settings.conversations.swipeLeft": "Свайп влево в чате агента",
   "mobile.settings.conversations.swipeRight": "Свайп вправо в чате агента",
+  "mobile.settings.conversations.swipeQuestion": "Побочный вопрос",
   "mobile.settings.conversations.swipeThreads": "Ветки",
   "mobile.settings.conversations.swipeBrowser": "Браузер",
   "mobile.settings.conversations.swipeOff": "Выкл.",

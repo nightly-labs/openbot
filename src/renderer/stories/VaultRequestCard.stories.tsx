@@ -39,14 +39,12 @@ const REQUESTS = {
   },
 } satisfies Record<VaultItemKind, { title: string; prefill: Record<string, string> }>;
 
-/** Who can use a requested API key, as the host offers it when the Vault is ready. */
 const API_KEY_SCOPE = {
   label: "Save for",
   options: ["All agents (Vault)", "Only this agent"],
   value: "All agents (Vault)",
 };
 
-/** The item and its summary values, as the host stores them: no secret value. */
 function savedFrom(input: VaultSaveInput): { saved: UiVaultSavedItem; values: Record<string, string> } {
   switch (input.kind) {
     case "card": {
@@ -77,7 +75,6 @@ function savedFrom(input: VaultSaveInput): { saved: UiVaultSavedItem; values: Re
   }
 }
 
-/** A request that the dialog saves and the Not now button closes, as in the chat. */
 function Request(props: {
   kind: VaultItemKind;
   status?: UiBlockStatus;
@@ -101,7 +98,6 @@ function Request(props: {
       saved={saved()}
       values={values()}
       onSave={async (input, scope) => {
-        // The host keeps no item in the block of an API key, only the answer without the key.
         if (input.kind === "apiKey") setValues({ [UI_API_KEY_SCOPE_FIELD_ID]: scope ?? API_KEY_SCOPE.value });
         else {
           const result = savedFrom(input);
@@ -115,24 +111,18 @@ function Request(props: {
   );
 }
 
-/** The agent asks for a card. It filled in the label and the name; the user types the rest. */
 export const Card: Story = { render: () => <Request kind="card" /> };
 
-/** The agent asks for an address. */
 export const Address: Story = { render: () => <Request kind="contact" /> };
 
-/** The agent asks for a login. It filled in the site and the username. */
 export const Login: Story = { render: () => <Request kind="login" /> };
 
-/** The agent asks for an API key. The user chooses who can use it in the dialog. */
 export const ApiKey: Story = { render: () => <Request kind="apiKey" /> };
 
-/** The user saved the API key for the asking agent only. */
 export const ApiKeySaved: Story = {
   render: () => <Request kind="apiKey" status="answered" values={{ [UI_API_KEY_SCOPE_FIELD_ID]: "Only this agent" }} />,
 };
 
-/** The user saved the card. The row shows the item, not the request. */
 export const Saved: Story = {
   render: () => (
     <Request
@@ -144,5 +134,4 @@ export const Saved: Story = {
   ),
 };
 
-/** The user chose Not now. */
 export const NotNow: Story = { render: () => <Request kind="card" status="closed" /> };

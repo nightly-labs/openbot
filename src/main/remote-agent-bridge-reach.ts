@@ -1,6 +1,3 @@
-// Exposes only the four remote-agent-bridge peer paths on the tailnet through Tailscale Serve,
-// then sets the bridge reach URL to the machine MagicDNS name.
-
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import {
@@ -14,7 +11,6 @@ import { isTailscaleConnected } from "./private-network-detection";
 
 const execFileAsync = promisify(execFile);
 
-/** Exact peer paths only; no directory prefix that could proxy the rest of the Team API. */
 const BRIDGE_SERVE_PATHS = [
   REMOTE_AGENT_BRIDGE_ROUTES.accept,
   REMOTE_AGENT_BRIDGE_ROUTES.agents,

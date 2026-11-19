@@ -46,7 +46,6 @@ import type { TaskListItem } from "@openbot/ui/features/conversation/TaskList";
 import { currentText } from "@openbot/ui/text";
 import { isRoutineEventItem } from "./features/conversation/conversation-read-state";
 
-/** The title in the host's thank-you text, which ends with it. Text from another host gives none. */
 function feedbackSentTitle(text: string): string {
   for (const key of ["status.agent.feedbackSent", "status.agent.feedbackWithdrawn"] as const) {
     const prefix = englishSourceText(key, { title: "" });
@@ -96,23 +95,13 @@ export function toAgentProfile(stored: ClientAgentSummary): AgentProfile {
   };
 }
 
-/** The text that a message shows: an agent reply without its markers, a user message as it was written. */
 function conversationMessageBody(message: ConversationMessage): string {
   return message.author === "user" ? message.text : cleanAgentMessageText(message.text);
 }
 
-/** The pages that one `@` thread search reads at most. */
 const THREAD_MESSAGE_SEARCH_PAGES = 3;
-/**
- * The threads that stop the `@` thread search. The list shows 5; the others cover threads that it
- * cannot tag or that match by their title.
- */
 const THREAD_MESSAGE_SEARCH_THREADS = 10;
 
-/**
- * The side thread matches of a search that also gives the agent's own chat. Newer matches in the
- * agent's own chat can fill a page, so it reads more pages until it has enough threads.
- */
 export async function collectThreadMessageMatches(
   readPage: (cursor: string | undefined) => Promise<ConversationSearchPage>,
 ): Promise<ComposerThreadMessageMatch[]> {
@@ -199,10 +188,6 @@ export function toAgentMessage(message: ConversationMessage, ownerAgentId?: stri
   };
 }
 
-/**
- * The plan of a `plan` message. A peer on a released Team API protocol sends only the checklist
- * text, so the plan is read back from it.
- */
 function messagePlan(message: ConversationMessage): AgentMessagePlan | null {
   if (message.author !== "assistant" || message.itemType !== CONVERSATION_PLAN_ITEM_TYPE) return null;
   const plan = message.plan ?? parseConversationPlanText(message.text);
@@ -210,10 +195,6 @@ function messagePlan(message: ConversationMessage): AgentMessagePlan | null {
   return { ...plan, stopped: message.status === "interrupted" || message.status === "failed" };
 }
 
-/**
- * The rows of a plan block. A step runs only while its turn runs: after the turn ends, a step that
- * was not finished shows as not started.
- */
 export function planItems(plan: AgentMessagePlan, streaming: boolean): TaskListItem[] {
   return plan.steps.map((step) => {
     const state =
@@ -224,11 +205,6 @@ export function planItems(plan: AgentMessagePlan, streaming: boolean): TaskListI
 
 const PLAN_TITLE_LIMIT = 80;
 
-/**
- * The plan rows that a later turn of the same agent replaced (`replacedConversationPlans`). Only the
- * agent's own output counts: not an exchange with a teammate, a routine or event marker, or the
- * memory changes, which are system rows.
- */
 export function replacedPlanIds(messages: readonly AgentMessage[]): ReadonlySet<string> {
   return replacedConversationPlans(
     messages.map((message) => ({
@@ -243,10 +219,6 @@ export function replacedPlanIds(messages: readonly AgentMessage[]): ReadonlySet<
   );
 }
 
-/**
- * The header of a plan block: a short explanation, else "Tasks", or "Stopped" for a stopped plan
- * that no later turn replaced.
- */
 export function planTitle(plan: AgentMessagePlan, replaced: boolean): string {
   const { t } = currentText();
   if (plan.stopped && !replaced && plan.steps.some((step) => step.status !== "completed"))
@@ -255,10 +227,6 @@ export function planTitle(plan: AgentMessagePlan, replaced: boolean): string {
   return t("chat.taskList.title");
 }
 
-/**
- * The chat rows of stored messages. `convert` gives the row of the message at an index; a caller
- * that keeps the rows of unchanged messages passes it.
- */
 export function toAgentMessages(
   messages: readonly ConversationMessage[],
   ownerAgentId?: string,
@@ -271,8 +239,6 @@ export function toAgentMessages(
     if ((message.delivery?.status === "queued" || message.delivery?.status === "cancelled") && !message.routine) {
       continue;
     }
-    // A new agent's setup message is for the agent only: the chat starts with the agent's welcome.
-    // The continuation of a channel request is for the agent only too (#8812).
     if (message.itemType === AGENT_WELCOME_ITEM_TYPE || message.itemType === CHANNEL_RESUME_ITEM_TYPE) continue;
     if (message.author !== "assistant" || message.itemType !== "commentary") {
       result.push(convert(message, index));
@@ -414,11 +380,6 @@ export function agentMessagesEqual(left: AgentMessage, right: AgentMessage): boo
   );
 }
 
-/**
- * Whether `JSON.stringify` gives the same text for both values, without the text: a chat of many
- * agents compares its messages on each change. A value with its own JSON form, such as a `Date`,
- * compares through `JSON.stringify`.
- */
 function sameJson(left: unknown, right: unknown): boolean {
   if (left === right) return true;
   if (hasOwnJson(left) || hasOwnJson(right)) return JSON.stringify(left) === JSON.stringify(right);
@@ -444,7 +405,6 @@ function sameJson(left: unknown, right: unknown): boolean {
   return jsonScalar(left) === jsonScalar(right);
 }
 
-/** A value that is not a plain object, array or primitive, or that has a `toJSON`. */
 function hasOwnJson(value: unknown): boolean {
   if (typeof value === "bigint") return true;
   if (typeof value !== "object" || value === null) return false;
@@ -457,17 +417,14 @@ function isJsonObject(value: unknown): value is object {
   return typeof value === "object" && value !== null;
 }
 
-/** `JSON.stringify` leaves these out of an object and writes `null` for them in an array. */
 function leftOutOfJson(value: unknown): boolean {
   return typeof value === "undefined" || typeof value === "function" || typeof value === "symbol";
 }
 
-/** `sameJson` for two array items, which `JSON.stringify` writes as `null` when it leaves them out of an object. */
 function sameJsonArrayItem(left: unknown, right: unknown): boolean {
   return sameJson(leftOutOfJson(left) ? null : left, leftOutOfJson(right) ? null : right);
 }
 
-/** The value of a primitive as JSON has it: `null` for a number that is not finite, `undefined` when left out. */
 function jsonScalar(value: unknown): string | number | boolean | null | undefined {
   if (typeof value === "string" || typeof value === "boolean") return value;
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
@@ -618,11 +575,6 @@ function deliveryStatus(status: QueueDeliveryStatus | undefined): Exclude<AgentD
   return status;
 }
 
-/**
- * Keeps the steps of the running turn that a snapshot does not hold yet. A turn that ended is
- * not kept: its last snapshot is what the thread stores, and a quiet routine run removes its
- * steps there on purpose, so a kept copy would show text that a reload no longer shows.
- */
 export function retainThinkingMessages(
   previous: AgentMessage[],
   next: AgentMessage[],
@@ -649,7 +601,6 @@ export function retainThinkingMessages(
   return result;
 }
 
-/** `values` without the agent's entry. The same object when it has none, so its readers do not run again. */
 export function withoutAgent<T>(values: Record<string, T>, agentId: string): Record<string, T> {
   if (!Object.hasOwn(values, agentId)) return values;
   const next = { ...values };
@@ -658,7 +609,6 @@ export function withoutAgent<T>(values: Record<string, T>, agentId: string): Rec
 }
 
 function cleanPreview(preview: string): string {
-  // The stored preview is the start of the message as written, Markdown and all.
   const cleaned = markdownPreviewText(cleanAgentMessageText(preview))
     .replace(/\binbox\s+at\s+zero\b[:,]?\s*/gi, "")
     .replace(/\s{2,}/g, " ")

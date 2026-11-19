@@ -1,11 +1,5 @@
 import type { AvatarColor } from "@openbot/contracts/ipc";
 
-/**
- * The 11 chat colors that the desktop picker and the mobile settings offer as presets. A desktop
- * bubble mixes a part of its color into the surface, so the presets have one OKLCH lightness (0.68)
- * and the most chroma up to 0.19 that sRGB holds at each hue. Their tints then have the same weight
- * in the light and the dark theme. Yellow is lighter, because a yellow at that lightness is mustard.
- */
 export const CHAT_COLOR_PRESETS = [
   { id: "red", value: "#f75d59" },
   { id: "orange", value: "#eb7007" },
@@ -24,11 +18,6 @@ export type ChatColorPresetId = (typeof CHAT_COLOR_PRESETS)[number]["id"];
 
 export type ChatBackgroundScheme = "light" | "dark";
 
-/**
- * The chat background presets: calm tints of the chat color preset hues, in the same order, that the
- * text of each scheme reads well on: OKLCH lightness 0.965 and chroma 0.018 in Light, lightness 0.25
- * and chroma 0.035 in Dark. The desktop, the web client and mobile offer the same presets.
- */
 export const CHAT_BACKGROUND_PRESETS = {
   light: [
     { id: "red", value: "#ffefed" },
@@ -58,10 +47,6 @@ export const CHAT_BACKGROUND_PRESETS = {
   ],
 } as const satisfies Record<ChatBackgroundScheme, readonly { id: ChatColorPresetId; value: AvatarColor }[]>;
 
-/**
- * The OKLCH limits that keep the muted text of each scheme at about 4.5:1 on a chat background. The
- * desktop applies the same limits in `styles/chat-background.css`; keep the two the same.
- */
 const READABLE_BACKGROUND = {
   light: { minLightness: 0.95, maxChroma: 0.02 },
   dark: { maxLightness: 0.3, maxChroma: 0.05 },
@@ -82,17 +67,11 @@ function hexByte(channel: number): string {
     .padStart(2, "0");
 }
 
-/**
- * The chat background that a screen without CSS relative colors shows, such as the mobile app: the
- * color made darker in Dark and lighter in Light when text would be hard to read on it, as
- * `#rrggbb`. A color out of sRGB is clipped, as CSS clips it.
- */
 export function readableChatBackground(color: AvatarColor, scheme: ChatBackgroundScheme): AvatarColor {
   const channel = (start: number) => linear(Number.parseInt(color.slice(start, start + 2), 16) / 255);
   const r = channel(1);
   const g = channel(3);
   const b = channel(5);
-  // sRGB to OKLab (Björn Ottosson's matrices).
   const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
   const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
   const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);

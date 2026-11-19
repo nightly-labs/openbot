@@ -6,12 +6,6 @@ import { CRM_SCHEMA_SQL } from "./migrations/0063-crm";
 import { THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION } from "./migrations/0065-thread-event-compaction";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
-// Failure modes: the upgrade changes or loses a row of any table; a failed upgrade leaves a CRM table
-// or its marker; a newer or incomplete history is accepted; the built-in statuses are missing or
-// added twice; a row has a bad id, currency, amount, tone, method or JSON; a customer points at no
-// status, or a payment at no customer; a number or a label is used twice; a deleted customer leaves
-// its rows behind, a deleted plan takes its payments, or a status in use is deleted. These fixtures
-// cover each.
 const databases: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of databases.splice(0)) db.close();
@@ -39,7 +33,6 @@ function migrateUpTo(db: DatabaseSync, version: number): void {
   db.exec("DROP TRIGGER stop_at_version");
 }
 
-/** A memory, and from schema 45 on a named browser profile: rows that migration 63 must keep. */
 function seed(db: DatabaseSync, version: number): void {
   db.prepare(`INSERT INTO projection_agent_memories
     (memory_id, agent_id, text, normalized_text, origin, source_turn_id, created_at, updated_at, last_event_sequence)
@@ -51,7 +44,6 @@ function seed(db: DatabaseSync, version: number): void {
 
 type Contents = Record<string, Record<string, SQLOutputValue>[]>;
 
-/** Every row of every table, by table name. */
 function contents(db: DatabaseSync): Contents {
   const tables = db
     .prepare(
@@ -154,7 +146,6 @@ describe("CRM migration", () => {
     (version) => {
       const db = databaseAt(version);
       seed(db, version);
-      // The earlier migrations run first; the rows after them are what v63 must keep.
       if (version < 62) migrateUpTo(db, 62);
       const before = contents(db);
       migrateOpenBotDatabase(db);

@@ -1,7 +1,3 @@
-// Two hosts exchange an agent message and a file through the Team API (`remote-agent-bridge-v1`).
-// Run: `bun scripts/remote-agent-bridge-e2e.ts`
-// Writes .openbot-build/remote-agent-bridge-e2e/report.json.
-
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, open, rm, writeFile } from "node:fs/promises";
@@ -239,7 +235,6 @@ async function stopHost(host: Host): Promise<void> {
 }
 
 const capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10);
-// Protocol 10 sends the names after the protocol 9 baseline, and the baseline ones it leaves out.
 const capabilityLists = encodeTeamCapabilitiesV10(capabilities);
 
 async function call(

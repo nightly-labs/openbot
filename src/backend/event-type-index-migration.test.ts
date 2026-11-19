@@ -3,8 +3,6 @@ import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
-// Failure modes: an upgrade loses or changes an event or a receipt; a partial migration survives a failure;
-// a retry fails on the index that the failed run left; a newer or incomplete history is changed.
 const databases: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of databases.splice(0)) db.close();
@@ -21,7 +19,6 @@ function databaseAt(version: number): DatabaseSync {
   return db;
 }
 
-// A thread snapshot, two flushes of one streamed message, and a hosted-site event, each with its receipt.
 function seedEvents(db: DatabaseSync): void {
   db.exec(`INSERT INTO orchestration_events
       (event_id, command_id, aggregate_type, aggregate_id, event_type, occurred_at, payload_json)
@@ -62,7 +59,6 @@ function expectHealthy(db: DatabaseSync): void {
 }
 
 describe("event type index migration", () => {
-  // The event table is the same from the v8 baseline on, so the oldest and the newest released schema bound it.
   it.each([8, 42])("upgrades v%i and keeps every event and receipt", (version) => {
     const db = databaseAt(version);
     seedEvents(db);
@@ -94,7 +90,6 @@ describe("event type index migration", () => {
     const db = databaseAt(42);
     seedEvents(db);
     const before = contents(db);
-    // SQLite refuses an index whose name a table holds, even with IF NOT EXISTS.
     db.exec("CREATE TABLE orchestration_events_thread_type (conflict TEXT)");
     expect(() => migrateOpenBotDatabase(db)).toThrow("migration to version 43 failed");
     expect(db.prepare("SELECT version FROM schema_migrations WHERE version = 43").all()).toEqual([]);

@@ -9,10 +9,6 @@ export interface ScanAgainButtonProps {
   onPress: () => void;
 }
 
-/**
- * The retry over the camera. Android has no Liquid Glass, so it is a light capsule in the style of
- * the status pill above it.
- */
 export function ScanAgainButton({ label, onPress }: ScanAgainButtonProps) {
   return (
     <Pressable

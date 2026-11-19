@@ -5,9 +5,6 @@ import { CRM_TABLES_AFTER_MIGRATION } from "./crm/crm-schema";
 import { THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION } from "./migrations/0065-thread-event-compaction";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
-// Failure modes: the upgrade changes or loses a row of any table; a failed upgrade leaves the table
-// or its marker; a newer or incomplete history is accepted; a deleted id can point to no thread, be
-// empty or be recorded twice; a deleted thread leaves its ids behind. These fixtures cover each.
 const databases: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of databases.splice(0)) db.close();
@@ -28,7 +25,6 @@ function migrateUpTo(db: DatabaseSync, version: number): void {
   db.exec("DROP TRIGGER stop_at_version");
 }
 
-/** A chat thread with a user message and an answer, the rows that migration 55 must keep. */
 function seed(db: DatabaseSync): void {
   db.prepare(`INSERT INTO projection_threads
     (thread_id, agent_id, title, active_turn_id, created_at, updated_at, last_event_sequence)
@@ -52,10 +48,6 @@ function seed(db: DatabaseSync): void {
   );
 }
 
-/**
- * Every row of every table, by table name. Migration 47 replaces the empty task table with the thread
- * table; `agent-thread-migration.test.ts` checks that move.
- */
 function contents(db: DatabaseSync): Record<string, unknown[]> {
   const tables = db
     .prepare(
@@ -68,7 +60,6 @@ function contents(db: DatabaseSync): Record<string, unknown[]> {
   return Object.fromEntries(tables.map((table) => [table, db.prepare(`SELECT * FROM "${table}"`).all()]));
 }
 
-/** Migration 55 adds the first; migration 56 adds the proxy tables after it. */
 const LATER_TABLES = {
   projection_deleted_thread_messages: [],
   browser_proxies: [],
@@ -100,7 +91,6 @@ describe("deleted thread messages migration", () => {
     (version) => {
       const db = databaseAt(version);
       seed(db);
-      // The earlier migrations run first; the rows after them are what v55 must keep.
       if (version < 54) migrateUpTo(db, 54);
       const before = contents(db);
       expect(before.projection_thread_messages).toHaveLength(2);

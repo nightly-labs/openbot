@@ -1,7 +1,3 @@
-// Links this host to another host so an agent can send a message and files there.
-// The database stores a hash and ciphertext. This module does not import Electron, and it does
-// not wake a hosted server that is off.
-
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -243,7 +239,6 @@ function normalizeReach(value: string): string {
   }
 }
 
-/** `remote:<linkId>:<agentId>`. Null when the id is not a linked agent, or it is longer than 128. */
 export function parseRemoteAgentId(id: string): { linkId: string; agentId: string } | null {
   if (!id.startsWith("remote:") || id.length > 128) return null;
   const rest = id.slice("remote:".length);
@@ -312,7 +307,6 @@ export class RemoteAgentBridge {
     this.#now = options.now ?? Date.now;
   }
 
-  /** The address this host puts in an invite. The Team API sets it when it starts to listen. */
   setReach(reach: string): void {
     this.#reach = normalizeReach(reach);
   }
@@ -510,7 +504,6 @@ export class RemoteAgentBridge {
     return { messageId: receipt.messageId };
   });
 
-  /** Agents of every linked server, for `list_agents`. A peer that does not answer is left out. */
   listRemoteAgents = Effect.fn("RemoteAgentBridge.listRemoteAgents")(function* (
     this: RemoteAgentBridge,
   ): Effect.fn.Return<RemoteAgentBridgeAgent[], { cause: RemoteAgentBridgeError }> {
@@ -686,10 +679,6 @@ export class RemoteAgentBridge {
     });
   }
 
-  /**
-   * Calls the peer over HTTP. A reach that is not http or https does not wake a hosted server:
-   * the send fails until the peer answers on an address this host can open.
-   */
   #dial<A>(
     input: {
       reach: string;
@@ -745,7 +734,6 @@ export class RemoteAgentBridge {
     });
   }
 
-  /** SQLite returns a BLOB as Uint8Array. `Uint8Array#toString` is not UTF-8. */
   #outgoingToken(link: LinkRow): string {
     return this.#cipher.decrypt(Buffer.from(link.token_ciphertext));
   }

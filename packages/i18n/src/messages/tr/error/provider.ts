@@ -6,7 +6,6 @@ export const messages = {
     "OpenBot, MCP sunucularını Codex yapılandırmasına kaydedemedi. Codex config.toml dosyanızın geçerli ve yazılabilir olduğunu denetleyin, ardından OpenBot'u yeniden başlatın.",
   "error.provider.computerUseConfig":
     "OpenBot, Bilgisayar Kullanımını Codex yapılandırmasına kaydedemedi. Codex config.toml dosyanızın geçerli ve yazılabilir olduğunu denetleyin, ardından OpenBot'u yeniden başlatın. Onsuz devam etmek için ekip arkadaşı ayarlarından Bilgisayar Kullanımını kapatabilirsiniz.",
-  // Provider, provider runtime and custom endpoint errors.
   "error.provider.codexUnresponsive": "Codex yanıt vermeyi bıraktı, bu yüzden OpenBot işlemini sonlandırdı.",
   "error.provider.acpUnresponsive": "{provider} zamanında yanıt vermedi, bu yüzden OpenBot işlemini sonlandırdı.",
   "error.provider.acpSignInLost":
@@ -392,12 +391,14 @@ export const messages = {
     "Claude hizmeti bu isteği engelledi. Bu genellikle Claude tarafında kısa süreli bir sorundur, hesabınızla ilgili değildir. Mesajı birkaç dakika sonra yeniden gönderin.",
   "error.provider.foreignReasoning":
     "Farklı bir hesap veya API anahtarı aldığı için {provider} bu sohbetteki önceki akıl yürütmeyi kabul etmedi. OpenBot sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
+  "error.provider.blankHistoryText":
+    "Kayıtlı geçmişinde boş bir mesaj olduğu için model bu sohbeti kabul etmedi. OpenBot sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
   "error.provider.codexHistoryItemMissing":
     "Kayıtlı geçmişindeki bir öğe eksik olduğu için Codex bu sohbete devam edemedi. OpenBot sohbet geçmişiyle yeni bir Codex oturumu başlattı. Tekrar deneyin.",
   "error.provider.codexRequestRefused":
     "{provider}, bu sohbetin isteğini reddetti ve nedenini belirtmedi. Bu, çok sayıda görsel içeren uzun bir sohbette olabilir. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
   "error.provider.codexAudioRefused":
-    "Model bu sohbetteki sesi kabul etmedi. OpenBot, sohbet geçmişiyle yeni bir Codex oturumu başlattı. Tekrar deneyin.",
+    "Bu model ses dinleyemez, bu yüzden bu sohbetteki sesi kabul etmedi. OpenBot, sohbet geçmişiyle yeni bir Codex oturumu başlattı. Devam etmek için isteğinizi yeniden gönderin ve ajandan ses olmadan çalışmasını isteyin. Sesi kontrol etmek için ajanın model menüsünde ses dinleyebilen bir model seçin.",
   "error.provider.imageTooSmall":
     "Görsel çok küçük olduğu için model bu sohbetteki bir görseli kabul etmedi. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
   "error.provider.imageTooLarge":

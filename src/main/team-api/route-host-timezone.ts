@@ -7,7 +7,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin } from "./request-helpers";
 
-/** The server timezone of this computer, read and set from a joined server. Frozen by `host-timezone-v1`. */
 export async function routeHostTimezone(
   context: TeamApiRequestContext,
   admin: TeamApiAdmin | undefined,

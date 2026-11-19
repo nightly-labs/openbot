@@ -15,13 +15,6 @@ export const QUEUE_DELIVERY_STATUSES = [
 ] as const;
 export type QueueDeliveryStatus = (typeof QUEUE_DELIVERY_STATUSES)[number];
 
-/**
- * What a message sent to a busy agent does. `queue` waits behind the running turn; `steer` joins
- * that turn at the provider's next step. Idle agents start every message the same way.
- *
- * `steer` is the default. A stored `queue`, for the app or for one agent, stays `queue`, and a
- * provider that cannot steer queues the message in either mode.
- */
 export const BUSY_MESSAGE_MODES = ["queue", "steer"] as const;
 export type BusyMessageMode = (typeof BUSY_MESSAGE_MODES)[number];
 export const DEFAULT_BUSY_MESSAGE_MODE: BusyMessageMode = "steer";
@@ -30,12 +23,10 @@ export function isBusyMessageMode(value: unknown): value is BusyMessageMode {
   return isOneOf(BUSY_MESSAGE_MODES, value);
 }
 
-/** The app default, as it is stored and as it crosses IPC. An agent's own setting comes first. */
 export interface BusyMessageModePreference {
   mode: BusyMessageMode;
 }
 
-/** Why a message sent in `steer` mode waits in the queue instead. */
 export const QUEUE_STEER_FALLBACKS = ["provider-unsupported", "steer-failed"] as const;
 export type QueueSteerFallback = (typeof QUEUE_STEER_FALLBACKS)[number];
 
@@ -56,36 +47,11 @@ export interface QueueDelivery {
   turnId: string | null;
   error: string | null;
   createdAt: string;
-  /**
-   * Another editor holds this queued message. It keeps its place in the queue and the agent does
-   * not start it until the edit is saved or cancelled.
-   *
-   * Absent rather than false on a released Team API response: the shipped adapters project a fixed
-   * key list, so a remote server drops this field instead of reporting it.
-   */
   editing?: boolean;
-  /**
-   * Whether the sender waits for an answer. Only an agent sender sets it, and only to `false`:
-   * a message the sender marked as information the recipient may act on, but must not answer.
-   *
-   * Absent means an answer is expected: what every message stored before this field existed meant,
-   * and what a remote server too old to send it reports.
-   */
   expectsReply?: boolean;
-  /**
-   * The message was sent to steer the running turn and waits in the queue instead. Absent on a
-   * released Team API response: the shipped adapters project a fixed key list.
-   */
   steerFallback?: QueueSteerFallback;
 }
 
-/**
- * A queued answer from another agent to a question this agent asked. A client shows it in the
- * waiting block, with the question it answers. Its only queue action is steer, while a turn runs.
- *
- * A host too old to send `expectsReply` reports every delivery as a question, so each one stays an
- * ordinary queue row there.
- */
 export function isQueuedAgentReply(delivery: QueueDelivery): boolean {
   return (
     delivery.status === "queued" &&
@@ -95,13 +61,6 @@ export function isQueuedAgentReply(delivery: QueueDelivery): boolean {
   );
 }
 
-/**
- * A routine run has its own provider session, which ends with the run, so the host does not steer a
- * message into its turn: the message waits for the next turn. A client does not offer Steer then.
- *
- * Only a delivery that names the turn counts. A routine that starts has no turn yet, and the turn on
- * screen can be the user's; if a steer reaches the routine's turn first, the host refuses it.
- */
 export function routineRunsTurn(
   deliveries: readonly QueueDelivery[] | undefined,
   turnId: string | null | undefined,
@@ -163,18 +122,10 @@ function isQueueSender(value: unknown): value is QueueDelivery["sender"] {
 export const QUEUE_HOLD_REASONS = ["channel-task"] as const;
 export type QueueHoldReason = (typeof QUEUE_HOLD_REASONS)[number];
 
-/**
- * Why a queue is waiting for something other than its own running turn.
- *
- * A channel assignment holds the member agent that does it, so an agent with nothing running in its
- * own chat can still be unable to start the message the user just sent it. Without this the wait has
- * no visible cause: the channel turn's events are not the agent's own, so the agent reads as idle.
- */
 export interface QueueHold {
   reason: QueueHoldReason;
   channelId: string;
   channelName: string;
-  /** The agent the channel work belongs to. Equal to the snapshot's agent when it is its own work. */
   agentId: string;
 }
 
@@ -191,15 +142,7 @@ export function isQueueHold(value: unknown): value is QueueHold {
 export interface QueueSnapshot {
   agentId: string;
   deliveries: QueueDelivery[];
-  /**
-   * Absent rather than null on a released Team API response: the shipped adapters project a fixed
-   * key list, so a remote server drops this field instead of reporting it.
-   */
   hold?: QueueHold | null;
-  /**
-   * The setup message of a new agent (`agent-welcome-v1`) waits or runs. No delivery shows it, so a
-   * client shows that the agent prepares its welcome. Absent on every other queue.
-   */
   welcome?: true;
 }
 
@@ -268,7 +211,6 @@ export interface UpdateQueuedMessageInput {
 export interface ReorderQueueInput {
   agentId: string;
   deliveryIds: string[];
-  /** The side thread whose queued messages `deliveryIds` orders. Absent for the agent's own chat. */
   taskId?: string;
 }
 
@@ -277,5 +219,4 @@ export interface InterruptTurnInput {
   turnId: string;
 }
 
-/** A queue edit for one agent. The Team API route names the agent, so the request body does not. */
 export type EditQueuedMessageInput = QueueEditRequest & { agentId: string };

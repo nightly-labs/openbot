@@ -1,18 +1,9 @@
-// Frozen optional remote-agent-bridge-v1 wire contract.
-//
-// An owner or an admin links this host to another host. The invite is one use, and it ends when it
-// is used or after seven days. Each host keeps the other host's token encrypted. The token can
-// list agent ids and names, send a message and files to one agent, and revoke the link. It cannot
-// read a chat, change settings, or run a command. A member session cannot call the peer routes,
-// and the link token cannot call a released route. Widening any of it needs a second capability
-// string.
 import { isDynamicRecord, isString } from "../runtime-values";
 import { adminRoute, boolean, empty, fields, identifier, list, type OptionalRouteCodec, string } from "./admin-wire";
 import type { TeamProtocolV7BaseJsonObject, TeamProtocolV7BaseJsonValue } from "./v7-base";
 
 export const REMOTE_AGENT_BRIDGE_CAPABILITY = "remote-agent-bridge-v1";
 
-/** Seven days, the same lifetime as a one-time member invite. */
 export const REMOTE_AGENT_BRIDGE_INVITE_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000;
 
 export const REMOTE_AGENT_BRIDGE_ROUTES = {
@@ -30,7 +21,6 @@ export const REMOTE_AGENT_BRIDGE_ROUTES = {
   peerRevoke: "/v1/remote-agent-bridge/revoke",
 } as const;
 
-/** Whether this host can give link codes to a server on another network. */
 export interface RemoteAgentBridgeReachStatus {
   ready: boolean;
   reach: string;
@@ -46,7 +36,6 @@ const PEER_PATHS = new Set<string>([
   REMOTE_AGENT_BRIDGE_ROUTES.peerRevoke,
 ]);
 
-/** A link token is accepted only on these paths, and only before member authentication. */
 export function isRemoteAgentBridgePeerPath(pathname: string): boolean {
   return PEER_PATHS.has(pathname);
 }
@@ -123,7 +112,6 @@ export const REMOTE_AGENT_BRIDGE_CODECS: ReadonlyMap<string, OptionalRouteCodec>
   [REMOTE_AGENT_BRIDGE_ROUTES.peerRevoke, adminRoute(empty, empty)],
 ]);
 
-/** The agent and the server that sent a message across a link. */
 export interface RemoteSender {
   agentId: string;
   agentName: string;
@@ -149,7 +137,6 @@ function knownRemoteSender(value: RemoteSender): TeamProtocolV7BaseJsonObject {
   return { agentId: value.agentId, agentName: value.agentName, serverName: value.serverName };
 }
 
-/** `projected` with `remoteSender` on each message of `source` that has one. */
 export function withConversationRemoteSender(
   projected: TeamProtocolV7BaseJsonValue,
   source: unknown,

@@ -1,6 +1,3 @@
-// Links in a joined server's conversation that an agent printed. A sign-in page of the agent's CLI
-// returns to a loopback address on the host, so this computer relays its callback (`sign-in-relay-v1`).
-
 import {
   decodeSignInRelayFlow,
   type McpSignInRelayPage,
@@ -19,7 +16,6 @@ import { type SignInRelayClient, signInRelayRemote } from "./sign-in-relay-clien
 
 const logger = createOpenBotLogger("message-link-relay");
 
-/** Opens an http or https link in the user's browser. Any other scheme is refused. */
 export function openHttpLink(url: string, openExternal: (url: string) => Promise<void>): Promise<void> {
   const parsed = new URL(url);
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:")
@@ -38,7 +34,6 @@ export interface MessageLinkRelayDependencies {
     ): Effect.Effect<T, RemoteWorkflowError>;
   };
   relay: Pick<SignInRelayClient, "run" | "paste">;
-  /** Opens a link that is not a relayed sign-in, as `app.openUrl` does. */
   openUrl: (url: string) => Promise<void>;
 }
 
@@ -50,12 +45,6 @@ export class MessageLinkRelay {
     this.#dependencies = dependencies;
   }
 
-  /**
-   * Opens a link of an agent of `serverId`. A sign-in page that the host relays opens once the host
-   * accepted it, and its callback goes to the host. When this computer cannot take the callback, the
-   * answer is the page that the renderer shows with a field for the address from the browser. A host
-   * that cannot relay the link, such as for a member who is not an admin, gets the link opened as it is.
-   */
   readonly open = Effect.fn("MessageLinkRelay.open")(function* (
     this: MessageLinkRelay,
     serverId: string,
@@ -84,8 +73,6 @@ export class MessageLinkRelay {
       yield* remoteCall(() => openUrl(url));
       return null;
     }
-    // The relay outlives this call: it waits for the callback until it ends, `paste` joins it or
-    // `cancel` interrupts it.
     const shown = yield* Effect.callback<McpSignInRelayPage | null, RemoteWorkflowError>((resume) => {
       const fiber = Effect.runFork(
         relay.run(key, signInRelayRemote(post, Effect.succeed(flow)), {
@@ -106,7 +93,6 @@ export class MessageLinkRelay {
     return shown?.pasteable && !shown.listening ? shown : null;
   });
 
-  /** The address that the user pasted from the browser. Succeeds when the sign-in ended well. */
   readonly paste = Effect.fn("MessageLinkRelay.paste")(function* (
     this: MessageLinkRelay,
     serverId: string,
@@ -122,7 +108,6 @@ export class MessageLinkRelay {
     if (result.error !== null) return yield* relayFailure(result.error);
   });
 
-  /** Ends the relayed sign-in of a link, and cancels it on the host. */
   readonly cancel = Effect.fn("MessageLinkRelay.cancel")(function* (
     this: MessageLinkRelay,
     serverId: string,
@@ -139,7 +124,6 @@ export class MessageLinkRelay {
   });
 }
 
-/** A failure whose message the renderer shows as it is: a host answer or a `sourceText` key. */
 function relayFailure(message: string): Effect.Effect<never, RemoteWorkflowError> {
   return Effect.fail(new RemoteWorkflowError({ cause: new Error(message) }));
 }

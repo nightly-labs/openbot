@@ -7,7 +7,6 @@ import type { OpenBotDatabase } from "./openbot-database";
 import { providerSync } from "./provider-client-effects";
 import type { ProviderHistoryConsumer, ProviderHistoryRequest } from "./provider-history";
 
-/** Builds the ACP history port from SQLite without exposing the database to a provider process. */
 export function providerHistoryPersistence(database: OpenBotDatabase, provider: AgentProvider): AcpHistoryPersistence {
   const recordsOnly = provider !== "codex" && provider !== "claude";
   const findSession = (externalSessionId: string) => {

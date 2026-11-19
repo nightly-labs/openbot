@@ -11,7 +11,6 @@ import {
   verifyRemoteServiceRequest,
 } from "../../../../server/request-auth";
 
-// The guild IDs of a large bot, each at most 24 digits.
 const RECONCILE_BODY_LIMIT = 1024 * 1024;
 const RECONCILE_GUILDS_LIMIT = 40_000;
 
@@ -20,8 +19,6 @@ const reconcileSchema = z.object({
   before: z.number().int().nonnegative(),
 });
 
-// Signal sends the guilds that the bot is in, from the Gateway. Each link of another guild that is
-// older than `before` goes: the bot left that guild while its unlink did not arrive.
 export const Route = createFileRoute("/v2/remote/discord-route/reconcile")({
   server: {
     handlers: {

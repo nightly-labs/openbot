@@ -111,7 +111,6 @@ export function decodeBridgeLinks(value: unknown): ReturnType<typeof decodeBridg
   return record.links.map(decodeBridgeLink);
 }
 
-/** Owner or admin links this server to another. Hidden when the host has no remote-agent-bridge-v1. */
 export function ServerRemoteAgentsSection(props: { serverId: string; calls: RemoteAgentBridgeCalls }) {
   const { t, errorMessage } = useText();
 

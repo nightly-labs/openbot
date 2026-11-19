@@ -67,7 +67,6 @@ function authRetentionOperations(now: number): AuthRetentionOperation[] {
       sql: "DELETE FROM remote_invites WHERE revoked_at IS NOT NULL AND revoked_at <= ?",
       cutoff: now - 24 * 60 * 60_000,
     },
-    // A revoked link signs in no phone. Revoke finds the phones it signed in by host, not by this row.
     {
       name: "mobileConnectLinks",
       sql: "DELETE FROM mobile_connect_links WHERE revoked_at IS NOT NULL AND revoked_at <= ?",

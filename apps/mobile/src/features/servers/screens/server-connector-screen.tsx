@@ -11,7 +11,6 @@ import { useServerConnectors } from "@/features/servers/model/use-server-connect
 import { SettingsContent, SettingsNote } from "@/features/settings/components/settings-content";
 import { useText } from "@/shared/lib/text";
 
-/** Marketplace › Apps › one connector of a joined server, for an owner or admin. */
 export function ServerConnectorScreen() {
   const { t } = useText();
   const { serverId, id } = useLocalSearchParams<{ serverId: string; id: string }>();

@@ -1,9 +1,3 @@
-// The shape and the bounds of the MCP payloads the renderer sends. No message here quotes a value,
-// because the field it would name can be an API key or an `Authorization` header.
-//
-// Domain rules - a duplicate name, a reserved name, the count of servers - stay in `McpServerStore`,
-// stated once, so the local path and the remote path cannot disagree about them.
-
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   CancelMcpSignInInput,
@@ -25,7 +19,6 @@ export function parseSaveMcpServer(value: unknown): SaveMcpServerInput {
   return { config: parseMcpServerConfig(value.config) };
 }
 
-/** The same shape as a save, because a test answers for exactly what a save would store. */
 export function parseTestMcpServer(value: unknown): TestMcpServerInput {
   if (!isObject(value)) throw new Error("An MCP server is required.");
   return { config: parseMcpServerConfig(value.config) };
@@ -54,7 +47,6 @@ export function parseMcpSignInApp(value: unknown): McpSignInAppInput {
   return { mcpServerId: requireString(value.mcpServerId, "MCP server") };
 }
 
-/** The secret is never quoted, as every value here; `null` keeps the one on file. */
 export function parseSaveMcpSignInApp(value: unknown): SaveMcpSignInAppInput {
   if (!isObject(value)) throw new Error("An MCP server is required.");
   return {
@@ -80,7 +72,6 @@ function parseMcpServerConfig(value: unknown): McpServerConfig {
   if (transport !== "stdio" && transport !== "http") throw new Error("Choose a stdio or HTTP transport.");
   if (!isBoolean(value.enabled)) throw new Error("The enabled state must be a boolean.");
   return {
-    // An empty id means a server that is not saved yet, so this field is bounded but not required.
     id: boundedText(value.id, "MCP server", INPUT_LIMITS.identifier),
     name: requireString(value.name, "Name", INPUT_LIMITS.mcpServerName),
     transport,
@@ -100,7 +91,6 @@ function parseMcpServerConfig(value: unknown): McpServerConfig {
   };
 }
 
-/** Empty is allowed everywhere here: the transport that is not in use has cleared fields, not absent ones. */
 function boundedText(value: unknown, field: string, maximum: number): string {
   if (!isString(value)) throw new Error(`${field} must be text.`);
   if (value.length > maximum) throw new Error(`${field} is too long.`);

@@ -5,8 +5,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import { databaseRows, requiredStringColumn } from "./database/database-rows";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
-// Failure modes: upgrade loses text; selection exceeds budget; a partial migration survives failure;
-// invalid history is accepted; selection/index outlive a deleted memory. These fixtures cover each.
 const databases: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of databases.splice(0)) db.close();

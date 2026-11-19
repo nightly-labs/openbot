@@ -389,12 +389,14 @@ export const messages = {
     "O serviço do Claude bloqueou esta solicitação. Normalmente é um problema rápido do lado do Claude, não da sua conta. Envie a mensagem de novo em alguns minutos.",
   "error.provider.foreignReasoning":
     "{provider} não aceitou o raciocínio anterior neste chat porque ele foi recebido por outra conta ou chave de API. O OpenBot iniciou uma nova sessão de {provider} com o histórico do chat. Tente novamente.",
+  "error.provider.blankHistoryText":
+    "O modelo não aceitou este chat porque o histórico salvo tem uma mensagem vazia. O OpenBot iniciou uma nova sessão de {provider} com o histórico do chat. Tente novamente.",
   "error.provider.codexHistoryItemMissing":
     "O Codex não pôde continuar este chat porque falta um item no histórico salvo. O OpenBot iniciou uma nova sessão do Codex com o histórico do chat. Tente novamente.",
   "error.provider.codexRequestRefused":
     "O {provider} recusou a solicitação deste chat e não informou a causa. Isso pode acontecer em um chat longo com muitas imagens. O OpenBot iniciou uma nova sessão do {provider} com o histórico do chat. Tente novamente.",
   "error.provider.codexAudioRefused":
-    "O modelo não aceitou o áudio deste chat. O OpenBot iniciou uma nova sessão do Codex com o histórico do chat. Tente novamente.",
+    "Este modelo não consegue ouvir áudio, por isso não aceitou o som deste chat. O OpenBot iniciou uma nova sessão do Codex com o histórico do chat. Para continuar, envie sua solicitação de novo e peça ao agente para trabalhar sem o som. Para verificar o som, selecione no menu de modelos do agente um modelo que consiga ouvir áudio.",
   "error.provider.imageTooSmall":
     "O modelo não aceitou uma imagem deste chat porque a imagem é pequena demais. O OpenBot iniciou uma nova sessão do {provider} com o histórico do chat. Tente novamente.",
   "error.provider.imageTooLarge":

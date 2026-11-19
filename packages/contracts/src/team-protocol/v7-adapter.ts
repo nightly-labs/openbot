@@ -60,18 +60,6 @@ import {
 } from "./v7-base-adapter";
 import { withConversationVideoGeneration } from "./video-generation-v1";
 
-/**
- * `editing` and `expectsReply` ride beside the frozen queue projection: the shipped key lists drop
- * them, so a client on protocol 1-3 reads the queue exactly as it did before, and only the current
- * protocol carries the mark that another editor holds a message, or that a teammate's message
- * needs no answer. A client uses the second mark to keep a teammate's answer out of the actions it
- * offers on queued messages.
- *
- * A present mark must be a boolean. The projection removes the key, so an unchecked `editing` would
- * reach the client as a message nobody holds, and enable the edit actions the hold disables; an
- * unchecked `expectsReply` would reach it as a question. Fail closed instead; an absent mark still
- * means an older host that never sends one: no hold, and an answer expected.
- */
 const QUEUE_MARKS = { editing: "Invalid queue edit mark.", expectsReply: "Invalid queue reply mark." } as const;
 
 function withQueueMarks(projected: TeamProtocolV7BaseJsonValue, source: unknown): TeamProtocolV7BaseJsonValue {
@@ -100,14 +88,6 @@ function withQueueMarks(projected: TeamProtocolV7BaseJsonValue, source: unknown)
   };
 }
 
-/**
- * The sender's `timezone` rides beside the frozen message projection: the shipped key list drops it,
- * so an older host never reads it and keeps its own zone for a routine the agent creates.
- *
- * A present value that is not a bounded string is malformed and fails closed. A string this runtime
- * cannot resolve is dropped instead: the client's time zone data can be newer than the host's, and
- * an unknown zone must not stop the message, only the schedule default it would give.
- */
 function messageTimezone(source: unknown): TeamProtocolV7BaseJsonObject {
   if (!isDynamicRecord(source) || source.timezone === undefined) return {};
   const timezone = source.timezone;
@@ -149,8 +129,6 @@ export function encodeTeamProtocolV7CurrentHttpRequest(
     return JSON.stringify(decodeScopedUsageRequest(value));
   }
   if (!duplicateRoute(method, path)) {
-    // The frozen base projection names no provider or model, so a chosen pair rides beside it:
-    // only a host behind the capability reads them, and anything older drops unknown keys.
     if (isAgentCreateRoute(method, path) && options.agentCreateModel) {
       const projected = JSON.parse(encodeTeamProtocolV7BaseCurrentHttpRequest(method, path, value, options));
       return JSON.stringify({ ...projected, ...decodeAgentCreateModel(value) });
@@ -161,7 +139,6 @@ export function encodeTeamProtocolV7CurrentHttpRequest(
     }
     return encodeTeamProtocolV7BaseCurrentHttpRequest(method, path, value, options);
   }
-  // The duplicate route reaches the frozen v3 codec directly, so the vocabulary swap happens here.
   const currentValue: TeamProtocolV7BaseJsonValue = JSON.parse(JSON.stringify(value ?? null));
   return JSON.stringify(decodeTeamProtocolV7HttpRequest(method, path, toWireAgentKeys(currentValue)));
 }
@@ -189,14 +166,8 @@ export function decodeTeamProtocolV7CurrentHttpRequest(
       : decodeTeamProtocolV7BaseCurrentHttpRequest(
           method,
           path,
-          // The encode call is only here to expand semantic tags, and it leaves the object in wire
-          // vocabulary. Decoding its output is what brings the keys back to the current spelling the
-          // handlers read.
           JSON.parse(encodeTeamProtocolV7BaseCurrentHttpRequest(method, path, value)),
         );
-    // Read off the raw request, not the projection: the frozen base codec drops unknown keys, so
-    // the pair is gone by the time `decoded` exists. A request without the capability takes the
-    // host default exactly as before.
     if (isAgentCreateRoute(method, path) && options.agentCreateModel) {
       return { ...decoded, ...decodeAgentCreateModel(value) };
     }
@@ -207,15 +178,6 @@ export function decodeTeamProtocolV7CurrentHttpRequest(
   return toCurrentAgentKeysObjectForPath(path, structuredClone(decodeTeamProtocolV7HttpRequest(method, path, value)));
 }
 
-/**
- * `historyExtent` is the negotiated history-extent-v1 capability: only then does a page carry its
- * unloaded length beside the frozen keys. `uiBlocks` is the negotiated ui-blocks-v1 capability: only
- * then does a conversation message carry its `uiBlock`. `subagents` is the negotiated subagents-v1
- * capability: only then does a conversation message carry its `subagents`. `promptMultiSelect` is the
- * negotiated prompt-multi-select-v1 capability: only then does a prompt question carry `multiSelect`.
- * `videoGeneration` is the negotiated video-generation-v1 capability: only then does a conversation
- * message carry its `videoGeneration`. Without them the output is the released projection.
- */
 export function encodeTeamProtocolV7CurrentHttpResponse(
   method: string,
   path: string,
@@ -228,7 +190,6 @@ export function encodeTeamProtocolV7CurrentHttpResponse(
     subagents?: boolean;
     promptMultiSelect?: boolean;
     videoGeneration?: boolean;
-    /** Protocol 7 does not send `remoteSender`. The field is accepted so a shared options object typechecks. */
     remoteSender?: boolean;
   } = {},
 ): string {
@@ -269,8 +230,6 @@ function encodeFrozenResponse(
   if (isBrowserViewSessionRoute(method, path) && status < 400) return "{}";
   if (isBrowserViewSessionsRoute(method, path) && status < 400)
     return JSON.stringify(decodeBrowserViewSessionResponse(value));
-  // The tabs keep the released projection, and that projection names `ownerBotId`, so the swap the
-  // base adapter does by path has to happen here too.
   if (isBrowserDisplayRoute(method, path) && status < 400)
     return JSON.stringify(decodeBrowserDisplayResponse(toWireAgentKeys(JSON.parse(JSON.stringify(value ?? null)))));
   if (isQueueEditRoute(method, path) && status === 204) return "{}";
@@ -305,16 +264,10 @@ function encodeFrozenResponse(
   if (!duplicateRoute(method, path)) {
     return encodeTeamProtocolV7BaseCurrentHttpResponse(method, path, status, value, options);
   }
-  // The duplicate route reaches the frozen v3 codec directly, so the vocabulary swap happens here.
   const currentValue: TeamProtocolV7BaseJsonValue = JSON.parse(JSON.stringify(value ?? null));
   return JSON.stringify(decodeTeamProtocolV7HttpResponse(method, path, status, toWireAgentKeys(currentValue)));
 }
 
-/**
- * A host sends the history extent only under history-extent-v1, a UI block only under ui-blocks-v1,
- * the subagents only under subagents-v1, a multi-select flag only under prompt-multi-select-v1, and
- * a video request only under video-generation-v1, so a present one is always kept.
- */
 export function decodeTeamProtocolV7CurrentHttpResponse(
   method: string,
   path: string,
@@ -323,7 +276,6 @@ export function decodeTeamProtocolV7CurrentHttpResponse(
 ): TeamProtocolV7BaseJsonValue {
   const decoded = decodeFrozenResponse(method, path, status, value);
   if (status >= 400) return decoded;
-  // The conversation page route carries all three.
   const withExtent = isHistoryExtentRoute(method, path) ? withPageHistoryExtent(decoded, value) : decoded;
   if (!isConversationRoute(method, path)) return withExtent;
   return withConversationVideoGeneration(
@@ -378,11 +330,6 @@ function decodeFrozenResponse(
   return toCurrentAgentKeys(structuredClone(decodeTeamProtocolV7HttpResponse(method, path, status, value)));
 }
 
-/**
- * The providers, model ids and reasoning efforts v7 shipped with, as in the `v7-base.ts` agent
- * validator. They are not the app's lists: a value the app adds later is not part of this frozen
- * protocol, so a v7 request cannot name it.
- */
 const V7_AGENT_PROVIDERS = [
   "codex",
   "claude",
@@ -398,11 +345,6 @@ const V7_AGENT_PROVIDERS = [
 export const V7_AGENT_MODEL = /^[A-Za-z0-9][A-Za-z0-9._:/[\],=-]{0,159}$/u;
 const V7_REASONING_EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
 
-/**
- * The provider, model and reasoning effort of an agent creation request, validated and fail-closed:
- * a present field with the wrong shape rejects the request rather than silently starting the agent
- * on the host default. Absent fields stay absent, so the host default still applies.
- */
 function decodeAgentCreateModel(value: unknown): TeamProtocolV7BaseJsonObject {
   if (!isDynamicRecord(value)) throw new Error("Invalid agent creation request.");
   const result: TeamProtocolV7BaseJsonObject = {};

@@ -112,6 +112,7 @@ import { pluginIpcHandlers } from "./ipc/plugin-handlers";
 import { providerAdminIpcHandlers } from "./ipc/provider-admin-handlers";
 import { providerDetectionIpcHandlers } from "./ipc/provider-detection-handlers";
 import { providerIpcHandlers } from "./ipc/provider-handlers";
+import { referralIpcHandlers } from "./ipc/referral-handlers";
 import { remoteAgentBridgeIpcHandlers } from "./ipc/remote-agent-bridge-handlers";
 import { routineFeedIpcHandlers } from "./ipc/routine-feed-handlers";
 import { routineFlowIpcHandlers } from "./ipc/routine-flow-handlers";
@@ -191,51 +192,25 @@ import { restartOutsideWindowsPackage } from "./windows-package-restart";
 
 const logger = createOpenBotLogger("main");
 
-// Electron keeps running after both events: an unhandled rejection only prints a warning, and a
-// monitor leaves the default exception handling in place, except after `hideExceptionErrorBox`. These
-// add a redacted log line and a trace span, so a diagnostics export shows that the main process failed
-// and how often.
 let crashTrace: TraceFile | null = null;
-/** How this run ends, for the next start (`run-marker.ts`). Only the process with the lock has one. */
 let runMarker: RunMarker | null = null;
-/** How the previous run ended when it did not quit cleanly. Host analytics sends it once. */
 let previousUncleanExit: UncleanExitProperties | null = null;
-/** The failed starts of this version in a row (`start-attempts.ts`). Only the process with the lock has one. */
 let startAttempts: StartAttempts | null = null;
-/** The reason file of the previous run, when that run stopped a server start loop (`server-start-halt.ts`). */
 let previousStartHalt: StartHaltRecord | null = null;
-/** Set when this run stops a server start loop. The process then exits with this code after the teardown. */
 let startHaltExitCode: number | null = null;
-/** The minimal Team API of a server that stopped its start loop (`server-safe-mode.ts`). */
 let serverSafeMode: ServerSafeMode | null = null;
-/**
- * Where no update script restarts the safe mode, it ends after this time with the start-loop exit
- * code, and the restart policy, such as the one of Docker, tries the start again.
- */
 const SERVER_SAFE_MODE_LIFETIME_MS = 60 * 60 * 1_000;
 process.on("unhandledRejection", (reason) => reportMainProcessFailure("unhandledRejection", reason));
 process.on("uncaughtExceptionMonitor", (error, origin) => reportMainProcessFailure(origin, error));
 
 let exceptionErrorBoxHidden = false;
 
-/**
- * Electron shows its error box for an uncaught exception only while no other listener handles it.
- * The box blocks the main thread: on a server nobody can close it, and during a quit it also holds
- * back the shutdown deadline (#3808). The monitor above still logs the exception.
- */
 function hideExceptionErrorBox(): void {
   if (exceptionErrorBoxHidden) return;
   exceptionErrorBoxHidden = true;
-  process.on("uncaughtException", () => {
-    // Electron's own listener keeps the process running too.
-  });
+  process.on("uncaughtException", () => {});
 }
 
-/**
- * `menu` and `shortcut` are the macOS Quit item by click and by `Cmd + Q`, `tray` is the tray item on
- * Windows and Linux, and `update` is an update install. `quit` is any other request: the Dock, another
- * app, or a system logout on macOS.
- */
 type ExitReason =
   | "main_window_closed"
   | "signal"
@@ -248,16 +223,9 @@ type ExitReason =
   | "start_loop";
 let exitRecorded = false;
 
-/**
- * Records once why OpenBot quits, in the main log and in the trace, before the teardown closes the
- * trace. The first reason wins: closing the window then also quits. A process that ends with no such
- * line and no crash dump stopped from outside with a signal that cannot be caught, such as SIGKILL or
- * Task Manager.
- */
 function recordExit(reason: ExitReason): void {
   if (exitRecorded) return;
   exitRecorded = true;
-  // First: a quit during the start must never count as a failed start.
   startAttempts?.quitting();
   logger.info(`Quitting: ${reason}.`);
   runMarker?.quitting(reason);
@@ -273,14 +241,12 @@ function quitFor(reason: ExitReason): void {
 
 function reportMainProcessFailure(origin: "uncaughtException" | "unhandledRejection", error: unknown): void {
   logger.error(`Main process ${origin}:`, toLogValue(error));
-  // Only before the start finished. A rejection is often a lost background task, not a broken start.
   if (origin === "uncaughtException") startAttempts?.failed("exception");
   if (!crashTrace) return;
   crashTrace.record({ kind: "crash", name: origin, durationMs: 0, outcome: "reported" });
   Effect.runFork(crashTrace.flush());
 }
 
-// Before any network call: a TLS-inspecting company network needs the roots that IT installed.
 try {
   trustSystemCertificates();
 } catch (error) {
@@ -295,23 +261,15 @@ const developmentRemoteRole =
     ? process.env.OPENBOT_DEV_REMOTE_ROLE
     : null;
 const developmentTestClientEnabled = !app.isPackaged && process.env.OPENBOT_DEV_TEST_CLIENT_ENABLED === "1";
-// Before any child process starts: agents must not run as part of a Claude Code session that started OpenBot.
 removeClaudeCodeSessionEnvironment(process.env);
-// Before any child process starts: agents must not report to the Orca pane that started OpenBot.
 removeOrcaPaneEnvironment(process.env);
-// Before any child process starts: this removes the single-use claim from the environment they inherit.
 const hostedServer = takeHostedServerEnvironment(process.env, app.isPackaged, process.platform);
-// Before the first provider check: a restored disk gives the provider CLIs a longer limit.
 if (hostedServer) setDiskRestoreProbe(hostedDiskRestoreProbe());
 const hostingDeveloperKey = takeHostingDeveloperKey(process.env, app.isPackaged);
 const serverMode = takeServerModeEnvironment(process.env, app.isPackaged, process.platform);
-// Always taken, so the owner password leaves the environment also when the flag is refused.
 const localServerChildEnvironment = takeLocalServerChildEnvironment(process.env, commandLineUserDataDirectory);
 const localServerChild = serverMode || hostedServer ? null : localServerChildEnvironment;
-// Development builds only: `scripts/start-recovery-e2e.ts` makes the start fail.
 const forcedStartFailure = takeForcedStartFailure(process.env, app.isPackaged);
-// A server stops its start loop; the desktop shows its recovery window. Development builds only:
-// `scripts/server-start-loop-e2e.ts` turns on the server behavior, because server mode needs a packaged build.
 const serverStartGuard =
   serverMode !== null || hostedServer !== null || takeServerStartGuardTest(process.env, app.isPackaged);
 const localServerControl = localServerChild
@@ -320,10 +278,7 @@ const localServerControl = localServerChild
     )
   : null;
 if (serverMode || hostedServer || localServerChild) hideExceptionErrorBox();
-// A local server keeps a main window that never loads. A second launch on its profile, a deep link or
-// an MCP sign-in showed it as an empty window next to the desktop app.
 if (serverMode || hostedServer || localServerChild) keepWindowsHidden();
-// A local server has no window, so it has no Dock tile either.
 if (localServerChild && process.platform === "darwin") app.dock?.hide();
 const inviteLinkOptions = {
   allowLocalDevelopmentApiUrl: developmentRemoteRole !== null,
@@ -333,14 +288,11 @@ const developmentRemoteDebuggingPort = !app.isPackaged
   ? readDevelopmentRemoteDebuggingPort(process.env.OPENBOT_DEV_REMOTE_DEBUGGING_PORT)
   : null;
 const analyticsCaptureUrl = !app.isPackaged ? readAnalyticsCaptureUrl(process.env.OPENBOT_ANALYTICS_CAPTURE_URL) : null;
-// Electron exposes FedCM without an account chooser, so every request fails with a NetworkError.
-// Sites such as Google Sign-In use FedCM when it exists and fall back to their popup when it does not.
 app.commandLine.appendSwitch("disable-features", "FedCm");
 if (developmentRemoteDebuggingPort) {
   app.commandLine.appendSwitch("remote-debugging-port", developmentRemoteDebuggingPort);
   app.commandLine.appendSwitch("remote-debugging-address", "127.0.0.1");
 }
-// Linux #2374: name the Secret Service where Chromium would keep no sign-in.
 if (configureLinuxPasswordStore())
   logger.info(`No Chromium keyring for "${process.env.XDG_CURRENT_DESKTOP ?? ""}"; using gnome-libsecret.`);
 if (commandLineUserDataDirectory) {
@@ -358,16 +310,12 @@ if (commandLineUserDataDirectory) {
   );
 }
 app.setName("OpenBot");
-// After `userData` has its final path and before the app is ready: renderers read `TZ` when they start.
 const systemTimezone =
   serverMode || hostedServer || localServerChild
     ? applyServerTimezone(join(app.getPath("userData"), SERVER_TIMEZONE_PREFERENCE_FILE), process.env)
     : localTimezone;
 app.enableSandbox();
 if (process.platform === "win32") app.setAppUserModelId("app.openbot.desktop");
-// Windows #11233: a start from a Microsoft Store app kept the data in that app's folder. Start again
-// outside it, before the single-instance lock and before any file goes into `userData`. `process.exit`,
-// as for a second launch: the new process must be able to take the lock.
 if (
   app.isPackaged &&
   !(serverMode || hostedServer || localServerChildEnvironment) &&
@@ -380,11 +328,6 @@ if (
   ))
 )
   process.exit(0);
-// Linux: on Wayland, Chromium waits until a monitor is on before it starts. With none, start again on
-// XWayland. Before the single-instance lock, so that the new process can take it. A parent process or
-// systemd watches the process, the output and the input of a headless server, so it does not restart.
-// The agent dock and the Dynamic Island above other apps also start again on XWayland, when the user chose it.
-// Software rendering starts again on XWayland too: on Wayland the window can get no frame and never show (#8110).
 const startedOnXWayland = takeXWaylandRestartMarker(process.env, process.argv);
 if (
   app.isPackaged &&
@@ -399,9 +342,6 @@ if (
     (await Effect.runPromise(restartOnXWaylandWithoutMonitor(process.env))))
 )
   app.exit(0);
-// macOS #9776: a launch while ShipIt installs an update cancels that install, and the old version stays.
-// Exit at once instead; ShipIt opens the new version when it is done. `process.exit`, as for a second
-// launch: no start marker or log may record this launch as a start that did not finish.
 if (
   process.platform === "darwin" &&
   app.isPackaged &&
@@ -417,14 +357,9 @@ if (
 )
   process.exit(0);
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
-// A second launch exits at once and must not write into the files of the instance that runs.
 if (hasSingleInstanceLock) {
   startMainLog(join(app.getPath("userData"), "logs"));
-  // Crash dumps stay in `crashDumps` on this computer. Crashpad removes old reports itself. Without
-  // them, a window that disappeared on Windows left nothing to tell a crash from a quit (#2675).
   crashReporter.start({ uploadToServer: false });
-  // After the crash reporter: the next start counts the dumps written after this run's last sign of life.
-  // The desktop stops a local server child with SIGKILL after a grace period, so the child has no marker.
   if (!localServerChild)
     ({ marker: runMarker, previous: previousUncleanExit } = RunMarker.start({
       userDataPath: app.getPath("userData"),
@@ -438,7 +373,6 @@ if (hasSingleInstanceLock) {
     logger.warn(
       `The previous run did not quit cleanly (${previousUncleanExit.phase}, ${previousUncleanExit.uptime_class}, ${previousUncleanExit.crash_dump_count} crash dumps).`,
     );
-  // Before the database opens: a start that fails in a migration must count too.
   if (!localServerChild) {
     startAttempts = StartAttempts.begin({
       userDataPath: app.getPath("userData"),
@@ -460,16 +394,10 @@ if (hasSingleInstanceLock) {
       logger.warn(
         `OpenBot ${attempts.appVersion} did not finish its start ${attempts.consecutiveFailures} times in a row (previous start: ${attempts.previousOutcome}, last failure: ${attempts.lastFailure ?? "none"}).`,
       );
-    // After crashes at launch, AppKit asks before `ready` whether to reopen the windows, and its
-    // modal alert stops the start until someone answers. OpenBot restores no macOS window state.
-    // A registered default is in memory for this process only, and a value the user set wins. The
-    // forced failure also needs it: all development builds share the crash history of Electron.app.
     if (process.platform === "darwin" && (attempts.consecutiveFailures > 0 || forcedStartFailure !== null))
       systemPreferences.registerDefaults({ ApplePersistenceIgnoreState: true });
   }
-  // Linux AppImage: the handler must stop before the AppImage unmounts (#3066).
   stopAppImageCrashpadHandlerAtExit();
-  // A file request that never finishes must not keep the process and its lock after an exit.
   stopStuckExitAfterLimit(join(app.getPath("userData"), "logs"));
   if (startedOnXWayland === "monitor")
     logger.warn("The Wayland session had no monitor, so OpenBot uses XWayland until the next start.");
@@ -478,7 +406,6 @@ if (hasSingleInstanceLock) {
   if (startedOnXWayland === "software-rendering")
     logger.info("Software rendering is on, so OpenBot uses XWayland: on Wayland its window can stay empty.");
 }
-// Linux: the GPU stays on until it fails on this computer (#992). `userData` has its final path here.
 configureLinuxGpu({
   userDataPath: app.getPath("userData"),
   ownsInstance: hasSingleInstanceLock,
@@ -498,8 +425,6 @@ protocol.registerSchemesAsPrivileged([
     scheme: "openbot-app",
     privileges: { standard: true, secure: true, supportFetchAPI: true },
   },
-  // `stream` lets an <audio> or <video> element play a file from the scheme: without it the
-  // element cannot make the range requests that playback needs.
   {
     scheme: "openbot-attachment",
     privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true },
@@ -508,7 +433,6 @@ protocol.registerSchemesAsPrivileged([
     scheme: "openbot-remote-attachment",
     privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true },
   },
-  // A visual reply page. It needs no fetch or CORS support: only a frame loads it.
   {
     scheme: "openbot-visual",
     privileges: { standard: true, secure: true },
@@ -517,7 +441,6 @@ protocol.registerSchemesAsPrivileged([
     scheme: "openbot-remote-visual",
     privileges: { standard: true, secure: true },
   },
-  // The decode window of `read_video`, in its own session. It fetches the downloaded files.
   {
     scheme: "openbot-video",
     privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true },
@@ -540,66 +463,36 @@ protocol.registerSchemesAsPrivileged([
   },
 ]);
 
-/**
- * The one handle that replaces the fourteen module-scope service `let`s this file used to keep.
- * Null until `createApplicationServices` returns, and never null again - which is why nothing below
- * treats a null as a recoverable state beyond the startup window it really is.
- */
 let services: ApplicationServices | null = null;
 let activeRemotePrincipalId: string | null = null;
-/** Counts account transitions, so queued work for a superseded one is dropped rather than applied. */
 let centralAuthGeneration = 0;
 let activeAnalyticsPrincipalId: string | null = null;
-/** The last account state that `forwardCentralAuth` saw. It tells a sign-in by the user from a restored session. */
 let previousCentralAuthStatus: CentralAuthState["status"] | null = null;
 const remoteAccountGate = Semaphore.makeUnsafe(1);
 const macHapticFeedback = new MacHapticFeedback();
 let isQuitting = false;
 let shutdownStarted = false;
-/** The teardown ended, also by an error. Until then `before-quit` holds every quit request. */
 let shutdownDone = false;
 let systemSessionEnding = false;
 let systemSessionEndFlushStarted = false;
 let relaunchRequested = false;
-/**
- * Set by a quit signal, by `before-quit` and by a Windows `session-end`, and never cleared. Not
- * `isQuitting`: a Windows session end that another app cancels also sets that, and then OpenBot
- * keeps running.
- */
 let quitStarted = false;
-/**
- * The link kinds a renderer is ever told about.
- *
- * `mcp-auth` is not one of them. It carries an OAuth grant for an MCP server, which is a secret,
- * and the sign-in waiting for that grant lives in this process. It is also never held: a grant is
- * answered by the sign-in that started it, and there is no such sign-in before the app is running.
- */
 type RendererDeepLink = Exclude<DeepLink, { kind: "mcp-auth" | "slack-workspace" | "discord-guild" }>;
 
-// One link at a time, of whichever kind: a second replaces the first, because what a user opened
-// last is what they meant. `deepLinkReceiverReady` says a window has asked for it, which is what
-// tells a link that arrives now to be sent rather than held.
 let pendingDeepLink: RendererDeepLink | null = takeRendererDeepLink(findDeepLink(process.argv, inviteLinkOptions));
 let deepLinkReceiverReady = false;
 
 const MAIN_WINDOW_STATE_FILE = "openbot-main-window-state-v1.json";
 const WM_ENDSESSION = 0x0016;
 
-// A server is stopped with SIGTERM (systemd, Docker). Without a handler, Electron ends at once and its
-// services do not stop. A hosted server's boat pre-stop hook stops it this way before the disk save
-// (`scripts/hosting/openbot-boat-pre-stop`). The desktop app quits the same way, so a `kill` from a
-// terminal or another app also stops its services and leaves a "Quitting: signal." line (#4149).
 {
   const quitAfterSignal = () => {
-    // Before `app.quit()`: the same signal can stop the Computer Use driver first.
     quitStarted = true;
     quitFor("signal");
   };
   process.once("SIGINT", quitAfterSignal);
   process.once("SIGTERM", quitAfterSignal);
   process.once("SIGHUP", quitAfterSignal);
-  // The desktop app holds the other end of the control pipe. Its end means that the app stopped, also
-  // by a crash. A process with no pipe cannot know that, so it quits at once.
   if (localServerChild) {
     if (localServerControl) {
       localServerControl.once("end", quitAfterSignal);
@@ -609,19 +502,12 @@ const WM_ENDSESSION = 0x0016;
   }
 }
 
-/**
- * Filled in as `createApplicationServices` builds, so a quit that arrives part-way through stops
- * exactly what exists. Each step's position in the sequence is declared where the service is built.
- */
 const teardown = new TeardownRegistry({
   reportError: (name, error) => logger.error(`Unable to shut down ${name}:`, toLogValue(error)),
 });
 
-// Declared before the forwarders and the window surface because both read it, and it outlives any
-// one window: macOS destroys the main window on close and `activate` rebuilds it into this slot.
 const windowHolder = createMainWindowHolder();
 
-// Destructured so every `service.on("event", forwardX)` registration below reads as it always has.
 const {
   closeChatNotifications,
   forwardAgentEvent,
@@ -652,38 +538,28 @@ const {
   forwardInstanceTransferUploadProgress,
 } = createRendererForwarders({
   getMainWindow: () => windowHolder.current,
-  // A function: the window controller is made after the forwarders, and no event comes before it.
   getChatWindows: () => windows.getChatWindows(),
   getAgentService: () => services?.service ?? null,
   getHostService: () => services?.host ?? null,
   getHostAnalytics: () => services?.analytics ?? null,
   getRemoteServerManager: () => services?.remoteServers ?? null,
   showMainWindow,
-  // An agent event cannot arrive before the services that raise it, so the fallback stands only so
-  // that this module-level value needs no null check on the notification path.
   getTranslate: () => services?.language.translate ?? translateFor("en"),
   getFormat: () => {
     const locale = services?.language.locale ?? "en";
     return createFormat(locale, withHourCycle(locale, systemHourCycle()));
   },
-  // The desktop app shows the notifications of a local server, as it does for every joined server.
   desktopNotificationsEnabled: () =>
     !localServerChild && (services?.notificationPreference.get().desktopNotifications ?? true),
   notificationPreviewEnabled: () => services?.notificationPreference.get().messagePreview ?? true,
   ownAgentNotificationLevels: () => services?.agentNotificationLevels.levels(OWNER_NOTIFICATION_KEY) ?? new Map(),
 });
 
-// Resolved once, safely: every `app.setPath("userData", ...)` above has already run.
-/**
- * The agents that a quit stops: the local agents, and the agents on the servers on this computer,
- * whose processes end with this one. Before the services start, no agent can work.
- */
 function workingAgents(): AgentSummary[] {
   if (!services) return [];
   return [...services.service.workingAgents(), ...(services.localServers?.workingAgents() ?? [])];
 }
 
-/** The user's `Cmd + Q` guard. Before the services exist, the default. */
 function quitGuard(): QuitGuard {
   return services?.appBehavior.quitGuard ?? DEFAULT_QUIT_GUARD;
 }
@@ -721,22 +597,9 @@ const windows = createMainWindowController({
 });
 
 let appIconColorImage: NativeImage | undefined;
-/**
- * A packaged release on macOS shows the icon of its bundle in the Dock. On macOS 26 that icon comes
- * from the Icon Composer catalog, with glass and with dark, clear and tinted versions; `dock.setIcon`
- * would replace it with one flat image until the app quits. So the Dock keeps it only until the user
- * chooses a logo color: a chosen color, the default one included, must not turn dark with the system.
- */
 const dockShowsBundleIcon = process.platform === "darwin" && app.isPackaged && appVariant === "production";
 let backgroundTray: BackgroundTray | null = null;
 
-/**
- * Shows the chosen logo color on the Dock icon, or on each window icon where there is no Dock. A dev
- * or preview build keeps the icon of its build, so it is not mistaken for the release; a dev build
- * from source shows that icon in the color of its worktree. macOS has no
- * alternate app icon API, so when the app is closed the Dock shows the icon inside the app bundle:
- * changing that file would break the code signature.
- */
 function applyAppIconColor(color: AppLogoColor, chosen: boolean): void {
   const worktreeIcon = developmentWorktreeIcon();
   if (worktreeIcon) {
@@ -759,10 +622,6 @@ function applyAppIconColor(color: AppLogoColor, chosen: boolean): void {
 }
 
 let developmentIcon: NativeImage | null | undefined;
-/**
- * A dev build from source shows the dev icon in the color of its worktree, so the apps of two
- * worktrees that are open at the same time are easy to tell apart in the Dock and the app switcher.
- */
 function developmentWorktreeIcon(): NativeImage | null {
   if (developmentIcon !== undefined) return developmentIcon;
   const icon = appVariant === "dev" && !app.isPackaged ? nativeImage.createFromPath(appIconPath) : null;
@@ -776,8 +635,6 @@ function showAppIcon(icon: NativeImage): void {
     app.dock?.setIcon(icon);
     return;
   }
-  // A window takes `appIconPath` when it is created, so a window opened after the choice gets the
-  // chosen icon here.
   if (!appIconColorImage)
     app.on("browser-window-created", (_event, window) => window.setIcon(appIconColorImage ?? icon));
   appIconColorImage = icon;
@@ -785,36 +642,14 @@ function showAppIcon(icon: NativeImage): void {
   backgroundTray?.setIcon(icon);
 }
 
-/**
- * Outside macOS, closing the main window ends OpenBot, unless the user chose to keep it running in
- * the background. The window is then hidden, not closed, so this event does not come.
- *
- * `window-all-closed` cannot carry that on its own any more. The Computer Use overlays are hidden
- * between actions and closed only after a minute of idle, and a hidden window is still a window,
- * so the event may never arrive: the user would close the last window they can see and leave OpenBot
- * and the driver running with no way back to them.
- */
 function attachQuitOnMainWindowClose(window: BrowserWindow): void {
   if (process.platform === "darwin") return;
   window.on("closed", () => {
     recordExit("main_window_closed");
-    // `quit`, not a teardown of its own: `before-quit` below is what OpenBot shuts down through,
-    // and it already ignores a second request while the first one runs.
     app.quit();
   });
 }
 
-/**
- * Windows gives an application a few seconds between announcing a session end and killing it, so
- * these two handlers flush rather than shut down: they deliberately do not call
- * `prepareForShutdown`, which awaits network teardown the deadline has no room for. They are
- * registered when the first window is built, long before any service exists, which is why every
- * read below goes through `services?.`.
- *
- * Another app can cancel a session end after the query, and OpenBot then keeps running. Provider
- * runtimes stop only on `session-end`: a stopped manager does not start again, so stopping it on the
- * query left every later Download failing with "OpenBot is closing." (#2518).
- */
 function attachWindowsSessionEndHandlers(window: BrowserWindow): void {
   if (process.platform !== "win32") return;
   window.on("query-session-end", () => {
@@ -831,24 +666,18 @@ function attachWindowsSessionEndHandlers(window: BrowserWindow): void {
         logger.error("Unable to flush browser storage before Windows session end:", toLogValue(error)),
       );
   });
-  // Windows sends WM_ENDSESSION with a zero wParam when another app cancels the session end. Electron
-  // has no event for it. Without this reset, closing the window later quits instead of hiding, and the
-  // next quit skips `prepareForShutdown`.
   window.hookWindowMessage(WM_ENDSESSION, (wParam) => {
     if (quitStarted || !systemSessionEnding || wParam.some((byte) => byte !== 0)) return;
     systemSessionEnding = false;
     systemSessionEndFlushStarted = false;
     isQuitting = false;
-    // The query stopped the update checks.
     services?.updater.resume();
   });
   window.on("session-end", () => {
     recordExit("session_end");
     systemSessionEnding = true;
     isQuitting = true;
-    // Windows can stop the Computer Use driver first, and sends no `before-quit` for a session end.
     quitStarted = true;
-    // An error box would hold back the flushes below until Windows ends the process.
     hideExceptionErrorBox();
     void runCauseEffect(windows.flushMainWindowBounds()).catch((error) =>
       logger.error("Unable to save the main window position during Windows session end:", toLogValue(error)),
@@ -938,6 +767,7 @@ function registerIpcHandlers({
   passwordManagers,
   vault,
   billing,
+  referral,
   license,
   hostedServers,
   localServers,
@@ -972,13 +802,6 @@ function registerIpcHandlers({
   crm,
   routineResults,
 }: ApplicationServices): void {
-  // Every renderer-to-main endpoint is bound by one of these, one file per domain under ./ipc.
-  // Nothing is bound inline here: this is the trust boundary, and a reviewer should be able to read
-  // a domain's whole surface in one file rather than find it interleaved with window and lifecycle
-  // code. `registerIpcGroups` takes one entry per group in `IPC_ENDPOINTS`, so a group no registrar
-  // covers - or a registrar that stops covering one - fails to compile here, naming the group.
-  // Every handler below reads this only as the parent of a native dialog. A dialog opens on the
-  // window that the user works in: when a chat window has focus, the main window can be hidden.
   const getDialogParent = () => windows.getChatWindows().find((window) => window.isFocused()) ?? windowHolder.current;
 
   registerIpcGroups({
@@ -1078,6 +901,7 @@ function registerIpcHandlers({
     ...passwordManagersIpcHandlers({ passwordManagers, remoteServers, openExternal: openLink }),
     ...vaultIpcHandlers({ vault, getMainWindow: getDialogParent, translate: language.translate, remoteServers }),
     ...billingIpcHandlers({ billing }),
+    ...referralIpcHandlers({ referral }),
     ...licenseIpcHandlers({ license }),
     ...routineFeedIpcHandlers({ routineFeed }),
     ...eventsIpcHandlers({ events, remoteServers }),
@@ -1267,12 +1091,6 @@ function requestDesktopNotificationPermission(
   );
 }
 
-/** `null` for every state but a signed-in one, matching what the two principal trackers store. */
-/** The Dock tile, the Linux desktop entry and the `openbot://` scheme. A local server has none of them. */
-/**
- * A server stops its start loop: it records the reason and exits with `START_LOOP_EXIT_CODE` after
- * the teardown, and systemd does not start it again (`server-start-halt.ts`).
- */
 function haltServerStart(reason: StartHaltReason): Omit<StartHaltRecord, "version"> {
   const appVersion = app.getVersion();
   logger.error(
@@ -1285,11 +1103,6 @@ function haltServerStart(reason: StartHaltReason): Omit<StartHaltRecord, "versio
   return record;
 }
 
-/**
- * After `haltServerStart`, and after the teardown of any service that started: keeps the safe mode
- * open so that members read the reason. When it cannot start (no team, no host credential), the
- * server quits with the start-loop exit code, as before.
- */
 async function enterServerSafeMode(halt: Omit<StartHaltRecord, "version">): Promise<void> {
   if (shutdownStarted) return;
   const markerDirectory = safeModeMarkerDirectory(process.env, process.platform);
@@ -1297,7 +1110,6 @@ async function enterServerSafeMode(halt: Omit<StartHaltRecord, "version">): Prom
     serverSafeMode = await runCauseEffect(
       startServerSafeMode({ userDataPath: app.getPath("userData"), reason: halt, markerDirectory }),
     );
-    // A quit that came during the start: its teardown did not see the safe mode.
     if (shutdownStarted) await Effect.runPromise(serverSafeMode.stop);
   } catch (error) {
     logger.warn("The safe mode did not start. OpenBot quits.", toLogValue(error));
@@ -1307,12 +1119,6 @@ async function enterServerSafeMode(halt: Omit<StartHaltRecord, "version">): Prom
   if (markerDirectory === null) setTimeout(() => app.quit(), SERVER_SAFE_MODE_LIFETIME_MS);
 }
 
-/**
- * Shows the recovery window when this version did not finish its start several times in a row.
- * Resolves with the window to close after "Try again", with "quit", or with null when no loop is
- * found. A server has no window and nobody to read it: it stops the loop, except in the one start
- * after a halt, which tries again.
- */
 async function recoverFromStartLoop(): Promise<
   StartRecovery | "quit" | { halt: Omit<StartHaltRecord, "version"> } | null
 > {
@@ -1326,7 +1132,6 @@ async function recoverFromStartLoop(): Promise<
     return { halt: haltServerStart("start_failed") };
   }
   logger.warn(`OpenBot ${summary.appVersion} is in a start loop. Showing the recovery window.`);
-  // An earlier release that cannot open the data would install this release again over it.
   const databaseSchemaVersion = readDatabaseSchemaVersion(app.getPath("userData"));
   const previousRelease = compatiblePreviousRelease({
     summary,
@@ -1336,7 +1141,6 @@ async function recoverFromStartLoop(): Promise<
   logger.info(
     `Recovery window: database schema ${databaseSchemaVersion ?? "unknown"}, last good version ${summary.lastGoodVersion ?? "none"} (schema ${summary.lastGoodSchemaVersion ?? "unknown"}), offered release: ${previousRelease ?? "latest"}.`,
   );
-  // The saved language is in the database, which this window must not need.
   const locale = resolveLocale("system", app.getLocale());
   const recovery = openStartRecoveryWindow({
     summary,
@@ -1356,13 +1160,6 @@ async function presentApplication(): Promise<void> {
     (policy) => app.setActivationPolicy(policy),
     () => app.dock?.show() ?? Promise.resolve(),
   );
-  // Linux registers the scheme through xdg-settings, which can only name a desktop entry that
-  // exists, so an AppImage writes its own first. On Windows the NSIS installer writes the scheme
-  // (`build/installer.nsh`), and each start writes it again for installs from before that script.
-  // A Windows development build does not register: the handler would be bare `electron.exe`.
-  // A macOS development build does not register either: macOS ignores the path and arguments and
-  // names the `com.github.Electron` bundle, so the link took `openbot://` from an installed
-  // OpenBot and opened some worktree's bare Electron.app. `bun run dev:slack` has a loopback return.
   await Effect.runPromise(
     installLinuxDesktopEntry({ platform: process.platform, environment: process.env, iconPath: appIconPath }),
   );
@@ -1381,10 +1178,7 @@ function centralAuthPrincipalId(state: CentralAuthState): string | null {
 }
 
 function forwardCentralAuth(state: CentralAuthState): void {
-  // A local server has no account: its owner is a password member that a sign-out must not unbind.
   if (localServerChild) return;
-  // A session that loads, recovers after an error, or refreshes is not a sign-in by the user. Its
-  // publish is automatic, so the account service can refuse a server that its owner removed (#5273).
   const automaticSignIn =
     previousCentralAuthStatus === null ||
     previousCentralAuthStatus === "loading" ||
@@ -1394,28 +1188,19 @@ function forwardCentralAuth(state: CentralAuthState): void {
   if (state.status === "signed_in") {
     if (activeAnalyticsPrincipalId && activeAnalyticsPrincipalId !== state.user.id) services?.analytics.clear();
     activeAnalyticsPrincipalId = state.user.id;
-    // Started before the renderer is told, so its next read of the answer waits for this one.
     services?.analyticsPreferences.followAccount(state.user);
   } else if (state.status === "signed_out") {
     if (activeAnalyticsPrincipalId) services?.analytics.clear();
     activeAnalyticsPrincipalId = null;
   }
-  // The renderer is told about the new account at the end of this function, before the
-  // queued work below can finish, so the host stops answering for the previous account now.
-  // The file is left alone until `applySignedInAccount` records the switch.
   services?.host.unbindChangedAccount(state.status === "signed_in" ? state.user : null);
   const generation = ++centralAuthGeneration;
   void runCauseEffect(
     remoteAccountGate.withPermit(
       Effect.gen(function* () {
-        // Sign-outs and sign-ins can queue up behind one slow teardown. Only the account the
-        // renderer was last told about may be activated; an earlier one would put a host the
-        // user has already left back within reach.
         if (generation !== centralAuthGeneration) return;
         const nextPrincipalId = state.status === "signed_in" ? state.user.id : null;
         if (activeRemotePrincipalId && activeRemotePrincipalId !== nextPrincipalId && services) {
-          // Best-effort, like every other network step here: a bridge disconnect that
-          // rejects must not stop the local host from leaving the previous account.
           yield* services.remoteServers
             .disconnectRemoteSessions()
             .pipe(
@@ -1426,14 +1211,10 @@ function forwardCentralAuth(state: CentralAuthState): void {
               ),
             );
         }
-        // Rechecked after the disconnect: another account can be announced while it awaits,
-        // and activating this one now would put its host back within the newer account's reach.
         if (generation !== centralAuthGeneration) return;
         activeRemotePrincipalId = nextPrincipalId;
         if (state.status !== "signed_in") {
           if (state.status === "signed_out" && services) {
-            // Stopping is best-effort; unbinding the host is not, so a failed teardown
-            // must not leave the signed-out account's host bound.
             yield* services.host
               .stop(false)
               .pipe(
@@ -1444,21 +1225,14 @@ function forwardCentralAuth(state: CentralAuthState): void {
                 ),
               );
             yield* services.host.applySignedInAccount(null);
-            // Also for a sign-out with no account before it, such as a session that ended while
-            // the app was closed: the copies of the joined servers' pictures go.
             yield* services.remoteServers.forgetSavedPictures();
           }
           return;
         }
         const host = services?.host ?? null;
-        // The local host is rebound before the joined-server list is synchronized, and the
-        // network failure is contained: this account must not end up signed in while the
-        // previous account's host is still selected and possibly online.
         if (host) {
           yield* host.applySignedInAccount(state.user);
           if (generation !== centralAuthGeneration) {
-            // Another account was announced while this one was being activated. Its own queued
-            // callback binds it; until then no host answers for either.
             host.unbindChangedAccount(null);
             return;
           }
@@ -1472,7 +1246,6 @@ function forwardCentralAuth(state: CentralAuthState): void {
                 Effect.sync(() => logger.error("Unable to synchronize the joined servers:", toLogValue(error.cause))),
               ),
             );
-        // A self-hosted server exists to be a host, so its first sign-in names and starts it too.
         if (host && services?.serverMode) yield* services.serverMode.publish(automaticSignIn);
         else if (host && shouldAutoStartHost({ ...host.getStatus(), remoteRole: developmentRemoteRole }))
           yield* host.start(true);
@@ -1481,19 +1254,12 @@ function forwardCentralAuth(state: CentralAuthState): void {
   ).catch((error) => {
     logger.error("Unable to synchronize the signed-in account:", toLogValue(error));
   });
-  // A chat window shows the workspace only while the account is signed in, as the main window does.
   for (const chatWindow of windows.getChatWindows()) sendToRenderer(chatWindow, IPC_ENDPOINTS.auth.event, state);
   const window = windowHolder.current;
   if (!window || window.isDestroyed()) return;
   sendToRenderer(window, IPC_ENDPOINTS.auth.event, state);
 }
 
-/**
- * Holds the link, and hands it over when there is a window listening for that kind.
- *
- * A link the renderer never received stays pending rather than being dropped, which is what makes a
- * cold start work: the window that the link itself opened asks for it once it is ready.
- */
 function acceptDeepLink(link: DeepLink): void {
   if (link.kind === "mcp-auth") {
     receiveMcpAuthorizationCode(link.state, link.code);
@@ -1523,10 +1289,6 @@ function sendDeepLink(window: BrowserWindow, link: RendererDeepLink): boolean {
   }
 }
 
-/**
- * The pending link, if it is the kind that asked. Any request marks the receiver ready, because
- * the renderer subscribes to every kind before it asks for any.
- */
 function takePendingDeepLink<Kind extends RendererDeepLink["kind"]>(
   kind: Kind,
 ): Extract<RendererDeepLink, { kind: Kind }> | null {
@@ -1544,18 +1306,12 @@ function isDeepLinkKind<Kind extends RendererDeepLink["kind"]>(
   return link.kind === kind;
 }
 
-/** A link of a kind a renderer can be sent, or null for one it cannot - which includes no link. */
 function takeRendererDeepLink(link: DeepLink | null): RendererDeepLink | null {
   return link && link.kind !== "mcp-auth" && link.kind !== "slack-workspace" && link.kind !== "discord-guild"
     ? link
     : null;
 }
 
-/**
- * Hands a Slack or Discord install the sealed grant it is waiting for. An install that this computer
- * opened for a joined server sends the grant on to that server. As with an MCP grant, a link this run
- * did not start does nothing and raises no window.
- */
 function receiveMessagingInstall(link: Extract<DeepLink, { kind: "slack-workspace" | "discord-guild" }>): void {
   const current = services;
   if (!current) return;
@@ -1582,22 +1338,13 @@ function receiveMessagingInstall(link: Extract<DeepLink, { kind: "slack-workspac
       if (window && !window.isDestroyed()) showMainWindow(window);
     })
     .catch((error: unknown) => {
-      // The connector settings show the connection's state. The log keeps the cause.
       logger.error(`Unable to finish the ${platform} install:`, toLogValue(error));
     });
 }
 
-/**
- * Hands one MCP sign-in the grant it is waiting for, and shows the window that asked for it.
- *
- * The grant travels no further, except to the joined server whose relayed sign-in waits for that
- * `state`. A `state` that nothing started finds no sign-in and does nothing, which is what makes a
- * forged or replayed link inert - so an unknown one raises no window either.
- */
 function receiveMcpAuthorizationCode(state: string, code: string): void {
   const elsewhere = services?.mcpOAuth.openedElsewhere(state) ?? false;
   if (!services?.mcpOAuth.receiveAuthorizationCode(state, code)) {
-    // A joined server's sign-in that waits on this computer; it ends on the host, so no window shows.
     services?.signInRelayClient.deliver(state, new URLSearchParams({ code, state }).toString());
     return;
   }
@@ -1625,7 +1372,6 @@ app.on("continue-activity", (event, type, _userInfo, details) => {
 });
 
 if (!hasSingleInstanceLock) {
-  // No application services exist yet, so the secondary process can exit without shutdown work.
   process.exit(0);
 } else {
   app.on("second-instance", (_event, argv) => {
@@ -1643,7 +1389,6 @@ if (!hasSingleInstanceLock) {
     else if (response === "reopen") reopenMainWindow();
     else if (response === "relaunch" && !relaunchRequested) {
       relaunchRequested = true;
-      // The new instance takes this launch's link, not the one this process may have started with.
       const isLink = (value: string) => parseDeepLink(value, inviteLinkOptions) !== null;
       const link = argv.find(isLink);
       const args = process.argv.slice(1).filter((value) => !isLink(value));
@@ -1654,24 +1399,19 @@ if (!hasSingleInstanceLock) {
   void app
     .whenReady()
     .then(async () => {
-      // Startup marks for `dev:bench`, which reads them over the inspector. They change nothing.
       performance.mark("openbot:when-ready");
-      // A run that ends in sleep, or in an OS shutdown that Electron reports, is told apart at the next start.
       powerMonitor.on("suspend", () => runMarker?.suspend());
       powerMonitor.on("resume", () => runMarker?.resume());
       powerMonitor.on("shutdown", () => {
         runMarker?.osShutdown();
         startAttempts?.osShutdown();
       });
-      // Set the Dock icon before `dock.show()` below. A development build runs the stock Electron.app,
-      // so until this call its Dock tile shows the Electron logo.
       if (process.platform === "darwin" && !localServerChild && !dockShowsBundleIcon)
         app.dock?.setIcon(developmentWorktreeIcon() ?? appIconPath);
       if (!(await runCauseEffect(hostAllowsTenantLaunch()))) {
         app.quit();
         return;
       }
-      // A server has no desktop: invitation links open on the client, and a container has no xdg-settings (#10861).
       if (!localServerChild && !serverMode && !hostedServer) await presentApplication();
       const recovery = await recoverFromStartLoop();
       if (recovery === "quit") {
@@ -1679,7 +1419,6 @@ if (!hasSingleInstanceLock) {
         return;
       }
       if (recovery && "halt" in recovery) {
-        // The bridge window of the safe mode is the only page. It gets the policy of each page.
         configureContentSecurityPolicy();
         configureRendererPermissions();
         await enterServerSafeMode(recovery.halt);
@@ -1689,15 +1428,12 @@ if (!hasSingleInstanceLock) {
       if (forcedStartFailure === "hang") await new Promise<never>(() => {});
       configureContentSecurityPolicy();
       configureRendererPermissions();
-      // A local server keeps a window that never loads: the agent browser and the services attach to it.
       if (!localServerChild) await Effect.runPromise(windows.restoreMainWindowBounds());
-      // The window takes its blur when it is built: see `glassWindowOptions`.
       if (process.platform === "darwin" && !localServerChild)
         setInitialWindowGlass(
           await runCauseEffect(readSavedTransparentWindow(join(app.getPath("userData"), APPEARANCE_PREFERENCE_FILE))),
         );
       const mainWindow = windows.openMainWindow();
-      // After the main window exists: on Windows and Linux, the last closed window quits the app.
       recovery?.close();
 
       const built = await createApplicationServices({
@@ -1730,24 +1466,14 @@ if (!hasSingleInstanceLock) {
       });
       services = built;
       performance.mark("openbot:services-built");
-      // The first window opens before the saved language is read, with the system's direction.
       placeWindowButtons(BrowserWindow.getAllWindows());
-      // A server has nobody to read the warning; a development build runs no `app.asar`.
       if (app.isPackaged && !serverMode && !hostedServer && !localServerChild) {
         teardown.push(0, "app archive watch", watchAppArchive(process.resourcesPath, built.language.translate));
       }
-      // `forwardCentralAuth` reaches the host, the remote servers and analytics only through
-      // `services`, so every account change announced during construction was dropped.
-      // `createApplicationServices` bound the local host to the one state it read and attributed the
-      // queued analytics to it, so adopt that as the active principal; then apply the current state
-      // if the account moved on after that read - a sign-in settling while `remoteServers.initialize()`
-      // awaits would otherwise leave the previous account's host selected, with nothing to replay it.
       const appliedAccount = built.appliedAccount;
       activeAnalyticsPrincipalId = centralAuthPrincipalId(appliedAccount);
       activeRemotePrincipalId = centralAuthPrincipalId(appliedAccount);
       const currentAccount = built.centralAuth.getState();
-      // A start with no account keeps no picture copies. The gate above deletes them only for a
-      // sign-out that it sees.
       if (currentAccount.status === "signed_out" && !localServerChild)
         void runCauseEffect(built.remoteServers.forgetSavedPictures());
       if (
@@ -1780,14 +1506,11 @@ if (!hasSingleInstanceLock) {
       setIpcCallObserver((call) => trace.record({ kind: "ipc", ...call }));
       service.on("event", (event) => trace.observeAgentEvent(event));
       service.on("event", (event) => forwardAgentEvent("local", event));
-      // A routine or its owner can be deleted outside the events API. Its route is then revoked here.
-      // Turns and channel messages also send these events, so only a deleted owner starts a sync.
       let webhookAgentIds = new Set(service.listAgents().map((agent) => agent.id));
       const onRoutineEvent = (event: AgentEvent): void => {
         switch (event.type) {
           case "routines-changed":
           case "channel-routines-changed":
-          // A save or a delete can remove a webhook trigger, and a new secret can add a route.
           case "workflows-changed":
             built.eventsRuntime.syncRoutes({ all: false });
             return;
@@ -1803,8 +1526,6 @@ if (!hasSingleInstanceLock) {
             return;
         }
       };
-      // Routes belong to the signed-in account, or, on a server on this computer, to the machine token
-      // that the desktop app gives it (`webhookPrincipal`). A token refresh does not change them.
       let webhookPrincipalId = built.webhookPrincipal();
       built.eventsRuntime.setAccountPrincipal(webhookPrincipalId);
       const refreshWebhookRoutes = (): void => {
@@ -1830,15 +1551,11 @@ if (!hasSingleInstanceLock) {
         built.centralAuth.off("changed", refreshWebhookRoutes);
         host.off("changed", onHostChanged);
       });
-      // Internal usage signals for analytics only. They are not agent events, so the renderer and
-      // Team API clients never receive them.
       service.on("toolUsage", (usage) => built.analytics.handleToolUsage(usage));
       service.on("workflowRun", (end) => built.analytics.handleWorkflowRun(end));
-      // Codex live voice goes to this computer's windows only, never to Team API clients.
       service.on("liveVoice", forwardVoiceLiveEvent);
       built.browser.onSiteVisited((visit) => built.analytics.handleSiteVisit(visit));
       sidebarLayout.on("changed", (layout) => forwardAgentEvent("local", { type: "sidebar-layout-changed", layout }));
-      // A pin from the owner's phone shows at once in the sidebar of this computer.
       built.sidebarPins.subscribe((key) => {
         if (key === OWNER_PIN_KEY)
           forwardAgentEvent("local", { type: "sidebar-pins-changed", ...built.sidebarPins.snapshot(OWNER_PIN_KEY) });
@@ -1873,11 +1590,6 @@ if (!hasSingleInstanceLock) {
       remoteServers.on("directTyping", forwardDirectTyping);
       remoteServers.on("attachmentDownload", forwardAttachmentDownload);
       remoteServers.on("attachmentImportProgress", forwardAttachmentImportProgress);
-      // Machine alerts are hidden for now: the check does not start, and no alert notification shows.
-      // The selected server connects while the window loads. Its WebRTC setup takes seconds, and
-      // the first screen waits for it. The other servers start after the load, below. The connection
-      // needs the signed-in account, so it starts only after the account loads. A failed account
-      // load is logged where it starts, and the event connections try again later.
       void Effect.runPromise(
         built.centralAuthInitialization.pipe(
           Effect.flatMap(() =>
@@ -1889,8 +1601,6 @@ if (!hasSingleInstanceLock) {
         ),
       ).catch((error) => logger.warn("Unable to start the selected server's connection:", toLogValue(error)));
       updater.on("status", forwardUpdateStatus);
-      // An install that fails after shutdown preparation has no window left to show the failure, and
-      // the process still holds the single-instance lock. Exit now, not at the install deadline.
       updater.on("status", (status) => {
         if (!shutdownStarted || status.errorCode !== "install_failed") return;
         logger.error("OpenBot update install failed after shutdown preparation and will exit now.");
@@ -1899,21 +1609,16 @@ if (!hasSingleInstanceLock) {
       built.requestedUpdate.on("preference", forwardUpdatePreference);
       updater.start();
       built.requiredUpdate?.start();
-      // Each tenant quits only itself. The host verifies process exit independently.
       built.hostUpdateCoordinator.setStopHandler(async () => {
         await prepareForUpdateInstall(SHUTDOWN_DEADLINE_MS);
         app.quit();
       });
-      // Before the renderer loads: the trust boundary and every protocol it fetches through have to
-      // be in place before the first request can arrive.
       registerIpcHandlers(built);
-      // A Signal socket of the host can be dead after sleep without knowing it; devices then cannot connect.
       const renewHostSignal = () =>
         void runCauseEffect(built.teamWebRtcBridge.renewHostSignal()).catch((error) =>
           logger.warn("Unable to renew the host Signal connection after sleep:", toLogValue(error)),
         );
       if (localServerChild) {
-        // No window, menu, tray, Dynamic Island or renderer: the desktop app is the interface.
         const childRoutineWake = new RoutineWake({ routines: service, isOnline: () => net.isOnline() });
         powerMonitor.on("suspend", () => childRoutineWake.suspend());
         powerMonitor.on("resume", () => childRoutineWake.resume());
@@ -1944,9 +1649,6 @@ if (!hasSingleInstanceLock) {
           );
         }
       };
-      // Nobody looks at the window of a server, and a device that woke it waits for the publish. So a
-      // server publishes now, before the window loads. A desktop publishes after its window loads, so
-      // the bridge window does not compete with the first window for the CPU.
       const publishesBeforeRenderer = Boolean(built.serverMode || hostedServer);
       if (publishesBeforeRenderer) publishOnLaunch();
       void requestDesktopNotificationPermission(built.notificationPreference, language.translate).catch((error) =>
@@ -1962,8 +1664,6 @@ if (!hasSingleInstanceLock) {
         quitGuard,
         quitFor,
       );
-      // The way back to a window hidden in the background, and the sign that a member controls
-      // this computer.
       backgroundTray = createBackgroundTray({
         icon: appIconColorImage ?? nativeImage.createFromPath(appIconPath),
         menuBarIcon: loadMenuBarIcon(),
@@ -1989,9 +1689,6 @@ if (!hasSingleInstanceLock) {
         host.off("remoteControlStarted", announceRemoteControl);
         tray.destroy();
       });
-      // One place turns a language change into every visible consequence: the menu is built again
-      // because a native label cannot be changed in place, and every window is told, including the
-      // Dynamic Island, which has no Settings of its own to read the new value from.
       language.subscribe((preference) => {
         configureApplicationMenu(
           service,
@@ -2038,22 +1735,17 @@ if (!hasSingleInstanceLock) {
         void Effect.runPromise(dynamicIsland.reconcileWindow()).catch((error) =>
           logger.error("Unable to reconcile Dynamic Island displays:", toLogValue(error)),
         );
-      // The island pages load beside the main window, not before it.
       reconcileDynamicIsland();
       await windows.loadRenderer(mainWindow);
       performance.mark("openbot:renderer-loaded");
-      // The start is finished: the database is open and the main window loaded.
       startAttempts?.finished();
       built.startup?.rendererLoaded();
-      // After the first window, so the new process does not compete with the start for the CPU.
       Effect.runFork(built.prewarmAgentDatabase);
-      // After the load: `sendToRenderer` drops events aimed at a window that is still loading.
       await Effect.runPromise(remoteServers.startEventConnections());
       screen.on("display-added", reconcileDynamicIsland);
       screen.on("display-removed", reconcileDynamicIsland);
       screen.on("display-metrics-changed", reconcileDynamicIsland);
       powerMonitor.on("resume", reconcileDynamicIsland);
-      // The agent dock window opens when the main renderer publishes the dock; this only moves it.
       const reconcileAgentDock = () =>
         void Effect.runPromise(agentDock.reconcileWindow()).catch((error) =>
           logger.error("Unable to place the agent dock:", toLogValue(error)),
@@ -2063,7 +1755,6 @@ if (!hasSingleInstanceLock) {
       screen.on("display-metrics-changed", reconcileAgentDock);
       powerMonitor.on("resume", reconcileAgentDock);
       powerMonitor.on("resume", () => void Effect.runPromise(remoteServers.wake()));
-      // A Slack socket can be dead after sleep without knowing it; reconnect instead of waiting for a ping.
       powerMonitor.on("resume", () => built.messaging.resume());
       powerMonitor.on("resume", renewHostSignal);
       const routineWake = new RoutineWake({ routines: service, isOnline: () => net.isOnline() });
@@ -2109,7 +1800,6 @@ if (!hasSingleInstanceLock) {
             ),
           );
       });
-      // A chat window is the app too (#2964): the user can move focus straight into it.
       const isAppWindow = (window: BrowserWindow | null) =>
         window !== null && (window === windowHolder.current || windows.getChatWindows().includes(window));
       app.on("browser-window-focus", (_event, window) => {
@@ -2122,7 +1812,6 @@ if (!hasSingleInstanceLock) {
         "browser-window-blur",
         () => void Effect.runPromise(remoteServers.setAppFocused(BrowserWindow.getFocusedWindow() !== null)),
       );
-      // A window that has no focus at start sends no blur event, and focus keeps a hosted server on.
       void Effect.runPromise(remoteServers.setAppFocused(BrowserWindow.getFocusedWindow() !== null));
       const refreshMemberships = () => void Effect.runPromise(directoryRefresh.refresh(true));
       remoteServers.on("directoryInvalidated", refreshMemberships);
@@ -2151,20 +1840,13 @@ if (!hasSingleInstanceLock) {
       });
     })
     .catch((error) => {
-      // A quit during the start, such as `docker stop`, closes the window that is still loading.
-      // The quit is already running: an error box would block it, and the shutdown deadline with it.
-      // Not `isQuitting`: a Windows session end that another app cancels also sets it, and then no quit runs.
       if (shutdownStarted) {
         logger.warn("The quit stopped the start:", toLogValue(error));
         return;
       }
-      // The Windows error box ends the text at a NUL character, so control characters are replaced.
       const message = (error instanceof Error ? error.message : String(error)).replace(/[^\P{Cc}\n\t]/gu, "�");
       logger.error("OpenBot failed to start:", toLogValue(error));
-      // Data that a newer version saved has its own recovery, and a new release ends that loop.
       if (!(error instanceof NewerDatabaseError)) startAttempts?.failed("error");
-      // A server stops its start loop when a restart cannot help (data from a newer version), or at the
-      // third failed start in a row. A failed migration counts as a failed start.
       if (serverStartGuard) {
         const reason = startHaltReason(error);
         if (reason !== "newer_database" && !startAttempts?.failureLimitReached) {
@@ -2172,7 +1854,6 @@ if (!hasSingleInstanceLock) {
           return;
         }
         const halt = haltServerStart(reason);
-        // The services that started stop first: the safe mode takes their Signal host connection.
         void teardown
           .runAll()
           .then(() => enterServerSafeMode(halt))
@@ -2182,13 +1863,9 @@ if (!hasSingleInstanceLock) {
           });
         return;
       }
-      // A server has nobody at its virtual display to close the box, and the box blocks the quit. A
-      // server on this computer has no window: the app that started it reports the failed start.
       if (!serverMode && !hostedServer && !localServerChild) {
-        // The services, and with them the saved language, may not exist yet. Then the system language applies.
         const locale = services?.language.locale ?? resolveLocale("system", app.getLocale());
         const translate = services?.language.translate ?? translateFor(locale);
-        // A newer OpenBot migrated the data: install that release instead of a dead-end error (#4969).
         if (error instanceof NewerDatabaseError) {
           recoverFromNewerDatabase({
             window: windowHolder.current,
@@ -2215,9 +1892,7 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", (event) => {
-  // Any other quit is recorded by `prepareForShutdown`.
   if (systemSessionEnding) recordExit("session_end");
-  // A quit after a Windows session-end query does not run `prepareForShutdown`.
   hideExceptionErrorBox();
   isQuitting = true;
   quitStarted = true;
@@ -2229,18 +1904,12 @@ app.on("before-quit", (event) => {
       );
     return;
   }
-  // The quit that follows the teardown.
   if (shutdownDone) return;
   event.preventDefault();
-  // A second request while the teardown runs. Outside macOS, the close of the last window sends one
-  // through `window-all-closed` right after the first. Electron would end the process on it at
-  // once, in the middle of the teardown, and the next start would count an unclean exit.
   if (shutdownStarted) return;
-  // A halted server start exits with its own code, which `app.quit()` cannot give.
   void prepareForShutdown().finally(() => (startHaltExitCode === null ? app.quit() : exitAfterLogFlush()));
 });
 
-/** Null outside macOS, or when the file is missing: the tray then shows the app icon. */
 function loadMenuBarIcon(): NativeImage | null {
   if (process.platform !== "darwin") return null;
   const icon = nativeImage.createFromPath(
@@ -2262,11 +1931,6 @@ function reopenMainWindow(): void {
     .catch((error) => logger.error("Unable to open the main window:", toLogValue(error)));
 }
 
-/**
- * The teardown gives up on each step after its own limit, but steps run one after another, and
- * something outside it can still hold the quit. A process that outlives its window keeps the
- * single-instance lock, so every later launch exits without opening anything.
- */
 const SHUTDOWN_DEADLINE_MS = 30_000;
 
 function forceExitAfterShutdownDeadline(deadlineMs: number): void {
@@ -2277,13 +1941,8 @@ function forceExitAfterShutdownDeadline(deadlineMs: number): void {
   }, deadlineMs);
 }
 
-/** Short, because the user waits: the window is already closed. */
 const LOG_FLUSH_DEADLINE_MS = 2_000;
 
-/**
- * `app.exit` stops the log writes that are not done. An exit at once after a failed update install
- * lost the error of the installer from `main.log` and `install_failed` from `update.log` (#5039).
- */
 function exitAfterLogFlush(): void {
   void Effect.runPromise(
     Effect.all([flushMainLog(), services ? services.updater.flushLog() : Effect.void], {
@@ -2292,29 +1951,14 @@ function exitAfterLogFlush(): void {
   ).finally(() => app.exit(startHaltExitCode ?? 0));
 }
 
-/**
- * An in-app update keeps the process alive after the teardown: on macOS Squirrel only now copies,
- * unpacks and verifies the downloaded ZIP, and quits when that is done. On a slow Mac this takes
- * longer than a quit may, and an exit before it ends leaves the old version installed (#4244). The
- * update uses the install timeout of the update service. It counts from the start of the teardown,
- * so Squirrel gets that time less the teardown.
- */
 async function prepareForUpdateInstall(deadlineMs = UPDATE_INSTALL_TIMEOUT_MS): Promise<void> {
   recordExit("update");
   if (services) await runCauseEffect(services.browser.flushPersistentStorage());
   await prepareForShutdown(deadlineMs);
 }
 
-/**
- * The five steps ahead of `teardown.runAll()` are pinned here rather than registered: the windows,
- * the notch windows and the haptic process have to disappear the moment the user asks to quit, not
- * behind a remote host that can take seconds to stop. The two service calls among them are
- * registered as well, for the case where the quit arrives before those services exist; both are
- * idempotent, so running twice costs nothing.
- */
 async function prepareForShutdown(deadlineMs = SHUTDOWN_DEADLINE_MS): Promise<void> {
   if (shutdownStarted) return;
-  // An update install runs this before its `app.quit()`, and the teardown closes the trace.
   recordExit("quit");
   shutdownStarted = true;
   isQuitting = true;
@@ -2325,7 +1969,6 @@ async function prepareForShutdown(deadlineMs = SHUTDOWN_DEADLINE_MS): Promise<vo
     await runCauseEffect(windows.flushMainWindowBounds()).catch((error) =>
       logger.error("Unable to save the main window position:", toLogValue(error)),
     );
-    // After the bounds are saved.
     hideWindowsForQuit();
     services?.dynamicIsland.destroy();
     services?.agentDock.destroy();

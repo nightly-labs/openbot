@@ -67,7 +67,6 @@ describe("user analytics answer migration", () => {
   it("accepts the insert of the Worker that runs before the deploy, and only a yes or a no", () => {
     const database = migratedTo("0043");
     database.exec(migration);
-    // The email sign-up insert of the deployed Worker names no analytics column.
     database.exec(`INSERT INTO users(id, identity_key, email, name, avatar_url, created_at, updated_at)
       VALUES ('old-worker', 'old-worker', 'old@example.com', NULL, NULL, 1, 1)`);
     expect(

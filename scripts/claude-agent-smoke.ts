@@ -1,15 +1,3 @@
-// Smoke test of a real OpenBot Claude agent session with the prompt settings that
-// `claude-client.ts` sends. Runs the real Claude CLI with the user's Claude login, on Claude Haiku,
-// through `ClaudeAgentClient`, in a temporary git workspace. One thread runs these turns:
-//   1. the core tools: TaskCreate, Bash, Write, Edit and Read,
-//   2. an `Explore` subagent,
-//   3. a skill that the agent sees by name only (`dataviz`),
-//   4. a deferred tool: ToolSearch loads WebSearch, which searches once,
-//   5. a git commit, which must have no Claude co-author line.
-// The checks also confirm that the init message has none of the Claude Code host tools or unfit skills.
-// Costs a few Haiku turns and one web search. `bun run smoke:claude-agent`; `--setup=on` turns the
-// user's Claude Code setup on; `--model=<id>` replaces Claude Haiku.
-// Writes .openbot-build/claude-agent-smoke/report-setup-<on|off>.json.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -146,7 +134,6 @@ try {
       prompt: 0,
     };
     requestIds.clear();
-    // The turn is logged also when it fails.
     try {
       await agent.runTurn(threadId, MODEL, turn.prompt);
     } finally {
@@ -163,7 +150,6 @@ const commitMessage = git("log", "-1", "--format=%B");
 const hello = await Bun.file(join(workspace, "hello.txt"))
   .text()
   .catch(() => "");
-// The init message lists agent types without the `Agent(...)` denies, so only the tools are checked.
 const hostTools = [
   ...CLAUDE_HOST_TOOLS.filter((tool) => !tool.startsWith("Agent(")),
   "RemoteTrigger",

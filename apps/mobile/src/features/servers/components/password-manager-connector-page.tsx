@@ -32,20 +32,12 @@ import { currentText, useText } from "@/shared/lib/text";
 
 const EXPIRY_FORMAT: Intl.DateTimeFormatOptions = { dateStyle: "medium" };
 
-/** Opens the sign-in page that the host named. The phone opens only a page of the manager's sign-in site. */
 async function openSignIn(manager: MobilePasswordManagerId, address: string | null): Promise<void> {
   const page = passwordManagerSignInPage(manager, address);
   if (!page) throw new Error(currentText().t("mobile.server.connectors.openFailed"));
   await openBrowserAsync(page);
 }
 
-/**
- * Server settings › Connectors › a password manager of a joined server, such as Proton Pass
- * (`password-managers-v1`). The host runs the sign-in of the manager's CLI. The phone opens the
- * sign-in page, and sends the extra password when the manager asks for one. Then the host makes its
- * own read-only access key and keeps only that key. An access key that the user made is the other
- * way in. A key or a password goes to the host once; this phone keeps no copy.
- */
 export function PasswordManagerConnectorPage({
   server,
   manager,
@@ -61,7 +53,6 @@ export function PasswordManagerConnectorPage({
   const [key, setKey] = useState("");
   const [keyOpen, setKeyOpen] = useState(false);
   const [extraPassword, setExtraPassword] = useState("");
-  /** True after Connect when the host had no sign-in page yet: the page opens it when it comes. */
   const openWhenReady = useRef(false);
   const status = query.data?.find((candidate) => candidate.manager === manager);
   const signInUrl = status?.state === "signing-in" && status.step === "browser" ? status.signInUrl : null;
@@ -112,7 +103,6 @@ export function PasswordManagerConnectorPage({
       });
   const sendExtraPassword = () => {
     const password = extraPassword;
-    // The password leaves the form when the request starts, as on the desktop.
     setExtraPassword("");
     void action.perform(async () => {
       await connectPasswordManager({ manager, method: { kind: "extra-password", password } }, server.id);
@@ -143,7 +133,6 @@ export function PasswordManagerConnectorPage({
     if (canSignIn) signIn();
     else setKeyOpen(true);
   };
-  /** The known failures have their own text. Another failure shows the host's sentence. */
   const statusFailure = (): string | null => {
     if (status.errorCode === "plan") return t(text.plan);
     if (status.errorCode === "extra-password") return t("mobile.server.connectors.passwordManager.extraPasswordWrong");

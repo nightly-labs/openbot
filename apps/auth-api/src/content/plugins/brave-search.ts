@@ -1,9 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Brave Search here is taken from brave.com and Brave's
-// brave-search-mcp-server repository on github.com. Each page used is in `sources`. Check the
-// sources again, and move `checkedAt`, whenever this file changes.
-
 export const BRAVE_SEARCH_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

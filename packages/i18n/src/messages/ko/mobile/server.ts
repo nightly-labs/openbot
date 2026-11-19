@@ -1440,7 +1440,6 @@ export const messages = {
   "mobile.server.audit.roleMemberAdded": "{member} 님을 {role}에 추가했어요",
   "mobile.server.audit.roleMemberRemoved": "{member} 님을 {role}에서 제거했어요",
   "mobile.server.audit.agentLevel": "{role}의 {agent}: {change}",
-  // Server settings › Import agents: Grok Bot and Hermes exports (`agent-import-v1`).
   "mobile.server.settings.importAgents": "에이전트 가져오기",
   "mobile.server.route.import": "에이전트 가져오기",
   "mobile.server.import.unsupported": "여기서 에이전트를 가져오려면 이 서버의 OpenBot을 업데이트하세요.",
@@ -1512,7 +1511,6 @@ export const messages = {
   "mobile.server.import.channel": "채널",
   "mobile.server.import.notImportedTitle": "가져오지 못함",
   "mobile.server.import.resultWarnings": "일부 항목은 옮겨지지 않았어요",
-  // Server settings › Transfer: the whole server to or from a transfer file (`instance-transfer-v1`).
   "mobile.server.settings.transfer": "이전",
   "mobile.server.route.transfer": "이전",
   "mobile.server.route.transferExport": "내보내기",

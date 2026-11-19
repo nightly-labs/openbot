@@ -3,7 +3,6 @@ import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
-// Migration 65 only creates tables. A saved mailbox message stays user, agent, or routine.
 const databases: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of databases.splice(0)) db.close();

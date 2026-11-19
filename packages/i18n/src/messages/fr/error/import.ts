@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/import";
 
 export const messages = {
-  // Agent import errors and warnings.
   "error.import.manifestNotJson": "{manifest} n’est pas un fichier JSON valide.",
   "error.import.notAgentExport": "{manifest} n’est pas une exportation d’agents OpenBot.",
   "error.import.newerExportSkill":

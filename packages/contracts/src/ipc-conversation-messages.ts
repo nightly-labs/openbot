@@ -24,11 +24,6 @@ export type ImageGenerationAspectRatio = (typeof IMAGE_GENERATION_ASPECT_RATIOS)
 
 export interface ImageGenerationInfo {
   prompt?: string | undefined;
-  /**
-   * The pixel size, such as "1254 × 1254". The host writes the real size of the image file when it
-   * stores the file. Before that, it is the size that the agent asked for, or empty when the size is
-   * not known. A host before 2026-11 wrote "1024 × 1024" when the provider gave no size.
-   */
   resolution: string;
   aspectRatio: ImageGenerationAspectRatio;
   error?: string;
@@ -43,7 +38,6 @@ export interface ImagePixelSize {
   height: number;
 }
 
-/** The width and height in a size such as "1254 × 1254" or "1536x1024", or null for another value. */
 export function imagePixelSize(value: string | undefined): ImagePixelSize | null {
   const match = /^\s*(\d{1,5})\s*[×xX]\s*(\d{1,5})\s*$/.exec(value ?? "");
   const width = Number(match?.[1] ?? 0);
@@ -51,12 +45,10 @@ export function imagePixelSize(value: string | undefined): ImagePixelSize | null
   return width > 0 && height > 0 ? { width, height } : null;
 }
 
-/** The size text of an image, as the chat shows it. */
 export function imagePixelSizeText(size: ImagePixelSize): string {
   return `${size.width} × ${size.height}`;
 }
 
-/** The nearest of the three frames for an image of this size. */
 export function imageAspectRatioOf(size: ImagePixelSize): ImageGenerationAspectRatio {
   const ratio = size.width / size.height;
   if (ratio > 1.05) return "landscape";
@@ -64,11 +56,6 @@ export function imageAspectRatioOf(size: ImagePixelSize): ImageGenerationAspectR
   return "square";
 }
 
-/**
- * The image info of a stored message after a provider sends the message again. Provider history has
- * no image size, and Codex history can have no prompt. Thus the stored size, frame and prompt stay
- * when the new info does not have them.
- */
 export function mergeImageGenerationInfo(
   stored: ImageGenerationInfo | undefined,
   update: ImageGenerationInfo | undefined,
@@ -92,17 +79,10 @@ export function isImageGenerationInfo(value: unknown): value is ImageGenerationI
   );
 }
 
-/**
- * A video that an agent made with a tool (Grok `reference_to_video`). The video file is the
- * message's attachment. The Team API carries it only to a client with the `video-generation-v1`
- * capability; an older client shows the attachment alone.
- */
 export interface VideoGenerationInfo {
   prompt?: string | undefined;
   aspectRatio: ImageGenerationAspectRatio;
-  /** The length that the agent asked for, in seconds. The player shows the real length. */
   durationSeconds?: number | undefined;
-  /** The resolution that the agent asked for, such as "720p". */
   resolution?: string | undefined;
   error?: string | undefined;
 }
@@ -119,21 +99,15 @@ export function isVideoGenerationInfo(value: unknown): value is VideoGenerationI
   );
 }
 
-/**
- * The id of the question that asks the user to allow or block an MCP plugin request. The plugin
- * takes only one of its options; a typed answer cancels the request.
- */
 export const MCP_ELICITATION_DECISION_QUESTION_ID = "mcp-elicitation-decision";
 
 export interface AgentPromptQuestion {
   id: string;
   header: string;
   question: string;
-  /** A short line under the question. The Team API does not carry it. */
   detail?: string;
   isSecret: boolean;
   options: Array<{ label: string; description: string }> | null;
-  /** The user can pick more than one option. Set only when true. */
   multiSelect?: boolean;
 }
 
@@ -229,20 +203,10 @@ export interface AgentExchangeSummary {
   recipientAgentIds: string[];
   replyToMessageId: string | null;
   deliveries: Array<Pick<QueueDelivery, "id" | "recipientAgentId" | "status" | "position" | "error">>;
-  /** Absent means the sender waits for an answer. See `QueueDelivery.expectsReply`. */
   expectsReply?: boolean;
-  /**
-   * The sender's side thread that sent an incoming message. The sender link opens it. The Team API
-   * does not carry it, so a joined client opens the sender's own chat.
-   */
   senderTaskId?: string;
 }
 
-/**
- * The loaded requests to teammates that a page of the latest messages does not hold, and that a
- * teammate still had open. A client keeps each older loaded message as it was, so it reads these
- * again: else a teammate that has ended shows as working in the waiting block (#9381).
- */
 export function openExchangesOutside(
   loaded: readonly { id: string; exchange?: AgentExchangeSummary | undefined }[],
   page: readonly { id: string }[],
@@ -285,10 +249,6 @@ function isAgentExchangeSummary(value: unknown): value is AgentExchangeSummary {
   );
 }
 
-/**
- * The person who wrote a user message, as the host saw them when it arrived. The host stamps it;
- * the sender never names itself. `name` is the name at send time, for a member who has since left.
- */
 export interface ConversationMessageSender {
   id: string;
   name: string;
@@ -298,7 +258,6 @@ export function isConversationMessageSender(value: unknown): value is Conversati
   return isDynamicRecord(value) && isIdentifier(value.id) && isBoundedString(value.name, INPUT_LIMITS.accountName);
 }
 
-/** The sender the host stamps, with the name cut to the bound every reader checks. */
 export function conversationMessageSender(id: string, name: string): ConversationMessageSender | undefined {
   return isIdentifier(id) ? { id, name: name.slice(0, INPUT_LIMITS.accountName) } : undefined;
 }
@@ -313,22 +272,14 @@ export interface ConversationMessage {
   itemType?: string | undefined;
   source?: "user" | "assistant" | "agent" | "system" | "routine" | undefined;
   senderAgentId?: string | undefined;
-  /** Absent on a message from before senders were kept, and on one from an older host. */
   senderMember?: ConversationMessageSender | undefined;
   replyToMessageId?: string | null | undefined;
   attachments?: AttachmentSummary[] | undefined;
-  /** What the user said, on a message that a voice turn sent. The agent got only the text. */
   voiceRecording?: AttachmentSummary | undefined;
   imageGeneration?: ImageGenerationInfo | undefined;
-  /** Set on a `video_generation` message. Absent on a message from an older host. */
   videoGeneration?: VideoGenerationInfo | undefined;
-  /** The agent on another server that sent this exchange. Absent when this host has no link. */
   remoteSender?: { agentId: string; agentName: string; serverName: string } | undefined;
   delivery?: Pick<QueueDelivery, "id" | "status" | "position"> | undefined;
-  /**
-   * Set on a message that joined a turn that was already running, a steer. The shared order puts it
-   * after the rows that the turn wrote before it (`conversation-order.ts`). The Team API drops it.
-   */
   steered?: true | undefined;
   exchange?: AgentExchangeSummary | undefined;
   reaction?: MessageReaction | null | undefined;
@@ -342,25 +293,12 @@ export interface ConversationMessage {
       }
     | undefined;
   questionPrompt?: ConversationQuestionPrompt | undefined;
-  /** Set on the one `plan` message of a turn. The text holds the same plan as a checklist. */
   plan?: ConversationPlan | undefined;
-  /** Set on the one `subagents` message of a turn. The text lists the same subagents by title. */
   subagents?: ConversationSubagent[] | undefined;
-  /** Set on the one `memory-changes` message of a turn. The text counts the same changes. */
   memoryChanges?: ConversationMemoryChange[] | undefined;
-  /** Set on an `instructions-change` message. */
   instructionsChange?: AgentInstructionsChange | undefined;
-  /** Set on a `skill-suggestion:*` message: the skill that the review asks to save. */
   skillSuggestion?: ConversationSkillSuggestion | undefined;
-  /**
-   * An interactive block from `ask_ui` (see `ui-blocks.ts`). It rides on a `question_prompt` message
-   * beside `questionPrompt`. Absent on a message from an older host.
-   */
   uiBlock?: ConversationUiBlock | undefined;
-  /**
-   * The timing, tokens and cost of the turn, on one message of a finished turn (see
-   * `ipc-conversation-trace.ts`). It stays on this computer: the Team API projections drop it.
-   */
   trace?: ConversationTurnTrace | undefined;
 }
 
@@ -431,32 +369,12 @@ function isConversationDelivery(value: unknown): boolean {
   );
 }
 
-/**
- * The item type of a text answer that a quiet routine run kept: the run had nothing to report, so the
- * answer is not news. It does not count as unread, change the preview, or go to a Team API client.
- * The desktop chat shows it inside the run, which starts collapsed.
- */
 export const ROUTINE_QUIET_ANSWER_ITEM_TYPE = "routine_quiet_answer";
 
-/**
- * The item type of the setup message that a client sends to a new agent (`agent-welcome-v1`). The
- * agent answers it with a welcome. No chat, history page, search, queue or preview shows it, and it
- * does not go to a Team API client.
- */
 export const AGENT_WELCOME_ITEM_TYPE = "agent_welcome";
 
-/**
- * The item type of the message that continues a channel request after the sub-tasks that it waited
- * for ended. It repeats the person's request for the member, but the person did not send it again
- * (#8812). No chat, history page, search, queue or preview shows it, and it does not go to a Team API
- * client.
- */
 export const CHANNEL_RESUME_ITEM_TYPE = "channel_resume";
 
-/**
- * An agent message that says something to the reader. Commentary, a question prompt, a plan, the
- * subagents and a quiet routine answer are not an answer.
- */
 export function isAgentAnswer(message: ConversationMessage): boolean {
   return (
     message.author === "assistant" &&
@@ -469,7 +387,6 @@ export function isAgentAnswer(message: ConversationMessage): boolean {
   );
 }
 
-/** The answer an agent gave in one turn: its last message of that turn that says something to the reader. */
 export function latestTurnAnswer(
   messages: readonly ConversationMessage[],
   turnId: string,

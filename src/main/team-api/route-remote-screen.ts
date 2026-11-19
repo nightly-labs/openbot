@@ -1,17 +1,3 @@
-import { parseRemoteDesktopTest } from "../ipc/server-inputs";
-// Remote control of this machine's screen: capabilities, a session, and the display it shows.
-//
-// Every failure here is a `RemoteScreenError`, not an `HttpError`, because the codes it carries
-// (`host_unavailable`, `session_expired`) are part of the frozen protocol and the viewer branches
-// on them. A missing gateway is one of those failures rather than an unmatched route: the paths
-// exist on every host, and answering 404 would tell a client the host is too old instead of
-// telling it remote control is switched off.
-//
-// The two refusals of the host owner's policy are the exception: a role that may not control this
-// computer, and a session that the person at it did not allow. No released protocol has a code for
-// them, and each one rejects an error envelope with an unknown code, so they are an `HttpError` 403
-// with only a message. Every client shows that message as it shows any failed request.
-
 import {
   type RemoteControlAccess,
   type RemoteDesktopSession,
@@ -21,6 +7,7 @@ import {
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
+import { parseRemoteDesktopTest } from "../ipc/server-inputs";
 import { RemoteScreenError } from "../remote-screen-gateway";
 import type { TeamStore } from "../team-store";
 import type { TeamApiRemoteScreen } from "./dependencies";
@@ -36,7 +23,6 @@ export interface RemoteScreenRouteDependencies {
         "capabilities" | "createSession" | "selectDisplay" | "closeMemberSession" | "checkSetup" | "test"
       >
     | undefined;
-  /** The roles that may control this computer. Every member when not set. */
   remoteControlAccess?: (() => RemoteControlAccess) | undefined;
 }
 
@@ -45,7 +31,6 @@ export async function routeRemoteScreen(
   { store, remoteScreen, remoteControlAccess }: RemoteScreenRouteDependencies,
 ): Promise<RouteOutcome> {
   const { method, url, request, response, member, sessionId, sessionExpiresAt, json, empty } = context;
-  // Setup and the test act on this computer as a session does, so the same roles may use them.
   const requireControlRole = (target: Pick<TeamMemberSummary, "role">) => {
     if (remoteControlAccess && !remoteControlAllowsRole(remoteControlAccess(), target.role))
       throw new HttpError(403, sourceText("error.remote.controlNotAllowed"));
@@ -87,8 +72,6 @@ export async function routeRemoteScreen(
     if (!identity || !remoteScreen) {
       throw new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.controlUnavailable"));
     }
-    // The session can wait for the person at this computer. A client that stops waiting ends the
-    // question, so nobody allows a session that nobody will open.
     const requestClosed = new AbortController();
     const closed = () => requestClosed.abort();
     response.once("close", closed);
@@ -110,7 +93,6 @@ export async function routeRemoteScreen(
     return json(201, session);
   }
   if (method === "PUT" && url.pathname === TEAM_API_ROUTES.remoteScreen.display) {
-    // A new display restarts every open stream, so only a role that may control this computer changes it.
     requireControlRole(member);
     if (!remoteScreen) {
       throw new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.controlUnavailable"));

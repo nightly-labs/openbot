@@ -19,7 +19,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The composer column, so the banner is judged at the width it actually renders at. */
 function ComposerStack(props: { children: JSX.Element }) {
   return (
     <div class="composer-wrap" style={{ width: "640px", padding: "16px" }}>
@@ -28,7 +27,6 @@ function ComposerStack(props: { children: JSX.Element }) {
   );
 }
 
-/** A fixed moment, so the story reads the same on every run and in every review screenshot. */
 const USAGE_RESETS_AT = Date.UTC(2026, 8, 21, 9, 0) / 1_000;
 
 export const ProviderError: Story = {
@@ -39,11 +37,6 @@ export const ProviderError: Story = {
   ),
 };
 
-/**
- * A provider that retries a dropped transport reports the same failure once per attempt. Every
- * report used to become a bubble in the transcript; one banner now stands for the whole run,
- * whatever its length, and one press clears it.
- */
 export const DroppedTransport: Story = {
   args: {
     message: "stream disconnected before completion: Connection refused (os error 61)",
@@ -55,10 +48,6 @@ export const DroppedTransport: Story = {
   ),
 };
 
-/**
- * The provider names no cause. The transcript used to show the bare word "error"; the sentence the
- * renderer writes in its place at least tells the reader what to do next.
- */
 export const UnnamedFailure: Story = {
   args: { message: "The agent could not continue. Try again." },
   render: (args) => (
@@ -68,7 +57,6 @@ export const UnnamedFailure: Story = {
   ),
 };
 
-/** The 401 a lapsed account returns, named rather than quoted. */
 export const AuthenticationFailed: Story = {
   args: { message: "Authentication failed. Check your account or server connection, then try again." },
   render: (args) => (
@@ -78,7 +66,6 @@ export const AuthenticationFailed: Story = {
   ),
 };
 
-/** Google asks the user to verify the account before Gemini answers (#2419). The button opens Google's page. */
 export const GeminiVerificationRequired: Story = {
   args: {
     message:
@@ -99,10 +86,6 @@ export const GeminiVerificationRequired: Story = {
   ),
 };
 
-/**
- * The two blocks the composer column can carry together, in the order the reader meets them: the
- * quota reading first, then the report of one failed turn. Each notice closes independently.
- */
 export const BesideTheUsageLimit: Story = {
   render: (args) => {
     const [dismissed, setDismissed] = createSignal(false);

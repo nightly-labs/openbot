@@ -1,5 +1,3 @@
-// The cloud account: email sign-in, profile, and the mobile devices connected to it.
-
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { LOCAL_SERVER_ID, type TestCompanySignInInput } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
@@ -18,7 +16,6 @@ export interface AccountIpcDependencies {
 }
 
 export function accountIpcHandlers({ centralAuth, host }: AccountIpcDependencies): Pick<IpcGroupHandlers, "auth"> {
-  // The account service knows this computer's server by its host id, which is set once it is registered.
   const hostId = (serverId: string): string => {
     if (serverId !== LOCAL_SERVER_ID) return serverId;
     const local = host.getStatus().serverId;
@@ -33,7 +30,9 @@ export function accountIpcHandlers({ centralAuth, host }: AccountIpcDependencies
         runCauseEffect(centralAuth.requestEmailCode(email)),
       ),
       verifyEmailCode: payloadHandler(parseEmailCodeVerification, (verification) =>
-        runCauseEffect(centralAuth.verifyEmailCode(verification.challengeId, verification.code)),
+        runCauseEffect(
+          centralAuth.verifyEmailCode(verification.challengeId, verification.code, verification.referralCode),
+        ),
       ),
       updateName: payloadHandler(parseProfileName, (name) => runCauseEffect(centralAuth.updateName(name))),
       updateAvatar: payloadHandler(parseAvatarImage, (parsed) => runCauseEffect(centralAuth.updateAvatar(parsed))),
