@@ -1021,7 +1021,6 @@ export class DrainScheduler {
         ),
         toDeliveryStartFailed,
       );
-      this.#startRetry.forget(delivery.id);
       this.#hooks.deliveriesStarting(
         batch.map((item) => item.delivery.id),
         { pickedAt, providerStartMs: providerRunning ? null : Date.now() - providerStartedAt },
@@ -1082,6 +1081,9 @@ export class DrainScheduler {
       let threadId =
         routineThreadId ??
         (yield* this.#threads.ensureThread(agent, client, execution?.threadId).pipe(toDeliveryStartFailed));
+      // After the session opens, not after the provider starts: a run whose session does not open
+      // keeps its count, so its waits end (#12480).
+      this.#startRetry.forget(delivery.id);
       const snapshot = this.#conversation.ensureSnapshot(agent.id, threadId);
       // A turn started on this thread while the provider and the thread were prepared. The user
       // cannot see that race, so the delivery goes back to the head of the queue rather than
@@ -1390,7 +1392,15 @@ export class DrainScheduler {
           // The provider of a routine run did not start, such as with no internet connection. Nothing
           // ran, so the run waits in the queue and starts again later, instead of failing until its
           // next occurrence (#6751). A message behind it ends the wait, and the run fails as before.
-          if (providerStartFailed && recipient && batch.length === 1 && this.#mayRetryStart(context, error, laneId)) {
+          // A session that did not open in time is the same: Codex can stop answering new sessions
+          // while its open chats still answer (#12480).
+          const sessionStartTimedOut = isRequestTimeout(error, "thread/start");
+          if (
+            (providerStartFailed || sessionStartTimedOut) &&
+            recipient &&
+            batch.length === 1 &&
+            this.#mayRetryStart(context, error, laneId)
+          ) {
             const provider = providerForAgent(recipient);
             if (this.#startRetry.schedule(delivery.id, delivery.recipientAgentId, provider)) {
               for (const item of batch)
@@ -1432,7 +1442,11 @@ export class DrainScheduler {
               ? sourceText("error.provider.stoppedBeforeStart", {
                   provider: providerLabel(providerForAgent(recipient)),
                 })
-              : null;
+              : sessionStartTimedOut && recipient
+                ? sourceText("error.provider.sessionStartTimedOut", {
+                    provider: providerLabel(providerForAgent(recipient)),
+                  })
+                : null;
           const reason = threadInUse ? sourceText("error.provider.codexThreadInUse") : (stoppedReason ?? detail);
           // A spent plan window refused the start, so nothing ran. The messages wait for the reset, and
           // a channel task goes back to its channel, so that its assignment does not reserve the host.

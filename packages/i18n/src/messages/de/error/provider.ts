@@ -184,6 +184,8 @@ export const messages = {
     "{provider} hat nicht rechtzeitig geantwortet. Der Computer ist möglicherweise ausgelastet. Aktualisiere die Anbieter, um es erneut zu versuchen.",
   "error.provider.stoppedBeforeStart":
     "{provider} wurde beendet, bevor diese Nachricht gestartet ist. Sende die Nachricht erneut.",
+  "error.provider.sessionStartTimedOut":
+    "{provider} hat nicht rechtzeitig einen neuen Chat geöffnet, daher ist diese Nachricht nicht gestartet. Öffne Anbieter, wähle {provider}, klicke auf Neu starten und versuche es dann erneut.",
   "error.provider.serviceUnreachable":
     "{provider} kann keine Verbindung zu seinem Dienst herstellen. Prüfe deine Internetverbindung. OpenBot versucht es erneut.",
   "error.provider.serviceUnreachableRefresh":
