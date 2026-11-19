@@ -882,6 +882,13 @@ All notable changes to OpenBot will be documented here. The project follows
 - When you ask an agent where a setting is, it now gives the correct tab names: Settings > Mobile
   Connect to connect a phone, and Settings > App behavior for the start, workspace, server connection
   and keep-awake settings. Before, it named tabs that do not exist ("Phones" and "App").
+- The Vault now saves logins for `http://` websites, such as a router or a NAS on your network. An
+  agent fills an `http://` login only on a page with the same address and port, and never fills an
+  HTTPS login on an `http://` page. Logins in 1Password and Proton Pass follow the same rule. When
+  no saved login fits an `http://` page, the agent asks you to sign in in the browser. The server
+  must also be on the new version.
+- The Cline model list shows Cline's "Latest" models again, such as GPT Astra Latest, and you can
+  choose them. Before, OpenBot left them out and wrote a warning for each one to the log.
 
 ### Security
 
