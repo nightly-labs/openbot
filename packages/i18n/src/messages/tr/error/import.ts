@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/import";
 
 export const messages = {
-  // Agent import errors and warnings.
   "error.import.manifestNotJson": "{manifest} geçerli bir JSON değil.",
   "error.import.notAgentExport": "{manifest} bir OpenBot ajan dışa aktarımı değil.",
   "error.import.newerExportSkill":
@@ -66,6 +65,19 @@ export const messages = {
   "error.import.transferModelMissing":
     '{name}: "{model}" modeli burada henüz kullanılamıyor, bu yüzden ajan varsayılan modeli kullanıyor. Sağlayıcısı hazır olduğunda modeli yeniden seçin.',
   "error.import.transferSettingSkipped": "{name} içe aktarılmadı. {reason}",
+  "error.import.transferRunsSkipped": '{name}: "{routine}" rutininin çalıştırma geçmişi içe aktarılmadı.',
+  "error.import.transferSharedSkillsSkipped": "Paylaşılan beceriler okunamadı, bu yüzden dosyada değiller.",
+  "error.import.transferSharedSkillsNotAdded": "Dosyadaki paylaşılan beceriler bu sunucuya eklenemedi.",
+  "error.import.transferMemberPreferencesSkipped": {
+    one: "{count} üyenin seçimleri kaydedilemedi.",
+    other: "{count} üyenin seçimleri kaydedilemedi.",
+  },
+  "error.import.transferSharedSkillExists":
+    "Bu sunucuda bu ada ve farklı dosyalara sahip paylaşılan bir beceri zaten var.",
+  "error.import.transferServerPreferencesSkipped": {
+    one: "Dosyadaki {count} sunucu tercihi burada geçerli değil, bu yüzden içe aktarılmaz.",
+    other: "Dosyadaki {count} sunucu tercihi burada geçerli değil, bu yüzden içe aktarılmaz.",
+  },
   "error.import.transferRoutineFlowSkipped": "İçe aktarma bir rutin akışını dışarıda bıraktı. {reason}",
   "error.import.transferCustomAgentCommand":
     '{name}: özel ajanlar bir komut çalıştırdıkları için içe aktarılmaz. "{command}" komutunu kontrol edin ve ajanı Ayarlar\'da yeniden ekleyin.',
@@ -75,9 +87,11 @@ export const messages = {
   "error.import.transferProviderKey": "{name}: API anahtarını Ayarlar'da yeniden girin.",
   "error.import.transferAgentEnv": "{name}: {names} değerlerini Ayarlar'da yeniden girin.",
   "error.import.transferMcpValues":
-    "{name}: MCP sunucusu kapalı olarak eklendi. Komutunu kontrol edin, değerlerini ve tam adresini yeniden girin, ardından MCP ayarlarında açın.",
+    "{name}: MCP sunucusu kapalı olarak eklendi. Komutunu kontrol edin, değerlerini ve tam adresini yeniden girin, ardından Pazaryeri, Uygulamalar bölümünde açın.",
   "error.import.transferValuesCleared":
     "{name}: bağımsız değişkenlerinden veya adresinden gizli bilgi içerebilecek değerler kaldırıldı. Bunları Ayarlar'da yeniden girin.",
   "error.import.transferSharedKept":
     "Paylaşılan klasördeki {number} dosya zaten burada, bu yüzden oldukları gibi korunuyor.",
+  "error.import.transferPartSkipped":
+    "Dosyanın bazı bölümleri içe aktarılamadı. Diğer bölümler bu sunucuda, bu yüzden dosyayı yeniden içe aktarmayın.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -5,25 +5,6 @@ import { LandingIcon } from "./LandingIcon";
 import { SiteNavigationPanel } from "./SiteNavigationPanel";
 import { useSiteChrome, useSitePath } from "./SiteText";
 
-// The header menu on a wide screen. A Solid port of the Kobra navigation menu
-// (https://kobra.systems/components/navigation-menu), which is React on Base UI.
-//
-// It is a disclosure, not an ARIA menu: a trigger is a link to its section's
-// index page, and a hover or ArrowDown shows its panel of ordinary links. Resources
-// has no index page, so its trigger is a button that opens the panel. Each
-// panel sits in the DOM right after its trigger, so Tab walks from a trigger into
-// its open panel and on to the next trigger. A closed panel is inert.
-//
-// Two things move, and neither is the panel itself:
-// - the pill, which slides behind the trigger under the pointer or focus;
-// - the surface, one frosted card behind every panel, which takes the size and
-//   position of the panel that is open. Changing section morphs the surface and
-//   slides the contents in from the side of the section being opened.
-//
-// Geometry is written to the DOM in the event handler rather than through a
-// signal. A setter here applies after a microtask, and the surface has to be at
-// its new size in the same frame the panel starts to slide in.
-
 type SectionId = SiteNavigationSection["id"];
 type PanelMotion = "enter" | "exit" | "from-start" | "from-end" | "to-start" | "to-end";
 
@@ -32,9 +13,7 @@ interface MenuMotion {
   closed?: { id: SectionId; motion: PanelMotion };
 }
 
-/** Long enough that a pointer crossing the header on its way down does not open a panel. */
 const OPEN_DELAY_MS = 90;
-/** Long enough to cross from a trigger to its panel, or to slip off an edge and come back. */
 const CLOSE_DELAY_MS = 180;
 const VIEWPORT_GUTTER_PX = 16;
 
@@ -45,8 +24,6 @@ export function SiteNavigationMenu() {
   const baseId = createUniqueId();
   const [active, setActive] = createSignal<SectionId | null>(null);
   const [motion, setMotion] = createSignal<MenuMotion>({ opened: "enter" });
-  // The panels on screen: the open one, and the one still animating out. Their
-  // featured artwork animates, and every other panel's stays still.
   const [shown, setShown] = createSignal<readonly SectionId[]>([]);
 
   let root: HTMLElement | undefined;
@@ -56,7 +33,6 @@ export function SiteNavigationMenu() {
   const triggers = new Map<SectionId, HTMLElement>();
   const panels = new Map<SectionId, HTMLDivElement>();
 
-  // The open section as of this handler. `active()` catches up a microtask later.
   let current: SectionId | null = null;
   let openTimer: ReturnType<typeof setTimeout> | undefined;
   let closeTimer: ReturnType<typeof setTimeout> | undefined;
@@ -72,7 +48,6 @@ export function SiteNavigationMenu() {
     clearTimeout(closeTimer);
   }
 
-  /** Apply a style change with transitions off, so the element jumps rather than slides. */
   function instantly(element: HTMLElement, change: () => void): void {
     element.dataset.instant = "";
     change();
@@ -80,7 +55,6 @@ export function SiteNavigationMenu() {
     delete element.dataset.instant;
   }
 
-  /** Centre the panel under its trigger, kept inside the window, and fit the surface to it. */
   function place(id: SectionId): void {
     const panel = panels.get(id);
     const trigger = triggers.get(id);
@@ -114,13 +88,11 @@ export function SiteNavigationMenu() {
       apply();
       return;
     }
-    // The first time it appears it fades in where it is, instead of sliding in from the left edge.
     instantly(element, apply);
     element.dataset.shown = "";
     pillShown = true;
   }
 
-  /** Back to the open trigger when the pointer leaves, or away when nothing is open. */
   function settlePill(): void {
     const trigger = current ? triggers.get(current) : undefined;
     if (trigger) {
@@ -149,8 +121,6 @@ export function SiteNavigationMenu() {
         opened: forward ? "from-end" : "from-start",
         closed: { id: previous, motion: forward ? "to-start" : "to-end" },
       });
-      // A panel older than `previous` has lost its motion, and with it the
-      // animation that kept it visible.
       setShown([previous, id]);
     }
     setActive(id);
@@ -164,8 +134,6 @@ export function SiteNavigationMenu() {
     const previous = current;
     current = null;
     setMotion({ opened: "enter", closed: { id: previous, motion: "exit" } });
-    // A panel still fading out of a switch loses its motion here, so its
-    // animation is cancelled and no animationend will stop its artwork.
     setShown([previous]);
     setActive(null);
     settlePill();
@@ -195,13 +163,8 @@ export function SiteNavigationMenu() {
     openTimer = setTimeout(() => open(id), OPEN_DELAY_MS);
   }
 
-  /** The pointer of the last press on a button trigger: a touch press has no hover before it. */
   let pressPointer = "mouse";
 
-  /**
-   * A press opens the panel. A mouse has usually opened it already by hover, so only a touch or pen
-   * press, or Enter or Space, which report no click count, closes it again.
-   */
   function handleButtonTriggerClick(event: MouseEvent, id: SectionId): void {
     if (current === id && (event.detail === 0 || pressPointer !== "mouse")) {
       close();
@@ -210,7 +173,6 @@ export function SiteNavigationMenu() {
     open(id);
   }
 
-  /** A plain link has no panel, so reaching it closes the one that is open. */
   function reachLink(link: HTMLElement): void {
     clearTimeout(openTimer);
     if (current !== null) close();
@@ -230,7 +192,6 @@ export function SiteNavigationMenu() {
     if (event.key === "ArrowDown" && id) {
       event.preventDefault();
       open(id);
-      // The panel stops being inert only once the signal has applied.
       flush();
       panels.get(id)?.querySelector<HTMLElement>("a")?.focus();
     }
@@ -248,13 +209,11 @@ export function SiteNavigationMenu() {
     close();
   }
 
-  /** A panel that has finished animating out is off screen, so its artwork stops. */
   function handlePanelAnimationEnd(event: AnimationEvent, id: SectionId): void {
     if (event.target !== event.currentTarget || current === id) return;
     setShown((ids) => ids.filter((shownId) => shownId !== id));
   }
 
-  /** A trigger or a link in a panel leaves the page, or moves within it: either way the menu is done. */
   function handleLinkClick(event: MouseEvent): void {
     if (event.target instanceof Element && event.target.closest("a")) close();
   }

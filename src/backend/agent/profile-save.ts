@@ -29,7 +29,6 @@ interface ProfileSaveHooks {
   delete(agent: AgentSummary): Effect.Effect<void, ProfileSaveFailed>;
 }
 
-/** Coordinates reviewed profiles with the separately persisted sidebar, and receipts for network retries. */
 export class ProfileSave {
   readonly #pendingAgents = new Set<string>();
 
@@ -43,7 +42,6 @@ export class ProfileSave {
     private readonly hooks: ProfileSaveHooks,
   ) {}
 
-  /** `sender` is the person who writes the first message of a new agent. */
   save(
     input: SaveAgentProfileInput,
     sidebar: Pick<SidebarLayoutStore, "getSnapshot" | "withProfileAssignment">,
@@ -76,7 +74,6 @@ export class ProfileSave {
       return agent;
     });
     const oldAvatar = previous ? this.store.resolveAvatar(previous.id) : null;
-    // The sidebar owns its serialization; the callback runs the profile workflow under that lock.
     const result = yield* sidebar
       .withProfileAssignment(input.draft.sectionId, (assign) =>
         this.#assign(
@@ -155,10 +152,6 @@ const { io: profileIo, sync: profileStep, rewrap: toProfileSaveFailed } = causeH
 
 export { toProfileSaveFailed };
 
-/**
- * Model and effort use live turn settings; these fields change standing context or access. An agent
- * that follows an account default reads `defaults`, and `previousDefaults` before a change of them.
- */
 export function standingProfileChanged(
   previous: AgentSummary | null | undefined,
   agent: AgentSummary,

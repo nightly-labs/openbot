@@ -65,9 +65,6 @@ export const exportOpenBotData = Effect.fn("Archive.exportOpenBotData")(function
           { concurrency: "unbounded" },
         );
         const manifest = {
-          // 4, not 3: a schema 3 archive a released build wrote spells the roster `bots`, and this one spells
-          // it `agents`. Anything reading the manifest picks its parser by this number, so leaving it at 3
-          // hands a reader the wrong shape under a version that promised the old one.
           schemaVersion: 4,
           exportedAt: new Date().toISOString(),
           application: { name: "OpenBot", version: app.getVersion() },
@@ -159,7 +156,6 @@ export const exportDiagnostics = Effect.fn("Archive.exportDiagnostics")(function
   const mcpServers = context.service.listMcpServers();
   const update = context.updater.getStatus();
   const diagnostics = {
-    // 4, not 3: schema 3 had a one-time `memory` reading, and this report has the `resources` summaries.
     schemaVersion: 4,
     generatedAt: new Date().toISOString(),
     application: applicationDiagnostics(),
@@ -172,8 +168,6 @@ export const exportDiagnostics = Effect.fn("Archive.exportDiagnostics")(function
       agentCount: agents.length,
       queues: queueCounts,
     },
-    // Ids, transports and whether each one is enabled. A name is user text and a configuration holds
-    // `env` values and headers, so neither one belongs in a report the user mails to somebody else.
     mcpServers: {
       count: mcpServers.length,
       enabledCount: mcpServers.filter((config) => config.enabled).length,
@@ -187,7 +181,6 @@ export const exportDiagnostics = Effect.fn("Archive.exportDiagnostics")(function
       tabCount: context.browser.listTabs().length,
       activeControlCount: context.browser.getControlState().sessions.length,
     },
-    // Process groups and provider ids with memory, CPU and delays: never a PID, a command or a path.
     resources: context.resources.diagnostics(),
     update: {
       phase: update.phase,
@@ -198,7 +191,6 @@ export const exportDiagnostics = Effect.fn("Archive.exportDiagnostics")(function
       errorCode: update.errorCode,
       history: context.updater.getDiagnostics(),
     },
-    // IPC channels and turn origins with counts, outcomes and durations, from the local trace file.
     trace: yield* context.trace.summarize(),
     privacy:
       "Contains no conversations, URLs, email addresses, tokens, file contents, file paths, or raw error messages.",
@@ -212,11 +204,6 @@ export const exportDiagnostics = Effect.fn("Archive.exportDiagnostics")(function
   return { saved: true };
 });
 
-/**
- * The diagnostics that the start recovery window exports. The start did not finish, so no agent
- * service, browser or updater exists: this has the application, the start attempts and the trace
- * summary only, under the same privacy promise as `exportDiagnostics`.
- */
 export const exportStartDiagnostics = Effect.fn("Archive.exportStartDiagnostics")(function* (
   context: Pick<MaintenanceContext, "parentWindow" | "translate"> & { startAttempts: StartAttemptsSummary },
 ): Effect.fn.Return<ExportResult, ArchiveOperationError> {
@@ -232,9 +219,7 @@ export const exportStartDiagnostics = Effect.fn("Archive.exportStartDiagnostics"
     kind: "start-recovery",
     generatedAt: new Date().toISOString(),
     application: applicationDiagnostics(),
-    // Versions, a count and fixed words.
     startAttempts: context.startAttempts,
-    // IPC channels, crash origins and quit reasons with counts and outcomes, from the local trace file.
     trace: yield* trace.summarize(),
     privacy:
       "Contains no conversations, URLs, email addresses, tokens, file contents, file paths, or raw error messages.",

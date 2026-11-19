@@ -10,7 +10,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin } from "./request-helpers";
 
-/** How long this server asks the provider to keep the prompt cache, read and set from a joined server. Frozen by `prompt-cache-ttl-v1`. */
 export async function routePromptCacheTtl(
   context: TeamApiRequestContext,
   admin: TeamApiAdmin | undefined,

@@ -9,16 +9,9 @@ import type {
 } from "../messaging-types";
 import { discordInboundAction, discordInboundMessage } from "./discord-events";
 
-/** The Gateway can send an event again after a resume. */
 const RECENT_EVENTS = 2_000;
 const OK: IngressAnswer = { status: 200 };
 
-/**
- * The inbound half of one guild's OpenBot app. Signal keeps the bot's Gateway connection, which only
- * it can, and passes the guild's mentions of OpenBot and its button presses to this host's ingress
- * socket. This holds that socket open while it runs. Signal has already acknowledged each button
- * press to Discord, so nothing here answers Discord.
- */
 export class DiscordTransport implements MessagingTransport {
   readonly #ingress: MessagingIngress;
   readonly #guildId: string;
@@ -27,6 +20,7 @@ export class DiscordTransport implements MessagingTransport {
   #release: (() => void) | null = null;
   #unsubscribe: (() => void) | null = null;
   #unsubscribeRoutes: (() => void) | null = null;
+  #linked = true;
 
   constructor(ingress: MessagingIngress, guildId: string) {
     this.#ingress = ingress;
@@ -35,17 +29,15 @@ export class DiscordTransport implements MessagingTransport {
 
   start(sink: TransportSink): void {
     this.#sink = sink;
-    // Before `acquire`, which can open the socket. The socket's route ticket is issued after this
-    // start, so a session without the guild means that it was unlinked or the bot left it.
     this.#unsubscribeRoutes ??= this.#ingress.onDiscordRoutes((guildIds) => {
-      if (!guildIds.has(this.#guildId)) this.#sink?.state("invalid_token");
+      this.#linked = guildIds.has(this.#guildId);
+      this.#report(this.#ingress.state());
     });
     this.#release ??= this.#ingress.acquire("discord");
     this.#unsubscribe ??= this.#ingress.onState((state) => this.#report(state));
     this.#report(this.#ingress.state());
   }
 
-  /** The main process reconnects the ingress socket itself when the computer wakes. */
   reconnect(): void {}
 
   readonly stop = Effect.fn("DiscordTransport.stop")(() =>
@@ -55,6 +47,7 @@ export class DiscordTransport implements MessagingTransport {
       this.#unsubscribe = null;
       this.#unsubscribeRoutes?.();
       this.#unsubscribeRoutes = null;
+      this.#linked = true;
       this.#release?.();
       this.#release = null;
     }),
@@ -83,10 +76,17 @@ export class DiscordTransport implements MessagingTransport {
   );
 
   #report(state: IngressState): void {
-    this.#sink?.state(state === "online" ? "connected" : state === "connecting" ? "connecting" : "relay_unavailable");
+    this.#sink?.state(
+      state === "online"
+        ? this.#linked
+          ? "connected"
+          : "not_linked"
+        : state === "connecting"
+          ? "connecting"
+          : "relay_unavailable",
+    );
   }
 
-  /** True when the event was already handled. */
   #remember(key: string): boolean {
     if (this.#seen.has(key)) return true;
     this.#seen.add(key);

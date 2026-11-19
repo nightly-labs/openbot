@@ -1,11 +1,5 @@
 import type { ProviderPage } from "./provider-page";
 
-// Every statement about Cline here is taken from cline.bot, the Cline documentation
-// and Cline's GitHub repository. Each page used is in `sources`. Cline's desktop
-// page and its documentation do not agree on Linux: the page lists Linux, the
-// documentation does not. Check them again, and move `checkedAt`, whenever this
-// file changes.
-
 export const CLINE_PROVIDER: ProviderPage = {
   provider: "cline",
   name: "Cline",

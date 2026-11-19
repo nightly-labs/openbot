@@ -43,7 +43,6 @@ export function encodeTeamProtocolV3CurrentHttpRequest(
     return JSON.stringify(decodeScopedUsageRequest(value));
   }
   if (!duplicateRoute(method, path)) return encodeTeamProtocolV1CurrentHttpRequest(method, path, value, options);
-  // The duplicate route reaches the frozen v3 codec directly, so the vocabulary swap happens here.
   const currentValue: TeamProtocolV1JsonValue = JSON.parse(JSON.stringify(value ?? null));
   return JSON.stringify(decodeTeamProtocolV3HttpRequest(method, path, toWireAgentKeys(currentValue)));
 }
@@ -63,8 +62,6 @@ export function decodeTeamProtocolV3CurrentHttpRequest(
   }
   if (!duplicateRoute(method, path)) {
     if (options.preserveSemanticTags) return decodeTeamProtocolV1CurrentHttpRequest(method, path, value);
-    // The encode call is only here to expand semantic tags, and it leaves the object in wire vocabulary.
-    // Decoding its output is what brings the keys back to the current spelling the handlers read.
     return decodeTeamProtocolV1CurrentHttpRequest(
       method,
       path,
@@ -97,7 +94,6 @@ export function encodeTeamProtocolV3CurrentHttpResponse(
   if (!duplicateRoute(method, path)) {
     return encodeTeamProtocolV1CurrentHttpResponse(method, path, status, value, options);
   }
-  // The duplicate route reaches the frozen v3 codec directly, so the vocabulary swap happens here.
   const currentValue: TeamProtocolV1JsonValue = JSON.parse(JSON.stringify(value ?? null));
   return JSON.stringify(decodeTeamProtocolV3HttpResponse(method, path, status, toWireAgentKeys(currentValue)));
 }

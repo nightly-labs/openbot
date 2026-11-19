@@ -23,42 +23,28 @@ type UsageText = Pick<TextValue, "t" | "format">;
 
 export type AccountUsageTone = PlanLimitTone;
 
-/** One limit window that a provider reported, such as its 5-hour or its weekly window. */
 export interface AccountUsageWindowRow {
   label: string;
+  group?: { name: string; window: string };
   remainingPercent: number;
   tone: AccountUsageTone;
-  /** Unix seconds. */
+  durationMins: number | null;
   resetsAt: number | null;
   resetsAtLabel: string | null;
 }
 
 export interface AccountUsageProviderRow {
   provider: AgentProviderId;
-  /** The account after the first that the reading is for. Null for the provider's own sign-in. */
   accountId: string | null;
-  /** The provider, and the account when the provider has more than one. */
   name: string;
-  /** The window that stops work first. The dock chip shows it. */
   remainingPercent: number | null;
   tone: AccountUsageTone;
-  /**
-   * Every reported window, the shortest first, so a weekly limit does not hide the 5-hour one. For a
-   * provider that names quota groups, the windows of each group in the provider's order.
-   */
   windows: AccountUsageWindowRow[];
-  /** The reading's own windows, the shortest first. The rail ring shows them, not the quota groups. */
   ringWindows: AccountUsageWindowRow[];
-  /** `false` for a provider that has no usage reading, so a missing amount is not a failure. */
   reportsUsage: boolean;
-  /** The provider whose plan quota this reading also counts, such as Grok for a merged Cursor plan. */
   sharedQuotaWith: AgentProviderId | null;
 }
 
-/**
- * One row per connected provider account. A limit the provider reported fills the remaining amount;
- * an available provider with no reading still appears, so the dock does not hide Claude or Grok.
- */
 export function accountUsageProviderRows(
   usage: AccountUsage | null,
   providers?: ReadonlyArray<{ id: string; state: string; accounts?: readonly ProviderAccountStatus[] | undefined }>,
@@ -81,7 +67,7 @@ export function accountUsageProviderRows(
       ? accounts.flatMap((account) =>
           account.id === DEFAULT_PROVIDER_ACCOUNT_ID
             ? [null]
-            : account.state === "connected" && !isApiKeyAccount(account.id)
+            : account.state === "connected" && !isApiKeyAccount(account.id, provider.id)
               ? [account.id]
               : [],
         )
@@ -104,7 +90,6 @@ function usageRowKey(provider: AgentProviderId, accountId: string | null): strin
   return `${provider}\u0000${accountId ?? ""}`;
 }
 
-/** The identity of a row across readings. A list keyed by it keeps its items when a reading builds new rows. */
 export function accountUsageRowKey(row: AccountUsageProviderRow): string {
   return usageRowKey(row.provider, row.accountId);
 }
@@ -122,11 +107,11 @@ function usageRow(
       label,
       remainingPercent,
       tone: usageTone(remainingPercent),
+      durationMins: window.windowDurationMins,
       resetsAt: window.resetsAt,
       resetsAtLabel: formatUsageReset(window.resetsAt, text),
     };
   };
-  // Cursor's total comes first, as the Cursor CLI shows it, and the two windows of its plan follow.
   const cursorTotal = provider === "cursor" ? limit?.tertiary : undefined;
   const reported = limit
     ? cursorTotal
@@ -136,8 +121,6 @@ function usageRow(
   const ownWindows = reported.map((window) =>
     windowRow(
       window,
-      // Cursor's two windows share one billing cycle and differ by the models they cover. One
-      // window alone, with no total, is the whole plan.
       window === cursorTotal
         ? text.t("account.usage.window.total")
         : provider === "cursor" && (cursorTotal || (limit?.primary && limit.secondary))
@@ -145,30 +128,21 @@ function usageRow(
           : usageWindowLabel(window.windowDurationMins, text),
     ),
   );
-  // Antigravity limits each group of models apart, such as Gemini 4 Argon: one line per group, by
-  // Google's name. The ring stays on the reading's own windows, the "Gemini Models" group. One group
-  // alone also shows its name: on a plan with no Gemini group, it is "Claude and GPT models".
   const groups = limit?.groups ?? [];
   const windows =
     groups.length > 0
       ? groups.flatMap((group) => {
           const groupWindows = reportedUsageWindows(group);
-          return groupWindows.map((window) =>
-            windowRow(
-              window,
+          return groupWindows.map((window) => {
+            const windowName = usageWindowLabel(window.windowDurationMins, text);
+            const label =
               groupWindows.length > 1
-                ? text.t("account.usage.window.group", {
-                    group: group.name,
-                    window: usageWindowLabel(window.windowDurationMins, text),
-                  })
-                : group.name,
-            ),
-          );
+                ? text.t("account.usage.window.group", { group: group.name, window: windowName })
+                : group.name;
+            return { ...windowRow(window, label), group: { name: group.name, window: windowName } };
+          });
         })
       : ownWindows;
-  // OpenCode's third window is a list line only: `secondary` already holds the long window that stops
-  // work first, and the ring has two tracks. Cursor's ring shows its total, or a window that is used up:
-  // the models of that window stop while the total still has some left.
   const cursorSpent = ownWindows.filter(
     (_, index) => cursorTotal && reported[index] !== cursorTotal && (reported[index]?.usedPercent ?? 0) >= 100,
   );
@@ -177,7 +151,6 @@ function usageRow(
       ? cursorSpent
       : ownWindows.filter((_, index) => reported[index] === cursorTotal)
     : ownWindows.filter((_, index) => reported[index] !== limit?.tertiary);
-  // The shortest window comes first, so on a tie the shorter window stops work first.
   const binding = ringWindows.reduce<AccountUsageWindowRow | null>(
     (lowest, window) => (lowest === null || window.remainingPercent < lowest.remainingPercent ? window : lowest),
     null,
@@ -231,7 +204,6 @@ export function formatUsageReset(resetsAt: number | null, text: UsageText = curr
   });
 }
 
-/** Time until a window resets, in short units: "38m", "1h 12m", "5d 2h". */
 export function formatUsageResetIn(
   resetsAt: number | null,
   nowMs: number,
@@ -239,7 +211,6 @@ export function formatUsageResetIn(
 ): string | null {
   if (resetsAt === null) return null;
   const remainingMs = resetsAt * 1_000 - nowMs;
-  // A past reset means the reading is stale until the next refresh; show no countdown.
   if (!Number.isFinite(remainingMs) || remainingMs <= 0) return null;
   const totalMinutes = Math.ceil(remainingMs / 60_000);
   const days = Math.floor(totalMinutes / 1_440);

@@ -13,10 +13,6 @@ import { haptics } from "@/shared/lib/haptics";
 import { speechRecognition } from "@/shared/lib/speech-recognition";
 import { useText } from "@/shared/lib/text";
 
-/**
- * The settings of the phone recognizer: the one language it hears. Settings > Voice shows it below the
- * choice of recognizer while the phone recognizer is checked.
- */
 export function DictationLanguageSection() {
   const { theme } = useUniwind();
   const dark = theme === "dark";
@@ -36,7 +32,6 @@ export function DictationLanguageSection() {
       active = false;
     };
   }, []);
-  // Without the module the composer has no mic, so the setting would do nothing.
   if (!speechRecognition) return null;
   const automatic = language.value === AUTOMATIC_DICTATION_LANGUAGE;
   const options = dictationLanguageOptions(supported, automatic ? null : language.value, t);

@@ -1,9 +1,3 @@
-// What main answers for team servers, the team host, its members and invites, direct messages, and
-// remote desktop sessions.
-//
-// Each decoder checks every field the contract type requires and keeps each optional field it
-// carries, so a value the renderer reads always has the shape its type says.
-
 import {
   type DirectConversationPage,
   type DirectConversationReadState,
@@ -47,6 +41,7 @@ import {
   requiredString,
 } from "@openbot/contracts/ipc-decoding";
 import { type DynamicRecord, isBoolean, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import { type ServerAppearance, serverAppearanceOrNull } from "@openbot/contracts/team-protocol/host-appearance-v1";
 
 const HOST_PHASES = ["unconfigured", "idle", "starting", "online", "stopping", "error"] as const;
 const TEAM_ROLES = ["owner", "admin", "member"] as const;
@@ -59,6 +54,7 @@ const SERVER_ISSUE_CODES = [
   "client_update_required",
   "host_update_required",
   "protocol_error",
+  "server_safe_mode",
   "authentication_required",
   "network_unavailable",
 ] as const;
@@ -105,6 +101,7 @@ export function decodeHostStatus(value: unknown): HostStatus {
     serverName: nullableString(status, "serverName"),
     apiUrl: nullableString(status, "apiUrl"),
     logoUrl: nullableString(status, "logoUrl"),
+    appearance: serverAppearance(status.appearance),
     apiOnline: requiredBoolean(status, "apiOnline"),
     remoteDesktopReady: requiredBoolean(status, "remoteDesktopReady"),
     remoteDesktopScreenRecordingDenied: requiredBoolean(status, "remoteDesktopScreenRecordingDenied"),
@@ -276,6 +273,7 @@ function server(summary: DynamicRecord): ServerSummary {
     compatibility,
     issue,
     connectionSequence,
+    capabilitiesPending,
     hostRestart,
     hostedSleep,
     hostedIssue,
@@ -286,6 +284,7 @@ function server(summary: DynamicRecord): ServerSummary {
     storageGb,
     keyChangedAt,
     thisComputer,
+    appearance,
   } = summary;
   if (!isOneOf(SERVER_NOTIFICATION_LEVELS, notificationLevel)) throw new Error("Invalid notificationLevel.");
   if (!isOneOf(SERVER_KINDS, kind)) throw new Error("Invalid kind.");
@@ -306,6 +305,9 @@ function server(summary: DynamicRecord): ServerSummary {
     throw new Error("Invalid keyChangedAt.");
   }
   if (thisComputer !== undefined && thisComputer !== true) throw new Error("Invalid thisComputer.");
+  if (capabilitiesPending !== undefined && capabilitiesPending !== true) {
+    throw new Error("Invalid capabilitiesPending.");
+  }
   return {
     notificationsMuted: requiredBoolean(summary, "notificationsMuted"),
     notificationsMutedUntil: nullableNumber(summary, "notificationsMutedUntil"),
@@ -317,6 +319,7 @@ function server(summary: DynamicRecord): ServerSummary {
     apiUrl: nullableString(summary, "apiUrl"),
     remoteDesktopAvailable: requiredBoolean(summary, "remoteDesktopAvailable"),
     logoUrl: nullableString(summary, "logoUrl"),
+    ...(appearance === undefined ? {} : { appearance: serverAppearance(appearance) }),
     role: role === null ? null : teamRole(role),
     active: requiredBoolean(summary, "active"),
     ...(compatibility === undefined
@@ -324,8 +327,8 @@ function server(summary: DynamicRecord): ServerSummary {
       : { compatibility: compatibility === null ? null : serverCompatibility(compatibility) }),
     ...(issue === undefined ? {} : { issue: issue === null ? null : serverIssue(issue) }),
     ...(connectionSequence === undefined ? {} : { connectionSequence }),
+    ...(capabilitiesPending === undefined ? {} : { capabilitiesPending }),
     ...(hostRestart === undefined ? {} : { hostRestart: hostRestart === null ? null : serverHostRestart(hostRestart) }),
-    // Only the indicator reads it, so a value from a newer main process shows no indicator.
     ...(hostedSleep === undefined
       ? {}
       : { hostedSleep: hostedSleep === "sleeping" || hostedSleep === "waking" ? hostedSleep : null }),
@@ -338,6 +341,13 @@ function server(summary: DynamicRecord): ServerSummary {
     ...(keyChangedAt === undefined ? {} : { keyChangedAt }),
     ...(thisComputer === undefined ? {} : { thisComputer }),
   };
+}
+
+function serverAppearance(value: unknown): ServerAppearance | null {
+  if (value === null) return null;
+  const appearance = serverAppearanceOrNull(value);
+  if (!appearance) throw new Error("Invalid appearance.");
+  return appearance;
 }
 
 function serverHostRestart(value: unknown): NonNullable<ServerSummary["hostRestart"]> {

@@ -15,10 +15,8 @@ export const Route = createFileRoute("/marketplace/")({
       readMarketplaceAgents(),
       loadPageText(context.locale, marketplaceIndexText),
     ]);
-    // The page renders catalog text in the browser too, so `getRouter` loads this one before hydration.
     return { ...page, agents, textCatalog: page.locale };
   },
-  // The search and the category filter the list on the page. Neither reads the catalog again.
   shouldReload: false,
   head: ({ match, loaderData }) =>
     marketplaceIndexHead(MARKETPLACE_ROUTE, match.context.siteUrl, loaderData?.text.agents),
@@ -29,7 +27,6 @@ function MarketplaceAgentsRoute() {
   const page = Route.useLoaderData();
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
-  // Each key goes into the address without a new history entry or a scroll to the top.
   const onQuery = (query: string) =>
     void navigate({ search: withMarketplaceQuery(query), replace: true, resetScroll: false });
   return (

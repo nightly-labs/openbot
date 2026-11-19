@@ -5,13 +5,8 @@ import { errorReference } from "@openbot/user-errors";
 import { createEffect, createStore, untrack } from "solid-js";
 import { usagePort } from "../usage/usage-port";
 
-/** The past year of this computer's host analytics, the report that the Profile tab summarizes. */
 const PROFILE_DAYS = 365;
 
-/**
- * Loads the report each time the Profile tab shows, and again after each turn while it shows. The
- * report on screen stays while a later load runs, so the tiles do not empty and fill again.
- */
 export function createProfileActivityStore(
   isActive: () => boolean,
   createShareImage: NonNullable<ProfileActivityState["onCreateShareImage"]>,
@@ -45,7 +40,6 @@ export function createProfileActivityStore(
         draft.phase = report ? "ready" : "unsupported";
       });
     } catch (error) {
-      // A failed refresh keeps the report on screen; the next turn or the next visit tries again.
       if (request !== generation || background) return;
       setState((draft) => {
         draft.phase = "error";

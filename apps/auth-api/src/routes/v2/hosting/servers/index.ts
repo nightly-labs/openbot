@@ -38,9 +38,9 @@ export const Route = createFileRoute("/v2/hosting/servers/")({
                   currency: body.currency,
                   entryPoint: body.entryPoint,
                   license: body.license,
+                  earlyStart: body.earlyStart,
                 },
                 request.headers.get("Idempotency-Key"),
-                // Stripe sends the desktop user to the return page, which tells them to go back to the app.
                 { target: "desktop", origin: new URL(request.url).origin },
               ),
               201,

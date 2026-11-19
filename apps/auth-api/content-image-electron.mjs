@@ -1,25 +1,11 @@
-// The Electron half of the article image generator. Plain JavaScript because
-// Electron runs this file directly and cannot read TypeScript.
-//
-// It opens one hidden window, injects the bundle that render-content-images.ts
-// built, and asks it for one data URL per image. The page is `about:blank` with
-// context isolation on: the injected code runs in the isolated world, which
-// shares the DOM but nothing else, and no file is ever loaded into the page.
-
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { app, BrowserWindow } from "electron";
 
-// A build tool must not leave a process behind when its last window closes.
 app.on("window-all-closed", () => app.quit());
 
-// Printed before anything that can hang, so a build that sees this line and
-// nothing after it knows the process ran and stopped on the way to ready.
 console.log("content-images: Electron started.");
 
-// No top-level await here. Electron sends `ready` only after this module has
-// finished loading, so awaiting `app.whenReady()` at the top level waits for
-// itself and never ends.
 main().then(
   () => app.exit(0),
   (error) => {
@@ -45,8 +31,6 @@ async function main() {
       nodeIntegration: false,
       sandbox: true,
       webgl: true,
-      // A hidden window still has to produce frames: the shader library sizes its
-      // canvas from a ResizeObserver, which only runs on a rendering tick.
       paintWhenInitiallyHidden: true,
       backgroundThrottling: false,
     },
@@ -57,9 +41,6 @@ async function main() {
     await window.webContents.executeJavaScript(control.fontScript);
     await window.webContents.executeJavaScript(control.bundle);
 
-    // One line per image. The build watches this: a long render and a stuck one
-    // look the same from outside, and the only difference is whether anything
-    // still arrives.
     let done = 0;
     for (const job of control.jobs) {
       const dataUrl = await window.webContents.executeJavaScript(

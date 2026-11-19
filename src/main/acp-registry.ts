@@ -39,7 +39,6 @@ interface Operation {
 export interface AcpRegistryDependencies {
   directory: string;
   customAgentChanges: CustomAgentChanges;
-  /** The host checks active work before removing executable files. */
   withRuntimeRemoval: (
     customAgentIds: readonly string[],
     operation: Effect.Effect<void, ProviderRuntimeFailure>,
@@ -48,7 +47,6 @@ export interface AcpRegistryDependencies {
   prepare?: typeof prepareRegistryAgent;
 }
 
-/** Owns managed ACP installations only. Agent identity, credentials, and history belong elsewhere. */
 export class AcpRegistry {
   readonly #root: string;
   readonly #removing = new Set<string>();
@@ -263,8 +261,6 @@ export class AcpRegistry {
               cause: new Error(sourceText("error.provider.registryCancelled")),
             });
           if (operation) operation.committing = true;
-          // Journal the candidate before switching the command. After a crash, only the record
-          // whose command matches the saved custom agent is displayed as installed.
           yield* this.#write([...(yield* this.#records()), record]);
           const result = yield* this.dependencies.customAgentChanges
             .saveIfUnchanged(inputToSave, old)
@@ -277,7 +273,6 @@ export class AcpRegistry {
       Effect.ensuring(
         Effect.gen({ self: this }, function* () {
           if (activated) return;
-          // If rollback itself failed, keep a runtime that the saved command still names.
           const agents = yield* this.dependencies.customAgentChanges.list();
           if (agents.some((agent) => agent.command.startsWith(`${folder}/`) || agent.command.startsWith(`${folder}\\`)))
             return;

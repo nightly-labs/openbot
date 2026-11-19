@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/site";
 
 export const messages = {
-  // Hosted site errors.
   "error.site.absolutePath": "サイトのディレクトリには絶対パスを指定してください。",
   "error.site.rootSymlink": "ホストするサイトではシンボリックリンクを使用できません。",
   "error.site.notDirectory": "サイトのソースはディレクトリである必要があります。",

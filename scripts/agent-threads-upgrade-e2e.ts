@@ -1,11 +1,3 @@
-// Upgrades a copy of a real `openbot.db` from a released app to migration 47 (tasks become side threads).
-// The source file is opened read-only (the app must be closed) and copied with the `sqlite3` CLI; only the copy changes. On the copy:
-// the earlier migrations run first, then a forced failure inside 47 must roll back to the task table, then
-// 47 runs. Checks: each task with a conversation is a side thread with the same values, and a task with
-// none is reported; every other table holds the same rows as before 47; every mailbox message that names
-// a task finds its thread; the integrity and foreign-key checks pass.
-//   bun scripts/agent-threads-upgrade-e2e.ts <openbot.db> [<openbot.db>...]
-// Writes .openbot-build/agent-threads-upgrade-e2e/report.json with counts only, no message text or titles.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -48,7 +40,6 @@ function tableNames(db: DatabaseSync): string[] {
     .map((row) => String(row.name));
 }
 
-/** A hash of every row of each table, in a stable order, so that two states compare without the data. */
 function tableHashes(db: DatabaseSync): Map<string, { rows: number; hash: string }> {
   const hashes = new Map<string, { rows: number; hash: string }>();
   for (const name of tableNames(db)) {
@@ -63,7 +54,6 @@ function tableHashes(db: DatabaseSync): Map<string, { rows: number; hash: string
   return hashes;
 }
 
-/** Runs every migration up to `last`; the next one must fail and roll back. */
 function migrateUpTo(db: DatabaseSync, last: number): void {
   db.exec(`CREATE TEMP TRIGGER stop_at_version BEFORE INSERT ON schema_migrations WHEN new.version > ${last}
     BEGIN SELECT RAISE(ABORT, 'upgrade smoke stop'); END;`);
@@ -77,9 +67,6 @@ function migrateUpTo(db: DatabaseSync, last: number): void {
 async function upgrade(source: string, workDirectory: string, index: number): Promise<SourceReport> {
   const report: SourceReport = { source, passed: false };
   const copy = join(workDirectory, `openbot-${index}.db`);
-  // A WAL database opens read-only only with its `-shm` file. A running app holds both files, and
-  // `.backup` copies under a read lock. A closed app removes them: `immutable=1` then reads with no lock
-  // and no file of its own, which is safe because no one writes.
   const uri = existsSync(`${source}-wal`) ? source : `file:${encodeURI(source)}?immutable=1`;
   try {
     execFileSync("sqlite3", ["-readonly", uri, `.backup '${copy.replaceAll("'", "''")}'`], { stdio: "pipe" });
@@ -109,7 +96,6 @@ async function upgrade(source: string, workDirectory: string, index: number): Pr
     report.tables = before.size;
     report.rows = [...before.values()].reduce((sum, table) => sum + table.rows, 0);
 
-    // A failure inside 47 leaves the database as it was before 47.
     migrateUpTo(db, THREAD_VERSION - 1);
     assert.equal(version(db), THREAD_VERSION - 1);
     assert.deepEqual(tableHashes(db), before, "a failed migration 47 changed a table");
@@ -158,8 +144,6 @@ async function upgrade(source: string, workDirectory: string, index: number): Pr
       .all()
       .map((row) => String(row.task_id));
     report.taskMessages = taskIds.length;
-    // A message can name a task that was not copied: its task had no conversation, or no row at all. The
-    // app's boot step interrupts its queued delivery (`AgentTasks.endWorkOfGoneTasks`); the row stays.
     report.taskMessagesWithoutThread = taskIds.filter((id) => !threads.has(id)).length;
 
     const integrity = db.prepare("PRAGMA integrity_check").all();

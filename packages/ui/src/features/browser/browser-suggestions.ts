@@ -1,6 +1,5 @@
 import type { BrowserTab } from "@openbot/contracts/ipc";
 
-/** A page that the user went to in this session, and how many times. */
 export interface BrowserHistoryEntry {
   url: string;
   title: string;
@@ -9,23 +8,18 @@ export interface BrowserHistoryEntry {
 
 export type BrowserSuggestionKind = "tab" | "history" | "search" | "url";
 
-/** A row under the address field. */
 export interface BrowserSuggestion {
   id: string;
   kind: BrowserSuggestionKind;
-  /** The text that the field shows when the arrow keys move to this row. */
   text: string;
   title: string;
-  /** The address under the title. A search has none: the row names the search provider. */
   detail: string | undefined;
   url: string;
-  /** The open tab that the row switches to. */
   tabId?: string;
 }
 
 const SEARCH_URL = "https://www.google.com/search?q=";
 
-/** The page that a new tab opens. */
 export const BROWSER_NEW_TAB_URL = "https://www.google.com";
 
 export function browserSearchUrl(query: string): string {
@@ -35,19 +29,16 @@ export function browserSearchUrl(query: string): string {
 export function browserSearchQuery(url: string): string | undefined {
   if (!url.startsWith(SEARCH_URL)) return undefined;
   try {
-    // A "+" is a space only before decoding: "c%2B%2B" is "c++".
     return decodeURIComponent((url.slice(SEARCH_URL.length).split("&")[0] ?? "").replaceAll("+", " "));
   } catch {
     return undefined;
   }
 }
 
-/** The address without the scheme, `www.` and a last slash, as the address bar shows it. */
 export function browserDisplayUrl(url: string): string {
   return url.replace(/^https?:\/\/(www\.)?/i, "").replace(/\/$/, "");
 }
 
-/** The text in the address field opens this page: a web address, or a Google search. */
 export function browserAddressUrl(value: string): string {
   const hasProtocol = /^https?:\/\//i.test(value);
   const candidate = hasProtocol ? value : `https://${value}`;
@@ -59,13 +50,10 @@ export function browserAddressUrl(value: string): string {
     ) {
       return candidate;
     }
-  } catch {
-    // Text that is not a web address is a search query.
-  }
+  } catch {}
   return browserSearchUrl(value.replace(/^https?:\/\//i, ""));
 }
 
-/** The most visited page whose address starts with the typed text. Its rest is completed in the field. */
 export function browserCompletion(
   typed: string,
   history: readonly BrowserHistoryEntry[],
@@ -118,10 +106,6 @@ function tabRow(tab: BrowserTab): BrowserSuggestion {
 
 const MAX_ROWS = 8;
 
-/**
- * The rows under the address field. With no text: the recent history that is not open. With text: the
- * completed or typed address first, then the search, then the open tabs and the history that match.
- */
 export function browserSuggestions(input: {
   typed: string;
   completion: BrowserHistoryEntry | undefined;

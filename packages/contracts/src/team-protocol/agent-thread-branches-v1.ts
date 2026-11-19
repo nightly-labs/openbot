@@ -1,26 +1,3 @@
-// Frozen optional agent-thread-branches-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: a signed-in member who can
-// send a message to an agent can branch a conversation of the agent. A branch is a new side thread, a
-// task of `agent-tasks-v1`, with a copy of the agent's own chat (`taskId` null) or of one side thread
-// through the turn of `messageId`, the last agent message of a finished turn. No turn starts. A host
-// that grants this also grants `agent-tasks-v1`, whose task shape stays as it is: it never carries the
-// branch link. The host does not ask for a role, as for a task start. A hidden agent, or an agent that
-// the peer cannot see, is not found (404).
-//
-// `branch` answers the new task: the frozen `agent-tasks-v1` task, with `branch`, the link to its
-// source. A retry with the same `requestId` answers the branch that the first call made, also for a
-// retry from another device. The member who branched has read the copy through its last message. A
-// source or message that the agent does not have is 404, a source with a running turn or an agent at
-// its open-thread limit is 409; the error text says which.
-//
-// `list` answers the link of each branch among the tasks that the `agent-tasks-v1` list answers, at
-// most 50. A link stays when its source is deleted. Its `sourceTitle` is the title of the source side
-// thread when the host answered: null for the agent's own chat and for a deleted source.
-// `agent-tasks-changed` carries no link: a client reads `list` again when the task list has a task that
-// it does not know.
-// Every route is a POST with its ids in the body. The host sends `agent-tasks-changed` after a branch.
-// Bounds and meaning do not follow IPC changes; widening any of it needs a second capability string.
 import type { AgentTaskBranch, AgentTasksSnapshot } from "../ipc-agent-tasks";
 import { isAgentTaskBranch } from "../ipc-agent-tasks";
 import { isIdentifier } from "../ipc-bounded-values";
@@ -43,7 +20,6 @@ export const AGENT_THREAD_BRANCHES_ROUTES = {
   list: "/v1/agent-threads/branches",
 } as const;
 
-/** The most links that one `list` answer carries: the size of the `agent-tasks-v1` task list. */
 export const AGENT_THREAD_BRANCHES_LIMIT = 50;
 
 const exact =
@@ -72,7 +48,6 @@ const branch = exact(
 );
 const agent = exact(["agentId"], fields({ agentId: identifier }));
 
-/** The frozen `agent-tasks-v1` task of a start, with the link of the branch. */
 function branchAnswer(): OptionalRouteCodec["response"] {
   const start = AGENT_TASKS_CODECS.get(AGENT_TASKS_ROUTES.start);
   if (!start) throw new Error("No agent-tasks-v1 codec for the task start.");
@@ -92,7 +67,6 @@ export const AGENT_THREAD_BRANCHES_CODECS: ReadonlyMap<string, OptionalRouteCode
   ],
 ]);
 
-/** The link of one branch, as `list` answers it. */
 export interface AgentThreadBranchLink extends AgentTaskBranch {
   taskId: string;
 }
@@ -105,7 +79,6 @@ export function isAgentThreadBranchLinks(value: unknown): value is { branches: A
   );
 }
 
-/** `snapshot` with the link of each task: the one that `links` names, or null for a task that is not a branch. */
 export function withAgentThreadBranches(
   snapshot: AgentTasksSnapshot,
   links: readonly AgentThreadBranchLink[],

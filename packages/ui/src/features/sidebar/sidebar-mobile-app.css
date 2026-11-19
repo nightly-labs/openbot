@@ -1,7 +1,3 @@
-/* The mobile app announcement at the bottom of the sidebar. It is a quiet
- * surface card rather than an accent one: an announcement is not an action. The body text and the
- * button use the full card width, so a narrow sidebar wraps the text instead of making a thin
- * column beside the icon. */
 .sidebar-mobile-app {
   display: flex;
   flex: 0 0 auto;
@@ -54,7 +50,6 @@
   white-space: nowrap;
 }
 
-/* The community invitation uses the same card. Discord takes the free width; X is an icon button. */
 .sidebar-community-actions {
   display: flex;
   gap: var(--openbot-space-1-5);
@@ -71,7 +66,6 @@
   height: var(--openbot-icon-sm);
 }
 
-/* The storage card uses the same card. At "full" the card uses the danger tone, and the ring follows the level. */
 .sidebar-storage[data-level="full"] {
   border-color: var(--openbot-danger-border);
   background: var(--openbot-danger-soft);

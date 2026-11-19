@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import type { WorkflowTriggerInput, WorkflowWebhookSecret } from "@openbot/contracts/ipc";
 import type {
+  AgentWebhookSecret,
   EventFilter,
   EventJsonValue,
   EventRoutine,
@@ -26,7 +27,12 @@ import { createOpenBotLogger, registerSecretValue } from "@openbot/logging";
 import { RoutineInputError } from "@openbot/team-client/routine-schedule";
 import { Effect, Semaphore } from "effect";
 import { RoutineOperationFailed } from "../backend/agent/routine-scheduler";
-import type { WebhookRoutineWriter } from "../backend/agent/webhook-routine-tool";
+import {
+  removeWebhookSecretKey,
+  type WebhookRoutineWriter,
+  webhookSecretKeyName,
+} from "../backend/agent/webhook-routine-tool";
+import type { AgentApiKeys } from "../backend/agent-api-keys";
 import { causeHelpers } from "../backend/effect-boundary";
 import type { RoutineRecords } from "../backend/routine-records";
 import type { OwnedRoutineRecord, RoutineRecordInput, WebhookReceiveResult } from "../backend/routine-store";
@@ -46,34 +52,23 @@ import { signWebhookBody, verifyStandardWebhookSignature, verifyWebhookSignature
 const logger = createOpenBotLogger("host-events");
 const DEFAULT_ACTIVITY_LIMIT = 50;
 const DEFAULT_RUN_LIMIT = 10;
-/** The type of a test event for a routine that accepts every type. */
 const TEST_EVENT_TYPE = "openbot.test";
 
 export interface HostWebhookRelay {
   connected(): boolean;
-  /** Holds the inbound relay connection open while at least one route exists. */
   setEnabled(enabled: boolean): void;
-  /** Pauses or refreshes the relay when the signed-in account changes. */
   setAccountActive(active: boolean): void;
-  /** Applies route changes to the open relay connection. */
   refresh(): void;
-  /**
-   * Registers this host for the account when it has no ID or no machine token, without publishing
-   * it (#6029). A sync calls it once, before the first route that it registers.
-   */
   ensureHost(): Effect.Effect<void>;
   registerRoute(routeId: string): Effect.Effect<string, { readonly cause: unknown } | WebhookRouteConflict>;
   revokeRoute(routeId: string): Effect.Effect<void, { readonly cause: unknown }>;
 }
 
-/** The webhook triggers of workflows: they share the routes, the relay and the route limit. */
 interface HostWorkflowWebhooks {
   receive(delivery: WorkflowWebhookDelivery): Effect.Effect<WorkflowWebhookResult, { readonly cause: unknown }>;
-  /** The workflow whose webhook address changed. */
   changed(workflowId: string): void;
 }
 
-/** What happened to one inbound webhook request. It holds no ID, body, or secret. */
 type WebhookDeliveryResult =
   | "started"
   | "ignored"
@@ -90,30 +85,43 @@ type WebhookDeliveryResult =
 
 type WebhookIgnoredReason = "event-type" | "filter" | "inactive" | "busy" | "refused";
 
-/** One inbound webhook request, for usage analytics. */
 export interface WebhookDeliveryReport {
-  /** Null when no route has the request's route ID. */
   ownerKind: WebhookRouteOwner["kind"] | null;
   format: "openbot" | "standard";
   result: WebhookDeliveryResult;
   ignoredReason: WebhookIgnoredReason | null;
   status: WebhookDeliveryStatus;
   bodyBytes: number;
-  /** The time from the start of the checks to the answer. */
   handleMs: number;
-  /** The time from the signed timestamp to the receipt. Null before the signature is verified. */
   ageMs: number | null;
-  /** A test event that the host sent to itself. */
   test: boolean;
+}
+
+export interface HostAgentWebhookKeys {
+  save(agentId: string, name: string, value: string): Effect.Effect<void, { readonly cause: unknown }>;
+  has(agentId: string, name: string): Effect.Effect<boolean, { readonly cause: unknown }>;
+  remove(agentId: string, name: string): Effect.Effect<void, { readonly cause: unknown }>;
+}
+
+export function hostAgentWebhookKeys(
+  keys: AgentApiKeys,
+  agentName: (agentId: string) => string | undefined,
+): HostAgentWebhookKeys {
+  return {
+    save: (agentId, name, value) =>
+      keys.save({ id: agentId, name: agentName(agentId) }, name, value).pipe(Effect.asVoid),
+    has: (agentId, name) => keys.has(agentId, name),
+    remove: (agentId, name) => keys.remove(agentId, name).pipe(Effect.asVoid),
+  };
 }
 
 export interface HostEventsServiceOptions {
   routines: RoutineRecords;
+  agentKeys?: HostAgentWebhookKeys;
   workflows?: HostWorkflowWebhooks;
   cipher: SecretCipher;
   relay: HostWebhookRelay;
   accountPrincipal: () => string | null;
-  /** Receives one report for each inbound request after the answer is known. */
   onDelivery?: (report: WebhookDeliveryReport) => void;
 }
 
@@ -135,25 +143,17 @@ function eventRoutine(owner: EventRoutineOwner, record: OwnedRoutineRecord): Eve
   };
 }
 
-/**
- * A random signing secret. The prefix makes a leaked value easy to recognize and to scan for. Standard
- * base64, as the Standard Webhooks specification says, so that senders such as PostHog accept it.
- */
 function newWebhookSecret(): string {
   return `whsec_${randomBytes(32).toString("base64")}`;
 }
 
-/** A sender's secret: 16 to 1024 visible ASCII characters, such as `whsec_...` from Svix or a Composio secret. */
 const SENDER_SECRET_PATTERN = /^[\x21-\x7e]{16,1024}$/u;
 
 type TestEventData = { [key: string]: TestEventData | EventScalar };
 
-/** Data that each filter matches: every pointer leads to its value. Conflicting filters cannot all match. */
 function testEventData(filters: readonly EventFilter[]): EventJsonValue {
-  // Without a prototype, a token such as "__proto__" is an own key and cannot reach Object.prototype.
   const root: TestEventData = Object.create(null);
   for (const { pointer, value } of filters) {
-    // The empty pointer compares the complete data with the value.
     if (pointer === "") return value;
     const tokens = pointer
       .slice(1)
@@ -177,13 +177,11 @@ function testEventData(filters: readonly EventFilter[]): EventJsonValue {
 
 type ReceivedDelivery = WebhookReceiveResult<unknown> | WorkflowWebhookResult | { kind: "unavailable" };
 
-/** The checks' result for one request. `received` is null when a check refused the request first. */
 interface ProcessedDelivery {
   status: WebhookDeliveryStatus;
   received: ReceivedDelivery | null;
   refusal: WebhookDeliveryResult | null;
   ownerKind: WebhookRouteOwner["kind"] | null;
-  /** True after the signature check passed. */
   authenticated: boolean;
 }
 
@@ -200,7 +198,6 @@ function deliveryResult(received: ReceivedDelivery): WebhookDeliveryResult {
   return received.kind === "too-large" ? "too_large" : received.kind;
 }
 
-/** Signed timestamps are unix seconds. A sender clock ahead of the host gives zero. */
 function deliveryAgeMs(timestamp: string, now: number): number | null {
   const seconds = Number(timestamp);
   return Number.isFinite(seconds) ? Math.max(0, now - seconds * 1000) : null;
@@ -232,7 +229,6 @@ interface DecodedWebhookBody {
   data: EventJsonValue;
 }
 
-/** The body as a JSON object, or null when it is not UTF-8 JSON or not an object. */
 function parseJsonObject(body: Uint8Array): DynamicRecord | null {
   try {
     const value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(body));
@@ -256,11 +252,6 @@ function decodeWebhookBody(body: Uint8Array): DecodedWebhookBody | null {
   return { type: value.type, occurredAt: value.occurredAt ?? null, data };
 }
 
-/**
- * A Standard Webhooks body: `type`, an optional `timestamp`, and fields that each sender names, such as
- * Composio's `metadata.trigger_slug`. The whole body is the event data, so filters and the agent read
- * every field. A `timestamp` that is not an ISO 8601 date is ignored: the sender defines it, not OpenBot.
- */
 const ISO_DATE_PREFIX = /^\d{4}-\d{2}-\d{2}T/u;
 
 function decodeStandardWebhookBody(body: Uint8Array): DecodedWebhookBody | null {
@@ -273,18 +264,11 @@ function decodeStandardWebhookBody(body: Uint8Array): DecodedWebhookBody | null 
   return { type: value.type, occurredAt, data: value };
 }
 
-/**
- * Owns webhook routines on this host: the trigger settings, the host-made signing secret, the relay
- * routes and authenticated receipts. A secret leaves the host only once, in
- * the result of the save or rotation that made it.
- */
 export class HostEventsService implements HostEventsApi {
   readonly #options: HostEventsServiceOptions;
   #accountPrincipal: string | null;
   #accountGeneration = 0;
-  /** Serializes routine writes, so the route limit check and the write are one step. */
   readonly #writes = Semaphore.makeUnsafe(1);
-  /** Serializes relay calls, so a revoke and a register of one route cannot cross. */
   readonly #sync = Semaphore.makeUnsafe(1);
 
   constructor(options: HostEventsServiceOptions) {
@@ -311,14 +295,11 @@ export class HostEventsService implements HostEventsApi {
     input: SaveEventRoutineInput,
   ) {
     const { saved, secret } = yield* this.#saveRecord(input);
-    // The relay sync runs after the write lock is released, so a slow relay does not block writes.
     yield* this.syncRoutes({ all: false });
-    // The sync can add the URL. A save that the relay did not confirm keeps a null URL.
     const current = yield* eventStep(() => this.#options.routines.get(input.owner, saved.id) ?? saved);
     return { routine: eventRoutine(input.owner, current), secret };
   }).bind(this);
 
-  /** Deletes the routine. The routine change event starts the sync that revokes its route. */
   readonly deleteRoutine = Effect.fn("HostEvents.deleteRoutine")(
     function* (this: HostEventsService, input: EventRoutineRef) {
       yield* toHostEventsFailure(this.#options.routines.delete(input.owner, input.id));
@@ -339,17 +320,63 @@ export class HostEventsService implements HostEventsApi {
       if (routine.trigger.kind !== "webhook")
         return yield* eventFailure(sourceText("error.backend.webhookSettingsInvalid"));
       const secret = newWebhookSecret();
-      const secretCiphertext = yield* this.#encrypt(secret);
-      yield* eventStep(() => this.#options.routines.routes.rotateSecret(input.owner, input.id, secretCiphertext));
+      yield* this.#replaceSecret(input, secret, false);
       return { secret };
     },
     (operation) => this.#writes.withPermit(operation),
   ).bind(this);
 
-  /**
-   * Replaces the signing secret of a webhook routine with one that the sender made, for a sender
-   * that cannot use a secret from the host. The route ID and the URL stay the same.
-   */
+  readonly giveSecretToAgent = Effect.fn("HostEvents.giveSecretToAgent")(
+    function* (
+      this: HostEventsService,
+      input: EventRoutineRef,
+    ): Effect.fn.Return<AgentWebhookSecret, HostEventsFailure> {
+      const keys = this.#options.agentKeys;
+      if (input.owner.kind !== "agent" || !keys)
+        return yield* eventFailure(sourceText("error.backend.webhookSettingsInvalid"));
+      const routine = yield* this.#requireRoutine(input);
+      if (routine.trigger.kind !== "webhook")
+        return yield* eventFailure(sourceText("error.backend.webhookSettingsInvalid"));
+      yield* this.#replaceSecret(input, newWebhookSecret(), true);
+      return { name: webhookSecretKeyName(input.id) };
+    },
+    (operation) => this.#writes.withPermit(operation),
+  ).bind(this);
+
+  readonly #replaceSecret = Effect.fn("HostEvents.replaceSecret")(function* (
+    this: HostEventsService,
+    input: EventRoutineRef,
+    secret: string,
+    give: boolean,
+  ) {
+    const routes = this.#options.routines.routes;
+    const old = yield* this.#requireRoute(input);
+    const keys = input.owner.kind === "agent" ? this.#options.agentKeys : undefined;
+    const name = webhookSecretKeyName(input.id);
+    const keep = keys !== undefined && (give || (yield* toHostEventsFailure(keys.has(input.owner.id, name))));
+    const secretCiphertext = yield* this.#encrypt(secret);
+    yield* eventStep(() => routes.rotateSecret(input.owner, input.id, secretCiphertext));
+    if (!keys || !keep) return;
+    yield* toHostEventsFailure(keys.save(input.owner.id, name, secret)).pipe(
+      Effect.tapError(() =>
+        eventStep(() => routes.rotateSecret(input.owner, input.id, old.secretCiphertext)).pipe(
+          Effect.catch(() =>
+            Effect.sync(() => logger.warn("A webhook routine did not get its old signing secret back.")),
+          ),
+        ),
+      ),
+    );
+  });
+
+  readonly #dropAgentKey = Effect.fn("HostEvents.dropAgentKey")(function* (
+    this: HostEventsService,
+    input: EventRoutineRef,
+  ) {
+    const keys = this.#options.agentKeys;
+    if (input.owner.kind !== "agent" || !keys) return;
+    yield* removeWebhookSecretKey(keys, input.owner.id, input.id);
+  });
+
   readonly setSecret = Effect.fn("HostEvents.setSecret")(
     function* (this: HostEventsService, input: SetWebhookSecretInput) {
       const secret = input.secret.trim();
@@ -358,22 +385,16 @@ export class HostEventsService implements HostEventsApi {
       const routine = yield* this.#requireRoutine(input);
       if (routine.trigger.kind !== "webhook")
         return yield* eventFailure(sourceText("error.backend.webhookSettingsInvalid"));
-      const secretCiphertext = yield* this.#encrypt(secret);
-      yield* eventStep(() => this.#options.routines.routes.rotateSecret(input.owner, input.id, secretCiphertext));
+      yield* this.#replaceSecret(input, secret, false);
     },
     (operation) => this.#writes.withPermit(operation),
   ).bind(this);
 
-  /**
-   * Gives a webhook trigger of a workflow a new signing secret. The first secret makes its route, so
-   * the route limit counts it then. The secret leaves the host only in this result.
-   */
   readonly rotateWorkflowSecret = Effect.fn("HostEvents.rotateWorkflowSecret")(function* (
     this: HostEventsService,
     input: WorkflowTriggerInput,
   ): Effect.fn.Return<WorkflowWebhookSecret, HostEventsFailure> {
     const secret = yield* this.#writeWorkflowSecret(input);
-    // As after a routine save: the relay sync runs after the write lock is released.
     yield* this.syncRoutes({ all: false });
     this.#options.workflows?.changed(input.workflowId);
     return { secret };
@@ -398,7 +419,6 @@ export class HostEventsService implements HostEventsApi {
     );
   }).bind(this);
 
-  /** Verifies one relayed request and starts its routine. The status goes back to the sender. */
   readonly receive = Effect.fn("HostEvents.receive")(function* (
     this: HostEventsService,
     input: WebhookIngressDelivery,
@@ -407,10 +427,6 @@ export class HostEventsService implements HostEventsApi {
     return { status };
   }).bind(this);
 
-  /**
-   * Sends one test event to the routine. The host signs an event that matches the routine's event
-   * type and filters, and receives it as a relayed request, so the test passes the same checks.
-   */
   readonly sendTestEvent = Effect.fn("HostEvents.sendTestEvent")(function* (
     this: HostEventsService,
     input: EventRoutineRef,
@@ -418,15 +434,7 @@ export class HostEventsService implements HostEventsApi {
     const routine = yield* this.#requireRoutine(input);
     if (routine.trigger.kind !== "webhook")
       return yield* eventFailure(sourceText("error.backend.webhookSettingsInvalid"));
-    const route = yield* eventStep(() =>
-      this.#options.routines.routes
-        .list()
-        .find(
-          (item) =>
-            item.routineId === input.id && item.owner.kind === input.owner.kind && item.owner.id === input.owner.id,
-        ),
-    );
-    if (!route) return yield* eventFailure(sourceText("error.backend.routineGone"));
+    const route = yield* this.#requireRoute(input);
     const secret = yield* eventStep(() => {
       const value = this.#options.cipher.decrypt(Buffer.from(route.secretCiphertext, "base64"));
       registerSecretValue(value);
@@ -437,7 +445,6 @@ export class HostEventsService implements HostEventsApi {
       JSON.stringify({ type: eventType, data: testEventData(routine.trigger.filters) }),
     );
     const timestamp = String(Math.floor(Date.now() / 1000));
-    // A new ID for each test, so the receipt check never takes it for a redelivery.
     const deliveryId = `openbot-test-${randomUUID()}`;
     const { status, received } = yield* this.#deliver(
       {
@@ -451,7 +458,6 @@ export class HostEventsService implements HostEventsApi {
     );
     if (received?.kind === "started")
       return { eventType, status: "started", reason: null, runId: runIdOf(received.run) };
-    // The route is a routine's, so it is never busy or refused: only a workflow skips a request so.
     if (received?.kind === "ignored" && received.reason !== "busy" && received.reason !== "refused")
       return { eventType, status: "ignored", reason: received.reason, runId: null };
     return yield* eventFailure(
@@ -459,12 +465,6 @@ export class HostEventsService implements HostEventsApi {
     );
   }).bind(this);
 
-  /**
-   * Makes the relay match the local routes. It first sends the revocations that routine writes
-   * queued, then registers each route without a URL, or every route when `all` is set (after an
-   * account change). A failed call keeps its local state for the next sync and never fails a save.
-   * The result is `true` when no route work remains.
-   */
   readonly syncRoutes = Effect.fn("HostEvents.syncRoutes")(
     function* (this: HostEventsService, options: { all: boolean }) {
       const { relay } = this.#options;
@@ -516,7 +516,6 @@ export class HostEventsService implements HostEventsApi {
         let registered = yield* Effect.result(relay.registerRoute(routeId));
         if (!isCurrent()) return true;
         if (registered._tag === "Failure" && registered.failure instanceof WebhookRouteConflict) {
-          // The relay keeps a refused route ID for good. A new ID gets a new URL, and the secret stays.
           const replacement = yield* eventStep(() => routes.replaceRouteId(route.routeId));
           if (replacement === null) continue;
           routeId = replacement;
@@ -539,10 +538,8 @@ export class HostEventsService implements HostEventsApi {
         return true;
       }
       const enabled = current.length > 0;
-      // `refresh` reconnects only a held socket. `setEnabled(true)` opens a new one with the current routes.
       if (changed && enabled) relay.refresh();
       relay.setEnabled(enabled);
-      // An open editor shows "URL pending" until it reloads the routine.
       for (const owner of updatedOwners.values()) {
         if (owner.kind === "workflow") this.#options.workflows?.changed(owner.id);
         else this.#options.routines.changed(owner);
@@ -561,7 +558,6 @@ export class HostEventsService implements HostEventsApi {
       ),
   ).bind(this);
 
-  /** Closes stale route claims and leaves local route rows ready for the next account sync. */
   setAccountPrincipal(principalId: string | null): void {
     if (principalId === this.#accountPrincipal) return;
     this.#accountPrincipal = principalId;
@@ -569,7 +565,6 @@ export class HostEventsService implements HostEventsApi {
     this.#options.relay.setAccountActive(principalId !== null);
   }
 
-  /** Processes one request and reports it, also when the processing fails. */
   readonly #deliver = Effect.fn("HostEvents.deliver")(function* (
     this: HostEventsService,
     input: WebhookIngressDelivery,
@@ -594,10 +589,6 @@ export class HostEventsService implements HostEventsApi {
     return outcome.success;
   });
 
-  /**
-   * Verifies one request and starts its routine. `received` is what the routine did with a verified
-   * request, and null when a check refused the request first.
-   */
   readonly #process = Effect.fn("HostEvents.process")(function* (
     this: HostEventsService,
     input: WebhookIngressDelivery,
@@ -614,7 +605,6 @@ export class HostEventsService implements HostEventsApi {
         return value;
       }),
     );
-    // The sender's request is not at fault, so it can retry when the host can read the secret again.
     if (secret._tag === "Failure") {
       logger.warn("A webhook signing secret could not be decrypted.");
       return refused(503, "secret_unreadable", ownerKind);
@@ -641,14 +631,12 @@ export class HostEventsService implements HostEventsApi {
     return { status: deliveryStatus(received), received, refusal: null, ownerKind, authenticated: true };
   });
 
-  /** A route of a workflow while this host has no workflows is gone, as a deleted routine is. */
   #receiveWorkflow(delivery: WorkflowWebhookDelivery): Effect.Effect<ReceivedDelivery, HostEventsFailure> {
     const workflows = this.#options.workflows;
     if (!workflows) return Effect.succeed({ kind: "gone" });
     return toHostEventsFailure(workflows.receive(delivery));
   }
 
-  /** Writes the routine under the write lock, so the route limit check and the write are one step. */
   readonly #saveRecord = Effect.fn("HostEvents.saveRecord")(
     function* (this: HostEventsService, input: SaveEventRoutineInput) {
       const { owner, trigger } = input;
@@ -682,6 +670,8 @@ export class HostEventsService implements HostEventsApi {
           ...(input.runIn === undefined ? {} : { runIn: input.runIn }),
         }),
       );
+      if (existing && (existing.trigger.kind === "webhook") !== (trigger.kind === "webhook"))
+        yield* this.#dropAgentKey({ owner, id: existing.id });
       return { saved, secret };
     },
     (operation) => this.#writes.withPermit(operation),
@@ -723,6 +713,21 @@ export class HostEventsService implements HostEventsApi {
     return yield* eventFailure(sourceText("error.backend.routineGone"));
   });
 
+  readonly #requireRoute = Effect.fn("HostEvents.requireRoute")(function* (
+    this: HostEventsService,
+    ref: EventRoutineRef,
+  ) {
+    const route = yield* eventStep(() =>
+      this.#options.routines.routes
+        .list()
+        .find(
+          (item) => item.routineId === ref.id && item.owner.kind === ref.owner.kind && item.owner.id === ref.owner.id,
+        ),
+    );
+    if (route) return route;
+    return yield* eventFailure(sourceText("error.backend.routineGone"));
+  });
+
   readonly #encrypt = Effect.fn("HostEvents.encrypt")(function* (this: HostEventsService, secret: string) {
     return yield* eventStep(() => {
       registerSecretValue(secret);
@@ -731,14 +736,8 @@ export class HostEventsService implements HostEventsApi {
   });
 }
 
-/**
- * The webhook routine tools of an agent, through the events service. A new routine's save makes the
- * first secret, and this drops it: the tool result goes to the model provider. The chat card makes
- * a new secret for the user.
- */
 export function agentWebhookRoutineWriter(events: HostEventsService): WebhookRoutineWriter {
   const toolFailure = (failure: HostEventsFailure) => {
-    // A reason the model can correct, such as the route limit, comes back as a tool failure.
     const message = hostEventsFailureMessage(failure);
     return new RoutineOperationFailed({ cause: message === null ? failure : new RoutineInputError(message) });
   };

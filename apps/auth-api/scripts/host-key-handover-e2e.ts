@@ -1,12 +1,3 @@
-// Runs the real host key handover of the account server on a migrated SQLite database (#2745). A host
-// that both keys signed for moves to the new key. It keeps its machine token and its auth epoch, so
-// paired devices stay signed in, and its Mobile Connect links stop. The same request again changes
-// nothing. A step from a key that the host no longer has, an earlier step, a bad signature, a wrong
-// machine token and another account are refused. The host list and the invitation preview send the
-// latest 32 steps, the earliest first.
-//
-// Run: bun run test:host-key-handover
-// It writes .openbot-build/host-key-handover-e2e/report.json and exits non-zero on a failure.
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -63,7 +54,6 @@ interface HostKey {
   privateKey: CryptoKey;
 }
 
-/** An Ed25519 key in the PEM form that the host sends: 64 characters for each line. */
 async function hostKey(): Promise<HostKey> {
   const pair = await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]);
   const spki = new Uint8Array(await crypto.subtle.exportKey("spki", pair.publicKey));
@@ -79,7 +69,6 @@ async function sign(key: CryptoKey, message: Uint8Array<ArrayBuffer>) {
   return encodeBase64Url(new Uint8Array(await crypto.subtle.sign({ name: "Ed25519" }, key, message)));
 }
 
-/** A step that `previousSigner` and `nextSigner` sign. By default they are the two keys of the step. */
 async function handover(
   previous: HostKey,
   next: HostKey,
@@ -95,7 +84,6 @@ async function handover(
   };
 }
 
-/** A migrated database with a registered host, an open Mobile Connect link, and the real control plane. */
 async function setup() {
   const database = await migratedDatabase();
   const now = Date.now();
@@ -143,7 +131,6 @@ async function setup() {
   return { plane, first, now, host, storedSteps, openLinks, events, hand, machineToken: registered.machineToken };
 }
 
-/** The error code of an operation, or null when it succeeds. */
 async function result<A, E extends object>(operation: Effect.Effect<A, E>) {
   const outcome = await Effect.runPromise(Effect.result(operation));
   if (outcome._tag === "Success") return { code: null, status: 200, value: outcome.success };
@@ -189,7 +176,6 @@ async function theHostMovesToTheNewKey() {
   check("the invitation preview sends the step", JSON.stringify(preview.keyHandovers) === JSON.stringify([step]));
   check("the invitation preview has the new key", preview.devicePublicKey === next.pem);
 
-  // The host publishes itself again on its next start, now with the new key.
   const published = await result(
     plane.registerHost(OWNER, {
       hostId: HOST_ID,
@@ -283,7 +269,6 @@ async function onlyTheLatestStepsStay() {
 async function aRegistrationWithAnotherKeyDropsTheSteps() {
   const { plane, first, now, host, storedSteps, hand } = await setup();
   await hand(await handover(first, await hostKey(), now));
-  // The host lost its machine token, so it dropped its pending handover and registers its old key.
   const registered = await result(
     plane.registerHost(OWNER, {
       hostId: HOST_ID,

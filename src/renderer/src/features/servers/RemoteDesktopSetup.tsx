@@ -131,7 +131,6 @@ export function RemoteDesktopSetup(props: { server: ServerSummary; platform: "da
   }
 
   async function release(session: RemoteDesktopSession) {
-    // Disconnect also removes a host panel when a stop request cannot reach the host.
     try {
       if (!state.videoOnly)
         await serversPort().remoteDesktop.test({ serverId: session.serverId, sessionId: session.id, action: "stop" });
@@ -330,7 +329,6 @@ export function RemoteDesktopSetup(props: { server: ServerSummary; platform: "da
                       when={
                         local() &&
                         (key === "screenRecording" || key === "accessibility") &&
-                        // Keep the last result during a re-check so Grant does not move under the cursor.
                         (state.result ? state.result[key] !== "allowed" : !state.checking)
                       }
                     >

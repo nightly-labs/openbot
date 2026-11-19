@@ -14,6 +14,7 @@ import { messages as composer } from "./composer";
 import { messages as computerUse } from "./computerUse";
 import { messages as connector } from "./connector";
 import { messages as conversation } from "./conversation";
+import { messages as crm } from "./crm";
 import { messages as customProvider } from "./customProvider";
 import { messages as diagram } from "./diagram";
 import { messages as dialog } from "./dialog";
@@ -52,19 +53,6 @@ import { messages as webClient } from "./webClient";
 import { messages as window } from "./window";
 import { messages as workflow } from "./workflow";
 
-/**
- * Russian. Written from the English source: a key that is missing here renders its English source.
- *
- * Notes for a reviewer. The English source addresses the user directly, so the text uses the polite
- * вы throughout and never the familiar ты, in the imperative form a Russian interface uses
- * («Откройте», «Проверьте»). Labels stay short, because Russian words run longer than English ones
- * and a button or a sidebar row has no room to spare. Typography follows Russian convention: quotes
- * are «ёлочки», the ellipsis is the single character …, and ё is written out. Plurals fill the one,
- * few, many and other forms. Product names stay in Latin script: OpenBot is the application name,
- * and ZIP and JSON are the file formats a picker shows.
- *
- * This is the desktop catalog: shared keys, source text, and every desktop area.
- */
 export const ru = {
   ...shared,
   ...source,
@@ -117,4 +105,5 @@ export const ru = {
   ...vault,
   ...uiBlock,
   ...sitePage,
+  ...crm,
 } as const satisfies PartialTranslation<AppMessages>;
