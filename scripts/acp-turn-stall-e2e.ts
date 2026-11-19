@@ -45,6 +45,7 @@ interface Report {
   lostTwice?: { status: string | null; error: string | null; elapsedMs: number; next: string | null };
   quiet?: { status: string | null; reply: string; prompts: number };
   noLoad?: { stopStatus: string | null; next: string | null; sessionsOpened: number; loads: number };
+  silentNew?: { error: string; elapsedMs: number };
   failure?: string;
 }
 
@@ -363,6 +364,20 @@ try {
   assert.equal(noLoadNext.status, "completed", "The next turn of that agent completes.");
   assert.equal(report.noLoad.sessionsOpened, 0, "The agent keeps its session.");
   assert.equal(report.noLoad.loads, 0, "OpenBot does not try to open the session again.");
+
+  const silentNew = await open("cline", DEFAULT_ACP_FLAVOR, join(root, "silent-new.jsonl"), { FAKE_SILENT_NEW: "1" });
+  const silentStart = await timed(() =>
+    startThread(silentNew, { cwd: workspace }).then(
+      () => "",
+      (error: unknown) => (error instanceof Error ? error.message : String(error)),
+    ),
+  );
+  report.silentNew = { error: silentStart.value, elapsedMs: silentStart.elapsedMs };
+  assert.equal(
+    silentStart.value,
+    sourceText("error.provider.acpUnresponsive", { provider: "Cline" }),
+    "A session start that the agent never answers fails after the stall limit.",
+  );
 
   report.passed = true;
 } catch (error) {
