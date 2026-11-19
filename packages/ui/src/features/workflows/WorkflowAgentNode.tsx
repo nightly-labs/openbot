@@ -7,6 +7,7 @@ import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { PickerMenu, type PickerOption } from "./WorkflowPicker";
 import { useBoard } from "./workflow-board";
+import { InputPictures } from "./workflow-input-pictures";
 import type { WorkflowCatalogs } from "./workflow-model";
 import { ModelPill, modelOption } from "./workflow-model-pills";
 import {
@@ -117,6 +118,7 @@ export function AgentNode(props: { id: string; agentId?: string; task?: string }
   );
   const [locked, setLocked] = useLocked(() => props.id);
   const run = useStepRun(untrack(() => props.id));
+  const pictures = () => (board.catalogs().agentFiles === true ? board.inputs(props.id, "image") : []);
   return (
     <NodeShell
       action={
@@ -141,6 +143,9 @@ export function AgentNode(props: { id: string; agentId?: string; task?: string }
       toolbar={<NodeToolbar id={props.id} name={t("workflow.agent.name")} locked={locked()} onLock={setLocked} />}
     >
       <Field class="wfn-field-task">
+        <Show when={pictures().length > 0}>
+          <InputPictures sources={pictures()} />
+        </Show>
         <Textarea
           class="wfn-input"
           aria-label={t("workflow.agent.task")}

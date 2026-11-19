@@ -37,6 +37,7 @@ export const STORY_CATALOGS: WorkflowCatalogs = {
     { id: "story-channel-support", name: "support" },
   ],
   mediaSize: true,
+  agentFiles: true,
   mediaPrice: async (request) => ({ credits: request.kind === "video" ? request.duration * 2.5 : 1.5 }),
   imageModels: [
     {

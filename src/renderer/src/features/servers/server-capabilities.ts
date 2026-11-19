@@ -149,6 +149,7 @@ export function serverSupportsCapability(
       capability === "workflows-chats-v1" ||
       capability === "workflows-channels-v1" ||
       capability === "workflows-media-v1" ||
+      capability === "workflows-agent-files-v1" ||
       capability === "vault-import-v1" ||
       capability === "agent-waits-v1" ||
       capability === "agent-queue-task-v1" ||

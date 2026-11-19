@@ -367,6 +367,15 @@ export function agentStepText(workflowTitle: string, task: string, input: string
   return parts.join("\n\n");
 }
 
+export function agentHandoffText(text: string, files: number): string {
+  if (files === 0) return text;
+  const attached =
+    files === 1
+      ? "The attached file comes from a step before this one. Use it as given"
+      : `The ${files} attached files come from the steps before this one. Use them together as given`;
+  return `${text}\n\n${attached}: keep the subjects, look and details they show, and do not invent a substitute.`;
+}
+
 export function modelStepPrompt(system: string, prompt: string, input: string): string {
   return [system.trim(), prompt.trim(), input ? `--- input ---\n${input}` : ""].filter(Boolean).join("\n\n");
 }
