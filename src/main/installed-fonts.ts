@@ -87,17 +87,17 @@ function parseFontFamilies(output: string): string[] {
 
 let symbolFontsCache: ReadonlySet<string> | null = null;
 
-const listSymbolFonts = Effect.fn("InstalledFonts.listSymbolFonts")(function* (platform: NodeJS.Platform) {
-  if (platform !== "win32") return new Set<string>();
-  if (symbolFontsCache !== null) return symbolFontsCache;
+const scanSymbolFonts = Effect.fn("InstalledFonts.scanSymbolFonts")(function* () {
   const listed = yield* Effect.result(runFontCommand(WINDOWS_SYMBOL_FONTS_COMMAND));
-  if (Result.isSuccess(listed)) {
-    const symbolFonts = new Set(parseFontFamilies(listed.success));
-    if (symbolFonts.size > 0) symbolFontsCache = symbolFonts;
-    return symbolFonts;
-  }
+  if (Result.isSuccess(listed)) return new Set(parseFontFamilies(listed.success));
   logger.warn("The list of symbol fonts did not load.", toLogValue(listed.failure.cause));
   return new Set<string>();
+});
+
+const listSymbolFonts = Effect.fn("InstalledFonts.listSymbolFonts")(function* (platform: NodeJS.Platform) {
+  if (platform !== "win32") return new Set<string>();
+  symbolFontsCache ??= yield* scanSymbolFonts();
+  return symbolFontsCache;
 });
 
 export const listInstalledFonts = Effect.fn("InstalledFonts.list")(function* (
