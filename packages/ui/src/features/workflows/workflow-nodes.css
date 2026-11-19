@@ -182,6 +182,11 @@
   flex-shrink: 1;
 }
 
+.wfn-stage .wfn-model-pill[data-static] {
+  display: inline-flex;
+  align-items: center;
+}
+
 .wfn-stage .wfn-agent-pill:has(+ .wfn-model-pill) {
   max-width: calc(100% - 96px - var(--openbot-space-2));
 }
@@ -202,7 +207,7 @@
 }
 
 .wfn-stage .wfn-field-foot .provider-model-trigger:is(:hover, [aria-expanded="true"]),
-.wfn-stage .wfn-pill:hover {
+.wfn-stage .wfn-pill:not([data-static]):hover {
   background: var(--wfn-hover);
 }
 
