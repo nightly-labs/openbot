@@ -1,5 +1,45 @@
 [
   {
+    "version": "0.74.0",
+    "date": "2026-11-19",
+    "notices": [
+      "Zaktualizuj także do tej wersji każdy serwer, do którego dołączyłeś. Na serwerze małe kopie obrazów na kanwie przepływu pracy, własne długości wideo oraz agenci, którzy kończą żądanie bez twojego „kontynuuj”, działają tylko wtedy, gdy serwer ma tę wersję.",
+      "W systemie Linux, jeśli OpenBot nadal działa wolno po aktualizacji, usuń plik `~/.config/OpenBot/gpu-crash.json` i uruchom OpenBot ponownie.",
+      "Jeśli w ustawieniach dostawcy ustawiłeś Myślenie dla agenta Mistral, wybierz poziom ponownie w menu Wysiłek i zresetuj stary wiersz Myślenie."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Udostępnij swój link z zaproszeniem w Ustawienia > Invite friends. Karta pokazuje twój kredyt i znajomych, którzy dołączyli. Znajomy dostaje 10% zniżki od każdej płatności, a ty dostajesz 10% każdej opłaconej faktury znajomego jako kredyt.",
+          "Umieść węzły kanwy przepływu pracy w grupie. Zaznacz je i naciśnij Grupuj (⌘G). Zwiń grupę do jednej karty stosu, a Rozgrupuj (⇧⌘G) zakończy grupowanie.",
+          "Nadaj krokowi wideo na kanwie przepływu pracy dowolną długość, jaką obsługuje jego model Sunra lub Higgsfield. Wybierz Własna w menu Długość i użyj suwaka.",
+          "Otwórz Marketplace z wiersza Aplikacje w ustawieniach agenta. Połącz aplikację albo dodaj własny serwer MCP przyciskiem Dodaj własną.",
+          "Gdy logujesz się na nowym komputerze, a twoje konto ma już serwery, pierwszy krok je pokazuje. Otwórz jeden, aby kontynuować z jego agentami i czatami."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Agenci kończą twoje żądanie bez „kontynuuj” z twojej strony. Gdy część żądania nie jest gotowa, agent kontynuuje tę część, najwyżej 3 razy. Pytanie, które wymaga twojego wyboru lub zgody, nadal zatrzymuje agenta.",
+          "Karty panelu bocznego zachowują tytuł i jedną szerokość. Gdy karty się nie mieszczą, wiersz się przewija, a menu na końcu wiersza pokazuje pozostałe karty. Środkowy przycisk myszy zamyka kartę.",
+          "Na serwerze, do którego dołączyłeś, obrazy na kanwie przepływu pracy wyświetlają się dużo szybciej. Kanwa dostaje małą kopię każdego obrazu, a pełny obraz otwiera się w przeglądarce.",
+          "Wątek wygląda teraz jak czat agenta. Wiadomości jednego nadawcy są czytane jako jeden blok, a kroki odpowiedzi są pokazane obok."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Agent Claude lub ChatGPT nie zostaje już godzinami w stanie „pracuje”, gdy dostawca przestaje odpowiadać. Po 15 minutach bez wyniku (60 minut, gdy działa narzędzie) OpenBot kończy turę, a wiadomości w kolejce są kontynuowane.",
+          "Gdy opcja „Używaj mojej konfiguracji Claude Code” jest wyłączona, agenci Claude nie wczytują już twoich globalnych instrukcji i reguł Claude Code. Każda tura jest szybsza i kosztuje mniej. Aby je zachować, włącz „Używaj mojej konfiguracji Claude Code”.",
+          "Agenci dalej pracują, gdy OpenBot pobiera aktualizację dostawcy. Pobieranie, które przez minutę nie dostaje danych, zatrzymuje się i wznawia od miejsca, w którym przerwało, gdy spróbujesz ponownie.",
+          "Agenci znów wysyłają wiadomości bezpośrednio do swoich agentów z zespołu. Wcześniej karta prosiła cię o zatwierdzenie każdego przekazania i praca stała, dopóki nie zatwierdziłeś.",
+          "Agent z automatycznymi zapasowymi modelami przechodzi do następnego zapasowego modelu w większej liczbie przypadków, na przykład po limicie zapytań albo gdy Gemini traci połączenie z Google."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.73.0",
     "date": "2026-11-18",
     "notices": [

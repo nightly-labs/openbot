@@ -1,5 +1,45 @@
 [
   {
+    "version": "0.74.0",
+    "date": "2026-11-19",
+    "notices": [
+      "Update each joined server to this version too. On a server, small copies of the pictures on the Workflows canvas, Custom video lengths and agents that finish a request without a \"continue\" work only when the server has this version.",
+      "On Linux, if OpenBot is still slow after the upgrade, delete the file `~/.config/OpenBot/gpu-crash.json` and start OpenBot again.",
+      "If you set Thinking under Provider settings for a Mistral agent, select the level again in the Effort menu and reset the old Thinking row."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Share your invite link in Settings > Invite friends. The tab shows your credit and the friends who joined. A friend gets 10% off each payment, and you get 10% of each paid invoice of your friend as credit.",
+          "Put nodes of a workflow canvas in a group. Select them and press Group (⌘G). Collapse a group into one stack card, and press Ungroup (⇧⌘G) to end it.",
+          "Give a video step on the workflow canvas any length that its Sunra or Higgsfield model makes. Select Custom in the Length menu and use the slider.",
+          "Open the Marketplace from the Apps row in the settings of an agent. Connect an app, or add your own MCP server with Add custom.",
+          "When you sign in on a new computer and your account already has servers, the first step shows them. Open one to continue with its agents and chats."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Agents finish your request without a \"continue\" from you. When a part of the request is not done, the agent continues with that part, at most 3 times. A question that needs your choice or approval still stops the agent.",
+          "Side panel tabs keep their title and one width. When the tabs do not fit, the row scrolls, and a menu at the end of the row lists the other tabs. A middle click closes a tab.",
+          "On a joined server, the pictures of the Workflows canvas show much faster. The canvas gets a small copy of each picture, and the full picture opens in the viewer.",
+          "A thread now looks like the agent's chat. Messages by one sender read as one block, and the steps of an answer show beside it."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "A Claude or ChatGPT agent no longer stays on \"working\" for hours when the provider stops responding. After 15 minutes with no output (60 minutes while a tool runs), OpenBot ends the turn, and the queued messages continue.",
+          "With \"Use my Claude Code setup\" off, Claude agents no longer load your global Claude Code instructions and rules. Each turn is faster and costs less. To keep them, turn on \"Use my Claude Code setup\".",
+          "Your agents keep working while OpenBot downloads a provider update. A download that gets no data for one minute stops, and it continues from where it stopped when you try again.",
+          "Agents send messages to their teammate agents directly again. Before, a card asked you to approve each handoff, and work stopped until you approved.",
+          "An agent with automatic backup models moves to its next backup model in more cases, for example after a rate limit or when Gemini loses its connection to Google."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.73.0",
     "date": "2026-11-18",
     "notices": [

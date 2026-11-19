@@ -1,5 +1,45 @@
 [
   {
+    "version": "0.74.0",
+    "date": "2026-11-19",
+    "notices": [
+      "Werk ook elke server waarbij je bent aangesloten bij naar deze versie. Op een server werken kleine kopieën van de afbeeldingen op het workflowcanvas, aangepaste videolengtes en agents die een verzoek afronden zonder dat je «doorgaan» typt, alleen als de server deze versie heeft.",
+      "Als OpenBot op Linux na de update nog steeds traag is, verwijder dan het bestand `~/.config/OpenBot/gpu-crash.json` en start OpenBot opnieuw.",
+      "Als je bij Instellingen van aanbieder Nadenken voor een Mistral-agent hebt ingesteld, selecteer dan het niveau opnieuw in het menu Denkniveau en reset de oude rij Nadenken."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Deel je uitnodigingslink in Instellingen > Invite friends. Het tabblad toont je tegoed en de vrienden die zich hebben aangemeld. Een vriend krijgt 10% korting op elke betaling, en jij krijgt 10% van elke betaalde factuur van je vriend als tegoed.",
+          "Zet knooppunten van een workflowcanvas in een groep. Selecteer ze en druk op Groeperen (⌘G). Vouw een groep samen tot één stapelkaart, en druk op Groep opheffen (⇧⌘G) om de groep te beëindigen.",
+          "Geef een videostap op het workflowcanvas elke lengte die het Sunra- of Higgsfield-model ondersteunt. Selecteer Aangepast in het menu Lengte en gebruik de schuifregelaar.",
+          "Open de Marktplaats vanuit de rij Apps in de instellingen van een agent. Koppel een app, of voeg je eigen MCP-server toe met Eigen toevoegen.",
+          "Wanneer je inlogt op een nieuwe computer en je account heeft al servers, toont de eerste stap ze. Open een server om verder te gaan met de agents en chats daarvan."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Agents ronden je verzoek af zonder dat je «doorgaan» hoeft te typen. Als een deel van het verzoek nog niet klaar is, gaat de agent met dat deel verder, maximaal 3 keer. Een vraag die jouw keuze of goedkeuring nodig heeft, stopt de agent nog steeds.",
+          "Tabbladen van het zijpaneel behouden hun titel en één breedte. Als de tabbladen niet passen, scrolt de rij, en een menu aan het eind van de rij toont de andere tabbladen. Met een middelklik sluit je een tabblad.",
+          "Op een server waarbij je bent aangesloten, verschijnen de afbeeldingen op het workflowcanvas veel sneller. Het canvas krijgt een kleine kopie van elke afbeelding, en de volledige afbeelding opent in de viewer.",
+          "Een thread ziet er nu uit als de chat van de agent. Berichten van dezelfde afzender lezen als één blok, en de stappen van een antwoord staan ernaast."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Een Claude- of ChatGPT-agent blijft niet meer uren op «Bezig» staan wanneer de provider niet meer reageert. Na 15 minuten zonder uitvoer (60 minuten terwijl een tool draait) beëindigt OpenBot de beurt, en de wachtende berichten gaan verder.",
+          "Met «Mijn Claude Code-configuratie gebruiken» uit, laden Claude-agents je algemene Claude Code-instructies en -regels niet meer. Elke beurt is sneller en kost minder. Wil je ze houden, zet «Mijn Claude Code-configuratie gebruiken» dan aan.",
+          "Je agents blijven werken terwijl OpenBot een providerupdate downloadt. Een download die een minuut geen gegevens krijgt, stopt en gaat verder waar hij was gebleven wanneer je het opnieuw probeert.",
+          "Agents sturen berichten weer rechtstreeks naar hun teamgenoten. Eerder vroeg een kaart je om elke overdracht goed te keuren, en het werk stopte tot je goedkeurde.",
+          "Een agent met automatische reservemodellen gaat in meer gevallen naar zijn volgende reservemodel, bijvoorbeeld na een limiet op het aantal verzoeken of wanneer Gemini de verbinding met Google verliest."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.73.0",
     "date": "2026-11-18",
     "notices": [
