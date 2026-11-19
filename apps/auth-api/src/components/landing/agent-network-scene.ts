@@ -555,10 +555,20 @@ export function startHubSignal(network: AgentNetwork, style: HubSignalStyle, at:
 
 const WORD_SEGMENTER = new Intl.Segmenter(undefined, { granularity: "word" });
 
+function wrapUnits(text: string): string[] {
+  const units: string[] = [];
+  for (const { segment, isWordLike } of WORD_SEGMENTER.segment(text)) {
+    const last = units.length - 1;
+    if (!isWordLike && !/\s/u.test(segment) && last >= 0) units[last] += segment;
+    else units.push(segment);
+  }
+  return units;
+}
+
 function wrapText(context: CanvasRenderingContext2D, text: string, width: number): string[] {
   const lines: string[] = [];
   let line = "";
-  for (const { segment } of WORD_SEGMENTER.segment(text)) {
+  for (const segment of wrapUnits(text)) {
     const candidate = line + segment;
     if (line.trim() && context.measureText(candidate.trimEnd()).width > width) {
       lines.push(line.trimEnd());
