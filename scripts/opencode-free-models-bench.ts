@@ -174,12 +174,14 @@ const TASKS: Task[] = [
     skill: "Find and fix two bugs from a failing test",
     files: {
       "package.json": '{ "type": "module" }\n',
-      "src/math.js": `export function sumRange(from, to) {
+      "src/math.js": `// The sum of the integers from \`from\` to \`to\`, both included.
+export function sumRange(from, to) {
   let total = 0;
   for (let n = from; n < to; n += 1) total += n;
   return total;
 }
 
+// The average of a list, or 0 for an empty list.
 export function average(values) {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
@@ -395,7 +397,9 @@ Attendees: Ana, Bo, Chen, Dee.
     skill: "Fix a parser with subtle bugs; hidden cases catch a fix that only fits the tests",
     files: {
       "package.json": '{ "type": "module" }\n',
-      "parse.js": `export function parseLine(line) {
+      "parse.js": `// Splits one CSV line into its fields (RFC 4180): a field in double quotes can hold commas,
+// and two double quotes inside it stand for one.
+export function parseLine(line) {
   const fields = [];
   let current = "";
   let quoted = false;

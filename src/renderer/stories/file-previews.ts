@@ -60,6 +60,7 @@ const TEXT = `2026-09-13T09:12:04.118Z  info   provider.claude-code   session st
 
 const SOURCE = `import type { ClientAgentSummary } from "./agents";
 
+/** Team API v1-v3 call an agent a "bot". Translate on the wire only. */
 export function toWireAgent(agent: ClientAgentSummary) {
   return { botId: agent.id, name: agent.name, workspace: agent.workspacePath };
 }

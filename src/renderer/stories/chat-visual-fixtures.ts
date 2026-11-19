@@ -173,6 +173,7 @@ export const INTERACTIVE_CHOICE = `<!doctype html>
 </div>
 <img id="chart" alt="Runs per day">
 <script>
+  // The chart is an image, drawn here with the theme colours, so a click on it opens the image viewer.
   const canvas = document.createElement("canvas");
   canvas.width = 480;
   canvas.height = 200;
