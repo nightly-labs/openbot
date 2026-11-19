@@ -13,7 +13,7 @@ import { Schema } from "effect";
 export const FINISH_CHECK_DEADLINE_MS = 30_000;
 
 /** The text in the provider input that marks a finish check, for logs and test fakes. */
-export const FINISH_CHECK_MARKER = "OpenBot finish check";
+const FINISH_CHECK_MARKER = "OpenBot finish check";
 
 /** How often a running check looks for a Stop or a new message, which end it at once. */
 export const FINISH_CHECK_ABORT_POLL = "250 millis";
