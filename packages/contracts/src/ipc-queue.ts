@@ -1,4 +1,4 @@
-import { type AgentProviderId, isAgentProvider } from "./agent-providers";
+import { type AgentProviderRef, isAgentProviderRef } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
 import { type AttachmentSummary, isAttachmentSummary } from "./ipc-attachments";
 import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
@@ -121,11 +121,11 @@ export type QueueHold =
       channelName: string;
       agentId: string;
     }
-  | { reason: "provider-restart"; provider: AgentProviderId };
+  | { reason: "provider-restart"; provider: AgentProviderRef };
 
 export function isQueueHold(value: unknown): value is QueueHold {
   if (!isDynamicRecord(value) || !isOneOf(QUEUE_HOLD_REASONS, value.reason)) return false;
-  if (value.reason === "provider-restart") return isAgentProvider(value.provider);
+  if (value.reason === "provider-restart") return isAgentProviderRef(value.provider);
   return (
     isIdentifier(value.channelId) &&
     isBoundedString(value.channelName, INPUT_LIMITS.agentTitle) &&

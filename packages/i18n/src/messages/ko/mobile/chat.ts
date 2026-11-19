@@ -517,6 +517,7 @@ export const messages = {
   "mobile.chat.queue.cancelUpload": "대기 중인 업로드 취소",
   "mobile.chat.queue.waitingTitle": "에이전트를 기다리는 중",
   "mobile.chat.queue.repliesTitle": "답변 대기 중",
+  "mobile.chat.queue.providerRestart": "{provider} 재시작을 기다리는 중",
   "mobile.chat.queue.replyState.asked": "요청함",
   "mobile.chat.queue.replyState.working": "작업 중",
   "mobile.chat.queue.replyState.replied": "답변함",

@@ -521,6 +521,7 @@ export const messages = {
   "mobile.chat.queue.cancelUpload": "キューのアップロードをキャンセル",
   "mobile.chat.queue.waitingTitle": "エージェントを待っています",
   "mobile.chat.queue.repliesTitle": "返信を待っています",
+  "mobile.chat.queue.providerRestart": "{provider} の再起動を待っています",
   "mobile.chat.queue.replyState.asked": "依頼済み",
   "mobile.chat.queue.replyState.working": "作業中",
   "mobile.chat.queue.replyState.replied": "返信済み",

@@ -537,6 +537,7 @@ export const messages = {
   "mobile.chat.queue.cancelUpload": "Annuler l’envoi en file d’attente",
   "mobile.chat.queue.waitingTitle": "En attente de l’agent",
   "mobile.chat.queue.repliesTitle": "En attente de réponses",
+  "mobile.chat.queue.providerRestart": "En attente du redémarrage de {provider}",
   "mobile.chat.queue.replyState.asked": "Demandé",
   "mobile.chat.queue.replyState.working": "En cours",
   "mobile.chat.queue.replyState.replied": "A répondu",

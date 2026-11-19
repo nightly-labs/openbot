@@ -517,6 +517,7 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.queue.cancelUpload": "Cancel queued upload",
   "mobile.chat.queue.waitingTitle": "Waiting for the agent",
   "mobile.chat.queue.repliesTitle": "Waiting for replies",
+  "mobile.chat.queue.providerRestart": "Waiting for {provider} to restart",
   "mobile.chat.queue.replyState.asked": "Asked",
   "mobile.chat.queue.replyState.working": "Working",
   "mobile.chat.queue.replyState.replied": "Replied",
