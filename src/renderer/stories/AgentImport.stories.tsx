@@ -140,7 +140,6 @@ export const ReviewNarrow: Story = {
   render: () => <Stage args={viewArgs({ phase: "review", preview: AGENT_IMPORT_PREVIEW })} narrow />,
 };
 
-/** Server settings > Import for this computer. The preview reads a Grok Bot export or the Hermes folder. */
 export const InServerSettings: Story = {
   name: "Import: Server settings",
   render: () => (
@@ -169,7 +168,6 @@ const hermesArgs = (overrides: Partial<HermesArgs> = {}): HermesArgs => ({
   ...overrides,
 });
 
-/** The first screen: Hermes, Grok Bot, or another OpenBot computer. */
 export const Sources: Story = {
   name: "Import: Sources",
   render: () => (
@@ -179,7 +177,6 @@ export const Sources: Story = {
   ),
 };
 
-/** A joined server the user does not administer: no Transfer. */
 export const SourcesJoinedServer: Story = {
   name: "Import: Sources on a joined server",
   render: () => (
@@ -198,7 +195,6 @@ const hermesGuideArgs = (overrides: Partial<ViewArgs> = {}): ViewArgs =>
     ...overrides,
   });
 
-/** Hermes on this computer: read its folder, install the export skill with a command, or add it by hand. */
 export const HermesSteps: Story = {
   name: "Hermes: Steps",
   render: () => {
@@ -229,7 +225,6 @@ export const HermesSkillYourself: Story = {
   ),
 };
 
-/** A joined server without `hermes-import-v1`, or a member: Hermes offers the export only. */
 export const HermesStepsJoinedServer: Story = {
   name: "Hermes: Steps on a joined server",
   render: () => (
@@ -239,7 +234,6 @@ export const HermesStepsJoinedServer: Story = {
   ),
 };
 
-/** An owner or admin of a joined server with `hermes-import-v1`: the server reads its own folder. */
 export const HermesStepsServerFolder: Story = {
   name: "Hermes: Steps on a joined server that reads its folder",
   render: () => (
@@ -249,7 +243,6 @@ export const HermesStepsServerFolder: Story = {
   ),
 };
 
-/** An export the skill made in Hermes: the same review as a Grok Bot export. */
 export const HermesExportReview: Story = {
   name: "Hermes: Export review",
   render: () => (
@@ -275,7 +268,6 @@ export const HermesExportReview: Story = {
   ),
 };
 
-/** Every item of every profile, with what needs approval and what stays in Hermes. */
 export const HermesReview: Story = {
   name: "Hermes: Review",
   render: () => (
@@ -285,7 +277,6 @@ export const HermesReview: Story = {
   ),
 };
 
-/** A second import: the profile imported before updates its agent, or is left as it is. */
 export const HermesSecondImport: Story = {
   name: "Hermes: Second import",
   render: () => (
@@ -313,7 +304,6 @@ export const HermesNotFound: Story = {
   ),
 };
 
-/** A joined server has no Hermes profiles. The folder dialog is on this computer, so there is no choice. */
 export const HermesNotFoundOnServer: Story = {
   name: "Hermes: No profiles on a joined server",
   render: () => (
@@ -337,7 +327,7 @@ export const HermesDone: Story = {
             channels: [],
             warnings: [
               "Research desk: SOUL.md is longer than 2000 characters, so the instructions keep its start. The full file is in imported/hermes/SOUL.md.",
-              "filesystem: the MCP server is added turned off. Check its command, enter its values and full address again, and turn it on in MCP settings.",
+              "filesystem: the MCP server is added turned off. Check its command, enter its values and full address again, and turn it on in Marketplace, Apps.",
             ],
           },
         })}

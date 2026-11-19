@@ -1,8 +1,3 @@
-// No Vite-only import belongs in this file. `vite.config.ts` reads it, through the
-// news artwork generator, while plain Node loads the config, and Node cannot
-// resolve an `?url` specifier. That is why the font asset arrives as an argument
-// from the root route instead of as an import here.
-
 import { faqStructuredData, type LandingQuestion } from "./landing-faq";
 import { OPENBOT_ALTERNATE_DOWNLOAD_LINKS, OPENBOT_DOWNLOAD_LINKS, OPENBOT_LINKS } from "./landing-links";
 
@@ -11,22 +6,17 @@ export const OPENBOT_SITE_TITLE = "OpenBot: Run a team of AI agents on your comp
 export const OPENBOT_SITE_DESCRIPTION =
   "A free desktop app that runs AI agents as a team on your own computer, with the ChatGPT, Claude, Gemini or Grok plan you already pay for, or your own model.";
 export const OPENBOT_SOCIAL_IMAGE_URL = `${OPENBOT_SITE_URL}openbot-social.png`;
-/** The account `OPENBOT_LINKS.x` opens, which a shared card names. */
 export const OPENBOT_X_HANDLE = "@OpenBot_";
 const OPENBOT_X_URL = "https://x.com/OpenBot_";
 const OPENBOT_REPOSITORY_URL = "https://github.com/nightly-labs/openbot";
 const OPENBOT_PRODUCT_HUNT_URL = "https://www.producthunt.com/products/openbot-3";
 const OPENBOT_LICENSE_URL = "https://polyformproject.org/licenses/noncommercial/1.0.0/";
-// One id for each entity, so that every page describes the same organization,
-// site and app, and an assistant can join what the pages say about each.
 const OPENBOT_ORGANIZATION_ID = `${OPENBOT_SITE_URL}#organization`;
 const OPENBOT_WEBSITE_ID = `${OPENBOT_SITE_URL}#website`;
 const OPENBOT_APPLICATION_ID = `${OPENBOT_SITE_URL}#app`;
-/** Square, as schema.org wants for a publisher logo. */
 export const OPENBOT_LOGO_URL = `${OPENBOT_SITE_URL}icon-512x512.png`;
 export const OPENBOT_SOCIAL_IMAGE_ALT = "Meet OpenBot on a dark grid background";
 
-/** The Open Graph tags of the site's own social card, which is 1600x900. */
 export const OPENBOT_SOCIAL_IMAGE_META = [
   { property: "og:image", content: OPENBOT_SOCIAL_IMAGE_URL },
   { property: "og:image:type", content: "image/png" },
@@ -35,7 +25,6 @@ export const OPENBOT_SOCIAL_IMAGE_META = [
   { property: "og:image:alt", content: OPENBOT_SOCIAL_IMAGE_ALT },
 ] as const;
 
-/** The site's card in the shape of `pageSocialImageMeta`, for a page that can have either. */
 export const OPENBOT_SOCIAL_IMAGE_TAGS = {
   openGraph: OPENBOT_SOCIAL_IMAGE_META,
   twitter: [
@@ -44,23 +33,16 @@ export const OPENBOT_SOCIAL_IMAGE_TAGS = {
   ],
 } as const;
 
-/** A page's own social card: a 1600x900 JPEG in `public/social/`, the size of the site's card. */
 export interface PageSocialImage {
-  /** The path from the site root, for example `/social/teams.jpg`. */
   path: string;
   alt: string;
 }
 
-/** The card of the terms, the privacy policy and the DPA. */
 export const OPENBOT_LEGAL_SOCIAL_IMAGE: PageSocialImage = {
   path: "/social/legal.jpg",
   alt: "Plain terms. No surprises. OpenBot agents beside a paper map",
 };
 
-/**
- * The Open Graph and X tags of a page's own social card. The image URL uses the site that
- * serves the page, so a pull-request preview names an image that it has.
- */
 export function pageSocialImageMeta(image: PageSocialImage, siteUrl: string) {
   const url = new URL(image.path, siteUrl).toString();
   return {
@@ -78,26 +60,14 @@ export function pageSocialImageMeta(image: PageSocialImage, siteUrl: string) {
   } as const;
 }
 
-// The hosts production answers on. Both serve the same pages, and those pages go by
-// openbot.run.
 const OPENBOT_PRODUCTION_HOSTS = new Set(["openbot.run", "api.openbot.run"]);
 
-/**
- * The site that the head tags of a page served at `pageUrl` name. Social sites fetch
- * `og:url` and `og:image` themselves and show no card when those answer 404. A
- * pull-request preview serves pages and images that openbot.run does not have yet,
- * so any host other than production names itself. Cloudflare marks preview URLs
- * `noindex`, so a preview canonical does not compete with production.
- */
 export function siteUrlForPage(pageUrl: URL): string {
   return OPENBOT_PRODUCTION_HOSTS.has(pageUrl.hostname) ? OPENBOT_SITE_URL : `${pageUrl.origin}/`;
 }
 
-/** What the app's structured data names and that this file can not import: see the note at the top. */
 export interface OpenBotApplicationFacts {
-  /** The version of the newest release. */
   version: string;
-  /** An absolute URL of a picture of the app. */
   screenshot: string;
 }
 
@@ -117,7 +87,6 @@ export function openBotSoftwareApplication(facts: OpenBotApplicationFacts) {
       "Windows 10 or later (x64)",
       "Linux (x64 or arm64)",
     ],
-    // The installers themselves: schema.org's `downloadUrl` is the file, not a page about it.
     downloadUrl: [
       OPENBOT_DOWNLOAD_LINKS.macos,
       OPENBOT_ALTERNATE_DOWNLOAD_LINKS.macos,
@@ -125,7 +94,6 @@ export function openBotSoftwareApplication(facts: OpenBotApplicationFacts) {
       OPENBOT_DOWNLOAD_LINKS.linux,
       OPENBOT_ALTERNATE_DOWNLOAD_LINKS.linux,
     ].map((path) => new URL(path, OPENBOT_SITE_URL).toString()),
-    // What people ask an assistant for. Keep it to what the released app does.
     featureList: [
       "Runs Codex, Claude Code, Gemini (Antigravity), Grok and OpenCode agents",
       "Uses your ChatGPT, Claude, Google AI Pro or Ultra, or Grok plan",
@@ -151,7 +119,6 @@ export function openBotSoftwareApplication(facts: OpenBotApplicationFacts) {
 
 export type OpenBotSoftwareApplication = ReturnType<typeof openBotSoftwareApplication>;
 
-// Search engines read these two for the site name and the logo next to a result.
 const OPENBOT_ORGANIZATION = {
   "@context": "https://schema.org",
   "@type": "Organization",
@@ -189,14 +156,6 @@ export const OPENBOT_SECURITY_HEADERS = {
   "X-Frame-Options": "SAMEORIGIN",
 } as const;
 
-/**
- * @param interLatinFont The hashed URL of Inter's upright latin range, the one font
- * file this site downloads. It is reached through two levels of CSS `@import`, so a
- * browser only learns of it after the stylesheet has parsed. That is late enough
- * that the first paint uses a fallback face and every line of text moves when Inter
- * replaces it. The caller passes the same hashed asset the `@font-face` rule asks
- * for, so the preload below is that request and not a second one.
- */
 export function openBotRootHead(interLatinFont: string) {
   return {
     meta: [
@@ -224,21 +183,17 @@ export function openBotRootHead(interLatinFont: string) {
   };
 }
 
-/** The home page's own social card. Other pages without a card of their own keep the site's card. */
 const OPENBOT_HOME_SOCIAL_IMAGE: PageSocialImage = {
   path: "/social/home.jpg",
   alt: "Models come and go. Your team stays. OpenBot agents on a paper planet",
 };
 
-/** The text and the address of the home page in one language. */
 export interface HomePageHead {
   title: string;
   description: string;
   questions: readonly LandingQuestion[];
-  /** The path of this language's home page, such as `/`, `/pl` or `/pt`. */
   path: string;
   openGraphLocale: string;
-  /** The home page in each language, for `hreflang` links. The first is also `x-default`. */
   alternates: readonly { hreflang: string; path: string }[];
 }
 

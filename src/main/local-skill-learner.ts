@@ -1,19 +1,13 @@
 import type { SkillConversationEvent } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
-import { zipSync } from "fflate";
+import { type Zippable, zipSync } from "fflate";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import type { LearnedSkillDraft, SkillLearner } from "../backend/agent/skill-learning";
 import { LocalSkillFailure, type LocalSkillLibrary } from "./local-skill-library";
 import type { SkillMarketplaceService } from "./skill-marketplace-service";
-import { normalizedFiles, SKILL_FRONTMATTER } from "./skill-package";
+import { readSkillArchive, SKILL_FRONTMATTER, skillZippable } from "./skill-package";
 
-/**
- * Saves the skills that a memory review learns in the local library, as `create_skill` and
- * `revise_skill` do, and installs the new revision for the agent. Other agents keep their copies.
- * When the install fails, the revision is withdrawn, so the review asks the user instead and the
- * library does not keep a skill that no agent has.
- */
 export function localSkillLearner(skills: SkillMarketplaceService): SkillLearner {
   const library = skills.requireLocalLibrary();
   return {
@@ -55,29 +49,27 @@ function newBundle(draft: Extract<LearnedSkillDraft, { action: "create" }>) {
   }));
 }
 
-/** The current bundle with the new description and instructions. Its other files and keys stay. */
 function revisedBundle(library: LocalSkillLibrary, draft: Extract<LearnedSkillDraft, { action: "update" }>) {
   return Effect.gen(function* () {
     const bytes = yield* library.bundle(draft.skillId, draft.expectedRevision);
     return yield* bundleSync(() => {
-      const files = normalizedFiles(bytes);
+      const { files, executable } = readSkillArchive(bytes);
       const text = new TextDecoder("utf-8", { fatal: true }).decode(files["SKILL.md"]);
       const metadata = parseYaml(text.match(SKILL_FRONTMATTER)?.[1] ?? "");
       if (!isDynamicRecord(metadata)) throw new Error("The skill has no frontmatter to keep.");
-      return {
-        ...files,
-        "SKILL.md": skillMarkdown({ ...metadata, description: draft.description }, draft.instructions),
-      };
+      return skillZippable(
+        { ...files, "SKILL.md": skillMarkdown({ ...metadata, description: draft.description }, draft.instructions) },
+        executable,
+      );
     });
   });
 }
 
 function skillMarkdown(metadata: DynamicRecord, instructions: string): Uint8Array {
-  // `stringify` quotes a value that YAML would read in another way, such as a colon in the description.
   return new TextEncoder().encode(`---\n${stringifyYaml(metadata)}---\n\n${instructions.trim()}\n`);
 }
 
-function bundleSync(files: () => Record<string, Uint8Array>) {
+function bundleSync(files: () => Zippable) {
   return Effect.try({
     try: () => zipSync(files(), { level: 6 }),
     catch: (cause) => new LocalSkillFailure({ cause }),

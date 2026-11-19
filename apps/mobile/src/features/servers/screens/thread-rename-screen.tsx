@@ -18,10 +18,8 @@ import { haptics } from "@/shared/lib/haptics";
 import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 
-/** The bound of `agent-threads-v1`: one line of 1 to 120 characters after trim. */
 const TITLE_LIMIT = 120;
 
-/** Renames a thread of an agent. The title then no longer follows the thread's first message. */
 export function ThreadRenameScreen() {
   const { t, errorMessage } = useText();
   const { serverId, agentId, taskId } = useLocalSearchParams<{ serverId: string; agentId: string; taskId: string }>();
@@ -38,7 +36,6 @@ export function ThreadRenameScreen() {
   const task = list.data?.tasks.find((item) => item.id === taskId);
   const [initialTitle, setInitialTitle] = useState(task?.title ?? "");
   const [title, setTitle] = useState(initialTitle);
-  // The list can load after the sheet opens. The field then starts with the thread's title.
   const loadedTitle = task?.title;
   const touched = useRef(false);
   useEffect(() => {
@@ -54,7 +51,6 @@ export function ThreadRenameScreen() {
   const dirty = trimmed !== initialTitle.trim();
   const available = online && canEditThreads(serverId) && Boolean(task);
   const valid = trimmed.length > 0 && trimmed.length <= TITLE_LIMIT;
-  // Discard turns prevention off before it repeats the action, so the hook does not warn.
   const [discarding, setDiscarding] = useState(false);
   usePreventRemove(!discarding && !finished && (dirty || saving), ({ repeat }) => {
     if (pending.current) return;
@@ -81,7 +77,6 @@ export function ThreadRenameScreen() {
     setError(null);
     try {
       await renameAgentThread({ agentId, taskId, title: trimmed }, serverId);
-      // The header shows the new title before the list event arrives.
       queryClient.setQueryData<AgentTasksSnapshot>(queryKeys.agentTasks(queryScope, serverId, agentId), (stored) =>
         stored
           ? {

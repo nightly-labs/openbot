@@ -15,7 +15,6 @@ import {
 } from "@/features/settings/components/settings-content";
 import { useText } from "@/shared/lib/text";
 
-/** "2 agents · 1 open tab": who uses a profile and what is open in it. */
 export function useBrowserProfileUsage() {
   const { t } = useText();
   return (agentCount: number, tabCount?: number) => {
@@ -29,18 +28,11 @@ export function useBrowserProfileUsage() {
   };
 }
 
-/**
- * Server settings > Browser profiles of a joined server (`browser-profiles-v1`): the shared profile,
- * then each named profile with its color, agents, open tabs and proxy, then the saved proxies when
- * the host has `browser-proxies-v1`. The header "+" adds a profile, and a profile opens its page. A
- * change made on the desktop or another device shows at once.
- */
 export function ServerBrowserProfilesScreen() {
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
   return <BrowserProfilesList serverId={serverId} stack={{ kind: "server" }} />;
 }
 
-/** The same list, opened from the profile choice of one agent. */
 export function AgentBrowserProfilesScreen() {
   const { serverId, agentId } = useLocalSearchParams<{ serverId: string; agentId: string }>();
   return <BrowserProfilesList serverId={serverId} stack={{ kind: "agent", agentId }} />;
@@ -52,7 +44,6 @@ function BrowserProfilesList({ serverId, stack }: { serverId: string; stack: Bro
   const { available, query, profiles, sharedAgentIds } = useServerBrowserProfiles(serverId);
   const proxies = useServerBrowserProxies(serverId);
   const proxyChoices = useBrowserProxyChoices(proxies.list);
-  /** "2 agents · 1 open tab · proxy.example.com" for a profile with a proxy. */
   const profileUsage = (profile: { id: string; agentIds: readonly string[]; tabCount: number }) => {
     const text = usage(profile.agentIds.length, profile.tabCount);
     const proxy = proxyChoices.find((choice) => choice.profileIds.includes(profile.id));

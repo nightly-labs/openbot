@@ -11,11 +11,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAgentLevel } from "./request-helpers";
 
-/**
- * A question about one agent's chat that does not go into the chat. Any member can ask one, as any
- * member can read the chat. The agent id is in the body, so the router's check of the path does not
- * see it, and this module refuses an agent hidden from the caller. Frozen by `side-question-v1`.
- */
 export async function routeSideQuestion(
   context: TeamApiRequestContext,
   agents: Pick<TeamApiAgents, "askSideQuestion" | "listAgents">,
@@ -25,11 +20,9 @@ export async function routeSideQuestion(
   if (method !== "POST" || url.pathname !== SIDE_QUESTION_ROUTES.ask) return "unmatched";
   if (!capabilities.has(SIDE_QUESTION_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.sideQuestionUnsupported"));
-  // `readJson` has already run the body through the side-question wire codec.
   const body = await readJson(request);
   let input: ReturnType<typeof parseAskSideQuestion>;
   try {
-    // The codec bounds each field; this also refuses an empty question.
     input = parseAskSideQuestion(body);
   } catch {
     throw new HttpError(400, sourceText("error.team.requestFailed"));
@@ -41,7 +34,6 @@ export async function routeSideQuestion(
   try {
     answer = await runCauseEffect(agents.askSideQuestion(input));
   } catch (error) {
-    // A busy provider, a usage limit or a failed generation is a sentence for the member, not a host fault.
     if (error instanceof Error && isFixedSourceText(error.message)) throw new HttpError(409, error.message);
     throw error;
   }

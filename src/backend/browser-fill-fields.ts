@@ -30,7 +30,6 @@ export class BrowserFillFieldsFailure extends Schema.TaggedError<BrowserFillFiel
   },
 ) {}
 
-/** Contains indices only. It never retains field text, page errors, or credentials. */
 export interface BrowserFillFieldsProgress {
   confirmed: number[];
   failedIndex: number | null;
@@ -47,7 +46,6 @@ export function fillFieldsFailure(reason: BrowserFillFieldsFailure["reason"]): B
   return browserFailure(new BrowserFillFieldsFailure({ reason }));
 }
 
-/** Owns ordered prepared-field execution. The engine owns native handles and its CDP lease. */
 export const fillPreparedFields = Effect.fn("BrowserFillFields.fillPrepared")(function* (
   prepared: readonly BrowserPreparedField[],
   progress: BrowserFillFieldsProgress,
@@ -68,7 +66,6 @@ export const fillPreparedFields = Effect.fn("BrowserFillFields.fillPrepared")(fu
   progress.failedIndex = null;
 });
 
-/** Fixed page code used only on retained native field handles. No caller supplies JavaScript. */
 export const FILL_FIELD_STATE_FUNCTION = String.raw`function(expected, origin, select, text, requireActive) {
   if (!this.isConnected || this.ownerDocument !== document || window !== window.top || location.origin !== origin) return null;
   if (this.localName !== 'textarea' && (this.localName !== 'input' || !['text', 'search', 'tel', 'url', 'email'].includes(this.type))) return null;

@@ -1,8 +1,3 @@
-// The dock over a local page of the browser full view. The page is a native view above the renderer, so
-// the dock in the renderer is under it. A transparent view above the page draws the same dock, and one
-// native blur view under it for each glass shape blurs the page. The main renderer owns the conversation:
-// it publishes what the dock shows and does the actions that the overlay sends back.
-
 import { isDeepStrictEqual } from "node:util";
 import type {
   BrowserDockAction,
@@ -11,7 +6,7 @@ import type {
   BrowserDockGlass,
   BrowserDockPresentation,
 } from "@openbot/contracts/ipc";
-import { BROWSER_DOCK_LIMITS, IPC_ENDPOINTS } from "@openbot/contracts/ipc";
+import { BROWSER_DOCK_LIMITS, BROWSER_DOCK_OVERLAY_WIDTH, IPC_ENDPOINTS } from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Schema, Semaphore } from "effect";
 import { type BrowserWindow, type Input, type Rectangle, View, type WebContents, WebContentsView } from "electron";
@@ -22,38 +17,23 @@ import { isTrustedRendererUrl } from "./trusted-renderer";
 
 const logger = createOpenBotLogger("browser-dock-overlay");
 
-/** The overlay width, in CSS pixels, until the dock reports the space that it needs. It is wider than the dock. */
-export const BROWSER_DOCK_OVERLAY_WIDTH = 688;
-/** The height of the overlay, in CSS pixels, until it reports the space that the dock needs. */
 const INITIAL_HEIGHT = 160;
-/** A smaller frame waits for this time, so a dock that shrinks while it moves is not cut. */
 const SHRINK_DELAY_MS = 500;
-/** The height changes in steps of this size, so a small change does not move the overlay. */
 const HEIGHT_STEP = 8;
-/**
- * A blur view needs a background with an alpha channel to show its blur. This one is almost clear: the
- * overlay draws the tint and the border of the glass.
- */
 const GLASS_BACKGROUND = "#01ffffff";
 
 export interface BrowserDockOverlayOptions {
   mainWindow: BrowserWindow;
   preloadPath: string;
   load: (contents: WebContents) => Promise<void>;
-  /** The keys of the window that work while the overlay has the focus. True when the window takes the key. */
   forwardShortcut: (input: Input) => boolean;
 }
 
-/** The overlay and its glass shapes, in window pixels. */
 export interface BrowserDockLayout {
   overlay: Rectangle;
   glass: Array<{ bounds: Rectangle; radius: number; blur: number }>;
 }
 
-/**
- * Where the overlay and its glass go over `page`. The overlay is at the bottom centre of the page, or at
- * the bottom corner on the side of the dock, and no part of it or of a glass shape is outside the page.
- */
 export function browserDockLayout(
   page: BrowserMainPage,
   height: number,
@@ -64,17 +44,14 @@ export function browserDockLayout(
   const wanted = Math.round((anchor?.width ?? BROWSER_DOCK_OVERLAY_WIDTH) * zoom);
   const width = Math.min(wanted, page.bounds.width);
   const overlayHeight = Math.min(Math.round(height * zoom), page.bounds.height);
-  const space = page.bounds.width - width;
   const overlay = {
-    x: page.bounds.x + (anchor?.side === "left" ? 0 : space),
+    x: page.bounds.x + Math.round((page.bounds.width - width) / 2),
     y: page.bounds.y + page.bounds.height - overlayHeight,
     width,
     height: overlayHeight,
   };
   const bottom = overlay.y + overlay.height;
-  // The glass is measured in an overlay of the width that the frame asks for. A dock at the right edge keeps
-  // its distance from that edge when the page is narrower than that width.
-  const origin = anchor?.side === "left" ? overlay.x : overlay.x + overlay.width - wanted;
+  const origin = overlay.x + (overlay.width - wanted) / 2;
   const shapes: BrowserDockLayout["glass"] = [];
   for (const shape of glass) {
     const left = Math.max(overlay.x, Math.round(origin + shape.left * zoom));
@@ -92,7 +69,6 @@ export function browserDockLayout(
   return { overlay, glass: shapes };
 }
 
-/** The overlay view did not load. The cause is what the renderer reads. */
 export class BrowserDockOverlayFailed extends Schema.TaggedError<BrowserDockOverlayFailed>()(
   "BrowserDockOverlayFailed",
   { cause: Schema.Defect() },
@@ -108,10 +84,8 @@ export class BrowserDockOverlay {
   readonly #glassViews: View[] = [];
   #presentation: BrowserDockPresentation | null = null;
   #page: BrowserMainPage | null = null;
-  /** The height that the overlay has, in CSS pixels, and the glass of its last frame. */
   #height = INITIAL_HEIGHT;
   #glass: BrowserDockGlass[] = [];
-  /** The corner and the width of the dock. They change at once, so the page gets its clicks back. */
   #anchor: BrowserDockAnchor | null = null;
   #seq = -1;
   #shrinkTimer: ReturnType<typeof setTimeout> | null = null;
@@ -136,13 +110,11 @@ export class BrowserDockOverlay {
     return this.#presentation;
   }
 
-  /** Null hides the overlay. The first dock creates the overlay view and waits until it loads. */
   readonly publish = Effect.fn("BrowserDockOverlay.publish")(function* (
     this: BrowserDockOverlay,
     presentation: BrowserDockPresentation | null,
   ): Effect.fn.Return<void, BrowserDockOverlayFailed> {
     if (this.#destroyed) return;
-    // The same presentation again still brings back a view that failed or was dropped.
     if (isDeepStrictEqual(this.#presentation, presentation) && (presentation === null || this.#view)) return;
     this.#presentation = presentation;
     if (presentation) yield* this.#ensureView();
@@ -151,7 +123,6 @@ export class BrowserDockOverlay {
     this.#sync();
   }).bind(this);
 
-  /** The page of the main window moved or hid. The page view is raised, so the overlay goes above it again. */
   setPage(page: BrowserMainPage | null): void {
     if (this.#destroyed) return;
     this.#page = page;
@@ -162,7 +133,6 @@ export class BrowserDockOverlay {
     sendToRenderer(this.#options.mainWindow, IPC_ENDPOINTS.browserDock.action, action);
   }
 
-  /** The space that the dock needs. A taller dock gets it at once; a shorter one after a pause. */
   setFrame(frame: BrowserDockFrame): void {
     if (this.#destroyed || frame.seq <= this.#seq) return;
     this.#seq = frame.seq;
@@ -234,7 +204,6 @@ export class BrowserDockOverlay {
     });
     contents.on("render-process-gone", (_event, details) => {
       logger.warn("The browser dock overlay stopped.", { reason: details.reason });
-      // The next dock makes a new overlay. Until then the dock in the renderer is the one that works.
       if (this.#view === view) this.#dropView(view);
     });
     this.#options.mainWindow.contentView.addChildView(view);
@@ -271,7 +240,6 @@ export class BrowserDockOverlay {
     if (!visible || !view || !page) {
       for (const glass of this.#glassViews) glass.setVisible(false);
       if (view && !view.webContents.isDestroyed()) {
-        // A hidden view that keeps the focus would take the keys of the window.
         if (view.webContents.isFocused() && !window.isDestroyed()) window.webContents.focus();
         view.setVisible(false);
       }
@@ -279,7 +247,6 @@ export class BrowserDockOverlay {
       return;
     }
     const layout = browserDockLayout(page, this.#height, this.#glass, this.#anchor);
-    // The page view was raised, so the glass and then the overlay go above it again, in this order.
     layout.glass.forEach((shape, index) => {
       const glass = this.#glassView(index);
       glass.setBounds(shape.bounds);
@@ -292,7 +259,6 @@ export class BrowserDockOverlay {
     view.setBounds(layout.overlay);
     view.setVisible(true);
     window.contentView.addChildView(view);
-    // The overlay draws in the CSS pixels of the main window.
     if (view.webContents.getZoomFactor() !== page.zoomFactor) view.webContents.setZoomFactor(page.zoomFactor);
     this.#setShown(true);
   }

@@ -25,10 +25,14 @@ export const messages = {
   "prompt.approval.allow": "Autoriser",
   "prompt.approval.alwaysAllow": "Toujours autoriser",
   "prompt.approval.deny": "Refuser",
+  "prompt.approval.cut":
+    "Cette carte n’affiche que le début de la demande : elle propose donc seulement Refuser. Si Autoriser n’apparaît pas bientôt, mettez à jour OpenBot sur le serveur.",
   "prompt.approval.report.bugHeadline": "Un bug ? Corrigeons-le.",
   "prompt.approval.report.ideaHeadline": "Une idée ? Concrétisons-la.",
   "prompt.approval.report.dontSend": "Pas maintenant",
   "prompt.approval.report.send": "Envoyer à l'équipe OpenBot",
+  "prompt.approval.report.phoneOnly":
+    "Ouvre cette discussion dans l'app OpenBot du téléphone et envoie le rapport depuis là. Le téléphone ajoute sa version, son système et son journal d'assistance. Si le téléphone ne peut pas se connecter, ouvre Réglages > Assistance dans l'app du téléphone et signale le problème sur GitHub.",
   "prompt.approval.title.command": "Exécuter une commande",
   "prompt.approval.title.fileChange": "Modifier des fichiers",
   "prompt.approval.title.permissions": "Accorder des autorisations",
@@ -41,12 +45,13 @@ export const messages = {
   "prompt.browser.title.pending": "Terminez l’étape sur {host}",
   "prompt.browser.cancelled": "Annulée",
   "prompt.browser.reload":
-    "Terminez la connexion, puis rechargez la page du navigateur avant de choisir « J’ai terminé ». L’inspection de la page reste bloquée jusqu’au rechargement.",
+    "OpenBot n’a pas pu finir de saisir le mot de passe ou le code. Vérifiez la page et saisissez ce qui manque. Terminez la connexion, puis rechargez la page du navigateur avant de choisir « J’ai terminé ». L’inspection de la page reste bloquée jusqu’au rechargement.",
   "prompt.browser.continuing": "{name} continue.",
   "prompt.browser.cancelledBody": "L’étape du navigateur a été annulée.",
   "prompt.browser.pendingBody":
     "Ouvrez la page pour terminer la connexion, la vérification ou le consentement. Laissez ensuite {name} continuer.",
   "prompt.browser.openPage": "Ouvrir {title}",
+  "prompt.browser.openFailed": "Impossible d’ouvrir la page dans la fenêtre principale. Réessayez.",
   "prompt.browser.done": "J’ai terminé",
   "prompt.browser.pageFallback": "Page du navigateur",
   "prompt.browser.hostFallback": "le navigateur",
@@ -54,6 +59,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "Connexion à {host} annulée",
   "prompt.browser.signInBlocked.body":
     "Connectez-vous sur cet ordinateur. OpenBot envoie uniquement la connexion à {host} vers {server}, et {name} continue.",
+  "prompt.browser.signInBlocked.desktopBody":
+    "{host} n’accepte pas de connexion depuis le serveur. Ouvrez ce chat dans l’application de bureau OpenBot sur votre ordinateur, et connectez-vous là. Ensuite, {name} continue.",
   "prompt.browser.signInBlocked.cancelledBody": "La connexion a été annulée.",
   "prompt.browser.signInBlocked.waiting": "En attente de la connexion",
   "prompt.browser.signInBlocked.waitingButton": "En attente de la connexion…",

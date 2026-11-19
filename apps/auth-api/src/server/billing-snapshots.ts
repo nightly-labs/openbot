@@ -1,7 +1,7 @@
 import { licensePeriodAmount, licensePlanFromPrice } from "@openbot/contracts/license";
 import { Effect, Schema } from "effect";
 import { readBillingCohortCounts } from "./billing-cohorts";
-import { BillingUsd } from "./billing-usd";
+import { BillingUsd, type BillingUsdCurrency } from "./billing-usd";
 import { SalesAnalyticsDelivery, SalesAnalyticsDeliveryError } from "./sales-analytics-delivery";
 import { isLicensePrice, STRIPE_API_VERSION } from "./stripe-client";
 
@@ -65,7 +65,6 @@ type StripeDiscount = typeof StripeDiscount.Type;
 type StripePrice = typeof StripePrice.Type;
 
 const BILLING_SNAPSHOT_EVENT = "billing_snapshot" as const;
-/** Errors of one row that do not go away when the run is tried again. */
 const PERMANENT_ROW_ERRORS: ReadonlySet<BillingSnapshotError["code"]> = new Set([
   "missing_subscription",
   "invalid_subscription",
@@ -94,7 +93,6 @@ export interface BillingSnapshotBindings {
 export type BillingSnapshotFetch = (input: string, init: RequestInit) => Promise<Response>;
 
 interface BillingSnapshotMetrics {
-  /** Server plans only. The name and meaning are older than the license, so they stay the same. */
   mrr: number;
   arr: number;
   overdueMrr: number;
@@ -118,11 +116,10 @@ interface SubscriptionSample {
   userId: string;
   serverId: string | null;
   product: "server" | "license";
-  /** The sum of the item quantities. For a license, this is the number of users that the account pays for. */
   quantity: number;
   status: "active" | "past_due";
   amountMinor: number;
-  currency: "eur" | "usd" | "pln";
+  currency: BillingUsdCurrency;
   interval: "month" | "year";
   cancelAtPeriodEnd: boolean;
 }
@@ -144,14 +141,6 @@ interface StripeSubscriptionSample {
   discounts: readonly StripeDiscount[];
 }
 
-/**
- * Takes a daily UTC sample of the current Stripe subscriptions that the account database knows.
- *
- * The source key is retained by SalesAnalyticsDelivery, so a five-minute cron can call this safely:
- * one `billing_snapshot:YYYY-MM-DD` event is accepted for each UTC day. Stripe remains the source of
- * the current subscription state; the D1 rows only provide the bounded list of known OpenBot IDs and
- * their account/server owners. Rows whose stored status is terminal in Stripe are not read again.
- */
 export const captureBillingSnapshot = Effect.fn("captureBillingSnapshot")(function* (
   bindings: BillingSnapshotBindings,
   timestamp: number,
@@ -164,8 +153,6 @@ export const captureBillingSnapshot = Effect.fn("captureBillingSnapshot")(functi
   const secretKey = bindings.STRIPE_SECRET_KEY?.trim();
   const clientId = bindings.OPENPANEL_CLIENT_ID?.trim();
   const clientSecret = bindings.OPENPANEL_CLIENT_SECRET?.trim();
-  // Test and development deployments do not have the production write credentials. They must not
-  // call Stripe or create a partial ledger row in that case.
   if (!secretKey || !clientId || !clientSecret) return;
 
   const day = utcDay(timestamp);
@@ -177,8 +164,6 @@ export const captureBillingSnapshot = Effect.fn("captureBillingSnapshot")(functi
 
   const rows = yield* readKnownSubscriptions(bindings.DB).pipe(Effect.mapError(() => snapshotError("database")));
   const samples: SubscriptionSample[] = [];
-  // A row that stays bad must not block every later snapshot, so it is counted and left out. A Stripe
-  // failure that can pass still fails the run: the snapshot of a day is never corrected.
   const skipped: BillingSnapshotError[] = [];
   for (const row of rows) {
     const sample = yield* subscriptionSample(row, secretKey, fetcher, timestamp).pipe(
@@ -196,8 +181,6 @@ export const captureBillingSnapshot = Effect.fn("captureBillingSnapshot")(functi
     );
     if (sample) samples.push(sample);
   }
-  // When every row is bad, the cause is more probably the Stripe key or the Stripe API than the rows.
-  // A snapshot with no revenue would then stay for the day, so the run fails.
   const [firstSkip] = skipped;
   if (firstSkip && skipped.length === rows.length) return yield* firstSkip;
 
@@ -309,17 +292,14 @@ export const captureBillingSnapshot = Effect.fn("captureBillingSnapshot")(functi
     );
 });
 
-/** Returns the UTC day used for the durable source key and the report's date dimension. */
 function utcDay(timestamp: number): string {
   return new Date(timestamp).toISOString().slice(0, 10);
 }
 
-/** The stable key that makes the five-minute cron idempotent for one UTC day. */
 function billingSnapshotSourceKey(timestamp: number): string {
   return `${BILLING_SNAPSHOT_EVENT}:${utcDay(timestamp)}`;
 }
 
-/** Reads one stored subscription from Stripe. Returns null when it has no recurring revenue now. */
 function subscriptionSample(
   row: StoredSubscription,
   secretKey: string,
@@ -358,10 +338,6 @@ function subscriptionSample(
   });
 }
 
-/**
- * Stripe never moves a subscription out of these statuses, so the snapshot does not read them. License
- * rows are in their own table and have no server.
- */
 function readKnownSubscriptions(database: D1Database): Effect.Effect<StoredSubscription[], unknown> {
   return Effect.tryPromise({
     try: async () => {
@@ -475,7 +451,7 @@ function inferInterval(
 
 function subscriptionAmountAfterDiscount(
   subscription: StripeSubscriptionSample,
-  currency: "eur" | "usd" | "pln",
+  currency: BillingUsdCurrency,
   product: StoredSubscription["product"],
   timestamp: number,
 ): Effect.Effect<{ amountMinor: number }, BillingSnapshotError> {
@@ -505,10 +481,6 @@ function subscriptionAmountAfterDiscount(
   });
 }
 
-/**
- * The items of one product. A server order has a server item and a license item until its split moves the
- * license to its own subscription, so the server row does not count the license.
- */
 function productItems(
   items: readonly StripeSubscriptionItem[],
   product: StoredSubscription["product"],
@@ -520,12 +492,7 @@ function productItems(
   );
 }
 
-/**
- * The Team license price is graduated tiers, so Stripe sends no `unit_amount` for it, and a subscription
- * cannot expand the tiers of another currency. The license service uses the same list price of the plan.
- * The amount is for the period of the Price; the caller divides a year.
- */
-function licensePriceAmount(price: StripePrice, quantity: number, currency: "eur" | "usd" | "pln"): number {
+function licensePriceAmount(price: StripePrice, quantity: number, currency: BillingUsdCurrency): number {
   if (!Number.isSafeInteger(quantity) || quantity < 0) throw new BillingSnapshotError({ code: "invalid_subscription" });
   return licensePeriodAmount(
     licensePlanFromPrice({ lookup_key: price.lookup_key ?? null, metadata: price.metadata ?? {} }),
@@ -587,8 +554,8 @@ function applyDiscounts(
   return result;
 }
 
-function isBillingUsdCurrency(value: string): value is "eur" | "usd" | "pln" {
-  return value === "eur" || value === "usd" || value === "pln";
+function isBillingUsdCurrency(value: string): value is BillingUsdCurrency {
+  return value === "eur" || value === "usd" || value === "pln" || value === "brl";
 }
 
 function addSafe(left: number, right: number): number {

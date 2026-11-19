@@ -1,11 +1,6 @@
 import { OPENBOT_LINKS } from "../../lib/landing-links";
 import { type Comparison, OPENBOT_LANGUAGE_COUNT, OPENBOT_TEXT } from "./comparison";
 
-// Every statement about Viktor here is taken from viktor.com: its home page, pricing page,
-// security page, changelog, documentation, privacy policy and general terms (both last updated
-// 2026-07-31); each page used is in `sources`. Viktor is a service of Zeta AI, Inc., a
-// Delaware corporation. Check them again, and move `checkedAt`, whenever this file changes.
-
 export const VIKTOR_COMPARISON: Comparison = {
   rival: { name: "Viktor", mark: "viktor" },
   answer:

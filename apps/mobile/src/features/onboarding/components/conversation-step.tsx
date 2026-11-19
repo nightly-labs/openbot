@@ -20,19 +20,12 @@ import { selectionColorProps } from "@/shared/lib/selection-color";
 import { fieldDirectionStyle } from "@/shared/lib/text-direction";
 
 const HEADER_HERO_SIZE = 56;
-// The replies come once the agent has finished "typing", one after another.
 const REPLIES_AT = STAGGER_MS + TYPING_MS;
 
-/** When the glass of reply `index` forms. The action after the replies comes in as one more reply. */
 function replyGlassDelay(index: number): number {
   return glassAfter(REPLIES_AT + (index + 1) * STAGGER_MS);
 }
 
-/**
- * A step that reads as the first chat with the new agent: the agent in the header, its question in
- * a bubble, replies to choose from, and a field at the bottom to write one's own. The replies come
- * after the agent has finished "typing".
- */
 export function ConversationStep({
   motion,
   name,
@@ -51,28 +44,20 @@ export function ConversationStep({
 }: {
   motion: OnboardingMotion;
   name: string;
-  /** The role under the name, or null. */
   caption: string | null;
   question: string;
-  /** Replies, already in the reader's language. */
   ideas: readonly string[];
   value: string;
   onChange: (value: string) => void;
   label: string;
   placeholder: string;
-  /** Unset for a field that shows its own limit rather than cutting the text at it. */
   maxLength?: number;
-  /** The colour of the agent. */
   color: string;
   disabled: boolean;
-  /** A choice that acts at once, last among the replies and set apart from them. */
   action?: { label: string; onPress: () => void };
-  /** Errors and actions under the replies. */
   children?: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
-  // With the keyboard open, the ideas belong right above the field. While the field is in use, the
-  // conversation keeps its end in view as the keyboard shrinks it, so the field never cuts them.
   const scroller = useRef<ScrollViewInstance>(null);
   const composing = useRef(false);
   const [foreground, muted] = useThemeColor(["foreground", "muted"]);
@@ -102,14 +87,12 @@ export function ConversationStep({
         onLayout={() => {
           if (composing.current) scroller.current?.scrollToEnd({ animated: false });
         }}
-        // Text under the replies, such as an error, can come while the user writes. It stays in view.
         onContentSizeChange={() => {
           if (composing.current) scroller.current?.scrollToEnd({ animated: true });
         }}
         className="flex-1"
         contentContainerClassName="grow gap-4 px-6 pt-4 pb-4"
         keyboardShouldPersistTaps="handled"
-        // Android has no interactive dismissal: a drag of the conversation closes the keyboard.
         keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
         alwaysBounceVertical={false}
         showsVerticalScrollIndicator={false}
@@ -129,7 +112,6 @@ export function ConversationStep({
                   radius={22}
                   onPress={() => {
                     void haptics.selection();
-                    // A second tap on the chosen reply takes it back.
                     onChange(chosen ? "" : idea);
                   }}
                 >

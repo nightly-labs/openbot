@@ -12,7 +12,6 @@ import type { MessagingTelegramMention, MessagingTelegramSend } from "../messagi
 import { EXTERNAL_EVENT_END, EXTERNAL_EVENT_START } from "../webhook-trigger";
 import { withoutEvents } from "./github-output";
 
-/** The message of a Telegram trigger, as the run payload keeps it. */
 interface TelegramTriggerMessage {
   connectionId: string;
   chatId: string;
@@ -25,7 +24,6 @@ function text(node: WorkflowNode, key: string): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-/** Whether `node` is a Telegram trigger that starts on this message. An empty chat takes each linked chat. */
 export function telegramTriggerMatches(node: WorkflowNode, mention: MessagingTelegramMention): boolean {
   if (node.kind !== "trigger" || node.fields.trigger !== "telegram") return false;
   if (!isOneOf(WORKFLOW_TELEGRAM_EVENTS, node.fields.event)) return false;
@@ -35,10 +33,6 @@ export function telegramTriggerMatches(node: WorkflowNode, mention: MessagingTel
   return !contains || mention.text.toLocaleLowerCase().includes(contains);
 }
 
-/**
- * The run payload of a Telegram message: the trigger's answer, which the next nodes read. The text came
- * from a person in the chat, so the frame tells an agent to read it as data.
- */
 export function workflowTelegramPayload(nodeId: string, mention: MessagingTelegramMention): string {
   return [
     EXTERNAL_EVENT_START,
@@ -64,7 +58,6 @@ export function workflowTelegramPayload(nodeId: string, mention: MessagingTelegr
   ].join("\n");
 }
 
-/** The data of the Telegram message in a run payload, or null when a Telegram message did not start the run. */
 function telegramEventData(payload: string | null): DynamicRecord | null {
   if (!payload?.startsWith(EXTERNAL_EVENT_START)) return null;
   const [, , json] = payload.split("\n");
@@ -77,7 +70,6 @@ function telegramEventData(payload: string | null): DynamicRecord | null {
   return isDynamicRecord(event) && event.type === "telegram.mention" && isDynamicRecord(event.data) ? event.data : null;
 }
 
-/** The message that started a run, from its payload, or null when a Telegram message did not start it. */
 export function telegramTriggerMessage(payload: string | null): TelegramTriggerMessage | null {
   const data = telegramEventData(payload);
   if (!data) return null;
@@ -87,15 +79,10 @@ export function telegramTriggerMessage(payload: string | null): TelegramTriggerM
     : null;
 }
 
-/** What a Telegram output sends, or the error text of a node that cannot send. */
 export type TelegramOutputPlan =
   | { connectionId: string; chatId: string; send: MessagingTelegramSend }
   | { error: string };
 
-/**
- * The post or reaction of a Telegram output. `trigger` is the message that started the run, if any. A
- * reply and a reaction act on that message, so they need it and its chat.
- */
 export function telegramOutputPlan(
   node: WorkflowNode,
   input: string,
@@ -107,8 +94,6 @@ export function telegramOutputPlan(
   const chosen = text(node, "connectionId") || WORKFLOW_TELEGRAM_TRIGGER_CHAT;
   const connectionId = chosen === WORKFLOW_TELEGRAM_TRIGGER_CHAT ? (trigger?.connectionId ?? "") : chosen;
   if (!connectionId) return { error: sourceText("error.workflow.telegramNoMessage") };
-  // The event of a trigger is data for an agent: the chat does not see it as a post. Empty text posts
-  // nothing.
   const body = withoutEvents(input).trim();
   const onlyEvent = !body && Boolean(input.trim());
   const eventOnly = { error: sourceText("error.workflow.githubEventText") };

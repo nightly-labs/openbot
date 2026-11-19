@@ -94,7 +94,6 @@ const TRIGGER_TEXT = {
   slack: "mobile.workflow.trigger.slackHint",
 } as const satisfies Record<WorkflowTriggerType, MobileTextKey>;
 
-/** Why the host kept a version, as the desktop version list says it. */
 export const VERSION_KIND_LABEL = {
   auto: "mobile.workflow.version.auto",
   restore: "mobile.workflow.version.restore",
@@ -107,7 +106,6 @@ export const DISCORD_ACTION_LABEL = {
   react: "mobile.workflow.discord.action.react",
 } as const satisfies Record<WorkflowDiscordAction, MobileTextKey>;
 
-/** The action of a Discord output, as the host reads it: a reply when it has none. */
 export function discordAction(node: WorkflowNode): WorkflowDiscordAction {
   const value = node.fields.action;
   return typeof value === "string" && isOneOf(WORKFLOW_DISCORD_ACTIONS, value) ? value : "reply";
@@ -119,7 +117,6 @@ export const TELEGRAM_ACTION_LABEL = {
   react: "mobile.workflow.telegram.action.react",
 } as const satisfies Record<WorkflowTelegramAction, MobileTextKey>;
 
-/** The action of a Telegram output, as the host reads it: a reply when it has none. */
 export function telegramAction(node: WorkflowNode): WorkflowTelegramAction {
   const value = node.fields.action;
   return typeof value === "string" && isOneOf(WORKFLOW_TELEGRAM_ACTIONS, value) ? value : "reply";
@@ -131,23 +128,18 @@ export const SLACK_ACTION_LABEL = {
   react: "mobile.workflow.discord.action.react",
 } as const satisfies Record<WorkflowSlackAction, MobileTextKey>;
 
-/** The action of a Slack output, as the host reads it: a reply in the thread when it has none. */
 export function slackAction(node: WorkflowNode): WorkflowSlackAction {
   const value = node.fields.action;
   return typeof value === "string" && isOneOf(WORKFLOW_SLACK_ACTIONS, value) ? value : "reply";
 }
 
-/**
- * When a trigger starts the workflow: how often and at what time for a schedule, such as "Daily · 09:00",
- * and the repository and the event of a GitHub trigger.
- */
 function triggerText(node: WorkflowNode, t: MobileTranslate): string {
   const type = triggerType(node);
   if (type === "github") {
     const github = githubTrigger(node);
     return github.repository
       ? t("mobile.workflow.github.summary", {
-          repository: github.repository,
+          repository: github.repositories.length > 0 ? github.repositories.join(", ") : github.repository,
           event: t(GITHUB_EVENT_LABEL[github.event]),
         })
       : t(TRIGGER_TEXT.github);
@@ -160,7 +152,6 @@ function triggerText(node: WorkflowNode, t: MobileTranslate): string {
   return "time" in draft ? t("mobile.workflow.trigger.repeatAt", { repeat, time: draft.time }) : repeat;
 }
 
-/** A run that goes on: the drawer and the list show it as active. */
 export function isActiveRun(status: WorkflowRunStatus | null | undefined): boolean {
   return status === "running" || status === "approval" || status === "stopping";
 }
@@ -170,7 +161,6 @@ const text = (node: WorkflowNode, name: string): string => {
   return typeof value === "string" ? value : "";
 };
 
-/** The trigger type of a trigger node. A missing type is manual, as the host reads it. */
 export function triggerType(node: WorkflowNode): WorkflowTriggerType {
   const value = node.fields.trigger;
   return typeof value === "string" && isOneOf(WORKFLOW_TRIGGER_TYPES, value) ? value : "manual";
@@ -180,7 +170,6 @@ export function kindLabel(kind: WorkflowNodeKind, t: MobileTranslate): string {
   return t(KIND_LABEL[kind]);
 }
 
-/** The first line of a step: its kind, with the agent or model that it uses. */
 export function stepLabel(node: WorkflowNode, agents: readonly MobileAgent[], t: MobileTranslate): string {
   if (node.kind === "trigger") return t(TRIGGER_LABEL[triggerType(node)]);
   if (node.kind === "agent") {
@@ -191,10 +180,10 @@ export function stepLabel(node: WorkflowNode, agents: readonly MobileAgent[], t:
     const model = text(node, "model");
     return model ? t("mobile.workflow.kind.llmNamed", { model }) : kindLabel(node.kind, t);
   }
+  if (node.kind === "image" && text(node, "media") === "video") return t("mobile.workflow.kind.video");
   return kindLabel(node.kind, t);
 }
 
-/** Where an output sends its result, and what a GitHub, Discord, Telegram or Slack output does there. */
 function outputText(node: WorkflowNode, t: MobileTranslate): string {
   switch (text(node, "target")) {
     case "channel":
@@ -224,7 +213,6 @@ function outputText(node: WorkflowNode, t: MobileTranslate): string {
   }
 }
 
-/** The second line of a step: what it does, or the default that the host uses when it is empty. */
 export function stepText(node: WorkflowNode, t: MobileTranslate): string {
   switch (node.kind) {
     case "trigger":
@@ -246,7 +234,6 @@ export function stepText(node: WorkflowNode, t: MobileTranslate): string {
   }
 }
 
-/** What stops a step from running, or null. The host fails an agent step that has no agent. */
 export function stepProblem(node: WorkflowNode, agents: readonly MobileAgent[], t: MobileTranslate): string | null {
   if (node.kind !== "agent") return null;
   const agentId = text(node, "agentId");
@@ -255,7 +242,6 @@ export function stepProblem(node: WorkflowNode, agents: readonly MobileAgent[], 
   return null;
 }
 
-/** The newest attempt of each node of a run. A retry is a new attempt of the same node. */
 export function latestSteps(steps: readonly WorkflowStep[]): Map<string, WorkflowStep> {
   const latest = new Map<string, WorkflowStep>();
   for (const step of steps) {

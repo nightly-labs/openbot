@@ -41,7 +41,6 @@ function stackOf(agentId: string | undefined): BrowserProfileStack {
   return agentId ? { kind: "agent", agentId } : { kind: "server" };
 }
 
-/** The icon of a proxy row: a waypoint for a saved proxy, a monitor for a member's computer. */
 function ProxyIcon({ kind }: { kind: BrowserProxyChoice["kind"] }) {
   const muted = String(useCSSVariable("--openbot-text-grouped-secondary"));
   const Icon = kind === "computer" ? Monitor : Waypoints;
@@ -52,11 +51,6 @@ function ProxyIcon({ kind }: { kind: BrowserProxyChoice["kind"] }) {
   );
 }
 
-/**
- * The Proxies section of Browser profiles (`browser-proxies-v1`): each saved proxy, each computer of
- * a member, and Add proxy. A row opens its page. A proxy that failed or a computer that is offline
- * shows that in red.
- */
 export function BrowserProxiesSection({ serverId, stack }: { serverId: string; stack: BrowserProfileStack }) {
   const { t, errorMessage } = useText();
   const accent = String(useCSSVariable("--openbot-accent"));
@@ -129,14 +123,6 @@ export function BrowserProxiesSection({ serverId, stack }: { serverId: string; s
   );
 }
 
-/**
- * Browser profiles > one saved proxy, a new proxy without `proxyId`, or the computer of a member.
- * A proxy has one address field; a saved password shows as a mask, and a save that keeps the mask
- * keeps the password. A save asks first when it closes open tabs, and a save that does not change
- * the address saves nothing. From a profile's proxy choice (`assignTo`), a new proxy goes to that
- * profile. A computer has no address: its member shares it from the desktop app, and this page only
- * shows its state and deletes it. Delete changes its profiles to Automatic.
- */
 export function ServerBrowserProxyScreen() {
   const { t, errorMessage } = useText();
   const { serverId, proxyId, assignTo } = useLocalSearchParams<{
@@ -151,7 +137,6 @@ export function ServerBrowserProxyScreen() {
   const list = proxies.list;
   const proxy = proxyId ? list?.proxies.find((candidate) => candidate.id === proxyId) : undefined;
   const choice = proxyId ? choices.find((candidate) => candidate.id === proxyId) : undefined;
-  // The address that the page opened with: the host refuses a save when the proxy is different now.
   const opened = useRef<{ address: string; previousAddress: string } | null>(null);
   if (proxy && opened.current === null)
     opened.current = { address: editableBrowserProxyAddress(proxy), previousAddress: browserProxyAddressText(proxy) };
@@ -160,7 +145,6 @@ export function ServerBrowserProxyScreen() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const locked = useRef(false);
-  /** True after a save or a delete: the page leaves without the question about the address. */
   const leaving = useRef(false);
   const address = draft ?? initial;
   const trimmed = address.trim();
@@ -187,7 +171,6 @@ export function ServerBrowserProxyScreen() {
     ]);
   });
 
-  /** Runs one change at a time, then goes back. */
   async function perform(operation: () => Promise<void>): Promise<void> {
     if (locked.current) return;
     locked.current = true;
@@ -208,7 +191,6 @@ export function ServerBrowserProxyScreen() {
     }
   }
 
-  // After a delete the new list has no proxy: the closing page shows nothing, not the gone note.
   if (proxyId && !choice && leaving.current) return <SettingsContent />;
   if (!proxies.available || !list || (proxyId && !choice))
     return (
@@ -225,7 +207,6 @@ export function ServerBrowserProxyScreen() {
       </SettingsContent>
     );
 
-  /** The open tabs of these named profiles: a proxy change closes them. */
   const openTabs = (profileIds: readonly string[]) =>
     (profiles ?? []).reduce(
       (count, profile) => (profileIds.includes(profile.id) ? count + profile.tabCount : count),
@@ -252,7 +233,6 @@ export function ServerBrowserProxyScreen() {
       void perform(async () => {
         const saved = await proxies.save(input);
         if (proxy || !assignTo) return;
-        // The proxy exists now, also when the profile does not take it: the page then shows it.
         setDraft(undefined);
         router.setParams({ proxyId: saved.id, assignTo: undefined });
         await proxies.setProfileProxy(assignTo, saved.id);
@@ -276,7 +256,6 @@ export function ServerBrowserProxyScreen() {
   }
 
   function remove(current: BrowserProxyChoice): void {
-    // The profiles that use it now, as the question shows them. The host refuses the delete when they change.
     const profileIds = [...current.profileIds];
     const used = profileIds.length
       ? t("mobile.server.browserProxies.deleteUsed", { count: profileIds.length })
@@ -368,12 +347,6 @@ export function ServerBrowserProxyScreen() {
   );
 }
 
-/**
- * Browser profiles > one profile > Proxy: Automatic, each saved proxy and each computer of a member.
- * A choice saves at once; when the profile has open tabs, the page asks first, because the host
- * closes them. New proxy adds a proxy and gives it to the profile. The phone cannot offer itself:
- * a member shares a computer from the desktop app.
- */
 export function BrowserProfileProxyScreen() {
   const { t, errorMessage } = useText();
   const accent = String(useCSSVariable("--openbot-accent"));

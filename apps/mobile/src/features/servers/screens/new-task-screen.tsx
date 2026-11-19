@@ -1,8 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { AgentTasksSnapshot } from "@openbot/contracts/ipc";
 import { plainTaskTitle } from "@openbot/team-client/agent-tasks";
 import { useQueryClient } from "@tanstack/react-query";
-import * as Crypto from "expo-crypto";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
@@ -13,10 +11,11 @@ import { Alert, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
+import { taskStartId } from "@/features/servers/model/task-start-id";
 import { useServerTasks } from "@/features/servers/model/use-server-tasks";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
-import { queryKeys } from "@/features/workspace/model/query-keys";
+import { addStartedTask } from "@/features/workspace/model/task-cache";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { AndroidHeaderButton } from "@/shared/components/android-header-button";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
@@ -28,10 +27,6 @@ import { useText } from "@/shared/lib/text";
 
 const AVATAR_SIZE = 26;
 
-/**
- * Starts a task: what to do, and the agent that does it, chosen in the list of the agents.
- * The task shows in the lists at once, and the sheet closes.
- */
 export function NewTaskScreen() {
   const { t, errorMessage } = useText();
   const { serverId, agentId: initialAgentId } = useLocalSearchParams<{ serverId: string; agentId?: string }>();
@@ -51,7 +46,6 @@ export function NewTaskScreen() {
   const dirty = title !== "";
   const canSave = online && supported && Boolean(chosen) && dirty && !finished;
 
-  // Discard turns prevention off before it repeats the action, so the hook does not warn.
   const [discarding, setDiscarding] = useState(false);
   usePreventRemove(!discarding && !finished && (dirty || saving), ({ repeat }) => {
     if (pending.current) return;
@@ -76,22 +70,14 @@ export function NewTaskScreen() {
     pending.current = true;
     setSaving(true);
     setError(null);
+    const attempt = taskStartId(serverId, chosen.id, draft);
     try {
-      const task = await startAgentTask(
-        { agentId: chosen.id, text: draft, clientMessageId: Crypto.randomUUID() },
-        serverId,
-      );
-      // The task shows before its list event arrives.
-      queryClient.setQueryData<AgentTasksSnapshot>(
-        queryKeys.agentTasks(queryScope, serverId, task.agentId),
-        (stored) =>
-          stored && !stored.tasks.some((entry) => entry.id === task.id)
-            ? { ...stored, tasks: [task, ...stored.tasks] }
-            : stored,
-      );
+      const task = await startAgentTask({ agentId: chosen.id, text: draft, clientMessageId: attempt.id }, serverId);
+      addStartedTask(queryClient, queryScope, serverId, task);
       void haptics.notification("success");
       setFinished(true);
     } catch (cause) {
+      attempt.failed();
       void haptics.notification("error");
       setError(errorMessage(cause, t("mobile.server.threads.error.start")));
       pending.current = false;

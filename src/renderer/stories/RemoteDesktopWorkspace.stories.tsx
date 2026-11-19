@@ -77,7 +77,6 @@ export const ConnectionError: Story = {
   },
 };
 
-// The one failure a retry alone never clears: the grant is on the other computer.
 export const ScreenRecordingBlocked: Story = {
   args: {
     session: undefined,

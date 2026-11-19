@@ -10,6 +10,11 @@
   background: transparent;
 }
 
+.tab-shape {
+  display: none;
+  -webkit-app-region: initial;
+}
+
 .conversation-heading-group {
   display: flex;
   min-width: 0;

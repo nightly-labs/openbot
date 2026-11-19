@@ -51,14 +51,11 @@ export const messages = {
   "mobile.server.join.inviteLink": "邀请链接",
   "mobile.server.join.joining": "正在加入…",
   "mobile.server.join.submit": "加入服务器",
-  // The cloud server that OpenBot runs for the user, with a paid plan. The phone shows the plans and
-  // the servers of the account; the purchase is in OpenBot on the computer.
   "mobile.server.hosted.loading": "正在加载套餐…",
   "mobile.server.hosted.loadFailed": "无法加载套餐，请重试。",
   "mobile.server.hosted.wakeFailed": "无法启动服务器，请重试。",
   "mobile.server.hosted.restartFailed": "无法重启服务器，请重试。",
   "mobile.server.hosted.unavailable": "该账号无法使用云服务器。",
-  // The name of a server before the first read of its name.
   "mobile.server.hosted.defaultName": "云服务器",
   "mobile.server.hosted.monthly": "按月",
   "mobile.server.hosted.yearly": "按年",
@@ -99,9 +96,7 @@ export const messages = {
   "mobile.server.hosted.intro.title": "你的助手，永不掉线",
   "mobile.server.hosted.intro.description":
     "即使你的电脑关机，云服务器也会运行你的助手和自动化任务。OpenBot 负责配置并保持它运行。",
-  // {members}, {storage}, {sites} and {speed} are the texts of the four facts of a plan.
   "mobile.server.hosted.planFacts": "{members} · {storage} · {sites} · {speed}",
-  // The steps on the desktop app. The names after "Settings" are the desktop Settings tabs and buttons.
   "mobile.server.hosted.computer.title": "在你的电脑上",
   "mobile.server.hosted.computer.add": "添加云服务器",
   "mobile.server.hosted.computer.addHint": "在 OpenBot 中打开“设置 → 托管服务器”，然后选择“添加服务器”。",
@@ -111,7 +106,6 @@ export const messages = {
   "mobile.server.hosted.plans": "套餐",
   "mobile.server.hosted.currentPlan": "你的套餐",
   "mobile.server.hosted.soldOut": "已售罄",
-  // The plan and the billing period of one server of the account, such as "Standard · Yearly". {date} is a date.
   "mobile.server.hosted.serverPlan": "{plan} · {interval}",
   "mobile.server.hosted.serverPlanEnds": "{plan} · {interval} · {date} 到期",
   "mobile.server.hosted.state.payment": "等待付款",
@@ -148,7 +142,6 @@ export const messages = {
   "mobile.server.hosted.detail.signIn": "正在以你的身份登录",
   "mobile.server.hosted.detail.publish": "正在把服务器加入你的账号",
   "mobile.server.hosted.detail.check": "正在检查连接",
-  // For screen readers, after the name of a setup step.
   "mobile.server.hosted.stepDone": "已完成",
   "mobile.server.hosted.stepActive": "进行中",
   "mobile.server.hosted.stepPending": "未开始",
@@ -253,6 +246,7 @@ export const messages = {
     "服务器会停止并重新启动，大约需要一分钟。正在运行的助手对话会中断，服务器恢复前成员会失去连接。文件和对话会保留。",
   "mobile.server.settings.restartConfirm": "重启",
   "mobile.server.settings.restarted": "{name} 正在重启",
+  "mobile.server.settings.restartUnsupported": "请更新此服务器上的 OpenBot，以便在此处重启它。",
   "mobile.server.settings.leaveTitle": "退出 {name}？",
   "mobile.server.settings.leaveBody": "如需再次加入，你需要另一个邀请。",
   "mobile.server.settings.leave": "退出服务器",
@@ -275,6 +269,13 @@ export const messages = {
   "mobile.server.settings.identityNotAllowed": "只有所有者或管理员可以更改服务器名称和标志。",
   "mobile.server.settings.identityUnsupported": "请更新该服务器上的 OpenBot，才能在此更改其名称和标志。",
   "mobile.server.settings.identityOffline": "请连接该服务器以更改其名称和标志。",
+  "mobile.server.settings.appearance": "形状和颜色",
+  "mobile.server.settings.appearanceShape": "形状",
+  "mobile.server.settings.appearanceShapeOption": "形状 {number}",
+  "mobile.server.settings.appearanceColor": "服务器颜色",
+  "mobile.server.settings.appearanceAutomatic": "自动",
+  "mobile.server.settings.appearanceReset": "重置",
+  "mobile.server.settings.appearanceSaveFailed": "无法保存服务器的形状和颜色，请重试。",
   "mobile.server.route.cropLogo": "裁切标志",
   "mobile.server.members.remove": "移除成员",
   "mobile.server.members.invitePeople": "邀请他人",
@@ -313,6 +314,8 @@ export const messages = {
   "mobile.server.route.invite": "邀请他人",
   "mobile.server.route.member": "成员",
   "mobile.server.route.timezone": "时区",
+  "mobile.server.route.personality": "助手个性",
+  "mobile.server.route.agents": "助手",
   "mobile.server.settings.storage": "存储",
   "mobile.server.route.storage": "存储",
   "mobile.server.route.storageFiles": "全部文件",
@@ -363,10 +366,36 @@ export const messages = {
   "mobile.server.library.noMatches": "没有匹配的文件",
   "mobile.server.library.showInChat": "在对话中显示",
   "mobile.server.library.share": "分享",
+  "mobile.server.library.folders.title": "文件夹",
+  "mobile.server.library.folders.allFiles": "所有文件",
+  "mobile.server.library.folders.removedAgents": "已删除的助手",
+  "mobile.server.library.folders.notInFolder": "不在文件夹中",
+  "mobile.server.library.folders.path": "文件夹：{path}",
+  "mobile.server.library.folders.pathHint": "显示文件夹",
+  "mobile.server.library.folders.new": "新建文件夹",
+  "mobile.server.library.folders.name": "文件夹名称",
+  "mobile.server.library.folders.inFolder": "在 {name} 中",
+  "mobile.server.library.folders.create": "创建",
+  "mobile.server.library.folders.rename": "重命名",
+  "mobile.server.library.folders.renameTitle": "重命名文件夹",
+  "mobile.server.library.folders.save": "保存",
+  "mobile.server.library.folders.delete": "删除文件夹",
+  "mobile.server.library.folders.deleteTitle": "删除“{name}”？",
+  "mobile.server.library.folders.deleteBody": "其中的文件夹也会被删除。文件仍归该助手所有。",
+  "mobile.server.library.folders.moveTo": "移动到文件夹",
+  "mobile.server.library.folders.actions": "{name} 的操作",
+  "mobile.server.library.folders.expand": "显示 {name} 的文件夹",
+  "mobile.server.library.folders.collapse": "隐藏 {name} 的文件夹",
+  "mobile.server.library.folders.emptyTitle": "此文件夹中没有文件",
+  "mobile.server.library.folders.emptyBody": "{agent} 可以用文件夹路径 {path} 把文件保存到这里。",
+  "mobile.server.library.folders.loadFailed": "无法加载文件夹",
+  "mobile.server.library.folders.changeFailed": "无法更改文件夹",
+  "mobile.server.library.folders.gone": "此文件夹已不在服务器上。",
+  "mobile.server.library.folders.fileGone": "此文件已不在服务器上，或者你无法移动它。",
+  "mobile.server.library.folders.unsupported": "此服务器的资料库没有文件夹。请更新服务器后使用。",
   "mobile.server.route.providers": "服务商",
   "mobile.server.route.provider": "服务商",
   "mobile.server.route.providerModels": "模型",
-  "mobile.server.route.mcp": "MCP 服务器",
   "mobile.server.route.mcpServer": "MCP 服务器",
   "mobile.server.members.rowLabel": "{name}，{role}",
   "mobile.server.members.you": "{name}（你）",
@@ -400,7 +429,8 @@ export const messages = {
   "mobile.server.settings.timezoneSearch": "搜索时区",
   "mobile.server.settings.timezoneNoMatch": "没有匹配该搜索的时区。",
   "mobile.server.settings.timezoneMore": "输入更多名称以查看其他时区。",
-  "mobile.server.settings.timezoneDescription": "消息没有给出发送者的时区时，新的自动化任务使用该时区。",
+  "mobile.server.settings.timezoneDescription":
+    "消息没有给出发送者的时区时，新的自动化任务使用该时区。在服务器上，浏览器也会在下次重启后使用该时区。",
   "mobile.server.settings.timezoneLoading": "正在加载时区…",
   "mobile.server.settings.timezoneLoadFailed": "无法加载服务器时区。",
   "mobile.server.settings.timezoneSaveFailed": "无法保存时区，请重试。",
@@ -426,6 +456,31 @@ export const messages = {
   "mobile.server.settings.memoryLimitLoadFailed": "无法加载该服务器的记忆数量上限。",
   "mobile.server.settings.memoryLimitSaveFailed": "无法保存记忆数量上限，请重试。",
   "mobile.server.settings.memoryLimitUnsupported": "请更新该服务器上的 OpenBot，才能在此更改其记忆数量上限。",
+  "mobile.server.settings.memoryReview": "记忆整理",
+  "mobile.server.settings.memoryReviewDescription": "该服务器上的助手在后台从聊天中保存长期事实的频率。",
+  "mobile.server.settings.memoryReviewOff": "关闭",
+  "mobile.server.settings.memoryReviewTurns": { other: "每 {count} 轮" },
+  "mobile.server.settings.memoryReviewLoadFailed": "无法加载记忆整理设置。",
+  "mobile.server.settings.skillLearning": "技能学习",
+  "mobile.server.settings.skillLearningDescription": "此服务器上的智能体是否将学到的内容保存为技能。",
+  "mobile.server.settings.skillLearningAutomatic": "自动",
+  "mobile.server.settings.skillLearningAsk": "先询问",
+  "mobile.server.settings.skillLearningOff": "关闭",
+  "mobile.server.settings.skillLearningLoadFailed": "无法加载技能学习设置。",
+  "mobile.server.settings.browsingMemory": "从我的浏览中学习",
+  "mobile.server.settings.browsingMemoryDescription":
+    "当你控制智能体的浏览器时，智能体会从你使用的页面和按钮中学习网站的用法。不会保存你输入的文字。",
+  "mobile.server.settings.browsingMemoryLoadFailed": "无法加载浏览设置。",
+  "mobile.server.settings.learningSaveFailed": "无法保存此设置，请重试。",
+  "mobile.server.settings.learningUnsupported": "请更新该服务器上的 OpenBot，才能在此更改此设置。",
+  "mobile.server.settings.responseStyleDescription":
+    "自然：助手在工作时发送简短进度，并显示在聊天中。经典：助手完成后只回复一次。",
+  "mobile.server.settings.responseStyleNatural": "自然",
+  "mobile.server.settings.responseStyleClassic": "经典",
+  "mobile.server.settings.personalityLoadFailed": "无法加载服务器个性。",
+  "mobile.server.settings.personalitySaveFailed": "无法保存回复风格，请重试。",
+  "mobile.server.settings.personalityUnsupported": "请更新该服务器上的 OpenBot，才能在此更改其回复风格。",
+  "mobile.server.settings.agentsUnavailable": "请以所有者或管理员身份连接该服务器，以更改其助手设置。",
   "mobile.server.route.browserProfiles": "浏览器配置文件",
   "mobile.server.browserProfiles.unavailable": "只有在线服务器的所有者或管理员可以管理其浏览器配置文件。",
   "mobile.server.browserProfiles.unsupported": "请更新此服务器上的 OpenBot,以便在这里管理其浏览器配置文件。",
@@ -505,13 +560,10 @@ export const messages = {
   "mobile.server.browserProxies.change": "更改代理",
   "mobile.server.browserProxies.choiceHint": "“自动”使用运行服务器的电脑的代理设置。更改会关闭该配置文件打开的标签页。",
   "mobile.server.browserProxies.shareHint": "要使用你的电脑，请在 OpenBot 桌面应用中共享它。",
-  // Server settings › Connectors: the Slack, Discord, Telegram, GitHub and 1Password connections of a
-  // joined server, for an owner or admin. {host} and {name} are the server name, such as Studio.
   "mobile.server.route.connectors": "连接器",
   "mobile.server.connectors.unavailable": "请以所有者或管理员身份连接该服务器，以管理其连接器。",
   "mobile.server.connectors.unsupported": "请更新该服务器上的 OpenBot，才能在此管理其连接器。",
   "mobile.server.connectors.loading": "正在加载连接器…",
-  // A connector that only the desktop app can set up, such as Bitwarden.
   "mobile.server.connectors.localOnly": "仅限桌面应用",
   "mobile.server.connectors.statusConnected": "已连接",
   "mobile.server.connectors.statusAttention": "需要关注",
@@ -521,12 +573,10 @@ export const messages = {
   "mobile.server.connectors.statusExpired": "已过期",
   "mobile.server.connectors.statusPaused": "已暂停",
   "mobile.server.connectors.readFailed": "无法读取该连接的状态。",
-  // {name} is the name of a connector, such as Slack.
   "mobile.server.connectors.actionFailed": "无法更改 {name} 连接，请重试。",
   "mobile.server.connectors.openFailed": "无法打开服务器给出的页面。",
   "mobile.server.connectors.reconnect": "重新连接",
   "mobile.server.connectors.disconnect": "断开连接",
-  // {action} is a button, such as Disconnect; {name} is a workspace or chat name.
   "mobile.server.connectors.rowAction": "{action}：{name}",
   "mobile.server.connectors.answerMessages": "回答消息",
   "mobile.server.connectors.noAgent": "还没有助手回答",
@@ -566,7 +616,6 @@ export const messages = {
     "复制验证码，然后在 GitHub 页面上输入。GitHub 完成后，该页面会显示连接状态。",
   "mobile.server.connectors.github.copyAndOpen": "复制验证码并打开 GitHub",
   "mobile.server.connectors.github.accountTitle": "账号",
-  // {login} is the GitHub account name, such as octocat.
   "mobile.server.connectors.github.connectedAs": "已连接为 @{login}",
   "mobile.server.connectors.github.chooseRepositories": "选择仓库",
   "mobile.server.connectors.github.repositoriesFooter": "助手只能使用已安装 OpenBot GitHub App 的仓库。",
@@ -597,7 +646,6 @@ export const messages = {
   "mobile.server.connectors.onePassword.vaultTitle": "共享保险库",
   "mobile.server.connectors.onePassword.vaultFooter":
     "在 1Password 中把登录信息移入该保险库，助手即可用它登录；移出则停止共享。",
-  // {count} is a number, such as 3.
   "mobile.server.connectors.onePassword.loginCount": { other: "{count} 个登录信息" },
   "mobile.server.connectors.onePassword.disconnect": "断开 1Password",
   "mobile.server.connectors.onePassword.disconnectTitle": "断开 1Password？",
@@ -609,6 +657,8 @@ export const messages = {
   "mobile.server.connectors.protonPass.keyHelp":
     "在 Proton Pass 中创建一个只能读取你与 OpenBot 共享的保险库的访问密钥，然后粘贴到这里。{host} 保存该密钥；这部手机不保存。",
   "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.protonPass.plan":
+    "你的 Proton 方案不包含 Proton Pass 命令行工具。需要包含 Pass Plus 的 Proton 方案。Mail Plus 等其他付费方案不包含它。请更改账户的方案，然后重新连接。",
   "mobile.server.connectors.passwordManager.unavailable": "{name} 在此服务器上不可用。",
   "mobile.server.connectors.passwordManager.howItWorks":
     "在这部手机上登录 {name}。然后 {host} 会创建一个共享保险库及其只读访问密钥，并只保存该密钥。代理永远看不到密码。",
@@ -636,7 +686,6 @@ export const messages = {
   "mobile.server.connectors.passwordManager.keyReadOnly": "只读",
   "mobile.server.connectors.passwordManager.keyExpires": "只读。将于 {date} 过期。",
   "mobile.server.connectors.passwordManager.keyExpired": "已于 {date} 过期",
-  "mobile.server.connectors.passwordManager.plan": "{name} 命令行工具需要付费方案。请更改账户的方案，然后重新连接。",
   "mobile.server.connectors.passwordManager.expiredTitle": "{name} 密钥已过期",
   "mobile.server.connectors.passwordManager.expiredBody":
     "在你重新连接之前，{host} 上的代理无法使用你共享的登录项登录。",
@@ -644,8 +693,6 @@ export const messages = {
   "mobile.server.connectors.passwordManager.disconnectTitle": "断开 {name}？",
   "mobile.server.connectors.passwordManager.disconnectBody":
     "{host} 会删除其访问密钥。保险库及其登录项仍保留在你的 {name} 账户中。",
-  // Slack: a workspace installs the one OpenBot app, and the Slack Orchestrator agent answers.
-  // {workspace} is the Slack workspace name.
   "mobile.server.connectors.slack.title": "Slack",
   "mobile.server.connectors.slack.description":
     "人们在 Slack 中提及 @OpenBot 或给它发私信。Slack 调度助手会找到合适的助手来回答。",
@@ -657,10 +704,8 @@ export const messages = {
   "mobile.server.connectors.slack.limit": { other: "最多可连接 {count} 个工作区。" },
   "mobile.server.connectors.slack.workspaceTitle": "工作区",
   "mobile.server.connectors.slack.workspaceDescription": "人们提及 @OpenBot 或给它发私信。",
-  // {scopes} lists Slack permissions, such as "chat:write and users:read".
   "mobile.server.connectors.slack.missingScopes":
     "OpenBot 在 Slack 中缺少这些权限：{scopes}。请断开该工作区后重新连接。",
-  // {time} is a time, such as 14:30.
   "mobile.server.connectors.slack.retryAt": "Slack 要求 OpenBot 等待，将于 {time} 重试。",
   "mobile.server.connectors.slack.helpInvalidToken":
     "Slack 不再接受 OpenBot 访问该工作区，可能已被卸载。请重新连接该工作区。",
@@ -668,6 +713,7 @@ export const messages = {
     "OpenBot 无法读取 {host} 上已保存的令牌。请断开该工作区后重新连接。",
   "mobile.server.connectors.slack.helpRelay":
     "{host} 上的 OpenBot 无法接收 Slack 事件。请在 {host} 上登录，在“服务器设置”中为服务器命名，并保持 OpenBot 打开。",
+  "mobile.server.connectors.slack.helpNotLinked": "此工作区未关联到 {host}。轻点“重新连接”进行关联。",
   "mobile.server.connectors.slack.orchestratorTitle": "Slack 调度助手",
   "mobile.server.connectors.slack.orchestratorDescription":
     "该助手接收来自 Slack 的所有请求。简单的问题它自己回答，其余的交给合适的助手处理，并把答案发在话题中。",
@@ -683,8 +729,6 @@ export const messages = {
   "mobile.server.connectors.slack.agentPromptTitle": "添加 Slack 调度助手？",
   "mobile.server.connectors.slack.agentPromptBody": "这个新助手会回答人们在 {workspace} 中发给 @OpenBot 的所有消息。",
   "mobile.server.connectors.slack.installFailed": "Slack 未完成安装，请重试。",
-  // Discord: a Discord server adds the one OpenBot bot. Always write "Discord server": "server" alone
-  // is an OpenBot server. {workspace} is the Discord server name.
   "mobile.server.connectors.discord.title": "Discord",
   "mobile.server.connectors.discord.description":
     "人们在 Discord 服务器的频道中提及 @OpenBot。Discord 调度助手会找到合适的助手来回答。",
@@ -696,10 +740,8 @@ export const messages = {
   "mobile.server.connectors.discord.limit": { other: "最多可连接 {count} 个 Discord 服务器。" },
   "mobile.server.connectors.discord.workspaceTitle": "Discord 服务器",
   "mobile.server.connectors.discord.workspaceDescription": "在频道中提及 @OpenBot，回复 OpenBot 可继续对话。",
-  // {scopes} lists Discord permissions.
   "mobile.server.connectors.discord.missingScopes":
     "OpenBot 在 Discord 中缺少这些权限：{scopes}。请断开该 Discord 服务器后重新连接。",
-  // {time} is a time, such as 14:30.
   "mobile.server.connectors.discord.retryAt": "Discord 要求 OpenBot 等待，将于 {time} 重试。",
   "mobile.server.connectors.discord.helpInvalidToken":
     "Discord 不再接受 OpenBot 访问该 Discord 服务器，可能已被移除。请重新连接该 Discord 服务器。",
@@ -707,6 +749,7 @@ export const messages = {
     "OpenBot 无法读取 {host} 上已保存的令牌。请断开该 Discord 服务器后重新连接。",
   "mobile.server.connectors.discord.helpRelay":
     "{host} 上的 OpenBot 无法接收 Discord 事件。请在 {host} 上登录，在“服务器设置”中为服务器命名，并保持 OpenBot 打开。",
+  "mobile.server.connectors.discord.helpNotLinked": "此 Discord 服务器未关联到 {host}。轻点“重新连接”进行关联。",
   "mobile.server.connectors.discord.orchestratorTitle": "Discord 调度助手",
   "mobile.server.connectors.discord.orchestratorDescription":
     "该助手接收来自 Discord 的所有请求。简单的问题它自己回答，其余的交给合适的助手处理，并在频道中回复答案。",
@@ -721,12 +764,9 @@ export const messages = {
   "mobile.server.connectors.discord.agentPromptTitle": "添加 Discord 调度助手？",
   "mobile.server.connectors.discord.agentPromptBody": "这个新助手会回答人们在 {workspace} 中发给 @OpenBot 的所有消息。",
   "mobile.server.connectors.discord.installFailed": "Discord 未完成授权，请重试。",
-  // Telegram: each chat adds the one OpenBot bot, and the Telegram Orchestrator answers all chats.
-  // {chat} is the Telegram chat name.
   "mobile.server.connectors.telegram.title": "Telegram",
   "mobile.server.connectors.telegram.description":
     "把 OpenBot 机器人加入 Telegram 群组，或与它开启私聊。Telegram 调度助手会找到合适的助手来回答。",
-  // {count} is the number of linked Telegram chats.
   "mobile.server.connectors.telegram.attention": { other: "{count} 个聊天需要关注" },
   "mobile.server.connectors.telegram.groupTitle": "群组",
   "mobile.server.connectors.telegram.directTitle": "私聊",
@@ -736,7 +776,7 @@ export const messages = {
   "mobile.server.connectors.telegram.helpRelay":
     "{host} 上的 OpenBot 无法接收 Telegram 消息。请在 {host} 上登录，在“服务器设置”中为服务器命名，并保持 OpenBot 打开。",
   "mobile.server.connectors.telegram.helpError": "OpenBot 无法连接到该聊天。请重新连接，或断开该聊天。",
-  // {time} is a time, such as 14:30.
+  "mobile.server.connectors.telegram.helpNotLinked": "此聊天未关联到 {host}。轻点“重新连接”进行关联。",
   "mobile.server.connectors.telegram.retryAt": "Telegram 要求 OpenBot 等待，将于 {time} 重试。",
   "mobile.server.connectors.telegram.linkTitle": "关联聊天",
   "mobile.server.connectors.telegram.linkAnother": "关联其他聊天",
@@ -769,14 +809,18 @@ export const messages = {
     "你允许的人可以联系 OpenBot。其他人会收到一个代码，需要把它交给你。",
   "mobile.server.connectors.whatsapp.helpLoggedOut": "WhatsApp 已把这台服务器从已关联的设备中移除。请重新关联该号码。",
   "mobile.server.connectors.whatsapp.helpError": "OpenBot 无法通过该号码连接 WhatsApp。请重新连接，或断开该号码。",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable": "OpenBot 无法读取该号码已保存的密钥。请重新关联该号码。",
   "mobile.server.connectors.whatsapp.retryAt": "WhatsApp 要求 OpenBot 等待，将于 {time} 重试。",
   "mobile.server.connectors.whatsapp.linkAgain": "重新关联",
   "mobile.server.connectors.whatsapp.ownNumber": "个人号码",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
-    "只有你的“给自己发消息”聊天和你允许的人可以发消息。如果是 OpenBot 专用号码，请关闭该选项。",
+    "只有你的“给自己发消息”聊天和你允许的人可以发消息。其他人不会收到回复。关闭后，OpenBot 会给陌生人回复一个代码。",
   "mobile.server.connectors.whatsapp.workingMessage": "“正在处理…”消息",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "代理工作时，OpenBot 会发送这条消息，随后用回答替换它。关闭后只发送回答。",
+    "代理工作时，OpenBot 会发送这条消息，随后用回答替换它。等待之前请求的新请求也会收到一条等待消息。关闭后只发送回答。",
+  "mobile.server.connectors.whatsapp.statusReactions": "状态表情回应",
+  "mobile.server.connectors.whatsapp.statusReactionsDescription":
+    "消息到达时，OpenBot 会用 👀 回应；回答准备好后用 ✅ 回应。关闭后不发送任何表情回应。",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp 调度助手",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "该助手接收你所有已关联号码中发给 OpenBot 的消息。简单的问题它自己回答，其余的交给合适的助手处理，并在 WhatsApp 中回答。",
@@ -788,10 +832,11 @@ export const messages = {
   "mobile.server.connectors.whatsapp.codeOnly": "在手机上，请使用配对码关联。如需扫描二维码，请在电脑上使用 OpenBot。",
   "mobile.server.connectors.whatsapp.kindLabel": "号码",
   "mobile.server.connectors.whatsapp.kindPersonal": "我的个人号码",
-  "mobile.server.connectors.whatsapp.kindPersonalDescription": "OpenBot 只回答你的“给自己发消息”聊天和你允许的人。",
+  "mobile.server.connectors.whatsapp.kindPersonalDescription":
+    "OpenBot 只回答你的“给自己发消息”聊天和你允许的人。其他人不会收到回复。",
   "mobile.server.connectors.whatsapp.kindDedicated": "OpenBot 专用号码",
   "mobile.server.connectors.whatsapp.kindDedicatedDescription":
-    "陌生人会收到一个代码，需要把它交给你。你在这里批准他们。",
+    "OpenBot 会用这个号码回复每个陌生人一个代码，需要把它交给你。你在这里批准他们。",
   "mobile.server.connectors.whatsapp.phoneLabel": "电话号码",
   "mobile.server.connectors.whatsapp.phoneDescription": "包含国家代码，例如 +44 7700 900123。",
   "mobile.server.connectors.whatsapp.phoneInvalid": "请输入带国家代码的电话号码。",
@@ -835,7 +880,8 @@ export const messages = {
   "mobile.server.connectors.whatsapp.contactNameDescription": "可选。留空时，列表中显示电话号码。",
   "mobile.server.connectors.whatsapp.add": "添加",
   "mobile.server.connectors.whatsapp.groupTitle": "添加群组",
-  "mobile.server.connectors.whatsapp.groupDescription": "该群组中的人可以给你的助手分配工作。",
+  "mobile.server.connectors.whatsapp.groupDescription":
+    "该群组中的人提及这个号码或回复它的消息时，可以给你的助手分配工作。",
   "mobile.server.connectors.whatsapp.groupSearch": "搜索群组",
   "mobile.server.connectors.whatsapp.groupsLoading": "正在读取群组…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot 无法读取群组",
@@ -851,7 +897,6 @@ export const messages = {
   "mobile.server.connectors.whatsapp.deny": "拒绝",
   "mobile.server.settings.providers": "服务商",
   "mobile.server.settings.providersConnected": { other: "已连接 {count} 个" },
-  // The AI providers of the computer that runs the server. Owners and admins manage them from the phone.
   "mobile.server.providers.description": "运行该服务器的电脑上的 AI 服务商。",
   "mobile.server.providers.connectedTitle": "已连接",
   "mobile.server.providers.otherTitle": "未连接",
@@ -943,6 +988,13 @@ export const messages = {
   "mobile.server.providers.status.ready": "已安装",
   "mobile.server.providers.status.notInstalled": "未安装",
   "mobile.server.providers.status.checking": "检查中",
+  "mobile.server.providers.addAccountWithCode": "用验证码添加账号",
+  "mobile.server.providers.accountSignInWithCode": "用验证码登录",
+  "mobile.server.providers.accountsKeyHint": "每个助手使用一个账号，可在助手设置中选择。新账号需要该账号的 API 密钥。",
+  "mobile.server.providers.accountChangeKey": "更换密钥",
+  "mobile.server.providers.accountKeyHint": "粘贴 {provider} 账号的 API 密钥。密钥会发送到服务器，这台手机不保存。",
+  "mobile.server.providers.accountKeyChecking": "正在检查密钥…",
+  "mobile.server.providers.accountKeyAddFailed": "无法添加账号，请重试。",
   "mobile.server.providers.pool": "账号池",
   "mobile.server.providers.poolHint": "助手先用一个账号，直到接近用量限额，再换到限额最先重置的账号。",
   "mobile.server.providers.accountsPooledHint": "助手共用这些账号。新账号在本手机上它的页面中登录。",
@@ -980,6 +1032,21 @@ export const messages = {
   "mobile.server.providers.compactWindowDefault": "Claude Code 默认",
   "mobile.server.providers.compactWindowTokens": "{size} 个 token",
   "mobile.server.providers.compactWindowLoadFailed": "无法加载该服务器的压缩大小。",
+  "mobile.server.environment.row": "变量",
+  "mobile.server.environment.title": "环境",
+  "mobile.server.environment.hint": "{name} 的每个进程获得的 API 密钥、基础 URL 等设置。更改在当前回合结束后生效。",
+  "mobile.server.environment.codexHint":
+    "OPENAI_BASE_URL 配合作为密钥的 OPENAI_API_KEY，会把 ChatGPT 的模型请求发送到该地址。",
+  "mobile.server.environment.shellNote": "智能体运行的命令可以读取这些值。",
+  "mobile.server.environment.add": "添加变量",
+  "mobile.server.environment.namePlaceholder": "VARIABLE_NAME",
+  "mobile.server.environment.valuePlaceholder": "值",
+  "mobile.server.environment.saved": "已保存",
+  "mobile.server.environment.sensitive": "敏感",
+  "mobile.server.environment.remove": "移除",
+  "mobile.server.environment.save": "保存",
+  "mobile.server.environment.loadFailed": "无法加载 {name} 的变量。",
+  "mobile.server.environment.invalid": "请先修正名称。",
   "mobile.server.providers.disconnect": "断开连接",
   "mobile.server.providers.disconnectTitle": "断开 {name}？",
   "mobile.server.providers.disconnectBody":
@@ -1016,21 +1083,10 @@ export const messages = {
   "mobile.server.providers.defaultForNew": "新助手的默认选项",
   "mobile.server.providers.startsWith": "新助手默认使用 {name}。",
   "mobile.server.providers.connectFirst": "请先连接 {name}。",
-  "mobile.server.settings.mcp": "MCP 服务器",
-  "mobile.server.settings.mcpCount": { other: "{count} 个服务器" },
   "mobile.server.mcp.unsupported": "请更新该服务器上的 OpenBot，才能在此管理其 MCP 服务器。",
   "mobile.server.mcp.unavailable": "请以所有者或管理员身份连接该服务器，以管理其 MCP 服务器。",
-  "mobile.server.mcp.description":
-    "MCP 服务器为该服务器的助手提供更多工具。Claude 和 Codex 助手只会使用该列表中的服务器。",
+  "mobile.server.mcp.accessUnsupported": "请更新该服务器上的 OpenBot，才能选择谁获得其 MCP 服务器。",
   "mobile.server.mcp.loading": "正在加载 MCP 服务器…",
-  "mobile.server.mcp.loadFailed": "无法加载 MCP 服务器。",
-  "mobile.server.mcp.empty": "还没有 MCP 服务器。",
-  "mobile.server.mcp.retry": "重试",
-  "mobile.server.mcp.add": "添加 MCP 服务器",
-  "mobile.server.mcp.rowLabel": "{name}，{status}",
-  "mobile.server.mcp.enabled": "开",
-  "mobile.server.mcp.disabled": "关",
-  "mobile.server.mcp.signedIn": "已登录",
   "mobile.server.mcp.gone": "该 MCP 服务器已不在这台服务器上。",
   "mobile.server.mcp.addTitle": "添加 MCP 服务器",
   "mobile.server.mcp.addConfirm": "添加",
@@ -1087,6 +1143,20 @@ export const messages = {
   "mobile.server.mcp.removeTitle": "移除 {name}？",
   "mobile.server.mcp.removeBody": "该服务器的助手将不再获得它的工具，设置不会保留。",
   "mobile.server.mcp.remove": "移除 MCP 服务器",
+  "mobile.server.mcp.access.title": "访问权限",
+  "mobile.server.mcp.access.agents": "助手",
+  "mobile.server.mcp.access.agentsOf": "可使用 {name} 的助手",
+  "mobile.server.mcp.access.allAgents": "所有助手",
+  "mobile.server.mcp.access.allAgentsHint": "所有助手也包括之后添加的每个助手。",
+  "mobile.server.mcp.access.noAgents": "没有助手",
+  "mobile.server.mcp.access.someAgents": "{count}/{total}",
+  "mobile.server.mcp.access.use": "可使用",
+  "mobile.server.mcp.access.fromEveryone": "与所有人相同",
+  "mobile.server.mcp.access.level": "{role} 对 {name} 的访问权限",
+  "mobile.server.mcp.access.hint":
+    "成员获得所有人与其角色中的最高级别。所有者、管理员和添加该服务器的人始终可以管理它。",
+  "mobile.server.mcp.access.loadFailed": "无法加载谁可以获得此 MCP 服务器。",
+  "mobile.server.mcp.access.unavailable": "只有在线服务器的所有者或管理员才能选择谁获得此 MCP 服务器。",
   "mobile.server.usage.agents": "助手",
   "mobile.server.usage.agentLine": "{tokens} 个 token · {cost} · {percent}",
   "mobile.server.usage.noAgents": "该时间范围内没有助手用量记录。",
@@ -1100,7 +1170,6 @@ export const messages = {
   "mobile.server.machine.sizeDetail": "{used} / {total}",
   "mobile.server.machine.unknown": "不可用",
   "mobile.server.machine.unsupported": "该主机不报告机器用量。请更新主机后查看。",
-  // The plan limits of the host's providers: the rings in the home header and their sheet. {time} is a date.
   "mobile.server.planLimits.title": "套餐额度",
   "mobile.server.planLimits.button": "套餐额度：{summary}",
   "mobile.server.planLimits.left": "剩余 {percent}%",
@@ -1115,7 +1184,6 @@ export const messages = {
   "mobile.server.planLimits.window.fiveHour": "5 小时",
   "mobile.server.planLimits.window.hours": { other: "{count} 小时" },
   "mobile.server.planLimits.window.minutes": "{minutes} 分钟",
-  // Server settings > Updates: the OpenBot update of the server's host. {name} is the server.
   "mobile.server.settings.updates": "更新",
   "mobile.server.settings.updateAvailable": "有可用更新",
   "mobile.server.route.updates": "更新",
@@ -1234,6 +1302,10 @@ export const messages = {
   "mobile.server.roles.agentCount": { other: "{count} 个助手" },
   "mobile.server.roles.memberCount": { other: "{count} 名成员" },
   "mobile.server.roles.agentLevel": "{role} 对 {agent} 的访问权限",
+  "mobile.server.roles.changeInEveryone": "在所有人中更改",
+  "mobile.server.roles.setAll": "全部设置",
+  "mobile.server.roles.setAllLabel": "全部设置：{role} 对所有智能体的访问权限",
+  "mobile.server.roles.mixed": "混合",
   "mobile.server.roles.delete": "删除角色",
   "mobile.server.roles.deleteTitle": "删除 {name}？",
   "mobile.server.roles.deleteBody": "拥有该角色的成员将失去它所授予的助手。",
@@ -1273,7 +1345,6 @@ export const messages = {
   "mobile.server.audit.roleMemberAdded": "将 {member} 添加到 {role}",
   "mobile.server.audit.roleMemberRemoved": "将 {member} 从 {role} 移除",
   "mobile.server.audit.agentLevel": "{role} 的 {agent}：{change}",
-  // Server settings › Import agents: Grok Bot and Hermes exports (`agent-import-v1`).
   "mobile.server.settings.importAgents": "导入助手",
   "mobile.server.route.import": "导入助手",
   "mobile.server.import.unsupported": "更新该服务器上的 OpenBot 后，才能在这里导入助手。",
@@ -1344,11 +1415,11 @@ export const messages = {
   "mobile.server.import.channel": "频道",
   "mobile.server.import.notImportedTitle": "未导入",
   "mobile.server.import.resultWarnings": "部分内容没有迁移",
-  // Server settings › Transfer: the whole server to or from a transfer file (`instance-transfer-v1`).
   "mobile.server.settings.transfer": "迁移",
   "mobile.server.route.transfer": "迁移",
   "mobile.server.route.transferExport": "导出",
   "mobile.server.route.transferImport": "导入",
+  "mobile.server.route.transferCopy": "复制到其他服务器",
   "mobile.server.transfer.unsupported": "更新该服务器上的 OpenBot 后，才能在这里迁移它。",
   "mobile.server.transfer.unavailable": "以所有者或管理员身份连接到该服务器后才能迁移它。",
   "mobile.server.transfer.title": "把这台服务器迁移到另一台电脑",
@@ -1408,4 +1479,24 @@ export const messages = {
     "这些服务商原先在另一台服务器上登录，在此处尚未登录。在“服务器设置 › 服务商”中登录它们。",
   "mobile.server.transfer.notImported": "未导入",
   "mobile.server.transfer.warnings": "请检查以下内容",
+  "mobile.server.transfer.copy": "复制到其他服务器",
+  "mobile.server.transfer.copyNote": "将助手发送到你的其他服务器。",
+  "mobile.server.transfer.copyTo": "到",
+  "mobile.server.transfer.copyNoAgents": "此服务器没有助手。",
+  "mobile.server.transfer.copyNotMoved":
+    "助手所在的频道、自动化任务流程、工作流和共享文件夹也会被复制。API 密钥、登录、连接器和聊天记录不会被复制。请在另一台服务器上重新设置。",
+  "mobile.server.transfer.copySubmit": { one: "复制 {count} 个助手", other: "复制 {count} 个助手" },
+  "mobile.server.transfer.copyDuplicatesTitle": "复制重复的助手？",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "{server} 上已有这些名称的助手：{names}。复制会为每个再添加一个助手，每份都是独立助手，拥有各自的对话、文件和记忆。",
+  "mobile.server.transfer.copyDuplicatesConfirm": "复制副本",
+  "mobile.server.transfer.copying": "正在复制…",
+  "mobile.server.transfer.copyFailed": "复制未完成。",
+  "mobile.server.transfer.copied": {
+    one: "已将 {count} 个助手复制到 {server}。",
+    other: "已将 {count} 个助手复制到 {server}。",
+  },
+  "mobile.server.transfer.copyAgents": "要复制的助手",
+  "mobile.server.transfer.copyNext": "复制的助手使用 {server} 的批准规则。",
+  "mobile.server.transfer.copyNoServer": "以所有者或管理员身份连接到另一台服务器后才能把助手复制过去。",
 } as const satisfies PartialTranslation<typeof source>;

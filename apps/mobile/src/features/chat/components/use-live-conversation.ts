@@ -31,31 +31,20 @@ import { type LiveConversationPhase, liveReplyTurn } from "../model/live-convers
 import type { OutboxMessage } from "../model/outbox";
 import { useVoiceDictation, type VoiceDictation } from "./use-voice-dictation";
 
-/**
- * The agent's turn ended, or has not shown as running yet, and its answer is not in the
- * conversation: the read that the end starts brings it. After this long the conversation listens again.
- */
 const REPLY_GRACE_MS = 5_000;
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const OPEN_MS = 460;
 const CLOSE_MS = 400;
 const SPEAKING_PULSE_MS = 420;
 
-/** The message that was said, until the reply to it is read or dropped. */
 interface PendingReply {
   clientMessageId: string;
   messageId: string | null;
   turnId: string | null;
-  /** When the turn showed as ended with no answer yet. */
   endedAt: number | null;
-  /**
-   * In a channel: the messages that were there when the words were sent, and the member that the
-   * words name at their start, whose answer is read. A channel send has no host message id.
-   */
   channel: { known: ReadonlySet<string>; knownTasks: ReadonlySet<string>; namedId: string | null } | null;
 }
 
-/** A channel's messages, tasks and leader, for a voice conversation in the channel. */
 export interface LiveChannel {
   messages: readonly ChannelMessage[];
   tasks: readonly Pick<ChannelTask, "id" | "ownerAgentId">[];
@@ -63,21 +52,15 @@ export interface LiveChannel {
 }
 
 interface LiveConversationInput {
-  /** The chat is in front and the user can write here. */
   enabled: boolean;
-  /** The agent's server is connected. */
   online: boolean;
   focused: boolean;
   foreground: boolean;
-  /** The agent's conversation; null in a channel. */
   conversation: { messages: readonly ConversationMessage[]; activeTurnId: string | null } | null;
-  /** The agent's provider, which names the ids of its progress updates. Undefined in a channel. */
   provider: AgentProviderRef | undefined;
-  /** The channel; null in an agent chat. */
   channel: LiveChannel | null;
   deliveries: readonly Pick<QueueDelivery, "messageId" | "turnId">[];
   outboxMessages: readonly OutboxMessage[];
-  /** Sends what the user said. Null when the chat could not take it. */
   send: (text: string) => OutboxMessage | null;
 }
 
@@ -88,7 +71,6 @@ interface LiveConversationState {
   caption: string;
   error: string | null;
   exit: "cancel" | null;
-  /** In a channel, the agent whose answer is read now; null before an answer, and in an agent chat. */
   speakerId: string | null;
 }
 
@@ -103,28 +85,16 @@ const CLOSED: LiveConversationState = {
 };
 
 export interface LiveConversation extends LiveConversationState {
-  /** The phone can listen and speak. */
   available: boolean;
-  /** The recognizer hears now. The phase can say "listening" while the microphone still opens. */
   micOpen: boolean;
-  /** The voice that is heard now, from 0 to 1: the user's while listening, a pulse while speaking. */
   level: SharedValue<number>;
-  /** 0 with the chat, 1 with the conversation. */
   presence: SharedValue<number>;
   start: () => void;
   toggleMute: () => void;
-  /** Stops the reply, or the wait for it, and listens again. The agent's turn goes on. */
   interrupt: () => void;
   end: () => void;
 }
 
-/**
- * A conversation by voice with one agent, as on desktop. It listens until the user stops speaking,
- * sends the words to the chat, and reads the answer aloud while the agent writes it, with the voice in
- * Settings > Voice (Supertonic 3 on the phone, or ElevenLabs); then it listens again. The microphone
- * is off while the agent thinks or speaks, because the recognizer would hear the reply; Interrupt
- * stops the reply instead.
- */
 export function useLiveConversation(input: LiveConversationInput): LiveConversation {
   const [state, setState] = useState(CLOSED);
   const inputRef = useRef(input);
@@ -162,15 +132,11 @@ export function useLiveConversation(input: LiveConversationInput): LiveConversat
     controller.connection(input.online);
   }, [controller, input.online]);
 
-  // The conversation belongs to the chat in front of an active app: a screen above the chat, or the
-  // app in the background, ends it, as closing the pane does on desktop. Android reports the app as
-  // in the background while its permission dialog is open, so the first start must not end itself.
   const asking = dictation.phase === "starting";
   useEffect(() => {
     if (state.open && (!input.focused || (!input.foreground && !asking))) controller.end();
   }, [controller, state.open, input.focused, input.foreground, asking]);
 
-  // The user speaks hands-free, and a screen lock would put the app in the background.
   const keepAwakeTag = useId();
   useEffect(() => {
     if (!state.open) return;
@@ -180,7 +146,6 @@ export function useLiveConversation(input: LiveConversationInput): LiveConversat
     };
   }, [state.open, keepAwakeTag]);
 
-  // Android back ends the conversation before it leaves the chat.
   useEffect(() => {
     if (!state.open || !input.focused) return;
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
@@ -205,10 +170,6 @@ export function useLiveConversation(input: LiveConversationInput): LiveConversat
   };
 }
 
-/**
- * The steps of the conversation. They read the newest input and recognizer through the getters, and
- * keep their own copies of the state: a state read shows a write only after the next render.
- */
 function createController({
   input,
   dictation,
@@ -228,21 +189,14 @@ function createController({
   let muted = false;
   let heard = "";
   let pending: PendingReply | null = null;
-  /** The reply that is read aloud now, and the answer messages of its turn in order. */
   let reading: ReplyReading | null = null;
   let readIds: string[] = [];
   let speakerId: string | null = null;
   const readTexts = new Map<string, string>();
-  /**
-   * The progress updates read aloud in the newest turn. A stop of the reading keeps them: words that
-   * steer the running turn do not read its earlier updates again.
-   */
   let readUpdates: { turnId: string; ids: Set<string> } | null = null;
-  /** Each turn, interruption and the end make the work of the turn before them stale. */
   let generation = 0;
   let pauseTimer: ReturnType<typeof setTimeout> | null = null;
   let graceTimer: ReturnType<typeof setTimeout> | null = null;
-  /** The recognizer reached `listening` in this session: an end after that is not a failed start. */
   let sessionListened = false;
   let previousRecognizerPhase: VoiceDictation["phase"] = "idle";
   let startedAt = 0;
@@ -259,10 +213,6 @@ function createController({
   };
   const setCaption = (caption: string) => update({ caption });
 
-  /**
-   * The time with no new words that ends the user's turn, from Settings > Voice. Only words count:
-   * the sound of a loud room or the street does not hold the turn open.
-   */
   const turnEndSilence = () => useVoiceSettings.getState().turnPauseMs;
 
   function clearTimers(): void {
@@ -281,7 +231,6 @@ function createController({
     readTexts.clear();
   }
 
-  /** Ends the current turn's work: its recognizer session, its reply and its timers. */
   function drop(): void {
     generation += 1;
     clearTimers();
@@ -289,20 +238,17 @@ function createController({
     pending = null;
   }
 
-  /** Opens the microphone for the user's next turn, unless it is muted. */
   function listen(): void {
     drop();
     heard = "";
     setPhase("listening");
     setCaption("");
-    // The next words go to the channel, so the leader listens again.
     setSpeaker(null);
     if (muted || !open) return;
     sessionListened = false;
     if (!dictation()?.start("")) setMuted(true);
   }
 
-  /** The user paused: the words so far are the turn. */
   function endTurn(): void {
     if (!open || phase !== "listening") return;
     clearTimers();
@@ -346,11 +292,6 @@ function createController({
     followReply();
   }
 
-  /**
-   * Reads the answer while the agent writes it. A turn can answer in more than one message, and its
-   * progress updates come before the answer: their texts join in order, so the text only grows. The
-   * phase turns to speaking when the first part plays.
-   */
   function readAnswer(answer: ConversationMessage, complete: boolean, settled = false): void {
     if (!reading) {
       const own = generation;
@@ -358,7 +299,6 @@ function createController({
         onPart: (part) => {
           if (own !== generation) return;
           if (phase !== "speaking") {
-            // The grace timer stays: a turn that ends with only progress updates completes the reading.
             if (pauseTimer) clearTimeout(pauseTimer);
             pauseTimer = null;
             setPhase("speaking");
@@ -386,7 +326,6 @@ function createController({
     }
     if (!readTexts.has(answer.id)) readIds.push(answer.id);
     readTexts.set(answer.id, answer.text);
-    // A complete update plays to its end at once, when it is the last text: the next text can come minutes later.
     reading.update(
       readIds.map((id) => readTexts.get(id) ?? "").join("\n\n"),
       complete,
@@ -395,10 +334,6 @@ function createController({
     if (complete) pending = null;
   }
 
-  /**
-   * Ends a reply that has no answer to read. The progress updates that play continue to their end,
-   * then the microphone opens.
-   */
   function endWithoutAnswer(): void {
     if (!reading) {
       listen();
@@ -408,10 +343,6 @@ function createController({
     reading.update(readIds.map((id) => readTexts.get(id) ?? "").join("\n\n"), true);
   }
 
-  /**
-   * Follows the message that was said to the turn that answers it, and reads the answer when the
-   * turn ends. A message that the outbox could not send ends the wait.
-   */
   function followReply(
     {
       conversation,
@@ -437,8 +368,6 @@ function createController({
     current.turnId ??= current.messageId ? liveReplyTurn(conversation.messages, deliveries, current.messageId) : null;
     const turnId = current.turnId;
     const active = turnId !== null && conversation.activeTurnId === turnId;
-    // A streamed message that a later step marks as commentary is not part of the spoken answer.
-    // Progress updates are read on purpose, so only a message read as the answer counts.
     if (
       readIds.some(
         (id) =>
@@ -455,8 +384,6 @@ function createController({
       }
     }
     const answer = turnId ? latestTurnAnswer(conversation.messages, turnId) : undefined;
-    // Each progress update is read when it is complete, as on desktop. A stopped or failed turn ends
-    // its open update part way, so only a completed one is read.
     const provider = input().provider;
     if (turnId && readUpdates?.turnId !== turnId) readUpdates = { turnId, ids: new Set() };
     for (const update of conversation.messages)
@@ -475,7 +402,6 @@ function createController({
         readUpdates.ids.add(update.id);
         readAnswer(update, false, true);
       }
-    // The answer plays while it streams. It is complete when it is done and its turn has ended.
     if (answer && (answer.status === "streaming" || answer.status === "completed")) {
       current.endedAt = null;
       if (graceTimer) clearTimeout(graceTimer);
@@ -483,7 +409,6 @@ function createController({
       readAnswer(answer, answer.status === "completed" && !active);
       return;
     }
-    // A stopped or failed answer is not read, as on desktop.
     if (answer) {
       endWithoutAnswer();
       return;
@@ -502,11 +427,6 @@ function createController({
     }, REPLY_GRACE_MS);
   }
 
-  /**
-   * The recognizer can end without a pause: Android ends a session at a silence, iOS at its time
-   * limit, and an error or a denied permission ends it too. Words said so far are the turn; a
-   * session that never listened mutes the microphone, and its alert explains why.
-   */
   function recognizerPhase(next: VoiceDictation["phase"]): void {
     const before = previousRecognizerPhase;
     previousRecognizerPhase = next;
@@ -521,19 +441,12 @@ function createController({
     else setMuted(true);
   }
 
-  /** The agent in the call bar. Null shows the channel's leader. */
   function setSpeaker(agentId: string | null): void {
     if (speakerId === agentId) return;
     speakerId = agentId;
     update({ speakerId });
   }
 
-  /**
-   * In a channel the answer is the first new answer of any agent: the leader's, or the answer of the
-   * member that the leader gave the task to. Words that name a member at their start wait for that
-   * member. The call bar shows the member as soon as a new task is given to it, and then the agent
-   * that answers. The answer is read while it streams.
-   */
   function followChannelReply(sent: NonNullable<PendingReply["channel"]>, channel: LiveChannel): void {
     const assignee = channel.tasks.find((task) => !sent.knownTasks.has(task.id) && task.ownerAgentId)?.ownerAgentId;
     if (assignee && phase === "thinking") setSpeaker(assignee);
@@ -548,11 +461,9 @@ function createController({
     setSpeaker(entry.author.id);
     const { status } = entry.message;
     if (status === "streaming" || status === "completed") readAnswer(entry.message, status === "completed");
-    // A stopped or failed answer is not read, as in an agent chat.
     else listen();
   }
 
-  /** No reply comes while the server is away, so the conversation stops until it is back. */
   function connection(online: boolean): void {
     if (!open || exiting) return;
     if (!online && phase !== "offline") {
@@ -574,11 +485,8 @@ function createController({
   }
 
   return {
-    /** The words the recognizer heard in this session so far. */
     hear(text: string): void {
-      // The final text of the turn can come after the pause ended it, while `finish` waits for it.
       if (!open || (phase !== "listening" && phase !== "sending")) return;
-      // In noise a recognizer can send the same words again and again. Only new words hold the turn.
       const changed = text.trim() !== heard.trim();
       heard = text;
       update({ caption: text });
@@ -604,9 +512,7 @@ function createController({
         server_kind: "remote",
         result: "succeeded",
       });
-      // The composer turns into the call bar on this progress.
       presence.set(withTiming(1, { duration: OPEN_MS, easing: EASE_OUT, reduceMotion: ReduceMotion.System }));
-      // Started while the server is away, it waits for the server as it would after a disconnect.
       if (online) listen();
       else {
         phase = "listening";
@@ -648,7 +554,6 @@ function createController({
         duration_ms: performance.now() - startedAt,
         turn_count: turns,
       });
-      // The call bar opens back into the composer.
       presence.set(
         withTiming(0, { duration: CLOSE_MS, easing: EASE_OUT, reduceMotion: ReduceMotion.System }, (finished) => {
           if (finished) scheduleOnRN(closed);

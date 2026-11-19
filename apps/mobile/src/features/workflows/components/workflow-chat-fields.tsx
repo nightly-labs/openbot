@@ -39,11 +39,6 @@ interface Choice {
   label: string;
 }
 
-/**
- * Who may change a Telegram or Slack step on this server, and the host's chats. The host takes a change
- * of one only from an owner or admin, and gives the routine-results options only to them
- * (`workflows-chats-v1`). Without the options, the step shows what it keeps, read-only.
- */
 export function useChatAccess(draft: Pick<WorkflowDraft, "serverId" | "mode"> | null) {
   const serverId = draft?.serverId ?? "";
   const admin = useMobileWorkspaceSelector((current) =>
@@ -61,7 +56,6 @@ export function useChatAccess(draft: Pick<WorkflowDraft, "serverId" | "mode"> | 
   };
 }
 
-/** Why the step is read-only: the host cannot change it from a phone, the person is a member, or no chats came. */
 function ChatNote({ access, hostOnly }: { access: ReturnType<typeof useChatAccess>; hostOnly: string }) {
   const { t } = useText();
   if (!access.supported) return <SettingsNote>{hostOnly}</SettingsNote>;
@@ -84,7 +78,6 @@ function ValueRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** A row with a native picker. A stored value that the host does not offer now stays a choice. */
 function PickerRow({
   label,
   value,
@@ -95,7 +88,6 @@ function PickerRow({
   label: string;
   value: string;
   choices: Choice[];
-  /** The label of a stored value that is not in `choices`. */
   missing: string;
   onChange: (value: string) => void;
 }) {
@@ -119,7 +111,6 @@ function PickerRow({
   );
 }
 
-/** The text filter of a trigger: a run starts only when the message has this text. */
 function TextFilter({ node, limit, editable }: { node: WorkflowNode; limit: number; editable: boolean }) {
   const { t } = useText();
   const setFields = useWorkflowDraft((state) => state.setFields);
@@ -144,9 +135,6 @@ const placeChoices = (connections: readonly RoutineResultConnectionOption[], con
     label: channelName(place.name),
   }));
 
-/* ------------------------------------------------------------ Telegram */
-
-/** The settings of a Telegram trigger: the chat, the event, and the text that a message must have. */
 export function TelegramTriggerFields({ node, draft }: { node: WorkflowNode; draft: WorkflowDraft }) {
   const { t } = useText();
   const setFields = useWorkflowDraft((state) => state.setFields);
@@ -178,7 +166,6 @@ export function TelegramTriggerFields({ node, draft }: { node: WorkflowNode; dra
   );
 }
 
-/** The settings of a Telegram output: the chat, the action, and the emoji of a reaction. */
 export function TelegramOutputFields({ node, draft }: { node: WorkflowNode; draft: WorkflowDraft }) {
   const { t } = useText();
   const setFields = useWorkflowDraft((state) => state.setFields);
@@ -237,9 +224,6 @@ export function TelegramOutputFields({ node, draft }: { node: WorkflowNode; draf
   );
 }
 
-/* --------------------------------------------------------------- Slack */
-
-/** The settings of a Slack trigger: the workspace, the event, the channel, and the text that a message must have. */
 export function SlackTriggerFields({ node, draft }: { node: WorkflowNode; draft: WorkflowDraft }) {
   const { t } = useText();
   const setFields = useWorkflowDraft((state) => state.setFields);
@@ -258,7 +242,6 @@ export function SlackTriggerFields({ node, draft }: { node: WorkflowNode; draft:
               value={connectionId}
               choices={[...(connectionId ? [] : [{ value: "", label: choose }]), ...connectionChoices(workspaces)]}
               missing={t("mobile.workflow.slack.oneWorkspace")}
-              // Channels belong to one workspace, so a new workspace starts with none, in one change.
               onChange={(next) => setFields(node.id, { connectionId: next, placeId: "" })}
             />
             <ValueRow label={t("mobile.workflow.discord.event")} value={t("mobile.workflow.discord.event.mention")} />
@@ -296,7 +279,6 @@ export function SlackTriggerFields({ node, draft }: { node: WorkflowNode; draft:
   );
 }
 
-/** The settings of a Slack output: the workspace, the channel of a post, the action, and the emoji of a reaction. */
 export function SlackOutputFields({ node, draft }: { node: WorkflowNode; draft: WorkflowDraft }) {
   const { t } = useText();
   const setFields = useWorkflowDraft((state) => state.setFields);
@@ -311,7 +293,6 @@ export function SlackOutputFields({ node, draft }: { node: WorkflowNode; draft: 
   const sameWorkspace = t("mobile.workflow.discord.sameServer");
   const workspaceValue =
     connectionId === WORKFLOW_SLACK_TRIGGER_WORKSPACE ? sameWorkspace : t("mobile.workflow.slack.oneWorkspace");
-  // A post needs a channel of a known workspace. A reply and a reaction act on the trigger's message.
   const needsPlace = posts && (connectionId === WORKFLOW_SLACK_TRIGGER_WORKSPACE || !placeId);
   return (
     <>

@@ -1,10 +1,6 @@
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { z } from "zod";
 
-/**
- * Parses the JSON text of a browser tool result. A snapshot in that text gives each element as one
- * line; this reads each line back into a record with the fields that the line holds.
- */
 export function parseBrowserToolText(text: string) {
   return z
     .json()
@@ -19,10 +15,6 @@ export function parseBrowserToolText(text: string) {
 
 const jsonString = (token: string) => z.string().parse(JSON.parse(token));
 
-/**
- * `ref [role] "name" [<tag>] [value="…"] [description="…"] [state:value…] [bounds=x,y,w,h]
- * [frame=id frameUrl="…"]`. A tag that the role implies is not in the line, so the record has no tag.
- */
 function parseElementLine(line: string): DynamicRecord {
   const tokens = lineTokens(line);
   const [ref = "", second = ""] = tokens;
@@ -61,7 +53,6 @@ function parseElementLine(line: string): DynamicRecord {
   };
 }
 
-/** Splits at spaces outside JSON strings. */
 function lineTokens(line: string): string[] {
   const tokens: string[] = [];
   let start = -1;

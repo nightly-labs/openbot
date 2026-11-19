@@ -5,6 +5,10 @@ import {
   type RoutineFlowStep,
 } from "@openbot/contracts/ipc";
 import {
+  ROUTINE_FLOW_STOP_CAPABILITY,
+  ROUTINE_FLOW_STOP_ROUTES,
+} from "@openbot/contracts/team-protocol/routine-flow-stop-v1";
+import {
   ROUTINE_FLOW_STEP_TEXT_LIMIT,
   ROUTINE_FLOWS_CAPABILITY,
   ROUTINE_FLOWS_ROUTES,
@@ -18,6 +22,7 @@ import {
   parseDisconnectRoutineFlow,
   parseRemoveRoutineFlowPosition,
   parseSaveRoutineFlowPosition,
+  parseStopRoutineFlowRun,
   parseUpdateRoutineFlowLink,
 } from "../ipc/routine-flow-inputs";
 import type { TeamApiAgents, TeamApiRoutineFlows } from "./dependencies";
@@ -25,13 +30,15 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAgentLevel, stringField, WEBRTC_FRAME_BODY_BUDGET } from "./request-helpers";
 
-const ROUTINE_FLOW_PATHS = new Set<string>(Object.values(ROUTINE_FLOWS_ROUTES));
+const ROUTINE_FLOW_PATHS = new Set<string>([
+  ...Object.values(ROUTINE_FLOWS_ROUTES),
+  ...Object.values(ROUTINE_FLOW_STOP_ROUTES),
+]);
 
 function agentNotFound(): never {
   throw new HttpError(404, sourceText("error.team.agentNotFound"));
 }
 
-/** The wire codec has already checked the body, so only a malformed payload fails here, in English. */
 function parse<A>(decode: (value: unknown) => A, body: unknown): A {
   try {
     return decode(body);
@@ -40,7 +47,6 @@ function parse<A>(decode: (value: unknown) => A, body: unknown): A {
   }
 }
 
-/** A flow refused by the store, such as a cycle, is the member's sentence. Anything else is a host fault. */
 async function run<A>(operation: Effect.Effect<A, { readonly cause: unknown }>): Promise<A> {
   try {
     return await runCauseEffect(operation);
@@ -63,12 +69,6 @@ function clipStep(step: RoutineFlowStep): RoutineFlowStep {
   };
 }
 
-/**
- * The canvas a member may read: no `once` routine, which the canvas codec rejects, no routine that
- * touches a hidden agent, and no webhook URL unless the member administers the server. Step texts
- * are clipped, and emptied from the routines with the oldest runs first while the canvas would not
- * fit one WebRTC frame; then the older runs' texts.
- */
 function memberCanvas(canvas: RoutineFlowCanvas, hidden: ReadonlySet<string>, admin: boolean): RoutineFlowCanvas {
   const visibleRoutineIds = new Set(
     canvas.routines
@@ -111,8 +111,6 @@ function memberCanvas(canvas: RoutineFlowCanvas, hidden: ReadonlySet<string>, ad
     flow.steps = flow.steps.map((step) => ({ ...step, input: "", output: null, error: null }));
     bytes -= before - Buffer.byteLength(JSON.stringify(flow.steps));
   }
-  // The run history shows only a run's status and times, and only the newest run shows its
-  // instruction, so the older runs give up their texts next.
   for (const flow of oldestFirst) {
     if (bytes <= WEBRTC_FRAME_BODY_BUDGET) break;
     const before = Buffer.byteLength(JSON.stringify(flow.recentRuns));
@@ -121,7 +119,6 @@ function memberCanvas(canvas: RoutineFlowCanvas, hidden: ReadonlySet<string>, ad
     );
     bytes -= before - Buffer.byteLength(JSON.stringify(flow.recentRuns));
   }
-  // The routines and links themselves cannot be cut: a canvas that still does not fit is refused.
   if (bytes > WEBRTC_FRAME_BODY_BUDGET) throw new HttpError(413, sourceText("error.team.routineCanvasTooLarge"));
   return result;
 }
@@ -134,12 +131,6 @@ function nodeRoutineId(nodeKey: string): string | null {
   return nodeKey.startsWith("routine:") ? nodeKey.slice("routine:".length) : null;
 }
 
-/**
- * The routine canvas of an agent, its node positions, and the links that hand a routine's answer on.
- * Any member can use them for the agents the member can see; every agent, routine or link that a
- * request names, or that a flow touches, is checked against the agents hidden from the caller, and a
- * hidden one answers as missing. Frozen by `routine-flows-v1`.
- */
 export async function routeRoutineFlows(
   context: TeamApiRequestContext,
   routineFlows: TeamApiRoutineFlows | undefined,
@@ -151,23 +142,20 @@ export async function routeRoutineFlows(
   if (method !== "POST" || !ROUTINE_FLOW_PATHS.has(path)) return "unmatched";
   if (!routineFlows || !capabilities.has(ROUTINE_FLOWS_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.routineFlowsUnsupported"));
-  // `readJson` has already run the body through the routine-flows wire codec.
   const body = await readJson(request);
   const visible = (agentId: string) =>
     !hiddenAgentIds.has(agentId) && agents.listAgents().some((agent) => agent.id === agentId);
   const requireVisible = (...agentIds: string[]) => {
     if (!agentIds.every(visible)) agentNotFound();
   };
-  // Each change to a flow changes the routines of the agents in it, so it needs `manage` for each.
   const requireManage = (agentIds: readonly string[]) => {
     for (const agentId of agentIds) requireAgentLevel(context, agentId, "manage");
   };
-  const requireVisibleFlow = async (ref: { routineId: string } | { linkId: string }) => {
+  const requireVisibleFlow = async (ref: { routineId: string } | { linkId: string } | { runId: string }) => {
     const touched = await run(routineFlows.agentsOf(ref));
     if (!touched?.every((agentId) => !hiddenAgentIds.has(agentId))) agentNotFound();
     requireManage(touched);
   };
-  /** A node is an agent or a routine, and either one must be visible to the caller. */
   const requireVisibleNode = async (agentId: string, nodeKey: string) => {
     requireVisible(agentId, ...nodeAgentIds(nodeKey));
     requireManage([agentId, ...nodeAgentIds(nodeKey)]);
@@ -210,6 +198,14 @@ export async function routeRoutineFlows(
       const input = parse(parseUpdateRoutineFlowLink, body);
       await requireVisibleFlow({ linkId: input.linkId });
       return json(200, await run(routineFlows.updateLink(input)));
+    }
+    case ROUTINE_FLOW_STOP_ROUTES.stopRun: {
+      if (!capabilities.has(ROUTINE_FLOW_STOP_CAPABILITY))
+        throw new HttpError(400, sourceText("error.team.routineFlowStopUnsupported"));
+      const input = parse(parseStopRoutineFlowRun, body);
+      await requireVisibleFlow({ runId: input.runId });
+      await run(routineFlows.stopRun(input));
+      return json(200, {});
     }
   }
   return "unmatched";

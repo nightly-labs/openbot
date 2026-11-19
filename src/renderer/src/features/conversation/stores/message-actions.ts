@@ -20,7 +20,6 @@ import { conversationRuntime } from "../conversation-runtime";
 import type { ComposerDraft, ConversationProps, ConversationTarget } from "../conversation-types";
 import { conversationOwnerId } from "./composer-store";
 
-// Each member reads the interface language when it is called.
 const { t, errorMessage } = currentText();
 
 export interface MessageActionsDeps {
@@ -41,39 +40,34 @@ export interface MessageActionsDeps {
   setComposerFocusRequest: (update: (current: number) => number) => void;
 }
 
+export function draftWithPageText(draft: string, text: string): string {
+  const current = draft.trimEnd();
+  return current ? `${current}\n${text}` : text;
+}
+
+export function draftWithPageContext(draft: string, messageId: string, text: string): string | undefined {
+  const quote = text.trim() ? serializeChatTagReference("quote", limitedQuoteText(text), messageId) : "";
+  const shown = chatTagReferences(draft).find((reference) => reference.kind === "quote" && reference.id === messageId);
+  if (!shown && !quote) return undefined;
+  const end = shown && !quote && draft[shown.end] === " " ? shown.end + 1 : shown?.end;
+  return shown ? `${draft.slice(0, shown.start)}${quote}${draft.slice(end)}` : `${quote} ${draft}`;
+}
+
 export function createMessageActions(deps: MessageActionsDeps) {
   function replyToMessage(message: AgentMessage) {
     deps.updateCurrentDraft({ replyToMessageId: message.id });
     deps.setOpenReactionMessageId(null);
-    // The user replies to type, so the caret goes to the composer.
     deps.setComposerFocusRequest((value) => value + 1);
   }
 
-  /**
-   * Puts the text that a visual reply's page wrote at the end of the draft. The user reads it and
-   * sends it, so a page never sends a message itself.
-   */
   function addPageText(text: string) {
-    const draft = deps.currentDraft().text.trimEnd();
-    deps.updateCurrentDraft({ text: draft ? `${draft}\n${text}` : text });
+    deps.updateCurrentDraft({ text: draftWithPageText(deps.currentDraft().text, text) });
     deps.setComposerFocusRequest((value) => value + 1);
   }
 
-  /**
-   * Keeps the state that a visual reply's page gave as a quote of the page at the start of the draft,
-   * so the user sees it and the next message sends it. The page's latest state replaces the one before
-   * it, and empty text removes it.
-   */
   function setPageContext(message: AgentMessage, text: string) {
-    const draft = deps.currentDraft().text;
-    const quote = text.trim() ? serializeChatTagReference("quote", limitedQuoteText(text), message.id) : "";
-    const shown = chatTagReferences(draft).find(
-      (reference) => reference.kind === "quote" && reference.id === message.id,
-    );
-    // A removed quote takes the space that the editor put after it.
-    const end = shown && !quote && draft[shown.end] === " " ? shown.end + 1 : shown?.end;
-    const next = shown ? `${draft.slice(0, shown.start)}${quote}${draft.slice(end)}` : quote && `${quote} ${draft}`;
-    if (shown || quote) deps.updateCurrentDraft({ text: next });
+    const next = draftWithPageContext(deps.currentDraft().text, message.id, text);
+    if (next !== undefined) deps.updateCurrentDraft({ text: next });
   }
 
   async function reactToMessage(message: AgentMessage, emoji: MessageReaction | null) {
@@ -100,7 +94,6 @@ export function createMessageActions(deps: MessageActionsDeps) {
     }
   }
 
-  /** The text of a message as the reader sees it: names in place of agent, skill and attachment markers. */
   function messageText(message: AgentMessage): string {
     const attachmentNames = new Map((message.attachments ?? []).map((attachment) => [attachment.id, attachment.name]));
     const agentNames = new Map(deps.props.agents.map((agent) => [agent.id, agent.name]));
@@ -142,8 +135,6 @@ export function createMessageActions(deps: MessageActionsDeps) {
   }
 
   function removeAttachment(id: string) {
-    // A pending Save keeps its attachment IDs for retry. Do not change or discard them,
-    // but only in the edited conversation: the pending state survives agent/server switches.
     const target = deps.currentTarget();
     if (
       target &&

@@ -1,16 +1,3 @@
-// The servers on this computer that the desktop app starts as child processes, and the owner
-// password of each one.
-//
-// The password is the one secret here, and it is sealed with the secret storage cipher. The rest of
-// a row is plaintext, so a computer that loses its keychain still knows which folders belong to which
-// server. The child's own identity is pinned at its first start: a later start that names another
-// key is refused, as for a joined server.
-//
-// `removedHostIds` names deleted servers that the account service can still list, because the
-// desktop app was signed out or offline when they were deleted. An earlier build ignores the field.
-//
-// Electron-free, with the cipher injected.
-
 import { readFile } from "node:fs/promises";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result, Schema, Semaphore } from "effect";
@@ -23,7 +10,6 @@ import {
 
 export const LOCAL_SERVERS_FILE = "openbot-local-servers-v1.json";
 
-/** The folder names come from this id, so a changed file cannot name a path outside the two roots. */
 const folderId = Schema.String.check(
   Schema.isPattern(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u),
 );
@@ -33,7 +19,6 @@ const storedLocalServerSchema = Schema.Struct({
   name: Schema.String,
   createdAt: Schema.String,
   encryptedSecret: Schema.String,
-  /** Null until the first start reports the identity of the server. */
   serverId: Schema.NullOr(Schema.String),
   fingerprint: Schema.NullOr(Schema.String),
   publicKey: Schema.NullOr(Schema.String),
@@ -58,7 +43,6 @@ export class LocalServerRegistry {
   readonly #path: string;
   #servers: readonly StoredLocalServer[] = [];
   #removedHostIds: readonly string[] = [];
-  /** Set when the file exists and this build cannot read it. Every write is then refused. */
   #readOnly = false;
   readonly #writes = Semaphore.makeUnsafe(1);
 
@@ -70,7 +54,6 @@ export class LocalServerRegistry {
     return this.#servers;
   }
 
-  /** Deleted servers that the account service can still list. */
   get removedHostIds(): readonly string[] {
     return this.#removedHostIds;
   }
@@ -79,10 +62,6 @@ export class LocalServerRegistry {
     return this.#readOnly;
   }
 
-  /**
-   * A missing file is a first run, and an empty one is moved aside. A file this build cannot read
-   * keeps its servers on disk: no server starts, and no write replaces it.
-   */
   readonly load = Effect.fn("LocalServerRegistry.load")(function* (this: LocalServerRegistry) {
     const contents = yield* Effect.tryPromise({
       try: () => readFile(this.#path, "utf8"),
@@ -111,7 +90,6 @@ export class LocalServerRegistry {
     return this.#servers.find((server) => server.serverId === serverId);
   }
 
-  /** The check of the limit and the write hold one permit, so two creates cannot both pass the check. */
   add(server: StoredLocalServer, limit: number): Effect.Effect<void, LocalServerRegistryError> {
     return this.#write((servers) =>
       servers.length < limit
@@ -124,7 +102,6 @@ export class LocalServerRegistry {
     return this.#write((servers) => servers.map((server) => (server.id === id ? { ...server, ...change } : server)));
   }
 
-  /** `removedHostId` stays listed until the account service no longer has the server. */
   remove(id: string, removedHostId: string | null = null): Effect.Effect<void, LocalServerRegistryError> {
     return this.#write(
       (servers) => servers.filter((server) => server.id !== id),
@@ -132,7 +109,6 @@ export class LocalServerRegistry {
     );
   }
 
-  /** The account service no longer lists the server. */
   forgetRemovedHost(hostId: string): Effect.Effect<void, LocalServerRegistryError> {
     return this.#write(
       (servers) => servers,
@@ -153,7 +129,6 @@ export class LocalServerRegistry {
         const servers = change(this.#servers);
         if (servers instanceof LocalServerRegistryError) return Effect.fail(servers);
         const removedHostIds = changeRemoved(this.#removedHostIds);
-        // An empty list is left out, so a file with no deleted server stays as an earlier build writes it.
         const file = removedHostIds.length ? { version: 1, servers, removedHostIds } : { version: 1, servers };
         return writeJsonFileAtomically(this.#path, file, { createDirectory: true }).pipe(
           Effect.mapError(({ cause }) => new LocalServerRegistryError({ cause })),

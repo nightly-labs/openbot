@@ -1,4 +1,3 @@
-// The seeded thread that the pinned-message E2E scripts use. `pinned-message-jump-e2e.ts --seed` writes it.
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -16,7 +15,6 @@ export type Seed = typeof SeedSchema.Type;
 
 const decodeSeed = Schema.decodeUnknownSync(Schema.fromJsonString(SeedSchema));
 
-/** The id of a seeded message. */
 export const seedMessageId = (index: number) => `pin-timing-${String(index).padStart(6, "0")}`;
 
 export function readSeed(): Seed {

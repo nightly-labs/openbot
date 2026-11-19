@@ -1,7 +1,6 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.computerUse", {
-  // Computer Use driver and permission window errors.
   "error.computerUse.noAppToDrag": "This build of OpenBot has no application to drag.",
   "error.computerUse.helpWindowChanged": "The permission help window changed before the drag started.",
   "error.computerUse.noAppToShow": "This build of OpenBot has no application to show.",
