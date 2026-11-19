@@ -36,6 +36,7 @@ import type {
   SidebarFilePreview,
   VoiceLiveTranscript,
 } from "./conversation-types";
+import { readStoredSidePanels, writeSidePanelsOnChange } from "./side-panel-storage";
 import type { TurnRuntime } from "./stores/activity-store";
 import { createAttachmentUploadStore } from "./stores/attachment-upload-store";
 import type { PastePreview } from "./stores/composer-actions";
@@ -424,7 +425,8 @@ export function createStableConversationState(
   };
 }
 
-export function createServerConversationState() {
+export function createServerConversationState(keepSidePanelFiles = false) {
+  const storedSidePanels = keepSidePanelFiles ? readStoredSidePanels() : { shown: false, side: {} };
   const [showComposerActions, setShowComposerActions] = createSignal(false);
   const [importingDrafts, setImportingDrafts] = createSignal<ReadonlySet<string>>(new Set());
   const [pastePreviews, setPastePreviews] = createSignal<readonly PastePreview[]>([]);
@@ -436,8 +438,13 @@ export function createServerConversationState() {
     agentId: string;
     tabId: string;
   } | null>(null);
-  const [sidePanels, setSidePanels] = createStore<SidePanelsState>({ side: {}, subagents: {}, threads: {} });
-  const [sidePanelShown, setSidePanelShown] = createSignal(false);
+  const [sidePanels, setSidePanels] = createStore<SidePanelsState>({
+    side: storedSidePanels.side,
+    subagents: {},
+    threads: {},
+  });
+  const [sidePanelShown, setSidePanelShown] = createSignal(storedSidePanels.shown);
+  if (keepSidePanelFiles) writeSidePanelsOnChange(sidePanels, rightPanels);
   const [settingsProvider, setSettingsProvider] = createSignal<AgentProviderId>("codex");
   const [settingsModel, setSettingsModel] = createSignal<AgentModelId>("gpt-6-luna");
   const [settingsReasoning, setSettingsReasoning] = createSignal<AgentReasoningEffort>("medium");
