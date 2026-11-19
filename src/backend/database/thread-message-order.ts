@@ -14,10 +14,11 @@ const STEERED_SQL = "json_extract(message_json, '$.steered') IS 1";
 function refreshOrderSql(filter: string): string {
   return `WITH ranked AS (
   SELECT message_id, created_at, ordinal, NULLIF(turn_id, '') AS turn, ${ROLE_RANK_SQL} AS role_rank,
-    ${STEERED_SQL} AS steered
+    ${STEERED_SQL} AS steered, item_type = 'question_prompt' AS question
   FROM projection_thread_messages WHERE thread_id = $thread ${filter}
 ), steers AS (
-  SELECT *, role_rank = 0 AND steered AND created_at > MIN(created_at) OVER (PARTITION BY turn) AS late_steer
+  SELECT *, role_rank = 0 AND created_at > CASE WHEN steered THEN MIN(created_at) OVER (PARTITION BY turn)
+    ELSE MIN(CASE WHEN question THEN created_at END) OVER (PARTITION BY turn) END AS late_steer
   FROM ranked
 ), keyed AS (
   SELECT message_id,
