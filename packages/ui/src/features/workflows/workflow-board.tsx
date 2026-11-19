@@ -279,7 +279,7 @@ export interface WfnBoard {
   resetSize?: ((id: string) => void) | undefined;
   /** Every result of a step, oldest first. */
   results: (id: string) => readonly WfnResult[];
-  /** The result that the step picked, else its result from the run on view, else its latest. */
+  /** The result that the user picked until a newer one comes, else its result from the run on view, else its latest. */
   shown: (id: string) => WfnResult | undefined;
   pick: (id: string, result: string) => void;
   /** Adds a result and shows it. */
@@ -419,8 +419,11 @@ interface BoardState {
   points: Record<string, PortPoint>;
   message: string;
   results: Record<string, WfnResult[]>;
-  /** A result that the user picked in one step. It stays until the run on view changes. */
-  picked: Record<string, string>;
+  /**
+   * A result that the user picked in one step, and the newest result of the step in the view at that
+   * time. It stays until the run on view changes or the view gets a newer result of the step.
+   */
+  picked: Record<string, { result: string; newest: string | undefined }>;
   viewing: number | null;
 }
 
@@ -920,9 +923,11 @@ export function createBoard(options: BoardOptions) {
     const result: WfnResult = { id: crypto.randomUUID(), at: new Date().toISOString(), value };
     if (run !== undefined) result.run = run;
     if (failed) result.failed = true;
+    // The result is the newest in the view, unless a past run with another number is on view.
+    const newest = state.viewing === null || run === state.viewing ? result.id : latestOf(id)?.id;
     setState((draft) => {
       draft.results[id] = [...(draft.results[id] ?? []), result];
-      draft.picked[id] = result.id;
+      draft.picked[id] = { result: result.id, newest };
     });
   };
 
@@ -954,6 +959,13 @@ export function createBoard(options: BoardOptions) {
   };
 
   const resultsOf = (id: string): readonly WfnResult[] => options.resultsOf?.(id) ?? state.results[id] ?? [];
+  /** The newest result of a step in the run on view, else its newest result. */
+  const latestOf = (id: string) => {
+    const list = resultsOf(id);
+    const viewing = state.viewing;
+    // A retried run has its failure first and its result after it.
+    return viewing === null ? list.at(-1) : list.findLast((result) => result.run === viewing);
+  };
   const selectedIds = createMembership(() => state.selection);
   const removedIds = createMembership(() => state.removed);
   const lockedIds = createMembership(() => state.locked);
@@ -1037,18 +1049,18 @@ export function createBoard(options: BoardOptions) {
     resetSize: options.resetSize,
     results: (id) => resultsOf(id),
     shown: (id) => {
-      const list = resultsOf(id);
+      const latest = latestOf(id);
       const picked = state.picked[id];
-      if (picked) return list.find((result) => result.id === picked);
-      const viewing = state.viewing;
-      // A retried run has its failure first and its result after it.
-      if (viewing !== null) return list.findLast((result) => result.run === viewing);
-      return list.at(-1);
+      // A newer result in the view replaces the pick, so a run that ends shows its result.
+      if (picked && latest?.id === picked.newest) return resultsOf(id).find((result) => result.id === picked.result);
+      return latest;
     },
-    pick: (id, result) =>
+    pick: (id, result) => {
+      const newest = latestOf(id)?.id;
       setState((draft) => {
-        draft.picked[id] = result;
-      }),
+        draft.picked[id] = { result, newest };
+      });
+    },
     record: (id, value, run) => add(id, value, run, false),
     recordFailure: (id, message, run) => add(id, message, run, true),
     viewing: () => state.viewing,
