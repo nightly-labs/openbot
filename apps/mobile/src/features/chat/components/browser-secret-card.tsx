@@ -6,7 +6,6 @@ import type {
 } from "@openbot/contracts/ipc";
 import { markdownInlinePlainText } from "@openbot/contracts/markdown-preview-text";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
-import { sourceText as englishSourceText } from "@openbot/i18n/source";
 import { GlassView } from "expo-glass-effect";
 import { Button, Spinner, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
@@ -18,6 +17,7 @@ import { type ReactNode, useState } from "react";
 import { Pressable, TextInput, View, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
+import { InactiveRequestError } from "@/features/workspace/model/pending-approvals";
 import { haptics } from "@/shared/lib/haptics";
 import { selectionColorProps } from "@/shared/lib/selection-color";
 import { useText } from "@/shared/lib/text";
@@ -188,7 +188,7 @@ export function BrowserSecretComposer({
   request: BrowserTakeoverRequest;
   respond: (input: RespondToBrowserSecretInput) => Promise<void>;
 }) {
-  const { t, errorMessage, sourceText } = useText();
+  const { t } = useText();
   const [value, setValue] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<MobileTextKey | null>(null);
@@ -218,9 +218,11 @@ export function BrowserSecretComposer({
       void haptics.notification("success");
     } catch (cause) {
       void haptics.notification("error");
-      const failed = t("mobile.chat.browserSecret.submitFailed");
-      const ended = errorMessage(cause, failed) === sourceText(englishSourceText("error.backend.authRequestInactive"));
-      setError(ended ? "mobile.chat.browserSecret.ended" : "mobile.chat.browserSecret.submitFailed");
+      setError(
+        cause instanceof InactiveRequestError
+          ? "mobile.chat.browserSecret.ended"
+          : "mobile.chat.browserSecret.submitFailed",
+      );
     } finally {
       if (input.decision === "submit") input.secret = "";
       setPending(false);

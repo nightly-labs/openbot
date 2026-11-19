@@ -911,8 +911,9 @@ export class AttentionRegistry {
   ) {
     const { pending, secret } = yield* attentionStep(() => {
       const value = this.#takeovers.get(input.requestId);
-      if (!value?.secret || value.request.agentId !== input.agentId || value.submitting)
+      if (!value?.secret || value.request.agentId !== input.agentId)
         throw new InactiveAttentionRequest(sourceText("error.backend.authRequestInactive"));
+      if (value.submitting) throw new Error(sourceText("error.backend.authSubmitting"));
       return { pending: value, secret: value.secret };
     });
     if (input.decision === "cancel") {

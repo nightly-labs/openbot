@@ -1,5 +1,7 @@
+import { BROWSER_SECRET_RESPONSE_PATH } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { BROWSER_SECRET_VAULT_ROUTES } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
 import {
   INSTANCE_TRANSFER_REMOTE_BYTES,
   INSTANCE_TRANSFER_ROUTES,
@@ -296,6 +298,12 @@ export const RemoteTeamTransport = memo(
             throw new InactiveRequestError(currentText().t("mobile.workspace.error.approvalInactive"));
           if (result.status === 409 && method === "POST" && path === TEAM_API_ROUTES.respond.prompt)
             throw new InactiveRequestError(currentText().t("mobile.workspace.error.formUnavailable"));
+          if (
+            result.status === 409 &&
+            method === "POST" &&
+            (path === BROWSER_SECRET_RESPONSE_PATH || path === BROWSER_SECRET_VAULT_ROUTES.respond)
+          )
+            throw new InactiveRequestError(currentText().t("mobile.chat.browserSecret.ended"));
           if (result.status !== undefined && result.status >= 400)
             throw referencedError(
               liveVoiceErrorText(path, result.status, result.body) ?? sourceText("error.remote.serverRequestFailed"),
