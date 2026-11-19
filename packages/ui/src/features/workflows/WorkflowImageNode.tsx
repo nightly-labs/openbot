@@ -39,7 +39,7 @@ import {
   Zap,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { ImageLightbox, type ImageLightboxOpening } from "../conversation/ImageLightbox";
 import { MediaGenerationCanvas } from "../conversation/media-generation-frame";
@@ -48,6 +48,7 @@ import { usePictureShape } from "./picture-shape";
 import { MediaModelPicker } from "./WorkflowMediaModelPicker";
 import { type PickerGroup, PickerMenu, type PickerOption } from "./WorkflowPicker";
 import { resultValue, useBoard } from "./workflow-board";
+import { InputPictures, type InputRole, orStoredPicture, pictureUrl } from "./workflow-input-pictures";
 import {
   asBoolean,
   asString,
@@ -320,36 +321,6 @@ function ChipMenu<T extends string>(props: {
   );
 }
 
-type InputRole = "reference" | "first" | "last" | "both";
-
-const ROLE_TEXT = {
-  reference: "workflow.video.role.reference",
-  first: "workflow.video.role.first",
-  last: "workflow.video.role.last",
-  both: "workflow.video.role.both",
-} as const satisfies Record<InputRole, AppTextKey>;
-
-const ROLE_BADGE = {
-  first: "workflow.video.badge.first",
-  last: "workflow.video.badge.last",
-  both: "workflow.video.badge.both",
-} as const satisfies Record<Exclude<InputRole, "reference">, AppTextKey>;
-
-function InputPicture(props: { index: number; url: string | undefined; role: InputRole }) {
-  const { t } = useText();
-  const badge = () => (props.role === "reference" ? undefined : t(ROLE_BADGE[props.role]));
-  const label = () =>
-    t("workflow.media.inputLabel", { index: String(props.index + 1), role: t(ROLE_TEXT[props.role]) });
-  return (
-    <span class="wfn-media-input" role="img" aria-label={label()}>
-      <Show when={props.url} fallback={<Image aria-hidden="true" />}>
-        {(url) => <img src={url()} alt="" draggable="false" />}
-      </Show>
-      <Show when={badge()}>{(text) => <span class="wfn-media-input-badge">{text()}</span>}</Show>
-    </span>
-  );
-}
-
 function videoPorts(t: AppTranslate): readonly WfnInputPort[] {
   return [
     { type: "text" },
@@ -464,12 +435,6 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
   const [voice, setVoice] = useField(() => props.id, "voice", "", asString);
   const inputs = () => board.inputs(props.id, "image");
   const runnable = () => prompt().trim() !== "" || inputs().length > 0 || board.inputs(props.id, "text").length > 0;
-  const inputUrl = (source: string) => {
-    const shown = board.shown(source);
-    const file = board.field(source, "fileId");
-    const value = shown && !shown.failed ? resultValue(shown) : typeof file === "string" && file ? file : undefined;
-    return value === undefined ? undefined : (pictureUrl(value) ?? undefined);
-  };
   const roleOf = (source: string): InputRole => {
     if (kind() !== "video") return "reference";
     const first = firstFrame() === source;
@@ -486,18 +451,11 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
   const seconds = useElapsed(run.running);
   const urlOf = (value: string | undefined) => {
     if (value === undefined) return undefined;
-    return orFile(board.catalogs().media?.(value, kind()), value);
-  };
-  const orFile = (made: string | null | undefined, value: string) => made ?? fileUrl(value) ?? made;
-  const fileUrl = (value: string) =>
-    board.catalogs().files.find((file) => file.name === value && file.previewKind === "image")?.previewUrl ?? undefined;
-  const pictureUrl = (value: string) => {
-    const preview = board.catalogs().mediaPreview;
-    return orFile(preview ? preview(value) : board.catalogs().media?.(value, "image"), value);
+    return orStoredPicture(board, board.catalogs().media?.(value, kind()), value);
   };
   const smallUrlOf = (value: string | undefined) => {
     if (value === undefined) return undefined;
-    return kind() === "image" ? pictureUrl(value) : urlOf(value);
+    return kind() === "image" ? pictureUrl(board, value) : urlOf(value);
   };
   const shownValue = () => {
     const shown = board.shown(props.id);
@@ -770,11 +728,7 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
           <Show when={panelShown()}>
             <div class="wfn-panel" data-inputs={inputs().length > 0 ? "" : undefined}>
               <Show when={inputs().length > 0}>
-                <fieldset class="wfn-media-inputs" aria-label={t("workflow.media.inputs")}>
-                  <For each={inputs()}>
-                    {(source, index) => <InputPicture index={index()} url={inputUrl(source)} role={roleOf(source)} />}
-                  </For>
-                </fieldset>
+                <InputPictures sources={inputs()} roleOf={roleOf} />
               </Show>
               <Textarea
                 ref={(element: HTMLTextAreaElement) => {

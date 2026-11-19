@@ -106,6 +106,10 @@
   min-height: 150px;
 }
 
+.wfn-field-task:has(> .wfn-media-inputs) {
+  grid-template-rows: auto 1fr auto;
+}
+
 .wfn-stage .wfn-input {
   min-height: 0;
   padding: 0;
