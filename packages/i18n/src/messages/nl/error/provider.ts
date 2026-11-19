@@ -177,6 +177,8 @@ export const messages = {
   "error.provider.cliTimedOutRefresh":
     "{provider} reageerde niet op tijd. De computer is misschien bezet. Vernieuw de aanbieders om het opnieuw te proberen.",
   "error.provider.stoppedBeforeStart": "{provider} stopte voordat dit bericht begon. Stuur het bericht opnieuw.",
+  "error.provider.sessionStartTimedOut":
+    "{provider} opende niet op tijd een nieuwe chat, dus dit bericht is niet begonnen. Open op de computer waarop OpenBot draait Aanbieders, kies {provider} en klik op Herstarten. Probeer het daarna opnieuw.",
   "error.provider.serviceUnreachable":
     "{provider} kan geen verbinding maken met zijn service. Controleer je internetverbinding. OpenBot probeert het opnieuw.",
   "error.provider.serviceUnreachableRefresh":

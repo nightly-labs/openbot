@@ -175,6 +175,8 @@ export const messages = {
   "error.provider.cliTimedOutRefresh":
     "{provider} не ответил вовремя. Возможно, компьютер занят. Обновите провайдеров, чтобы повторить попытку.",
   "error.provider.stoppedBeforeStart": "{provider} остановился до начала этого сообщения. Отправьте сообщение ещё раз.",
+  "error.provider.sessionStartTimedOut":
+    "{provider} не открыл новый чат вовремя, поэтому это сообщение не началось. На компьютере, где работает OpenBot, откройте «Провайдеры», выберите {provider} и нажмите «Перезапустить». Затем попробуйте ещё раз.",
   "error.provider.serviceUnreachable":
     "{provider} не может подключиться к своему сервису. Проверьте подключение к интернету. OpenBot повторит попытку.",
   "error.provider.serviceUnreachableRefresh":

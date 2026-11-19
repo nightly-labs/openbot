@@ -165,6 +165,8 @@ export const messages = {
   "error.provider.cliTimedOut": "{provider} לא הגיב בזמן. ייתכן שהמחשב עמוס. OpenBot ינסה שוב.",
   "error.provider.cliTimedOutRefresh": "{provider} לא הגיב בזמן. ייתכן שהמחשב עמוס. יש לרענן את הספקים כדי לנסות שוב.",
   "error.provider.stoppedBeforeStart": "{provider} נעצר לפני שההודעה הזו התחילה. יש לשלוח את ההודעה שוב.",
+  "error.provider.sessionStartTimedOut":
+    "{provider} לא פתח צ׳אט חדש בזמן, ולכן ההודעה הזו לא התחילה. במחשב שמריץ את OpenBot, יש לפתוח את ספקים, לבחור את {provider} וללחוץ על הפעלה מחדש. אחר כך יש לנסות שוב.",
   "error.provider.serviceUnreachable":
     "{provider} לא מצליח להתחבר לשירות שלו. יש לבדוק את החיבור לאינטרנט. OpenBot ינסה שוב.",
   "error.provider.serviceUnreachableRefresh":
