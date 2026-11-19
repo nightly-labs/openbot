@@ -1015,7 +1015,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             ? Effect.void
             : this.#endpoints.moveAccountAgentsOffUnlistedModels(provider, accountId),
         onProviderResumed: (provider) => {
-          this.#emitProviderQueues(provider);
           this.#drain.providerResumed(provider);
           this.#drain.scheduleDrains(
             this.#store
@@ -1024,6 +1023,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               .map((agent) => agent.id),
           );
           this.#retryHeldMoves();
+          this.#emitProviderQueues(provider);
         },
         onProviderHeld: (provider) => this.#emitProviderQueues(provider),
         onAccountsChanged: () => this.#retryHeldMoves(),
@@ -5753,12 +5753,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   #emitProviderQueues(provider: AgentProvider): void {
     for (const agent of this.#store.list())
-      if (providerForAgent(agent) === provider && this.#mailbox.laneQueuedIds(agent.id, null).length > 0)
+      if (
+        providerForAgent(agent) === provider &&
+        this.#mailbox.listQueue(agent.id).deliveries.some((delivery) => delivery.status === "queued")
+      )
         this.#mailboxSync.emitQueue(agent.id);
   }
 
   #providerRestartHold(agentId: string): QueueHold | null {
-    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+    const agent = this.#store.get(agentId);
     const provider = agent ? providerForAgent(agent) : null;
     return provider && this.#providers.isReplacingCli(provider) ? { reason: "provider-restart", provider } : null;
   }
