@@ -57,6 +57,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "Troppi tentativi di accesso. Riprova più tardi.",
   "error.team.clientUpdateRequired": "Aggiorna questo client OpenBot prima di connetterti a questo host.",
   "error.team.hostUpdateRequired": "Aggiorna OpenBot sull'host prima di connetterti.",
+  "error.team.serverSafeMode": "Questo server è in modalità provvisoria perché OpenBot non si avvia.",
+  "error.team.serverSafeModeNewerDatabase":
+    "OpenBot {version} su questo server non può aprire i suoi dati perché una versione più recente di OpenBot li ha salvati. Una versione più recente di OpenBot sul server risolve il problema.",
+  "error.team.serverSafeModeStartFailed":
+    "OpenBot {version} su questo server si è fermato dopo molti avvii non riusciti. Una versione più recente di OpenBot sul server risolve il problema.",
   "error.team.sidebarLayoutUnavailable": "Il layout della barra laterale non è disponibile.",
   "error.team.providersUnsupported": "Le impostazioni dei provider non sono supportate da questa connessione.",
   "error.team.providerNotManaged": "OpenBot non gestisce la CLI di questo provider.",
@@ -78,10 +83,14 @@ export const messages = {
   "error.team.agentColorsUnsupported": "I colori degli agenti non sono supportati da questa connessione.",
   "error.team.chatColorsUnsupported": "I colori della chat non sono supportati da questa connessione.",
   "error.team.routineRunPlaceUnsupported": "Questa connessione non può cambiare dove viene eseguita una routine.",
+  "error.team.routinePauseReasonsUnsupported": "Questa connessione non può mostrare perché una routine è in pausa.",
+  "error.team.activeQueuesUnsupported": "Questa connessione non può mostrare le code di tutti gli agenti.",
   "error.team.routinesOnceUnsupported": "Questa connessione non può salvare routine che vengono eseguite una volta.",
   "error.team.routineRunCommandUnsupported":
     "Questa connessione non può fornire il comando di esecuzione di una routine.",
   "error.team.threadQueueUnsupported": "Questa connessione non può mostrare la coda di un thread secondario.",
+  "error.team.threadRequestsUnsupported":
+    "Questa connessione non può mostrare le richieste di un thread secondario ad altri agenti.",
   "error.team.hostTurnLimitsUnsupported":
     "Questa connessione non può mostrare né modificare i limiti dei thread del server.",
   "error.team.usageLimitUnsupported":
@@ -89,6 +98,8 @@ export const messages = {
   "error.team.hermesImportUnsupported": "Questa connessione non può importare profili Hermes dal server.",
   "error.team.providerDetectionUnsupported":
     "Questa connessione non può trovare i server di modelli e gli agenti del server.",
+  "error.team.providerModelSourceUnsupported":
+    "Questa connessione non può mostrare da dove arrivano i modelli di un provider.",
   "error.team.routineFlowStopUnsupported": "Questa connessione non può fermare l’esecuzione di una routine.",
   "error.team.sidebarFoldersUnsupported": "Le cartelle nelle cartelle non sono supportate da questa connessione.",
   "error.team.libraryFoldersUnsupported": "Le cartelle della Libreria non sono supportate da questa connessione.",

@@ -1,18 +1,25 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { type ConversationMessage, isQueuedAgentReply, type QueueDelivery } from "@openbot/contracts/ipc";
+import {
+  type AgentTask,
+  type ConversationMessage,
+  isQueuedAgentReply,
+  type QueueDelivery,
+  routineRunsTurn,
+} from "@openbot/contracts/ipc";
 import { isQueueEditRejected } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { type MobileTextKey, sourceText } from "@openbot/i18n/mobile";
 import { replaceEqualDeep, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { useMobileSession, useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { useAgentWaits } from "@/features/workspace/components/use-agent-activity";
 import {
   useMobileWorkspaceReader,
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
+import { addStartedTask } from "@/features/workspace/model/task-cache";
 import { withUploadCancel } from "@/features/workspace/model/upload-cancels";
 import { currentText, useText } from "@/shared/lib/text";
 import { useHiddenReplies } from "../context/queued-messages-context";
@@ -42,7 +49,6 @@ const DRAFT_ERROR_KEYS = {
   pendingSave: "mobile.chat.queue.readPendingSaveFailed",
 } as const satisfies Record<QueueEditDraftError["part"], MobileTextKey>;
 
-/** The ids of every queued delivery, answers included, with `delivery` first and the others in their order. */
 function firstIds(waiting: readonly QueueDelivery[], delivery: QueueDelivery): string[] {
   return [delivery.id, ...waiting.filter((item) => item.id !== delivery.id).map((item) => item.id)];
 }
@@ -52,28 +58,26 @@ export function useChatQueue(
   serverId: string,
   online: boolean,
   activeTurnId: string | null,
-  /** False for an agent that cannot take a message into its running turn: it offers Send now, not Steer. */
   steers: boolean,
-  /** The loaded conversation. Its outgoing exchanges name the teammates the agent waits for. */
   messages: readonly ConversationMessage[] = EMPTY_MESSAGES,
 ) {
   const workspace = useMobileWorkspaceReader();
   const canEditQueue = useMobileWorkspaceSelector((current) => current.canEditQueue(serverId));
+  const canRunAsThread = useMobileWorkspaceSelector((current) => current.canRunQueuedMessageAsTask(serverId));
   const text = useText();
   const { session } = useMobileSession();
   const storageKey = `queue-edit.${session?.user.id}.${serverId}.${agentId}`;
   const queryClient = useQueryClient();
+  const queryScope = useQueryScope();
   const queryKey = useMemo(() => queryKeys.chatQueue(serverId, agentId), [serverId, agentId]);
   const query = useQuery({
     queryKey,
     queryFn: () => workspace().loadQueue(agentId, serverId),
     enabled: online,
-    // The chat reads the queue once when it opens, also when the cache holds a recent copy.
     refetchOnMount: "always",
     retry: false,
   });
   const [error, setError] = useState<string | null>(null);
-  // Send now reads the turn after the reorder: a turn that ended meanwhile has nothing to stop.
   const activeTurnRef = useRef(activeTurnId);
   activeTurnRef.current = activeTurnId;
   const [restored] = useState(() => {
@@ -98,35 +102,19 @@ export function useChatQueue(
   const busyRef = useRef(false);
   const [progress, setProgress] = useState<number | null>(null);
   const cancelled = useRef(false);
-  // An edit request in flight still owns the outcome: the queue can report the
-  // delivery as started before the host answers, which flashes the finished
-  // notice on every edit. Settle the request first; a genuinely gone delivery
-  // marks the edit unavailable after the request completes. An unconfirmed Save
-  // owns the outcome the same way: keep it retryable until the host confirms
-  // or rejects it, instead of replacing Save with Close and deleting it.
   const editUnavailable = Boolean(
     edit &&
       !edit.pendingSave &&
       !busy &&
       query.data?.deliveries.some((item) => item.id === edit.delivery.id && item.status !== "queued"),
   );
-  // A teammate's answer waits in the queue until the agent reads it, but it is not the user's
-  // message: it has no edit or reorder actions, only steer. The waiting block shows it instead.
   const queued = useMemo(
     () => orderedQueue((query.data?.deliveries ?? []).filter((item) => !isQueuedAgentReply(item))),
     [query.data],
   );
   const replies = useMemo(() => orderedQueue((query.data?.deliveries ?? []).filter(isQueuedAgentReply)), [query.data]);
-  // The questions come from the conversation and the answers from the queue. A teammate that is
-  // still asked or working has a row before any answer arrives.
-  // The person can close the rows when every teammate is done, as on desktop. A closed row that
-  // works again shows.
   const { hiddenReplyIds, hideReplies } = useHiddenReplies();
-  // A teammate that waits for the person in its own chat says so in its row.
   const waits = useAgentWaits(serverId, online);
-  // The conversation is a new array on each streamed chunk. The rows stay the same array while they
-  // say the same, so the controller below, and each part of the screen that reads it, does not
-  // change with each chunk.
   const lastWaiting = useRef<AwaitingReply[]>([]);
   const waiting = useMemo(() => {
     const rows = awaitingReplies(messages, replies, waits).filter(
@@ -135,8 +123,6 @@ export function useChatQueue(
     lastWaiting.current = replaceEqualDeep(lastWaiting.current, rows);
     return lastWaiting.current;
   }, [messages, replies, waits, hiddenReplyIds]);
-  // Persist typing after a pause, without blocking each key event. The edit identity is
-  // persisted synchronously BEFORE requesting the host hold, so a restart can recover it.
   useEffect(() => {
     if (!edit) return;
     const timer = setTimeout(() => {
@@ -153,12 +139,9 @@ export function useChatQueue(
   useEffect(
     () => () => {
       if (editRef.current) {
-        // The host still holds the original if the final local write fails.
         try {
           SecureStore.setItem(storageKey, JSON.stringify(editRef.current));
-        } catch {
-          /* Previous durable draft remains available. */
-        }
+        } catch {}
       }
     },
     [storageKey],
@@ -166,8 +149,6 @@ export function useChatQueue(
   const refresh = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey });
   }, [queryClient, queryKey]);
-  // A connection that comes back reads the queue again. The chat that opens online has its read
-  // from the query: a second request here would replace it.
   const wasOnline = useRef(online);
   useEffect(() => {
     if (online && !wasOnline.current) void queryClient.invalidateQueries({ queryKey }, { cancelRefetch: false });
@@ -177,7 +158,6 @@ export function useChatQueue(
   const run = useCallback(
     async (action: () => Promise<void>) => {
       if (busyRef.current) return false;
-      // A silent refusal leaves a screen that waits for this result with nothing to show.
       if (!online) {
         setError(currentText().t("mobile.chat.queue.reconnect"));
         return false;
@@ -331,7 +311,6 @@ export function useChatQueue(
               () => workspace().uploadAttachment(agentId, upload, serverId),
             );
           },
-          // Once Save can reach the host, these IDs must survive an uncertain response.
           discard: async (id) => {
             if (!editRef.current?.pendingSave) await workspace().discardAttachment(agentId, id, serverId);
           },
@@ -370,14 +349,11 @@ export function useChatQueue(
   );
   return useMemo(
     () => ({
-      // The identity the queue sheet is opened with: one chat's controller never answers
-      // for another chat that the native stack keeps mounted behind it.
       chatId: `${serverId}:${agentId}`,
       agentId,
       serverId,
       attachments,
       changeAttachments,
-      /** What this host accepts, for files an edit adds. */
       attachmentSupport: () => workspace().attachmentSupport(serverId),
       editUnavailable,
       discardFinishedEdit: () =>
@@ -387,7 +363,6 @@ export function useChatQueue(
       queued,
       replies,
       waiting,
-      /** Closes the waiting rows. The sheet offers it only when no teammate still works. */
       hideWaiting: () => hideReplies(waiting.map((row) => row.id)),
       deliveries: query.data?.deliveries ?? EMPTY_DELIVERIES,
       edit,
@@ -400,9 +375,11 @@ export function useChatQueue(
         (query.error ? text.errorMessage(query.error, text.t("mobile.chat.queue.loadFailed")) : null),
       loading: online && query.isPending,
       canEdit: canEditQueue,
+      canRunAsThread,
       online,
       activeTurnId,
       steers,
+      steerRefused: steers && routineRunsTurn(query.data?.deliveries, activeTurnId),
       begin,
       save,
       refresh,
@@ -417,8 +394,6 @@ export function useChatQueue(
       cancelUpload: () => {
         cancelled.current = true;
       },
-      // Reports whether the host hold is gone. A rejection means the host already finished
-      // this edit, so the local hold goes as well; any other failure keeps the edit for a retry.
       cancelEdit: async () => {
         if (!edit) return true;
         let rejected = false;
@@ -445,29 +420,34 @@ export function useChatQueue(
         }),
       steer: (delivery: QueueDelivery) =>
         run(async () => {
-          if (!activeTurnId) return;
+          if (!activeTurnId || routineRunsTurn(query.data?.deliveries, activeTurnId)) return;
           await workspace().changeQueue(agentId, serverId, "steer", {
             deliveryId: delivery.id,
             expectedTurnId: activeTurnId,
           });
         }),
-      // As on desktop: the message goes first, and the running turn stops, so the message runs next.
       sendNow: (delivery: QueueDelivery) =>
         run(async () => {
           const turnId = activeTurnId;
           if (!turnId) return;
           const waiting = orderedQueue(query.data?.deliveries ?? []);
-          // An edited message keeps its place. The actions screen disables Send now in this state.
           if (waiting[0]?.editing && waiting[0].id !== delivery.id) return;
           if (waiting[0]?.id !== delivery.id)
             await workspace().changeQueue(agentId, serverId, "reorder", { deliveryIds: firstIds(waiting, delivery) });
           if (activeTurnRef.current !== turnId) return;
           await workspace().interruptTurn(agentId, turnId, serverId);
         }),
+      runAsThread: async (delivery: QueueDelivery): Promise<AgentTask | null> => {
+        const started: { task: AgentTask | null } = { task: null };
+        const done = await run(async () => {
+          started.task = await workspace().runQueuedMessageAsTask({ agentId, deliveryId: delivery.id }, serverId);
+        });
+        const task = done ? started.task : null;
+        if (task) addStartedTask(queryClient, queryScope, serverId, task);
+        return task;
+      },
       moveFirst: (delivery: QueueDelivery) =>
         run(async () => {
-          // The host checks the order against every queued delivery, so the answers the sheet does
-          // not list keep their places behind the moved message.
           await workspace().changeQueue(agentId, serverId, "reorder", {
             deliveryIds: firstIds(orderedQueue(query.data?.deliveries ?? []), delivery),
           });
@@ -491,6 +471,7 @@ export function useChatQueue(
       query.error,
       query.isPending,
       canEditQueue,
+      canRunAsThread,
       online,
       activeTurnId,
       steers,
@@ -503,6 +484,8 @@ export function useChatQueue(
       serverId,
       clearEdit,
       text,
+      queryClient,
+      queryScope,
     ],
   );
 }

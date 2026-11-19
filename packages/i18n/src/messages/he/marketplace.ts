@@ -117,6 +117,7 @@ export const messages = {
   "marketplace.app.partialTitle": "{name} אינו שלם",
   "marketplace.app.partialDescription": "חלק מהאפליקציות או המיומנויות שלו לא הותקנו. חיבור מחדש יתקין אותן.",
   "marketplace.app.notConnected": "לא מחובר",
+  "marketplace.app.paused": "מושהה",
   "marketplace.app.custom": "שרת MCP",
   "marketplace.app.githubTagline": "מאגרים, בעיות ו-pull requests",
   "marketplace.app.onePasswordTagline": "התחברות לאתרים עם פרטי כניסה משותפים",
@@ -161,6 +162,7 @@ export const messages = {
     "ב-{host} פועלת גרסה ישנה של OpenBot שלא יכולה לחבר אפליקציות. עדכנו את OpenBot ב-{host}, או בקשו מהבעלים לעדכן אותה.",
   "marketplace.app.blocked.member":
     "רק בעלים או מנהל של {host} יכולים לחבר שם אפליקציות. בקשו מאחד מהם לחבר את {name}, או לעדכן את OpenBot ב-{host} כדי שחברים יוכלו לחבר אפליקציות.",
+  "marketplace.app.blocked.mac": "{name} פועל רק ב-Mac שמריץ את OpenBot.",
   "marketplace.app.connectAgain": "חיבור מחדש",
   "marketplace.app.automation.askOnInstall": "בקשת גישה מ-macOS בהתקנה",
   "marketplace.app.automation.title": "גישה לאפליקציות של Apple",
@@ -382,8 +384,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.recall": "מה ההערות שלי אומרות על ההחלטות בפרויקט הזה?",
   "marketplace.plugin.obsidian.prompt.save": "שמור את ההחלטה הזו כהערה חדשה בכספת שלי.",
   "marketplace.plugin.obsidian.prompt.log": "הוסף סיכום של עבודת היום להערה Work log שלי.",
-  "marketplace.plugin.obsidian.hint.apiKey":
-    'ב-Obsidian, יש לפתוח Settings > Local REST API. יש להעתיק את מפתח ה-API ולהפעיל את "Enable non-encrypted (HTTP) server".',
+  "marketplace.plugin.obsidian.hint.apiKey": "ב-Obsidian, יש לפתוח Settings > Local REST API ולהעתיק את מפתח ה-API.",
   "marketplace.plugin.resend.tagline": "אימייל טרנזקציוני",
   "marketplace.plugin.resend.description":
     "Resend מאפשר לסוכנים לשלוח אימייל טרנזקציוני ולבדוק מסירה דרך API אחד. מפתח API מלוח הבקרה של Resend מועבר לשרת המקומי כמשתנה סביבה אחד.",

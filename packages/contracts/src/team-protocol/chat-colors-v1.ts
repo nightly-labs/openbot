@@ -1,15 +1,3 @@
-// Frozen optional chat-colors-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: a chat colour is a soft tint
-// of chat bubbles, `#rrggbb` in lower case. It is not the avatar colour (`avatarHue`,
-// `agent-colors-v1`), and it does not change it. Any member reads the chat colour of each agent that
-// the member can see, and the chat colour of each member of the server. A member sets the chat colour
-// of an agent with manage access to it, as for its avatar on the released agent update route.
-// `color: null` removes it. A member's own chat colour comes from their OpenBot account; this route
-// cannot set it. An agent or a member that is not in the list has no chat colour. Each change sends
-// `chat-colors-changed` with the whole list. The members list has at most 100 entries, the bound of the
-// released presence snapshot. Bounds and meaning do not follow IPC changes; widening any of it needs a
-// second capability string.
 import { isDynamicRecord } from "../runtime-values";
 import {
   type AdminDecoder,
@@ -53,7 +41,6 @@ export const CHAT_COLORS_CODECS: ReadonlyMap<string, OptionalRouteCodec> = new M
   ],
 ]);
 
-/** The agents and members that have a chat colour. */
 export interface ChatColorsSnapshot {
   agents: { agentId: string; color: `#${string}` }[];
   members: { memberId: string; color: `#${string}` }[];
@@ -61,7 +48,6 @@ export interface ChatColorsSnapshot {
 
 export type ChatColorsEvent = { type: "chat-colors-changed" } & ChatColorsSnapshot;
 
-/** Decodes a snapshot that the read or set route returns. */
 export function decodeChatColorsSnapshot(input: unknown): ChatColorsSnapshot {
   const decoded = snapshot(input);
   if (!isDynamicRecord(decoded) || !Array.isArray(decoded.agents) || !Array.isArray(decoded.members))

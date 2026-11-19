@@ -1,10 +1,3 @@
-// Runs the real LocalMcpBridge with the tools that a Hermes Agent session gets, lists them with the MCP SDK
-// client, and gives them to the tool search of a Hermes Agent checkout. Hermes hides all MCP tools behind
-// its own tool_search, tool_describe, and tool_call. Its tool_call refused `openbot.channel_result`, and a
-// channel member could not send its result (#9312). Each catalog tool must now be a Hermes tool that its
-// search finds, its describe gives with the guidance, and its tool_call runs through the bridge.
-// HERMES_REPO=<hermes-agent checkout> HERMES_PYTHON=<python 3.11+ with its dependencies>
-// `bun run test:hermes-catalog-tools`. Writes .openbot-build/hermes-catalog-tools-e2e/report.json.
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -26,7 +19,6 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/hermes-catalog-tools
 const HERMES_REPO = process.env.HERMES_REPO;
 const HERMES_PYTHON = process.env.HERMES_PYTHON ?? "python3";
 
-/** Queries that a model sends for the channel result, and the tool that each must find. */
 const SEARCHES: ReadonlyArray<[string, string]> = [
   ["channel_result", "channel_result"],
   ["openbot.channel_result", "channel_result"],
@@ -36,7 +28,6 @@ const SEARCHES: ReadonlyArray<[string, string]> = [
   ["click", "click"],
 ];
 
-// Hermes Agent's own code: its editor server names, its tool registry, and its tool search.
 const HERMES_SEARCH = `
 import json, sys
 repo, tools_path = sys.argv[1], sys.argv[2]
@@ -107,10 +98,6 @@ interface Report {
   bridged?: Array<Pick<DynamicToolCallParams, "namespace" | "tool" | "arguments">>;
 }
 
-/**
- * The SDK transport classes declare their handlers and `sessionId` as `T | undefined`, which
- * `exactOptionalPropertyTypes` does not accept as a `Transport`. This one forwards to such a class.
- */
 function asTransport(inner: {
   start(): Promise<void>;
   send: Transport["send"];
@@ -155,7 +142,6 @@ try {
   assert.equal(customAgentFlavor("/opt/bin/hermes").catalogAsMcpTools, true, "A custom hermes agent gets them too.");
   assert.equal(customAgentFlavor("omp").catalogAsMcpTools, undefined, "Other custom agents keep OpenBot's search.");
 
-  // The tools that AcpClient gives the bridge for a Hermes session, through the same check.
   const sent: unknown[] = visibleDynamicTools("hermes");
   const given = sent.filter(isDynamicToolNamespace);
   assert.equal(given.length, sent.length, "AcpClient takes each namespace.");
@@ -217,7 +203,6 @@ try {
     /Read a workflow before a change/,
     "Describe gives the guidance.",
   );
-  // send_message is a direct tool of every agent, and OpenBot's tool_describe is not listed for Hermes.
   const message = describedTools.find(([name]) => name.endsWith("__send_message"))?.[1];
   assert.match(message?.parameters.description ?? "", /Choose recipients/, "A direct tool gives its guidance too.");
 
@@ -227,7 +212,6 @@ try {
   assert.ok(hermes.calls.bare[2]?.includes(String(fullName)), "The bare name gets the full name as a hint.");
   assert.equal(hermes.calls.nested[2], null, "OpenBot's tool_call, which channel rules name, still resolves.");
 
-  // Hermes runs the resolved tool on the MCP server it came from.
   const [, prefix, tool] = /^mcp__(.+)__([^_].*)$/.exec(String(fullName)) ?? [];
   const server = prefix ? hermes.servers[prefix] : undefined;
   assert.ok(server && tool, `Hermes resolved an MCP tool: ${fullName}`);

@@ -23,6 +23,13 @@ export const messages = {
   "settings.codeFont.title": "Czcionka kodu",
   "settings.codeFont.description": "Czcionka kodu, terminali i ścieżek plików.",
   "settings.codeFont.default": "Domyślna",
+  "settings.motion.title": "Ruch",
+  "settings.backgroundBlur.title": "Rozmycie tła",
+  "settings.backgroundBlur.description":
+    "Rozmycie za menu i oknami dialogowymi. Na komputerze bez GPU jest na początku wyłączone.",
+  "settings.movingFaces.title": "Ruchome twarze agentów",
+  "settings.movingFaces.description":
+    "Twarze agentów mrugają i się ruszają. Na komputerze bez GPU są na początku nieruchome.",
   "settings.logoColor.title": "Kolor logo",
   "settings.logoColor.description": "Widoczny w Docku, na pasku zadań i w Dynamic Island.",
   "settings.logoColor.buildNote": "Ta kompilacja ma własny kolor logo. Wybór dotyczy wersji wydanej.",
@@ -473,7 +480,6 @@ export const messages = {
   "settings.profile.share.copyFailed": "Nie udało się skopiować obrazu.",
   "settings.profile.share.createFailed": "Nie udało się utworzyć obrazu.",
   "settings.profile.share.fileName": "openbot-activity.png",
-  // The text in the image to share.
   "settings.profile.share.caption": "Moje ostatnie pół roku z OpenBot",
   "settings.profile.activity.title": "Aktywność na tym komputerze",
   "settings.profile.activity.activeDays": {
@@ -485,7 +491,6 @@ export const messages = {
   "settings.profile.activity.empty": "Brak aktywności",
   "settings.profile.activity.loading": "Wczytywanie aktywności…",
   "settings.profile.activity.loadFailed": "Nie udało się wczytać aktywności.",
-  // {tokens} is a short number, such as 1.2M.
   "settings.profile.activity.heatmapLabel": {
     one: "Tokeny: {tokens}, {count} aktywny dzień w ostatnim roku",
     few: "Tokeny: {tokens}, {count} aktywne dni w ostatnim roku",
@@ -678,7 +683,6 @@ export const messages = {
   "settings.hostedServers.plan.standard.summary": "Dla małego zespołu z codziennymi rutynami.",
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Dla wielu agentów i intensywnej pracy w przeglądarce.",
-  // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "Dyktowanie",
   "settings.voice.model.parakeet.description": "Szybki. Sam rozpoznaje język mowy, w 25 językach europejskich.",
   "settings.voice.model.parakeetUnified.description":
@@ -707,6 +711,10 @@ export const messages = {
   "settings.voice.language.parakeetUnifiedEnglishOnly":
     "Parakeet Unified rozpoznaje tylko angielski. Aby ustawić język, użyj Whisper, Cohere lub ElevenLabs.",
   "settings.voice.language.automatic": "Automatycznie",
+  "settings.voice.pause.title": "Pauza przed wysłaniem",
+  "settings.voice.pause.description":
+    "W rozmowie głosowej OpenBot wysyła Twoje słowa, gdy przestaniesz mówić na tak długo. Wybierz dłuższą pauzę, jeśli mówisz wolno lub zatrzymujesz się, by pomyśleć. Głos na żywo Codex sam rozpoznaje koniec.",
+  "settings.voice.pause.seconds": "{seconds} s",
   "settings.voice.loadFailed": "Nie udało się odczytać modeli głosu.",
   "settings.voice.saveFailed": "Nie udało się zapisać ustawienia głosu. Spróbuj ponownie.",
   "settings.voice.downloadFailed": "Nie udało się rozpocząć pobierania. Spróbuj ponownie.",
@@ -800,6 +808,13 @@ export const messages = {
   "settings.transfer.import.lede": "Wybierz plik wyeksportowany z innego serwera. Jego nazwa kończy się na .zip.",
   "settings.transfer.import.choose": "Wybierz plik…",
   "settings.transfer.import.reading": "Odczytywanie pliku…",
+  "settings.transfer.upload.label": "Wysyłanie na serwer",
+  "settings.transfer.upload.sending": "Wysyłanie pliku…",
+  "settings.transfer.upload.sent": "Wysłano {sent} z {total}",
+  "settings.transfer.upload.serverReading": "Serwer odczytuje plik…",
+  "settings.transfer.upload.etaSoon": "Mniej niż minuta do końca",
+  "settings.transfer.upload.etaMinutes": "Jeszcze około {minutes} min",
+  "settings.transfer.upload.etaHours": "Jeszcze około {hours} godz. {minutes} min",
   "settings.transfer.import.openFailed": "Nie udało się otworzyć pliku",
   "settings.transfer.import.contains": "Ten plik zawiera",
   "settings.transfer.import.source": "OpenBot {version} · eksport: {date}",
@@ -851,13 +866,17 @@ export const messages = {
   "settings.transfer.copy.noAgents": "Ten serwer nie ma agentów.",
   "settings.transfer.copy.new": "Nowy",
   "settings.transfer.copy.notCopied":
-    "Ich kanały i folder współdzielony też są kopiowane. Klucze API, logowania, konektory i historia czatów nie są kopiowane. Skonfiguruj je ponownie na drugim serwerze.",
+    "Ich kanały, przepływy rutyn, przepływy pracy i folder współdzielony też są kopiowane. Klucze API, logowania, konektory i historia czatów nie są kopiowane. Skonfiguruj je ponownie na drugim serwerze.",
   "settings.transfer.copy.submit": {
     one: "Kopiuj {count} agenta",
     few: "Kopiuj {count} agentów",
     many: "Kopiuj {count} agentów",
     other: "Kopiuj {count} agenta",
   },
+  "settings.transfer.copy.duplicatesTitle": "Skopiować zduplikowanych agentów?",
+  "settings.transfer.copy.duplicatesDescription":
+    "{server} ma już agentów o tych nazwach: {names}. Kopiowanie doda drugiego agenta dla każdego z nich. Każda kopia to osobny agent z własnymi czatami, plikami i wspomnieniami.",
+  "settings.transfer.copy.duplicatesConfirm": "Kopiuj duplikaty",
   "settings.transfer.copy.copying": "Kopiowanie…",
   "settings.transfer.copy.done": {
     one: "Skopiowano {count} agenta na {server}.",

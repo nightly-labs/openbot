@@ -1,6 +1,3 @@
-// Installs the Proton Pass CLI (`pass-cli`) into a folder that OpenBot owns. OpenBot runs the binary
-// only; it does not include or change its code.
-
 import { createHash, randomBytes } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { chmod, mkdir, rename, rm } from "node:fs/promises";
@@ -15,22 +12,14 @@ import { PasswordManagerError, passwordManagerFailure } from "./driver";
 
 const { io } = causeHelpers(PasswordManagerError);
 
-/**
- * The release that the host installs. Each SHA-256 is pinned here, taken from the files that Proton
- * publishes for this version. A new release is a code change.
- */
 const PROTON_PASS_CLI_VERSION = "2.7.0";
 
 interface ReleaseFile {
-  /** The file name at Proton. */
   name: string;
-  /** The hash of the download. */
   sha256: string;
-  /** The hash of each installed file, by name. The CLI runs only when all of them match. */
   installed: Readonly<Record<string, string>>;
 }
 
-/** On macOS and Linux, the file is the executable. On Windows, it is a zip with `pass-cli.exe` and its DLL. */
 const FILES: Record<RuntimeTarget, ReleaseFile> = {
   "darwin-arm64": single("pass-cli-macos-aarch64", "f17222619b4c4c4112eccc3796edea4bc0e4a341dc8960f7bb4023782adcc4a1"),
   "darwin-x64": single("pass-cli-macos-x86_64", "1829f7ecef108df5e14f92081cf4a4412c0fdc5be2034f9ee85d1e6745a62322"),
@@ -46,7 +35,6 @@ const FILES: Record<RuntimeTarget, ReleaseFile> = {
   },
 };
 
-/** A download that is the executable itself. */
 function single(name: string, sha256: string): ReleaseFile {
   return { name, sha256, installed: { "pass-cli": sha256 } };
 }
@@ -55,7 +43,6 @@ function executableName(target: RuntimeTarget): "pass-cli" | "pass-cli.exe" {
   return target === "win32-x64" ? "pass-cli.exe" : "pass-cli";
 }
 
-/** The SHA-256 of a file, or null when it cannot be read. */
 function fileSha256(path: string): Promise<string | null> {
   return new Promise((resolve) => {
     const hash = createHash("sha256");
@@ -66,7 +53,6 @@ function fileSha256(path: string): Promise<string | null> {
   });
 }
 
-/** True when each installed file is there and has its pinned hash. */
 async function installedFilesMatch(destination: string, release: ReleaseFile): Promise<boolean> {
   const checks = Object.entries(release.installed).map(
     async ([name, sha256]) => (await fileSha256(join(destination, name))) === sha256,
@@ -78,11 +64,6 @@ function fileUrl(target: RuntimeTarget): string {
   return `https://proton.me/download/pass-cli/${PROTON_PASS_CLI_VERSION}/${FILES[target].name}`;
 }
 
-/**
- * The installed CLI when its files have their pinned hashes, or else a new install of the pinned
- * release: downloaded, checked against its hash, and put into `<directory>/<version>`. A failed or
- * stopped install leaves nothing in that folder.
- */
 export const managedProtonPassCli = Effect.fn("ProtonPassCli.managed")(function* (options: {
   directory: string;
   target: RuntimeTarget;

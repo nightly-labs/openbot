@@ -54,6 +54,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "Demasiados intentos de inicio de sesión. Inténtalo más tarde.",
   "error.team.clientUpdateRequired": "Actualiza este cliente de OpenBot antes de conectarte a este host.",
   "error.team.hostUpdateRequired": "Actualiza OpenBot en el host antes de conectarte.",
+  "error.team.serverSafeMode": "Este servidor está en modo seguro porque OpenBot no se inicia en él.",
+  "error.team.serverSafeModeNewerDatabase":
+    "OpenBot {version} en este servidor no puede abrir sus datos porque una versión más reciente de OpenBot los guardó. Una versión más reciente de OpenBot en el servidor lo soluciona.",
+  "error.team.serverSafeModeStartFailed":
+    "OpenBot {version} en este servidor se detuvo tras fallar al iniciarse muchas veces. Una versión más reciente de OpenBot en el servidor lo soluciona.",
   "error.team.sidebarLayoutUnavailable": "La distribución de la barra lateral no está disponible.",
   "error.team.providersUnsupported": "Esta conexión no admite los ajustes de proveedores.",
   "error.team.providerNotManaged": "OpenBot no gestiona la CLI de este proveedor.",
@@ -74,15 +79,21 @@ export const messages = {
   "error.team.agentColorsUnsupported": "Esta conexión no admite colores de agentes.",
   "error.team.chatColorsUnsupported": "Esta conexión no admite colores de chat.",
   "error.team.routineRunPlaceUnsupported": "Esta conexión no puede cambiar dónde se ejecuta una rutina.",
+  "error.team.routinePauseReasonsUnsupported": "Esta conexión no puede mostrar por qué una rutina está en pausa.",
+  "error.team.activeQueuesUnsupported": "Esta conexión no puede mostrar las colas de todos los agentes.",
   "error.team.routinesOnceUnsupported": "Esta conexión no puede guardar rutinas que se ejecutan una vez.",
   "error.team.routineRunCommandUnsupported": "Esta conexión no puede dar el comando de ejecución de una rutina.",
   "error.team.threadQueueUnsupported": "Esta conexión no puede mostrar la cola de un hilo lateral.",
+  "error.team.threadRequestsUnsupported":
+    "Esta conexión no puede mostrar las solicitudes de un hilo lateral a otros agentes.",
   "error.team.hostTurnLimitsUnsupported":
     "Esta conexión no puede mostrar ni cambiar los límites de hilos del servidor.",
   "error.team.usageLimitUnsupported": "Esta conexión no puede mostrar ni cambiar los límites de uso de los agentes.",
   "error.team.hermesImportUnsupported": "Esta conexión no puede importar perfiles de Hermes desde el servidor.",
   "error.team.providerDetectionUnsupported":
     "Esta conexión no puede encontrar los servidores de modelos y los agentes del servidor.",
+  "error.team.providerModelSourceUnsupported":
+    "Esta conexión no puede mostrar de dónde vienen los modelos de un proveedor.",
   "error.team.routineFlowStopUnsupported": "Esta conexión no puede detener una ejecución de rutina.",
   "error.team.sidebarFoldersUnsupported": "Esta conexión no permite carpetas dentro de carpetas.",
   "error.team.libraryFoldersUnsupported": "Esta conexión no permite carpetas de la Biblioteca.",

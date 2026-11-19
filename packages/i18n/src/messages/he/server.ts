@@ -44,6 +44,7 @@ export const messages = {
   "server.compatibility.updateHostTitle": "עדכון OpenBot ב-{name}",
   "server.compatibility.unsafeDataTitle": "המארח החזיר נתונים לא בטוחים",
   "server.compatibility.cannotConnectTitle": "לא ניתן להתחבר אל {name}",
+  "server.compatibility.safeModeTitle": "{name} לא מופעל",
   "server.compatibility.updateClientDescription":
     "האפליקציה הזו תומכת רק בפרוטוקולים ישנים יותר מהמארח. יש לעדכן את האפליקציה ולנסות שוב.",
   "server.compatibility.updateHostDescription":
@@ -112,6 +113,7 @@ export const messages = {
   "server.local.create": "יצירת שרת",
   "server.local.creating": "יוצר שרת…",
   "server.local.createFailed": "לא ניתן ליצור את השרת.",
+  "server.local.createFailedRetry": "משהו השתבש. יש לנסות שוב. אם זה נכשל שוב, יש להפעיל מחדש את OpenBot.",
   "server.local.limitReached": "אפשר להחזיק לכל היותר {limit} שרתים במחשב הזה. יש למחוק אחד כדי ליצור אחר.",
   "server.local.deleteConfirmTitle": "למחוק את {name}?",
   "server.local.deleteConfirmDescription": "OpenBot עוצר את השרת ומעביר את הסוכנים, הצ'אטים והקבצים שלו לפח.",
@@ -395,7 +397,7 @@ export const messages = {
   "server.settings.agentsDescription": "בחרו מה הסוכנים בשרת הזה יכולים לעשות כשלא הגדרתם זאת לסוכן.",
   "server.settings.timezone": "אזור זמן",
   "server.settings.timezoneDescription":
-    "שגרות חדשות משתמשות באזור הזמן הזה כשההודעה אינה מציינת את אזור הזמן של השולח.",
+    "שגרות חדשות משתמשות באזור הזמן הזה כשההודעה אינה מציינת את אזור הזמן של השולח. בשרת, גם הדפדפן משתמש בו אחרי ההפעלה מחדש הבאה.",
   "server.settings.timezoneAutomatic": "אוטומטי ({zone})",
   "server.settings.timezoneLoadFailed": "לא ניתן לטעון את אזור הזמן של השרת.",
   "server.settings.turnLimit": "שרשורים בו־זמנית",

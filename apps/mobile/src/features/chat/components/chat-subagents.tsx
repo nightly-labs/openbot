@@ -2,6 +2,7 @@ import type { ConversationSubagent, ConversationSubagentStatus } from "@openbot/
 import { Typography } from "heroui-native";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
 import CircleCheck from "lucide-react-native/icons/circle-check";
+import CircleX from "lucide-react-native/icons/circle-x";
 import GitFork from "lucide-react-native/icons/git-fork";
 import LoaderCircle from "lucide-react-native/icons/loader-circle";
 import Minus from "lucide-react-native/icons/minus";
@@ -28,6 +29,7 @@ import {
 } from "@/features/chat/model/subagents";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { ACTIVITY_ICON_SIZE, ChatActivityLine, useActivityColors } from "./chat-activity-line";
 
 type SubagentsMessage = Extract<ChatMessage, { kind: "subagents" }>;
 
@@ -73,7 +75,6 @@ export function useSubagentColors(): SubagentColors {
   };
 }
 
-/** The time now, again each second while `running`. */
 export function useSubagentClock(running: boolean): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -85,7 +86,7 @@ export function useSubagentClock(running: boolean): number {
   return now;
 }
 
-function Spinner({ color, size }: { color: string; size: number }) {
+export function Spinner({ color, size }: { color: string; size: number }) {
   const turn = useSharedValue(0);
   useEffect(() => {
     turn.set(
@@ -101,7 +102,6 @@ function Spinner({ color, size }: { color: string; size: number }) {
   );
 }
 
-/** The state of one subagent, in the icons and colors of desktop. */
 export function SubagentStatusIcon({
   status,
   colors,
@@ -129,7 +129,6 @@ export function SubagentRow({
   now: number;
   colors: SubagentColors;
   first: boolean;
-  /** How many lines of the latest step or answer show. */
   lines: number;
   onOpen: (() => void) | undefined;
 }) {
@@ -152,7 +151,6 @@ export function SubagentRow({
           : undefined
       }
       className="py-3 pl-3.5 pr-3"
-      // A list row: the pressed row darkens, as an iOS table cell does.
       style={({ pressed }) => ({ backgroundColor: pressed ? colors.pressed : "transparent" })}
     >
       {first ? null : (
@@ -170,7 +168,6 @@ export function SubagentRow({
         >
           {subagent.title}
         </Typography.Paragraph>
-        {/* The time and the arrow sit together on the title line, as the detail text of an iOS row. */}
         <View className="flex-row items-center gap-0.5">
           <Typography.Paragraph type="body-sm" style={{ color: colors.muted, fontVariant: ["tabular-nums"] }}>
             {subagentDuration(subagentElapsedMs(subagent, now), text)}
@@ -189,7 +186,6 @@ export function SubagentRow({
   );
 }
 
-/** The title, the progress and the time of the subagents of one turn. */
 export function useSubagentGroupSummary(subagents: readonly ConversationSubagent[]) {
   const text = useText();
   const { t } = text;
@@ -209,50 +205,33 @@ export function useSubagentGroupSummary(subagents: readonly ConversationSubagent
         ? `${t("mobile.chat.subagents.done", { count: finished - failed })} · ${t("mobile.chat.subagents.failed", { count: failed })}`
         : t("mobile.chat.subagents.done", { count: finished });
   const elapsed = subagentDuration(subagentGroupElapsedMs(subagents, now), text);
-  return { title, progress, elapsed, now };
+  return { title, progress, elapsed, now, running, failed };
 }
 
-/**
- * The subagents that the agent started in one turn, in one line: their count, their progress and
- * their time. The line opens the sheet with each subagent and its details.
- */
 export function ChatSubagents({
   message,
   onOpen,
 }: {
   message: SubagentsMessage;
-  /** Absent where no sheet can show the subagents. */
   onOpen: ((messageId: string) => void) | undefined;
 }) {
-  const colors = useSubagentColors();
-  const { title, progress, elapsed } = useSubagentGroupSummary(message.subagents);
+  const colors = useActivityColors();
+  const { title, progress, elapsed, running, failed } = useSubagentGroupSummary(message.subagents);
+  const icon =
+    running > 0 ? (
+      <Spinner color={colors.running} size={ACTIVITY_ICON_SIZE} />
+    ) : failed > 0 ? (
+      <CircleX size={ACTIVITY_ICON_SIZE} color={colors.danger} />
+    ) : (
+      <GitFork size={ACTIVITY_ICON_SIZE} color={colors.muted} />
+    );
   return (
-    <Pressable
-      accessibilityRole={onOpen ? "button" : undefined}
+    <ChatActivityLine
+      icon={icon}
+      label={title}
+      meta={`${progress} · ${elapsed}`}
       accessibilityLabel={`${title}, ${progress}, ${elapsed}`}
-      disabled={!onOpen}
-      onPress={
-        onOpen
-          ? () => {
-              void haptics.selection();
-              onOpen(message.id);
-            }
-          : undefined
-      }
-      className="flex-row items-center gap-2 self-start px-1"
-      style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
-    >
-      {/* A quiet line, as the memory changes line: the work of the turn, not an answer. */}
-      <GitFork size={16} color={colors.muted} />
-      <Typography.Paragraph
-        type="body-sm"
-        numberOfLines={1}
-        className="shrink"
-        style={{ color: colors.muted, fontVariant: ["tabular-nums"] }}
-      >
-        {`${title} · ${progress} · ${elapsed}`}
-      </Typography.Paragraph>
-      {onOpen ? <ChevronRight size={16} color={colors.dim} /> : null}
-    </Pressable>
+      onPress={onOpen ? () => onOpen(message.id) : undefined}
+    />
   );
 }

@@ -83,6 +83,7 @@ export const messages = {
   "marketplace.app.partialTitle": "{name}이(가) 완료되지 않았어요",
   "marketplace.app.partialDescription": "일부 앱 또는 스킬이 설치되지 않았어요. 다시 연결하면 설치돼요.",
   "marketplace.app.notConnected": "연결 안 됨",
+  "marketplace.app.paused": "일시 중지됨",
   "marketplace.app.custom": "MCP 서버",
   "marketplace.app.githubTagline": "저장소, 이슈, 풀 리퀘스트",
   "marketplace.app.onePasswordTagline": "공유한 로그인 정보로 사이트에 로그인",
@@ -128,6 +129,7 @@ export const messages = {
     "{host}의 OpenBot 버전이 오래되어 앱을 연결할 수 없습니다. {host}의 OpenBot을 업데이트하거나 소유자에게 업데이트를 요청하세요.",
   "marketplace.app.blocked.member":
     "{host}에서는 소유자나 관리자만 앱을 연결할 수 있습니다. 이들에게 {name} 연결을 요청하거나, 멤버도 앱을 연결할 수 있도록 {host}의 OpenBot 업데이트를 요청하세요.",
+  "marketplace.app.blocked.mac": "{name}은(는) OpenBot을 실행하는 Mac에서만 작동합니다.",
   "marketplace.app.connectAgain": "다시 연결",
   "marketplace.app.automation.askOnInstall": "설치할 때 macOS에 접근 요청",
   "marketplace.app.automation.title": "Apple 앱 접근",
@@ -363,8 +365,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.recall": "이 프로젝트의 결정 사항에 대해 내 노트에는 뭐라고 적혀 있어?",
   "marketplace.plugin.obsidian.prompt.save": "이 결정을 내 보관함에 새 노트로 저장해 줘.",
   "marketplace.plugin.obsidian.prompt.log": "오늘 한 작업 요약을 내 작업 로그 노트에 추가해 줘.",
-  "marketplace.plugin.obsidian.hint.apiKey":
-    'Obsidian에서 Settings > Local REST API를 여세요. API 키를 복사하고 "Enable non-encrypted (HTTP) server"를 켜세요.',
+  "marketplace.plugin.obsidian.hint.apiKey": "Obsidian에서 Settings > Local REST API를 열고 API 키를 복사하세요.",
   "marketplace.plugin.resend.tagline": "트랜잭션 이메일",
   "marketplace.plugin.resend.description":
     "Resend를 사용하면 에이전트가 API 하나로 트랜잭션 이메일을 보내고 전송 상태를 확인할 수 있어요. Resend 대시보드의 API 키는 환경 변수 하나로 로컬 서버에 전달돼요.",

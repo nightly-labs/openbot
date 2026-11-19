@@ -47,6 +47,7 @@ export const messages = {
   "server.compatibility.updateHostTitle": "Actualiza OpenBot en {name}",
   "server.compatibility.unsafeDataTitle": "El host devolvió datos no seguros",
   "server.compatibility.cannotConnectTitle": "No se puede conectar con {name}",
+  "server.compatibility.safeModeTitle": "{name} no se inicia",
   "server.compatibility.updateClientDescription":
     "Esta aplicación solo admite protocolos anteriores a los del host. Actualiza esta aplicación y vuelve a intentarlo.",
   "server.compatibility.updateHostDescription":
@@ -116,6 +117,7 @@ export const messages = {
   "server.local.create": "Crear servidor",
   "server.local.creating": "Creando servidor…",
   "server.local.createFailed": "No se pudo crear el servidor.",
+  "server.local.createFailedRetry": "Algo salió mal. Inténtalo de nuevo. Si vuelve a fallar, reinicia OpenBot.",
   "server.local.limitReached":
     "Puedes tener como máximo {limit} servidores en este equipo. Elimina uno para crear otro.",
   "server.local.deleteConfirmTitle": "¿Eliminar {name}?",
@@ -350,7 +352,7 @@ export const messages = {
     "Elige qué pueden hacer los agentes de este servidor cuando no lo configuras para un agente.",
   "server.settings.timezone": "Zona horaria",
   "server.settings.timezoneDescription":
-    "Las rutinas nuevas usan esta zona horaria cuando el mensaje no indica la zona horaria del remitente.",
+    "Las rutinas nuevas usan esta zona horaria cuando el mensaje no indica la zona horaria del remitente. En un servidor, el navegador también la usa después del próximo reinicio.",
   "server.settings.timezoneAutomatic": "Automática ({zone})",
   "server.settings.timezoneLoadFailed": "No se pudo cargar la zona horaria del servidor.",
   "server.settings.turnLimit": "Hilos a la vez",

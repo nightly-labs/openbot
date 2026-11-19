@@ -1,6 +1,7 @@
 import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { AgentTask, AgentTasksSnapshot, RespondToPromptInput } from "@openbot/contracts/ipc";
+import type { AgentTask, RespondToPromptInput } from "@openbot/contracts/ipc";
+import { retryOperationIds } from "@openbot/team-client/retry-operation-id";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
@@ -9,7 +10,7 @@ import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import ArrowLeft from "lucide-react-native/icons/arrow-left";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AppState, Keyboard, Pressable, useColorScheme, View } from "react-native";
+import { Keyboard, Pressable, useColorScheme, View } from "react-native";
 import { KeyboardGestureArea } from "react-native-keyboard-controller";
 import Animated, { useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -21,24 +22,27 @@ import {
   BrowserTakeoverCard,
   QuestionSecretComposer,
 } from "@/features/chat/components/browser-secret-card";
+import type { ApprovalDecision } from "@/features/chat/components/chat-approval-card";
 import { ChatAttachmentPanel } from "@/features/chat/components/chat-attachment-panel";
-import { ChatComposer, VOICE_BUTTON_SIZE } from "@/features/chat/components/chat-composer";
+import { ChatComposer } from "@/features/chat/components/chat-composer";
 import { ChatEndPullRing, useChatEndPull } from "@/features/chat/components/chat-end-pull";
 import { ChatHeader } from "@/features/chat/components/chat-header";
 import { ChatMessageList } from "@/features/chat/components/chat-message-list";
 import { DRAFT_THREAD_ID, useChatThreadMenu } from "@/features/chat/components/chat-thread-menu";
 import { useRowsAfterOpenTransition } from "@/features/chat/components/chat-view";
-import { dictationVoice } from "@/features/chat/components/composer-voice";
 import { useMarkThreadRead, useThreadOpeningUnread } from "@/features/chat/components/use-agent-thread-reads";
 import { useBranchThread } from "@/features/chat/components/use-branch-thread";
 import { useChatAttachments } from "@/features/chat/components/use-chat-attachments";
 import { useChatMotion } from "@/features/chat/components/use-chat-motion";
+import {
+  useComposerDictation,
+  useComposerDictationWithSettings,
+} from "@/features/chat/components/use-composer-dictation";
 import { useComposerContextMeter } from "@/features/chat/components/use-context-usage";
+import { useLeaveChat } from "@/features/chat/components/use-leave-chat";
 import { useMessageDelete } from "@/features/chat/components/use-message-delete";
 import { useMessagePins } from "@/features/chat/components/use-message-pins";
 import { useQuestionPrompt } from "@/features/chat/components/use-question-prompt";
-import { useVoiceMode } from "@/features/chat/components/use-voice-mode";
-import { VoiceOverlay } from "@/features/chat/components/voice-overlay";
 import { branchDividerRowId } from "@/features/chat/model/branch-points";
 import { mentionDraft } from "@/features/chat/model/chat-mentions";
 import {
@@ -50,56 +54,56 @@ import {
   withQuestionContext,
 } from "@/features/chat/model/chat-messages";
 import type { AgentChatTarget } from "@/features/chat/model/chat-target";
-import { finishedTurnSummaries, type TurnStepsSummary } from "@/features/chat/model/turn-thinking";
+import {
+  answerlessTurnSummaries,
+  finishedTurnSummaries,
+  type TurnStepsSummary,
+} from "@/features/chat/model/turn-thinking";
 import { uploadChatAttachments } from "@/features/chat/model/upload-chat-attachments";
 import { useAgentMentionReferences } from "@/features/chat/model/use-agent-mention-references";
+import { useAgentMentionSkills } from "@/features/chat/model/use-agent-mention-skills";
 import { useProgressUpdates } from "@/features/chat/model/use-progress-updates";
 import { voiceAccent, voicePalette } from "@/features/chat/model/voice-palette";
 import { agentTaskHoldText } from "@/features/servers/model/agent-task-text";
+import { taskStartId } from "@/features/servers/model/task-start-id";
 import { useThreadActions } from "@/features/servers/model/use-thread-actions";
+import { useChatRowShown, useThinkingDisplayPreference } from "@/features/settings/model/chat-details";
 import { useChatPullPreference } from "@/features/settings/model/chat-swipe";
 import { ConnectionStatus } from "@/features/workspace/components/connection-status";
 import { useTurnStepLines } from "@/features/workspace/components/use-agent-activity";
-import { useApprovalRequests, useBrowserRequests } from "@/features/workspace/components/use-live-workspace";
+import {
+  useApprovalRequests,
+  useBrowserRequests,
+  useThreadWaits,
+} from "@/features/workspace/components/use-live-workspace";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileAgentActivity } from "@/features/workspace/model/agent-activity";
+import type { PendingApproval } from "@/features/workspace/model/pending-approvals";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { showsOnline } from "@/features/workspace/model/server-status";
+import { addStartedTask } from "@/features/workspace/model/task-cache";
+import { hostAwaitsQuestion } from "@/features/workspace/model/thread-waits";
 import type { MenuAction } from "@/shared/components/menu-view";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
+import { useAppActive } from "@/shared/lib/use-app-active";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import { useReducedTransparency } from "@/shared/lib/use-reduced-transparency";
 
 const NO_MESSAGES: never[] = [];
-/** The item of the thread's menu that opens the pinned messages. */
 const PINS_ACTION = "pinned-messages";
 const NO_ALIASES: ReadonlyMap<string, string> = new Map();
-/** As in the agent's chat: a host starts a turn within a second or two; this only ends a wait for a turn that never shows. */
+const NO_OLDER = () => {};
 const AWAIT_TURN_MS = 10_000;
+const taskMessageId = retryOperationIds(() => Crypto.randomUUID());
 
 function onThreadDeleted(task: AgentTask) {
   router.dismissTo({ pathname: "/chat/[agentId]", params: { agentId: task.agentId } });
 }
 
-/** Leaves the task. A task opened from a notification or a link has no screen under it. */
-function leaveTask() {
-  void Keyboard.dismiss();
-  if (router.canGoBack()) router.back();
-  else router.replace("/connected");
-}
-
-/**
- * One thread of an agent, laid out as the agent's chat: the same header, message list and composer.
- * The agent's name in the header opens the thread menu, the header has the thread's actions in place
- * of the browser. The composer has files only on a host with `agent-thread-files-v1`: `agent-tasks-v1`
- * carries text only. The files upload when the person sends, and a failed send keeps them. The task id
- * `DRAFT_THREAD_ID` is a new thread: its first message starts the thread, as on desktop.
- */
 export function AgentTaskScreen() {
   const { t } = useText();
-  // `focusAt` changes when a pinned message of this thread opens again, so the thread goes to it again.
   const { serverId, agentId, taskId, messageId, focusAt } = useLocalSearchParams<{
     serverId: string;
     agentId: string;
@@ -121,9 +125,9 @@ export function AgentTaskScreen() {
   return <TaskNote note={t("mobile.server.threads.notFound")} />;
 }
 
-/** A full screen note with a way back, for a task or an agent that this phone cannot show. */
 function TaskNote({ note, retry }: { note: string; retry?: () => void }) {
   const { t } = useText();
+  const leaveTask = useLeaveChat();
   const foreground = useThemeColor("foreground");
   const insets = useSafeAreaInsets();
   return (
@@ -150,9 +154,6 @@ function TaskNote({ note, retry }: { note: string; retry?: () => void }) {
   );
 }
 
-/**
- * `focusMessageId` opens the thread at a message, after a tap on "Branched from" in a branch of it.
- */
 function AgentTaskChat({
   target,
   taskId,
@@ -163,15 +164,14 @@ function AgentTaskChat({
   focusMessageId: string | null;
 }) {
   const { t, errorMessage } = useText();
+  const leaveTask = useLeaveChat();
   const { serverId, id: agentId } = target;
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();
   const isDraft = taskId === DRAFT_THREAD_ID;
   const threadMenu = useChatThreadMenu(target, taskId);
   const mentionReferences = useAgentMentionReferences(serverId, agentId, taskId);
-  // A deleted thread has no screen: the agent's chat takes its place.
   const threadActions = useThreadActions(target.serverId, onThreadDeleted);
-  // The thread's menu also opens the pinned messages of the agent's chats, on a host with `message-pins-v1`.
   const pins = useMessagePins(serverId, agentId);
   const pinsEnabled = pins.enabled;
   const pinnedMessageIds = useMemo(
@@ -215,7 +215,6 @@ function AgentTaskChat({
     queryFn: () => loadAgentTaskConversation({ agentId, taskId }, serverId),
   });
   const task = list.data?.tasks.find((item) => item.id === taskId);
-  // The reader's membership marks their own messages, which they can delete, and names the other members.
   const memberId = server?.membershipId ?? null;
   const accountUserId = useMobileSession().session?.user.id ?? null;
   const progressUpdates = useProgressUpdates(serverId, serverAgents, agentId);
@@ -238,9 +237,6 @@ function AgentTaskChat({
     activeTurnId,
   });
   const branch = branching.branch;
-  // In a branch, the "Branched from" line follows the copied messages. The list has the current title
-  // of a listed source; an archived one can be missing, so the link's title is the fallback, and a link
-  // with no title is a deleted source. The agent's own chat shows the agent's name, as on desktop.
   const link = task?.branch ?? null;
   const dividerAfterId =
     link && conversation.data ? branchDividerRowId(conversation.data.messages, messages, link.throughMessageId) : null;
@@ -254,30 +250,24 @@ function AgentTaskChat({
     () => (dividerAfterId ? { afterId: dividerAfterId, label: sourceTitle } : null),
     [dividerAfterId, sourceTitle],
   );
-  // Opens the source at the message that the branch came from. A source thread replaces the branch on
-  // the screen, so Back still returns to the agent's chat.
-  const openBranchSource =
-    link && sourceTitle !== null
-      ? () => {
-          if (link.sourceTaskId === null)
-            router.dismissTo({ pathname: "/chat/[agentId]", params: { agentId, messageId: link.sourceMessageId } });
-          else router.setParams<"/task/[taskId]">({ taskId: link.sourceTaskId, messageId: link.sourceMessageId });
-        }
-      : undefined;
-  // The message that the thread opens at, until the list shows it.
+  const openBranchSource = useMemo(
+    () =>
+      link && sourceTitle !== null
+        ? () => {
+            if (link.sourceTaskId === null)
+              router.dismissTo({ pathname: "/chat/[agentId]", params: { agentId, messageId: link.sourceMessageId } });
+            else router.setParams<"/task/[taskId]">({ taskId: link.sourceTaskId, messageId: link.sourceMessageId });
+          }
+        : undefined,
+    [link, sourceTitle, agentId],
+  );
   const [focus, setFocus] = useState(focusMessageId);
-  // The NEW line of this visit, as in the agent's chat. The open thread reads itself, so the line
-  // keeps the first unread message that the thread had when it opened.
   const openingUnread = useThreadOpeningUnread(serverId, agentId, isDraft ? null : taskId);
   const [unreadLine, setUnreadLine] = useState<{ messageId: string | null } | null>(null);
-  // While the server connects or resumes, the host marks are not read yet, and the thread can show
-  // the messages that the phone kept.
   const connecting = Boolean(server?.initialConnectionPending) || (online && server?.state !== "online");
   if (unreadLine === null && openingUnread.firstUnread !== undefined && !connecting && (isDraft || conversation.data))
     setUnreadLine({ messageId: openingUnread.firstUnread });
   const unreadLineMessageId = unreadLine?.messageId ?? null;
-  // The line shows above the first of these messages that has a row. The set stays the same object
-  // while its ids stay, as the list asks: a streamed reply changes the messages on each chunk.
   const lastUnreadLineIds = useRef<ReadonlySet<string> | null>(null);
   const unreadLineMessageIds = useMemo(() => {
     const entries = conversation.data?.messages ?? [];
@@ -291,10 +281,6 @@ function AgentTaskChat({
           );
     return lastUnreadLineIds.current;
   }, [unreadLineMessageId, conversation.data?.messages]);
-  // The thread opens at the NEW line once, after a message that it opens at. A thread that showed
-  // before the line does not move to it later, under the reader. While the marks of this visit load,
-  // the list waits only when the kept marks show the thread as unread, and not while the server
-  // connects or resumes: the thread then shows the messages that the phone kept.
   const [unreadOpening, setUnreadOpening] = useState<"pending" | "done">("pending");
   const opensAtUnread =
     focus === null &&
@@ -305,22 +291,29 @@ function AgentTaskChat({
     setFocus(null);
     setUnreadOpening("done");
   }, []);
-  // As in the agent's chat: the steps row of a finished turn and the activity row open the thinking sheet.
   const turnLines = useTurnStepLines(serverId);
   const lastTurnSummaries = useRef<ReadonlyMap<string, TurnStepsSummary> | undefined>(undefined);
-  const turnSummaries = useMemo(() => {
+  const showThinking = useThinkingDisplayPreference((state) => state.enabled);
+  const allTurnSummaries = useMemo(() => {
     lastTurnSummaries.current = conversation.data
       ? finishedTurnSummaries(conversation.data.messages, activeTurnId, turnLines, lastTurnSummaries.current)
       : undefined;
     return lastTurnSummaries.current;
   }, [conversation.data, activeTurnId, turnLines]);
+  const answerlessSummaries = useMemo(() => answerlessTurnSummaries(allTurnSummaries), [allTurnSummaries]);
+  const turnSummaries = showThinking ? allTurnSummaries : answerlessSummaries;
+  const rowShown = useChatRowShown(turnSummaries);
   const openTurn = useCallback(
     (turnId: string) => router.push({ pathname: "/turn-thinking", params: { agentId, serverId, taskId, turnId } }),
     [agentId, serverId, taskId],
   );
-  // As in the agent's chat: the open question of the running turn has the form; earlier ones show their result.
+  const threadWaits = useThreadWaits(serverId);
   const activePrompt = messages.findLast(
-    (row) => row.kind === "question" && !row.prompt.resolution && activeTurnId !== null && row.turnId === activeTurnId,
+    (row) =>
+      row.kind === "question" &&
+      !row.prompt.resolution &&
+      ((activeTurnId !== null && row.turnId === activeTurnId) ||
+        hostAwaitsQuestion(threadWaits, agentId, row.turnId, row.prompt.requestId)),
   );
   const respond = useCallback(
     (_agentId: string, input: RespondToPromptInput) => respondToTaskPrompt(input, serverId),
@@ -332,17 +325,14 @@ function AgentTaskChat({
     online,
     respond,
   );
-  // The composer answers only after the person chooses it in the form. A private answer has its own field.
   const answersQuestion = Boolean(questionForm.question && !questionForm.question.isSecret && questionForm.replyInChat);
   const threadId = conversation.data?.threadId ?? null;
-  // A draft has no provider thread yet, so it shows no ring.
   const contextMeter = useComposerContextMeter({
     serverId,
     agentId,
     task: { taskId, threadId: isDraft ? null : threadId },
   });
   const browserRequests = useBrowserRequests(serverId);
-  // Only the browser requests of the task's own thread; the agent's chat shows those of its thread.
   const taskBrowserRequests = useMemo(
     () =>
       threadId === null
@@ -351,7 +341,6 @@ function AgentTaskChat({
     [browserRequests, agentId, threadId],
   );
   const waitReason = questionForm.question ? "question" : taskBrowserRequests.length > 0 ? "takeover" : null;
-  // A task turn is not in the agent's live activity, so the row comes from the task.
   const activity = useMemo<MobileAgentActivity | undefined>(
     () =>
       task?.state === "running"
@@ -362,7 +351,6 @@ function AgentTaskChat({
     [task?.state, waitReason, agentId, activeTurnId],
   );
   const serverApprovals = useApprovalRequests(serverId);
-  // Only the approvals of the task's own thread, as the agent's chat shows only its own.
   const approvals = useMemo(
     () =>
       threadId === null
@@ -388,18 +376,11 @@ function AgentTaskChat({
     "accent-foreground",
     "background",
   ]);
-  const [appActive, setAppActive] = useState(AppState.currentState === "active");
-  useEffect(() => {
-    const subscription = AppState.addEventListener("change", (state) => setAppActive(state === "active"));
-    return () => subscription.remove();
-  }, []);
-  // The person sees the thread while its screen is in front, so its dot in the thread menu goes, on
-  // this phone and on the member's other devices.
+  const appActive = useAppActive();
   useMarkThreadRead(
     serverId,
     agentId,
     task ? taskId : null,
-    // The mark waits for the NEW line, which reads the mark that the thread had when it opened.
     isFocused && appActive && conversation.data && unreadLine !== null
       ? (latestReadBoundaryMessage(conversation.data.messages)?.id ?? null)
       : null,
@@ -410,10 +391,7 @@ function AgentTaskChat({
   const [sending, setSending] = useState(false);
   const filesAllowed = canAttachThreadFiles(serverId);
   const attachments = useChatAttachments([], undefined, () => attachmentSupport(serverId));
-  // The card's open progress, shared with the composer, as in the agent's chat.
   const menuProgress = useSharedValue(0);
-  // As in the agent's chat: after the host takes the message, the activity row waits for the turn,
-  // the reply or a failure. Task events can arrive after the read that holds the reply.
   const [awaitingTurn, setAwaitingTurn] = useState(false);
   const ready = isDraft || Boolean(conversation.data);
   const rowsShown = useRowsAfterOpenTransition();
@@ -422,21 +400,17 @@ function AgentTaskChat({
     insets.top + 84,
     keyboardOffset,
     ready && rowsShown,
-    rowsShown && messages.some((row) => row.kind !== "thinking" || turnSummaries?.has(row.id)),
+    rowsShown && messages.some(rowShown),
     lastUserId,
     questionForm.question ? (questionForm.messageId ?? null) : null,
-    // As a chat that opens at a message from search: the list does not take the latest message first.
     focus !== null || opensAtUnread,
   );
-  // A message that the thread shows no row for opens the thread at its latest message.
   const focusMissing = focus !== null && Boolean(conversation.data) && chatRowIndex(messages, focus) < 0;
   useEffect(() => {
     if (!focusMissing) return;
     setFocus(null);
     setUnreadOpening("done");
   }, [focusMissing]);
-  // The list showed without the NEW line, such as at the latest message while the line's message
-  // was not loaded. A line that comes later does not move the list under the reader.
   const shownWithoutFocus = motion.historyVisible && focus === null && !opensAtUnread;
   useEffect(() => {
     if (shownWithoutFocus) setUnreadOpening("done");
@@ -445,7 +419,6 @@ function AgentTaskChat({
   const canSend = online && !closed && (!isDraft || enabled);
   const messageDelete = useMessageDelete(serverId, { kind: "agent", agentId, taskId });
   const removeMessage = messageDelete.deleteMessage;
-  // The host deletes only from an open task. Its thread does not follow the agent's chat events.
   const deleteTaskMessage = useCallback(
     async (message: ChatBubbleMessage) => {
       await removeMessage?.(message.id);
@@ -454,15 +427,16 @@ function AgentTaskChat({
     [removeMessage, queryClient, queryScope, serverId, taskId],
   );
   const deleteMessage = removeMessage && !isDraft && !closed ? deleteTaskMessage : undefined;
-  const voice = useVoiceMode({
+  const dictation = useComposerDictation({
     enabled: isFocused && canSend,
     focused: isFocused,
-    sendable: canSend,
-    onSend: (text) => void send(text),
+    draft,
+    onDraft: setDraft,
   });
-  const voiceOpen = voice.stage !== "closed";
-  // As in the agent's chat: a pull past the latest message opens the agent's info sheet on top of
-  // this thread, unless Settings turns the pull off.
+  const dictating = dictation.active;
+  const composerDictation = useComposerDictationWithSettings(dictation);
+  const mentionSkills = useAgentMentionSkills(agentId, serverId, canSend);
+  const [skillPickerVersion, setSkillPickerVersion] = useState(0);
   const pullOn = useChatPullPreference((state) => state.enabled);
   const openInfo = useCallback(
     () => router.push({ pathname: "/agent-info/[agentId]", params: { agentId, serverId } }),
@@ -470,14 +444,13 @@ function AgentTaskChat({
   );
   const endPull = useChatEndPull({
     motion,
-    enabled: pullOn && !attachments.menuOpen && !voiceOpen,
+    enabled: pullOn && !attachments.menuOpen && !dictating,
     onOpen: openInfo,
   });
-  // As in the agent's chat: a password or a code is typed where the composer is.
   const showBrowserRequests = online && foregroundVisit && isFocused;
-  const secretRequest = showBrowserRequests && !voiceOpen ? taskBrowserRequests.find(asksForSecret) : undefined;
-  // A private answer to a form question is typed there too, never in a second field beside the composer.
-  const secretQuestion = !secretRequest && !voiceOpen && questionForm.question?.isSecret ? questionForm : undefined;
+  const keepsComposer = dictating || attachments.menuOpen;
+  const secretRequest = showBrowserRequests && !keepsComposer ? taskBrowserRequests.find(asksForSecret) : undefined;
+  const secretQuestion = !secretRequest && !keepsComposer && questionForm.question?.isSecret ? questionForm : undefined;
   const dark = useColorScheme() === "dark";
   const palette = useMemo(
     () => voicePalette([avatarHeadColor(target.avatarSeed, target.avatarHue, target.avatarColor)], dark),
@@ -496,15 +469,9 @@ function AgentTaskChat({
     return () => clearTimeout(timer);
   }, [awaitingTurn]);
 
-  /**
-   * As in a chat, the text leaves the composer at once; a failed send puts it back in an empty composer.
-   * The files stay in the composer until the host takes the message, because they upload first.
-   */
   async function send(value: string) {
     const text = value.trim();
     const files = filesAllowed ? attachments.items : [];
-    // The files of a send in progress are still in the composer, so they do not go twice. A second
-    // start of a new thread would make a second thread.
     if ((!text && files.length === 0) || !canSend || (sending && (isDraft || files.length > 0))) return;
     if (files.length > INPUT_LIMITS.attachments) {
       void haptics.notification("error");
@@ -515,35 +482,33 @@ function AgentTaskChat({
     setSendError(null);
     Keyboard.dismiss();
     void haptics.impact();
-    // While the agent asks a question and the person chose to reply here, the text is the answer.
-    // Files still go as a message, as in the agent's chat.
     if (answersQuestion && files.length === 0) {
       if (!questionForm.disabled) questionForm.answer([mentionDraft(text).text]);
       return;
     }
-    /** Uploads the files as drafts, then sends; a failure discards the drafts that uploaded. */
     const withFiles = <R,>(deliver: (attachmentDraftIds: string[]) => Promise<R>) =>
       uploadChatAttachments(files, {
         upload: (file, onProgress) => uploadAttachment(agentId, file, serverId, onProgress),
         discard: (id) => discardAttachment(agentId, id, serverId),
         send: deliver,
       });
-    // A new thread starts with this message, and the screen then shows the thread.
     if (isDraft) {
       setSending(true);
+      const start = taskStartId(
+        serverId,
+        agentId,
+        text,
+        files.map((file) => file.id),
+      );
       try {
         const started = await withFiles((attachmentDraftIds) =>
-          startAgentTask({ agentId, text, attachmentDraftIds, clientMessageId: Crypto.randomUUID() }, serverId),
+          startAgentTask({ agentId, text, attachmentDraftIds, clientMessageId: start.id }, serverId),
         );
         attachments.clear();
-        // The thread shows in the menu before its list event arrives.
-        queryClient.setQueryData<AgentTasksSnapshot>(queryKeys.agentTasks(queryScope, serverId, agentId), (stored) =>
-          stored && !stored.tasks.some((entry) => entry.id === started.id)
-            ? { ...stored, tasks: [started, ...stored.tasks] }
-            : stored,
-        );
+        addStartedTask(queryClient, queryScope, serverId, started);
         router.setParams<"/task/[taskId]">({ taskId: started.id });
       } catch (error) {
+        start.failed();
         void haptics.notification("error");
         setDraft((current) => (current.trim() ? current : value));
         setSendError(errorMessage(error, t("mobile.server.threads.error.start")));
@@ -551,22 +516,19 @@ function AgentTaskChat({
       }
       return;
     }
-    // As in the agent's chat: a message to an idle task moves to the top of the chat when its row
-    // shows. A running task takes the message into its turn or its queue, so the list only goes to the end.
     const startsTurn = activeTurnId === null;
     if (startsTurn && ready) motion.beginSend();
     else motion.scrollToLatest();
     setSending(true);
+    const message = taskMessageId([serverId, agentId, taskId, text, files.map((file) => file.id)]);
     try {
       await withFiles((attachmentDraftIds) =>
-        sendAgentTaskMessage(
-          { agentId, taskId, text, attachmentDraftIds, clientMessageId: Crypto.randomUUID() },
-          serverId,
-        ),
+        sendAgentTaskMessage({ agentId, taskId, text, attachmentDraftIds, clientMessageId: message.id }, serverId),
       );
       attachments.clear();
       if (startsTurn) setAwaitingTurn(true);
     } catch (error) {
+      message.failed();
       motion.cancelSend();
       void haptics.notification("error");
       setDraft((current) => (current.trim() ? current : value));
@@ -576,72 +538,101 @@ function AgentTaskChat({
     }
   }
 
+  const respondToListApproval = useCallback(
+    (approval: PendingApproval, decision: ApprovalDecision) =>
+      respondToApproval(serverId, { requestId: approval.requestId, decision }),
+    [respondToApproval, serverId],
+  );
+  const loadWholeListApproval = useCallback(
+    (approval: PendingApproval) => readWholeApproval(serverId, approval),
+    [readWholeApproval, serverId],
+  );
+  const branchMessage = useMemo(
+    () => (branch ? (message: ChatBubbleMessage) => void branch(message.id) : undefined),
+    [branch],
+  );
+  const setPinned = pins.setPinned;
+  const togglePinMessage = useMemo(
+    () =>
+      pinsEnabled && !isDraft
+        ? (message: ChatBubbleMessage, pinned: boolean) => setPinned(taskId, message.id, pinned)
+        : undefined,
+    [pinsEnabled, isDraft, setPinned, taskId],
+  );
+  const refetchConversation = conversation.refetch;
+  const retryHistory = useCallback(() => void refetchConversation(), [refetchConversation]);
+  const listLimit = list.data?.limit ?? 1;
+  const taskNotes = useMemo(() => {
+    const hold = task ? agentTaskHoldText(task, listLimit, t) : null;
+    return isDraft ? (
+      <Typography.Paragraph type="body-xs" align="center" className="px-6 pb-3 text-text-secondary">
+        {t("mobile.chat.threads.draftNote", { name: target.name })}
+      </Typography.Paragraph>
+    ) : task ? (
+      <View className="gap-3 pb-3">
+        {hold ? (
+          <Typography.Paragraph type="body-xs" className="px-1 text-text-secondary">
+            {hold}
+          </Typography.Paragraph>
+        ) : null}
+        {task.queuedMessages.length > 0 ? (
+          <View className="gap-2">
+            <Typography.Paragraph type="body-xs" weight="semibold" className="px-1 text-text-secondary">
+              {t("mobile.server.threads.queued")}
+            </Typography.Paragraph>
+            {task.queuedMessages.map((queued) => (
+              <View
+                key={queued.deliveryId}
+                className="max-w-[92%] self-end rounded-[30px] bg-control/40 px-4 py-3"
+                style={{ borderCurve: "circular" }}
+              >
+                <Typography.Paragraph numberOfLines={3} className="text-text-secondary">
+                  {queued.text}
+                </Typography.Paragraph>
+              </View>
+            ))}
+          </View>
+        ) : null}
+        {task.state === "idle" && task.outcome === "failed" ? (
+          <View accessibilityRole="alert" className="gap-1 px-1">
+            <Typography.Paragraph weight="medium" className="text-danger-text">
+              {t("mobile.server.threads.failedTitle")}
+            </Typography.Paragraph>
+            <Typography.Paragraph type="body-xs" className="text-danger-text">
+              {task.error?.trim()
+                ? errorMessage(task.error, t("mobile.chat.failure.fallback"))
+                : t("mobile.server.threads.failedBody")}
+            </Typography.Paragraph>
+          </View>
+        ) : null}
+      </View>
+    ) : null;
+  }, [isDraft, task, listLimit, t, errorMessage, target.name]);
+
+  const { menu: threadMenuActions, run: runThreadAction } = threadActions;
+  const actionsMenu = useMemo(() => {
+    if (!task) return null;
+    const pinsAction: MenuAction = { id: PINS_ACTION, title: t("mobile.chat.pins.title"), image: "pin" };
+    return {
+      label: t("mobile.server.threads.actions"),
+      actions: pinsEnabled && !isDraft ? [...threadMenuActions(task), pinsAction] : threadMenuActions(task),
+      onPressAction: (id: string) => {
+        if (id !== PINS_ACTION) {
+          runThreadAction(task, id);
+          return;
+        }
+        void haptics.impact("soft");
+        router.push({ pathname: "/pinned-messages", params: { agentId, serverId, taskId } });
+      },
+    };
+  }, [task, t, pinsEnabled, isDraft, threadMenuActions, runThreadAction, agentId, serverId, taskId]);
+
   if (!task && !isDraft) {
     if (list.isError)
       return <TaskNote note={t("mobile.server.threads.loadFailed")} retry={() => void list.refetch()} />;
     if (!enabled || list.data)
       return <TaskNote note={t(enabled ? "mobile.server.threads.notFound" : "mobile.server.threads.offline")} />;
   }
-
-  const hold = task ? agentTaskHoldText(task, list.data?.limit ?? 1, t) : null;
-  const pinsAction: MenuAction = { id: PINS_ACTION, title: t("mobile.chat.pins.title"), image: "pin" };
-  const actionsMenu = task
-    ? {
-        label: t("mobile.server.threads.actions"),
-        actions: pinsEnabled && !isDraft ? [...threadActions.menu(task), pinsAction] : threadActions.menu(task),
-        onPressAction: (id: string) => {
-          if (id !== PINS_ACTION) {
-            threadActions.run(task, id);
-            return;
-          }
-          void haptics.impact("soft");
-          router.push({ pathname: "/pinned-messages", params: { agentId, serverId, taskId } });
-        },
-      }
-    : null;
-
-  // Under the activity, as the desktop task panel: why the task waits, its queued messages and its failure.
-  const taskNotes = isDraft ? (
-    <Typography.Paragraph type="body-xs" align="center" className="px-6 pb-3 text-text-secondary">
-      {t("mobile.chat.threads.draftNote", { name: target.name })}
-    </Typography.Paragraph>
-  ) : task ? (
-    <View className="gap-3 pb-3">
-      {hold ? (
-        <Typography.Paragraph type="body-xs" className="px-1 text-text-secondary">
-          {hold}
-        </Typography.Paragraph>
-      ) : null}
-      {task.queuedMessages.length > 0 ? (
-        <View className="gap-2">
-          <Typography.Paragraph type="body-xs" weight="semibold" className="px-1 text-text-secondary">
-            {t("mobile.server.threads.queued")}
-          </Typography.Paragraph>
-          {task.queuedMessages.map((queued) => (
-            <View
-              key={queued.deliveryId}
-              className="max-w-[92%] self-end rounded-[30px] bg-control/40 px-4 py-3"
-              style={{ borderCurve: "circular" }}
-            >
-              <Typography.Paragraph numberOfLines={3} className="text-text-secondary">
-                {queued.text}
-              </Typography.Paragraph>
-            </View>
-          ))}
-        </View>
-      ) : null}
-      {task.state === "idle" && task.outcome === "failed" ? (
-        <View accessibilityRole="alert" className="gap-1 px-1">
-          <Typography.Paragraph weight="medium" className="text-danger-text">
-            {t("mobile.server.threads.failedTitle")}
-          </Typography.Paragraph>
-          <Typography.Paragraph type="body-xs" className="text-danger-text">
-            {task.error || t("mobile.server.threads.failedBody")}
-          </Typography.Paragraph>
-        </View>
-      ) : null}
-    </View>
-  ) : null;
 
   return (
     <View className="flex-1" style={{ backgroundColor: background }}>
@@ -662,15 +653,14 @@ function AgentTaskChat({
           liquidGlassAvailable={liquidGlassAvailable}
           topInset={insets.top}
           onBack={leaveTask}
-          accessibilityHidden={voiceOpen}
         />
         <ChatMessageList
+          bubbleSurface={String(background)}
           pullGesture={endPull.gesture}
           pullShift={endPull.shift}
           agents={serverAgents}
           rowsShown={rowsShown}
           target={target}
-          accessibilityHidden={voiceOpen}
           motion={motion}
           sending={sending}
           awaitingTurn={awaitingTurn}
@@ -691,16 +681,14 @@ function AgentTaskChat({
           }
           appActive={appActive}
           activeTurnId={activeTurnId}
-          questionForm={questionForm}
+          questionForm={questionForm.messageId ? questionForm : undefined}
           activityAccessory={taskNotes}
           approvals={approvals}
           browserRequests={taskBrowserRequests}
           serverName={server?.name ?? ""}
-          onRespondApproval={(approval, decision) =>
-            respondToApproval(serverId, { requestId: approval.requestId, decision })
-          }
+          onRespondApproval={respondToListApproval}
           readsWholeApprovals={readsWholeApprovals(serverId)}
-          onLoadWholeApproval={(approval) => readWholeApproval(serverId, approval)}
+          onLoadWholeApproval={loadWholeListApproval}
           foreground={foreground}
           messages={messages}
           turnSummaries={turnSummaries}
@@ -710,43 +698,26 @@ function AgentTaskChat({
           hasOlder={false}
           olderLoading={false}
           olderError={false}
-          onLoadOlder={() => {}}
-          onBranch={branch ? (message) => void branch(message.id) : undefined}
+          onLoadOlder={NO_OLDER}
+          onBranch={branchMessage}
           onDeleteMessage={deleteMessage}
           deletesAnyMessage={messageDelete.deletesAny}
-          onTogglePin={
-            pinsEnabled && !isDraft ? (message, pinned) => pins.setPinned(taskId, message.id, pinned) : undefined
-          }
+          onTogglePin={togglePinMessage}
           pinnedMessageIds={pinnedMessageIds}
           branchPoints={branching.branchPoints}
           branchDivider={branchDivider}
           onOpenBranchSource={openBranchSource}
           unreadLineMessageIds={unreadLineMessageIds}
-          // The NEW line waits for its message, as in the agent's chat.
           focusMessageId={focus ?? (opensAtUnread && unreadLineMessageIds ? unreadLineMessageId : null)}
           focusUnread={focus === null && opensAtUnread}
           onFocusPlaced={clearFocus}
           muted={muted}
           showStarter={false}
           topInset={insets.top}
-          onRetryHistory={() => void conversation.refetch()}
+          onRetryHistory={retryHistory}
         />
-        {voiceOpen ? (
-          <VoiceOverlay
-            voice={voice}
-            hint={voice.phase === "listening" ? t("mobile.chat.voice.listening") : ""}
-            reply={null}
-            muted={muted}
-            topInset={insets.top}
-            controlsHeight={Math.max(insets.bottom, 10) + VOICE_BUTTON_SIZE + 48}
-            reducedTransparency={reducedTransparency}
-          />
-        ) : null}
         <Animated.View
-          style={[
-            { position: "absolute", left: 0, right: 0, bottom: 0, zIndex: voiceOpen ? 31 : undefined },
-            motion.composerStyle,
-          ]}
+          style={[{ position: "absolute", left: 0, right: 0, bottom: 0 }, motion.composerStyle]}
           pointerEvents="box-none"
           onLayout={motion.onComposerLayout}
         >
@@ -786,7 +757,6 @@ function AgentTaskChat({
             </Typography.Paragraph>
           ) : null}
           {closed ? (
-            // A closed task takes no messages. Reopen in the header menu takes it back.
             <Typography.Paragraph
               type="body-xs"
               align="center"
@@ -832,6 +802,8 @@ function AgentTaskChat({
               onCancelReply={() => {}}
               mentionAgents={serverAgents.filter((item) => item.id !== agentId)}
               mentionReferences={mentionReferences}
+              mentionSkills={mentionSkills}
+              skillPickerVersion={skillPickerVersion}
               action={action}
               actionForeground={actionForeground}
               agentName={target.name}
@@ -862,14 +834,13 @@ function AgentTaskChat({
               onStop={task?.state === "running" && !answersQuestion ? () => threadActions.run(task, "stop") : undefined}
               stopping={task ? threadActions.acting(task) : false}
               keyboardProgress={motion.keyboardProgress}
-              voice={dictationVoice(voice, t)}
+              dictation={composerDictation}
               voiceAccent={accent}
               contextMeter={contextMeter}
             />
           )}
         </Animated.View>
       </KeyboardGestureArea>
-      {/* As in the agent's chat: the card stays while a system prompt holds the foreground. */}
       {filesAllowed && attachments.menuAnchor && isFocused ? (
         <ChatAttachmentPanel
           anchor={attachments.menuAnchor}
@@ -882,6 +853,7 @@ function AgentTaskChat({
           keyboardOffset={keyboardOffset}
           liquidGlassAvailable={liquidGlassAvailable}
           onClose={attachments.closeMenu}
+          onUseSkill={mentionSkills.length ? () => setSkillPickerVersion((version) => version + 1) : undefined}
           progress={menuProgress}
         />
       ) : null}

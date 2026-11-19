@@ -1,5 +1,3 @@
-/** The sidebar's agent, channel and section confirmations share one pending delete state. */
-
 import { ConfirmDialog } from "@openbot/ui";
 import { Show } from "solid-js";
 import { useText } from "../../text";
@@ -29,7 +27,6 @@ export function SidebarDialogs() {
     },
     onCancel: closeDelete,
   };
-  // Each dialog unmounts with its target, so its text never shows an empty name while it closes.
   return (
     <>
       <Show when={deleteTarget()}>

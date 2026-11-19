@@ -10,11 +10,12 @@ on:
 permissions:
   contents: read
 
-# A new PR push cancels the old run. On main, each commit gets its own complete run: merges come
-# faster than one run takes, and a shared group cancelled almost every main run and its deploy.
+# A new PR push cancels the old run. On main, a run always completes, and only the newest commit
+# waits for it: GitHub cancels an older waiting run. Merges come faster than one run takes, so each
+# run tests all the commits merged since the last run, and runner use does not grow with each merge.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event_name == 'push' && github.sha || github.ref }}
-  cancel-in-progress: ${{ github.event_name != 'push' }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   GIT_CONFIG_COUNT: 1
@@ -42,6 +43,7 @@ jobs:
       api: ${{ steps.lanes.outputs.api }}
       remote: ${{ steps.lanes.outputs.remote }}
       storybook: ${{ steps.lanes.outputs.storybook }}
+      schema: ${{ steps.lanes.outputs.schema }}
       surfaces: ${{ steps.lanes.outputs.surfaces }}
     steps:
       - name: Check out repository
@@ -97,6 +99,7 @@ jobs:
           lane api '^(apps/(auth-api|site-router)|src/renderer|resources)/|^(apps/mobile/)?CHANGELOG\.md$'
           lane remote '^(remote|scripts)/'
           lane storybook '^(src|apps/(auth-api|status)|\.storybook|resources|marketplace|build)/'
+          lane schema '^(src/backend/|scripts/released-schema-fixtures\.ts$)'
           lane surfaces '^(apps/(mobile|mobile-updates|site-router|status)|remote|scripts)/'
           cat "$GITHUB_OUTPUT"
 
@@ -139,6 +142,12 @@ jobs:
         if: env.CODE == 'true'
         run: bun run check:desktop:static
 
+      # Not in the parallel group: it fetches a release tag into the shallow clone, and a parallel
+      # `git fetch` (released database schemas) then fails on `.git/shallow.lock`.
+      - name: Check frozen migrations
+        if: env.CODE == 'true'
+        run: bun run check:migrations
+
       - parallel:
           - name: Check translation catalogs
             if: env.CODE == 'true'
@@ -155,6 +164,19 @@ jobs:
           - name: Check translated What's new notes
             if: env.CODE == 'true'
             run: bun scripts/whats-new-translations.ts
+
+          - name: Check minimum app versions
+            if: env.CODE == 'true'
+            run: bun run check:app-minimum-version
+
+          # Fails after a release that changed the database schema until `releases.json` has it. It
+          # takes about 50 s, so it runs only when the database code changes: a new migration must be
+          # tested from every released schema. `git archive` needs only the tag commits.
+          - name: Check released database schemas
+            if: needs.detect.result != 'success' || needs.detect.outputs.schema == 'true'
+            run: |
+              git fetch --no-tags --depth=1 origin '+refs/tags/v*:refs/tags/v*'
+              bun scripts/released-schema-fixtures.ts --check
 
   browser:
     # The smoke test starts the real Electron binary and opens windows, so it
@@ -308,6 +330,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:crm-team-api
 
+      - name: Run the release version comparator E2E test
+        if: ${{ !cancelled() }}
+        run: bun scripts/release-version-comparator-e2e.ts
+
       - name: Upload the Team API routes E2E report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -316,6 +342,7 @@ jobs:
           path: |
             .openbot-build/team-api-routes-e2e/
             .openbot-build/crm-team-api-e2e/
+            .openbot-build/release-version-comparator-e2e.json
           if-no-files-found: ignore
 
   reverse-actions-e2e:
@@ -340,6 +367,21 @@ jobs:
       - name: Run the Team API legacy clients E2E test
         if: ${{ !cancelled() }}
         run: bun run test:team-legacy-clients
+
+      - name: Run the Team API protocol 10 E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:team-protocol-v10
+
+      - name: Run the Team WebRTC wire parity E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:team-webrtc-wire-parity
+
+      - name: Run the remote viewer proxy E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:remote-viewer-proxy
+      - name: Run the server safe mode E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:server-safe-mode
 
       - name: Run the Team session revoke and reconnect E2E test
         if: ${{ !cancelled() }}
@@ -400,6 +442,14 @@ jobs:
       - name: Run the agent hide and restore E2E test
         if: ${{ !cancelled() }}
         run: bun run test:agent-hide-restore
+
+      - name: Run the agent create retry E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:agent-create-retry
+
+      - name: Run the update host takeover E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:update-host-takeover
 
       - name: Run the messaging pause and resume E2E test
         if: ${{ !cancelled() }}
@@ -740,6 +790,10 @@ jobs:
           name: reverse-actions-e2e
           path: |
             .openbot-build/team-api-legacy-clients-e2e/
+            .openbot-build/team-protocol-v10-e2e/
+            .openbot-build/team-webrtc-wire-parity-e2e/
+            .openbot-build/remote-viewer-proxy-e2e/
+            .openbot-build/server-safe-mode-e2e/
             .openbot-build/team-session-revoke-e2e/
             .openbot-build/sign-in-relay-paste-e2e/
             .openbot-build/sign-in-relay-replay-e2e/
@@ -755,6 +809,8 @@ jobs:
             .openbot-build/routine-overnight-window-e2e/
             .openbot-build/agent-waits-tools-e2e/
             .openbot-build/agent-hide-restore-e2e/
+            .openbot-build/agent-create-retry-e2e/
+            .openbot-build/update-host-takeover-e2e/
             .openbot-build/messaging-pause-resume-e2e/
             .openbot-build/messaging-discord-access-e2e/
             .openbot-build/messaging-discord-embeds-e2e/
@@ -905,6 +961,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:agent-database-host-start
 
+      - name: Run the versioned JSON stores E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:versioned-json-stores
+
       - name: Run the ACP instructions once E2E test
         if: ${{ !cancelled() }}
         run: bun run test:acp-instructions-once
@@ -989,6 +1049,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:cline-free-models
 
+      - name: Run the Cline plan limit failover E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:cline-plan-limit-failover
+
       - name: Run the recorded provider transcripts E2E test
         if: ${{ !cancelled() }}
         run: bun run test:provider-transcript-replay
@@ -1012,6 +1076,7 @@ jobs:
             .openbot-build/copilot-mcp-relay-e2e/
             .openbot-build/acp-turn-stall-e2e/
             .openbot-build/agent-database-host-start-e2e/
+            .openbot-build/versioned-json-stores-e2e/
             .openbot-build/acp-instructions-once-e2e/
             .openbot-build/acp-audio-input-e2e/
             .openbot-build/antigravity-steer-e2e/
@@ -1033,6 +1098,7 @@ jobs:
             .openbot-build/cursor-stream-closed-e2e/
             .openbot-build/cursor-model-set-e2e/
             .openbot-build/cline-free-models-e2e/
+            .openbot-build/cline-plan-limit-failover-e2e/
             .openbot-build/provider-transcript-replay-e2e/
           if-no-files-found: ignore
 

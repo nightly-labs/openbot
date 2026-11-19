@@ -25,6 +25,7 @@ import { listenLoopback } from "./listen-loopback";
 import { RemoteDesktopOperationError } from "./remote-desktop-effects";
 import { remoteDesktopPasteScript } from "./remote-desktop-paste";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
+import { remoteDesktopStreamWatchScript } from "./remote-desktop-stream-watch";
 import { RemoteWorkflowError, remoteCall } from "./remote-service-effects";
 import {
   RemoteRuntimeStartError,
@@ -43,10 +44,7 @@ const MAX_PENDING_STREAM_FRAMES = 32;
 const MAX_PENDING_STREAM_BYTES = 1_048_576;
 const MAX_TIMER_DELAY_MS = 2_147_000_000;
 const MAX_CLIPBOARD_BYTES = 1_048_576;
-/** The member of the loopback test session that the host owner starts in Settings on this computer. */
 export const LOCAL_TEST_MEMBER_ID = "local-setup";
-// Served here, not by Moonlight. They sit under `moonlight/` because the released Team API adapters
-// forward only the viewer routes of that family.
 const PASTE_SCRIPT_PATH = "/openbot-paste.js";
 const CLIPBOARD_PATH = "/openbot-clipboard";
 const RUNTIME_START_FAILURE = {
@@ -72,7 +70,6 @@ export type RemoteScreenGatewayCreateRuntime = (
 
 interface RemoteScreenGatewayOptions {
   platform: "darwin" | "win32" | "linux";
-  // Read for a Linux host only. Defaults to the environment of this process.
   sessionEnvironment?: Readonly<Record<string, string | undefined>>;
   unattended: boolean;
   runtimePaths: RemoteDesktopRuntimePaths | null;
@@ -80,22 +77,14 @@ interface RemoteScreenGatewayOptions {
   getRuntimeCredentials: () => Effect.Effect<{ username: string; password: string }, RemoteWorkflowError>;
   getDisplays?: (() => RemoteDesktopDisplay[]) | undefined;
   getDisplayScreenOrigin?: ((displayId: string) => { x: number; y: number } | undefined) | undefined;
-  // Read for a Windows host only: true when this computer's session has no screen to capture.
   sessionDisconnected?: (() => boolean) | undefined;
   getIceServers: () => Effect.Effect<RemoteDesktopIceServer[], RemoteWorkflowError>;
   createRuntime?: RemoteScreenGatewayCreateRuntime;
   audit?: (event: RemoteScreenAuditEvent) => void;
   now?: () => number;
   onDiagnostic?: (source: "sunshine" | "moonlight", message: string) => void;
-  // Puts a member's pasted text on the host's clipboard. Without it, a paste in the viewer pastes
-  // the host's own clipboard.
   writeClipboard?: (text: string) => void;
-  // Called only when the answer changes, so the host owner's screen can show the one refusal a
-  // member cannot act on themselves -- and stop showing it once a member gets through.
   onScreenRecordingDenied?: (denied: boolean) => void;
-  // Runs before a member's session starts, and fails to refuse it, such as when the person at this
-  // computer does not allow it. The loopback test session of the host owner skips it. The gateway
-  // stops the wait when the request closes, the member's team session ends, or the host stops.
   confirmSession?: (memberId: string) => Effect.Effect<void, RemoteWorkflowError>;
 }
 
@@ -103,7 +92,6 @@ export interface RemoteScreenRuntime {
   start: SunshineMoonlightRuntime["start"];
   selectDisplay: SunshineMoonlightRuntime["selectDisplay"];
   stop: SunshineMoonlightRuntime["stop"];
-  // Optional: only the real runtime reads the operating system's answer.
   screenCaptureDenied?(): boolean;
   checkSetup?: SunshineMoonlightRuntime["checkSetup"];
   test?: SunshineMoonlightRuntime["test"];
@@ -162,12 +150,7 @@ export class RemoteScreenGateway {
   readonly #localTestServers = new Map<string, Server>();
   readonly #sessions = new Map<string, ManagedRemoteScreenSession>();
   readonly #pendingStreamStarts: Array<{ sessionId: string; start: () => void }> = [];
-  // The session requests that wait for `confirmSession`. Aborting one refuses it.
   readonly #pendingConfirmations = new Map<AbortController, { memberId: string; teamSessionId: string }>();
-  /**
-   * The requests between the question and their session. The runtime can take seconds to start
-   * after Allow, and a revoke or Stop all in that time must refuse the session that comes after it.
-   */
   readonly #requestsAfterQuestion = new Set<{ memberId: string; teamSessionId: string; refused: boolean }>();
   readonly #layer: Layer.Layer<ScreenDependencies>;
   #scope = Scope.makeUnsafe();
@@ -183,8 +166,6 @@ export class RemoteScreenGateway {
   #testSessionId: string | null = null;
   #selectedDisplayId: string | null = null;
   #displaySwitching = false;
-  // Sticky, unlike the runtime's own answer: the refusal below drops the runtime that reported it, so
-  // nothing would be left to ask by the time the host owner looks.
   #screenRecordingDenied = false;
   #activeStreamStart: { sessionId: string; timeout: ReturnType<typeof setTimeout> } | null = null;
   #linuxWithoutX11: boolean;
@@ -202,20 +183,9 @@ export class RemoteScreenGateway {
     this.#selectedDisplayId = displays.find((display) => display.primary)?.id ?? displays[0]?.id ?? null;
   }
 
-  // Whether the last attempt to start a stream was refused screen recording by the operating system.
   screenRecordingDenied(): boolean {
     return this.#screenRecordingDenied;
   }
-
-  /**
-   * Reads the operating system's answer again, without opening a session.
-   *
-   * The refusal is sticky because the runtime that reported it is dropped, so a member's attempt was
-   * the only thing that could clear it. That is the wrong computer: the grant is given here, and the
-   * host owner who gives it has to be able to see it take effect. Starting the runtime is the answer
-   * itself -- Sunshine reads the grant when it starts -- so this leaves the host as it found it, and
-   * a runtime a live session owns is asked rather than replaced.
-   */
 
   readonly recheckScreenRecording = Effect.fn("RemoteScreenGateway.recheckScreenRecording")(
     function* (this: RemoteScreenGateway): Effect.fn.Return<boolean, RemoteWorkflowError> {
@@ -383,7 +353,6 @@ export class RemoteScreenGateway {
         }).pipe(Effect.result);
         if (Result.isFailure(attempt2)) {
           const error = attempt2.failure.cause;
-          // The request can fail after the panel opened. Keep input contained until cleanup succeeds.
           yield* (this.#runtime?.test?.("stop") ?? Effect.succeed(undefined))
             .pipe(Effect.mapError(({ cause }: RemoteDesktopOperationError) => new RemoteWorkflowError({ cause })))
             .pipe(
@@ -550,7 +519,6 @@ export class RemoteScreenGateway {
         cause: new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.runtimeMissing")),
       });
     }
-    // Sunshine runs in this session. Without this, the stream fails with only a capture error.
     if (this.#options.platform === "win32" && this.#options.sessionDisconnected?.()) {
       return yield* new RemoteWorkflowError({
         cause: new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.windowsSessionDisconnected")),
@@ -560,15 +528,11 @@ export class RemoteScreenGateway {
       return yield* new RemoteWorkflowError({
         cause: new RemoteScreenError(409, "session_capacity_reached", sourceText("error.remote.testActive")),
       });
-    // After the checks that need no answer, so the person at this computer is not asked about a
-    // request that fails anyway.
     const starting = { memberId: input.memberId, teamSessionId: input.teamSessionId, refused: false };
     this.#requestsAfterQuestion.add(starting);
     yield* this.#confirm(input).pipe(
       Effect.andThen(
         this.#ensureRuntime().pipe(
-          // `mapError` does not see a defect, such as a cleanup step that fails during the start. Without
-          // this, the member gets a 500 with no reason, and the host diagnostics get nothing.
           Effect.catchDefect((defect) => Effect.fail(new RemoteWorkflowError({ cause: defect }))),
           Effect.mapError(({ cause }) => new RemoteWorkflowError({ cause: this.#runtimeStartRefusal(cause) })),
         ),
@@ -580,12 +544,7 @@ export class RemoteScreenGateway {
       return yield* new RemoteWorkflowError({
         cause: new RemoteScreenError(409, "session_capacity_reached", sourceText("error.remote.testActive")),
       });
-    // The runtime starts and answers either way, so this is the only place the refusal can become a
-    // failure the member sees. Without it the session is created, the stream never starts, and the
-    // viewer sits at "connecting" until the member gives up.
     if (this.#runtime?.screenCaptureDenied?.()) {
-      // The createSession lease releases an idle runtime after pending creates settle, so a new
-      // grant is read by the next process without stopping an existing member's session.
       this.#reportScreenRecordingDenied(true);
       return yield* new RemoteWorkflowError({
         cause: new RemoteScreenError(
@@ -676,7 +635,6 @@ export class RemoteScreenGateway {
     for (const starting of this.#requestsAfterQuestion) if (matches(starting)) starting.refused = true;
   }
 
-  /** Ends every session, the host owner's test included, and refuses each request that waits for an answer. */
   readonly closeAllSessions = Effect.fn("RemoteScreenGateway.closeAllSessions")(
     function* (this: RemoteScreenGateway): Effect.fn.Return<void, RemoteWorkflowError> {
       this.#abortConfirmations(() => true);
@@ -911,7 +869,8 @@ export class RemoteScreenGateway {
       };
       client.once("close", close);
       upstream.once("close", close);
-      upstream.once("error", () => client.close(1011, "Moonlight stream failed"));
+      client.on("error", () => client.close(1011, "Moonlight stream failed"));
+      upstream.on("error", () => client.close(1011, "Moonlight stream failed"));
     });
   }
 
@@ -990,7 +949,6 @@ export class RemoteScreenGateway {
     if (this.#stopping) return yield* Deferred.await(this.#stopping);
     const stopped = Deferred.makeUnsafe<void, RemoteWorkflowError>();
     this.#stopping = stopped;
-    // A request that waits for an answer is an operation below, so it must end first.
     this.#abortConfirmations(() => true);
     return yield* Effect.gen({ self: this }, function* () {
       yield* this.#stopSessions();
@@ -1057,8 +1015,6 @@ export class RemoteScreenGateway {
     next.start();
   }
 
-  // Both halves together, always: a cleared `#runtimeState` beside a live `#runtime` is what latched
-  // the screen capture refusal past the grant that fixed it.
   readonly #stopRuntime = Effect.fn("RemoteScreenGateway.stopRuntime")(function* (this: RemoteScreenGateway) {
     if (this.#runtimeStopping) return yield* Fiber.join(this.#runtimeStopping);
     const runtime = this.#runtime;
@@ -1113,8 +1069,6 @@ export class RemoteScreenGateway {
         getDisplayScreenOrigin: this.#options.getDisplayScreenOrigin,
         getIceServers: () =>
           Effect.gen({ self: this }, function* () {
-            // Loopback tests need no account or Signal service. Keep remote ICE configuration
-            // whenever a remote session shares this runtime.
             if (this.#sessions.size > 0 && [...this.#sessions.keys()].every((id) => this.#localTestServers.has(id)))
               return [];
             return yield* dependencies.iceServers();
@@ -1134,8 +1088,6 @@ export class RemoteScreenGateway {
     return this.#runtimeState;
   });
 
-  // A start failure is the host's answer to the member, so it names the part that failed. The cause
-  // can hold local paths and ports, so it goes to the host's diagnostics only.
   #runtimeStartRefusal(error: unknown): RemoteScreenError {
     if (error instanceof RemoteScreenError) return error;
     const stage = error instanceof RemoteRuntimeStartError ? error.stage : null;
@@ -1151,8 +1103,6 @@ export class RemoteScreenGateway {
     );
   }
 
-  // The runtime's processes are gone, so no session it served can stream again. End them and stop
-  // what is left of it; the next session starts a new runtime, and a start that fails names its reason.
   readonly #runtimeExited = Effect.fn("RemoteScreenGateway.runtimeExited")(function* (this: RemoteScreenGateway) {
     yield* Effect.all(
       [...this.#sessions.keys()].map((id) => this.closeSession(id, "connection_failed")),
@@ -1189,8 +1139,6 @@ export class RemoteScreenGateway {
     }
     const writeClipboard = this.#options.writeClipboard;
     if (writeClipboard && upstreamPath === CLIPBOARD_PATH && request.method === "POST") {
-      // The viewer cookie can be SameSite=None, and a text POST needs no preflight. Only the viewer
-      // page itself may write the host's clipboard.
       const site = request.headers["sec-fetch-site"];
       if (site !== undefined && site !== "same-origin") return sendText(response, 403, "Paste is not allowed.");
       const body = yield* remoteCall(() => readBodyWithin(request, MAX_CLIPBOARD_BYTES));
@@ -1200,13 +1148,15 @@ export class RemoteScreenGateway {
       response.end();
       return;
     }
-    if (writeClipboard && upstreamPath === PASTE_SCRIPT_PATH) {
+    if (upstreamPath === PASTE_SCRIPT_PATH) {
       response.writeHead(200, { "Content-Type": "text/javascript", "Cache-Control": "no-store" });
-      response.end(remoteDesktopPasteScript(this.#options.platform));
+      response.end(
+        remoteDesktopStreamWatchScript(session.snapshot.serverId) +
+          (writeClipboard ? remoteDesktopPasteScript(this.#options.platform) : ""),
+      );
       return;
     }
-    // The viewer page loads the paste script before Moonlight's own, so its listeners run first.
-    const addPasteScript = writeClipboard !== undefined && upstreamPath === "/stream.html" && request.method === "GET";
+    const addViewerScript = upstreamPath === "/stream.html" && request.method === "GET";
     const target = new URL(`${upstreamPath}${search}`, this.#runtimeState.baseUrl);
     const authHeader = this.#runtimeState.authHeader;
     yield* Effect.callback<void>((resume) => {
@@ -1224,7 +1174,7 @@ export class RemoteScreenGateway {
         (upstreamResponse) => {
           const headers = { ...upstreamResponse.headers };
           delete headers["set-cookie"];
-          if (addPasteScript && upstreamResponse.statusCode === 200 && !headers["content-encoding"]) {
+          if (addViewerScript && upstreamResponse.statusCode === 200 && !headers["content-encoding"]) {
             const chunks: Buffer[] = [];
             upstreamResponse.on("data", (chunk: Buffer) => chunks.push(chunk));
             upstreamResponse.once("end", () => {
@@ -1323,20 +1273,13 @@ export interface RemoteScreenSessionRequest {
   teamSessionId: string;
   teamSessionExpiresAt: string;
   publicHttpBaseUrl: string;
-  /** Aborted when the request that asked for the session closes. */
   signal?: AbortSignal;
 }
 
-/**
- * The refusal of a session that the person at this computer did not allow. It has no code: each
- * released Team API protocol reads only its own closed list of codes, so an older client shows the
- * message as it shows any failed request.
- */
 export function remoteControlDeclined(): HttpError {
   return new HttpError(403, sourceText("error.remote.controlDeclined"));
 }
 
-/** Fails with `remoteControlDeclined` when the signal aborts. */
 function untilAborted(signal: AbortSignal): Effect.Effect<never, RemoteWorkflowError> {
   return Effect.callback<never, RemoteWorkflowError>((resume) => {
     const abort = () => resume(Effect.fail(new RemoteWorkflowError({ cause: remoteControlDeclined() })));
@@ -1359,10 +1302,6 @@ export class RemoteScreenError extends Schema.TaggedError<RemoteScreenError>()("
   }
 }
 
-// Sunshine captures and sends input through X11 only. Under Wayland, X11 reaches only the windows
-// of XWayland clients, so the stream would show an empty screen.
-// The runtime wraps a cause, such as "Sunshine did not start on a reserved port family", around the
-// reason it did not start: an exit, or no answer.
 function describeCause(cause: unknown): string {
   const parts: string[] = [];
   for (

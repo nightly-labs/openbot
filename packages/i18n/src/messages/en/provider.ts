@@ -1,7 +1,6 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("provider", {
-  // The provider list, shown in Settings and during onboarding.
   "provider.availableHere": "Available on this computer",
   "provider.availableOnHost": "Runs on {name}",
   "provider.custom.name": "Custom provider",
@@ -16,8 +15,6 @@ export const messages = defineMessages("provider", {
   "provider.refreshingLabel": "Checking providers",
   "provider.refreshing": "Checking…",
 
-  // What a provider row reports about itself. A percentage while downloading is a number, not a
-  // message, so it has no key.
   "provider.status.connecting": "Connecting",
   "provider.status.updateAvailable": "Update available",
   "provider.status.settingUp": "Setting up",
@@ -36,12 +33,8 @@ export const messages = defineMessages("provider", {
   "provider.gemini.hostSignIn":
     "To connect Gemini, open OpenBot on the host and select Connect in Server settings > Providers. Google sign-in needs a browser on that host. Remote sign-in is not supported.",
 
-  // Which account tier the OpenCode row runs on. It shows only while it adds to the runtime
-  // badge: a saved key leaves the runtime "Connected" to speak for the row.
   "provider.key.free": "Free",
 
-  // The buttons on a provider row, and the name a screen reader reads for each. The name repeats
-  // the provider, because a list of rows all saying "Connect" tells a screen reader user nothing.
   "provider.action.connect": "Connect",
   "provider.action.reconnect": "Reconnect",
   "provider.action.restart": "Restart",
@@ -72,8 +65,6 @@ export const messages = defineMessages("provider", {
   "provider.aria.codeFallback": "Log in to {name} with a code",
   "provider.aria.moreActions": "More actions for {name}",
 
-  // The switch that turns a provider on or off in OpenBot. While an agent uses the provider, the
-  // switch stays on and a toast names the agent, or counts the agents when there are more.
   "provider.aria.use": "Use {name} in OpenBot",
   "provider.use.inUseOne": "{agent} uses {name}. Change the model of this agent, then turn {name} off.",
   "provider.use.inUse": {
@@ -81,7 +72,6 @@ export const messages = defineMessages("provider", {
     other: "{count} agents use {name}. Change the model of these agents, then turn {name} off.",
   },
 
-  // The dialog that signs in to a provider with a code on another device.
   "provider.codeLogin.title": "Log in to {name} with a code",
   "provider.codeLogin.description": "Finish on your phone or another browser. OpenBot waits here.",
   "provider.codeLogin.starting": "Getting a code from {name}…",
@@ -108,13 +98,11 @@ export const messages = defineMessages("provider", {
   "provider.codeLogin.chatgptDeviceSetting":
     "In ChatGPT on a computer, open the security settings and turn on device code sign-in for Codex. For a work account, your workspace admin turns it on.",
 
-  // A provider that only the OpenBot app can sign in, from a browser tab.
   "provider.useApp.title": "Connect {name} in the OpenBot app",
   "provider.useApp.description":
     "The {name} sign-in returns to the computer that started it, and a browser tab cannot receive it. Connect {name} in the OpenBot app. The app finishes the sign-in by itself.",
   "provider.useApp.download": "Get the app",
 
-  // The agent model picker.
   "provider.picker.noEndpoints": "No endpoints yet",
   "provider.picker.customCounts": "{endpoints} · {agents}",
   "provider.picker.agentModel": "Agent model",
@@ -129,9 +117,13 @@ export const messages = defineMessages("provider", {
   "provider.picker.download": "{name} download",
   "provider.picker.search": "Search models",
   "provider.picker.noMatches": "No models match your search.",
+  "provider.picker.workspaceOnlyUnavailable":
+    "These models do not work with Workspace only on Windows and Linux. To use them, change Permissions in the agent settings.",
   "provider.picker.olderModels": "Older models",
   "provider.picker.olderModelsList": "Older {name} models",
   "provider.picker.noModels": "No models are available from {name}.",
+  "provider.picker.endpointModelsInCustom": "{name} runs your custom endpoints. Their models are on the Custom tab.",
+  "provider.picker.showCustomModels": "Show models",
   "provider.picker.museNoModels":
     "Muse sent no models for this account. Muse may not be available in the country where this agent runs. Choose a model from another provider.",
   "provider.picker.customEmpty":
@@ -159,6 +151,8 @@ export const messages = defineMessages("provider", {
   "provider.picker.selectEffort": "Select effort",
   "provider.picker.custom": "Custom",
   "provider.picker.cliReady": "{cli} ready",
+  "provider.picker.modelSourceProvider": "Uses {name} from your {cli} settings",
+  "provider.picker.modelSourceCatalog": "Uses a model list from your {cli} settings",
   "provider.status.signInRequired": "Sign in required",
   "provider.model.free": "Free",
   "provider.model.new": "New",
@@ -216,7 +210,6 @@ export const messages = defineMessages("provider", {
     "Save an OpenRouter API key on the host to use the models that OpenRouter serves. OpenBot runs them in the Pi CLI that it downloads.",
   "provider.openrouterKey.label": "OpenRouter API key",
 
-  // The optional OpenCode Go key dialog.
   "provider.openCodeKey.title": "Sign in to OpenCode Go",
   "provider.openCodeKey.description": "Free models need no account. A key unlocks the paid Go models.",
   "provider.openCodeKey.unreadable": "Saved key is unreadable. Paste it again, or remove it.",
@@ -270,7 +263,6 @@ export const messages = defineMessages("provider", {
   "provider.account.poolCount": "Pool of {accounts}",
   "provider.account.poolInUse": "{pool} · {name} in use",
 
-  // Settings > Providers: a list of providers, and one page for each provider.
   "provider.settings.connected": "Connected",
   "provider.settings.other": "Other providers",
   "provider.settings.search": "Search providers",
@@ -328,6 +320,8 @@ export const messages = defineMessages("provider", {
   "provider.settings.versionDownloaded": "{version} · downloaded by OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Not in use: {version} · installed by you",
   "provider.settings.otherVersionDownloaded": "Not in use: {version} · downloaded by OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "Some models need a part that this version does not have. Download OpenBot's version to use them.",
   "provider.settings.useInstalledVersion": "Use installed version",
   "provider.settings.useDownloadedVersion": "Use OpenBot's version",
   "provider.settings.update": "Update",

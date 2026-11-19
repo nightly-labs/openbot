@@ -22,7 +22,8 @@ export const messages = {
   "error.crm.currencyInUse": "لا يمكنك تغيير عملة عميل لديه خطط أو دفعات.",
   "error.crm.badCursor": "لم تعد هذه الصفحة صالحة. حمّل القائمة مرة أخرى.",
   "error.crm.invalidChange": "هذا التغيير غير صالح.",
-  "error.crm.agentNotAllowed": "لا يمكن لهذا الوكيل استخدام CRM. يمكن للمالك أو المسؤول السماح له من صفحة CRM.",
+  "error.crm.agentNotAllowed":
+    "لا يمكن لهذا الوكيل استخدام CRM. يمكن للمالك أو المسؤول السماح له: افتح صفحة CRM، وانقر على اقتراحات، ثم انقر على الزر الذي يعرض عدد الوكلاء، وفعّل هذا الوكيل.",
   "error.crm.tooManyProposals": "هناك اقتراحات كثيرة جدًا تنتظر قرارًا. انتظر حتى يبت فيها شخص.",
   "error.crm.amountInvalid": "اكتب المبلغ كرقم، مثل 129.00.",
   "error.crm.amountDecimals": "يحتوي المبلغ على منازل عشرية أكثر من اللازم لعملة {currency}.",

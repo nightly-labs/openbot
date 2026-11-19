@@ -1,4 +1,3 @@
-// Provider administration for Pi and Muse. Earlier contracts remain unchanged.
 import {
   adminRoute,
   count,
@@ -26,9 +25,7 @@ export const PROVIDERS_V5_ROUTES = {
   runtimesCheck: "/v1/admin/providers/v5/runtimes/check-updates",
 } as const;
 
-/** The providers these routes sign in. */
 export const PROVIDERS_V5_SIGN_IN_PROVIDERS = ["codex", "claude", "grok", "cursor", "cline"] as const;
-/** The managed runtimes these routes read, download and cancel. */
 export const PROVIDERS_V5_RUNTIME_PROVIDERS = [
   "codex",
   "claude",

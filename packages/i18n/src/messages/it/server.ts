@@ -47,6 +47,7 @@ export const messages = {
   "server.compatibility.updateHostTitle": "Aggiorna OpenBot su {name}",
   "server.compatibility.unsafeDataTitle": "L'host ha restituito dati non sicuri",
   "server.compatibility.cannotConnectTitle": "Impossibile connettersi a {name}",
+  "server.compatibility.safeModeTitle": "{name} non si avvia",
   "server.compatibility.updateClientDescription":
     "Questa app supporta solo protocolli più vecchi di quelli dell'host. Aggiorna l'app, poi riprova.",
   "server.compatibility.updateHostDescription":
@@ -115,6 +116,7 @@ export const messages = {
   "server.local.create": "Crea server",
   "server.local.creating": "Creazione del server…",
   "server.local.createFailed": "Impossibile creare il server.",
+  "server.local.createFailedRetry": "Qualcosa è andato storto. Riprova. Se non funziona ancora, riavvia OpenBot.",
   "server.local.limitReached":
     "Puoi avere al massimo {limit} server su questo computer. Eliminane uno per crearne un altro.",
   "server.local.deleteConfirmTitle": "Eliminare {name}?",
@@ -346,7 +348,7 @@ export const messages = {
     "Scegli cosa possono fare gli agenti su questo server quando non lo imposti per un agente.",
   "server.settings.timezone": "Fuso orario",
   "server.settings.timezoneDescription":
-    "Le nuove routine usano questo fuso orario quando il messaggio non indica quello del mittente.",
+    "Le nuove routine usano questo fuso orario quando il messaggio non indica quello del mittente. Su un server, anche il browser lo usa dopo il prossimo riavvio.",
   "server.settings.timezoneAutomatic": "Automatico ({zone})",
   "server.settings.timezoneLoadFailed": "Impossibile caricare il fuso orario del server.",
   "server.settings.turnLimit": "Thread contemporanei",

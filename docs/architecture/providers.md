@@ -637,6 +637,12 @@ starts each stdio server itself (`mcp-stdio-relay.ts`) and gives OpenCode a Stre
 127.0.0.1 with a bearer token. The sessions of one directory share the relay of each server, and the
 last of them to close stops it and its process group.
 
+OpenCode also keeps one `openbot` server for each directory, so the sessions of one directory share
+its token in the local MCP bridge. OpenCode gives a server 30 s to connect, then continues without it
+and does not connect again while the settings stay the same (#10749). When the bridge did not list
+its tools within that time after the session request, OpenBot gives the directory a new token and
+resumes the session once. The earlier tokens stay valid until the last session of the directory closes.
+
 OpenCode adds its own system prompt, tools, skill listing and Code Mode catalog to each request of an
 agent. `opencode-agent-defaults.ts` denies the parts that an OpenBot agent does not use: the
 `question` tool (OpenBot has `ask_user`), the `opencode_list_mcp_resources` and
@@ -748,7 +754,9 @@ Free means a display name ending in "Free", or an id in a short explicit list
 (`opencode/big-pickle`): `model/list` carries no price and neither Go endpoint authenticates.
 `isFreeOpencodeModel` in `packages/contracts/src/agent-providers.ts` is shared with the picker badge in
 `packages/ui/src/components/provider-model-options.ts`, so a badge and a default cannot disagree
-about what costs money.
+about what costs money. A model of a custom endpoint that Pi runs gets the badge by the same name
+rule (`isFreeOpencodeModelName`). Pi gets cost 0 for each endpoint model, so its cost does not
+show that a model is free.
 
 A keyless OpenCode still lists models whose provider has no sign-in. OpenCode 2.1.1 fails a turn on
 one with `-32000` "provider authentication required" and no provider ID. `OPENCODE_ACP_FLAVOR`
@@ -759,6 +767,23 @@ expired one (#9095). OpenBot sends its saved key only to OpenCode Go, so with a 
 `opencode-go/` model the client's `savedKey` option makes the flavor show
 `error.provider.opencodeKeyRefused`. With no saved key, a refused key and a missing key look the
 same, and the text stays `error.provider.opencodeAuthRequired`.
+
+OpenCode 2.2.5 sends a 401 and a 403 as the same `-32000`, but it keeps the provider's status in the
+newest `session_message` row of the failed turn (`{"error":{"type":"provider.auth","status":403,…}}`).
+OpenCode Go answers a bad key with 401, and refuses a valid key with 403, for example when the Go
+plan is not active or the network is blocked. The client's `providerRefusalStatus` option reads that
+row read-only (`readOpenCodeRefusalStatus` in `opencode-usage.ts`), and with a saved key a 403 shows
+`error.provider.opencodeGoRequestRefused`, which does not ask for a new key (#12281). No row, another
+status, or a database that cannot be read keeps `error.provider.opencodeKeyRefused`.
+
+OpenCode 2.3.0 also sends each HTTP 401 and 403 of a provider as this `-32000`, with no status, also
+when a firewall blocks a VPN address (#10166). The client's `providerKeyStored` option then reads
+OpenCode's own store (`hasOpenCodeProviderKey` in `opencode-usage.ts`): an active `credential` row
+of OpenCode 2, an `auth.json` entry, or `OPENCODE_AUTH_CONTENT`. With a key for the provider, the
+flavor shows `error.provider.opencodeProviderRefused`: the provider refused the request, and a VPN,
+a proxy or a blocked country can be the cause. A key in an environment variable or a config file is
+not found, so the text stays `error.provider.opencodeAuthRequired`. An `opencode-go/` model keeps
+that text too, because it names the fix in OpenBot's settings for an expired Go key.
 
 #### Turns of a background subagent or shell command
 
@@ -790,6 +815,26 @@ command that runs in the background does the same when it ends (#7713). The flag
 
 The watch is in memory. A background task that ends while OpenBot is closed, or after OpenBot
 loaded the session again, shows only in OpenCode's own store.
+
+#### Model retries and the stall limit
+
+OpenCode 2.2.7 waits 300 s for a model's response headers (`headerTimeout`; 30 minutes for a custom
+endpoint), the same time as OpenBot's stall limit, and then sends the request again, up to three
+times for a timeout. It reports each retry as a `session_info_update` with
+`_meta["opencode/retry"]`, and a failed retried attempt as the same key with null. OpenBot ended
+the turn as stalled at the moment when the retry started (#9941). `modelRetryUpdate` of
+`OPENCODE_ACP_FLAVOR` makes OpenBot wait 1.2 times the limit, so the retry notice comes first. Only
+the first timeout retry notice after other output or a steer counts as activity: a model that also
+does not answer the retry fails the turn after about 11 minutes, with the stall message, and not
+after all four attempts with OpenCode's raw error text. A retry after a rate limit, a provider
+failure or a lost network comes sooner, and each of its notices keeps the turn open as before.
+
+A provider failure, such as the 502 or 504 of an overloaded endpoint, gets 10 attempts in about 90 s.
+`retryUpdate` of `OPENCODE_ACP_FLAVOR` shows each retry after a provider failure (`provider.internal`),
+a timeout or a lost connection as the turn's status, with the attempt number: OpenCode does not say
+how many attempts it makes. The first output after it replaces the status. When OpenCode gives up, a
+`provider.internal` error shows `error.provider.opencodeProviderFailed`, also when its text matches
+no OpenCode 1 pattern (#10129).
 
 #### Text of two steps
 
@@ -865,7 +910,11 @@ logged. On Windows the CLI runs `C:\Windows\System32\rundll32.exe url.dll,FilePr
 absolute path, so a folder on `PATH` cannot catch the link. There OpenBot makes no opener folder
 (`googleSignInByOpenBot`): the page opens from the CLI itself. A remote host cannot relay it, as
 with 1.4.5 (#4521), so OpenBot refuses a sign-in from another device before the process starts, and
-a Reconnect does not sign the account out. The Windows test of 1.5.4 confirmed this. A valid saved Google token answers `authenticate` with no browser page.
+a Reconnect does not sign the account out. A relayed sign-in from the desktop app that runs a server
+on this computer is not from another device: its Team API session is a password session of the
+owner, which only that app can open. The owner's other devices connect through Signal and stay
+refused. The sign-in runs as a Connect on this computer, the CLI opens the page here, and the relay
+ends with no page (#11677). The Windows test of 1.5.4 confirmed this. A valid saved Google token answers `authenticate` with no browser page.
 So a Reconnect of a connected Google sign-in, with no saved key, first calls ACP `logout`, which
 `initialize` advertises in `agentCapabilities.auth.logout`. `logout` deletes `antigravity-oauth-token`
 and `cache/acp-auth-state.json` only: it does not revoke the token at Google, and a copy of the old
@@ -934,8 +983,10 @@ Antigravity 1.5 has no `/usage` command. The driver's `readRateLimits`
 (`src/backend/antigravity-usage.ts`) reads the access token from the account's token file and calls
 Google's Code Assist service as the CLI does: `loadCodeAssist` gives the account's project, and
 `retrieveUserQuotaSummary` gives each quota group with its buckets. Google refuses these calls (403)
-unless the User-Agent is `antigravity/<version> <os>/<arch>`, and it sends the "Gemini Models" group only
-to the desktop app's version, not to the CLI's, so the User-Agent names the desktop version (#7215). 
+unless the User-Agent names Antigravity, and it sends the "Gemini Models" group only to the desktop app's
+version, not to the CLI's, so the User-Agent names the desktop version (#7215). It is the desktop app's own
+form, `antigravity/hub/<version> (aidev_client; os_type=<os>; arch=<arch>; cl=<build>)`: with
+`antigravity/<version> <os>/<arch>`, Pro plans got no "Gemini 4 Argon" group (#10934). 
 `loadCodeAssist` goes to `cloudcode-pa`. The summary comes only from `daily-cloudcode-pa`, the host
 that meters a Google account sign-in: the other host's room for the account can be wrong, and a wrong
 "spent" reading would hold Gemini turns. OpenBot does not refresh the token: it
@@ -1119,6 +1170,12 @@ change with `session/set_model` does not write a file. Devin answers a lost sess
 and `{ "cognition.ai/errorKind": "session_not_found" }`, which `DEVIN_ACP_FLAVOR` reads as a missing
 session.
 
+Devin CLI 3000.14.30821 keeps a session after a plain `session/close`, also in the background process
+that outlives OpenBot for about 10 minutes, and a later `session/load` keeps the MCP servers that the
+session got first. It advertises `sessionCapabilities.close._meta["cognition.ai/force"]`, so the ACP
+client sends that `_meta` with each `session/close`, and a forced close before it loads a session that
+it does not hold. The session then gets the new token of the OpenBot bridge (#12082).
+
 No frozen Team API protocol knows `devin`. The host hides Devin agents, models, status, and sign-in
 state from peers below protocol 8, and `providers-v8` carries it.
 
@@ -1129,7 +1186,9 @@ The GitHub Copilot provider (id `copilot`, issue #4637) starts GitHub's Copilot 
 `github/copilot-cli` and downloads `copilot-<target>.tar.gz` (`.zip` on Windows). Each archive holds
 only `copilot` (`copilot.exe`). The licence lets an app include the CLI only unchanged, so OpenBot
 downloads it and does not ship it. `OPENBOT_COPILOT_PATH` selects another executable. Every Copilot
-process gets `COPILOT_AUTO_UPDATE=false`, because `copilot login` refuses `--no-auto-update`.
+process gets `COPILOT_AUTO_UPDATE=false`, because `copilot login` refuses `--no-auto-update`. The
+install check runs `copilot --version` with it too: without it, the CLI runs the newest package in its
+cache and reports that version, so a newer cached package failed the check (#9888).
 
 The executable unpacks its JavaScript package into `pkg/<platform>/<version>` of its cache folder
 when that folder is missing. A confined process gets `COPILOT_CACHE_HOME` and
@@ -1174,6 +1233,13 @@ In Vibe 3.1.0 this stops its usage events, its OpenTelemetry traces and its expe
 organization's managed configuration from Mistral is a higher layer, so it can turn telemetry on
 again. Only the terminal app checks for updates; `vibe-acp` does not update itself (from the source,
 not confirmed in a run).
+
+Each Mistral session runs in a `vibe-acp` process of its own (`sessionProcesses`). Vibe 3.1.2 keeps
+one MCP server of each name for the whole process, and its server fingerprint holds the header names
+but not their values. In one shared process, each session's `openbot` call went out with the bearer
+token of the session that opened last, so OpenBot ran it in that session's chat (#9805). Vibe loads
+a session that another process created (`session/load`), so an idle session closes with its
+process and opens again in a new one. A process with one session uses about 150 MB on Linux.
 
 Vibe 3.1.0 lists the ACP auth method `browser-auth`. Sign in calls `authenticate` with it: the CLI
 opens Mistral's sign-in page in the browser of the host and polls Mistral until the sign-in ends. It
@@ -1500,6 +1566,14 @@ Codex does not read a base URL from its environment while it has a ChatGPT sign-
 Checked with Claude Code 2.1.325, Codex 0.167.2 and Antigravity CLI 1.5.9 against a local server that
 logged each request. Grok is not in the list: with a Grok sign-in, Grok CLI 1.0.52 sends the Grok token
 to `GROK_XAI_API_BASE_URL` and ignores `XAI_API_KEY`.
+
+The user's own Codex settings can also give Codex another model provider (`model_provider`, such as
+Ollama) or a model list file (`model_catalog_json`). Codex then lists those models in `model/list`, and
+OpenBot shows them on the ChatGPT tab (#9956). With each good model list, `readCodexModelSource` reads
+`config/read` and the Codex status row gets `modelSource`. The model picker shows it on the ChatGPT tab
+in place of the pool and version line, so the user sees why the list is not OpenAI's. The
+`openbot_environment` provider above is not a source: the user set it on this page, and Codex keeps
+OpenAI's list with it. A joined server gives the source on `provider-model-source-v1`.
 
 The commands that agents run can read the variables: Claude Code and the Antigravity CLI pass their
 environment on, and Codex leaves out the names with `KEY`, `SECRET` or `TOKEN`. With a proxy, the proxy

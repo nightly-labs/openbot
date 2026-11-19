@@ -1,11 +1,3 @@
-/*
- * The app loading screen. In the `pile` scene, Web Animations from a recorded simulation move each
- * plush; CSS only places the pit over the whole screen and fades the screen. When the app is ready,
- * the crew hop out while the screen fades. When the app is ready very soon, the screen only fades.
- * The component sets --app-loading-at, the age of the run, so a second screen does not show again,
- * and --app-loading-exit-delay, the time before the fade, which waits for the rest of the rain.
- */
-
 .app-loading {
   --app-loading-at: 0s;
   --app-loading-exit-delay: 300ms;
@@ -26,7 +18,6 @@
   gap: 28px;
 }
 
-/* The crew fill the screen. */
 .app-loading[data-scene="pile"] .app-loading-stage {
   position: absolute;
   inset: 0;
@@ -38,7 +29,6 @@
   inset: 0;
 }
 
-/* The pit keeps its floor on the bottom of the screen, also when the window changes size. */
 .app-loading-pit {
   position: absolute;
   bottom: 0;
@@ -79,19 +69,16 @@
   -webkit-app-region: no-drag;
 }
 
-/* The fade also runs with reduced motion: its animationend removes the screen. */
 .app-loading:is([data-phase="fade"], [data-phase="exit"]) {
   animation: app-loading-exit var(--openbot-duration-overlay) var(--openbot-ease-in-out) forwards;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  /* The app fades in while the crew hop out. The heavy views mounted before the hop. */
   .app-loading[data-phase="exit"] {
     animation-duration: 1100ms;
     animation-delay: var(--app-loading-exit-delay);
   }
 
-  /* The stage waits before it shows, so a fast load does not flash the crew. */
   .app-loading-stage {
     animation: app-loading-enter var(--openbot-duration-overlay) var(--openbot-ease-out)
       calc(250ms - var(--app-loading-at)) both;
@@ -154,8 +141,7 @@
   gap: var(--openbot-space-2);
   -webkit-app-region: no-drag;
 }
-/* The toast of a long first load, like the GitHub star toast: a raised card with the 1px ring only.
-   The buttons sit 8px from the bottom edge. */
+
 .server-connection-toast-host {
   width: var(--width);
 }
@@ -172,7 +158,6 @@
   font-size: var(--openbot-text-md);
   line-height: var(--openbot-leading-md);
 }
-/* The close control sits on the corner, mostly outside the card, so the title keeps a small space. */
 .server-connection-toast-title {
   padding-right: var(--openbot-space-1);
   font-weight: var(--openbot-weight-semibold);
@@ -186,7 +171,6 @@
   font-variant-numeric: tabular-nums;
   text-wrap: pretty;
 }
-/* Retry is last, in the corner. With the grid gap, the button row is 12px below the words. */
 .server-connection-toast-actions {
   margin-top: var(--openbot-space-1);
 }

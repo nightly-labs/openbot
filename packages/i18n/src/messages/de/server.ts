@@ -48,6 +48,7 @@ export const messages = {
   "server.compatibility.updateHostTitle": "OpenBot auf {name} aktualisieren",
   "server.compatibility.unsafeDataTitle": "Der Host hat unsichere Daten zurückgegeben",
   "server.compatibility.cannotConnectTitle": "Verbindung mit {name} nicht möglich",
+  "server.compatibility.safeModeTitle": "{name} startet nicht",
   "server.compatibility.updateClientDescription":
     "Diese App unterstützt nur ältere Protokolle als der Host. Aktualisiere diese App und versuche es erneut.",
   "server.compatibility.updateHostDescription":
@@ -116,6 +117,8 @@ export const messages = {
   "server.local.create": "Server erstellen",
   "server.local.creating": "Server wird erstellt…",
   "server.local.createFailed": "Der Server konnte nicht erstellt werden.",
+  "server.local.createFailedRetry":
+    "Etwas ist schiefgelaufen. Versuche es erneut. Wenn es wieder fehlschlägt, starte OpenBot neu.",
   "server.local.limitReached":
     "Auf diesem Computer sind höchstens {limit} Server möglich. Löschen Sie einen, um einen neuen zu erstellen.",
   "server.local.deleteConfirmTitle": "{name} löschen?",
@@ -353,7 +356,7 @@ export const messages = {
     "Legen Sie fest, was die Agenten auf diesem Server tun können, wenn Sie es nicht für einen Agenten festlegen.",
   "server.settings.timezone": "Zeitzone",
   "server.settings.timezoneDescription":
-    "Neue Routinen verwenden diese Zeitzone, wenn die Nachricht die Zeitzone des Absenders nicht angibt.",
+    "Neue Routinen verwenden diese Zeitzone, wenn die Nachricht die Zeitzone des Absenders nicht angibt. Auf einem Server verwendet auch der Browser sie nach dem nächsten Neustart.",
   "server.settings.timezoneAutomatic": "Automatisch ({zone})",
   "server.settings.timezoneLoadFailed": "Die Zeitzone des Servers konnte nicht geladen werden.",
   "server.settings.turnLimit": "Threads gleichzeitig",

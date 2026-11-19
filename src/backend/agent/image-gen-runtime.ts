@@ -1,13 +1,19 @@
-import type { AttachmentSummary, ImageGenerationInfo, VideoGenerationInfo } from "@openbot/contracts/ipc";
+import {
+  type AttachmentSummary,
+  type ImageGenerationInfo,
+  imageAspectRatioOf,
+  imagePixelSizeText,
+  type VideoGenerationInfo,
+} from "@openbot/contracts/ipc";
 import { isNumber, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Exit, Fiber, Result, Schema, Scope } from "effect";
 import { newAssistantMessage } from "../conversation-snapshots";
 import { causeHelpers } from "../effect-boundary";
+import { type ImageSize, imageSize, imageSizeOfBytes } from "../image-size";
 import type { MailboxStore } from "../mailbox-store";
 import { getString, type ThreadItem } from "../protocol";
 import type { ConversationRuntime } from "./conversation-runtime";
-import { lastUserPrompt } from "./delivery-content";
 import {
   decodeGeneratedImage,
   type GeneratedMediaKind,
@@ -26,7 +32,6 @@ interface ImageGenerationOperation {
 }
 
 export interface ImageGenHooks {
-  /** Mirrors the facade's itemId → turnId index used by turn completion. */
   trackItem(itemId: string, turnId: string): void;
 }
 
@@ -36,15 +41,6 @@ export interface ImageGenRuntimeOptions {
   hooks: ImageGenHooks;
 }
 
-/**
- * Streaming image-generation and video-generation items, and the interrupt flag that races them.
- *
- * Owns the `threadId:turnId:itemId` operation map plus the `threadId:turnId`
- * interrupted set. Everything else (snapshots, attachments, events) goes
- * through the injected conversation/mailbox, so this class never imports the
- * facade. The facade keeps `#itemTurns` — it is shared with plain agent
- * messages and deltas — and only receives updates via `trackItem`.
- */
 export class ImageGenRuntime {
   readonly #conversation: ConversationRuntime;
   readonly #mailbox: MailboxStore;
@@ -59,10 +55,6 @@ export class ImageGenRuntime {
     this.#hooks = options.hooks;
   }
 
-  /**
-   * Handles one streaming item when it is an image-generation or a video-generation item.
-   * Returns true when handled, so the caller can fall through for the rest.
-   */
   readonly handleItem = Effect.fn("ImageGenRuntime.handleItem")(function* (
     this: ImageGenRuntime,
     agentId: string,
@@ -129,7 +121,6 @@ export class ImageGenRuntime {
     this.#interruptedTurns.delete(`${threadId}:${turnId}`);
   }, Effect.uninterruptible).bind(this);
 
-  /** Work the facade awaits during stop() before clearing. */
   pendingOperations(): Effect.Effect<void, GeneratedImageFailed>[] {
     return [...this.#operations.values()]
       .map((operation) => operation.fiber)
@@ -165,12 +156,11 @@ export class ImageGenRuntime {
     const previous =
       generatedMediaInfo(message)?.kind === kind ? (message.imageGeneration ?? message.videoGeneration) : undefined;
     const prompt =
+      getString(item, "revisedPrompt") ??
       getString(item, "revised_prompt") ??
       getString(item, "prompt") ??
       previous?.prompt ??
-      lastUserPrompt(snapshot) ??
       undefined;
-    // A video model makes a wide clip unless the call asks for another frame.
     const aspectRatio =
       imageGenerationAspectRatio(item) ?? previous?.aspectRatio ?? (kind === "video" ? "landscape" : "square");
     const providerStatus = getString(item, "status");
@@ -195,10 +185,7 @@ export class ImageGenRuntime {
       info = video;
     } else {
       const resolution =
-        getString(item, "resolution") ??
-        getString(item, "size") ??
-        message.imageGeneration?.resolution ??
-        "1024 × 1024";
+        getString(item, "resolution") ?? getString(item, "size") ?? message.imageGeneration?.resolution ?? "";
       message.itemType = "image_generation";
       delete message.videoGeneration;
       const image: ImageGenerationInfo = {
@@ -228,10 +215,10 @@ export class ImageGenRuntime {
     }
 
     const savedPath = getString(item, "saved_path");
-    // Only an image comes as data. A video always comes as a file.
     const result = kind === "image" ? getString(item, "result") : null;
     yield* Effect.gen({ self: this }, function* () {
       let attachment: AttachmentSummary;
+      let size: ImageSize | null = null;
       const storeBytes = Effect.gen({ self: this }, function* () {
         if (!result)
           return yield* new GeneratedImageFailed({
@@ -242,6 +229,7 @@ export class ImageGenRuntime {
             ),
           });
         const bytes = yield* imageStep(() => decodeGeneratedImage(result));
+        size = imageSizeOfBytes(bytes);
         return yield* this.#mailbox
           .storeGeneratedAttachment({
             bytes,
@@ -264,8 +252,11 @@ export class ImageGenRuntime {
             })
             .pipe(toGeneratedImageFailed),
         );
-        if (Result.isSuccess(saved)) attachment = saved.success;
-        else {
+        if (Result.isSuccess(saved)) {
+          attachment = saved.success;
+          if (kind === "image")
+            size = yield* Effect.tryPromise(() => imageSize(savedPath)).pipe(Effect.orElseSucceed(() => null));
+        } else {
           if (!result) return yield* saved.failure;
           attachment = yield* storeBytes;
         }
@@ -289,6 +280,10 @@ export class ImageGenRuntime {
         latestMessage.attachments = [attachment];
         latestMessage.status = "completed";
         delete latestMedia.info.error;
+        if (size && latestMessage.imageGeneration) {
+          latestMessage.imageGeneration.resolution = imagePixelSizeText(size);
+          latestMessage.imageGeneration.aspectRatio = imageAspectRatioOf(size);
+        }
         this.#conversation.emitConversation(latestSnapshot);
         return;
       });

@@ -1,8 +1,3 @@
-// Electron side of `scripts/main-loop-profile-e2e.ts`. It blocks the main thread in a named function
-// and writes what the stall profiler reports to `--result-file`.
-// 1. Always: one profile with `MainLoopProfiler`, as the resource monitor makes it.
-// 2. With `--trigger`: the resource monitor itself, at its real one-minute samples. The main thread
-//    blocks every 20 s from the start, so the first profile comes after the two start-up minutes.
 import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -32,7 +27,6 @@ function blockMainLoopForTest(durationMs: number): number {
   return turns;
 }
 
-// No top-level await: Electron does not get ready until an ESM main module has run to its end.
 void app.whenReady().then(async () => {
   const profiler = new MainLoopProfiler();
   await Effect.runPromise(profiler.start());

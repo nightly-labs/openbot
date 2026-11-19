@@ -45,12 +45,13 @@ export const messages = {
   "prompt.browser.title.pending": "Conclua a etapa ({host})",
   "prompt.browser.cancelled": "Cancelado",
   "prompt.browser.reload":
-    "Conclua o login e recarregue a página do navegador antes de escolher “Terminei”. A inspeção da página continua bloqueada até que a página seja recarregada.",
+    "O OpenBot não conseguiu terminar de inserir a senha ou o código. Confira a página e insira o que falta. Conclua o login e recarregue a página do navegador antes de escolher “Terminei”. A inspeção da página continua bloqueada até que a página seja recarregada.",
   "prompt.browser.continuing": "{name} está continuando.",
   "prompt.browser.cancelledBody": "A etapa no navegador foi cancelada.",
   "prompt.browser.pendingBody":
     "Abra a página para concluir o login, a verificação ou o consentimento. Depois, deixe {name} continuar.",
   "prompt.browser.openPage": "Abrir {title}",
+  "prompt.browser.openFailed": "Não foi possível abrir a página na janela principal. Tente novamente.",
   "prompt.browser.done": "Terminei",
   "prompt.browser.pageFallback": "Página do navegador",
   "prompt.browser.hostFallback": "o navegador",

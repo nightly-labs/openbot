@@ -62,7 +62,9 @@ it finds the marker by its text. When a turn that ran only quiet routine runs co
 answer is the marker, or the agent called the tool and the turn gave no file, image or question, the
 turn drops its markers, thinking and plan from the conversation. Each other text answer stays with the
 item type `routine_quiet_answer`. A quiet answer does not count as unread, does not change the agent
-preview, and no Team API client gets it; the desktop chat shows it under its run, which starts closed.
+preview, and only a Team API client with `routine-quiet-answers-v1` gets it; the desktop chat and the web
+client show it under its run, which starts closed. `history_read` marks it `quiet`, so the agent does not
+say that the user saw it.
 The turn puts back the agent preview from
 before the run (the run start shows the task there; memory only, so after a restart the task stays),
 and its `turn-completed`
@@ -88,14 +90,38 @@ the agent sent its result to that teammate with `send_message` (`quietTeammateTu
 The turn does not need `routine_no_update`, and the prompt does not name it: Claude often does not
 load the tool, which waits behind its tool search. When only answered requests started the turn and
 its answers are text alone, that text repeats the reply, so it becomes quiet answers as after the tool
-call. A file, an image or a question keeps the whole turn in the chat. The tool still accepts a
+call. A file, an image or a question keeps the whole turn in the chat. So the request prompt tells the
+agent that the user does not see its written answer, and to ask the user with `ask_user`, whose
+question card keeps the turn shown (#11012). The tool still accepts a
 request: before the reply it answers that the agent must send the result first, but only when the
-missing reply is all that keeps the turn from a quiet end. Only the agent's own reply from the turn
-that ran the request counts (`MailboxStore.hasOwnReplyFrom`): the result that OpenBot relays when the
-turn ends, the note for a failed request and a reply from a later turn do not count, so the turn
-completion and the history import decide the same. The import also reads the stored file and question
+missing reply is all that keeps the turn from a quiet end. When the agent sends no reply, OpenBot
+sends the turn's answer to the teammate as its result when the turn ends (`#relayAgentResult`). The
+teammate then has the answer, so the turn ends quiet too (#8021). The turn completion makes this
+decision with the same check as the relay (`#sendsResult`), and reads the answer before the quiet end
+changes it to a quiet answer. The history import runs after the relay. It counts the agent's own reply
+from the turn that ran the request (`MailboxStore.hasOwnReplyFrom`) or the stored idempotency key of
+the relayed result (`MailboxStore.hasSentResultFor`), so both decide the same. The note for a failed
+request and a reply from a later turn do not count. The import also reads the stored file and question
 messages of the turn, because the provider history does not hold them. A reply to a message of the
 agent can hold the result that the user asked for, so it is never quiet.
+
+A quiet turn can start background work, such as a background command or subagent. When it ends while
+no turn runs, Claude starts a turn of its own to answer it, and no delivery started that turn. The
+Claude client keeps the turn that started each background task (`task_started`), and the turn that
+answers it names those turns (`continues` on `turn/started`). When each of them ended quiet, the
+turn can end quiet in the same way: the no-update tool accepts the call, and its text answers become
+quiet answers (#10847). Work that ends while that turn runs goes to it too
+(`openbot/turn-continues`). Work of a person's request, or of an unknown turn, keeps the answer in
+the chat. That answer is the first one after the request. Work that a turn of the provider's own
+started can end quiet too, so a watcher that a person started and that wakes again does not post each
+time; a result that the agent writes without the no-update call still shows (#11090). On the first
+answer after a person's request, the tool returns `shown`, not a refusal: after a refusal, the model
+did not call the tool on the later wakes. The CLI wakes the model with its own prompt, which does not
+name the tool, so a Claude agent always loads the tool (not behind the tool search) and its developer
+instructions say when a wake needs no answer. The model decides: in tests, Sonnet called the tool on
+a wake with nothing new, and Haiku often wrote a status line instead. The lifecycle
+keeps the newest quiet turns and the newest such turns in memory only, so after a restart such a turn
+shows.
 
 A completed turn that a teammate's message started (`origin: "agent"`: a request from another agent,
 or its answer) is work between agents. Its answer shows in the chat and counts as unread, but the
@@ -154,6 +180,17 @@ place, for schedule and webhook routines. A save without `runIn`, or to a host w
 keeps the saved place. The `create_routine`,
 `update_routine`, `create_webhook_routine` and `update_webhook_routine` tools take `runIn` too. A routine set back to `chat` keeps its thread, but new runs,
 the run marker's "Open thread" link, a test run and the routine's reply digest do not use it.
+
+A scheduled run may pause its own routine when its task says to stop (#8963). The tool router then
+records a `routine.paused-by-run` event with the run's `scheduledFor` and makes it the routine's
+`last_event_sequence` (`RoutineStore.markPausedByRun`). The routine lists read that event back as
+`pausedByRun` while the routine stays paused and nothing changes it, so no migration is necessary. The
+Routines list and the routine chat card show "Paused by its 8:00 AM run" (#10048). A run
+that pauses its routine and then reports a failure turns it on again, and that change clears the reason.
+A joined host serves the reasons on the optional `routine-pause-reasons-v1` capability
+(`packages/contracts/src/team-protocol/routine-pause-reasons-v1.ts`, host route `routeRoutinePauseReasons`
+in `src/main/team-api/route-routine-pause-reasons.ts`), which the remote adapters merge into their lists
+as they merge the run places. A client of an older host shows only "Paused".
 `AgentTasks.routineThread` makes the thread on the first run in a thread, with the routine's name as its title and `routine_id` set
 (migration 54; a unique index keeps one thread for each routine of an agent, also when it is
 archived). A later run uses the same thread, and a run reopens an archived one. A run also gives the
@@ -597,7 +634,7 @@ the phone read the profiles again on `browser-profiles-changed` (`browser-profil
 A side thread (in code and on the wire still a **task**) is a separate execution thread of one agent.
 The agent keeps one identity, workspace and provider settings; each side thread has its own provider
 thread, conversation, queue, progress and result. The agent's own chat is its main thread and has no
-side thread row. `projection_agent_threads` (`src/backend/agent-threads/agent-thread-schema.ts`,
+side thread row. `projection_agent_threads` (`src/backend/agent-threads/agent-thread-store.ts`,
 migration 47) holds one row for each side thread, with its title and the source of the title
 (`auto`, `agent` or `user`). Migration 47 moved every task of `projection_agent_tasks` (migration 38)
 there: a closed task became an archived thread, and the task id stays as `legacy_task_id`. The task id
@@ -953,22 +990,33 @@ correction applies from this point, and the unfinished work continues unless the
 The block is a text item of its own, as the turn context blocks are, so the history readers remove
 it and the chat shows only the sender's text. Claude Code and Grok Build tell their model the same
 with a note of their own, so `steerNoteFor` gives them no block; Grok also reads only the first text
-block of a steer. A routine run gets no block. A slash command from the person gets none, as at the
+block of a steer. Claude Code shows a steer to its model next to the result of the running tool. With
+the header and rules of a teammate prompt, Claude Haiku took a steered teammate message for text in
+the tool result and ignored it. For Claude, `QueueControls.steer` therefore sets `steerFramedAsUser`,
+and `deliveryPromptInput` sends a teammate message as plain words (`userFramedTeammateText`): the
+sender, the text, and for a request the `send_message` reply rule. The steer's uuid is the delivery
+ID, so the history import finds the delivery without `teammatePrompts`. A routine run gets no block. A slash command from the person gets none, as at the
 start of a turn, so the command stays at the start of the input. `scripts/pi-steer-e2e.ts` checks the
 block.
 
-A message from another agent that only gives information follows the recipient's busy-message mode,
-as a message from the person does: an answer, a requested result, or a notice (`expectsReply` false).
-When the mode is "steer", the provider steers natively and the recipient runs a chat turn,
-`send_message` and the result relay take the message into that turn
-(`AgentService.#steerAgentMessage`). A request (a message that expects a reply) never joins a running
-turn automatically, in each mode: it asks for work and a result, and in a running turn that result
-and the answer to the person would be one message. It waits for a turn of its own, and `send_message`
-tells the sender `queuedBecause: "own-turn"`. Routine runs, channel work and messages from Slack,
-Telegram or WhatsApp also do not steer automatically: each starts a turn of its own. Channel,
-messaging and task work, and each answer to a request that went to two or more teammates, stay
-queued (`MailboxStore.chatTurnSteer`), so those answers still start together. A message from an
-agent that cannot steer gets no fallback reason on its row.
+A message from another agent follows the recipient's busy-message mode, as a message from the person
+does: a request, an answer, a requested result, or a notice. When the mode is "steer", the provider
+steers natively and the recipient runs a chat turn, `send_message` and the result relay take the
+message into that turn (`AgentService.#steerAgentMessage`). A request that joins a running turn keeps
+its result separate from the answer to the person: the request text tells the recipient to send the
+result with `send_message`. The turn's answer is for the person or another request, so the turn end
+never relays it for a steered request, and sends no "no reply" note: Claude can still answer a late
+steer in a turn of its own (`moveSteerToTurn`). When the turn ends as interrupted before a reply (a
+stop, or an exit of the provider process), the sender gets an OpenBot note (`MailboxStore.answerFailedRequest`), and does not wait for a result that
+never comes. Routine runs, channel work and messages from Slack, Telegram or
+WhatsApp do not steer automatically: each starts a turn of its own. A question back (a reply that
+expects a reply) asks for no `send_message` reply, so it stays queued and its own turn's answer goes
+back. Channel, messaging and task work, and each answer to a request that went to two or more teammates, stay queued
+(`MailboxStore.joinsChatTurn`), so those answers still start together. A message from an agent that
+cannot steer gets no fallback reason on its row. A message from an agent also stays queued while a
+turn that only the person's messages started runs, and starts as a turn of its own after it: the tools
+that only a person's message can start check each message of the turn, and a message from an agent
+in the person's turn would make them refuse the person's own request (#11165).
 The person can steer any queued answer into the running turn from the waiting block on desktop, the
 web and mobile; it has no other queue action. That is the person's choice, so it can take one answer
 of a group before the others.
@@ -1035,6 +1083,8 @@ model or an unsupported effort is an error that names the valid values; OpenBot 
 it creates the agent. Without a provider and a model, the new agent starts on the calling agent's
 provider, model and reasoning effort, so a team that one agent creates runs where that agent runs.
 When the caller's provider no longer lists its model, the new agent starts on the user's default.
+When that provider lists no model now, or the caller is a custom agent, the call fails and asks the
+caller to try again or to name a model: an empty or partial list is no proof that the model is gone (#11033).
 Creation stays this small. The calling agent then configures the new agent, or any other local
 agent, with the same tools that act on itself. `openbot.read_agent` returns one agent's setup:
 profile, runtime, access, Computer Use, notifications, auto-approve, installed skills, routines,

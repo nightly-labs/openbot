@@ -4,6 +4,9 @@ import type { messages as source } from "../en/composer";
 export const messages = {
   "composer.queueEdit.body": "キュー内のメッセージを編集中です。実行するには編集を保存するかキャンセルしてください。",
   "composer.queueEdit.cancel": "編集をキャンセル",
+  "composer.feedbackFix.body":
+    "レポート #{number} を修正しています。リクエストを送信するか、キャンセルしてレポートをそのままにします。",
+  "composer.feedbackFix.cancel": "キャンセル",
   "composer.providerWait.offlineTitle": "インターネットに接続されていません",
   "composer.providerWait.offline": "このコンピューターがオンラインに戻るまで、{provider} は返信できません。",
   "composer.providerWait.silent": "{provider} からの更新が {duration} ありません。",
@@ -19,6 +22,11 @@ export const messages = {
   "composer.update.manual": "続行するには、{provider} を実行しているコンピューターで更新してください。",
   "composer.update.pending": "更新中…",
   "composer.update.action": "更新",
+  "composer.imageInput.body":
+    "{model} はテキストのみを受け取るため、添付した画像を見られません。このモデルが画像を読める場合は、画像をオンにしてください。",
+  "composer.imageInput.label": "{model} の画像をオンにする",
+  "composer.imageInput.pending": "オンにしています…",
+  "composer.imageInput.action": "画像をオン",
   "composer.usageLimit.credits":
     "{provider} のプランの上限をすべて使用しました。エージェントは現在クレジットを使用しています。",
   "composer.usageLimit.creditsResets":
@@ -46,6 +54,7 @@ export const messages = {
   "composer.picker.noSkills": "このエージェントにはスキルがありません。",
   "composer.picker.noSkillMatch": "「{query}」に一致するスキルはありません。",
   "composer.picker.skillsLoadFailed": "スキルを読み込めませんでした。",
+  "composer.picker.skillProblem": "{name} は使用できません。{problem} エージェントに修正を依頼してください。",
   "composer.token.attachment": "添付ファイル {name} を開く",
   "composer.token.agent": "エージェント {name}",
   "composer.token.skill": "スキル {name}",
@@ -64,6 +73,8 @@ export const messages = {
     "マイクへのアクセスがブロックされています。システム設定で OpenBot にマイクの使用を許可してください。",
   "composer.voice.noMicrophone": "使用できるマイクがありません。",
   "composer.voice.startFailed": "OpenBot は音声の録音を開始できませんでした。",
+  "composer.voice.microphoneUnavailable":
+    "OpenBot はマイクを開けませんでした。マイクを使用している他のアプリを閉じ、マイクが接続され、システム設定で許可されていることを確認してから、もう一度お試しください。",
   "composer.voice.transcribeFailed": "OpenBot はこの録音を文字起こしできませんでした。",
   "composer.reply.toYou": "あなたのメッセージに返信しています",
   "composer.reply.toAgent": "エージェントに返信しています",
@@ -123,6 +134,7 @@ export const messages = {
   "composer.voice.noSpeechRecorded": "音声が録音されませんでした。",
   "composer.voice.noSpeechDetected": "音声が検出されませんでした。",
   "composer.voice.readFailed": "返信を読み上げられませんでした。",
+  "composer.voice.languageUnsupported": "返信を読み上げられませんでした。この言語にはまだ対応していません。",
   "composer.error.saveEditTryAgain": "このコンピューターに編集を保存できませんでした。もう一度お試しください。",
   "composer.error.saveUnconfirmed": "保存は確認されていません。結果を確認するには、もう一度保存してください。",
   "composer.error.changeModel": "モデルを変更できませんでした。もう一度お試しください。",

@@ -183,7 +183,10 @@ async function send(request: ShareSendRequest): Promise<void> {
     current: {
       getBootstrap: (hostId, clientPublicKey, existingSessionId) =>
         runTeamEffect(directory.createBootstrap(hostId, clientPublicKey, existingSessionId)),
-      endSession: (sessionId) => runTeamEffect(directory.endSession(sessionId)),
+      // The page uses the account session of the app, so the account service gives it the app's
+      // session on the host. To end it would end the app's session too: the host then has no phone
+      // for notifications and Live Activities until the app opens again. So the page never ends it.
+      endSession: async () => undefined,
       onConnectionUpdate: async (update) => {
         // Signal holds the attempt while a hosted server is offline. A start request wakes it, as the app does.
         if (!update.hostOffline || !request.hosted || wakeRequested) return;

@@ -1,6 +1,3 @@
-// Drives MuseAgentClient and the installed SDK over real child stdio for issues #2346 and #3356.
-// bun scripts/muse-workspace-roots-e2e.ts --phase=before|after
-// Phase changes only the report folder. Both phases require unique, canonical workspace roots.
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { chmod, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
@@ -16,12 +13,9 @@ assert.ok(
   process.argv.length === 3 && (phase === "--phase=before" || phase === "--phase=after"),
   "Use --phase=before or --phase=after.",
 );
-// Keep artifacts inside the bounded scripts workspace, independent of the launch directory.
 const out = resolve(import.meta.dirname, ".openbot-build/muse-workspace-roots-e2e", phase.slice(8));
 const deadlineMs = 8_000;
 
-// This fixture implements only the MSP surface used here. Unknown requests fail closed.
-// The SDK owns spawn, NDJSON framing, command IDs, handshake, and process shutdown.
 const fixture = `#!${process.execPath}
 const fs = require("node:fs");
 const readline = require("node:readline");
@@ -85,7 +79,6 @@ lines.on("line", (line) => {
   if (new Set(p.workspaceRoots).size !== p.workspaceRoots.length) {
     return reject("duplicate workspaceRoots");
   }
-  // As the Muse host: the real path, in the verbatim form on Windows.
   const canonical = (root) => {
     try { return path.toNamespacedPath(fs.realpathSync.native(root)); } catch { return null; }
   };
@@ -208,7 +201,6 @@ try {
   const shared = join(root, "shared");
   const home = join(root, "home");
   for (const directory of [cwd, shared, home]) await mkdir(directory);
-  // A junction needs no Windows privilege. Other platforms ignore the type.
   const linkedCwd = join(root, "linked-workspace");
   const linkedShared = join(root, "linked-shared");
   await symlink(cwd, linkedCwd, "junction");
@@ -224,7 +216,6 @@ try {
     let threadId: string | null = null;
     for (const operation of ["thread/start", "thread/resume"]) {
       const log = join(root, `${scenario.name}-${operation.replace("/", "-")}.jsonl`);
-      // No inherited environment, credentials, account reads, model list, or spawn override.
       const client = new MuseAgentClient(
         { executable, version: "fixture" },
         {
@@ -262,7 +253,6 @@ try {
         result.failures.push(message(error));
       } finally {
         try {
-          // SDK shutdown is bounded at 10 seconds plus its 2 second signal grace.
           await bounded(runCauseEffect(client.stop()), "client stop", 15_000);
           result.cleanup.clientStopped = !client.running;
         } catch (error) {
@@ -278,7 +268,6 @@ try {
               eof: result.requests.some((row) => row.pid === entry.pid && row.event === "eof"),
             });
             if (!stopped) {
-              // Only a PID recorded by this run's private fixture can be stopped here.
               process.kill(entry.pid, "SIGKILL");
               result.failures.push("SDK stop left the owned fixture running; sent SIGKILL.");
             }
@@ -309,7 +298,6 @@ try {
             result.requests.filter((entry) => entry.event === "rejected").length,
             result.clientError ? 1 : 0,
           );
-          // Keep the same success contract in before and after. A rejection is never a pass.
           assert.ok(!result.clientError, `Turn must be accepted. Client error: ${result.clientError}`);
           assert.deepEqual(result.observedRoots, scenario.expected, "Preserve cwd and each extra root once.");
           assert.equal(result.requests.filter((entry) => entry.event === "accepted").length, 1);
@@ -359,7 +347,6 @@ async function turn(client: MuseAgentClient, threadId: string, result: CaseResul
     finish = resolve;
     fail = reject;
   });
-  // Attach a rejection handler before the request can fail or emit an exit event.
   void completed.catch(() => undefined);
   const notification = (event: AppServerNotification) => {
     if (getString(event.params, "threadId") !== threadId) return;

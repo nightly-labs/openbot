@@ -22,7 +22,8 @@ export const messages = {
   "error.crm.currencyInUse": "Planı veya ödemesi olan bir müşterinin para birimini değiştiremezsiniz.",
   "error.crm.badCursor": "Bu sayfa artık geçerli değil. Listeyi yeniden yükleyin.",
   "error.crm.invalidChange": "Bu değişiklik geçerli değil.",
-  "error.crm.agentNotAllowed": "Bu ajan CRM'i kullanamaz. Bir sahip veya yönetici CRM sayfasında ona izin verebilir.",
+  "error.crm.agentNotAllowed":
+    "Bu ajan CRM'i kullanamaz. Bir sahip veya yönetici ona izin verebilir: CRM sayfasını açın, Öneriler'e tıklayın, ajan sayısını gösteren düğmeye tıklayın ve bu ajanı açın.",
   "error.crm.tooManyProposals": "Karar bekleyen çok fazla öneri var. Bir kişi karar verene kadar bekleyin.",
   "error.crm.amountInvalid": "Tutarı 129.00 gibi bir sayı olarak yazın.",
   "error.crm.amountDecimals": "Tutar {currency} için çok fazla ondalık basamak içeriyor.",

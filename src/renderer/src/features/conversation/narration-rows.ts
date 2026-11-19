@@ -1,18 +1,15 @@
 import type { AgentProviderRef } from "@openbot/contracts/agent-providers";
-import { isNarrationItemId } from "@openbot/contracts/conversation-narration";
+import { isNarrationItemId, showsNarration } from "@openbot/contracts/conversation-narration";
 import type { AgentMessage } from "@openbot/ui/data";
 import { formatMessageTime } from "../../app-message-projection";
 
-/**
- * The narration of a `thinking` row as rows of their own, in order. A row is still a step of the
- * turn: with `itemType: "commentary"` the timeline gives it no stored-message actions.
- */
 export function narrationRows(thinking: AgentMessage, provider: AgentProviderRef | undefined): AgentMessage[] {
   const items = thinking.items ?? [];
   const rows: AgentMessage[] = [];
+  const shown = new Set<string>();
   for (const [index, body] of items.entries()) {
     const id = thinking.itemIds?.[index];
-    if (!id || !body.trim() || !isNarrationItemId(id, provider)) continue;
+    if (!id || !isNarrationItemId(id, provider) || !showsNarration(body, shown)) continue;
     const createdAt = thinking.itemCreatedAt?.[index];
     rows.push({
       id,
@@ -25,19 +22,12 @@ export function narrationRows(thinking: AgentMessage, provider: AgentProviderRef
       streaming: thinking.itemStreaming?.[index] === true,
       itemType: "commentary",
       kind: "text",
-      // A row that arrives while the chat is open enters as a new message does. The timeline plays
-      // the entrance once for each id, so an update enters when it arrives, not when the next one does.
       animate: thinking.animate,
     });
   }
   return rows;
 }
 
-/**
- * Puts the progress updates and the steps row of each turn among the other rows, by time. Each
- * update goes before the first row that is newer. The steps row of a turn takes the time of its last
- * update, so it stays under them. A row with no time does not move an update.
- */
 export function placeTurnRowsByTime(rows: readonly AgentMessage[], turns: readonly AgentMessage[][]): AgentMessage[] {
   const timed = turns.flatMap((turn) => {
     let at = "";
@@ -47,7 +37,6 @@ export function placeTurnRowsByTime(rows: readonly AgentMessage[], turns: readon
     });
   });
   if (timed.length === 0) return [...rows];
-  // A stable sort keeps the order of a turn when its rows share a time.
   timed.sort((left, right) => (left.at < right.at ? -1 : left.at > right.at ? 1 : 0));
   const placed: AgentMessage[] = [];
   let next = 0;
@@ -60,26 +49,12 @@ export function placeTurnRowsByTime(rows: readonly AgentMessage[], turns: readon
   return placed;
 }
 
-/**
- * Puts the updates that an agent wrote after a message steered into its turn under that message.
- * The rows of a turn show where its first update is, so a reply to a steer showed above the steer
- * (#7717). As in the shared order (`sortConversationMessages`), a turn goes by time from its second
- * message on: such an update goes before the first newer row of its turn, or after the turn's last
- * row. The steps row goes under the last update that moves. All other rows keep their place.
- */
 export function placeUpdatesAfterSteers(rows: AgentMessage[], turns: readonly AgentMessage[][]): AgentMessage[] {
-  const inputTimes = new Map<string, string[]>();
-  for (const row of rows) {
-    const input = row.author === "you" || row.exchange?.direction === "incoming";
-    if (!row.turnId || !row.createdAt || !input) continue;
-    const times = inputTimes.get(row.turnId) ?? [];
-    times.push(row.createdAt);
-    inputTimes.set(row.turnId, times);
-  }
+  const steerTimes = turnSteerTimes(rows);
   const moved = new Map<string, { row: AgentMessage; at: string }[]>();
   for (const turn of turns) {
     const turnId = turn[0]?.turnId;
-    const steerAt = turnId ? inputTimes.get(turnId)?.sort()[1] : undefined;
+    const steerAt = turnId ? steerTimes.get(turnId) : undefined;
     if (!turnId || steerAt === undefined) continue;
     const later = turn.flatMap((row) =>
       row.kind !== "thinking" && row.createdAt && row.createdAt >= steerAt ? [{ row, at: row.createdAt }] : [],
@@ -106,4 +81,27 @@ export function placeUpdatesAfterSteers(rows: AgentMessage[], turns: readonly Ag
     if (waiting && lastOfTurn.get(row.turnId ?? "") === index) placed.push(...waiting.splice(0).map(({ row }) => row));
   }
   return placed;
+}
+
+function turnSteerTimes(rows: readonly AgentMessage[]): Map<string, string> {
+  const firstTimes = new Map<string, string>();
+  const inputs = new Map<string, AgentMessage[]>();
+  for (const row of rows) {
+    if (!row.turnId || !row.createdAt) continue;
+    const first = firstTimes.get(row.turnId);
+    if (first === undefined || row.createdAt < first) firstTimes.set(row.turnId, row.createdAt);
+    if (row.author !== "you" && row.exchange?.direction !== "incoming") continue;
+    inputs.set(row.turnId, [...(inputs.get(row.turnId) ?? []), row]);
+  }
+  const steerTimes = new Map<string, string>();
+  for (const [turnId, turnInputs] of inputs) {
+    const second = turnInputs.map((row) => row.createdAt ?? "").sort()[1];
+    const first = firstTimes.get(turnId) ?? "";
+    const steers = turnInputs.flatMap((row) =>
+      row.steered && row.createdAt && row.createdAt > first ? [row.createdAt] : [],
+    );
+    const steerAt = [...(second === undefined ? [] : [second]), ...steers].sort()[0];
+    if (steerAt !== undefined) steerTimes.set(turnId, steerAt);
+  }
+  return steerTimes;
 }

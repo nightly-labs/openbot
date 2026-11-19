@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { observedD1 } from "../src/server/observed-d1";
 
-// A D1 message can quote SQL text and a bound value. The log line of a failed call must hold neither.
 const SECRET = "person@example.com";
 const SQL = `SELECT id FROM users WHERE email = '${SECRET}'`;
 
@@ -37,7 +36,6 @@ class FailingDatabase implements D1Database {
   prepare(): D1PreparedStatement {
     return this.statement;
   }
-  // Like workerd, `batch` refuses a statement that this database did not make.
   batch(statements: D1PreparedStatement[]): Promise<never> {
     if (statements.some((statement) => statement !== this.statement)) {
       return Promise.reject(new TypeError("Statement is not from this database."));

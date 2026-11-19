@@ -111,6 +111,7 @@ export const messages = {
   "app.settingsPage.searchPlaceholder": "Einstellungen durchsuchen…",
   "app.settingsPage.results": "Suchergebnisse der Einstellungen",
   "app.settingsPage.noResults": "Keine passenden Einstellungen.",
+  "app.settingsPage.marketplaceApps": "Connectors und MCP-Server",
   "app.settingsPage.resultCount": {
     one: "{count} passende Einstellung.",
     other: "{count} passende Einstellungen.",

@@ -1,26 +1,6 @@
-/**
- * The plugins the marketplace offers.
- *
- * Generated from marketplace/plugin-catalog/ by scripts/build-plugin-catalog.ts.
- * Do not edit by hand: run bun run marketplace:build:plugins, or
- * bun run marketplace:build:plugins -- --check to verify.
- */
-
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import type { MarketplacePluginApp, MarketplacePluginDetail } from "@openbot/ui/features/settings/marketplace-plugins";
 
-/**
- * The configuration an app installs as. The catalog states the name and how the server is reached -
- * an address, or a command and its words; the rest of the record and `enabled` are made here rather
- * than stored as catalog data that could disagree with `normalizeMcpConfig`.
- *
- * A credential is never among them. What a server asks for is declared in `server.auth`, and the
- * value is typed by the user in the connect dialog, which hands back the configuration that
- * connected.
- *
- * The id is empty, which is what the store reads as "new". An id it does not hold is an edit of a
- * row that is gone, and the save is refused.
- */
 export function createPluginAppConfig(app: MarketplacePluginApp): McpServerConfig {
   return {
     id: "",
@@ -29,7 +9,10 @@ export function createPluginAppConfig(app: MarketplacePluginApp): McpServerConfi
     enabled: true,
     command: app.server.transport === "stdio" ? app.server.command : "",
     args: app.server.transport === "stdio" ? [...app.server.args] : [],
-    env: [],
+    env:
+      app.server.transport === "stdio"
+        ? Object.entries(app.server.env ?? {}).map(([key, value]) => ({ key, value }))
+        : [],
     envPassthrough: [],
     workingDirectory: "",
     url: app.server.transport === "http" ? app.server.url : "",
@@ -209,7 +192,7 @@ const OBSIDIAN: MarketplacePluginDetail = {
   category: "productivity",
   creatorName: "Obsidian",
   iconUrl: "https://obsidian.md/apple-touch-icon.png",
-  version: "1.0.0",
+  version: "1.1.0",
   prompts: [
     { id: "prompt-recall", text: "What do my notes say about the decisions on this project?" },
     { id: "prompt-save", text: "Save this decision as a new note in my vault." },
@@ -226,6 +209,7 @@ const OBSIDIAN: MarketplacePluginDetail = {
         transport: "stdio",
         command: "npx",
         args: ["-y", "obsidian-mcp-server@3.7.2"],
+        env: { OBSIDIAN_BASE_URL: "https://127.0.0.1:27124" },
         auth: [
           {
             id: "obsidian-key",
@@ -236,7 +220,7 @@ const OBSIDIAN: MarketplacePluginDetail = {
                 id: "token",
                 label: "API key",
                 env: "OBSIDIAN_API_KEY",
-                hint: 'In Obsidian, open Settings > Local REST API. Copy the API key and turn on "Enable non-encrypted (HTTP) server".',
+                hint: "In Obsidian, open Settings > Local REST API and copy the API key.",
               },
             ],
             docsUrl: "https://github.com/coddingtonbear/obsidian-local-rest-api",

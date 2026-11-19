@@ -1,4 +1,5 @@
 import { sourceText } from "@openbot/i18n/source";
+import { base64ToBytes } from "@openbot/team-client/base64";
 import { referenceFrom } from "@openbot/user-errors";
 import { CodedError } from "expo";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -17,7 +18,6 @@ import { haptics } from "@/shared/lib/haptics";
 import { speechRecognition } from "@/shared/lib/speech-recognition";
 import { currentText } from "@/shared/lib/text";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
-import { base64Bytes } from "../model/base64-bytes";
 import {
   applyDictationResult,
   type DictationNotice,
@@ -31,22 +31,14 @@ import {
 } from "../model/voice-dictation";
 import type { VoiceDictation } from "./use-voice-dictation";
 
-/** The engines that capture the microphone in the speech module, not in the phone's recognizer. */
 export type ModelRecognition = LocalRecognition | "elevenlabs" | "voice-server";
 
-/** A model on the phone decodes faster with more threads, and a phone has four or more cores. */
 const LOCAL_MODEL_THREADS = 4;
-/**
- * A finish that never reports its end must not hold the composer. Parakeet decodes the last segment
- * in about a second; Qwen3-ASR writes the words one at a time, so it takes longer; ElevenLabs can
- * take up to ten seconds for its last segment.
- */
 const STOP_TIMEOUT_MS = {
   parakeet: 8_000,
   "parakeet-unified": 8_000,
   "qwen3-asr": 20_000,
   elevenlabs: 12_000,
-  // The whole recording goes at the end, and a server without a GPU can take two minutes.
   "voice-server": 125_000,
 } as const;
 
@@ -80,15 +72,10 @@ interface CaptureSession {
   engine: ModelRecognition;
   base: string;
   transcript: DictationTranscript;
-  /** The ElevenLabs session; null for a model on the phone. */
   scribe: ScribeRealtimeSession | null;
-  /** The voice server: the audio so far, as Base64 PCM chunks. It goes to the server at the end. */
   recording: string[] | null;
-  /** When the user last spoke, for the end of a turn after a pause. Null before the first word. */
   spokeAt: number | null;
-  /** The token request, which a cancel stops. */
   abort: AbortController;
-  /** The microphone is open for this session. Events before that belong to an earlier one. */
   native: boolean;
   heard: boolean;
   listeningAt: number | null;
@@ -96,7 +83,6 @@ interface CaptureSession {
   ending: "cancelled" | "permission_denied" | "operation_failed" | null;
 }
 
-/** The sentence of a failed voice server request names the host and what to change. */
 function showVoiceServerNotice(error: VoiceServerError): void {
   void haptics.notification("error");
   const text = currentText();
@@ -108,9 +94,8 @@ function showVoiceServerNotice(error: VoiceServerError): void {
   );
 }
 
-/** The 16 kHz mono PCM of a recording, from the Base64 chunks of the speech module. */
 function joinRecording(chunks: readonly string[]): Uint8Array {
-  const parts = chunks.map(base64Bytes);
+  const parts = chunks.map(base64ToBytes);
   const pcm = new Uint8Array(parts.reduce((total, part) => total + part.byteLength, 0));
   let offset = 0;
   for (const part of parts) {
@@ -120,13 +105,12 @@ function joinRecording(chunks: readonly string[]): Uint8Array {
   return pcm;
 }
 
-/** The language of the dictation for the server, or null to let the server find it. */
 function voiceServerLanguage(): string | null {
   const chosen = useDictationLanguage.getState().value;
   return chosen === AUTOMATIC_DICTATION_LANGUAGE ? null : (chosen.split(/[-_]/)[0]?.toLowerCase() ?? null);
 }
 
-function showNotice(notice: DictationNotice, error?: unknown): void {
+export function showNotice(notice: DictationNotice, error?: unknown): void {
   void haptics.notification("error");
   const { t } = currentText();
   showFailureAlert(
@@ -143,13 +127,15 @@ function showNotice(notice: DictationNotice, error?: unknown): void {
   );
 }
 
-/** One analytics event for each session. It has no words of the transcript. */
-function trackTurn(current: CaptureSession): void {
+export function trackTurn(
+  current: Pick<CaptureSession, "heard" | "listeningAt" | "stoppingAt" | "ending">,
+  transcription: "cloud" | "local" | undefined,
+): void {
   const now = performance.now();
   const failed = current.ending === "permission_denied" || current.ending === "operation_failed";
   mobileAnalytics.track("voice_turn", {
     server_kind: "remote",
-    transcription: current.engine === "elevenlabs" || current.engine === "voice-server" ? "cloud" : "local",
+    transcription,
     result: failed ? "failed" : current.ending === "cancelled" || !current.heard ? "cancelled" : "succeeded",
     failure_code: !failed
       ? undefined
@@ -162,31 +148,20 @@ function trackTurn(current: CaptureSession): void {
   });
 }
 
-/** The speech module has the microphone and the recognizer: an app binary from before them does not. */
 export const modelCaptureAvailable = (): boolean =>
   typeof speechNative?.startCapture === "function" && speechRecognition !== null;
 
-// The microphone of the speech module is one for the whole app, and every mounted chat receives its
-// events. Only the composer that started the session reacts.
 let owner: symbol | null = null;
 
-/**
- * Dictation with Parakeet or Qwen3-ASR on the phone, or ElevenLabs Scribe, which all find the spoken
- * language themselves. The speech module opens the microphone: the model on the phone recognizes
- * each segment there, and ElevenLabs gets the audio through a socket. The draft and the phases work as
- * with the phone's recognizer, so the composer and the voice conversation use both the same way.
- */
 export function useModelDictation({
   engine,
   enabled,
   onDraft,
   endsOnPause = false,
 }: {
-  /** Null while the phone's recognizer is in use. */
   engine: ModelRecognition | null;
   enabled: boolean;
   onDraft: (text: string) => void;
-  /** The voice server ends the capture after the pause of a voice conversation. */
   endsOnPause?: boolean;
 }): VoiceDictation {
   const [id] = useState(() => Symbol("model-dictation"));
@@ -211,7 +186,11 @@ export function useModelDictation({
   }, []);
 
   const settle = useCallback(() => {
-    if (session.current) trackTurn(session.current);
+    if (session.current)
+      trackTurn(
+        session.current,
+        session.current.engine === "elevenlabs" || session.current.engine === "voice-server" ? "cloud" : "local",
+      );
     if (owner === id) owner = null;
     session.current = null;
     if (stopTimer.current) clearTimeout(stopTimer.current);
@@ -221,7 +200,6 @@ export function useModelDictation({
     for (const resolve of finished.current.splice(0)) resolve();
   }, [id, level, update]);
 
-  /** Ends the session that failed while it listened. The draft keeps the text so far. */
   const fail = useCallback(
     (current: CaptureSession, notice: DictationNotice, error?: unknown) => {
       if (session.current !== current) return;
@@ -247,7 +225,6 @@ export function useModelDictation({
         const current = session.current;
         if (owner !== id || !current?.native) return;
         level.set(withTiming(Math.min(1, Math.max(0, value)), { duration: 100 }));
-        // The server sends no text before the end, so the pause after the words ends the turn here.
         if (!current.recording || !endsOnPauseRef.current || phaseRef.current !== "listening") return;
         const now = performance.now();
         if (speaking) current.spokeAt = now;
@@ -270,8 +247,6 @@ export function useModelDictation({
         const current = session.current;
         if (owner !== id || !current?.native) return;
         current.native = false;
-        // A phone call or a new audio route ended it: the draft keeps the text so far, with no alert,
-        // as with the phone's recognizer.
         if (error === "interrupted") {
           current.scribe?.cancel();
           settle();
@@ -283,10 +258,8 @@ export function useModelDictation({
           });
           return;
         }
-        // ElevenLabs has the last audio now: wait for its last segment.
         if (current.scribe) void current.scribe.finish().then(() => session.current === current && settle());
         else if (current.recording) {
-          // The voice server gets the whole recording now. A cancel aborts the request.
           const pcm = joinRecording(current.recording);
           current.recording = [];
           if (pcm.byteLength === 0) {
@@ -337,7 +310,6 @@ export function useModelDictation({
       };
       session.current = current;
       update("starting");
-      // A cancel, or a cancel and a new press, can happen during any wait. Only this session may continue.
       const stillCurrent = () => owner === id && session.current === current && phaseRef.current === "starting";
       void (async () => {
         try {
@@ -354,7 +326,6 @@ export function useModelDictation({
               throw new VoiceServerError("address", sourceText("error.voice.server.routeOff"));
           } else if (engine !== "elevenlabs") {
             try {
-              // The first start loads about 650 MB, or 1 GB for Qwen3-ASR, which takes a few seconds.
               await loadLocalRecognizer(engine, LOCAL_MODEL_THREADS);
             } catch (error) {
               if (!stillCurrent()) return;
@@ -417,7 +388,6 @@ export function useModelDictation({
     const current = session.current;
     if (owner !== id || !current) return Promise.resolve();
     if (phaseRef.current === "starting") {
-      // No speech yet: the permission prompt, the model or the socket is still opening.
       cancelNative(current);
       settle();
       return Promise.resolve();
@@ -452,15 +422,12 @@ export function useModelDictation({
   const foreground = useAppForeground();
   useEffect(() => {
     if (owner !== id) return;
-    // Android reports the app as in the background while its permission dialog is open, so the
-    // first press must not stop itself there.
     if (!enabled || (!foreground && phaseRef.current !== "starting")) void finish();
   }, [enabled, foreground, finish, id]);
 
   useEffect(
     () => () => {
       if (owner !== id) return;
-      // The draft already holds the last text, so leaving the chat keeps it.
       if (session.current) cancelNative(session.current);
       owner = null;
       if (stopTimer.current) clearTimeout(stopTimer.current);

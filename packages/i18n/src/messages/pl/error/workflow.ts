@@ -16,6 +16,7 @@ export const messages = {
   "error.workflow.agentMissing": "Wybierz agenta dla tego kroku.",
   "error.workflow.handoffFailed": "OpenBot nie mógł wysłać tego kroku do jego agenta.",
   "error.workflow.agentStepEnded": "Wiadomość do agenta została usunięta, zanim odpowiedział.",
+  "error.workflow.agentStepStopped": "Agent zatrzymał się, zanim odpowiedział na ten krok. Uruchom krok ponownie.",
   "error.workflow.conditionUnclear": "Model nie odpowiedział tak ani nie.",
   "error.workflow.modelFailed": "Model nie mógł odpowiedzieć. Uruchom krok ponownie.",
   "error.workflow.modelTimedOut":
@@ -31,6 +32,7 @@ export const messages = {
   "error.workflow.pictureMissing": "Obrazu nie ma już na serwerze. Wyślij go ponownie.",
   "error.workflow.pictureType": "Użyj obrazu PNG, JPEG lub WebP.",
   "error.workflow.mediaInputMissing": "Obraz z wcześniejszego kroku jest niedostępny. Uruchom ten krok ponownie.",
+  "error.workflow.mediaEmptyRequest": "Napisz opis albo uruchom wcześniejsze kroki, aby dotarł tekst lub obraz.",
   "error.workflow.mediaInputNotImage": "Ten krok przyjmuje tylko obrazy, nie wideo. Usuń połączenie z wideo.",
   "error.workflow.stepMissing": "Ten krok już nie istnieje.",
   "error.workflow.nodeMissing": "Tego kroku nie ma w przepływie pracy.",

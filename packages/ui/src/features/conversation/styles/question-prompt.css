@@ -1,9 +1,14 @@
-/* Question prompt: one bubble, one question at a time. The open page moves and fades in; the others
-   wait to the start (done) or to the end (later). The stage height follows the open page. */
-
 .question-prompt-bubble.ui-bubble {
   width: min(540px, 100%);
   max-width: 100%;
+}
+
+.question-prompt-with-author {
+  padding-inline-start: calc(var(--message-author-column) + var(--openbot-space-2));
+}
+
+.question-prompt-with-author:has(> *) {
+  padding-block: var(--openbot-chat-entry-gap);
 }
 
 .question-prompt-bubble[data-entrance] {
@@ -55,8 +60,6 @@
     visibility 0s linear var(--page-slide-dur);
 }
 
-/* Only the open page sizes the stage. A chat that opens with an answered card lays it out at its
-   summary height at once, so the rows under it do not move when the stage height is set. */
 .question-prompt-page[data-pos="prev"],
 .question-prompt-page[data-pos="next"] {
   position: absolute;
@@ -87,7 +90,6 @@
   transition-delay: 0s, 0s, 0s, 0s;
 }
 
-/* The footer folds away when the answers are sent. */
 .question-prompt-fold {
   display: grid;
   grid-template-rows: 0fr;
@@ -116,8 +118,6 @@
     opacity var(--acc-expand) var(--acc-ease),
     filter var(--acc-expand) var(--acc-ease);
 }
-
-/* Question ------------------------------------------------------------------------------------ */
 
 .question-prompt-header {
   display: grid;
@@ -178,7 +178,6 @@
   background: var(--openbot-question-option-pressed);
 }
 
-/* The stage clips, so the keyboard ring sits inside the row. */
 .question-prompt-option.ui-questionnaire-choice:focus-within {
   outline: 0;
 }
@@ -204,7 +203,6 @@
   overflow-wrap: anywhere;
 }
 
-/* Letter badge: a question tint; solid when picked, with a small pop; success tint once answered. */
 .question-prompt-letter.ui-kbd {
   width: 22px;
   min-width: 22px;
@@ -274,8 +272,6 @@
   box-shadow: none;
 }
 
-/* Footer: progress, then Back, Skip and Next. ------------------------------------------------ */
-
 .question-prompt-footer {
   display: flex;
   align-items: center;
@@ -306,7 +302,6 @@
   opacity: 0.55;
 }
 
-/* The current question is a wide pill. It moves along as the questions open. */
 .question-prompt-dot[data-state="current"] {
   width: 18px;
   background: var(--openbot-question-option);
@@ -324,8 +319,6 @@
   padding-inline: var(--openbot-space-4);
   font-size: var(--openbot-text-md);
 }
-
-/* Summary ------------------------------------------------------------------------------------- */
 
 .question-prompt-summary {
   display: grid;

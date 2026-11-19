@@ -45,12 +45,13 @@ export const messages = {
   "prompt.browser.title.pending": "{host}에서 단계를 완료해 주세요",
   "prompt.browser.cancelled": "취소됨",
   "prompt.browser.reload":
-    "로그인을 마친 다음 “완료했어요”를 선택하기 전에 브라우저 페이지를 새로 고쳐 주세요. 페이지를 새로 고칠 때까지 페이지 검사가 차단돼요.",
+    "OpenBot이 비밀번호 또는 코드를 끝까지 입력하지 못했어요. 페이지를 확인하고 빠진 부분을 입력해 주세요. 로그인을 마친 다음 “완료했어요”를 선택하기 전에 브라우저 페이지를 새로 고쳐 주세요. 페이지를 새로 고칠 때까지 페이지 검사가 차단돼요.",
   "prompt.browser.continuing": "{name}이(가) 이어서 진행하는 중이에요.",
   "prompt.browser.cancelledBody": "브라우저 단계가 취소되었어요.",
   "prompt.browser.pendingBody":
     "페이지를 열어 로그인, 인증 또는 동의를 완료해 주세요. 그런 다음 {name}이(가) 이어서 진행하게 해 주세요.",
   "prompt.browser.openPage": "{title} 열기",
+  "prompt.browser.openFailed": "기본 창에서 페이지를 열 수 없어요. 다시 시도해 주세요.",
   "prompt.browser.done": "완료했어요",
   "prompt.browser.pageFallback": "브라우저 페이지",
   "prompt.browser.hostFallback": "브라우저",

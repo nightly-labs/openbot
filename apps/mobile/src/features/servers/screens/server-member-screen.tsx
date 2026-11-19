@@ -20,11 +20,6 @@ import { useText } from "@/shared/lib/text";
 const DATE_FORMAT = { year: "numeric", month: "short", day: "numeric" } as const;
 const EXPIRY_FORMAT = { month: "short", day: "numeric", hour: "numeric", minute: "numeric" } as const;
 
-/**
- * Server sheet > Members > one person: their role and access. An owner or admin changes the role
- * of another member, opens the Roles page of a member, or removes them; the owner and your own membership stay read-only here, and
- * Server settings has Leave. An email invitation opens here too, and its owner or admin revokes it.
- */
 export function ServerMemberScreen() {
   const { t, format, errorMessage } = useText();
   const { theme } = useUniwind();
@@ -122,7 +117,6 @@ export function ServerMemberScreen() {
           ) : null}
         </SettingsSection>
         {error}
-        {/* Roles apply only to a member: an owner or admin can use all agents. */}
         {manageable && memberRole === "member" && roles.available ? (
           <SettingsSection footer={t("mobile.server.roles.memberHint")}>
             <SettingsRow
@@ -238,10 +232,6 @@ export function ServerMemberScreen() {
   );
 }
 
-/**
- * The centered portrait, name and email at the top of the page, as Profile has. The initials come
- * from `name`; `label` is the shown text, such as "Norbi (you)".
- */
 function Identity({ name, label, detail }: { name: string; label: string; detail: string | null }) {
   return (
     <View className="items-center gap-3">

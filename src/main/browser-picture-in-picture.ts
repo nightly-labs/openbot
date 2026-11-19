@@ -20,13 +20,11 @@ interface BrowserPictureInPictureOptions {
   onEvent: (event: BrowserPictureInPictureEvent) => void;
 }
 
-/** A host's tab, which the window draws from the live view because it has no native view here. */
 export interface BrowserPictureInPictureLiveView {
   clipboard: boolean;
 }
 
 const HOVER_POLL_INTERVAL_MS = 150;
-/** The dark background of the floating browser, under its own page. */
 const PICTURE_IN_PICTURE_DARK_BACKGROUND = "#111415";
 
 export class BrowserPictureInPicture {
@@ -94,8 +92,6 @@ export class BrowserPictureInPicture {
       },
     });
     this.#controlsView = controlsView;
-    // The controls share the main window's origin, and so its zoom, which would clip them in the
-    // fixed 30 px strip.
     controlsView.webContents.setZoomMode("isolated");
     controlsView.setBackgroundColor("#00000000");
     this.#options.browser.setPictureInPictureOverlayView(controlsView);
@@ -127,7 +123,6 @@ export class BrowserPictureInPicture {
       positionControls();
     });
     window.on("closed", () => {
-      // A child view's contents outlive its window. A window that the system closes skips `#close`.
       if (!controlsView.webContents.isDestroyed()) controlsView.webContents.close();
       if (this.#window !== window) return;
       this.#stopHoverTracking();
@@ -148,7 +143,6 @@ export class BrowserPictureInPicture {
       if (liveView.clipboard) pageUrl.searchParams.set("clipboard", "1");
     }
     yield* pipCall(() => window.loadURL(pageUrl.toString()));
-    // The system can close the window during the load, and the `closed` handler closes the controls.
     if (controlsView.webContents.isDestroyed()) return bounds;
     yield* pipCall(() =>
       developmentUrl
@@ -229,12 +223,6 @@ export class BrowserPictureInPicture {
         .catch(() => undefined);
     };
     update();
-    // The cursor is polled because a window that is not focused gets no mouse
-    // events, and hover on an unfocused always-on-top window is the whole
-    // feature. 75 ms was 13 reads of the cursor and the window bounds every
-    // second, for the life of the window; a control strip that appears within
-    // 150 ms reads the same to a user and costs half as much. `unref` keeps the
-    // timer from holding the event loop awake between those reads.
     const timer = setInterval(update, HOVER_POLL_INTERVAL_MS);
     timer.unref();
     this.#hoverTimer = timer;

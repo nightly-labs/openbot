@@ -1,7 +1,6 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("app", {
-  // The app shell, shared state, and shared controls without a feature of their own.
   "app.loading": "Loading OpenBot",
   "app.leftPanel.resize": "Resize left sidebar",
   "app.host.thisMac": "This Mac",
@@ -47,7 +46,6 @@ export const messages = defineMessages("app", {
   "app.questionnaire.empty": "No questions",
   "app.standingApproval.title": "Always allow {name}?",
   "app.standingApproval.titleUnnamed": "Always allow this agent?",
-  // The page rail and the settings page of the desktop window.
   "app.rail.label": "Pages",
   "app.rail.website": "OpenBot website",
   "app.rail.agents": "Agents",
@@ -109,6 +107,7 @@ export const messages = defineMessages("app", {
   "app.settingsPage.searchPlaceholder": "Search settings…",
   "app.settingsPage.results": "Settings search results",
   "app.settingsPage.noResults": "No matching settings.",
+  "app.settingsPage.marketplaceApps": "Connectors and MCP servers",
   "app.settingsPage.resultCount": {
     one: "{count} matching setting.",
     other: "{count} matching settings.",

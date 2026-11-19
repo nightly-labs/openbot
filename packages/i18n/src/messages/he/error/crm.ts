@@ -22,7 +22,8 @@ export const messages = {
   "error.crm.currencyInUse": "אי אפשר לשנות את המטבע של לקוח שיש לו תוכניות או תשלומים.",
   "error.crm.badCursor": "הדף הזה כבר לא תקף. יש לטעון את הרשימה מחדש.",
   "error.crm.invalidChange": "השינוי הזה אינו תקף.",
-  "error.crm.agentNotAllowed": "הסוכן הזה לא יכול להשתמש ב-CRM. בעלים או מנהל יכולים לתת לו גישה בדף ה-CRM.",
+  "error.crm.agentNotAllowed":
+    "הסוכן הזה לא יכול להשתמש ב-CRM. בעלים או מנהל יכולים לתת לו גישה: יש לפתוח את דף ה-CRM, ללחוץ על הצעות, ללחוץ על הכפתור עם מספר הסוכנים ולהפעיל את הסוכן הזה.",
   "error.crm.tooManyProposals": "יותר מדי הצעות ממתינות להחלטה. יש להמתין עד שמישהו יחליט עליהן.",
   "error.crm.amountInvalid": "יש לכתוב את הסכום כמספר, למשל 129.00.",
   "error.crm.amountDecimals": "לסכום יש יותר מדי ספרות אחרי הנקודה העשרונית עבור {currency}.",

@@ -45,11 +45,12 @@ export const messages = {
   "prompt.browser.title.pending": "أكمل الخطوة على {host}",
   "prompt.browser.cancelled": "أُلغي",
   "prompt.browser.reload":
-    "أكمل تسجيل الدخول، ثم أعد تحميل صفحة المتصفح قبل اختيار «انتهيت». يبقى فحص الصفحة محظورًا حتى تُعاد تحميلها.",
+    "تعذّر على OpenBot إكمال إدخال كلمة المرور أو الرمز. تحقّق من الصفحة وأدخل ما ينقص. أكمل تسجيل الدخول، ثم أعد تحميل صفحة المتصفح قبل اختيار «انتهيت». يبقى فحص الصفحة محظورًا حتى تُعاد تحميلها.",
   "prompt.browser.continuing": "يتابع {name}.",
   "prompt.browser.cancelledBody": "أُلغيت خطوة المتصفح.",
   "prompt.browser.pendingBody": "افتح الصفحة لإكمال تسجيل الدخول أو التحقق أو الموافقة. ثم دع {name} يتابع.",
   "prompt.browser.openPage": "فتح {title}",
+  "prompt.browser.openFailed": "تعذّر فتح الصفحة في النافذة الرئيسية. حاول مرة أخرى.",
   "prompt.browser.done": "انتهيت",
   "prompt.browser.pageFallback": "صفحة المتصفح",
   "prompt.browser.hostFallback": "المتصفح",

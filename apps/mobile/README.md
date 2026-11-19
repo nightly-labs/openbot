@@ -21,12 +21,12 @@ After switching from the isolated linker to the hoisted linker, move the old
 from the repository root. A normal install can retain old workspace symlinks and cause
 the local fingerprint to differ from the clean EAS installation.
 
-Expo 58.0.17 is patched in `patches/expo@58.0.17.patch` so a DOM component ignores a props
+Expo 58.0.25 is patched in `patches/expo@58.0.25.patch` so a DOM component ignores a props
 message that it sends before Android mounts its web view, or after Android removes it. Android
 rejects these calls, and the rejection shows as a console error. The DOM component asks for the
 props again when it is ready.
 
-expo-splash-screen 58.0.11 is patched in `patches/expo-splash-screen@58.0.11.patch` so Android 12
+expo-splash-screen 58.0.14 is patched in `patches/expo-splash-screen@58.0.14.patch` so Android 12
 and 13 get no splash exit animation listener. With the listener, the platform hides the starting
 window on the first draw, and the app crashes when that window is already gone. Gradle links the
 prebuilt AAR of an Expo module and ignores a patch to its Kotlin source, so
@@ -39,7 +39,7 @@ Expo modules by default, so a patch to Expo Swift code needs `expo.autolinking.i
 extend `NativeMethods`, which React Native 0.87 removed from its types, so `MaskedView` was not a
 valid JSX component. Remove the patch when a release fixes the types.
 
-react-native-screens 4.30.0 is patched in `patches/react-native-screens@4.30.0.patch` so the full
+react-native-screens 4.30.1 is patched in `patches/react-native-screens@4.30.1.patch` so the full
 screen swipe back of a chat waits for a gesture handler pan in the top screen to fail. The swipe back
 starts anywhere in the chat, and a swipe to the right on a message bubble still replies. Without
 the patch, no rule sets which of the two recognizers gets the swipe. Remove the patch when a
@@ -262,8 +262,8 @@ the user unlocks. Expo Go does not have the module: it measures with the phone c
 
 ## iOS shortcuts
 
-The Shortcuts app of iOS 26 and later has two OpenBot shortcuts: List Agents and Send Message. An
-older iOS has none: their cards need `SnippetIntent`.
+The Shortcuts app of iOS 26 and later has three OpenBot shortcuts: List Agents, Send Message and
+Open Agent. An older iOS has none: their cards need `SnippetIntent`.
 
 The shortcuts run in native code, with no JavaScript of the app. iOS runs a shortcut in the
 background, also when the app is not in memory. There the app has no window, React Native does not
@@ -278,6 +278,8 @@ start, and iOS suspends the app soon after the intent returns.
   Shortcuts, the app lock and the card text. Sign-out deletes it. The servers with their public
   keys and the agent pictures are the ones that the app writes for the share extension.
 - List Agents reads that file. A tap on an agent opens its chat.
+- Open Agent opens the app on the chat of the agent of Settings > Shortcuts. With no agent, it opens
+  Settings > Shortcuts. It uses the same `ShortcutBridge` path as the card buttons.
 - Send Message sends to the agent of Settings > Shortcuts with the sender of the share extension
   (`plugins/share-extension/ShareSender.swift` and the page `share-sender.html`, which the plugin
   also adds to the app target). A hidden web view with the Team client connects to the agent's
@@ -603,13 +605,15 @@ Do not publish the draft by hand in the GitHub page with the prerelease mark cle
 The site makes the link from the version and does not ask GitHub. So the publish workflow fails when
 the version has no release: the link on the site is then dead. Stage the APK of that version, then
 start `Publish the Android APK` again. `ANDROID_APK_FIRST_VERSION` in the same file hides the APK
-download while it is `null` or newer than the newest Google Play version. It is `null` now.
+download while it is `null` or newer than the newest Google Play version. It is `1.4.11` now.
 
-**The APK that Google Play makes does not work as a direct download.** Play's automatic integrity
-protection is on for the app, so the generated APK has an installer check
-(`com.pairip.licensecheck`). After an install from the file, the app shows "Get this app from Play"
-and does not continue. The APK of 1.4.9 was public on 2026-11-13 and showed this. Keep the download
-hidden until an APK starts after an install from the file: test each new source on a phone first.
+**Play's automatic integrity protection must stay off.** With it, the APK that Google Play makes
+has an installer check (`com.pairip.licensecheck`). After an install from the file, the app shows
+"Get this app from Play" and does not continue. The APK of 1.4.9 was public on 2026-11-13 and showed
+this. The protection is off in Play Console (Protected by Google Play > Automatic protection:
+"Installer check: off") since 2026-11-16. It changes only new uploads, so builds up to 1.4.10 still have it, and
+the first APK is the one of 1.4.11. Do not turn the protection on again: each APK on the site then
+stops after an install.
 
 The service account must have the Play Console permission to download the generated APKs of the
 app. Without it, Google Play answers "The caller does not have permission" (run 43252109769). The

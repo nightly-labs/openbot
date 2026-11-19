@@ -26,16 +26,12 @@
   letter-spacing: 0;
 }
 
-/* With a title, the name button gets narrower before any other part of the header, but not narrower
-   than the avatar and the name. */
 .conversation-title:has(> h1 > .conversation-agent-title-room),
 .conversation-heading-group:not(:has(> .agent-threads-header)):has(.conversation-agent-title-room) {
   min-width: auto;
   flex-shrink: 1000;
 }
 
-/* The name keeps its width. The title column takes only the room that is left, down to none. A
-   channel heading is not in this grid: its name has its own ellipsis (channels.css). */
 .conversation-agent-heading {
   display: grid;
   min-width: 0;
@@ -44,7 +40,6 @@
   white-space: nowrap;
 }
 
-/* The header hides a title that has less room than its minimum width (see ConversationHeader.tsx). */
 .conversation-agent-title-room {
   display: flex;
   min-width: 0;
@@ -66,6 +61,39 @@
   margin-inline: 0.4em;
 }
 
+.conversation-header[data-model-fit="icon"] .conversation-heading-group:not(:has(> .agent-threads-header)) {
+  min-width: 0;
+  flex-shrink: 1000;
+  overflow-x: clip;
+}
+
+.conversation-header[data-model-fit="icon"]
+  .conversation-heading-group:not(:has(> .agent-threads-header))
+  .conversation-title {
+  min-width: auto;
+  flex-shrink: 1;
+}
+
+.conversation-header[data-model-fit="icon"]
+  .conversation-heading-group:not(:has(> .agent-threads-header))
+  .conversation-agent-heading {
+  grid-template-columns: minmax(0, auto) minmax(0, max-content);
+}
+
+.conversation-header[data-model-fit="icon"]
+  .conversation-heading-group:not(:has(> .agent-threads-header))
+  .conversation-agent-title-room {
+  display: none;
+}
+
+.conversation-header[data-model-fit="icon"]
+  .conversation-heading-group:not(:has(> .agent-threads-header))
+  .conversation-agent-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .conversation-access-lock {
   display: inline-flex;
   flex: none;
@@ -84,7 +112,6 @@
   gap: 6px;
 }
 
-/* The model change that waits for the running turn to end. */
 .conversation-model-pending {
   flex: none;
   gap: 4px;
@@ -103,7 +130,6 @@
 .provider-model-trigger {
   display: flex;
   width: max-content;
-  /* Room for the effort after the model name. The model name shortens first. */
   max-width: 240px;
   height: 28px;
   align-items: center;
@@ -175,9 +201,6 @@
   content: "·";
 }
 
-/* In the chat header the picker text has the size of the tab labels. When the thread tabs do not
-   fit, the picker gets smaller: first the effort closes, then the model name. Each part slides closed
-   and fades. The tooltip and the accessible name of the picker keep both. */
 .conversation-header .provider-model-trigger {
   interpolate-size: allow-keywords;
 }
@@ -191,8 +214,6 @@
     opacity var(--openbot-duration-normal) var(--openbot-ease-out);
 }
 
-/* A closed part also takes back the gap before it, so the picker has no blank space. When the thread
-   tabs become one button, the picker shows only its icon, so the button has room for the thread title. */
 .conversation-header[data-model-fit] .provider-model-trigger-effort,
 .conversation-header[data-model-fit="icon"] .provider-model-trigger-name,
 .conversation-header:where(:has(.agent-threads-header:not([data-mode="tabs"])))
@@ -203,7 +224,6 @@
   opacity: 0;
 }
 
-/* While the tabs measure a step, the picker shows it at once. */
 .conversation-header[data-model-measure]
   .provider-model-trigger
   :is(.provider-model-trigger-name, .provider-model-trigger-effort) {
@@ -216,9 +236,6 @@
   }
 }
 
-/* The Fast chip gets its own room, so the model name keeps the width it has without it. A form field
-   keeps the width of its row. `:where()` keeps the specificity low, so the narrow header rule below
-   still wins. */
 .provider-model-trigger:where(:not(.provider-model-trigger-field)):has(.provider-model-trigger-fast) {
   max-width: 296px;
 }
@@ -230,9 +247,6 @@
   stroke-width: var(--openbot-icon-stroke);
 }
 
-/* An email can be long: the account gives way before the model name does. Shrink is in proportion
-   to the factor, so the account takes all of it until it has no width left. The factor is large
-   because a part of a pixel off the model name is sufficient to cut it with an ellipsis. */
 .provider-model-trigger-account {
   min-width: 0;
   max-width: 160px;
@@ -240,7 +254,6 @@
   overflow: hidden;
 }
 
-/* SwapLabel: the old text sits on top of the new text while both animate. */
 .ui-swap {
   position: relative;
   display: inline-block;
@@ -259,13 +272,10 @@
   inset-inline-start: 0;
 }
 
-/* The trigger swap is mostly a blur. The box does not clip it: a clip cuts the blur and the old
- * text with a hard edge while the box eases to the new width. The name clips itself instead. */
 .provider-model-trigger-value .ui-swap {
   overflow: visible;
 }
 
-/* A name without SwapLabel, such as a static copy of the trigger, clips itself. */
 .provider-model-trigger-name:not(.ui-swap) {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -283,7 +293,6 @@
   text-overflow: ellipsis;
 }
 
-/* A newly chosen provider's mark springs in. */
 .provider-model-trigger-mark {
   display: flex;
   flex: 0 0 auto;
@@ -383,7 +392,6 @@
   animation: ui-menu-in var(--ui-menu-duration) var(--ui-menu-ease) both;
 }
 
-/* The copy that ContentExitMotion leaves in the place of the closed popover plays the exit. */
 .provider-model-popover:not([data-expanded]) {
   animation: ui-menu-out var(--ui-menu-duration) var(--ui-menu-ease) both;
 }
@@ -407,9 +415,6 @@
   padding: 9px 7px;
 }
 
-/* Many providers or accounts scroll here, so the add button below stays in the panel. The padding
- * keeps the focus outline and the account badges, which sit across the button corner, inside the
- * scroll box. */
 .provider-model-rail-tabs {
   display: flex;
   min-height: 0;
@@ -422,7 +427,6 @@
   padding: 5px;
 }
 
-/* Opens the provider settings, to connect a provider that the rail leaves out. */
 .provider-model-rail-add {
   color: var(--openbot-text-muted);
 }
@@ -500,8 +504,6 @@
   opacity: 1;
 }
 
-/* A provider that cannot run: a dim mark and a dot. The dot uses the warning color when the user can
- * fix it here (sign in, update), and the muted text color otherwise. The tooltip names the state. */
 .provider-model-rail-button-unavailable .provider-model-mark {
   opacity: 0.28;
 }
@@ -531,8 +533,6 @@
   background: var(--openbot-warning);
 }
 
-/* The place of an account in its provider's list, when the provider has more than one. The API key
- * account shows a key, as it bills API credit and not the provider's plan. */
 .provider-model-rail-account {
   position: absolute;
   inset-inline-end: -3px;
@@ -577,8 +577,7 @@
   flex-shrink: 0;
   align-items: center;
   gap: var(--openbot-space-2);
-  /* The end inset lives on the text, not the row, so the action button can line its end edge up
-   * with the search field and the model rows below it. */
+
   padding-block: var(--openbot-space-1-5) var(--openbot-space-2);
   padding-inline: var(--ui-menu-inset) 0;
 }
@@ -589,8 +588,6 @@
   padding-inline-end: 4px;
 }
 
-/* The icons are raw lucide exports with no intrinsic size, and only the icon-only button sizes
- * carry a rule, so an icon beside a label needs one here to match every other button. */
 .provider-model-heading .ui-button,
 .provider-model-empty .ui-button-variant-outline {
   border-color: transparent;
@@ -619,8 +616,6 @@
   white-space: nowrap;
 }
 
-/* A spent plan window: the chip shares the first line with the provider name, and the version stays
- * on the second. The chip shortens with an ellipsis, so the heading keeps its height. */
 .provider-model-heading-limited {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -632,7 +627,6 @@
   grid-column: 1 / -1;
 }
 
-/* A Badge, at the height of the row tags (default, Free, New) so the heading keeps its height. */
 .provider-model-limit {
   display: block;
   justify-self: start;
@@ -644,7 +638,6 @@
   text-overflow: ellipsis;
 }
 
-/* The runtime status: a filled block with no border, as the search field. */
 .provider-model-empty {
   display: grid;
   justify-items: start;
@@ -679,7 +672,6 @@
 
 .provider-model-list {
   display: grid;
-  /* A long model name must not widen its row past the panel. */
   grid-template-columns: minmax(0, 1fr);
   gap: 0;
 }
@@ -687,12 +679,10 @@
 .provider-model-effort {
   flex-shrink: 0;
   display: flex;
-  /* The effort segments go to a line of their own when they do not fit beside the label. */
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--openbot-space-1) 12px;
-  /* The separator runs to both edges of the panel, as in the menus. */
   margin: var(--ui-menu-padding) calc(var(--ui-menu-padding) * -1) 0;
   border-top: 1px solid var(--openbot-border);
   padding-block: var(--ui-menu-padding) 0;
@@ -702,14 +692,12 @@
   line-height: 17px;
 }
 
-/* The effort and auto-approve rows are one group under one separator. */
 .provider-model-effort + .provider-model-effort {
   margin-top: 0;
   border-top: 0;
   padding-top: var(--openbot-space-1);
 }
 
-/* Each row is as high as the effort control, so the switch and the segments have room. */
 .provider-model-effort > :first-child {
   display: flex;
   min-height: var(--openbot-control-md);
@@ -753,7 +741,6 @@
   background: var(--ui-menu-item-hover);
 }
 
-/* Each speed has a name and a description, so the list is wider than the select, and wraps. */
 .provider-model-speed-content {
   width: 300px;
 }
@@ -768,7 +755,6 @@
   color: var(--openbot-text-primary);
 }
 
-/* The check of the selected model is a filled circle on the left, as in the menus. */
 .provider-model-option {
   position: relative;
   display: flex;
@@ -827,7 +813,6 @@
   gap: 7px;
 }
 
-/* A long name, such as a Fusion model of Devin, goes to a second line so that it shows in full. */
 .provider-model-option-name > span {
   overflow-wrap: anywhere;
   text-wrap: pretty;
@@ -846,17 +831,14 @@
   line-height: 15px;
 }
 
-/* The fold row at the end of a provider's list: the models that the host's default hides. */
 .provider-model-older {
   color: var(--openbot-text-secondary);
 }
 
-/* The fold row is not a model, so it has no selection circle. */
 .provider-model-older::before {
   content: none;
 }
 
-/* The fold row is a Button, but it keeps the height and the font of a model row. */
 .provider-model-older.ui-button {
   height: auto;
   font: inherit;
@@ -866,7 +848,6 @@
   transform: rotate(180deg);
 }
 
-/* The settings that a Cursor model value fixes, such as "256k · High · Fast". */
 .provider-model-option-name > .provider-model-option-settings {
   flex: 0 0 auto;
   color: var(--openbot-text-muted);
@@ -874,7 +855,6 @@
   white-space: nowrap;
 }
 
-/* The tick sits in the filled circle, cut out of it in the panel color. */
 .provider-model-check {
   position: absolute;
   top: 50%;
@@ -890,13 +870,10 @@
 }
 
 @media (max-width: 720px) {
-  /* A form field keeps the width of its row. */
   .provider-model-trigger:not(.provider-model-trigger-field) {
     max-width: 148px;
   }
 
-  /* A narrow header keeps the model name; the label and the title still name the effort. A form
-     field has the room of its row. */
   .provider-model-trigger:not(.provider-model-trigger-field) .provider-model-trigger-effort {
     display: none;
   }

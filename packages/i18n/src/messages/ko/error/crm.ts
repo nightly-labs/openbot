@@ -23,7 +23,7 @@ export const messages = {
   "error.crm.badCursor": "이 페이지는 더 이상 유효하지 않아요. 목록을 다시 불러오세요.",
   "error.crm.invalidChange": "이 변경은 유효하지 않아요.",
   "error.crm.agentNotAllowed":
-    "이 에이전트는 CRM을 사용할 수 없어요. 소유자나 관리자가 CRM 페이지에서 허용할 수 있어요.",
+    "이 에이전트는 CRM을 사용할 수 없어요. 소유자나 관리자가 허용할 수 있어요: CRM 페이지를 열고 제안을 클릭한 다음, 에이전트 수 버튼을 클릭하고 이 에이전트를 켜세요.",
   "error.crm.tooManyProposals": "결정을 기다리는 제안이 너무 많아요. 사람이 결정할 때까지 기다리세요.",
   "error.crm.amountInvalid": "금액을 129.00처럼 숫자로 입력하세요.",
   "error.crm.amountDecimals": "{currency}에 비해 금액의 소수 자릿수가 너무 많아요.",

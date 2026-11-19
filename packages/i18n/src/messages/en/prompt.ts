@@ -44,12 +44,13 @@ export const messages = defineMessages("prompt", {
   "prompt.browser.title.pending": "Complete the step on {host}",
   "prompt.browser.cancelled": "Cancelled",
   "prompt.browser.reload":
-    "Finish sign-in, then reload the browser page before choosing “I’m done”. Page inspection stays blocked until the page reloads.",
+    "OpenBot could not finish entering the password or code. Check the page and enter what is missing. Finish sign-in, then reload the browser page before choosing “I’m done”. Page inspection stays blocked until the page reloads.",
   "prompt.browser.continuing": "{name} is continuing.",
   "prompt.browser.cancelledBody": "The browser step was cancelled.",
   "prompt.browser.pendingBody":
     "Open the page to finish the sign-in, verification, or consent. Then let {name} continue.",
   "prompt.browser.openPage": "Open {title}",
+  "prompt.browser.openFailed": "Could not open the page in the main window. Try again.",
   "prompt.browser.done": "I’m done",
   "prompt.browser.pageFallback": "Browser page",
   "prompt.browser.hostFallback": "the browser",

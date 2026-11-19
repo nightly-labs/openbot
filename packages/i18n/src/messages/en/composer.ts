@@ -3,6 +3,8 @@ import { defineMessages } from "../../message";
 export const messages = defineMessages("composer", {
   "composer.queueEdit.body": "You are editing a queued message. Save or cancel the edit to let it run.",
   "composer.queueEdit.cancel": "Cancel edit",
+  "composer.feedbackFix.body": "Correcting report #{number}. Send the request, or cancel to keep the report as it is.",
+  "composer.feedbackFix.cancel": "Cancel",
   "composer.providerWait.offlineTitle": "No internet connection",
   "composer.providerWait.offline": "{provider} cannot reply until this computer is online again.",
   "composer.providerWait.silent": "{provider} has sent no update for {duration}.",
@@ -18,6 +20,11 @@ export const messages = defineMessages("composer", {
   "composer.update.manual": "Update {provider} on the computer that runs it to continue.",
   "composer.update.pending": "Updating…",
   "composer.update.action": "Update",
+  "composer.imageInput.body":
+    "{model} gets only text, so it does not see the images that you attach. If this model can read images, turn on images for it.",
+  "composer.imageInput.label": "Turn on images for {model}",
+  "composer.imageInput.pending": "Turning on…",
+  "composer.imageInput.action": "Turn on images",
   "composer.usageLimit.credits": "You used all of your {provider} plan limit. Your agents now use your credits.",
   "composer.usageLimit.creditsResets":
     "You used all of your {provider} plan limit. Your agents use your credits until it resets {reset}.",
@@ -43,6 +50,7 @@ export const messages = defineMessages("composer", {
   "composer.picker.noSkills": "This agent has no skills.",
   "composer.picker.noSkillMatch": "No skill matches “{query}”.",
   "composer.picker.skillsLoadFailed": "Skills did not load.",
+  "composer.picker.skillProblem": "{name} is not available. {problem} Ask the agent to fix it.",
   "composer.token.attachment": "Open attached file {name}",
   "composer.token.agent": "Agent {name}",
   "composer.token.skill": "Skill {name}",
@@ -60,6 +68,8 @@ export const messages = defineMessages("composer", {
   "composer.voice.blocked": "Microphone access is blocked. Allow OpenBot to use the microphone in system settings.",
   "composer.voice.noMicrophone": "No microphone is available.",
   "composer.voice.startFailed": "OpenBot could not start voice recording.",
+  "composer.voice.microphoneUnavailable":
+    "OpenBot could not open the microphone. Close other apps that use it, make sure that it is connected and allowed in system settings, then try again.",
   "composer.voice.transcribeFailed": "OpenBot could not transcribe this recording.",
   "composer.reply.toYou": "Replying to your message",
   "composer.reply.toAgent": "Replying to Agent",
@@ -119,6 +129,7 @@ export const messages = defineMessages("composer", {
   "composer.voice.noSpeechRecorded": "No speech was recorded.",
   "composer.voice.noSpeechDetected": "No speech was detected.",
   "composer.voice.readFailed": "Could not read the reply aloud.",
+  "composer.voice.languageUnsupported": "Could not read the reply aloud. This language is not available yet.",
   "composer.error.saveEditTryAgain": "Could not save this edit on this computer. Try again.",
   "composer.error.saveUnconfirmed": "Save is not confirmed. Retry Save to check the result.",
   "composer.error.changeModel": "Could not change model. Try again.",

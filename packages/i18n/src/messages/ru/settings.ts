@@ -23,6 +23,11 @@ export const messages = {
   "settings.codeFont.title": "Шрифт кода",
   "settings.codeFont.description": "Шрифт кода, терминалов и путей к файлам.",
   "settings.codeFont.default": "По умолчанию",
+  "settings.motion.title": "Движение",
+  "settings.backgroundBlur.title": "Размытие фона",
+  "settings.backgroundBlur.description": "Размытие за меню и диалогами. На компьютере без GPU сначала выключено.",
+  "settings.movingFaces.title": "Подвижные лица агентов",
+  "settings.movingFaces.description": "Лица агентов моргают и двигаются. На компьютере без GPU сначала неподвижны.",
   "settings.logoColor.title": "Цвет логотипа",
   "settings.logoColor.description": "Отображается в Dock, на панели задач и в Dynamic Island.",
   "settings.logoColor.buildNote":
@@ -474,7 +479,6 @@ export const messages = {
   "settings.profile.share.copyFailed": "Не удалось скопировать изображение.",
   "settings.profile.share.createFailed": "Не удалось создать изображение.",
   "settings.profile.share.fileName": "openbot-activity.png",
-  // The text in the image to share.
   "settings.profile.share.caption": "Мои последние полгода с OpenBot",
   "settings.profile.activity.title": "Активность на этом компьютере",
   "settings.profile.activity.activeDays": {
@@ -486,7 +490,6 @@ export const messages = {
   "settings.profile.activity.empty": "Пока нет активности",
   "settings.profile.activity.loading": "Загрузка активности…",
   "settings.profile.activity.loadFailed": "Не удалось загрузить активность.",
-  // {tokens} is a short number, such as 1.2M.
   "settings.profile.activity.heatmapLabel": {
     one: "Токенов: {tokens}, {count} активный день за последний год",
     few: "Токенов: {tokens}, {count} активных дня за последний год",
@@ -678,7 +681,6 @@ export const messages = {
   "settings.hostedServers.plan.standard.summary": "Для небольшой команды с ежедневными регулярными задачами.",
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Для многих агентов и интенсивной работы в браузере.",
-  // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "Диктовка",
   "settings.voice.model.parakeet.description": "Быстрая. Сама определяет язык речи, 25 европейских языков.",
   "settings.voice.model.parakeetUnified.description":
@@ -707,6 +709,10 @@ export const messages = {
   "settings.voice.language.parakeetUnifiedEnglishOnly":
     "Parakeet Unified распознаёт только английский. Чтобы задать язык, используйте Whisper, Cohere или ElevenLabs.",
   "settings.voice.language.automatic": "Автоматически",
+  "settings.voice.pause.title": "Пауза перед отправкой",
+  "settings.voice.pause.description":
+    "В голосовом разговоре OpenBot отправляет ваши слова, когда вы молчите столько времени. Выберите паузу длиннее, если говорите медленно или останавливаетесь подумать. Живой голос Codex сам находит конец.",
+  "settings.voice.pause.seconds": "{seconds} с",
   "settings.voice.loadFailed": "Не удалось прочитать голосовые модели.",
   "settings.voice.saveFailed": "Не удалось сохранить настройку голоса. Повторите попытку.",
   "settings.voice.downloadFailed": "Не удалось начать загрузку. Повторите попытку.",
@@ -800,6 +806,13 @@ export const messages = {
   "settings.transfer.import.lede": "Выберите файл, экспортированный с другого сервера. Его имя заканчивается на .zip.",
   "settings.transfer.import.choose": "Выбрать файл…",
   "settings.transfer.import.reading": "Чтение файла…",
+  "settings.transfer.upload.label": "Отправка на сервер",
+  "settings.transfer.upload.sending": "Отправка файла…",
+  "settings.transfer.upload.sent": "Отправлено {sent} из {total}",
+  "settings.transfer.upload.serverReading": "Сервер читает файл…",
+  "settings.transfer.upload.etaSoon": "Осталось меньше минуты",
+  "settings.transfer.upload.etaMinutes": "Осталось около {minutes} мин",
+  "settings.transfer.upload.etaHours": "Осталось около {hours} ч {minutes} мин",
   "settings.transfer.import.openFailed": "Не удалось открыть файл",
   "settings.transfer.import.contains": "Содержимое файла",
   "settings.transfer.import.source": "OpenBot {version} · экспорт {date}",
@@ -851,13 +864,17 @@ export const messages = {
   "settings.transfer.copy.noAgents": "На этом сервере нет агентов.",
   "settings.transfer.copy.new": "Новый",
   "settings.transfer.copy.notCopied":
-    "Их каналы и общая папка тоже копируются. Ключи API, входы в аккаунты, коннекторы и история чатов не копируются. Настройте их заново на другом сервере.",
+    "Их каналы, схемы регулярных задач, рабочие процессы и общая папка тоже копируются. Ключи API, входы в аккаунты, коннекторы и история чатов не копируются. Настройте их заново на другом сервере.",
   "settings.transfer.copy.submit": {
     one: "Копировать {count} агента",
     few: "Копировать {count} агентов",
     many: "Копировать {count} агентов",
     other: "Копировать {count} агента",
   },
+  "settings.transfer.copy.duplicatesTitle": "Скопировать дубликаты агентов?",
+  "settings.transfer.copy.duplicatesDescription":
+    "На {server} уже есть агенты с такими именами: {names}. Копирование добавит второго агента для каждого. Каждая копия — отдельный агент со своими чатами, файлами и записями памяти.",
+  "settings.transfer.copy.duplicatesConfirm": "Копировать дубликаты",
   "settings.transfer.copy.copying": "Копирование…",
   "settings.transfer.copy.done": {
     one: "{count} агент скопирован на {server}.",

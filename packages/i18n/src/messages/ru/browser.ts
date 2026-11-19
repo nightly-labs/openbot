@@ -39,7 +39,7 @@ export const messages = {
   "browser.tab.closeNamed": "Закрыть {name}",
   "browser.tab.closeUnnamed": "Закрыть вкладку браузера",
   "browser.newTab": "Новая вкладка браузера",
-  "browser.hide": "Скрыть браузер",
+  "browser.backToChat": "Вернуться в чат",
   "browser.goBack": "Назад",
   "browser.goForward": "Вперёд",
   "browser.reload": "Перезагрузить страницу",
@@ -69,6 +69,8 @@ export const messages = {
   "browser.liveView.pasteTooLong": "Этот текст слишком длинный для вставки. Вставьте меньше 100 000 символов.",
   "browser.liveView.copyTooLarge": "Выделение слишком длинное для копирования. Выделите меньше текста.",
   "browser.liveView.copyFailed": "Не удалось скопировать текст. Нажмите на страницу и повторите попытку.",
+  "browser.liveView.pageCopied":
+    "Страница скопировала текст. Выберите «Копировать», чтобы поместить его в буфер обмена.",
   "browser.previews.label": "Превью браузера",
   "browser.previews.resize": "Изменить размер правой панели",
   "browser.previews.empty": "Нет вкладок браузера",

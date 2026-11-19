@@ -9,6 +9,7 @@ import {
 } from "@/features/settings/components/settings-content";
 import { WorkflowKindTile } from "@/features/workflows/components/workflow-kind-tile";
 import { useWorkflowDraft } from "@/features/workflows/model/workflow-draft";
+import { placeFromParams, placeKinds } from "@/features/workflows/model/workflow-graph-edit";
 import {
   ADDABLE_KINDS,
   type AddableKind,
@@ -29,27 +30,37 @@ const KIND_DESCRIPTION = {
   output: "mobile.workflow.add.output",
 } as const satisfies Record<AddableKind, MobileTextKey>;
 
-/** The editor sheet > Add a step: the kinds of step, at the place that the person chose. */
 export function WorkflowAddStepScreen() {
   const { t } = useText();
-  const params = useLocalSearchParams<{ list: string; index: string }>();
+  const params = useLocalSearchParams<{
+    list?: string;
+    index?: string;
+    edge?: string;
+    after?: string;
+    branch?: string;
+  }>();
   const draft = useWorkflowDraft((state) => state.draft);
   const add = useWorkflowDraft((state) => state.add);
+  const addAt = useWorkflowDraft((state) => state.addAt);
+  const place = placeFromParams(params);
   const list: FlowList = FLOW_LISTS.find((name) => name === params.list) ?? "main";
   const index = Number(params.index) || 0;
-  // A workflow has one condition on the phone, and it starts from the steps before the paths.
-  const conditionAllowed = list === "main" && draft !== null && !hasCondition(draft.graph);
-  const kinds = ADDABLE_KINDS.filter((kind) => kind !== "condition" || conditionAllowed);
+  const conditionAllowed = place !== null || (list === "main" && draft !== null && !hasCondition(draft.graph));
+  const allowed: readonly AddableKind[] =
+    place && draft
+      ? placeKinds(draft.graph, place, ADDABLE_KINDS)
+      : ADDABLE_KINDS.filter((kind) => kind !== "condition" || conditionAllowed);
   return (
     <SettingsContent>
       <SettingsSection>
-        {kinds.map((kind) => (
+        {ADDABLE_KINDS.map((kind) => (
           <SettingsRow
             key={kind}
+            disabled={!allowed.includes(kind)}
             leading={<WorkflowKindTile kind={kind} size={34} />}
             supportingText={t(KIND_DESCRIPTION[kind])}
             onPress={() => {
-              if (!add(kind, list, index)) return;
+              if (!(place ? addAt(kind, place) : add(kind, list, index))) return;
               void haptics.impact("light");
               router.back();
             }}

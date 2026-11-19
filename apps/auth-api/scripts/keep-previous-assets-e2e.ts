@@ -1,10 +1,3 @@
-// Three deploys in a row keep the code files of earlier builds (issue #4087). Each deploy runs the real
-// `keep-previous-assets.ts` process against a local site that serves the previous deploy's output:
-// - the first deploy finds no history and records only its own files;
-// - the second keeps the first build's files, and drops a file that is too old, one that the site
-//   no longer has, one that the site answers with a page, and a name that is not a flat file name;
-// - the third keeps the files of both earlier builds, and a kept file keeps the time it stopped being live.
-// `bun run test:keep-previous-assets`. Writes .openbot-build/keep-previous-assets-e2e.json.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -40,10 +33,8 @@ interface Report {
   failure?: string;
 }
 
-/** The live site: the files of one deploy's output. A path with no file gets the Worker's 404 page. */
 async function serveSite(): Promise<{ server: Server; origin: string; setRoot: (root: string) => void }> {
   let root = "";
-  /** Names that the site answers with a page and status 200, as a fallback route would. */
   const pages = new Set(["page.js"]);
   const server = createServer((request, response) => {
     const path = normalize(decodeURIComponent(new URL(request.url ?? "/", "http://site").pathname));
@@ -95,7 +86,6 @@ async function main(): Promise<void> {
   const work = await mkdtemp(join(tmpdir(), "keep-previous-assets-"));
   const site = await serveSite();
   try {
-    // 1. No history on the site.
     const first = await build(join(work, "first"), { "index-a.js": "a", "pkg@1~a.js": "pkg", "shared.js": "shared" });
     const one = await deploy(site.origin, first);
     report.deploys.push({ name: "first", ...one });
@@ -103,7 +93,6 @@ async function main(): Promise<void> {
     assert.equal(one.result.kept, 0);
     assert.deepEqual(one.history.files, { "index-a.js": null, "pkg@1~a.js": null, "shared.js": null });
 
-    // 2. The first deploy is live. Its history also names files that must not be kept.
     const now = Date.now();
     await writeFile(join(first, "assets", "stale.js"), "stale");
     await writeFile(
@@ -138,7 +127,6 @@ async function main(): Promise<void> {
     assert.ok(typeof retiredA === "number" && retiredA >= before, "The first build stops being live now.");
     assert.equal(two.history.files["shared.js"], null);
 
-    // 3. The second deploy is live.
     site.setRoot(second);
     const third = await build(join(work, "third"), { "index-c.js": "c", "shared.js": "shared" });
     const three = await deploy(site.origin, third);

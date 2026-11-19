@@ -16,6 +16,7 @@ export const messages = {
   "error.workflow.agentMissing": "이 단계의 에이전트를 선택하세요.",
   "error.workflow.handoffFailed": "OpenBot이 이 단계를 에이전트에 보내지 못했어요.",
   "error.workflow.agentStepEnded": "에이전트가 답하기 전에 이 단계의 메시지가 삭제됐어요.",
+  "error.workflow.agentStepStopped": "에이전트가 이 단계에 답하기 전에 멈췄어요. 단계를 다시 실행해 주세요.",
   "error.workflow.conditionUnclear": "모델이 ‘예’ 또는 ‘아니요’로 답하지 않았어요.",
   "error.workflow.modelFailed": "모델이 답할 수 없었어요. 단계를 다시 실행해 주세요.",
   "error.workflow.modelTimedOut":
@@ -31,6 +32,7 @@ export const messages = {
   "error.workflow.pictureMissing": "이미지가 서버에 더 이상 없어요. 다시 보내 주세요.",
   "error.workflow.pictureType": "PNG, JPEG 또는 WebP 이미지를 사용해 주세요.",
   "error.workflow.mediaInputMissing": "이전 단계의 이미지를 사용할 수 없어요. 그 단계를 다시 실행해 주세요.",
+  "error.workflow.mediaEmptyRequest": "설명을 작성하거나 앞 단계를 실행해 텍스트나 이미지가 들어오게 해 주세요.",
   "error.workflow.mediaInputNotImage": "이 단계는 동영상이 아닌 이미지만 받아요. 동영상에서 오는 연결을 지워 주세요.",
   "error.workflow.stepMissing": "이 단계는 더 이상 존재하지 않아요.",
   "error.workflow.nodeMissing": "이 단계는 워크플로에 없어요.",

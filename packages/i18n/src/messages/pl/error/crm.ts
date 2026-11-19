@@ -23,7 +23,7 @@ export const messages = {
   "error.crm.badCursor": "Ta strona jest już nieaktualna. Wczytaj listę ponownie.",
   "error.crm.invalidChange": "Ta zmiana jest nieprawidłowa.",
   "error.crm.agentNotAllowed":
-    "Ten agent nie może korzystać z CRM. Właściciel lub administrator może mu na to pozwolić na stronie CRM.",
+    "Ten agent nie może korzystać z CRM. Właściciel lub administrator może mu na to pozwolić: otwórz stronę CRM, kliknij Sugestie, kliknij przycisk z liczbą agentów i włącz tego agenta.",
   "error.crm.tooManyProposals": "Zbyt wiele propozycji czeka na decyzję. Poczekaj, aż ktoś je rozpatrzy.",
   "error.crm.amountInvalid": "Wpisz kwotę jako liczbę, na przykład 129.00.",
   "error.crm.amountDecimals": "Kwota ma za dużo miejsc po przecinku dla {currency}.",

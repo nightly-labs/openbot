@@ -4,6 +4,8 @@ import type { messages as source } from "../en/composer";
 export const messages = {
   "composer.queueEdit.body": "הודעה בתור נמצאת בעריכה. יש לשמור את העריכה או לבטל אותה כדי שההודעה תרוץ.",
   "composer.queueEdit.cancel": "ביטול העריכה",
+  "composer.feedbackFix.body": "מתקנים את הדיווח #{number}. שלחו את הבקשה, או בטלו כדי להשאיר את הדיווח כפי שהוא.",
+  "composer.feedbackFix.cancel": "ביטול",
   "composer.providerWait.offlineTitle": "אין חיבור לאינטרנט",
   "composer.providerWait.offline": "{provider} לא יכול להשיב עד שהמחשב הזה יחזור להיות מחובר.",
   "composer.providerWait.silent": "{provider} לא שלח עדכון במשך {duration}.",
@@ -19,6 +21,11 @@ export const messages = {
   "composer.update.manual": "יש לעדכן את {provider} במחשב שמריץ אותו כדי להמשיך.",
   "composer.update.pending": "מעדכן…",
   "composer.update.action": "עדכון",
+  "composer.imageInput.body":
+    "{model} מקבל רק טקסט, ולכן אינו רואה את התמונות שמצרפים. אם המודל הזה יכול לקרוא תמונות, הפעילו עבורו תמונות.",
+  "composer.imageInput.label": "הפעלת תמונות עבור {model}",
+  "composer.imageInput.pending": "מפעיל…",
+  "composer.imageInput.action": "הפעלת תמונות",
   "composer.usageLimit.credits": "ניצלת את כל מכסת התוכנית של {provider}. הסוכנים שלך משתמשים עכשיו בקרדיטים שלך.",
   "composer.usageLimit.creditsResets":
     "ניצלת את כל מכסת התוכנית של {provider}. הסוכנים שלך משתמשים בקרדיטים שלך עד שהיא תתאפס {reset}.",
@@ -44,6 +51,7 @@ export const messages = {
   "composer.picker.noSkills": "אין לסוכן הזה מיומנויות.",
   "composer.picker.noSkillMatch": "אין מיומנות שמתאימה ל-״{query}״.",
   "composer.picker.skillsLoadFailed": "המיומנויות לא נטענו.",
+  "composer.picker.skillProblem": "{name} לא זמינה. {problem} בקשו מהסוכן לתקן אותה.",
   "composer.token.attachment": "פתיחת הקובץ המצורף {name}",
   "composer.token.agent": "סוכן {name}",
   "composer.token.skill": "מיומנות {name}",
@@ -61,6 +69,8 @@ export const messages = {
   "composer.voice.blocked": "הגישה למיקרופון חסומה. יש לאפשר ל-OpenBot להשתמש במיקרופון בהגדרות המערכת.",
   "composer.voice.noMicrophone": "אין מיקרופון זמין.",
   "composer.voice.startFailed": "OpenBot לא הצליח להתחיל הקלטת קול.",
+  "composer.voice.microphoneUnavailable":
+    "OpenBot לא הצליח לפתוח את המיקרופון. יש לסגור אפליקציות אחרות שמשתמשות בו, לוודא שהוא מחובר ומותר בהגדרות המערכת, ולנסות שוב.",
   "composer.voice.transcribeFailed": "OpenBot לא הצליח לתמלל את ההקלטה הזו.",
   "composer.reply.toYou": "משיב להודעה שלך",
   "composer.reply.toAgent": "משיב לסוכן",
@@ -119,6 +129,7 @@ export const messages = {
   "composer.voice.noSpeechRecorded": "לא הוקלט דיבור.",
   "composer.voice.noSpeechDetected": "לא זוהה דיבור.",
   "composer.voice.readFailed": "לא ניתן להקריא את התשובה.",
+  "composer.voice.languageUnsupported": "לא ניתן להקריא את התשובה. השפה הזו עדיין לא זמינה.",
   "composer.error.saveEditTryAgain": "לא ניתן לשמור את העריכה הזו במחשב הזה. יש לנסות שוב.",
   "composer.error.saveUnconfirmed": "השמירה לא אושרה. יש לנסות לשמור שוב כדי לבדוק את התוצאה.",
   "composer.error.changeModel": "לא ניתן לשנות מודל. יש לנסות שוב.",

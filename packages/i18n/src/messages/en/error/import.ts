@@ -1,7 +1,6 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.import", {
-  // Agent import errors and warnings.
   "error.import.manifestNotJson": "{manifest} is not valid JSON.",
   "error.import.notAgentExport": "{manifest} is not an OpenBot agent export.",
   "error.import.newerExportSkill": "This export was made by a newer export skill. Update OpenBot and try again.",
@@ -52,7 +51,6 @@ export const messages = defineMessages("error.import", {
     '{name}: the server already has the skill "{skill}", so the agent uses that skill. Ask an admin to update it.',
   "error.import.skillRenamed":
     '{name}: the name of the skill "{skill}" is too similar to the name of another skill, so it is saved as "{renamed}".',
-  // Hermes Agent import from a folder on this computer.
   "error.import.hermesNoProfiles":
     "This folder has no Hermes profiles. Choose the Hermes folder, which holds config.yaml or SOUL.md.",
   "error.import.hermesClosed": "The Hermes profiles are no longer open. Read them again.",
@@ -64,7 +62,6 @@ export const messages = defineMessages("error.import", {
     "It has code that it did not have when the profiles were read. Read them again to allow it.",
   "error.import.hermesLinkNotSaved":
     "{name}: OpenBot could not save which agent came from this profile, so the next import adds it as a new agent.",
-  // Instance transfer between two OpenBot computers.
   "error.import.transferRemoteTooLarge":
     "A transfer file for a joined server must be under 100 MB. Turn off workspace files, or export fewer agents.",
   "error.import.transferNotFile": "This file is not an OpenBot transfer file.",
@@ -106,6 +103,8 @@ export const messages = defineMessages("error.import", {
     "{name}: values that can hold a secret were removed from its arguments or address. Enter them again in Settings.",
   "error.import.transferSharedKept":
     "{number} files in the Shared folder are already here, so they are kept as they are.",
+  "error.import.transferPartSkipped":
+    "Some parts of the file could not be imported. The other parts are on this server, so do not import the file again.",
   "error.import.transferChannelInvalid": "Channel {number} in the file is invalid, so it is skipped.",
   "error.import.transferChannelLimit": "Only the first {limit} channels are in the file.",
   "error.import.transferWorkflowInvalid": "A workflow in the file is invalid, so it is skipped.",
@@ -128,7 +127,6 @@ export const messages = defineMessages("error.import", {
     "{name}: you always allowed this agent on the other computer. Here it asks first until you allow it again.",
   "error.import.transferFolders":
     "{name}: it used {number} folders outside its workspace. Add them again in its settings, in Folders.",
-  // A transfer file that goes to or from a joined server in parts.
   "error.import.transferPartsClosed": "The transfer with the server stopped. Try again.",
   "error.import.transferPartInvalid": "Part of the transfer file did not arrive correctly. Try again.",
   "error.import.transferStepFailed": "This server did not save it.",

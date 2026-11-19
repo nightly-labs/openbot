@@ -120,9 +120,14 @@ export const messages = {
   "provider.picker.download": "Descarga de {name}",
   "provider.picker.search": "Buscar modelos",
   "provider.picker.noMatches": "Ningún modelo coincide con tu búsqueda.",
+  "provider.picker.workspaceOnlyUnavailable":
+    "Estos modelos no funcionan con «Solo espacio de trabajo» en Windows y Linux. Para usarlos, cambia «Acceso» en los ajustes del agente.",
   "provider.picker.olderModels": "Modelos anteriores",
   "provider.picker.olderModelsList": "Modelos anteriores de {name}",
   "provider.picker.noModels": "No hay modelos disponibles de {name}.",
+  "provider.picker.endpointModelsInCustom":
+    "{name} ejecuta tus endpoints personalizados. Sus modelos están en la pestaña Personalizado.",
+  "provider.picker.showCustomModels": "Ver modelos",
   "provider.picker.museNoModels":
     "Muse no envió modelos para esta cuenta. Es posible que Muse no esté disponible en el país donde se ejecuta este agente. Elige un modelo de otro proveedor.",
   "provider.picker.customEmpty":
@@ -150,6 +155,8 @@ export const messages = {
   "provider.picker.selectEffort": "Seleccionar esfuerzo",
   "provider.picker.custom": "Personalizado",
   "provider.picker.cliReady": "{cli} listo",
+  "provider.picker.modelSourceProvider": "Usa {name} de tu configuración de {cli}",
+  "provider.picker.modelSourceCatalog": "Usa una lista de modelos de tu configuración de {cli}",
   "provider.status.signInRequired": "Es necesario iniciar sesión",
   "provider.model.free": "Gratis",
   "provider.model.new": "Nuevo",
@@ -266,6 +273,8 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · descargada por OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Sin usar: {version} · instalada por ti",
   "provider.settings.otherVersionDownloaded": "Sin usar: {version} · descargada por OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "Algunos modelos necesitan una parte que esta versión no tiene. Descarga la versión de OpenBot para usarlos.",
   "provider.settings.useInstalledVersion": "Usar la instalada",
   "provider.settings.useDownloadedVersion": "Usar la de OpenBot",
   "provider.settings.cache": "Caché",

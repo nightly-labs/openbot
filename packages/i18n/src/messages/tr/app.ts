@@ -108,6 +108,7 @@ export const messages = {
   "app.settingsPage.searchPlaceholder": "Ayarlarda ara…",
   "app.settingsPage.results": "Ayar arama sonuçları",
   "app.settingsPage.noResults": "Eşleşen ayar yok.",
+  "app.settingsPage.marketplaceApps": "Bağlayıcılar ve MCP sunucuları",
   "app.settingsPage.resultCount": {
     one: "{count} eşleşen ayar.",
     other: "{count} eşleşen ayar.",

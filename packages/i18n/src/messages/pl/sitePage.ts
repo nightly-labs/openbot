@@ -90,6 +90,8 @@ export const messages = {
   "sitePage.pricing.consent.statement": "Oświadczam, że akceptuję {policy}, {terms}.",
   "sitePage.pricing.consent.policy": "politykę prywatności",
   "sitePage.pricing.consent.terms": "regulamin i prawo odstąpienia od umowy",
+  "sitePage.pricing.consent.earlyStart":
+    "Żądam rozpoczęcia świadczenia usługi hostingu przed upływem 14-dniowego terminu na odstąpienie od umowy. Przyjmuję do wiadomości, że jeśli odstąpię od umowy przed pełnym wykonaniem usługi, będę musiał(a) zapłacić za usługi świadczone do chwili odstąpienia, a po pełnym wykonaniu usługi utracę prawo odstąpienia od umowy.",
   "sitePage.teams.title": "OpenBot dla zespołów",
   "sitePage.teams.description":
     "Uruchom OpenBot na zarządzanej infrastrukturze albo pozwól nam zaprojektować wdrożenie dopasowane do Twojego zespołu, procesów i istniejących systemów.",

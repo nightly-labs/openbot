@@ -5,7 +5,6 @@ import { loadSitePage } from "../../../lib/site-locale";
 import { sitePageHead } from "../../../lib/site-page-head";
 import { LOCALIZED_PAGE_PATHS } from "../../../lib/site-paths";
 
-// The contact page in Brazilian Portuguese, whatever the language of the request.
 export const Route = createFileRoute("/_contact/pt/contact")({
   loader: () => loadSitePage("pt", contactPageText),
   head: ({ match, loaderData }) => {

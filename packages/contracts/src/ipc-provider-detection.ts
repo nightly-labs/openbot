@@ -1,11 +1,3 @@
-// Local model servers that the host finds without the user's help, and the model list of one
-// endpoint that the user types. Main makes every request: the renderer's content security policy
-// does not let the page call a local address, and a stored key must not travel back to the page to
-// make one.
-//
-// A scan never sends a key. A model list for a saved endpoint may use the stored key and headers,
-// but only while the address has the same origin as the saved one.
-
 import { INPUT_LIMITS } from "./input-limits";
 import { isBoundedString } from "./ipc-bounded-values";
 import {
@@ -22,16 +14,12 @@ import {
 import { isBoolean, isDynamicRecord } from "./runtime-values";
 
 export const PROVIDER_DETECTION_LIMITS = {
-  /** Extra addresses, and extra folders, in the detection settings. */
   entries: 16,
   entryLength: 2_048,
-  /** Detection keys that the user hid. */
   hidden: 64,
-  /** Models that one list request can return. A longer list is cut, not refused. */
   models: 256,
 } as const;
 
-/** The default addresses of the local servers OpenBot knows. Product names are not translated. */
 export const DEFAULT_MODEL_SERVERS = {
   ollama: { name: "Ollama", baseUrl: "http://127.0.0.1:11434/v1" },
   lmstudio: { name: "LM Studio", baseUrl: "http://127.0.0.1:1234/v1" },
@@ -39,14 +27,10 @@ export const DEFAULT_MODEL_SERVERS = {
 
 export type DefaultModelServerId = keyof typeof DEFAULT_MODEL_SERVERS;
 
-/** Where the host looks, besides the default addresses and PATH, and the rows the user hid. */
 export interface ProviderDetectionSettings {
   enabled: boolean;
-  /** Base URLs of more OpenAI-compatible servers. */
   addresses: string[];
-  /** More folders to search for known ACP agent commands. */
   folders: string[];
-  /** Detection keys: `models:<endpoint key>` or `agent:<command path>`. */
   hiddenIds: string[];
 }
 
@@ -57,37 +41,21 @@ export const DEFAULT_PROVIDER_DETECTION_SETTINGS: ProviderDetectionSettings = {
   hiddenIds: [],
 };
 
-/**
- * One model that a server lists. The other fields are what the list says about the model, so the
- * form can fill them in (#3946). Each is absent when the list does not say it.
- */
 export interface DetectedModel {
   id: string;
-  /** What the model reads beside text. Empty: text only. */
   inputs?: CustomProviderInputKind[];
   contextWindow?: number;
-  /** Only with `contextWindow`, as the form takes it. */
   maxOutput?: number;
-  /** The efforts that the list gives for the model, in `CUSTOM_PROVIDER_REASONING_EFFORTS` order. Never empty. */
   reasoningEfforts?: CustomProviderReasoningEffort[];
 }
 
-/** One server that answered `GET {baseUrl}/models` with no key. */
 export interface DetectedModelServer {
-  /** A free endpoint id to suggest, such as `ollama` or `server-192-168-1-20-11434`. */
   id: string;
-  /** The server's product name when the address is a known default, or its host and port. */
   name: string;
   baseUrl: string;
   models: DetectedModel[];
 }
 
-/**
- * The model list of one endpoint that the user types. `savedProviderId` names the endpoint that the
- * user edits: main then uses its stored key for a blank key, and the stored value of a header whose
- * value is empty, but only for the same origin, so an edited address can never receive the old
- * credentials.
- */
 export interface DiscoverModelsInput {
   baseUrl: string;
   apiKey: string | null;
@@ -116,7 +84,6 @@ function isDetectedModels(value: unknown): value is DetectedModel[] {
   return Array.isArray(value) && value.length <= PROVIDER_DETECTION_LIMITS.models && value.every(isDetectedModel);
 }
 
-/** Fails closed like `isCustomProviderSummary`: a row with a key or headers is refused. */
 export function isDetectedModelServer(value: unknown): value is DetectedModelServer {
   return (
     isDynamicRecord(value) &&
@@ -151,7 +118,6 @@ export function isProviderDetectionSettings(value: unknown): value is ProviderDe
   );
 }
 
-/** An absolute path or a path in the home folder. A NUL character ends a path in the system call. */
 export function isDetectionFolder(value: string): boolean {
   if (value.includes("\0")) return false;
   return value.startsWith("/") || value.startsWith("~/") || value === "~" || /^[A-Za-z]:[\\/]/.test(value);
@@ -160,12 +126,6 @@ export function isDetectionFolder(value: string): boolean {
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 const DEFAULT_PORTS: Readonly<Record<string, string>> = { "http:": "80", "https:": "443" };
 
-/**
- * One form of an endpoint address, so the same server found twice, or saved and found, is one row:
- * the host is lowercase, a loopback name is `127.0.0.1`, the default port is dropped, and so is a
- * trailing `/`. Null for a text that is not an http or https URL.
- */
-/** The detection key of a found server, which `hiddenIds` stores: `models:<endpoint key>`. */
 export function detectedModelServerKey(baseUrl: string): string {
   return `models:${customProviderEndpointKey(baseUrl) ?? baseUrl}`;
 }
@@ -179,11 +139,6 @@ export function customProviderEndpointKey(baseUrl: string): string | null {
   return `${url.protocol}//${host}${port}${path}`;
 }
 
-/**
- * Whether two addresses have the same scheme, host and port, so a stored key may go to the second.
- * Loopback names stay separate here: a server on `[::1]` can be a different server from the one on
- * `127.0.0.1` at the same port, and `localhost` can resolve to either.
- */
 export function sameCustomProviderOrigin(a: string, b: string): boolean {
   const first = parseHttpUrl(a);
   const second = parseHttpUrl(b);

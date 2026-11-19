@@ -4,31 +4,13 @@ import type { WebWorkspaceRuntime } from "../features/web-client/web-runtime";
 import { createMockOpenBot } from "./mock-openbot";
 import { mockWebRuntimeFor } from "./mock-web-runtime";
 
-/**
- * The mock host for `bun run perf:web` (`scripts/web-client-perf-e2e.ts`) and
- * `scripts/web-client-conversation-trim-e2e.ts`. The first agent has a long conversation, and the
- * scripts stream a reply into it and count the host requests that the web client makes. The scripts
- * read the driver from `globalThis.openbotWebBench`.
- */
 interface WebBench {
-  /** Resolves when the host has the long conversation. */
   ready: Promise<string>;
-  /** Host requests per runtime method since the last reset. `conversationOlder` counts older-page reads. */
   calls: Record<string, number>;
-  /** The names of the agent with the long conversation and of another agent, set when `ready` resolves. */
   agentNames: { open: string; other: string };
   resetCalls: () => void;
-  /** Resolves when no host request is running for one macrotask. */
   idle: () => Promise<void>;
-  /**
-   * One turn: start, `tokens` stream chunks in separate tasks, final page, completion. The turn is
-   * in the open conversation, or with `other` in the conversation of another agent.
-   */
   stream: (tokens: number, marker: string, other?: boolean) => Promise<void>;
-  /**
-   * Adds `count` messages, `<prefix> <index>: ...`, to the conversation of another agent on the host
-   * only, with no event, as when they arrive while that conversation is not open.
-   */
   append: (count: number, prefix: string) => void;
 }
 
@@ -102,8 +84,6 @@ export const createBenchWebRuntime: WebRuntimeFactory = (_accountId, events) => 
     resolveReady(agentId);
   }
 
-  // Count each host request on the paths the script measures, and track the ones that run, so the
-  // script can wait for quiet.
   function counted<Args extends unknown[], Result>(
     name: string,
     call: (...args: Args) => Promise<Result>,
@@ -120,7 +100,6 @@ export const createBenchWebRuntime: WebRuntimeFactory = (_accountId, events) => 
   }
   const runtime: WebWorkspaceRuntime = {
     ...base,
-    // The fixture seeds the conversation before the web client reads it.
     connect: counted("connect", async (...args) => {
       await seed();
       return base.connect(...args);

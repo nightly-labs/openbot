@@ -6,7 +6,6 @@ import { clearChatSearchHighlights, findChatSearchMatches, renderChatSearchHighl
 import type { ConversationProps } from "../conversation-types";
 
 export interface SearchStoreDeps {
-  /** The messages are read only to search again when they change. */
   props: Pick<ConversationProps, "onSearchMessages" | "onOpenSearchMessage"> & {
     messages: readonly Pick<AgentMessage, "id" | "body" | "items">[];
   };
@@ -41,7 +40,6 @@ export function createSearchStore(deps: SearchStoreDeps) {
       return {
         open,
         query,
-        // Read the transcript only while a search runs, so a closed search does not join it on each stream chunk.
         messageSignature:
           open && query.trim()
             ? deps.props.messages
@@ -58,7 +56,6 @@ export function createSearchStore(deps: SearchStoreDeps) {
       const queryChanged = query !== lastChatSearchQuery;
       lastChatSearchQuery = query;
       if (!open || !query.trim()) {
-        // A response for an earlier query must not reopen a hit after close or a cleared query.
         chatSearchRequest += 1;
         deps.setChatSearchMatches([]);
         if (remoteMessageIds.length > 0) deps.setChatSearchMessageIds([]);
@@ -187,7 +184,6 @@ export function createSearchStore(deps: SearchStoreDeps) {
   }
 
   function handleChatSearchShortcut(event: KeyboardEvent): void {
-    // A control that used the key, such as the search of a trace dialog, keeps it.
     if (event.defaultPrevented) return;
     const primaryModifier = event.metaKey || event.ctrlKey;
     const key = event.key.toLocaleLowerCase();

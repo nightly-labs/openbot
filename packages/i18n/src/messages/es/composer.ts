@@ -4,6 +4,9 @@ import type { messages as source } from "../en/composer";
 export const messages = {
   "composer.queueEdit.body": "Estás editando un mensaje en cola. Guarda o cancela la edición para que se ejecute.",
   "composer.queueEdit.cancel": "Cancelar edición",
+  "composer.feedbackFix.body":
+    "Corrigiendo el informe #{number}. Envía la solicitud o cancela para dejar el informe como está.",
+  "composer.feedbackFix.cancel": "Cancelar",
   "composer.providerWait.offlineTitle": "Sin conexión a internet",
   "composer.providerWait.offline": "{provider} no puede responder hasta que este equipo vuelva a estar en línea.",
   "composer.providerWait.silent": "{provider} no ha enviado nada en {duration}.",
@@ -19,6 +22,11 @@ export const messages = {
   "composer.update.manual": "Actualiza {provider} en el equipo donde se ejecuta para continuar.",
   "composer.update.pending": "Actualizando…",
   "composer.update.action": "Actualizar",
+  "composer.imageInput.body":
+    "{model} recibe solo texto, así que no ve las imágenes que adjuntas. Si este modelo puede leer imágenes, activa las imágenes para él.",
+  "composer.imageInput.label": "Activar imágenes para {model}",
+  "composer.imageInput.pending": "Activando…",
+  "composer.imageInput.action": "Activar imágenes",
   "composer.usageLimit.credits": "Has agotado el límite del plan de {provider}. Tus agentes usan ahora tus créditos.",
   "composer.usageLimit.creditsResets":
     "Has agotado el límite del plan de {provider}. Tus agentes usan tus créditos hasta que se restablezca {reset}.",
@@ -44,6 +52,7 @@ export const messages = {
   "composer.picker.noSkills": "Este agente no tiene habilidades.",
   "composer.picker.noSkillMatch": "Ninguna habilidad coincide con «{query}».",
   "composer.picker.skillsLoadFailed": "No se cargaron las habilidades.",
+  "composer.picker.skillProblem": "{name} no está disponible. {problem} Pide al agente que lo corrija.",
   "composer.token.attachment": "Abrir archivo adjunto {name}",
   "composer.token.agent": "Agente {name}",
   "composer.token.skill": "Habilidad {name}",
@@ -62,6 +71,8 @@ export const messages = {
     "El acceso al micrófono está bloqueado. Permite que OpenBot use el micrófono en los ajustes del sistema.",
   "composer.voice.noMicrophone": "No hay ningún micrófono disponible.",
   "composer.voice.startFailed": "OpenBot no pudo iniciar la grabación de voz.",
+  "composer.voice.microphoneUnavailable":
+    "OpenBot no pudo abrir el micrófono. Cierra otras apps que lo usen, comprueba que esté conectado y permitido en los ajustes del sistema, y vuelve a intentarlo.",
   "composer.voice.transcribeFailed": "OpenBot no pudo transcribir esta grabación.",
   "composer.reply.toYou": "Respondiendo a tu mensaje",
   "composer.reply.toAgent": "Respondiendo al agente",
@@ -123,6 +134,7 @@ export const messages = {
   "composer.voice.noSpeechRecorded": "No se grabó ninguna voz.",
   "composer.voice.noSpeechDetected": "No se detectó ninguna voz.",
   "composer.voice.readFailed": "No se pudo leer la respuesta en voz alta.",
+  "composer.voice.languageUnsupported": "No se pudo leer la respuesta en voz alta. Este idioma aún no está disponible.",
   "composer.error.saveEditTryAgain": "No se pudo guardar esta edición en este equipo. Vuelve a intentarlo.",
   "composer.error.saveUnconfirmed":
     "No se ha confirmado que se haya guardado. Vuelve a pulsar Guardar para comprobar el resultado.",

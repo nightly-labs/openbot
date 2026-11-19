@@ -17,6 +17,8 @@ export const messages = {
   "error.workflow.agentMissing": "このステップのエージェントを選択してください。",
   "error.workflow.handoffFailed": "OpenBot はこのステップをエージェントに送信できませんでした。",
   "error.workflow.agentStepEnded": "エージェントが回答する前に、このステップのメッセージが削除されました。",
+  "error.workflow.agentStepStopped":
+    "エージェントはこのステップに回答する前に停止しました。ステップをもう一度実行してください。",
   "error.workflow.conditionUnclear": "モデルが「はい」か「いいえ」で回答しませんでした。",
   "error.workflow.modelFailed": "モデルが回答できませんでした。ステップをもう一度実行してください。",
   "error.workflow.modelTimedOut":
@@ -32,6 +34,7 @@ export const messages = {
   "error.workflow.pictureMissing": "画像はサーバーにありません。もう一度送信してください。",
   "error.workflow.pictureType": "PNG、JPEG、WebP の画像を使用してください。",
   "error.workflow.mediaInputMissing": "前のステップの画像を利用できません。そのステップをもう一度実行してください。",
+  "error.workflow.mediaEmptyRequest": "説明を書くか、前のステップを実行して、テキストか画像が届くようにしてください。",
   "error.workflow.mediaInputNotImage":
     "このステップは画像のみを受け取り、動画は受け取れません。動画からの接続を削除してください。",
   "error.workflow.stepMissing": "このステップはもう存在しません。",

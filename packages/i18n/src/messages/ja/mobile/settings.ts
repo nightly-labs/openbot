@@ -124,26 +124,65 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "明度",
   "mobile.settings.appearance.messageColorFooter":
     "「エージェントの色」では、エージェントとのチャットで自分のメッセージにそのエージェントの色を使います。「カスタムの色」では、すべてのチャットで選んだ色を使います。文字の色は読みやすいように変わります。",
+  "mobile.settings.appearance.bubbleStyle": "吹き出しのスタイル",
+  "mobile.settings.appearance.bubbleStyleSolid": "塗りつぶし",
+  "mobile.settings.appearance.bubbleStyleTint": "淡色",
+  "mobile.settings.appearance.seeThroughBubbles": "透ける吹き出し",
+  "mobile.settings.appearance.seeThroughBubblesNote":
+    "エージェントの吹き出しと色のない吹き出しから背景が透けて見えます。背景がないときは、吹き出しは常に不透明です。",
+  "mobile.settings.appearance.tab.colors": "カラー",
+  "mobile.settings.appearance.tab.chat": "チャット",
+  "mobile.settings.appearance.preview.routines": "ルーティンの実行 3 回",
+  "mobile.settings.appearance.preview.thinking": "4 秒間考えました",
+  "mobile.settings.appearance.preview.memory": "記憶を 1 件保存しました",
+  "mobile.settings.appearance.backdrop.title": "背景",
+  "mobile.settings.appearance.backdrop.footer":
+    "このスマートフォンのホームとチャットの後ろに表示されます。エージェントが設定することもでき、チャットの「元に戻す」で前の背景に戻せます。",
+  "mobile.settings.appearance.backdrop.none": "なし",
+  "mobile.settings.appearance.backdrop.pond": "鯉の池",
+  "mobile.settings.appearance.backdrop.jellyfish": "クラゲ",
+  "mobile.settings.appearance.backdrop.sunset": "レトロな夕焼け",
+  "mobile.settings.appearance.backdrop.snowfall": "雪",
+  "mobile.settings.appearance.backdrop.fireflies": "ホタル",
+  "mobile.settings.appearance.backdrop.agentPage": "エージェントのページ",
+  "mobile.settings.appearance.backdrop.agentPageNote": "エージェントが設定",
+  "mobile.settings.appearance.backdrop.photo": "写真",
+  "mobile.settings.appearance.backdrop.photoChoose": "写真から選択",
+  "mobile.settings.appearance.backdrop.photoChange": "もう一度タップすると別の写真を選べます",
+  "mobile.settings.appearance.backdrop.strength": "背景の強さ",
+  "mobile.settings.appearance.backdrop.calm": "控えめ",
+  "mobile.settings.appearance.backdrop.vivid": "鮮やか",
+  "mobile.settings.appearance.backdrop.strengthFooter":
+    "控えめな背景にすると、長い返信も読みやすくなります。ホームの上部で最もよく見えます。",
+  "mobile.settings.appearance.backdrop.previewQuestion": "リリースノートを書いてくれる？",
+  "mobile.settings.appearance.backdrop.previewAnswer":
+    "下書きです。エージェントが設定した背景が、スマートフォンにも表示されるようになりました。",
   "mobile.settings.appearance.chatBackground": "チャットの背景",
   "mobile.settings.appearance.chatBackgroundDefault": "デフォルト",
   "mobile.settings.appearance.chatBackgroundFooter":
     "テーマごとに色を保持します。文字が読みにくい色は、暗くまたは明るくなります。",
+  "mobile.settings.appearance.chatBackgroundBackdropFooter":
+    "背景はチャットの背景に代わって表示されます。色を使うには、背景で「なし」を選択してください。",
   "mobile.settings.appearance.collapseRoutines": "ルーティンのアクティビティを折りたたむ",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "チャット内で連続するルーティンのイベントを、折りたたんだ1行で表示します。行をタップすると表示されます。",
+  "mobile.settings.appearance.replyDetails": "返信の詳細",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "詳細をオフにすると、チャットでその行が非表示になります。エージェントは引き続き思考し、サブエージェントを実行し、記憶を保存します。",
+  "mobile.settings.appearance.showThinking": "エージェントの思考を表示",
+  "mobile.settings.appearance.showSubagents": "サブエージェントを表示",
+  "mobile.settings.appearance.showMemoryChanges": "保存した記憶を表示",
   "mobile.settings.appearance.fullVisuals": "ビジュアルのプレビューを全体表示",
   "mobile.settings.appearance.fullVisualsFooter":
     "エージェントのビジュアルをチャットに全体の高さで表示します。オフのときは高いビジュアルが途中で切れます。タップすると全体を表示します。",
   "mobile.settings.animations.title": "アニメーション",
-  "mobile.settings.animations.footer":
-    "アニメーションをオフにすると、アプリ全体の動きを減らします。スマートフォンの設定で「視差効果を減らす」がオンのときも、アプリは動きを減らします。その場合、下のアニメーションはオフのままです。",
-  "mobile.settings.animations.all": "アニメーション",
+  "mobile.settings.animations.fullMotion": "フルモーション",
+  "mobile.settings.animations.reduced": "軽減",
+  "mobile.settings.animations.motionFooter":
+    "「軽減」はアプリ全体の動きを減らし、下のアニメーションをオフのままにします。スマートフォンの設定で「視差効果を減らす」がオンのときも、アプリは動きを減らします。",
   "mobile.settings.animations.agentFaces": "エージェントの表情アニメーション",
   "mobile.settings.animations.agentFacesFooter":
     "エージェントが作業中や待機中に、アバターの表情が動きます。オフにすると、表情は動かず、ようこそ画面と空のホーム画面のキャラクターも浮遊しなくなります。",
-  "mobile.settings.animations.composerResize": "コンパクトなメッセージ欄",
-  "mobile.settings.animations.composerResizeFooter":
-    "キーボードを閉じている間、メッセージ欄は小さなバーになります。オフにすると、メッセージ欄は常に元のサイズのままです。",
   "mobile.settings.animations.textReveal": "返信のアニメーション",
   "mobile.settings.animations.textRevealFooter":
     "返信が一語ずつ表示され、吹き出しがなめらかに大きくなります。オフにすると、テキストは届いた時点で表示されます。",
@@ -239,12 +278,22 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "大きなファイルを自動でダウンロード",
   "mobile.settings.conversations.largeFilesFooter":
     "{small} を超える画像、動画、音声は、タップしたときだけダウンロードされます。オンにすると、{large} まですぐにダウンロードします。モバイルデータを多く使う場合があります。",
+  "mobile.settings.conversations.messageField": "メッセージ欄",
+  "mobile.settings.conversations.compact": "コンパクト",
+  "mobile.settings.conversations.fullSize": "フルサイズ",
+  "mobile.settings.conversations.compactFooter":
+    "「コンパクト」では、キーボードが閉じている間メッセージ欄が小さなバーになります。",
+  "mobile.settings.conversations.compactComposerReduced":
+    "アニメーションまたはスマートフォンの設定で視差効果が減らされているため、メッセージ欄はフルサイズのままです。",
+  "mobile.settings.conversations.media": "写真とファイル",
   "mobile.settings.conversations.swipeLeft": "エージェントのチャットで左にスワイプ",
   "mobile.settings.conversations.swipeRight": "エージェントのチャットで右にスワイプ",
+  "mobile.settings.conversations.swipeQuestion": "サイド質問",
   "mobile.settings.conversations.swipeThreads": "スレッド",
   "mobile.settings.conversations.swipeBrowser": "ブラウザー",
+  "mobile.settings.conversations.swipeOff": "オフ",
   "mobile.settings.conversations.swipeFooter":
-    "エージェントのチャットで「戻る」と逆方向にスワイプすると、これが開きます。メッセージ上のスワイプは引き続き返信です。",
+    "エージェントのチャットで「戻る」と逆方向にスワイプすると、これが開きます。メッセージ上で同じ方向にスワイプすると、メッセージの時刻が表示されます。",
   "mobile.settings.conversations.pullInfo": "上に引いて情報を表示",
   "mobile.settings.conversations.pullInfoFooter":
     "チャット、チャンネル、スレッドで最新のメッセージより先まで上に引いて離すと、その情報が開きます。",
@@ -506,6 +555,11 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "プロセスを停止できませんでした。",
   "mobile.settings.agents.processes.stopTitle": "このプログラムを停止しますか？",
   "mobile.settings.agents.processes.stopLabel": "プロセス {pid} を停止",
+  "mobile.settings.quickActions.title": "アプリアイコンのメニュー",
+  "mobile.settings.quickActions.footer":
+    "OpenBotのアイコンを長押しすると、これらの操作が表示されます。最大{count}個までオンにできます。",
+  "mobile.settings.quickActions.latestChat": "最新のチャット",
+  "mobile.settings.quickActions.secondChat": "2番目に新しいチャット",
   "mobile.settings.shortcuts.title": "ショートカット",
   "mobile.settings.shortcuts.agent": "エージェント",
   "mobile.settings.shortcuts.none": "なし",
@@ -520,7 +574,7 @@ export const messages = {
   "mobile.settings.shortcuts.card.locked.title": "OpenBot はロックされています",
   "mobile.settings.shortcuts.card.locked.action": "OpenBot を開く",
   "mobile.settings.shortcuts.footer":
-    "ショートカットアプリの Send Message はこのエージェントに送信します。アプリは開きません。",
+    "ショートカットアプリの Send Message はこのエージェントに送信します。アプリは開きません。Open Agent はこのエージェントのチャットを開きます。",
   "mobile.settings.shortcuts.send.sent": "送信済み",
   "mobile.settings.shortcuts.send.failed": "OpenBot はこれを送信できませんでした。",
   "mobile.settings.shortcuts.send.unconfirmed":

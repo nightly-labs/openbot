@@ -1,7 +1,3 @@
-// Electron side of `scripts/exit-records-e2e.ts`. It starts the main log, the crash reporter, the trace
-// and the resource monitor as `src/main/index.ts` and `application-services.ts` do, and opens a window.
-// It writes the crash dump folder to `--ready-file` when the page has loaded. A "crash" line on stdin
-// crashes the page renderer through the DevTools protocol. A "quit" line or the end of stdin quits.
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -18,7 +14,6 @@ function argument(name: string): string {
   return value.slice(name.length + 3);
 }
 
-// A closed output must not stop the test app with an error dialog.
 process.stdout.on("error", () => undefined);
 process.stderr.on("error", () => undefined);
 const userDataPath = argument("user-data");
@@ -28,7 +23,6 @@ startMainLog(logs);
 crashReporter.start({ uploadToServer: false });
 const logger = createOpenBotLogger("main");
 
-// No top-level await: Electron does not get ready until an ESM main module has run to its end.
 void app.whenReady().then(async () => {
   const trace = new TraceFile({ directory: logs });
   const monitor = new ResourceMonitor({
@@ -58,7 +52,6 @@ void app.whenReady().then(async () => {
   process.stdin.on("data", (chunk: string) => {
     for (const line of chunk.split("\n")) {
       if (line === "crash") {
-        // A crash, not a kill: only a crash writes a dump.
         window.webContents.debugger.attach();
         void window.webContents.debugger.sendCommand("Page.crash").catch(() => undefined);
       }

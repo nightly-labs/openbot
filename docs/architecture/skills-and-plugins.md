@@ -100,7 +100,9 @@ A script can also write Cache Storage that a service worker serves as page code,
 the worker claims after it loaded, so the origin stays tainted in that session. Thus, while a scripted
 page is open, no page of its origin in the same session fills. When it ends, a same-origin page of a
 connected popup or opener keeps that mark, each other open page of the origin must navigate before
-its own fill, and OpenBot clears the origin's Cache Storage and service workers. A fill waits for that purge, and runs it again when no other page of
+its own fill, and OpenBot clears the origin's Cache Storage and service workers. It deletes the service workers when
+no page of the origin loads, after at most 10 seconds, because a deleted worker fails the requests of a page that loads
+(#9981). A fill waits for the Cache Storage purge, and clears both again when no other page of
 the origin is open. A page whose navigation a service worker handled must reload once with `navigate direction=reload`.
 That reload uses `reloadIgnoringCache`, which skips the service worker, also when the page registered it
 again after the purge (#8017). A normal reload, a reload from `evaluate`, or opening the address again

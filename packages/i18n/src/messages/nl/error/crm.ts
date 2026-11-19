@@ -24,7 +24,7 @@ export const messages = {
   "error.crm.badCursor": "Deze pagina is niet meer geldig. Laad de lijst opnieuw.",
   "error.crm.invalidChange": "Deze wijziging is niet geldig.",
   "error.crm.agentNotAllowed":
-    "Deze agent kan het CRM niet gebruiken. Een eigenaar of beheerder kan toegang geven op de CRM-pagina.",
+    "Deze agent kan het CRM niet gebruiken. Een eigenaar of beheerder kan toegang geven: open de CRM-pagina, klik op Suggesties, klik op de knop met het aantal agents en zet deze agent aan.",
   "error.crm.tooManyProposals": "Er wachten te veel voorstellen op een beslissing. Wacht tot iemand erover beslist.",
   "error.crm.amountInvalid": "Schrijf het bedrag als getal, zoals 129.00.",
   "error.crm.amountDecimals": "Het bedrag heeft te veel decimalen voor {currency}.",

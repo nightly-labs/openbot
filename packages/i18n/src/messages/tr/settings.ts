@@ -23,6 +23,13 @@ export const messages = {
   "settings.codeFont.title": "Kod yazı tipi",
   "settings.codeFont.description": "Kodun, terminallerin ve dosya yollarının yazı tipi.",
   "settings.codeFont.default": "Varsayılan",
+  "settings.motion.title": "Hareket",
+  "settings.backgroundBlur.title": "Arka plan bulanıklığı",
+  "settings.backgroundBlur.description":
+    "Menülerin ve iletişim kutularının arkasındaki bulanıklık. GPU’su olmayan bir bilgisayarda başta kapalıdır.",
+  "settings.movingFaces.title": "Hareketli ajan yüzleri",
+  "settings.movingFaces.description":
+    "Ajan yüzleri göz kırpar ve hareket eder. GPU’su olmayan bir bilgisayarda başta durağandır.",
   "settings.logoColor.title": "Logo rengi",
   "settings.logoColor.description": "Dock'ta, görev çubuğunda ve Dynamic Island'da gösterilir.",
   "settings.logoColor.buildNote": "Bu derleme kendi logo rengini korur. Seçim, yayımlanan uygulamaya uygulanır.",
@@ -463,7 +470,6 @@ export const messages = {
   "settings.profile.share.copyFailed": "Görüntü kopyalanamadı.",
   "settings.profile.share.createFailed": "Görüntü oluşturulamadı.",
   "settings.profile.share.fileName": "openbot-activity.png",
-  // The text in the image to share.
   "settings.profile.share.caption": "OpenBot ile son altı ayım",
   "settings.profile.activity.title": "Bu bilgisayardaki etkinlik",
   "settings.profile.activity.activeDays": {
@@ -473,7 +479,6 @@ export const messages = {
   "settings.profile.activity.empty": "Henüz etkinlik yok",
   "settings.profile.activity.loading": "Etkinlik yükleniyor…",
   "settings.profile.activity.loadFailed": "Etkinliğiniz yüklenemedi.",
-  // {tokens} is a short number, such as 1.2M.
   "settings.profile.activity.heatmapLabel": {
     one: "Son bir yılda {count} etkin günde {tokens} token",
     other: "Son bir yılda {count} etkin günde {tokens} token",
@@ -555,7 +560,6 @@ export const messages = {
   "settings.updates.autoInstall.title": "Güncellemeleri otomatik yükle",
   "settings.updates.autoInstall.description":
     "Ajanlar boştayken OpenBot yeniden başlar ve indirilen güncellemeyi yükler. Sunucularınızın üyelerinin bağlantısı kısa bir süre kesilir.",
-  // Ajan çalışmadığında OpenBot'u yeniden başlatın veya indirilmiş bir güncellemeyi yükleyin.
   "settings.updates.idleRestart.title": "OpenBot'u yeniden başlat",
   "settings.updates.idleRestart.relaunchDescription":
     "OpenBot hiçbir ajan çalışmadığında yeniden başlatılır. Yeni rutin çalıştırmaları o zamana kadar bekler.",
@@ -652,7 +656,6 @@ export const messages = {
   "settings.hostedServers.plan.standard.summary": "Günlük rutinleri olan küçük bir ekip için.",
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Çok sayıda ajan ve yoğun tarayıcı çalışması için.",
-  // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "Dikte",
   "settings.voice.model.parakeet.description": "Hızlı. Konuşulan dili 25 Avrupa dili arasında kendisi bulur.",
   "settings.voice.model.parakeetUnified.description":
@@ -681,6 +684,10 @@ export const messages = {
   "settings.voice.language.parakeetUnifiedEnglishOnly":
     "Parakeet Unified yalnızca İngilizceyi tanır. Bir dil belirlemek için Whisper, Cohere veya ElevenLabs kullanın.",
   "settings.voice.language.automatic": "Otomatik",
+  "settings.voice.pause.title": "Göndermeden önce duraklama",
+  "settings.voice.pause.description":
+    "Sesli konuşmada, bu kadar süre konuşmadığınızda OpenBot sözlerinizi gönderir. Yavaş konuşuyorsanız veya düşünmek için duruyorsanız daha uzun bir duraklama seçin. Codex canlı ses sonu kendisi bulur.",
+  "settings.voice.pause.seconds": "{seconds} sn",
   "settings.voice.loadFailed": "Ses modelleri okunamadı.",
   "settings.voice.saveFailed": "Ses ayarı kaydedilemedi. Tekrar deneyin.",
   "settings.voice.downloadFailed": "İndirme başlatılamadı. Tekrar deneyin.",
@@ -774,6 +781,13 @@ export const messages = {
   "settings.transfer.import.lede": "Diğer sunucudan dışa aktardığınız dosyayı seçin. Dosya adı .zip ile biter.",
   "settings.transfer.import.choose": "Dosya seç…",
   "settings.transfer.import.reading": "Dosya okunuyor…",
+  "settings.transfer.upload.label": "Sunucuya yükleme",
+  "settings.transfer.upload.sending": "Dosya gönderiliyor…",
+  "settings.transfer.upload.sent": "{total} içinden {sent} gönderildi",
+  "settings.transfer.upload.serverReading": "Sunucu dosyayı okuyor…",
+  "settings.transfer.upload.etaSoon": "Bir dakikadan az kaldı",
+  "settings.transfer.upload.etaMinutes": "Yaklaşık {minutes} dk kaldı",
+  "settings.transfer.upload.etaHours": "Yaklaşık {hours} sa {minutes} dk kaldı",
   "settings.transfer.import.openFailed": "Dosya açılamadı",
   "settings.transfer.import.contains": "Bu dosyanın içeriği",
   "settings.transfer.import.source": "OpenBot {version} · {date} tarihinde dışa aktarıldı",
@@ -817,8 +831,12 @@ export const messages = {
   "settings.transfer.copy.noAgents": "Bu sunucuda ajan yok.",
   "settings.transfer.copy.new": "Yeni",
   "settings.transfer.copy.notCopied":
-    "Kanalları ve paylaşılan klasör de kopyalanır. API anahtarları, oturum açma bilgileri, bağlayıcılar ve sohbet geçmişi kopyalanmaz. Bunları diğer sunucuda yeniden kurun.",
+    "Kanalları, rutin akışları, iş akışları ve paylaşılan klasör de kopyalanır. API anahtarları, oturum açma bilgileri, bağlayıcılar ve sohbet geçmişi kopyalanmaz. Bunları diğer sunucuda yeniden kurun.",
   "settings.transfer.copy.submit": { one: "{count} ajanı kopyala", other: "{count} ajanı kopyala" },
+  "settings.transfer.copy.duplicatesTitle": "Yinelenen ajanlar kopyalansın mı?",
+  "settings.transfer.copy.duplicatesDescription":
+    "{server} üzerinde bu adlara sahip ajanlar zaten var: {names}. Kopyalama her biri için ikinci bir ajan ekler. Her kopya, kendi sohbetleri, dosyaları ve bellekleri olan ayrı bir ajandır.",
+  "settings.transfer.copy.duplicatesConfirm": "Yinelenenleri kopyala",
   "settings.transfer.copy.copying": "Kopyalanıyor…",
   "settings.transfer.copy.done": {
     one: "{count} ajan {server} sunucusuna kopyalandı.",

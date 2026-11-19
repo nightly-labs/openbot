@@ -63,7 +63,6 @@ function CounterLayer({
       <Animated.View
         style={[{ position: "absolute", left: -BLUR_PADDING, top: -BLUR_PADDING, width, height }, blurredStyle]}
       >
-        {/* Filter the glyphs themselves. ForeignObject keeps HeroUI's font, scale and theme. */}
         <Svg width={width} height={height}>
           <Defs>
             <Filter id={filterId} filterUnits="userSpaceOnUse" x={0} y={0} width={width} height={height}>
@@ -128,8 +127,6 @@ function SvgBlurCounter({ value }: { value: string }) {
   );
 }
 
-// Android draws ForeignObject without its filter, and the new text can mount a frame before a shared
-// progress reset. Each Android layer keeps one value and its own progress, and RenderEffect blurs it.
 const ANDROID_BLUR = Platform.OS === "android" && Number(Platform.Version) >= 31;
 
 function AndroidCounterLayer({

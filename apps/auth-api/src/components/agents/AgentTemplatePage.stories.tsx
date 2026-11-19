@@ -2,9 +2,7 @@ import type { AgentTemplateDetail } from "@openbot/contracts/ipc";
 import type { JSX } from "@solidjs/web";
 import { createRootRoute, createRoute, createRouter, RouterContextProvider } from "@tanstack/solid-router";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-// The site's stylesheet, loaded only when a site story opens. See `ArticleMedia.stories.tsx`.
 import "../../styles.css";
-// Stands in for a photo the owner uploaded as the agent's avatar.
 import samplePhoto from "../../../public/icon-512x512.png";
 import { AgentTemplateNotSharedPage } from "./AgentTemplateNotSharedPage";
 import { AgentTemplatePage } from "./AgentTemplatePage";
@@ -53,11 +51,6 @@ const TEMPLATE: AgentTemplateDetail = {
   ],
 };
 
-/**
- * The site header's links need a router. The real route tree carries Worker-only modules, so this is
- * a small stand-in tree. It is built at module level:
- * creating a router writes reactive state, which Solid refuses inside a component.
- */
 const rootRoute = createRootRoute();
 rootRoute.addChildren([
   createRoute({ getParentRoute: () => rootRoute, path: "/" }),
@@ -84,10 +77,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** What `openbot.run/agents/<id>` shows. "Add to OpenBot" opens `openbot://agents/<id>`. */
 export const SharedAgent: Story = {};
 
-/** The owner uploaded a photo for the agent, so the page shows it instead of the generated avatar. */
 export const WithPhoto: Story = {
   args: { template: { ...TEMPLATE, avatarUrl: samplePhoto } },
 };
@@ -96,7 +87,6 @@ export const InstructionsOnly: Story = {
   args: { template: { ...TEMPLATE, title: "", skills: [], routines: [] } },
 };
 
-/** Long instructions are clamped behind "Read more". */
 export const LongInstructions: Story = {
   args: {
     template: {
@@ -113,10 +103,6 @@ export const LongInstructions: Story = {
   },
 };
 
-/**
- * Instructions in Markdown. Closed, they read as plain text; "Read more" shows the headings and lists.
- * The raw HTML shows as text and never runs.
- */
 export const MarkdownInstructions: Story = {
   args: {
     template: {
@@ -138,7 +124,6 @@ export const MarkdownInstructions: Story = {
   },
 };
 
-/** The owner unpublished the agent, or the id is unknown: the loader's 404 shows this page. */
 export const NoLongerShared: Story = {
   render: () => <WithRouter>{() => <AgentTemplateNotSharedPage />}</WithRouter>,
 };

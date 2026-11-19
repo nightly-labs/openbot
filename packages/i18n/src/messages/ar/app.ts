@@ -115,6 +115,7 @@ export const messages = {
   "app.settingsPage.searchPlaceholder": "ابحث في الإعدادات…",
   "app.settingsPage.results": "نتائج البحث في الإعدادات",
   "app.settingsPage.noResults": "لا إعدادات مطابقة.",
+  "app.settingsPage.marketplaceApps": "الموصلات وخوادم MCP",
   "app.settingsPage.resultCount": {
     zero: "لا إعدادات مطابقة.",
     one: "إعداد واحد مطابق.",

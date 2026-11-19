@@ -24,7 +24,7 @@ export const messages = {
   "error.crm.badCursor": "このページはもう有効ではありません。リストを再読み込みしてください。",
   "error.crm.invalidChange": "この変更は無効です。",
   "error.crm.agentNotAllowed":
-    "このエージェントは CRM を使用できません。オーナーまたは管理者が CRM ページでアクセスを許可できます。",
+    "このエージェントは CRM を使用できません。オーナーまたは管理者がアクセスを許可できます: CRM ページを開き、「提案」をクリックし、エージェント数のボタンをクリックして、このエージェントをオンにします。",
   "error.crm.tooManyProposals": "判断待ちの提案が多すぎます。誰かが判断するまでお待ちください。",
   "error.crm.amountInvalid": "金額は 129.00 のように数値で入力してください。",
   "error.crm.amountDecimals": "{currency} では金額の小数点以下の桁数が多すぎます。",

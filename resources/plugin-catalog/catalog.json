@@ -28,9 +28,9 @@
     },
     {
       "slug": "obsidian",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "featured": false,
-      "detailSha256": "37e15fe89d36e955c2b289f421b3a987a88841a3525281a0eb2b4f82974087ca"
+      "detailSha256": "3869f8c6df24d2ea40bdc12fe627eedc27c2fc6886b486c30dcb26a48ef1b079"
     },
     {
       "slug": "atlassian",

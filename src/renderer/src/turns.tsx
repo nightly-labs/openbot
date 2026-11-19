@@ -7,9 +7,10 @@ import type {
   QueueSnapshot,
   RoutineFields,
 } from "@openbot/contracts/ipc";
+import type { AgentActiveQueues } from "@openbot/contracts/team-protocol/agent-active-queues-v1";
 import { approvalIsCut, withWholeApproval } from "@openbot/team-client/runtime-attention";
 import { currentText } from "@openbot/ui/text";
-import { createEffect, createMemo, createSignal, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, createStore, untrack } from "solid-js";
 import { desktopAnalytics } from "./analytics";
 import { useAnsweredPrompts } from "./answered-prompts";
 import {
@@ -24,86 +25,40 @@ import type { TurnStepLines } from "./features/conversation/turn-step-lines";
 import { useDynamicIsland } from "./features/dynamic-island/dynamic-island-context";
 import { useServers } from "./features/servers/servers-context";
 import { queuedDeliveriesInOrder } from "./queue-reconciliation";
+import { isRoutineSteerRefusal } from "./routine-steer-refusal";
 import { createScopeGuard } from "./scope-lifetime";
 import { createSimpleContext } from "./simple-context";
 import { turnsPort } from "./turns-port";
 
 type PromptEvent = Extract<AgentEvent, { type: "prompt" }>;
-/** `current` is false while a new list loads. */
 type RoutineSnapshot = { routines: RoutineFields[]; current: boolean };
 
-/**
- * What each agent is *doing*: the turn it is running, the queue behind it, and
- * the prompt or approval it is blocked on.
- *
- * This is the one domain inside the per-server subtree whose state survives a
- * server switch. `DynamicIslandCoordinator` lives above the keyed boundary,
- * keeps six of these maps per server and hands them back through
- * `serverState(serverId)`, so this provider seeds from that snapshot on mount
- * instead of starting empty. Keeping turns separate from `conversation` is what
- * keeps that seam visible - mixed together, the one layer that is restored
- * would be indistinguishable from the ones that are not.
- *
- * Two placements deviate from the plan's inventory, both for the same reason -
- * the edge only points one way:
- *
- * - **This provider sits *outside* `conversation`, not inside it.** The plan had
- *   conversation first, but `applyConversation` and `applyConversationPage` both
- *   write `activeTurns` (a snapshot carries the turn that produced it) while
- *   nothing here needs a conversation *signal*. Nesting turns outside leaves a
- *   single downward edge; the other order needs two.
- * - **`presentPromptResolution` is not here.** It is the one turn command that
- *   reads `liveMessages`, to tell a resolution the user has seen from one main
- *   has already persisted. It moves to `conversation` with that state.
- *
- * `completedTurnByAgent` and `routinesByConversation` used to survive a switch
- * because nobody cleared them; they now die with the scope, which is the
- * teardown the old list of setters kept forgetting. `completedTurnByAgent` had
- * grown for the life of the process.
- *
- * `presentedPromptResolutions` and `submittedPromptRequests` are the exception
- * that proves that rule: they too survived by neglect, but for them the survival
- * was load-bearing, because an answered prompt is only proved answered by a
- * snapshot that may arrive after the user has moved to another server. They are
- * re-exported from here under their own names so nothing downstream can tell,
- * but they are owned by `answered-prompts.tsx` above the boundary and scoped to
- * this server by its id - and they are read before `pendingPrompts` exists,
- * because the seed below is the first thing that has to consult them.
- */
 const Turns = createSimpleContext({
   name: "Turns",
   init: () => {
-    const { activeServerId } = useServers();
+    const { activeServerId, activeServer } = useServers();
     const { dynamicIslandCoordinator } = useDynamicIsland();
     const { activeAgent, activeAgentId, agentList, agentListSettled, agentStatus, appendUiError } = useAgents();
     const scopeIsCurrent = createScopeGuard();
 
-    // The layer-2 seed: what this server was doing the last time it was open. The scope is keyed
-    // on the server, so its id and the seed are read once.
     const scopeServerId = untrack(activeServerId);
     const seed = dynamicIslandCoordinator.serverState(scopeServerId);
     const [activeTurns, setActiveTurns] = createSignal<Record<string, string | null>>(seed?.activeTurns ?? {});
-    const [turnProgress, setTurnProgress] = createSignal<
+    const [turnProgressStore, setTurnProgress] = createStore<
       Record<string, { turnId: string; detail: string; running?: boolean; activity?: string } | undefined>
-    >(seed?.turnProgress ?? {});
-    // Every progress line of the newest turns, by turn, for the steps under the activity line.
+    >({ ...seed?.turnProgress });
+    const turnProgress = () => turnProgressStore;
     const [turnStepLines, setTurnStepLines] = createSignal<TurnStepLines>({});
     const [failedTurns, setFailedTurns] = createSignal<Record<string, string | undefined>>(seed?.failedTurns ?? {});
-    // The agents whose queue waits for a provider plan to reset, in epoch seconds. Only a runtime snapshot of the local host carries it.
     const [contextStates, setContextStates] = createSignal<Record<string, AgentContextState>>({});
-    // The context of each side thread, by thread id. Only a runtime snapshot of the local host carries it.
     const [threadContextStates, setThreadContextStates] = createSignal<Record<string, AgentContextState>>({});
     const [usageLimits, setUsageLimits] = createSignal<Record<string, number | null>>({});
-    // The turn of each agent whose subagents still run, also after the turn ended. Only a runtime snapshot of the local host carries it.
     const [subagentTurns, setSubagentTurns] = createSignal<Record<string, string>>({});
-    // Each provider account and model that a usage limit holds, also with no agent on it.
+    const [backgroundWork, setBackgroundWork] = createSignal<Record<string, number>>({});
     const [usageLimitedModels, setUsageLimitedModels] = createSignal<AgentModelChoice[]>([]);
-    // Each provider account and model that a provider error holds, so that a switch passes over it.
     const [failedModels, setFailedModels] = createSignal<AgentModelChoice[]>([]);
-    // The holds whose ask card the user closed with "Wait", by agent, with the reset of that hold.
     const [waitedUsageLimits, setWaitedUsageLimits] = createSignal<Record<string, number | null>>({});
     const [queues, setQueues] = createSignal<Record<string, QueueSnapshot>>(seed?.queues ?? {});
-    // Only the active agent's open waits load; a `waits-changed` event updates any agent.
     const [waits, setWaits] = createSignal<Record<string, AgentWaitsSnapshot>>({});
     const [routinesByConversation, setRoutinesByConversation] = createSignal<
       Record<string, RoutineSnapshot | undefined>
@@ -119,11 +74,9 @@ const Turns = createSimpleContext({
         seededAttentionPrompts(seed?.pendingPrompts, presentedPromptResolutions(), submittedPromptRequests()),
       ),
     );
-    // Every waiting approval: the agent's chat and each of its tasks has its own thread.
     const [approvals, setApprovals] = createSignal<AgentApproval[]>(
       Object.values(seed?.pendingApprovals ?? {}).filter((approval) => approval !== undefined),
     );
-    /** The newest waiting approval of each agent, in any thread. */
     const pendingApprovals = createMemo(() =>
       Object.fromEntries(approvals().map((approval) => [approval.agentId, approval] as const)),
     );
@@ -141,8 +94,6 @@ const Turns = createSimpleContext({
           : current,
       );
     }
-    // A runtime snapshot cuts the long texts of an approval. Main reads the whole copy once for each cut
-    // request. Until it comes, and when the server cannot send it, the card offers only Deny.
     const wholeApprovalReads = new Set<string>();
     createEffect(
       () => approvals().filter(approvalIsCut),
@@ -154,8 +105,6 @@ const Turns = createSimpleContext({
           void turnsPort()
             .agent.readPendingApproval({ agentId: approval.agentId, requestId: approval.requestId })
             .then((whole) => {
-              // Before a joined server connects, main does not know its capabilities and returns null. The
-              // next change of the approvals tries again.
               if (!whole) {
                 wholeApprovalReads.delete(key);
                 return;
@@ -166,7 +115,6 @@ const Turns = createSimpleContext({
                 return next === current ? current : [...next];
               });
             })
-            // The next change of the approvals tries again.
             .catch(() => wholeApprovalReads.delete(key));
         }
       },
@@ -209,8 +157,6 @@ const Turns = createSimpleContext({
           if (!scopeIsCurrent() || queueSnapshotRequests.get(agentId) !== queueRequest) return;
           setQueues((current) => ({ ...current, [agentId]: queue }));
         })
-        // This background read can time out while chat replies still arrive. Keep the last queue;
-        // the next load or queue-changed event updates it. Queue action failures still report errors.
         .catch(() => undefined);
     }
 
@@ -230,50 +176,63 @@ const Turns = createSimpleContext({
           if (!scopeIsCurrent() || waitSnapshotRequests.get(agentId) !== request) return;
           setWaits((current) => ({ ...current, [agentId]: snapshot }));
         })
-        // As in `loadQueue`: this background read can time out on a joined server while the agent
-        // works. Keep the last waits; the next load (a new phase, agent or server) or a local
-        // `waits-changed` event updates them. A failed cancel still reports an error.
         .catch(() => undefined);
     }
 
+    const connectionSequence = createMemo(() => activeServer()?.connectionSequence);
     createEffect(
-      () => ({ agentId: activeAgentId(), agentPhase: agentStatus().phase, serverId: activeServerId() }),
+      () => ({
+        agentId: activeAgentId(),
+        agentPhase: agentStatus().phase,
+        serverId: activeServerId(),
+        connectionSequence: connectionSequence(),
+      }),
       ({ agentId }) => {
         if (agentId) loadWaits(agentId);
       },
     );
 
-    /**
-     * Reads the queues of many agents and writes them at once. One write for each answer ran every
-     * sidebar row again for each agent: on a host with 50 agents, the first conversation waited
-     * seconds for those runs (`bun run perf:remote`).
-     */
     function loadQueues(agentIds: string[]): void {
-      const reads = agentIds.map((agentId) => {
-        const queueRequest = (queueSnapshotRequests.get(agentId) ?? 0) + 1;
-        queueSnapshotRequests.set(agentId, queueRequest);
-        return turnsPort()
-          .agent.listQueue(agentId)
-          .then(
-            (queue) => ({ agentId, queueRequest, queue }),
-            // As in `loadQueue`: keep the last queue; the next load or queue-changed event updates it.
-            () => null,
-          );
-      });
-      void Promise.all(reads).then((results) => {
+      const opened = untrack(activeAgentId);
+      if (opened && agentIds.includes(opened)) loadQueue(opened);
+      const rows = agentIds.filter((agentId) => agentId !== opened);
+      if (rows.length === 0) return;
+      const requests = new Map(
+        rows.map((agentId) => {
+          const queueRequest = (queueSnapshotRequests.get(agentId) ?? 0) + 1;
+          queueSnapshotRequests.set(agentId, queueRequest);
+          return [agentId, queueRequest] as const;
+        }),
+      );
+      void readQueues(rows).then((queues) => {
         if (!scopeIsCurrent()) return;
-        const loaded = results.flatMap((result) =>
-          result && queueSnapshotRequests.get(result.agentId) === result.queueRequest
-            ? [[result.agentId, result.queue] as const]
+        const active = untrack(activeAgentId);
+        const loaded = queues.flatMap((queue) =>
+          queue.agentId !== active && queueSnapshotRequests.get(queue.agentId) === requests.get(queue.agentId)
+            ? [[queue.agentId, queue] as const]
             : [],
         );
         if (loaded.length > 0) setQueues((current) => ({ ...current, ...Object.fromEntries(loaded) }));
       });
     }
 
-    // The active-agent load above misses everyone else. A routine mark needs each agent's real
-    // queue sender, which a runtime snapshot does not carry. The agents of a saved frame wait for the
-    // first read of the roster: the host is not connected yet.
+    async function readQueues(agentIds: string[]): Promise<QueueSnapshot[]> {
+      let listed: AgentActiveQueues | null;
+      try {
+        listed = await turnsPort().agent.listActiveQueues(agentIds);
+      } catch {
+        listed = null;
+      }
+      const each = await Promise.all(
+        (listed?.omitted ?? agentIds).map((agentId) =>
+          turnsPort()
+            .agent.listQueue(agentId)
+            .catch(() => null),
+        ),
+      );
+      return [...(listed?.queues ?? []), ...each.filter((queue) => queue !== null)];
+    }
+
     createEffect(
       () => ({
         agentIds: agentListSettled()
@@ -294,8 +253,6 @@ const Turns = createSimpleContext({
           return;
         }
         if (!next.agentIds) return;
-        // A new phase or server, or the first roster, also runs the active-agent load, so that agent is
-        // read only once.
         const activeLoads =
           !previous?.agentIds || next.agentPhase !== previous.agentPhase || next.serverId !== previous.serverId;
         const active = activeLoads ? untrack(activeAgentId) : null;
@@ -303,7 +260,6 @@ const Turns = createSimpleContext({
       },
     );
 
-    /** Answers the prompt of the agent's chat, or of its side thread `threadId`. */
     async function answerPrompt(
       answers: Record<string, string[]>,
       options?: PromptAnswerOptions,
@@ -312,15 +268,10 @@ const Turns = createSimpleContext({
       const agent = activeAgent();
       const prompt = agent ? pendingPrompts()[attentionKey(agent.id, threadId ?? agent.threadId)] : undefined;
       if (!agent || prompt?.type !== "prompt") return false;
-      // A side thread marks its answer by its own key: the agent id marks the agent's own chat.
       const mark = threadId === undefined ? agent.id : attentionKey(agent.id, threadId);
       return submitPromptAnswers(agent.id, mark, prompt, answers, options);
     }
 
-    /**
-     * Answers the prompt `requestId` of the thread `threadId` of any agent, from outside its chat, as the
-     * agent dock does. False when the thread no longer waits for that prompt.
-     */
     async function answerPromptRequest(
       agentId: string,
       threadId: string | null,
@@ -329,7 +280,6 @@ const Turns = createSimpleContext({
     ): Promise<boolean> {
       const prompt = pendingPrompts()[attentionKey(agentId, threadId)];
       if (prompt?.type !== "prompt" || String(prompt.requestId) !== String(requestId)) return false;
-      // The agent id marks the agent's own chat, as `answerPrompt` does.
       const own = agentList().some((agent) => agent.id === agentId && agent.threadId === threadId);
       return submitPromptAnswers(agentId, own ? agentId : attentionKey(agentId, threadId), prompt, answers);
     }
@@ -412,7 +362,6 @@ const Turns = createSimpleContext({
       return respondToApprovalRequest(agent.id, approval.requestId, decision);
     }
 
-    /** Answers the takeover of the agent's chat, or of its side thread `threadId`. */
     async function respondToBrowserTakeover(
       decision: "complete" | "cancel",
       threadId?: string,
@@ -425,10 +374,6 @@ const Turns = createSimpleContext({
       return respondToBrowserTakeoverRequest(agent.id, thread, event.request.requestId, decision, options);
     }
 
-    /**
-     * Answers the takeover `requestId` of the thread `threadId` of any agent. The agent dock answers from
-     * outside the chat. False when the thread no longer waits for that takeover.
-     */
     async function respondToBrowserTakeoverRequest(
       agentId: string,
       threadId: string | null,
@@ -472,7 +417,6 @@ const Turns = createSimpleContext({
       const serverId = activeServerId();
       void turnsPort()
         .agent.cancelWait({ agentId: agent.id, waitId })
-        // A joined server sends no event when a wait closes, so the list is read again.
         .then(() => loadWaits(agent.id))
         .catch((error) => appendUiError(agent.id, error, currentText().t("app.errorStatus.waitCancel"), serverId));
     }
@@ -488,29 +432,19 @@ const Turns = createSimpleContext({
         .then(() => analytics.track("queue_action", { action: "steer", result: "succeeded" }))
         .catch((error) => {
           analytics.track("queue_action", { action: "steer", result: "failed", failure_code: "steer_failed" });
-          // After the turn ended, the message runs as the next turn. The refusal is old news (#3206).
           if (activeTurns()[agent.id] !== turnId) return;
-          // A message that left the queue is in the turn already: an agent that steers each message
-          // sent while it works can take it first.
           const delivery = queues()[agent.id]?.deliveries.find((item) => item.id === deliveryId);
           if (delivery && delivery.status !== "queued") return;
+          if (isRoutineSteerRefusal(error)) return;
           appendUiError(agent.id, error, currentText().t("app.errorStatus.steer"), serverId);
         });
     }
 
-    /**
-     * For an agent whose provider cannot steer: puts a queued message first and stops the running
-     * turn, so the message runs as the next turn. A message just sent is not in the queue snapshot
-     * yet; it is last in the queue, so first is still the correct place.
-     * Channel and messaging work that waits keeps its place before the message: it reserved the agent first.
-     */
     function sendQueuedMessageNow(deliveryId: string) {
       const agent = activeAgent();
       const turnId = agent ? activeTurns()[agent.id] : null;
       if (!agent || !turnId) return;
       const queued = queuedDeliveriesInOrder(queues()[agent.id]);
-      // An edited message keeps its place, and the queue starts nothing while it is first. A stop would
-      // then end the turn and start nothing, so the message waits as it did.
       const head = queued[0];
       if (head?.editing && head.id !== deliveryId) return;
       const serverId = activeServerId();
@@ -534,7 +468,6 @@ const Turns = createSimpleContext({
                 },
               );
       void reorder.then((moved) => {
-        // A turn that ended in the meantime has nothing to stop: the message runs next already.
         if (!moved || activeTurns()[agent.id] !== turnId) return;
         return port
           .interrupt({ agentId: agent.id, turnId })
@@ -586,9 +519,13 @@ const Turns = createSimpleContext({
         });
     }
 
+    function stoppableSubagentTurn(agent: { id: string; provider: string } | undefined): string | null {
+      return agent?.provider === "codex" ? (subagentTurns()[agent.id] ?? null) : null;
+    }
+
     function stopActiveTurn() {
       const agent = activeAgent();
-      const turnId = agent ? activeTurns()[agent.id] : null;
+      const turnId = agent ? (activeTurns()[agent.id] ?? stoppableSubagentTurn(agent)) : null;
       if (!agent || !turnId) return;
       const serverId = activeServerId();
       const analytics = desktopAnalytics.scope();
@@ -617,19 +554,12 @@ const Turns = createSimpleContext({
       const agent = activeAgent();
       return agent ? routinesByConversation()[agentConversationKey(activeServerId(), agent.id)] : undefined;
     });
-    // A routine link opens only a routine the newest list has; a deleted one must not open.
     const activeRoutineIds = createMemo(() => {
       const snapshot = activeRoutineSnapshot();
       return snapshot?.current ? snapshot.routines.map((routine) => routine.id) : undefined;
     });
-    // A chat card keeps the last list while a new one loads, so it does not blink.
     const activeRoutines = createMemo(() => activeRoutineSnapshot()?.routines);
 
-    /**
-     * The seed is `dynamicIslandCoordinator.serverState(serverId)`, which is
-     * `undefined` for a server the coordinator has not seen. Each field falls
-     * back to empty, exactly as `selectServer` did inline.
-     */
     return {
       activeTurns,
       setActiveTurns,
@@ -647,6 +577,8 @@ const Turns = createSimpleContext({
       setUsageLimits,
       subagentTurns,
       setSubagentTurns,
+      backgroundWork,
+      setBackgroundWork,
       usageLimitedModels,
       setUsageLimitedModels,
       failedModels,
@@ -689,6 +621,7 @@ const Turns = createSimpleContext({
       updateQueuedMessage,
       reorderQueue,
       stopActiveTurn,
+      stoppableSubagentTurn,
     };
   },
 });

@@ -4,6 +4,9 @@ import type { messages as source } from "../en/composer";
 export const messages = {
   "composer.queueEdit.body": "Edytujesz wiadomość z kolejki. Zapisz lub anuluj edycję, aby mogła zostać wysłana.",
   "composer.queueEdit.cancel": "Anuluj edycję",
+  "composer.feedbackFix.body":
+    "Poprawiasz zgłoszenie #{number}. Wyślij prośbę albo anuluj, aby zostawić zgłoszenie bez zmian.",
+  "composer.feedbackFix.cancel": "Anuluj",
   "composer.providerWait.offlineTitle": "Brak połączenia z internetem",
   "composer.providerWait.offline": "{provider} nie może odpowiedzieć, dopóki ten komputer nie wróci do sieci.",
   "composer.providerWait.silent": "Czas bez aktualizacji od {provider}: {duration}.",
@@ -19,6 +22,11 @@ export const messages = {
   "composer.update.manual": "Zaktualizuj {provider} na komputerze, na którym działa, aby kontynuować.",
   "composer.update.pending": "Aktualizowanie…",
   "composer.update.action": "Zaktualizuj",
+  "composer.imageInput.body":
+    "{model} dostaje tylko tekst, więc nie widzi załączonych obrazów. Jeśli ten model umie czytać obrazy, włącz dla niego obrazy.",
+  "composer.imageInput.label": "Włącz obrazy dla {model}",
+  "composer.imageInput.pending": "Włączanie…",
+  "composer.imageInput.action": "Włącz obrazy",
   "composer.usageLimit.credits": "Wykorzystano cały limit planu {provider}. Agenci używają teraz Twoich kredytów.",
   "composer.usageLimit.creditsResets":
     "Wykorzystano cały limit planu {provider}. Agenci używają Twoich kredytów do odnowienia: {reset}.",
@@ -44,6 +52,7 @@ export const messages = {
   "composer.picker.noSkills": "Ten agent nie ma umiejętności.",
   "composer.picker.noSkillMatch": "Żadna umiejętność nie pasuje do „{query}”.",
   "composer.picker.skillsLoadFailed": "Nie udało się wczytać umiejętności.",
+  "composer.picker.skillProblem": "Umiejętność {name} jest niedostępna. {problem} Poproś agenta o naprawę.",
   "composer.token.attachment": "Otwórz załączony plik {name}",
   "composer.token.agent": "Agent {name}",
   "composer.token.skill": "Umiejętność {name}",
@@ -62,6 +71,8 @@ export const messages = {
     "Dostęp do mikrofonu jest zablokowany. Pozwól OpenBot używać mikrofonu w ustawieniach systemowych.",
   "composer.voice.noMicrophone": "Brak dostępnego mikrofonu.",
   "composer.voice.startFailed": "OpenBot nie mógł rozpocząć nagrywania głosu.",
+  "composer.voice.microphoneUnavailable":
+    "OpenBot nie mógł otworzyć mikrofonu. Zamknij inne aplikacje, które go używają, sprawdź, czy jest podłączony i dozwolony w ustawieniach systemowych, a potem spróbuj ponownie.",
   "composer.voice.transcribeFailed": "OpenBot nie mógł przetranskrybować tego nagrania.",
   "composer.reply.toYou": "Odpowiedź na twoją wiadomość",
   "composer.reply.toAgent": "Odpowiedź na wiadomość agenta",
@@ -122,6 +133,8 @@ export const messages = {
   "composer.voice.noSpeechRecorded": "Nie nagrano mowy.",
   "composer.voice.noSpeechDetected": "Nie wykryto mowy.",
   "composer.voice.readFailed": "Nie udało się przeczytać odpowiedzi na głos.",
+  "composer.voice.languageUnsupported":
+    "Nie udało się przeczytać odpowiedzi na głos. Ten język nie jest jeszcze dostępny.",
   "composer.error.saveEditTryAgain": "Nie udało się zapisać tej edycji na tym komputerze. Spróbuj ponownie.",
   "composer.error.saveUnconfirmed": "Zapis nie jest potwierdzony. Ponów zapis, aby sprawdzić wynik.",
   "composer.error.changeModel": "Nie udało się zmienić modelu. Spróbuj ponownie.",

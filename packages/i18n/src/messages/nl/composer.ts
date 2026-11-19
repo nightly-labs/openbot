@@ -5,6 +5,9 @@ export const messages = {
   "composer.queueEdit.body":
     "Je bewerkt een bericht in de wachtrij. Sla de wijziging op of annuleer hem om het bericht te laten uitvoeren.",
   "composer.queueEdit.cancel": "Bewerking annuleren",
+  "composer.feedbackFix.body":
+    "Melding #{number} wordt gecorrigeerd. Verstuur het verzoek, of annuleer om de melding te laten zoals hij is.",
+  "composer.feedbackFix.cancel": "Annuleren",
   "composer.providerWait.offlineTitle": "Geen internetverbinding",
   "composer.providerWait.offline": "{provider} kan pas antwoorden als deze computer weer online is.",
   "composer.providerWait.silent": "{provider} heeft al {duration} geen update gestuurd.",
@@ -20,6 +23,11 @@ export const messages = {
   "composer.update.manual": "Werk {provider} bij op de computer waarop het draait om door te gaan.",
   "composer.update.pending": "Bijwerken…",
   "composer.update.action": "Bijwerken",
+  "composer.imageInput.body":
+    "{model} krijgt alleen tekst en ziet de afbeeldingen die je bijvoegt dus niet. Als dit model afbeeldingen kan lezen, zet afbeeldingen ervoor aan.",
+  "composer.imageInput.label": "Afbeeldingen aanzetten voor {model}",
+  "composer.imageInput.pending": "Aanzetten…",
+  "composer.imageInput.action": "Afbeeldingen aan",
   "composer.usageLimit.credits":
     "Je hebt de volledige planlimiet van {provider} gebruikt. Je agents gebruiken nu je tegoed.",
   "composer.usageLimit.creditsResets":
@@ -48,6 +56,7 @@ export const messages = {
   "composer.picker.noSkills": "Deze agent heeft geen vaardigheden.",
   "composer.picker.noSkillMatch": "Geen vaardigheid gevonden voor “{query}”.",
   "composer.picker.skillsLoadFailed": "Vaardigheden zijn niet geladen.",
+  "composer.picker.skillProblem": "{name} is niet beschikbaar. {problem} Vraag de agent om het te herstellen.",
   "composer.token.attachment": "Bijgevoegd bestand {name} openen",
   "composer.token.agent": "Agent {name}",
   "composer.token.skill": "Vaardigheid {name}",
@@ -66,6 +75,8 @@ export const messages = {
     "Toegang tot de microfoon is geblokkeerd. Geef OpenBot toegang tot de microfoon in de systeeminstellingen.",
   "composer.voice.noMicrophone": "Er is geen microfoon beschikbaar.",
   "composer.voice.startFailed": "OpenBot kan de spraakopname niet starten.",
+  "composer.voice.microphoneUnavailable":
+    "OpenBot kan de microfoon niet openen. Sluit andere apps die hem gebruiken, controleer of hij is aangesloten en is toegestaan in de systeeminstellingen, en probeer het opnieuw.",
   "composer.voice.transcribeFailed": "OpenBot kan deze opname niet uitschrijven.",
   "composer.reply.toYou": "Antwoord op je bericht",
   "composer.reply.toAgent": "Antwoord aan agent",
@@ -124,6 +135,7 @@ export const messages = {
   "composer.voice.noSpeechRecorded": "Er is geen spraak opgenomen.",
   "composer.voice.noSpeechDetected": "Er is geen spraak gedetecteerd.",
   "composer.voice.readFailed": "Kan het antwoord niet voorlezen.",
+  "composer.voice.languageUnsupported": "Kan het antwoord niet voorlezen. Deze taal is nog niet beschikbaar.",
   "composer.error.saveEditTryAgain": "Kan deze wijziging niet opslaan op deze computer. Probeer het opnieuw.",
   "composer.error.saveUnconfirmed": "Opslaan is niet bevestigd. Kies opnieuw Opslaan om het resultaat te controleren.",
   "composer.error.changeModel": "Kan het model niet wijzigen. Probeer het opnieuw.",

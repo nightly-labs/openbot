@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/team";
 
 export const messages = {
-  // Errors that the Team API and the team store send to clients.
   "error.team.ownerNotLinked": "Cet hôte n’est pas lié à un compte propriétaire OpenBot.",
   "error.team.ownerEmailRequired": "Connectez-vous avec l’adresse e-mail OpenBot qui a créé cet hôte.",
   "error.team.hostNotConfigured": "L’hôte de l’équipe n’est pas configuré.",
@@ -56,6 +55,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "Trop de tentatives de connexion. Réessayez plus tard.",
   "error.team.clientUpdateRequired": "Mettez à jour ce client OpenBot avant de vous connecter à cet hôte.",
   "error.team.hostUpdateRequired": "Mettez à jour OpenBot sur l’hôte avant de vous connecter.",
+  "error.team.serverSafeMode": "Ce serveur est en mode sans échec, car OpenBot ne démarre pas dessus.",
+  "error.team.serverSafeModeNewerDatabase":
+    "OpenBot {version} sur ce serveur ne peut pas ouvrir ses données, car une version plus récente d’OpenBot les a enregistrées. Une version plus récente d’OpenBot sur le serveur corrige ce problème.",
+  "error.team.serverSafeModeStartFailed":
+    "OpenBot {version} sur ce serveur s’est arrêté après de nombreux échecs de démarrage. Une version plus récente d’OpenBot sur le serveur corrige ce problème.",
   "error.team.sidebarLayoutUnavailable": "La disposition de la barre latérale n’est pas disponible.",
   "error.team.providersUnsupported": "Les réglages des fournisseurs ne sont pas pris en charge par cette connexion.",
   "error.team.providerNotManaged": "OpenBot ne gère pas la CLI de ce fournisseur.",
@@ -78,11 +82,15 @@ export const messages = {
   "error.team.agentColorsUnsupported": "Les couleurs d’agents ne sont pas prises en charge par cette connexion.",
   "error.team.chatColorsUnsupported": "Les couleurs de discussion ne sont pas prises en charge par cette connexion.",
   "error.team.routineRunPlaceUnsupported": "Cette connexion ne peut pas changer l’endroit où une routine s’exécute.",
+  "error.team.routinePauseReasonsUnsupported": "Cette connexion ne peut pas montrer pourquoi une routine est en pause.",
+  "error.team.activeQueuesUnsupported": "Cette connexion ne peut pas afficher les files d’attente de tous les agents.",
   "error.team.routinesOnceUnsupported":
     "Cette connexion ne peut pas enregistrer les routines qui s’exécutent une fois.",
   "error.team.routineRunCommandUnsupported":
     "Cette connexion ne peut pas fournir la commande d’exécution d’une routine.",
   "error.team.threadQueueUnsupported": "Cette connexion ne peut pas afficher la file d’attente d’un fil annexe.",
+  "error.team.threadRequestsUnsupported":
+    "Cette connexion ne peut pas afficher les demandes d’un fil annexe aux autres agents.",
   "error.team.hostTurnLimitsUnsupported":
     "Cette connexion ne peut pas afficher ni modifier les limites de fils du serveur.",
   "error.team.usageLimitUnsupported":
@@ -90,6 +98,8 @@ export const messages = {
   "error.team.hermesImportUnsupported": "Cette connexion ne peut pas importer de profils Hermes depuis le serveur.",
   "error.team.providerDetectionUnsupported":
     "Cette connexion ne peut pas trouver les serveurs de modèles et les agents du serveur.",
+  "error.team.providerModelSourceUnsupported":
+    "Cette connexion ne peut pas indiquer d’où viennent les modèles d’un fournisseur.",
   "error.team.routineFlowStopUnsupported": "Cette connexion ne peut pas arrêter une exécution de routine.",
   "error.team.sidebarFoldersUnsupported":
     "Les dossiers dans des dossiers ne sont pas pris en charge par cette connexion.",

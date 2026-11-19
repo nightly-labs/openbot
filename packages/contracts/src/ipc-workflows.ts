@@ -3,13 +3,6 @@ import { integerInRange, isBoundedString, isFiniteNumber, isIdentifier } from ".
 import { isRoutineSchedule, type RoutineSchedule } from "./ipc-routines";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 
-/**
- * Workflows: a canvas of nodes that a trigger starts. Any agent can be any step, and a step hands its
- * output on along the edges. A workflow belongs to a server, not to an agent. These IPC types also
- * cross the Team API through the frozen `workflows-v1` codec, so a field added here needs a new
- * capability before a joined client may read it.
- */
-
 export const WORKFLOW_NODE_KINDS = [
   "text",
   "prompt",
@@ -26,7 +19,6 @@ export const WORKFLOW_NODE_KINDS = [
 ] as const;
 export type WorkflowNodeKind = (typeof WORKFLOW_NODE_KINDS)[number];
 
-/** Nodes for people: a run never goes through them. */
 export const WORKFLOW_ANNOTATION_KINDS = ["text", "note", "shape"] as const satisfies readonly WorkflowNodeKind[];
 
 export function isWorkflowStepKind(kind: WorkflowNodeKind): boolean {
@@ -51,10 +43,6 @@ export const WORKFLOW_TRIGGER_TYPES = [
 ] as const;
 export type WorkflowTriggerType = (typeof WORKFLOW_TRIGGER_TYPES)[number];
 
-/**
- * `channel` is a place of a messaging connection, as its released name says. `chat-channel` is an
- * OpenBot channel of this computer.
- */
 export const WORKFLOW_OUTPUT_TARGETS = [
   "notify",
   "channel",
@@ -67,95 +55,47 @@ export const WORKFLOW_OUTPUT_TARGETS = [
 ] as const;
 export type WorkflowOutputTarget = (typeof WORKFLOW_OUTPUT_TARGETS)[number];
 
-/** A value that a node keeps: a text, a choice, a number or a switch. */
 export type WorkflowFieldValue = string | number | boolean;
 
-/**
- * The fields of a node, by name. The host reads only the names its runtime needs:
- * - trigger: `trigger` (a `WorkflowTriggerType`) and `timezone`; the schedule is `WorkflowNode.schedule`.
- *   For `github`: `repositories` ("owner/name", one a line) and `repository` (its first name; read both
- *   with `workflowGitHubTriggerRepositories`), `event` (a `WorkflowGitHubEvent`), `filters` and `labels`
- *   (lists, one name a line), `titleText` and `branch` (the values of those filters). For `discord`:
- *   `connectionId` (the Discord server's messaging connection), `event` (a `WorkflowDiscordEvent`),
- *   `placeId` (a channel id, "" for any channel), `roles` (role ids, one a line, "" for anyone) and
- *   `text` (a text the message must contain, "" for any). For `telegram`: `connectionId` (the Telegram
- *   chat's messaging connection, "" for any linked chat), `event` (a `WorkflowTelegramEvent`) and `text`.
- *   For `slack`: `connectionId` (the Slack workspace's messaging connection), `event` (a
- *   `WorkflowSlackEvent`), `placeId` (a channel id, "" for any channel) and `text` (a text the message
- *   must contain, "" for any).
- * - agent: `agentId`, `task`.
- * - llm: `provider`, `model`, `effort`, `prompt`, `system`.
- * - condition: `rule`, the yes-or-no question about its input, and `provider`, `model` and `effort`, as
- *   llm has them. A condition saved with no `model` lets the host choose the model of each run.
- * - approval: `question`.
- * - output: `target` (a `WorkflowOutputTarget`); for `channel`, `connectionId` and `placeId`. For
- *   `github`: `repository` ("owner/name", or "trigger" for the repository of the trigger's event), `item` ("event" for the item
- *   of the event, "input" for the number in the input), `action` (a `WorkflowGitHubAction`), `labels`
- *   (a list), `labelsFrom` and `person` ("agent" when the agent chooses), `reason` and `title`. For
- *   `discord`: `connectionId` ("trigger" for the trigger's server), `action` (a `WorkflowDiscordAction`),
- *   `placeId` (the channel of `post`) and `emoji` (the emoji of `react`). For `telegram`: `connectionId`
- *   ("trigger" for the trigger's chat), `action` (a `WorkflowTelegramAction`) and `emoji`. A chat is one
- *   connection, so a post needs no place. For `slack`: `connectionId` ("trigger" for the trigger's
- *   workspace), `action` (a `WorkflowSlackAction`), `placeId` (the channel of `post`) and `emoji` (the
- *   emoji of `react`). For `chat-channel`: `channelId`. The result shows in the channel as a note; no
- *   task starts.
- * - prompt: `text`.
- * - image: `media` (a `WorkflowMediaKind`, "image" when absent), `prompt`, `aspect` (one of
- *   `WORKFLOW_MEDIA_ASPECTS`), `model` (an id of `WORKFLOW_MEDIA_MODELS`), `account` (the id of the
- *   account of the model's provider that pays for the file; empty or absent is the provider's own
- *   sign-in, and Sunra and Higgsfield ignore it), `resolution` (one of the
- *   model's resolutions, such as "720p" or "2K"), and for a video `duration` (seconds), `firstFrame`
- *   and `lastFrame` (the id of an image node that an
- *   `image` edge connects, whose picture is the first or the last frame) and `voice` (an id of
- *   `WORKFLOW_VIDEO_VOICES`), and for an image `background` ("transparent" for a picture with clear
- *   pixels around its subject, from a model with `transparent`; absent is the model's own background).
- *   The pictures of the other image nodes with an `image` edge into it are
- *   references. The output of its step is the id of the generated attachment.
- * Every other field is view state, such as a colour or a font, and the host keeps it as it is.
- */
 export type WorkflowFields = Record<string, WorkflowFieldValue>;
+
+export const WORKFLOW_GROUP_FIELDS = { id: "group", name: "groupName", folded: "groupFolded" } as const;
 
 export const WORKFLOW_MEDIA_KINDS = ["image", "video"] as const;
 export type WorkflowMediaKind = (typeof WORKFLOW_MEDIA_KINDS)[number];
 
-export const WORKFLOW_MEDIA_ASPECTS = ["1:1", "4:3", "16:9", "9:16"] as const;
+export const WORKFLOW_MEDIA_ASPECTS = ["1:1", "4:3", "16:9", "9:16", "4:5", "5:4"] as const;
 export type WorkflowMediaAspect = (typeof WORKFLOW_MEDIA_ASPECTS)[number];
+const WORKFLOW_VIDEO_ASPECTS: readonly WorkflowMediaAspect[] = ["1:1", "4:3", "16:9", "9:16"];
+export const WORKFLOW_MEDIA_LEGACY_ASPECTS: readonly WorkflowMediaAspect[] = WORKFLOW_VIDEO_ASPECTS;
 
-/**
- * The service that makes the file: the subscription of an agent provider (`codex`, `grok`), or Sunra or
- * Higgsfield, whose MCP server the user connects in Apps and whose credits pay for the file.
- */
+export const WORKFLOW_MEDIA_CUSTOM_ASPECT = "custom";
+export const WORKFLOW_MEDIA_SIZE_MIN = 64;
+export const WORKFLOW_MEDIA_SIZE_MAX = 4096;
+
+export interface WorkflowMediaSize {
+  width: number;
+  height: number;
+}
+
 export type WorkflowMediaProvider = "codex" | "grok" | "sunra" | "higgsfield";
 
-/** A model that makes the image or the video of an `image` node, with the subscription of its provider. */
 export interface WorkflowMediaModel {
   id: string;
   provider: WorkflowMediaProvider;
   name: string;
   maker: string;
-  /** The name of the subscription, or of the credits with `credits`, that pays for the file. */
   subscription: string;
-  /** True when each file spends credits of the provider account, not a subscription. */
   credits?: boolean;
-  /** The id of the model at the provider, when it is not `id`. */
   providerModel?: string;
   kinds: readonly WorkflowMediaKind[];
-  /** Whether a video can speak in a preset voice of `WORKFLOW_VIDEO_VOICES`. */
   voices: boolean;
-  /** The aspect ratios that it makes. All of `WORKFLOW_MEDIA_ASPECTS` when absent. */
   aspects?: readonly WorkflowMediaAspect[];
-  /** The lengths of a video in seconds. `WORKFLOW_VIDEO_DURATIONS` when absent. */
   durations?: readonly number[];
-  /**
-   * The resolutions that it makes, the default first. A video has `WORKFLOW_VIDEO_RESOLUTIONS` when
-   * absent; an image without them has no resolution choice.
-   */
   resolutions?: readonly string[];
-  /** Whether an image can have a transparent background (`background` "transparent"). */
   transparent?: boolean;
 }
 
-/** The Sunra image models, from Sunra's `list_models` (2026-11-12). */
 const SUNRA_IMAGE_RESOLUTIONS = ["1K", "2K", "4K"] as const;
 const SUNRA_VIDEO_RESOLUTIONS = ["720p", "1080p"] as const;
 
@@ -180,10 +120,6 @@ function sunraModel(
   };
 }
 
-/**
- * The Higgsfield models, from Higgsfield's `models_explore` (2026-11-16). The resolutions are the
- * canvas names; the host sends them in lower case, as Higgsfield names them ("2k").
- */
 const HIGGSFIELD_IMAGE_RESOLUTIONS = ["1K", "2K", "4K"] as const;
 const HIGGSFIELD_VIDEO_RESOLUTIONS = ["720p", "1080p"] as const;
 const HIGGSFIELD_VIDEO_DURATIONS = [5, 10, 15] as const;
@@ -277,13 +213,11 @@ export const WORKFLOW_MEDIA_MODELS: readonly WorkflowMediaModel[] = [
   }),
 ];
 
-/** The picture types that an asset step keeps and that image and video steps take as input. */
 export const WORKFLOW_PICTURE_TYPES: ReadonlySet<string> = new Set(["image/png", "image/jpeg", "image/webp"]);
 
 export const WORKFLOW_VIDEO_DURATIONS = [6, 10] as const;
 export const WORKFLOW_VIDEO_RESOLUTIONS = ["480p", "720p"] as const;
 
-/** The preset voices that a person in a Grok Imagine video can speak in (Grok CLI 1.0.77). */
 export const WORKFLOW_VIDEO_VOICES = [
   { id: "ara", name: "Ara" },
   { id: "eve", name: "Eve" },
@@ -292,23 +226,34 @@ export const WORKFLOW_VIDEO_VOICES = [
 ] as const;
 export type WorkflowVideoVoice = (typeof WORKFLOW_VIDEO_VOICES)[number]["id"];
 
-/** The media kind of an `image` node. */
 export function workflowMediaKind(fields: WorkflowFields): WorkflowMediaKind {
   return fields.media === "video" ? "video" : "image";
 }
 
-/** The choices of a model, or of every model when it is not known. */
 type WorkflowMediaRange = Pick<WorkflowMediaModel, "aspects" | "durations" | "resolutions" | "transparent">;
 
-export function workflowMediaAspects(model: WorkflowMediaRange | null | undefined): readonly WorkflowMediaAspect[] {
-  return model?.aspects ?? WORKFLOW_MEDIA_ASPECTS;
+export function workflowMediaAspects(
+  model: WorkflowMediaRange | null | undefined,
+  kind: WorkflowMediaKind,
+): readonly WorkflowMediaAspect[] {
+  return model?.aspects ?? (kind === "video" ? WORKFLOW_VIDEO_ASPECTS : WORKFLOW_MEDIA_ASPECTS);
 }
 
 export function workflowVideoDurations(model: WorkflowMediaRange | null | undefined): readonly number[] {
   return model?.durations ?? WORKFLOW_VIDEO_DURATIONS;
 }
 
-/** The resolutions of a model for a kind. An image of a model without them has none. */
+export const WORKFLOW_MEDIA_CATALOG_DURATIONS_MAX = 64;
+const WORKFLOW_VIDEO_LENGTH_CHOICES = 5;
+
+export function workflowVideoLengthChoices(durations: readonly number[]): number[] {
+  const sorted = [...new Set(durations)].sort((left, right) => left - right);
+  if (sorted.length <= WORKFLOW_VIDEO_LENGTH_CHOICES) return sorted;
+  const first = sorted[0];
+  const last = sorted[sorted.length - 1];
+  return sorted.filter((value) => value === first || value === last || value % 5 === 0);
+}
+
 export function workflowMediaResolutions(
   model: WorkflowMediaRange | null | undefined,
   kind: WorkflowMediaKind,
@@ -316,28 +261,64 @@ export function workflowMediaResolutions(
   return model?.resolutions ?? (kind === "video" ? WORKFLOW_VIDEO_RESOLUTIONS : []);
 }
 
-/** The frame, the length and the resolution that an `image` node asks its model for. */
-export interface WorkflowMediaSpecs {
-  aspect: WorkflowMediaAspect;
-  /** Seconds. Only a video uses it. */
-  duration: number;
-  resolution: string | null;
-  /** An image with a transparent background. Only an image of a model with `transparent` has one. */
-  transparent: boolean;
+export function isWorkflowMediaSide(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= WORKFLOW_MEDIA_SIZE_MIN &&
+    value <= WORKFLOW_MEDIA_SIZE_MAX
+  );
 }
 
-/**
- * The specs of an `image` node for its model. A value that the model does not make, such as a length
- * kept from another model, becomes the nearest length or the first choice of the model. The host and
- * the canvas read it the same way, so the canvas shows what the model gets.
- */
+export function workflowMediaSize(fields: WorkflowFields, kind: WorkflowMediaKind): WorkflowMediaSize | null {
+  if (kind !== "image" || fields.aspect !== WORKFLOW_MEDIA_CUSTOM_ASPECT) return null;
+  const { width, height } = fields;
+  return isWorkflowMediaSide(width) && isWorkflowMediaSide(height) ? { width, height } : null;
+}
+
+function nearestAspect(aspects: readonly WorkflowMediaAspect[], size: WorkflowMediaSize): WorkflowMediaAspect {
+  const wanted = Math.log(size.width / size.height);
+  const distance = (aspect: WorkflowMediaAspect) => {
+    const [width = 1, height = 1] = aspect.split(":").map(Number);
+    return Math.abs(Math.log(width / height) - wanted);
+  };
+  return aspects.reduce((best, aspect) => (distance(aspect) < distance(best) ? aspect : best), aspects[0] ?? "1:1");
+}
+
+function resolutionPixels(resolution: string): number | null {
+  const match = /^(\d+)K$/i.exec(resolution);
+  return match ? Number(match[1]) * 1024 : null;
+}
+
+function resolutionForSize(resolutions: readonly string[], size: WorkflowMediaSize): string | null {
+  const long = Math.max(size.width, size.height);
+  const sized = resolutions.flatMap((value) => {
+    const pixels = resolutionPixels(value);
+    return pixels === null ? [] : [{ value, pixels }];
+  });
+  if (sized.length === 0) return resolutions[0] ?? null;
+  sized.sort((left, right) => left.pixels - right.pixels);
+  return (sized.find((entry) => entry.pixels >= long) ?? sized[sized.length - 1])?.value ?? null;
+}
+
+export interface WorkflowMediaSpecs {
+  aspect: WorkflowMediaAspect;
+  duration: number;
+  resolution: string | null;
+  transparent: boolean;
+  size: WorkflowMediaSize | null;
+}
+
 export function workflowMediaSpecs(
   fields: WorkflowFields,
   kind: WorkflowMediaKind,
   model: WorkflowMediaRange | null | undefined,
 ): WorkflowMediaSpecs {
-  const aspects = workflowMediaAspects(model);
-  const aspect = aspects.find((value) => value === fields.aspect) ?? aspects[0] ?? "1:1";
+  const aspects = workflowMediaAspects(model, kind);
+  const size = workflowMediaSize(fields, kind);
+  const aspect = size
+    ? nearestAspect(aspects, size)
+    : (aspects.find((value) => value === fields.aspect) ?? aspects[0] ?? "1:1");
   const durations = workflowVideoDurations(model);
   const asked = typeof fields.duration === "number" ? fields.duration : WORKFLOW_VIDEO_DURATIONS[0];
   const duration = durations.reduce(
@@ -346,16 +327,23 @@ export function workflowMediaSpecs(
   );
   const resolutions = workflowMediaResolutions(model, kind);
   const preferred = typeof fields.resolution === "string" ? fields.resolution : "720p";
-  const resolution = resolutions.includes(preferred) ? preferred : (resolutions[0] ?? null);
+  const resolution = size
+    ? resolutionForSize(resolutions, size)
+    : resolutions.includes(preferred)
+      ? preferred
+      : (resolutions[0] ?? null);
   const transparent = kind === "image" && model?.transparent === true && fields.background === "transparent";
-  return { aspect, duration, resolution, transparent };
+  return { aspect, duration, resolution, transparent, size };
 }
 
-/** The model of an `image` node, or null when the node names a model the host does not know. */
-export function workflowMediaModel(fields: WorkflowFields): WorkflowMediaModel | null {
+export function workflowMediaModel(
+  fields: WorkflowFields,
+  catalog: readonly WorkflowMediaModel[] = [],
+): WorkflowMediaModel | null {
   const kind = workflowMediaKind(fields);
   const id = typeof fields.model === "string" && fields.model !== "" ? fields.model : null;
-  return WORKFLOW_MEDIA_MODELS.find((model) => (id === null || model.id === id) && model.kinds.includes(kind)) ?? null;
+  const fits = (model: WorkflowMediaModel) => (id === null || model.id === id) && model.kinds.includes(kind);
+  return (id === null ? null : catalog.find(fits)) ?? WORKFLOW_MEDIA_MODELS.find(fits) ?? null;
 }
 
 export interface WorkflowPoint {
@@ -363,11 +351,9 @@ export interface WorkflowPoint {
   y: number;
 }
 
-/** A size the user set. A missing side keeps the default size of the node. */
 export interface WorkflowNodeSize {
   width?: number;
   height?: number;
-  /** The font size of a text node that the user scaled, in world pixels. */
   font?: number;
 }
 
@@ -378,7 +364,6 @@ export interface WorkflowNode {
   size?: WorkflowNodeSize;
   locked?: boolean;
   fields: WorkflowFields;
-  /** When a schedule trigger fires. Only a trigger node has one. */
   schedule?: RoutineSchedule;
 }
 
@@ -387,11 +372,9 @@ export interface WorkflowEdge {
   from: string;
   to: string;
   type: WorkflowPortType;
-  /** The branch of a condition that the edge leaves from. */
   branch?: WorkflowBranch;
 }
 
-/** A line drawn on the canvas. */
 export interface WorkflowStroke {
   id: string;
   brush: string;
@@ -400,20 +383,12 @@ export interface WorkflowStroke {
   points: WorkflowPoint[];
 }
 
-/** Everything that a save writes. Nodes are in stack order: the last one is drawn on top. */
 export interface WorkflowGraph {
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
   strokes: WorkflowStroke[];
 }
 
-/**
- * The edges that go back to an earlier step and so close a loop. The host runs them as the next
- * pass of the loop and the canvas draws them as loops, so both must pick the same edges. A walk goes
- * depth first from the nodes that no edge enters, then from the rest, each in canvas order; an edge
- * to a node that the walk is still inside is a loop edge. Without the loop edges, the graph has no
- * loop.
- */
 export function workflowLoopEdges(
   nodes: readonly { id: string }[],
   edges: readonly { id: string; from: string; to: string }[],
@@ -430,7 +405,6 @@ export function workflowLoopEdges(
   const done = new Set<string>();
   const open = new Set<string>();
   const starts = [...nodes.filter((node) => !entered.has(node.id)), ...nodes.filter((node) => entered.has(node.id))];
-  // Without recursion: a long chain must not reach the stack limit.
   for (const { id: start } of starts) {
     if (done.has(start)) continue;
     const stack = [{ id: start, index: 0 }];
@@ -458,10 +432,6 @@ export type WorkflowGraphProblem = "annotation" | "port" | "branch" | "condition
 
 const ALL_PORTS = ["text", "image", "file"] as const satisfies readonly WorkflowPortType[];
 
-/**
- * The port types each step kind takes in and sends out. The host refuses a graph with another edge,
- * and the desktop canvas and the mobile editor offer only these, so the three read the same table.
- */
 export const WORKFLOW_PORTS: Readonly<
   Record<WorkflowNodeKind, { in: readonly WorkflowPortType[]; out: readonly WorkflowPortType[] }>
 > = {
@@ -479,7 +449,6 @@ export const WORKFLOW_PORTS: Readonly<
   shape: { in: [], out: [] },
 };
 
-/** Why one edge cannot be in a workflow that runs, or null when it can. */
 export function workflowEdgeProblem(
   from: WorkflowNode,
   to: WorkflowNode,
@@ -492,11 +461,6 @@ export function workflowEdgeProblem(
   return edge.branch === undefined ? null : "branch";
 }
 
-/**
- * The first edge that stops the graph from running, with the reason, or null when it can run. A loop
- * is allowed: the run takes its edge back as the next pass (`workflowLoopEdges`). The shape and the
- * limits of a graph are `isWorkflowGraph`'s.
- */
 export function workflowGraphProblemAt(
   graph: WorkflowGraph,
 ): { problem: WorkflowGraphProblem; edge: WorkflowEdge } | null {
@@ -505,7 +469,6 @@ export function workflowGraphProblemAt(
   for (const edge of graph.edges) {
     const from = nodes.get(edge.from);
     const to = nodes.get(edge.to);
-    // `isWorkflowGraph` already holds every edge to two nodes of the graph.
     if (!from || !to) return { problem: "port", edge };
     const problem = workflowEdgeProblem(from, to, edge);
     if (problem) return { problem, edge };
@@ -516,18 +479,15 @@ export function workflowGraphProblemAt(
   return null;
 }
 
-/** Why the graph is not a workflow that can run, or null when it is. */
 export function workflowGraphProblem(graph: WorkflowGraph): WorkflowGraphProblem | null {
   return workflowGraphProblemAt(graph)?.problem ?? null;
 }
 
-/** The agent of an agent node, or null for another kind or an agent node with no agent yet. */
 export function nodeAgentId(node: WorkflowNode): string | null {
   const agentId = node.fields.agentId;
   return node.kind === "agent" && typeof agentId === "string" && agentId.length > 0 ? agentId : null;
 }
 
-/** The agent of each agent node of the graph. */
 export function graphAgentIds(graph: WorkflowGraph): string[] {
   return graph.nodes.flatMap((node) => nodeAgentId(node) ?? []);
 }
@@ -551,40 +511,29 @@ export type WorkflowRunSource = (typeof WORKFLOW_RUN_SOURCES)[number];
 
 export const WORKFLOW_VERSION_KINDS = ["auto", "restore", "run"] as const;
 export type WorkflowVersionKind = (typeof WORKFLOW_VERSION_KINDS)[number];
-/** A save adds an `auto` version when the newest version is older than this. */
 export const WORKFLOW_AUTO_VERSION_INTERVAL_MS = 5 * 60_000;
-/** The versions that a workflow keeps. A new version removes the oldest. */
 export const WORKFLOW_MAX_VERSIONS = 50;
 
 export interface WorkflowSummary {
   id: string;
   title: string;
-  /** The nodes that a run goes through. */
   steps: number;
   updatedAt: string;
   lastRun: { status: WorkflowRunStatus; at: string } | null;
 }
 
-/** What the host knows about one trigger node: when it fires next, and its webhook address. */
 export interface WorkflowTriggerState {
   nodeId: string;
   type: WorkflowTriggerType;
-  /** Null while the trigger is not a schedule, or has no next time. */
   nextDueAt: string | null;
-  /** Null until the relay gives the webhook an address. */
   webhookUrl: string | null;
 }
 
 export interface WorkflowDetail {
   summary: WorkflowSummary;
   graph: WorkflowGraph;
-  /** Goes up by one on each save. A save from an older revision is a conflict. */
   revision: number;
   triggers: WorkflowTriggerState[];
-  /**
-   * Set by the client when the host sent a node kind or a port type that this app does not know.
-   * The app shows such a node as a locked note and must not save the graph, as the save would drop it.
-   */
   needsNewerApp?: true;
 }
 
@@ -599,7 +548,6 @@ export interface WorkflowRun {
   id: string;
   workflowId: string;
   number: number;
-  /** Null for a manual run of the whole workflow. */
   triggerNodeId: string | null;
   source: WorkflowRunSource;
   status: WorkflowRunStatus;
@@ -608,7 +556,6 @@ export interface WorkflowRun {
   endedAt: string | null;
 }
 
-/** One try of one node. A step that runs alone, outside a run, has no `runId`. */
 export interface WorkflowStep {
   id: string;
   workflowId: string;
@@ -618,7 +565,6 @@ export interface WorkflowStep {
   agentId: string | null;
   status: WorkflowStepStatus;
   output: string | null;
-  /** The answer of a condition. */
   branch: WorkflowBranch | null;
   error: string | null;
   startedAt: string | null;
@@ -630,11 +576,9 @@ export interface WorkflowRunDetail {
   steps: WorkflowStep[];
 }
 
-/** Runs newest first. The first page also carries the newest steps that ran alone. */
 export interface WorkflowRunPage {
   runs: WorkflowRunDetail[];
   soloSteps: WorkflowStep[];
-  /** Pass as `before` to read older runs; null on the last page. */
   nextBefore: string | null;
 }
 
@@ -663,9 +607,7 @@ export interface WorkflowVersionInput {
 
 export interface StartWorkflowRunInput {
   workflowId: string;
-  /** Repeats of one request start one run. */
   requestId: string;
-  /** Runs this node and what comes after it, with the newest results of the steps before it. */
   fromNodeId?: string;
 }
 
@@ -696,16 +638,13 @@ export interface WorkflowTriggerInput {
   nodeId: string;
 }
 
-/** A new webhook secret. The host shows it once and keeps only its ciphertext. */
 export interface WorkflowWebhookSecret {
   secret: string;
 }
 
-/** The largest coordinate a node may take; far beyond any canvas a person would build. */
 export const WORKFLOW_MAX_COORDINATE = 1_000_000;
 const MAX_SIZE = 100_000;
 const FIELD_NAME = 64;
-/** `<started at>|<run id>`, as `WorkflowRunPage.nextBefore` gives it. */
 const RUN_CURSOR = 64;
 
 function isCoordinate(value: unknown): value is number {
@@ -783,10 +722,6 @@ function uniqueIds(items: readonly { id: string }[]): boolean {
   return new Set(items.map((item) => item.id)).size === items.length;
 }
 
-/**
- * The shape of a graph and its limits. Each edge must join two nodes of the graph. Rules that need
- * the meaning of the nodes, such as branch edges, are the host's.
- */
 export function isWorkflowGraph(value: unknown): value is WorkflowGraph {
   if (
     !isDynamicRecord(value) ||
@@ -990,34 +925,55 @@ export function isWorkflowWebhookSecret(value: unknown): value is WorkflowWebhoo
   return isDynamicRecord(value) && isBoundedString(value.secret, INPUT_LIMITS.identifier) && value.secret.length > 0;
 }
 
-/**
- * The media services that the host can use now, beyond the agent providers. `sunra`: an enabled Sunra
- * row in the host's Apps is signed in, so the Sunra models of `WORKFLOW_MEDIA_MODELS` can run.
- * `higgsfield`: the same for a Higgsfield row and the Higgsfield models.
- */
 export interface WorkflowMediaProviders {
   sunra: boolean;
   higgsfield: boolean;
+  accounts: readonly WorkflowMediaServiceAccount[] | null;
 }
+
+export const WORKFLOW_MEDIA_SERVICE_ACCOUNT_MAX = 32;
+export const WORKFLOW_MEDIA_SERVICE_ACCOUNT_NAME_MAX = 80;
+
+export interface WorkflowMediaServiceAccount {
+  provider: WorkflowCatalogProvider;
+  id: string;
+  name: string | null;
+}
+
+export function isWorkflowMediaServiceAccount(value: unknown): value is WorkflowMediaServiceAccount {
+  return (
+    isDynamicRecord(value) &&
+    isOneOf(WORKFLOW_CATALOG_PROVIDERS, value.provider) &&
+    isIdentifier(value.id) &&
+    (value.name === null || isBoundedString(value.name, WORKFLOW_MEDIA_SERVICE_ACCOUNT_NAME_MAX))
+  );
+}
+
+const isNullableListOf = <T>(value: unknown, item: (entry: unknown) => entry is T): value is readonly T[] | null =>
+  value === null || (Array.isArray(value) && value.length <= WORKFLOW_MEDIA_SERVICE_ACCOUNT_MAX && value.every(item));
 
 export function isWorkflowMediaProviders(value: unknown): value is WorkflowMediaProviders {
-  return isDynamicRecord(value) && isBoolean(value.sunra) && isBoolean(value.higgsfield);
+  return (
+    isDynamicRecord(value) &&
+    isBoolean(value.sunra) &&
+    isBoolean(value.higgsfield) &&
+    isNullableListOf(value.accounts, isWorkflowMediaServiceAccount)
+  );
 }
 
-/**
- * The credits of a media service that the host can spend now. `available`: the credits that the
- * signed-in account can spend. `quota`: the limit of a team member, or null for an account with no
- * limit of its own.
- */
 export interface WorkflowMediaCreditBalance {
   available: number;
   quota: number | null;
 }
 
-/** The credits of each media service beyond the agent providers. Null when the host cannot read them. */
 export interface WorkflowMediaCredits {
   sunra: WorkflowMediaCreditBalance | null;
   higgsfield: WorkflowMediaCreditBalance | null;
+  accounts: readonly WorkflowMediaAccountCredits[] | null;
+}
+
+export interface WorkflowMediaAccountCredits extends WorkflowMediaServiceAccount {
+  credits: WorkflowMediaCreditBalance | null;
 }
 
 const isCreditCount = (value: unknown): value is number =>
@@ -1033,6 +989,142 @@ export function isWorkflowMediaCredits(value: unknown): value is WorkflowMediaCr
   return (
     isDynamicRecord(value) &&
     (value.sunra === null || isWorkflowMediaCreditBalance(value.sunra)) &&
-    (value.higgsfield === null || isWorkflowMediaCreditBalance(value.higgsfield))
+    (value.higgsfield === null || isWorkflowMediaCreditBalance(value.higgsfield)) &&
+    isNullableListOf(value.accounts, isWorkflowMediaAccountCredits)
+  );
+}
+
+export function isWorkflowMediaAccountCredits(value: unknown): value is WorkflowMediaAccountCredits {
+  return (
+    isWorkflowMediaServiceAccount(value) &&
+    isDynamicRecord(value) &&
+    (value.credits === null || isWorkflowMediaCreditBalance(value.credits))
+  );
+}
+
+export type WorkflowCatalogProvider = "sunra" | "higgsfield";
+export const WORKFLOW_CATALOG_PROVIDERS: readonly WorkflowCatalogProvider[] = ["sunra", "higgsfield"];
+export const WORKFLOW_MEDIA_CATALOG_MAX = 1000;
+
+export const workflowCatalogProvider = (id: string): WorkflowCatalogProvider | null =>
+  id.startsWith("sunra-") ? "sunra" : id.startsWith("higgsfield-") ? "higgsfield" : null;
+const WORKFLOW_MEDIA_NAME_MAX = 160;
+const WORKFLOW_MEDIA_MAKER_MAX = 120;
+const WORKFLOW_MEDIA_RESOLUTION_MAX = 16;
+
+export interface WorkflowMediaCatalogModel {
+  id: string;
+  provider: WorkflowCatalogProvider;
+  providerModel: string;
+  name: string;
+  maker: string;
+  kinds: readonly WorkflowMediaKind[];
+  aspects: readonly WorkflowMediaAspect[];
+  durations: readonly number[];
+  resolutions: readonly string[];
+  transparent: boolean;
+}
+
+export interface WorkflowMediaCatalog {
+  models: readonly WorkflowMediaCatalogModel[];
+}
+
+const isListOf = <T>(value: unknown, max: number, item: (entry: unknown) => entry is T): value is readonly T[] =>
+  Array.isArray(value) && value.length <= max && value.every(item);
+
+export function isWorkflowMediaCatalogModel(value: unknown): value is WorkflowMediaCatalogModel {
+  return (
+    isDynamicRecord(value) &&
+    isIdentifier(value.id) &&
+    isOneOf(WORKFLOW_CATALOG_PROVIDERS, value.provider) &&
+    isIdentifier(value.providerModel) &&
+    isBoundedString(value.name, WORKFLOW_MEDIA_NAME_MAX) &&
+    isBoundedString(value.maker, WORKFLOW_MEDIA_MAKER_MAX) &&
+    isListOf(value.kinds, 2, (entry): entry is WorkflowMediaKind => isOneOf(WORKFLOW_MEDIA_KINDS, entry)) &&
+    isListOf(value.aspects, 6, (entry): entry is WorkflowMediaAspect => isOneOf(WORKFLOW_MEDIA_ASPECTS, entry)) &&
+    isListOf(value.durations, WORKFLOW_MEDIA_CATALOG_DURATIONS_MAX, isCreditCount) &&
+    isListOf(value.resolutions, 16, (entry): entry is string =>
+      isBoundedString(entry, WORKFLOW_MEDIA_RESOLUTION_MAX),
+    ) &&
+    isBoolean(value.transparent)
+  );
+}
+
+export function isWorkflowMediaCatalog(value: unknown): value is WorkflowMediaCatalog {
+  return isDynamicRecord(value) && isListOf(value.models, WORKFLOW_MEDIA_CATALOG_MAX, isWorkflowMediaCatalogModel);
+}
+
+export function workflowCatalogMediaModel(entry: WorkflowMediaCatalogModel): WorkflowMediaModel | null {
+  const kind = entry.kinds[0];
+  if (kind === undefined || entry.aspects.length === 0) return null;
+  if (kind === "video" && entry.durations.length === 0) return null;
+  return {
+    id: entry.id,
+    provider: entry.provider,
+    providerModel: entry.providerModel,
+    name: entry.name,
+    maker: entry.maker,
+    subscription: entry.provider === "sunra" ? "Sunra" : "Higgsfield",
+    credits: true,
+    kinds: [kind],
+    voices: false,
+    aspects: entry.aspects,
+    ...(kind === "video" ? { durations: entry.durations } : {}),
+    resolutions: entry.resolutions,
+    transparent: kind === "image" && entry.transparent,
+  };
+}
+
+export function workflowFixedCatalogModel(
+  model: WorkflowMediaModel,
+  provider: WorkflowCatalogProvider,
+): WorkflowMediaCatalogModel {
+  const kind = model.kinds[0] ?? "image";
+  return {
+    id: model.id,
+    provider,
+    providerModel: model.providerModel ?? model.id,
+    name: model.name,
+    maker: model.maker,
+    kinds: [kind],
+    aspects: workflowMediaAspects(model, kind),
+    durations: kind === "video" ? workflowVideoDurations(model) : [],
+    resolutions: workflowMediaResolutions(model, kind),
+    transparent: kind === "image" && model.transparent === true,
+  };
+}
+
+export interface WorkflowMediaPriceRequest {
+  model: string;
+  kind: WorkflowMediaKind;
+  aspect: WorkflowMediaAspect;
+  duration: number;
+  resolution: string | null;
+  transparent: boolean;
+}
+
+export interface WorkflowMediaPrice {
+  credits: number | null;
+}
+
+export const WORKFLOW_MEDIA_PRICE_MAX = 1_000_000_000;
+
+export function isWorkflowMediaPriceRequest(value: unknown): value is WorkflowMediaPriceRequest {
+  return (
+    isDynamicRecord(value) &&
+    isIdentifier(value.model) &&
+    isOneOf(WORKFLOW_MEDIA_KINDS, value.kind) &&
+    isOneOf(WORKFLOW_MEDIA_ASPECTS, value.aspect) &&
+    isCreditCount(value.duration) &&
+    (value.resolution === null || isBoundedString(value.resolution, WORKFLOW_MEDIA_RESOLUTION_MAX)) &&
+    isBoolean(value.transparent)
+  );
+}
+
+export function isWorkflowMediaPrice(value: unknown): value is WorkflowMediaPrice {
+  return (
+    isDynamicRecord(value) &&
+    (value.credits === null ||
+      (isFiniteNumber(value.credits) && value.credits >= 0 && value.credits <= WORKFLOW_MEDIA_PRICE_MAX))
   );
 }

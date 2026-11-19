@@ -2,15 +2,11 @@
 @import "@fontsource-variable/inter/wght-italic.css";
 @import "tailwindcss";
 @import "@openbot/brand/tokens.css";
-/* Only the web client at /app sets the attribute that turns it on. The public pages stay dark. */
 @import "@openbot/brand/tokens-light.css";
 @import "@openbot/ui/stagger.css";
 @import "@openbot/ui/styles/sr-only.css";
 @import "@openbot/ui/styles/scroll-edges.css";
 
-/* Arial with the size and line metrics of Inter. Until Inter loads, the text takes the same space,
-   so the hero does not move when the font changes. Inter is wider than the system font, and on a
-   slow phone the description wrapped to one more line and pushed the buttons down. */
 @font-face {
   font-family: "Inter Variable Fallback";
   src: local("Arial"), local("ArialMT");
@@ -35,8 +31,7 @@
   --openbot-font-sans:
     "Inter Variable", "Inter Variable Fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Arabic",
     sans-serif;
-  /* The site keeps the type scale that it was designed for. The app made its three small steps 1px
-   * larger, in @openbot/brand/tokens.css. */
+
   --openbot-text-sm: 12px;
   --openbot-text-md: 13px;
   --openbot-text-lg: 14px;
@@ -70,7 +65,6 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Site pages only: the web client at /app keeps the desktop document styles. */
 html:not(:has(.web-app)) {
   min-width: 320px;
   scroll-behavior: smooth;
@@ -85,9 +79,6 @@ a {
   text-decoration: none;
 }
 
-/* The hero lines rise in with CSS when the page loads, not after hydration. The
-   text is the largest paint, and Chrome does not count it while its opacity is 0,
-   so the lines only move and sharpen: they never fade. */
 @keyframes landing-hero-in {
   from {
     transform: translateY(var(--stagger-distance));
@@ -111,10 +102,6 @@ a {
   }
 }
 
-/* The wrap stacks two layers on the same coordinates. The
-   skeleton owns the cold pulse + the fade-out side of the
-   reveal; the content owns the fade-in side. They share the
-   same duration / ease so the swap reads as one motion. */
 .t-skel {
   position: relative;
 }
@@ -148,17 +135,12 @@ a {
   opacity: 1;
   filter: blur(0);
 }
-/* Snap-back when replaying: kill transitions so the reverse
-   (revealed → skeleton) is instant. Drop .is-resetting
-   after a forced reflow and the next reveal animates again. */
+
 .t-skel.is-resetting .t-skel-skeleton,
 .t-skel.is-resetting .t-skel-content {
   transition: none;
 }
 
-/* Pulse: place the animation on the bar/avatar children, not
-   on the skeleton itself, so the skeleton's opacity / filter
-   stay free for the cross-fade transition above. */
 .t-skel-skeleton.is-pulsing > * {
   animation: t-skel-pulse var(--pulse-dur) ease-in-out var(--pulse-count);
 }
@@ -197,10 +179,6 @@ a {
   overflow: clip;
 }
 
-/* Three columns with the outer two equal, so the menu sits at the true centre
-   of the page whatever the brand and the buttons measure. The header is its own
-   stacking context: the menu panels and the mobile sheet have to cover whatever
-   the page draws under it. */
 .landing-header {
   position: relative;
   z-index: 40;
@@ -237,13 +215,7 @@ a {
   flex: 0 0 auto;
 }
 
-/* Header menu ---------------------------------------------------------------
-   SiteNavigationMenu.tsx says what moves and why. The pill slides behind the
-   trigger under the pointer, and the surface is one frosted card behind every
-   panel that morphs to the size of the one that is open. */
-
 .site-nav {
-  /* A long, soft settle: fast out of the gate, then a slow glide into place. */
   --site-nav-ease: cubic-bezier(0.32, 0.72, 0, 1);
   --site-nav-duration: 460ms;
   --site-nav-quick: 300ms;
@@ -252,9 +224,7 @@ a {
   --site-nav-radius: 18px;
   --site-nav-hairline: rgba(255, 255, 255, 0.07);
   --site-nav-hover: rgba(255, 255, 255, 0.05);
-  /* The one containing block for the pill, the panels and the surface. The menu
-     places a panel and the surface with the same numbers, so they must share it:
-     a positioned track or list moved the panel 4px off its frame. */
+
   position: relative;
 }
 
@@ -330,7 +300,6 @@ a {
   box-shadow: 0 0 0 2px var(--openbot-accent-strong);
 }
 
-/* A link with no panel: no chevron, so the padding is even on both sides. */
 .site-nav-link {
   padding: 0 14px;
 }
@@ -389,8 +358,6 @@ a {
   transition: none;
 }
 
-/* Every panel is laid out all the time, so the menu can measure one before it
-   opens it; a closed one is only invisible and inert. */
 .site-nav-panel {
   --site-nav-shift: 0px;
   --site-nav-rise: 0px;
@@ -407,8 +374,6 @@ a {
   visibility: visible;
 }
 
-/* A bridge over the gap under the trigger, so a pointer moving down to the panel
-   never leaves the menu on the way. */
 .site-nav-panel[data-state="open"]::before {
   content: "";
   position: absolute;
@@ -418,8 +383,6 @@ a {
   height: calc(var(--site-nav-offset) + 6px);
 }
 
-/* Contents come in and go out through a blur, so a change of section reads as one
-   picture dissolving into the next rather than two sliding past each other. */
 .site-nav-panel[data-motion] {
   will-change: opacity, transform, filter;
 }
@@ -476,8 +439,6 @@ a {
   }
 }
 
-/* Panel contents: the same markup in the desktop panel and the mobile sheet. */
-
 .site-panel {
   width: 580px;
   display: flex;
@@ -520,10 +481,7 @@ a {
   z-index: -2;
   background: var(--site-panel-art);
   transition: transform 700ms var(--site-nav-ease, var(--openbot-ease-out));
-  /* Firefox on a GPU drew the live shader canvas with square corners here, past the
-     host's own clip and the card's, and even past a clip-path. Only while the zoom
-     below made the host a layer of its own were the corners round, so it is one
-     at all times. */
+
   will-change: transform;
 }
 
@@ -541,9 +499,7 @@ a {
   left: 12px;
   padding: 4px 8px;
   border-radius: var(--openbot-radius-pill);
-  /* Solid, not frosted. Chromium does not paint a backdrop filter while an
-     ancestor fades or blurs on the compositor, so a frosted badge appeared only
-     after the panel had finished coming in. */
+
   background: rgba(0, 0, 0, 0.44);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
   color: var(--openbot-text-primary);
@@ -624,8 +580,7 @@ a {
   border-radius: 10px;
   background: var(--site-panel-art);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
-  /* A short ease and a layer of its own. With the menu's long settle, the browser painted the
-     mark again on each step of the last few tenths of a pixel, so the hover zoom stuttered. */
+
   transition: transform var(--openbot-duration-slow) var(--openbot-ease-out);
   will-change: transform;
 }
@@ -724,8 +679,6 @@ a {
   display: none;
 }
 
-/* The language button and its list. Only pages with a copy in each language show it. The button
-   rules come after the `landing-button` rules, which they change. */
 .site-language-menu {
   position: relative;
 }
@@ -749,7 +702,6 @@ a {
   display: none;
 }
 
-/* The rows match the header logo menu (`.site-logo-menu-item`). */
 .site-language-list a {
   display: flex;
   align-items: center;
@@ -792,8 +744,6 @@ a {
   color: var(--openbot-text-secondary);
 }
 
-/* Just above the mobile header, the brand, the full menu and the buttons do not fit with the menu
-   at the true centre. The menu centres between them, and the triggers are tighter. */
 @media (min-width: 1101px) and (max-width: 1280px) {
   .landing-header {
     grid-template-columns: auto 1fr auto;
@@ -839,9 +789,6 @@ a {
   }
 }
 
-/* The header on a narrow screen: the brand, the download button and a menu
-   button that opens the sheet. 1100px is MOBILE_HEADER_QUERY in SiteMobileMenu. Below it, the
-   full menu in Polish and the language button do not fit. */
 @media (max-width: 1100px) {
   .landing-header {
     display: flex;
@@ -853,8 +800,6 @@ a {
     display: none;
   }
 
-  /* The globe is not the last button here, and a list that ends at the globe goes past the left
-     edge of a phone screen. The list ends at the menu button. */
   .site-header-actions {
     position: relative;
   }
@@ -905,8 +850,6 @@ a {
     transform: rotate(-45deg);
   }
 
-  /* Fixed to the window, and under the header row inside the header's own
-     stacking context, so the brand and the close button stay on top of it. */
   .site-sheet {
     position: fixed;
     inset: 0;
@@ -990,7 +933,6 @@ a {
     margin: 6px -6px -6px;
   }
 
-  /* A page with no panel, drawn as one row in the same frame the panels use. */
   .site-sheet-link {
     display: flex;
     align-items: center;
@@ -1021,7 +963,6 @@ a {
     gap: 8px;
   }
 
-  /* Keep the scrollbar's space, so the header does not jump sideways when the page locks. */
   html[data-site-sheet-open] {
     overflow: hidden;
     scrollbar-gutter: stable;
@@ -1086,8 +1027,6 @@ a {
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M14 3h7v7h-2V6.41l-8.29 8.3-1.42-1.42L17.59 5H14V3ZM5 5h6v2H5v12h12v-6h2v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z'/%3E%3C/svg%3E");
 }
 
-/* The only trailing icon so far. `order` moves the shared ::before after the
-   label instead of adding a second pseudo-element for one button. */
 .landing-button[data-icon="arrow-right"]::before {
   order: 1;
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M13.17 5 11.76 6.41 16.34 11H4v2h12.34l-4.58 4.59L13.17 19l7-7-7-7Z'/%3E%3C/svg%3E");
@@ -1150,23 +1089,19 @@ a {
   margin-top: 30px;
 }
 
-/* The one action after a Slack install sits in the middle. */
 .join-card-actions-single {
   grid-template-columns: auto;
   justify-content: center;
 }
 
-/* The action waits hidden until the page has the link for it. */
 .join-card-actions[hidden] {
   display: none;
 }
 
-/* The one action on the join page fills the card. */
 .join-card-actions-full {
   grid-template-columns: 1fr;
 }
 
-/* The line under the join action: the browser and the download, as links in a sentence. */
 .join-card-alternatives {
   margin: 16px 0 0;
   color: var(--openbot-text-secondary);
@@ -1242,7 +1177,6 @@ a {
   backdrop-filter: blur(16px) saturate(160%);
 }
 
-/* Frosted glass: the hero beam rises behind these buttons and the availability pill. */
 .site-header-actions > .landing-button-glass,
 .landing-availability {
   border-color: rgba(255, 255, 255, 0.14);
@@ -1255,10 +1189,6 @@ a {
   backdrop-filter: blur(20px) saturate(180%);
 }
 
-/* The hero beam falls through this button. The opaque fill gives the sharp edge, and a soft glow
-   of the beam colour hugs it. The beam canvas has fewer pixels than the screen, so the glow next
-   to the edge is drawn here. It shows once the beam front reaches the button. Any line or inner
-   tint shows as a second layer around the fill. */
 .landing-button[data-beam-source] {
   position: relative;
 }
@@ -1287,14 +1217,12 @@ a {
   transform: scale(0.97);
 }
 
-/* The language button of the header. See `.site-language-menu`. */
 .site-language-trigger {
   gap: 6px;
   padding: 0 12px;
   cursor: pointer;
 }
 
-/* The icons are children here, not the mask of `landing-button`. */
 .site-language-trigger::before {
   content: none;
 }
@@ -1304,7 +1232,6 @@ a {
   height: 14px;
 }
 
-/* Below the full desktop header, there is room for one more round button only: the globe. */
 @media (max-width: 1280px) {
   .site-language-trigger {
     width: 38px;
@@ -1345,9 +1272,6 @@ a {
   transform: translateX(-50%);
 }
 
-/* The beam falls from above the header and lands on the app preview. It covers the hero
-   from edge to edge of the screen, so the light that runs off the preview's corners is
-   not cut at the 1280px column. */
 .landing-beam {
   position: absolute;
   z-index: 0;
@@ -1360,7 +1284,6 @@ a {
   mask-image: linear-gradient(var(--openbot-transparent), var(--openbot-mask-solid) 120px);
 }
 
-/* A beam that falls through a header button lights the top of the hero, so the top needs no fade. */
 .landing-beam[data-source] {
   mask-image: none;
 }
@@ -1434,7 +1357,6 @@ a {
   color: var(--openbot-text-dim);
 }
 
-/* Between the desktop systems and the phone apps. */
 .landing-availability-divider {
   width: 1px;
   height: 12px;
@@ -1484,7 +1406,6 @@ a {
   vertical-align: -0.04em;
 }
 
-/* A provider and the comma after it, so that a line never starts with the comma. */
 .landing-provider-item {
   white-space: nowrap;
 }
@@ -1793,7 +1714,6 @@ a {
   background: var(--openbot-logo-dev);
 }
 
-/* The phone apps: a blue and a coral beside the three build colours. Dark text keeps over 7:1 on both. */
 .landing-page {
   --download-ios-color: #74b9ff;
   --download-android-color: #ee9a7d;
@@ -1891,8 +1811,6 @@ a {
   transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
 }
 
-/* A card with two downloads is a box, not a link. Its first link covers the card, so the card
-   opens it as the other cards open theirs. The second link is above that cover. */
 .landing-download-card:has(.landing-download-card-link) {
   position: relative;
 }
@@ -1911,7 +1829,6 @@ a {
   text-decoration: none;
 }
 
-/* The radius of `.landing-download-card`. `inherit` would take the radius of the link, which has none. */
 .landing-download-card-link::after {
   content: "";
   position: absolute;
@@ -1928,12 +1845,12 @@ a {
   outline-offset: 3px;
 }
 
-.landing-download-action-apk {
+.landing-download-action-alternate {
   position: relative;
   z-index: 1;
 }
 
-.landing-download-action-apk:focus-visible {
+.landing-download-action-alternate:focus-visible {
   border-radius: 4px;
   outline: 2px solid var(--openbot-download-card-focus);
   outline-offset: 4px;
@@ -1982,9 +1899,6 @@ a {
   line-height: 1.4;
 }
 
-/* The figure is three stacked copies of the same two glyphs: a blurred glow behind,
-   the clipped metal gradient in the middle, and a hairline rim on top. The rim is
-   what separates a dark body from a dark canvas; without it the glyphs dissolve. */
 .landing-pricing-amount {
   position: relative;
   isolation: isolate;
@@ -2013,9 +1927,7 @@ a {
       var(--openbot-price-metal-low) 100%
     );
   background-repeat: no-repeat;
-  /* The band layer is twice the glyph height, so the 13% of it the sheen occupies
-     lands as a band a quarter of the figure tall - and sliding that layer is what
-     the sheen animation moves, without touching the body underneath. */
+
   background-size:
     100% 200%,
     100% 100%;
@@ -2024,12 +1936,7 @@ a {
     0 0;
   -webkit-background-clip: text;
   background-clip: text;
-  /* The rim is a bevel, not an outline. -webkit-text-stroke traces each glyph
-     contour on its own, so on the "$" it drew the stem's rectangle straight
-     across the S and the stem read as a pasted-on bar. drop-shadow works from
-     the rendered silhouette, where stem and S are already one shape. Held in a
-     variable because the entrance animates filter, and a keyframe that set
-     blur() alone would drop the bevel for the length of the entrance. */
+
   --price-bevel: drop-shadow(0 -1px 0 var(--openbot-price-rim)) drop-shadow(0 1px 0 var(--openbot-price-rim-under));
   filter: var(--price-bevel);
 }
@@ -2094,18 +2001,12 @@ a {
   animation-delay: 440ms;
 }
 
-/* The figure does not use the shared card reveal: the light arriving is the
-   entrance. The band starts below the glyphs and rises into its resting
-   position, ending exactly where the sheen loop begins so the two join without
-   a jump. */
 .landing-pricing-amount[data-revealed="true"] {
   animation:
     landing-price-enter 1200ms cubic-bezier(0.22, 1, 0.36, 1) 60ms backwards,
     landing-price-sheen 14s ease-in-out 1260ms infinite alternate;
 }
 
-/* The sections between the hero and the price: what it does, how it starts, and
-   the questions. Same width and heading as the download section. */
 .landing-section {
   --landing-card-border: color-mix(in srgb, var(--openbot-text-primary) 8%, transparent);
   --landing-card-border-hover: color-mix(in srgb, var(--openbot-text-primary) 16%, transparent);
@@ -2140,9 +2041,6 @@ a {
   text-wrap: pretty;
 }
 
-/* A bento on 12 columns: the team window is the tall tile on the left, and the
-   data tile has the colour of the macOS download card. Each picture is a piece
-   of the app, and it reacts when the pointer is on its tile. */
 .landing-features-grid {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
@@ -2153,7 +2051,6 @@ a {
   list-style: none;
 }
 
-/* Provider marks in their brand colours. Gemini's mark is a gradient. */
 .landing-section svg[data-provider] {
   color: var(--openbot-provider-current);
   fill: currentColor;
@@ -2213,8 +2110,6 @@ a {
   color: var(--openbot-text-on-light);
 }
 
-/* The second half mirrors the first, with the column line one column to the right: two wide
-   tiles on the left, and the workflow, whose steps go down, in a tall, narrow tile on the right. */
 .landing-feature[data-feature="multiplayer"] {
   grid-column: 1 / 9;
   grid-row: 3;
@@ -2259,7 +2154,6 @@ a {
   text-wrap: pretty;
 }
 
-/* The wide tiles have room for longer lines, so their text takes fewer lines and the tiles are lower. */
 .landing-feature:is([data-feature="team"], [data-feature="multiplayer"], [data-feature="persist"]) p {
   max-width: 64ch;
 }
@@ -2268,8 +2162,6 @@ a {
   color: var(--openbot-download-card-muted);
 }
 
-/* The provider names lead to their pages. An underline marks them, so the colour
-   of the sentence does not change. */
 .landing-feature-link {
   color: inherit;
   text-decoration: underline;
@@ -2284,7 +2176,6 @@ a {
   text-decoration-color: currentColor;
 }
 
-/* A window from the app: the channel, the data folder and the browser. */
 .landing-window {
   min-width: 0;
   overflow: hidden;
@@ -2301,9 +2192,6 @@ a {
   border-bottom: 1px solid var(--landing-card-border);
 }
 
-/* The channel runs off the right edge and fades out above the copy. */
-/* The window starts under the top padding and fills the tile down to the copy, so no gap is left
-   above it when the tiles on the right make the row taller. */
 .landing-feature[data-feature="team"] .landing-feature-visual {
   display: flex;
   align-items: stretch;
@@ -2338,7 +2226,6 @@ a {
   margin-left: -4px;
 }
 
-/* Three agents hand one task down the line. */
 .landing-team {
   display: grid;
   gap: 20px;
@@ -2353,8 +2240,6 @@ a {
   gap: 14px;
 }
 
-/* The selector outranks the generic `.agent-avatar` size rule, which loads with
-   the avatar's own code after this stylesheet. */
 .landing-feature .landing-team-avatar {
   --landing-team-avatar-size: 46px;
   flex: none;
@@ -2371,7 +2256,6 @@ a {
   background: var(--openbot-bg-surface-raised);
 }
 
-/* The empty circle the Worker renders until the avatar loads. */
 .landing-feature .landing-team-avatar:empty {
   background: var(--landing-card-fill);
 }
@@ -2431,7 +2315,6 @@ a {
   background: var(--landing-card-border);
 }
 
-/* The typing dots and the reply share one place: on hover the reply arrives. */
 .landing-team-next {
   display: grid;
 }
@@ -2486,16 +2369,11 @@ a {
   transition-delay: 120ms;
 }
 
-/* People and agents in one channel. A person has a drawn face in place of an
-   agent avatar. On hover, the invited person joins the stack. */
-/* As in the team tile, the channel starts at the left and runs off the right edge. */
 .landing-feature[data-feature="multiplayer"] .landing-feature-visual {
   display: flex;
   padding: 36px 0 0 36px;
 }
 
-/* People and agents side by side: an agent avatar is wider than its circle, so
-   an overlap would cover a face. */
 .landing-multiplayer-window .landing-team-stack {
   padding-right: 0;
 }
@@ -2504,8 +2382,6 @@ a {
   margin-left: 4px;
 }
 
-/* A drawn face: each person has the colours of their skin, hair and shirt. The colours are light, so
-   the faces stay bright on the dark page. */
 .landing-feature .landing-face {
   overflow: hidden;
   background: var(--landing-face-background);
@@ -2640,11 +2516,6 @@ a {
   height: 14px;
 }
 
-/* A workflow as on the app's canvas: a trigger, two agents that run at the
-   same time, two more that use their results, and an approval. On hover the
-   run goes along the lines. Each step starts when every step before it is
-   done, so the steps side by side finish at different times. The lines are
-   drawn from the same gap as `landing-workflow.ts`. */
 .landing-feature[data-feature="workflows"] .landing-feature-visual {
   container: landing-workflow / inline-size;
   place-items: center stretch;
@@ -2657,12 +2528,6 @@ a {
   position: relative;
 }
 
-/* A line is drawn by a clip that opens in the direction of the run. A dash
-   offset cannot draw it: the stroke does not scale, so its dashes are in
-   pixels and not in lengths of the path. The clip goes 4 units out of the
-   line's box on the other axis only: a straight line has a box with no width,
-   and a clip in that box hides all of the line. On the axis of the run, the
-   clip stops at the box, so the line ends when its step ends. */
 .landing-workflow-edges {
   --landing-workflow-clip: inset(-4px 100% -4px 0);
   --landing-workflow-clip-end: inset(-4px 0);
@@ -2712,8 +2577,6 @@ a {
   list-style: none;
 }
 
-/* A step alone in its column is at the middle. Two steps in one column share
-   it, and have the same height. */
 .landing-workflow-node {
   position: relative;
   grid-column: var(--landing-workflow-column);
@@ -2736,7 +2599,6 @@ a {
   grid-row: 2;
 }
 
-/* The ports where the lines meet a card. */
 .landing-workflow-node:not([data-step="trigger"])::before,
 .landing-workflow-node:not([data-step="approval"])::after {
   content: "";
@@ -2780,7 +2642,6 @@ a {
   background: var(--openbot-bg-canvas);
 }
 
-/* The run of the step: a bar along the bottom of the card. */
 .landing-workflow-card::after {
   content: "";
   position: absolute;
@@ -2919,7 +2780,6 @@ a {
   opacity: 0;
 }
 
-/* The person clicks Approve just before the run ends. */
 .landing-feature[data-feature="workflows"]:hover .landing-workflow-approve {
   animation:
     landing-workflow-press 240ms ease calc(var(--landing-workflow-start) + var(--landing-workflow-run) - 240ms),
@@ -2953,7 +2813,6 @@ a {
   }
 }
 
-/* Only while the animation runs: before and after it, the card is at rest. */
 @keyframes landing-workflow-active {
   from,
   to {
@@ -3020,7 +2879,6 @@ a {
   }
 }
 
-/* The run still goes step by step, but nothing turns, grows or moves. */
 @media (prefers-reduced-motion: reduce) {
   .landing-feature[data-feature="workflows"]:hover .landing-workflow-spinner {
     animation:
@@ -3042,9 +2900,6 @@ a {
 }
 
 @container landing-workflow (max-width: 640px) {
-  /* The steps go down the tile when four columns do not fit. The steps that run
-     at the same time stay side by side. The lines go from the middle of a card
-     to the middle of the next one, behind the cards. */
   .landing-workflow-card {
     padding-inline: 10px;
   }
@@ -3100,8 +2955,6 @@ a {
   }
 }
 
-/* Two rows of providers that scroll the opposite way. Each track holds its
-   list twice, so moving it by half loops with no jump. The pointer stops them. */
 .landing-feature[data-feature="providers"] .landing-feature-visual {
   padding: 36px 0 0;
 }
@@ -3110,15 +2963,12 @@ a {
   width: 100%;
   display: grid;
   gap: 12px;
-  /* The mask hides all that is outside this box, so leave room for a pill that
-     moves up on hover. */
+
   padding-block: 4px;
   mask-image: linear-gradient(to right, transparent, #000 14%, #000 86%, transparent);
 }
 
 .landing-marquee-row {
-  /* Clip only the sides, so a pill that moves up on hover keeps its top edge. A clip,
-     unlike a scroll container, does not let a grid item shrink, so set the minimum. */
   min-width: 0;
   overflow-x: clip;
 }
@@ -3169,7 +3019,6 @@ a {
   height: 20px;
 }
 
-/* The copy on the left, and the data folder that runs off the bottom right. */
 .landing-feature[data-feature="local"] .landing-feature-visual {
   grid-area: visual;
   align-self: end;
@@ -3248,9 +3097,6 @@ a {
   color: var(--openbot-download-card-muted);
 }
 
-/* A chat with one agent. On hover the provider changes, and the next message
-   continues the same task. The thread has a fixed height, so the new messages
-   push the old ones up and the tile keeps its size. */
 .landing-feature[data-feature="persist"] .landing-feature-visual {
   place-items: end stretch;
 }
@@ -3364,7 +3210,6 @@ a {
   font-weight: 400;
 }
 
-/* The later messages take no room until the pointer is on the tile. */
 .landing-persist-later {
   display: grid;
   grid-template-rows: 0fr;
@@ -3393,7 +3238,6 @@ a {
   transition-delay: 160ms;
 }
 
-/* The heading stays beside the questions while they open. */
 .landing-faq-layout {
   display: grid;
   grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
@@ -3447,8 +3291,6 @@ a {
   list-style: none;
 }
 
-/* A strip of the comparison's gradient with the two marks on it, and the name
-   under it, so a long name does not push the marks or the arrow out of line. */
 .landing-compare-links a {
   position: relative;
   height: 100%;
@@ -3958,7 +3800,6 @@ a {
   }
 }
 
-/* Only the sheen layer moves; the metal body is the second background and stays put. */
 @keyframes landing-price-sheen {
   from {
     background-position:
@@ -3988,9 +3829,6 @@ a {
   animation: landing-enter var(--openbot-duration-overlay) var(--openbot-ease-out) both;
 }
 
-/* Backwards, not both: a transform left on the header after it has arrived
-   would make it the containing block of the mobile sheet, which is fixed to the
-   window. */
 [data-enter="header"] {
   animation-name: landing-header-enter;
   animation-fill-mode: backwards;
@@ -4091,12 +3929,11 @@ a {
     transform: translate(2px, -2px);
   }
 
-  /* The pointer is on the APK link, so the card does not show the Google Play link as the target. */
-  .landing-download-card[data-state="available"]:has(.landing-download-action-apk:hover) .landing-download-arrow {
+  .landing-download-card[data-state="available"]:has(.landing-download-action-alternate:hover) .landing-download-arrow {
     transform: none;
   }
 
-  .landing-download-action-apk:hover {
+  .landing-download-action-alternate:hover {
     text-decoration: underline;
     text-underline-offset: 4px;
   }
@@ -4112,7 +3949,6 @@ a {
   }
 }
 
-/* After the button rules, which it resizes. The sheet shows only below the header breakpoint. */
 @media (max-width: 1100px) {
   .site-sheet-actions > .landing-button {
     flex: 1 1 0;
@@ -4120,7 +3956,6 @@ a {
   }
 }
 
-/* The header menu still fades, but nothing slides, grows, turns or staggers. */
 @media (prefers-reduced-motion: reduce) {
   .site-nav-pill,
   .site-nav-chevron,
@@ -4259,7 +4094,6 @@ a {
     font-size: 8px;
   }
 
-  /* The five systems do not fit on a phone with the words in front of them. */
   .landing-availability-copy {
     display: none;
   }
@@ -4405,10 +4239,6 @@ a {
   }
 }
 
-/* The agent network: one screen high, with the heading over the top of the canvas.
-   The words of the heading appear one at a time when the stage starts to play. The
-   canvas fades out at its sides, at its bottom, and under the heading, whose height the
-   section writes to `--landing-network-top`. */
 .landing-network {
   overflow: hidden;
 }
@@ -4465,7 +4295,6 @@ a {
   animation: landing-download-reveal 720ms cubic-bezier(0.22, 1, 0.36, 1) 560ms backwards;
 }
 
-/* After the rules above, so it overrides their animation shorthand. */
 @media (prefers-reduced-motion: reduce) {
   .landing-network[data-playing="true"] :is(.landing-network-word, .landing-network-description) {
     animation: none;
@@ -4491,20 +4320,11 @@ a {
   overflow: hidden;
 }
 
-/* OpenBot for Teams --------------------------------------------------------
-   The heading and the button stay on the left. One colour card for each offer
-   sticks one step below the previous card, so the label row of each card stays
-   visible. `TeamsSection` sets `--landing-teams-covered` from 0 to 1 while the
-   next card moves on top; the card then becomes a little smaller and darker. */
-
 .landing-teams {
-  /* The top edge of the stuck heading and of the first stuck card. */
   --landing-teams-top: 96px;
-  /* The distance between two stuck cards: the height of the label row of a card. */
   --landing-teams-step: 64px;
 }
 
-/* Each offer has one colour, from the build colours of the logo and the iOS download card. */
 .landing-teams [data-offer="servers"] {
   --landing-teams-color: var(--openbot-logo-production);
 }
@@ -4557,7 +4377,6 @@ a {
   margin-top: 28px;
 }
 
-/* The offers in order. The card on top of the stack has a coloured bar. */
 .landing-teams-progress {
   display: grid;
   margin: 48px 0 0;
@@ -4632,7 +4451,6 @@ a {
   filter: brightness(calc(1 - var(--landing-teams-covered, 0) * 0.22));
 }
 
-/* A soft grid on the full card. It is clearest behind the icon and fades below the text. */
 .landing-teams-card::before {
   content: "";
   position: absolute;
@@ -4668,11 +4486,9 @@ a {
   position: absolute;
   z-index: -1;
   top: calc(var(--landing-teams-step) + 4px);
-  /* Inside the card padding, so the card edge does not cut the icon. */
   right: clamp(26px, 3vw, 40px);
   width: clamp(130px, 15vw, 200px);
   height: clamp(130px, 15vw, 200px);
-  /* About 6 px at this size; the icon stroke of 2 is for 24 px. */
   stroke-width: 0.75;
   opacity: 0.85;
 }
@@ -4745,12 +4561,6 @@ a {
   }
 }
 
-/* The For Teams page ------------------------------------------------------
-   /teams: the team in the hero title with moving name cursors, the setups in
-   the colours of the Teams cards, a bento of benefits, the steps of a custom
-   project, a marquee of who it is for, and a closing title that lights up as
-   you scroll. */
-
 .teams-page {
   --landing-card-border: color-mix(in srgb, var(--openbot-text-primary) 8%, transparent);
   --landing-card-border-hover: color-mix(in srgb, var(--openbot-text-primary) 16%, transparent);
@@ -4786,8 +4596,6 @@ a {
 .teams-page [data-tile="3"] {
   --teams-color: var(--download-ios-color);
 }
-
-/* Shared ----------------------------------------------------------------- */
 
 .teams-page .teams-section {
   position: relative;
@@ -4855,17 +4663,12 @@ a {
   animation-delay: 240ms;
 }
 
-/* Hero, setups and benefits --------------------------------------------- */
-
-/* Registered, so the light on the pill border can turn. */
 @property --teams-pill-angle {
   syntax: "<angle>";
   inherits: false;
   initial-value: 0deg;
 }
 
-/* A light in the three setup colours runs around the border, the dots hop in turn, and a sheen
-   crosses the label. `::before` is the sharp light and `::after` is its blurred glow. */
 .teams-page .teams-pill {
   position: relative;
   display: inline-flex;
@@ -5094,7 +4897,6 @@ a {
   grid-column: 6 / 13;
 }
 
-/* The picture of a tile: the hero grid, a glow in the tile colour, and the icon on a coloured tile. */
 .teams-page .teams-tile-art {
   position: relative;
   flex: 1;
@@ -5146,8 +4948,6 @@ a {
   text-wrap: pretty;
 }
 
-/* Custom timeline -------------------------------------------------------- */
-
 .teams-page .teams-timeline {
   position: relative;
   margin: clamp(56px, 7vw, 88px) 0 0;
@@ -5176,7 +4976,6 @@ a {
   transform-origin: left;
 }
 
-/* The spark is under the nodes, so it goes out of view behind each step. */
 .teams-page .teams-timeline-spark {
   position: absolute;
   top: 50%;
@@ -5267,7 +5066,6 @@ a {
   text-wrap: balance;
 }
 
-/* Before a step lights, its node is a small grey dot, and its text is not shown. */
 .teams-page [data-play="false"] .teams-timeline-fill {
   transform: scaleX(0);
 }
@@ -5283,7 +5081,6 @@ a {
   opacity: 0;
 }
 
-/* One run of the spark. Step n lights when the spark gets to it. */
 .teams-page [data-play="true"] .teams-timeline-fill {
   animation: teams-timeline-fill 2000ms linear 200ms backwards;
 }
@@ -5354,8 +5151,6 @@ a {
     transform: scale(2.4);
   }
 }
-
-/* Audience: marquee ---------------------------------------------------------- */
 
 .teams-page .teams-marquee {
   display: grid;
@@ -5469,9 +5264,6 @@ a {
   text-wrap: balance;
 }
 
-/* Closing ---------------------------------------------------------------- */
-
-/* A second grid in a setup colour, shown only in a circle under the pointer. */
 .teams-page .teams-closing-spot {
   --openbot-hero-grid-line: color-mix(in srgb, var(--openbot-logo-preview) 60%, transparent);
   mask-image: radial-gradient(
@@ -5481,9 +5273,6 @@ a {
   );
 }
 
-/* `--teams-progress` (0 to 1) follows the scroll with inertia. Each word turns on over three words' part of
-   it, so the next words start before one ends, and `--teams-ease` (smoothstep) softens each start and end.
-   The dim words keep 3:1 contrast, as large text needs. */
 .teams-page .teams-closing-word {
   --teams-on: clamp(0, calc((var(--teams-progress, 0) * (var(--teams-count) + 3) - var(--teams-word)) / 3), 1);
   --teams-ease: calc(var(--teams-on) * var(--teams-on) * (3 - 2 * var(--teams-on)));
@@ -5499,7 +5288,6 @@ a {
   color: transparent;
 }
 
-/* The button rises into place over the last part of the scroll. It follows the same smooth value. */
 .teams-page .teams-closing-action {
   --teams-rise: clamp(0, calc((var(--teams-progress, 0) - 0.7) / 0.3), 1);
   position: relative;
@@ -5507,7 +5295,6 @@ a {
   transform: translateY(calc((1 - var(--teams-rise)) * 14px)) scale(calc(0.97 + var(--teams-rise) * 0.03));
 }
 
-/* A soft glow behind the button. It fades in when the title is complete, then breathes slowly. */
 .teams-page .teams-closing-action::before {
   position: absolute;
   inset: -8px -14px;
@@ -5546,9 +5333,6 @@ a {
   }
 }
 
-/* Hero: the agents in the title ----------------------------------------- */
-
-/* The selector outranks the generic `.agent-avatar` size rule, which loads after this stylesheet. */
 .teams-page .teams-avatar {
   --teams-avatar-size: 0.7em;
   flex: none;
@@ -5571,7 +5355,6 @@ a {
   translate: 0 calc(var(--teams-avatar-size) * -0.14);
 }
 
-/* "of" and the avatars stay on one line, so the avatars never start a line alone. */
 .teams-page .teams-title-keep {
   white-space: nowrap;
 }
@@ -5592,7 +5375,6 @@ a {
   pointer-events: none;
 }
 
-/* The script moves each cursor each frame, and sets `--teams-lean` from its sideways speed. */
 .teams-page .teams-cursor {
   position: absolute;
   top: 0;
@@ -5604,7 +5386,6 @@ a {
   will-change: transform;
 }
 
-/* The script sets `data-placed` when the cursor is on its first point. Until then, the Worker HTML hides it. */
 .teams-page .teams-cursor[data-placed] {
   opacity: 1;
 }
@@ -5631,8 +5412,6 @@ a {
   font-size: 14px;
   font-weight: 600;
 }
-
-/* Phone ------------------------------------------------------------------ */
 
 @media (max-width: 900px) {
   .teams-page .teams-setups {
@@ -5789,7 +5568,6 @@ a {
     animation: none;
   }
 
-  /* No marquee: the chips of the first copy wrap, and the second copy is not shown. */
   .teams-page .teams-marquee {
     mask-image: none;
   }
@@ -5819,11 +5597,6 @@ a {
   }
 }
 
-/* Articles -----------------------------------------------------------------
-   The index and article pages of every collection: /news, /guides, and whatever
-   is added next. They reuse .landing-header and .landing-footer, so only the
-   content between them is described here. */
-
 .post-main {
   padding: clamp(17px, 2.8vw, 34px) 0 clamp(50px, 6.3vw, 84px);
 }
@@ -5841,9 +5614,6 @@ a {
   line-height: 1.4;
 }
 
-/* Laid out rather than written as one string, so the space on each side of the
-   separator is equal whatever the date and the name are, and so a long name wraps
-   under the date instead of taking the dot with it. */
 .post-byline {
   display: flex;
   flex-wrap: wrap;
@@ -5881,9 +5651,6 @@ a {
   line-height: 1.6;
 }
 
-/* The heading's link, stretched over the whole featured block. It is what makes
-   the artwork clickable: one link in the document, one name to announce, and the
-   whole area reacts to a pointer the way the grid cards below it do. */
 .post-featured-title a::after {
   content: "";
   position: absolute;
@@ -5892,14 +5659,11 @@ a {
 }
 
 .post-featured-action {
-  /* Above the stretched link, so the button keeps its own hover and focus ring. */
   position: relative;
   z-index: 2;
   margin-top: 26px;
 }
 
-/* The artwork frame. The gradient host fills it and the title sits on top;
-   `place-items` is what centres that title without a second positioned layer. */
 .post-featured-art,
 .post-card-art,
 .post-article-art,
@@ -5910,11 +5674,7 @@ a {
   place-items: center;
   overflow: hidden;
   border: 1px solid var(--openbot-border-strong);
-  /* The artwork is decoration, and it is the largest thing on a card. It takes no
-     pointer, so a click on it reaches the link that covers the block: on the
-     featured article that link is a stretched pseudo-element, and it cannot paint
-     over this frame because the entry animation leaves a transform on the copy
-     column, which traps the z-index inside a stacking context of its own. */
+
   pointer-events: none;
 }
 
@@ -5934,26 +5694,15 @@ a {
   border-radius: 14px;
 }
 
-/* Squarer than an article card: what sits in the middle is a mark rather than a
-   line of words, and a wide frame leaves it stranded in empty colour. */
 .plugin-card-art {
   aspect-ratio: 4 / 3;
   border-radius: 12px;
 }
 
-/* Layer order inside the frame, bottom to top: the CSS approximation and the
-   generated PNG are two backgrounds of this element, and the shader canvas is
-   prepended by the library at z-index -1, which paints over a background but
-   under anything else in the frame. */
 .post-gradient {
   position: absolute;
   inset: 0;
-  /* Clipped three ways, for the one picture. The canvas is prepended at z-index -1,
-     and Firefox on a GPU gives it a compositing layer of its own: a layer is not cut
-     by an ancestor's rounded corner, so the picture stayed square inside a round card.
-     `isolation` keeps the negative layer in this host rather than in a stacking context
-     further up, `overflow` cuts it here, and the corner on the canvas itself is what
-     rounds the layer when the other two are composited around it. */
+
   isolation: isolate;
   overflow: hidden;
   border-radius: inherit;
@@ -5961,10 +5710,6 @@ a {
   background-size: cover;
 }
 
-/* The library's own canvas rules sit in a cascade layer, so these plain ones win
-   without a fight. The canvas is transparent until the component has seen it draw
-   a frame, and it arrives as a fade: the picture underneath it is the same first
-   frame, so a reader sees the artwork start to move rather than change. */
 .post-gradient > canvas {
   border-radius: inherit;
   opacity: 0;
@@ -5978,11 +5723,7 @@ a {
 .post-featured-art-title,
 .post-card-art-title {
   position: relative;
-  /* The gradient host below listens for pointerenter to start its shader, and it
-     is a sibling of this title, not an ancestor. Without this, crossing onto the
-     title counts as leaving the artwork and the shader is thrown away exactly
-     where the pointer usually rests. The title is decorative and aria-hidden, so
-     it has nothing to answer a pointer with. */
+
   pointer-events: none;
   padding: clamp(18px, 2.6vw, 40px);
   color: var(--openbot-text-primary);
@@ -6026,8 +5767,6 @@ a {
   margin-top: 14px;
 }
 
-/* A card is a quarter of the row, so the two parts are given their own line when
-   the name no longer fits beside the date. */
 .post-card-byline {
   row-gap: 1px;
 }
@@ -6042,8 +5781,6 @@ a {
   transition: color var(--openbot-duration-normal) ease;
 }
 
-/* The reveal is per card, ordered by --post-card-index, so the row arrives as a
-   sweep rather than all at once. */
 .post-grid-section[data-revealed="false"] .post-card,
 .post-more[data-revealed="false"] .post-card {
   opacity: 0;
@@ -6055,21 +5792,6 @@ a {
   animation-delay: calc(var(--post-card-index, 0) * 80ms);
 }
 
-/* The block at the top of a collection page is in the server's HTML and is already on
-   screen when the page loads, so it takes the header's `data-enter` route rather
-   than an observer: nothing has to arrive before it can play. The longhands below
-   the `[data-enter]` shorthand swap in the same reveal the cards use, so one page
-   has one motion. The artwork follows the copy by a step, which is the order the
-   block is read in, and the body follows the artwork by another step, so an
-   article opens as one movement down the page instead of a title and a picture
-   arriving over text that is already sitting there.
-
-   `backwards`, not the shorthand's `both`, and it is what the cards already use.
-   The reveal ends on `blur(0.001px)`, and a filter that is held makes the element
-   a containing block for anything absolutely positioned inside it. Held on the
-   copy column, that shrinks the featured article's stretched link to the width of
-   the copy, and the artwork beside it stops being clickable. The last frame is
-   the resting state anyway, so there is nothing for the fill to hold. */
 [data-enter="post-copy"],
 [data-enter="post-art"],
 [data-enter="post-prose"] {
@@ -6167,8 +5889,6 @@ a {
   padding-left: 22px;
 }
 
-/* Tailwind preflight removes every list marker. Prose is the one place that needs
-   them back: without a number, a list of steps reads as unrelated paragraphs. */
 .post-prose ul {
   list-style: disc;
 }
@@ -6213,9 +5933,6 @@ a {
   line-height: 1.6;
 }
 
-/* A run of code inside a block is already in the block's own face and on the
-   block's own background. Left with the inline treatment, every line of a command
-   carried a second box around it. */
 .post-prose pre code {
   padding: 0;
   border-radius: 0;
@@ -6271,10 +5988,6 @@ a {
   margin-bottom: 0;
 }
 
-/* Media in an article. The components in `ArticleMedia.tsx` write this markup, but
-   the two rules below are also the floor for anything an author writes by hand: a
-   picture wider than the column has to stay inside it, or a phone scrolls sideways
-   for the length of the article. */
 .post-prose img,
 .post-prose video {
   max-width: 100%;
@@ -6282,9 +5995,6 @@ a {
 }
 
 .post-figure {
-  /* The figure's own margin, not a paragraph's. Both edges are set, because a
-     figure can open an article and a paragraph's bottom margin cannot be relied on
-     to be there above it. */
   margin: 32px 0;
 }
 
@@ -6298,34 +6008,19 @@ a {
   height: auto;
   border: 1px solid var(--openbot-border-strong);
   border-radius: var(--openbot-radius-card);
-  /* The frame is filled before the file arrives, so what the reader sees in that
-     moment is the shape the picture will take rather than a hole in the page. The
-     space itself comes from the width and height the component writes. */
+
   background: var(--openbot-bg-surface);
 }
 
-/* A picture with room around it, standing on the article's own gradient. A
-   screenshot of a pale interface runs into the page where it stops, and a picture
-   of the product sitting on the page reads as part of the page rather than as a
-   picture of something. The gradient is the same one the reader met on the card
-   they arrived from, because both are drawn from the article title.
-
-   The gradient host inside is absolutely positioned to the padding box, so it
-   fills the room around the picture and leaves the border alone. */
 .post-mount {
   position: relative;
-  /* The shader canvas is prepended by the library at z-index -1. Without a
-     stacking context of its own here, that negative layer leaves the mount and
-     paints behind the page instead of behind the picture. */
+
   isolation: isolate;
   display: grid;
   overflow: hidden;
   border: 1px solid var(--openbot-border-strong);
   border-radius: var(--openbot-radius-card);
-  /* Proportional, so the room around the picture stays the same fraction of the
-     column on a phone as on a wide screen, with a floor and a ceiling that keep
-     it from vanishing or from eating the picture. Authors pick `tight` or
-     `roomy` on the component; this is the fallback if neither is set. */
+
   padding: clamp(14px, 4.5%, 52px);
 }
 
@@ -6337,11 +6032,6 @@ a {
   padding: clamp(22px, 7%, 72px);
 }
 
-/* Inside a mount the picture is a smaller thing on a coloured field, so it takes
-   a tighter radius and a lift instead of the plain border it wears on the page.
-   `z-index` is what keeps it above the gradient host: that host is positioned,
-   so without a layer of its own the picture paints underneath and the mount
-   reads as a gradient with no screenshot on it. */
 .post-mount .post-media {
   position: relative;
   z-index: 1;
@@ -6371,11 +6061,6 @@ a {
   letter-spacing: -0.035em;
 }
 
-/* The heading joins the sweep of the cards under it. Left out, it was the one
-   fixed thing in a moving section. It carries no card index, so it arrives with
-   the first of them, which is the pair a reader takes as one thing anyway. It is
-   written here rather than beside the cards because its own rule is above, and a
-   reveal declared before it would be the higher specificity of the two. */
 .post-more[data-revealed="false"] .post-more-title {
   opacity: 0;
 }
@@ -6384,10 +6069,6 @@ a {
   animation: landing-download-reveal 720ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
-/* A honeycomb of agent faces and art tiles. A cell is a regular hexagon with a point at
-   the top. `--agent-honeycomb-tile` is its width, flat side to flat side, and it is the
-   width / 0.866 (cos 30°) tall. Each cell is the wall plus one width from each of its six
-   neighbours, so a row is 0.866 of that below the row above it. */
 .agent-honeycomb {
   --agent-honeycomb-tile: 84px;
   --agent-honeycomb-gap: 6px;
@@ -6406,14 +6087,10 @@ a {
   margin-top: calc((var(--agent-honeycomb-tile) + var(--agent-honeycomb-gap)) * 0.866 - var(--agent-honeycomb-height));
 }
 
-/* `translate`, not a margin: the comb keeps the width of one row. */
 .agent-honeycomb-row:nth-of-type(even) {
   translate: calc((var(--agent-honeycomb-tile) + var(--agent-honeycomb-gap)) / 2) 0;
 }
 
-/* Every cell, face or art, has the same outline. A CSS shape, not a `url(#clip)`
-   reference: in one browser, a referenced clip left the animated faces square. A
-   browser with `shape()` gets soft corners; the others keep the sharp polygon. */
 .agent-honeycomb-cell {
   position: relative;
   flex: none;
@@ -6453,9 +6130,6 @@ a {
   filter: grayscale(0.35);
 }
 
-/* The square body is 0.61 of its drawing. At 1.75 cells, it is a little taller than the
-   cell, so its colour fills the hexagon to the point. The drawing is centred on the cell
-   rather than laid out in it. */
 .agent-honeycomb-cell > .agent-honeycomb-avatar {
   position: absolute;
   top: 50%;
@@ -6465,8 +6139,6 @@ a {
   translate: -50% -50%;
 }
 
-/* A hexagon is 0.866 as wide as it is tall, and the body is square: narrower, the body
-   fits the width of the cell, and eyes near its sides stay in the cell. */
 .agent-honeycomb-cell > .agent-honeycomb-avatar > svg {
   display: block;
   width: 100%;
@@ -6475,11 +6147,6 @@ a {
   scale: 0.86 1;
 }
 
-/* The closing block of the landing page and of a collection page. Centred, because it is an end rather than
-   another row of the page. A comb of agents fills the full width and fades out at the
-   top and the bottom, so it reads as an offer and not as the last article. The type
-   scale is the download section's, so the two places that ask the reader to take the
-   app speak at the same size. */
 .post-cta {
   position: relative;
   display: grid;
@@ -6490,8 +6157,6 @@ a {
   text-align: center;
 }
 
-/* The mask is on a layer the size of the block, so its edges fade where the block
-   ends. The comb is larger than the layer and centred on it. */
 .post-cta-comb {
   position: absolute;
   inset: 0;
@@ -6504,8 +6169,6 @@ a {
   );
 }
 
-/* Every second row moves half a cell to the right, outside the comb's box. A quarter
-   cell to the left centres the rows, so both sides end at the same distance. */
 .post-cta-comb > .agent-honeycomb {
   position: absolute;
   top: 50%;
@@ -6513,14 +6176,16 @@ a {
   translate: calc(-50% - (var(--agent-honeycomb-tile) + var(--agent-honeycomb-gap)) / 4) -50%;
 }
 
-/* Blurs the faces behind the text, and fades out from the centre, so it has no edge.
-   The pointer goes through it to the faces. */
 .post-cta-veil {
   position: absolute;
-  inset: 0;
+  top: 50%;
+  left: 50%;
+  width: min(100%, 1080px);
+  height: 510px;
+  translate: -50% -50%;
   background: color-mix(in srgb, var(--openbot-bg-canvas) 62%, var(--openbot-transparent));
   backdrop-filter: blur(16px);
-  mask-image: radial-gradient(720px 340px at 50% 50%, var(--openbot-mask-solid) 50%, var(--openbot-transparent) 100%);
+  mask-image: radial-gradient(closest-side, var(--openbot-mask-solid) 66%, var(--openbot-transparent) 100%);
   pointer-events: none;
 }
 
@@ -6528,8 +6193,6 @@ a {
   position: relative;
 }
 
-/* The rows end 964 px from the centre: on a wider screen, the sides fade too, so the
-   comb has no hard edge there. */
 @media (min-width: 1920px) {
   .post-cta-comb {
     mask-image:
@@ -6551,7 +6214,6 @@ a {
 }
 
 @media (max-width: 760px) {
-  /* Not taller than the comb: 12 rows of the small cell are 688 px. */
   .post-cta {
     min-height: 680px;
   }
@@ -6562,6 +6224,10 @@ a {
   }
 
   .post-cta-veil {
+    inset: 0;
+    width: auto;
+    height: auto;
+    translate: none;
     mask-image: radial-gradient(340px 400px at 50% 50%, var(--openbot-mask-solid) 55%, var(--openbot-transparent) 100%);
   }
 }
@@ -6584,8 +6250,6 @@ a {
   text-wrap: pretty;
 }
 
-/* Wraps rather than shrinks: two full-width buttons stacked read better on a
-   narrow screen than two that have been squeezed to fit one row. */
 .post-cta-actions {
   display: flex;
   flex-wrap: wrap;
@@ -6594,15 +6258,6 @@ a {
   margin-top: clamp(28px, 3.5vw, 40px);
 }
 
-/* The block arrives in the order it is read, rather than as one slab. Two things
-   made it snap: the shared curve is a quintic ease-out, which is right for a 120ms
-   hover but over 760ms puts the block at 97% of the way there by the halfway mark
-   and then spends the rest on motion too small to see; and every part of the block
-   moved at the same instant, so there was nothing to follow. A gentler curve
-   spreads the same distance across the whole duration, and it holds back at the
-   start rather than opening at speed, so the block reads as arriving instead of
-   appearing. The stagger gives the eye an order to take it in: the offer, the
-   reason for it, then the two ways to act on it. */
 .post-cta[data-revealed="false"] .post-cta-title,
 .post-cta[data-revealed="false"] .post-cta-description,
 .post-cta[data-revealed="false"] .post-cta-actions {
@@ -6634,7 +6289,6 @@ a {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  /* Artwork first on a narrow screen, which is how the grid cards read too. */
   .post-featured-art {
     order: -1;
   }
@@ -6652,16 +6306,8 @@ a {
     cursor: pointer;
   }
 
-  /* Nothing about the card's shape moves under the pointer: not the frame, not
-     the artwork inside it. A grid of cards that each swell as the pointer crosses
-     is restless to read. The artwork answers by starting its animation, and the
-     title grows a little. */
   .post-featured-art-title,
   .post-card-art-title {
-    /* An explicit scale rather than `none`, and a layer that is there before the
-       transition starts. Otherwise the browser rasterises the text once for the
-       moving layer and again for the resting element, and that second pass lands
-       on different pixels: the title looks like it jumps as the growth ends. */
     transform: scale(1);
     transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
     will-change: transform;
@@ -6671,9 +6317,6 @@ a {
     transform: scale(1.06);
   }
 
-  /* Keyed to the block, not to the artwork: the stretched link covers the artwork,
-     so the frame under it never reports a hover. The hero title is already large,
-     so it takes the smaller step of the two. */
   .post-featured:hover .post-featured-art-title {
     transform: scale(1.04);
   }
@@ -6696,11 +6339,6 @@ a {
     animation: none;
   }
 
-  /* The global escape shortens every animation to nothing, but it selects with
-     `*`, and an attribute selector outranks that. So the blocks below were still
-     running their full reveal for a reader who asked for no motion. Naming them
-     is what makes these pages arrive at rest. The shared `[data-enter]` header
-     has the same gap and is left alone here, because it is not ours to change. */
   [data-enter="post-copy"],
   [data-enter="post-art"],
   [data-enter="post-prose"],
@@ -6719,27 +6357,16 @@ a {
   }
 }
 
-/* ---------------------------------------------------------------------------
-   Reading progress, on news, guides and comparisons.
-
-   One segment per section, as long as the section. The part the reader has
-   passed is OpenBot's lilac, and the segment they are in glows at the point
-   they have reached. Pointing at the rail brings in the titles through the
-   same blur as the header menu, over a scrim with no edge.
-   ------------------------------------------------------------------------- */
-
 .reading-progress {
   --reading-accent: var(--openbot-logo-production);
   --reading-track: rgba(255, 255, 255, 0.1);
   --reading-glow: color-mix(in srgb, var(--reading-accent) 60%, transparent);
-  /* The header menu's motion. Its tokens live on .site-nav, out of reach here. */
   --reading-ease: cubic-bezier(0.32, 0.72, 0, 1);
   --reading-duration: 460ms;
   --reading-quick: 300ms;
   --reading-blur: 8px;
 }
 
-/* Narrow screens: a line across the top of the viewport. */
 .reading-progress-line {
   position: fixed;
   top: 0;
@@ -6769,8 +6396,6 @@ a {
     display: none;
   }
 
-  /* Only the bars take the pointer until the rail opens, so the text beside it
-     stays selectable. */
   .reading-progress-rail {
     position: fixed;
     top: 50%;
@@ -6800,9 +6425,6 @@ a {
     pointer-events: auto;
   }
 
-  /* A scrim in the page colour, with no edge of its own. It darkens only where
-     the titles are, so they stay legible over wide content such as the
-     comparison cards, and on plain text it does not show at all. */
   .reading-progress-surface {
     position: absolute;
     inset: -64px -12px -64px -64px;
@@ -6901,7 +6523,6 @@ a {
     text-underline-offset: 4px;
   }
 
-  /* A hit area wider than the 2px bar it holds. */
   .reading-progress-bar {
     position: relative;
     width: 20px;
@@ -6948,7 +6569,6 @@ a {
     box-shadow: 0 0 10px var(--reading-glow);
   }
 
-  /* The reading head: where the reader is inside the current section. */
   .reading-progress-item[data-state="active"] .reading-progress-bar::after {
     content: "";
     position: absolute;
@@ -6988,8 +6608,6 @@ a {
   }
 }
 
-/* The rules above name their own transitions, which outrank the global
-   reduced-motion rule, so the titles would still slide and blur in. */
 @media (prefers-reduced-motion: reduce) {
   .reading-progress[data-visible] .reading-progress-line,
   .reading-progress[data-visible] .reading-progress-rail,
@@ -7000,27 +6618,11 @@ a {
   }
 }
 
-/* A heading or a roundup entry that a link opens sits clear of the top edge. */
 .post-article-body h2,
 .compare-article h2,
 .compare-roundup-list > li {
   scroll-margin-top: 32px;
 }
-
-/* ---------------------------------------------------------------------------
-   /compare and /compare/<slug>.
-
-   A comparison is read as a set of answers, so the page is built from blocks
-   rather than prose: the two marks side by side over the artwork, the short
-   answer, a table, a pair of cards per topic, the questions, and the sources.
-   Each side keeps one accent the whole way down (`--compare-accent`), so a reader
-   can tell which column is which without reading the label again. OpenBot's is
-   its own lilac and the rival's is a quiet grey, so OpenBot is the side the eye
-   goes to. Where one side is better, the page marks it in green
-   (`--openbot-success`), with a check and a word, never with colour alone.
-   A page that compares two other apps (sides "a" and "b") gives both sides the
-   same quiet accent: it takes no side.
-   ------------------------------------------------------------------------- */
 
 .compare-page [data-side="openbot"] {
   --compare-accent: var(--openbot-logo-production);
@@ -7030,7 +6632,6 @@ a {
   --compare-accent: var(--openbot-text-muted);
 }
 
-/* One centred column for the hero and every section under it. */
 .compare-article {
   width: min(100%, 1160px);
 }
@@ -7093,13 +6694,6 @@ a {
   transition: color var(--openbot-duration-normal) ease;
 }
 
-/* The artwork frame, the same shape as the featured article on /news. The
-   gradient host inside carries the Firefox corner fix (see `.post-gradient`).
-
-   The frame itself only rises; the artwork and the plate fade on their own. The
-   plate is frosted, and Chromium paints no backdrop filter while an ancestor
-   fades or blurs (see `.site-panel-feature-badge`), so nothing that holds the
-   plate may animate its opacity or a filter. */
 .compare-stage {
   position: relative;
   display: grid;
@@ -7116,8 +6710,6 @@ a {
   animation: compare-fade 900ms cubic-bezier(0.22, 1, 0.36, 1) 160ms backwards;
 }
 
-/* One frosted plate holds both marks, split by a hairline with "vs" on it: two
-   brands side by side, not a scoreboard. The table below gives the score. */
 .compare-marks {
   position: relative;
   display: grid;
@@ -7183,8 +6775,6 @@ a {
   content: "";
 }
 
-/* Each mark moves in a little from its own side. No blur: a filter under the
-   plate would take its frosted backdrop away. */
 @keyframes compare-plate-in {
   from {
     opacity: 0;
@@ -7239,9 +6829,6 @@ a {
   font-size: 15px;
 }
 
-/* The plans an agent can run on, each with its provider's logo in its own colour
-   (`--openbot-provider-current`, from `data-provider` on the logo). Plain cards:
-   the logos are the colour on this part of the page. */
 .compare-plans-lead {
   max-width: 62ch;
   margin: 14px 0 0;
@@ -7259,12 +6846,10 @@ a {
   list-style: none;
 }
 
-/* A card alone in the last row takes the full row. */
 .compare-plan:last-child:nth-child(3n + 1) {
   grid-column: 1 / -1;
 }
 
-/* Two cards in the last row: the second one fills the empty cell. */
 .compare-plan:last-child:nth-child(3n + 2) {
   grid-column: span 2;
 }
@@ -7281,7 +6866,6 @@ a {
   background: var(--openbot-bg-surface);
 }
 
-/* On a page about two other apps, their two plans lead the grid. */
 .compare-plan[data-highlighted] {
   border-color: color-mix(in srgb, var(--openbot-logo-production) 34%, var(--openbot-border));
   background:
@@ -7352,7 +6936,6 @@ a {
   margin-top: 0.12em;
 }
 
-/* What the two share, set apart between the table and the details. */
 .compare-intro {
   max-width: 62ch;
   margin: clamp(56px, 7vw, 96px) auto 0;
@@ -7370,8 +6953,6 @@ a {
   margin-top: 22px;
 }
 
-/* A card per side. The accent is a soft light from the top corner and a short
-   line on the top edge: enough to tell the sides apart, not enough to shout. */
 .compare-card {
   position: relative;
   min-width: 0;
@@ -7549,8 +7130,6 @@ a {
   height: 22px;
 }
 
-/* OpenBot's column is lit the whole way down, the way a pricing table marks the
-   plan it recommends. */
 .compare-table thead th[data-side="openbot"] {
   box-shadow: inset 0 2px 0 var(--compare-accent);
 }
@@ -7618,8 +7197,6 @@ a {
   border-bottom: 1px solid var(--openbot-border);
 }
 
-/* The panel grows to its own height where the browser can animate to `auto`;
-   elsewhere it opens at once, which is what a `details` does anyway. */
 .compare-faq-item::details-content {
   block-size: 0;
   overflow: clip;
@@ -7677,8 +7254,6 @@ a {
   line-height: 1.65;
 }
 
-/* The landing questions sit in a narrower column than a comparison's, so each
-   one gets more room. After the rules above, which these outrank. */
 .landing-faq-body .compare-faq-list {
   margin-top: 0;
 }
@@ -7736,8 +7311,6 @@ a {
   color: var(--openbot-text-dim);
 }
 
-/* The roundup: a wide table with one row per app, then a card per app with the
-   comparisons that include it. */
 .compare-roundup-disclosure {
   max-width: 62ch;
   margin: 12px 0 0;
@@ -7801,11 +7374,6 @@ a {
   transition: transform var(--openbot-duration-normal) ease;
 }
 
-/* The benchmark chart: a table with a bar in each cell. Each agent has its own
-   colour, and the rows keep this order, so each pair of neighbours stays apart for
-   colour-blind readers. Checked with the dataviz palette check, dark mode, on
-   --openbot-bg-canvas: "#d95926,#3987e5,#199e70,#9085e9". Blue next to violet fails,
-   so do not reorder. Text stays in the text colours; only the bars are coloured. */
 .compare-bench-table tr[data-agent="claude-code"] {
   --compare-bench-fill: var(--openbot-chart-storage-files);
 }
@@ -7880,8 +7448,6 @@ a {
   color: var(--openbot-text-dim);
 }
 
-/* The bar starts square at zero and ends round at its value; the value sits after
-   it. The track is the cell, so bars in one column share one scale. */
 .compare-bench-cell {
   display: flex;
   align-items: center;
@@ -7918,8 +7484,6 @@ a {
   text-underline-offset: 3px;
 }
 
-/* Scroll reveals. The heading leads; the parts under it follow in reading order,
-   and the table rows and questions sweep in one by one. */
 .compare-section[data-revealed="false"] > *,
 .compare-section[data-revealed="false"] .compare-table tbody tr,
 .compare-section[data-revealed="false"] .compare-plan,
@@ -7953,7 +7517,6 @@ a {
   animation-delay: calc(160ms + var(--compare-index, 0) * 70ms);
 }
 
-/* /compare */
 .compare-index-hero {
   position: relative;
   isolation: isolate;
@@ -7985,8 +7548,6 @@ a {
   line-height: 1.55;
 }
 
-/* Cards keep one width and the row is centred, so one comparison sits in the
-   middle of the page rather than in the left half of it. */
 .compare-index-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(0, 560px));
@@ -8035,8 +7596,6 @@ a {
   height: clamp(32px, 3.4vw, 44px);
 }
 
-/* A roundup puts every app's mark on the plate, in two rows, with no names and
-   no "vs". The marks fade in where they are. */
 .compare-mark-row {
   grid-template-columns: repeat(7, auto);
   gap: clamp(10px, 1.6vw, 20px);
@@ -8097,8 +7656,6 @@ a {
   transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
 }
 
-/* The card only rises, and its parts fade one by one, for the reason given at
-   `.compare-stage`: the card holds a frosted plate. */
 .compare-index-grid[data-revealed="false"] .compare-index-card :is(.post-gradient, .compare-marks),
 .compare-index-grid[data-revealed="false"] .compare-index-copy {
   opacity: 0;
@@ -8133,7 +7690,6 @@ a {
 }
 
 @media (max-width: 640px) {
-  /* Two narrow columns: the logo goes over the name. */
   .compare-plans-grid {
     gap: 10px;
   }
@@ -8154,9 +7710,6 @@ a {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  /* Too narrow for three columns: each topic takes its own line, and the two
-     values sit side by side under it, below the two brand headers. The elements
-     stay a table, so a screen reader still reads a topic with its two cells. */
   .compare-table {
     display: block;
     min-width: 0;
@@ -8173,8 +7726,6 @@ a {
     grid-template-columns: var(--compare-table-columns, repeat(2, minmax(0, 1fr)));
   }
 
-  /* Out of the grid but still in the table, so the brand headers keep their
-     columns: removed, "OpenBot" would head the topic column. */
   .compare-table thead th:first-child {
     position: absolute;
     width: 1px;
@@ -8203,8 +7754,6 @@ a {
     gap: 8px;
   }
 
-  /* The benchmark has three measures: one column each, under the agent. Each
-     header stays over its column, and the bar goes under the value. */
   .compare-bench-table {
     --compare-table-columns: repeat(3, minmax(0, 1fr));
   }
@@ -8223,8 +7772,6 @@ a {
     width: calc(var(--compare-bench-share) * 100%);
   }
 
-  /* Five columns do not fit as stacked cells: the roundup table keeps its
-     columns and scrolls in its frame. */
   .compare-roundup-table,
   .compare-roundup-table :is(thead, tbody, tr) {
     display: revert;
@@ -8277,8 +7824,6 @@ a {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  /* Named one by one for the reason given in the post block above: an attribute
-     selector outranks the global `*` escape. */
   .compare-stage,
   .compare-stage-art,
   .compare-marks,
@@ -8303,14 +7848,6 @@ a {
     transition: none;
   }
 }
-
-/* ---------------------------------------------------------------------------
-   /providers and /providers/<slug>.
-
-   Built from the compare parts: the same hero plate, sections, table, plan grid
-   and questions. Only the setup steps, the cards of what OpenBot adds and the
-   comparison links are new.
-   --------------------------------------------------------------------------- */
 
 .provider-mark-frame {
   display: grid;
@@ -8416,7 +7953,6 @@ a {
   margin-top: 18px;
 }
 
-/* Inline, so the arrow follows the last word when a long title wraps. */
 .provider-related-list a {
   display: inline;
   font-size: 15px;
@@ -8451,7 +7987,6 @@ a {
   background: var(--openbot-bg-surface);
 }
 
-/* The first card is the one about this provider, so it carries the accent. */
 .provider-add:first-child {
   border-color: color-mix(in srgb, var(--openbot-logo-production) 34%, var(--openbot-border));
   background:
@@ -8484,7 +8019,6 @@ a {
   line-height: 1.55;
 }
 
-/* Above the phone layout only: below 641px each row is a grid, where a percentage width shrinks the cell. */
 @media (min-width: 641px) {
   .provider-table thead th:is(:first-child, :nth-child(2)) {
     width: 26%;
@@ -8549,23 +8083,6 @@ a {
   }
 }
 
-/* ---------------------------------------------------------------------------
-   /plugins and /plugins/<slug>.
-
-   The index reads as a sibling of /news and /guides, and it is built from the
-   same parts: the article frame, the gradient that runs in it under a pointer,
-   and the per-card reveal. A listing is recognised before it is read, so the
-   mark is the largest thing on a card and the words under it are only the two a
-   reader needs to choose. Nothing about a card's shape moves.
-
-   The listing page is built from the same parts, and from the article page's
-   column as well: it opens on the picture the card a reader pressed was already
-   carrying, under the back link, the title and the standfirst that /news and
-   /guides set. Only the rules below are its own, and they are the ones that turn
-   the boxed lists it used to draw into text. A later change to an article page's
-   type scale moves this page with it, which is the point of borrowing the
-   classes rather than copying them. */
-
 .plugin-intro {
   margin-top: clamp(28px, 3.5vw, 50px);
 }
@@ -8601,38 +8118,24 @@ a {
   outline-offset: 4px;
 }
 
-/* One colour on a gradient that is a different colour on every card. The shadow
-   is what keeps it readable where the picture behind it is pale: the mark has no
-   plate under it, so the frame stays a picture rather than a tile. */
 .plugin-logo {
   position: relative;
-  /* The gradient host listens for pointerenter, and it is this mark's sibling
-     rather than its ancestor. Without this, crossing onto the mark counts as
-     leaving the artwork and throws the shader away where the pointer rests. */
+
   pointer-events: none;
   color: var(--openbot-text-primary);
   filter: drop-shadow(0 1px 6px rgb(0 0 0 / 35%));
 }
 
-/* Sized against the frame rather than the viewport: the card is widest where the
-   grid has folded to one column, which is exactly where a mark set in viewport
-   units would be at its smallest. */
 .plugin-card-logo {
   width: auto;
   max-width: 58%;
   height: 20%;
 }
 
-/* An upright mark takes more of the frame's height than a wide one, so that the
-   two kinds read as the same size on a row of cards: a wide mark spends its size
-   on width, and an upright one has only height to spend it on. */
 .plugin-card-logo.plugin-logo-upright {
   height: 34%;
 }
 
-/* The listing's own icon on a card, sized against the frame like the drawn mark
-   beside it. It is square art already, so it takes the logo corner and no plate:
-   what is behind it is the gradient, which is the card's picture. */
 .plugin-card-icon {
   position: relative;
   height: 40%;
@@ -8641,9 +8144,6 @@ a {
   pointer-events: none;
 }
 
-/* The letter a plugin falls back to when its mark is not drawn yet. Type cannot
-   be sized against the frame the way a mark is, so it takes a clamp; the letter
-   is a stand-in for a path that is on its way, not a listing's resting state. */
 .plugin-logo-letter {
   display: grid;
   place-items: center;
@@ -8653,10 +8153,6 @@ a {
   line-height: 1;
 }
 
-/* Both text lines under a card share one shape: what a reader asks on the left,
-   what answers it on the right, and the gap between the two ends doing the work a
-   separator would. `baseline` rather than `center`, because the two ends of a line
-   are set at different sizes and centring them would leave neither on the line. */
 .plugin-card-meta,
 .plugin-card-headline {
   display: flex;
@@ -8676,9 +8172,6 @@ a {
   letter-spacing: var(--openbot-tracking-wide);
 }
 
-/* One end of each line gives way first, and it is whichever end a reader can lose:
-   the publisher's own name on the meta line, the sentence about the plugin on the
-   one below. Truncating is what keeps a card the height of the two beside it. */
 .plugin-card-publisher,
 .plugin-card-tagline {
   overflow: hidden;
@@ -8691,12 +8184,7 @@ a {
   text-align: right;
 }
 
-/* The switches over the grid and the tags under a card carry the same words, but
-   they are not the same object: one is pressed and one is read. So the switch
-   takes the size and the shape of every other button on the site, and the card
-   tag stays a label. The words are what ties them together. */
 .plugin-filters {
-  /* A fieldset draws a border and reserves room for a legend the page hides. */
   margin-inline: 0;
   border: 0;
   padding: 0;
@@ -8725,10 +8213,6 @@ a {
   white-space: nowrap;
 }
 
-/* The metrics of `.landing-button-sm`, written out rather than borrowed: the
-   shared class paints an icon box on every button that wears it, and a filter has
-   no icon to put in it. Everything a reader can compare - the height, the padding,
-   the pill, the weight, the rest and pressed colours - is the button family's. */
 .plugin-tag-button {
   height: 38px;
   display: inline-flex;
@@ -8745,8 +8229,7 @@ a {
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
-  /* Colour, and a press. A filter row is read before it is used, so the motion
-     that belongs on it is the motion every other button here already has. */
+
   transition:
     border-color var(--openbot-duration-normal) ease,
     background-color var(--openbot-duration-normal) ease,
@@ -8754,10 +8237,6 @@ a {
     transform var(--openbot-duration-fast) var(--openbot-ease-out);
 }
 
-/* Pressed is the only state that fills a switch in, and it fills it the way a
-   primary button is filled. A switch a reader can turn off has to look different
-   from one that was never on, and the grid behind it has already changed, so the
-   fill confirms what happened rather than announcing it. */
 .plugin-tag-button[aria-pressed="true"] {
   border-color: var(--openbot-surface-light);
   background: var(--openbot-surface-light);
@@ -8798,7 +8277,6 @@ a {
   font-size: 13px;
 }
 
-/* Per card, ordered by --plugin-card-index, so the grid arrives as a sweep. */
 .plugin-grid-section[data-revealed="false"] .plugin-card {
   opacity: 0;
 }
@@ -8808,20 +8286,12 @@ a {
   animation-delay: calc(var(--plugin-card-index, 0) * 80ms);
 }
 
-/* Larger against its frame than a card's mark is against its own: this frame is
-   the width of the column and a mark sized for a card would sit lost in it. Both
-   are measured against the frame rather than the viewport, so neither shrinks on
-   the narrow screen where the picture is at its widest. */
 .plugin-hero-logo {
   width: auto;
   max-width: 44%;
   height: 26%;
 }
 
-/* The title and the button share a line, so the space between the two ends of it is
-   what separates them. Below the width that holds both, the button wraps under the
-   title rather than crushing it. The row carries the title's own top margin, so that
-   margin is not inside the item the row centres the button against. */
 .plugin-hero-row {
   display: flex;
   flex-wrap: wrap;
@@ -8831,8 +8301,6 @@ a {
   margin-top: 18px;
 }
 
-/* Smaller than an article's title. This one is read against a tile rather than across a
-   column, and at the article's size the two lines beside the mark stand taller than it. */
 .plugin-hero-row .post-article-title {
   min-width: 0;
   margin-top: 0;
@@ -8840,8 +8308,6 @@ a {
   line-height: 1.1;
 }
 
-/* The mark, the name and the line under it are one thing, so they travel together when the
-   button wraps below them. */
 .plugin-hero-heading {
   display: flex;
   align-items: center;
@@ -8849,22 +8315,16 @@ a {
   min-width: 0;
 }
 
-/* What the mark stands beside: the name and the one line that says what the listing does. */
 .plugin-hero-text {
   min-width: 0;
 }
 
-/* Closer than an article's standfirst sits under its title: here the two lines are one
-   block against the mark, and the article's gap would leave the mark between them. */
 .plugin-hero-standfirst {
   margin-top: 4px;
   font-size: clamp(14px, 1.3vw, 16px);
   line-height: 1.4;
 }
 
-/* The listing's mark as an icon rather than as artwork: the frame further down is
-   21/9 and reads as a picture, and a reader deciding whether to install something
-   looks for a square. Same gradient as that frame, at the size of an app icon. */
 .plugin-hero-mark {
   position: relative;
   display: grid;
@@ -8876,13 +8336,9 @@ a {
   border: 1px solid var(--openbot-glass-border);
   border-radius: var(--openbot-radius-logo);
   background: var(--openbot-glass-surface);
-  /* Decoration, like every other frame on this page: it takes no pointer. */
   pointer-events: none;
 }
 
-/* The listing's own icon, filling the tile: an icon a developer publishes is already
-   drawn as a square, so it is given the whole square rather than inset in it. The plate
-   and its hairline go with the same reasoning as the row's. */
 .plugin-hero-mark-icon {
   width: 100%;
   height: 100%;
@@ -8894,17 +8350,12 @@ a {
   background: none;
 }
 
-/* Sized against the tile rather than the viewport, the way a card's mark is. */
 .plugin-hero-mark-logo {
   width: auto;
   max-width: 64%;
   height: 32%;
 }
 
-/* Against the right edge of the column, opposite the tags: the block above is
-   read from the left, and the one thing on it a reader acts on is the one thing
-   that is not. It wraps back under the tags before the column gets too narrow
-   to hold both. */
 .plugin-actions-row {
   display: flex;
   flex-wrap: wrap;
@@ -8912,10 +8363,6 @@ a {
   gap: 10px;
 }
 
-/* The download offer, as the small modal it is: the visitor has just asked for the app and
-   nothing happened, so this is the only thing on the page worth reading. Same panel the
-   download menu is built from - sidebar surface, strong hairline, overlay shadow - because
-   it is the same kind of surface, lifted off the page rather than drawn into it. */
 .plugin-dialog {
   width: min(380px, calc(100vw - 32px));
   margin: auto;
@@ -8940,7 +8387,6 @@ a {
   }
 }
 
-/* The page stays visible behind it, because the visitor is deciding whether to leave it. */
 .plugin-dialog::backdrop {
   background: var(--openbot-dialog-overlay);
   backdrop-filter: blur(6px);
@@ -8959,8 +8405,6 @@ a {
   line-height: 1.55;
 }
 
-/* The way out on the left and the way on to the right, which is the order the rest of the
-   site puts a pair of actions in. */
 .plugin-dialog-actions {
   display: flex;
   flex-wrap: wrap;
@@ -8982,7 +8426,6 @@ a {
   transition: color var(--openbot-duration-fast) ease;
 }
 
-/* The ring the site's buttons take, rather than the browser's own box. */
 .plugin-dialog-dismiss:focus-visible {
   outline: 0;
   box-shadow: 0 0 0 3px var(--openbot-accent-strong);
@@ -9003,13 +8446,11 @@ a {
   margin-top: clamp(32px, 4vw, 48px);
 }
 
-/* The uses are written text, so they take two columns at most and no icon above the title. */
 .provider-adds-grid.plugin-uses {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-top: 0;
 }
 
-/* No use is more important than the others, so the first card does not take the accent. */
 .plugin-uses .provider-add:first-child {
   border-color: var(--openbot-border);
   background: var(--openbot-bg-surface);
@@ -9023,7 +8464,6 @@ a {
   margin-top: 0;
 }
 
-/* The values a sign-in asks for, or the steps a local server needs, inside one step. */
 .plugin-connect-fields {
   display: grid;
   gap: 6px;
@@ -9046,9 +8486,6 @@ a {
   }
 }
 
-/* A shared agent, as one card: the page a link on X opens. `--agent-share-accent` is the agent's
-   avatar colour, set on the page, so every shared agent is tinted as itself. */
-/* Registered, so the tint fades in when the avatar colour arrives after hydration. */
 @property --agent-share-accent {
   syntax: "<color>";
   inherits: true;
@@ -9085,8 +8522,6 @@ a {
   box-shadow: 0 40px 120px -40px color-mix(in srgb, var(--agent-share-accent) 45%, transparent);
 }
 
-/* The agent's colour as light on a dark field, with a soft grain, the way a product shot sits on a
-   coloured backdrop. It shrinks with the window's height, so the whole card fits a 13-inch laptop. */
 .agent-share-hero {
   position: relative;
   display: grid;
@@ -9118,8 +8553,6 @@ a {
   pointer-events: none;
 }
 
-/* The agent's own avatar from `@openbot/ui`. The hero in the selector outranks the generic
-   `.agent-avatar` size rule, which loads with the avatar's own code after this stylesheet. */
 .agent-share-hero .agent-share-avatar {
   --agent-share-avatar-size: clamp(100px, 16vh, 140px);
   position: relative;
@@ -9132,7 +8565,6 @@ a {
   filter: drop-shadow(0 18px 30px rgba(0, 0, 0, 0.35));
 }
 
-/* The Bloub sits low in its drawing, so it is lifted by the share of its size the app uses. */
 .agent-share-hero .agent-share-avatar > svg {
   display: block;
   width: 128%;
@@ -9177,7 +8609,6 @@ a {
   font-size: 15px;
 }
 
-/* What the agent brings, as one row of small tags. */
 .agent-share-tags {
   display: flex;
   flex-wrap: wrap;
@@ -9197,8 +8628,6 @@ a {
   font-size: 12px;
 }
 
-/* Clamped, the instructions read as one paragraph of plain text, so the ellipsis never lands on a
-   blank line. Opened, they show their Markdown: they are what the agent will do. */
 .agent-share-description {
   display: -webkit-box;
   margin: 14px 0 0;
@@ -9211,8 +8640,6 @@ a {
   line-clamp: 3;
 }
 
-/* Headings and lists read from the left edge, so the opened instructions are not centered. The
-   site has no chat stylesheet, so the Markdown elements are styled here. */
 .agent-share-instructions {
   width: 100%;
   margin: 14px 0 0;
@@ -9356,8 +8783,6 @@ a {
   text-underline-offset: 3px;
 }
 
-/* The heading the app's plugin detail sets, rather than the uppercase eyebrow this
-   page used: the section's name at reading size, with its count in a box beside it. */
 .plugin-section-title {
   display: flex;
   align-items: center;
@@ -9368,8 +8793,6 @@ a {
   font-weight: 500;
 }
 
-/* A count is one or two digits. A box that is square at one digit holds every count
-   at one width, so a section with 2 rows and one with 12 draw the same shape. */
 .plugin-section-count {
   display: inline-flex;
   align-items: center;
@@ -9384,22 +8807,14 @@ a {
   font-variant-numeric: tabular-nums;
 }
 
-/* The app draws its prompts on the plugin's own artwork, so this card is that screen:
-   the gradient fills it and the requests sit on plates over it. It is one of the
-   artwork frames above rather than a card that copies them - the same rule, the same
-   corner as the picture further up this column, and the same clipping of the shader,
-   which is the whole reason it is declared there and not here. */
 .plugin-prompts-card {
   border-radius: 14px;
   padding: clamp(16px, 2.4vw, 24px);
 }
 
 .plugin-prompts {
-  /* Over the canvas, which the shader library prepends at z-index -1: that paints
-     above a background but below anything in the card that is positioned. */
   position: relative;
-  /* Given back what the frame rule turns off for artwork. These are sentences a
-     reader copies, so the list takes the pointer even though the frame does not. */
+
   pointer-events: auto;
   width: min(100%, 520px);
   margin: 0 auto;
@@ -9409,9 +8824,6 @@ a {
   gap: 8px;
 }
 
-/* One frame around the whole list, like the app's item group: the rows share a
-   border and a surface, and a single hairline separates each pair. No gap - a gap
-   would leave that hairline floating between two rows rather than between them. */
 .plugin-rows {
   overflow: hidden;
   margin: 0;
@@ -9424,9 +8836,6 @@ a {
   background: var(--openbot-bg-surface);
 }
 
-/* One request as the app draws it: the plugin's chip, then the line a reader would
-   type. The plate is opaque because the colour behind it is a different colour on
-   every listing, and no transparent surface is legible on all of them. */
 .plugin-prompt {
   display: flex;
   align-items: center;
@@ -9441,8 +8850,6 @@ a {
   line-height: 1.5;
 }
 
-/* The chip the app puts in front of a prompt: this is the plugin the request would
-   be sent to, said once per line rather than in a heading above the list. */
 .plugin-prompt-chip {
   display: inline-flex;
   flex: 0 0 auto;
@@ -9455,9 +8862,6 @@ a {
   font-size: 13px;
 }
 
-/* Set by height alone, so a wide wordmark stays a wordmark instead of being letterboxed
-   into a square. The shadow the marks carry over artwork is dropped here: the plate under
-   this one is opaque, so it has nothing to lift off. */
 .plugin-prompt-mark {
   width: auto;
   max-width: 56px;
@@ -9487,13 +8891,6 @@ a {
   border-top: 1px solid var(--openbot-border-strong);
 }
 
-/* What kind of thing the row is, in a tile the height of its two lines of type. The
-   app draws the thing's own icon here; this page draws a glyph, because that icon
-   lives on a developer's own servers and the site fetches nothing from one. */
-/* The square is this plate, not the picture on it. A listing's icon is usually a mark on
-   a transparent ground - Canva's is a circle - so an icon left to draw its own shape reads
-   as whatever shape its developer chose. A lighter plate under it, inset far enough to be
-   seen at every edge, is what makes every row open on the same square. */
 .plugin-row-icon {
   display: grid;
   flex: 0 0 auto;
@@ -9513,33 +8910,23 @@ a {
   height: 16px;
 }
 
-/* A listing's own icon is a picture of any proportion - one of them is a favicon - and it
-   is drawn here as the rounded square an icon is everywhere else in the product. `cover`
-   is what makes the square: a wide picture is trimmed to it rather than left floating in
-   a frame at the height its proportion allows. */
 .plugin-icon {
   display: block;
   aspect-ratio: 1;
   object-fit: cover;
 }
 
-/* The icon is the tile. An icon a developer publishes is drawn as a square already - both
-   in the catalog are - so it takes the whole plate rather than sitting inset in one, and a
-   picture that is not square is trimmed to it. */
 .plugin-row-icon .plugin-icon {
   width: 100%;
   height: 100%;
 }
 
-/* The plate is for the glyph. A row that draws a real icon drops the inset and the hairline
-   with it, which would otherwise read as a frame around a picture that has its own edge. */
 .plugin-row-icon:has(.plugin-icon) {
   border-color: transparent;
   background: none;
   padding: 0;
 }
 
-/* On the chip the icon sits on a line of type, so it takes the height of one. */
 .plugin-prompt-icon {
   width: 14px;
   height: 14px;
@@ -9619,9 +9006,6 @@ a {
     cursor: pointer;
   }
 
-  /* An explicit scale rather than `none`, for the reason the article titles give:
-     the resting element and the moving layer otherwise rasterise on different
-     pixels, and the mark looks like it jumps as the growth ends. */
   .plugin-card-logo,
   .plugin-card-icon {
     transform: scale(1);
@@ -9676,8 +9060,6 @@ a {
   }
 }
 
-/* 404. The "0" is the OpenBot logo: it looks around while the page is idle,
-   and follows the pointer while it moves. A search log types out below. */
 .not-found-main {
   position: relative;
   isolation: isolate;
@@ -9729,9 +9111,6 @@ a {
     not-found-float 6s ease-in-out 900ms infinite;
 }
 
-/* `background-image`, not the `background` shorthand: the build copies this
-   declaration into an `@supports` block for `color-mix()`, and a shorthand there
-   resets `background-clip` to the border box. */
 .not-found-digit {
   background-image: linear-gradient(
     180deg,
@@ -9758,8 +9137,6 @@ a {
     not-found-flicker 7s linear 2s infinite;
 }
 
-/* The tilt has the same length as the logo's look-around, and both restart
-   when the pointer stops, so the head turns with the eyes. */
 .not-found-bot-logo {
   display: block;
   width: 100%;
@@ -9864,7 +9241,6 @@ a {
   line-height: 1.5;
 }
 
-/* Each line types in from the left, one after the other. */
 .not-found-line {
   overflow-wrap: anywhere;
   animation: not-found-type 480ms steps(24, end) calc(1100ms + var(--line) * 560ms) both;
@@ -9985,7 +9361,6 @@ a {
   }
 }
 
-/* A sign with a loose wire: a short stutter, then a long rest. */
 @keyframes not-found-flicker {
   0%,
   70%,
@@ -10047,19 +9422,9 @@ a {
   }
 }
 
-/* ---------------------------------------------------------------------------
-   /changelog.
-
-   The release notes from CHANGELOG.md, one block per release under a hero that
-   dissolves into the page. On a wide screen the index of releases stays beside
-   the notes and marks the one being read; on a narrow one it becomes a strip of
-   versions that stays at the top. Colour belongs to the kind of change, so a
-   reader scanning for fixes finds the green groups without reading headings. */
-
 .changelog-page {
   --changelog-hairline: color-mix(in srgb, var(--openbot-text-primary) 8%, transparent);
   --changelog-scroll-offset: 24px;
-  /* The header menu's motion, so a change of app reads as a change of menu section. */
   --changelog-swap-ease: cubic-bezier(0.32, 0.72, 0, 1);
   --changelog-swap-duration: 460ms;
   --changelog-swap-quick: 300ms;
@@ -10074,8 +9439,6 @@ a {
   margin-top: clamp(4px, 1vw, 12px);
 }
 
-/* The picture fades out at the bottom rather than ending on an edge, so the
-   title reads as standing in the page and the notes start where the colour stops. */
 .changelog-hero-art {
   position: absolute;
   z-index: -1;
@@ -10087,8 +9450,6 @@ a {
   mask-image: linear-gradient(to bottom, var(--openbot-mask-solid) 40%, transparent 100%);
 }
 
-/* A shade on the reading side, so white type keeps its contrast over the lightest
-   colours the shader draws. */
 .changelog-hero-art::after {
   content: "";
   position: absolute;
@@ -10172,8 +9533,6 @@ a {
   background: var(--openbot-success);
 }
 
-/* A ring that grows out of the dot and fades: the release is live, and the dot says so
-   without blinking. */
 .changelog-latest-dot::after {
   content: "";
   position: absolute;
@@ -10221,8 +9580,6 @@ a {
   scroll-margin-top: var(--changelog-scroll-offset);
 }
 
-/* A change of app ---------------------------------------------------------- */
-
 .changelog-swap {
   position: relative;
   min-width: 0;
@@ -10249,9 +9606,6 @@ a {
   animation: site-nav-panel-enter var(--changelog-swap-duration) var(--changelog-swap-ease) both;
 }
 
-/* The closed list leaves the flow, so the page takes the height of the open one at once. It is
-   cut at the height of the window: the rest is out of sight, and a blur over the whole desktop
-   list would cost more than a frame. */
 .changelog-swap-panel[data-motion="to-start"],
 .changelog-swap-panel[data-motion="to-end"] {
   position: absolute;
@@ -10263,8 +9617,6 @@ a {
   pointer-events: none;
   animation: site-nav-panel-leave var(--changelog-swap-quick) var(--changelog-swap-ease) both;
 }
-
-/* The apps ------------------------------------------------------------------ */
 
 .changelog-platforms {
   margin: 0 0 22px;
@@ -10281,7 +9633,6 @@ a {
     inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
-/* The header menu's pill. `ChangelogPlatformTabs` measures the open link. */
 .changelog-platforms-track::before {
   content: "";
   position: absolute;
@@ -10324,7 +9675,6 @@ a {
   color: var(--openbot-text-primary);
 }
 
-/* Before the pill is measured, and with no script, the open link carries its own. */
 .changelog-platforms-track:not([data-ready]) .changelog-platform[aria-current="page"] {
   background: rgba(255, 255, 255, 0.08);
 }
@@ -10333,8 +9683,6 @@ a {
   outline: 0;
   box-shadow: 0 0 0 2px var(--openbot-accent-strong);
 }
-
-/* The index -------------------------------------------------------------- */
 
 .changelog-index {
   position: sticky;
@@ -10360,13 +9708,10 @@ a {
   letter-spacing: 0;
 }
 
-/* Scrolls on its own, inside the window, and fades at both ends so a row cut by the
-   edge reads as more to come rather than as a clipped line. */
 .changelog-index-scroll {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  /* The window, less the apps and the title above the list. */
   max-height: calc(100dvh - var(--changelog-scroll-offset) * 2 - 96px);
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -10420,8 +9765,6 @@ a {
   transition: color var(--openbot-duration-normal) ease;
 }
 
-/* The current row's mark sits on the rail, so the rail reads as a track the reader
-   moves along. */
 .changelog-index-link::before {
   content: "";
   position: absolute;
@@ -10463,8 +9806,6 @@ a {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-
-/* A release ---------------------------------------------------------------- */
 
 .changelog-releases {
   min-width: 0;
@@ -10509,7 +9850,6 @@ a {
   letter-spacing: 0.02em;
 }
 
-/* The stores that have a mobile version. A store that still reviews it reads as waiting. */
 .changelog-stores {
   display: inline-flex;
   flex-wrap: wrap;
@@ -10557,7 +9897,6 @@ a {
   color: inherit;
 }
 
-/* A store that a newer version replaced. It will not ship this version, so it reads as done, not waiting. */
 .changelog-store[data-state="skipped"] {
   color: var(--openbot-text-dim);
 }
@@ -10581,8 +9920,6 @@ a {
   text-decoration: none;
 }
 
-/* The link to this release, shown under a pointer so a reader knows the title can
-   be copied as one. */
 .changelog-release-anchor::after {
   content: "#";
   margin-left: 10px;
@@ -10688,8 +10025,6 @@ a {
   line-height: 1.6;
 }
 
-/* Most notices are bold from end to end in the file. Inside a box that already says
-   "act on this", full weight on every word is only harder to read. */
 .changelog-notice .changelog-strong {
   color: var(--openbot-text-primary);
   font-weight: 500;
@@ -10756,8 +10091,6 @@ a {
   list-style: none;
 }
 
-/* A hanging mark in the group's colour, so a long item wraps under its own text and
-   not under the mark. */
 .changelog-item {
   position: relative;
   padding-left: 22px;
@@ -10777,8 +10110,6 @@ a {
   background: color-mix(in srgb, var(--changelog-tone) 70%, transparent);
 }
 
-/* Narrow screens: the index becomes a strip of versions that stays at the top of the
-   window, over the notes, and scrolls sideways to keep the current one in sight. */
 @media (max-width: 959px) {
   .changelog-page {
     --changelog-scroll-offset: 72px;
@@ -10925,14 +10256,6 @@ a {
   }
 }
 
-/* ---------------------------------------------------------------------------
-   /download and /download/<platform>.
-
-   The landing download cards grow into the page: each system keeps its card
-   colour, with dark text and dark buttons on it. Everything under the panel is
-   quiet rows on the canvas, so the colour stays the one loud thing.
-   ------------------------------------------------------------------------- */
-
 .download-main {
   width: min(100%, 1280px);
   margin: 0 auto;
@@ -10971,8 +10294,6 @@ a {
   background: var(--download-color);
   color: var(--openbot-text-on-light);
 }
-
-/* Platform page: the panel ---------------------------------------------- */
 
 .download-panel {
   overflow: hidden;
@@ -11078,8 +10399,6 @@ a {
   line-height: 1.35;
 }
 
-/* Installer buttons: dark on the system's colour ------------------------- */
-
 .download-installer-button {
   display: inline-flex;
   align-items: center;
@@ -11122,8 +10441,6 @@ a {
   outline-offset: 3px;
 }
 
-/* Platform page: the rows under the panel -------------------------------- */
-
 .download-rows {
   margin-top: clamp(56px, 8vw, 104px);
 }
@@ -11150,7 +10467,6 @@ a {
   text-wrap: balance;
 }
 
-/* The steps are a sequence, so each one is numbered, and a line joins them. */
 .download-steps {
   display: grid;
   margin: 0;
@@ -11373,8 +10689,6 @@ a {
   text-underline-offset: 3px;
 }
 
-/* Hub ------------------------------------------------------------------- */
-
 .download-hub-hero {
   padding-bottom: clamp(48px, 6vw, 80px);
 }
@@ -11503,7 +10817,6 @@ a {
   }
 }
 
-/* Named transitions outrank the global reduced-motion rule, so the hover lift stops here. */
 @media (prefers-reduced-motion: reduce) {
   .download-installer-button,
   .download-system-card,
@@ -11540,7 +10853,6 @@ a {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  /* Beside the back link, so the title keeps the full width of the panel. */
   .download-panel-logo {
     position: absolute;
     top: 20px;
@@ -11591,11 +10903,6 @@ a {
   text-underline-offset: 3px;
 }
 
-/* ---------------------------------------------------------------------------
-   Contact page: the form beside the other ways to reach the team. An error
-   replaces text on its own line, so a field never moves when one shows.
-   --------------------------------------------------------------------------- */
-
 .contact-section {
   --contact-fill: color-mix(in srgb, var(--openbot-text-primary) 5%, transparent);
   --contact-border: color-mix(in srgb, var(--openbot-text-primary) 8%, transparent);
@@ -11626,7 +10933,6 @@ a {
   min-width: 0;
 }
 
-/* One line high in each state: the label on the left, then "Optional" or the error on the right. */
 .contact-field-head {
   display: flex;
   align-items: baseline;
@@ -11694,7 +11000,6 @@ a {
   box-shadow: 0 0 0 3px var(--openbot-accent-strong);
 }
 
-/* A value that the page filled in, such as the site on the report form. */
 .contact-field input[readonly] {
   border-color: var(--contact-border);
   background: transparent;
@@ -11826,7 +11131,6 @@ a {
   color: var(--openbot-logo-production);
 }
 
-/* The other channels under the heading. */
 .contact-channels {
   display: grid;
   margin: 32px 0 0;
@@ -11880,8 +11184,6 @@ a {
   }
 }
 
-/* Shared agent page: the footer and the "no longer shared" state. */
-/* The page centres its card in a flex column; the footer spans the full width below it. */
 .agent-share-page > .landing-footer {
   align-self: stretch;
 }
@@ -11901,12 +11203,6 @@ a {
   margin-top: 22px;
 }
 
-/* ---------------------------------------------------------------------------
-   Transactional pages: join, Slack and Discord connect, billing return, site
-   report, and page error. The site header and footer frame one centred card
-   (`.join-card`). `components/transactional/TransactionalPage.tsx` owns it.
-   --------------------------------------------------------------------------- */
-
 .transactional-main {
   min-height: min(78dvh, 820px);
   display: grid;
@@ -11914,7 +11210,6 @@ a {
   padding: clamp(32px, 6vw, 72px) 16px clamp(48px, 8vw, 96px);
 }
 
-/* A form reads from the start edge, and needs more width than a message. */
 .transactional-card[data-layout="form"] {
   width: min(100%, 640px);
   justify-items: stretch;
@@ -11930,7 +11225,6 @@ a {
   margin-top: 12px;
 }
 
-/* A shared button that cannot act yet, for example before the join page reads its link. */
 .transactional-card .landing-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -11952,7 +11246,6 @@ a {
   flex: 0 0 auto;
 }
 
-/* The brand page --------------------------------------------------------- */
 .brand-hero-row {
   display: flex;
   flex-wrap: wrap;
@@ -11992,7 +11285,6 @@ a {
   height: 82%;
 }
 
-/* The panel is the face. The logo square shows only its eyes, and its color changes move to the panel. */
 .brand-stage .app-logo-background {
   visibility: hidden;
 }
@@ -12020,7 +11312,6 @@ a {
   }
 }
 
-/* The focus ring goes on the panel, not on the small logo square. */
 .brand-stage .app-logo[data-interactive="true"]:focus-visible {
   box-shadow: none;
 }
@@ -12048,14 +11339,10 @@ a {
   }
 }
 
-/* The header logo menu -------------------------------------------------- */
-
-/* The trigger wraps the header link and takes no grid cell of its own. */
 .site-logo-trigger {
   display: contents;
 }
 
-/* The surface and rows match the header menu panels, without the drop shadow. */
 .site-logo-menu {
   z-index: 60;
   min-width: 236px;
@@ -12095,8 +11382,6 @@ a {
   border: 0;
   border-top: 1px solid rgba(255, 255, 255, 0.07);
 }
-
-/* Brand page logo cards --------------------------------------------------- */
 
 .brand-card-art[data-surface="dark"] {
   background: var(--openbot-bg-frame);
@@ -12196,17 +11481,10 @@ a {
   }
 }
 
-/* The public Marketplace at /marketplace. The pages borrow the plugin index and plugin page classes
-   above; these rules are only for what those pages do not have: the switch, the search, the rows,
-   the agent avatar, and the shield. They come last, so they win over the plugin classes they share
-   an element with. */
-
 .marketplace-site a {
   text-decoration: none;
 }
 
-/* The title on the left and Agents / Skills / Apps on the right, as one track in the search field's
-   fill. The current option is filled as a pressed category is, so the two rows read as one family. */
 .marketplace-site-intro {
   display: flex;
   flex-wrap: wrap;
@@ -12244,7 +11522,6 @@ a {
   color: var(--openbot-text-on-light);
 }
 
-/* One field as wide as the page, filled like the rows' Add, with the magnifier inside it. */
 .marketplace-site-search {
   position: relative;
   margin-bottom: clamp(28px, 3.4vw, 40px);
@@ -12295,7 +11572,6 @@ a {
   margin-top: clamp(24px, 3vw, 36px);
 }
 
-/* The category links take the filter switches' look; the current one is filled like a pressed switch. */
 .marketplace-site-categories .plugin-tag-button[aria-current="page"] {
   border-color: var(--openbot-surface-light);
   background: var(--openbot-surface-light);
@@ -12320,9 +11596,6 @@ a {
   color: var(--openbot-text-dim);
 }
 
-/* The avatar box. The Worker renders it empty and the browser draws the agent in it. It fills the
-   box a row, a card or a page header gives it, and takes no pointer, for the reason the plugin
-   card's mark gives. */
 .marketplace-site-avatar {
   position: relative;
   display: grid;
@@ -12340,13 +11613,10 @@ a {
   height: 100%;
 }
 
-/* The drawn bloub leaves a third of its box empty for its motion; here the body fills the box, so
-   it reads at the size of the skill icon beside it. The avatar already scales its plush body by 1.15. */
 .marketplace-site-avatar .bloub-avatar-svg {
   scale: calc(1.45 / 1.15);
 }
 
-/* The glyph a skill shows when the catalog has no icon for it. */
 .marketplace-site-glyph {
   position: relative;
   width: auto;
@@ -12378,7 +11648,6 @@ a {
   margin-top: 14px;
 }
 
-/* The open buttons sit at the end of a plugin hero; here they start the line, before Copy link. */
 .marketplace-site-actions .plugin-actions-row {
   justify-content: flex-start;
 }
@@ -12392,8 +11661,6 @@ a {
   margin: 28px 0 clamp(80px, 12vw, 160px);
 }
 
-/* The index, as x.ai's bot marketplace lays it out: Featured as cards, then each group as two
-   columns of rows. */
 .marketplace-site-group + .marketplace-site-group {
   margin-top: clamp(40px, 5vw, 56px);
 }
@@ -12450,7 +11717,6 @@ a {
   margin-bottom: 12px;
 }
 
-/* A block, so a long name wraps with the shield after its last word, not beside the whole name. */
 .marketplace-site-feature-name {
   display: block;
   font-size: 15px;
@@ -12478,7 +11744,6 @@ a {
   list-style: none;
 }
 
-/* The whole row is one link; Add is its label's end, not a second control. */
 .marketplace-site-row {
   display: flex;
   align-items: center;
@@ -12538,7 +11803,6 @@ a {
   transition: background-color var(--openbot-duration-normal) ease;
 }
 
-/* A skill's square icon, at the size an avatar fills. */
 .marketplace-site-skill-icon {
   display: block;
   width: 88%;
@@ -12546,15 +11810,11 @@ a {
   border-radius: 22%;
 }
 
-/* A listing page. The header borrows the plugin page's hero row: the mark and the name on the left,
-   Add on the right of the same line, and the description under both. Under a rule, the rows and
-   the information side by side. */
 .marketplace-site-detail-head {
   padding-bottom: clamp(32px, 4vw, 44px);
   border-bottom: 1px solid var(--openbot-border-strong);
 }
 
-/* Where the listing is, each step a link: it replaces the single back link. */
 .marketplace-site-crumbs {
   margin-top: clamp(28px, 3.5vw, 50px);
 }
@@ -12579,15 +11839,11 @@ a {
   transition: color var(--openbot-duration-normal) ease;
 }
 
-/* The name starts at the top of the mark, with or without a trust line under it, and the buttons
-   start on the same line, so the two always line up. */
 .marketplace-site-detail-row {
   align-items: flex-start;
   margin-top: clamp(24px, 3vw, 32px);
 }
 
-/* The heading takes what the buttons leave, so a long trust line wraps beside them rather than
-   pushing them under it. Below the width that holds both, the buttons wrap under the heading. */
 .marketplace-site-detail-row .plugin-hero-heading {
   flex: 1 1 0;
   align-items: flex-start;
@@ -12610,7 +11866,6 @@ a {
   margin: 0;
 }
 
-/* As in a Featured card: a long name wraps with the shield after its last word. */
 .marketplace-site-detail-title .marketplace-site-name {
   display: inline;
 }
@@ -12651,7 +11906,6 @@ a {
   display: none;
 }
 
-/* One column, and the line may take two lines: here it says what the skill or the routine does. */
 .marketplace-site-detail-rows {
   grid-template-columns: minmax(0, 1fr);
 }
@@ -12707,12 +11961,10 @@ a {
 }
 
 @media (max-width: 640px) {
-  /* The track goes under the title and takes the page's width, each option a third of it. */
   .marketplace-site-switch {
     flex: 1 1 100%;
   }
 
-  /* One line of categories that scrolls sideways to the page's edges, not three lines of pills. */
   .marketplace-site-categories {
     flex-wrap: nowrap;
     overflow-x: auto;
@@ -12744,12 +11996,10 @@ a {
     height: 72px;
   }
 
-  /* The plugin page's phone size for a name beside its mark. */
   .marketplace-site-detail-title {
     font-size: 26px;
   }
 
-  /* One button per line, each as wide as the page. */
   .marketplace-site-actions,
   .marketplace-site-actions .plugin-actions-row,
   .marketplace-site-missing-actions {
@@ -12757,7 +12007,6 @@ a {
     align-items: stretch;
   }
 
-  /* Add wraps under the name and takes the page's width. */
   .marketplace-site-detail-row .marketplace-site-actions {
     flex: 1 1 100%;
   }

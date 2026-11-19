@@ -16,6 +16,7 @@ export const messages = {
   "error.workflow.agentMissing": "Bu adım için bir ajan seçin.",
   "error.workflow.handoffFailed": "OpenBot bu adımı ajanına gönderemedi.",
   "error.workflow.agentStepEnded": "Ajana giden mesaj, ajan yanıt vermeden kaldırıldı.",
+  "error.workflow.agentStepStopped": "Ajan bu adımı yanıtlamadan durdu. Adımı yeniden çalıştırın.",
   "error.workflow.conditionUnclear": "Model evet ya da hayır yanıtı vermedi.",
   "error.workflow.modelFailed": "Model yanıt veremedi. Adımı yeniden çalıştırın.",
   "error.workflow.modelTimedOut":
@@ -31,6 +32,8 @@ export const messages = {
   "error.workflow.pictureMissing": "Görsel artık sunucuda değil. Yeniden gönderin.",
   "error.workflow.pictureType": "PNG, JPEG veya WebP görseli kullanın.",
   "error.workflow.mediaInputMissing": "Önceki bir adımın görseli kullanılamıyor. O adımı yeniden çalıştırın.",
+  "error.workflow.mediaEmptyRequest":
+    "Bir açıklama yazın ya da bir metin veya görsel gelmesi için önceki adımları çalıştırın.",
   "error.workflow.mediaInputNotImage": "Bu adım yalnızca görsel alır, video almaz. Videodan gelen bağlantıyı kaldırın.",
   "error.workflow.stepMissing": "Bu adım artık yok.",
   "error.workflow.nodeMissing": "Bu adım iş akışında yok.",

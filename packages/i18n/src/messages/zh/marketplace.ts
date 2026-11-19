@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/marketplace";
 
 export const messages = {
-  // The listing: categories, rows, and the words for each kind of listing.
   "marketplace.category.coding": "编程",
   "marketplace.category.design": "设计",
   "marketplace.category.dataAnalytics": "数据与分析",
@@ -19,7 +18,6 @@ export const messages = {
   "marketplace.loadMore": "加载更多",
   "marketplace.version": "版本 {version}",
 
-  // The dialog frame: title, close and tabs.
   "marketplace.title": "市场",
   "marketplace.kinds": "市场内容类型",
   "marketplace.tab.agents": "助手",
@@ -28,10 +26,8 @@ export const messages = {
   "marketplace.description.agents": "带有自身指令和技能的现成助手。",
   "marketplace.description.skills": "教助手完成某项任务或使用某个工具的指令。",
 
-  // A plugin link.
   "marketplace.plugins.missing": "OpenBot 目录中没有该插件。",
 
-  // The agent page.
   "marketplace.agents.loadingDetail": "正在加载助手详情…",
   "marketplace.agents.skills": "技能",
   "marketplace.agents.routines": "自动化任务",
@@ -48,7 +44,6 @@ export const messages = {
   "marketplace.agents.trust.pendingBeforeAdd": "创建者在 OpenBot 审核前分享了它。添加后，它可以代表你执行操作。",
   "marketplace.agents.source.pending": "尚未审核",
 
-  // The skill page, and why Try is off.
   "marketplace.skill.loading": "正在加载技能",
   "marketplace.try.readFailed": "OpenBot 无法读取该助手的技能，请重试。",
   "marketplace.try.enable": "请在助手设置中启用该技能后再试用。",
@@ -56,7 +51,6 @@ export const messages = {
   "marketplace.try.update": "请更新该技能后再试用该版本。",
   "marketplace.try.composerUnavailable": "助手输入框不可用。",
 
-  // The Marketplace window. {name} is an agent, app or skill name. {count} is a number.
   "marketplace.open": "打开 {name}",
   "marketplace.tab.apps": "应用",
   "marketplace.crumbs.label": "位置",
@@ -78,7 +72,6 @@ export const messages = {
   "marketplace.properties.updated": "更新时间",
   "marketplace.properties.installs": "安装量",
 
-  // Agents.
   "marketplace.agent.add": "添加",
   "marketplace.agent.addNamed": "添加 {name}",
   "marketplace.agent.addAgent": "添加助手",
@@ -87,7 +80,6 @@ export const messages = {
   "marketplace.agent.update": "更新",
   "marketplace.agent.openChat": "打开对话",
 
-  // Apps.
   "marketplace.app.connect": "连接",
   "marketplace.app.reconnect": "重新连接",
   "marketplace.app.connectNamed": "连接 {name}",
@@ -97,6 +89,7 @@ export const messages = {
   "marketplace.app.partialTitle": "{name} 未完成安装",
   "marketplace.app.partialDescription": "部分应用或技能尚未安装。重新连接即可安装。",
   "marketplace.app.notConnected": "未连接",
+  "marketplace.app.paused": "已暂停",
   "marketplace.app.custom": "MCP 服务器",
   "marketplace.app.githubTagline": "仓库、Issue 与拉取请求",
   "marketplace.app.onePasswordTagline": "用你共享的登录信息登录网站",
@@ -106,7 +99,6 @@ export const messages = {
   "marketplace.app.whatsappTagline": "WhatsApp 中你自己的聊天和你允许的人",
   "marketplace.app.bitwardenTagline": "用共享文件夹中的登录信息登录网站",
   "marketplace.app.protonPassTagline": "用共享保管库中的登录信息登录网站",
-  // The category row in the 1Password page's information.
   "marketplace.app.onePasswordCategory": "登录与凭据管理",
   "marketplace.app.yourApps": "你的应用",
   "marketplace.app.addCustom": "添加自定义项",
@@ -142,6 +134,7 @@ export const messages = {
     "{host} 运行的 OpenBot 版本较旧，无法连接应用。请更新 {host} 上的 OpenBot，或请其所有者更新。",
   "marketplace.app.blocked.member":
     "只有 {host} 的所有者或管理员可以在那里连接应用。请他们连接 {name}，或更新 {host} 上的 OpenBot，以便成员也能连接应用。",
+  "marketplace.app.blocked.mac": "{name} 仅在运行 OpenBot 的 Mac 上可用。",
   "marketplace.app.connectAgain": "再次连接",
   "marketplace.app.automation.askOnInstall": "安装时向 macOS 请求访问权限",
   "marketplace.app.automation.title": "Apple 应用访问权限",
@@ -161,9 +154,6 @@ export const messages = {
   "marketplace.app.signInTitle": "请重新登录 {name}",
   "marketplace.app.signInDescription": "{name} 拒绝了已保存的登录。重新登录之前，你的助手无法使用它。",
 
-  // The catalog apps' listing text, by slug. Each English text is the catalog's own text, byte for
-  // byte: a key whose English no longer matches the catalog is not used. The prompts are requests that
-  // the user sends to an agent.
   "marketplace.plugin.aave.tagline": "Aave 数据与交易",
   "marketplace.plugin.aave.description":
     "Aave 让用户浏览实时的 Aave V3 和 V4 市场、查看钱包持仓与 DAO 治理、模拟借贷操作，并准备非托管交易。所有交易都以未签名形式返回：插件只读取市场并生成调用，钱包始终掌握在用户手中。",
@@ -357,8 +347,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.recall": "我的笔记里关于这个项目的决定是怎么写的？",
   "marketplace.plugin.obsidian.prompt.save": "把这个决定作为新笔记保存到我的仓库。",
   "marketplace.plugin.obsidian.prompt.log": "把今天工作的总结添加到我的“工作日志”笔记中。",
-  "marketplace.plugin.obsidian.hint.apiKey":
-    '在 Obsidian 中打开 Settings > Local REST API。复制 API 密钥并开启 "Enable non-encrypted (HTTP) server"。',
+  "marketplace.plugin.obsidian.hint.apiKey": "在 Obsidian 中打开 Settings > Local REST API，然后复制 API 密钥。",
   "marketplace.plugin.resend.tagline": "事务性邮件",
   "marketplace.plugin.resend.description":
     "Resend 让助手通过一个 API 发送事务性邮件并检查投递情况。把 Resend 控制台中的 API 密钥作为一个环境变量传给本地服务器即可。",
@@ -398,7 +387,6 @@ export const messages = {
   "marketplace.plugin.composio.prompt.handoff": "把这个拉取请求的摘要发到我们的团队频道。",
   "marketplace.plugin.composio.prompt.apps": "通过 Composio 你能使用哪些应用和操作？",
 
-  // The connect form text of the catalog listings. Each English text is the catalog's own text, byte for byte.
   "marketplace.plugin.composio.hint.apiKey": "可在你的 Composio 账号的 Settings > Sessions & API Key 中找到。",
   "marketplace.plugin.neon.tagline": "Postgres 项目、分支与迁移",
   "marketplace.plugin.neon.description":
@@ -495,7 +483,6 @@ export const messages = {
   "marketplace.auth.apiKey": "API 密钥",
   "marketplace.auth.personalApiKey": "个人 API 密钥",
   "marketplace.auth.createKey": "创建密钥",
-  // Skills. {label} is the install button text: an agent name, "All agents" or "2 agents".
   "marketplace.skill.doc": "SKILL.md",
   "marketplace.try.in": "在 {name} 中试用",
   "marketplace.skills.yours": "你的技能",
@@ -566,7 +553,6 @@ export const messages = {
   "marketplace.skills.dialog.unread": "未读取技能",
   "marketplace.skills.local.gone": "现在没有助手拥有该技能。",
 
-  // Results that a screen reader hears. {agents} is a list of agent names.
   "marketplace.notice.agentAdded": "已添加 {name}。",
   "marketplace.notice.agentUpdated": "已更新 {name}。",
   "marketplace.notice.appConnected": "{name} 已连接。",
@@ -582,7 +568,6 @@ export const messages = {
   },
   "marketplace.error.skillPartial": "{name} 在这些助手上没有变化：{agents}。{reason}",
 
-  // Errors. {reason} is an error message. {failures} is a list of error messages.
   "marketplace.error.openLink": "无法打开链接。",
   "marketplace.error.copyLink": "无法复制链接。",
   "marketplace.error.connectNoServer": "请选择一台本地服务器来连接该应用。",

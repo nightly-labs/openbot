@@ -62,6 +62,7 @@ export const messages = {
   "mobile.marketplace.facts.accessSignIn": "התחברות",
   "mobile.marketplace.facts.accessLocal": "המחשב הזה",
   "mobile.marketplace.facts.accessNone": "ללא התחברות",
+  "mobile.marketplace.facts.accessMac": "Mac בלבד",
   "mobile.marketplace.permission.admin": "רק בעלים ומנהלים יכולים להתקין מהחנות.",
   "mobile.marketplace.permission.unavailable":
     "השרת הזה לא מקוון, או שגרסת OpenBot שלו ישנה מדי לכך. יש לעדכן את OpenBot במחשב שמריץ אותו.",
@@ -92,6 +93,7 @@ export const messages = {
   "mobile.marketplace.skill.doc": "SKILL.md",
   "mobile.marketplace.skill.examplePrompt": "עזור לי להשתמש במיומנות הזו.",
   "mobile.marketplace.app.add": "הוספת אפליקציה",
+  "mobile.marketplace.app.addCustom": "הוספה מותאמת אישית",
   "mobile.marketplace.app.connect": "חיבור",
   "mobile.marketplace.app.connectTitle": "חיבור {name}",
   "mobile.marketplace.app.keyIntro": "יש להדביק את המפתח מהחשבון. השרת בודק אותו לפני ששומר את האפליקציה.",
@@ -109,6 +111,7 @@ export const messages = {
   "mobile.marketplace.app.linkInvalid": "יש להשתמש בקישור https ב-{hostname}.",
   "mobile.marketplace.app.docs": "קבלת מפתח",
   "mobile.marketplace.app.local": "האפליקציה הזו פועלת במחשב עם OpenBot. יש להגדיר אותה באותו מחשב.",
+  "mobile.marketplace.app.needsMac": "האפליקציה הזו פועלת רק ב-Mac שמריץ את OpenBot, והשרת הזה אינו Mac.",
   "mobile.marketplace.app.relayUnsupported":
     "האפליקציה הזו דורשת התחברות בדפדפן. יש לעדכן את OpenBot בשרת, או לחבר את האפליקציה במחשב.",
   "mobile.marketplace.app.waiting": "ממתין לדף ההתחברות…",

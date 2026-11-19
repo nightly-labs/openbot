@@ -39,7 +39,7 @@ export const messages = {
   "browser.tab.closeNamed": "{name} schließen",
   "browser.tab.closeUnnamed": "Browser-Tab schließen",
   "browser.newTab": "Neuer Browser-Tab",
-  "browser.hide": "Browser ausblenden",
+  "browser.backToChat": "Zurück zum Chat",
   "browser.goBack": "Zurück",
   "browser.goForward": "Vorwärts",
   "browser.reload": "Seite neu laden",
@@ -68,6 +68,8 @@ export const messages = {
   "browser.liveView.pasteTooLong": "Dieser Text ist zu lang zum Einfügen. Füge weniger als 100.000 Zeichen ein.",
   "browser.liveView.copyTooLarge": "Die Auswahl ist zu lang zum Kopieren. Wähle weniger Text aus.",
   "browser.liveView.copyFailed": "Der Text konnte nicht kopiert werden. Klicke auf die Seite und versuche es erneut.",
+  "browser.liveView.pageCopied":
+    "Die Seite hat Text kopiert. Wähle „Kopieren“, um ihn in deine Zwischenablage zu legen.",
   "browser.previews.label": "Browser-Vorschauen",
   "browser.previews.resize": "Größe des rechten Bereichs ändern",
   "browser.previews.empty": "Keine Browser-Tabs",

@@ -5,6 +5,9 @@ export const messages = {
   "composer.queueEdit.body":
     "Du bearbeitest eine Nachricht in der Warteschlange. Speichere die Änderung oder brich sie ab, damit die Nachricht ausgeführt werden kann.",
   "composer.queueEdit.cancel": "Bearbeitung abbrechen",
+  "composer.feedbackFix.body":
+    "Bericht #{number} wird korrigiert. Sende die Anfrage, oder brich ab, damit der Bericht bleibt, wie er ist.",
+  "composer.feedbackFix.cancel": "Abbrechen",
   "composer.providerWait.offlineTitle": "Keine Internetverbindung",
   "composer.providerWait.offline": "{provider} kann erst antworten, wenn dieser Computer wieder online ist.",
   "composer.providerWait.silent": "{provider} hat seit {duration} nichts gesendet.",
@@ -20,6 +23,11 @@ export const messages = {
   "composer.update.manual": "Aktualisiere {provider} auf dem Computer, auf dem es läuft, um fortzufahren.",
   "composer.update.pending": "Wird aktualisiert…",
   "composer.update.action": "Aktualisieren",
+  "composer.imageInput.body":
+    "{model} erhält nur Text und sieht die angehängten Bilder nicht. Wenn dieses Modell Bilder lesen kann, schalte Bilder dafür ein.",
+  "composer.imageInput.label": "Bilder für {model} einschalten",
+  "composer.imageInput.pending": "Wird eingeschaltet…",
+  "composer.imageInput.action": "Bilder einschalten",
   "composer.usageLimit.credits":
     "Du hast das Planlimit von {provider} erreicht. Deine Agenten nutzen jetzt dein Guthaben.",
   "composer.usageLimit.creditsResets":
@@ -47,6 +55,7 @@ export const messages = {
   "composer.picker.noSkills": "Dieser Agent hat keine Fähigkeiten.",
   "composer.picker.noSkillMatch": "Keine Fähigkeit passt zu „{query}“.",
   "composer.picker.skillsLoadFailed": "Die Fähigkeiten wurden nicht geladen.",
+  "composer.picker.skillProblem": "{name} ist nicht verfügbar. {problem} Bitte den Agenten, das zu beheben.",
   "composer.token.attachment": "Angehängte Datei {name} öffnen",
   "composer.token.agent": "Agent {name}",
   "composer.token.skill": "Fähigkeit {name}",
@@ -65,6 +74,8 @@ export const messages = {
     "Der Mikrofonzugriff ist gesperrt. Erlaube OpenBot in den Systemeinstellungen den Zugriff auf das Mikrofon.",
   "composer.voice.noMicrophone": "Kein Mikrofon verfügbar.",
   "composer.voice.startFailed": "OpenBot konnte die Sprachaufnahme nicht starten.",
+  "composer.voice.microphoneUnavailable":
+    "OpenBot konnte das Mikrofon nicht öffnen. Schließe andere Apps, die es verwenden, prüfe, ob es angeschlossen und in den Systemeinstellungen erlaubt ist, und versuche es erneut.",
   "composer.voice.transcribeFailed": "OpenBot konnte diese Aufnahme nicht transkribieren.",
   "composer.reply.toYou": "Antwort auf deine Nachricht",
   "composer.reply.toAgent": "Antwort an den Agenten",
@@ -127,6 +138,8 @@ export const messages = {
   "composer.voice.noSpeechRecorded": "Es wurde keine Sprache aufgenommen.",
   "composer.voice.noSpeechDetected": "Es wurde keine Sprache erkannt.",
   "composer.voice.readFailed": "Die Antwort konnte nicht vorgelesen werden.",
+  "composer.voice.languageUnsupported":
+    "Die Antwort konnte nicht vorgelesen werden. Diese Sprache ist noch nicht verfügbar.",
   "composer.error.saveEditTryAgain":
     "Diese Änderung konnte nicht auf diesem Computer gespeichert werden. Versuche es erneut.",
   "composer.error.saveUnconfirmed":

@@ -16,6 +16,8 @@ export const messages = {
   "error.workflow.agentMissing": "Scegli un agente per questo passaggio.",
   "error.workflow.handoffFailed": "OpenBot non è riuscito a inviare questo passaggio al suo agente.",
   "error.workflow.agentStepEnded": "Il messaggio all’agente è stato rimosso prima della sua risposta.",
+  "error.workflow.agentStepStopped":
+    "L’agente si è fermato prima di rispondere a questo passaggio. Esegui di nuovo il passaggio.",
   "error.workflow.conditionUnclear": "Il modello non ha risposto sì o no.",
   "error.workflow.modelFailed": "Il modello non ha potuto rispondere. Esegui di nuovo il passaggio.",
   "error.workflow.modelTimedOut":
@@ -33,6 +35,8 @@ export const messages = {
   "error.workflow.pictureType": "Usa un’immagine PNG, JPEG o WebP.",
   "error.workflow.mediaInputMissing":
     "Un’immagine di un passaggio precedente non è disponibile. Esegui di nuovo quel passaggio.",
+  "error.workflow.mediaEmptyRequest":
+    "Scrivi una descrizione o esegui i passaggi precedenti, così arriva un testo o un’immagine.",
   "error.workflow.mediaInputNotImage":
     "Questo passaggio accetta solo immagini, non video. Rimuovi il collegamento dal video.",
   "error.workflow.stepMissing": "Questo passaggio non esiste più.",

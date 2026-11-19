@@ -1,17 +1,12 @@
 import { type ConversationMemoryChange, countConversationMemoryChanges } from "@openbot/contracts/ipc";
-import { Typography } from "heroui-native";
-import Brain from "lucide-react-native/icons/brain";
-import ChevronRight from "lucide-react-native/icons/chevron-right";
-import { Pressable } from "react-native";
+import Bookmark from "lucide-react-native/icons/bookmark";
 import type { ChatMessage } from "@/features/chat/model/chat-messages";
-import { haptics } from "@/shared/lib/haptics";
 import type { MobileText } from "@/shared/lib/text";
 import { useText } from "@/shared/lib/text";
-import { useSubagentColors } from "./chat-subagents";
+import { ACTIVITY_ICON_SIZE, ChatActivityLine, useActivityColors } from "./chat-activity-line";
 
 type MemoryChangesMessage = Extract<ChatMessage, { kind: "memory-changes" }>;
 
-/** "Memory: 2 saved and 1 forgotten", as the steps summary on desktop counts the changes. */
 export function memoryChangesSummary(
   changes: readonly ConversationMemoryChange[],
   { t, format }: Pick<MobileText, "t" | "format">,
@@ -26,42 +21,22 @@ export function memoryChangesSummary(
   return t("mobile.chat.memory.summary", { changes: format.list(parts) });
 }
 
-/**
- * The memory changes that one turn committed, in one line, as the subagents line shows its group.
- * The line opens the sheet with each change.
- */
 export function ChatMemoryChanges({
   message,
   onOpen,
 }: {
   message: MemoryChangesMessage;
-  /** Absent where no sheet can show the changes. */
   onOpen: ((messageId: string) => void) | undefined;
 }) {
   const text = useText();
-  const colors = useSubagentColors();
+  const colors = useActivityColors();
   const summary = memoryChangesSummary(message.changes, text);
   return (
-    <Pressable
-      accessibilityRole={onOpen ? "button" : undefined}
+    <ChatActivityLine
+      icon={<Bookmark size={ACTIVITY_ICON_SIZE} color={colors.muted} />}
+      label={summary}
       accessibilityLabel={summary}
-      disabled={!onOpen}
-      onPress={
-        onOpen
-          ? () => {
-              void haptics.selection();
-              onOpen(message.id);
-            }
-          : undefined
-      }
-      className="flex-row items-center gap-2 self-start px-1"
-      style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
-    >
-      <Brain size={16} color={colors.muted} />
-      <Typography.Paragraph type="body-sm" numberOfLines={1} className="shrink" style={{ color: colors.muted }}>
-        {summary}
-      </Typography.Paragraph>
-      {onOpen ? <ChevronRight size={16} color={colors.dim} /> : null}
-    </Pressable>
+      onPress={onOpen ? () => onOpen(message.id) : undefined}
+    />
   );
 }

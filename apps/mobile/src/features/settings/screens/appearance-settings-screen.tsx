@@ -7,15 +7,31 @@ import Check from "lucide-react-native/icons/check";
 import { useRef, useState } from "react";
 import { Pressable, View } from "react-native";
 import { useUniwind } from "uniwind";
+import { UsageSegments } from "@/features/agents/components/usage-segments";
 import { readableOn } from "@/features/onboarding/model/onboarding-colors";
 import { AppIconSection } from "@/features/settings/components/app-icon-row";
+import { AppearancePreview } from "@/features/settings/components/appearance-preview";
+import { ChatBackdropSection } from "@/features/settings/components/chat-backdrop-section";
 import { MessageColorPicker } from "@/features/settings/components/message-color-picker";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsPicker, SettingsSwitch } from "@/features/settings/components/settings-controls";
-import { saveAppearance, useAppearance } from "@/features/settings/model/appearance";
+import { SettingsPictureChoice } from "@/features/settings/components/settings-picture-choice";
+import { MessageColorPicture, ThemePicture } from "@/features/settings/components/settings-pictures";
+import { type Appearance, saveAppearance, useAppearance } from "@/features/settings/model/appearance";
+import { useChatBackdrop } from "@/features/settings/model/chat-backdrop";
 import { saveChatBackground, useChatBackground } from "@/features/settings/model/chat-background";
 import {
+  type ChatDetailPreference,
+  saveMemoryChangesDisplayPreference,
+  saveSubagentsDisplayPreference,
+  saveThinkingDisplayPreference,
+  useMemoryChangesDisplayPreference,
+  useSubagentsDisplayPreference,
+  useThinkingDisplayPreference,
+} from "@/features/settings/model/chat-details";
+import {
   type MessageColorMode,
+  type MessageColorStyle,
   type MessageColorValue,
   saveMessageColor,
   useMessageColor,
@@ -44,129 +60,198 @@ const PRESET_LABELS = {
   pink: "mobile.agent.appearance.hue.pink",
 } as const satisfies Record<ChatColorPresetId, MobileTextKey>;
 
+type AppearanceTab = "theme" | "colors" | "backdrop" | "chat";
+
 export function AppearanceSettingsScreen() {
   const { t } = useText();
   const { theme } = useUniwind();
-  const { value, ready, saving } = useAppearance();
+  const dark = theme === "dark";
+  const [tab, setTab] = useState<AppearanceTab>("theme");
+  return (
+    <SettingsContent>
+      <View className="gap-3">
+        <AppearancePreview />
+        <UsageSegments<AppearanceTab>
+          options={[
+            { value: "theme", label: t("mobile.settings.appearance.theme") },
+            { value: "colors", label: t("mobile.settings.appearance.tab.colors") },
+            { value: "backdrop", label: t("mobile.settings.appearance.backdrop.title") },
+            { value: "chat", label: t("mobile.settings.appearance.tab.chat") },
+          ]}
+          value={tab}
+          accessibilityLabel={t("mobile.settings.appearance.title")}
+          onChange={setTab}
+        />
+      </View>
+      {tab === "theme" ? (
+        <>
+          <ThemeSection />
+          <TextSizeSection />
+          <AppIconSection />
+        </>
+      ) : null}
+      {tab === "colors" ? (
+        <>
+          <MessageColorSection dark={dark} />
+          <ChatBackgroundSection dark={dark} />
+        </>
+      ) : null}
+      {tab === "backdrop" ? <ChatBackdropSection dark={dark} /> : null}
+      {tab === "chat" ? (
+        <>
+          <ChatDetailsSection dark={dark} />
+          <RoutineCollapseSection dark={dark} />
+          <FullVisualSection dark={dark} />
+        </>
+      ) : null}
+    </SettingsContent>
+  );
+}
+
+function ThemeSection() {
+  const { t } = useText();
+  const { value, ready } = useAppearance();
   const [error, setError] = useState<string | null>(null);
+  return (
+    <SettingsSection
+      title={t("mobile.settings.appearance.theme")}
+      footer={error || t("mobile.settings.appearance.footer")}
+    >
+      <SettingsPictureChoice<Appearance>
+        label={t("mobile.settings.appearance.theme")}
+        value={value}
+        disabled={!ready}
+        options={(
+          [
+            ["light", t("mobile.settings.appearance.light")],
+            ["dark", t("mobile.settings.appearance.dark")],
+            ["system", t("mobile.settings.appearance.system")],
+          ] as const
+        ).map(([mode, label]) => ({
+          value: mode,
+          label,
+          picture: (play: number) => <ThemePicture mode={mode} play={play} />,
+        }))}
+        onChange={(next) => {
+          setError(null);
+          void saveAppearance(next).catch(() => {
+            setError(t("mobile.settings.appearance.saveFailed"));
+            void haptics.notification("error");
+          });
+        }}
+      />
+    </SettingsSection>
+  );
+}
+
+function MessageColorSection({ dark }: { dark: boolean }) {
+  const { t } = useText();
   const messageColor = useMessageColor();
   const [messageColorError, setMessageColorError] = useState<string | null>(null);
-  const changeMessageColor = (change: Partial<MessageColorValue>) => {
+  const changeMessageColor = (change: Partial<MessageColorValue>, { haptic = true } = {}) => {
     setMessageColorError(null);
-    void haptics.selection();
+    if (haptic) void haptics.selection();
     void saveMessageColor(change).catch(() => {
       setMessageColorError(t("mobile.settings.saveFailed"));
       void haptics.notification("error");
     });
   };
   return (
-    <SettingsContent>
-      <SettingsSection footer={error || t("mobile.settings.appearance.footer")}>
+    <SettingsSection
+      title={t("mobile.settings.appearance.messageColor")}
+      footer={messageColorError ?? t("mobile.settings.appearance.messageColorFooter")}
+    >
+      <SettingsPictureChoice<MessageColorMode>
+        label={t("mobile.settings.appearance.messageColor")}
+        value={messageColor.mode}
+        disabled={!messageColor.ready}
+        options={(
+          [
+            ["none", t("mobile.settings.appearance.messageColorNone")],
+            ["agent", t("mobile.settings.appearance.messageColorAgent")],
+            ["custom", t("mobile.settings.appearance.messageColorCustom")],
+          ] as const
+        ).map(([mode, label]) => ({
+          value: mode,
+          label,
+          picture: (play: number) => (
+            <MessageColorPicture mode={mode} customColor={messageColor.customColor} play={play} />
+          ),
+        }))}
+        onChange={(mode) => changeMessageColor({ mode }, { haptic: false })}
+      />
+      {messageColor.mode === "custom" ? (
+        <View
+          className="flex-row flex-wrap gap-3 px-4 py-3"
+          accessibilityRole="radiogroup"
+          accessibilityLabel={t("mobile.settings.appearance.messageColorCustom")}
+        >
+          {CHAT_COLOR_PRESETS.map(({ id, value: color }) => {
+            const checked = color === messageColor.customColor;
+            return (
+              <Pressable
+                key={id}
+                accessibilityRole="radio"
+                accessibilityLabel={t(PRESET_LABELS[id])}
+                accessibilityState={{ checked, disabled: !messageColor.ready }}
+                disabled={!messageColor.ready}
+                hitSlop={4}
+                onPress={() => {
+                  if (!checked) changeMessageColor({ customColor: color });
+                }}
+              >
+                {({ pressed }) => (
+                  <View
+                    className="size-8 items-center justify-center rounded-full"
+                    style={{ backgroundColor: color, opacity: pressed && !checked ? 0.6 : 1 }}
+                  >
+                    {checked ? <Check size={18} strokeWidth={2.5} color={readableOn(color)} /> : null}
+                  </View>
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
+      {messageColor.mode === "custom" ? (
+        <MessageColorPicker
+          value={messageColor.customColor}
+          disabled={!messageColor.ready}
+          dark={dark}
+          onChange={(customColor) => changeMessageColor({ customColor })}
+        />
+      ) : null}
+      {messageColor.mode === "none" ? null : (
         <SettingsRow
           trailing={
-            <SettingsPicker
-              value={value}
+            <SettingsPicker<MessageColorStyle>
+              value={messageColor.style}
               options={[
-                { value: "system", label: t("mobile.settings.appearance.system") },
-                { value: "light", label: t("mobile.settings.appearance.light") },
-                { value: "dark", label: t("mobile.settings.appearance.dark") },
+                { value: "solid", label: t("mobile.settings.appearance.bubbleStyleSolid") },
+                { value: "tint", label: t("mobile.settings.appearance.bubbleStyleTint") },
               ]}
-              enabled={ready && !saving}
-              dark={theme === "dark"}
-              label={t("mobile.settings.appearance.theme")}
-              onChange={(next) => {
-                setError(null);
-                void haptics.selection();
-                void saveAppearance(next).catch(() => {
-                  setError(t("mobile.settings.appearance.saveFailed"));
-                  void haptics.notification("error");
-                });
+              enabled={messageColor.ready}
+              dark={dark}
+              label={t("mobile.settings.appearance.bubbleStyle")}
+              onChange={(style) => {
+                if (style !== messageColor.style) changeMessageColor({ style });
               }}
             />
           }
         >
-          <Typography.Paragraph>{t("mobile.settings.appearance.theme")}</Typography.Paragraph>
+          <Typography.Paragraph>{t("mobile.settings.appearance.bubbleStyle")}</Typography.Paragraph>
         </SettingsRow>
-      </SettingsSection>
-      <AppIconSection />
-      <TextSizeSection />
-      <SettingsSection footer={messageColorError ?? t("mobile.settings.appearance.messageColorFooter")}>
-        <SettingsRow
-          trailing={
-            <SettingsPicker<MessageColorMode>
-              value={messageColor.mode}
-              options={[
-                { value: "none", label: t("mobile.settings.appearance.messageColorNone") },
-                { value: "agent", label: t("mobile.settings.appearance.messageColorAgent") },
-                { value: "custom", label: t("mobile.settings.appearance.messageColorCustom") },
-              ]}
-              enabled={messageColor.ready}
-              dark={theme === "dark"}
-              label={t("mobile.settings.appearance.messageColor")}
-              onChange={(mode) => changeMessageColor({ mode })}
-            />
-          }
-        >
-          <Typography.Paragraph>{t("mobile.settings.appearance.messageColor")}</Typography.Paragraph>
-        </SettingsRow>
-        {messageColor.mode === "custom" ? (
-          <View
-            className="flex-row flex-wrap gap-3 px-4 py-3"
-            accessibilityRole="radiogroup"
-            accessibilityLabel={t("mobile.settings.appearance.messageColorCustom")}
-          >
-            {CHAT_COLOR_PRESETS.map(({ id, value: color }) => {
-              const checked = color === messageColor.customColor;
-              return (
-                <Pressable
-                  key={id}
-                  accessibilityRole="radio"
-                  accessibilityLabel={t(PRESET_LABELS[id])}
-                  accessibilityState={{ checked, disabled: !messageColor.ready }}
-                  disabled={!messageColor.ready}
-                  hitSlop={4}
-                  onPress={() => {
-                    if (!checked) changeMessageColor({ customColor: color });
-                  }}
-                >
-                  {({ pressed }) => (
-                    <View
-                      className="size-8 items-center justify-center rounded-full"
-                      style={{ backgroundColor: color, opacity: pressed && !checked ? 0.6 : 1 }}
-                    >
-                      {checked ? <Check size={18} strokeWidth={2.5} color={readableOn(color)} /> : null}
-                    </View>
-                  )}
-                </Pressable>
-              );
-            })}
-          </View>
-        ) : null}
-        {messageColor.mode === "custom" ? (
-          <MessageColorPicker
-            value={messageColor.customColor}
-            disabled={!messageColor.ready}
-            dark={theme === "dark"}
-            onChange={(customColor) => changeMessageColor({ customColor })}
-          />
-        ) : null}
-      </SettingsSection>
-      <ChatBackgroundSection dark={theme === "dark"} />
-      <RoutineCollapseSection dark={theme === "dark"} />
-      <FullVisualSection dark={theme === "dark"} />
-    </SettingsContent>
+      )}
+    </SettingsSection>
   );
 }
 
-/**
- * The chat background of the theme that the app shows now: the theme's own background, a preset or
- * any color. The other theme keeps its color, as on the desktop.
- */
 function ChatBackgroundSection({ dark }: { dark: boolean }) {
   const { t } = useText();
   const scheme = dark ? "dark" : "light";
   const saved = useChatBackground((state) => state[scheme]);
-  const ready = useChatBackground((state) => state.ready);
+  const backdropShown = useChatBackdrop((state) => state.ready && state.choice !== "none");
+  const ready = useChatBackground((state) => state.ready) && !backdropShown;
   const themeBackground = String(useThemeColor("background"));
   const [error, setError] = useState<string | null>(null);
   const change = (color: AvatarColor | null) => {
@@ -194,7 +279,12 @@ function ChatBackgroundSection({ dark }: { dark: boolean }) {
   return (
     <SettingsSection
       title={t("mobile.settings.appearance.chatBackground")}
-      footer={error ?? t("mobile.settings.appearance.chatBackgroundFooter")}
+      footer={
+        error ??
+        (backdropShown
+          ? t("mobile.settings.appearance.chatBackgroundBackdropFooter")
+          : t("mobile.settings.appearance.chatBackgroundFooter"))
+      }
     >
       <View
         className="flex-row flex-wrap gap-3 px-4 py-3"
@@ -237,7 +327,6 @@ function ChatBackgroundSection({ dark }: { dark: boolean }) {
   );
 }
 
-/** Whether the rows of consecutive routine markers in a chat start closed. */
 function RoutineCollapseSection({ dark }: { dark: boolean }) {
   const { t } = useText();
   const preference = useRoutineCollapsePreference();
@@ -263,7 +352,52 @@ function RoutineCollapseSection({ dark }: { dark: boolean }) {
   );
 }
 
-/** Whether a visual reply in a chat grows to the full height of its page. */
+function ChatDetailsSection({ dark }: { dark: boolean }) {
+  const { t } = useText();
+  const [error, setError] = useState<string | null>(null);
+  const details = [
+    {
+      label: t("mobile.settings.appearance.showThinking"),
+      state: useThinkingDisplayPreference(),
+      save: saveThinkingDisplayPreference,
+    },
+    {
+      label: t("mobile.settings.appearance.showSubagents"),
+      state: useSubagentsDisplayPreference(),
+      save: saveSubagentsDisplayPreference,
+    },
+    {
+      label: t("mobile.settings.appearance.showMemoryChanges"),
+      state: useMemoryChangesDisplayPreference(),
+      save: saveMemoryChangesDisplayPreference,
+    },
+  ] satisfies { label: string; state: ChatDetailPreference; save: (enabled: boolean) => Promise<void> }[];
+  return (
+    <SettingsSection
+      title={t("mobile.settings.appearance.replyDetails")}
+      footer={error ?? t("mobile.settings.appearance.replyDetailsFooter")}
+    >
+      {details.map(({ label, state, save }) => (
+        <SettingsRow key={label}>
+          <SettingsSwitch
+            value={state.enabled}
+            disabled={!state.ready || state.saving}
+            label={label}
+            dark={dark}
+            onValueChange={(enabled) => {
+              setError(null);
+              void save(enabled).catch(() => {
+                setError(t("mobile.settings.saveFailed"));
+                void haptics.notification("error");
+              });
+            }}
+          />
+        </SettingsRow>
+      ))}
+    </SettingsSection>
+  );
+}
+
 function FullVisualSection({ dark }: { dark: boolean }) {
   const { t } = useText();
   const preference = useFullVisualPreference();
@@ -289,10 +423,6 @@ function FullVisualSection({ dark }: { dark: boolean }) {
   );
 }
 
-/**
- * The text size, in the steps of the desktop interface size. The slider moves through the steps;
- * the size applies when the finger lifts, so the screen does not change its layout during a drag.
- */
 function TextSizeSection() {
   const { t, format } = useText();
   const ready = useTextSize((state) => state.ready);
@@ -300,7 +430,6 @@ function TextSizeSection() {
   const [error, setError] = useState<string | null>(null);
   const [dragged, setDragged] = useState<AppInterfaceSize | null>(null);
   const shown = dragged ?? saved;
-  // The slider can report more than one value before the next render: a step plays one tick.
   const lastStep = useRef(shown);
   const step = (index: number) =>
     APP_INTERFACE_SIZES[Math.min(APP_INTERFACE_SIZES.length - 1, Math.max(0, Math.round(index)))] ?? saved;

@@ -23,6 +23,11 @@ export const messages = {
   "settings.codeFont.title": "خط الشيفرة",
   "settings.codeFont.description": "خط الشيفرة والطرفيات ومسارات الملفات.",
   "settings.codeFont.default": "الافتراضي",
+  "settings.motion.title": "الحركة",
+  "settings.backgroundBlur.title": "تمويه الخلفية",
+  "settings.backgroundBlur.description": "تمويه خلف القوائم ومربعات الحوار. يبدأ متوقفًا على جهاز بلا GPU.",
+  "settings.movingFaces.title": "وجوه الوكلاء المتحركة",
+  "settings.movingFaces.description": "ترمش وجوه الوكلاء وتتحرك. تبدأ ثابتة على جهاز بلا GPU.",
   "settings.logoColor.title": "لون الشعار",
   "settings.logoColor.description": "يظهر في Dock وشريط المهام وDynamic Island.",
   "settings.logoColor.buildNote": "يحتفظ هذا الإصدار بلون شعاره الخاص. ينطبق الاختيار على التطبيق الرسمي.",
@@ -704,6 +709,10 @@ export const messages = {
   "settings.voice.language.parakeetUnifiedEnglishOnly":
     "يتعرّف Parakeet Unified على الإنجليزية فقط. لتحديد لغة، استخدم Whisper أو Cohere أو ElevenLabs.",
   "settings.voice.language.automatic": "تلقائي",
+  "settings.voice.pause.title": "التوقف قبل الإرسال",
+  "settings.voice.pause.description":
+    "في المحادثة الصوتية، يرسل OpenBot كلماتك عندما تتوقف عن الكلام لهذه المدة. اختر توقفًا أطول إذا كنت تتكلم ببطء أو تتوقف للتفكير. صوت Codex المباشر يحدد النهاية بنفسه.",
+  "settings.voice.pause.seconds": "{seconds} ث",
   "settings.voice.loadFailed": "تعذّرت قراءة نماذج الصوت.",
   "settings.voice.saveFailed": "تعذّر حفظ إعداد الصوت. حاول مرة أخرى.",
   "settings.voice.downloadFailed": "تعذّر بدء التنزيل. حاول مرة أخرى.",
@@ -820,6 +829,13 @@ export const messages = {
   "settings.transfer.import.lede": "اختر الملف الذي صدّرته من الخادم الآخر. ينتهي بـ .zip.",
   "settings.transfer.import.choose": "اختيار ملف…",
   "settings.transfer.import.reading": "جارٍ قراءة الملف…",
+  "settings.transfer.upload.label": "الرفع إلى الخادم",
+  "settings.transfer.upload.sending": "جارٍ إرسال الملف…",
+  "settings.transfer.upload.sent": "تم إرسال {sent} من {total}",
+  "settings.transfer.upload.serverReading": "يقرأ الخادم الملف…",
+  "settings.transfer.upload.etaSoon": "أقل من دقيقة متبقية",
+  "settings.transfer.upload.etaMinutes": "يتبقى نحو {minutes} د",
+  "settings.transfer.upload.etaHours": "يتبقى نحو {hours} س {minutes} د",
   "settings.transfer.import.openFailed": "تعذّر فتح الملف",
   "settings.transfer.import.contains": "يحتوي هذا الملف على",
   "settings.transfer.import.source": "OpenBot {version} · صُدّر في {date}",
@@ -877,7 +893,7 @@ export const messages = {
   "settings.transfer.copy.noAgents": "لا يوجد وكلاء على هذا الخادم.",
   "settings.transfer.copy.new": "جديد",
   "settings.transfer.copy.notCopied":
-    "تُنسخ قنواتهم والمجلد المشترك أيضًا. لا يتم نسخ مفاتيح API وتسجيلات الدخول والموصلات وسجل المحادثات. أعد إعدادها على الخادم الآخر.",
+    "تُنسخ قنواتهم وتدفقات المهام الدورية ومسارات العمل والمجلد المشترك أيضًا. لا يتم نسخ مفاتيح API وتسجيلات الدخول والموصلات وسجل المحادثات. أعد إعدادها على الخادم الآخر.",
   "settings.transfer.copy.submit": {
     zero: "لا وكلاء للنسخ",
     one: "نسخ وكيل واحد",
@@ -886,6 +902,10 @@ export const messages = {
     many: "نسخ {count} وكيلًا",
     other: "نسخ {count} وكيل",
   },
+  "settings.transfer.copy.duplicatesTitle": "هل تريد نسخ وكلاء مكررين؟",
+  "settings.transfer.copy.duplicatesDescription":
+    "يحتوي {server} بالفعل على وكلاء بهذه الأسماء: {names}. يضيف النسخ وكيلًا ثانيًا لكل واحد منهم. كل نسخة وكيل منفصل له دردشاته وملفاته وذكرياته.",
+  "settings.transfer.copy.duplicatesConfirm": "نسخ المكررين",
   "settings.transfer.copy.copying": "جارٍ النسخ…",
   "settings.transfer.copy.done": {
     zero: "لم يُنسخ أي وكيل إلى {server}.",

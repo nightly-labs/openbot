@@ -8,18 +8,8 @@ import { useText } from "@openbot/ui/text";
 import { createSignal } from "solid-js";
 import { dismissMarketplaceSuggestion, marketplaceSuggestionDismissed } from "./marketplace-suggestion-dismissals";
 
-/**
- * Where a skill suggestion is. `open`: the user has not answered. `working`: the agent works on the
- * answer. `saved`: the agent saved the skill. `answered`: the user answered and the agent saved
- * nothing, or the user wrote about something else.
- */
 export type SkillSuggestionOutcome = "open" | "working" | "saved" | "answered";
 
-/**
- * The outcome from the messages after the suggestion. Only the first user message after it carries
- * the suggestion to the agent, so a later one cannot save it: a new skill after a later message counts
- * only when it has the suggested name, as when the host saved it from the Save button.
- */
 export function skillSuggestionOutcome(
   messages: readonly AgentMessage[],
   messageId: string,
@@ -45,39 +35,32 @@ export function skillSuggestionOutcome(
   return turnActive ? "working" : "answered";
 }
 
+export type SkillSuggestionSaveResult = "saved" | "sent" | null;
+
 export interface SkillSuggestionChatCardProps {
   messageId: string;
   suggestion: SkillSuggestionEvent;
   outcome: SkillSuggestionOutcome;
-  /**
-   * Saves the skill on the host in the background, or sends `reply`, the user's yes, to the agent of
-   * this chat when the host saved nothing. False when the chat cannot send now.
-   */
-  onSave?: ((reply: string) => Promise<boolean>) | undefined;
-  /** Opens the skill that an update changes. */
+  onSave?: ((reply: string) => Promise<SkillSuggestionSaveResult>) | undefined;
   onOpenSkill?: ((skill: { skillId: string }) => void) | undefined;
 }
 
-/**
- * A memory review's question to save a skill from the chat. Save asks the host to write the skill in
- * the background, and the card turns to Saved when the skill line comes. When the host saves nothing,
- * Save sends the user's yes to the agent, which saves the skill in a turn.
- */
 export function SkillSuggestionChatCard(props: SkillSuggestionChatCardProps) {
   const { t } = useText();
-  /* The save or the yes runs before the chat shows its result, so the card waits from the click. */
-  const [sent, setSent] = createSignal(false);
+  const [press, setPress] = createSignal<"pending" | "saved" | null>(null);
   const state = () => {
-    if (props.outcome === "saved") return "connected";
-    if (props.outcome === "working" || (sent() && props.outcome === "open")) return "busy";
+    if (props.outcome === "saved" || press() === "saved") return "connected";
+    if (props.outcome === "working" || (press() === "pending" && props.outcome === "open")) return "busy";
     return "available";
   };
   const save = async () => {
-    if (sent()) return;
-    setSent(true);
+    if (press() !== null) return;
+    setPress("pending");
     const reply =
       props.suggestion.action === "create" ? t("chat.suggestion.saveReply") : t("chat.suggestion.updateReply");
-    if (!(await props.onSave?.(reply))) setSent(false);
+    const result = await props.onSave?.(reply);
+    if (result === "saved") setPress("saved");
+    else if (!result) setPress(null);
   };
   const skillAction = (): MarketplaceSuggestionSkillAction =>
     props.suggestion.action === "create" ? "save" : "update";
@@ -91,6 +74,7 @@ export function SkillSuggestionChatCard(props: SkillSuggestionChatCardProps) {
     <MarketplaceSuggestionCard
       kind="skill"
       skillAction={skillAction()}
+      saving={press() === "pending"}
       name={props.suggestion.skillName}
       description={props.suggestion.question}
       fullDescription

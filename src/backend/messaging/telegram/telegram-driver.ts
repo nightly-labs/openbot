@@ -21,7 +21,7 @@ import {
   type MessagingDriver,
   type MessagingDriverOptions,
   type MessagingIngress,
-  type MessagingPlace,
+  type MessagingPlaces,
   type RecentMessages,
   type StatusReaction,
   TelegramCallError,
@@ -32,11 +32,8 @@ import { escapeHtml, hasTelegramMention, telegramChunks, telegramHtml, telegramP
 import { TelegramTransport } from "./telegram-transport";
 import { TELEGRAM_CALLBACK_PREFIXES, telegramPlacement, telegramThreadKey } from "./telegram-updates";
 
-/** Emoji that the Bot API accepts as a reaction. A bot sets one reaction on a message. */
-/** As the Slack client: a rate-limited call waits and tries again, up to this many times. */
 const RATE_LIMIT_RETRIES = 3;
 const RATE_LIMIT_WAIT_LIMIT_S = 60;
-/** A shorter wait does not change the connection's state. */
 const RATE_LIMIT_NOTICE_S = 5;
 
 const REACTIONS: Record<StatusReaction, string> = {
@@ -46,7 +43,6 @@ const REACTIONS: Record<StatusReaction, string> = {
   stopped: "🫡",
 };
 
-/** The credentials of one Telegram connection. None is secret: the bot token is in Signal. */
 interface TelegramCredentials {
   botId: string;
   chatId: string;
@@ -54,7 +50,6 @@ interface TelegramCredentials {
   chatTitle?: string;
 }
 
-/** The Bot API side of one chat, through Signal. It never logs message text. */
 class TelegramAdapter implements MessagingAdapter {
   readonly platform = "telegram" as const;
   readonly #ingress: MessagingIngress;
@@ -78,11 +73,6 @@ class TelegramAdapter implements MessagingAdapter {
     this.#rateLimited = options.rateLimited;
   }
 
-  /**
-   * The chat was linked through Signal, which checked it. Only a link whose bot lookup failed needs
-   * the network: a mention needs the bot's username, so a failure here makes the service try again.
-   * The transport holds the socket only after this, so the lookup holds it itself.
-   */
   identify(): Effect.Effect<ConnectionIdentity, MessagingAdapterError> {
     return Effect.gen({ self: this }, function* () {
       if (!this.#state.botUsername) {
@@ -125,7 +115,6 @@ class TelegramAdapter implements MessagingAdapter {
     }).pipe(Effect.catch((failure) => (notModified(failure) ? Effect.void : Effect.fail(failure))));
   });
 
-  /** Telegram has no private message in a group, so the text is a reply that everyone in the chat sees. */
   postPrivate(target: MessageTarget, _userId: string, text: string): Effect.Effect<void, MessagingAdapterError> {
     return this.post(target, { text }).pipe(Effect.asVoid);
   }
@@ -144,7 +133,6 @@ class TelegramAdapter implements MessagingAdapter {
     });
   });
 
-  /** A workflow's reaction. A bot has one reaction on a message, so it replaces a status reaction. */
   readonly addEmoji = Effect.fnUntraced(function* (
     this: TelegramAdapter,
     target: MessageTarget,
@@ -166,7 +154,6 @@ class TelegramAdapter implements MessagingAdapter {
   ) {
     const [first = "", ...rest] = telegramChunks(markdown);
     let firstId: string | null = null;
-    // An edit notifies nobody, so an answer that mentions a person replaces the status post with a new one.
     if (replaceMessageId && !hasTelegramMention(first)) {
       const updated = yield* Effect.result(
         this.#answerPart(first, (text) => this.#editText(target, replaceMessageId, text)),
@@ -175,7 +162,6 @@ class TelegramAdapter implements MessagingAdapter {
     }
     if (firstId === null) {
       firstId = yield* this.#answerPart(first, (text) => this.#postText(target, text));
-      // After the post: when the post fails, the status post stays for the next attempt to edit.
       if (replaceMessageId)
         yield* this.#call("deleteMessage", {
           chat_id: this.#chatNumber(target),
@@ -227,7 +213,6 @@ class TelegramAdapter implements MessagingAdapter {
     return Effect.sync(() => this.#state.history(threadKey, afterId, beforeId));
   }
 
-  /** Telegram has no history API: this is what the host saw of the chat since it started. */
   recent(
     _platformChannelId: string,
     threadKey: string | null,
@@ -257,16 +242,12 @@ class TelegramAdapter implements MessagingAdapter {
     return Effect.sync(() => this.#state.title || platformChannelId);
   }
 
-  /** One connection is one chat, and Signal lets this host post only in its linked chats. */
-  places(): Effect.Effect<MessagingPlace[], MessagingAdapterError> {
-    return Effect.sync(() => [{ id: this.#chatId, name: this.#state.title || this.#chatId, kind: "chat" }]);
+  places(): Effect.Effect<MessagingPlaces, MessagingAdapterError> {
+    return Effect.sync(() => ({
+      places: [{ id: this.#chatId, name: this.#state.title || this.#chatId, kind: "chat" }],
+    }));
   }
 
-  /**
-   * A marker, not markup: status text is escaped as a whole, which would make a link inert.
-   * `#statusHtml` turns the marker back into a mention after the escape. The answer of an agent never
-   * goes through it: `#answerPart` makes the mentions of an answer.
-   */
   mention(userId: string): string {
     return /^[0-9]+$/u.test(userId) ? `@${userId}` : userId;
   }
@@ -278,7 +259,6 @@ class TelegramAdapter implements MessagingAdapter {
     });
   }
 
-  /** Status text is written by the host. Buttons become an inline keyboard. */
   #content(body: MessageBody): {
     text: string;
     parse_mode: "HTML";
@@ -304,18 +284,12 @@ class TelegramAdapter implements MessagingAdapter {
     };
   }
 
-  /**
-   * One part of an answer as HTML, or as plain text when Telegram cannot parse the HTML. In HTML,
-   * `@username` and `@<user id>` mention the person. Plain text mentions nobody: Telegram would also
-   * read a `@name` in code there.
-   */
   #answerPart<A>(
     markdown: string,
     send: (text: { text: string; html: boolean }) => Effect.Effect<A, MessagingAdapterError>,
   ): Effect.Effect<A, MessagingAdapterError> {
     const html = telegramHtml(markdown, (userId) => this.#state.name(userId) ?? userId);
     const plain = () => send({ text: telegramPlainText(markdown), html: false });
-    // Escapes make HTML longer than its text. Signal refuses a longer call and closes the socket.
     if (new TextEncoder().encode(html).byteLength > TELEGRAM_TEXT_LIMIT) return plain();
     return send({ text: html, html: true }).pipe(
       Effect.catch((failure) => (unparsable(failure) ? plain() : Effect.fail(failure))),
@@ -351,10 +325,8 @@ class TelegramAdapter implements MessagingAdapter {
     }).pipe(Effect.asVoid);
   }
 
-  /** Remembers the conversation of a post, so a reply to it in a basic group finds the conversation. */
   #posted(target: MessageTarget, messageId: number | undefined): Effect.Effect<string, MessagingAdapterError> {
     if (messageId === undefined) return Effect.fail(new MessagingAdapterError({ cause: new Error("no_message_id") }));
-    // A top-level post, such as one that an agent sends to the chat, starts its own reply chain.
     if (target.replyThreadId !== null) this.#state.rememberThread(messageId, telegramThreadKey(target));
     return Effect.succeed(String(messageId));
   }
@@ -392,11 +364,9 @@ function unparsable(failure: MessagingAdapterError): boolean {
 }
 
 export interface TelegramDriverOptions {
-  /** The Signal relay, which brings each chat's updates and carries its Bot API calls. Without it, no chat connects. */
   ingress?: MessagingIngress;
 }
 
-/** Each chat added the one OpenBot bot. Its updates and calls go through the ingress relay. */
 export function telegramDriver(options: TelegramDriverOptions = {}): MessagingDriver {
   const chats = new TelegramChats();
   const state = (credentials: Record<string, string>) => {

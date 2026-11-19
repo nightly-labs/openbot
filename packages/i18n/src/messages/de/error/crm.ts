@@ -24,7 +24,7 @@ export const messages = {
   "error.crm.badCursor": "Diese Seite ist nicht mehr gültig. Lade die Liste neu.",
   "error.crm.invalidChange": "Diese Änderung ist nicht gültig.",
   "error.crm.agentNotAllowed":
-    "Dieser Agent kann das CRM nicht nutzen. Ein Eigentümer oder Administrator kann ihn auf der CRM-Seite zulassen.",
+    "Dieser Agent kann das CRM nicht nutzen. Ein Eigentümer oder Administrator kann ihn zulassen: CRM-Seite öffnen, auf Vorschläge klicken, auf die Schaltfläche mit der Anzahl der Agenten klicken und diesen Agenten einschalten.",
   "error.crm.tooManyProposals":
     "Zu viele Vorschläge warten auf eine Entscheidung. Warte, bis eine Person darüber entscheidet.",
   "error.crm.amountInvalid": "Gib den Betrag als Zahl ein, zum Beispiel 129.00.",

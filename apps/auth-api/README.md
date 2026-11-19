@@ -49,8 +49,9 @@ Stripe customer keeps as proof of the check. Without it, the check works and has
 `bun scripts/stripe-vat-migrate.ts` moves the subscriptions that used Stripe Tax to the Tax Rate; it is
 a dry run unless you give `--apply`.
 The Worker variable `BILLING_COUNTRY_REQUIRED=true` refuses a Checkout of an account with no billing
-country (409 `billing_country_required`). Unset, such an account gets a Stripe Tax Checkout, so that an
-older desktop app can still buy.
+country (409 `billing_country_required`). `wrangler.jsonc` sets it, so production and local development
+refuse. With `false`, such an account gets a Stripe Tax Checkout, so that a desktop app older than 0.72.0
+can still buy. Set `BILLING_COUNTRY_REQUIRED=false` in the shell to try that path locally.
 
 For a local Worker, forward the webhooks and set the secret that `stripe listen` prints in your
 shell as `STRIPE_WEBHOOK_SECRET`:
@@ -82,6 +83,12 @@ repository root:
 ```bash
 bun scripts/stripe-flows-e2e.ts --api http://127.0.0.1:<port> [scenario ...]
 ```
+
+The `promotion-link` scenario makes a coupon with two promotion codes in the sandbox and checks the
+Checkout pages of a discount link (`?promo=CODE`): an active code is applied, and a code that does not
+fit the order or does not exist gives the code field. A copy of the Brazil partner code (BRL server plans only)
+gives a discount on a BRL server page and the code field on a EUR server page and a license page. It deletes the
+coupons and turns off the codes at the end.
 
 The `portal` scenario prints a Customer Portal cancel page and waits until you use it. Then it checks
 that the plan change flow of an old app opens the Portal home, and that the Portal has no plan change. The report goes to `.openbot-build/stripe-flows-e2e.json`.
@@ -216,8 +223,15 @@ before remote changes. Test deployments do not send account analytics.
 PKCS #1 key; convert it with `openssl pkcs8 -topk8 -nocrypt -in <key>.pem`. With the key, the
 Worker gives the desktop installation tokens, so GitHub shows `openbotgit[bot]` as the author of an
 agent's work. The key also lets `POST /v1/feedback` open an approved bug report or feature idea from the app as
-an issue in `nightly-labs/openbot`, for any signed-in account, three times a minute (`FEEDBACK_RATE_LIMITER`) and 10 times a UTC day (`feedback_daily_counts` in D1). The Worker does not store or log the text. With `sameAs`, the report is a comment on that open app issue. Before the card, `POST /v1/feedback/similar` finds open app issues with a similar title, three times a minute for each account (the same limiter, with its own key); the title is in the body, so request logs do not keep it. With no key, the route answers 503, the app
-gives the GitHub form link instead, and the desktop acts as the signed-in user. In GitHub Actions the secret is
+an issue in `nightly-labs/openbot`, for any signed-in account, three times a minute (`FEEDBACK_RATE_LIMITER`) and 10 times a UTC day (`feedback_daily_counts` in D1). The Worker does not store or log the text. With `sameAs`, the report is a comment on that open app issue. Before the card, `POST /v1/feedback/similar` finds open app issues with a similar title, three times a minute for each account (the same limiter, with its own key); the title is in the body, so request logs do not keep it. Each report ends with a hidden owner mark
+(`feedback-owner.ts`): a random value and an HMAC of it and the account ID, with a key that HKDF derives
+from the app key. `POST /v1/feedback/withdraw` takes `{ number }` and, for the account whose mark ends
+the text, deletes its comments on that issue or moves its issue to `FEEDBACK_WITHDRAWN_REPOSITORY`, a
+private repository where the app has Issues write access. GitHub keeps every earlier version of an
+edited text, so the route never edits. Without that variable, an issue answers 503
+`feedback_withdraw_unavailable`; a comment can still go. A new app key makes the earlier marks invalid.
+With no key, the route answers 503, the app gives the GitHub form link instead, and the desktop acts
+as the signed-in user. In GitHub Actions the secret is
 `OPENBOT_GITHUB_APP_PRIVATE_KEY`, because GitHub refuses secret names that start with `GITHUB_`.
 Secrets are never passed as process arguments. The other values are Worker
 variables. The SMTP connection uses TLS from the start and accepts only port 465.
@@ -358,6 +372,15 @@ ticket names `REMOTE_SIGNAL_URL`, as before.
   places, a host gets one of the homes at most 1000 km farther from it than the nearest home, from the
   Cloudflare request location. A host keeps its home while that home is near; otherwise it moves at its
   next ticket. The variable has no effect when `REMOTE_SIGNAL_HOMES` is empty.
+- `REMOTE_SIGNAL_HOME_COUNTRIES`: the homes of the hosts in a country, as `CC=id+id,...` with the
+  Cloudflare country code (`request.cf.country`), for example `CN=us+au`. A host in a listed country
+  gets one of its homes by the same hash, and the distance rule does not apply to it. When its home
+  fails, the host moves to another home of its country; when its country has no other home, the
+  distance rule chooses. A host reports only one failed home, so with two homes that are both down it
+  goes between them, as with the distance rule. Empty means the distance rule for each
+  country. Each ID must be a home of `REMOTE_SIGNAL_HOMES`, or each ticket request fails with
+  `503 remote_not_configured`, so remove a home from this list in the same deploy. Use it where the
+  network routes do not follow the map. The variable has no effect when `REMOTE_SIGNAL_HOMES` is empty.
 - `REMOTE_AUTH_WEBHOOK_URLS`: each Signal that gets the auth events, as `url,url`. Empty means
   `REMOTE_AUTH_WEBHOOK_URL` only. The outbox deletes an event when each URL accepted it, and sends it
   again only to the URLs that failed.

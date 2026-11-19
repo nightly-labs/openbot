@@ -85,6 +85,7 @@ export const messages = {
   "marketplace.app.partialDescription":
     "Sommige apps of vaardigheden ervan zijn niet geïnstalleerd. “Opnieuw koppelen” installeert ze.",
   "marketplace.app.notConnected": "Niet gekoppeld",
+  "marketplace.app.paused": "Gepauzeerd",
   "marketplace.app.custom": "MCP-server",
   "marketplace.app.githubTagline": "Repository’s, issues en pull requests",
   "marketplace.app.onePasswordTagline": "Log in op sites met logins die je deelt",
@@ -131,6 +132,7 @@ export const messages = {
     "{host} draait een oudere OpenBot-versie die geen apps kan koppelen. Werk OpenBot op {host} bij, of vraag de eigenaar dat te doen.",
   "marketplace.app.blocked.member":
     "Alleen een eigenaar of beheerder van {host} kan daar apps koppelen. Vraag een van hen om {name} te koppelen, of om OpenBot op {host} bij te werken zodat leden apps kunnen koppelen.",
+  "marketplace.app.blocked.mac": "{name} werkt alleen op een Mac waarop OpenBot draait.",
   "marketplace.app.connectAgain": "Opnieuw koppelen",
   "marketplace.app.automation.askOnInstall": "Bij installatie macOS om toegang vragen",
   "marketplace.app.automation.title": "Toegang tot Apple-apps",
@@ -388,8 +390,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.save": "Sla deze beslissing op als nieuwe notitie in mijn kluis.",
   "marketplace.plugin.obsidian.prompt.log":
     "Voeg een samenvatting van het werk van vandaag toe aan mijn notitie Work log.",
-  "marketplace.plugin.obsidian.hint.apiKey":
-    "Open in Obsidian Settings > Local REST API. Kopieer de API-sleutel en zet “Enable non-encrypted (HTTP) server” aan.",
+  "marketplace.plugin.obsidian.hint.apiKey": "Open in Obsidian Settings > Local REST API en kopieer de API-sleutel.",
   "marketplace.plugin.resend.tagline": "Transactionele e-mail",
   "marketplace.plugin.resend.description":
     "Met Resend kunnen agents transactionele e-mail versturen en de bezorging controleren via één API. Een API-sleutel uit het Resend-dashboard gaat als één omgevingsvariabele naar de lokale server.",

@@ -47,6 +47,7 @@ export const messages = {
   "server.compatibility.updateHostTitle": "{name} の OpenBot を更新してください",
   "server.compatibility.unsafeDataTitle": "ホストが安全でないデータを返しました",
   "server.compatibility.cannotConnectTitle": "{name} に接続できません",
+  "server.compatibility.safeModeTitle": "{name} が起動しません",
   "server.compatibility.updateClientDescription":
     "このアプリはホストより古いプロトコルにのみ対応しています。このアプリを更新してから、もう一度お試しください。",
   "server.compatibility.updateHostDescription":
@@ -112,6 +113,8 @@ export const messages = {
   "server.local.create": "サーバーを作成",
   "server.local.creating": "サーバーを作成中…",
   "server.local.createFailed": "サーバーを作成できませんでした。",
+  "server.local.createFailedRetry":
+    "問題が発生しました。もう一度お試しください。再び失敗する場合は、OpenBot を再起動してください。",
   "server.local.limitReached":
     "このコンピューターに作成できるサーバーは最大 {limit} 台です。新しく作成するには、1 台を削除してください。",
   "server.local.deleteConfirmTitle": "{name} を削除しますか？",
@@ -343,7 +346,7 @@ export const messages = {
     "エージェントごとに設定しない場合に、このサーバーのエージェントができることを選択します。",
   "server.settings.timezone": "タイムゾーン",
   "server.settings.timezoneDescription":
-    "メッセージに送信者のタイムゾーンがない場合、新しいルーティンはこのタイムゾーンを使います。",
+    "メッセージに送信者のタイムゾーンがない場合、新しいルーティンはこのタイムゾーンを使います。サーバーでは、次の再起動後にブラウザーもこのタイムゾーンを使います。",
   "server.settings.timezoneAutomatic": "自動 ({zone})",
   "server.settings.timezoneLoadFailed": "サーバーのタイムゾーンを読み込めませんでした。",
   "server.settings.turnLimit": "同時に実行するスレッド",

@@ -10,12 +10,9 @@ const APPLE_APP_SITE_ASSOCIATION = {
       },
       {
         appID: "ZTRDTUL87R.run.openbot.mobile",
-        // The mobile app opens a shared agent's preview; the desktop reads that page in the browser.
         paths: ["/join", "/agents/*"],
       },
       {
-        // The mobile app moves to the Synthetify team. Builds from the old team stay installed until
-        // their users update, so both teams keep the same paths.
         appID: "8A47NKRZSJ.run.openbot.mobile",
         paths: ["/join", "/agents/*"],
       },

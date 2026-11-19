@@ -6,21 +6,11 @@ import { readPreferenceFile, writePreferenceFile } from "./preference-file";
 import { quantize } from "./resource-summary";
 
 const STARTUP_FILE = "startup-history.json";
-/** Without the workspace's first load, the summary goes this long after the renderer loaded. */
 const WORKSPACE_WAIT_MS = 2 * 60_000;
 
-/**
- * `warm`: OpenBot started earlier since the computer booted. `cold`: the first start since the boot.
- * `updated`: the first start of this app version. `unknown`: no earlier start is saved, or the saved
- * start was not read before the summary went.
- *
- * The boot time comes from the system uptime. Windows Fast Startup resumes the kernel instead of a
- * full boot, so the uptime continues and a start after a shut down can show as `warm`.
- */
 export const START_KINDS = ["warm", "cold", "updated", "unknown"] as const;
 export type StartKind = (typeof START_KINDS)[number];
 
-/** The steps of `createApplicationServices`, in order. Each `openbot:services.<step>` mark ends one. */
 export const SERVICE_STEPS = [
   "pre-store",
   "store",
@@ -42,11 +32,9 @@ export const SERVICE_STEPS = [
   "host-update",
 ] as const;
 type ServiceStep = (typeof SERVICE_STEPS)[number];
-/** `service_pre_store_ms` for `pre-store`: the time of one step. */
 type ServiceStepProperty = `service_${Snake<ServiceStep>}_ms`;
 type Snake<T extends string> = T extends `${infer Head}-${infer Tail}` ? `${Head}_${Snake<Tail>}` : T;
 
-// The template type cannot follow a runtime `replaceAll`, so this list maps each name once.
 const SERVICE_STEP_PROPERTIES = {
   "pre-store": "service_pre_store_ms",
   store: "service_store_ms",
@@ -68,13 +56,8 @@ const SERVICE_STEP_PROPERTIES = {
   "host-update": "service_host_update_ms",
 } as const satisfies { readonly [Step in ServiceStep]: `service_${Snake<Step>}_ms` };
 
-/** The property names of the step times, in step order. */
 export const SERVICE_STEP_PROPERTY_NAMES = SERVICE_STEPS.map((step) => SERVICE_STEP_PROPERTIES[step]);
 
-/**
- * Milliseconds after the main process started, at two significant digits. A
- * `service_<step>_ms` value is the length of that step instead.
- */
 export interface StartupProperties extends Partial<Record<ServiceStepProperty, number>> {
   start_kind: StartKind;
   host_kind: "desktop" | "server";
@@ -117,11 +100,6 @@ function markMs(name: string): number | undefined {
   return value === undefined || !Number.isFinite(value) || value < 0 ? undefined : value;
 }
 
-/**
- * The length of each step between the `openbot:services.*` marks. The first step starts at
- * `services.start`, the top of `createApplicationServices`, so it does not include the window.
- * A step with no mark has no length, and the next step starts at the last mark before it.
- */
 function serviceStepTimes(): { step: ServiceStep; ms: number }[] {
   let previous = markMs("services.start") ?? markMs("when-ready");
   const times: { step: ServiceStep; ms: number }[] = [];
@@ -134,10 +112,6 @@ function serviceStepTimes(): { step: ServiceStep; ms: number }[] {
   return times;
 }
 
-/**
- * One `system_startup` summary per main process: the startup marks that `dev:bench` reads, and the
- * workspace's first load that the renderer reports. Main times all of them on its own clock.
- */
 export class StartupTiming {
   readonly #options: StartupTimingOptions;
   #startKind: StartKind = "unknown";
@@ -150,10 +124,6 @@ export class StartupTiming {
     this.#options = options;
   }
 
-  /**
-   * Reads the last start and saves this one. A file that cannot be read or saved gives `unknown`.
-   * Not on the startup path: the summary goes much later, at the workspace's first load.
-   */
   readonly recordStart = Effect.fn("StartupTiming.recordStart")(function* (this: StartupTiming) {
     const path = join(this.#options.userDataPath, STARTUP_FILE);
     const saved = yield* readPreferenceFile(path, decodeSavedStart).pipe(Effect.catch(() => Effect.succeed(null)));
@@ -164,7 +134,6 @@ export class StartupTiming {
     );
   });
 
-  /** The main window loaded. The summary goes at the workspace's first load, or after a wait. */
   rendererLoaded(): void {
     if (this.#sent || this.#rendererLoaded) return;
     this.#rendererLoaded = true;
@@ -176,7 +145,6 @@ export class StartupTiming {
     this.#timer.unref();
   }
 
-  /** The main window's workspace finished its first load. Later loads, after a reload, do not count. */
   workspaceReady(): void {
     if (this.#sent || this.#workspaceReadyMs !== null) return;
     this.#workspaceReadyMs = performance.now();

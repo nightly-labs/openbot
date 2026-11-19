@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/team";
 
 export const messages = {
-  // Errors that the Team API and the team store send to clients.
   "error.team.ownerNotLinked": "该主机未关联到 OpenBot 所有者账号。",
   "error.team.ownerEmailRequired": "请用创建该主机时使用的 OpenBot 邮箱登录。",
   "error.team.hostNotConfigured": "团队主机未配置。",
@@ -52,6 +51,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "登录尝试次数过多，请稍后再试。",
   "error.team.clientUpdateRequired": "连接该主机前请先更新该 OpenBot 客户端。",
   "error.team.hostUpdateRequired": "连接前请先更新主机上的 OpenBot。",
+  "error.team.serverSafeMode": "此服务器处于安全模式，因为 OpenBot 无法在其上启动。",
+  "error.team.serverSafeModeNewerDatabase":
+    "此服务器上的 OpenBot {version} 无法打开其数据，因为更新版本的 OpenBot 保存过这些数据。在服务器上安装更新的 OpenBot 版本即可解决。",
+  "error.team.serverSafeModeStartFailed":
+    "此服务器上的 OpenBot {version} 多次启动失败后已停止。在服务器上安装更新的 OpenBot 版本即可解决。",
   "error.team.sidebarLayoutUnavailable": "侧边栏布局不可用。",
   "error.team.providersUnsupported": "当前连接不支持服务商设置。",
   "error.team.providerNotManaged": "OpenBot 不管理该服务商的 CLI。",
@@ -71,13 +75,17 @@ export const messages = {
   "error.team.agentColorsUnsupported": "当前连接不支持助手颜色。",
   "error.team.chatColorsUnsupported": "当前连接不支持聊天颜色。",
   "error.team.routineRunPlaceUnsupported": "当前连接无法更改自动化任务的运行位置。",
+  "error.team.routinePauseReasonsUnsupported": "当前连接无法显示自动化任务暂停的原因。",
+  "error.team.activeQueuesUnsupported": "此连接无法显示所有智能体的队列。",
   "error.team.routinesOnceUnsupported": "当前连接无法保存只运行一次的自动化任务。",
   "error.team.routineRunCommandUnsupported": "当前连接无法提供自动化任务的运行命令。",
   "error.team.threadQueueUnsupported": "当前连接无法显示支线对话的队列。",
+  "error.team.threadRequestsUnsupported": "当前连接无法显示支线对话发给其他智能体的请求。",
   "error.team.hostTurnLimitsUnsupported": "此连接无法显示或更改服务器的话题数限制。",
   "error.team.usageLimitUnsupported": "当前连接无法显示或更改助手的用量限制。",
   "error.team.hermesImportUnsupported": "当前连接无法从服务器导入 Hermes 配置文件。",
   "error.team.providerDetectionUnsupported": "当前连接无法查找服务器上的模型服务器和智能体。",
+  "error.team.providerModelSourceUnsupported": "当前连接无法显示提供商模型的来源。",
   "error.team.routineFlowStopUnsupported": "此连接无法停止自动化任务的运行。",
   "error.team.sidebarFoldersUnsupported": "当前连接不支持文件夹嵌套。",
   "error.team.libraryFoldersUnsupported": "当前连接不支持资料库文件夹。",

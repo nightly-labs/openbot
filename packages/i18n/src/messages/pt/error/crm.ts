@@ -23,7 +23,7 @@ export const messages = {
   "error.crm.badCursor": "Esta página não é mais válida. Carregue a lista de novo.",
   "error.crm.invalidChange": "Esta alteração não é válida.",
   "error.crm.agentNotAllowed":
-    "Este agente não pode usar o CRM. Um proprietário ou administrador pode liberar o acesso na página do CRM.",
+    "Este agente não pode usar o CRM. Um proprietário ou administrador pode liberar o acesso: abra a página do CRM, clique em Sugestões, clique no botão com o número de agentes e ative este agente.",
   "error.crm.tooManyProposals": "Há sugestões demais aguardando decisão. Aguarde até que uma pessoa as decida.",
   "error.crm.amountInvalid": "Escreva o valor como número, por exemplo 129.00.",
   "error.crm.amountDecimals": "O valor tem casas decimais demais para {currency}.",

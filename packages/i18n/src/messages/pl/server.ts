@@ -49,6 +49,7 @@ export const messages = {
   "server.compatibility.updateHostTitle": "Zaktualizuj OpenBot na serwerze {name}",
   "server.compatibility.unsafeDataTitle": "Host zwrócił niebezpieczne dane",
   "server.compatibility.cannotConnectTitle": "Nie można połączyć się z: {name}",
+  "server.compatibility.safeModeTitle": "{name} się nie uruchamia",
   "server.compatibility.updateClientDescription":
     "Ta aplikacja obsługuje tylko starsze protokoły niż host. Zaktualizuj aplikację i spróbuj ponownie.",
   "server.compatibility.updateHostDescription":
@@ -119,6 +120,8 @@ export const messages = {
   "server.local.create": "Utwórz serwer",
   "server.local.creating": "Tworzenie serwera…",
   "server.local.createFailed": "Nie udało się utworzyć serwera.",
+  "server.local.createFailedRetry":
+    "Coś poszło nie tak. Spróbuj ponownie. Jeśli to się powtórzy, uruchom ponownie OpenBot.",
   "server.local.limitReached":
     "Na tym komputerze możesz mieć najwyżej {limit} serwerów. Skasuj jeden, aby utworzyć kolejny.",
   "server.local.deleteConfirmTitle": "Skasować: {name}?",
@@ -353,7 +356,7 @@ export const messages = {
     "Wybierz, co mogą robić agenci na tym serwerze, gdy nie ustawisz tego dla agenta.",
   "server.settings.timezone": "Strefa czasowa",
   "server.settings.timezoneDescription":
-    "Nowe rutyny używają tej strefy czasowej, gdy wiadomość nie podaje strefy czasowej nadawcy.",
+    "Nowe rutyny używają tej strefy czasowej, gdy wiadomość nie podaje strefy czasowej nadawcy. Na serwerze przeglądarka też używa jej po następnym ponownym uruchomieniu.",
   "server.settings.timezoneAutomatic": "Automatycznie ({zone})",
   "server.settings.timezoneLoadFailed": "Nie udało się wczytać strefy czasowej serwera.",
   "server.settings.turnLimit": "Wątki jednocześnie",

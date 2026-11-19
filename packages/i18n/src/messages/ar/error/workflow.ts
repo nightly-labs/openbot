@@ -15,6 +15,7 @@ export const messages = {
   "error.workflow.agentMissing": "اختر وكيلًا لهذه الخطوة.",
   "error.workflow.handoffFailed": "تعذّر على OpenBot إرسال هذه الخطوة إلى وكيلها.",
   "error.workflow.agentStepEnded": "أُزيلت رسالة الوكيل لهذه الخطوة قبل أن يجيب.",
+  "error.workflow.agentStepStopped": "توقّف الوكيل قبل أن يجيب عن هذه الخطوة. شغّل الخطوة مرة أخرى.",
   "error.workflow.conditionUnclear": "لم يجب النموذج بـ «نعم» أو «لا».",
   "error.workflow.modelFailed": "تعذّر على النموذج الإجابة. شغّل الخطوة مرة أخرى.",
   "error.workflow.modelTimedOut":
@@ -30,6 +31,7 @@ export const messages = {
   "error.workflow.pictureMissing": "الصورة لم تعد على الخادم. أرسلها مرة أخرى.",
   "error.workflow.pictureType": "استخدم صورة بتنسيق PNG أو JPEG أو WebP.",
   "error.workflow.mediaInputMissing": "صورة من خطوة سابقة غير متاحة. شغّل تلك الخطوة مرة أخرى.",
+  "error.workflow.mediaEmptyRequest": "اكتب وصفًا، أو شغّل الخطوات التي قبل هذه الخطوة حتى يصل نص أو صورة.",
   "error.workflow.mediaInputNotImage": "تقبل هذه الخطوة الصور فقط، لا مقاطع الفيديو. أزل الاتصال من الفيديو.",
   "error.workflow.stepMissing": "لم تعد هذه الخطوة موجودة.",
   "error.workflow.nodeMissing": "هذه الخطوة ليست في سير العمل.",

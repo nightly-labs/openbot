@@ -1,13 +1,3 @@
-// Checks that an edit of a queued message holds the message only for a time (#7750). Runs the real
-// agent service, mailbox and SQLite on a temporary profile; Claude is the real `ClaudeAgentClient`
-// with a stand-in `claude`. A turn with "SLOW-<n>" in its text ends when the file `release-<n>` exists.
-// The clock moves forward in this process, and the wake that the host arms for the end of a hold
-// runs when the clock passed it, so the check does not wait 10 minutes.
-// Steps: 1. an edit holds the first queued message and the one behind it; 2. after the time, the
-// message runs with its original text, the next one follows, and a late Save is refused; 3. an edit
-// open at a restart holds its message again, and a Save after the restart runs the edited text;
-// 4. a second edit from before the restart ends at its time, and its message runs unchanged.
-// `bun scripts/queue-edit-hold-e2e.ts`. Writes .openbot-build/queue-edit-hold-e2e/report.json.
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -37,11 +27,9 @@ process.env.HOME = home;
 process.env.OPENBOT_CLAUDE_PATH = claudeExecutable;
 mkdirSync(home, { recursive: true });
 
-// The clock of this process. The host reads it to end a hold, so moving it ends the hold.
 let clockOffset = 0;
 const realNow = Date.now.bind(Date);
 Date.now = () => realNow() + clockOffset;
-// The wakes that the host arms for the end of a hold. They run when the clock passed them.
 let holdWakeDelay = Number.POSITIVE_INFINITY;
 const holdWakes: Array<{ at: number; run: () => void }> = [];
 const realSetTimeout = globalThis.setTimeout;
@@ -133,7 +121,6 @@ interface ClientEvents {
   diagnostic: [message: string, origin?: DiagnosticOrigin];
 }
 
-/** The real Claude client; only the account, usage and model reads are answered here. */
 class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
   readonly provider = "claude";
   readonly contextCompaction = "native";
@@ -241,7 +228,6 @@ async function waitFor<T>(label: string, read: () => T | null | undefined | fals
   }
 }
 
-/** The text of each turn that the stand-in CLI started, in order. */
 function turnTexts(): string[] {
   if (!existsSync(processLog)) return [];
   return readFileSync(processLog, "utf8")
@@ -271,7 +257,6 @@ function open() {
     browser,
     hostMemory: memory,
     preferredProvider: "claude",
-    // A message sent during a turn waits in the queue, as it does for a provider that cannot steer.
     busyMessageMode: () => "queue",
     offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "claude"),
     clientFactory: (_provider, cli) => new ClaudeStandIn(cli),
@@ -307,7 +292,6 @@ try {
     runCauseEffect(host.agents.editQueuedMessage(agent.id, input));
   await waitFor("the first turn to end", idle);
 
-  // 1. An edit holds the first queued message, and the message behind it waits too.
   await send("SLOW-1 turn.");
   await waitFor("the slow turn", () => status("SLOW-1 turn.") === "running");
   await send("Edit me.");
@@ -322,7 +306,6 @@ try {
   assert.equal(byText("Edit me.")?.editing, true, "The queue shows the edit.");
   step("edit holds the queue", brief());
 
-  // 2. After the time, the wake starts the message with its original text, and the next one follows.
   assert.equal(moveClock(QUEUE_EDIT_HOLD_MS / 2), 0, "No wake runs before the time.");
   await waitFor("the queue to settle", settled);
   assert.equal(status("Edit me."), "queued", "The edit still holds its message within the time.");
@@ -348,7 +331,6 @@ try {
   assert.ok(!turnTexts().some((text) => text.includes("Too late.")), "A refused Save never reaches the agent.");
   step("time ends the hold", brief());
 
-  // 3. Two edits are open when the host stops.
   await send("SLOW-2 turn.");
   await waitFor("the second slow turn", () => status("SLOW-2 turn.") === "running");
   await send("Restart save.");
@@ -360,7 +342,6 @@ try {
   holdWakes.length = 0;
   await runCauseEffect(host.agents.stop());
   host.database.close();
-  // A turn that the restart runs again ends at once.
   writeFileSync(join(root, "release-2"), "");
   step("host stopped with two edits", { saved: saved.id, lost: lost.id });
 
@@ -372,7 +353,6 @@ try {
   assert.equal(byText("Restart save.")?.editing, true, "The queue shows the edit after the restart.");
   step("restart keeps the edits", brief());
 
-  // The editor comes back: its Save runs the edited text.
   await edit({ action: "begin", deliveryId: saved.id, editId: "edit-2" });
   await edit({
     action: "save",
@@ -391,7 +371,6 @@ try {
   assert.equal(status("Restart lost."), "queued", "The second edit still holds its message.");
   step("save after the restart", brief());
 
-  // 4. Nobody comes back for the second edit: it ends at its time, and the message runs unchanged.
   assert.ok(moveClock(QUEUE_EDIT_HOLD_MS + 1_000) >= 1, "The startup wake runs at its time.");
   await waitFor("the lost edit's message to complete", () => status("Restart lost.") === "completed");
   assert.equal(byText("Restart lost.")?.editing, false, "The lost edit ended.");

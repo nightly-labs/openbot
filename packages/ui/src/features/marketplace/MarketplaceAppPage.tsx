@@ -53,6 +53,7 @@ import {
   type MarketplaceAppStatus,
   type MarketplaceMacAutomation,
   pluginAppSetup,
+  pluginNeedsMac,
 } from "./marketplace-model";
 import { type MarketplaceScope, serverAddress } from "./marketplace-view";
 import { PluginIcon } from "./PluginIcon";
@@ -72,23 +73,19 @@ function PluginAppPage(props: { scope: MarketplaceScope; app: PluginApp }) {
   const { t } = useText();
   const model = () => props.scope.model;
   const plugin = () => props.app.plugin;
-  /* The name a reader hears carries the visible host, so the row is not three times "Open link". */
   const links = () =>
     [
       { label: t("plugin.link.website"), url: plugin().websiteUrl },
       { label: t("plugin.link.privacyPolicy"), url: plugin().privacyPolicyUrl },
       { label: t("plugin.link.terms"), url: plugin().termsUrl },
     ].flatMap((link) => (link.url ? [{ label: link.label, url: link.url, text: pluginLinkText(link.url) }] : []));
-  /** The first app whose server refused its saved sign-in. */
   const refused = () => plugin().apps.find((app) => props.app.connections[app.id]?.signInNeeded);
-  /** The app that can sign in to one more account here, when the host keeps a sign-in for each. */
   const accountsEntry = () =>
     model().canConnectApps() ? plugin().apps.find((app) => props.app.connections[app.id]?.multipleAccounts) : undefined;
   const automation = () =>
     model().canConnectApps() && plugin().apps.some((app) => app.macAutomation?.length)
       ? model().macAutomation
       : undefined;
-  /** Each MCP row that the host holds for the plugin. */
   const accessRows = () => plugin().apps.flatMap((entry) => props.app.connections[entry.id]?.accounts ?? []);
   const access = () => {
     if (accessRows().length === 0) return undefined;
@@ -117,7 +114,6 @@ function PluginAppPage(props: { scope: MarketplaceScope; app: PluginApp }) {
             <Link2 aria-hidden="true" />
             {t("plugin.copyLink")}
           </Button>
-          {/* With more than one app, each app's row signs in again: the header cannot say which. */}
           <Show when={!refused() || plugin().apps.length === 1}>
             <AppAction scope={props.scope} app={props.app} size="sm" variant="default" />
           </Show>
@@ -178,7 +174,6 @@ function PluginAppPage(props: { scope: MarketplaceScope; app: PluginApp }) {
             description={t("marketplace.app.disconnect.description", { name: props.app.name })}
             action={t("marketplace.app.disconnect.action")}
             busy={model().appBusy(props.app.id)}
-            // A plugin opens its own uninstall dialog, which lists the apps and skills it removes.
             onAction={() => model().disconnectApp(props.app)}
           />
         </Show>
@@ -262,10 +257,6 @@ function PluginAppPage(props: { scope: MarketplaceScope; app: PluginApp }) {
 
 const NOT_HELD: MarketplaceAppConnection = { held: false, signInNeeded: false, accounts: [], multipleAccounts: false };
 
-/**
- * One account of an app that can sign in to more than one: its name, which a message tags with @,
- * and the actions of that account alone. The last account goes with Disconnect, as the app does.
- */
 function AccountRow(props: {
   scope: MarketplaceScope;
   app: PluginApp;
@@ -279,9 +270,7 @@ function AccountRow(props: {
   const [removing, setRemoving] = createSignal(false);
   const busy = () => model().appBusy(props.app.id);
   const signInAgain = () => void model().reconnectApp(props.app, props.entry.id, props.account.id);
-  // A refused sign-in, or none at all, as after a Sign out on the app page: agents cannot use it.
   const signInNeeded = () => props.account.signInNeeded || !props.account.signedIn;
-  // A sign-in with tokens on file opens no browser, so a signed-in account has no "Sign in again".
   const above = () => props.account.renamable || signInNeeded();
   return (
     <Item class="settings-modal-row">
@@ -349,7 +338,6 @@ function AccountRow(props: {
           </DropdownMenu.Root>
         </Show>
       </ItemActions>
-      {/* As provider settings remove an account: the sign-in goes, and a new one needs the browser. */}
       <ConfirmDialog
         open={removing()}
         tone="destructive"
@@ -368,15 +356,10 @@ function AccountRow(props: {
   );
 }
 
-/** The address that a desktop app's server answers on, as the listing gives it. */
 function localAddress(entry: MarketplacePluginApp): string {
   return entry.server.transport === "http" ? entry.server.url : "";
 }
 
-/**
- * One app of a plugin in the Connection section: how it connects, what the host holds, and the
- * action that connects a held app again. A key is named, never shown.
- */
 function ConnectionRow(props: { scope: MarketplaceScope; app: PluginApp; entry: MarketplacePluginApp }) {
   const { t } = useText();
   const model = () => props.scope.model;
@@ -387,8 +370,9 @@ function ConnectionRow(props: { scope: MarketplaceScope; app: PluginApp; entry: 
     const fields = mcpFlowFields(props.entry.server.auth?.find((flow) => flow.kind === "key"));
     return (fields.find((field) => !field.optional) ?? fields[0])?.label ?? "";
   };
-  /** Why this account cannot connect the app here. The reason replaces how the app connects. */
   const reason = () => {
+    if (pluginNeedsMac(model(), { apps: [props.entry] }))
+      return t("marketplace.app.blocked.mac", { name: props.entry.name });
     const blocked = connection().held ? undefined : model().appsBlocked?.();
     if (blocked?.reason === "update") return t("marketplace.app.blocked.update", { host: blocked.host });
     if (blocked?.reason === "member")
@@ -415,7 +399,6 @@ function ConnectionRow(props: { scope: MarketplaceScope; app: PluginApp; entry: 
         return t("marketplace.app.setup.open");
     }
   };
-  /** The row action of a held app. An app that asks for nothing has none. */
   const action = (): AppTextKey | null => {
     if (!connection().held || !model().canConnectApps()) return null;
     switch (setup()) {
@@ -436,7 +419,6 @@ function ConnectionRow(props: { scope: MarketplaceScope; app: PluginApp; entry: 
       </ItemMedia>
       <ItemContent>
         <ItemTitle>{props.entry.name}</ItemTitle>
-        {/* A reason wraps: cut to one line, it would lose what to do. */}
         <Show when={reason()} fallback={<ItemDescription>{description()}</ItemDescription>}>
           {(text) => <ItemDescription class="marketplace-app-reason">{text()}</ItemDescription>}
         </Show>
@@ -465,10 +447,6 @@ function ConnectionRow(props: { scope: MarketplaceScope; app: PluginApp; entry: 
   );
 }
 
-/**
- * The Automation access of the Apple apps that a plugin drives. Before the install, the switch says
- * whether the install asks macOS; after it, the button asks again, such as for an app added later.
- */
 function AutomationRow(props: { scope: MarketplaceScope; app: PluginApp; automation: MarketplaceMacAutomation }) {
   const { t } = useText();
   const busy = () => props.scope.model.appBusy(props.app.id);
@@ -510,11 +488,9 @@ function AutomationRow(props: { scope: MarketplaceScope; app: PluginApp; automat
 interface AppInformationLink {
   label: string;
   url: string;
-  /** The visible host and path. */
   text: string;
 }
 
-/** What an app does, who makes it, its category and version, and its links: one card. */
 function AppInformation(props: {
   description?: string | undefined;
   developer: string;
@@ -535,7 +511,6 @@ function AppInformation(props: {
               </Text>
             )}
           </Show>
-          {/* `dt` and `dd` stay direct children of the list: axe rejects a wrapper per row. */}
           <dl class="marketplace-props marketplace-info">
             <dt>
               <Text as="span" variant="caption" tone="muted">
@@ -608,7 +583,6 @@ interface ConnectorLink {
   url: string;
 }
 
-/** The publisher's pages, shown in each connector page's information. Only addresses we are sure of. */
 const CONNECTOR_LINKS: Readonly<Record<ConnectorId, readonly ConnectorLink[]>> = {
   slack: [{ label: "plugin.link.website", url: "https://slack.com" }],
   discord: [{ label: "plugin.link.website", url: "https://discord.com" }],
@@ -624,7 +598,6 @@ const CONNECTOR_LINKS: Readonly<Record<ConnectorId, readonly ConnectorLink[]>> =
   protonpass: [{ label: "plugin.link.website", url: "https://proton.me/pass" }],
 };
 
-/** Who makes each connector's service: the name the user knows it by. */
 const CONNECTOR_DEVELOPER = {
   slack: "connector.slack.title",
   discord: "connector.discord.title",
@@ -636,10 +609,8 @@ const CONNECTOR_DEVELOPER = {
   protonpass: "connector.protonPass.title",
 } as const satisfies Record<ConnectorId, AppTextKey>;
 
-/** The information card of a connector page: what it gives, its developer, category and website. */
 function ConnectorInformation(props: { scope: MarketplaceScope; app: ConnectorApp; detail: ConnectorDetail }) {
   const { t } = useText();
-  /* A password manager has a category more exact than the listing's own. */
   const category = () =>
     appSetup(props.app) === "vault" ? t("marketplace.app.onePasswordCategory") : t(CATEGORY_LABELS[props.app.category]);
   return (
@@ -657,7 +628,6 @@ function ConnectorInformation(props: { scope: MarketplaceScope; app: ConnectorAp
   );
 }
 
-/** An MCP server that the user added, and that no catalog app claims. */
 function CustomServerPage(props: { scope: MarketplaceScope; app: CustomApp }) {
   const { t } = useText();
   const model = () => props.scope.model;
@@ -674,8 +644,6 @@ function CustomServerPage(props: { scope: MarketplaceScope; app: CustomApp }) {
         props.scope.nav.back();
       });
   };
-  /* OpenBot connects to a custom server only for a test, so the header says what the user set, and
-     not that the server answers. */
   return (
     <IntegrationPage
       class="marketplace-custom-page"
@@ -723,7 +691,6 @@ function CustomServerPage(props: { scope: MarketplaceScope; app: CustomApp }) {
         </ItemGroup>
       </SettingsSection>
       <Show when={model().canConnectApps() ? model().servers : undefined}>
-        {/* In JSX, so the card follows the slot and the row. */}
         {(slots) => <>{slots().controls({ id: props.app.server.id })}</>}
       </Show>
       <Show when={model().mcpAccess}>
@@ -769,11 +736,6 @@ function CustomServerPage(props: { scope: MarketplaceScope; app: CustomApp }) {
   );
 }
 
-/**
- * The form of a custom MCP server, as a page of the Marketplace. It sits in the scroll of the window,
- * so it has the fades of the other pages and no scroll of its own. A new server that saves opens its
- * own page; Cancel and a saved edit go back.
- */
 export function MarketplaceServerPage(props: { scope: MarketplaceScope; id: string | null }) {
   const nav = () => props.scope.nav;
   const close = (saved: McpServerConfig | null) => {
@@ -785,13 +747,11 @@ export function MarketplaceServerPage(props: { scope: MarketplaceScope; id: stri
   };
   return (
     <div class="marketplace-view marketplace-server-page">
-      {/* In JSX, so another row opens a form of its own. */}
       <Show when={props.scope.model.servers}>{(slots) => <>{slots().form({ id: props.id, onClose: close })}</>}</Show>
     </div>
   );
 }
 
-/** The page of one app: a connector, a catalog app, or a server that the user added. */
 export function MarketplaceAppPage(props: { scope: MarketplaceScope; id: string }) {
   const { t } = useText();
   const model = () => props.scope.model;

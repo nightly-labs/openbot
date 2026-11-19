@@ -44,9 +44,9 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
     },
     {
       slug: "obsidian",
-      version: "1.0.0",
+      version: "1.1.0",
       featured: false,
-      detailSha256: "37e15fe89d36e955c2b289f421b3a987a88841a3525281a0eb2b4f82974087ca",
+      detailSha256: "3869f8c6df24d2ea40bdc12fe627eedc27c2fc6886b486c30dcb26a48ef1b079",
     },
     {
       slug: "atlassian",
@@ -1561,7 +1561,14 @@ export interface PluginCatalogApp {
 
 export type PluginCatalogServer =
   | { name: string; transport: "http"; url: string; earlierUrls?: string[]; auth?: unknown }
-  | { name: string; transport: "stdio"; command: string; args: string[]; auth?: unknown };
+  | {
+      name: string;
+      transport: "stdio";
+      command: string;
+      args: string[];
+      env?: Record<string, string>;
+      auth?: unknown;
+    };
 
 export interface PluginCatalogDetail {
   slug: string;
@@ -1728,7 +1735,7 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     category: "productivity",
     creatorName: "Obsidian",
     iconUrl: "https://obsidian.md/apple-touch-icon.png",
-    version: "1.0.0",
+    version: "1.1.0",
     prompts: [
       { id: "prompt-recall", text: "What do my notes say about the decisions on this project?" },
       { id: "prompt-save", text: "Save this decision as a new note in my vault." },
@@ -1745,6 +1752,7 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
           transport: "stdio",
           command: "npx",
           args: ["-y", "obsidian-mcp-server@3.7.2"],
+          env: { OBSIDIAN_BASE_URL: "https://127.0.0.1:27124" },
           auth: [
             {
               id: "obsidian-key",
@@ -1755,7 +1763,7 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
                   id: "token",
                   label: "API key",
                   env: "OBSIDIAN_API_KEY",
-                  hint: 'In Obsidian, open Settings > Local REST API. Copy the API key and turn on "Enable non-encrypted (HTTP) server".',
+                  hint: "In Obsidian, open Settings > Local REST API and copy the API key.",
                 },
               ],
               docsUrl: "https://github.com/coddingtonbear/obsidian-local-rest-api",

@@ -12,7 +12,6 @@ export const messages = defineMessages("error.backend", {
   "error.backend.webhookTestUnavailable":
     "The host cannot take the test event now. Make sure it is signed in, then try again.",
   "error.backend.webhookTestFailed": "The test event did not reach the routine. Try again.",
-  // Errors that the backend services send: channels, messages, routines, memories, MCP, browser and remote desktop.
   "error.backend.browserViewRemoteOnly": "A live browser view is only for a remote host.",
   "error.backend.browserViewUnsupported": "This remote host does not support a live browser view.",
   "error.backend.browserViewLimit": "Too many browser views are open on this host.",
@@ -89,6 +88,7 @@ export const messages = defineMessages("error.backend", {
   "error.backend.channelCompactNotSupported":
     "No member of this channel can compact on request. Members that support it compact their context automatically when it is almost full.",
   "error.backend.channelArchived": "Restore this channel before sending messages or changing tasks.",
+  "error.backend.channelArchiveRunning": "Stop the running work in this channel, then delete it.",
   "error.backend.channelReferenceUnavailable": "The referenced channel message is unavailable.",
   "error.backend.channelTaskNotFound": "Channel task not found.",
   "error.backend.channelTaskComplete": "This task is already complete.",
@@ -120,6 +120,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.memoryGone": "This memory no longer exists.",
   "error.backend.routineGone": "This routine no longer exists.",
   "error.backend.routineRunGone": "This routine run no longer exists.",
+  "error.backend.routineRunFailedNoReason":
+    "The run stopped with an error, but no reason came with it. Open the run to see what the agent did.",
   "error.backend.turnNotStarted": "The provider did not start this turn.",
   "error.backend.routineResultConnectionOff": "This messaging connection is off or removed. Choose another place.",
   "error.backend.routineResultNoDelivery": "This run has no answer to send again.",
@@ -246,8 +248,12 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpSignInAppRefused":
     "The sign-in server did not accept the sign-in app of this server. Check the client ID and the client secret of the sign-in app, then sign in again.",
   "error.backend.mcpCommandNotFound": "Command not found: {command}",
+  "error.backend.mcpProviderLimit":
+    "This agent can use only a limited number of MCP servers. To use this server, turn off an MCP server that the agent does not need.",
   "error.backend.mcpRegistrationRefused":
     "The sign-in server does not accept OpenBot as an app yet. Your account is not the cause. Use another way to connect, such as a local MCP server.",
+  "error.backend.mcpRegistrationUnavailable":
+    "The sign-in server cannot register OpenBot as an app. Your account is not the cause. To connect, save this server in Marketplace, Apps, then add a sign-in app to it.",
   "error.backend.mcpSignInAbandonedGeneric": "The sign-in was abandoned.",
   "error.backend.mcpSignInForgotten": "The MCP sign-in was forgotten while it was running.",
   "error.backend.mcpSignInAbandoned": "The MCP sign-in was abandoned.",
@@ -259,6 +265,7 @@ export const messages = defineMessages("error.backend", {
     "This server asks for a sign-in, and OpenBot signs in only over https. Change the URL to {url}.",
   "error.backend.mcpSignInCancelled": "The sign-in was cancelled.",
   "error.backend.mcpSignInTimedOut": "The sign-in was not finished in the browser.",
+  "error.backend.mcpSignInRefused": "The sign-in page refused access. Sign in again.",
   "error.backend.mcpSignInResponseTimedOut": "The sign-in response did not arrive in time.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot could not read the sign-in information of this server. Check the server address and try again.",
@@ -266,9 +273,11 @@ export const messages = defineMessages("error.backend", {
     "The sign-in server sent an answer that OpenBot cannot read. If the service gives you an API key or a token, add it to the settings of this server, then test the connection again.",
   "error.backend.mcpServerExited":
     "The server stopped before it answered. Run the command in a terminal to see its error.",
+  "error.backend.mcpServerExitedWithOutput": "The server stopped before it answered. It wrote: {detail}",
   "error.backend.mcpServerFailedToStart": "The server did not start: {reason}",
   "error.backend.mcpServerStartAbandoned":
     "{provider} stopped waiting before the server started, so its agents do not get the tools of this server.",
+  "error.backend.mcpServerStoppedDuringCall": "The MCP server stopped before it answered this call.",
   "error.backend.mcpToolSchemaRefused":
     "Its tool {tool} has an input format that this provider cannot read. Agents on other providers still get the server.",
   "error.backend.mcpServerSignInForProvider":
@@ -291,6 +300,8 @@ export const messages = defineMessages("error.backend", {
     "OpenBot could not start its local sign-in connection for this server. Restart OpenBot, then try again.",
   "error.backend.mcpOAuthSignInNeeded":
     "The sign-in to this MCP server has ended. The user must sign in to it again in OpenBot.",
+  "error.backend.mcpOAuthRenewalFailed":
+    "OpenBot could not renew the sign-in to this MCP server now. The sign-in is kept, and the next request tries again. If this error continues, the user can sign out of the server in OpenBot and sign in again.",
   "error.backend.mcpOAuthRequestRefused":
     "The MCP server refused this request, but the sign-in to it is still active. Possibly the account cannot use this tool, or the sign-in did not give all the necessary access. The user can examine the plan and the access of the account at the service, or sign in to the server again in OpenBot and allow all the access that it asks for.",
   "error.backend.mcpServerUnreachable": "OpenBot could not reach the server. Check the URL and your network.",
@@ -429,12 +440,10 @@ export const messages = defineMessages("error.backend", {
     "The sign-in server of this MCP server changed, so OpenBot did not send it the sign-in app. If the change is correct, remove the sign-in app and add it again.",
   "error.backend.mcpSignInAppNoServer": "Save this MCP server as a URL server before you add a sign-in app.",
   "error.backend.mcpSignInAppUnavailable": "This computer cannot keep a sign-in app.",
-  // Tasks: conversations of one agent that run beside its own chat.
   "error.backend.taskMoveRefused": "Only a message that you sent to this agent alone can run as a task.",
   "error.backend.taskNotFound": "This task is not available.",
   "error.backend.taskClosed": "This task is closed. Open it again to send a message.",
   "error.backend.taskStillRunning": "This task still runs. Wait until it stops, then close it.",
-  // Side threads. Hosts before side threads send the task texts above, so those keys stay.
   "error.backend.threadNotFound": "This thread is not available.",
   "error.backend.threadStillRunning": "This thread still runs. Stop it, then try again.",
   "error.backend.threadArchived": "This thread is archived. Restore it to send a message.",
@@ -445,6 +454,7 @@ export const messages = defineMessages("error.backend", {
   "error.backend.branchSourceBusy": "Stop the current turn before you branch this chat.",
   "error.backend.branchMessageNotFound": "You can branch only from a finished answer of the agent.",
   "error.backend.branchRemoteUnsupported": "Branches are only available for agents on this computer.",
+  "error.backend.feedbackWithdrawRemoteUnsupported": "To remove this report, ask the agent to remove it.",
   "error.backend.threadMoveRefused": "Only a message that you sent to this agent alone can run in a new thread.",
   "error.backend.taskTitleRequired": "Give the task a short title.",
   "error.backend.taskToolInvalid": "Give the task a title of at most 120 characters and a brief that says what to do.",

@@ -7,22 +7,10 @@ export interface PointerPoint {
   readonly y: number;
 }
 
-/** A path longer than this starts this far from the target, so it crosses few other elements. */
 const MAX_POINTER_PATH = 160;
 const POINTER_PATH_STEPS = 3;
-// Longer than a frame of a throttled tab, and short against the wait of a tab with no frames.
 const POINTER_PATH_MOVE_WAIT = "100 millis";
 
-/**
- * Moves the pointer to `to` in a few events along a slight curve, as a hand does, instead of in
- * one jump. The path starts at `from` when it is near, otherwise a short distance away. The events
- * have no delay between them.
- *
- * Chromium acknowledges a pointer move on the page's next frame. A tab with no frames, such as a
- * hidden tab of a window that does not draw, acknowledges a move only after a second or more. When
- * a path move is not acknowledged in time, the rest of the path is skipped, so the pointer goes to
- * `to` with no more wait than one move.
- */
 export const dispatchPointerMove = Effect.fn("Browser.dispatchPointerMove")(function* (
   send: SendCommand,
   from: PointerPoint | undefined,
@@ -56,12 +44,10 @@ function pointerPath(from: PointerPoint | undefined, to: PointerPoint): PointerP
     dx *= MAX_POINTER_PATH / distance;
     dy *= MAX_POINTER_PATH / distance;
   }
-  // A bend at right angles to the line, up to a tenth of its length.
   const bend = (Math.random() - 0.5) * 0.2;
   const points: PointerPoint[] = [];
   for (let step = 0; step < POINTER_PATH_STEPS; step += 1) {
     const rest = 1 - step / POINTER_PATH_STEPS;
-    // Fast at the start and slow near the target.
     const along = rest * rest;
     const curve = Math.sin(Math.PI * rest) * bend;
     points.push({
@@ -73,7 +59,6 @@ function pointerPath(from: PointerPoint | undefined, to: PointerPoint): PointerP
   return points;
 }
 
-/** A press holds the button for 30 to 60 ms, as a quick human click does. A press with no hold is a bot signal. */
 function pressHold() {
   return Effect.sleep(30 + Math.floor(Math.random() * 30));
 }
@@ -140,16 +125,7 @@ export const dispatchShortcut = Effect.fn("Browser.dispatchShortcut")(function* 
   const { text: keyText, ...normalized } = yield* browserSync(() => normalizeKey(key));
   const modifiers = modifierMask(modifierNames);
   const shiftOnly = modifiers === SHIFT_MODIFIER;
-  // A named key gets its character from the alias table; a single-character shortcut is its own.
-  // A command modifier gets none, because `Ctrl+S` is a command rather than an `s` in the document.
-  // Shift is not one of those: `Shift+Enter` is how a composer spells "line break, do not submit",
-  // and suppressing its character made the shortcut fire a key event, insert nothing, and report
-  // success. Which glyph Shift produces is only knowable for the alias keys, whose text does not
-  // depend on it, and for a letter -- `Shift+1` is `!` on a US layout and something else on half a
-  // dozen others, so it stays a key event rather than a guessed character.
   const character = keyText ?? (key.length === 1 ? (shiftOnly ? shiftedLetter(key) : key) : undefined);
-  // A real `Shift+a` reports `A` in `event.key`, not an `a` with a shift flag beside it, and the
-  // character event has to agree with the key events around it.
   const keyInfo = shiftOnly && keyText === undefined && character ? { ...normalized, key: character } : normalized;
   const pressedModifiers: string[] = [];
   let keyPressed = false;
@@ -170,9 +146,6 @@ export const dispatchShortcut = Effect.fn("Browser.dispatchShortcut")(function* 
     yield* send("Input.dispatchKeyEvent", { type: "rawKeyDown", ...keyInfo, modifiers }, sessionId);
     keyPressed = true;
     if (character !== undefined && (modifiers === 0 || shiftOnly))
-      // The keypress has to agree with the keydown around it. Without the mask CDP defaults it to
-      // zero, so `Shift+Enter` arrives at the page as an unshifted Enter -- and a composer that
-      // decides between "send" and "line break" in its keypress handler sends the message.
       yield* send("Input.dispatchKeyEvent", { type: "char", ...keyInfo, modifiers, text: character }, sessionId);
     yield* send("Input.dispatchKeyEvent", { type: "keyUp", ...keyInfo, modifiers }, sessionId);
     keyPressed = false;
@@ -205,7 +178,6 @@ function normalizeModifier(value: string) {
   return null;
 }
 
-// The keys of a US layout: each character with its unshifted and shifted twin, `code` and key code.
 const US_SYMBOL_KEYS: readonly (readonly [string, string, string, number])[] = [
   ["`", "~", "Backquote", 192],
   ["-", "_", "Minus", 189],
@@ -254,39 +226,13 @@ const US_KEYS: ReadonlyMap<string, UsKey> = new Map<string, UsKey>([
   ),
 ]);
 
-/**
- * Text up to this length is typed as key events, one key per character, as a person types it. A
- * page that counts key events before it accepts a value then accepts it. Longer text, and each
- * character that has no key on a US layout, is inserted as text: it is faster, and key events
- * would give no more. Empty text is inserted too: it deletes the selection, as a replace needs.
- */
 const MAX_KEYED_TEXT = 128;
 
-/**
- * Code editors such as CodeMirror and Monaco add a closing bracket, quote or tag, or an indent,
- * when a person types one of these characters. Text that has one is inserted in one piece, so the
- * field gets the exact text.
- */
 const EDITOR_COMPLETED_TEXT = /[\n\r([{'"`<]/;
 
 interface TextChecks {
-  /**
-   * Tells whether the first key event reached the page. Chromium can drop key events for a tab that
-   * it accepts inserted text for, as for a hidden tab under Xvfb, and drops them with no error. The
-   * rest of the text is then inserted, as it was before keys.
-   */
   readonly keyArrived?: Effect.Effect<boolean, BrowserOperationError>;
-  /**
-   * Saves the field text for `keyArrived` again. It runs when text was inserted before the first
-   * key, so that the inserted text does not read as a key that arrived.
-   */
   readonly saveText?: Effect.Effect<void, BrowserOperationError>;
-  /**
-   * Runs before each key or insert after the first one, with the count of characters that the page
-   * already has. It fails when a key handler moved focus or the deadline passed, so that the error
-   * can tell the caller that part of the text is in the field. Focus that moves after the last
-   * character, as in a one-time code box, is not a failure.
-   */
   readonly beforeNext?: (typed: number, total: number) => Effect.Effect<void, BrowserOperationError>;
 }
 
@@ -324,7 +270,6 @@ export const dispatchText = Effect.fn("Browser.dispatchText")(function* (
     if (pending) yield* insert(pending);
     pending = "";
     yield* beforePiece;
-    // The characters before the first key have no US key, so they were inserted.
     if (!keyed && index > 0 && checks.saveText) yield* checks.saveText;
     yield* dispatchTextKey(send, character, sessionId);
     typed += 1;
@@ -342,7 +287,6 @@ export const dispatchTextKey = Effect.fn("Browser.dispatchTextKey")(function* (
   character: string,
   sessionId?: string,
 ) {
-  // A character that has no US key keeps the key event that Chromium gives an unknown key.
   const usKey = US_KEYS.get(character);
   const key = {
     key: character,
@@ -374,12 +318,6 @@ export const dispatchTextKey = Effect.fn("Browser.dispatchTextKey")(function* (
   );
 });
 
-// `text` is the character the key produces, and only the keys that produce one carry it. Chromium
-// decides implicit form submission and text insertion from the character event, not the key event:
-// without `\r` here, `press("Enter")` fires `keydown` and nothing else, so a plain `<form>` with no
-// script never submits and a textarea never gains a line. `Tab` stays characterless on purpose --
-// the browser moves focus on the key event, and a character dispatched afterwards would land in
-// whatever gained focus.
 const KEY_ALIASES: Record<string, [string, string, number?, string?]> = {
   enter: ["Enter", "Enter", 13, "\r"],
   tab: ["Tab", "Tab", 9],
@@ -418,14 +356,14 @@ function normalizeKey(key: string): {
   }
   if (!/^[\w\-.,/;='[\]`]{1,20}$/u.test(key)) throw new Error(`Unsupported browser key: ${key}`);
   const upper = key.length === 1 ? key.toUpperCase() : key;
-  return { key, code: key.length === 1 && /[a-z]/i.test(key) ? `Key${upper}` : upper };
+  const usKey = key.length === 1 ? US_KEYS.get(key) : undefined;
+  return {
+    key,
+    code: key.length === 1 && /[a-z]/i.test(key) ? `Key${upper}` : upper,
+    ...(usKey ? { windowsVirtualKeyCode: usKey.keyCode } : {}),
+  };
 }
 
-/**
- * The key code and character of a named key, as `KeyboardEvent.key` spells it. Chromium runs an
- * editing command such as Backspace or an arrow from the key code, and submits a form from Enter's
- * character, so a named key that has neither does nothing in the page.
- */
 export function namedKey(key: string): {
   windowsVirtualKeyCode?: number | undefined;
   nativeVirtualKeyCode?: number | undefined;
@@ -444,7 +382,6 @@ function macNativeVirtualKeyCode(key: string): number | undefined {
   return process.platform === "darwin" ? { ArrowUp: 126, ArrowDown: 125, Home: 115 }[key] : undefined;
 }
 
-/** Chromium's `Input.dispatchKeyEvent` bit for Shift, the one modifier that still yields a character. */
 export const SHIFT_MODIFIER = 8;
 
 function shiftedLetter(key: string): string | undefined {

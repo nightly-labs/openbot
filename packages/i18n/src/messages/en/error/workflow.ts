@@ -1,6 +1,5 @@
 import { defineMessages } from "../../../message";
 
-/** Errors that the workflow store and runtime send. */
 export const messages = defineMessages("error.workflow", {
   "error.workflow.missing": "This workflow no longer exists.",
   "error.workflow.versionMissing": "This version of the workflow no longer exists.",
@@ -15,6 +14,7 @@ export const messages = defineMessages("error.workflow", {
   "error.workflow.agentMissing": "Choose an agent for this step.",
   "error.workflow.handoffFailed": "OpenBot could not send this step to its agent.",
   "error.workflow.agentStepEnded": "The agent's message for this step was removed before it answered.",
+  "error.workflow.agentStepStopped": "The agent stopped before it answered this step. Run the step again.",
   "error.workflow.conditionUnclear": "The model did not answer yes or no.",
   "error.workflow.modelFailed": "The model could not answer. Run the step again.",
   "error.workflow.modelTimedOut":
@@ -30,6 +30,8 @@ export const messages = defineMessages("error.workflow", {
   "error.workflow.pictureMissing": "The picture is no longer on the server. Send it again.",
   "error.workflow.pictureType": "Use a PNG, JPEG or WebP picture.",
   "error.workflow.mediaInputMissing": "A picture from a step before this one is not available. Run that step again.",
+  "error.workflow.mediaEmptyRequest":
+    "Write a description, or run the steps before this one so that a text or a picture comes in.",
   "error.workflow.mediaInputNotImage":
     "This step takes only pictures, not videos. Remove the connection from the video.",
   "error.workflow.stepMissing": "This step no longer exists.",

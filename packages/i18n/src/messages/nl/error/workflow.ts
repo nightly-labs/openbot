@@ -17,6 +17,8 @@ export const messages = {
   "error.workflow.agentMissing": "Kies een agent voor deze stap.",
   "error.workflow.handoffFailed": "OpenBot kon deze stap niet naar de agent sturen.",
   "error.workflow.agentStepEnded": "Het bericht van de agent voor deze stap is verwijderd voordat de agent antwoordde.",
+  "error.workflow.agentStepStopped":
+    "De agent is gestopt voordat hij deze stap beantwoordde. Voer de stap opnieuw uit.",
   "error.workflow.conditionUnclear": "Het model antwoordde niet met ja of nee.",
   "error.workflow.modelFailed": "Het model kon niet antwoorden. Voer de stap opnieuw uit.",
   "error.workflow.modelTimedOut":
@@ -34,6 +36,8 @@ export const messages = {
   "error.workflow.pictureType": "Gebruik een PNG-, JPEG- of WebP-afbeelding.",
   "error.workflow.mediaInputMissing":
     "Een afbeelding van een eerdere stap is niet beschikbaar. Voer die stap opnieuw uit.",
+  "error.workflow.mediaEmptyRequest":
+    "Schrijf een beschrijving, of voer de stappen ervoor uit zodat er een tekst of afbeelding binnenkomt.",
   "error.workflow.mediaInputNotImage":
     "Deze stap neemt alleen afbeeldingen aan, geen video’s. Verwijder de verbinding vanaf de video.",
   "error.workflow.stepMissing": "Deze stap bestaat niet meer.",

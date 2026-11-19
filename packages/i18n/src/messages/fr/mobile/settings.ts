@@ -125,26 +125,65 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Luminosité",
   "mobile.settings.appearance.messageColorFooter":
     "Avec Couleur de l’agent, vos messages dans une discussion avec un agent prennent la couleur de cet agent. Avec Couleur personnalisée, vos messages dans toutes les discussions prennent la couleur choisie. La couleur du texte change pour rester lisible.",
+  "mobile.settings.appearance.bubbleStyle": "Style des bulles",
+  "mobile.settings.appearance.bubbleStyleSolid": "Plein",
+  "mobile.settings.appearance.bubbleStyleTint": "Teinte",
+  "mobile.settings.appearance.seeThroughBubbles": "Bulles transparentes",
+  "mobile.settings.appearance.seeThroughBubblesNote":
+    "Les bulles de l’agent et les bulles sans couleur laissent voir l’arrière-plan. Sans arrière-plan, les bulles restent toujours opaques.",
+  "mobile.settings.appearance.tab.colors": "Couleurs",
+  "mobile.settings.appearance.tab.chat": "Chat",
+  "mobile.settings.appearance.preview.routines": "3 exécutions de routine",
+  "mobile.settings.appearance.preview.thinking": "A réfléchi 4 secondes",
+  "mobile.settings.appearance.preview.memory": "1 souvenir enregistré",
+  "mobile.settings.appearance.backdrop.title": "Arrière-plan",
+  "mobile.settings.appearance.backdrop.footer":
+    "S’affiche derrière l’accueil et vos chats sur ce téléphone. Un agent peut en choisir un pour vous. Annuler dans le chat remet l’ancien.",
+  "mobile.settings.appearance.backdrop.none": "Aucun",
+  "mobile.settings.appearance.backdrop.pond": "Bassin à koïs",
+  "mobile.settings.appearance.backdrop.jellyfish": "Méduses",
+  "mobile.settings.appearance.backdrop.sunset": "Coucher de soleil rétro",
+  "mobile.settings.appearance.backdrop.snowfall": "Chute de neige",
+  "mobile.settings.appearance.backdrop.fireflies": "Lucioles",
+  "mobile.settings.appearance.backdrop.agentPage": "Page de l’agent",
+  "mobile.settings.appearance.backdrop.agentPageNote": "Défini par un agent",
+  "mobile.settings.appearance.backdrop.photo": "Photo",
+  "mobile.settings.appearance.backdrop.photoChoose": "Choisir dans vos photos",
+  "mobile.settings.appearance.backdrop.photoChange": "Touchez de nouveau pour choisir une autre photo",
+  "mobile.settings.appearance.backdrop.strength": "Intensité de l’arrière-plan",
+  "mobile.settings.appearance.backdrop.calm": "Doux",
+  "mobile.settings.appearance.backdrop.vivid": "Vif",
+  "mobile.settings.appearance.backdrop.strengthFooter":
+    "Un arrière-plan doux garde les longues réponses lisibles. C’est en haut de l’accueil qu’il se voit le plus.",
+  "mobile.settings.appearance.backdrop.previewQuestion": "Pouvez-vous rédiger la note de version ?",
+  "mobile.settings.appearance.backdrop.previewAnswer":
+    "Voici un brouillon : l’arrière-plan défini par un agent s’affiche maintenant aussi sur votre téléphone.",
   "mobile.settings.appearance.chatBackground": "Arrière-plan du chat",
   "mobile.settings.appearance.chatBackgroundDefault": "Par défaut",
   "mobile.settings.appearance.chatBackgroundFooter":
     "Chaque thème garde sa propre couleur. Une couleur qui rend le texte difficile à lire devient plus foncée ou plus claire.",
+  "mobile.settings.appearance.chatBackgroundBackdropFooter":
+    "L’arrière-plan remplace l’arrière-plan du chat. Choisissez Aucun comme arrière-plan pour utiliser une couleur.",
   "mobile.settings.appearance.collapseRoutines": "Réduire l’activité des routines",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Les événements de routines consécutifs d’une discussion s’affichent sur une seule ligne réduite. Touchez la ligne pour les afficher.",
+  "mobile.settings.appearance.replyDetails": "Détails des réponses",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "Désactivez un détail pour masquer sa ligne dans les chats. L'agent continue de réfléchir, de lancer des sous-agents et d'enregistrer des souvenirs.",
+  "mobile.settings.appearance.showThinking": "Afficher la réflexion de l'agent",
+  "mobile.settings.appearance.showSubagents": "Afficher les sous-agents",
+  "mobile.settings.appearance.showMemoryChanges": "Afficher les souvenirs enregistrés",
   "mobile.settings.appearance.fullVisuals": "Afficher les aperçus visuels en entier",
   "mobile.settings.appearance.fullVisualsFooter":
     "Un visuel d’un agent s’affiche dans le chat sur toute sa hauteur. Si cette option est désactivée, un visuel haut est coupé ; touchez-le pour le voir en entier.",
   "mobile.settings.animations.title": "Animations",
-  "mobile.settings.animations.footer":
-    "Désactivez « Animations » pour réduire les mouvements dans toute l’app. Quand « Réduire les animations » est activé dans les réglages du téléphone, l’app réduit aussi les mouvements. Les animations ci-dessous restent alors désactivées.",
-  "mobile.settings.animations.all": "Animations",
+  "mobile.settings.animations.fullMotion": "Mouvement complet",
+  "mobile.settings.animations.reduced": "Réduit",
+  "mobile.settings.animations.motionFooter":
+    "Réduit diminue les animations dans toute l’app et garde les animations ci-dessous désactivées. Si Réduire les animations est activé dans les réglages du téléphone, l’app réduit aussi les animations.",
   "mobile.settings.animations.agentFaces": "Visages animés des agents",
   "mobile.settings.animations.agentFacesFooter":
     "Les avatars des agents bougent leur visage pendant que les agents travaillent et se reposent. Désactivé, les visages restent immobiles et les personnages de l’écran d’accueil et de l’accueil vide ne flottent plus.",
-  "mobile.settings.animations.composerResize": "Champ de message compact",
-  "mobile.settings.animations.composerResizeFooter":
-    "Le champ de message devient une petite barre quand le clavier est fermé. Désactivé, le champ garde sa taille complète.",
   "mobile.settings.animations.textReveal": "Animer les réponses",
   "mobile.settings.animations.textRevealFooter":
     "Une réponse s’écrit mot par mot, et sa bulle grandit en douceur. Désactivé, le texte s’affiche dès son arrivée.",
@@ -239,12 +278,22 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Télécharger les gros fichiers automatiquement",
   "mobile.settings.conversations.largeFilesFooter":
     "Les images, vidéos et fichiers audio de plus de {small} ne se téléchargent que lorsque vous les touchez. Activez cette option pour les télécharger directement, jusqu’à {large}. Cela peut utiliser beaucoup de données mobiles.",
+  "mobile.settings.conversations.messageField": "Champ de message",
+  "mobile.settings.conversations.compact": "Compact",
+  "mobile.settings.conversations.fullSize": "Taille complète",
+  "mobile.settings.conversations.compactFooter":
+    "Compact transforme le champ de message en petite barre tant que le clavier est fermé.",
+  "mobile.settings.conversations.compactComposerReduced":
+    "Les animations sont réduites dans Animations ou dans les réglages du téléphone : le champ de message garde sa taille complète.",
+  "mobile.settings.conversations.media": "Photos et fichiers",
   "mobile.settings.conversations.swipeLeft": "Balayer à gauche dans un chat",
   "mobile.settings.conversations.swipeRight": "Balayer à droite dans un chat",
+  "mobile.settings.conversations.swipeQuestion": "Question annexe",
   "mobile.settings.conversations.swipeThreads": "Fils",
   "mobile.settings.conversations.swipeBrowser": "Navigateur",
+  "mobile.settings.conversations.swipeOff": "Désactivé",
   "mobile.settings.conversations.swipeFooter":
-    "Un balayage opposé à Retour dans le chat d’un agent ouvre ceci. Un balayage sur un message y répond toujours.",
+    "Un balayage opposé à Retour dans le chat d’un agent ouvre ceci. Le même balayage sur un message affiche l’heure des messages.",
   "mobile.settings.conversations.pullInfo": "Tirer vers le haut pour les infos",
   "mobile.settings.conversations.pullInfoFooter":
     "Dans un chat, un canal ou un fil, tirez vers le haut après le dernier message, puis relâchez pour ouvrir ses infos.",
@@ -518,6 +567,11 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "Impossible d’arrêter le processus.",
   "mobile.settings.agents.processes.stopTitle": "Arrêter ce programme ?",
   "mobile.settings.agents.processes.stopLabel": "Arrêter le processus {pid}",
+  "mobile.settings.quickActions.title": "Menu de l’icône",
+  "mobile.settings.quickActions.footer":
+    "Touchez longuement l’icône OpenBot pour voir ces actions. Vous pouvez en activer {count} au maximum.",
+  "mobile.settings.quickActions.latestChat": "Dernier chat",
+  "mobile.settings.quickActions.secondChat": "Avant-dernier chat",
   "mobile.settings.shortcuts.title": "Raccourcis",
   "mobile.settings.shortcuts.agent": "Agent",
   "mobile.settings.shortcuts.none": "Aucun",
@@ -531,7 +585,8 @@ export const messages = {
   "mobile.settings.shortcuts.card.noAgent.action": "Choisir un agent",
   "mobile.settings.shortcuts.card.locked.title": "OpenBot est verrouillé",
   "mobile.settings.shortcuts.card.locked.action": "Ouvrir OpenBot",
-  "mobile.settings.shortcuts.footer": "Send Message dans l’app Raccourcis envoie à cet agent. L’app ne s’ouvre pas.",
+  "mobile.settings.shortcuts.footer":
+    "Send Message dans l’app Raccourcis envoie à cet agent. L’app ne s’ouvre pas. Open Agent ouvre sa discussion.",
   "mobile.settings.shortcuts.send.sent": "Envoyé",
   "mobile.settings.shortcuts.send.failed": "OpenBot n’a pas pu envoyer ce message.",
   "mobile.settings.shortcuts.send.unconfirmed": "Pas de réponse du serveur. Le message est peut-être dans le chat.",

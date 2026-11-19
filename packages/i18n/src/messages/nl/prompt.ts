@@ -45,12 +45,13 @@ export const messages = {
   "prompt.browser.title.pending": "Voltooi de stap op {host}",
   "prompt.browser.cancelled": "Geannuleerd",
   "prompt.browser.reload":
-    "Rond het inloggen af en laad daarna de browserpagina opnieuw voordat je “Ik ben klaar” kiest. De pagina kan pas weer worden geïnspecteerd nadat ze opnieuw is geladen.",
+    "OpenBot kon het wachtwoord of de code niet helemaal invullen. Controleer de pagina en vul in wat ontbreekt. Rond het inloggen af en laad daarna de browserpagina opnieuw voordat je “Ik ben klaar” kiest. De pagina kan pas weer worden geïnspecteerd nadat ze opnieuw is geladen.",
   "prompt.browser.continuing": "{name} gaat verder.",
   "prompt.browser.cancelledBody": "De browserstap is geannuleerd.",
   "prompt.browser.pendingBody":
     "Open de pagina om het inloggen, de verificatie of de toestemming af te ronden. Laat {name} daarna verdergaan.",
   "prompt.browser.openPage": "{title} openen",
+  "prompt.browser.openFailed": "Kan de pagina niet openen in het hoofdvenster. Probeer het opnieuw.",
   "prompt.browser.done": "Ik ben klaar",
   "prompt.browser.pageFallback": "Browserpagina",
   "prompt.browser.hostFallback": "de browser",

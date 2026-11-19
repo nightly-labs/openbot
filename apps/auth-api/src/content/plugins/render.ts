@@ -1,9 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Render here is taken from render.com and Render's MCP server repository.
-// Each page used is in `sources`. Check the sources again, and move `checkedAt`, whenever this
-// file changes.
-
 export const RENDER_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

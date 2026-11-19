@@ -196,6 +196,8 @@ export const messages = {
   "agentSettings.fullAccess.confirm": "Permitir acceso completo",
   "agentSettings.fullAccess.askConfirm": "Usar Preguntar antes",
   "agentSettings.links.usage": "Uso",
+  "agentSettings.links.apps": "Apps",
+  "agentSettings.links.appsScope": "Todos los agentes",
   "agentSettings.links.memories": "Recuerdos",
   "agentSettings.links.memoriesCount": {
     one: "{count} guardado",

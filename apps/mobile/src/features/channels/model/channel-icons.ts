@@ -28,10 +28,6 @@ import Store from "lucide-react-native/icons/store";
 import Workflow from "lucide-react-native/icons/workflow";
 import Zap from "lucide-react-native/icons/zap";
 
-/**
- * The glyph and name of each channel icon, as the desktop channel settings draw them. The contracts
- * own the names and their order; a saved name that this version does not know shows the member faces.
- */
 export const CHANNEL_ICONS = {
   megaphone: { glyph: Megaphone, label: "mobile.channel.picture.icon.megaphone" },
   chart: { glyph: ChartArea, label: "mobile.channel.picture.icon.chart" },
@@ -55,14 +51,12 @@ export const CHANNEL_ICONS = {
   card: { glyph: CreditCard, label: "mobile.channel.picture.icon.card" },
 } as const satisfies Record<ChannelIconName, { glyph: LucideIcon; label: MobileTextKey }>;
 
-/** The colour of a new icon, before the reader chooses one, as on the desktop. */
 export const DEFAULT_CHANNEL_ICON_HUE: AvatarHue = 215;
 
 function isChannelIconName(name: string): name is ChannelIconName {
   return CHANNEL_ICON_NAMES.some((known) => known === name);
 }
 
-/** A saved icon this version can draw, or null. A hue from a later version takes the default colour. */
 export function knownChannelIcon(
   icon: ChannelIcon | null | undefined,
 ): { name: ChannelIconName; hue: AvatarHue } | null {

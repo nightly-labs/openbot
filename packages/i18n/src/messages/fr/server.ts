@@ -48,6 +48,7 @@ export const messages = {
   "server.compatibility.updateHostTitle": "Mettez à jour OpenBot sur {name}",
   "server.compatibility.unsafeDataTitle": "L’hôte a renvoyé des données non sûres",
   "server.compatibility.cannotConnectTitle": "Impossible de se connecter à {name}",
+  "server.compatibility.safeModeTitle": "{name} ne démarre pas",
   "server.compatibility.updateClientDescription":
     "Cette application prend en charge uniquement des protocoles plus anciens que ceux de l’hôte. Mettez à jour cette application, puis réessayez.",
   "server.compatibility.updateHostDescription":
@@ -117,6 +118,7 @@ export const messages = {
   "server.local.create": "Créer le serveur",
   "server.local.creating": "Création du serveur…",
   "server.local.createFailed": "Impossible de créer le serveur.",
+  "server.local.createFailedRetry": "Un problème est survenu. Réessayez. Si le problème persiste, redémarrez OpenBot.",
   "server.local.limitReached":
     "Vous pouvez avoir au plus {limit} serveurs sur cet ordinateur. Supprimez-en un pour en créer un autre.",
   "server.local.deleteConfirmTitle": "Supprimer {name} ?",
@@ -352,7 +354,7 @@ export const messages = {
     "Choisissez ce que les agents de ce serveur peuvent faire quand vous ne le définissez pas pour un agent.",
   "server.settings.timezone": "Fuseau horaire",
   "server.settings.timezoneDescription":
-    "Les nouvelles routines utilisent ce fuseau horaire quand le message n’indique pas celui de l’expéditeur.",
+    "Les nouvelles routines utilisent ce fuseau horaire quand le message n’indique pas celui de l’expéditeur. Sur un serveur, le navigateur l’utilise aussi après le prochain redémarrage.",
   "server.settings.timezoneAutomatic": "Automatique ({zone})",
   "server.settings.timezoneLoadFailed": "Impossible de charger le fuseau horaire du serveur.",
   "server.settings.turnLimit": "Fils en même temps",

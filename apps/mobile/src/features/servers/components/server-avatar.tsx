@@ -19,18 +19,11 @@ import type { MobileServer } from "@/features/workspace/model/workspace-types";
 import { END_X } from "@/shared/lib/text-direction";
 
 const INK = "rgba(0, 0, 0, 0.72)";
-/** The squircle's corner radius as a part of its side. */
 export const SERVER_AVATAR_CORNER_RATIO = 0.32;
 const DOT = 12;
 const DOT_OVERHANG = 2;
-// The ring cut out of the squircle around the dot, so the dot works on any background.
 const DOT_GAP = 2.5;
 
-/**
- * A square with a circular hole around the dot. The mask keeps only the filled part. The dot is at
- * the bottom end corner: `right` puts it on the left in a right-to-left layout, but the drawing
- * of the mask counts from the left, so the hole moves with it.
- */
 function cutoutPath(size: number): string {
   const centerY = size + DOT_OVERHANG - DOT / 2;
   const centerX = END_X === 1 ? centerY : size - centerY;
@@ -47,12 +40,6 @@ function serverInitials(name: string): string {
   return initials.toUpperCase() || "S";
 }
 
-/**
- * A squircle with the server logo; with no logo, the felt plush that an owner or admin chose
- * (`host-appearance-v1`), or else initials in the agent avatar palette. A dot shows the connection
- * state. `logoUri` replaces the saved logo with a draft; `null` shows no logo.
- * `showStatus={false}` leaves out the dot and the dimming, for a place that shows the logo only.
- */
 export function ServerAvatar({
   server,
   size = 48,
@@ -74,7 +61,6 @@ export function ServerAvatar({
       if (!session || !logoKey) throw new Error("The server logo is unavailable.");
       return loadServerLogo(session, server.id, logoKey);
     },
-    // The event that names a new logo can arrive before the host has uploaded it.
     retry: 4,
     staleTime: Infinity,
   });
@@ -95,16 +81,16 @@ export function ServerAvatar({
         : offline;
   const muted = showStatus && !online;
   const showsLogo = Boolean(logo && !logoFailed);
+  const showsPlush = !showsLogo && (server.kind !== "local" || Boolean(server.appearance));
   const plush = useServerPlush(
     server.id,
-    showsLogo ? null : server.appearance,
+    server.appearance,
     size,
     muted ? DISCONNECTED_APPEARANCE.saturation : 1,
+    showsPlush,
   );
-  // The plush has no tile: its shape shows on the background. It is empty while it is drawn, and a
-  // plush that cannot be drawn shows the initials.
   const tile =
-    server.appearance && !showsLogo && !plush.failed ? (
+    showsPlush && !plush.failed ? (
       <View style={{ height: size, opacity: muted ? DISCONNECTED_APPEARANCE.opacity : 1, width: size }}>
         {plush.uri ? (
           <Image

@@ -1,12 +1,3 @@
-// Checks the open-wait tools on the real SQLite stores and mailbox: an agent fills its open waits to
-// the limit with `await_event`, gets its waits back in the refusal, lists them with `list_waits`,
-// and closes one by ID. A second agent reads the counts that `list_agents` shows and closes a wait of
-// the first agent with `agentId`. Each call goes through `AgentWaits.handleTool`, as the tool router
-// sends it. No provider, account or network is started: the user's request is a mailbox delivery
-// marked running for a synthetic turn.
-// Run: `bun scripts/agent-waits-tools-e2e.ts`.
-// Writes .openbot-build/agent-waits-tools-e2e/report.json.
-
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -58,7 +49,6 @@ async function step<T>(name: string, run: () => Promise<T>): Promise<T> {
   }
 }
 
-/** The JSON body of a tool answer. */
 function body(response: OpenBotToolResponse | null): { success: boolean; value: DynamicRecord } {
   assert.ok(response, "AgentWaits answers the tool.");
   const item = response.contentItems[0];
@@ -185,7 +175,6 @@ try {
 
   await step("list_waits returns the IDs, and close_wait closes one by ID", async () => {
     const before = listed(call(worker.id, LIST_WAITS_TOOL, {}).value);
-    // Waits opened in the same millisecond sort by ID, so the IDs are compared as a set.
     assert.deepEqual(
       before.map((wait) => wait.waitId).sort(),
       [...opened.ids].sort(),

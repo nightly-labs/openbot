@@ -1,7 +1,7 @@
 import type { ChannelSummary, SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { GlassView } from "expo-glass-effect";
-import { type Href, router, Stack } from "expo-router";
+import { type Href, router, Stack, useIsFocused } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Ellipsis from "lucide-react-native/icons/ellipsis";
@@ -42,6 +42,13 @@ import {
 } from "@/features/agents/components/chat-drag";
 import { ChatListRail } from "@/features/agents/components/chat-list-rail";
 import { EmptyAgentsScene, type WelcomeHandOff } from "@/features/agents/components/empty-agents-scene";
+import {
+  HOME_CARD_RADIUS,
+  HomeCardBackdrop,
+  HomeCardRow,
+  HomeCardTop,
+  useHomeCard,
+} from "@/features/agents/components/home-backdrop-card";
 import { PinnedAgentsGrid } from "@/features/agents/components/pinned-agents-grid";
 import { SidebarSectionHeader } from "@/features/agents/components/sidebar-section-header";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
@@ -55,6 +62,7 @@ import { ChannelListRow } from "@/features/channels/components/channel-list";
 import { useChannels } from "@/features/channels/components/use-channels";
 import { OnboardingFlow } from "@/features/onboarding/components/onboarding-flow";
 import { useHomeOnboarding } from "@/features/onboarding/context/home-onboarding-context";
+import { useRatingAskGate } from "@/features/rating-ask/model/use-rating-ask-gate";
 import {
   HOME_SEARCH_HEIGHT,
   HomeSearchBar,
@@ -106,12 +114,10 @@ const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const ONBOARDING_EXIT = FadeOut.duration(220).easing(EASE_OUT);
 const ROW_ENTER = FadeIn.duration(180).easing(EASE_OUT).reduceMotion(ReduceMotion.System);
 const LIST_REFLOW = LinearTransition.duration(240).easing(EASE_OUT).reduceMotion(ReduceMotion.System);
-// A row is about 80 pt high. The list keeps a few screens of rows mounted instead of the default 21,
-// so a server with many agents mounts fewer avatars, swipe handlers and menus.
+const CARD_MOVE = { duration: 240, easing: EASE_OUT, reduceMotion: ReduceMotion.Never };
 const LIST_WINDOW_SIZE = 7;
 const LIST_BATCH = 10;
 
-/** A chat row: an agent, or a channel with its server and the agents of that server. */
 interface ChatRowTarget {
   agent?: MobileAgent;
   channel?: ChannelSummary;
@@ -119,16 +125,10 @@ interface ChatRowTarget {
   channelAgents?: ReadonlyMap<string, MobileAgent>;
 }
 
-/**
- * A list row that a closed folder folds to no height. The list keeps the cell, and the height changes
- * on the UI thread.
- */
 function CollapsingRow({ collapsed, children }: { collapsed: boolean; children: ReactNode }) {
   const [initiallyExpanded] = useState(!collapsed);
   const [contentMounted, setContentMounted] = useState(!collapsed);
   const [measuredHeight, setMeasuredHeight] = useState<number | null>(null);
-  // An expanded row at rest lays out in the flow with no animated height. A later render then
-  // cannot put back a first-render height of 0 when the animated value has not reached React.
   const [settled, setSettled] = useState(!collapsed);
   const height = useSharedValue(0);
   useLayoutEffect(() => {
@@ -165,8 +165,6 @@ function CollapsingRow({ collapsed, children }: { collapsed: boolean; children: 
     height: measuredHeight === null && initiallyExpanded ? undefined : height.get(),
     overflow: "hidden",
   }));
-  // Derive the fade from the same height, so a reversed toggle cannot leave
-  // opacity and the accordion at different points in their transitions.
   const contentStyle = useAnimatedStyle(() => ({
     opacity:
       measuredHeight !== null && measuredHeight > 0
@@ -190,7 +188,6 @@ function CollapsingRow({ collapsed, children }: { collapsed: boolean; children: 
           style={resting ? undefined : [{ position: "absolute", top: 0, left: 0, right: 0 }, contentStyle]}
           onLayout={({ nativeEvent }) => {
             const nextHeight = nativeEvent.layout.height;
-            // At rest the row takes its own height, so a collapse starts from the height it has now.
             if (resting) height.set(nextHeight);
             setMeasuredHeight(nextHeight);
           }}
@@ -239,7 +236,6 @@ const TransitioningChatRow = memo(function TransitioningChatRow({
   );
 });
 
-/** A section header, which takes a dropped chat into its section. */
 function SectionDropTarget({ sectionId, children }: { sectionId: string; children: ReactNode }) {
   const ref = useChatDropTarget(sectionDragKey(sectionId));
   return (
@@ -249,7 +245,6 @@ function SectionDropTarget({ sectionId, children }: { sectionId: string; childre
   );
 }
 
-/** Saves a drop: the new pins at once, then the move in the layout of the host. */
 function applyChatDrop(workspace: MobileWorkspaceActions, serverId: string, change: DropChange) {
   if (change.pins && !workspace.setChatPins(serverId, change.pins)) return;
   if (!change.move) return;
@@ -265,7 +260,6 @@ function applyChatDrop(workspace: MobileWorkspaceActions, serverId: string, chan
   });
 }
 
-/** The name of each chat order in the chat options menu. */
 const CHAT_ORDER_LABEL = {
   manual: "mobile.agent.home.sort.manual",
   recent: "mobile.agent.home.sort.recent",
@@ -273,7 +267,6 @@ const CHAT_ORDER_LABEL = {
   "unread-first": "mobile.agent.home.sort.unreadFirst",
 } as const satisfies Record<MobileChatOrder, MobileTextKey>;
 
-/** Saves the order on this phone. A failed write keeps the order until the app restarts. */
 function changeChatOrder(order: MobileChatOrder): void {
   if (order === useChatOrderPreference.getState().order) return;
   void haptics.selection();
@@ -287,16 +280,8 @@ function listItemKey(item: MobileSidebarItem) {
 }
 
 const HEADER_RIPPLE = { borderless: true, radius: 20 } as const;
-/**
- * The bar that the chat list pane draws has the height of the native bar of the screens beside it, so
- * the buttons of the two columns line up. Its iOS buttons have the 48 pt glass of the chat header.
- */
 const PANE_BAR_HEIGHT = NATIVE_BAR_HEIGHT;
 
-/**
- * The glass behind a header button that the screen draws. Android has the plain fill of the search field.
- * On iOS, the chat list pane draws its own bar, so its buttons take Liquid Glass as the native bar does.
- */
 function HeaderGlass({
   glass,
   capsule = false,
@@ -349,7 +334,6 @@ function HeaderIconButton({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      // A Material tonal icon button: a 40 dp filled circle and ripple in a 48 dp target.
       android_ripple={HEADER_RIPPLE}
       className="size-12 items-center justify-center rounded-full"
       style={({ pressed }) => (isIOS && pressed ? { opacity: 0.6 } : undefined)}
@@ -365,11 +349,6 @@ function openFromMenu(href: Href): void {
   router.push(href);
 }
 
-/**
- * Home: the chat list of the selected server. On a narrow window it is the first screen of the stack,
- * under the native bar. On a wide window it is the pane beside the detail column and draws its own
- * bar, since the native bar belongs to the screens of the stack.
- */
 export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "pane" }) {
   const pane = variant === "pane";
   const { t, sourceText } = useText();
@@ -395,7 +374,6 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     [agents, activeServer.id],
   );
   const [foreground, muted] = useThemeColor(["foreground", "muted"]);
-  // The Android header buttons have the glass of the search field.
   const buttonGlass = useChromeGlass({ shadow: isIOS });
   const barBlurTarget = useRef<ViewInstance>(null);
   const iconColor = String(foreground);
@@ -403,29 +381,18 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   const hasSelectedServer = servers.some((server) => server.id === activeServer.id);
   const planLimits = usePlanLimits(activeServer.id);
   const showsPlanLimits = hasSelectedServer && planLimits.rows.length > 0;
-  // A server that the phone shows from its cache has its list at once, while it connects.
   const showLoader =
     (serverDirectoryState === "loading" && servers.length === 0) ||
     (hasSelectedServer && activeServer.initialConnectionPending && channelAgents.size === 0);
-  // The list comes in as the loader starts to roll up, so the two overlap instead of waiting in turn.
-  // The list also waits for the saved chat order, so that it does not show in one order and then move.
   const chatOrderReady = useChatOrderPreference((state) => state.ready);
   const listReady = !showLoader && !isLoaderPresent && chatOrderReady;
-  // A new account gets the first-run flow in place of the empty home. The flow shows its own
-  // connection state, so the loader does not cover it.
   const onboarding = useHomeOnboarding();
   const onboardingReady = onboarding.active && !isLoaderPresent;
-  // Skipped on its welcome, the flow fades off the empty home, which has the welcome's layout. The
-  // home reads where the welcome's main action stood when it comes in; later visits do not.
   const [welcomeHandOff, setWelcomeHandOff] = useState<WelcomeHandOff | null>(null);
   useEffect(() => {
     if (welcomeHandOff) setWelcomeHandOff(null);
   }, [welcomeHandOff]);
-  // The header actions belong to the list. While the loader shows they have nothing to act on, so
-  // they come in with the list. The header itself stays, so its height does not change.
   const headerActions = listReady && !onboarding.active;
-  // Connecting to a server continues while the user reads a chat, so the label only
-  // belongs to this screen while it is the route on top.
   useScreenLoadingLabel(
     "/connected",
     showLoader && !onboarding.active
@@ -436,12 +403,10 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     const byId = new Map(activeAgents.map((agent) => [agent.id, agent]));
     return pinnedAgentIds.flatMap((agentId) => byId.get(agentId) ?? []);
   }, [activeAgents, pinnedAgentIds]);
-  // A deleted channel is archived on the host; the list and the pins leave it out.
   const openChannels = useMemo(
     () => channels.channels.filter((channel) => !channel.archived && !hiddenChannelIds.includes(channel.id)),
     [channels.channels, hiddenChannelIds],
   );
-  // In the order of the pins, which a drag changes.
   const pinnedChannels = useMemo(() => {
     const byId = new Map(openChannels.map((channel) => [channel.id, channel]));
     return pinnedChannelIds.flatMap((channelId) => byId.get(channelId) ?? []);
@@ -450,7 +415,6 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     hiddenAgents.length > 0 ||
     channels.channels.some((channel) => !channel.archived && hiddenChannelIds.includes(channel.id));
   const hasPins = pinnedAgents.length + pinnedChannels.length > 0;
-  // As Hidden chats, the menu offers Deleted channels only when the server has one to restore or read.
   const hasDeletedChannels = channels.supported && channels.channels.some((channel) => channel.archived);
   const unreadAgentIds = useUnreadAgentIds();
   const hasUnread = useMemo(() => {
@@ -483,13 +447,8 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     return activeAgents.filter((agent) => !pinned.has(agent.id));
   }, [activeAgents, pinnedAgentIds]);
   const sidebar = sidebarByServer[activeServer.id];
-  // A waiting agent leaves its section for "Needs you". A pinned agent stays in its tile, which shows the same badge.
   const waitingAgentIds = useWaitingAgentIds();
-  // This phone's own choice. "Recent activity" sorts each section by last activity. "Unread in a group"
-  // takes the unread chats out of their sections, under "Needs you"; "Unread first in folders" puts them
-  // first in each section. None of them changes the layout.
   const chatOrder = useChatOrderPreference((state) => state.order);
-  // The manual and recent orders do not read the unread state, so a read does not build the list again.
   const unreadChatIds = useMemo(
     () =>
       chatOrder === "manual" || chatOrder === "recent"
@@ -501,8 +460,6 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     [chatOrder, unreadAgentIds, openChannels],
   );
   const [dragging, setDragging] = useState(false);
-  // As on the desktop, an order other than manual holds still during a drag: a reply then does not move the rows
-  // under the finger. The list takes the new order when the drag ends.
   const heldItems = useRef<MobileSidebarItem[] | null>(null);
   const items = useMemo(() => {
     if (dragging && chatOrder !== "manual" && heldItems.current) return heldItems.current;
@@ -548,19 +505,20 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   );
   const insets = useSafeAreaInsets();
   const barTop = useBarTop();
+  const focused = useIsFocused();
+  const homeCard = useHomeCard();
+  const cardBackground = String(useThemeColor("background"));
+  const [stageHeight, setStageHeight] = useState(0);
+  const cardEdge = useSharedValue(-1);
+  const cardServer = useSharedValue("");
   const scroll = useLargeTitleScroll(pane ? { headerHeight: barTop + PANE_BAR_HEIGHT } : undefined);
   const { headerHeight } = scroll;
   const search = useHomeSearch();
-  // Search has no bar: the list and the results move up by the bar's height as it opens.
   const searchBarOffset = Math.max(0, headerHeight - insets.top);
-  // A new server shows a new list at its top, which sends no scroll event.
   const listServerId = activeServer.id;
   useEffect(() => {
     if (listServerId) scroll.scrolled.set(0);
   }, [listServerId, scroll.scrolled]);
-  // With nothing in the list, the scene replaces it. In a list, the native header and safe-area
-  // insets add to a content container that already fills the screen, so iOS would scroll it.
-  // Pins and a sidebar error still need the list header, so they keep the scene in the list.
   const showAgentsScene =
     hasSelectedServer &&
     activeServerOnline &&
@@ -573,19 +531,15 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     router.push("/add-agent");
   };
   const sceneShows = listReady && showAgentsScene;
-  // The same condition as the connection state in the bar.
   const statusShows = hasSelectedServer && !activeServer.initialConnectionPending && !activeServerOnline;
-  // The empty scene has its own main action where the field would be.
   const searchShows = listReady && hasSelectedServer && !onboarding.active && !sceneShows;
-  // An app update drops the lilac block to a header above the list, where the search field shows.
   const appUpdate = useAppUpdate();
   const updateHeader = useAppUpdateHeader(searchShows ? appUpdate : null);
+  useRatingAskGate(!pane && searchShows && !search.open && !updateHeader.shown);
   const { open: searchOpen, closeSearch } = search;
   useEffect(() => {
     if (!searchShows && searchOpen) closeSearch();
   }, [searchShows, searchOpen, closeSearch]);
-  // A quick action waits while the list loads. A ready home without the field drops it, also while
-  // What's new hides the field. When home leaves, a request waits again for the next home.
   const updateExpanded = updateHeader.expanded;
   useEffect(() => {
     setHomeSearchUnavailable(listReady && (!searchShows || updateExpanded));
@@ -600,10 +554,30 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     [finishGate],
   );
   const listReveal = useAgentListReveal(listReady, activeServer.id);
-  // Collapse keeps stable list cells and changes their heights on the UI thread.
-  // Enable cell reflow again when a host layout update moves agents or sections.
+  const cardMotionOff = listReveal.reducedMotion;
+  const layoutStage = useCallback(
+    (height: number) => {
+      const edge = height - HOME_CARD_RADIUS;
+      const serverId = activeServer.id;
+      if (cardServer.get() === serverId || cardEdge.get() < 0 || cardMotionOff) {
+        cancelAnimation(cardEdge);
+        cardEdge.set(edge);
+        cardServer.set(serverId);
+        setStageHeight(height);
+        return;
+      }
+      setStageHeight((current) => Math.max(current, height));
+      cardEdge.set(
+        withTiming(edge, CARD_MOVE, (finished) => {
+          if (!finished) return;
+          cardServer.set(serverId);
+          scheduleOnRN(setStageHeight, height);
+        }),
+      );
+    },
+    [activeServer.id, cardEdge, cardMotionOff, cardServer],
+  );
   const [collapseLayout, setCollapseLayout] = useState<SidebarLayoutSnapshot | null>(null);
-  // The rows that a closed folder hides: its chats, and the folders in it with their chats.
   const collapsedRowIds = useMemo(() => {
     const ids = new Set<string>();
     let sectionCollapsed = false;
@@ -617,12 +591,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     }
     return ids;
   }, [items, collapsedSectionIds]);
-  // As on the desktop, a closed folder counts the unread messages in it and in the folders in it.
-  // The read state changes on each message, so the counts become a string first: the map, and with it
-  // `renderItem`, change only when the count of a closed folder changes.
   const unreadCounts = useUnreadCounts();
-  // Loads the read marks of the agents' side threads for their badges. As on the desktop, those
-  // threads add no number to the count of a folder.
   const activeAgentIds = useMemo(() => activeAgents.map((agent) => agent.id), [activeAgents]);
   useHomeThreadState(activeServer.id, activeAgentIds);
   const folderUnreadKey = useMemo(() => {
@@ -656,9 +625,8 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     },
     [serverId, sidebarLayout, workspace],
   );
-  // Rows are memoized, so a new message for one agent renders only that agent's row.
-  const rowOffset = hasPins ? 1 : 0;
-  const renderItem = useCallback(
+  const rowOffset = hasPins ? 1 + pinnedAgents.length + pinnedChannels.length : 0;
+  const renderRow = useCallback(
     ({ item, index }: { item: MobileSidebarItem; index: number }) =>
       item.kind === "waiting" ? (
         <AgentListRowReveal index={index + rowOffset} reveal={listReveal}>
@@ -717,10 +685,22 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
       visibleSectionIds,
     ],
   );
+  const renderItem = useCallback(
+    (info: { item: MobileSidebarItem; index: number }) => (
+      <HomeCardRow
+        card={homeCard}
+        background={cardBackground}
+        serverId={serverId}
+        cardServer={cardServer}
+        settled={listReveal.finished}
+      >
+        {renderRow(info)}
+      </HomeCardRow>
+    ),
+    [renderRow, homeCard, cardBackground, serverId, cardServer, listReveal.finished],
+  );
   const listRef = useRef<FlatList>(null);
-  /** The scroll of the list while a drag scrolls it. The user cannot scroll during a drag. */
   const dragScroll = useRef({ offset: 0, content: 0, viewport: 0 });
-  // iOS insets the content under its native header, so the content rests at minus its height.
   const scrollRest = scroll.ownsInset ? 0 : -headerHeight;
   const pinCount = pinnedAgentIds.length + pinnedChannelIds.length;
   const dragScreen = useMemo<ChatDragScreen>(
@@ -731,8 +711,6 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
         ...pinnedChannels.map((channel) => ({ kind: "channel" as const, id: channel.id })),
       ],
       collapsedSectionIds,
-      // The recent and unread-first orders are not manual, so a drag in the list does not reorder them.
-      // Pins still work.
       sections: sidebarLayout !== null && !mobileChatOrderSortsSections(chatOrder),
       canPin: canAddChatPin(pinCount),
       scrollInsets: { top: headerHeight, bottom: insets.bottom + HOME_SEARCH_HEIGHT },
@@ -741,7 +719,6 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
       },
       scrollBy: (delta) => {
         const state = dragScroll.current;
-        // The content size has the padding of the list. iOS adds its bottom inset when it insets the list.
         const end = Math.max(scrollRest, state.content - state.viewport + (scroll.ownsInset ? 0 : insets.bottom));
         const offset = Math.min(end, Math.max(scrollRest, state.offset + delta));
         if (Math.abs(offset - state.offset) < 0.5) return false;
@@ -752,7 +729,6 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
       onDraggingChange: setDragging,
       onDrop: (_dragged, _target, change) => applyChatDrop(workspace(), serverId, change),
       readPins: () => workspace().readChatPins(serverId),
-      // Without manual sections, a drop in the list only unpins: it does not move the chat in the layout.
       layout: () => (mobileChatOrderSortsSections(chatOrder) ? null : sidebarLayout),
     }),
     [
@@ -772,7 +748,6 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
       workspace,
     ],
   );
-  // Add actions come first, then a divider and the actions on existing chats.
   const optionsActions = useMemo<MenuAction[]>(() => {
     const chatActions: MenuAction[] = [
       ...(hasSelectedServer
@@ -832,17 +807,14 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     const order = MOBILE_CHAT_ORDERS.find((candidate) => event === `sort:${candidate}`);
     if (order) changeChatOrder(order);
   };
-  // The bar buttons that the screen draws: the Android header of the screen, and the bar of the pane.
-  // In the pane, the status takes the room that the buttons leave: the pane can be 320 pt wide.
+  const openServersButton = (
+    <HeaderIconButton accessibilityLabel={t("mobile.agent.home.openServers")} glass={buttonGlass} onPress={openDrawer}>
+      <PanelLeft color={iconColor} size={22} strokeWidth={2} style={MIRROR_IN_RTL} />
+    </HeaderIconButton>
+  );
   const headerLeading = (
     <View className={pane ? "min-w-0 flex-1 flex-row items-center gap-2" : "flex-row items-center gap-2"}>
-      <HeaderIconButton
-        accessibilityLabel={t("mobile.agent.home.openServers")}
-        glass={buttonGlass}
-        onPress={openDrawer}
-      >
-        <PanelLeft color={iconColor} size={22} strokeWidth={2} style={MIRROR_IN_RTL} />
-      </HeaderIconButton>
+      {openServersButton}
       <ConnectionHeaderStatus server={hasSelectedServer ? activeServer : undefined} fill={pane} />
     </View>
   );
@@ -892,18 +864,9 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     </View>
   );
 
-  // The pane also has its rail of avatars, which shows when the user drags the pane narrow.
   const railTree = pane ? (
     <ChatListRail
-      header={
-        <HeaderIconButton
-          accessibilityLabel={t("mobile.agent.home.openServers")}
-          glass={buttonGlass}
-          onPress={openDrawer}
-        >
-          <PanelLeft color={iconColor} size={22} strokeWidth={2} style={MIRROR_IN_RTL} />
-        </HeaderIconButton>
-      }
+      header={openServersButton}
       pinnedAgents={pinnedAgents}
       pinnedChannels={pinnedChannels}
       items={items}
@@ -915,12 +878,19 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
 
   const listTree = (
     <View className="flex-1 bg-background">
-      {/* The bar blurs the home content. */}
       <AndroidBlurTarget target={barBlurTarget} surface="canvas">
+        {homeCard && !onboarding.active && !sceneShows ? (
+          <HomeCardBackdrop
+            height={headerHeight + stageHeight}
+            top={headerHeight}
+            edge={cardEdge}
+            scrolled={scroll.scrolled}
+            background={cardBackground}
+            active={focused}
+          />
+        ) : null}
         <HomeSearchList search={search} barHeight={searchBarOffset}>
           {onboarding.active ? null : sceneShows ? (
-            // The scene has the insets of the welcome, so the characters stand in the same places on
-            // both. Its top leaves the transparent header and its blur clear.
             <EmptyAgentsScene
               onAddAgent={addAgent}
               style={{ paddingTop: insets.top + CROWD_TOP, paddingBottom: insets.bottom + 12 }}
@@ -944,61 +914,59 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
                 }
                 skipEnteringExitingAnimations
                 removeClippedSubviews={false}
-                className="flex-1 bg-background"
-                // The side insets (the iPhone Duo rail, the landscape cutout) go outside the list. With
-                // `always`, iOS would also inset the content by them.
+                className={homeCard ? "flex-1" : "flex-1 bg-background"}
                 style={{ marginLeft: insets.left, marginRight: insets.right }}
                 alwaysBounceVertical={false}
                 contentContainerClassName={items.length > 0 ? undefined : "grow"}
-                // Without a content inset from iOS (Android, the pane, the vertical bar of iPhone Duo), the
-                // list starts below the bar. The end of the list scrolls clear of the search field.
                 contentContainerStyle={{
                   paddingTop: scroll.ownsInset ? headerHeight : 0,
                   paddingBottom: insets.bottom + HOME_SEARCH_HEIGHT + 24,
                 }}
                 scrollEventThrottle={16}
                 onScroll={scroll.onScroll}
-                // Keep the native header inset even when short content cannot scroll or bounce.
                 contentInsetAdjustmentBehavior={scroll.ownsInset ? "never" : "always"}
                 data={items}
                 keyExtractor={listItemKey}
                 renderItem={renderItem}
                 initialNumToRender={LIST_BATCH}
                 maxToRenderPerBatch={LIST_BATCH}
-                // A drag scrolls the list, and the dragged row must stay mounted for its gesture to go on.
                 windowSize={dragging ? LIST_WINDOW_SIZE * 3 : LIST_WINDOW_SIZE}
                 ListHeaderComponent={
-                  <AgentListRowReveal index={0} reveal={listReveal}>
-                    {hasSelectedServer ? (
-                      <LargeTitle
-                        scroll={scroll}
-                        title={activeServer.name}
-                        above={<AppUpdateSpacer header={updateHeader} headerHeight={headerHeight} />}
-                        accessibilityLabel={t("mobile.agent.home.serverTitle", { name: activeServer.name })}
-                        onPress={openDrawer}
-                      />
-                    ) : null}
-                    {sidebar?.error ? (
-                      <View className="gap-2 px-4">
-                        <Typography.Paragraph className="text-danger-text">
-                          {sourceText(sidebar.error)}
-                        </Typography.Paragraph>
-                        <Button
-                          variant="secondary"
-                          onPress={() =>
-                            void workspace()
-                              .refreshServer(activeServer.id)
-                              .catch(() => undefined)
-                          }
-                        >
-                          <Button.Label>{t("mobile.agent.home.retrySections")}</Button.Label>
-                        </Button>
-                      </View>
-                    ) : null}
+                  <View onLayout={(event) => layoutStage(event.nativeEvent.layout.height)}>
+                    <AgentListRowReveal index={0} reveal={listReveal}>
+                      {hasSelectedServer ? (
+                        <LargeTitle
+                          scroll={scroll}
+                          title={activeServer.name}
+                          above={<AppUpdateSpacer header={updateHeader} headerHeight={headerHeight} />}
+                          accessibilityLabel={t("mobile.agent.home.serverTitle", { name: activeServer.name })}
+                          onPress={openDrawer}
+                        />
+                      ) : null}
+                      {sidebar?.error ? (
+                        <View className="gap-2 px-4">
+                          <Typography.Paragraph className="text-danger-text">
+                            {sourceText(sidebar.error)}
+                          </Typography.Paragraph>
+                          <Button
+                            variant="secondary"
+                            onPress={() =>
+                              void workspace()
+                                .refreshServer(activeServer.id)
+                                .catch(() => undefined)
+                            }
+                          >
+                            <Button.Label>{t("mobile.agent.home.retrySections")}</Button.Label>
+                          </Button>
+                        </View>
+                      ) : null}
+                    </AgentListRowReveal>
                     <PinnedAgentsGrid
                       agents={pinnedAgents}
                       animateLayout={!updateHeader.moving}
                       dropZone={dragging && !hasPins}
+                      reveal={listReveal}
+                      revealOffset={1}
                     >
                       {pinnedChannels.length > 0
                         ? pinnedChannels.map((channel) => (
@@ -1012,7 +980,14 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
                           ))
                         : null}
                     </PinnedAgentsGrid>
-                  </AgentListRowReveal>
+                    <HomeCardTop
+                      card={homeCard}
+                      background={cardBackground}
+                      serverId={activeServer.id}
+                      cardServer={cardServer}
+                      settled={listReveal.finished}
+                    />
+                  </View>
                 }
                 ListEmptyComponent={
                   serverDirectoryState === "error" && servers.length === 0 ? (
@@ -1051,7 +1026,6 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
                           {t("mobile.agent.home.noServersBody")}
                         </Typography.Paragraph>
                       </View>
-                      {/* The drawer holds the ways to add a server. Without this, the next step is hidden. */}
                       <Button size="md" variant="secondary" onPress={openDrawer}>
                         <Button.Label>{t("mobile.agent.home.openServers")}</Button.Label>
                       </Button>
@@ -1083,36 +1057,29 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
         </HomeSearchList>
       </AndroidBlurTarget>
 
-      {/* The list scrolls under the transparent header, which gets the blur of the chat header. iOS 27
-          shows no native scroll edge effect here. The native top edge is hidden to avoid two effects. */}
       {onboarding.active ? null : (
         <LargeTitleBar
           scroll={scroll}
           title={activeServer.name}
           blurTarget={barBlurTarget}
-          // The connection state takes the place of the title in the bar.
+          androidSurfaceWithTitle={homeCard}
           hidden={!searchShows || statusShows || search.open}
         >
           <AppUpdateBlock header={updateHeader} scroll={scroll} hidden={search.open} />
         </LargeTitleBar>
       )}
 
-      {/* The results lie over the bar's edge, so its blur cannot soften them; they have their own. */}
       {searchShows ? <HomeSearchResults search={search} barHeight={searchBarOffset} /> : null}
 
-      {/* What's new covers home with the update block, so the field leaves while it shows. */}
       {searchShows && !updateHeader.expanded ? <HomeSearchBar search={search} /> : null}
 
       {onboardingReady ? (
-        // The flow fades out over the home, which comes in under it with its own reveal.
         <Animated.View exiting={ONBOARDING_EXIT} style={StyleSheet.absoluteFill}>
           <OnboardingFlow onFinish={finishOnboarding} />
         </Animated.View>
       ) : null}
 
       {pane ? (
-        // The bar of the pane, over the edge effect of `LargeTitleBar`. The search takes the pane, so
-        // the bar buttons go while it is open.
         headerActions && !search.open ? (
           <View
             className="absolute flex-row items-center justify-between gap-2"
@@ -1133,7 +1100,6 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
       {pane ? null : (
         <Stack.Screen
           options={{
-            // The first-run flow is a whole screen with its own back and skip actions.
             headerShown: !onboarding.active,
             headerLeft: isAndroid && headerActions && !search.open ? () => headerLeading : undefined,
             headerRight: isAndroid && headerActions && !search.open ? () => headerTrailing : undefined,
@@ -1148,7 +1114,6 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
       {isIOS && headerActions && !pane ? (
         <>
           <Stack.Toolbar placement="left">
-            {/* The search takes the screen, so the bar buttons go while it is open. */}
             <Stack.Toolbar.Button icon="sidebar.leading" hidden={search.open} onPress={openDrawer} />
             <Stack.Toolbar.View hidesSharedBackground hidden={search.open}>
               <ConnectionHeaderStatus server={hasSelectedServer ? activeServer : undefined} />
@@ -1170,7 +1135,6 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
               separateBackground
               hidden={search.open}
             >
-              {/* Add actions come first, then a divider and the actions on existing chats. */}
               <Stack.Toolbar.Menu inline>
                 <Stack.Toolbar.MenuAction icon="plus.circle" onPress={() => openFromMenu("/add-agent")}>
                   {t("mobile.agent.home.addAgent")}
@@ -1242,7 +1206,6 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   return pane ? <SplitPaneLayers list={listTree} rail={railTree} /> : listTree;
 }
 
-/** The detail column of a wide window before a chat opens: the list is in the pane beside it. */
 function NoChatOpen() {
   const { t } = useText();
   const muted = useThemeColor("muted");
@@ -1262,10 +1225,6 @@ function NoChatOpen() {
   );
 }
 
-/**
- * The first route of the stack. A wide window shows the chat list in the pane, so the route shows the
- * empty detail column there. The first-run flow keeps the whole window, so it has no pane.
- */
 export function ConnectedRoute() {
   return useSplitLayout() ? <NoChatOpen /> : <ConnectedScreen />;
 }

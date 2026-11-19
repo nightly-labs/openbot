@@ -10,6 +10,7 @@ import {
   uiBlockAnswersFromResponse,
   uiBlockFallbackQuestions,
   uiBlockOutcomeText,
+  uiConfirmAnswersWithPreview,
 } from "@openbot/contracts/ui-blocks";
 import type { AgentProfile } from "@openbot/ui/data";
 import { MarkdownMessageText } from "@openbot/ui/features/conversation/MarkdownMessageText";
@@ -21,25 +22,17 @@ import { createMemo, createSignal, onCleanup, Show } from "solid-js";
 import type { PromptAnswerOptions } from "./conversation-types";
 
 export interface UiBlockPromptProps {
-  /** A block the person answers through the prompt it sits beside. */
   block: ConversationUiBlock;
   agents: AgentProfile[];
-  /** The agent that asks, which a Vault request names. */
   agentId?: string | undefined;
   onSelectAgent: (agentId: string) => void;
   onOpenLink: (url: string) => void;
-  /**
-   * Sends the answers to the block's fallback questions through the prompt route. Absent for a block
-   * in the history, which only shows its stored state.
-   */
   onAnswer?: ((answers: Record<string, string[]>, options?: PromptAnswerOptions) => Promise<boolean>) | undefined;
-  /** The answer went through and the card shows it. */
+  canEditPreview?: boolean | undefined;
   onAnswered?: (() => void) | undefined;
-  /** Gets the card's element, and undefined once the card is gone. */
   elementRef?: ((element: HTMLElement | undefined) => void) | undefined;
 }
 
-/** The form values of a Vault item, keyed by the field ids of `UI_VAULT_REQUEST_FIELDS`. */
 function vaultFormValues(input: VaultSaveInput): Record<string, string> {
   switch (input.kind) {
     case "login":
@@ -61,9 +54,7 @@ function vaultFormValues(input: VaultSaveInput): Record<string, string> {
   }
 }
 
-/** The `request_api_key` form with the choice of who can use the key, which the Vault card shows. */
 interface ApiKeyRequest {
-  /** The secret field, whose label is the name of the key. */
   keyFieldId: string;
   name: string;
   placeholder: string | undefined;
@@ -86,24 +77,16 @@ function apiKeyRequestOf(block: ConversationUiBlock): ApiKeyRequest | undefined 
   };
 }
 
-/**
- * An agent's blocking block as a card. The card's response goes out as the answers to the block's
- * fallback questions, the same way a client that only knows the questions answers, so the host
- * reads both alike. A skip answers every question with nothing.
- */
 export function UiBlockPrompt(props: UiBlockPromptProps) {
   const { t, format, errorMessage, sourceText } = useText();
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string>();
-  // What this client sent, shown frozen until the host's stored state replaces it.
   const [sent, setSent] = createSignal<UiBlockState>();
   onCleanup(() => props.elementRef?.(undefined));
   const stored = (): UiBlockState =>
     props.block.state.status === "pending" ? (sent() ?? props.block.state) : props.block.state;
-  // The host stores the outcome with English list commas; draw it again in the reader's language.
   const state = (): UiBlockState => {
     const current = stored();
-    // Only the host gives a closed block an outcome, as English source text, such as "Closed by a new message".
     if (current.status === "closed" && current.outcome) return { ...current, outcome: sourceText(current.outcome) };
     if (current.status !== "answered" || !current.response) return current;
     const outcome = uiBlockOutcomeText(props.block.spec, current.response, format.list);
@@ -134,10 +117,10 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
     props.onAnswered?.();
   }
 
-  function respond(response: UiBlockResponse): void {
+  function respond(response: UiBlockResponse, preview?: string): void {
     const spec = props.block.spec;
     const outcome = uiBlockOutcomeText(spec, response);
-    void send(uiBlockAnswersFromResponse(spec, response), {
+    void send(uiConfirmAnswersWithPreview(spec, response, preview), {
       status: "answered",
       response,
       ...(outcome.trim() ? { outcome } : {}),
@@ -151,7 +134,6 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
 
   const apiKeyRequest = createMemo(() => apiKeyRequestOf(props.block));
 
-  /** The fields that the agent filled in, or the name of a requested API key. */
   const prefill = () => {
     const apiKey = apiKeyRequest();
     if (apiKey) return { name: apiKey.name };
@@ -162,7 +144,6 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
     );
   };
 
-  /** The answer of the form for the item, and the secret field ids, which the frozen state does not keep. */
   function itemAnswer(input: VaultSaveInput, scope: string | undefined): [Record<string, string>, readonly string[]] {
     const apiKey = apiKeyRequest();
     if (apiKey && input.kind === "apiKey")
@@ -173,10 +154,6 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
     return [vaultFormValues(input), UI_VAULT_SECRET_FIELDS];
   }
 
-  /**
-   * Sends the item as the form's answer. The host saves it to the Vault and gives the agent only its
-   * name. The frozen state keeps no secret value. A failure goes to the dialog.
-   */
   async function saveVaultItem(input: VaultSaveInput, scope?: string): Promise<void> {
     const answer = props.onAnswer;
     if (!answer || state().status !== "pending") return;
@@ -201,7 +178,6 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
     props.onAnswered?.();
   }
 
-  // An API key request opens the Vault dialog when the host offers the Vault, which the scope field shows.
   const vaultRequest = (): VaultItemKind | undefined =>
     props.block.vault?.kind ?? (apiKeyRequest() ? "apiKey" : undefined);
 
@@ -238,6 +214,7 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
         error={error()}
         disabled={!props.onAnswer}
         onRespond={respond}
+        canEditPreview={props.canEditPreview}
         onSkip={props.onAnswer ? skip : undefined}
         elementRef={(element) => props.elementRef?.(element)}
         renderPreview={(markdown) => (
