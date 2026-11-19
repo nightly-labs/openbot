@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import { CONTEXT_RESET_ITEM_TYPE, type ConversationMessage, type ConversationSnapshot } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n";
 import { argument, connectChannelE2e, SHORT_PROMPT, waitFor, writeReport } from "./channel-e2e-support";
 
 const agentArgument = argument("agent");
@@ -21,7 +22,7 @@ interface Report {
   word: string;
   resetMarkerBetween: boolean;
   wordInMemories?: boolean;
-  firstTurn?: Turn;
+  firstTurn?: Turn & { searchedChats: boolean };
   recall?: Turn & { found: boolean };
   screenshot?: string;
   passed: boolean;
@@ -75,15 +76,21 @@ try {
   await page.evaluate((id) => window.openbot.agent.clearContext(id), agentId);
 
   const first = await turn("What is 7 times 6? Reply with the number only.", "first reply after New chat");
-  report.firstTurn = first.result;
+  report.firstTurn = {
+    ...first.result,
+    searchedChats: first.result.toolSteps.includes(sourceText("status.agent.chatsSearching")),
+  };
 
   const recall = "What was the one-time test value that I gave you? Reply with that test value only.";
   const { snapshot: after, result } = await turn(recall, "recall reply");
-  const seedIndex = after.messages.findLastIndex((message) => message.text.includes(seed));
-  const recallIndex = after.messages.findLastIndex((message) => message.text.includes(recall));
-  report.resetMarkerBetween = after.messages
-    .slice(seedIndex + 1, recallIndex)
-    .some((message) => message.itemType === CONTEXT_RESET_ITEM_TYPE);
+  const sentIndex = (text: string) =>
+    after.messages.findLastIndex((message) => message.author === "user" && message.text.includes(text));
+  const seedIndex = sentIndex(seed);
+  const recallIndex = sentIndex(recall);
+  report.resetMarkerBetween =
+    seedIndex >= 0 &&
+    recallIndex > seedIndex &&
+    after.messages.slice(seedIndex + 1, recallIndex).some((message) => message.itemType === CONTEXT_RESET_ITEM_TYPE);
   report.recall = { ...result, found: result.reply.includes(word) };
 
   const memories = await page.evaluate((id) => window.openbot.agent.listMemories(id), agentId);
@@ -93,7 +100,7 @@ try {
   await page.screenshot({ path: screenshot });
   report.screenshot = screenshot;
 
-  assert.equal(report.firstTurn.toolSteps.length, 0, "An unrelated first turn after New chat runs no tool.");
+  assert.ok(!report.firstTurn.searchedChats, "An unrelated first turn after New chat does not search past chats.");
   assert.ok(report.resetMarkerBetween, "A New chat divider is between the seed and the question.");
   assert.ok(!report.wordInMemories, "The test value is not in a saved memory, so only the chat history holds it.");
   assert.ok(

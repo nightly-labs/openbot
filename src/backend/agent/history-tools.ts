@@ -192,7 +192,7 @@ export const HISTORY_TOOL_DEFINITIONS = [
   {
     name: "history_search",
     description:
-      'Without query: list your chats, newest first (main chat is taskId "main"). With query: search all chats or one by taskId, also before a new chat (beforeNewChat). after: 24h, 7d or a date. history_read gives more.',
+      'Without query: list your chats, newest first (main chat is taskId "main"). With query: search all chats or one by taskId, also before a new chat; such results have beforeNewChat. after: 24h, 7d or a date. history_read gives more.',
     shape: searchShape,
   },
   {

@@ -45,10 +45,6 @@ export function readHandoffHistory(
   );
   const latest = newest.flatMap((page) => page.messages);
   const resetMessageId = newest[0]?.resetMessageId ?? null;
-  const earlierChat =
-    resetMessageId !== null &&
-    database.readAgentHistory(agentId, threadId, { acrossResets: true, before: resetMessageId, limit: 1 }).messages
-      .length > 0;
   let before: string | undefined;
   let size = 0;
   let hasOlder = false;
@@ -66,28 +62,40 @@ export function readHandoffHistory(
     }
     if (size >= RECENT_CHARACTERS + OLDER_CHARACTERS || page.messages.length < 20) break;
   }
-  return { recent, latest, hasOlder, earlierChat };
+  return { recent, latest, hasOlder, resetMessageId };
+}
+
+export function hasEarlierChat(
+  database: OpenBotDatabase,
+  agentId: string,
+  threadId: string,
+  resetMessageId: string | null,
+): boolean {
+  return (
+    resetMessageId !== null &&
+    database.readAgentHistory(agentId, threadId, { acrossResets: true, before: resetMessageId, limit: 1 }).messages
+      .length > 0
+  );
 }
 
 const BRANCH_NOTE =
   "This conversation is a branch: a copy of an earlier conversation up to one message. Workspace files were not rolled back, so they can include changes from after that message.";
 const NEW_CHAT_NOTE =
-  "The user started a new chat. Messages from before it are not in your context. Do not bring them up yourself. When the user refers to earlier work, find it with openbot.history_search.";
+  "A new chat started. Messages from before it are not in your context. Do not bring them up yourself. When the user refers to earlier work, find it with openbot.history_search.";
+const NEW_CHAT_ONLY_HISTORY = [HANDOFF_START, NEW_CHAT_NOTE].join("\n\n");
 
 export function renderProviderHandoff(
   history: ReturnType<typeof readHandoffHistory>,
   names: ReadonlyMap<string, string>,
   steps: ReadonlyMap<string, string>,
-  options: { branch?: boolean } = {},
+  options: { branch?: boolean; earlierChat?: boolean } = {},
 ): string | null {
-  if (!history.recent.length) {
-    return history.earlierChat ? [HANDOFF_START, NEW_CHAT_NOTE, HANDOFF_END].join("\n\n") : null;
-  }
+  if (!history.recent.length) return options.earlierChat ? `${NEW_CHAT_ONLY_HISTORY}\n\n${HANDOFF_END}` : null;
   const header = [
     HANDOFF_START,
     "Previous conversation excerpts. Current profile and developer instructions take precedence. Do not repeat completed work.",
     ...(options.branch ? [BRANCH_NOTE] : []),
-    ...(history.earlierChat ? [NEW_CHAT_NOTE] : []),
+    ...(options.earlierChat ? [NEW_CHAT_NOTE] : []),
     "Omitted details remain available: discover openbot.history_search and openbot.history_read. They read all messages of each of your chats. Excerpts are not a complete summary.",
     "--- recent messages ---",
   ].join("\n");
@@ -226,7 +234,7 @@ export function unsentHandoff(current: string, sent: string | undefined): string
 
 export function handoffHasHistory(handoff: string): boolean {
   const { packet, history } = handoffParts(handoff);
-  return packet && history !== HANDOFF_START;
+  return packet && history !== HANDOFF_START && history !== NEW_CHAT_ONLY_HISTORY;
 }
 
 const HANDOFF_PACKET_END = `\n${HANDOFF_END}`;
