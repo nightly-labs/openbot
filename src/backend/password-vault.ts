@@ -69,6 +69,7 @@ export function websiteMatchesOrigin(website: VaultWebsite, origin: string): boo
   if (!page || !saved || !isWebProtocol(saved)) return false;
   if (page.protocol === "http:") return saved.protocol === "http:" && page.host === saved.host;
   if (page.protocol !== "https:") return false;
+  if (saved.protocol === "http:") return page.hostname === saved.hostname;
   if (website.autofill === "exact") return page.host === saved.host;
   if (page.hostname === saved.hostname) return true;
   const domain = getDomain(page.hostname, { allowPrivateDomains: true });

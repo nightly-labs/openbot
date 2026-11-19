@@ -716,7 +716,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.vault.import": "Import passwords from a CSV file",
   "mobile.server.vault.importing": "Importing…",
   "mobile.server.vault.importFooter":
-    "Use a password export from a browser or a password manager. {host} adds its logins. It skips a row that is not HTTP or HTTPS, has no password or is saved already. This phone deletes its copy of the file after it reads it.",
+    "Use a password export from a browser or a password manager. {host} adds its logins. It skips a row with an address that it cannot use, a row with no password and a row that is saved already. This phone deletes its copy of the file after it reads it.",
   "mobile.server.vault.importResult": "Added: {imported}. Skipped: {skipped}.",
   "mobile.server.vault.importTooLarge": "This file is too large to send from a phone. Import it in OpenBot on {host}.",
   "mobile.server.vault.importReadFailed": "Could not read the file.",
@@ -730,7 +730,8 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.vault.saveFailed": "Could not save the item. Try again.",
   "mobile.server.vault.gone": "This item is no longer in the Vault.",
   "mobile.server.vault.website": "Website",
-  "mobile.server.vault.websiteHint": "An HTTP or HTTPS address. Agents fill this login only on this website.",
+  "mobile.server.vault.websiteHint":
+    "A website address, such as example.com. Agents fill this login only on this website.",
   "mobile.server.vault.username": "User name",
   "mobile.server.vault.password": "Password",
   "mobile.server.vault.notes": "Notes",

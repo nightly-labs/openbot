@@ -88,6 +88,10 @@ function loginTitle(website: string): string {
   return websiteUrl(website)?.hostname ?? website;
 }
 
+function sameScheme(left: string, right: string): boolean {
+  return websiteUrl(left)?.protocol === websiteUrl(right)?.protocol;
+}
+
 function typedLoginWebsite(website: string): string {
   const url = websiteUrl(website);
   if (!url) return website;
@@ -390,6 +394,7 @@ export class VaultService {
         const duplicate = logins.findIndex(
           (login) =>
             loginTitle(login.website) === loginTitle(website) &&
+            sameScheme(login.website, website) &&
             login.username === row.username &&
             login.password === row.password,
         );
@@ -537,7 +542,9 @@ export class VaultService {
     const outcome: { saved: (VaultAgentResult & { created: boolean; changed: boolean }) | null } = { saved: null };
     yield* this.#change((record) => {
       const matches = (item: StoredLogin) =>
-        item.username === username && websiteMatchesOrigin({ url: item.website, autofill: "anywhere" }, website);
+        item.username === username &&
+        sameScheme(item.website, website) &&
+        websiteMatchesOrigin({ url: item.website, autofill: "anywhere" }, website);
       const usable = record.logins.filter((item) => vaultItemAllows(item, agent.id) && matches(item));
       const existing =
         usable.find((item) => loginHost(item.website) === loginHost(website)) ??
