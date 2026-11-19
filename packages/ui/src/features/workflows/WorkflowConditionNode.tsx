@@ -20,6 +20,7 @@ import {
   useTextField,
   type WfProvider,
 } from "./workflow-node-parts";
+import { StepSettingsAction } from "./workflow-step-settings";
 
 const BRANCHES = ["yes", "no"] as const;
 
@@ -68,7 +69,11 @@ export function ConditionNode(props: { id: string; rule?: string }) {
       kind="condition"
       inputs={["text"]}
       requires
-      toolbar={<NodeToolbar id={props.id} name={t("workflow.condition.name")} locked={locked()} onLock={setLocked} />}
+      toolbar={
+        <NodeToolbar id={props.id} name={t("workflow.condition.name")} locked={locked()} onLock={setLocked}>
+          <StepSettingsAction id={props.id} kind="condition" />
+        </NodeToolbar>
+      }
     >
       <Field class="wfn-block-field">
         <Textarea

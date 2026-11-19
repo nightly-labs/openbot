@@ -181,10 +181,10 @@ index 5da11964f5932cb44e1131c44a2480803c0a62b5..a04b4678830bb5ea16984486072eacad
  - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
      shouldBeRequiredToFailByGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer
 diff --git a/ios/RNSScreenStackHeaderConfig.mm b/ios/RNSScreenStackHeaderConfig.mm
-index e217b2411d20c85db3ec84bb87765c1e9407fd3b..84b6467ec36b080eb2e30eea48682f4418e59d50 100644
+index 12f2272070030a771ca521140d99a3cfc854bf5f..ba9cd9a0b0aa7eecf34768fb8e76b8352458cd91 100644
 --- a/ios/RNSScreenStackHeaderConfig.mm
 +++ b/ios/RNSScreenStackHeaderConfig.mm
-@@ -96,7 +96,10 @@ RNS_IGNORE_SUPER_CALL_BEGIN
+@@ -97,7 +97,10 @@ RNS_IGNORE_SUPER_CALL_BEGIN
  
  - (NSArray<UIView *> *)reactSubviews
  {
@@ -196,7 +196,7 @@ index e217b2411d20c85db3ec84bb87765c1e9407fd3b..84b6467ec36b080eb2e30eea48682f44
  }
  RNS_IGNORE_SUPER_CALL_END
  
-@@ -563,12 +566,17 @@ RNS_IGNORE_SUPER_CALL_END
+@@ -632,12 +635,17 @@ RNS_IGNORE_SUPER_CALL_END
        config.largeTitle ? UINavigationItemLargeTitleDisplayModeAlways : UINavigationItemLargeTitleDisplayModeNever;
  
  #if RNS_IPHONE_OS_VERSION_AVAILABLE(27_0)

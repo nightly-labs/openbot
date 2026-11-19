@@ -276,6 +276,12 @@ export const messages = {
     "{provider} לא הצליח להפעיל את שרת ה-MCP {name}. הכלים שלו אינם זמינים ל-{provider}. {provider} מפעיל את השרת בעצמו, ולכן בדיקת החיבור ב-OpenBot יכולה לעבור. יש להתחיל צ׳אט חדש כדי לנסות שוב.",
   "error.backend.mcpServerTimedOutInProvider":
     "{provider} לא הצליח להפעיל את שרת ה-MCP {name}, כי השרת לא ענה בזמן. יש להתחיל צ׳אט חדש כדי לנסות שוב.",
+  "error.backend.mcpServerUnavailableInProvider":
+    "{provider} לא הצליח להפעיל את שרת ה-MCP {name}, כי השרת לא זמין כרגע. יש להמתין כמה דקות ואז להתחיל צ׳אט חדש כדי לנסות שוב.",
+  "error.backend.mcpServerUnreachableInProvider":
+    "{provider} לא הצליח להגיע לשרת ה-MCP {name}. יש לפתוח את {name} בחנות, אפליקציות, ולוודא שהכתובת שלו נכונה ושהשרת פועל. לאחר מכן יש להתחיל צ׳אט חדש כדי לנסות שוב.",
+  "error.backend.githubToolsNotStarted":
+    "{provider} לא הצליח לקבל את כלי GitHub, כי GitHub לא ענה. יש לפתוח את GitHub בחנות, אפליקציות, ולחבר אותו שוב אם הוא מבקש. לאחר מכן יש להתחיל צ׳אט חדש כדי לנסות שוב.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot לא הצליח להפעיל את חיבור ההתחברות המקומי שלו עבור השרת הזה. יש להפעיל מחדש את OpenBot ולנסות שוב.",
   "error.backend.mcpOAuthSignInNeeded": "ההתחברות לשרת ה-MCP הזה הסתיימה. המשתמש צריך להתחבר אליו שוב ב-OpenBot.",

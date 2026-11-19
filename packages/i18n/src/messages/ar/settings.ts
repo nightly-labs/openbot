@@ -621,6 +621,7 @@ export const messages = {
   "settings.hostedServers.state.planEnded": "انتهت الخطة",
   "settings.hostedServers.state.creating": "جارٍ الإنشاء",
   "settings.hostedServers.state.starting": "جارٍ البدء",
+  "settings.hostedServers.state.restoring": "جارٍ استعادة البيانات",
   "settings.hostedServers.state.running": "قيد التشغيل",
   "settings.hostedServers.state.stopping": "جارٍ الإيقاف",
   "settings.hostedServers.state.stopped": "متوقف",
@@ -630,6 +631,8 @@ export const messages = {
   "settings.hostedServers.errorDescription": "تعذّر بدء الخادم. ابدأه للمحاولة مرة أخرى.",
   "settings.hostedServers.paymentDescription": "يبدأ الإعداد عندما يؤكد Stripe الدفع.",
   "settings.hostedServers.planEndedDescription": "انتهت الخطة، لذا توقف الخادم. تبقى بياناته. جدّد الخطة لبدئه.",
+  "settings.hostedServers.planEndedKeptUntil":
+    "انتهت الخطة، لذا توقف الخادم. تبقى بياناته حتى {date}. جدّد الخطة قبل ذلك لبدئه.",
   "settings.hostedServers.pay": "فتح صفحة الدفع",
   "settings.hostedServers.payLabel": "فتح صفحة الدفع لـ {name}",
   "settings.hostedServers.renew": "تجديد الخطة",

@@ -170,6 +170,7 @@ export const messages = {
   "server.hosted.detail.create.copy": "OpenBot wird auf die Maschine kopiert",
   "server.hosted.detail.create.key": "Einmaliger Anmeldeschlüssel wird hinzugefügt",
   "server.hosted.detail.start.boot": "Maschine wird eingeschaltet",
+  "server.hosted.detail.start.restore": "Daten werden wiederhergestellt",
   "server.hosted.detail.start.app": "OpenBot wird gestartet",
   "server.hosted.detail.start.wait": "Warten auf eine Antwort von OpenBot",
   "server.hosted.detail.connect.signIn": "Anmeldung mit deinem Konto läuft",

@@ -972,6 +972,7 @@ export class MessagingService {
         }),
       (release) => Effect.sync(release),
     );
+    yield* messagingStep(() => this.#threads.history.forget(record.connectionId));
     yield* this.#credentials.clear(record.connectionId);
     yield* messagingStep(() =>
       this.#threads.store.updateConnection(record.connectionId, { enabled: false, lastErrorCode: null }),
@@ -1080,6 +1081,7 @@ export class MessagingService {
     const live: LiveConnection = {
       record,
       adapter: driver.createAdapter(credentials, {
+        connectionId: record.connectionId,
         rateLimited: (retryAt) => {
           live.retryAt = retryAt;
           this.#dispatch(this.#setState(live, "rate_limited"));

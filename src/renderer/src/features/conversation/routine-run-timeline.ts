@@ -1,4 +1,4 @@
-import { ROUTINE_QUIET_ANSWER_ITEM_TYPE } from "@openbot/contracts/ipc";
+import { ROUTINE_QUIET_ANSWER_ITEM_TYPE, routineQuietStepsItemId } from "@openbot/contracts/ipc";
 import type {
   AgentMessage,
   ChatActionMarkerModel,
@@ -180,7 +180,15 @@ export function placeRoutineRunTurns(
 
 function routineRunOpenByDefault(marker: RoutineRunMarker, messages: readonly AgentMessage[]): boolean {
   if (marker.status === "queued" || marker.status === "running" || marker.status === "needs-attention") return true;
-  return messages.some((message) => message.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE);
+  return messages.some((message) => message.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE && !quietRunStepsRow(message));
+}
+
+export function quietRunStepsRow(message: AgentMessage): boolean {
+  return (
+    message.kind === "thinking" &&
+    message.turnId !== undefined &&
+    message.itemIds?.includes(routineQuietStepsItemId(message.turnId)) === true
+  );
 }
 
 export function expandRoutineRunGroups(

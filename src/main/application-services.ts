@@ -840,7 +840,7 @@ async function createMessagingServices({
     drivers: [
       slackDriver({ ingress: signalIngress }),
       discordDriver({ ingress: signalIngress }),
-      telegramDriver({ ingress: signalIngress }),
+      telegramDriver({ ingress: signalIngress, history: service.messaging.history }),
       whatsAppDriver({ runtime: whatsapp }),
     ],
     downloadsRoot: join(app.getPath("userData"), "messaging-downloads"),
@@ -2244,6 +2244,12 @@ export async function createApplicationServices({
       stopDelivery: stopHandoff,
       generateText: (request) =>
         service.generateWorkflowText(request).pipe(
+          Effect.mapError((failure) => ({
+            message: failure.cause instanceof Error ? failure.cause.message : sourceText("error.workflow.modelFailed"),
+          })),
+        ),
+      chooseTextModel: (request) =>
+        service.chooseWorkflowModel(request).pipe(
           Effect.mapError((failure) => ({
             message: failure.cause instanceof Error ? failure.cause.message : sourceText("error.workflow.modelFailed"),
           })),

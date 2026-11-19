@@ -1,3 +1,4 @@
+import type { WorkflowStepSettings } from "@openbot/contracts/ipc";
 import { Toaster } from "@openbot/ui";
 import { AgentNode } from "@openbot/ui/features/workflows/WorkflowAgentNode";
 import { ApprovalNode } from "@openbot/ui/features/workflows/WorkflowApprovalNode";
@@ -18,6 +19,7 @@ import {
   AGENT_RESULT,
   competitorWatch,
   githubTriage,
+  higgsfieldVideo,
   LLM_RESULT,
   newCompetitorAlert,
   STORY_CATALOGS,
@@ -81,6 +83,11 @@ export const ExampleWithCollaborators: Story = {
 export const InApp: Story = {
   name: "In app",
   render: () => <WorkflowInAppStory workflows={[competitorWatch(), newCompetitorAlert()]} />,
+};
+
+export const HiggsfieldVideo: Story = {
+  name: "Higgsfield video",
+  render: () => <WorkflowStory workflows={[higgsfieldVideo()]} features={STORY_ALL_FEATURES} />,
 };
 
 export const ExampleAfterRun: Story = {
@@ -171,6 +178,47 @@ export const Prompt: Story = {
       <PromptNode id="filled" text={TASK} />
     </NodeGallery>
   ),
+};
+
+const REFERENCES = [
+  { id: "file-1", name: "launch-hero.png" },
+  { id: "file-2", name: "launch-hero-dark.png" },
+];
+
+const agentWithReferences: StoryWorkflow = {
+  id: "agent-references",
+  title: "Launch illustration",
+  graph: {
+    nodes: [
+      ...REFERENCES.map((file, index) => ({
+        kind: "asset" as const,
+        id: `reference-${index + 1}`,
+        at: { x: 0, y: index * 340 },
+        fields: { fileId: file.id, file: file.name },
+      })),
+      {
+        kind: "agent",
+        id: "illustrate",
+        at: { x: 420, y: 120 },
+        fields: {
+          agentId: AGENT,
+          task: "Make one 4:5 illustration that keeps the character and the style of the two pictures. Do not invent a new character.",
+        },
+      },
+    ],
+    edges: REFERENCES.map((_, index) => ({
+      id: `reference-${index + 1}>illustrate:image`,
+      from: `reference-${index + 1}`,
+      to: "illustrate",
+      type: "image" as const,
+    })),
+    strokes: [],
+  },
+};
+
+export const AgentWithPictures: Story = {
+  name: "Agent with connected pictures",
+  render: () => <WorkflowStory workflows={[agentWithReferences]} features={STORY_ALL_FEATURES} />,
 };
 
 export const Agent: Story = {
@@ -277,6 +325,114 @@ export const ImageManyResults: Story = {
       }}
     >
       <ImageNode id="filled" prompt="Hero image for the Atlas comparison page, one product window" />
+    </NodeGallery>
+  ),
+};
+
+const BRIEF = "Atlas launched on 22 Oct at €12 a seat, with a Slack connector";
+const REFERENCE = "story-reference-picture";
+const LONG_BRIEF = [
+  "Atlas launched on 22 Oct at €12 a seat, with a Slack connector and a shared inbox for small teams.",
+  "The launch post names three rivals: Relay, Northwind and Harbor. Relay costs €9 a seat but has no connectors.",
+  "Northwind sells only yearly plans. Harbor has a free plan for 3 seats and a Slack connector since September.",
+  "Early users on the forum ask for a Linear connector, an API and a way to export a workspace.",
+].join("\n\n");
+const LONG_PROMPT = [
+  "Read the research notes and write a short brief for the market team.",
+  "1. Start with one line that says what launched, when, and at what price.",
+  "2. Compare the price per seat with each rival that the notes name. Give the numbers, not adjectives.",
+  "3. List the connectors that each product has. Say which connector only Atlas has.",
+  "4. Name the requests from early users that we can answer in our next post.",
+  "5. End with one risk for our product and one action that we can take this week.",
+  "Keep it under 120 words. Use the names of the products as the notes write them. Do not guess numbers that are not in the notes.",
+].join("\n");
+
+const SAVED_SETTINGS: Record<string, WorkflowStepSettings> = {
+  "llm-saved": {
+    settings: {
+      provider: "codex",
+      model: "gpt-5.6-luna",
+      effort: "high",
+      prompt: "Summarize the research in 3 lines for the market team",
+      system: "You write for busy readers. Use short sentences and no adjectives.",
+    },
+    sources: [{ from: "brief", type: "text", stepId: "brief-result", attachmentId: null }],
+  },
+  "llm-long": {
+    settings: {
+      provider: "codex",
+      model: "gpt-5.6-luna",
+      effort: "high",
+      prompt: LONG_PROMPT,
+      system:
+        "You write for busy readers on a market team. Use short sentences, plain words and no adjectives. Put numbers before opinions. When the notes do not answer a question, say so.",
+    },
+    sources: [{ from: "brief", type: "text", stepId: "brief-long", attachmentId: null }],
+  },
+  "image-saved": {
+    settings: {
+      media: "image",
+      model: "gpt-image",
+      account: "a0123456789abcdef",
+      prompt: "Hero image for the Atlas comparison page, one product window",
+      aspect: "16:9",
+      background: "solid",
+      options: JSON.stringify({ quality: "high" }),
+    },
+    sources: [{ from: "reference", type: "image", stepId: null, attachmentId: REFERENCE }],
+  },
+};
+
+const SAVED_CATALOGS: WorkflowCatalogs = {
+  ...STORY_CATALOGS,
+  imageModels: STORY_CATALOGS.imageModels.map((model) =>
+    model.id === "gpt-image"
+      ? { ...model, options: [{ name: "quality", kind: "choice", values: ["standard", "high"], default: "standard" }] }
+      : model,
+  ),
+  mediaPreview: (attachmentId) => (attachmentId === REFERENCE ? STORY_IMAGES[1]?.previewUrl : undefined),
+  stepSettings: async (stepId) => SAVED_SETTINGS[stepId] ?? { settings: null, sources: null },
+};
+
+export const ResultSettings: Story = {
+  name: "Result settings",
+  render: () => (
+    <NodeGallery
+      selected="summary"
+      catalogs={SAVED_CATALOGS}
+      edges={[{ id: "brief-summary", from: "brief", to: "summary", type: "text" }]}
+      results={{
+        brief: [{ id: "brief-result", at: todayAt(9, 10), value: BRIEF }],
+        summary: [
+          { id: "llm-old", at: todayAt(8, 2), value: LLM_RESULT },
+          { id: "llm-saved", at: todayAt(9, 14), value: LLM_RESULT },
+        ],
+        hero: [{ id: "image-saved", at: todayAt(9, 20), value: STORY_IMAGES[0]?.name ?? "" }],
+      }}
+      fields={{ summary: { provider: "codex", model: "gpt-6-luna", effort: "low" } }}
+    >
+      <PromptNode id="brief" text={BRIEF} />
+      <LlmNode id="summary" prompt="Summarize the research in 3 lines" />
+      <ImageNode id="hero" prompt="Hero image for the Atlas comparison page" />
+    </NodeGallery>
+  ),
+};
+
+export const ResultSettingsLongPrompt: Story = {
+  name: "Result settings, long prompt",
+  render: () => (
+    <NodeGallery
+      selected="summary"
+      catalogs={SAVED_CATALOGS}
+      edges={[{ id: "brief-summary", from: "brief", to: "summary", type: "text" }]}
+      results={{
+        brief: [{ id: "brief-long", at: todayAt(9, 10), value: LONG_BRIEF }],
+        summary: [{ id: "llm-long", at: todayAt(9, 14), value: LLM_RESULT }],
+      }}
+      fields={{ summary: { provider: "codex", model: "gpt-6-luna", effort: "low" } }}
+    >
+      <PromptNode id="brief" text={LONG_BRIEF} />
+      <LlmNode id="summary" prompt={LONG_PROMPT} />
     </NodeGallery>
   ),
 };

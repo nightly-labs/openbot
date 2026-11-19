@@ -70,7 +70,7 @@ const GEMINI_REQUEST_FAILURES = [
   ],
   [
     "error.provider.antigravityModelUnavailable",
-    /\bmodel\b.{0,60}\b(?:not found|not supported|does not exist|is unavailable)\b|\bunknown model\b/iu,
+    /\bmodel\b.{0,60}\b(?:not found|not supported|does not exist|is unavailable|retired|is no longer (?:available|supported))\b|\bunknown model\b|\bmodels\/\S+ is not found\b|\b(?:status|code|HTTP(?:\/[\d.]+)?)\W{0,4}410\b/iu,
   ],
   ["error.provider.antigravityServiceFailure", /\b(?:UNAVAILABLE|DEADLINE_EXCEEDED)\b/u],
   [

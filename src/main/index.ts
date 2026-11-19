@@ -30,6 +30,7 @@ import {
   powerSaveBlocker,
   protocol,
   screen,
+  session,
   shell,
   systemPreferences,
 } from "electron";
@@ -510,6 +511,7 @@ const windowHolder = createMainWindowHolder();
 const {
   closeChatNotifications,
   forwardAgentEvent,
+  withdrawSettledNotifications,
   forwardWorkflowNotice,
   forwardBrowserDisplayState,
   forwardUpdateStatus,
@@ -1584,6 +1586,7 @@ if (!hasSingleInstanceLock) {
       remoteServers.on("agent", (serverId, event, bufferedLive) => {
         forwardAgentEvent(serverId, event, bufferedLive);
       });
+      remoteServers.on("receivedRuntimeSnapshot", withdrawSettledNotifications);
       remoteServers.on("presence", forwardTeamPresence);
       remoteServers.on("directMessage", forwardDirectMessage);
       remoteServers.on("directTyping", forwardDirectTyping);
@@ -1968,6 +1971,7 @@ async function prepareForShutdown(deadlineMs = SHUTDOWN_DEADLINE_MS): Promise<vo
     await runCauseEffect(windows.flushMainWindowBounds()).catch((error) =>
       logger.error("Unable to save the main window position:", toLogValue(error)),
     );
+    session.defaultSession.flushStorageData();
     hideWindowsForQuit();
     services?.dynamicIsland.destroy();
     services?.agentDock.destroy();

@@ -405,6 +405,7 @@ export interface OpenBotToolRouterHooks {
   interrupt(agentId: string, turnId: string, mayStop: () => boolean): Effect.Effect<boolean, ToolOperationFailed>;
   turnActivity(agentId: string, turnId: string | null): { startedAt: number | null; lastEventAt: number | null };
   turnUnfinished(turnId: string): boolean;
+  startedTask(turnId: string): void;
   requestNoUpdate(
     agentId: string,
     threadId: string,
@@ -2267,6 +2268,7 @@ export class OpenBotToolRouter {
     if (waitResult) return waitResult;
 
     const taskResult = yield* this.#tasks.handleTool(params, caller);
+    if (taskResult?.success) this.#hooks.startedTask(params.turnId);
     if (taskResult) return taskResult;
 
     const tableResult = yield* handleDataTool(params.tool, params.arguments, senderAgentId, this.#tables);

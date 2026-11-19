@@ -9,6 +9,26 @@ import { HOSTED_PLAN_SIZE, HOSTED_SERVER_SIZE_NAMES } from "@openbot/contracts/h
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { z } from "zod";
+import {
+  ARCHIVE_REGION,
+  abortUpload,
+  archiveScript,
+  B2_BUCKET,
+  type B2Key,
+  completeUpload,
+  deleteArchive,
+  newArchiveKey,
+  PART_BYTES,
+  partCount,
+  partUrls,
+  SERVER_BYTES,
+  shellWord,
+  startUpload,
+  uploadedParts,
+  wrapArchiveKey,
+  wrapKeySecret,
+} from "./pool-archive";
+import { hostingCopy, MACHINE_HOSTING, prepareScript, upgradeScript } from "./pool-machine";
 
 const logger = createOpenBotLogger("leaseweb-pool");
 const AUTH_API = resolve(import.meta.dirname, "../../apps/auth-api");
@@ -49,7 +69,6 @@ const AUTH_API_URL = {
   test: "https://openbot-auth-api-test.internal9671.workers.dev",
 };
 const SANDBOX_MOVE = "/root/openbot-move";
-const MACHINE_HOSTING = "/root/openbot-hosting";
 const MACHINE_ARCHIVE = "/root/openbot-move.tar";
 const EXPORT_WAIT_MS = 3 * 60 * 60_000;
 const RESTORE_WAIT_MS = 30 * 60_000;
@@ -70,6 +89,15 @@ const POOL_FIRST_START_SQL = `(operator_host IS NOT NULL AND observed_state = 's
 const TOKEN_HASH_PATTERN = /^[A-Za-z0-9_-]{43}$/u;
 const OFFER_WAIT_MS = 2 * 60_000;
 const ROOT = resolve(HOSTING, "../..");
+const DAY_MS = 24 * 60 * 60_000;
+const ARCHIVE_KEPT_MS = 14 * DAY_MS;
+const POOL_UNPAID_ARCHIVE_AFTER_MS = 3 * DAY_MS;
+const OPEN_STATUSES_SQL = "('active', 'trialing', 'past_due', 'unpaid', 'paused')";
+const ENDED_SUBSCRIPTION_STATUSES = new Set(["canceled", "incomplete_expired"]);
+const SUBSCRIPTION_PATTERN = /^sub_[A-Za-z0-9]{1,250}$/u;
+const OBJECT_KEY_PATTERN = /^[a-z]{2}\/[A-Za-z0-9:_-]{1,128}\/\d{13}\.tar\.age$/u;
+const ARCHIVE_VALUE_PATTERN = /^[A-Za-z0-9._-]{1,512}$/u;
+const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
 
 function literal(value: string | number, pattern?: RegExp): string {
   if (typeof value === "number") {
@@ -122,6 +150,20 @@ const workRowSchema = z.object({
   operator_host: z.string().regex(HOST_ID_PATTERN),
 });
 type WorkRow = z.infer<typeof workRowSchema>;
+const archiveRowSchema = workRowSchema.extend({
+  plan_ended_at: z.number().int(),
+  subscription: z.string().regex(SUBSCRIPTION_PATTERN).nullable(),
+});
+type ArchiveRow = z.infer<typeof archiveRowSchema>;
+const storedArchiveSchema = z.object({
+  object_key: z.string().regex(OBJECT_KEY_PATTERN),
+  version_id: z.string().regex(ARCHIVE_VALUE_PATTERN),
+  server_id: z.string().regex(SERVER_ID_PATTERN),
+});
+const subscriptionSchema = z.object({
+  status: z.string(),
+  cancellation_details: z.object({ reason: z.string().nullable() }).nullish(),
+});
 
 const moveRowSchema = z.object({
   plan: z.string(),
@@ -347,6 +389,7 @@ class Pool {
   #operatorKeysBase64: string | undefined;
   readonly #boatKey: string | undefined;
   readonly #claimsToken: string | undefined;
+  readonly #environment: NodeJS.ProcessEnv;
 
   constructor(
     apply: boolean,
@@ -360,6 +403,7 @@ class Pool {
     this.#operatorKeysHost = environment.OPERATOR_KEYS_HOST || undefined;
     this.#boatKey = environment.BOAT_API_KEY || undefined;
     this.#claimsToken = environment.SERVER_CLAIMS_ADMIN_TOKEN || undefined;
+    this.#environment = environment;
     this.#keys = Object.entries(environment).flatMap(([name, key]) =>
       /^LEASEWEB_API_KEY_[A-Z]+$/u.test(name) && key ? [{ name, key }] : [],
     );
@@ -418,7 +462,9 @@ class Pool {
   #work() {
     const query = (where: string) =>
       this.#rows(
-        `SELECT server_id, operator_host FROM hosted_servers WHERE operator_host IS NOT NULL AND ${where}`,
+        `SELECT server_id, operator_host FROM hosted_servers WHERE operator_host IS NOT NULL AND ${where}
+           AND NOT EXISTS(SELECT 1 FROM hosted_server_archives a WHERE a.server_id = hosted_servers.server_id
+             AND a.deleted_at IS NULL AND a.restored_at IS NULL)`,
         workRowSchema,
       );
     return {
@@ -429,7 +475,32 @@ class Pool {
         `desired_state = 'running' AND observed_state NOT IN ('running', 'deleted') AND NOT COALESCE(${POOL_FIRST_START_SQL}, 0)`,
       ),
       reinstall: query("desired_state = 'deleted' AND observed_state = 'deleted'"),
+      archive: this.#rows(
+        `SELECT h.server_id, h.operator_host, h.plan_ended_at,
+           (SELECT s.stripe_subscription_id FROM billing_subscriptions s WHERE s.server_id = h.server_id
+            ORDER BY COALESCE(s.current_period_end, 0) DESC, s.updated_at DESC LIMIT 1) AS subscription
+         FROM hosted_servers h
+         WHERE h.operator_host IS NOT NULL AND h.desired_state = 'stopped' AND h.observed_error = 'plan_ended'
+           AND h.plan_ended_at IS NOT NULL AND NOT COALESCE(${POOL_FIRST_START_SQL}, 0)
+           AND NOT EXISTS(SELECT 1 FROM billing_subscriptions s WHERE s.server_id = h.server_id
+             AND s.status IN ${OPEN_STATUSES_SQL})
+           AND NOT EXISTS(SELECT 1 FROM hosted_server_archives a WHERE a.server_id = h.server_id
+             AND a.deleted_at IS NULL)
+         ORDER BY h.plan_ended_at`,
+        archiveRowSchema,
+      ),
     };
+  }
+
+  #dueArchives() {
+    return this.#rows(
+      `SELECT a.object_key, a.version_id, a.server_id FROM hosted_server_archives a
+       LEFT JOIN hosted_servers h ON h.server_id = a.server_id
+       WHERE a.deleted_at IS NULL AND ((a.delete_after <= ${literal(Date.now())} AND h.desired_state != 'running')
+         OR a.restored_at IS NOT NULL OR h.server_id IS NULL OR h.desired_state = 'deleted')
+       ORDER BY a.delete_after`,
+      storedArchiveSchema,
+    );
   }
 
   #readySql() {
@@ -498,7 +569,9 @@ class Pool {
     for (const [action, rows] of Object.entries(work)) {
       for (const row of rows) logger.info(`sync would ${action} ${row.operator_host} (server ${row.server_id}).`);
     }
-    if (Object.values(work).every((rows) => rows.length === 0)) logger.info("sync has no work.");
+    const due = this.#dueArchives();
+    for (const row of due) logger.info(`sync would delete the archive of server ${row.server_id} in B2.`);
+    if (Object.values(work).every((rows) => rows.length === 0) && due.length === 0) logger.info("sync has no work.");
   }
 
   async add(ids: string[]) {
@@ -556,7 +629,7 @@ class Pool {
   async sync() {
     const work = this.#work();
     let failed = 0;
-    const each = async (row: WorkRow, task: (row: WorkRow) => Promise<void>) => {
+    const each = async <Row extends WorkRow>(row: Row, task: (row: Row) => Promise<void>) => {
       try {
         await task(row);
       } catch (error) {
@@ -567,6 +640,15 @@ class Pool {
     for (const row of work.stop) await each(row, (item) => this.#runService(item, "stopped"));
     for (const row of work.start) await each(row, (item) => this.#runService(item, "running"));
     for (const row of work.reinstall) await each(row, (item) => this.#reinstall(item));
+    for (const row of work.archive) await each(row, (item) => this.#archive(item));
+    for (const row of this.#dueArchives()) {
+      try {
+        await this.#deleteStoredArchive(row);
+      } catch (error) {
+        failed += 1;
+        logger.error(`The archive of server ${row.server_id} is not deleted.`, toLogValue(error));
+      }
+    }
     try {
       await this.#nameMachines();
     } catch (error) {
@@ -619,7 +701,12 @@ class Pool {
     const machine = await this.#vps(row.operator_host.replace("leaseweb:", ""));
     logger.info(`${state === "stopped" ? "Stop" : "Start"} OpenBot on VPS ${machine.id} (server ${row.server_id}).`);
     if (!this.#apply) return;
-    this.#remote(machine, `systemctl ${state === "stopped" ? "disable" : "enable"} --now openbot.service`);
+    this.#remote(
+      machine,
+      state === "stopped"
+        ? "systemctl disable --now openbot.service"
+        : "rm -f /run/openbot-pre-stop && systemctl enable --now openbot.service",
+    );
     const changes = this.#write(
       `UPDATE hosted_servers SET observed_state = '${state}', updated_at = ${literal(Date.now())}
        WHERE server_id = ${literal(row.server_id, SERVER_ID_PATTERN)}
@@ -653,6 +740,132 @@ class Pool {
       changes === 1
         ? `VPS ${machine.id} is free. Run prepare to offer it for a new server.`
         : `The row of server ${row.server_id} changed.`,
+    );
+  }
+
+  #archiveKeys(): { b2: B2Key; wrapSecret: Buffer } {
+    const id = this.#environment.B2_KEY_ID_EU;
+    const secret = this.#environment.B2_APPLICATION_KEY_EU;
+    if (!id || !secret) throw new Error("B2_KEY_ID_EU and B2_APPLICATION_KEY_EU are not in the environment.");
+    return { b2: { id, secret }, wrapSecret: wrapKeySecret(this.#environment.HOSTED_ARCHIVE_KEY_SECRET) };
+  }
+
+  async #subscriptionEnd(subscription: string): Promise<"open" | "cancelled" | "payment_failed"> {
+    const key = this.#environment.STRIPE_SECRET_KEY;
+    if (!key) throw new Error("STRIPE_SECRET_KEY is not in the environment.");
+    const response = await fetch(`https://api.stripe.com/v1/subscriptions/${subscription}`, {
+      headers: { authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!response.ok) throw new Error(`Stripe answered ${response.status} for subscription ${subscription}.`);
+    const body = subscriptionSchema.parse(await response.json());
+    if (!ENDED_SUBSCRIPTION_STATUSES.has(body.status)) return "open";
+    return body.cancellation_details?.reason === "payment_failed" ? "payment_failed" : "cancelled";
+  }
+
+  async #archive(row: ArchiveRow) {
+    if (!row.subscription) {
+      logger.warn(`Server ${row.server_id} has no Stripe subscription. It is not archived. Examine it by hand.`);
+      return;
+    }
+    const end = await this.#subscriptionEnd(row.subscription);
+    if (end === "open") {
+      logger.info(`The plan of server ${row.server_id} is open in Stripe. It is not archived.`);
+      return;
+    }
+    const archiveAt = row.plan_ended_at + POOL_UNPAID_ARCHIVE_AFTER_MS;
+    if (end === "payment_failed" && Date.now() < archiveAt) {
+      logger.info(
+        `The last payment of server ${row.server_id} failed. Its archive starts after ${new Date(archiveAt).toISOString()}.`,
+      );
+      return;
+    }
+    const machine = await this.#vps(row.operator_host.replace("leaseweb:", ""));
+    logger.info(`Archive server ${row.server_id} from VPS ${machine.id} in B2, then reinstall the VPS.`);
+    if (!this.#apply) return;
+    const { b2, wrapSecret } = this.#archiveKeys();
+    const host = literal(row.operator_host, HOST_ID_PATTERN);
+    const server = literal(row.server_id, SERVER_ID_PATTERN);
+    this.#remote(machine, "bash -s", {
+      input: `${hostingCopy()}
+command -v age >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y -q age >/dev/null
+`,
+    });
+    const serverBytes = Number(this.#remote(machine, SERVER_BYTES, { capture: true }).trim());
+    if (!Number.isSafeInteger(serverBytes) || serverBytes <= 0)
+      throw new Error(`VPS ${machine.id} has no server data.`);
+    const objectKey = `${ARCHIVE_REGION}/${row.server_id}/${Date.now()}.tar.age`;
+    const archiveKey = newArchiveKey();
+    const uploadId = await startUpload(b2, objectKey);
+    let versionId = "";
+    let kept = false;
+    try {
+      const output = this.#remote(
+        machine,
+        `bash -c ${shellWord(archiveScript(MACHINE_HOSTING))} archive ${archiveKey.recipient} ${PART_BYTES}`,
+        { input: `${partUrls(b2, objectKey, uploadId, partCount(serverBytes))}\n`, capture: true },
+      );
+      const upload = uploadedParts(output);
+      if (upload.parts.length === 0 || upload.sha256 === "" || upload.parts.some((part) => part.etag !== part.md5)) {
+        throw new Error(`B2 did not get each part of server ${row.server_id} as the machine sent it.`);
+      }
+      const head = await completeUpload(b2, objectKey, uploadId, upload.parts);
+      versionId = head.versionId;
+      if (head.status !== 200 || head.size !== upload.bytes || !ARCHIVE_VALUE_PATTERN.test(versionId)) {
+        throw new Error(`B2 has ${head.size} of ${upload.bytes} bytes of the archive of server ${row.server_id}.`);
+      }
+      const wrapped = wrapArchiveKey(wrapSecret, archiveKey.identity, row.server_id, objectKey);
+      const stored = this.#write(
+        `INSERT INTO hosted_server_archives(object_key, server_id, region, bucket, version_id, size_bytes, sha256,
+           wrapped_key, plan_ended_at, delete_after, created_at)
+         SELECT ${literal(objectKey, OBJECT_KEY_PATTERN)}, server_id, '${ARCHIVE_REGION}', '${B2_BUCKET}',
+           ${literal(versionId, ARCHIVE_VALUE_PATTERN)}, ${literal(upload.bytes)}, ${literal(upload.sha256, SHA256_PATTERN)},
+           ${literal(wrapped, ARCHIVE_VALUE_PATTERN)}, plan_ended_at, plan_ended_at + ${literal(ARCHIVE_KEPT_MS)},
+           ${literal(Date.now())}
+         FROM hosted_servers WHERE server_id = ${server} AND operator_host = ${host} AND desired_state = 'stopped'
+           AND plan_ended_at = ${literal(row.plan_ended_at)}`,
+      );
+      if (stored !== 1) {
+        logger.warn(`Server ${row.server_id} changed during its archive. It stays on VPS ${machine.id}.`);
+        return;
+      }
+      kept = true;
+    } finally {
+      if (versionId === "") await abortUpload(b2, objectKey, uploadId);
+      else if (!kept) await deleteArchive(b2, objectKey, versionId).catch(() => undefined);
+    }
+    const released = this.#write(
+      `UPDATE hosted_servers SET operator_host = NULL, updated_at = ${literal(Date.now())}
+       WHERE server_id = ${server} AND operator_host = ${host} AND desired_state = 'stopped'`,
+    );
+    if (released !== 1) {
+      logger.warn(`Server ${row.server_id} was renewed after its archive. It stays on VPS ${machine.id}.`);
+      await this.#deleteStoredArchive({ object_key: objectKey, version_id: versionId, server_id: row.server_id });
+      return;
+    }
+    this.#write(`UPDATE operator_hosts SET assign_token_hash = NULL, seen_at = NULL WHERE host_id = ${host}`);
+    try {
+      await this.#erase(machine);
+    } catch (error) {
+      throw new Error(
+        `Server ${row.server_id} is in B2, but VPS ${machine.id} still has its data. Run prepare --reinstall for it.`,
+        { cause: error },
+      );
+    }
+    await this.#setReference(machine, POOL_REFERENCE);
+    logger.info(`VPS ${machine.id} is free. Run prepare to offer it for a new server.`);
+  }
+
+  async #deleteStoredArchive(row: z.infer<typeof storedArchiveSchema>) {
+    logger.info(`Delete the archive of server ${row.server_id} in B2.`);
+    if (!this.#apply) return;
+    const { b2 } = this.#archiveKeys();
+    const answer = await deleteArchive(b2, row.object_key, row.version_id);
+    if (!answer.deleted)
+      throw new Error(`B2 answered ${answer.status} and keeps the archive of server ${row.server_id}.`);
+    this.#write(
+      `UPDATE hosted_server_archives SET deleted_at = ${literal(Date.now())}, wrapped_key = NULL
+       WHERE object_key = ${literal(row.object_key, OBJECT_KEY_PATTERN)} AND deleted_at IS NULL`,
     );
   }
 
@@ -858,39 +1071,19 @@ class Pool {
     return z.object({ password: z.string().min(1) }).parse(await response.json()).password;
   }
 
-  #hostingCopy() {
-    const archive = execFileSync("tar", ["-czf", "-", "--exclude=*.ts", "-C", resolve(HOSTING, ".."), "hosting"], {
-      maxBuffer: 16 * 1024 * 1024,
-    });
-    return `set -euo pipefail
-rm -rf ${MACHINE_HOSTING}
-install -d -m 0700 ${MACHINE_HOSTING}
-base64 -d <<'OPENBOT_HOSTING' | tar -xz --no-same-owner --strip-components=1 -C ${MACHINE_HOSTING}
-${archive.toString("base64")}
-OPENBOT_HOSTING
-`;
-  }
-
   async #prepareMachine(machine: Vps, release: Release) {
     const keys = this.#operatorKeys();
     const password = this.#machineState(machine) === null ? await this.#rootPassword(machine) : undefined;
     if (password !== undefined)
       logger.info(`VPS ${machine.id} has no key of this computer. Sign in one time with the root password.`);
     const authApi = this.#testDatabase ? AUTH_API_URL.test : AUTH_API_URL.production;
-    const script = `${this.#hostingCopy()}
-bash ${MACHINE_HOSTING}/move-from-boat.sh prepare lsw-${machine.id} 1000 1000 '${release.url}' ${release.sha256} '${authApi}'
-bash ${MACHINE_HOSTING}/leaseweb-bootstrap.sh '${keys}'
-`;
-    this.#remote(machine, "bash -s", { input: script, password });
+    this.#remote(machine, "bash -s", { input: prepareScript(machine.id, release, authApi, keys), password });
     await this.#restartMachine(machine);
   }
 
   #upgradeMachine(machine: Vps, release: Release) {
     const authApi = this.#testDatabase ? AUTH_API_URL.test : AUTH_API_URL.production;
-    const script = `${this.#hostingCopy()}
-bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha256} '${authApi}'
-`;
-    this.#remote(machine, "bash -s", { input: script });
+    this.#remote(machine, "bash -s", { input: upgradeScript(release, authApi) });
   }
 
   async #restartMachine(machine: Vps) {
@@ -943,7 +1136,7 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
     );
     if (changes !== 1) throw new Error(`VPS ${machine.id} is not a free machine of the pool any more.`);
     try {
-      this.#remote(machine, "bash -s", { input: this.#hostingCopy() });
+      this.#remote(machine, "bash -s", { input: hostingCopy() });
       this.#remote(machine, `bash ${MACHINE_HOSTING}/move-from-boat.sh offer leaseweb:${machine.id}`, {
         input: `${token}\n`,
       });
@@ -1267,7 +1460,7 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
     const hostname = `lsw-${id}`;
     const claim = install ? await this.#serverClaim(owner) : "";
     const authApi = this.#testDatabase ? ` --auth-api-url '${AUTH_API_URL.test}'` : "";
-    const script = `${this.#hostingCopy()}
+    const script = `${hostingCopy()}
 hostnamectl set-hostname ${hostname}
 ${
   install
@@ -1483,7 +1676,7 @@ exit "$status"`;
       state = this.#machineState(machine);
     } else {
       this.#remote(machine, "bash -s", {
-        input: `${this.#hostingCopy()}\nbash ${MACHINE_HOSTING}/move-from-boat.sh withdraw\n`,
+        input: `${hostingCopy()}\nbash ${MACHINE_HOSTING}/move-from-boat.sh withdraw\n`,
       });
     }
     if (state?.user !== "user" || state.data || state.enabled === "enabled") {

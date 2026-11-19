@@ -654,6 +654,7 @@ import type {
   WorkflowRunsInput,
   WorkflowSaveResult,
   WorkflowStep,
+  WorkflowStepSettings,
   WorkflowSummary,
   WorkflowTriggerInput,
   WorkflowVersion,
@@ -1628,6 +1629,7 @@ export const IPC_ENDPOINTS = {
     decide: scopedRequest<DecideWorkflowStepInput, void>()("workflows:decide"),
     runs: scopedRequest<WorkflowRunsInput, WorkflowRunPage>()("workflows:runs"),
     run: scopedRequest<string, WorkflowRunDetail>()("workflows:run"),
+    stepSettings: scopedRequest<string, WorkflowStepSettings>()("workflows:step-settings"),
     rotateWebhookSecret: scopedRequest<WorkflowTriggerInput, WorkflowWebhookSecret>()(
       "workflows:rotate-webhook-secret",
     ),

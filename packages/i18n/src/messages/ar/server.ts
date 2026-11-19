@@ -198,6 +198,7 @@ export const messages = {
   "server.hosted.detail.create.copy": "جارٍ نسخ OpenBot إلى الجهاز",
   "server.hosted.detail.create.key": "جارٍ إضافة مفتاح تسجيل دخول لمرة واحدة",
   "server.hosted.detail.start.boot": "جارٍ تشغيل الجهاز",
+  "server.hosted.detail.start.restore": "جارٍ استعادة البيانات",
   "server.hosted.detail.start.app": "جارٍ بدء OpenBot",
   "server.hosted.detail.start.wait": "بانتظار استجابة OpenBot",
   "server.hosted.detail.connect.signIn": "جارٍ تسجيل الدخول باسمك",

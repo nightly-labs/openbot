@@ -1,11 +1,14 @@
 import {
+  isWorkflowFields,
   isWorkflowGraph,
+  isWorkflowStepSource,
   WORKFLOW_BRANCHES,
   WORKFLOW_NODE_KINDS,
   WORKFLOW_RUN_SOURCES,
   WORKFLOW_RUN_STATUSES,
   WORKFLOW_STEP_STATUSES,
   type WorkflowBranch,
+  type WorkflowFields,
   type WorkflowGraph,
   type WorkflowNodeKind,
   type WorkflowRun,
@@ -13,6 +16,7 @@ import {
   type WorkflowRunSource,
   type WorkflowRunStatus,
   type WorkflowStep,
+  type WorkflowStepSource,
   type WorkflowStepStatus,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
@@ -39,6 +43,8 @@ export interface StoredWorkflowRun extends WorkflowRun {
 export interface StoredWorkflowStep extends WorkflowStep {
   kind: WorkflowNodeKind;
   input: string;
+  settings: WorkflowFields | null;
+  sources: readonly WorkflowStepSource[] | null;
   deliveryId: string | null;
   turnId: string | null;
   createdAt: string;
@@ -94,6 +100,8 @@ export interface NewWorkflowStep {
   agentId: string | null;
   status: WorkflowStepStatus;
   input: string;
+  settings?: WorkflowFields | null;
+  sources?: readonly WorkflowStepSource[] | null;
   output?: string | null;
   branch?: WorkflowBranch | null;
   error?: string | null;
@@ -314,8 +322,8 @@ export class WorkflowRunStore {
       const ended = isOneOf(OPEN_STEP_STATUSES, input.status) ? null : at;
       db.prepare(
         `INSERT INTO workflow_steps (step_id, workflow_id, run_id, node_id, attempt, request_id, kind, agent_id, status,
-          input, output, branch, error, started_at, ended_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          input, settings_json, sources_json, output, branch, error, started_at, ended_at, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         stepId,
         input.workflowId,
@@ -327,6 +335,8 @@ export class WorkflowRunStore {
         input.agentId,
         input.status,
         input.input,
+        input.settings ? JSON.stringify(input.settings) : null,
+        input.sources ? JSON.stringify(input.sources) : null,
         input.output ?? null,
         input.branch ?? null,
         input.error ?? null,
@@ -339,6 +349,14 @@ export class WorkflowRunStore {
       if (!step) throw new Error("A new workflow step was not stored.");
       return step;
     });
+  }
+
+  recordUsedSettings(stepId: string, used: WorkflowFields): void {
+    const settings = this.step(stepId)?.settings;
+    if (!settings) return;
+    this.#database.connection
+      .prepare("UPDATE workflow_steps SET settings_json = ? WHERE step_id = ?")
+      .run(JSON.stringify({ ...settings, ...used }), stepId);
   }
 
   attachDelivery(stepId: string, deliveryId: string, now = new Date()): void {
@@ -506,8 +524,8 @@ const RUN_SELECT = `
   FROM workflow_runs`;
 
 const STEP_SELECT = `
-  SELECT step_id, workflow_id, run_id, node_id, attempt, kind, agent_id, status, delivery_id, turn_id, input, output,
-    branch, error, started_at, ended_at, created_at, rowid AS sequence
+  SELECT step_id, workflow_id, run_id, node_id, attempt, kind, agent_id, status, delivery_id, turn_id, input,
+    settings_json, sources_json, output, branch, error, started_at, ended_at, created_at, rowid AS sequence
   FROM workflow_steps`;
 
 function toRun(row: DynamicRecord): StoredWorkflowRun {
@@ -530,6 +548,18 @@ function toRun(row: DynamicRecord): StoredWorkflowRun {
   };
 }
 
+function isWorkflowStepSources(value: unknown): value is WorkflowStepSource[] {
+  return Array.isArray(value) && value.every(isWorkflowStepSource);
+}
+
+function jsonColumn<T>(row: DynamicRecord, column: string, valid: (value: unknown) => value is T): T | null {
+  const text = optionalStringColumn(row, column);
+  if (text === null) return null;
+  const value = JSON.parse(text);
+  if (!valid(value)) throw new Error(`Invalid SQLite column: workflow_steps.${column}`);
+  return value;
+}
+
 function toStep(row: DynamicRecord): StoredWorkflowStep {
   const branch = row.branch;
   return {
@@ -544,6 +574,8 @@ function toStep(row: DynamicRecord): StoredWorkflowStep {
     deliveryId: optionalStringColumn(row, "delivery_id"),
     turnId: optionalStringColumn(row, "turn_id"),
     input: requiredStringColumn(row, "input"),
+    settings: jsonColumn(row, "settings_json", isWorkflowFields),
+    sources: jsonColumn(row, "sources_json", isWorkflowStepSources),
     output: optionalStringColumn(row, "output"),
     branch: isOneOf(WORKFLOW_BRANCHES, branch) ? branch : null,
     error: optionalStringColumn(row, "error"),

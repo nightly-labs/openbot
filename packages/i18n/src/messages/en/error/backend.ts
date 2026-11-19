@@ -288,6 +288,12 @@ export const messages = defineMessages("error.backend", {
     "{provider} could not start the MCP server {name}. Its tools are not available to {provider}. {provider} starts the server itself, so the connection test in OpenBot can pass. Start a new chat to try again.",
   "error.backend.mcpServerTimedOutInProvider":
     "{provider} could not start the MCP server {name}, because the server did not answer in time. Start a new chat to try again.",
+  "error.backend.mcpServerUnavailableInProvider":
+    "{provider} could not start the MCP server {name}, because the server is not available now. Wait a few minutes, then start a new chat to try again.",
+  "error.backend.mcpServerUnreachableInProvider":
+    "{provider} could not reach the MCP server {name}. Open {name} in Marketplace, Apps, and make sure that its address is correct and that the server is running. Then start a new chat to try again.",
+  "error.backend.githubToolsNotStarted":
+    "{provider} could not get the GitHub tools, because GitHub did not answer. Open GitHub in Marketplace, Apps, and connect it again if it asks you to. Then start a new chat to try again.",
   "error.backend.mcpAppReconnect":
     "{name} on ChatGPT asks you to sign in again. Reconnect {name} on ChatGPT, then ask the agent again.",
   "error.backend.mcpServerSignInPage":

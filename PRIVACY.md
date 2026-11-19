@@ -351,8 +351,8 @@ when there is no install ID.
   connection took, rounded, and how long each fixed step of it took; whether it was the first
   connection to that server since the app started; whether the session was new or saved; how many
   attempts failed before it; and, for a hosted server, how long the server took to start. The first
-  attempt that fails after a connection also sends the last step that finished. The server ID,
-  address, session, ticket and keys are not sent.
+  attempt that fails after a connection also sends the last step that finished. It also sends the short
+  name of the OpenBot Signal machine that the connection used, as the connection ticket names it. The server ID, address, session, ticket and keys are not sent.
 - **Turn times.** When a turn completes, the host sends how long the message waited in the queue, how
   long the provider took to start the turn and, when it had to start, its process, and how long until
   the first output. These are times only; the messages are not sent.
@@ -569,7 +569,21 @@ find the server in the Leaseweb portal, the operator gives it a reference in Lea
 email and the first 8 characters of the server ID, such as `ada@example.com 1a2b3c4d`. When you
 delete the server, when its plan is cancelled with a refund, or 14 days after its plan ends with no renewal, the account service deletes the old
 sandbox when the server has one, and within a day an operator reinstalls the virtual server, which erases its disk, and sets
-its reference to `pool-free`.
+its reference to `pool`.
+
+When the plan of a server on a virtual server ends with no refund, an operator moves the server's
+disk into an archive, so that the virtual server can take a new server. This occurs within a day
+after the plan ends, or 3 to 4 days after it when the last payment failed. The virtual server
+encrypts the archive with a new key before it sends it, and sends it straight to
+[Backblaze B2](https://www.backblaze.com) in the EU (the Netherlands), also from a virtual server in the United States. Backblaze
+stores the encrypted archive and has no key to read it. When Backblaze has all of the archive, the
+operator reinstalls the virtual server, which erases its disk. The account service stores the
+archive key, encrypted with a key that only the account service has, and the server ID, size,
+checksum and Backblaze name of the archive, with its times. When you renew the plan, the server
+gets its data back from the archive. The operator deletes the archive and the key within a day
+after 14 days from the end of the plan, after you delete the server or your account, or after the
+plan is cancelled with a refund. Backblaze deletes each archive by itself 16 days after it was
+made. The account service keeps the other values of the archive with the server record.
 
 ## Central data retention
 
@@ -1637,18 +1651,19 @@ short-lived signed addresses, in transit only.
   database holds the chat name and IDs, which agent is the Telegram Orchestrator, and one row per
   conversation that an agent answers. The messages of that conversation are kept as a conversation
   of that agent, with the Telegram name of each author, and files people send are kept with the
-  agent's attachments. The names of authors and the last messages of a chat are also kept in memory
-  for context, until OpenBot quits. Workspace memories are kept for each chat, as for Slack.
-  Disconnect makes the bot leave the chat, unlinks it and keeps the conversations and the workspace
-  memories; deleting an agent removes its conversations.
+  agent's attachments. The names of authors are also kept in memory for context, until OpenBot
+  quits. The messages of the chat that OpenBot sees, also those that do not address it, are kept in
+  the database for 90 days after they arrive, with the names of their files, so that an agent can
+  read them after a restart. Workspace memories are kept for each chat, as for Slack.
+  Disconnect makes the bot leave the chat, unlinks it, deletes the saved messages and keeps the
+  conversations and the workspace memories; deleting an agent removes its conversations.
 - **Read from Telegram.** Every message of a linked chat, the files in them, the names of their
   authors and the name of the chat. The OpenBot bot has privacy mode off, because with it on,
   Telegram does not send a plain mention to a bot that is not a group admin. A request starts only
   from a message that mentions the bot, a reply to it, another message of a reply chain that an
   agent answers, or a message of a direct chat. A new conversation in a group can start a workflow
-  run instead; see [Workflows](#workflows). The other messages of a group stay in the
-  computer's memory until OpenBot quits, and an agent can read the last of them with its history
-  tool, as for Slack.
+  run instead; see [Workflows](#workflows). The other messages of a group are saved on the
+  host as above, and an agent can read the last of them with its history tool, as for Slack.
 - **Given to the Telegram Orchestrator.** Every new Telegram request goes first to the orchestrator
   agent, which runs on its provider like any other agent and passes the work to a teammate with the
   facts it needs.

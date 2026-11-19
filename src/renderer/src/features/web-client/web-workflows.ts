@@ -9,6 +9,7 @@ import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-
 import { ATTACHMENT_PREVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-preview-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
 import { decodeTeamProtocolV2Json, TEAM_PROTOCOL_V2_MAX_FILE_BYTES } from "@openbot/contracts/team-protocol/v2";
+import { WORKFLOWS_AGENT_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-agent-files-v1";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
 import {
@@ -25,6 +26,10 @@ import {
   WORKFLOWS_MEDIA_CATALOG_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-catalog-v1";
 import {
+  WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY,
+  WORKFLOWS_MEDIA_CATALOG_V2_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-catalog-v2";
+import {
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-service-account-v1";
@@ -34,6 +39,10 @@ import {
   WORKFLOWS_MEDIA_CAPABILITY,
   WORKFLOWS_MEDIA_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-v1";
+import {
+  WORKFLOWS_STEP_SETTINGS_CAPABILITY,
+  WORKFLOWS_STEP_SETTINGS_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-step-settings-v1";
 import {
   WORKFLOWS_SUNRA_CAPABILITY,
   WORKFLOWS_SUNRA_ROUTES,
@@ -73,6 +82,7 @@ import {
   decodeRemoteWorkflowSaveResult,
   decodeRemoteWorkflowSecret,
   decodeRemoteWorkflowStep,
+  decodeRemoteWorkflowStepSettings,
   decodeRemoteWorkflowSummary,
   decodeRemoteWorkflowVersionGraph,
   decodeRemoteWorkflowVersions,
@@ -182,6 +192,10 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
       decide: (input) => post(WORKFLOWS_ROUTES.decide, empty, input),
       runs: (input) => post(WORKFLOWS_ROUTES.runs, decodeRemoteWorkflowRunPage, input),
       run: (runId) => post(WORKFLOWS_ROUTES.run, decodeRemoteWorkflowRunDetail, { runId }),
+      stepSettings: async (stepId) => {
+        if (!has(WORKFLOWS_STEP_SETTINGS_CAPABILITY)) throw tooOld();
+        return post(WORKFLOWS_STEP_SETTINGS_ROUTES.read, decodeRemoteWorkflowStepSettings, { stepId });
+      },
       rotateWebhookSecret: (input) => post(WORKFLOWS_ROUTES.rotateWebhookSecret, decodeRemoteWorkflowSecret, input),
       githubCatalog: () => postGitHub(WORKFLOWS_GITHUB_ROUTES.catalog, decodeRemoteWorkflowGitHubCatalog, {}),
       githubOptions: (input) => postGitHub(WORKFLOWS_GITHUB_ROUTES.options, decodeRemoteWorkflowGitHubOptions, input),
@@ -229,13 +243,17 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
         return { ...sunra, ...higgsfield, accounts: null };
       },
       mediaCatalog: async () =>
-        has(WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
-          ? post(WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
-          : { models: [] },
+        has(WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY)
+          ? post(WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
+          : has(WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
+            ? post(WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
+            : { models: [] },
       mediaPrice: async (input) =>
-        has(WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
-          ? post(WORKFLOWS_MEDIA_CATALOG_ROUTES.price, decodeRemoteWorkflowMediaPrice, input)
-          : { credits: null },
+        has(WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY)
+          ? post(WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.price, decodeRemoteWorkflowMediaPrice, input)
+          : has(WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
+            ? post(WORKFLOWS_MEDIA_CATALOG_ROUTES.price, decodeRemoteWorkflowMediaPrice, input)
+            : { credits: null },
     },
     onChanged(changed) {
       const events = options.onHostEvent((event) => {
@@ -323,6 +341,8 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
     mediaAccountSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY) && has(WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY),
     mediaTransparentSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY) && has(WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY),
     mediaSizeSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY) && has(WORKFLOWS_MEDIA_SIZE_CAPABILITY),
+    agentFilesSupported: () => has(WORKFLOWS_AGENT_FILES_CAPABILITY),
+    stepSettingsSupported: () => has(WORKFLOWS_STEP_SETTINGS_CAPABILITY),
     mediaUrl,
     mediaPreviewUrl(attachmentId) {
       const previews = options.previewMedia;

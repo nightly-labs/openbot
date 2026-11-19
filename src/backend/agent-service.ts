@@ -358,7 +358,7 @@ import { generateHiggsfieldMedia, HIGGSFIELD_MCP_HOST, readHiggsfieldCredits } f
 import { WorkflowMediaCatalogCache } from "./workflows/media-catalog";
 import { generateSunraMedia, readSunraCredits, SUNRA_MCP_HOST } from "./workflows/sunra-media";
 import type { WorkflowTools } from "./workflows/workflow-tools";
-import { type MediaImageRole, mediaInputText } from "./workflows/workflow-walk";
+import { type MediaImageRole, type MediaPictureRole, mediaInputText } from "./workflows/workflow-walk";
 import type { WorkflowRunEnd } from "./workflows/workflows";
 import {
   listWorkspaceDirectory,
@@ -498,6 +498,12 @@ export type AgentUpdate = UpdateAgentInput & {
   additionalFolders?: string[];
   excludedFolders?: string[];
 };
+
+interface WorkflowModelInput {
+  provider: AgentProvider | null;
+  model: string | null;
+  effort: AgentReasoningEffort | null;
+}
 
 export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly channels: ChannelService;
@@ -980,6 +986,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         sharedRoot: () => this.#store.sharedRoot,
         isStopping: () => this.#stopping,
         isProviderBusy: (provider) => this.#isProviderBusy(provider),
+        releasePersonWaits: (provider) => this.#attention.detachPromptsOf(provider),
         isProviderBusyApartFrom: (provider, agentId) => this.#isProviderBusyApartFrom(provider, agentId),
         isAgentBusy: (agentId) => this.#runsTurn(agentId),
         isProviderAssigned: (provider) => this.#store.list().some((agent) => providerForAgent(agent) === provider),
@@ -1661,6 +1668,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         mayContinueOnBackup: (agentId) => this.#mayContinueStoppedWork(agentId),
         mayFailOver: (agentId) => this.#mayFailOver(agentId),
         turnEnded: (turnId) => this.#turn.hasEnded(turnId),
+        staleTurnSettlement: (agentId, threadId, turnId) =>
+          this.#turnRunsNowhere(agentId, turnId) ? this.#settleStaleOwnTurn(agentId, threadId, turnId) : null,
         turnRestarting: (turnId) => this.#turn.forgetEnded(turnId),
         deliveriesStarting: (deliveryIds, start) => this.#turn.deliveriesStarting(deliveryIds, start),
         startRequestedNewChat: (agentId, queuedRuns) => this.#startRequestedNewChat(agentId, queuedRuns),
@@ -2015,6 +2024,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           lastEventAt: this.#turn.lastEventAt(agentId),
         }),
         turnUnfinished: (turnId) => this.#turn.turnStartedAt(turnId) !== null || this.#turn.isCompleting(turnId),
+        startedTask: (turnId) => this.#turn.startedTask(turnId),
         requestNoUpdate: (agentId, threadId, turnId, channelRun) =>
           this.#turn.requestNoUpdate(agentId, threadId, turnId, channelRun),
         reportRoutineFailure: (agentId, turnId, reason, channelRun) =>
@@ -2780,38 +2790,45 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return { saved };
   }).bind(this);
 
+  readonly #workflowModel = Effect.fn("AgentService.workflowModel")(function* (
+    this: AgentService,
+    input: WorkflowModelInput,
+  ) {
+    const starting = this.#startingChoice()?.provider ?? this.#providers.preferredProvider();
+    const provider =
+      input.provider ??
+      (input.model === null
+        ? workflowProvider(starting, this.#preference(), this.getStatus().providers ?? [], this.#endpoints.available())
+        : starting);
+    yield* this.#providers.ensureProvider(provider);
+    const models = this.#endpoints.available();
+    const model =
+      (input.model === null
+        ? undefined
+        : models.find((candidate) => candidate.provider === provider && candidate.id === input.model)) ??
+      startingModel(provider, models, this.#preference());
+    if (!model) return yield* new ProfileGenerationFailed({ cause: new Error(sourceText("error.provider.noModel")) });
+    return { provider, model };
+  }).bind(this);
+
+  readonly chooseWorkflowModel = Effect.fn("AgentService.chooseWorkflowModel")(
+    function* (this: AgentService, input: WorkflowModelInput) {
+      if (this.#stopping)
+        return yield* new ProfileGenerationFailed({ cause: new Error(sourceText("error.backend.shuttingDown")) });
+      const { provider, model } = yield* this.#workflowModel(input);
+      return { provider, model: model.id, effort: input.effort ?? model.defaultReasoningEffort };
+    },
+    Effect.mapError(
+      (failure) => new AgentLifecycleFailed({ operation: "choose workflow model", cause: failure.cause }),
+    ),
+  ).bind(this);
+
   readonly generateWorkflowText = Effect.fn("AgentService.generateWorkflowText")(
-    function* (
-      this: AgentService,
-      input: {
-        provider: AgentProvider | null;
-        model: string | null;
-        effort: AgentReasoningEffort | null;
-        prompt: string;
-      },
-    ) {
+    function* (this: AgentService, input: WorkflowModelInput & { prompt: string; images: readonly string[] }) {
       const failed = (message: string) => new ProfileGenerationFailed({ cause: new Error(message) });
       if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
       if (this.#profileClients.busy()) return yield* failed(sourceText("error.workflow.modelBusy"));
-      const starting = this.#startingChoice()?.provider ?? this.#providers.preferredProvider();
-      const provider =
-        input.provider ??
-        (input.model === null
-          ? workflowProvider(
-              starting,
-              this.#preference(),
-              this.getStatus().providers ?? [],
-              this.#endpoints.available(),
-            )
-          : starting);
-      yield* this.#providers.ensureProvider(provider);
-      const models = this.#endpoints.available();
-      const model =
-        (input.model === null
-          ? undefined
-          : models.find((candidate) => candidate.provider === provider && candidate.id === input.model)) ??
-        startingModel(provider, models, this.#preference());
-      if (!model) return yield* failed(sourceText("error.provider.noModel"));
+      const { provider, model } = yield* this.#workflowModel(input);
       if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
       if (this.#profileClients.busy()) return yield* failed(sourceText("error.workflow.modelBusy"));
       return yield* this.#warmGenerations
@@ -2820,6 +2837,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           { ...model, defaultReasoningEffort: input.effort ?? model.defaultReasoningEffort },
           input.prompt,
           workflowUsageObserver(this.#store.database.usage, provider, model.id),
+          input.images,
         )
         .pipe(
           Effect.tapError((failure) =>
@@ -2934,6 +2952,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       },
     ) {
       const failed = (message: string) => new ProfileGenerationFailed({ cause: new Error(message) });
+      const pictures = input.images.filter(
+        (image): image is { role: MediaPictureRole; attachmentId: string } => image.role !== "file",
+      );
       if (input.provider === "sunra") {
         if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
         const signIn = yield* this.#mediaStepSignIn("sunra", input.account);
@@ -2949,7 +2970,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             model: input.model,
             prompt: input.prompt,
             specs: input.specs,
-            images: input.images,
+            images: pictures,
             plan,
           },
         ).pipe(
@@ -2987,8 +3008,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         );
       }
       const provider = input.provider;
-      const images: { role: MediaImageRole; path: string }[] = [];
-      for (const image of input.images) {
+      const images: { role: MediaPictureRole; path: string }[] = [];
+      for (const image of pictures) {
         const file = yield* this.#mailbox
           .resolveAttachment(image.attachmentId)
           .pipe(Effect.mapError(() => failed(sourceText("error.workflow.mediaInputMissing"))));
@@ -3548,6 +3569,32 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       logger.warn("A task turn that no provider runs held the agent. It ends as interrupted.", { agentId, turnId });
       yield* this.#turn.settleOrphanedTurn(agentId, threadId, turnId, "interrupted");
     }
+  });
+
+  #turnRunsNowhere(agentId: string, turnId: string): boolean {
+    return (
+      !this.#stopping &&
+      this.#turn.hasEnded(turnId) &&
+      this.#turn.turnStartedAt(turnId) === null &&
+      !this.#turn.isCompleting(turnId) &&
+      this.#mailbox.findDeliveriesByTurn(agentId, turnId).length === 0 &&
+      this.#mailbox.startingDeliveriesForAgent(agentId).length === 0 &&
+      this.#turn.workingCodexChildren(agentId, turnId).length === 0
+    );
+  }
+
+  readonly #settleStaleOwnTurn = Effect.fn("AgentService.settleStaleOwnTurn")(function* (
+    this: AgentService,
+    agentId: string,
+    threadId: string,
+    turnId: string,
+  ) {
+    if (!this.#turnRunsNowhere(agentId, turnId)) return;
+    logger.warn("A chat turn that no provider runs held the agent's queue. It ends as interrupted.", {
+      agentId,
+      turnId,
+    });
+    yield* this.#turn.settleOrphanedTurn(agentId, threadId, turnId, "interrupted");
   });
 
   readonly #applyAgentUpdate = Effect.fn("AgentService.updateAgent")(function* (
@@ -6296,13 +6343,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           (failure) => new AgentLifecycleFailed({ operation: "load message agent", cause: failure.cause }),
         ),
       );
-    yield* this.#providers
-      .ensureProvider(providerForAgent(agent))
-      .pipe(
-        Effect.mapError(
-          (failure) => new AgentLifecycleFailed({ operation: "ensure message provider", cause: failure.cause }),
-        ),
-      );
+    const provider = providerForAgent(agent);
+    yield* this.#providers.ensureProvider(provider).pipe(
+      Effect.catchIf(
+        (failure) =>
+          this.#providers.signInRecheckPending(provider) &&
+          this.#providers.signInRequired(provider) &&
+          failure.cause instanceof Error &&
+          failure.cause.message ===
+            this.#providers.status().providers?.find((status) => status.id === provider)?.message,
+        () => Effect.void,
+      ),
+      Effect.mapError(
+        (failure) => new AgentLifecycleFailed({ operation: "ensure message provider", cause: failure.cause }),
+      ),
+    );
     yield* lifecycleStep("validate message recipient", validateRecipient);
     const taskId = input.taskId;
     const task = taskId

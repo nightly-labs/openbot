@@ -60,6 +60,17 @@ export const StartingOpenBot: Story = {
     />
   ),
 };
+export const StartRestoring: Story = {
+  render: () => (
+    <ServerConnectionNotice
+      name="My server"
+      phase="waking"
+      start={{ step: "restore", startedAt: Date.now() - 3 * 60_000 }}
+      initial
+      onRetry={() => {}}
+    />
+  ),
+};
 export const StartRateLimited: Story = {
   render: () => (
     <ServerConnectionNotice

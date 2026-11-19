@@ -7,6 +7,7 @@ const quietMs = Number(process.env.FAKE_QUIET_MS ?? 0);
 const retryMs = Number(process.env.FAKE_RETRY_MS ?? 0);
 const rateRetryMs = Number(process.env.FAKE_RATE_RETRY_MS ?? 0);
 const loadSession = process.env.FAKE_NO_LOAD !== "1";
+const silentNew = process.env.FAKE_SILENT_NEW === "1";
 const sessionCapabilities = process.env.FAKE_RESUME === "1" ? { sessionCapabilities: { resume: {} } } : {};
 const resumed = new Set<string>();
 let count = 0;
@@ -62,6 +63,7 @@ serveFakeAcpAgent(
     "session/new": (request, peer) => {
       count += 1;
       logEntry({ event: "session/new" });
+      if (silentNew && count > 1) return;
       peer.reply(request, setup(`s-${process.pid}-${count}`));
     },
     "session/load": restore,

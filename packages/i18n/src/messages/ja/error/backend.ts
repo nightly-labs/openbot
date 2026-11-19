@@ -306,6 +306,12 @@ export const messages = {
     "{provider} は MCP サーバー {name} を起動できませんでした。{provider} はこのサーバーのツールを使えません。{provider} はサーバーを自分で起動するため、OpenBot の接続テストは成功することがあります。新しいチャットを開始して、もう一度お試しください。",
   "error.backend.mcpServerTimedOutInProvider":
     "サーバーが時間内に応答しなかったため、{provider} は MCP サーバー {name} を起動できませんでした。新しいチャットを開始して、もう一度お試しください。",
+  "error.backend.mcpServerUnavailableInProvider":
+    "サーバーが現在利用できないため、{provider} は MCP サーバー {name} を起動できませんでした。数分待ってから新しいチャットを開始して、もう一度お試しください。",
+  "error.backend.mcpServerUnreachableInProvider":
+    "{provider} は MCP サーバー {name} に接続できませんでした。マーケットプレイス、アプリで {name} を開き、アドレスが正しいことと、サーバーが動作していることを確認してください。その後、新しいチャットを開始して、もう一度お試しください。",
+  "error.backend.githubToolsNotStarted":
+    "GitHub が応答しなかったため、{provider} は GitHub のツールを取得できませんでした。マーケットプレイス、アプリで GitHub を開き、求められた場合はもう一度接続してください。その後、新しいチャットを開始して、もう一度お試しください。",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot はこのサーバーのローカルサインイン接続を開始できませんでした。OpenBot を再起動してから、もう一度お試しください。",
   "error.backend.mcpOAuthSignInNeeded":

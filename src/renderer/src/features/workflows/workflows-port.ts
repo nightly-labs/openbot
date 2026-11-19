@@ -11,9 +11,11 @@ import {
   type WorkflowMediaKind,
 } from "@openbot/contracts/ipc";
 import { ATTACHMENT_PREVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-preview-v1";
+import { WORKFLOWS_AGENT_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-agent-files-v1";
 import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-account-v1";
 import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-size-v1";
 import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-transparent-v1";
+import { WORKFLOWS_STEP_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-step-settings-v1";
 import type {
   WorkflowChannel,
   WorkflowDiscordServer,
@@ -51,6 +53,8 @@ export interface WorkflowHost {
   mediaAccountSupported(): boolean;
   mediaTransparentSupported(): boolean;
   mediaSizeSupported(): boolean;
+  agentFilesSupported(): boolean;
+  stepSettingsSupported(): boolean;
   pictures(): Promise<readonly StoredFileRow[]>;
   uploadPicture(file: File): Promise<StoredFileRow>;
   mediaUrl(attachmentId: string, kind: WorkflowMediaKind): string | null | undefined;
@@ -116,6 +120,7 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
     mediaSupported() && (local() || serverSupportsCapability(server(), WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY));
   const mediaSizeSupported = () =>
     mediaSupported() && (local() || serverSupportsCapability(server(), WORKFLOWS_MEDIA_SIZE_CAPABILITY));
+  const agentFilesSupported = () => local() || serverSupportsCapability(server(), WORKFLOWS_AGENT_FILES_CAPABILITY);
   const hostGitHub = hostGitHubConnectorPort(() => (githubSupported() ? serverId : undefined));
   const mediaUrl = (attachmentId: string) =>
     local()
@@ -144,6 +149,7 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
       decide: (input) => api().decide(input, serverId),
       runs: (input) => api().runs(input, serverId),
       run: (runId) => api().run(runId, serverId),
+      stepSettings: (stepId) => api().stepSettings(stepId, serverId),
       rotateWebhookSecret: (input) => api().rotateWebhookSecret(input, serverId),
       githubCatalog: () => api().githubCatalog(serverId),
       githubOptions: (input) => api().githubOptions(input, serverId),
@@ -258,6 +264,8 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
     mediaAccountSupported,
     mediaTransparentSupported,
     mediaSizeSupported,
+    agentFilesSupported,
+    stepSettingsSupported: () => local() || serverSupportsCapability(server(), WORKFLOWS_STEP_SETTINGS_CAPABILITY),
     mediaUrl,
     mediaPreviewUrl,
     get githubConnector() {

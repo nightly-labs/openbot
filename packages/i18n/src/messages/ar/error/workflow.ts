@@ -22,6 +22,9 @@ export const messages = {
     "لم يُجب النموذج في الوقت المحدد. اختر جهدًا أقل أو نموذجًا أسرع لهذه الخطوة، ثم شغّلها مرة أخرى.",
   "error.workflow.modelToolUse":
     "حاول النموذج استخدام أداة، لكن هذه الخطوة لا تجيب إلا بنص. شغّل الخطوة مرة أخرى، أو اختر نموذجًا آخر لها.",
+  "error.workflow.modelImageUnsupported":
+    "لا يستطيع نموذج هذه الخطوة قراءة الصور. اختر نموذجًا يستطيع ذلك، أو أزل اتصال الصورة.",
+  "error.workflow.modelImageType": "يمكن لخطوة النموذج قراءة صور PNG وJPEG وGIF وWebP فقط. صِل صورة من أحد هذه الأنواع.",
   "error.workflow.modelUnavailable": "نموذج هذه الخطوة غير متاح. اختر نموذجًا آخر لهذه الخطوة.",
   "error.workflow.providerBusy": "المزوّد مشغول. انتظر بضع دقائق، ثم شغّل الخطوة مرة أخرى.",
   "error.workflow.providerOffline":
@@ -33,6 +36,7 @@ export const messages = {
   "error.workflow.mediaInputMissing": "صورة من خطوة سابقة غير متاحة. شغّل تلك الخطوة مرة أخرى.",
   "error.workflow.mediaEmptyRequest": "اكتب وصفًا، أو شغّل الخطوات التي قبل هذه الخطوة حتى يصل نص أو صورة.",
   "error.workflow.mediaInputNotImage": "تقبل هذه الخطوة الصور فقط، لا مقاطع الفيديو. أزل الاتصال من الفيديو.",
+  "error.workflow.mediaInputNotClip": "يقبل هذا الإدخال مقاطع الفيديو والملفات الصوتية فقط. أزل الاتصال من الملف.",
   "error.workflow.stepMissing": "لم تعد هذه الخطوة موجودة.",
   "error.workflow.nodeMissing": "هذه الخطوة ليست في سير العمل.",
   "error.workflow.runMissing": "لم يعد هذا التشغيل موجودًا.",

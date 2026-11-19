@@ -310,6 +310,12 @@ export const messages = {
     "{provider} n’a pas pu démarrer le serveur MCP {name}. Ses outils ne sont pas disponibles pour {provider}. {provider} démarre le serveur lui-même, donc le test de connexion dans OpenBot peut réussir. Commencez une nouvelle discussion pour réessayer.",
   "error.backend.mcpServerTimedOutInProvider":
     "{provider} n’a pas pu démarrer le serveur MCP {name}, car le serveur n’a pas répondu à temps. Commencez une nouvelle discussion pour réessayer.",
+  "error.backend.mcpServerUnavailableInProvider":
+    "{provider} n’a pas pu démarrer le serveur MCP {name}, car le serveur n’est pas disponible pour le moment. Attendez quelques minutes, puis commencez une nouvelle discussion pour réessayer.",
+  "error.backend.mcpServerUnreachableInProvider":
+    "{provider} n’a pas pu joindre le serveur MCP {name}. Ouvrez {name} dans Marketplace, Apps, et vérifiez que son adresse est correcte et que le serveur fonctionne. Commencez ensuite une nouvelle discussion pour réessayer.",
+  "error.backend.githubToolsNotStarted":
+    "{provider} n’a pas pu obtenir les outils GitHub, car GitHub n’a pas répondu. Ouvrez GitHub dans Marketplace, Apps, et reconnectez-le s’il vous le demande. Commencez ensuite une nouvelle discussion pour réessayer.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot n’a pas pu démarrer sa connexion locale de connexion pour ce serveur. Redémarrez OpenBot, puis réessayez.",
   "error.backend.mcpOAuthSignInNeeded":

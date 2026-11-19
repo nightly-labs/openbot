@@ -25,10 +25,12 @@ const NEW_OUTAGE_MS = 2 * 60_000;
 export function hostedStartStep(server: {
   state: HostedServerState;
   error: HostedServerError | null;
+  restoring?: boolean;
 }): HostedServerStartStep | null {
   if (server.state === "stopped") return server.error === null ? "machine" : null;
   if (!WAKE_RECONNECT_STATES.has(server.state) || server.error === "plan_ended") return null;
   if (server.state === "running") return "openbot";
+  if (server.restoring === true) return "restore";
   return server.state === "waking" && server.error === "provider_limit" ? "provider_limit" : "machine";
 }
 export const WAKE_RECONNECT_DELAY_MS = 5_000;

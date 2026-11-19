@@ -46,6 +46,7 @@
       "./plugins/with-update-channel",
       "./plugins/with-app-icons",
       "./plugins/with-android-view-preallocation-off",
+      "./plugins/with-android-optional-features",
       "expo-router",
       "expo-video",
       [

@@ -27,13 +27,17 @@ export interface RemoteTicketClaims {
 }
 
 export function ticketNamesSignalHome(ticket: string): boolean {
+  return ticketSignalHome(ticket) !== null;
+}
+
+export function ticketSignalHome(ticket: string): string | null {
   const payload = ticket.split(".")[1];
-  if (!payload) return false;
+  if (!payload) return null;
   const base64 = payload.replaceAll("-", "+").replaceAll("_", "/");
   try {
     const claims = JSON.parse(atob(base64 + "=".repeat((4 - (base64.length % 4)) % 4)));
-    return isDynamicRecord(claims) && isString(claims.signal);
+    return isDynamicRecord(claims) && isString(claims.signal) ? claims.signal : null;
   } catch {
-    return false;
+    return null;
   }
 }
