@@ -171,8 +171,10 @@ const TEXT_RESET_MARGIN_MS = 60_000;
  * The provider errors that move an agent set to switch without asking to its next backup model. Each
  * one can pass on another provider, account or model; a request the model refuses fails on each.
  * A usage limit that the usage-limit gate does not hold comes here too, such as a spent Gemini quota (#4368).
- * A model that gave only its reasoning and no answer can answer on another model (#6594). As for each
- * cause, a turn that ran a tool step does not run again, so the tool does not run two times.
+ * A model that gave only its reasoning and no answer can answer on another model (#6594), and a model
+ * that the account cannot use now, such as Gemini's "Unknown model ID", is not missing on the others
+ * (#12432). As for each cause, a turn that ran a tool step does not run again, so the tool does not
+ * run two times.
  */
 export const FAILOVER_CAUSES: ReadonlySet<CauseCode> = new Set([
   "billing",
@@ -183,6 +185,7 @@ export const FAILOVER_CAUSES: ReadonlySet<CauseCode> = new Set([
   "network",
   "timeout",
   "empty_answer",
+  "model_not_found",
 ]);
 
 /**
@@ -195,10 +198,11 @@ function isRefusedGeminiToken(provider: string | undefined, message: string): bo
 
 /**
  * The provider errors after which a backup model continues the work that the turn started, as after a
- * spent quota: a sign-in that failed, and a provider that does not answer, such as a firewall block
- * in front of it (#8406). The backup gets the turn's work steps, so it does not do them again.
+ * spent quota: a sign-in that failed, a provider that does not answer, such as a firewall block in
+ * front of it (#8406), and a rate limit, which Gemini names together with a spent quota (#12432). The
+ * backup gets the turn's work steps, so it does not do them again.
  */
-const CONTINUE_CAUSES: ReadonlySet<CauseCode> = new Set(["authentication", "provider_unavailable"]);
+const CONTINUE_CAUSES: ReadonlySet<CauseCode> = new Set(["authentication", "provider_unavailable", "rate_limit"]);
 
 /**
  * The provider errors during a turn's own compaction that end the turn but can pass when it continues:

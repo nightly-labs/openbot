@@ -184,10 +184,16 @@ const GEMINI_REQUEST_FAILURES = [
 
 type GeminiRequestFailureKey = (typeof GEMINI_REQUEST_FAILURES)[number][0];
 
-/** The cause of each Gemini request failure that a backup model can pass, as the message says. */
+/**
+ * The cause of each Gemini request failure that a backup model can pass, as the message says. A
+ * dropped connection comes after the CLI's own retries, and a model that the account cannot use now
+ * can be used on another, so a backup model takes the turn (#12432).
+ */
 const GEMINI_FAILURE_CAUSES: Partial<Record<GeminiRequestFailureKey, CauseCode>> = {
   "error.provider.antigravityQuotaReached": "usage_limit",
   "error.provider.antigravityRateLimited": "rate_limit",
+  "error.provider.antigravityModelUnavailable": "model_not_found",
+  "error.provider.antigravityNetwork": "network",
 };
 
 /**
