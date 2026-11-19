@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/app";
 
 export const messages = {
-  // Errors from app, notification, and secret storage actions.
   "error.app.externalLinkProtocol": "只有 HTTP(S) 链接可以在外部浏览器中打开。",
   "error.app.notificationsUnsupported": "该系统不支持桌面通知。",
   "error.app.notificationSettingsMissing": "该系统没有通知设置页面。",

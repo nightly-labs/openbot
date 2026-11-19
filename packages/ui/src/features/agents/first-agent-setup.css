@@ -72,8 +72,6 @@
   height: 72px;
 }
 
-/* The fur paints past the avatar box and over the color row. Only the box takes the pointer, so a
-   click there reaches the color under it. */
 .first-agent-live-avatar .agent-avatar > svg {
   pointer-events: none;
 }
@@ -85,7 +83,6 @@
   padding: 0;
 }
 
-/* The automatic color and 17 colors: two full rows of 9, as in the agent settings. */
 .first-agent-color-options {
   display: grid;
   grid-template-columns: repeat(9, 28px);
@@ -143,7 +140,6 @@
   border-radius: var(--openbot-radius-pill);
 }
 
-/* The swatch draws its own ring, so the ring and the dot share one box and stay concentric. */
 .first-agent-color-choice[aria-pressed="true"] .first-agent-color-swatch {
   outline: 1px solid var(--openbot-accent-text);
   outline-offset: 4px;
@@ -173,10 +169,6 @@
   min-width: 132px;
 }
 
-/*
- * The model picker in this form reads as a form control, like the inputs above it: the same
- * border, radius and background, and no press-down scale, so opening it never moves it.
- */
 .first-agent-fields .provider-model-trigger-field {
   border: 1px solid var(--openbot-border-strong);
   border-radius: var(--openbot-radius-md);

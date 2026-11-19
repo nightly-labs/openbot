@@ -19,22 +19,15 @@ import { dismissMarketplaceSuggestion, marketplaceSuggestionDismissed } from "./
 export interface MarketplaceSuggestionChatCardProps {
   messageId: string;
   appId: string;
-  /** The connectors of the server on screen. Without it, a connector card has no action. */
   connectors?: ConnectorRegistry | undefined;
-  /** The MCP servers of the host. A catalog app is connected when the host holds each of its servers. */
   mcpServers?: readonly McpServerConfig[] | undefined;
   onOpenMarketplaceApp?: ((request: { appId: string; connect: boolean }) => void) | undefined;
 }
 
-/** True when this client can draw a card for the app: a catalog plugin, or a connector. */
 export function marketplaceSuggestionKnown(appId: string): boolean {
   return isConnectorId(appId) || MARKETPLACE_PLUGINS.some((plugin) => plugin.slug === appId);
 }
 
-/**
- * The Marketplace app an agent suggested in this chat. Connect and the name open the app in
- * Marketplace, where the connect step and its dialogs run.
- */
 export function MarketplaceSuggestionChatCard(props: MarketplaceSuggestionChatCardProps) {
   const { t } = useText();
   const plugin = createMemo(() => MARKETPLACE_PLUGINS.find((candidate) => candidate.slug === props.appId));
@@ -52,11 +45,6 @@ export function MarketplaceSuggestionChatCard(props: MarketplaceSuggestionChatCa
     const found = plugin();
     return found ? localizedPlugin(found, t).tagline : "";
   };
-  /**
-   * Connected when the host holds every app, and attention when it holds some, as Marketplace does
-   * for apps. Marketplace also counts the plugin's skills, which belong to an agent; no catalog
-   * plugin has one yet.
-   */
   const pluginState = (): MarketplaceSuggestionState => {
     const apps = plugin()?.apps ?? [];
     const held = apps.map((app) => (props.mcpServers ?? []).some((config) => isPluginAppConfig(config, app)));
@@ -79,7 +67,6 @@ export function MarketplaceSuggestionChatCard(props: MarketplaceSuggestionChatCa
     return known ? t(known.title) : (plugin()?.name ?? props.appId);
   };
   const open = (connect: boolean) => props.onOpenMarketplaceApp?.({ appId: props.appId, connect });
-  /** Why the user cannot connect it: a computer-only app, a member's role, or a host without it. */
   const unavailableText = () => {
     if (connector()?.access === "local-only") return t("chat.suggestion.localOnly", { name: name() });
     if (props.connectors && !props.connectors.canManage()) return t("chat.suggestion.notAllowed", { name: name() });
@@ -103,10 +90,6 @@ export function MarketplaceSuggestionChatCard(props: MarketplaceSuggestionChatCa
   );
 }
 
-/**
- * The suggestion card of a side thread message, as the agent's own chat draws it. Another message, or
- * an app this client does not know, keeps its row.
- */
 export function useThreadMarketplaceSuggestionCard() {
   const { props, mcpServers } = useConversationViewScope();
   return (message: AgentMessage) => {

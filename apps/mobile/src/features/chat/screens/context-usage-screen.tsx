@@ -25,7 +25,6 @@ import { useText } from "@/shared/lib/text";
 
 const BAR_HEIGHT = 10;
 
-/** The colour of each category, as in the desktop popover. */
 function useCategoryColors(): Record<AgentContextCategory, string> {
   const [systemPrompt, memoryFiles, tools, skills, toolResults, messages, other] = useCSSVariable([
     "--openbot-chart-storage-workspaces",
@@ -47,10 +46,6 @@ function useCategoryColors(): Record<AgentContextCategory, string> {
   };
 }
 
-/**
- * The context sheet of the composer's ring: how full the chat's context is, what fills it, and Compact
- * now, as the popover of the desktop ring. It reads the host's live state, so it follows a compaction.
- */
 export function ContextUsageScreen() {
   const { t, format } = useText();
   const { agentId, serverId, taskId, threadId } = useLocalSearchParams<{
@@ -80,7 +75,6 @@ export function ContextUsageScreen() {
     );
   const share = usedShare(usage);
   const level = contextMeterLevel(usage);
-  // Only the warning and danger levels colour the figure, as on the desktop.
   const percentColor = level === "warning" ? warning : level === "danger" ? danger : undefined;
   const rows = contextCategoryRows(usage);
   const note = [
@@ -102,7 +96,6 @@ export function ContextUsageScreen() {
     <SettingsContent>
       <SettingsSection footer={note}>
         <View className="gap-3 px-4 py-4">
-          {/* The sheet's title already says Context, so the figure leads. */}
           <Typography.Heading
             type="h4"
             style={percentColor === undefined ? undefined : { color: String(percentColor) }}
@@ -157,19 +150,15 @@ export function ContextUsageScreen() {
         </SettingsSection>
       ) : null}
       {agent && canCompactHere && !viewOnly && canCompact(usage) ? (
-        // The sheet shows only while the host is online, so the row is available.
         <AgentCompactSection agent={agent} available taskId={taskId} compacting={usage.compacting} />
       ) : null}
-      {/* New chat acts on the agent's own chat only, as on the desktop: a side thread has no New chat. */}
       {agent && !taskId && canStartNewChat && !viewOnly ? (
-        // The sheet shows only while the host is online. As on the desktop, a running compaction holds it.
         <AgentNewChatSection agent={agent} available={!usage.compacting} />
       ) : null}
     </SettingsContent>
   );
 }
 
-/** The used share, split by category when the provider gives one, then free space, with a tick at auto-compaction. */
 function ContextBar({
   usage,
   colors,

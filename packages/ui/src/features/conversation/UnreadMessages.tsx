@@ -40,7 +40,6 @@ export function UnreadMessagesBanner(props: {
 
 export function UnreadMessagesDivider(props: {
   elementRef?: (element: HTMLDivElement) => void;
-  /** Asked once, when the line shows: true when it marks a new place, and then it animates in. */
   animateIn?: (() => boolean) | undefined;
 }) {
   const { t } = useText();

@@ -9,10 +9,6 @@ import { useUsage } from "../usage/usage-context";
 import { SettingsPage } from "./SettingsPage";
 import { type SettingsKind, useWindowPage } from "./window-page-context";
 
-/**
- * The page of the desktop window that covers the conversation: a settings page, usage, schedule,
- * workflows, the Library, the CRM, the Marketplace or the pricing page. The tasks page shows in the middle pane, in `WorkspaceShell`.
- */
 export function WindowPageView() {
   const { t } = useText();
   const windowPage = useWindowPage();
@@ -28,7 +24,6 @@ export function WindowPageView() {
   return (
     <Show
       when={windowPage.page() !== "pricing"}
-      // The add-server flow shows its pricing page here (`AddServerOverlay`).
       fallback={<div class="window-page-portal" ref={windowPage.setPricingMount} />}
     >
       <Show

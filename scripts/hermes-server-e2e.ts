@@ -1,20 +1,3 @@
-// End-to-end check of Hermes Agent on a self-hosted server (#4881). It makes a test image from the
-// OpenBot release image with the packages of this checkout's `scripts/hosting/packages.txt`, and
-// points Hermes at a mock OpenAI-compatible model on this computer. Then:
-//
-//   1. The `HermesInstaller` of this checkout, which the Hermes row's Download runs, installs Hermes
-//      in the container as the service user `openbot` (`--install`). A Cancel during the install
-//      stops it with no installer process left, and the next Download installs Hermes to `ready`.
-//   2. The real release server in the container finds Hermes, and the Hermes row is `available` with
-//      the mock model.
-//   3. The Hermes driver of this checkout runs in the container as `openbot` (`--inside`): model list,
-//      one turn that reaches the mock model, and a resume in a new process.
-//
-// It needs Docker and network access for the image, the Hermes installer and Bun. No account is used.
-//
-//   bun run test:hermes-server [-- --image ghcr.io/nightly-labs/openbot:0.60.0]
-//
-// The report is `.openbot-build/hermes-server-e2e/report.json`.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -39,25 +22,19 @@ if (process.argv.includes("--install")) {
 }
 
 interface InstallResult {
-  /** The phases and progress of the cancelled install, in order. */
   cancelled: string[];
-  /** The status after Cancel. */
   afterCancel: string;
-  /** Installer processes that were still running after Cancel. */
   leftProcesses: string[];
-  /** The phases and progress of the full install, in order. */
   installed: string[];
   final: string;
 }
 
-/** In the container, as `openbot`: the Download of the Hermes row, with a Cancel first. */
 async function install(): Promise<void> {
   const { Effect } = await import("effect");
   const { runCauseEffect } = await import("../src/backend/effect-boundary");
   const { requireProviderDriver } = await import("../src/backend/provider-drivers");
   const { HermesInstaller } = await import("../src/main/hermes-installer");
   const driver = requireProviderDriver("hermes");
-  // The agent status of the app: the provider check after the install finds the CLI, or does not.
   const installer: InstanceType<typeof HermesInstaller> = new HermesInstaller({
     downloadRoot: join(tmpdir(), "hermes-downloads"),
     refreshProvider: () =>
@@ -75,7 +52,6 @@ async function install(): Promise<void> {
     const status = installer.status();
     return status ? `${status.phase}${status.progress === null ? "" : ` ${status.progress}`}` : "none";
   };
-  /** Records each status until `done` says to stop. */
   const follow = (done: (phase: string | undefined) => boolean) =>
     new Promise<string[]>((settle) => {
       const seen: string[] = [describe()];
@@ -90,7 +66,6 @@ async function install(): Promise<void> {
       installer.on("status", listener);
     });
   try {
-    // Cancel after the clone, while the virtual environment and the Python packages install.
     const cancelled = follow((phase) => phase !== "downloading");
     const cancelAt = new Promise<void>((settle) => {
       const listener = () => {
@@ -133,7 +108,6 @@ interface InsideResult {
   resumedStatus: string | null;
 }
 
-/** In the container, as `openbot`: the Hermes driver of this checkout with the user's own Hermes. */
 async function inside(): Promise<void> {
   const { runCauseEffect } = await import("../src/backend/effect-boundary");
   const { decodeModelListResponse } = await import("../src/backend/protocol");
@@ -189,7 +163,6 @@ interface Run {
   stderr: string;
 }
 
-/** Async, so that the mock model in this process can answer while a container runs. */
 function run(command: string, args: string[], timeoutMs = 600_000): Promise<Run> {
   return new Promise((settle, reject) => {
     const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"], timeout: timeoutMs });
@@ -219,7 +192,6 @@ function argument(name: string): string | null {
   return index === -1 ? null : (process.argv[index + 1] ?? null);
 }
 
-/** The mock model: an OpenAI-compatible list and chat endpoint that always gives `REPLY`. */
 function startMockModel(requests: string[]) {
   const chunk = (delta: { role?: "assistant"; content?: string }, finish: string | null) =>
     `data: ${JSON.stringify({
@@ -276,7 +248,6 @@ async function host(): Promise<void> {
   let version = "unknown";
   await mkdir(OUT, { recursive: true });
 
-  /** A shell command as `openbot` in a new container on the data volume. */
   const oneShot = `${server}-shell`;
   const asOpenBot = (script: string, extra: string[] = [], timeoutMs?: number) =>
     run(
@@ -304,7 +275,6 @@ async function host(): Promise<void> {
 
   try {
     await must("docker", ["pull", "--quiet", image]);
-    // The release image with the packages of this checkout, as the next release has them.
     const packages = await readFile(join(REPO, "scripts/hosting/packages.txt"), "utf8");
     await writeFile(join(build, "packages.txt"), packages);
     await writeFile(
@@ -322,7 +292,6 @@ async function host(): Promise<void> {
     version = (await must("docker", ["run", "--rm", "--entrypoint", "openbot", testImage, "version"])).trim();
     check("image", true, `${image}, OpenBot ${version}`);
 
-    // Hermes as the service user, with the Download of the Hermes row: a Cancel, then the install.
     const installed = await asOpenBot(
       `curl -fsSL https://bun.sh/install | bash -s bun-v${BUN_VERSION} >/dev/null 2>&1
       cd /src && ~/.bun/bin/bun scripts/hermes-server-e2e.ts --install
@@ -358,7 +327,6 @@ async function host(): Promise<void> {
     );
     check("hermes install", true, installed.stdout.trim().split("\n").at(-1) ?? "");
 
-    // The real server: OpenBot finds Hermes and reads its model, with no sign-in of the account.
     await must("docker", [
       "run",
       "--detach",
@@ -376,7 +344,6 @@ async function host(): Promise<void> {
       `${volume}:/data`,
       testImage,
     ]);
-    // Waits for the Hermes state in the provider log: `available` or another end state.
     const waited = await run(
       "docker",
       [
@@ -402,7 +369,6 @@ async function host(): Promise<void> {
     );
     await must("docker", ["stop", "--timeout", "60", server]);
 
-    // The driver of this checkout as `openbot`, with the user's Hermes: a turn and a resume.
     const driven = await asOpenBot(
       "cd /src && ~/.bun/bin/bun scripts/hermes-server-e2e.ts --inside",
       ["-v", `${REPO}:/src:ro`],

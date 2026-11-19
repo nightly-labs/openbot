@@ -1,10 +1,3 @@
-// Checks the agent plan block and the waiting block in a running Storybook, which renders the real
-// conversation timeline and composer against the preview mock. Read-only. Pass the Storybook URL
-// that `bun run storybook` reports: `bun scripts/task-plan-e2e.ts --storybook=http://localhost:6006`.
-// It also checks the panels above the input: each panel goes under the next one, the lower panel
-// paints over the shared edge, and the top of each panel stays visible. The cards in the one stack
-// above the input sit flush, with one shared line between them, and fill the stack's width.
-// Writes .openbot-build/task-plan-e2e/report.json and one screenshot per story.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -54,9 +47,7 @@ interface ComposerStack {
   cardsFillStack: boolean;
 }
 
-/** The seams between the panels above the input, from the top to the composer, and the cards in the stack. */
 async function composerStack(page: Page): Promise<ComposerStack> {
-  // The panels slide in once; the shimmer and spinner animations run forever.
   await page.waitForFunction(() =>
     document
       .getAnimations()
@@ -125,7 +116,6 @@ const browser = await chromium.launch({ channel: "chrome" });
 try {
   const page = await browser.newPage({ viewport: { width: 1200, height: 860 } });
 
-  // The agent asked Research and Sales Outbound. Research replied; its answer waits in the queue.
   await openStory(page, "conversation-conversation--waiting-for-replies");
   const plan = header(page, t("chat.taskList.title"));
   await plan.waitFor();
@@ -144,7 +134,6 @@ try {
   const research = waitingBlock.getByRole("listitem").filter({ hasText: "Research" });
   assert.match((await research.textContent()) ?? "", new RegExp(t("chat.awaiting.state.replied")));
   assert.match((await research.textContent()) ?? "", /All four sources check out/u);
-  // Chief reads the answers only when Sales Outbound is done too.
   assert.doesNotMatch(
     (await research.textContent()) ?? "",
     new RegExp(t("chat.awaiting.readsNext", { name: "Chief" })),
@@ -164,7 +153,6 @@ try {
   await page.screenshot({ path: resolve(OUT, "conversation-waiting.png") });
   report.waitingForReplies = { planSteps: 4, waitingRows: 2, agentReplyInQueue: false, waitingAboveQueue };
 
-  // A plan in the running turn is open and names the step that runs.
   await openStory(page, "conversation-conversation--plan-in-progress");
   const live = header(page, t("chat.taskList.title"));
   await live.waitFor();
@@ -178,7 +166,6 @@ try {
   await page.screenshot({ path: resolve(OUT, "conversation-plan-live.png") });
   report.planInProgress = { expanded: true, done: 1, total: 3 };
 
-  // All four states of a waiting row, and the closed header that names the agent that works.
   await openStory(page, "conversation-awaiting-replies--waiting");
   const rows = page.getByRole("listitem");
   assert.equal(await rows.count(), 3);
@@ -190,7 +177,6 @@ try {
     assert.match((await rows.filter({ hasText: name }).textContent()) ?? "", new RegExp(t(state)));
   }
   const opened = header(page, t("chat.awaiting.title"));
-  // A closed header shows the agent that works in place of the title, so its name changes.
   const block = page.locator(`[aria-controls="${await opened.getAttribute("aria-controls")}"]`);
   await block.click();
   assert.equal(await block.getAttribute("aria-expanded"), "false");
@@ -202,8 +188,6 @@ try {
   );
   report.awaitingStates = ["replied", "working", "asked", "failed"];
 
-  // Waiting + queue, waiting + queue + notices, waiting alone, waiting + notice, and a channel's
-  // waiting + stopped task.
   report.stacks = {};
   for (const id of [
     "conversation-conversation--waiting-for-replies",
@@ -222,7 +206,6 @@ try {
       assert.ok(seam.lowerPaintsOver, `${id}: ${seam.pair} covers the next panel.`);
       assert.ok(seam.upperTopVisible, `${id}: the top of ${seam.pair} is hidden.`);
     }
-    // One pixel is the shared line: each card covers the line above it with its own top line.
     for (const card of stack.cards) {
       assert.equal(card.overlap, 1, `${id}: ${card.pair} does not sit flush on the card above.`);
     }

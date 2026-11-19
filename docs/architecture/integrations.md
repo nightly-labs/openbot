@@ -673,7 +673,7 @@ Team API adapters stay while a release in the support window speaks them (see [T
 1. **Frozen codec.** Add `packages/contracts/src/team-protocol/<name>-v1.ts`. Build each route with
    the helpers of [`admin-wire.ts`](../../packages/contracts/src/team-protocol/admin-wire.ts)
    (`adminRoute`, `fields`, `string(max)`, `nullable`). Export the capability name, the routes and
-   the codec map. Write the header comment as the contract: what each route does and who can use it.
+   the codec map. Write the contract in the PR: what each route does and who can use it.
 2. **Package export.** Add `"./team-protocol/<name>-v1"` to
    [`packages/contracts/package.json`](../../packages/contracts/package.json).
 3. **Codecs.** Spread the codec map into `CODECS` in

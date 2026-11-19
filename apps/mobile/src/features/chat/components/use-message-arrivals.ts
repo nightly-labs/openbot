@@ -1,11 +1,7 @@
 import { useRef } from "react";
 import type { ChatMessage } from "@/features/chat/model/chat-messages";
 
-// Only messages appended to an already visible conversation get an entrance.
-// Opening history, reconnecting, and returning from the background establish a new baseline.
 export function useMessageArrivals(agentId: string, messages: ChatMessage[], enabled: boolean) {
-  // The result of the last render, kept in a ref: a state update here would make React render the
-  // whole message list a second time for each streamed chunk.
   const kept = useRef<ArrivalSnapshot | null>(null);
   kept.current ??= { agentId, messages, enabled, arriving: new Set<string>() };
   const snapshot = kept.current;
@@ -13,8 +9,6 @@ export function useMessageArrivals(agentId: string, messages: ChatMessage[], ena
     const arriving = new Set<string>();
     if (enabled && snapshot.enabled && snapshot.agentId === agentId) {
       const previous = snapshot.messages;
-      // A streamed chunk keeps each message at its index, so the message before is at the same
-      // index. The map of all messages is made only when a message is not there.
       let byId: Map<string, ChatMessage> | undefined;
       const previousTail = previous.at(-1)?.id;
       const tailIndex = !previousTail
@@ -36,7 +30,6 @@ export function useMessageArrivals(agentId: string, messages: ChatMessage[], ena
           arriving.add(message.id);
       }
     }
-    // Keep the same set while a reply streams, so rows that read it do not re-render per chunk.
     const next =
       arriving.size === snapshot.arriving.size && [...arriving].every((id) => snapshot.arriving.has(id))
         ? snapshot.arriving

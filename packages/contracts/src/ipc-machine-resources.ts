@@ -8,32 +8,21 @@ import {
 
 export { MACHINE_ALERT_LEVEL_MAX, MACHINE_ALERT_LEVEL_MIN, MACHINE_METRICS, type MachineMetric };
 
-/**
- * The use of the machine that runs a host (`machine-resources-v1`), as the server can use it: in a
- * container, its memory and CPU limits. Each value is null when the host cannot tell. Memory counts
- * what programs can still use, so file caches do not read as used.
- */
 export interface MachineMetrics {
-  /** As `df` counts it: space that the file system keeps for root is neither used nor free. */
   diskUsedBytes: number | null;
-  /** What the server can still write. */
   diskFreeBytes: number | null;
   diskTotalBytes: number | null;
   memoryAvailableBytes: number | null;
   memoryTotalBytes: number | null;
-  /** The use of the CPUs the server can use, in whole percent, since the reading before. */
   cpuPercent: number | null;
-  /** The CPUs the server can use, in thousandths: its CPU limit, or every core. */
   cpuMillicores: number;
   checkedAt: string;
 }
 
-/** The alert level of each metric in whole percent of use, and the owner or admin who gets the alert. */
 export interface MachineAlertSettings {
   diskPercent: number;
   memoryPercent: number;
   cpuPercent: number;
-  /** Null: the owner of the server. */
   responsibleMemberId: string | null;
 }
 
@@ -44,16 +33,13 @@ export const DEFAULT_MACHINE_ALERT_SETTINGS: MachineAlertSettings = {
   responsibleMemberId: null,
 };
 
-/** The level of `metric` in `settings`. */
 export function machineAlertLevel(settings: MachineAlertSettings, metric: MachineMetric): number {
   return metric === "disk" ? settings.diskPercent : metric === "memory" ? settings.memoryPercent : settings.cpuPercent;
 }
 
-/** The use of `metric` from 0 to 1, or null when the host cannot tell. */
 export function machineMetricRatio(metrics: MachineMetrics, metric: MachineMetric): number | null {
   if (metric === "cpu") return metrics.cpuPercent === null ? null : metrics.cpuPercent / 100;
   if (metric === "disk") {
-    // As `df` counts it, so the disk is full when nothing is free for the server.
     const { diskUsedBytes: used, diskFreeBytes: free } = metrics;
     if (used === null || free === null || used + free <= 0) return null;
     return Math.min(1, Math.max(0, used / (used + free)));
@@ -65,13 +51,11 @@ export function machineMetricRatio(metrics: MachineMetrics, metric: MachineMetri
 
 export type MachineMetricTone = "normal" | "warning" | "danger";
 
-/** The whole percent in use, or null when the host could not read the metric. 0% is a reading too. */
 export function machineMetricPercent(metrics: MachineMetrics, metric: MachineMetric): number | null {
   const ratio = machineMetricRatio(metrics, metric);
   return ratio === null ? null : Math.floor(ratio * 100);
 }
 
-/** Warning from the alert level, and danger far above it: at 95%, or 10 points above a higher level. */
 export function machineMetricTone(percent: number | null, level: number | null): MachineMetricTone {
   if (percent === null || level === null || percent < level) return "normal";
   return percent >= Math.max(95, level + 10) ? "danger" : "warning";
@@ -109,12 +93,10 @@ export function decodeMachineMetrics(value: unknown): MachineMetrics {
   };
 }
 
-/** A remote host without `machine-resources-v1` answers null, and Storage shows no machine part. */
 export function decodeOptionalMachineMetrics(value: unknown): MachineMetrics | null {
   return value === null ? null : decodeMachineMetrics(value);
 }
 
-/** Fails closed on a level outside the range a host accepts, from a renderer or from a host. */
 export function decodeMachineAlertSettings(value: unknown): MachineAlertSettings {
   if (
     !isDynamicRecord(value) ||

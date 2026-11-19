@@ -51,10 +51,6 @@ export interface MockTeamOptions {
   remoteDesktopSessions?: RemoteDesktopSession[];
 }
 
-/**
- * The team side: the server list, the local host with its members and invitations, direct messages
- * between members, and remote desktop sessions. They share one host status and one presence.
- */
 export function createMockTeam(
   options: MockTeamOptions,
   { emit }: MockRuntime,
@@ -133,7 +129,6 @@ export function createMockTeam(
     emit(remoteDesktopListeners, sessionsValue);
   }
 
-  /** The look a host shows with no logo. Main tells the window with the server list, as here. */
   function setServerAppearance(serverId: string, appearance: ServerAppearance | null): void {
     servers = servers.map((server) => (server.id === serverId ? { ...server, appearance } : server));
     emit(serverListeners, servers);
@@ -206,7 +201,6 @@ export function createMockTeam(
     retryConnection: async (serverId) => {
       const server = servers.find((candidate) => candidate.id === serverId);
       if (!server) throw new Error("Server not found");
-      // As in main, the check keeps an online server and its connection.
       if (server.state === "online" && !server.issue && !server.hostedSleep && !server.hostedIssue)
         return clone(server);
       const connected = {
@@ -341,7 +335,6 @@ export function createMockTeam(
       directTypingListeners.add(listener);
       return () => directTypingListeners.delete(listener);
     },
-    // The unfiltered streams the preload narrows to one server. The preview sends only the narrowed ones.
     onScopedPresence: () => () => undefined,
     onScopedDirectMessage: () => () => undefined,
     onScopedDirectTyping: () => () => undefined,
@@ -396,7 +389,6 @@ export function createMockTeam(
       emitHostStatus(hostStatus);
       return clone(hostStatus);
     },
-    // The preview has no runtime to ask, so the check is what a granted permission looks like.
     recheckScreenRecording: async () => {
       hostStatus = { ...hostStatus, remoteDesktopScreenRecordingDenied: false };
       emitHostStatus(hostStatus);
@@ -422,7 +414,6 @@ export function createMockTeam(
       remoteControlPolicy = { access: policy.access, askOnHost: policy.askOnHost };
       return clone(remoteControlPolicy);
     },
-    // The preview's sessions end at once, as the host's do.
     stopRemoteControl: async () => {
       hostStatus = { ...hostStatus, remoteDesktopActiveSessions: 0 };
       emitHostStatus(hostStatus);
@@ -526,7 +517,6 @@ export function createMockTeam(
   return {
     servers: serversApi,
     localServers: localServersApi,
-    /** The server the preview shows, which its agent events belong to. */
     activeServerId: () => servers.find((server) => server.active)?.id ?? "local",
     host,
     remoteDesktop,

@@ -5,15 +5,10 @@ import { attentionAgentId, type PendingAttentionPrompts } from "./agent-runtime-
 
 export interface AgentThreadAttentionInput {
   agents: readonly Pick<AgentProfile, "id" | "threadId">[];
-  /** By `attentionKey`. */
   pendingPrompts: PendingAttentionPrompts;
   approvals: readonly AgentApproval[];
 }
 
-/**
- * The prompts and approvals of each agent's own thread, by agent. A wait in a channel or side
- * thread stays out, because the agent's chat cannot answer it.
- */
 export function agentThreadAttention(input: AgentThreadAttentionInput): {
   pendingPrompts: Record<string, SidebarAttention | undefined>;
   pendingApprovals: Record<string, SidebarApproval | undefined>;
@@ -38,10 +33,6 @@ export function agentThreadAttention(input: AgentThreadAttentionInput): {
   };
 }
 
-/**
- * The page of the browser takeover in each agent's own thread, by agent. The waiting block opens it
- * when the user takes over for an agent that this agent asked.
- */
 export function agentTakeoverTabIds(
   agents: readonly Pick<AgentProfile, "id" | "threadId">[],
   takeovers: readonly Pick<BrowserTakeoverRequest, "agentId" | "threadId" | "tabId">[],

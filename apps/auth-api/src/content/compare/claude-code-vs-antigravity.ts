@@ -1,15 +1,5 @@
 import { BENCHMARK_SOURCES, type MatchupComparison } from "./comparison";
 
-// Every statement about Claude Code here is taken from code.claude.com, claude.com and
-// the Claude help center. Every statement about Antigravity is taken from
-// antigravity.google, gemini.google, Google's developers blog and the ACP registry
-// entry that Google LLC publishes. Each page used is in `sources`. The benchmark
-// numbers are read by hand from the Artificial Analysis Coding Agent Index. Where the
-// sources state nothing, the text says so. Check them again, and move `checkedAt`,
-// whenever this file changes. Gemini CLI stopped serving Google AI Pro, Ultra and free
-// users on 18 June 2026, and Google sends them to Antigravity CLI: that is why this
-// page compares Antigravity and not Gemini CLI.
-
 const CLAUDE_CODE_DOCS = "https://code.claude.com/docs/en";
 const ANTIGRAVITY_DOCS = "https://antigravity.google/docs";
 

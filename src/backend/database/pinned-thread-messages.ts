@@ -9,14 +9,6 @@ import {
   requiredStringColumn,
 } from "./database-rows";
 
-/**
- * The messages that a person or the agent pinned in a thread (`projection_pinned_thread_messages`).
- *
- * Pure functions over a connection that the caller holds. They open no transaction: each write is
- * one statement, and the conversation writer calls the removals inside its dispatch, so the delete
- * of a message and the removal of its pin commit together.
- */
-
 export interface PinnedThreadMessage {
   threadId: string;
   message: ConversationMessage;
@@ -24,7 +16,6 @@ export interface PinnedThreadMessage {
   pinnedBy: MessagePinner;
 }
 
-/** The pinned messages of these threads that are still shown, the newest pin first, at most `limit`. */
 export function pinnedThreadMessages(
   db: DatabaseSync,
   threadIds: readonly string[],
@@ -52,10 +43,6 @@ export function pinnedThreadMessages(
   }));
 }
 
-/**
- * The number of pins of a thread that are still shown. The pin of a message that a sync or a replay
- * removed stays and shows again when the message comes back, but it does not count toward the limit.
- */
 export function pinnedThreadMessageCount(db: DatabaseSync, threadId: string): number {
   const row = databaseRow(
     db
@@ -71,7 +58,6 @@ export function pinnedThreadMessageCount(db: DatabaseSync, threadId: string): nu
   return row ? requiredNumberColumn(row, "pins") : 0;
 }
 
-/** Who pinned this message of the thread, or null when it is not pinned. */
 export function threadMessagePinner(db: DatabaseSync, threadId: string, messageId: string): MessagePinner | null {
   const row = databaseRow(
     db
@@ -84,7 +70,6 @@ export function threadMessagePinner(db: DatabaseSync, threadId: string, messageI
   return row ? pinner(row) : null;
 }
 
-/** Pins a message. A second pin of the same message keeps the first time and the first pinner. */
 export function pinThreadMessage(
   db: DatabaseSync,
   threadId: string,
@@ -101,10 +86,6 @@ export function pinThreadMessage(
   ).run(threadId, messageId, pinnedAt, pinnedBy.kind, id, name);
 }
 
-/**
- * The newest shown messages of a thread whose text contains `quote`, at most `limit`, the newest
- * first. SQLite folds only ASCII letters for the case, so a quote in another script must match exactly.
- */
 export function threadMessagesContaining(
   db: DatabaseSync,
   threadId: string,
@@ -122,7 +103,6 @@ export function threadMessagesContaining(
   ).map((row) => decodeConversationMessageJson(requiredStringColumn(row, "message_json")));
 }
 
-/** Removes the pin of a message. Also the delete of a shown message calls it. */
 export function unpinThreadMessage(db: DatabaseSync, threadId: string, messageId: string): void {
   db.prepare("DELETE FROM projection_pinned_thread_messages WHERE thread_id = ? AND message_id = ?").run(
     threadId,
@@ -130,7 +110,6 @@ export function unpinThreadMessage(db: DatabaseSync, threadId: string, messageId
   );
 }
 
-/** Removes every pin of a thread, for "Delete history". */
 export function unpinThreadHistory(db: DatabaseSync, threadId: string): void {
   db.prepare("DELETE FROM projection_pinned_thread_messages WHERE thread_id = ?").run(threadId);
 }

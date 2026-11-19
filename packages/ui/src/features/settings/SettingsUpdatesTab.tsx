@@ -40,7 +40,6 @@ interface SettingsUpdatesTabProps {
   onOpenWhatsNew?: (() => void) | undefined;
   value: GeneralSettingsValue;
   onUpdateSetting: <Key extends keyof GeneralSettingsValue>(key: Key, value: GeneralSettingsValue[Key]) => void;
-  /** The dialog element the Select popover portals into, captured when this tab was created. */
   selectMount: HTMLElement | undefined;
 }
 
@@ -159,7 +158,6 @@ export function SettingsUpdatesTab(props: SettingsUpdatesTabProps) {
             </Show>
             <ItemDescription class={props.store.messageClass()}>{props.store.message()}</ItemDescription>
           </ItemContent>
-          {/* The host installs the shared application itself, so a tenant has no action to take. */}
           <Show when={!managed()}>
             <ItemActions class="settings-modal-update-actions">
               <Button
@@ -232,7 +230,6 @@ export function SettingsUpdatesTab(props: SettingsUpdatesTabProps) {
             </>
           }
         >
-          {/* Host management is machine state an administrator owns. Report it; never offer it. */}
           <Item data-settings-row="settings.updates.managed.title" class="settings-modal-row">
             <ItemContent>
               <ItemTitle>{t("settings.updates.managed.title")}</ItemTitle>

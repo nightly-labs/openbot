@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/remote";
 
 export const messages = {
-  // Errors from remote servers, WebRTC transport, remote desktop, and the team client.
   "error.remote.desktopSetupClientUpdate": "请更新客户端以使用远程桌面配置。",
   "error.remote.desktopSetupUnavailable": "远程桌面配置不可用。",
   "error.remote.desktopTestUnavailable": "远程桌面测试不可用。",
@@ -23,6 +22,7 @@ export const messages = {
   "error.remote.screenRecordingDenied": "主机未允许 OpenBot 录制屏幕。请在主机上授予屏幕录制权限后重试。",
   "error.remote.windowsSessionDisconnected":
     "主机上的 Windows 会话已断开，没有可共享的屏幕。请在主机的屏幕上登录 Windows，然后重试。",
+  "error.remote.macScreenLocked": "Mac 已锁定，无法共享屏幕。请在 Mac 的屏幕上解锁，然后重试。",
   "error.remote.streamTooSlowLowerQuality": "与主机的连接太慢，无法显示画面。请重试：下一次连接将使用较低的画质。",
   "error.remote.streamTooSlow": "与主机的连接太慢，无法显示画面。请使用更快的网络，然后重试。",
   "error.remote.teamSessionExpired": "团队会话已过期。",
@@ -165,7 +165,6 @@ export const messages = {
   "error.remote.signalFrameUnreadable": "Signal 发送了对端无法读取的数据帧。",
   "error.remote.webRtcCommandFailed": "WebRTC 命令执行失败。",
   "error.remote.dataChannelFailed": "{kind} 通道失败。",
-  // Signal refusals, by the code in the Signal error frame. The client maps the code, not the text.
   "error.remote.hostBusy": "主机正忙于其他连接，请稍后重试。",
   "error.remote.signalPermissionDenied": "你的账号无权访问该主机，请向所有者申请权限。",
   "error.remote.signalRateLimited": "连接尝试过于频繁，OpenBot 将在 {seconds} 秒后重试。",
@@ -173,10 +172,10 @@ export const messages = {
   "error.remote.signalRefused": "Signal 拒绝了该连接。",
   "error.remote.signalClosed": "在主机响应之前，与 Signal 的连接已关闭。",
   "error.remote.relayUnavailable": "Signal 没有为这次连接提供中继服务器，请稍后重试。",
-  // How a direct (WebRTC) connection ended.
   "error.remote.iceFailed": "无法与主机建立直连。防火墙、VPN 或代理可能阻断了连接。",
   "error.remote.iceDisconnected": "与主机的直连已断开。",
-  // Account service (control plane) refusals, by their error code.
+  "error.remote.webrtcBlocked":
+    "此设备阻止了 OpenBot 所需的连接。如果已打开锁定模式，请在“设置”>“隐私与安全性”>“锁定模式”中为 OpenBot 关闭它。",
   "error.remote.directoryUnreachable": "OpenBot 无法连接 OpenBot 服务，请检查网络连接。",
   "error.remote.directoryTimeout": "OpenBot 服务未及时响应，请重试。",
   "error.remote.inviteAlreadyUsed": "该邀请已被使用，请申请新的邀请。",
@@ -190,7 +189,6 @@ export const messages = {
   "error.remote.hostOtherAccount": "该主机属于另一个账号。",
   "error.remote.remoteNotConfigured": "该 OpenBot 服务未配置远程连接。",
   "error.remote.hostRefused": "主机拒绝了该请求（{status}）。",
-  // Channel actions on mobile.
   "error.remote.formUnavailable": "该表单已不可用。",
   "error.remote.hostedServerRemoval": "请使用账单页面删除托管服务器。",
   "error.remote.hostRemoved": "所有者已将该服务器从账户中移除。",

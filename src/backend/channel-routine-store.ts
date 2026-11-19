@@ -25,11 +25,6 @@ export interface DueChannelRoutine {
   schedule: DueRoutine["schedule"];
 }
 
-/**
- * The channel-shaped names over the shared store: `ownerId` reads as `channelId` and the run handle
- * reads as `requestMessageId` - the id of the message the fire posted, which is also the key that
- * joins a run to the tasks it produced.
- */
 export class ChannelRoutineStore extends RoutineStore {
   constructor(database: OpenBotDatabase) {
     super(database, ROUTINE_TABLES.channel);
@@ -54,7 +49,6 @@ export class ChannelRoutineStore extends RoutineStore {
     return toChannelRoutine(this.updateRoutine(channelId, fields, now));
   }
 
-  /** Writes the finished runs that a server transfer brought for one of the channel's routines. */
   importRuns(channelId: string, routineId: string, runs: readonly ImportedRoutineRun[]): string[] {
     return this.importRunRows(routineId, channelId, runs);
   }
@@ -71,7 +65,6 @@ export class ChannelRoutineStore extends RoutineStore {
     return this.activeRunRows(channelId, routineId).map(toChannelRun);
   }
 
-  /** `excludedChannelIds` carries the archived channels: they must not fire and must not wake the timer. */
   due(now = new Date(), excludedChannelIds: ReadonlySet<string> = new Set()): DueChannelRoutine[] {
     return this.dueRoutines(now, excludedChannelIds).map((entry) => ({
       routine: toChannelRoutine(entry.routine),
@@ -138,10 +131,6 @@ function runSource({
   return { id, ownerId: channelId, name, instruction };
 }
 
-/**
- * The run table's `status` CHECK omits `interrupted`, so a stored row cannot carry it. The shared
- * store still reads the wider agent union, and this is where the narrower channel one is proved.
- */
 function toChannelRun({ ownerId, handleId, status, ...fields }: OwnedRoutineRun): ChannelRoutineRun {
   if (status === "interrupted") throw new Error("The stored channel routine run status is invalid.");
   return { ...fields, channelId: ownerId, requestMessageId: handleId, status };

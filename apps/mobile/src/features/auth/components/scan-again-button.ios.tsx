@@ -6,7 +6,6 @@ import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { haptics } from "@/shared/lib/haptics";
 import type { ScanAgainButtonProps } from "./scan-again-button";
 
-/** The retry over the camera: a native Liquid Glass capsule, like the close button above it. */
 export function ScanAgainButton({ label, onPress }: ScanAgainButtonProps) {
   return (
     <Host matchContents colorScheme="dark">

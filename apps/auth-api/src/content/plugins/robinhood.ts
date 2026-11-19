@@ -1,8 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Robinhood here is taken from robinhood.com. Each page used is in
-// `sources`. Check the sources again, and move `checkedAt`, whenever this file changes.
-
 export const ROBINHOOD_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

@@ -1,11 +1,6 @@
 import { OPENBOT_LINKS } from "../../lib/landing-links";
 import { type Comparison, OPENBOT_TEXT } from "./comparison";
 
-// Every statement about Devin here is taken from devin.ai, the Devin documentation,
-// cognition.com and Cognition's terms and Trust Center, and each page used is in
-// `sources`. Where they state nothing, the text says so. Check them again, and move
-// `checkedAt`, whenever this file changes. Devin Desktop was Windsurf until June 2026.
-
 const DEVIN_DOCS = "https://docs.devin.ai";
 
 export const DEVIN_COMPARISON: Comparison = {

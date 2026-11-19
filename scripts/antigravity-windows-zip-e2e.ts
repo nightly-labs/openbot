@@ -1,10 +1,3 @@
-// Run: bun scripts/antigravity-windows-zip-e2e.ts [--archive <agy_cli_windows_x64.zip>]
-// Report: .openbot-build/antigravity-windows-zip-e2e.json
-// Stages zips through the real Antigravity provider descriptor for Windows. The Antigravity CLI 1.5.x
-// Windows zip stores `antigravity.exe` with Unix mode 0600 and no type bits, which OpenBot 0.67.0
-// refused as a special file. A zip entry with a link type must still be refused. With `--archive`, the
-// locked zip (from the lock's win32-x64 URL) also stages and passes the lock hashes.
-
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -32,7 +25,6 @@ function sha256(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-/** A zip from a Unix host with one stored entry, as the Antigravity CLI Windows zip is made. */
 function unixZip(name: string, data: Buffer, unixMode: number): Buffer {
   const nameBytes = Buffer.from(name, "utf8");
   const crc = crc32(data) >>> 0;
@@ -62,7 +54,6 @@ function unixZip(name: string, data: Buffer, unixMode: number): Buffer {
   return Buffer.concat([local, nameBytes, data, central, nameBytes, end]);
 }
 
-/** The Unix mode of the first central directory entry. */
 function firstEntryMode(zip: Buffer): number {
   let end = -1;
   for (let index = zip.length - 22; index >= 0; index -= 1) {
@@ -111,7 +102,6 @@ try {
   assert.ok(Exit.isFailure(refused), "a zip entry with a link type staged");
   assert.ok(String(refused).includes(sourceText("error.provider.archiveSpecialFile")), String(refused));
 
-  // The locked zip is 70 MB, so CI runs only the cases above. A local run can add it.
   let locked: { version: string; entryMode: string; installedSha256: string } | null = null;
   if (lockedPath) {
     const bytes = await readFile(lockedPath);

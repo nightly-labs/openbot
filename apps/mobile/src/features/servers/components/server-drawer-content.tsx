@@ -80,40 +80,31 @@ const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const SERVER_LIST_MOTION = { duration: 240, easing: EASE_OUT };
 const SERVER_AVATAR_SIZE = 40;
 const HEADER_AVATAR_SIZE = 48;
-// The blur is full behind the header text and fades out slowly: it starts this far above the
-// header's bottom and goes on this far below it.
 const HEADER_FADE_START = 16;
 const HEADER_EDGE = 16;
-// The first row's text starts below the blur, so it is clear when the list is at the top.
 const LIST_TOP_GAP = 8;
 const DRAWER_ROW_HEIGHT = 46;
 const CLOSED_LIST = { height: 0, overflow: "hidden" } as const;
 const UNPINNED_OPACITY = 0.5;
-/** The same dimming as a disabled settings row. */
 const UNAVAILABLE_OPACITY = 0.45;
 
 interface ServerDrawerContentProps {
   activeServerId: string;
   muted: ViewStyle["backgroundColor"];
-  /** True after the drawer has opened: the drawer then reads its values from the host. */
   open: boolean;
   servers: MobileServer[];
   session: MobileSession;
-  /** The drawer's left padding. The header blur reaches over it to the screen edge. */
   sideInset: number;
   topInset: number;
   onNavigate: (href: Href) => void;
   onLeave: (serverId: string) => Promise<void>;
   onRemove: (serverId: string) => Promise<void>;
-  /** Deletes a server that an OpenBot desktop app runs beside its own server, through that app. */
   onDelete: (serverId: string) => Promise<void>;
-  /** See `MobileWorkspaceState.localServerKind`. */
   localServerKind: (serverId: string) => "computer" | "onComputer" | null;
   onReorder: (serverIds: string[]) => boolean;
   onSelectServer: (serverId: string) => void;
 }
 
-/** Local or Remote, with the connection state only when it needs attention. The dot shows online or offline. */
 function serverDetail(server: MobileServer, t: MobileTranslate): string {
   const label = serverKindLabel(server, t);
   const pending = server.state === "connecting" && server.initialConnectionPending;
@@ -151,12 +142,6 @@ function serverKindLabel(server: MobileServer, t: MobileTranslate): string {
   return server.kind === "local" ? t("mobile.server.drawer.local") : t("mobile.server.drawer.remote");
 }
 
-/**
- * The drawer under the home screen. The name of the open server opens the server list in place;
- * below it are the tools of that server, each with its current value. The app opens on the first
- * server of the list. The shell renders again while the drawer moves; with the same props this
- * content does not.
- */
 export const ServerDrawerContent = memo(function ServerDrawerContent({
   activeServerId,
   muted,
@@ -176,8 +161,6 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
   const { t } = useText();
   const { theme } = useUniwind();
   const reducedMotion = useReducedMotion();
-  // Android: the row's own long press opens its menu, as on the agent rows. `shouldOpenOnLongPress`
-  // does not open it there, because the row takes the long press.
   const menus = useRef(new Map<string, MenuComponentRef | null>());
   const displayName = mobileUserName(session.user);
   const avatarUrl = session.user.avatarUrl ? new URL(session.user.avatarUrl, session.apiUrl).toString() : null;
@@ -187,23 +170,18 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
   const [dragging, setDragging] = useState(false);
   const [listOpen, setListOpen] = useState(false);
   const [headerHeight, setHeaderHeight] = useState(0);
-  // The iOS menu host sizes to its content, so a row in a menu gets the slot width explicitly.
   const [rowWidth, setRowWidth] = useState<number>();
   const activeServer = servers.find((server) => server.id === activeServerId);
   const serverIds = servers.map((server) => server.id);
   const canReorder = serverIds.length > 1;
-  // Without an open server the list is the only content, so it stays open.
   const showsList = listOpen || editing || !activeServer;
   const memberCount = useDrawerMemberCount(activeServer?.id ?? "");
   const hostedServerIds = useHostedServerAvailability((state) =>
     state.userId === session.user.id ? state.serverIds : null,
   );
   const exiting = useRef(false);
-  // The same rules as the server settings screen. The owner cannot leave. Billing deletes a hosted
-  // server, so Remove shows only after the hosted servers are known.
   function serverExit(server: MobileServer): ServerExit | null {
     if (server.role !== "owner") return "leave";
-    // The desktop app's own server stays while the app runs; a server beside it is deleted on its computer.
     const kind = localServerKind(server.id);
     if (kind === "computer") return null;
     if (kind === "onComputer") return "delete";
@@ -231,7 +209,6 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
     return actions;
   }
 
-  // The server leaves the list after it succeeds, and the workspace selects another server if it was active.
   function confirmExit(server: MobileServer, exit: ServerExit) {
     const text = EXIT_TEXT[exit];
     Alert.alert(t(text.title, { name: server.name }), t(text.body), [
@@ -253,7 +230,6 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
     } catch (error) {
       void haptics.notification("error");
       const text = currentText();
-      // The account service explains a refusal, such as a hosted server that Billing deletes.
       showFailureAlert(
         error,
         "team",
@@ -265,7 +241,6 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
     }
   }
 
-  // A drag cut short by leaving edit mode never reports its end, so leaving also releases the scroll lock.
   const stopEditing = () => {
     void haptics.selection();
     setEditing(false);
@@ -273,7 +248,6 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
     setDragging(false);
   };
 
-  // The server list closes, so the tools that the user edits stay in view.
   const editTools = useCallback(() => {
     void haptics.selection();
     setEditing(false);
@@ -281,7 +255,6 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
     setEditingTools(true);
   }, []);
 
-  // The drawer opens again on the tools of the open server.
   useEffect(() => {
     if (open) return;
     setEditing(false);
@@ -290,10 +263,6 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
     setListOpen(false);
   }, [open]);
 
-  // The plus button opens the plans and the account's hosted servers when the account can have
-  // hosted servers and the feature flag of this build is on. A development build can override both.
-  // With the flag off, an account that has hosted servers still opens the sheet to manage them; it
-  // then shows no plans.
   const accountHasPlans = useHostedServerAvailability((state) => state.userId === session.user.id && state.available);
   const ownsHostedServers = useHostedServerAvailability(
     (state) => state.userId === session.user.id && state.ownsServers,
@@ -338,14 +307,11 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
         }}
         className={`flex-row items-center gap-3 rounded-2xl px-2.5 ${selected ? "bg-control" : ""}`}
         onPress={editing ? undefined : () => onSelectServer(serverItem.id)}
-        // The native context menu does not cancel this touch. Without a long-press handler, lifting the
-        // finger after the menu opens counts as a tap and closes the drawer under the open menu.
         delayLongPress={longPressDelay}
         onLongPress={
           editing
             ? undefined
             : () => {
-                // A row with no actions has no menu, so it gives no menu haptic.
                 if (menuActions(serverItem).length === 0) return;
                 void haptics.longPress();
                 if (isAndroid) menus.current.get(serverItem.id)?.show();
@@ -374,7 +340,6 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
     );
   }
 
-  // Every row gets the same fixed slot, so the list keeps its spacing in edit mode and in the menu wrapper.
   function rowSlot(serverItem: MobileServer, row: ReactNode) {
     return (
       <View
@@ -510,7 +475,6 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
           </View>
         </View>
 
-        {/* The list scrolls under the header, which blurs it as the other screens blur theirs. */}
         <DrawerHeaderBlur
           left={-sideInset}
           solidHeight={Math.max(0, headerHeight - HEADER_FADE_START)}
@@ -593,15 +557,9 @@ interface DrawerTool {
   label: string;
   value?: string | null;
   accentValue?: boolean;
-  /** The server is not connected, and only its last connection had this tool. */
   disabled?: boolean;
 }
 
-/**
- * The tools of the open server with their values. Each answer from the host renders only this part
- * of the drawer, not the server list above it. A long press opens a menu to edit the tools or unpin
- * one. In edit mode all tools show: the handle moves a tool, and the pin button shows or hides it.
- */
 function DrawerServerTools({
   server,
   open,
@@ -624,21 +582,16 @@ function DrawerServerTools({
   const serverId = server.id;
   const workflows = useDrawerWorkflows(serverId, open);
   const layout = useDrawerToolLayout();
-  // The iOS menu host sizes to its content, so a row in a menu gets the width of the list.
   const [rowWidth, setRowWidth] = useState<number>();
-  // A connected host that shares its screen. The host decides which members it lets in.
   const remoteDesktop = useMobileWorkspaceSelector((current) =>
     serverRowState(current, serverId, (checks) => checks.canControlComputer(serverId)),
   );
-  // An older host has no storage routes, so it has no Library, as on desktop.
   const library = useMobileWorkspaceSelector((current) =>
     serverRowState(current, serverId, (checks) => checks.canReadServerStorage(serverId)),
   );
-  // Only an owner or admin of a host with `providers-v1` manages its providers, as on the desktop rail.
   const providers = useMobileWorkspaceSelector((current) =>
     serverRowState(current, serverId, (checks) => checks.canManageProviders(serverId)),
   );
-  // Until the host answers, a server without kept values shows Threads and Workflows from its last connection.
   const tasksRow = useMobileWorkspaceSelector((current) =>
     serverRowState(current, serverId, (checks) => checks.canUseTasks(serverId)),
   );
@@ -660,7 +613,6 @@ function DrawerServerTools({
     }),
     [serverId],
   );
-  // A tool that this server does not have is null. A tool that only the last connection had is disabled.
   const tools: Record<DrawerToolId, DrawerTool | null> = {
     tasks: values.tasks
       ? {
@@ -775,14 +727,12 @@ function DrawerServerTools({
         })
       )}
       <DrawerDivider />
-      {/* Server settings always shows, so its long press opens the edit mode when all tools are unpinned. */}
       <DrawerToolRow
         toolId={null}
         icon={Settings2}
         label={t("mobile.server.drawer.serverSettings")}
         href={routes.settings}
         width={rowWidth}
-        // In edit mode a tap does not leave the drawer, as on the server rows.
         disabled={editing}
         onAction={editing ? undefined : onToolAction}
         onNavigate={onNavigate}
@@ -791,7 +741,6 @@ function DrawerServerTools({
   );
 }
 
-/** A drawer row with the menu of the tools. `toolId` is null for Server settings, which cannot be unpinned. */
 const DrawerToolRow = memo(function DrawerToolRow({
   toolId,
   width,
@@ -800,7 +749,6 @@ const DrawerToolRow = memo(function DrawerToolRow({
 }: DrawerRowProps & {
   toolId: DrawerToolId | null;
   width?: number;
-  /** Without it, the row has no menu. */
   onAction?: (action: string, toolId: DrawerToolId | null) => void;
 }) {
   const { t } = useText();
@@ -845,7 +793,6 @@ const DrawerToolRow = memo(function DrawerToolRow({
   );
 });
 
-/** A tool in edit mode. The list adds the handle; the pin button shows or hides the tool. */
 function DrawerEditRow({
   icon: Icon,
   label,
@@ -904,7 +851,6 @@ function DrawerEditRow({
         {pinned ? (
           <Pin color={String(foreground)} fill={String(foreground)} size={18} strokeWidth={1.8} />
         ) : (
-          // Dimmed as the name of the unpinned tool.
           <View style={{ opacity: UNPINNED_OPACITY }}>
             <PinOff color={String(foreground)} size={18} strokeWidth={1.8} />
           </View>
@@ -914,24 +860,17 @@ function DrawerEditRow({
   );
 }
 
-/**
- * Opens the server list under the server name and closes it again. The rows come down 6 pt as they
- * fade in, so the list reads as coming out of the name.
- */
 function ServerListCollapse({
   open,
   reducedMotion,
   children,
 }: PropsWithChildren<{ open: boolean; reducedMotion: boolean }>) {
   const [height, setHeight] = useState(0);
-  // At rest the list has no animated style: open, it takes its own height; closed, none. A later
-  // render then cannot put back a first-render style when the animated value has not reached React.
   const [moving, setMoving] = useState(false);
   const progress = useSharedValue(open ? 1 : 0);
   const shown = useRef(open);
   useEffect(() => {
     if (shown.current === open) {
-      // A change of the motion setting cuts a move short: the list goes to rest where it is going.
       progress.set(open ? 1 : 0);
       setMoving(false);
       return;
@@ -985,16 +924,13 @@ interface DrawerRowProps {
   icon: LucideIcon;
   label: string;
   value?: string | null;
-  /** A value that asks for the person, such as tasks that need them. */
   accentValue?: boolean;
   href: Href;
   disabled?: boolean;
-  /** Dimmed and not tappable: the server is not connected, and only its last connection had this tool. */
   unavailable?: boolean;
   onNavigate: (href: Href) => void;
 }
 
-/** One tool of the open server, with its current value on the right. A new value renders only its row. */
 const DrawerRow = memo(function DrawerRow({
   icon: Icon,
   label,
@@ -1034,8 +970,6 @@ const DrawerRow = memo(function DrawerRow({
         void haptics.impact("soft");
         onNavigate(href);
       }}
-      // The native context menu does not cancel this touch. Without a long-press handler, lifting the
-      // finger after the menu opens counts as a tap and navigates under the open menu.
       delayLongPress={longPressDelay}
       onLongPress={onLongPress}
     >

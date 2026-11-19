@@ -1,8 +1,3 @@
-// CRM: the leads and customers of a server, their plans, payments and activity, and the changes that
-// agents propose. This computer's host answers from its own CRM service, with the owner of this
-// computer as the person who acts. A joined server answers through `crm-v1`, which only its owners
-// and admins may use.
-
 import type { CrmActor } from "@openbot/contracts/ipc";
 import { CRM_CAPABILITY, CRM_ROUTES } from "@openbot/contracts/team-protocol/crm-v1";
 import { sourceText } from "@openbot/i18n/source";
@@ -47,7 +42,6 @@ interface CrmIpcDependencies {
   remoteServers: CrmRemoteServers;
 }
 
-/** The owner of this computer: the local app has no member id or name. */
 const LOCAL_PERSON: CrmActor = { kind: "person", id: null, name: null };
 
 export function crmIpcHandlers({ crm, remoteServers }: CrmIpcDependencies): Pick<IpcGroupHandlers, "crm"> {
@@ -78,7 +72,6 @@ export function crmIpcHandlers({ crm, remoteServers }: CrmIpcDependencies): Pick
         local: (change) => Effect.runPromise(crm.apply(change, LOCAL_PERSON)),
         remote: (change, serverId) => remote(serverId, CRM_ROUTES.apply, decodeRemoteCrmApplyResult, change),
       }),
-      // A joined server keeps the key and pulls from Stripe itself; the key crosses only in this request.
       sourceConnect: scopedHandler(parseCrmSourceConnect, {
         local: (input) => Effect.runPromise(crm.sourceConnect(input)),
         remote: (input, serverId) => remote(serverId, CRM_ROUTES.sourceConnect, decodeRemoteCrmApplyResult, input),
