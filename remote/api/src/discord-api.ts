@@ -14,6 +14,7 @@ import {
   type DiscordApiErrorCode,
   type DiscordApiRequest,
   type DiscordButton,
+  type DiscordChannelList,
   type DiscordChannelSummary,
   type DiscordHistoryMessage,
   type DiscordRoleSummary,
@@ -196,7 +197,7 @@ type DiscordApiResult =
   | { messageId: string }
   | { name: string }
   | { messages: DiscordHistoryMessage[] }
-  | { channels: DiscordChannelSummary[] }
+  | DiscordChannelList
   | { roles: DiscordRoleSummary[] }
   | Record<string, never>;
 
@@ -491,7 +492,8 @@ export function makeDiscordApi(transport: DiscordTransport, state: DiscordState)
         const can = (channelId: string | null | undefined, needed: bigint) =>
           channelId != null && ((permissions.get(channelId) ?? 0n) & needed) === needed;
         const joined = new Set((active.members ?? []).flatMap((member) => (member.id ? [member.id] : [])));
-        const channels: DiscordChannelSummary[] = [
+        // The newest threads first: a Discord id grows with time, and the limit drops the oldest ones.
+        const places: DiscordChannelSummary[] = [
           ...guildChannels
             .filter(
               (channel) => POSTABLE_CHANNEL_TYPES.has(channel.type) && can(channel.id, VIEW_CHANNEL | SEND_MESSAGES),
@@ -503,10 +505,12 @@ export function makeDiscordApi(transport: DiscordTransport, state: DiscordState)
                 can(thread.parent_id, VIEW_CHANNEL | SEND_MESSAGES_IN_THREADS) &&
                 (thread.type !== PRIVATE_THREAD_TYPE || joined.has(thread.id)),
             )
+            .sort((left, right) => (BigInt(right.id) > BigInt(left.id) ? 1 : -1))
             .map((thread) => ({ id: thread.id, name: thread.name ?? "", kind: "thread" as const })),
-        ].slice(0, DISCORD_LIST_CHANNELS_LIMIT);
+        ];
+        const channels = places.slice(0, DISCORD_LIST_CHANNELS_LIMIT);
         for (const channel of channels) state.rememberChannel(channel.id, request.guildId, channel.name);
-        return { channels };
+        return { channels, omitted: places.length - channels.length };
       }
       // The roles a person can have: not `@everyone`, whose id is the guild's, and not a role that a
       // bot or integration manages.

@@ -55,6 +55,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "Muitas tentativas de login. Tente novamente mais tarde.",
   "error.team.clientUpdateRequired": "Atualize este cliente OpenBot antes de conectar a este computador anfitrião.",
   "error.team.hostUpdateRequired": "Atualize o OpenBot no computador anfitrião antes de conectar.",
+  "error.team.serverSafeMode": "Este servidor está no modo de segurança porque o OpenBot não inicia nele.",
+  "error.team.serverSafeModeNewerDatabase":
+    "O OpenBot {version} neste servidor não consegue abrir os dados porque uma versão mais recente do OpenBot os salvou. Uma versão mais recente do OpenBot no servidor resolve isso.",
+  "error.team.serverSafeModeStartFailed":
+    "O OpenBot {version} neste servidor parou depois de falhar ao iniciar muitas vezes. Uma versão mais recente do OpenBot no servidor resolve isso.",
   "error.team.sidebarLayoutUnavailable": "A organização da barra lateral está indisponível.",
   "error.team.providersUnsupported": "Esta conexão não oferece suporte às configurações de provedores.",
   "error.team.providerNotManaged": "O OpenBot não gerencia a CLI deste provedor.",
@@ -74,13 +79,21 @@ export const messages = {
   "error.team.agentColorsUnsupported": "Esta conexão não oferece suporte a cores de agentes.",
   "error.team.chatColorsUnsupported": "Esta conexão não oferece suporte a cores de chat.",
   "error.team.routineRunPlaceUnsupported": "Esta conexão não pode alterar onde uma rotina é executada.",
+  "error.team.routinePauseReasonsUnsupported": "Esta conexão não pode mostrar por que uma rotina está pausada.",
+  "error.team.activeQueuesUnsupported": "Esta conexão não pode mostrar as filas de todos os agentes.",
   "error.team.routinesOnceUnsupported": "Esta conexão não pode salvar rotinas que são executadas uma vez.",
   "error.team.routineRunCommandUnsupported": "Esta conexão não pode fornecer o comando de execução de uma rotina.",
   "error.team.threadQueueUnsupported": "Esta conexão não pode mostrar a fila de uma thread paralela.",
+  "error.team.threadRequestsUnsupported":
+    "Esta conexão não pode mostrar os pedidos de uma thread paralela para outros agentes.",
+  "error.team.hostTurnLimitsUnsupported":
+    "Esta conexão não pode mostrar nem alterar os limites de tópicos do servidor.",
   "error.team.usageLimitUnsupported": "Esta conexão não pode mostrar nem alterar os limites de uso dos agentes.",
   "error.team.hermesImportUnsupported": "Esta conexão não pode importar perfis do Hermes do servidor.",
   "error.team.providerDetectionUnsupported":
     "Esta conexão não pode encontrar os servidores de modelos e os agentes do servidor.",
+  "error.team.providerModelSourceUnsupported": "Esta conexão não pode mostrar de onde vêm os modelos de um provedor.",
+  "error.team.routineFlowStopUnsupported": "Esta conexão não pode parar a execução de uma rotina.",
   "error.team.sidebarFoldersUnsupported": "Esta conexão não oferece suporte a pastas dentro de pastas.",
   "error.team.libraryFoldersUnsupported": "Esta conexão não oferece suporte a pastas da Biblioteca.",
   "error.team.agentNotificationLevelsUnsupported":
@@ -116,6 +129,7 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "Esta conexão não oferece suporte a alterações na identidade do servidor.",
   "error.team.hostUpdateUnsupported": "Esta conexão não oferece suporte a atualizações do computador anfitrião.",
   "error.team.hostTimezoneUnsupported": "Esta conexão não oferece suporte ao fuso horário do servidor.",
+  "error.team.hostRestartUnsupported": "Esta conexão não oferece suporte à reinicialização do servidor.",
   "error.team.hostKeyRotationUnsupported": "Esta conexão não oferece suporte à alteração da chave do servidor.",
   "error.team.localServersUnsupported": "Esta conexão não oferece suporte a servidores neste computador.",
   "error.team.routineResultsUnsupported": "Esta conexão não oferece suporte a destinos de rotinas.",
@@ -128,6 +142,7 @@ export const messages = {
   "error.team.promptCacheTtlUnsupported": "Esta conexão não oferece suporte à duração do cache de prompts.",
   "error.team.claudeUserSetupUnsupported": "Esta conexão não suporta a opção de configuração do Claude Code.",
   "error.team.claudeCompactWindowUnsupported": "Esta conexão não oferece suporte ao tamanho de compactação do Claude.",
+  "error.team.providerEnvironmentUnsupported": "Esta conexão não oferece suporte a variáveis de provedor.",
   "error.team.modelVisibilityUnsupported": "Esta conexão não oferece suporte à lista de modelos.",
   "error.team.providerDefaultUnsupported": "Esta conexão não oferece suporte ao provedor padrão.",
   "error.team.attachmentNameRequired": "É necessário informar um nome seguro para o anexo.",
@@ -181,6 +196,8 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "Nenhum agente deste servidor mostrou este link de login.",
   "error.team.hostPersonalityUnsupported": "Esta conexão não suporta a personalidade do servidor.",
   "error.team.agentWaitsUnsupported": "Esta conexão não suporta esperas abertas.",
+  "error.team.pendingApprovalUnsupported": "Esta conexão não permite ler uma aprovação completa.",
+  "error.team.phoneFeedbackUnsupported": "Esta conexão não permite enviar um relato pelo app do celular.",
   "error.team.messagePinsUnsupported": "Esta conexão não oferece suporte a mensagens fixadas.",
   "error.team.queuedMessageThreadUnsupported":
     "Esta conexão não suporta executar uma mensagem na fila como um novo tópico.",

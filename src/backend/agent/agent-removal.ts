@@ -29,8 +29,15 @@ export interface AgentRemovalHooks {
   /**
    * Stops the agent's own provider process, which runs in its workspace. On Windows it also stops the
    * shared OpenCode process when no turn uses it, because that process watches the folder (#7029).
+   * True when work of another agent keeps that shared process, so the folder can stay in use.
    */
-  stopAgentProcess(agentId: string): Effect.Effect<void, AgentRemovalFailed>;
+  stopAgentProcess(agentId: string): Effect.Effect<boolean, AgentRemovalFailed>;
+  /**
+   * After the folder removal failed with `EBUSY`: on Windows, stops the other shared provider processes
+   * that the agent used, when no work uses them, because a command that one of them started can hold
+   * the folder (#12294). True when work of another agent keeps one of them.
+   */
+  releaseFolderHolders(agentId: string): Effect.Effect<boolean, AgentRemovalFailed>;
   /** The provider's shared client, which can hold a session of the agent that the conversation does not list. */
   currentClient(provider: AgentProvider): AgentClient | null;
   /** Whether a usage limit holds the agent's queue. */
@@ -192,7 +199,11 @@ export class AgentRemoval {
     // Approval revocation remains owned by the main-process gate. Its callback runs the
     // complete ordered removal before the gate can restore an approval on failure.
     yield* this.#deleteWithRevokedApproval(agent.id, () => this.#removeAgentDataEffect(agent)).pipe(
-      Effect.mapError(() => new AgentRemovalFailed({ cause: new Error(sourceText("error.agent.deleteIncomplete")) })),
+      Effect.mapError((failure) =>
+        failure.cause instanceof AgentFolderInUse
+          ? failure
+          : new AgentRemovalFailed({ cause: new Error(sourceText("error.agent.deleteIncomplete")) }),
+      ),
     );
   }, Effect.uninterruptible);
 
@@ -215,6 +226,7 @@ export class AgentRemoval {
       })),
     );
     let stage = "provider-files";
+    let processKeptForWork = false;
     yield* Effect.gen({ self: this }, function* () {
       for (const session of providerSessions)
         yield* this.#threads
@@ -235,12 +247,32 @@ export class AgentRemoval {
       const stopped = yield* Effect.result(this.#hooks.stopAgentProcess(agent.id));
       if (Result.isFailure(stopped))
         this.#logger.warn("Could not stop a deleted agent's provider process.", removalErrorCode(stopped.failure));
+      else processKeptForWork = stopped.success;
       stage = "agent-files-and-record";
-      yield* this.#store.deleteAgent(agent.id).pipe(toAgentRemovalFailed);
+      yield* this.#store.deleteAgent(agent.id).pipe(
+        toAgentRemovalFailed,
+        // A process stays in the folder. Stop the shared processes that can hold it, and remove it again.
+        Effect.catch((failure) =>
+          removalErrorCode(failure).code === "EBUSY"
+            ? this.#hooks.releaseFolderHolders(agent.id).pipe(
+                Effect.tap((kept) =>
+                  Effect.sync(() => {
+                    if (kept) processKeptForWork = true;
+                  }),
+                ),
+                Effect.andThen(this.#store.deleteAgent(agent.id).pipe(toAgentRemovalFailed)),
+              )
+            : Effect.fail(failure),
+        ),
+      );
     }).pipe(
       Effect.mapError((failure) => {
         // File-system errors can contain private paths. Log only the failed stage and the error code.
-        this.#logger.warn("Agent deletion failed.", { stage, ...removalErrorCode(failure) });
+        const code = removalErrorCode(failure);
+        this.#logger.warn("Agent deletion failed.", { stage, ...code });
+        // Retry would fail again until that work ends, so tell the user what to wait for (#11737).
+        if (stage === "agent-files-and-record" && processKeptForWork && code.code === "EBUSY")
+          return new AgentRemovalFailed({ cause: new AgentFolderInUse(sourceText("error.agent.deleteFolderInUse")) });
         return new AgentRemovalFailed({ cause: new Error(sourceText("error.agent.deleteIncomplete")) });
       }),
     );
@@ -305,6 +337,9 @@ export class AgentRemovalFailed extends Schema.TaggedError<AgentRemovalFailed>()
 }) {}
 
 const { sync: removalStep, rewrap: toAgentRemovalFailed } = causeHelpers(AgentRemovalFailed);
+
+/** The agent folder stays in use by a shared provider process that work of another agent keeps. */
+class AgentFolderInUse extends Error {}
 
 /** The first error code in the cause chain, such as `EBUSY` or `ERR_SQLITE_ERROR`. Never a message or a path. */
 function removalErrorCode(failure: unknown): { code?: string; errcode?: number } {

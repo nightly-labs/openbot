@@ -4,7 +4,9 @@
 // `enabled_tools` hides the tools of a server with the same transport (#5786). The payload is
 // the one `readCodexMcpConfig`, `codexDisabledServers`, `codexMcpServers` and `codexThreadMcpServers`
 // build for a thread. A local server that speaks the Responses API stands in for the model and
-// records the MCP namespaces Codex offers, so no account or key is used.
+// records the MCP namespaces Codex offers, so no account or key is used. Issue #11041: OpenBot's
+// disabled placeholder under a plain key turned off the server that another Codex app, such as T3
+// Code, sends under the same key at runtime; a second thread stands in for that app.
 // `bun scripts/codex-mcp-name-clash-e2e.ts`. Writes .openbot-build/codex-mcp-name-clash-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -15,12 +17,14 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
+import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { Effect, Result } from "effect";
 import { readCodexMcpConfig } from "../src/backend/agent/codex-mcp-config";
 import { CodexAppServerClient } from "../src/backend/app-server-client";
 import { resolveCodexCli } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import {
+  type CodexMcpServer,
   type CodexOwnTransports,
   codexDisabledServers,
   codexMcpServers,
@@ -180,8 +184,10 @@ interface Case {
   /** The user's own entries, as TOML. */
   user: string;
   rows: McpServerConfig[];
-  /** True runs the payload as it was before the fix: the keys ignore what the user's file declares. */
+  /** True runs the payload as it was before #2851: each server under its plain key. */
   legacy?: boolean;
+  /** The `mcp_servers` of a thread that another Codex app starts after OpenBot's, with the same home. */
+  foreign?: Record<string, CodexMcpServer>;
 }
 
 interface Outcome {
@@ -189,6 +195,9 @@ interface Outcome {
   error: string | null;
   keys: string[];
   offered: string[];
+  /** The namespaces offered in the thread of the other Codex app, before and after OpenBot's registration. */
+  foreignBefore: string[];
+  foreignOffered: string[];
   file: string;
 }
 
@@ -211,11 +220,24 @@ async function run(executable: string, modelPort: number, test: Case): Promise<O
     ].join(NL),
   );
   const client = new CodexAppServerClient(executable, 30_000, { CODEX_HOME: home, FAKE_KEY: "e2e" });
-  const turnDone = new Promise<void>((done) => {
-    client.on("notification", (notification) => {
-      if (notification.method === "turn/completed") done();
-    });
+  let turnDone = () => {};
+  client.on("notification", (notification) => {
+    if (notification.method === "turn/completed") turnDone();
   });
+  /** Runs one turn in a new thread, and answers the MCP namespaces that the model was offered. */
+  const turn = async (threadStarted: DynamicRecord, what: string) => {
+    const threadId = getString(getRecord(threadStarted, "thread"), "id");
+    assert(threadId, "thread/start returned no thread id");
+    const requests = model.offered.length;
+    const done = new Promise<void>((resolve) => {
+      turnDone = resolve;
+    });
+    await runCauseEffect(
+      client.request("turn/start", { threadId, input: [{ type: "text", text: "hello" }] }, decodeRecordResponse),
+    );
+    await Promise.race([done, deadline(what)]);
+    return model.offered[requests] ?? [];
+  };
   client.start();
   try {
     await runCauseEffect(
@@ -226,8 +248,31 @@ async function run(executable: string, modelPort: number, test: Case): Promise<O
       ),
     );
     client.notify("initialized");
+    const foreignTurn = async (when: string) =>
+      test.foreign
+        ? turn(
+            await runCauseEffect(
+              client.request(
+                "thread/start",
+                { cwd: home, model: "fake-model", config: { mcp_servers: test.foreign } },
+                decodeRecordResponse,
+              ),
+            ),
+            `the other app's turn ${when} ${test.name}`,
+          )
+        : [];
+    const foreignBefore = await foreignTurn("before");
     const usable = await runCauseEffect(usableMcpServers(test.rows));
-    const keyed = (own: CodexOwnTransports) => codexMcpServers(usable, test.legacy ? {} : own).servers;
+    // Before the fix, each server travelled under its plain key.
+    const keyed = (own: CodexOwnTransports) =>
+      test.legacy
+        ? Object.fromEntries(
+            Object.entries(codexMcpServers(usable).servers).map(([key, server]) => [
+              key.replace(/^openbot_/u, ""),
+              server,
+            ]),
+          )
+        : codexMcpServers(usable, own).servers;
     const own = await runCauseEffect(
       codexDisabledServers(() => readCodexMcpConfig(client, keyed).pipe(toMcpShapeFailed)),
     );
@@ -247,18 +292,13 @@ async function run(executable: string, modelPort: number, test: Case): Promise<O
         ),
       ),
     );
-    const outcome = { keys: Object.keys(servers).sort(), file: await readFile(file, "utf8") };
+    const outcome = { keys: Object.keys(servers).sort(), file: await readFile(file, "utf8"), foreignBefore };
     if (Result.isFailure(started)) {
-      return { ...outcome, started: false, error: String(started.failure.cause), offered: [] };
+      return { ...outcome, started: false, error: String(started.failure.cause), offered: [], foreignOffered: [] };
     }
-    const threadId = getString(getRecord(started.success, "thread"), "id");
-    assert(threadId, "thread/start returned no thread id");
-    const requests = model.offered.length;
-    await runCauseEffect(
-      client.request("turn/start", { threadId, input: [{ type: "text", text: "hello" }] }, decodeRecordResponse),
-    );
-    await Promise.race([turnDone, deadline(`the turn of ${test.name}`)]);
-    return { ...outcome, started: true, error: null, offered: model.offered[requests] ?? [] };
+    const offered = await turn(started.success, `the turn of ${test.name}`);
+    const foreignOffered = await foreignTurn("after");
+    return { ...outcome, started: true, error: null, offered, foreignOffered };
   } finally {
     await runCauseEffect(client.stop());
   }
@@ -359,11 +399,54 @@ try {
       ]);
     },
   );
-  await step("no clash: the connector keeps the github key", { name: "no-clash", user: "", rows: [connector] }, (o) => {
-    assert.equal(o.started, true, o.error ?? "");
-    assert.deepEqual(o.keys, ["github"]);
-    assert.ok(o.offered.includes("mcp__github"), `offered ${o.offered.join(", ")}`);
-  });
+  await step(
+    "no clash: the connector travels as openbot_github too",
+    { name: "no-clash", user: "", rows: [connector] },
+    (o) => {
+      assert.equal(o.started, true, o.error ?? "");
+      assert.deepEqual(o.keys, ["openbot_github"]);
+      assert.ok(o.offered.includes("mcp__openbot_github"), `offered ${o.offered.join(", ")}`);
+      assert.deepEqual(table(o.file, "github"), []);
+      assert.deepEqual(table(o.file, "openbot_github"), ['url = "http://127.0.0.1:1"', "enabled = false"]);
+    },
+  );
+  const oldPlaceholder = `[mcp_servers.github]${NL}url = "http://127.0.0.1:1"${NL}enabled = false${NL}${NL}[mcp_servers.github.tools.ping]${NL}approval_mode = "approve"${NL}`;
+  await step(
+    "issue #11041: the old placeholder turns off another app's github until an agent with no server moves it",
+    {
+      name: "old-placeholder",
+      user: oldPlaceholder,
+      rows: [],
+      foreign: { github: { url: httpUrl, http_headers: {} } },
+    },
+    (o) => {
+      assert.equal(o.started, true, o.error ?? "");
+      assert.ok(!o.foreignBefore.includes("mcp__github"), `other app offered ${o.foreignBefore.join(", ")}`);
+      assert.ok(o.foreignOffered.includes("mcp__github"), `other app offered ${o.foreignOffered.join(", ")}`);
+      assert.deepEqual(table(o.file, "github"), []);
+      assert.deepEqual(table(o.file, "openbot_github.tools.ping"), ['approval_mode = "approve"']);
+    },
+  );
+  await step(
+    "issue #11041: the old placeholder moves to openbot_github with its approval, and another app's github is on",
+    {
+      name: "moved-placeholder",
+      user: oldPlaceholder,
+      rows: [connector],
+      foreign: { github: { url: httpUrl, http_headers: {} } },
+    },
+    (o) => {
+      assert.equal(o.started, true, o.error ?? "");
+      assert.deepEqual(o.keys, ["openbot_github"]);
+      assert.ok(o.offered.includes("mcp__openbot_github"), `offered ${o.offered.join(", ")}`);
+      assert.ok(!o.foreignBefore.includes("mcp__github"), `other app offered ${o.foreignBefore.join(", ")}`);
+      assert.ok(o.foreignOffered.includes("mcp__github"), `other app offered ${o.foreignOffered.join(", ")}`);
+      assert.deepEqual(table(o.file, "github"), []);
+      assert.deepEqual(table(o.file, "github.tools.ping"), []);
+      assert.deepEqual(table(o.file, "openbot_github"), ['url = "http://127.0.0.1:1"', "enabled = false"]);
+      assert.deepEqual(table(o.file, "openbot_github.tools.ping"), ['approval_mode = "approve"']);
+    },
+  );
   // Its tool consent keeps a card only under this name, so a clash must never rename it.
   await step(
     "Computer Use over a user http computer_use: the key stays computer_use",

@@ -5,6 +5,7 @@ import {
   DEFAULT_PROVIDER_ACCOUNT_ID,
   type HostProviderAccounts,
   type UpdateAgentInput,
+  workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
 import { useQueryClient } from "@tanstack/react-query";
 import { router, Stack, useLocalSearchParams } from "expo-router";
@@ -38,7 +39,7 @@ import {
 } from "@/features/agents/components/agent-backup-models";
 import { AgentBrowserProfileRow } from "@/features/agents/components/agent-browser-profile";
 import {
-  AgentCompactSection,
+  AgentDeleteHistoryRow,
   AgentNewChatSection,
   AgentNotificationLevelRow,
 } from "@/features/agents/components/agent-chat-settings";
@@ -61,7 +62,8 @@ import { AgentSharedTables } from "@/features/agents/components/agent-shared-tab
 import { AgentTasksRow } from "@/features/agents/components/agent-tasks-row";
 import { BloubAvatarPreview } from "@/features/agents/components/bloub-avatar";
 import { InstructionsLimit, instructionsTooLong } from "@/features/agents/components/instructions-limit";
-import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
+import { useAgentAccessLevel } from "@/features/servers/model/use-server-roles";
+import { SettingsGroupRow, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { RowIcon } from "@/features/settings/components/settings-row-icon";
 import {
   type MobileAgent,
@@ -150,7 +152,7 @@ function AgentForm({
     canManageSharedTables,
     canPublishAgent,
     canStartNewChat,
-    canCompactContext,
+    canDeleteChatHistory,
     canManageAgentInstructions,
     canManageAgentAccess,
     canManageAgentHostSettings,
@@ -163,22 +165,32 @@ function AgentForm({
     setAgentProviderAccount,
   } = useMobileWorkspace();
   const queryClient = useQueryClient();
-  // The Permissions row shows the access, as on desktop. Its page reads the same host answer.
-  const { settings: adminSettings } = useAgentAdminSettings(agent, host, available && page === "info");
+  // The Permissions row shows the access, as on desktop. Its page reads the same host answer. The
+  // Model page reads it to say when the chosen provider does not work with Workspace only.
+  const { settings: adminSettings } = useAgentAdminSettings(
+    agent,
+    host,
+    available && (page === "info" || page === "runtime"),
+  );
   const showPermissions = canManageAgentAccess(agent.serverId) || canManageAgentHostSettings(agent.serverId);
   const showFolders = canManageAgentFolders(agent.serverId);
   // The user's own level of the agent, on a host that keeps it for each member. Settings > Notifications
   // is the one place that changes notifications, so the agent has no switch of its own here.
   const showNotificationLevel = agent.notifications !== undefined && canSetAgentNotificationLevel(agent.serverId);
-  const showAdvanced =
-    Boolean(agent.workspacePath) ||
-    canStartNewChat(agent.serverId) ||
-    canCompactContext(agent.serverId) ||
+  // "Delete history" deletes any message of the chat, so it needs `manage`, as a message delete does.
+  const accessLevel = useAgentAccessLevel(agent.serverId, agent.id);
+  const showDeleteHistory = canDeleteChatHistory(agent.serverId) && accessLevel === "manage";
+  const showBehavior =
     canManageAgentHostSettings(agent.serverId) ||
     canManageAgentTaskLimit(agent.serverId) ||
     canManageAgentNewChat(agent.serverId) ||
-    canManageAgentPlanCard(agent.serverId) ||
-    canManageBrowserProfiles(agent.serverId);
+    canManageAgentPlanCard(agent.serverId);
+  const showWorkspace = Boolean(agent.workspacePath) || canManageBrowserProfiles(agent.serverId);
+  // As on desktop, Compact is in the context sheet of the composer, not here.
+  // The host needs `chat` access for a new chat, as the context sheet checks.
+  const showNewChat = canStartNewChat(agent.serverId) && accessLevel !== "view";
+  const showChatActions = showNewChat || showDeleteHistory;
+  const showAdvanced = showBehavior || showWorkspace || showChatActions;
   const [edits, setEdits] = useState<AgentEdits>({});
   const foreground = useThemeColor("foreground");
   const [photo, setPhoto] = useState<AgentPhotoDraft | null | undefined>();
@@ -439,6 +451,7 @@ function AgentForm({
           reasoningEffort={edits.reasoningEffort ?? agent.reasoningEffort}
           accounts={providerAccounts}
           accountId={account ?? savedAccount}
+          workspaceOnly={adminSettings ? workspaceAccessEnforced(adminSettings) : false}
           onChange={(value) => {
             change(value);
             // An account belongs to one provider.
@@ -468,24 +481,36 @@ function AgentForm({
       ) : null}
       {page === "advanced" ? (
         <>
-          <AgentBusyMessageField agent={agent} server={host} available={available} />
-          <AgentTaskLimitField agent={agent} server={host} available={available} />
-          {/* After the task limit, as in the desktop Advanced group. */}
-          <AgentBrowserProfileRow agent={agent} />
-          {agent.workspacePath ? (
-            <SettingsSection title={t("mobile.agent.workspace.title")} footer={t("mobile.agent.workspace.footer")}>
-              <SettingsRow>
-                <Typography.Paragraph selectable type="body-sm">
-                  {agent.workspacePath}
-                </Typography.Paragraph>
-              </SettingsRow>
+          {/* Each field hides itself while it loads and when the host or the role does not serve it. */}
+          {showBehavior ? (
+            <SettingsSection title={t("mobile.agent.advanced.behavior")} rowsDrawSeparators>
+              <AgentBusyMessageField agent={agent} server={host} available={available} />
+              <AgentTaskLimitField agent={agent} server={host} available={available} />
+              <AgentNewChatAllowedField agent={agent} server={host} available={available} />
+              <AgentPlanCardField agent={agent} server={host} available={available} />
             </SettingsSection>
           ) : null}
-          {canStartNewChat(agent.serverId) ? <AgentNewChatSection agent={agent} available={available} /> : null}
-          {canCompactContext(agent.serverId) ? <AgentCompactSection agent={agent} available={available} /> : null}
-          <AgentNewChatAllowedField agent={agent} server={host} available={available} />
-          {/* After the new-chat switch, as in the desktop Advanced group. */}
-          <AgentPlanCardField agent={agent} server={host} available={available} />
+          {showWorkspace ? (
+            <SettingsSection title={t("mobile.agent.advanced.workspace")} rowsDrawSeparators>
+              <AgentBrowserProfileRow agent={agent} />
+              {agent.workspacePath ? (
+                <SettingsGroupRow>
+                  <SettingsRow description={t("mobile.agent.workspace.footer")}>
+                    <Typography.Paragraph>{t("mobile.agent.workspace.title")}</Typography.Paragraph>
+                    <Typography.Paragraph selectable type="body-xs" className="text-grouped-secondary">
+                      {agent.workspacePath}
+                    </Typography.Paragraph>
+                  </SettingsRow>
+                </SettingsGroupRow>
+              ) : null}
+            </SettingsSection>
+          ) : null}
+          {showChatActions ? (
+            <SettingsSection title={t("mobile.agent.advanced.chat")} rowsDrawSeparators>
+              {showNewChat ? <AgentNewChatSection agent={agent} available={available} grouped /> : null}
+              {showDeleteHistory ? <AgentDeleteHistoryRow agent={agent} available={available} /> : null}
+            </SettingsSection>
+          ) : null}
         </>
       ) : null}
       {page === "folders" ? <AgentFolders agent={agent} host={host} available={available} /> : null}

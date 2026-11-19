@@ -9,15 +9,19 @@ import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } f
  * speaks, so it is held in memory after `load`.
  *
  * A file that is missing, unreadable as JSON or names an unknown model or language reads as
- * Parakeet with automatic language, which is what dictation did before the setting existed.
+ * `defaults`, which the app makes from the user's language. They are not saved, so a later change of
+ * that language changes them.
  */
 export class VoicePreferenceStore {
   readonly #path: string;
-  #settings: VoiceSettings = { ...DEFAULT_VOICE_SETTINGS };
+  readonly #defaults: () => VoiceSettings;
+  /** The user's choice, or null before they make one. */
+  #settings: VoiceSettings | null = null;
   #writes = Semaphore.makeUnsafe(1);
 
-  constructor(path: string) {
+  constructor(path: string, defaults: () => VoiceSettings = () => DEFAULT_VOICE_SETTINGS) {
     this.#path = path;
+    this.#defaults = defaults;
   }
 
   load(): Effect.Effect<void, PreferenceFileFailure> {
@@ -40,7 +44,7 @@ export class VoicePreferenceStore {
   }
 
   get(): VoiceSettings {
-    return { ...this.#settings };
+    return { ...(this.#settings ?? this.#defaults()) };
   }
 
   readonly set = Effect.fn("VoicePreference.set")(function* (

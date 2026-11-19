@@ -15,18 +15,23 @@
 // The fallback path is for hosts too old to replay events on connect. It reads the whole agent list
 // and one page each, which is expensive, so it runs once per connection rather than per event.
 
-import type {
-  AgentColors,
-  AgentEvent,
-  AgentRuntimeSnapshot,
-  AvatarColor,
-  BrowserTab,
-  ChatColors,
-  ClientAgentSummary,
-  TeamMemberSummary,
+import {
+  type AgentColors,
+  type AgentEvent,
+  type AgentRuntimeSnapshot,
+  type AgentStatus,
+  type AvatarColor,
+  type BrowserTab,
+  type ChatColors,
+  type ClientAgentSummary,
+  decodeProviderModelSources,
+  type ProviderModelSourceEntry,
+  type TeamMemberSummary,
+  withModelSources,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_USAGE_LIMIT_ROUTES, type AgentUsageLimits } from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
+import { PROVIDER_MODEL_SOURCE_ROUTES } from "@openbot/contracts/team-protocol/provider-model-source-v1";
 import { Deferred, Effect, Result } from "effect";
 import { decodeAgentSummaries, decodeQueueSnapshot, decodeRemoteAgentUsageLimits } from "./remote-agent-decoding";
 import { decodeConversationPageFromHost } from "./remote-conversation-decoding";
@@ -60,6 +65,8 @@ export interface RemoteEventRefreshOptions {
   onMemberChatColors?: (serverId: string) => void;
   /** Whether the server sends the usage limits of its agents on their own route (`agent-usage-limit-v1`). */
   hasUsageLimits?: (serverId: string) => boolean;
+  /** Whether the server says where its providers' models come from (`provider-model-source-v1`). */
+  hasModelSources?: (serverId: string) => boolean;
 }
 
 export class RemoteEventRefresh {
@@ -68,6 +75,7 @@ export class RemoteEventRefresh {
   readonly #emit: (serverId: string, event: AgentEvent, bufferedLive?: boolean) => void;
   readonly #onMemberChatColors: (serverId: string) => void;
   readonly #hasUsageLimits: (serverId: string) => boolean;
+  readonly #hasModelSources: (serverId: string) => boolean;
   readonly #conversations = new Map<string, ConversationRefresh>();
   readonly #queues = new Map<string, QueueRefresh>();
   readonly #generations = new Map<string, number>();
@@ -91,6 +99,14 @@ export class RemoteEventRefresh {
   readonly #runtimeSnapshots = new Map<string, AgentRuntimeSnapshot>();
   readonly #usageLimits = new Map<string, AgentUsageLimits>();
   readonly #usageLimitReads = new Map<string, QueueRefresh>();
+  /**
+   * The last status of each server, and the model sources that `provider-model-source-v1` gave. The
+   * released status event carries no source (#9956), so each one goes out with the last sources, and
+   * a changed source sends the status again.
+   */
+  readonly #statuses = new Map<string, AgentStatus>();
+  readonly #modelSources = new Map<string, ProviderModelSourceEntry[]>();
+  readonly #modelSourceReads = new Map<string, QueueRefresh>();
 
   constructor(options: RemoteEventRefreshOptions) {
     this.#request = options.request;
@@ -98,6 +114,7 @@ export class RemoteEventRefresh {
     this.#emit = options.emit;
     this.#onMemberChatColors = options.onMemberChatColors ?? (() => undefined);
     this.#hasUsageLimits = options.hasUsageLimits ?? (() => false);
+    this.#hasModelSources = options.hasModelSources ?? (() => false);
   }
 
   /**
@@ -131,6 +148,12 @@ export class RemoteEventRefresh {
       this.#emit(serverId, event);
       const state = this.#browserStates.get(serverId);
       if (state) this.#emit(serverId, addRemotePreviewUrls(this.#withBrowserHolds(serverId, state), serverId));
+    } else if (event.type === "status" && this.#hasModelSources(serverId)) {
+      // The status goes out at once with the last sources. A source change on the host sends a
+      // status, so the sources are read again after it.
+      this.#statuses.set(serverId, event.status);
+      this.#emitStatus(serverId, bufferedLive);
+      yield* this.#refreshModelSources(serverId);
     } else if (event.type === "runtime-snapshot" && this.#hasUsageLimits(serverId)) {
       // The snapshot goes out at once with the last usage limits. A changed hold also sends a runtime
       // snapshot, so the limits are read again after it.
@@ -291,6 +314,51 @@ export class RemoteEventRefresh {
     else this.#emit(serverId, event);
   }
 
+  #emitStatus(serverId: string, bufferedLive = false): void {
+    const status = this.#statuses.get(serverId);
+    if (!status) return;
+    const event = { type: "status" as const, status: withModelSources(status, this.#modelSources.get(serverId) ?? []) };
+    if (bufferedLive) this.#emit(serverId, event, true);
+    else this.#emit(serverId, event);
+  }
+
+  /** As `#refreshUsageLimits`: one read for a burst of status events. A failed read keeps the last sources. */
+  readonly #refreshModelSources = Effect.fn("RemoteEvents.refreshModelSources")(function* (
+    this: RemoteEventRefresh,
+    serverId: string,
+  ) {
+    const pending = this.#modelSourceReads.get(serverId);
+    if (pending) {
+      pending.dirty = true;
+      return;
+    }
+    const read = { dirty: false };
+    this.#modelSourceReads.set(serverId, read);
+    yield* Effect.gen({ self: this }, function* () {
+      do {
+        read.dirty = false;
+        const result = yield* this.#request(serverId, PROVIDER_MODEL_SOURCE_ROUTES.list, decodeProviderModelSources, {
+          method: "POST",
+          body: {},
+        }).pipe(Effect.result);
+        if (Result.isFailure(result)) {
+          if (read.dirty) continue;
+          return;
+        }
+        if (!this.#hasServer(serverId)) return;
+        const previous = this.#modelSources.get(serverId);
+        this.#modelSources.set(serverId, result.success);
+        if (JSON.stringify(previous ?? []) !== JSON.stringify(result.success)) this.#emitStatus(serverId);
+      } while (read.dirty);
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          if (this.#modelSourceReads.get(serverId) === read) this.#modelSourceReads.delete(serverId);
+        }),
+      ),
+    );
+  });
+
   readonly #refreshUsageLimits = Effect.fn("RemoteEvents.refreshUsageLimits")(function* (
     this: RemoteEventRefresh,
     serverId: string,
@@ -346,6 +414,9 @@ export class RemoteEventRefresh {
     this.#runtimeSnapshots.delete(serverId);
     this.#usageLimits.delete(serverId);
     this.#usageLimitReads.delete(serverId);
+    this.#statuses.delete(serverId);
+    this.#modelSources.delete(serverId);
+    this.#modelSourceReads.delete(serverId);
     this.#generations.delete(serverId);
     for (const key of this.#conversations.keys()) {
       if (key.startsWith(`${serverId}\0`)) this.#conversations.delete(key);

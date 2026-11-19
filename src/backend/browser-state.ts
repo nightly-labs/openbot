@@ -1,14 +1,12 @@
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { type BrowserBounds, type BrowserEnvironment, isBrowserProfileId } from "@openbot/contracts/ipc";
-import { isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { legacyAgentId } from "@openbot/contracts/validation";
 import { Effect } from "effect";
-import { browserCall, browserSync } from "./browser-effects";
 import type { BrowserToolArguments } from "./browser-tools";
-import { isMissingFileError } from "./file-errors";
 import { isRecord } from "./protocol";
+import { readVersionedJsonFile, type VersionedJsonFormat } from "./versioned-json-store";
 
 export interface StoredBrowserTab {
   id: string;
@@ -300,40 +298,40 @@ export interface StoredBrowserStateV2 {
   activeTabId: string | null;
   tabs: Array<StoredBrowserTab & { environment: BrowserEnvironment }>;
 }
-export const readBrowserState = Effect.fn("Browser.readState")((path: string) =>
-  Effect.gen(function* () {
-    const content = yield* browserCall((signal) => readFile(path, { encoding: "utf8", signal }));
-    return yield* browserSync((): StoredBrowserStateV2 => {
-      const parsed = JSON.parse(content);
-      if (!isRecord(parsed) || (parsed.version !== 1 && parsed.version !== 2)) {
-        return { version: 2, activeTabId: null, tabs: [] };
-      }
-      const tabs = Array.isArray(parsed.tabs)
-        ? parsed.tabs
-            .map(storedBrowserTab)
-            .filter((tab) => tab !== null)
-            .map((tab) => ({
-              ...tab,
-              url: persistentBrowserUrl(tab.url),
-              // A v1 file never wrote an environment, so anything sitting under that key in one is not
-              // ours to trust -- the tab starts from the default instead.
-              environment: (parsed.version === 2 ? tab.environment : undefined) ?? defaultBrowserEnvironment(),
-            }))
-        : [];
-      return {
-        version: 2,
-        activeTabId: isString(parsed.activeTabId) ? parsed.activeTabId : null,
-        tabs: tabs.filter((tab, index) => tabs.findIndex((candidate) => candidate.id === tab.id) === index),
-      };
-    });
-  }).pipe(
-    Effect.catch((error) =>
-      isMissingFileError(error.cause) || error.cause instanceof SyntaxError
-        ? Effect.succeed<StoredBrowserStateV2>({ version: 2, activeTabId: null, tabs: [] })
-        : Effect.fail(error),
-    ),
-  ),
-);
+const BROWSER_STATE_FORMAT: VersionedJsonFormat<StoredBrowserStateV2> = {
+  current: 2,
+  releases: { 1: (file) => browserStateFromFile(file, 1), 2: (file) => browserStateFromFile(file, 2) },
+};
+
+/**
+ * The saved tabs, and the file that the next save writes. The file of a newer release stays
+ * unchanged: no tab comes back, and the saves go to `<path>.v2`. See `readVersionedJsonFile`.
+ */
+export const readBrowserState = Effect.fn("Browser.readState")(function* (path: string) {
+  const loaded = yield* readVersionedJsonFile(path, BROWSER_STATE_FORMAT);
+  const state: StoredBrowserStateV2 = loaded.value ?? { version: 2, activeTabId: null, tabs: [] };
+  return { state, writePath: loaded.writePath };
+});
+
+function browserStateFromFile(file: DynamicRecord, version: 1 | 2): StoredBrowserStateV2 {
+  const tabs = Array.isArray(file.tabs)
+    ? file.tabs
+        .map(storedBrowserTab)
+        .filter((tab) => tab !== null)
+        .map((tab) => ({
+          ...tab,
+          url: persistentBrowserUrl(tab.url),
+          // A v1 file never wrote an environment, so anything sitting under that key in one is not
+          // ours to trust -- the tab starts from the default instead.
+          environment: (version === 2 ? tab.environment : undefined) ?? defaultBrowserEnvironment(),
+        }))
+    : [];
+  return {
+    version: 2,
+    activeTabId: isString(file.activeTabId) ? file.activeTabId : null,
+    tabs: tabs.filter((tab, index) => tabs.findIndex((candidate) => candidate.id === tab.id) === index),
+  };
+}
 
 export function resolveEnvironment(
   value: BrowserToolArguments<"set_environment">,

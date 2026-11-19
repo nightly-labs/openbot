@@ -150,9 +150,11 @@ export interface RuntimeSnapshotSources {
   conversation: Pick<ConversationRuntime, "loadedSnapshot">;
   database: Pick<OpenBotDatabase, "readConversationRuntime">;
   mailbox: Pick<MailboxStore, "listRuntimeWork">;
-  turn: Pick<TurnLifecycle, "failedTurns" | "subagentTurns">;
+  turn: Pick<TurnLifecycle, "failedTurns" | "subagentTurns" | "backgroundWork">;
   attention: Pick<AttentionRegistry, "runtimeAttention">;
   usageLimits: Pick<UsageLimitGate, "limitedAgents" | "limitedModels" | "failedModels">;
+  /** Whether a held agent waits for its limit: no ready backup model or pool account takes its work. */
+  waitsForLimit: (agentId: string) => boolean;
 }
 
 /** The runtime view of every agent: active turns, queued work, latest messages and attention. */
@@ -166,6 +168,7 @@ export function buildRuntimeSnapshot({
   turn,
   attention,
   usageLimits,
+  waitsForLimit,
 }: RuntimeSnapshotSources): AgentRuntimeSnapshot {
   const runtimeAgents: AgentRuntimeSnapshot["agents"] = agents.map((agent) => ({
     id: agent.id,
@@ -177,11 +180,13 @@ export function buildRuntimeSnapshot({
     avatarHue: agent.avatarHue,
     avatarUrl: agent.avatarUrl,
   }));
+  const agentIds = new Set(agents.map((agent) => agent.id));
   const activeTurns: AgentRuntimeSnapshot["activeTurns"] = [];
   const latestMessages: AgentRuntimeSnapshot["latestMessages"] = [];
   for (const agent of agents) {
     const live = conversation.loadedSnapshot(agent.id);
-    const liveLatest = [...(live?.messages ?? [])].reverse().find(
+    // Each change of attention builds this for every agent, so the messages are not copied.
+    const liveLatest = live?.messages.findLast(
       (message) =>
         (message.author === "assistant" || message.author === "agent") &&
         // A message that another agent sent to this one is not a reply to the user.
@@ -222,10 +227,12 @@ export function buildRuntimeSnapshot({
     latestMessages,
     ...attention.runtimeAttention(),
     failedTurns: [...turn.failedTurns()].map(([agentId, turnId]) => ({ agentId, turnId })),
-    usageLimits: usageLimits.limitedAgents(),
+    // An agent that moves to a ready backup with its next work does not show that it waits (#12360).
+    usageLimits: usageLimits.limitedAgents().filter((limit) => waitsForLimit(limit.agentId)),
     usageLimitedModels: usageLimits.limitedModels(),
     failedModels: usageLimits.failedModels(),
-    subagentTurns: turn.subagentTurns(new Set(agents.map((agent) => agent.id))),
+    subagentTurns: turn.subagentTurns(agentIds),
+    backgroundWork: turn.backgroundWork(agentIds),
     ...(contextStates ? { contextStates } : {}),
     ...(threadContextStates ? { threadContextStates } : {}),
   });

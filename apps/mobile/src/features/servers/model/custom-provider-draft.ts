@@ -1,12 +1,14 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   CUSTOM_PROVIDER_ID_PATTERN,
+  type CustomProviderSummary,
   composedCustomModelId,
   DEFAULT_MODEL_SERVERS,
   isAgentModel,
   isCustomProviderHeaderName,
   isNewCustomProviderId,
   type SaveCustomProviderInput,
+  type UpdateCustomProviderInput,
 } from "@openbot/contracts/ipc";
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import type { PairItem } from "@/features/servers/components/repeatable-fields";
@@ -16,8 +18,8 @@ import type { MobileText } from "@/shared/lib/text";
 export const CUSTOM_PROVIDER_URL_EXAMPLE = DEFAULT_MODEL_SERVERS.ollama.baseUrl;
 
 /**
- * What the Add custom provider page edits. A model is a pair of its ID and display name, and a header
- * of its name and value. The Team API has no edit route, so the page only adds an endpoint.
+ * What the custom provider form edits. A model is a pair of its ID and display name, and a header of
+ * its name and value. A saved header starts with an empty value, which keeps the saved value.
  */
 export interface CustomProviderDraft {
   name: string;
@@ -49,6 +51,22 @@ export function presetCustomProviderDraft(preset: CustomProviderPreset): CustomP
     apiKey: "",
     models: [{ key: "", value: "" }],
     headers: [],
+  };
+}
+
+/**
+ * The form of a saved endpoint (`custom-provider-edit-v1`). The key and the header values do not come
+ * back from the host, so their fields start empty, and an empty one keeps the saved value.
+ */
+export function savedCustomProviderDraft(saved: CustomProviderSummary): CustomProviderDraft {
+  return {
+    name: saved.name,
+    id: saved.id,
+    idEdited: true,
+    baseUrl: saved.baseUrl,
+    apiKey: "",
+    models: saved.models.map((model) => ({ key: model.id, value: model.name === model.id ? "" : model.name })),
+    headers: (saved.headerNames ?? []).map((name) => ({ key: name, value: "" })),
   };
 }
 
@@ -92,10 +110,12 @@ export function customProviderErrors(
   draft: CustomProviderDraft,
   taken: readonly string[],
   t: MobileText["t"],
+  saved?: CustomProviderSummary,
 ): CustomProviderErrors {
   const errors: CustomProviderErrors = {};
   const id = draft.id.trim();
-  if (id) {
+  // The ID of a saved endpoint does not change, so it has no check.
+  if (id && !saved) {
     if (!CUSTOM_PROVIDER_ID_PATTERN.test(id)) errors.id = t("mobile.server.customProviders.idPattern");
     // The field stops at the length limit, so only a built-in provider name fails here.
     else if (!isNewCustomProviderId(id)) errors.id = t("mobile.server.customProviders.idBuiltIn", { id });
@@ -127,7 +147,8 @@ export function customProviderErrors(
     else if (!isCustomProviderHeaderName(name)) errors.headers = t("mobile.server.customProviders.headerNameInvalid");
     else if (headerNames.has(name.toLowerCase()))
       errors.headers = t("mobile.server.customProviders.headerDuplicate", { name });
-    else if (!header.value.trim()) errors.headers = t("mobile.server.customProviders.headerValueRequired");
+    else if (!header.value.trim() && !savedHeader(saved, name))
+      errors.headers = t("mobile.server.customProviders.headerValueRequired");
     headerNames.add(name.toLowerCase());
     if (errors.headers) break;
   }
@@ -174,5 +195,38 @@ export function customProviderInput(draft: CustomProviderDraft): SaveCustomProvi
     headers: draft.headers
       .filter((header) => !blank(header))
       .map((header) => ({ name: header.key.trim(), value: header.value.trim() })),
+  };
+}
+
+/**
+ * Whether the endpoint has a saved header of this exact name. The host takes a kept value only for
+ * the same name (`mergeHeaders` in `src/main/custom-provider-store.ts`).
+ */
+function savedHeader(saved: CustomProviderSummary | undefined, name: string): boolean {
+  return saved?.headerNames?.includes(name) ?? false;
+}
+
+/**
+ * The edit payload of a saved endpoint. An empty key keeps the saved key. An empty value of a saved
+ * header is `null`, which keeps the saved value; a saved header that is not in the list is removed.
+ */
+export function customProviderUpdateInput(
+  draft: CustomProviderDraft,
+  saved: CustomProviderSummary,
+): UpdateCustomProviderInput {
+  const { name, baseUrl, apiKey, models } = customProviderInput(draft);
+  return {
+    id: saved.id,
+    name,
+    baseUrl,
+    models,
+    ...(apiKey ? { apiKey } : {}),
+    headers: draft.headers
+      .filter((header) => !blank(header))
+      .map((header) => {
+        const headerName = header.key.trim();
+        const value = header.value.trim();
+        return { name: headerName, value: !value && savedHeader(saved, headerName) ? null : value };
+      }),
   };
 }

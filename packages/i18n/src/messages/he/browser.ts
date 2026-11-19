@@ -39,7 +39,7 @@ export const messages = {
   "browser.tab.closeNamed": "סגירת {name}",
   "browser.tab.closeUnnamed": "סגירת לשונית דפדפן",
   "browser.newTab": "לשונית דפדפן חדשה",
-  "browser.hide": "הסתרת הדפדפן",
+  "browser.backToChat": "חזרה לצ'אט",
   "browser.goBack": "חזרה",
   "browser.goForward": "קדימה",
   "browser.reload": "טעינת הדף מחדש",
@@ -68,6 +68,7 @@ export const messages = {
   "browser.liveView.pasteTooLong": "הטקסט ארוך מדי להדבקה. אפשר להדביק פחות מ-100,000 תווים.",
   "browser.liveView.copyTooLarge": "הבחירה ארוכה מדי להעתקה. יש לבחור פחות טקסט.",
   "browser.liveView.copyFailed": "לא ניתן להעתיק את הטקסט. יש ללחוץ על הדף ולנסות שוב.",
+  "browser.liveView.pageCopied": "הדף העתיק טקסט. יש לבחור „העתקה” כדי לשים אותו בלוח.",
   "browser.previews.label": "תצוגות מקדימות של הדפדפן",
   "browser.previews.resize": "שינוי גודל הלוח הימני",
   "browser.previews.empty": "אין לשוניות דפדפן",
@@ -98,6 +99,16 @@ export const messages = {
   "browser.secret.submitting": "שולח…",
   "browser.secret.takeOver": "השתלטות",
   "browser.secret.failed": "לא ניתן להשלים את הבקשה. יש לבדוק את החיבור ולנסות שוב.",
+  "browser.secret.vaultSkip.agentScript":
+    "OpenBot לא השתמש בפרטי ההתחברות השמורים כי הסוכן הריץ סקריפט בדף הזה. כדי להשתמש בהם, צריך לבקש מהסוכן לטעון מחדש את הדף ולנסות שוב.",
+  "browser.secret.vaultSkip.fieldKind": "OpenBot לא השתמש בפרטי ההתחברות השמורים כי הסוכן בחר שדה שגוי בדף.",
+  "browser.secret.vaultSkip.loginChoice":
+    "OpenBot לא השתמש בפרטי התחברות שמורים כי הסוכן לא בחר אף אחד מפרטי ההתחברות השמורים לאתר הזה. צריך לומר לסוכן באיזה חשבון להשתמש.",
+  "browser.secret.vaultSkip.noPassword": "OpenBot לא השתמש בפרטי ההתחברות השמורים כי אין בהם סיסמה לאתר הזה.",
+  "browser.secret.vaultSkip.noAuthenticatorKey":
+    "OpenBot לא השתמש בפרטי ההתחברות השמורים כי אין בהם מפתח של אפליקציית אימות.",
+  "browser.secret.vaultSkip.vaultUnreadable":
+    "OpenBot לא השתמש בפרטי התחברות שמורים כי לא הצליח לקרוא את מנהל הסיסמאות.",
   "browser.error.openAddress": "לא ניתן לפתוח את הכתובת בלשונית הזו.",
   "browser.error.channelNoBrowserMember": "אף חבר לא יכול לפתוח לשונית חדשה בערוץ הזה.",
   "browser.error.closeTab": "לא ניתן לסגור את לשונית הדפדפן.",

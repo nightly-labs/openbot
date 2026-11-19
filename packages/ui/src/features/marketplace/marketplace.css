@@ -757,6 +757,29 @@ body[data-skills-marketplace] :is(.integration-dialog-backdrop, .integration-wiz
   gap: var(--openbot-space-2);
 }
 
+/* OpenBot did not review a skill from GitHub. */
+.marketplace-github-trust {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  margin: 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}
+
+.marketplace-github-trust > svg {
+  width: var(--openbot-space-4);
+  height: var(--openbot-space-4);
+  flex: none;
+  color: var(--openbot-warning-text);
+}
+
+.marketplace-github {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-2);
+}
+
 .marketplace-skill-empty {
   display: flex;
   align-items: center;

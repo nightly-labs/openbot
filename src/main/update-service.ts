@@ -2,7 +2,7 @@ import { EventEmitter } from "node:events";
 import { constants } from "node:fs";
 import { access, appendFile, mkdir, readdir, readFile, rename, rm, stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import type {
   IdleRestart,
   ScheduledUpdateRestart,
@@ -11,12 +11,14 @@ import type {
   UpdateStatus,
 } from "@openbot/contracts/ipc";
 import { isUpdateBusyPhase } from "@openbot/contracts/ipc";
+import { isNewerRelease } from "@openbot/contracts/release-version";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
-import { Cause, Deferred, Effect, Result, Schema, Scope, Semaphore } from "effect";
+import { Cause, Deferred, Effect, Fiber, Result, Schema, Scope, Semaphore } from "effect";
 import type { ProgressInfo, UpdateInfo } from "electron-updater";
 import type { HostUpdateState } from "../../packages/contracts/src/host-manager";
 import { causeHelpers } from "../backend/effect-boundary";
+import { writeUpdateHandover, writeUpdateInstallRecord } from "./update-install-guard";
 import type { OpenBotSiblingInstance, SiblingScanFailed } from "./update-sibling-instances";
 
 const logger = createOpenBotLogger("update");
@@ -109,12 +111,6 @@ export function electronUpdaterCacheDirectory(): string {
   return join(root, "openbot-updater");
 }
 
-export function isValidSemver(version: string): boolean {
-  return /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/u.test(
-    version,
-  );
-}
-
 type UpdateOperation = "check" | "download" | "install";
 
 interface UpdateServiceEvents {
@@ -133,8 +129,16 @@ interface UpdateServiceOptions {
   platform?: NodeJS.Platform;
   /** macOS: the application bundle that Squirrel.Mac replaces. */
   appBundlePath?: string | undefined;
+  /** Linux: the AppImage file that electron-updater replaces (`APPIMAGE`). */
+  appImagePath?: string | undefined;
   logDirectory?: string;
   shipItDirectory?: string | undefined;
+  /** macOS: the record that keeps a launch during the install from cancelling it (`update-install-guard.ts`). */
+  handoverPath?: string | undefined;
+  /** macOS: the record that tells the next start which update a restart did not install. */
+  installRecordPath?: string | undefined;
+  /** The version that the last update restart did not install, read from that record at start. */
+  notInstalledVersion?: string | null | undefined;
   /** electron-updater's cache directory, named by `updaterCacheDirName` in `app-update.yml`. */
   updaterCacheDirectory?: string | undefined;
   initialCheckDelayMs?: number;
@@ -221,10 +225,14 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     Pick<
       UpdateServiceOptions,
       | "appBundlePath"
+      | "appImagePath"
       | "beforeInstall"
       | "checkSiblingInstances"
       | "currentUid"
+      | "handoverPath"
+      | "installRecordPath"
       | "logDirectory"
+      | "notInstalledVersion"
       | "shipItDirectory"
       | "updaterCacheDirectory"
     > & {
@@ -242,6 +250,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   #operation: UpdateOperation = "check";
   #history: UpdateDiagnosticEvent[] = [];
   readonly #logLock = Semaphore.makeUnsafe(1);
+  readonly #logWrites = new Set<Fiber.Fiber<void, UpdateOperationFailure>>();
   readonly #workScope = Scope.makeUnsafe();
   #autoDownload: boolean;
   #downloadedVersion: string | null = null;
@@ -266,6 +275,8 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   #rolloutMiss: string | null = null;
   /** A newer release in its staged rollout that the last check did not offer to this install. */
   #stagedVersion: string | null = null;
+  /** The supported minimum, while this install is below it. */
+  #requiredVersion: string | null = null;
 
   constructor(updater: UpdateAdapter, options: UpdateServiceOptions) {
     super();
@@ -282,6 +293,8 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
         installing: options.installTimeoutMs ?? DEFAULT_PHASE_TIMEOUTS.installing,
       },
     };
+    if (options.notInstalledVersion)
+      logger.warn(`The last update restart did not install OpenBot ${options.notInstalledVersion}.`);
     this.#status = {
       phase: options.enabled ? "idle" : "unsupported",
       currentVersion: options.currentVersion,
@@ -293,9 +306,21 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     };
     this.on("diagnostic", (event) => {
       const directory = this.#options.logDirectory;
-      if (directory) this.#fork(this.#logLock.withPermit(appendUpdateLog(directory, event)));
+      if (!directory) return;
+      // `appendUpdateLog` catches every failure, so this write needs no failure log of `#fork`.
+      const write = Effect.runFork(this.#logLock.withPermit(appendUpdateLog(directory, event)));
+      this.#logWrites.add(write);
+      write.addObserver(() => this.#logWrites.delete(write));
     });
     this.#recordStatus();
+  }
+
+  /**
+   * Waits for the `update.log` events that were recorded before this call. The file write is
+   * asynchronous, so an `app.exit` right after a failed install lost its `install_failed` (#5039).
+   */
+  flushLog(): Effect.Effect<void> {
+    return Effect.suspend(() => Fiber.awaitAll([...this.#logWrites])).pipe(Effect.asVoid);
   }
 
   start(scheduleChecks = true): void {
@@ -386,7 +411,15 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       status.scheduledRestart = { ...this.#scheduledRestart, waitingFor: [...this.#scheduledRestart.waitingFor] };
     if (this.#idleRestart) status.idleRestart = { ...this.#idleRestart, waitingFor: [...this.#idleRestart.waitingFor] };
     if (this.#stagedVersion && status.phase === "up-to-date") status.stagedVersion = this.#stagedVersion;
+    if (this.#requiredVersion) status.requiredVersion = this.#requiredVersion;
     return status;
+  }
+
+  /** Carries the minimum from `RequiredUpdate` to the renderer. It is not a phase change. */
+  setRequiredVersion(version: string | null): void {
+    if (this.#requiredVersion === version) return;
+    this.#requiredVersion = version;
+    this.emit("status", this.getStatus());
   }
 
   /**
@@ -426,18 +459,32 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   setManagedByHost(managed: boolean): void {
     if (this.#managedByHost === managed) return;
     this.#managedByHost = managed;
-    if (!managed) {
-      this.#downloadedVersion = null;
-      this.#setStatus({
-        phase: this.#options.enabled ? "idle" : "unsupported",
-        availableVersion: null,
-        progress: null,
-        message: null,
-        errorCode: null,
-      });
-      if (this.#options.enabled) this.#scheduleCheck(this.#options.initialCheckDelayMs);
+    if (managed) {
+      // The host owns the updates now. A check or a download of this tenant that is still out must not
+      // write its result over the host state, and the download must not use the network for nothing.
+      this.#checkGeneration += 1;
+      this.#downloadGeneration += 1;
+      this.#activeDownload = null;
+      this.#cancellationToken?.cancel();
+      this.#cancellationToken = null;
+      // An install keeps its phase: its shutdown preparation runs, and the app quits.
+      if (this.#installStarted) {
+        this.#setStatus({});
+        return;
+      }
     }
-    this.#setStatus({});
+    // Also on a takeover: no phase deadline runs while the host manages the updates, so a busy phase
+    // of this tenant would stay on screen until the host state replaces it, and forever for a tenant
+    // that the host does not list.
+    this.#downloadedVersion = null;
+    this.#setStatus({
+      phase: this.#options.enabled ? "idle" : "unsupported",
+      availableVersion: null,
+      progress: null,
+      message: null,
+      errorCode: null,
+    });
+    if (!managed && this.#options.enabled) this.#scheduleCheck(this.#options.initialCheckDelayMs);
   }
 
   setHostState(state: HostUpdateState): void {
@@ -654,6 +701,16 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
         logger.warn("OpenBot update install refused: the application runs from a read-only volume.");
         return yield* new UpdateOperationFailure({ cause: new Error(sourceText("error.update.readOnlyLocation")) });
       }
+      const appImage = this.#options.platform === "linux" ? this.#options.appImagePath : undefined;
+      const appImageProblem = appImage ? yield* findAppImageInstallProblem(appImage) : null;
+      if (appImageProblem === "missing") {
+        logger.warn("OpenBot update install refused: the AppImage file is missing.");
+        return yield* new UpdateOperationFailure({ cause: new Error(sourceText("error.update.appImageMissing")) });
+      }
+      if (appImageProblem === "readOnly") {
+        logger.warn("OpenBot update install refused: the AppImage folder is not writable.");
+        return yield* new UpdateOperationFailure({ cause: new Error(sourceText("error.update.appImageReadOnly")) });
+      }
       if (this.#managedByHost) return yield* new UpdateOperationFailure({ cause: new Error(MANAGED_HOST_MESSAGE) });
       if (!this.#canInstall() || this.#installStarted)
         return yield* new UpdateOperationFailure({ cause: new Error(sourceText("error.update.notReady")) });
@@ -671,10 +728,29 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
           if (this.#checkRequest) yield* Deferred.await(this.#checkRequest).pipe(Effect.catch(() => Effect.void));
           if (this.#installGeneration !== generation) return;
           this.#installHandedOver = true;
-          // Silent, so the assisted Windows installer shows no page and opens the app again: it ignores
-          // the force-run flag in a visible run. Other updaters only relaunch, now from `true` and not
-          // from `autoRunAppAfterInstall`, which is also `true`.
-          yield* updateSync(() => this.#updater.quitAndInstall(true, true));
+          if (this.#options.platform === "darwin" && this.#options.handoverPath) {
+            yield* writeUpdateHandover(this.#options.handoverPath, this.#options.currentVersion, Date.now()).pipe(
+              Effect.catch((error) =>
+                Effect.sync(() => logger.warn("The update handover record was not saved.", toLogValue(error))),
+              ),
+            );
+          }
+          const { installRecordPath } = this.#options;
+          if (this.#options.platform === "darwin" && installRecordPath && this.#downloadedVersion) {
+            yield* writeUpdateInstallRecord(
+              installRecordPath,
+              this.#options.currentVersion,
+              this.#downloadedVersion,
+            ).pipe(
+              Effect.catch((error) =>
+                Effect.sync(() => logger.warn("The update install record was not saved.", toLogValue(error))),
+              ),
+            );
+          }
+          // Visible, so the Windows installer shows its progress until the new version opens. In an
+          // update it shows only that page and opens the app again (`customFinishPage` in
+          // `build/installer.nsh`). Other updaters only relaunch, from `autoRunAppAfterInstall`.
+          yield* updateSync(() => this.#updater.quitAndInstall(false, true));
           this.#armPhaseTimer();
         }),
       );
@@ -817,7 +893,8 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       phase: "ready",
       availableVersion: version,
       progress: 100,
-      message: null,
+      // The last restart did not install this same update (#11768). A newer one is a normal "ready".
+      message: version !== null && version === this.#options.notInstalledVersion ? NOT_INSTALLED_MESSAGE : null,
       errorCode: null,
     });
   }
@@ -933,6 +1010,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
 
 const INSTALL_FAILED_MESSAGE = sourceText("error.update.installFailed");
 const MANAGED_HOST_MESSAGE = sourceText("error.update.managedByHost");
+const NOT_INSTALLED_MESSAGE = sourceText("error.update.notInstalled");
 const SIBLING_SESSION_MESSAGE = sourceText("error.update.siblingSession");
 const CHECK_STALLED_MESSAGE = sourceText("error.update.checkStalled");
 const CHECK_OFFLINE_MESSAGE = sourceText("error.update.checkOffline");
@@ -1019,6 +1097,33 @@ function isOnReadOnlyVolume(bundlePath: string): Effect.Effect<boolean> {
   );
 }
 
+/**
+ * electron-updater deletes the AppImage file that `APPIMAGE` names and moves the download into its
+ * folder. It finds a problem with either only inside `quitAndInstall`, after shutdown preparation, so
+ * the app quit with no message (#9779): a file that was moved, renamed or replaced while OpenBot ran,
+ * or a folder that this user cannot write to. Checked first, the app stays open.
+ */
+function findAppImageInstallProblem(appImagePath: string): Effect.Effect<"missing" | "readOnly" | null> {
+  return Effect.gen(function* () {
+    const missing = yield* updateIO(() => stat(appImagePath)).pipe(
+      Effect.as(false),
+      Effect.catch(({ cause }) => Effect.succeed(isMissingPathError(cause))),
+    );
+    if (missing) return "missing";
+    const writable = yield* updateIO(() => access(dirname(appImagePath), constants.W_OK)).pipe(
+      Effect.as(true),
+      Effect.catch(() => Effect.succeed(false)),
+    );
+    return writable ? null : "readOnly";
+  });
+}
+
+/** A path that does not exist, or that has a file where a folder must be. */
+function isMissingPathError(cause: unknown): boolean {
+  const code = typeof cause === "object" && cause !== null && "code" in cause ? cause.code : undefined;
+  return code === "ENOENT" || code === "ENOTDIR";
+}
+
 function errorMessage(code: UpdateFailureCode) {
   if (code === "download_failed") return sourceText("error.update.downloadFailed");
   if (code === "install_failed") return INSTALL_FAILED_MESSAGE;
@@ -1080,26 +1185,11 @@ function pruneInstalledUpdate(directory: string, currentVersion: string): Effect
   }).pipe(Effect.catch(() => Effect.void));
 }
 
-/**
- * Compares the release numbers only. The feed offers no prereleases (`allowPrerelease` is off), so
- * a candidate with the same numbers is not newer. A stale feed answer that names an older release
- * must not replace a newer download.
- */
 /** The rollout percentage as electron-updater reads it, or null when the release has no stage. */
 function stagingPercentage(value: unknown): number | null {
   if (value === null || value === undefined) return null;
   const percentage = Number.parseInt(String(value), 10);
   return Number.isNaN(percentage) ? null : percentage;
-}
-
-function isNewerRelease(candidate: string, current: string): boolean {
-  const parse = (version: string) => version.split(/[-+]/u, 1)[0]?.split(".").map(Number) ?? [];
-  const [left, right] = [parse(candidate), parse(current)];
-  for (let index = 0; index < 3; index += 1) {
-    const difference = (left[index] ?? 0) - (right[index] ?? 0);
-    if (difference !== 0) return difference > 0;
-  }
-  return false;
 }
 
 /** A percent that is not a number means that the download runs but its progress is not known. */

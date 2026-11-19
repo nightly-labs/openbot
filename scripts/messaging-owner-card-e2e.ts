@@ -4,6 +4,9 @@
 // checked the provider's thread id, the Discord thread passed as the agent's own chat, and the turn
 // waited on the owner's card until the provider's tool timeout (100 minutes for Grok), so every later
 // message of that author got "Too many requests are waiting". The person's own chat still gets the card.
+// A bug report about the phone app is a card that only the owner's phone can send: a plain accept, as
+// the desktop gives, is refused and the card keeps waiting, and the phone's accept sends the report
+// with the phone's version, system and support log, redacted.
 // Runs the real agent service, messaging threads and tool router on a temporary profile with a fake
 // Codex app-server. The fake calls the tool through `tool_call`, as a model does, and logs the result.
 // `bun scripts/messaging-owner-card-e2e.ts`. Writes .openbot-build/messaging-owner-card-e2e/report.json.
@@ -12,8 +15,9 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { bugReportPlatform } from "@openbot/contracts/feedback";
+import { bugReportPlatform, type Feedback, type FeedbackPhone } from "@openbot/contracts/feedback";
 import { AGENT_PROVIDERS } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 
@@ -206,6 +210,8 @@ const report: {
 } = { calls: [], checks: [], passed: false };
 
 await writeFile(fakeCodex, FAKE_CODEX, { mode: 0o755 });
+/** The reports that the service sends to the account service, in order. */
+const sent: Feedback[] = [];
 const database = new OpenBotDatabase(userData);
 const store = new AgentStore(userData, home, database);
 const mailbox = new MailboxStore(userData, store.sharedRoot, store.database);
@@ -221,7 +227,17 @@ const agents = new AgentService({
   feedback: {
     signedIn: () => true,
     similar: () => Effect.succeed([]),
-    send: () => Effect.die(new Error("No report is sent in this check.")),
+    send: (feedback) =>
+      Effect.sync(() => {
+        sent.push(feedback);
+        return {
+          status: "sent" as const,
+          url: "https://github.com/nightly-labs/openbot/issues/9001",
+          number: 9001,
+          comment: false,
+        };
+      }),
+    withdraw: () => Effect.die(new Error("No report is removed in this check.")),
   },
 });
 
@@ -313,7 +329,80 @@ try {
   pass("The person's own chat shows the feedback card", card.reason !== null, JSON.stringify(card));
   await runCauseEffect(agents.respondToApproval({ requestId: card.requestId, decision: "decline" }));
   const fromOwner = await logged("send_feedback from the own chat", ownIndex);
-  pass("A declined card sends nothing", fromOwner.text.includes('"declined"'), fromOwner.text);
+  pass("A declined card sends nothing", fromOwner.text.includes('"declined"') && sent.length === 0, fromOwner.text);
+
+  // 4. A bug in the phone app. The card is for the phone: a plain accept is refused and the card waits.
+  const phoneIndex = toolLogs().length;
+  const phoneCall = `${CALL_MARK} <<ARGS${JSON.stringify({ __tool: "send_feedback", kind: "bug", title: "The phone app stays on Reconnecting", text: "The phone app never connects while the VPN is on.", surface: "Phone app" })}ARGS>>`;
+  await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: phoneCall }, PERSON));
+  const phoneCard = await waitFor("the card of the phone report", () => approvals[1]);
+  pass(
+    "A bug in the phone app shows the card with the notice of a phone report",
+    phoneCard.reason === sourceText("status.agent.reportPhoneProblem"),
+    JSON.stringify(phoneCard),
+  );
+  const plain = await runCauseEffect(
+    agents.respondToApproval({ requestId: phoneCard.requestId, decision: "accept" }),
+  ).then(
+    () => "accepted",
+    (error: unknown) => (error instanceof Error ? error.message : String(error)),
+  );
+  const member = await runCauseEffect(
+    agents.respondToApproval({ requestId: phoneCard.requestId, decision: "accept" }, { owner: true }),
+  ).then(
+    () => "accepted",
+    (error: unknown) => (error instanceof Error ? error.message : String(error)),
+  );
+  pass(
+    "An accept without the phone's data is refused, the card still waits, and nothing is sent",
+    plain === sourceText("error.backend.feedbackNeedsPhone") &&
+      member === sourceText("error.backend.feedbackNeedsPhone") &&
+      agents.pendingApproval(phoneCard.requestId) !== undefined &&
+      sent.length === 0 &&
+      toolLogs().length === phoneIndex,
+    `${plain} | ${member}`,
+  );
+
+  // 5. The phone sends it with its data. The report has the data, and a secret in the log is redacted.
+  const secret = ["sk", "live", "abcdefghijklmnopqrstuvwx"].join("_");
+  // An older phone app does not mask these. The host masks them: the report is public.
+  const userHost = "team.kowalska.example.com";
+  const serverId = "0f8fad5b-d9cb-469f-a165-70867728950e";
+  const userAddress = "203.0.113.77";
+  const phone: FeedbackPhone = {
+    platform: "Android",
+    appVersion: "1.4.9 (212) · a1b2c3d4",
+    system: "Android 16, Xiaomi 14 (23127PN0CC)",
+    network: "Wi-Fi · VPN: Tailscale",
+    log: `2026-11-13T10:00:00.000Z WARN  connection host-1 offline (ice_failed)\n2026-11-13T10:00:01.000Z WARN  console Authorization: Bearer ${secret}\n2026-11-13T10:00:02.000Z WARN  network GET https://${userHost}/v1/hosts/${serverId}/state -> failed from ${userAddress}`,
+  };
+  await runCauseEffect(
+    agents.respondToApproval({ requestId: phoneCard.requestId, decision: "accept" }, { owner: true, phone }),
+  );
+  const fromPhone = await logged("send_feedback for the phone app", phoneIndex);
+  const report0 = sent[0];
+  const sentPhone = report0?.kind === "bug" ? report0.phone : null;
+  pass(
+    "The phone's accept sends the report with the phone's system, version, device, network and log",
+    fromPhone.text.includes('"sent"') &&
+      sent.length === 1 &&
+      report0?.surface === "Phone app" &&
+      sentPhone?.platform === "Android" &&
+      sentPhone.appVersion === phone.appVersion &&
+      sentPhone.system === phone.system &&
+      sentPhone.network === phone.network &&
+      sentPhone.log.includes("host-1 offline (ice_failed)"),
+    `${fromPhone.text} ${JSON.stringify(report0)}`,
+  );
+  pass("A secret in the phone's log does not leave the host", sentPhone !== null && !sentPhone.log.includes(secret));
+  pass(
+    "A host name, a server ID and a network address in the phone's log do not leave the host",
+    sentPhone !== null &&
+      !sentPhone.log.includes(userHost) &&
+      !sentPhone.log.includes(serverId) &&
+      !sentPhone.log.includes(userAddress) &&
+      sentPhone.log.includes("GET https://[host]/v1/hosts/[id]/state -> failed from [public-ip]"),
+  );
 
   report.passed = true;
 } catch (error) {

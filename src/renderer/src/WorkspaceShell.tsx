@@ -1,5 +1,6 @@
 import type { CentralAuthUser } from "@openbot/contracts/ipc";
 import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-tasks-v1";
+import { CRM_CAPABILITY } from "@openbot/contracts/team-protocol/crm-v1";
 import {
   ConversationLoadNotice,
   ServerConnectionNotice,
@@ -27,6 +28,7 @@ import { WorkspaceRoutineFlows } from "./features/routine-flows/WorkspaceRoutine
 import { createRoutineTimezonePrompt, desktopRoutineZoneTargets } from "./features/schedule/routine-timezone-prompt";
 import { createHostedUpsellOffline } from "./features/servers/hosted-server-upsell-controller";
 import { createRemoteSyncMarks } from "./features/servers/remote-sync-marks";
+import { serverCanAdminister } from "./features/servers/server-capabilities";
 import { createServerConnectionToast } from "./features/servers/server-connection-toast";
 import { useServerScope } from "./features/servers/server-scope";
 import { followsServerUpdate, ServerUpdateDialogHost } from "./features/servers/server-update-flow";
@@ -35,8 +37,9 @@ import { WorkspaceServerRail } from "./features/servers/WorkspaceServerRail";
 import { useSettings } from "./features/settings/settings-context";
 import { WorkspaceSidebar } from "./features/sidebar/WorkspaceSidebar";
 import { TasksPanel } from "./features/tasks/TasksPanel";
-import { createHostRestartToasts, type HostRestartView } from "./features/updates/host-restart-toast";
+import { createHostRestartToasts, type HostRestartView, noteServerAgents } from "./features/updates/host-restart-toast";
 import { useUsage } from "./features/usage/usage-context";
+import { WindowBackdrop } from "./features/window/WindowBackdrop";
 import { WindowPageView } from "./features/window/WindowPageView";
 import { WorkspacePageRail } from "./features/window/WorkspacePageRail";
 import { useWindowPage } from "./features/window/window-page-context";
@@ -153,6 +156,21 @@ export function WorkspaceShell(props: {
       const server = activeServer();
       if (usage.state.serverId === null || usage.state.view !== "library") return false;
       return !!server?.compatibility?.hostAppVersion && !serverHasStorage(server);
+    },
+    (unsupported) => {
+      if (unsupported) usage.closeUsage();
+    },
+  );
+  /**
+   * The CRM follows a server switch too. A member, or an older joined server, has no CRM button, and
+   * the page closes when an owner or admin turns the CRM off on any device.
+   */
+  createEffect(
+    () => {
+      const server = activeServer();
+      if (usage.state.serverId === null || usage.state.view !== "crm") return false;
+      if (usage.crmEnabled() === false) return true;
+      return !!server?.compatibility?.hostAppVersion && !serverCanAdminister(server, CRM_CAPABILITY);
     },
     (unsupported) => {
       if (unsupported) usage.closeUsage();
@@ -300,6 +318,19 @@ export function WorkspaceShell(props: {
     />
   );
 
+  // A server that this window saw with no agents stays in its first run after the owner leaves it.
+  createEffect(
+    () => {
+      const server = activeServer();
+      return server?.kind === "remote" && agentListSettled()
+        ? { id: server.id, empty: agentList().length === 0 }
+        : null;
+    },
+    (seen) => {
+      if (seen) noteServerAgents(seen.id, seen.empty);
+    },
+  );
+
   const remoteHosts = (): HostRestartView[] =>
     servers().flatMap((server) =>
       server.kind === "remote"
@@ -310,6 +341,10 @@ export function WorkspaceShell(props: {
               online: server.id === activeServer()?.id ? scope.loaded() : server.state === "online",
               restart: server.hostRestart?.state ?? null,
               version: server.hostRestart?.version ?? null,
+              // Until the agents load, the open server could be new; a notice that waits shows after them.
+              ...(server.id === activeServer()?.id
+                ? { firstRun: !agentListSettled() || agentList().length === 0 }
+                : {}),
             },
           ]
         : [],
@@ -323,6 +358,7 @@ export function WorkspaceShell(props: {
   return (
     // The overlays and the chat cards show the same connectors.
     <ConnectorsProvider>
+      <WindowBackdrop />
       {/* The page rail sits at the left of the frame. The frame is the card of the page that the rail selects. */}
       <div class="app-window">
         <WorkspacePageRail hidden={chatWindow || remoteDesktopWorkspaceVisible()} />

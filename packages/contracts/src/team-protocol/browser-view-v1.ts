@@ -103,6 +103,26 @@ export function browserViewClientWantsContextMenu(url: URL): boolean {
   return url.searchParams.get(BROWSER_VIEW_CONTEXT_MENU_QUERY) === "1";
 }
 
+/**
+ * A host that sends a client the text that the page itself copies, such as with a "Copy code"
+ * button, as a `pageCopied` message. The page writes the clipboard of the host, which the member
+ * cannot reach. The host sends it only to a client that asked, and only shortly after that client's
+ * own click or key on the tab.
+ */
+export const TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY = "browser-view-page-copy-v1";
+/** Present on the view socket when this client puts the page's own copies on its clipboard. */
+export const BROWSER_VIEW_PAGE_COPY_QUERY = "pageCopy";
+
+export function browserViewClientWantsPageCopy(url: URL): boolean {
+  return url.searchParams.get(BROWSER_VIEW_PAGE_COPY_QUERY) === "1";
+}
+/**
+ * How long after a member's own click or key a page's copy may go to that member's clipboard. It is
+ * the time Chromium lets a page use one user action. The host and the client both check it, so a
+ * copy long after the member's last input stays on the host, and a host cannot fill the clipboard.
+ */
+export const BROWSER_VIEW_PAGE_COPY_AFTER_INPUT_MS = 5_000;
+
 /** The items of a page's context menu. A client leaves out an item it does not know. */
 export const BROWSER_VIEW_CONTEXT_MENU_ITEMS = [
   "copy-link",
@@ -157,20 +177,22 @@ export interface BrowserViewContextMenu {
 
 /**
  * What a host sends on the view socket as text, beside the binary frames: the answer to a copy, and
- * the cursor and the menus for a client that asked for them.
+ * the cursor, the menus and the page's own copies for a client that asked for them.
  */
 export type BrowserViewHostMessage =
   | BrowserViewCopied
   | { type: "cursor"; cursor: BrowserViewCursor }
-  | ({ type: "context-menu" } & BrowserViewContextMenu);
+  | ({ type: "context-menu" } & BrowserViewContextMenu)
+  | { type: "pageCopied"; text: string };
 
 export function encodeBrowserViewHostMessage(message: BrowserViewHostMessage): string {
   return JSON.stringify(message);
 }
 
 /**
- * Null for a message that this client does not know: a newer host can send more. A client that
- * reads only `decodeBrowserViewCopied` asks for no cursor and no menu, so a host sends it neither.
+ * Null for a message that this client does not know: a newer host can send more. An older client
+ * that reads only the answer to a copy asks for no cursor, no menu and no page copy, so a host sends
+ * it none of them.
  */
 export function decodeBrowserViewHostMessage(value: string): BrowserViewHostMessage | null {
   return decodeHostMessageValue(JSON.parse(value));
@@ -183,6 +205,11 @@ function decodeHostMessageValue(message: unknown): BrowserViewHostMessage | null
     if (!isString(message.cursor)) throw new Error("Invalid browser view message.");
     const cursor = BROWSER_VIEW_CURSORS.find((name) => name === message.cursor) ?? "default";
     return { type: "cursor", cursor };
+  }
+  if (message.type === "pageCopied") {
+    if (!isBoundedString(message.text, BROWSER_VIEW_MAX_CLIPBOARD_TEXT) || message.text.length === 0)
+      throw new Error("Invalid browser view message.");
+    return { type: "pageCopied", text: message.text };
   }
   if (message.type === "context-menu") {
     const listed = message.items;
@@ -275,6 +302,11 @@ export type BrowserViewInput =
    * only when the selection is still `text` and in a field the user can edit.
    */
   | { type: "cut"; text: string };
+
+/** A click or a key, which gives the page a user action. A move, a scroll or an acknowledgement does not. */
+export function isBrowserViewUserAction(input: BrowserViewInput): boolean {
+  return input.type === "key" || (input.type === "pointer" && (input.action === "down" || input.action === "up"));
+}
 
 /**
  * The text message a host sends on the view socket, only in answer to a `copy`: the selection, or
@@ -437,10 +469,6 @@ export function encodeBrowserViewCopied(message: BrowserViewCopied): string {
 }
 
 /** The client decodes what the host sends, with the same bound as a paste going the other way. */
-export function decodeBrowserViewCopied(value: string): BrowserViewCopied {
-  return decodeBrowserViewCopiedValue(JSON.parse(value));
-}
-
 function decodeBrowserViewCopiedValue(message: unknown): BrowserViewCopied {
   if (!isDynamicRecord(message)) throw new Error("Invalid browser view message.");
   if (message.type === "copyTooLarge") return { type: "copyTooLarge" };

@@ -473,6 +473,11 @@ export function museStatePaths(env: NodeJS.ProcessEnv = process.env, home = home
   };
 }
 
+/** The home folder of the first ChatGPT account, as Codex reads it: `$CODEX_HOME`, or `~/.codex`. */
+export function codexHomeDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return env.CODEX_HOME?.trim() || join(home, ".codex");
+}
+
 /** The home folder of the GitHub Copilot CLI: `$COPILOT_HOME`, or `~/.copilot`. */
 export function copilotHomeDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
   return env.COPILOT_HOME?.trim() || join(home, ".copilot");
@@ -544,8 +549,18 @@ export const COPILOT_CONFINED_ENV: Readonly<Record<string, string>> = {
   COPILOT_PKG_CACHE_HOME: join(COPILOT_CONFINED_CACHE, "pkg"),
 };
 
-/** The environment of a confined OpenCode process: its own cache, apart from the one outside. */
-export const OPENCODE_CONFINED_ENV: Readonly<Record<string, string>> = { XDG_CACHE_HOME: OPENCODE_CONFINED_CACHE };
+/**
+ * The environment of a confined OpenCode process: its own cache, apart from the one outside.
+ * OpenCode installs the adapter of each custom endpoint with npm, and npm keeps its own cache in
+ * `~/.npm`, which the sandbox does not let it write: each install failed with `EPERM` (#10090). The
+ * cache in `~/.npm` stays closed, because the processes that are not confined, such as `npx`, use it.
+ * npm reads both spellings and takes the later one, so both replace a value from the user's shell.
+ */
+export const OPENCODE_CONFINED_ENV: Readonly<Record<string, string>> = {
+  XDG_CACHE_HOME: OPENCODE_CONFINED_CACHE,
+  npm_config_cache: join(OPENCODE_CONFINED_CACHE, "npm-cache"),
+  NPM_CONFIG_CACHE: join(OPENCODE_CONFINED_CACHE, "npm-cache"),
+};
 
 /**
  * The project settings of every provider, in each root, whatever the provider of this process. A

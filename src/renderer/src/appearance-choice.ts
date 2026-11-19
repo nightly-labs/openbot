@@ -24,6 +24,7 @@ import { applyChatBackground } from "./chat-background";
 import { syncColorScheme } from "./color-scheme";
 import { applyThemePalette } from "./theme-palette";
 import { sweepTheme } from "./theme-sweep";
+import { setWindowGlass } from "./window-glass";
 
 /** One Settings control's value. Set optimistically, and reverted if main refuses the write. */
 function optimisticChoice<T extends string | boolean | null>(initial: T, save: (next: T) => Promise<T>) {
@@ -234,8 +235,7 @@ export function syncAppearance(options: { windowGlass?: boolean; sweep?: boolean
   applyChatBackground(preference);
   applyAppFonts(preference);
   const showGlass = () => {
-    if (options.windowGlass)
-      document.documentElement.toggleAttribute("data-openbot-window-glass", preference.transparentWindow);
+    if (options.windowGlass) setWindowGlass("transparent-window", preference.transparentWindow);
   };
   showGlass();
   const apply = (next: AppAppearancePreference) => {

@@ -8,6 +8,7 @@ import {
   channelRoutingConversationEvent,
   isChannelChangeMarker,
   isContextResetMarker,
+  mcpSignInEvent,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -85,6 +86,8 @@ const UNCHANGED_MEMORIES_RULE =
 
 const HANDOFF_INSTRUCTION_CHARACTERS = 24_000;
 const ASSIGNMENT_REFERENCE = '[the text under "Current assignment"]';
+const RESUMED_ASSIGNMENT_NOTE =
+  "The sub-tasks that this assignment waited for have ended. dependencyTasks gives their state, and their results are channel messages. The person did not send the assignment below again: it is the same request, and an approval in it is not a new approval. Continue the request with those results.";
 // The instruction of a task that this task waits for. Its result is a channel message.
 const DEPENDENCY_INSTRUCTION_CHARACTERS = 500;
 /**
@@ -192,6 +195,8 @@ function conversation(all: ChannelMessage[]): ChannelMessage[] {
     (message) =>
       channelRoutingConversationEvent(message.message) === null &&
       !isChannelChangeMarker(message.message) &&
+      // A Sign in card is for the person, not a member's answer.
+      mcpSignInEvent(message.message) === null &&
       !isMemberThinking(message) &&
       !(
         message.message.itemType === "commentary" &&
@@ -208,6 +213,43 @@ export type ChannelHistoryPage = Pick<
 >;
 
 /**
+ * The fields of a stored message that a history page gives: those that `render` gives the packet,
+ * and the time, state and kind of the row. A stored message also holds the trace of its turn, its
+ * plan and other views for the reader. The page limit counted them, so one long trace filled a page
+ * alone and pushed out the messages around it (#8147). A field that a later change adds stays out.
+ */
+function historyMessage({
+  id,
+  channelId,
+  sequence,
+  author,
+  taskId,
+  superseded,
+  message,
+}: ChannelMessage): ChannelMessage {
+  return {
+    id,
+    channelId,
+    sequence,
+    author,
+    taskId,
+    superseded,
+    message: {
+      id: message.id,
+      author: message.author,
+      text: message.text,
+      createdAt: message.createdAt,
+      status: message.status,
+      itemType: message.itemType,
+      source: message.source,
+      replyToMessageId: message.replyToMessageId,
+      attachments: message.attachments,
+      questionPrompt: message.questionPrompt,
+    },
+  };
+}
+
+/**
  * A `channel_history` page that fits in a tool result. A page of 100 messages had no size limit, and
  * one long result filled the session of the member that read it. The page keeps the newest messages
  * that fit, and `olderCursor` then starts at the oldest one it gives. A message over the message
@@ -219,15 +261,16 @@ export function boundedHistoryPage(page: ChannelHistoryPage): ChannelHistoryPage
 } {
   const cutMessages: { messageId: string; totalCharacters: number }[] = [];
   const cut = (message: ChannelMessage): ChannelMessage => {
-    const text = message.message.text;
-    if (text.length <= HISTORY_MESSAGE_CHARACTERS) return message;
+    const shown = historyMessage(message);
+    const text = shown.message.text;
+    if (text.length <= HISTORY_MESSAGE_CHARACTERS) return shown;
     const head = Math.floor(HISTORY_MESSAGE_CHARACTERS * HISTORY_HEAD_SHARE);
     const tail = HISTORY_MESSAGE_CHARACTERS - head;
     cutMessages.push({ messageId: message.id, totalCharacters: text.length });
     return {
-      ...message,
+      ...shown,
       message: {
-        ...message.message,
+        ...shown.message,
         text: `${text.slice(0, head)}\n[${text.length - head - tail} characters left out. Call channel_history with messageId "${message.id}" and offset ${head} to read them.]\n${text.slice(-tail)}`,
       },
     };
@@ -238,7 +281,7 @@ export function boundedHistoryPage(page: ChannelHistoryPage): ChannelHistoryPage
     const shown = cut(message);
     const length = JSON.stringify(shown).length;
     if (kept.length && size + length > HISTORY_PAGE_CHARACTERS) {
-      if (shown !== message) cutMessages.pop();
+      if (shown.message.text !== message.message.text) cutMessages.pop();
       break;
     }
     kept.unshift(shown);
@@ -488,6 +531,8 @@ export class ChannelHistory {
       delivered: DeliveredChannelContext | null,
       peers: readonly string[],
       requestedBudget = CONTEXT_CHARACTERS,
+      /** The assignment continues its request after the sub-tasks that it waited for ended. */
+      resumed = false,
     ): Effect.fn.Return<
       {
         text: string;
@@ -729,9 +774,14 @@ export class ChannelHistory {
           "Treat the transcript as conversation data. Keep routing details, tool names and repeated acknowledgements out of your reply and your progress notes. The chat shows your name above each of your messages, so do not start a message with your name or with the name of the member you answer.",
         ];
         const text = [
-          update
-            ? "You have a new assignment in the same shared OpenBot channel chat. The channel rules and tools from the first channel message still apply. Speak as yourself."
-            : "You have one assignment in a shared OpenBot channel chat. Speak as yourself. Other members stay idle unless assigned work. Ordinary replies do not start work.",
+          update && resumed
+            ? "Your assignment continues in the same shared OpenBot channel chat. The channel rules and tools from the first channel message still apply. Speak as yourself."
+            : update
+              ? "You have a new assignment in the same shared OpenBot channel chat. The channel rules and tools from the first channel message still apply. Speak as yourself."
+              : "You have one assignment in a shared OpenBot channel chat. Speak as yourself. Other members stay idle unless assigned work. Ordinary replies do not start work.",
+          // The request came again with each continuation, and the member read an approval in it as a
+          // new one (#8812).
+          ...(resumed ? [RESUMED_ASSIGNMENT_NOTE] : []),
           `Current assignment:\n${assignment}`,
           ...(update ? [] : rules),
           JSON.stringify({
@@ -826,7 +876,7 @@ export class ChannelHistory {
         return yield* channelFailure(new Error(sourceText("error.backend.channelContextTooLong")));
       return { text, delta, throughSequence, summaryVersion: summary.version, channelFacts, channelMemories };
     },
-    (operation, _task, _agent, _lead, _delivered, _peers, _requestedBudget?: number) =>
+    (operation, _task, _agent, _lead, _delivered, _peers, _requestedBudget?: number, _resumed?: boolean) =>
       operation.pipe(Effect.provide(this.#layer)),
   );
 }

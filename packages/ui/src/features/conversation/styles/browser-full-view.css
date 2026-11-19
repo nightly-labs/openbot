@@ -65,10 +65,10 @@ body[data-browser-full-view] .app-frame {
   flex: 1;
 }
 
-/* Close is a round filled button, as Close of a settings page is, so it reads as the way out of the
- * view. It keeps the distance from the window edge that Close of a settings page has. */
+/* "Back to chat" is a round filled button with its text, so it reads as the way out of the view. It
+ * keeps the distance from the window edge that Close of a settings page has. */
 .browser-full-top > .browser-hide {
-  --browser-full-icon-size: var(--openbot-icon-md);
+  flex: none;
   border-radius: var(--openbot-radius-pill);
   color: var(--openbot-text-primary);
   margin-inline-end: var(--openbot-space-2);

@@ -1,4 +1,9 @@
-import { MESSAGE_REACTIONS, MORE_MESSAGE_REACTIONS, nextSpeechSpeed } from "@openbot/contracts/ipc";
+import {
+  type AttachmentSummary,
+  MESSAGE_REACTIONS,
+  MORE_MESSAGE_REACTIONS,
+  nextSpeechSpeed,
+} from "@openbot/contracts/ipc";
 import { router } from "expo-router";
 import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
@@ -7,6 +12,8 @@ import SmilePlus from "lucide-react-native/icons/face-slightly-smiling-plus";
 import GitFork from "lucide-react-native/icons/git-fork";
 import Hash from "lucide-react-native/icons/hash";
 import MailDot from "lucide-react-native/icons/mail-dot";
+import Pin from "lucide-react-native/icons/pin";
+import PinOff from "lucide-react-native/icons/pin-off";
 import Reply from "lucide-react-native/icons/reply";
 import Square from "lucide-react-native/icons/square";
 import TextCursor from "lucide-react-native/icons/text-cursor";
@@ -24,7 +31,9 @@ import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
+import { MessageFileActions } from "../components/message-file-actions";
 import { useCopyMessage } from "../components/use-copy-message";
+import { MOBILE_LARGE_FILE_BYTES } from "../model/large-files";
 import { releaseMessageActions, useMessageActionsRequest } from "../model/message-actions-sheet";
 
 const ICON_SIZE = 22;
@@ -33,6 +42,7 @@ const PRESSED = { transform: [{ scale: 0.92 }] };
 const MORE = "more";
 /** The accessibility action of the Read aloud row that changes the speed. */
 const SPEED_ACTION = "speed";
+const NO_FILES: readonly AttachmentSummary[] = [];
 
 /**
  * Always two rows with the same columns: six reactions, the first five of the others and the More
@@ -47,8 +57,9 @@ function emojiRows(all: boolean): string[][] {
 }
 
 /**
- * The sheet that a touch and hold on a message opens: the reactions on top, then Reply, Branch, Mark
- * unread and Send to channel, then the actions on the text, and Delete last. Each action closes the sheet.
+ * The sheet that a touch and hold on a message opens: the reactions on top, then the actions on the
+ * files of the message, then Reply, Branch, Mark unread and Send to channel, then the actions on the
+ * text, and Delete last. Each action closes the sheet.
  */
 export function MessageActionsScreen() {
   const { t, format } = useText();
@@ -60,6 +71,10 @@ export function MessageActionsScreen() {
   const speed = useVoiceSettings((state) => state.speed);
   const speedReady = useVoiceSettings((state) => state.ready);
   const { copy } = useCopyMessage(request?.copyText ?? "");
+  // A file above the download limit cannot come to the phone, so it has no file actions.
+  const attachments = (request?.files?.attachments ?? NO_FILES).filter(
+    (attachment) => attachment.size <= MOBILE_LARGE_FILE_BYTES,
+  );
   // Runs when the sheet has closed. A selection that starts while the sheet is on screen ends when
   // the sheet takes the focus with it.
   const afterClose = useRef<(() => void) | undefined>(undefined);
@@ -87,6 +102,11 @@ export function MessageActionsScreen() {
     void saveVoiceSettings({ speed: nextSpeechSpeed(speed) }).catch(() => Alert.alert(t("mobile.settings.saveFailed")));
   };
   const sendToChannel = request.sendToChannel?.channels.length ? request.sendToChannel : undefined;
+  /** Runs a file action when the sheet has closed, so a share sheet or a picker shows over the chat. */
+  const afterSheet = (action: () => void) => {
+    afterClose.current = action;
+    router.back();
+  };
   const sent = request.createdAt
     ? format.date(new Date(request.createdAt), { dateStyle: "medium", timeStyle: "short" })
     : undefined;
@@ -141,7 +161,16 @@ export function MessageActionsScreen() {
         </View>
       ) : null}
 
-      {request.onReply || request.onBranch || request.onMarkUnread || sendToChannel ? (
+      {attachments.length > 0 && request.files ? (
+        <MessageFileActions
+          serverId={request.files.serverId}
+          attachments={attachments}
+          iconColor={icon}
+          afterSheet={afterSheet}
+        />
+      ) : null}
+
+      {request.onReply || request.onBranch || request.onMarkUnread || request.onTogglePin || sendToChannel ? (
         <SettingsSection>
           {request.onReply ? (
             <SettingsRow
@@ -168,6 +197,17 @@ export function MessageActionsScreen() {
               onPress={() => run(() => request.onMarkUnread?.())}
             >
               <Typography>{t("mobile.chat.message.markUnread")}</Typography>
+            </SettingsRow>
+          ) : null}
+          {request.onTogglePin ? (
+            <SettingsRow
+              leading={
+                request.pinned ? <PinOff size={ICON_SIZE} color={icon} /> : <Pin size={ICON_SIZE} color={icon} />
+              }
+              disclosure={false}
+              onPress={() => run(() => request.onTogglePin?.())}
+            >
+              <Typography>{request.pinned ? t("mobile.chat.pins.unpin") : t("mobile.chat.pins.pin")}</Typography>
             </SettingsRow>
           ) : null}
           {sendToChannel ? (

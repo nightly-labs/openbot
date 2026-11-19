@@ -13,6 +13,11 @@ import {
   decodeBrowserPageStateSnapshot,
 } from "@openbot/contracts/team-protocol/browser-page-state-v1";
 import {
+  BROWSER_SIGN_IN_STORAGE_CAPABILITY,
+  BROWSER_SIGN_IN_STORAGE_ROUTES,
+  decodeBrowserSignInStorageResult,
+} from "@openbot/contracts/team-protocol/browser-sign-in-storage-v1";
+import {
   BROWSER_SIGN_IN_CAPABILITY,
   BROWSER_SIGN_IN_ROUTES,
   decodeBrowserSignInResult,
@@ -277,14 +282,26 @@ export function browserIpcHandlers({
           return null;
         }
         const cookies = await runCauseEffect(localSignIn.collect());
-        if (cookies.length === 0) return { cookies: 0, signedIn: false };
-        const result = await runCauseEffect(
-          remoteServers.request(target.serverId, BROWSER_SIGN_IN_ROUTES.import, decodeBrowserSignInResult, {
-            method: "POST",
-            body: { tabId: target.tabId, cookies },
-          }),
-        );
-        if (result.cookies === 0) return { cookies: 0, signedIn: false };
+        // Some sites keep the sign-in in the page storage, not in a cookie (#8686). An older server takes cookies only.
+        const withStorage = remoteServers.supportsCapability(target.serverId, BROWSER_SIGN_IN_STORAGE_CAPABILITY);
+        const storage = withStorage ? await runCauseEffect(localSignIn.collectStorage()) : null;
+        if (cookies.length === 0 && !storage?.entries.length) return { cookies: 0, signedIn: false };
+        const set = withStorage
+          ? await runCauseEffect(
+              remoteServers.request(
+                target.serverId,
+                BROWSER_SIGN_IN_STORAGE_ROUTES.import,
+                decodeBrowserSignInStorageResult,
+                { method: "POST", body: { tabId: target.tabId, cookies, storage } },
+              ),
+            ).then((result) => result.cookies + result.storage)
+          : await runCauseEffect(
+              remoteServers.request(target.serverId, BROWSER_SIGN_IN_ROUTES.import, decodeBrowserSignInResult, {
+                method: "POST",
+                body: { tabId: target.tabId, cookies },
+              }),
+            ).then((result) => result.cookies);
+        if (set === 0) return { cookies: 0, signedIn: false };
         if (check) {
           const signedIn = async () => {
             const tabs = await runCauseEffect(
@@ -309,10 +326,10 @@ export function browserIpcHandlers({
             );
             done = await signedIn();
           }
-          if (!done) return { cookies: result.cookies, signedIn: false };
+          if (!done) return { cookies: set, signedIn: false };
         }
         await runCauseEffect(localSignIn.discard());
-        return { cookies: result.cookies, signedIn: true };
+        return { cookies: set, signedIn: true };
       }),
       takeControl: payloadHandler(stringPayload("tabId"), (tabId) =>
         routeToServer(remoteServers.activeServerId, {

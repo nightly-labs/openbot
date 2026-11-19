@@ -1,9 +1,11 @@
 import type { AgentEvent, AgentTask, AgentTasksSnapshot, ConversationSnapshot } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
+import { retryOperationIds } from "@openbot/team-client/retry-operation-id";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createStore, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { desktopAnalytics } from "../../analytics";
+import { isRoutineSteerRefusal } from "../../routine-steer-refusal";
 import { createScopeGuard } from "../../scope-lifetime";
 import type { AgentTasksPort } from "./agent-tasks-port";
 
@@ -222,8 +224,12 @@ export function createAgentTasks(options: AgentTasksOptions) {
    * Stores a thread list. A conversation of a thread that the list no longer has goes with it. A task
    * without `branch` keeps the link that the stored list has: an `agent-tasks-changed` event of a joined
    * server does not carry it, and a link does not change. A task without `queue` keeps the stored queue
-   * in the same way, but only the messages that still wait. Returns true when a waiting message changed
-   * and the stored list had a queue: then only a new read of the list gives the full queue.
+   * in the same way, but only the messages that still wait. A task without `awaitedReplies` keeps the
+   * stored requests while its state stays: a thread sends a request in a turn, and an answer or a note for
+   * a failed request starts the thread again. Returns true when a waiting message changed and the stored
+   * list had a queue, when a thread became idle, when a thread with requests changed its state, or while
+   * a stored request is queued: then only a new read of the list gives the full queue and the current
+   * requests.
    */
   function setSnapshot(snapshot: AgentTasksSnapshot): boolean {
     const ids = new Set(snapshot.tasks.map((task) => task.id));
@@ -243,6 +249,13 @@ export function createAgentTasks(options: AgentTasksOptions) {
         const waiting = new Set(task.queuedMessages.map((message) => message.deliveryId));
         next.queue = held.queue.filter((delivery) => waiting.has(delivery.id)).map((delivery) => ({ ...delivery }));
         if (queuedKey(task) !== queuedKey(held)) staleQueue = true;
+      }
+      if (task.awaitedReplies === undefined && held.awaitedReplies) {
+        next.awaitedReplies = held.awaitedReplies.map((reply) => ({ ...reply }));
+        // A turn that ends can have sent a request, and a turn that starts can read an answer. A queued
+        // request starts, or a person cancels it, with no change of the thread's state.
+        const changed = task.state !== held.state && (task.state === "idle" || held.awaitedReplies.length > 0);
+        if (changed || held.awaitedReplies.some((reply) => reply.status === "queued")) staleQueue = true;
       }
       return next;
     });
@@ -650,22 +663,31 @@ export function createAgentTasks(options: AgentTasksOptions) {
     }
   }
 
+  /**
+   * The client ids of task starts. A failed start can still have made
+   * its task on the server (the answer got lost), so a retry of the same start sends the same id and
+   * gets that task, not a second one.
+   */
+  const startIds = retryOperationIds(() => crypto.randomUUID());
+
   /** Sends `attachmentDraftIds` only when there are files, so a server with text-only threads gets no new key. */
   async function startTask(
     agentId: string,
     text: string,
     attachmentDraftIds: string[] = [],
   ): Promise<AgentTask | null> {
+    const start = startIds([agentId, text, attachmentDraftIds]);
     const task = await runAction(
       () =>
         port().startTask({
           agentId,
           text,
           ...(attachmentDraftIds.length ? { attachmentDraftIds } : {}),
-          clientMessageId: crypto.randomUUID(),
+          clientMessageId: start.id,
         }),
       "conversation.threads.error.start",
     );
+    if (!task) start.failed();
     if (task && scopeIsCurrent()) rememberTask(task);
     return task;
   }
@@ -702,6 +724,9 @@ export function createAgentTasks(options: AgentTasksOptions) {
     return task;
   }
 
+  /** The client ids of thread messages: a send again after a failure sends the same id, as a start does. */
+  const sendIds = retryOperationIds(() => crypto.randomUUID());
+
   /** Steers the task's running turn, or queues the message in the task. */
   async function sendToTask(
     agentId: string,
@@ -713,6 +738,7 @@ export function createAgentTasks(options: AgentTasksOptions) {
     // The sent message and the answer come after the part around an old message, so the thread shows
     // its latest messages again.
     void loadLatest(agentId, taskId);
+    const message = sendIds([agentId, taskId, text, attachmentDraftIds, replyToMessageId]);
     const receipt = await runAction(
       () =>
         port().sendToTask({
@@ -721,10 +747,11 @@ export function createAgentTasks(options: AgentTasksOptions) {
           text,
           ...(attachmentDraftIds.length ? { attachmentDraftIds } : {}),
           ...(replyToMessageId ? { replyToMessageId } : {}),
-          clientMessageId: crypto.randomUUID(),
+          clientMessageId: message.id,
         }),
       "conversation.threads.error.send",
     );
+    if (receipt === null) message.failed();
     return receipt !== null;
   }
 
@@ -747,6 +774,8 @@ export function createAgentTasks(options: AgentTasksOptions) {
       if (task?.activeTurnId !== expectedTurnId) return;
       // A message that left the queue is in the turn already.
       if (!task.queue?.some((delivery) => delivery.id === deliveryId)) return;
+      // A routine run refuses the steer, and the queue row says why the message waits.
+      if (isRoutineSteerRefusal(error)) return;
       const { t, errorMessage } = currentText();
       actionToast.error(errorMessage(error, t("app.errorStatus.steer")));
     });

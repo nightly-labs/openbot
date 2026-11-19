@@ -1,4 +1,10 @@
-import type { AttachmentSummary, ImageGenerationAspectRatio, ImageGenerationInfo } from "@openbot/contracts/ipc";
+import {
+  type AttachmentSummary,
+  type ImageGenerationAspectRatio,
+  type ImageGenerationInfo,
+  imageAspectRatioOf,
+  imagePixelSize,
+} from "@openbot/contracts/ipc";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { Image } from "expo-image";
 import { Button, Typography } from "heroui-native";
@@ -75,7 +81,13 @@ export function ChatImageGeneration({
     ready && attachment && isViewableImage(attachment) ? attachment.id : null,
     FRAME_RADIUS,
   );
-  const dimensions = file.dimensions ?? loaded;
+  // The host reads the size of the file, so the frame has its shape before the file arrives. An older
+  // row has the size that the model was asked for, which can disagree with its frame.
+  const hostSize = status === "completed" ? imagePixelSize(generation.resolution) : null;
+  const dimensions =
+    file.dimensions ??
+    loaded ??
+    (hostSize && imageAspectRatioOf(hostSize) === generation.aspectRatio ? hostSize : null);
   const ratio = dimensions ? dimensions.width / dimensions.height : requestedRatio(generation.aspectRatio);
   const frame = generationFrame(ratio, Math.min(MAX_WIDTH, windowWidth - 64));
   const label = unavailable

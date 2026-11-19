@@ -345,7 +345,9 @@ async function offeredLoginMethods(host: string): Promise<string> {
     host,
     "true",
   ]);
-  return /Permission denied \(([^)]*)\)/u.exec(result.stderr)?.[1] ?? `exit ${result.code}`;
+  const denied = /Permission denied \(([^)]*)\)/u.exec(result.stderr)?.[1];
+  // The last line of the ssh error tells why it did not get to the login, such as a reset connection.
+  return denied ?? `exit ${result.code}: ${result.stderr.trim().split("\n").at(-1) ?? ""}`;
 }
 
 async function waitForBoot(host: string, lastBootId: string): Promise<string> {

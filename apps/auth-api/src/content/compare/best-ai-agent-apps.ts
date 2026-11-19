@@ -23,7 +23,7 @@ export const BEST_AI_AGENT_APPS: RoundupComparison = {
       runsOn: "Your computer. Apps for macOS, Windows, Linux, iPhone and Android, and a web app.",
       models:
         "Your ChatGPT, Claude, Gemini, Grok, Cursor, Cline or Muse Code plan, free models, Inception's Mercury models, your own model, or any ACP agent.",
-      price: "Free for noncommercial use. Hosted EU server from €20 or $25 a month.",
+      price: "Free for noncommercial use. Hosted EU server from €30 or $36 a month.",
       summary:
         "OpenBot runs Codex, Claude Code, Antigravity, Grok CLI, Cursor CLI, Cline, OpenCode, Pi, Muse Code and custom ACP agents as one team on your computer. Each agent gets a job, and they pass work to each other in shared channels. When a plan hits its limit, an agent can move to a backup model on another provider. You follow along from the iPhone and Android apps or the web app, no VPN needed, and agents answer in Slack, Discord and Telegram too. Workspaces, chats and files stay in a database on your computer.",
     },

@@ -12,13 +12,16 @@ import {
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
-import { Children, type ReactNode, useEffect, useRef, useState } from "react";
-import { Alert, View } from "react-native";
+import { Children, type ReactNode, useEffect, useId, useMemo, useRef, useState } from "react";
+import { Alert, StyleSheet, View } from "react-native";
 import { useUniwind } from "uniwind";
+import { VaultTwoStepSection } from "@/features/servers/components/vault-two-step-section";
 import { useServerVault } from "@/features/servers/model/use-server-vault";
+import { useVaultAgentPicker } from "@/features/servers/model/vault-agent-picker";
 import {
   type VaultDraft,
   vaultAddressExample,
+  vaultAgentsSummary,
   vaultCardTitle,
   vaultContactTitle,
   vaultCountryOptions,
@@ -33,11 +36,15 @@ import {
   SettingsSection,
 } from "@/features/settings/components/settings-content";
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
-import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
+import {
+  useMobileWorkspaceActions,
+  useMobileWorkspaceSelector,
+} from "@/features/workspace/context/mobile-workspace-context";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import type { SheetFormFieldProps } from "@/shared/components/sheet-form-field.types";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
+import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 
 const KINDS: readonly VaultItemKind[] = ["login", "card", "contact", "apiKey"];
@@ -63,10 +70,20 @@ function FieldRow({ children }: { children: ReactNode }) {
 }
 
 type FieldProps = Partial<Omit<SheetFormFieldProps, "label" | "value" | "onChangeText">>;
-type TextKey = Exclude<keyof VaultDraft, "fillSites">;
+type TextKey = Exclude<keyof VaultDraft, "fillSites" | "twoStepKey" | "agents">;
 
 function isKind(value: string | undefined): value is VaultItemKind {
   return KINDS.some((kind) => kind === value);
+}
+
+/** A line of the sign-in card: its label at the start, and the field with no frame of its own. */
+function LoginLine({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <View className="flex-row items-center ps-4">
+      <Typography.Paragraph className="w-28 py-2 pe-2 text-grouped-secondary">{label}</Typography.Paragraph>
+      <View className="min-w-0 flex-1">{children}</View>
+    </View>
+  );
 }
 
 /**
@@ -158,10 +175,22 @@ export function VaultItemForm({
     removedState.current = null;
     if (state) void showState.current(state);
   }, [leaving]);
-  const input = vaultSaveInput(kind, saved?.id ?? null, draft);
+  // An agent's request makes an item for every agent, as on the desktop; the user changes it later here.
+  const allAgents = useMobileWorkspaceSelector((workspace) => workspace.agents);
+  const agents = useMemo(() => allAgents.filter((agent) => agent.serverId === serverId), [allAgents, serverId]);
+  // As on the desktop, the choice shows only while the server's agents are loaded.
+  const agentScope = vault.query.data?.agentScope === true && !request && agents.length > 0;
+  const openAgentPicker = useVaultAgentPicker((state) => state.open);
+  // The order of the ids does not matter. The save sends the agents only when they changed, so it
+  // does not undo a change that another device made to them.
+  const agentsKey = (value: string[] | null) => (value === null ? null : [...value].sort());
+  const agentsChanged = JSON.stringify(agentsKey(draft.agents)) !== JSON.stringify(agentsKey(initial.agents));
+  const input = vaultSaveInput(kind, saved?.id ?? null, draft, agentScope && agentsChanged);
   const example = vaultAddressExample(draft.country);
-  const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
+  const dirty =
+    agentsChanged || JSON.stringify({ ...draft, agents: null }) !== JSON.stringify({ ...initial, agents: null });
   const locked = action.isPending;
+  const formId = useId();
 
   usePreventRemove(!discarding && (dirty || locked) && !leaving, ({ repeat }) => {
     if (locked) return;
@@ -295,16 +324,38 @@ export function VaultItemForm({
               placeholder: WEBSITE_PLACEHOLDER,
               hint: t("mobile.server.vault.websiteHint"),
             })}
-            {field("username", t("mobile.server.vault.username"), {
-              autoCapitalize: "none",
-              placeholder: EMAIL_PLACEHOLDER,
-            })}
-            {secret("password", t("mobile.server.vault.password"), {
-              secureTextEntry: true,
-              placeholder: PASSWORD_PLACEHOLDER,
-              maxLength: VAULT_PASSWORD_LIMIT,
-              hint: t("mobile.server.vault.secretHint", { host }),
-            })}
+            <View className="gap-2">
+              {/* One card for the sign-in, as a password manager shows it: a label at the start of each line. */}
+              <View
+                // The radius of `SheetFormField` on each platform, so the card matches the other fields.
+                className={`overflow-hidden border border-border bg-grouped ${isIOS ? "" : "rounded-2xl"}`}
+                style={isIOS ? { borderRadius: 16, borderCurve: "continuous" } : undefined}
+              >
+                <LoginLine label={t("mobile.server.vault.username")}>
+                  {field("username", t("mobile.server.vault.username"), {
+                    autoCapitalize: "none",
+                    placeholder: EMAIL_PLACEHOLDER,
+                    hideLabel: true,
+                    appearance: "soft",
+                  })}
+                </LoginLine>
+                <View className="ms-4 bg-border" style={{ height: StyleSheet.hairlineWidth }} />
+                <LoginLine label={`${t("mobile.server.vault.password")}${saved ? "" : " *"}`}>
+                  {secret("password", t("mobile.server.vault.password"), {
+                    secureTextEntry: true,
+                    placeholder: PASSWORD_PLACEHOLDER,
+                    maxLength: VAULT_PASSWORD_LIMIT,
+                    hideLabel: true,
+                    appearance: "soft",
+                  })}
+                </LoginLine>
+              </View>
+              <View className="px-1">
+                <Typography.Paragraph type="body-xs" className="text-text-secondary">
+                  {t("mobile.server.vault.secretHint", { host })}
+                </Typography.Paragraph>
+              </View>
+            </View>
             {request
               ? null
               : field("notes", t("mobile.server.vault.notes"), {
@@ -430,6 +481,19 @@ export function VaultItemForm({
           </Typography.Paragraph>
         </View>
       </View>
+      {/* An agent's request form has no two-step key: an agent saves one only from a person's message. */}
+      {kind === "login" && !request && vault.canManageTwoStep ? (
+        <VaultTwoStepSection
+          formId={formId}
+          serverId={serverId}
+          host={host}
+          website={draft.website}
+          saved={saved?.kind === "login" ? saved : undefined}
+          twoStepKey={draft.twoStepKey}
+          disabled={locked}
+          onChange={(twoStepKey) => edit({ twoStepKey })}
+        />
+      ) : null}
       {kind === "card" && !request ? (
         <SettingsSection title={t("mobile.server.vault.billingContact")}>
           <SettingsRow
@@ -470,6 +534,26 @@ export function VaultItemForm({
               <Typography.Paragraph numberOfLines={1}>{site}</Typography.Paragraph>
             </SettingsRow>
           ))}
+        </SettingsSection>
+      ) : null}
+      {agentScope ? (
+        <SettingsSection footer={draft.agents?.length === 0 ? t("mobile.server.vault.agentsNone") : undefined}>
+          <SettingsRow
+            value={
+              draft.agents === null ? t("mobile.server.vault.agentsAll") : vaultAgentsSummary(draft.agents, agents, t)
+            }
+            disabled={locked}
+            onPress={() => {
+              openAgentPicker({
+                serverId,
+                agents: draft.agents,
+                onChange: (next) => edit({ agents: next }),
+              });
+              router.push({ pathname: "/server-settings/vault-item-agents" });
+            }}
+          >
+            <Typography.Paragraph>{t("mobile.server.vault.agents")}</Typography.Paragraph>
+          </SettingsRow>
         </SettingsSection>
       ) : null}
       {saved ? (

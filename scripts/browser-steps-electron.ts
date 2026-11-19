@@ -718,12 +718,22 @@ async function main(): Promise<void> {
     recordCases("idle-tabs-past-cap-sleep");
 
     assert(firstTabId, "Missing the first sleep tab.");
-    const woken = snapshotSchema.parse(
-      parseBrowserToolText(
-        text(await runCauseEffect(sleepy.handleDynamicTool(params("snapshot", { tabId: firstTabId, image: "never" })))),
-      ),
+    const wokenResult = await runCauseEffect(
+      sleepy.handleDynamicTool(params("snapshot", { tabId: firstTabId, image: "never" })),
     );
+    const woken = snapshotSchema.parse(parseBrowserToolText(text(wokenResult)));
     assert.equal(woken.url, `${origin}/form?tab=1`, "A slept tab did not load its page again.");
+    // The address is the same, so only this note tells the agent that its page state is gone (#8833).
+    const unloadNote = (result: DynamicToolResult) =>
+      result.contentItems.some((item) => item.type === "inputText" && item.text.includes("unloaded to free memory"));
+    assert(unloadNote(wokenResult), "A woken tab did not tell the agent that its page was unloaded.");
+    assert(
+      !unloadNote(
+        await runCauseEffect(sleepy.handleDynamicTool(params("snapshot", { tabId: firstTabId, image: "never" }))),
+      ),
+      "The unload note came again on the next call.",
+    );
+    recordCases("slept-tab-tells-agent-once");
     // The woken tab is now the most recently used one, so the second tab is past the cap.
     await unloaded(second);
     assert(

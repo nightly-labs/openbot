@@ -56,7 +56,7 @@ export function parseCardFieldDescription(value: unknown): BrowserCardFieldDescr
 
 /**
  * Reads a field without its value. `ownerDocument === document` keeps the field in the frame whose
- * context runs the function: the main page, or a payment frame in its own process.
+ * context runs the function. `fillCard` runs it in the automation world of the frame that holds the field.
  */
 /** Page code: true when the frame's document came from the network, not from a service worker. */
 export const LOADED_FROM_NETWORK = "performance.getEntriesByType('navigation')[0]?.workerStart === 0";

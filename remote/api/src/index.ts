@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { type IngressRoute, ROUTE_HOST_STATES } from "@openbot/contracts/signal-protocol/ingress-queue";
 import { Context, Effect, Layer, ManagedRuntime, Schema, Semaphore } from "effect";
@@ -430,8 +430,8 @@ const healthServer = Bun.serve({
     "/health/live": () => Response.json({ service: "openbot-remote-api", status: "live", commit: config.sourceCommit }),
     "/health/ready": () => Response.json({ service: "openbot-remote-api", status: "ready" }),
     "/metrics": (request) => {
-      const authorization = request.headers.get("Authorization");
-      if (!config.metricsToken || authorization !== `Bearer ${config.metricsToken}`)
+      const authorization = request.headers.get("Authorization") ?? "";
+      if (!config.metricsToken || !sameSecret(authorization, `Bearer ${config.metricsToken}`))
         return new Response("Not found", { status: 404 });
       return new Response(prometheusMetrics(signal, turnRelays, entry), {
         headers: { "Content-Type": "text/plain; version=0.0.4" },
@@ -520,3 +520,8 @@ const shutdown = () => {
 };
 process.once("SIGINT", () => void shutdown());
 process.once("SIGTERM", () => void shutdown());
+
+/** A constant-time compare: the SHA-256 digests have the same length, so the length does not show. */
+function sameSecret(actual: string, expected: string): boolean {
+  return timingSafeEqual(createHash("sha256").update(actual).digest(), createHash("sha256").update(expected).digest());
+}

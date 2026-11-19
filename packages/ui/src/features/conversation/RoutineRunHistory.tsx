@@ -34,7 +34,7 @@ interface RoutineRunHistoryProps {
 
 type HistoryEntry =
   | { kind: "run"; at: string; run: RoutineRunFields }
-  | { kind: "skipped"; at: string; missed: RoutineMissedRuns }
+  | { kind: "skipped"; at: string; missed: RoutineMissedRuns; reason: string | null }
   | { kind: "ignored"; at: string; item: EventActivity };
 
 const VISIBLE_ENTRIES = 10;
@@ -99,7 +99,7 @@ export function RoutineRunHistory(props: RoutineRunHistoryProps) {
       ...props.runs.map(
         (run): HistoryEntry =>
           run.missed
-            ? { kind: "skipped", at: run.scheduledFor, missed: run.missed }
+            ? { kind: "skipped", at: run.scheduledFor, missed: run.missed, reason: run.error }
             : { kind: "run", at: run.scheduledFor, run },
       ),
       // A started request already shows as its run. The history adds only the requests that did not start a run.
@@ -145,7 +145,7 @@ export function RoutineRunHistory(props: RoutineRunHistoryProps) {
                     <div class="agent-routine-run-row">
                       <span class="agent-routine-run-text">
                         <span>{formatRoutineRunTime(skipped().at, text, skipped().missed.until)}</span>
-                        <span class="agent-routine-run-note">{skippedNote(skipped().missed, text)}</span>
+                        <span class="agent-routine-run-note">{skippedNote(skipped(), text)}</span>
                       </span>
                       {/* The note already says "Skipped", so the icon has no label of its own. */}
                       <span class="agent-routine-run-icon agent-routine-run-icon-ignored" aria-hidden="true">
@@ -306,7 +306,12 @@ function formatLateStart(scheduledFor: string, startedAt: Date, text: Pick<TextV
     : formatRoutineRunTime(startedAt.toISOString(), text);
 }
 
-function skippedNote(missed: RoutineMissedRuns, text: Pick<TextValue, "t">): string {
+/** A record that names no reason is from a time when OpenBot was closed. */
+function skippedNote(
+  { missed, reason }: { missed: RoutineMissedRuns; reason: string | null },
+  text: Pick<TextValue, "t" | "sourceText">,
+): string {
+  if (reason) return text.sourceText(reason);
   return missed.count > ROUTINE_MISSED_COUNT_LIMIT
     ? text.t("routine.history.skippedMore", { count: ROUTINE_MISSED_COUNT_LIMIT })
     : text.t("routine.history.skipped", { count: missed.count });

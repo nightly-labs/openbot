@@ -524,7 +524,13 @@ export function QueuePanel(props: QueuePanelProps) {
                       <Show when={props.onSteer}>
                         {(steer) => (
                           <LabelTooltip
-                            content={t(props.sendsNow ? "queue.item.sendNowTooltip" : "queue.item.steerTooltip")}
+                            content={t(
+                              props.sendsNow
+                                ? "queue.item.sendNowTooltip"
+                                : props.routineRuns && !props.canSteer
+                                  ? "queue.item.steerFallback.routineRun"
+                                  : "queue.item.steerTooltip",
+                            )}
                           >
                             <LabelTooltipTrigger
                               as={Button}

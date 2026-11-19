@@ -417,6 +417,30 @@ const dataTableMessages: RendererAgentMessage[] = [
     time: "10:03",
     kind: "text",
   },
+  {
+    id: "data-table-wide-user",
+    author: "you",
+    body: "Add the form and the expected goals for each team.",
+    time: "10:04",
+    kind: "text",
+  },
+  {
+    id: "data-table-wide-agent",
+    author: "agent",
+    body: [
+      "A wide table takes more of the chat:",
+      "",
+      "| Fixture | Kickoff | Home form | Away form | Home xG | Away xG | Market odds H/D/A | Implied H/D/A | Scenario | Pick |",
+      "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |",
+      "| Ipswich–Liverpool | Sat 12:30 | L D L W L | W W D W W | 1.02 | 2.14 | 5.25 / 4.60 / 1.57 | 18% / 21% / 61% | 20% / 22% / 58% | Liverpool win |",
+      "| Newcastle–Bournemouth | Sat 15:00 | W W L D W | D L W W L | 1.71 | 1.18 | 2.20 / 3.70 / 3.00 | 43% / 26% / 32% | 45% / 27% / 28% | Newcastle, cautiously |",
+      "| Brighton–Leeds | Sun 14:00 | W D W L W | L L D W D | 1.88 | 0.97 | 1.90 / 3.60 / 4.00 | 50% / 26% / 24% | 48% / 27% / 25% | Brighton win |",
+      "",
+      `![Remote desktop](${new URL("./assets/remote-desktop-mac-mock.png", import.meta.url).href})`,
+    ].join("\n"),
+    time: "10:05",
+    kind: "text",
+  },
 ];
 
 const codeBlockMessages: RendererAgentMessage[] = [
@@ -1792,12 +1816,158 @@ export const PromptQuestionsInChat: Story = {
   },
 };
 
+/** An answered question card in the chat history. Its page height must not change after it opens. */
+export const AnsweredQuestionsInChat: Story = {
+  name: "Answered questions in chat",
+  args: {
+    messages: [
+      ...promptChatMessages,
+      {
+        id: "question-prompt:turn-answered:answered-auth",
+        turnId: "turn-answered",
+        author: "agent",
+        body: "",
+        time: "10:02",
+        kind: "question",
+        itemType: "question_prompt",
+        questionPrompt: {
+          requestId: "answered-auth",
+          questions: promptQuestions.questions.slice(0, 1),
+          resolution: { status: "answered", responses: { approach: { status: "skipped" } } },
+        },
+      },
+      {
+        id: "answered-chat-agent",
+        author: "agent",
+        body: "Session cookies it is. I will keep the secrets where they are and ship to everyone.",
+        time: "10:03",
+        kind: "text",
+      },
+    ],
+  },
+};
+
 export const UiBlocksInChat: Story = {
   name: "Agent UI blocks in chat",
   args: {
     messages: uiBlockChatMessages,
     prompt: uiBlockPrompt,
     promptUiBlock: uiBlockPendingLetter,
+  },
+};
+
+const uiBlockEpicTable = [
+  "Recommendation: **Sunday — reliability and finish**, with 7 items.",
+  "",
+  "| Issue | Proposed delivery | Size | Area |",
+  "| --- | --- | --- | --- |",
+  "| #5476 | Isolate the test foundation contention; accept 10 runs in a row without a timeout | M | Backend tests |",
+  "| #5258 | Make the auth connection and cache lock tests deterministic; 20 runs without a failure | M | Tests/CI |",
+  "| #5454 | Make the actions test really exercise the kept snapshot during a failure and API recovery | M | Frontend cache |",
+  "| #4700 | Count every FETCH miss without a double hit or miss | S | Observability |",
+  "| #4703 | Limit the memory of the PDF extraction subprocess; keep the parent alive | M | Backend security |",
+  "| #4720 | Remove duplicate historical alerts and keep new anomalies, repairs and repeats | M | Data quality |",
+  "| #4722 | Document reference_date of the options hub, also for an old trading session | S | API contract |",
+].join("\n");
+
+const uiBlockEpic: UiConfirmBlock = {
+  type: "confirm",
+  title: "Approve the Sunday epic before I open it?",
+  preview: uiBlockEpicTable,
+  actions: [
+    { id: "open", label: "Open the epic", style: "primary" },
+    { id: "change", label: "Change items" },
+  ],
+};
+
+/** More columns than the widest card holds: the table scrolls sideways in the card. */
+const uiBlockEarlierEpic: UiConfirmBlock = {
+  ...uiBlockEpic,
+  title: "Approve the Saturday epic before I open it?",
+  preview: [
+    "| Issue | Proposed delivery | Size | Area | Owner | Risk | Tests | Docs | Release |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    "| #5476 | Isolate the test foundation contention | M | Backend tests | Ana | Low | 10 runs | None | 0.71 |",
+    "| #5258 | Make the auth and cache lock tests deterministic | M | Tests/CI | Rui | Low | 20 runs | None | 0.71 |",
+  ].join("\n"),
+};
+
+const uiBlockEpicScript: UiConfirmBlock = {
+  type: "confirm",
+  title: "Run the script that opens the epics?",
+  preview: [
+    "```sh",
+    'gh issue create --title "Sunday — reliability and finish" --label epic --body-file sunday-epic.md --milestone 0.71',
+    "```",
+  ].join("\n"),
+  actions: [{ id: "run", label: "Run", style: "primary" }],
+};
+
+/**
+ * A table or code in a card preview makes the card as wide as an agent reply with a table, live and
+ * in the history. A table wider than that scrolls sideways in the card.
+ */
+export const UiBlockWithTable: Story = {
+  name: "Agent UI block with a table",
+  args: {
+    messages: [
+      {
+        id: "ui-block-table-user",
+        author: "you",
+        body: "Plan the weekend epics from the open issues.",
+        time: "10:00",
+        kind: "text",
+      },
+      {
+        id: "question-prompt:turn-ui-block-table-earlier:ui-block-saturday",
+        turnId: "turn-ui-block-table-earlier",
+        author: "agent",
+        body: "",
+        time: "10:01",
+        kind: "question",
+        itemType: "question_prompt",
+        questionPrompt: {
+          requestId: "ui-block-saturday",
+          questions: uiBlockFallbackQuestions(uiBlockEarlierEpic),
+          resolution: { status: "answered", responses: {} },
+        },
+        uiBlock: {
+          version: 1,
+          blockId: "saturday",
+          spec: uiBlockEarlierEpic,
+          state: { status: "answered", response: { actionId: "open" }, outcome: "Open the epic" },
+        },
+      },
+      {
+        id: "question-prompt:turn-ui-block-table-script:ui-block-script",
+        turnId: "turn-ui-block-table-script",
+        author: "agent",
+        body: "",
+        time: "10:02",
+        kind: "question",
+        itemType: "question_prompt",
+        questionPrompt: {
+          requestId: "ui-block-script",
+          questions: uiBlockFallbackQuestions(uiBlockEpicScript),
+          resolution: { status: "answered", responses: {} },
+        },
+        uiBlock: {
+          version: 1,
+          blockId: "script",
+          spec: uiBlockEpicScript,
+          state: { status: "answered", response: { actionId: "run" }, outcome: "Run" },
+        },
+      },
+    ],
+    prompt: {
+      type: "prompt",
+      requestId: "ui-block-sunday",
+      agentId: "chief",
+      threadId: "thread-chief",
+      turnId: "turn-ui-block-table",
+      questions: uiBlockFallbackQuestions(uiBlockEpic),
+    },
+    promptUiBlock: { version: 1, blockId: "sunday", spec: uiBlockEpic, state: { status: "pending" } },
   },
 };
 

@@ -418,7 +418,14 @@ function normalizeKey(key: string): {
   }
   if (!/^[\w\-.,/;='[\]`]{1,20}$/u.test(key)) throw new Error(`Unsupported browser key: ${key}`);
   const upper = key.length === 1 ? key.toUpperCase() : key;
-  return { key, code: key.length === 1 && /[a-z]/i.test(key) ? `Key${upper}` : upper };
+  // Chromium finds the editing command of a shortcut, such as Select All for `Ctrl+A` or Copy for
+  // `Ctrl+C`, from the key code. Without it, the shortcut does nothing in the page.
+  const usKey = key.length === 1 ? US_KEYS.get(key) : undefined;
+  return {
+    key,
+    code: key.length === 1 && /[a-z]/i.test(key) ? `Key${upper}` : upper,
+    ...(usKey ? { windowsVirtualKeyCode: usKey.keyCode } : {}),
+  };
 }
 
 /**

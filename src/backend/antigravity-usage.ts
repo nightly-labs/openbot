@@ -10,7 +10,10 @@
 //
 // The call needs the account's Code Assist project, from `loadCodeAssist`, and Google refuses it
 // (403) unless the User-Agent names Antigravity. Google sends the "Gemini Models" group only to the
-// desktop app's version, not to the CLI's, so the User-Agent names the desktop version (#7215). A
+// desktop app's version, not to the CLI's, so the User-Agent names the desktop version (#7215). Pro
+// plans got no Gemini 4 Argon group with the form `antigravity/<version> <os>/<arch>`. Other readers
+// of this service send the desktop app's own `antigravity/hub/...` form and get it, so OpenBot sends
+// that form too (#10934). A
 // Google account sign-in (`oauth-personal`, the only one whose token OpenBot reads) uses its quota on
 // the daily host, so the quota comes only from that host: the other host's room for the account can
 // be wrong, and a wrong "spent" reading would hold Gemini turns. OpenBot reads the access token from
@@ -19,7 +22,9 @@
 // Gemini usage.
 //
 // Google names the groups and can give a model a group of its own, such as Gemini 4 Argon on some
-// plans (#3055). The reading carries every group, so the usage popover shows each one.
+// plans (#3055). The reading carries every group, so the usage popover shows each one. Google lists
+// no models for the Argon group: its description is a plan note, so the group's name names its model
+// (#9864). Google's JSON leaves a zero `remainingFraction` out, so a spent bucket has none.
 
 import { readFile } from "node:fs/promises";
 import { usageGroupForModel } from "@openbot/contracts/ipc";
@@ -36,8 +41,9 @@ const CODE_ASSIST_URL = "https://cloudcode-pa.googleapis.com/v1internal";
 /** The Code Assist host that meters a Google account sign-in. */
 const DAILY_CODE_ASSIST_URL = "https://daily-cloudcode-pa.googleapis.com/v1internal";
 
-/** The Antigravity desktop app's version, which the User-Agent names. */
-const DESKTOP_VERSION = "2.31.0";
+/** The Antigravity desktop app's version and build, which the User-Agent names. */
+const DESKTOP_VERSION = "2.24.0";
+const DESKTOP_BUILD = "963137146";
 
 /**
  * A local fake of the service, for `scripts/antigravity-usage-e2e.ts`. Only a loopback `http` URL is
@@ -72,7 +78,10 @@ const QuotaBucket = Schema.Struct({
   displayName: Schema.optional(Schema.String),
   resetTime: Schema.optional(Schema.String),
   remainingFraction: Schema.optional(Schema.Number),
+  remainingAmount: Schema.optional(Schema.Union([Schema.String, Schema.Number])),
+  disabled: Schema.optional(Schema.Boolean),
 });
+type QuotaBucket = typeof QuotaBucket.Type;
 
 /** The `retrieveUserQuotaSummary` answer. Fields that OpenBot does not read are left out. */
 const AntigravityQuotaSummary = Schema.Struct({
@@ -101,7 +110,10 @@ type QuotaGroup = AccountRateLimitGroupResult & { primary: UsageWindow | null; s
 export const readAntigravityQuota = Effect.fn("AntigravityUsage.read")(function* (options: {
   tokenFile: string;
   model: string | null;
+  /** The calls to Google. The app gives one that uses the computer's proxy settings (#11278). */
+  fetch?: (url: string, init: RequestInit) => Promise<Response>;
 }) {
+  const send = options.fetch ?? fetch;
   const accessToken = yield* Effect.tryPromise(() => readFile(options.tokenFile, "utf8")).pipe(
     Effect.map(validAccessToken),
     Effect.orElseSucceed(() => null),
@@ -110,7 +122,7 @@ export const readAntigravityQuota = Effect.fn("AntigravityUsage.read")(function*
   const testEndpoint = localTestUrl(process.env[DEV_CODE_ASSIST_URL]);
   const call = <S extends Schema.Top>(endpoint: string, method: string, body: { project?: string }, answer: S) =>
     Effect.tryPromise(async (signal) => {
-      const response = await fetch(`${endpoint}:${method}`, {
+      const response = await send(`${endpoint}:${method}`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -162,11 +174,14 @@ function validAccessToken(text: string): string | null {
   return token?.access_token && expiry > Date.now() + 60_000 ? token.access_token : null;
 }
 
-/** The desktop app's User-Agent, such as `antigravity/2.31.0 darwin/arm64`, in Go's platform names. */
+/**
+ * The desktop app's User-Agent, such as
+ * `antigravity/hub/2.24.0 (aidev_client; os_type=darwin; arch=arm64; cl=963137146)`, in Go's platform names.
+ */
 function antigravityUserAgent(): string {
   const os = process.platform === "win32" ? "windows" : process.platform;
   const arch = process.arch === "x64" ? "amd64" : process.arch;
-  return `antigravity/${DESKTOP_VERSION} ${os}/${arch}`;
+  return `antigravity/hub/${DESKTOP_VERSION} (aidev_client; os_type=${os}; arch=${arch}; cl=${DESKTOP_BUILD})`;
 }
 
 /**
@@ -221,11 +236,12 @@ function quotaGroups(summary: AntigravityQuotaSummary): QuotaGroup[] {
       secondary: null,
     };
     for (const bucket of entry.buckets ?? []) {
-      if (bucket.remainingFraction === undefined) continue;
+      const remainingFraction = bucket.remainingFraction ?? omittedFraction(bucket);
+      if (remainingFraction === undefined) continue;
       const label = `${bucket.window ?? ""} ${bucket.displayName ?? ""}`;
       const resetsAt = bucket.resetTime ? Date.parse(bucket.resetTime) : Number.NaN;
       const window: UsageWindow = {
-        usedPercent: Math.max(0, Math.min(100, 100 - bucket.remainingFraction * 100)),
+        usedPercent: Math.max(0, Math.min(100, 100 - remainingFraction * 100)),
         windowDurationMins: /week/iu.test(label)
           ? WEEKLY_WINDOW_MINS
           : /\b5\s*-?\s*h|five.?hour/iu.test(label)
@@ -238,7 +254,20 @@ function quotaGroups(summary: AntigravityQuotaSummary): QuotaGroup[] {
     }
     groups.push(group);
   }
-  return groups;
+  // A group that lists no models while others do limits the model that it names, such as "Gemini 4
+  // Argon". When no group lists models, they stay empty: the Gemini group then covers every model.
+  if (!groups.some((group) => group.models.length > 0)) return groups;
+  return groups.map((group) => (group.models.length > 0 ? group : { ...group, models: [group.name] }));
+}
+
+/**
+ * The fraction of a bucket that has none. Google leaves a zero fraction out, so a bucket with a reset
+ * time and no amount is spent. A bucket that gives an amount instead, or that is turned off, has no
+ * fraction.
+ */
+function omittedFraction(bucket: QuotaBucket): number | undefined {
+  const resets = bucket.resetTime !== undefined && Number.isFinite(Date.parse(bucket.resetTime));
+  return resets && bucket.remainingAmount === undefined && bucket.disabled !== true ? 0 : undefined;
 }
 
 /** "Gemini Models" by name, else the first group whose name starts with Gemini. */

@@ -73,12 +73,16 @@ export function createSettingsGeneralStore(props: GeneralStoreProps) {
        *
        * A CLI the user installed that failed shows its own version too, so the row names the CLI
        * that failed. A copy that is not downloaded keeps its Download then.
+       *
+       * An incomplete CLI of the user's is read as a row with no owner while the copy is not
+       * downloaded: the copy that main offers in its place keeps its Download, as the copy runs
+       * instead once downloaded (#9139).
        */
       const agentVersionShown = Boolean(
         runtime &&
           agent &&
           (runtime.phase === "ready" || runtime.phase === "not-downloaded") &&
-          (agent.cliSource === "system"
+          (agent.cliSource === "system" && !(agent.cliIncomplete && runtime.phase === "not-downloaded")
             ? agent.state === "available" ||
               agent.state === "sign-in-required" ||
               (agent.state === "error" && runtime.phase === "ready")
@@ -132,6 +136,12 @@ export function createSettingsGeneralStore(props: GeneralStoreProps) {
         // The label goes only with the version of the CLI it names: in other states the row shows
         // the copy's version, while the agent status can still name the user's CLI.
         cliSource: agentVersionShown || agent?.cliSource === "managed" ? agent?.cliSource : undefined,
+        otherCliVersion: agentVersionShown || agent?.cliSource === "managed" ? agent?.otherCliVersion : undefined,
+        // The row keeps the Download of the copy, and names the user's CLI that runs meanwhile (#11854).
+        incompleteCliVersion:
+          agent?.cliSource === "system" && agent.cliIncomplete && runtime?.phase === "not-downloaded"
+            ? (agent.version ?? undefined)
+            : undefined,
       };
     }),
   );

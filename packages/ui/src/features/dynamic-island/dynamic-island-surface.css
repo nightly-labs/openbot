@@ -174,6 +174,12 @@
   flex: 0 0 20px;
 }
 
+/* While the idle island stays inside the notch, its ears have no room: the logo and the greeting show
+   again when the pointer opens the ears. */
+.dynamic-island-idle-in-notch .dynamic-island-ear {
+  visibility: hidden;
+}
+
 /* The idle greeting is a little larger than the 14px trailing slot of a status. */
 .dynamic-island-idle .dynamic-island-trailing-content {
   width: var(--openbot-icon-md);
@@ -413,11 +419,6 @@
 .dynamic-island-surface-working-badge .ui-spinner {
   border-color: var(--openbot-success-soft);
   border-top-color: currentColor;
-}
-
-/* The island is above every app all day. Its spinner turns only while the user looks at it. */
-.openbot-dynamic-island-transition-root[data-ambient-motion="paused"] .ui-spinner {
-  animation-play-state: paused;
 }
 
 .dynamic-island[data-layout-state="expanded"] .dynamic-island-surface-compact-name {

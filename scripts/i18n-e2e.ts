@@ -64,8 +64,9 @@ async function openSettings(page: Page, shown: TranslatedLocale) {
   if (!(await title.isVisible()))
     await page.keyboard.press(process.platform === "darwin" ? "Meta+Comma" : "Control+Comma");
   await title.waitFor();
-  const general = page.getByRole("tab", { name: t("settings.tab.general.title"), exact: true });
-  if (await general.isVisible()) await general.click();
+  // Language is in the Appearance section.
+  const appearance = page.getByRole("tab", { name: t("settings.appearance.title"), exact: true });
+  if (await appearance.isVisible()) await appearance.click();
   return languageButton(page, t("settings.language.title"));
 }
 

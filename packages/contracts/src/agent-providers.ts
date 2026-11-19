@@ -121,6 +121,22 @@ export interface AgentProviderDescriptor {
    */
   readonly localCodeSignIn: "device" | "paste" | null;
   /**
+   * How an account after the first signs in. `"key"`: each one is an API key of the provider, so a
+   * client asks for the key and shows no browser sign-in for it. Absent: the browser sign-in. It
+   * mirrors `ProviderKeyAccountSupport` of the driver in `src/backend/provider-drivers.ts`; keep the
+   * two in step. A host adds such an account only with `provider-account-keys-v1`.
+   */
+  readonly accountSignIn?: "key";
+  /**
+   * An account after the first can also sign in with a code: the provider's CLI gives a page, and
+   * the person finishes on any device. `device`: a code or a link that the page confirms by itself.
+   * `paste`: a code that the person copies back, which only a computer where
+   * `pasteCodeSignInSupported` can run. It mirrors `accounts.codeSignIn` of the driver in
+   * `src/backend/provider-drivers.ts`; keep the two in step. A joined server's host runs it only
+   * with `provider-account-code-v1`.
+   */
+  readonly accountCodeSignIn?: "device" | "paste";
+  /**
    * Where the provider's sign-in page ends. `callback`: the page sends the browser to an address on
    * the computer that started it, so a browser tab elsewhere must paste that address back. `page`:
    * the user finishes on the page and the provider sees it by itself, so any browser can run it.
@@ -165,11 +181,15 @@ export interface AgentProviderDescriptor {
   readonly workspaceEnforcement: "tool-sandbox" | "command-sandbox" | "confined-process";
   /**
    * How the CLI takes a message into a running turn. `native`: it reads the message at its next
-   * step (Grok through its `x.ai/interject` ACP extension). `deferred`: the protocol has no steer
-   * request (ACP), so the message can wait until the turn ends. Only a `native` provider steers a
-   * message sent in `steer` mode; the others queue it.
+   * step (Grok through its `x.ai/interject` ACP extension, OpenCode through its `_session/steering`
+   * ACP extension, Antigravity and Devin through a second `session/prompt`). `deferred`: the protocol has no
+   * steer request (ACP), so the message can wait until the turn ends. `reported`: each agent of the
+   * provider reports whether it steers, and its models carry `steersTurns` (a custom ACP agent with
+   * the `_session/steering` extension). Only a `native` provider, or a `reported` one whose model
+   * steers, steers a message sent in `steer` mode; the others queue it. A `native` CLI of a release
+   * before its steer request refuses the message, which then waits in the queue.
    */
-  readonly steer: "native" | "deferred";
+  readonly steer: "native" | "deferred" | "reported";
   /**
    * Whether the CLI runs turns of two sessions of one agent at the same time. `false`: the agent runs
    * one turn at a time, so its tasks and its own chat wait for each other. A custom ACP agent is
@@ -217,6 +237,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     authKind: "chatgpt",
     pickerOrder: 1,
     localCodeSignIn: "device",
+    accountCodeSignIn: "device",
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
     homeSkills: "native",
@@ -240,6 +261,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     authKind: "claude",
     pickerOrder: 0,
     localCodeSignIn: "paste",
+    accountCodeSignIn: "paste",
     signInPageEnd: "callback",
     skillFolders: [".claude/skills"],
     homeSkills: "plugin",
@@ -263,6 +285,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     authKind: "grok",
     pickerOrder: 2,
     localCodeSignIn: "device",
+    accountCodeSignIn: "device",
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
     homeSkills: "native",
@@ -293,7 +316,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     homeSkills: "native",
     workspaceInstructionFiles: ["AGENTS.md"],
     workspaceEnforcement: "confined-process",
-    steer: "deferred",
+    steer: "native",
     concurrentTurns: true,
     reportsUsage: true,
     approvalsInFullAccess: true,
@@ -318,7 +341,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     homeSkills: "instructions",
     workspaceInstructionFiles: [],
     workspaceEnforcement: "confined-process",
-    steer: "deferred",
+    steer: "native",
     concurrentTurns: true,
     reportsUsage: true,
     approvalsInFullAccess: true,
@@ -336,6 +359,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     defaultModel: "",
     legacyModelPrefix: null,
     authKind: "cursor",
+    accountSignIn: "key",
     pickerOrder: 5,
     localCodeSignIn: "device",
     signInPageEnd: "callback",
@@ -420,7 +444,8 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     homeSkills: "native",
     workspaceInstructionFiles: ["AGENTS.md", "CLAUDE.md"],
     workspaceEnforcement: "confined-process",
-    steer: "deferred",
+    // A Devin CLI that sets `cognition.ai/midTurnPrompts` (3000.12.57 does) takes a second prompt into the turn.
+    steer: "native",
     concurrentTurns: true,
     reportsUsage: false,
     approvalsInFullAccess: true,
@@ -649,7 +674,8 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     homeSkills: "instructions",
     workspaceInstructionFiles: [],
     workspaceEnforcement: "confined-process",
-    steer: "deferred",
+    // An agent that reports `_session/steering` in `initialize` steers; its models carry `steersTurns`.
+    steer: "reported",
     concurrentTurns: false,
     reportsUsage: false,
     approvalsInFullAccess: true,
@@ -667,10 +693,33 @@ export function agentProviderDescriptor(provider: AgentProviderId): AgentProvide
 
 /**
  * Whether the provider can take a queued message into its running turn. A provider that this build
- * does not know can: its host decides, and refuses the message when it cannot.
+ * does not know can: its host decides, and refuses the message when it cannot. A `reported` provider
+ * cannot here; `agentSteersTurns` reads its model.
  */
 export function providerSteersTurns(provider: AgentProviderRef): boolean {
   return !isKnownAgentProvider(provider) || agentProviderDescriptor(provider).steer === "native";
+}
+
+/**
+ * Whether an agent on this provider and model can take a queued message into its running turn. A
+ * `reported` provider steers only when `models` has a model with `steersTurns` from the same custom
+ * agent: the agent process reports it, not one model, so a saved model that the list no longer has, or
+ * that model visibility hides, still counts. An agent with no listed model, or a host without
+ * `model-steering-v1`, does not steer.
+ */
+export function agentSteersTurns(
+  runtime: { provider: AgentProviderRef; model: string },
+  models: readonly { provider: string; id: string; steersTurns?: boolean | undefined }[],
+): boolean {
+  if (!isKnownAgentProvider(runtime.provider) || agentProviderDescriptor(runtime.provider).steer !== "reported")
+    return providerSteersTurns(runtime.provider);
+  const agentId = customAgentIdOfModel(runtime.model);
+  return models.some(
+    (model) =>
+      model.provider === runtime.provider &&
+      model.steersTurns === true &&
+      (agentId === null ? model.id === runtime.model : customAgentIdOfModel(model.id) === agentId),
+  );
 }
 
 /** The provider name to put in front of a user. */

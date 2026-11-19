@@ -58,7 +58,9 @@ function numberNote({ t, format }: MobileText, connection: MessagingConnection, 
     // WhatsApp removed the linked device: only a new link brings the number back.
     case "invalid_token":
       return t("mobile.server.connectors.whatsapp.helpLoggedOut");
+    // The saved keys of the number cannot be read: a reconnect has nothing to connect with.
     case "secret_storage_unavailable":
+      return t("mobile.server.connectors.whatsapp.helpKeysUnreadable");
     case "error":
       return t("mobile.server.connectors.whatsapp.helpError");
     default:
@@ -93,6 +95,7 @@ export function WhatsAppConnectorPage({
     setWhatsAppEnabled,
     setWhatsAppOwnNumber,
     setWhatsAppWorkingMessage,
+    setWhatsAppStatusReactions,
     addWhatsAppOrchestrator,
     removeWhatsAppSender,
     answerWhatsAppRequest,
@@ -261,8 +264,24 @@ export function WhatsAppConnectorPage({
                 />
               </SettingsRow>
             ) : null}
-            {/* WhatsApp removed the device. Only a new link from the phone brings the number back. */}
-            {connection.state === "invalid_token" ? (
+            {/* An older host cannot set it: its numbers carry no `statusReactions`. */}
+            {settings && settings.statusReactions !== undefined ? (
+              <SettingsRow supportingText={t("mobile.server.connectors.whatsapp.statusReactionsDescription")}>
+                <SettingsSwitch
+                  value={settings.statusReactions}
+                  disabled={action.busy}
+                  label={t("mobile.server.connectors.whatsapp.statusReactions")}
+                  dark={theme === "dark"}
+                  onValueChange={(statusReactions) =>
+                    run(() =>
+                      setWhatsAppStatusReactions({ workspaceId: connection.workspaceId, statusReactions }, serverId),
+                    )
+                  }
+                />
+              </SettingsRow>
+            ) : null}
+            {/* The device was removed, or its keys cannot be read: only a new link brings the number back. */}
+            {connection.state === "invalid_token" || connection.state === "secret_storage_unavailable" ? (
               <SettingsRow
                 disclosure={false}
                 disabled={action.busy}

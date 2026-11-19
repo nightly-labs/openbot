@@ -5,6 +5,7 @@ import type { AppTextKey } from "@openbot/i18n";
 import {
   Button,
   CreditCard,
+  Gift,
   Item,
   ItemActions,
   ItemContent,
@@ -18,8 +19,13 @@ import {
   toast,
   UserRound,
 } from "@openbot/ui";
+import { documentColorScheme } from "@openbot/ui/document-color-scheme";
+import { ReferralPanel } from "@openbot/ui/features/referral/ReferralPanel";
+import { createReferralStore, type ReferralCalls } from "@openbot/ui/features/referral/referral-store";
 import { AppearanceSelect } from "@openbot/ui/features/settings/AppearanceSelect";
 import { ACTION_SOUND_CHOICES, TASK_SOUND_CHOICES } from "@openbot/ui/features/settings/app-settings";
+import { ChatBackgroundSetting } from "@openbot/ui/features/settings/ChatBackgroundSetting";
+import { ChatBubbleStyleSelect } from "@openbot/ui/features/settings/ChatBubbleStyleSelect";
 import { OwnChatColorTrigger } from "@openbot/ui/features/settings/ChatColorSetting";
 import { LanguageSelect } from "@openbot/ui/features/settings/LanguageSelect";
 import { NotificationMatrix, NotificationScopeTitle } from "@openbot/ui/features/settings/NotificationMatrix";
@@ -33,17 +39,21 @@ import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, onCleanup } from "solid-js";
 import { readActionSoundChoice, setActionSoundChoice } from "../../action-sounds";
 import { setShowAgentSteps, useShowAgentSteps } from "../../agent-steps-preference";
+import { setChatBubbleStyle, useChatBubbleStyle } from "../../chat-bubble-style-preference";
 import { setCompactMessageActions, useCompactMessageActions } from "../../compact-message-actions-preference";
 import { playSoundChoice, readTaskSound, setTaskSound } from "../../completion-sound";
 import { webReportsEnabled } from "../../error-reports";
 import { useLayout } from "../../layout";
 import { currentDevicePlatform, setSendShortcutMode, useSendShortcutMode } from "../../send-shortcut-preference";
+import { ChatBackdropSetting } from "../settings/ChatBackdropSetting";
+import { MotionSwitches } from "../settings/MotionSwitches";
 import type { WebAccountCalls } from "./web-account";
 import { sendWebAnalyticsChoice, setWebAnalyticsEnabled } from "./web-analytics";
+import { setWebChatBackground, useWebChatBackground } from "./web-chat-background";
 import { setWebLiveVoice, useWebLiveVoice } from "./web-live-voice";
 import type { WebNotificationSettings } from "./web-notification-settings";
 
-const TABS = ["profile", "preferences"] as const;
+const TABS = ["profile", "preferences", "referral"] as const;
 type WebAccountSettingsTab = (typeof TABS)[number];
 
 const TAB_ITEMS = {
@@ -56,6 +66,11 @@ const TAB_ITEMS = {
     titleKey: "webClient.settings.preferences.title",
     descriptionKey: "webClient.settings.preferences.description",
     icon: SlidersHorizontal,
+  },
+  referral: {
+    titleKey: "settings.tab.referral.title",
+    descriptionKey: "settings.tab.referral.description",
+    icon: Gift,
   },
 } as const satisfies Record<
   WebAccountSettingsTab,
@@ -75,6 +90,8 @@ export interface WebAccountSettingsProps {
   onChangeAppearance: (appearance: AppAppearance) => void;
   /** Closes these settings and opens the plans and servers of the account. */
   onOpenBilling: () => void;
+  /** Invite friends: the invite link, the credit and the friends of the account. */
+  referral: ReferralCalls;
   onSignOut: () => Promise<void>;
   /** The levels of each host and its agents, which apply on all devices of the user. */
   notifications: WebNotificationSettings;
@@ -100,6 +117,8 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
   const layout = useLayout();
   const showAgentSteps = useShowAgentSteps();
   const compactMessageActions = useCompactMessageActions();
+  const bubbleStyle = useChatBubbleStyle();
+  const chatBackground = useWebChatBackground();
   const webLiveVoice = useWebLiveVoice();
   // Playback reads the stored value on each event, so the menus follow a change from another tab.
   const [soundChoice, setSoundChoice] = createSignal(readActionSoundChoice());
@@ -125,6 +144,10 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
       onRevokeAccountSession: (sessionId) => props.calls.revokeSession(sessionId),
     },
     () => activeTab() === "profile",
+  );
+  const referral = createReferralStore(
+    () => props.referral,
+    () => props.open && activeTab() === "referral",
   );
   const navItem = () => TAB_ITEMS[activeTab()];
   // A server menu or a settings link opens the notification levels, which are in Preferences.
@@ -197,6 +220,10 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
             canRevokeSession
             onSignOut={props.onSignOut}
           />
+        </Tabs.Content>
+
+        <Tabs.Content value="referral" class="settings-modal-tab-panel" data-tab="referral">
+          <ReferralPanel store={referral} available />
         </Tabs.Content>
 
         <Tabs.Content value="preferences" class="settings-modal-tab-panel" data-tab="preferences">
@@ -279,6 +306,43 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
                   <OwnChatColorTrigger value={props.account.chatColor ?? null} onChange={saveChatColor} />
                 </ItemActions>
               </Item>
+              <Item class="settings-modal-row">
+                <ItemContent>
+                  <ItemTitle>{t("settings.bubbleStyle.title")}</ItemTitle>
+                  <ItemDescription>{t("settings.bubbleStyle.description")}</ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  <ChatBubbleStyleSelect
+                    value={bubbleStyle()}
+                    onChange={setChatBubbleStyle}
+                    {...(modalElement ? { mount: modalElement } : {})}
+                  />
+                </ItemActions>
+              </Item>
+              <Item class="settings-modal-row">
+                <ItemContent>
+                  <ItemTitle>{t("settings.chatBackground.title")}</ItemTitle>
+                  <ItemDescription>{t("settings.chatBackground.description")}</ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  <ChatBackgroundSetting
+                    scheme={documentColorScheme()}
+                    light={chatBackground().chatBackgroundLight}
+                    dark={chatBackground().chatBackgroundDark}
+                    onChange={setWebChatBackground}
+                  />
+                </ItemActions>
+              </Item>
+              <Item class="settings-modal-row">
+                <ItemContent>
+                  <ItemTitle>{t("settings.chatBackdrop.title")}</ItemTitle>
+                  <ItemDescription>{t("settings.chatBackdrop.description")}</ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  <ChatBackdropSetting {...(modalElement ? { mount: modalElement } : {})} />
+                </ItemActions>
+              </Item>
+              <MotionSwitches />
             </ItemGroup>
           </SettingsSection>
           {/* The choice is kept in this browser and holds for each server that serves live voice. */}

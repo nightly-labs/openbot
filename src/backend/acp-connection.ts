@@ -55,6 +55,7 @@ export class AcpConnection {
   #connection: ClientSideConnection | null = null;
   #ended: Deferred.Deferred<ProcessEnd> | null = null;
   #stopping = false;
+  #lastOutputAt = 0;
   readonly #stoppedProcesses = new WeakSet<ChildProcessWithoutNullStreams>();
   constructor(private readonly options: AcpConnectionOptions) {}
   get running(): boolean {
@@ -62,6 +63,10 @@ export class AcpConnection {
   }
   get ended(): Deferred.Deferred<ProcessEnd> | null {
     return this.#ended;
+  }
+  /** `Date.now()` when the process last wrote to its output or its error stream, or when it started. */
+  get lastOutputAt(): number {
+    return this.#lastOutputAt;
   }
   get connection(): ClientSideConnection | null {
     return this.#connection;
@@ -91,6 +96,12 @@ export class AcpConnection {
       }),
     );
     this.#process = child;
+    this.#lastOutputAt = Date.now();
+    const wrote = () => {
+      this.#lastOutputAt = Date.now();
+    };
+    child.stdout.on("data", wrote);
+    child.stderr.on("data", wrote);
     registerProviderProcess(child, this.options.provider);
     // A start that times out says nothing of the process. These lines show whether it ran, how long
     // it took to write anything, and how it ended, such as a Windows server that unpacks itself (#2311).
@@ -131,7 +142,7 @@ export class AcpConnection {
       emit: (message) => {
         lastDiagnostic = message;
         if (crashDiagnostic === null && CRASH_LINE.test(message)) crashDiagnostic = message;
-        this.options.diagnostic(message, { duringStop: this.#stoppedProcesses.has(child) });
+        this.options.diagnostic(message, { duringStop: this.#stoppedProcesses.has(child), stderr: true });
       },
     });
     child.stderr.on("data", (chunk: Buffer) => diagnostics.push(chunk.toString("utf8")));
@@ -210,10 +221,11 @@ export class AcpConnection {
     this: AcpConnection,
     error: unknown,
     ended: Deferred.Deferred<ProcessEnd> | null,
+    serverLost = false,
   ): Effect.fn.Return<unknown, ProviderClientOperationError> {
     if (!ended || this.#stopping) return yield* providerSync(() => error);
     const message = error instanceof Error ? error.message : "";
-    if (message !== "ACP connection closed" && message !== "ACP client is not running.")
+    if (!serverLost && message !== "ACP connection closed" && message !== "ACP client is not running.")
       return yield* providerSync(() => error);
     const ending = yield* Deferred.await(ended).pipe(
       Effect.timeoutOrElse({ duration: EXIT_REPORT_WAIT_MS, orElse: () => Effect.succeed(null) }),

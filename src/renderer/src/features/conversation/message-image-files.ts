@@ -5,6 +5,19 @@ import type { ConversationRuntime } from "./conversation-runtime";
 /** A path that the host reads as one in the shared folder, such as `Shared/report.md`. */
 export const SHARED_FOLDER_PATH = /^Shared[/\\]/u;
 
+/**
+ * A workspace path with `%XX` decoded once, as the workspace resolver reads it. The shared-file resolver
+ * does not decode, so a `Shared/…` path that falls back to it is decoded here (#12104).
+ */
+export function decodedPath(path: string): string {
+  try {
+    return decodeURIComponent(path);
+  } catch {
+    // A literal percent sign can be part of a file name.
+    return path;
+  }
+}
+
 /** A larger named image keeps only its chip. The host does not read or send a larger file. */
 const INLINE_IMAGE_BYTES = 8 * 1024 * 1024;
 /**
@@ -60,7 +73,7 @@ export function createMessageImageFiles(
 
   async function read(file: MessageImageFile, agentId: string | undefined, key: string): Promise<string | null> {
     if (file.kind === "workspace" && !agentId) return null;
-    const shared = () => agent.previewSharedFile({ path: file.path, maxBytes: INLINE_IMAGE_BYTES });
+    const shared = (path = file.path) => agent.previewSharedFile({ path, maxBytes: INLINE_IMAGE_BYTES });
     const preview =
       file.kind === "shared"
         ? await shared()
@@ -76,7 +89,7 @@ export function createMessageImageFiles(
             .catch((error: unknown) => {
               if (!SHARED_FOLDER_PATH.test(file.path)) throw error;
               sharedFallbacks.add(key);
-              return shared();
+              return shared(decodedPath(file.path));
             });
     releaseFilePreviewPage(preview.pageUrl);
     const type = preview.mimeType.split(";")[0]?.trim().toLowerCase() ?? "";
@@ -112,7 +125,7 @@ export function createMessageImageFiles(
 
   /** The file that the shown image of `file` came from. */
   function source(file: MessageImageFile, scope: MessageImageScope): MessageImageFile {
-    return sharedFallbacks.has(keyOf(file, scope)) ? { kind: "shared", path: file.path } : file;
+    return sharedFallbacks.has(keyOf(file, scope)) ? { kind: "shared", path: decodedPath(file.path) } : file;
   }
 
   return { load, source };

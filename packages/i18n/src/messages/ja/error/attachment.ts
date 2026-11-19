@@ -5,6 +5,7 @@ export const messages = {
   // Attachment and file preview errors.
   "error.attachment.notFound": "添付ファイルが見つかりませんでした。",
   "error.attachment.fileTooLarge": "100 MB の上限を超えるファイルがあります。",
+  "error.attachment.namedFileTooLarge": "{name} は 100 MB の上限を超えています。",
   "error.attachment.totalTooLarge": "添付ファイルの合計が 250 MB の上限を超えています。",
   "error.attachment.unavailable": "このファイルはもう利用できません。",
   "error.attachment.tooMany": "選択できるファイルは {limit} 個までです。",

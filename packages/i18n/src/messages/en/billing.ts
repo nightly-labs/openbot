@@ -31,10 +31,15 @@ export const messages = defineMessages("billing", {
   "billing.status.paused": "Paused",
   "billing.otherServers": "Other servers",
   "billing.action.menu": "Plan actions for {server}",
-  "billing.action.change": "Change plan",
+  "billing.action.addStorage": "Add storage",
   "billing.action.cancel": "Cancel plan",
   "billing.action.renew": "Renew plan",
   "billing.action.updatePayment": "Update payment method",
+  // "Add storage" in Billing. {server} is the server name.
+  "billing.storage.title": "More space for {server}",
+  // The button that buys the chosen storage. {size} is the added storage, for example "50 GB".
+  "billing.storage.add": "Add {size}",
+  "billing.storage.failed": "Could not add storage.",
   "billing.lifecycle.cancelRenewal": "Cancel renewal",
   "billing.lifecycle.cancelTitle": "Cancel renewal for {name}?",
   "billing.lifecycle.cancelDescription":
@@ -161,6 +166,8 @@ export const messages = defineMessages("billing", {
   "billing.order.server.summary": "We run OpenBot for your team.",
   "billing.order.server.none": "No server",
   "billing.order.server.noneDetail": "Run OpenBot on your own computer",
+  // The free choice of the order form in the app, which already runs on this computer. The web page says "No server".
+  "billing.order.server.thisComputer": "Your computer",
   "billing.order.server.bestValue": "Best value",
   "billing.order.server.bestFor.starter": "Best for one person",
   "billing.order.server.bestFor.standard": "Best for a small team",
@@ -209,6 +216,8 @@ export const messages = defineMessages("billing", {
   "billing.order.cta.server": "Create a server",
   "billing.order.cta.license": "Buy a license",
   "billing.order.cta.download": "Download",
+  // The button of the order form in the app when the order has no server and no license. It closes the page.
+  "billing.order.cta.keepComputer": "Keep using this computer",
   // Shown before an invite that makes the license too small.
   "billing.license.invite.title": "Add a user to the license?",
   "billing.license.invite.description": "This invite adds 1 user to your license: {price} more a month.",
@@ -221,4 +230,56 @@ export const messages = defineMessages("billing", {
     other:
       "Your license has {count} users, the maximum. Contact us for a larger license. New people cannot join your servers.",
   },
+  // The billing country and the EU VAT ID before the payment page. They decide the VAT.
+  "billing.details.country": "Billing country",
+  "billing.details.countryPlaceholder": "Select a country",
+  "billing.details.vatId": "EU VAT ID (optional)",
+  "billing.details.vatIdInvalid": "This is not a VAT ID of the selected country.",
+  "billing.details.countryMissing": "Select your billing country.",
+  "billing.details.saveFailed": "Could not save the billing details",
+  // The "Invite friends" tab in Settings and the Invite friends dialog in the web client.
+  // The split, as one text for screen readers. {percent} is the share, for example "10%".
+  "billing.referral.split":
+    "Your friend gets {percent} off each payment. You get {percent} of each payment of your friend, as credit.",
+  // The two short chips of the split.
+  "billing.referral.split.friend": "{percent} off for your friend",
+  "billing.referral.split.you": "{percent} credit for you",
+  "billing.referral.link.title": "Your link",
+  "billing.referral.link.label": "Your invite link",
+  "billing.referral.link.copy": "Copy link",
+  "billing.referral.link.copied": "Link copied",
+  "billing.referral.link.copyFailed": "Could not copy the link.",
+  // {amount} is one or more formatted amounts, for example "€12.40".
+  "billing.referral.credit.title": "Your credit",
+  "billing.referral.credit.none": "None",
+  "billing.referral.credit.next": "Goes to your next invoice.",
+  "billing.referral.credit.empty": "Starts when a friend pays a second time.",
+  "billing.referral.credit.pendingTitle": "Waiting",
+  "billing.referral.credit.pending": "Ready after a friend pays a second time. Goes to your credit when full.",
+  "billing.referral.credit.progress": "{ready} of {minimum} ready",
+  "billing.referral.credit.earnedTitle": "Earned in total",
+  "billing.referral.friends.title": "Friends",
+  "billing.referral.filter.label": "Show friends",
+  "billing.referral.filter.all": "All",
+  "billing.referral.filter.paying": "Paying",
+  "billing.referral.filter.noPlan": "No plan",
+  "billing.referral.filter.stopped": "Stopped",
+  "billing.referral.empty.all": "No friend has joined with your link yet.",
+  "billing.referral.empty.paying": "No friend pays now.",
+  "billing.referral.empty.noPlan": "Each friend has a plan.",
+  "billing.referral.empty.stopped": "No friend stopped paying.",
+  "billing.referral.friend.unnamed": "Friend with no name",
+  "billing.referral.friend.joined": "Joined on {date}",
+  "billing.referral.friend.paying": "Joined on {date} · paying since {since}",
+  "billing.referral.friend.stopped": "Joined on {date} · stopped on {stopped}",
+  "billing.referral.friend.earned": "{amount} credit",
+  "billing.referral.friend.pending": "{amount} waiting",
+  "billing.referral.pages.label": "Pages of friends",
+  // For example "21–40 of 312".
+  "billing.referral.pages.range": "{first}–{last} of {total}",
+  "billing.referral.pages.previous": "Previous page",
+  "billing.referral.pages.next": "Next page",
+  "billing.referral.loading": "Loading your invite link…",
+  "billing.referral.loadFailed": "Could not load your invite link.",
+  "billing.referral.unavailable": "Invite links are not available on this account server.",
 });

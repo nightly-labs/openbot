@@ -6,11 +6,15 @@
 // host's WhatsApp numbers over a stand-in messaging service (`whatsapp-connector-v1`), the
 // host's password managers (`password-managers-v1`) over the real engine with a stand-in Proton
 // Pass driver and the real Bitwarden adapter, the
-// host's Vault (`vault-v1`, its API keys through `vault-v2`, and the CSV import of `vault-import-v1`)
+// host's Vault (`vault-v1`, its API keys through `vault-v2`, the agents of each item through `vault-v4`, and the CSV import of `vault-import-v1`)
 // over the real service and store,
 // where each routine runs (`routine-run-place-v1`) over stand-in routine records,
+// which run paused each paused routine (`routine-pause-reasons-v1`) over the same records,
+// the open work of the queues of all agents in one read (`agent-active-queues-v1`),
 // a password that an admin saves from the secure card (`browser-secret-vault-v1`),
 // a transfer file larger than one part, sent and read in parts (`instance-transfer-chunks-v1`),
+// the whole copy of a pending approval (`pending-approval-v1`),
+// a bug report about the phone app, sent with the phone's data (`phone-feedback-v1`),
 // direct-message isolation, agents hidden from an older
 // protocol, the queue routes, message delete (`message-delete-v1`) under the agent roles, the attachment and file routes with their size limits,
 // a Grok Bot export sent in parts (`agent-import-v2`) to the real import service, and the error
@@ -60,10 +64,12 @@ import {
   decodeHostProviderAccountPools,
   decodeHostWhatsAppLinkState,
   decodeHostWhatsAppOverview,
+  decodeInstalledSkills,
   disconnectedPasswordManager,
   type HermesImportPreview,
   type HiddenAgentsSnapshot,
   INSTANCE_TRANSFER_LIMITS,
+  isWhatsAppStatusReactionsList,
   isWhatsAppWorkingMessageList,
   type LibraryFolderAction,
   type PasswordManagerConnectMethod,
@@ -73,6 +79,7 @@ import {
   type ProviderDetectionSettings,
   type QueueDelivery,
   type QueueSnapshot,
+  ROUTINE_QUIET_ANSWER_ITEM_TYPE,
   type Routine,
   type RoutineResultConnectionOption,
   type RoutineResultDestination,
@@ -84,18 +91,26 @@ import {
   type VoiceLiveEvent,
   type WhatsAppAccount,
   type WhatsAppLinkState,
+  type WhatsAppStatusReactionsList,
   type WhatsAppWorkingMessageList,
   withHostProviderAccountModels,
+  withWhatsAppStatusReactions,
   withWhatsAppWorkingMessages,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { TEAM_PROTOCOL_V1_WEBSOCKET } from "@openbot/contracts/team-protocol";
 import {
+  AGENT_ACTIVE_QUEUE_DELIVERY_LIMIT,
+  AGENT_ACTIVE_QUEUES_CAPABILITY,
+  AGENT_ACTIVE_QUEUES_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-active-queues-v1";
+import {
   AGENT_BACKUP_MODELS_CAPABILITY,
   AGENT_BACKUP_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import { AGENT_COLORS_CAPABILITY, AGENT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/agent-colors-v1";
+import { AGENT_DEFAULTS_CAPABILITY, AGENT_DEFAULTS_ROUTES } from "@openbot/contracts/team-protocol/agent-defaults-v1";
 import {
   AGENT_FAST_MODE_CAPABILITY,
   AGENT_FAST_MODE_ROUTES,
@@ -119,6 +134,10 @@ import {
   AGENT_NOTIFICATION_LEVELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import {
+  AGENT_PENDING_RUNTIME_CAPABILITY,
+  AGENT_PENDING_RUNTIME_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-pending-runtime-v1";
+import {
   AGENT_PLAN_CARD_CAPABILITY,
   AGENT_PLAN_CARD_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
@@ -126,10 +145,16 @@ import {
   AGENT_QUEUE_TASK_CAPABILITY,
   AGENT_QUEUE_TASK_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-queue-task-v1";
+import { AGENT_SPEED_CAPABILITY, AGENT_SPEED_ROUTES } from "@openbot/contracts/team-protocol/agent-speed-v1";
 import {
   AGENT_TASK_LIMIT_CAPABILITY,
   AGENT_TASK_LIMIT_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
+import { AGENT_TASKS_CAPABILITY, AGENT_TASKS_ROUTES } from "@openbot/contracts/team-protocol/agent-tasks-v1";
+import {
+  AGENT_THREAD_FILES_CAPABILITY,
+  AGENT_THREAD_FILES_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-thread-files-v1";
 import {
   AGENT_THREAD_PAGES_CAPABILITY,
   AGENT_THREAD_PAGES_ROUTES,
@@ -143,6 +168,10 @@ import {
   AGENT_THREAD_REPLIES_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-thread-replies-v1";
 import {
+  AGENT_THREAD_REQUESTS_CAPABILITY,
+  AGENT_THREAD_REQUESTS_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-thread-requests-v1";
+import {
   AGENT_USAGE_LIMIT_CAPABILITY,
   AGENT_USAGE_LIMIT_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
@@ -151,6 +180,7 @@ import {
   AGENT_WAITS_REQUEST_TEXT_LIMIT,
   AGENT_WAITS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-waits-v1";
+import { ATTACHMENT_PREVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-preview-v1";
 import {
   BACKGROUND_PROCESS_COMMAND_LIMIT,
   BACKGROUND_PROCESSES_CAPABILITY,
@@ -168,6 +198,11 @@ import {
   BROWSER_SECRET_VAULT_CAPABILITY,
   BROWSER_SECRET_VAULT_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
+import {
+  BROWSER_SIGN_IN_STORAGE_CAPABILITY,
+  BROWSER_SIGN_IN_STORAGE_ROUTES,
+  decodeBrowserSignInStorageResult,
+} from "@openbot/contracts/team-protocol/browser-sign-in-storage-v1";
 import {
   BROWSER_TEACH_CAPABILITY,
   BROWSER_TEACH_ROUTES,
@@ -205,7 +240,12 @@ import {
   CONVERSATION_UNREAD_FROM_CAPABILITY,
   CONVERSATION_UNREAD_FROM_ROUTE,
 } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
-import { AGENT_HIDDEN_WORK_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import {
+  AGENT_HIDDEN_WORK_CAPABILITY,
+  decodeTeamProtocolSupportExpanded,
+  TEAM_CURRENT_CAPABILITIES,
+  teamCapabilityHeaders,
+} from "@openbot/contracts/team-protocol/current";
 import {
   CUSTOM_AGENTS_CAPABILITY,
   CUSTOM_AGENTS_CODECS,
@@ -217,24 +257,52 @@ import {
   CUSTOM_PROVIDER_EDIT_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
 import {
+  CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
+  CUSTOM_PROVIDER_HARNESS_CHOICE_CODECS,
+  CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES,
+} from "@openbot/contracts/team-protocol/custom-provider-harness-choice-v1";
+import {
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_CODECS,
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
+import {
+  decodeFeedbackWithdrawResult,
+  FEEDBACK_WITHDRAW_CAPABILITY,
+  FEEDBACK_WITHDRAW_ROUTES,
+} from "@openbot/contracts/team-protocol/feedback-withdraw-v1";
+import { GITHUB_SKILLS_CAPABILITY, GITHUB_SKILLS_ROUTES } from "@openbot/contracts/team-protocol/github-skills-v1";
 import { HERMES_IMPORT_CAPABILITY, HERMES_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/hermes-import-v1";
+import {
+  HOST_APPEARANCE_CAPABILITY,
+  HOST_APPEARANCE_EVENT,
+  HOST_APPEARANCE_ROUTES,
+  type ServerAppearance,
+  serverAppearanceOrNull,
+} from "@openbot/contracts/team-protocol/host-appearance-v1";
 import {
   HOST_KEY_ROTATION_CAPABILITY,
   HOST_KEY_ROTATION_ROUTES,
 } from "@openbot/contracts/team-protocol/host-key-rotation-v1";
+import { HOST_RESTART_CAPABILITY, HOST_RESTART_ROUTES } from "@openbot/contracts/team-protocol/host-restart-v1";
+import {
+  HOST_TURN_LIMITS_CAPABILITY,
+  HOST_TURN_LIMITS_ROUTES,
+} from "@openbot/contracts/team-protocol/host-turn-limits-v1";
 import {
   INSTANCE_TRANSFER_CHUNK_BYTES,
   INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
   INSTANCE_TRANSFER_CHUNKS_ROUTES,
 } from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
 import {
+  INSTANCE_TRANSFER_FULL_COPY_CAPABILITY,
+  INSTANCE_TRANSFER_FULL_COPY_ROUTES,
+} from "@openbot/contracts/team-protocol/instance-transfer-full-copy-v1";
+import {
   INSTANCE_TRANSFER_CAPABILITY,
   INSTANCE_TRANSFER_ROUTES,
 } from "@openbot/contracts/team-protocol/instance-transfer-v1";
+import { LIBRARY_FOLDERS_EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/library-folders-events-v1";
 import {
   LIBRARY_FOLDERS_CAPABILITY,
   LIBRARY_FOLDERS_ROUTES,
@@ -246,6 +314,7 @@ import {
   liveVoiceEvent,
 } from "@openbot/contracts/team-protocol/live-voice-v1";
 import { LOCAL_SERVERS_CAPABILITY, LOCAL_SERVERS_ROUTES } from "@openbot/contracts/team-protocol/local-servers-v1";
+import { MAC_APPS_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/mac-apps-limit-v1";
 import {
   MACHINE_RESOURCES_CAPABILITY,
   MACHINE_RESOURCES_ROUTES,
@@ -255,11 +324,26 @@ import {
 import { MEMORY_REVIEW_CAPABILITY, MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { MESSAGE_PINS_CAPABILITY, MESSAGE_PINS_ROUTES } from "@openbot/contracts/team-protocol/message-pins-v1";
+import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mistral-code-sign-in-v1";
+import { MODEL_STEERING_CAPABILITY, MODEL_STEERING_ROUTES } from "@openbot/contracts/team-protocol/model-steering-v1";
 import {
   PASSWORD_MANAGERS_CAPABILITY,
   PASSWORD_MANAGERS_CODECS,
   PASSWORD_MANAGERS_ROUTES,
 } from "@openbot/contracts/team-protocol/password-managers-v1";
+import {
+  PENDING_APPROVAL_CAPABILITY,
+  PENDING_APPROVAL_ROUTES,
+} from "@openbot/contracts/team-protocol/pending-approval-v1";
+import { PHONE_FEEDBACK_CAPABILITY, PHONE_FEEDBACK_ROUTES } from "@openbot/contracts/team-protocol/phone-feedback-v1";
+import {
+  PROVIDER_ACCOUNT_CODE_CAPABILITY,
+  PROVIDER_ACCOUNT_CODE_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-account-code-v1";
+import {
+  PROVIDER_ACCOUNT_KEYS_CAPABILITY,
+  PROVIDER_ACCOUNT_KEYS_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-account-keys-v1";
 import {
   PROVIDER_ACCOUNT_MODELS_CAPABILITY,
   PROVIDER_ACCOUNT_MODELS_ROUTES,
@@ -277,6 +361,15 @@ import {
   PROVIDER_DETECTION_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-detection-v1";
 import {
+  PROVIDER_ENVIRONMENT_CAPABILITY,
+  PROVIDER_ENVIRONMENT_CODECS,
+  PROVIDER_ENVIRONMENT_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-environment-v1";
+import {
+  PROVIDER_MODEL_SOURCE_CAPABILITY,
+  PROVIDER_MODEL_SOURCE_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-model-source-v1";
+import {
   PROVIDER_USAGE_RESET_CAPABILITY,
   PROVIDER_USAGE_RESET_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-usage-reset-v1";
@@ -290,9 +383,15 @@ import { PROVIDERS_V5_CAPABILITY, PROVIDERS_V5_ROUTES } from "@openbot/contracts
 import { PROVIDERS_V8_CAPABILITY, PROVIDERS_V8_ROUTES } from "@openbot/contracts/team-protocol/providers-v8";
 import { QueueEditRejectedError, TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import {
+  ROUTINE_PAUSE_REASONS_CAPABILITY,
+  ROUTINE_PAUSE_REASONS_ROUTES,
+} from "@openbot/contracts/team-protocol/routine-pause-reasons-v1";
+import { ROUTINE_QUIET_ANSWERS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-quiet-answers-v1";
+import {
   ROUTINE_RESULTS_CAPABILITY,
   ROUTINE_RESULTS_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-results-v1";
+import { ROUTINE_RESULTS_WHATSAPP_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-whatsapp-v1";
 import {
   decodeRoutineRunCommandResponse,
   ROUTINE_RUN_COMMAND_CAPABILITY,
@@ -303,44 +402,69 @@ import {
   ROUTINE_RUN_PLACE_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-run-place-v1";
 import { ROUTINES_ONCE_CAPABILITY, ROUTINES_ONCE_ROUTES } from "@openbot/contracts/team-protocol/routines-once-v1";
+import { SETTING_LINK_MARKERS_CAPABILITY } from "@openbot/contracts/team-protocol/setting-link-markers-v1";
 import { SIDE_QUESTION_CAPABILITY, SIDE_QUESTION_ROUTES } from "@openbot/contracts/team-protocol/side-question-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { SIDEBAR_PINS_CAPABILITY, SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { SKILL_LEARNING_CAPABILITY, SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
+import { SKILL_PROBLEMS_CAPABILITY } from "@openbot/contracts/team-protocol/skill-problems-v1";
+import { SKILLS_ADMIN_CAPABILITY, SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { STORAGE_DISK_CAPABILITY, STORAGE_DISK_ROUTES } from "@openbot/contracts/team-protocol/storage-disk-v1";
+import {
+  STORAGE_USER_FILES_CAPABILITY,
+  STORAGE_USER_FILES_ROUTES,
+} from "@openbot/contracts/team-protocol/storage-user-files-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import {
   THREAD_MESSAGE_SEARCH_CAPABILITY,
   THREAD_MESSAGE_SEARCH_ROUTES,
 } from "@openbot/contracts/team-protocol/thread-message-search-v1";
+import { UI_BLOCK_PREVIEW_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/ui-block-preview-edit-v1";
+import { USAGE_CREDITS_CAPABILITY, USAGE_CREDITS_ROUTES } from "@openbot/contracts/team-protocol/usage-credits-v1";
 import {
   TEAM_APP_VERSION_HEADER,
   TEAM_CAPABILITIES_HEADER,
   TEAM_PROTOCOL_VERSION_HEADER,
 } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
+import { encodeTeamProtocolV9WebRtcHttpRequest } from "@openbot/contracts/team-protocol/v9-webrtc-adapter";
+import { TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
 import { VAULT_IMPORT_CAPABILITY, VAULT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY, VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY, VAULT_V2_ROUTES } from "@openbot/contracts/team-protocol/vault-v2";
 import { VAULT_V3_CAPABILITY, VAULT_V3_ROUTES } from "@openbot/contracts/team-protocol/vault-v3";
+import { VAULT_V4_CAPABILITY, VAULT_V4_ROUTES } from "@openbot/contracts/team-protocol/vault-v4";
+import {
+  WEBHOOK_AGENT_SECRET_CAPABILITY,
+  WEBHOOK_AGENT_SECRET_ROUTES,
+} from "@openbot/contracts/team-protocol/webhook-agent-secret-v1";
 import {
   WHATSAPP_CONNECTOR_CAPABILITY,
   WHATSAPP_CONNECTOR_CODECS,
   WHATSAPP_CONNECTOR_ROUTES,
 } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
 import {
+  WHATSAPP_STATUS_REACTIONS_CAPABILITY,
+  WHATSAPP_STATUS_REACTIONS_CODECS,
+  WHATSAPP_STATUS_REACTIONS_ROUTES,
+} from "@openbot/contracts/team-protocol/whatsapp-status-reactions-v1";
+import {
   WHATSAPP_WORKING_MESSAGE_CAPABILITY,
   WHATSAPP_WORKING_MESSAGE_CODECS,
   WHATSAPP_WORKING_MESSAGE_ROUTES,
 } from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
+import { WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/workspace-only-process-limit-v1";
 import { parseTwoStepKey, twoStepCode } from "@openbot/contracts/two-step-code";
+import { UI_CONFIRM_PREVIEW_ANSWER_ID } from "@openbot/contracts/ui-blocks";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { RoutineInputError } from "@openbot/team-client/routine-schedule";
 import { Effect } from "effect";
 import { strToU8, unzipSync, zipSync } from "fflate";
+import { ForbiddenAttentionAnswer, InactiveAttentionRequest } from "../src/backend/agent/inactive-attention-request";
 import { SteerUnsupportedError } from "../src/backend/agent/queue-controls";
 import { AgentLifecycleFailed } from "../src/backend/agent-service";
+import { AgentThreadLimitError } from "../src/backend/agent-tasks/agent-tasks";
 import { AgentWaitError } from "../src/backend/agent-waits/agent-wait-store";
 import { BrowserProfileStore } from "../src/backend/browser-profiles/browser-profile-store";
 import { BrowserProxyStore } from "../src/backend/browser-profiles/browser-proxy-store";
@@ -353,19 +477,27 @@ import { MailboxStore } from "../src/backend/mailbox-store";
 import { MessageDeleteRefused } from "../src/backend/message-delete";
 import { MessagePinRefused } from "../src/backend/message-pins";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
+import { canConfineProcesses } from "../src/backend/process-confinement";
 import { RoutineResultError } from "../src/backend/routine-results/routine-results";
 import type { OwnedRoutineRecord } from "../src/backend/routine-store";
 import { TeamChatStore } from "../src/backend/team-chat-store";
 import type { AgentAccessState } from "../src/main/agent-access-store";
+import { createAgentDefaultsPreferenceStore } from "../src/main/agent-defaults-preference-store";
+import { createAgentDefaultsSettings } from "../src/main/agent-defaults-settings";
 import { createAgentFolders } from "../src/main/agent-folders";
 import { createAgentHostSettings } from "../src/main/agent-host-settings";
 import { AgentImportService } from "../src/main/agent-import-service";
 import { createAgentInstructionsFiles } from "../src/main/agent-instructions-files";
 import { AgentNotificationLevelStore } from "../src/main/agent-notification-level-store";
-import { type BitwardenCliRunner, BitwardenConnectorService } from "../src/main/bitwarden-connector-service";
+import {
+  type BitwardenCliRunner,
+  BitwardenConnectorService,
+  BitwardenKeyIdBackfillError,
+} from "../src/main/bitwarden-connector-service";
 import { BitwardenConnectorStore } from "../src/main/bitwarden-connector-store";
 import { createBrowserProfileService } from "../src/main/browser-profile-service";
 import { BrowsingMemoryPreferenceStore } from "../src/main/browsing-memory-preference-store";
+import { BusyMessageModePreferenceStore } from "../src/main/busy-message-mode-preference-store";
 import {
   claudeCompactWindowControl,
   createClaudeCompactWindowPreferenceStore,
@@ -376,6 +508,9 @@ import {
 } from "../src/main/claude-user-setup-preference-store";
 import { createCustomProviderChanges } from "../src/main/custom-provider-changes";
 import { CustomProviderStore } from "../src/main/custom-provider-store";
+import { githubSkillSource } from "../src/main/github-skill-source";
+import type { HostEventsApi } from "../src/main/host-events-api";
+import { HostTurnLimitsPreferenceStore } from "../src/main/host-turn-limits-preference-store";
 import {
   INSTANCE_TRANSFER_FORMAT,
   INSTANCE_TRANSFER_MANIFEST,
@@ -387,15 +522,23 @@ import { MemoryReviewPreferenceStore } from "../src/main/memory-review-preferenc
 import type { PasswordManagerDriver } from "../src/main/password-managers/driver";
 import { PasswordManagersService } from "../src/main/password-managers/password-managers-service";
 import { ProviderAccountsHost } from "../src/main/provider-accounts-host";
+import { ProviderCredentialStore } from "../src/main/provider-credential-store";
+import {
+  createProviderEnvironmentPreferenceStore,
+  providerEnvironmentControl,
+  providerEnvironmentSecret,
+} from "../src/main/provider-environment-store";
 import { downloadTransferInParts, uploadTransferInParts } from "../src/main/remote-instance-transfer-chunks";
 import { RemoteRequestError } from "../src/main/remote-server-errors";
 import { RemoteWorkflowError } from "../src/main/remote-service-effects";
 import { SidebarPinStore } from "../src/main/sidebar-pin-store";
 import { SkillLearningPreferenceStore } from "../src/main/skill-learning-preference-store";
+import { SkillMarketplaceFailure, SkillMarketplaceService } from "../src/main/skill-marketplace-service";
 import type {
   TeamApiAgentAccess,
   TeamApiAgents,
   TeamApiAgentTasks,
+  TeamApiAttachmentPreviews,
   TeamApiBrowser,
   TeamApiConnectors,
   TeamApiLiveVoice,
@@ -453,6 +596,13 @@ interface RecordedCall {
 
 mkdirSync(OUT, { recursive: true });
 const root = mkdtempSync(join(tmpdir(), "openbot-team-api-routes-"));
+const agentDefaultsPath = join(root, "agent-defaults.json");
+const agentDefaultsPreferences = createAgentDefaultsPreferenceStore(agentDefaultsPath);
+const busyMessageModePreferences = new BusyMessageModePreferenceStore(join(root, "busy-message-mode.json"));
+// The real turn limits file. The memory of this stand-in host sets an automatic limit of 8.
+const hostTurnLimitsPath = join(root, "host-turn-limits.json");
+const hostTurnLimits = new HostTurnLimitsPreferenceStore(hostTurnLimitsPath, () => 8);
+await runCauseEffect(hostTurnLimits.load());
 const transferUploads = join(root, "user-data", "instance-transfer-uploads");
 const checks: Check[] = [];
 const calls: RecordedCall[] = [];
@@ -466,6 +616,13 @@ const routineResultOptions: RoutineResultConnectionOption[] = [
     platform: "slack",
     connectionName: "Acme",
     places: [{ id: "C0123", name: "general" }],
+    placesFailed: false,
+  },
+  {
+    connectionId: "whatsapp-ada",
+    platform: "whatsapp",
+    connectionName: "Ada's phone",
+    places: [{ id: "120363000000000000@g.us", name: "Family" }],
     placesFailed: false,
   },
 ];
@@ -489,6 +646,9 @@ let providerDefault: { provider: AgentProviderId | null; model: AgentModelId | n
 function check(name: string, passed: boolean, detail: unknown = null): void {
   checks.push({ name, passed, detail });
 }
+
+/** The page of a Mistral sign-in, as Vibe's `browser-auth-delegated` gives it. */
+const MISTRAL_SIGN_IN_PAGE = "https://console.mistral.ai/vibe/sign-in/e2e";
 
 function record(method: string, ...args: unknown[]): void {
   calls.push({ method, args });
@@ -527,7 +687,10 @@ function startDisk(volumes: Json | undefined): boolean {
   return list(volumes).some((volume) => field(volume, "path") === root);
 }
 
-// One model with a fast tier and one without: the fast-mode models route lists only the first.
+// A Codex model with fast and Ultrafast tiers, a Codex model without a tier, and a Claude model with a
+// fast tier. The fast-mode models route lists only the first, with no Ultrafast tier; the speed route
+// lists the first and the Claude model. Two custom agent models have no tier: the first steers, so the
+// model-steering route lists only it.
 const FAST_MODE_MODELS: AgentModelOption[] = [
   {
     provider: "codex",
@@ -537,6 +700,16 @@ const FAST_MODE_MODELS: AgentModelOption[] = [
     defaultReasoningEffort: "medium",
     supportedReasoningEfforts: ["medium"],
     fastServiceTier: "priority",
+    ultrafastServiceTier: "ultrafast",
+  },
+  {
+    provider: "claude",
+    id: "claude-fast",
+    name: "Claude Fast",
+    description: "",
+    defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: ["medium"],
+    fastServiceTier: "fast",
   },
   {
     provider: "codex",
@@ -546,7 +719,29 @@ const FAST_MODE_MODELS: AgentModelOption[] = [
     defaultReasoningEffort: "medium",
     supportedReasoningEfforts: ["medium"],
   },
+  {
+    provider: "acp",
+    id: "steering-agent/default",
+    name: "Steering agent",
+    description: "",
+    defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: ["medium"],
+    steersTurns: true,
+  },
+  {
+    provider: "acp",
+    id: "plain-agent/default",
+    name: "Plain agent",
+    description: "",
+    defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: ["medium"],
+  },
 ];
+
+const SPENT_WEEK = { usedPercent: 100, windowDurationMins: 10_080, resetsAt: 1_900_000_000 };
+
+/** The text of the only thread start of this run, which the host refuses at the open-thread limit. */
+const THREAD_LIMIT_START_TEXT = "A new topic";
 
 function unused(name: string): () => never {
   return () => {
@@ -567,6 +762,12 @@ const sharedPath = join(files, "shared.txt");
 writeFileSync(sharedPath, "shared file bytes\n");
 const workspacePath = join(files, "notes.md");
 writeFileSync(workspacePath, "# workspace notes\n");
+// A picture and its small copy, for `attachment-preview-v1`. The fake copy service does not decode it.
+const pictureAttachmentPath = join(files, "picture.png");
+writeFileSync(pictureAttachmentPath, "the whole picture\n");
+const picturePreviewPath = join(files, "picture-preview.jpg");
+const picturePreviewBytes = "the small copy of the picture\n";
+writeFileSync(picturePreviewPath, picturePreviewBytes);
 
 function agent(id: string, name: string, provider: AgentProviderId, model: string): AgentSummary {
   return {
@@ -619,6 +820,36 @@ const agents = [
 const transferAgent = agent("agent-transfer", "Tess", "claude", "claude-sonnet-4-5");
 mkdirSync(transferAgent.workspacePath, { recursive: true });
 writeFileSync(join(transferAgent.workspacePath, "random.bin"), randomBytes(INSTANCE_TRANSFER_CHUNK_BYTES + 4096));
+
+/** `agent-active-queues-v1`: the text of each open delivery, and how many each agent has. */
+let activeQueueText = "open work";
+let activeQueueDeliveries = 1;
+
+/** The open work of a queue, with an attachment whose preview URL is an address on the host. */
+function activeQueue(agentId: string): QueueSnapshot {
+  const [delivery] = queueSnapshot(agentId).deliveries;
+  if (!delivery) throw new Error("The queue fixture has no delivery.");
+  return {
+    agentId,
+    ...(agentId === "agent-oc" ? { welcome: true as const } : {}),
+    deliveries: Array.from({ length: agentId === "agent-ada" ? activeQueueDeliveries : 1 }, (_, index) => ({
+      ...delivery,
+      id: `delivery-${agentId}-${index}`,
+      text: activeQueueText,
+      attachments: [
+        {
+          id: "attachment-1",
+          name: "notes.txt",
+          size: 4,
+          kind: "file" as const,
+          mimeType: "text/plain",
+          previewKind: "text" as const,
+          previewUrl: "http://127.0.0.1:1/preview/attachment-1",
+        },
+      ],
+    })),
+  };
+}
 
 function queueSnapshot(agentId: string): QueueSnapshot {
   return {
@@ -687,8 +918,21 @@ const ARGON_MODEL: AgentModelOption = {
   supportedReasoningEfforts: ["low", "high"],
   listing: "new",
 };
+/** The account that the fake host adds for a code sign-in (`provider-account-code-v1`). */
+const CODE_ACCOUNT = "ac0de000000000001";
+/** The key that the fake host's Cursor refuses (`provider-account-keys-v1`). */
+const REFUSED_ACCOUNT_KEY = "key_e2e_refused";
+const ACCOUNT_KEY = "key_e2e_accepted";
+
 /** The fake host's Gemini pool (`provider-account-pool-v1`): off until the pool update route turns it on. */
 let antigravityPool: ProviderAccountPool | undefined;
+/** The account whose code sign-in runs on the fake host. */
+let codeSignInAccount: string | null = null;
+/** The status that the agents fake gives, while a case sets one. Unset, the status read fails. */
+let agentStatus: AgentStatus | null = null;
+/** The text with which the agents fake fails a delete, while a case sets one. */
+let deleteFailure: string | null = null;
+
 function accountModelsStatus(): AgentStatus {
   const account = (id: string, models?: AgentModelOption[]) => ({
     id,
@@ -927,6 +1171,29 @@ const fakeRoutineRunPlaces: TeamApiRoutineRunPlaces = {
   },
 };
 
+/**
+ * The events host that the routes reach. Only the call of `webhook-agent-secret-v1` answers; the
+ * check reads what it got. The other calls are not part of this check.
+ */
+const notInThisCheck = () => Effect.die(new Error("Not used by this check."));
+const fakeEvents: HostEventsApi = {
+  getStatus: notInThisCheck,
+  listRoutines: notInThisCheck,
+  saveRoutine: notInThisCheck,
+  deleteRoutine: notInThisCheck,
+  testRoutine: notInThisCheck,
+  rotateSecret: notInThisCheck,
+  setSecret: notInThisCheck,
+  giveSecretToAgent: (input) =>
+    Effect.sync(() => {
+      record("giveSecretToAgent", input);
+      return { name: `WEBHOOK_SECRET_${input.id.replaceAll("-", "").toUpperCase()}` };
+    }),
+  sendTestEvent: notInThisCheck,
+  listActivity: notInThisCheck,
+  listRoutineRuns: notInThisCheck,
+};
+
 /** The pins that the fake host answers: one pin by default, or the given messages. */
 function pinnedSnapshot(agentId: string, messageIds: string[] = ["message-pinned"]): PinnedMessagesSnapshot {
   return {
@@ -956,6 +1223,7 @@ const fakeAgents: TeamApiAgents = {
   preferredProvider: () => "claude",
   newAgentProvider: () => "claude",
   getStatus: () => {
+    if (agentStatus) return agentStatus;
     throw new Error(`The status backend failed with ${FAKE_SECRET}.`);
   },
   listAgents: () => agents,
@@ -997,11 +1265,15 @@ const fakeAgents: TeamApiAgents = {
     record("listQueue", agentId);
     return queueSnapshot(agentId);
   },
+  listActiveQueues: (agentIds) => {
+    record("listActiveQueues", agentIds);
+    return agentIds.map(activeQueue);
+  },
   acknowledgeFailedTurn: (agentId, turnId) => record("acknowledgeFailedTurn", agentId, turnId),
   cancelQueuedMessage: (agentId, deliveryId) => Effect.sync(() => record("cancelQueuedMessage", agentId, deliveryId)),
   steerQueuedMessage: (input) => {
     record("steerQueuedMessage", input);
-    // OpenCode defers steering: the queue keeps the message and refuses the steer.
+    // This agent cannot steer: the queue keeps the message and refuses the steer.
     if (input.agentId === "agent-oc")
       return Effect.fail(
         new AgentLifecycleFailed({ operation: "steerQueuedMessage", cause: new SteerUnsupportedError() }),
@@ -1073,7 +1345,10 @@ const fakeAgents: TeamApiAgents = {
         insideWorkspace: false,
       };
     }),
-  deleteAgent: (agentId) => Effect.sync(() => record("deleteAgent", agentId)),
+  deleteAgent: (agentId) =>
+    deleteFailure === null
+      ? Effect.sync(() => record("deleteAgent", agentId))
+      : Effect.fail(new AgentLifecycleFailed({ operation: "deleteAgent", cause: new Error(deleteFailure) })),
   // Only `agent-usage-limit-v1` reads the snapshot in this run: a usage limit holds Ada and the hidden Pi.
   getRuntimeSnapshot: () => ({
     agents: [],
@@ -1095,10 +1370,18 @@ const fakeAgents: TeamApiAgents = {
     ],
     failedModels: [{ provider: "codex", model: "gpt-5", providerAccountId: "a0123456789abcdef" }],
   }),
-  getUsage: unused("getUsage"),
+  // Codex reports credits for its own sign-in; Claude reports none; an account after the first is not a member's.
+  getUsage: () =>
+    Effect.succeed({
+      limits: [
+        { id: "codex", primary: null, secondary: SPENT_WEEK, creditsAvailable: true },
+        { id: "claude", primary: null, secondary: SPENT_WEEK },
+        { id: "codex", accountId: "a0123456789abcdef", primary: null, secondary: SPENT_WEEK, creditsAvailable: false },
+      ],
+    }),
   getAnalytics: unused("getAnalytics"),
   getHostAnalytics: unused("getHostAnalytics"),
-  listModels: unused("listModels"),
+  listModels: () => FAST_MODE_MODELS,
   sidebarChatIds: unused("sidebarChatIds"),
   listConversationReads: unused("listConversationReads"),
   generateProfile: unused("generateProfile"),
@@ -1117,26 +1400,41 @@ const fakeAgents: TeamApiAgents = {
     record("saveSkillSuggestion", input);
     return Effect.succeed({ saved: input.messageId === "suggestion-1" });
   },
+  withdrawFeedback: (input) => {
+    record("withdrawFeedback", input);
+    return Effect.succeed({ status: input.messageId === "feedback-card-1" ? "withdrawn" : "notYours" });
+  },
   saveProfile: unused("saveProfile"),
   createAgent: unused("createAgent"),
   committedAgentDuplication: unused("committedAgentDuplication"),
   duplicateAgent: unused("duplicateAgent"),
   commitAgentDuplication: unused("commitAgentDuplication"),
-  // Only an exact colour (`agent-colors-v1`), a chat colour (`chat-colors-v1`) or a move at a usage
-  // limit (`agent-usage-limit-v1`) reaches this writer in this run. A chat colour change sends
-  // `agents-changed`, as the agent service does.
-  updateAgent: (input) =>
+  // Only an exact colour (`agent-colors-v1`), a chat colour (`chat-colors-v1`), a move at a usage
+  // limit (`agent-usage-limit-v1`) or a runtime change (`agent-pending-runtime-v1`) reaches this writer
+  // in this run. A chat colour change sends `agents-changed`, as the agent service does. A runtime change
+  // is kept for the next turn, as for an agent that works.
+  updateAgent: (input, _initiatingAgentId, queueWhileBusy) =>
     Effect.sync(() => {
-      record(
-        input.leaveUsageLimit
-          ? "updateAgentModel"
-          : input.chatColor === undefined
-            ? "updateAgentColor"
-            : "updateAgentChatColor",
-        input,
-      );
+      const runtime = !input.leaveUsageLimit && (input.provider ?? input.model ?? input.reasoningEffort) !== undefined;
+      if (runtime) record("updateAgentRuntime", input, queueWhileBusy);
+      else
+        record(
+          input.leaveUsageLimit
+            ? "updateAgentModel"
+            : input.chatColor === undefined
+              ? "updateAgentColor"
+              : "updateAgentChatColor",
+          input,
+        );
       const target = agents.find((item) => item.id === input.agentId);
       if (!target) throw new Error("Agent not found.");
+      if (runtime && input.provider && input.model && input.reasoningEffort)
+        target.pendingRuntime = {
+          provider: input.provider,
+          model: input.model,
+          reasoningEffort: input.reasoningEffort,
+          ...(input.providerAccountId ? { providerAccountId: input.providerAccountId } : {}),
+        };
       if (input.avatarColor === null) delete target.avatarColor;
       else if (input.avatarColor !== undefined) target.avatarColor = input.avatarColor;
       if (input.chatColor === null) delete target.chatColor;
@@ -1248,7 +1546,32 @@ const fakeAgents: TeamApiAgents = {
   setAvatar: unused("setAvatar"),
   resolveAvatar: unused("resolveAvatar"),
   readConversation: unused("readConversation"),
-  readConversationFor: unused("readConversationFor"),
+  // A quiet routine run: its run row and the report that the agent ended quiet (#11174).
+  readConversationFor: (agentId) =>
+    Effect.succeed({
+      agentId,
+      threadId: `thread-${agentId}`,
+      activeTurnId: null,
+      revision: 1,
+      messages: [
+        {
+          id: "run-answer",
+          author: "assistant",
+          text: "Reply",
+          createdAt: "2026-11-05T08:00:00.000Z",
+          status: "completed",
+        },
+        {
+          id: "quiet-report",
+          author: "assistant",
+          text: "Inbox rundown",
+          createdAt: "2026-11-05T08:01:00.000Z",
+          status: "completed",
+          itemType: ROUTINE_QUIET_ANSWER_ITEM_TYPE,
+        },
+      ],
+      readState: { unreadCount: 0, firstUnreadMessageId: null, throughMessageId: "quiet-report" },
+    }),
   // The chat of each agent shows every message but `message-gone`. A page around a message starts with it.
   readConversationPageFor: (agentId, memberId, anchor, limit, options) => {
     record("readConversationPageFor", agentId, memberId, anchor, limit, options);
@@ -1308,7 +1631,11 @@ const fakeAgents: TeamApiAgents = {
   },
   listWorkspaceDirectory: unused("listWorkspaceDirectory"),
   sendMessage: unused("sendMessage"),
-  setMessageReaction: unused("setMessageReaction"),
+  setMessageReaction: (input, sender) =>
+    Effect.sync(() => {
+      record("setMessageReaction", input, sender);
+      return undefined;
+    }),
   // A member owns `message-of-<member id>`. `message-gone` is not shown and `message-busy` is in a
   // running turn, as the agent service answers them.
   deleteConversationMessage: (input, access) => {
@@ -1348,9 +1675,41 @@ const fakeAgents: TeamApiAgents = {
       );
     return Effect.void;
   },
-  agentIdForRequest: () => undefined,
-  respondToPrompt: unused("respondToPrompt"),
-  respondToApproval: unused("respondToApproval"),
+  // Request 7 is the report of `agent-ada` that `pendingApproval` returns.
+  agentIdForRequest: (requestId) => (requestId === 7 ? "agent-ada" : undefined),
+  pendingApproval: (requestId) => {
+    record("pendingApproval", requestId);
+    // Longer than a runtime snapshot carries (240 characters), so only this read gives all of it.
+    if (requestId === 7)
+      return {
+        requestId: 7,
+        agentId: "agent-ada",
+        threadId: "thread-ada",
+        turnId: "turn-ada",
+        kind: "permissions",
+        command: `Long report\n\n${"r".repeat(5_000)}`,
+        cwd: null,
+        reason: sourceText("status.agent.reportProblem"),
+        grantRoot: null,
+        permissions: null,
+      };
+    return undefined;
+  },
+  // Records the answers as the route decodes them, such as an edited confirm preview (`_preview`).
+  respondToPrompt: (input, responder) => Effect.sync(() => record("respondToPrompt", input, responder)),
+  // As the agent service answers: a closed request, an answer that only the owner can give, and a
+  // report about the phone app (request 7), which takes "accept" only with the phone's data.
+  respondToApproval: (input, responder) => {
+    record("respondToApproval", input, responder);
+    const refuse = (cause: Error) => Effect.fail(new AgentLifecycleFailed({ operation: "respondToApproval", cause }));
+    if (input.requestId !== 7)
+      return refuse(new InactiveAttentionRequest(sourceText("error.backend.approvalInactive")));
+    if (responder && !responder.owner)
+      return refuse(new ForbiddenAttentionAnswer(sourceText("error.backend.approvalOwnerOnly")));
+    if (input.decision === "accept" && !responder?.phone)
+      return refuse(new ForbiddenAttentionAnswer(sourceText("error.backend.feedbackNeedsPhone")));
+    return Effect.void;
+  },
   respondToBrowserSecret: (input) => Effect.sync(() => record("respondToBrowserSecret", input)),
   respondToBrowserTakeover: unused("respondToBrowserTakeover"),
 };
@@ -1359,6 +1718,7 @@ const fakeAgents: TeamApiAgents = {
 // (`agent-thread-pages-v1`) reach the side threads in this run. The thread holds one message before
 // `message-7`, and no other message.
 // The thread list has one thread with a waiting message (`agent-thread-queue-v1`) and one without.
+// The thread without one waits for the answer to a request to another agent (`agent-thread-requests-v1`).
 // With `longThreadQueue`, the waiting thread holds 20 messages of 100,000 characters: more than one
 // WebRTC frame.
 let longThreadQueue = false;
@@ -1420,7 +1780,11 @@ const fakeAgentTasks: TeamApiAgentTasks = {
           position: index + 1,
         }))
       : [waiting];
-    return { agentId, tasks: [task("task-queued", queue), task("task-idle", [])], limit: 10 };
+    const asking: AgentTask = {
+      ...task("task-idle", []),
+      awaitedReplies: [{ messageId: "message-asked", recipientAgentId: "agent-grace", status: "running" }],
+    };
+    return { agentId, tasks: [task("task-queued", queue), asking], limit: 10 };
   },
   readTask: unused("readTask"),
   readTaskPage: (input) => {
@@ -1472,9 +1836,15 @@ const fakeAgentTasks: TeamApiAgentTasks = {
       hasNewer: held,
     };
   },
-  startTask: unused("startTask"),
+  startTask: (input, sender) => {
+    if (input.text !== THREAD_LIMIT_START_TEXT) return unused("startTask")();
+    record("startTask", input, sender);
+    return Effect.fail(new AgentLifecycleFailed({ operation: "start task", cause: new AgentThreadLimitError() }));
+  },
   runQueuedMessageAsTask: (input) => {
     record("runQueuedMessageAsTask", input);
+    if (input.deliveryId === "delivery-full")
+      return Effect.fail(new AgentLifecycleFailed({ operation: "create task", cause: new AgentThreadLimitError() }));
     if (input.deliveryId !== "delivery-1")
       return Effect.fail(
         new AgentLifecycleFailed({
@@ -1510,7 +1880,11 @@ const fakeAgentTasks: TeamApiAgentTasks = {
     }),
   stopTask: unused("stopTask"),
   closeTask: unused("closeTask"),
-  reopenTask: unused("reopenTask"),
+  reopenTask: (input) => {
+    if (input.taskId !== "task-archived") return unused("reopenTask")();
+    record("reopenTask", input);
+    throw new AgentThreadLimitError();
+  },
   renameTask: unused("renameTask"),
   deleteTask: unused("deleteTask"),
   listTaskReads: unused("listTaskReads"),
@@ -1520,7 +1894,25 @@ const fakeAgentTasks: TeamApiAgentTasks = {
 
 const mailbox: TeamApiMailbox = {
   resolveAttachment: (id) =>
-    Effect.succeed(id === "att-1" ? { path: attachmentPath, mimeType: "text/plain", name: "report one.txt" } : null),
+    Effect.succeed(
+      id === "att-1"
+        ? { path: attachmentPath, mimeType: "text/plain", name: "report one.txt" }
+        : id === "att-picture"
+          ? { path: pictureAttachmentPath, mimeType: "image/png", name: "picture.png" }
+          : id === "att-large-webp"
+            ? { path: pictureAttachmentPath, mimeType: "image/webp", name: "large.webp" }
+            : null,
+    ),
+};
+
+/** The copy service of `attachment-preview-v1`: it records the file that the route gives it. */
+const attachmentPreviews: TeamApiAttachmentPreviews = {
+  file: (attachmentId, source) =>
+    Effect.sync(() => {
+      record("attachmentPreview", attachmentId, source);
+      // A large file with no copy.
+      return attachmentId === "att-large-webp" ? null : { path: picturePreviewPath, mimeType: "image/jpeg" };
+    }),
 };
 
 // What a member did in the tab while the host recorded: a page, then a click. No step has typed text.
@@ -1534,8 +1926,13 @@ const releasedHolders: Parameters<TeamApiBrowser["releaseUserControlHeldBy"]>[0]
 const releasedSession = (sessionId: string | undefined) =>
   releasedHolders.some((holder) => holder.kind === "session" && holder.sessionId === sessionId);
 
+// The tabs of the host, and the tabs that people hold. Only the check of the tabs of a closed agent
+// sets them.
+let browserTabs: ReturnType<TeamApiBrowser["listTabs"]> = [];
+let userControlHolds: [string, Parameters<Parameters<TeamApiBrowser["releaseUserControlRefused"]>[0]>[1]][] = [];
+
 const browser: TeamApiBrowser = {
-  listTabs: unused("listTabs"),
+  listTabs: () => browserTabs,
   getControlState: unused("getControlState"),
   open: unused("open"),
   activate: unused("activate"),
@@ -1556,17 +1953,29 @@ const browser: TeamApiBrowser = {
   releaseUserControlHeldBy: (holder) => {
     releasedHolders.push(holder);
   },
+  releaseUserControlRefused: (refused) => {
+    record(
+      "releaseUserControlRefused",
+      userControlHolds
+        .filter(([tabId, holder]) => refused(tabId, holder))
+        .map(([tabId, holder]) => `${tabId}:${holder.kind === "member" ? holder.memberId : "local"}`),
+    );
+  },
   close: unused("close"),
   capturePreview: unused("capturePreview"),
   setVisible: unused("setVisible"),
-  getDisplayState: unused("getDisplayState"),
+  getDisplayState: () => ({ tabs: browserTabs, activeTabId: null }),
   loadUrl: unused("loadUrl"),
   // Only the browser-profiles tab route asks. `tab-private` holds an administrator's MCP sign-in.
   isPrivate: (tabId) => tabId === "tab-private",
   startView: unused("startView"),
   dispatchViewInput: unused("dispatchViewInput"),
   copyViewSelection: unused("copyViewSelection"),
-  importSignIn: unused("importSignIn"),
+  // The values never reach the record; only counts and the origin do.
+  importSignIn: (tabId, cookies, storage = null) => {
+    record("importSignIn", tabId, cookies.length, storage?.origin ?? null, storage?.entries.length ?? 0);
+    return Effect.succeed({ cookies: cookies.length, storage: storage?.entries.length ?? 0 });
+  },
 };
 
 // Account tickets that the fake account service redeems. Anything else is a ticket it refuses.
@@ -1590,12 +1999,20 @@ const bitwardenFile = join(root, "openbot-bitwarden-connector-v1.json");
 const bitwardenCalls: { args: string[]; env: Record<string, string> }[] = [];
 /** While set, `unlock` reports that it started and waits for `released`. */
 let bitwardenUnlockGate: { started: () => void; released: Promise<void> } | null = null;
+/** While set, the server has no user key id route, as Vaultwarden before 1.37.4 (#10130). */
+let bitwardenServerRefusesBackfill = false;
+interface BitwardenCliState {
+  server: string | null;
+  signedIn: boolean;
+  /** `bw` pauses its user key id backfill after the server refuses it. */
+  backfillPaused?: boolean;
+}
 /** The CLI's own state lives in its data folder, so removing the folder signs it out. */
-function bitwardenCliState(): { server: string | null; signedIn: boolean } {
+function bitwardenCliState(): BitwardenCliState {
   const path = join(bitwardenData, "data.json");
   return existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : { server: null, signedIn: false };
 }
-function saveBitwardenCliState(change: Partial<{ server: string | null; signedIn: boolean }>): void {
+function saveBitwardenCliState(change: Partial<BitwardenCliState>): void {
   mkdirSync(bitwardenData, { recursive: true });
   writeFileSync(join(bitwardenData, "data.json"), JSON.stringify({ ...bitwardenCliState(), ...change }));
 }
@@ -1626,6 +2043,11 @@ const fakeBitwardenCli: BitwardenCliRunner = async (_executable, args, env) => {
       await bitwardenUnlockGate.released;
     }
     if (!state.signedIn || env.BW_PASSWORD !== BW_MASTER_PASSWORD) throw new Error("bad password");
+    // As `bw` 2026.9: the unlock runs the backfill, and a refusal pauses it, then fails the unlock.
+    if (bitwardenServerRefusesBackfill && !state.backfillPaused) {
+      saveBitwardenCliState({ backfillPaused: true });
+      throw new BitwardenKeyIdBackfillError("KeyIdBackfillError");
+    }
     return `${BW_SESSION_KEY}\n`;
   }
   if (env.BW_SESSION !== BW_SESSION_KEY) throw new Error("locked");
@@ -1720,6 +2142,7 @@ const whatsappAccount: WhatsAppAccount = {
   workspaceId: WHATSAPP_NUMBER,
   ownNumber: true,
   workingMessage: true,
+  statusReactions: true,
   allowedSenders: [],
   pendingRequests: [{ code: "K7Q2ZP", senderId: "48600100400", name: "Ola", expiresAt: "2026-11-03T21:00:00.000Z" }],
 };
@@ -1824,6 +2247,11 @@ const whatsappMessaging: TeamApiConnectors["messaging"] = {
       record("whatsapp.setWorkingMessage", workspaceId, workingMessage);
       whatsappAccount.workingMessage = workingMessage;
     }),
+  setWhatsAppStatusReactions: (workspaceId, statusReactions) =>
+    Effect.sync(() => {
+      record("whatsapp.setStatusReactions", workspaceId, statusReactions);
+      whatsappAccount.statusReactions = statusReactions;
+    }),
 };
 const connectors: TeamApiConnectors = {
   github: {
@@ -1840,6 +2268,14 @@ const connectors: TeamApiConnectors = {
 const vaultFile = join(root, "openbot-vault-v1.json");
 const vault = new VaultService({ store: new VaultStore(vaultFile, fakeCipher), canPersist: () => true });
 await Effect.runPromise(vault.load());
+// The real key file over the test folder, where the sensitive variables of a provider go.
+const providerCredentials = new ProviderCredentialStore(join(root, "provider-credentials.json"), fakeCipher);
+await Effect.runPromise(providerCredentials.load());
+const providerEnvironment = providerEnvironmentControl(
+  createProviderEnvironmentPreferenceStore(join(root, "provider-environment.json")),
+  providerCredentials,
+  (provider) => Effect.sync(() => record("providerEnvironmentChanged", provider)),
+);
 const VAULT_PASSWORD = "e2e-vault-password-7f3c";
 const VAULT_API_KEY = "e2e-vault-api-key-91d2";
 /** A two-step setup key as a site shows it: grouped and in lower case. The host saves it in upper case. */
@@ -1908,6 +2344,75 @@ let refuseHostKeyRotation = false;
 /** The servers that the stand-in of `LocalServers` runs. */
 const localServerList: { serverId: string; name: string; published: boolean }[] = [];
 const memoryReview = new MemoryReviewPreferenceStore(memoryReviewFile);
+// The real GitHub skill reader over a fake GitHub: one public repository, `acme/skills`, with two
+// skill folders, a skill folder inside one of them, and a folder with no skill.
+const GITHUB_COMMIT = "0123456789abcdef0123456789abcdef01234567";
+const GITHUB_SKILL_FILES: Record<string, string> = {
+  "skills/pdf/SKILL.md": "---\nname: pdf\ndescription: Read and fill PDF forms.\n---\n\n# PDF\n",
+  "skills/pdf/reference.md": "# Reference\n",
+  "skills/docx/SKILL.md": "---\nname: docx\ndescription: Write Word documents.\n---\n\n# DOCX\n",
+  "skills/docx/nested/SKILL.md": "---\nname: nested\ndescription: A skill inside a skill.\n---\n",
+  "docs/guide.md": "# Guide\n",
+};
+const githubFetches: string[] = [];
+const githubReader = githubSkillSource(async (url) => {
+  githubFetches.push(url);
+  const json = (status: number, body: unknown) =>
+    new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  const commit = /^https:\/\/api\.github\.com\/repos\/acme\/skills\/commits\/(HEAD|main)$/u.exec(url);
+  if (commit) return json(200, { sha: GITHUB_COMMIT, commit: { committer: { date: "2026-11-01T10:00:00Z" } } });
+  if (url === `https://api.github.com/repos/acme/skills/git/trees/${GITHUB_COMMIT}?recursive=1`)
+    return json(200, {
+      tree: Object.entries(GITHUB_SKILL_FILES).map(([path, text]) => ({ type: "blob", path, size: text.length })),
+    });
+  const raw = `https://raw.githubusercontent.com/acme/skills/${GITHUB_COMMIT}/`;
+  const file = url.startsWith(raw) ? GITHUB_SKILL_FILES[url.slice(raw.length)] : undefined;
+  if (file !== undefined) return new Response(file);
+  return json(404, { message: "Not Found" });
+});
+// The host's skill service: the real GitHub read, and an install that records the id it gets.
+const githubSkillsAdmin: Pick<
+  SkillMarketplaceService,
+  "listInstalled" | "install" | "uninstall" | "setEnabled" | "readGithub"
+> = {
+  readGithub: (link) =>
+    githubReader.read(link).pipe(Effect.mapError((error) => new SkillMarketplaceFailure({ cause: error.cause }))),
+  listInstalled: () => Effect.succeed([]),
+  install: (input) =>
+    Effect.sync(() => {
+      record("installSkill", input);
+      return {
+        skillId: input.skillId,
+        slug: "pdf",
+        name: "pdf",
+        installedVersion: 1,
+        availableVersion: 1,
+        state: "installed" as const,
+      };
+    }),
+  uninstall: (input) => Effect.sync(() => record("uninstallSkill", input)),
+  setEnabled: () => Effect.die(new Error("Not used.")),
+};
+
+// The real skill reader over Ada's workspace (#9006): one skill folder that the provider reads, and one
+// whose `SKILL.md` starts with the byte order mark that Windows PowerShell 5.1 writes.
+const adaSkills = join(root, "workspaces", "agent-ada", ".claude", "skills");
+mkdirSync(join(adaSkills, "good-skill"), { recursive: true });
+writeFileSync(join(adaSkills, "good-skill", "SKILL.md"), "---\nname: good-skill\ndescription: Works.\n---\n# Good\n");
+mkdirSync(join(adaSkills, "settlement-economy"), { recursive: true });
+writeFileSync(
+  join(adaSkills, "settlement-economy", "SKILL.md"),
+  "\uFEFF---\r\nname: settlement-economy\r\ndescription: Settles.\r\n---\r\n# Settle\r\n",
+);
+const chatSkills = new SkillMarketplaceService(
+  {
+    requestAuthorized: () => Effect.die("Not used."),
+    downloadAuthorized: () => Effect.die("Not used."),
+    resolveApiUrl: () => "",
+  },
+  () => agents,
+);
+
 // The real skill learning store on a temporary file, as the host keeps it.
 const skillLearningFile = join(root, "skill-learning.json");
 const skillLearning = new SkillLearningPreferenceStore(skillLearningFile);
@@ -2041,6 +2546,10 @@ try {
   );
 
   await Effect.runPromise(libraryStore.initialize());
+  // As in application-services: each saved folder change is an agent event (library-folders-events-v1).
+  libraryStore.onChanged(() => {
+    for (const listener of agentEventListeners) listener({ type: "library-folders-changed" });
+  });
   server = new TeamApiServer({
     appVersion: APP_VERSION,
     agentImport,
@@ -2050,10 +2559,13 @@ try {
     agentTasks: fakeAgentTasks,
     agentAccess,
     mailbox,
+    attachmentPreviews,
     browser,
     chat: new TeamChatStore(database),
+    skills: chatSkills,
     // The real host-settings service, over an agent writer that records each change.
     admin: {
+      skills: githubSkillsAdmin,
       customAgents: {
         list: () => Effect.succeed(customAgentList),
         save: (input) =>
@@ -2114,13 +2626,38 @@ try {
               if (input.quickAcknowledgement === null) delete target.quickAcknowledgement;
               else if (input.quickAcknowledgement !== undefined)
                 target.quickAcknowledgement = input.quickAcknowledgement;
-              if (input.fastMode !== undefined) target.fastMode = input.fastMode;
+              if (input.fastMode !== undefined) {
+                target.fastMode = input.fastMode;
+                // As the agent store: a `fastMode` change without `ultrafast: true` turns Ultrafast off.
+                if (input.fastMode && input.ultrafast) target.ultrafast = true;
+                else delete target.ultrafast;
+              }
               return target;
             }),
           listModels: () => FAST_MODE_MODELS,
         },
         busyMessageMode: { get: () => ({ mode: "queue" }) },
         agentDefaults: { get: () => DEFAULT_AGENT_DEFAULTS },
+      }),
+      // The real preference files in the temporary folder, over agents that record each write.
+      agentDefaults: createAgentDefaultsSettings({
+        agents: {
+          listAgents: () => agents,
+          updateAgent: (input) =>
+            Effect.sync(() => {
+              record("updateAgent", input);
+              const target = agents.find((item) => item.id === input.agentId);
+              if (!target) throw new Error("Agent not found.");
+              if (input.allowAutomation === null) delete target.allowAutomation;
+              else if (input.allowAutomation !== undefined) target.allowAutomation = input.allowAutomation;
+              if (input.busyMessageMode === null) delete target.busyMessageMode;
+              else if (input.busyMessageMode !== undefined) target.busyMessageMode = input.busyMessageMode;
+              return target;
+            }),
+          agentDefaultsChanged: (previous) => record("agentDefaultsChanged", previous),
+        },
+        agentDefaults: agentDefaultsPreferences,
+        busyMessageMode: busyMessageModePreferences,
       }),
       memoryReview,
       skillLearning,
@@ -2136,6 +2673,24 @@ try {
                 return { publicKey: ROTATED_HOST_KEY };
               }),
       },
+      // A stand-in for the server-mode restart, which closes the app under its service manager. This
+      // checks the gate and that a refused request never reaches the host.
+      restart: { request: (memberId) => record("restartHost", memberId) },
+      // The real team store, as the host service writes it. The host service then sends the new
+      // look to each event socket, so this does the same.
+      identity: {
+        updateIdentity: (input) =>
+          store.updateIdentity(input).pipe(
+            Effect.tap(() =>
+              Effect.sync(() => {
+                record("updateIdentity", input);
+                server?.refreshAppearance();
+              }),
+            ),
+            Effect.asVoid,
+          ),
+      },
+      turnLimits: hostTurnLimits,
       // A stand-in for `LocalServers`; `local-servers-e2e.ts` starts real children. This checks the gate
       // and the wire, and that a refused request never reaches the desktop app.
       localServers: {
@@ -2192,9 +2747,12 @@ try {
             record("setRoutineResultDestination", input);
             if (input.agentId !== "agent-ada" || input.routineId !== "routine-ada")
               return Effect.fail({ cause: new RoutineResultError(sourceText("error.backend.routineGone")) });
-            routineDestination = input.destination
-              ? { ...input.destination, platform: "slack", connectionName: "Acme" }
-              : null;
+            const { destination } = input;
+            const connection = routineResultOptions.find((option) => option.connectionId === destination?.connectionId);
+            routineDestination =
+              destination && connection
+                ? { ...destination, platform: connection.platform, connectionName: connection.connectionName }
+                : null;
             return Effect.succeed(routineDestination);
           }),
       },
@@ -2208,6 +2766,8 @@ try {
         createClaudeCompactWindowPreferenceStore(join(root, "claude-compact-window.json")),
         () => record("claudeCompactWindowChanged"),
       ),
+      // The real variables over files of the test folder; a change records the provider to restart.
+      providerEnvironment,
       // The host's scan: one model server, one agent, and a model list that echoes no key.
       providerDetection: {
         detection: {
@@ -2250,7 +2810,12 @@ try {
       // A credential store in memory. The service runs the change as the host's does.
       providers: {
         service: {
-          startProviderCodeLogin: unused("providers.startProviderCodeLogin"),
+          // Mistral's code sign-in answers with the page that the user opens on any device.
+          startProviderCodeLogin: (provider) => {
+            record("startProviderCodeLogin", provider);
+            if (provider !== "mistral") throw new Error(sourceText("error.provider.noCodeSignIn", { provider }));
+            return Effect.succeed({ kind: "link", verificationUrl: MISTRAL_SIGN_IN_PAGE, expiresAt: 1 });
+          },
           submitProviderCodeLogin: unused("providers.submitProviderCodeLogin"),
           cancelProviderCodeLogin: unused("providers.cancelProviderCodeLogin"),
           changeProviderCredential: (provider, change) => {
@@ -2334,6 +2899,14 @@ try {
               );
               return customEndpointResult();
             }),
+          peerHarnessUpdate: (input, harness) =>
+            Effect.sync(() => {
+              record("peerHarnessUpdateCustomProvider", input, harness);
+              customEndpoints = customEndpoints.map((endpoint) =>
+                endpoint.id === input.id ? { ...endpoint, name: input.name, harness } : endpoint,
+              );
+              return customEndpointResult();
+            }),
           remove: (id) =>
             Effect.sync(() => {
               customEndpoints = customEndpoints.filter((endpoint) => endpoint.id !== id);
@@ -2348,7 +2921,7 @@ try {
     connectors,
     vault,
     // The real transfer service and parts over an empty instance, with its upload folder on disk.
-    instanceTransfer: emptyInstanceTransferService(transferUploads, [transferAgent]),
+    instanceTransfer: emptyInstanceTransferService(transferUploads, [transferAgent], () => store.getOwnerMemberId()),
     browserProfiles,
     machine,
     // The host reads its own Hermes folder: one profile under a token.
@@ -2410,6 +2983,12 @@ try {
           record("disk");
           return { freeBytes: 2 * 1024 ** 3, totalBytes: 64 * 1024 ** 3 };
         }),
+      // As a hosted server: the host measures the files of its user (`du`) for the plan storage.
+      diskUse: () =>
+        Effect.sync(() => {
+          record("diskUse");
+          return { freeBytes: 2 * 1024 ** 3, totalBytes: 64 * 1024 ** 3, userBytes: 5 * 1024 ** 3 };
+        }),
     },
     // The real host service over a fake status: only the models and pool routes run in this run.
     providerAccounts: new ProviderAccountsHost({
@@ -2430,6 +3009,67 @@ try {
         listAgents: () => [],
         updateAgent: unused("providerAccounts.updateAgent"),
         signInProviderAccountOnHost: unused("providerAccounts.signInProviderAccountOnHost"),
+        // As the backend: Cursor refuses one key, and each other key gives an account.
+        connectProviderAccountKey: (provider, accountId, key) => {
+          record("connectProviderAccountKey", { provider, accountId, keyLength: key.length });
+          return key === REFUSED_ACCOUNT_KEY
+            ? Effect.fail(
+                new AgentLifecycleFailed({
+                  operation: "connectProviderAccount",
+                  cause: new Error(sourceText("error.provider.accountKeyRefused", { provider: "Cursor" })),
+                }),
+              )
+            : Effect.sync(accountModelsStatus);
+        },
+        // As the backend: Cursor has no code sign-in; ChatGPT gives a page and a code, and the sign-in
+        // of the new account goes on until a cancel.
+        startProviderAccountCodeLogin: (provider, accountId) => {
+          record("startProviderAccountCodeLogin", { provider, accountId });
+          if (provider === "claude") {
+            codeSignInAccount = accountId ?? CODE_ACCOUNT;
+            return Effect.succeed({
+              accountId: codeSignInAccount,
+              start: {
+                kind: "paste" as const,
+                verificationUrl: "https://claude.ai/oauth/authorize",
+                expiresAt: clock + 900_000,
+              },
+            });
+          }
+          if (provider !== "codex")
+            return Effect.fail(
+              new AgentLifecycleFailed({
+                operation: "connectProviderAccount",
+                cause: new Error(sourceText("error.provider.noCodeSignIn", { provider: "Cursor" })),
+              }),
+            );
+          codeSignInAccount = accountId ?? CODE_ACCOUNT;
+          return Effect.succeed({
+            accountId: codeSignInAccount,
+            start: {
+              kind: "code" as const,
+              userCode: "ABCD-12345",
+              verificationUrl: "https://auth.openai.com/codex/device",
+              expiresAt: clock + 900_000,
+            },
+          });
+        },
+        // As the backend: only a sign-in that waits takes a code, and a refusal can quote the code.
+        submitProviderAccountCodeLogin: (provider, accountId, code) => {
+          record("submitProviderAccountCodeLogin", { provider, accountId, code });
+          if (codeSignInAccount !== accountId) throw new Error(`The provider refused ${code}`);
+        },
+        providerAccountCodeLoginStatus: (provider, accountId) => {
+          record("providerAccountCodeLoginStatus", { provider, accountId });
+          // The error is longer than the wire limit, so the host must shorten it.
+          return codeSignInAccount === accountId ? { result: null } : { result: { error: "e".repeat(2_500) } };
+        },
+        cancelProviderAccountSignIn: (provider, accountId) =>
+          Effect.sync(() => {
+            record("cancelProviderAccountSignIn", { provider, accountId });
+            codeSignInAccount = null;
+            return accountModelsStatus();
+          }),
         renameProviderAccount: unused("providerAccounts.renameProviderAccount"),
         removeProviderAccount: unused("providerAccounts.removeProviderAccount"),
       },
@@ -2465,6 +3105,7 @@ try {
       subscribe: (listener) => agentLevels.subscribe(listener),
     },
     routineRunPlaces: fakeRoutineRunPlaces,
+    events: fakeEvents,
     hiddenAgents: {
       listHiddenAgents: () => hidden,
       setAgentHidden: (input) =>
@@ -2573,7 +3214,7 @@ try {
       "compatibility answers without protocol headers and names the supported range",
       compatibility.status === 200 &&
         field(compatibility.body, "protocol", "minimum") === 1 &&
-        field(compatibility.body, "protocol", "maximum") === TEAM_PROTOCOL_V9,
+        field(compatibility.body, "protocol", "maximum") === TEAM_PROTOCOL_V10,
       summary(compatibility),
     );
     const noHeaders = await call("GET", TEAM_API_ROUTES.identity, { protocol: null });
@@ -2590,12 +3231,12 @@ try {
       badHeader.status === 400 && field(badHeader.body, "code") === "protocol_error",
       summary(badHeader),
     );
-    const newer = await call("GET", TEAM_API_ROUTES.identity, { protocol: TEAM_PROTOCOL_V9 + 1 });
+    const newer = await call("GET", TEAM_API_ROUTES.identity, { protocol: TEAM_PROTOCOL_V10 + 1 });
     check(
       "a newer protocol gets 426 host_update_required with the client version",
       newer.status === 426 &&
         field(newer.body, "code") === "host_update_required" &&
-        field(newer.body, "client", "protocol") === TEAM_PROTOCOL_V9 + 1,
+        field(newer.body, "client", "protocol") === TEAM_PROTOCOL_V10 + 1,
       summary(newer),
     );
     const zero = await call("GET", TEAM_API_ROUTES.identity, { protocol: 0 });
@@ -3053,6 +3694,26 @@ try {
         !list(field(hiddenWorkV8.body, "capabilities")).includes(AGENT_HIDDEN_WORK_CAPABILITY),
       [summary(hiddenWorkV9), list(field(hiddenWorkV8.body, "capabilities")).length],
     );
+    check(
+      "the host advertises workspace-only-process-limit to a protocol 9 peer only when it cannot confine the process",
+      list(field(hiddenWorkV9.body, "capabilities")).includes(WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY) ===
+        !canConfineProcesses() &&
+        !list(field(hiddenWorkV8.body, "capabilities")).includes(WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY),
+      { platform: process.platform, v9: summary(hiddenWorkV9) },
+    );
+    check(
+      "the host advertises mac-apps-limit to a protocol 9 peer only when it is not a Mac",
+      list(field(hiddenWorkV9.body, "capabilities")).includes(MAC_APPS_LIMIT_CAPABILITY) ===
+        (process.platform !== "darwin") &&
+        !list(field(hiddenWorkV8.body, "capabilities")).includes(MAC_APPS_LIMIT_CAPABILITY),
+      { platform: process.platform, v9: summary(hiddenWorkV9) },
+    );
+    check(
+      "the host advertises ui-block-preview-edit to a protocol 9 peer only",
+      list(field(hiddenWorkV9.body, "capabilities")).includes(UI_BLOCK_PREVIEW_EDIT_CAPABILITY) &&
+        !list(field(hiddenWorkV8.body, "capabilities")).includes(UI_BLOCK_PREVIEW_EDIT_CAPABILITY),
+      { v9: summary(hiddenWorkV9) },
+    );
     const unsupported = await call("POST", AGENT_HIDDEN_ROUTES.read, { token: bobToken, json: {}, capabilities: [] });
     check(
       "the hidden-agent routes without the capability get 400 agentHideUnsupported",
@@ -3098,6 +3759,26 @@ try {
         callsOf("deleteAgent").length === 0,
       summary(memberDelete),
     );
+
+    // #7023: a refusal is a 409 with its text, which the web client shows. A failed removal stays a 500.
+    for (const [key, status] of [
+      ["error.agent.stopBeforeDelete", 409],
+      ["error.agent.deletionBusy", 409],
+      ["error.agent.deleteIncomplete", 500],
+    ] as const) {
+      deleteFailure = sourceText(key);
+      const loggedBefore = logged.length;
+      const refused = await call("DELETE", TEAM_API_ROUTES.agent.one("agent-ada"), { token: adaToken });
+      deleteFailure = null;
+      const loggedAsFault = logged.slice(loggedBefore).some((line) => line.includes("Team API request failed"));
+      check(
+        `an admin's delete that fails with ${key} answers ${status} with its text`,
+        errorIs(refused, status, sourceText(key)) &&
+          callsOf("deleteAgent").length === 0 &&
+          loggedAsFault === (status === 500),
+        { ...summary(refused), loggedAsFault },
+      );
+    }
   }
 
   // ---- Backup models (agent-backup-models-v1) ----
@@ -3327,6 +4008,94 @@ try {
         errorIs(hiddenSet, 404, sourceText("error.team.agentNotFound")) &&
         callsOf("updateAgent").length === writes + 2,
       [summary(hiddenRead), summary(hiddenSet)],
+    );
+  }
+
+  // ---- Host turn limits (host-turn-limits-v1) ----
+  {
+    const v9 = { capabilities: [HOST_TURN_LIMITS_CAPABILITY], protocol: TEAM_PROTOCOL_V9 };
+    const automatic = { turnLimit: null, automaticTurnLimit: 8, agentTaskLimit: null, defaultAgentTaskLimit: 4 };
+    const adminRead = await call("POST", HOST_TURN_LIMITS_ROUTES.settings, { token: adaToken, json: {}, ...v9 });
+    check(
+      "an admin reads the automatic turn limits of a host with no choice",
+      adminRead.status === 200 && isDeepStrictEqual(adminRead.body, automatic),
+      summary(adminRead),
+    );
+    const unsupported = await call("POST", HOST_TURN_LIMITS_ROUTES.settings, { token: adaToken, json: {} });
+    const memberRead = await call("POST", HOST_TURN_LIMITS_ROUTES.settings, { token: bobToken, json: {}, ...v9 });
+    const memberSet = await call("POST", HOST_TURN_LIMITS_ROUTES.update, {
+      token: bobToken,
+      json: { turnLimit: 32, agentTaskLimit: 8 },
+      ...v9,
+    });
+    check(
+      "a member cannot read or set the turn limits, and a client without host-turn-limits-v1 gets 400",
+      errorIs(unsupported, 400, sourceText("error.team.hostTurnLimitsUnsupported")) &&
+        errorIs(memberRead, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberSet, 403, sourceText("error.team.adminRequired")) &&
+        isDeepStrictEqual(hostTurnLimits.get(), automatic),
+      [summary(unsupported), summary(memberRead), summary(memberSet)],
+    );
+    const outOfRange = await Promise.all(
+      [
+        { turnLimit: 0, agentTaskLimit: null },
+        { turnLimit: 129, agentTaskLimit: null },
+        { turnLimit: "infinite", agentTaskLimit: null },
+        { turnLimit: null, agentTaskLimit: "unlimited" },
+        { turnLimit: null, agentTaskLimit: 65 },
+        { turnLimit: 2.5, agentTaskLimit: null },
+      ].map((json) => call("POST", HOST_TURN_LIMITS_ROUTES.update, { token: adaToken, json, ...v9 })),
+    );
+    check(
+      "the host refuses a turn limit outside 1 to 128 or unlimited, or an agent default outside 1 to 64, and saves nothing",
+      outOfRange.every((reply) => reply.status === 400) &&
+        isDeepStrictEqual(hostTurnLimits.get(), automatic) &&
+        !existsSync(hostTurnLimitsPath),
+      outOfRange.map(summary),
+    );
+    // Above the automatic limit: an owner or admin can choose any value in range.
+    const adminSet = await call("POST", HOST_TURN_LIMITS_ROUTES.update, {
+      token: adaToken,
+      json: { turnLimit: 32, agentTaskLimit: 8 },
+      ...v9,
+    });
+    const reloaded = new HostTurnLimitsPreferenceStore(hostTurnLimitsPath, () => 8);
+    await runCauseEffect(reloaded.load());
+    const chosen = { turnLimit: 32, automaticTurnLimit: 8, agentTaskLimit: 8, defaultAgentTaskLimit: 4 };
+    check(
+      "an admin sets limits above the automatic one, the file keeps them, and agents on the default get 8",
+      adminSet.status === 200 &&
+        isDeepStrictEqual(adminSet.body, chosen) &&
+        isDeepStrictEqual(reloaded.get(), chosen) &&
+        reloaded.agentTaskLimit() === 8,
+      summary(adminSet),
+    );
+    // Unlimited: no total even where the memory sets one.
+    const unlimitedSet = await call("POST", HOST_TURN_LIMITS_ROUTES.update, {
+      token: adaToken,
+      json: { turnLimit: "unlimited", agentTaskLimit: 64 },
+      ...v9,
+    });
+    const reloadedUnlimited = new HostTurnLimitsPreferenceStore(hostTurnLimitsPath, () => 8);
+    await runCauseEffect(reloadedUnlimited.load());
+    const unlimited = { turnLimit: "unlimited", automaticTurnLimit: 8, agentTaskLimit: 64, defaultAgentTaskLimit: 4 };
+    check(
+      "an admin sets no total limit and 64 for each agent, and the file keeps them",
+      unlimitedSet.status === 200 &&
+        isDeepStrictEqual(unlimitedSet.body, unlimited) &&
+        isDeepStrictEqual(reloadedUnlimited.get(), unlimited) &&
+        reloadedUnlimited.turnLimit() === "unlimited",
+      summary(unlimitedSet),
+    );
+    const adminReset = await call("POST", HOST_TURN_LIMITS_ROUTES.update, {
+      token: adaToken,
+      json: { turnLimit: null, agentTaskLimit: null },
+      ...v9,
+    });
+    check(
+      "an admin returns both limits to their defaults",
+      adminReset.status === 200 && isDeepStrictEqual(adminReset.body, automatic),
+      summary(adminReset),
     );
   }
 
@@ -3685,6 +4454,194 @@ try {
       "an admin turns the pool off again",
       offAgain.status === 200 && isDeepStrictEqual(cleared.body, { pools: [] }),
       [summary(offAgain), summary(cleared)],
+    );
+  }
+
+  // ---- Account keys (provider-account-keys-v1) ----
+  {
+    const v9 = { capabilities: [PROVIDER_ACCOUNT_KEYS_CAPABILITY], protocol: TEAM_PROTOCOL_V9 };
+    const connect = PROVIDER_ACCOUNT_KEYS_ROUTES.connect;
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises provider-account-keys-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(PROVIDER_ACCOUNT_KEYS_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(PROVIDER_ACCOUNT_KEYS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const body = { provider: "cursor", accountId: null, key: ACCOUNT_KEY };
+    const unsupported = await call("POST", connect, { token: adaToken, json: body, protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the account key route without the capability gets 400 providersUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.providersUnsupported")),
+      summary(unsupported),
+    );
+    const writes = callsOf("connectProviderAccountKey").length;
+    const member = await call("POST", connect, { token: bobToken, json: body, ...v9 });
+    check(
+      "a member cannot give an account a key, and the host saves nothing",
+      errorIs(member, 403, sourceText("error.team.adminRequired")) &&
+        callsOf("connectProviderAccountKey").length === writes,
+      summary(member),
+    );
+    const noKey = await call("POST", connect, { token: adaToken, json: { ...body, key: "  " }, ...v9 });
+    const badAccount = await call("POST", connect, {
+      token: adaToken,
+      json: { ...body, accountId: "not-an-account" },
+      ...v9,
+    });
+    const longKey = await call("POST", connect, { token: adaToken, json: { ...body, key: "k".repeat(513) }, ...v9 });
+    check(
+      "an empty key, a key that is too long and an account id that is not one get 400, and the host saves nothing",
+      noKey.status === 400 &&
+        badAccount.status === 400 &&
+        longKey.status === 400 &&
+        callsOf("connectProviderAccountKey").length === writes,
+      [summary(noKey), summary(badAccount), summary(longKey)],
+    );
+    const added = await call("POST", connect, { token: adaToken, json: body, ...v9 });
+    const replaced = await call("POST", connect, {
+      token: adaToken,
+      json: { ...body, accountId: ULTRA_ACCOUNT, key: ` ${ACCOUNT_KEY} ` },
+      ...v9,
+    });
+    check(
+      "an admin adds an account from a key and gives an account a new key; the answer holds no key",
+      added.status === 200 &&
+        isDeepStrictEqual(added.body, {}) &&
+        replaced.status === 200 &&
+        isDeepStrictEqual(callsOf("connectProviderAccountKey").slice(writes), [
+          [{ provider: "cursor", accountId: null, keyLength: ACCOUNT_KEY.length }],
+          [{ provider: "cursor", accountId: ULTRA_ACCOUNT, keyLength: ACCOUNT_KEY.length }],
+        ]),
+      [summary(added), summary(replaced)],
+    );
+    const refused = await call("POST", connect, {
+      token: adaToken,
+      json: { ...body, key: REFUSED_ACCOUNT_KEY },
+      ...v9,
+    });
+    check(
+      "a key that the provider refuses fails with the reason, and the answer does not repeat the key",
+      errorIs(refused, 409, sourceText("error.provider.accountKeyRefused", { provider: "Cursor" })) &&
+        !JSON.stringify(refused.body).includes(REFUSED_ACCOUNT_KEY),
+      summary(refused),
+    );
+  }
+
+  // ---- Account code sign-in (provider-account-code-v1) ----
+  {
+    const v9 = { capabilities: [PROVIDER_ACCOUNT_CODE_CAPABILITY], protocol: TEAM_PROTOCOL_V9 };
+    const { start, submit, status, cancel } = PROVIDER_ACCOUNT_CODE_ROUTES;
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises provider-account-code-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(PROVIDER_ACCOUNT_CODE_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(PROVIDER_ACCOUNT_CODE_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const body = { provider: "codex", accountId: null };
+    const account = { provider: "codex", accountId: CODE_ACCOUNT };
+    const unsupported = await call("POST", start, { token: adaToken, json: body, protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the account code route without the capability gets 400 providersUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.providersUnsupported")),
+      summary(unsupported),
+    );
+    const starts = callsOf("startProviderAccountCodeLogin").length;
+    const memberStart = await call("POST", start, { token: bobToken, json: body, ...v9 });
+    const memberStatus = await call("POST", status, { token: bobToken, json: account, ...v9 });
+    const memberCancel = await call("POST", cancel, { token: bobToken, json: account, ...v9 });
+    check(
+      "a member cannot start, read or cancel an account code sign-in",
+      [memberStart, memberStatus, memberCancel].every((answer) =>
+        errorIs(answer, 403, sourceText("error.team.adminRequired")),
+      ) &&
+        callsOf("startProviderAccountCodeLogin").length === starts &&
+        callsOf("cancelProviderAccountSignIn").length === 0,
+      [summary(memberStart), summary(memberStatus), summary(memberCancel)],
+    );
+    const badAccount = await call("POST", start, {
+      token: adaToken,
+      json: { ...body, accountId: "not-an-account" },
+      ...v9,
+    });
+    const noAccount = await call("POST", status, { token: adaToken, json: body, ...v9 });
+    check(
+      "an account id that is not one, and a status with no account, get 400",
+      badAccount.status === 400 &&
+        noAccount.status === 400 &&
+        callsOf("startProviderAccountCodeLogin").length === starts,
+      [summary(badAccount), summary(noAccount)],
+    );
+    const noCode = await call("POST", start, { token: adaToken, json: { ...body, provider: "cursor" }, ...v9 });
+    check(
+      "a provider whose accounts have no code sign-in fails with the reason",
+      errorIs(noCode, 409, sourceText("error.provider.noCodeSignIn", { provider: "Cursor" })),
+      summary(noCode),
+    );
+    const started = await call("POST", start, { token: adaToken, json: body, ...v9 });
+    const running = await call("POST", status, { token: adaToken, json: account, ...v9 });
+    check(
+      "an admin starts the code sign-in of a new account: the answer names the account, the page and the code",
+      started.status === 200 &&
+        isDeepStrictEqual(started.body, {
+          accountId: CODE_ACCOUNT,
+          start: {
+            kind: "code",
+            userCode: "ABCD-12345",
+            verificationUrl: "https://auth.openai.com/codex/device",
+            expiresAt: clock + 900_000,
+          },
+        }) &&
+        isDeepStrictEqual(running.body, { result: null }),
+      [summary(started), summary(running)],
+    );
+    const cancelled = await call("POST", cancel, { token: adaToken, json: account, ...v9 });
+    const ended = await call("POST", status, { token: adaToken, json: account, ...v9 });
+    const endedError = field(ended.body, "result", "error");
+    check(
+      "an admin cancels the sign-in; the status then holds a result with a bounded error",
+      cancelled.status === 200 &&
+        isDeepStrictEqual(cancelled.body, {}) &&
+        isDeepStrictEqual(callsOf("cancelProviderAccountSignIn"), [[{ provider: "codex", accountId: CODE_ACCOUNT }]]) &&
+        ended.status === 200 &&
+        typeof endedError === "string" &&
+        endedError.length === 2_000,
+      [summary(cancelled), `status ${ended.status}`],
+    );
+    // A `paste` sign-in (Claude): the page shows a code, and `submit` sends it to the host.
+    const pasteCode = "paste-code-e2e-0123456789";
+    const claude = { provider: "claude", accountId: CODE_ACCOUNT };
+    const memberSubmit = await call("POST", submit, { token: bobToken, json: { ...claude, code: pasteCode }, ...v9 });
+    const idle = await call("POST", submit, { token: adaToken, json: { ...claude, code: pasteCode }, ...v9 });
+    check(
+      "a member cannot submit a code, and a refusal does not quote the code",
+      errorIs(memberSubmit, 403, sourceText("error.team.adminRequired")) &&
+        idle.status === 409 &&
+        !JSON.stringify(idle.body).includes(pasteCode) &&
+        callsOf("submitProviderAccountCodeLogin").length === 1,
+      [summary(memberSubmit), summary(idle)],
+    );
+    const pasteStarted = await call("POST", start, {
+      token: adaToken,
+      json: { provider: "claude", accountId: null },
+      ...v9,
+    });
+    const submitted = await call("POST", submit, { token: adaToken, json: { ...claude, code: pasteCode }, ...v9 });
+    check(
+      "an admin starts a paste sign-in and submits the code: the host gets it, and no answer carries it",
+      isDeepStrictEqual(pasteStarted.body, {
+        accountId: CODE_ACCOUNT,
+        start: { kind: "paste", verificationUrl: "https://claude.ai/oauth/authorize", expiresAt: clock + 900_000 },
+      }) &&
+        submitted.status === 200 &&
+        isDeepStrictEqual(submitted.body, {}) &&
+        isDeepStrictEqual(callsOf("submitProviderAccountCodeLogin").at(-1), [{ ...claude, code: pasteCode }]),
+      [summary(pasteStarted), summary(submitted)],
     );
   }
 
@@ -4271,6 +5228,173 @@ try {
     );
   }
 
+  // ---- Agent defaults (agent-defaults-v1) ----
+  {
+    const defaultsCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, AGENT_DEFAULTS_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises agent-defaults-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(AGENT_DEFAULTS_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(AGENT_DEFAULTS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const writes = callsOf("updateAgent").length;
+    const unsupported = await call("POST", AGENT_DEFAULTS_ROUTES.settings, { token: adaToken, json: {} });
+    check(
+      "the agent defaults routes without the capability get 400 agentSettingsUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.agentSettingsUnsupported")),
+      summary(unsupported),
+    );
+    const memberRead = await call("POST", AGENT_DEFAULTS_ROUTES.settings, {
+      token: bobToken,
+      json: {},
+      capabilities: defaultsCapabilities,
+    });
+    const memberUpdate = await call("POST", AGENT_DEFAULTS_ROUTES.update, {
+      token: bobToken,
+      json: { allowAutomation: true },
+      capabilities: defaultsCapabilities,
+    });
+    const memberChoice = await call("POST", AGENT_DEFAULTS_ROUTES.choice, {
+      token: bobToken,
+      json: { agentIds: ["agent-ada"], setting: "allowAutomation", choice: "on" },
+      capabilities: defaultsCapabilities,
+    });
+    check(
+      "a member cannot read or change the agent defaults, and nothing is written",
+      errorIs(memberRead, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberUpdate, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberChoice, 403, sourceText("error.team.adminRequired")) &&
+        callsOf("updateAgent").length === writes &&
+        !existsSync(agentDefaultsPath),
+      [summary(memberRead), summary(memberUpdate), summary(memberChoice)],
+    );
+    const adminRead = await call("POST", AGENT_DEFAULTS_ROUTES.settings, {
+      token: adaToken,
+      json: {},
+      capabilities: defaultsCapabilities,
+    });
+    const readAgents = list(field(adminRead.body, "agents"));
+    check(
+      "an admin reads the host defaults, the steer default and the own values of each agent",
+      adminRead.status === 200 &&
+        isDeepStrictEqual(field(adminRead.body, "defaults"), DEFAULT_AGENT_DEFAULTS) &&
+        field(adminRead.body, "busyMessageMode") === "steer" &&
+        readAgents.some((agent) => field(agent, "agentId") === "agent-ada"),
+      summary(adminRead),
+    );
+    const hiddenRead = await call("POST", AGENT_DEFAULTS_ROUTES.settings, {
+      token: adaToken,
+      json: {},
+      capabilities: defaultsCapabilities,
+      protocol: 6,
+    });
+    check(
+      "the read does not list an agent that the client protocol does not show",
+      hiddenRead.status === 200 &&
+        readAgents.some((agent) => field(agent, "agentId") === "agent-pi") &&
+        !list(field(hiddenRead.body, "agents")).some((agent) => field(agent, "agentId") === "agent-pi"),
+      summary(hiddenRead),
+    );
+    const invalid = await call("POST", AGENT_DEFAULTS_ROUTES.update, {
+      token: adaToken,
+      json: { planStartAfterMs: 1_234 },
+      capabilities: defaultsCapabilities,
+    });
+    check(
+      "the host refuses a plan start time outside the limits, and writes nothing",
+      invalid.status === 400 && !existsSync(agentDefaultsPath) && callsOf("agentDefaultsChanged").length === 0,
+      summary(invalid),
+    );
+    const update = await call("POST", AGENT_DEFAULTS_ROUTES.update, {
+      token: adaToken,
+      json: { allowAutomation: true, planStartAfterMs: null, automationRunsPerHour: 12, busyMessageMode: "queue" },
+      capabilities: defaultsCapabilities,
+    });
+    const stored = existsSync(agentDefaultsPath) ? JSON.parse(readFileSync(agentDefaultsPath, "utf8")) : null;
+    const expectedDefaults = {
+      ...DEFAULT_AGENT_DEFAULTS,
+      allowAutomation: true,
+      planStartAfterMs: null,
+      automationRunsPerHour: 12,
+    };
+    check(
+      "an admin changes the defaults; the host saves them, keeps the other values and tells the agents once",
+      update.status === 200 &&
+        isDeepStrictEqual(field(update.body, "defaults"), expectedDefaults) &&
+        field(update.body, "busyMessageMode") === "queue" &&
+        isDeepStrictEqual(stored, { version: 1, ...expectedDefaults }) &&
+        isDeepStrictEqual(busyMessageModePreferences.get(), { mode: "queue" }) &&
+        isDeepStrictEqual(callsOf("agentDefaultsChanged"), [[DEFAULT_AGENT_DEFAULTS]]),
+      [summary(update), stored],
+    );
+    const limitOnly = await call("POST", AGENT_DEFAULTS_ROUTES.update, {
+      token: adaToken,
+      json: { automationRunsPerHour: 20 },
+      capabilities: defaultsCapabilities,
+    });
+    const sameMode = await call("POST", AGENT_DEFAULTS_ROUTES.update, {
+      token: adaToken,
+      json: { automationRunsPerHour: 20, busyMessageMode: "queue" },
+      capabilities: defaultsCapabilities,
+    });
+    check(
+      "each change tells the agents and the open clients (agents-changed); a request that changes nothing does not",
+      limitOnly.status === 200 &&
+        field(limitOnly.body, "defaults", "automationRunsPerHour") === 20 &&
+        sameMode.status === 200 &&
+        isDeepStrictEqual(callsOf("agentDefaultsChanged"), [[DEFAULT_AGENT_DEFAULTS], [expectedDefaults]]),
+      [summary(limitOnly), summary(sameMode)],
+    );
+    const steer = await call("POST", AGENT_DEFAULTS_ROUTES.choice, {
+      token: adaToken,
+      json: { agentIds: ["agent-ada"], setting: "busyMessageMode", choice: "on" },
+      capabilities: defaultsCapabilities,
+    });
+    const ownAda = (body: Json | undefined) =>
+      list(field(body, "agents")).find((agent) => field(agent, "agentId") === "agent-ada");
+    check(
+      "an admin gives an agent its own steer value through the agent writer",
+      steer.status === 200 &&
+        field(ownAda(steer.body), "busyMessageMode") === "steer" &&
+        isDeepStrictEqual(callsOf("updateAgent").at(-1), [{ agentId: "agent-ada", busyMessageMode: "steer" }]),
+      summary(steer),
+    );
+    const followDefault = await call("POST", AGENT_DEFAULTS_ROUTES.choice, {
+      token: adaToken,
+      json: { agentIds: ["agent-ada"], setting: "busyMessageMode", choice: "default" },
+      capabilities: defaultsCapabilities,
+    });
+    check(
+      "the default choice removes the own value, so the agent follows the default again",
+      followDefault.status === 200 &&
+        field(ownAda(followDefault.body), "busyMessageMode") === null &&
+        isDeepStrictEqual(callsOf("updateAgent").at(-1), [{ agentId: "agent-ada", busyMessageMode: null }]),
+      summary(followDefault),
+    );
+    const before = callsOf("updateAgent").length;
+    const missing = await call("POST", AGENT_DEFAULTS_ROUTES.choice, {
+      token: adaToken,
+      json: { agentIds: ["agent-ada", "agent-none"], setting: "allowAutomation", choice: "off" },
+      capabilities: defaultsCapabilities,
+    });
+    const hiddenChoice = await call("POST", AGENT_DEFAULTS_ROUTES.choice, {
+      token: adaToken,
+      json: { agentIds: ["agent-pi"], setting: "allowAutomation", choice: "off" },
+      capabilities: defaultsCapabilities,
+      protocol: 6,
+    });
+    check(
+      "a choice that names an unknown agent or an agent that the client protocol does not show gets 404 and writes nothing",
+      errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(hiddenChoice, 404, sourceText("error.team.agentNotFound")) &&
+        callsOf("updateAgent").length === before,
+      [summary(missing), summary(hiddenChoice)],
+    );
+  }
+
   // ---- Fast mode (agent-fast-mode-v1) ----
   {
     const fastCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, AGENT_FAST_MODE_CAPABILITY];
@@ -4372,6 +5496,253 @@ try {
       errorIs(hiddenSet, 404, sourceText("error.team.agentNotFound")) && callsOf("updateAgent").length === writes + 2,
       summary(hiddenSet),
     );
+  }
+
+  // ---- Speed (agent-speed-v1) ----
+  {
+    const speedCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, AGENT_SPEED_CAPABILITY];
+    const fastCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, AGENT_FAST_MODE_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises agent-speed-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(AGENT_SPEED_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(AGENT_SPEED_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const writes = callsOf("updateAgent").length;
+    const unsupported = await call("POST", AGENT_SPEED_ROUTES.settings, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities: fastCapabilities,
+    });
+    check(
+      "the speed routes without the capability get 400 agentSettingsUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.agentSettingsUnsupported")),
+      summary(unsupported),
+    );
+    const models = await call("POST", AGENT_SPEED_ROUTES.models, {
+      token: bobToken,
+      json: {},
+      capabilities: speedCapabilities,
+    });
+    const fastModels = await call("POST", AGENT_FAST_MODE_ROUTES.models, {
+      token: bobToken,
+      json: {},
+      capabilities: fastCapabilities,
+    });
+    check(
+      "a member reads the models with a fast tier, with the Ultrafast tier and the Claude model; the older route keeps neither",
+      models.status === 200 &&
+        isDeepStrictEqual(models.body, {
+          models: [
+            { provider: "codex", id: "gpt-fast", fastServiceTier: "priority", ultrafastServiceTier: "ultrafast" },
+            { provider: "claude", id: "claude-fast", fastServiceTier: "fast" },
+          ],
+        }) &&
+        isDeepStrictEqual(fastModels.body, {
+          models: [{ provider: "codex", id: "gpt-fast", fastServiceTier: "priority" }],
+        }),
+      [summary(models), summary(fastModels)],
+    );
+    const unknownSpeed = await call("POST", AGENT_SPEED_ROUTES.update, {
+      token: bobToken,
+      json: { agentId: "agent-ada", speed: "turbo" },
+      capabilities: speedCapabilities,
+    });
+    check(
+      "the host refuses a speed that is not standard, fast or ultrafast, and writes nothing",
+      unknownSpeed.status === 400 && callsOf("updateAgent").length === writes,
+      summary(unknownSpeed),
+    );
+    const ultra = await call("POST", AGENT_SPEED_ROUTES.update, {
+      token: bobToken,
+      json: { agentId: "agent-ada", speed: "ultrafast" },
+      capabilities: speedCapabilities,
+    });
+    const readUltra = await call("POST", AGENT_SPEED_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      capabilities: speedCapabilities,
+    });
+    const readUltraOld = await call("POST", AGENT_FAST_MODE_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      capabilities: fastCapabilities,
+    });
+    check(
+      "a member sets Ultrafast through the agent writer; the speed route reads it, the older route reads fast mode on",
+      ultra.status === 200 &&
+        isDeepStrictEqual(ultra.body, { speed: "ultrafast" }) &&
+        isDeepStrictEqual(readUltra.body, { speed: "ultrafast" }) &&
+        isDeepStrictEqual(readUltraOld.body, { fastMode: true }) &&
+        isDeepStrictEqual(callsOf("updateAgent").at(-1), [{ agentId: "agent-ada", fastMode: true, ultrafast: true }]),
+      [summary(ultra), summary(readUltra), summary(readUltraOld)],
+    );
+    const oldFast = await call("POST", AGENT_FAST_MODE_ROUTES.update, {
+      token: bobToken,
+      json: { agentId: "agent-ada", fastMode: true, ultrafast: true },
+      capabilities: fastCapabilities,
+    });
+    const readFast = await call("POST", AGENT_SPEED_ROUTES.settings, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities: speedCapabilities,
+    });
+    check(
+      "the older fast-mode route sets only Fast, so Ultrafast ends",
+      oldFast.status === 200 &&
+        isDeepStrictEqual(callsOf("updateAgent").at(-1), [{ agentId: "agent-ada", fastMode: true }]) &&
+        isDeepStrictEqual(readFast.body, { speed: "fast" }),
+      [summary(oldFast), summary(readFast)],
+    );
+    const standard = await call("POST", AGENT_SPEED_ROUTES.update, {
+      token: bobToken,
+      json: { agentId: "agent-ada", speed: "standard" },
+      capabilities: speedCapabilities,
+    });
+    const missing = await call("POST", AGENT_SPEED_ROUTES.settings, {
+      token: bobToken,
+      json: { agentId: "agent-none" },
+      capabilities: speedCapabilities,
+    });
+    check(
+      "a member sets Standard, and an unknown agent gets 404",
+      standard.status === 200 &&
+        isDeepStrictEqual(standard.body, { speed: "standard" }) &&
+        isDeepStrictEqual(callsOf("updateAgent").at(-1), [{ agentId: "agent-ada", fastMode: false }]) &&
+        errorIs(missing, 404, sourceText("error.team.agentNotFound")),
+      [summary(standard), summary(missing)],
+    );
+    const hiddenSet = await call("POST", AGENT_SPEED_ROUTES.update, {
+      token: bobToken,
+      json: { agentId: "agent-pi", speed: "fast" },
+      capabilities: speedCapabilities,
+      protocol: 6,
+    });
+    check(
+      "a member cannot set the speed of an agent that the client protocol does not show",
+      errorIs(hiddenSet, 404, sourceText("error.team.agentNotFound")) && callsOf("updateAgent").length === writes + 3,
+      summary(hiddenSet),
+    );
+  }
+
+  // ---- Steering models (model-steering-v1) ----
+  {
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises model-steering-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(MODEL_STEERING_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(MODEL_STEERING_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", MODEL_STEERING_ROUTES.list, {
+      token: bobToken,
+      json: {},
+      capabilities: [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY],
+    });
+    check(
+      "the steering models route without the capability gets 400 modelVisibilityUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.modelVisibilityUnsupported")),
+      summary(unsupported),
+    );
+    const steering = await call("POST", MODEL_STEERING_ROUTES.list, {
+      token: bobToken,
+      json: {},
+      capabilities: [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, MODEL_STEERING_CAPABILITY],
+    });
+    // A released client reads the model list with no `steersTurns`: only this capability gives it.
+    const released = await call("GET", TEAM_API_ROUTES.agents.models, {
+      token: bobToken,
+      capabilities: [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, MODEL_STEERING_CAPABILITY],
+    });
+    check(
+      "the released model list does not carry steersTurns",
+      released.status === 200 &&
+        list(released.body).some((model) => field(model, "id") === "steering-agent/default") &&
+        list(released.body).every((model) => field(model, "steersTurns") === undefined),
+      summary(released),
+    );
+    check(
+      "a member reads only the custom agent models that steer",
+      steering.status === 200 &&
+        isDeepStrictEqual(steering.body, { models: [{ provider: "acp", id: "steering-agent/default" }] }),
+      summary(steering),
+    );
+  }
+
+  // ---- Model sources (provider-model-source-v1) ----
+  {
+    const sourceCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, PROVIDER_MODEL_SOURCE_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises provider-model-source-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(PROVIDER_MODEL_SOURCE_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(PROVIDER_MODEL_SOURCE_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", PROVIDER_MODEL_SOURCE_ROUTES.list, {
+      token: bobToken,
+      json: {},
+      capabilities: [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY],
+    });
+    check(
+      "the model sources route without the capability gets 400 providerModelSourceUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.providerModelSourceUnsupported")),
+      summary(unsupported),
+    );
+    // Codex runs on Ollama by its settings, OpenCode lists a model file, and Claude has its own list.
+    agentStatus = {
+      ...NO_STATUS,
+      providers: [
+        {
+          id: "codex",
+          state: "available",
+          version: "0.169.0",
+          message: null,
+          modelSource: { kind: "provider", name: "Ollama" },
+        },
+        { id: "claude", state: "available", version: "2.1.0", message: null },
+        { id: "opencode", state: "available", version: "2.3.0", message: null, modelSource: { kind: "catalog" } },
+      ],
+    };
+    try {
+      const sources = await call("POST", PROVIDER_MODEL_SOURCE_ROUTES.list, {
+        token: bobToken,
+        json: {},
+        capabilities: sourceCapabilities,
+      });
+      const expected = {
+        sources: [
+          { provider: "codex", source: { kind: "provider", name: "Ollama" } },
+          { provider: "opencode", source: { kind: "catalog" } },
+        ],
+      };
+      check(
+        "a member reads where each provider's models come from, only for the providers that give a source",
+        sources.status === 200 && isDeepStrictEqual(sources.body, expected),
+        summary(sources),
+      );
+      // A released client reads the status with no source: only this capability gives it.
+      const released = await call("GET", TEAM_API_ROUTES.agents.status, {
+        token: bobToken,
+        capabilities: sourceCapabilities,
+      });
+      check(
+        "the released status does not carry modelSource",
+        released.status === 200 &&
+          list(field(released.body, "providers")).length === 3 &&
+          list(field(released.body, "providers")).every((row) => field(row, "modelSource") === undefined),
+        summary(released),
+      );
+    } finally {
+      agentStatus = null;
+    }
   }
 
   // ---- Compact now (context-compact-v1) ----
@@ -4749,6 +6120,7 @@ try {
               excludeRoutineRunEvents: true,
               excludeHostedSiteEvents: true,
               excludeRoutineQuietAnswers: true,
+              excludeSettingLinks: true,
             },
           ],
         ]),
@@ -4855,6 +6227,100 @@ try {
       "an admin turns the memory review on again at 40 turns",
       on.status === 200 && field(on.body, "interval") === 40 && memoryReview.get().interval === 40,
       summary(on),
+    );
+  }
+
+  // ---- Setting cards (setting-link-markers-v1) ----
+  {
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises setting-link-markers-v1 on protocol 9 only",
+      list(field(compatibility.body, "capabilities")).includes(SETTING_LINK_MARKERS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(SETTING_LINK_MARKERS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    // The database leaves the setting cards out of a page for a client that cannot show them.
+    const pagePath = `${TEAM_API_ROUTES.agent.conversationPage("agent-ada")}?around=setting-card`;
+    const pageExclusions = () => {
+      const options = callsOf("readConversationPageFor").at(-1)?.[4];
+      return options && typeof options === "object" && "excludeSettingLinks" in options
+        ? options.excludeSettingLinks
+        : undefined;
+    };
+    const withCards = await call("GET", pagePath, {
+      token: bobToken,
+      protocol: TEAM_PROTOCOL_V9,
+      capabilities: [SETTING_LINK_MARKERS_CAPABILITY],
+    });
+    const withCardsExcluded = pageExclusions();
+    const withoutCards = await call("GET", pagePath, { token: bobToken, protocol: TEAM_PROTOCOL_V9 });
+    const withoutCardsExcluded = pageExclusions();
+    check(
+      "a conversation page keeps the setting cards only for a client with setting-link-markers-v1",
+      withCards.status === 200 &&
+        withCardsExcluded === false &&
+        withoutCards.status === 200 &&
+        withoutCardsExcluded === true,
+      [summary(withCards), withCardsExcluded, summary(withoutCards), withoutCardsExcluded],
+    );
+  }
+
+  // ---- Quiet routine answers (routine-quiet-answers-v1) ----
+  {
+    // A capability after protocol 9: the protocol 9 list is full.
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, {
+      protocol: TEAM_PROTOCOL_V10,
+      headers: teamCapabilityHeaders(TEAM_PROTOCOL_V10, TEAM_CURRENT_CAPABILITIES),
+    });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises routine-quiet-answers-v1 to a protocol 10 peer only",
+      decodeTeamProtocolSupportExpanded(compatibility.body).capabilities.includes(ROUTINE_QUIET_ANSWERS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(ROUTINE_QUIET_ANSWERS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    // A user on a server reads a report that the agent ended quiet in its closed run, as on desktop.
+    const ids = (response: Awaited<ReturnType<typeof call>>) =>
+      list(field(response.body, "messages")).map((message) => field(message, "id"));
+    const conversationPath = TEAM_API_ROUTES.agent.conversation("agent-ada");
+    const withQuiet = await call("GET", conversationPath, {
+      token: bobToken,
+      protocol: TEAM_PROTOCOL_V10,
+      capabilities: [ROUTINE_QUIET_ANSWERS_CAPABILITY],
+    });
+    const withoutQuiet = await call("GET", conversationPath, { token: bobToken, protocol: TEAM_PROTOCOL_V10 });
+    const through = (response: Awaited<ReturnType<typeof call>>) =>
+      field(field(response.body, "readState"), "throughMessageId");
+    check(
+      "a conversation keeps a quiet routine answer, and a read through it, only for a client with routine-quiet-answers-v1",
+      withQuiet.status === 200 &&
+        isDeepStrictEqual(ids(withQuiet), ["run-answer", "quiet-report"]) &&
+        through(withQuiet) === "quiet-report" &&
+        withoutQuiet.status === 200 &&
+        isDeepStrictEqual(ids(withoutQuiet), ["run-answer"]) &&
+        through(withoutQuiet) === "run-answer",
+      [summary(withQuiet), summary(withoutQuiet)],
+    );
+    const pagePath = `${TEAM_API_ROUTES.agent.conversationPage("agent-ada")}?around=quiet-report`;
+    const pageExcludes = () => {
+      const options = callsOf("readConversationPageFor").at(-1)?.[4];
+      return options && typeof options === "object" && "excludeRoutineQuietAnswers" in options
+        ? options.excludeRoutineQuietAnswers
+        : undefined;
+    };
+    await call("GET", pagePath, {
+      token: bobToken,
+      protocol: TEAM_PROTOCOL_V10,
+      capabilities: [ROUTINE_QUIET_ANSWERS_CAPABILITY],
+    });
+    const withQuietExcluded = pageExcludes();
+    await call("GET", pagePath, { token: bobToken, protocol: TEAM_PROTOCOL_V10 });
+    const withoutQuietExcluded = pageExcludes();
+    check(
+      "a conversation page keeps quiet routine answers only for a client with routine-quiet-answers-v1",
+      withQuietExcluded === false && withoutQuietExcluded === true,
+      [withQuietExcluded, withoutQuietExcluded],
     );
   }
 
@@ -5013,6 +6479,108 @@ try {
     );
   }
 
+  // ---- Skills from GitHub (github-skills-v1) ----
+  {
+    const capabilities = [SKILLS_ADMIN_CAPABILITY, GITHUB_SKILLS_CAPABILITY];
+    const v9 = { protocol: TEAM_PROTOCOL_V9, capabilities };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises github-skills-v1 on protocol 9 only",
+      list(field(compatibility.body, "capabilities")).includes(GITHUB_SKILLS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(GITHUB_SKILLS_CAPABILITY),
+    );
+
+    const read = await call("POST", GITHUB_SKILLS_ROUTES.read, {
+      ...v9,
+      token: adaToken,
+      json: { link: "https://github.com/acme/skills" },
+    });
+    const skills = list(field(read.body, "skills"));
+    const ids = skills.map((skill) => field(skill, "id"));
+    check(
+      "an admin reads a repository link: the host pins the commit and lists each top skill folder once",
+      read.status === 200 &&
+        field(read.body, "owner") === "acme" &&
+        field(read.body, "repo") === "skills" &&
+        field(read.body, "commit") === GITHUB_COMMIT &&
+        field(read.body, "committedAt") === "2026-11-01T10:00:00Z" &&
+        isDeepStrictEqual(ids, [
+          `github:acme/skills@${GITHUB_COMMIT}:skills/docx`,
+          `github:acme/skills@${GITHUB_COMMIT}:skills/pdf`,
+        ]) &&
+        field(skills[1], "description") === "Read and fill PDF forms." &&
+        field(skills[1], "instructions") === "# PDF" &&
+        isDeepStrictEqual(field(skills[1], "files"), ["SKILL.md", "reference.md"]),
+      summary(read),
+    );
+
+    const fetchesBefore = githubFetches.length;
+    const noCapability = await call("POST", GITHUB_SKILLS_ROUTES.read, {
+      protocol: TEAM_PROTOCOL_V9,
+      capabilities: [SKILLS_ADMIN_CAPABILITY],
+      token: adaToken,
+      json: { link: "https://github.com/acme/skills" },
+    });
+    const member = await call("POST", GITHUB_SKILLS_ROUTES.read, {
+      ...v9,
+      token: bobToken,
+      json: { link: "https://github.com/acme/skills" },
+    });
+    check(
+      "without the capability the read gets 400, a member gets 403, and the host does not contact GitHub",
+      errorIs(noCapability, 400, sourceText("error.skill.githubHostTooOld")) &&
+        errorIs(member, 403, sourceText("error.team.adminRequired")) &&
+        githubFetches.length === fetchesBefore,
+      { noCapability: summary(noCapability), member: summary(member) },
+    );
+
+    const missing = await call("POST", GITHUB_SKILLS_ROUTES.read, {
+      ...v9,
+      token: adaToken,
+      json: { link: "https://github.com/acme/private" },
+    });
+    const empty = await call("POST", GITHUB_SKILLS_ROUTES.read, {
+      ...v9,
+      token: adaToken,
+      json: { link: "https://github.com/acme/skills/tree/main/docs" },
+    });
+    const invalid = await call("POST", GITHUB_SKILLS_ROUTES.read, {
+      ...v9,
+      token: adaToken,
+      json: { link: "https://example.com/acme/skills" },
+    });
+    check(
+      "a missing repository, a folder with no SKILL.md and a link that is not GitHub get the admin's reason",
+      errorIs(missing, 409, sourceText("error.skill.githubNotFound", { repository: "acme/private" })) &&
+        errorIs(empty, 409, sourceText("error.skill.githubNoSkills", { folder: "acme/skills/docs" })) &&
+        errorIs(invalid, 409, sourceText("error.skill.githubLinkInvalid")),
+      { missing: summary(missing), empty: summary(empty), invalid: summary(invalid) },
+    );
+
+    const skillId = `github:acme/skills@${GITHUB_COMMIT}:skills/pdf`;
+    const installsBefore = callsOf("installSkill").length;
+    const oldClient = await call("POST", SKILLS_ADMIN_ROUTES.install, {
+      protocol: TEAM_PROTOCOL_V9,
+      capabilities: [SKILLS_ADMIN_CAPABILITY],
+      token: adaToken,
+      json: { agentId: "agent-ada", skillId },
+    });
+    const install = await call("POST", SKILLS_ADMIN_ROUTES.install, {
+      ...v9,
+      token: adaToken,
+      json: { agentId: "agent-ada", skillId },
+    });
+    check(
+      "skills-admin-v1 installs a GitHub skill id only for a client with github-skills-v1",
+      errorIs(oldClient, 400, sourceText("error.skill.githubHostTooOld")) &&
+        install.status === 200 &&
+        field(install.body, "skillId") === skillId &&
+        isDeepStrictEqual(callsOf("installSkill").slice(installsBefore), [[{ agentId: "agent-ada", skillId }]]),
+      { oldClient: summary(oldClient), install: summary(install) },
+    );
+  }
+
   // ---- Teach a task (browser-teach-v1) ----
   {
     const capabilities = [BROWSER_TEACH_CAPABILITY];
@@ -5085,6 +6653,182 @@ try {
           ],
         ),
       [summary(noSave), summary(saved), summary(discarded)],
+    );
+  }
+
+  // ---- The skills that an agent cannot use, with the reason (skill-problems-v1, #9006) ----
+  {
+    const withSkillProblems = teamCapabilityHeaders(TEAM_PROTOCOL_V10, TEAM_CURRENT_CAPABILITIES);
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, {
+      protocol: TEAM_PROTOCOL_V10,
+      headers: withSkillProblems,
+    });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises skill-problems-v1 to a protocol 10 peer only",
+      decodeTeamProtocolSupportExpanded(compatibility.body).capabilities.includes(SKILL_PROBLEMS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(SKILL_PROBLEMS_CAPABILITY),
+      [summary(compatibility), list(field(older.body, "capabilities")).length],
+    );
+    const path = TEAM_API_ROUTES.agent.skills("agent-ada");
+    const plain = await call("GET", path, {
+      token: bobToken,
+      protocol: TEAM_PROTOCOL_V10,
+      headers: teamCapabilityHeaders(
+        TEAM_PROTOCOL_V10,
+        TEAM_CURRENT_CAPABILITIES.filter((capability) => capability !== SKILL_PROBLEMS_CAPABILITY),
+      ),
+    });
+    const withProblems = await call("GET", path, {
+      token: bobToken,
+      protocol: TEAM_PROTOCOL_V10,
+      headers: withSkillProblems,
+    });
+    // The list also has the host user's own skills in `~/.agents/skills`, which differ on each computer.
+    const named = (reply: Reply) =>
+      decodeInstalledSkills(reply.body)
+        .filter((skill) => skill.skillId.startsWith("workspace:"))
+        .map(({ slug, problem }) => ({ slug, problem }));
+    check(
+      "an older client gets only the usable skill folder, as before",
+      plain.status === 200 && isDeepStrictEqual(named(plain), [{ slug: "good-skill", problem: undefined }]),
+      summary(plain),
+    );
+    check(
+      "a client with skill-problems-v1 also gets the folder whose SKILL.md has a byte order mark, with the reason",
+      withProblems.status === 200 &&
+        isDeepStrictEqual(named(withProblems), [
+          { slug: "good-skill", problem: undefined },
+          { slug: "settlement-economy", problem: sourceText("error.skill.frontmatterMissing") },
+        ]),
+      summary(withProblems),
+    );
+  }
+
+  // ---- The tabs of an agent that the roles close to a member ----
+  {
+    const tab = (id: string, ownerAgentId: string) => ({
+      id,
+      title: id,
+      url: "https://shop.example/",
+      loading: false,
+      ownerThreadId: null,
+      ownerAgentId,
+    });
+    browserTabs = [tab("tab-ada", "agent-ada"), tab("tab-oc", "agent-oc")];
+    const ids = (reply: Reply) => list(reply.body).map((entry) => field(entry, "id"));
+    const opensBefore = callsOf("open").length;
+    const teachesBefore = callsOf("startTeach").length;
+    accessLevels = { revision: 93, everyone: { "agent-ada": "none" }, roles: [] };
+    const memberTabs = await call("GET", TEAM_API_ROUTES.browser.tabs, { token: bobToken });
+    const adminTabs = await call("GET", TEAM_API_ROUTES.browser.tabs, { token: adaToken });
+    const teach = await call("POST", BROWSER_TEACH_ROUTES.start, {
+      token: bobToken,
+      json: { tabId: "tab-ada" },
+      capabilities: [BROWSER_TEACH_CAPABILITY],
+    });
+    const open = await call("POST", TEAM_API_ROUTES.browser.open, {
+      token: bobToken,
+      json: { url: "https://shop.example/", ownerThreadId: null, ownerAgentId: "agent-ada" },
+    });
+    // The access change ends Bob's hold of the closed agent's tab, not his other hold or the holds of others.
+    userControlHolds = [
+      ["tab-ada", { kind: "member", memberId: bobId, sessionId: "bob-session" }],
+      ["tab-oc", { kind: "member", memberId: bobId, sessionId: "bob-session" }],
+      ["tab-ada", { kind: "member", memberId: adaId, sessionId: "ada-session" }],
+      ["tab-ada", { kind: "local" }],
+    ];
+    const notifyAccess = () => {
+      for (const listener of accessListeners) listener(store.getIdentity()?.serverId ?? "", accessLevels);
+    };
+    notifyAccess();
+    const releasedOnClose = callsOf("releaseUserControlRefused").at(-1);
+    accessLevels = { revision: 94, everyone: {}, roles: [] };
+    notifyAccess();
+    const releasedOnOpen = callsOf("releaseUserControlRefused").at(-1);
+    userControlHolds = [];
+    const reopened = await call("GET", TEAM_API_ROUTES.browser.tabs, { token: bobToken });
+    browserTabs = [];
+    check(
+      "when the roles close an agent to a member, the host gives back only that member's hold of the agent's tab; when they open it again, no hold",
+      isDeepStrictEqual(releasedOnClose, [[`tab-ada:${bobId}`]]) && isDeepStrictEqual(releasedOnOpen, [[]]),
+      { releasedOnClose, releasedOnOpen },
+    );
+    check(
+      "a member does not see or use a tab of an agent at none, and cannot open one for it; an admin sees it; the member sees it again when the access opens",
+      isDeepStrictEqual(ids(memberTabs), ["tab-oc"]) &&
+        isDeepStrictEqual(ids(adminTabs), ["tab-ada", "tab-oc"]) &&
+        errorIs(teach, 404, sourceText("error.backend.browserTabNotFound")) &&
+        errorIs(open, 404, sourceText("error.team.agentNotFound")) &&
+        callsOf("open").length === opensBefore &&
+        callsOf("startTeach").length === teachesBefore &&
+        isDeepStrictEqual(ids(reopened), ["tab-ada", "tab-oc"]),
+      [summary(memberTabs), summary(adminTabs), summary(teach), summary(open), summary(reopened)],
+    );
+  }
+
+  // ---- A sign-in kept in the page storage (browser-sign-in-storage-v1, #8686) ----
+  {
+    const capabilities = [BROWSER_SIGN_IN_STORAGE_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises browser-sign-in-storage-v1 on protocol 9 only",
+      list(field(compatibility.body, "capabilities")).includes(BROWSER_SIGN_IN_STORAGE_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(BROWSER_SIGN_IN_STORAGE_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const cookie = {
+      name: "session",
+      value: "fixture",
+      domain: "shop.example",
+      path: "/",
+      secure: true,
+      httpOnly: true,
+      sameSite: "lax",
+      expirationDate: null,
+    };
+    const storage = { origin: "https://shop.example", entries: [{ name: "token", value: "fixture" }] };
+    const json = { tabId: "tab-1", cookies: [cookie], storage };
+    const unsupported = await call("POST", BROWSER_SIGN_IN_STORAGE_ROUTES.import, { token: bobToken, json });
+    check(
+      "the storage sign-in route without the capability gets 400 browserSignInUnsupported",
+      errorIs(unsupported, 400, sourceText("error.backend.browserSignInUnsupported")) &&
+        callsOf("importSignIn").length === 0,
+      summary(unsupported),
+    );
+    const imported = await call("POST", BROWSER_SIGN_IN_STORAGE_ROUTES.import, { token: bobToken, json, capabilities });
+    const cookiesOnly = await call("POST", BROWSER_SIGN_IN_STORAGE_ROUTES.import, {
+      token: bobToken,
+      json: { ...json, storage: null },
+      capabilities,
+    });
+    check(
+      "a member sends cookies and the page storage of one origin; the answer has both counts, which the client decoder takes",
+      imported.status === 200 &&
+        isDeepStrictEqual(decodeBrowserSignInStorageResult(imported.body), { cookies: 1, storage: 1 }) &&
+        cookiesOnly.status === 200 &&
+        isDeepStrictEqual(cookiesOnly.body, { cookies: 1, storage: 0 }) &&
+        isDeepStrictEqual(callsOf("importSignIn"), [
+          ["tab-1", 1, "https://shop.example", 1],
+          ["tab-1", 1, null, 0],
+        ]),
+      [summary(imported), summary(cookiesOnly)],
+    );
+    const withPath = await call("POST", BROWSER_SIGN_IN_STORAGE_ROUTES.import, {
+      token: bobToken,
+      json: { ...json, storage: { ...storage, origin: "https://shop.example/account" } },
+      capabilities,
+    });
+    const extra = await call("POST", BROWSER_SIGN_IN_STORAGE_ROUTES.import, {
+      token: bobToken,
+      json: { ...json, sessionStorage: [] },
+      capabilities,
+    });
+    check(
+      "an origin with a path, or an unknown field, gets 400 and sets nothing",
+      withPath.status === 400 && extra.status === 400 && callsOf("importSignIn").length === 2,
+      [summary(withPath), summary(extra)],
     );
   }
 
@@ -6347,6 +8091,46 @@ try {
     );
   }
 
+  // ---- Disk space and the files of the server's user (storage-user-files-v1) ----
+  {
+    const unsupported = await call("POST", STORAGE_USER_FILES_ROUTES.disk, {
+      token: bobToken,
+      json: {},
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    check(
+      "the user-files route without the capability gets 400 storageUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.storageUnsupported")) && callsOf("diskUse").length === 0,
+      summary(unsupported),
+    );
+    const userFiles = { protocol: TEAM_PROTOCOL_V9, capabilities: [STORAGE_USER_FILES_CAPABILITY] };
+    // Every signed-in member reads it: the clients show the plan storage that is left to each member.
+    const member = await call("POST", STORAGE_USER_FILES_ROUTES.disk, { ...userFiles, token: bobToken, json: {} });
+    const owner = await call("POST", STORAGE_USER_FILES_ROUTES.disk, { ...userFiles, token: adaToken, json: {} });
+    const expected = { freeBytes: 2 * 1024 ** 3, totalBytes: 64 * 1024 ** 3, userBytes: 5 * 1024 ** 3 };
+    check(
+      "a member and the owner read the free, total and user-file bytes of the host disk",
+      member.status === 200 &&
+        owner.status === 200 &&
+        isDeepStrictEqual(member.body, expected) &&
+        isDeepStrictEqual(owner.body, expected) &&
+        callsOf("diskUse").length === 2,
+      [summary(member), summary(owner)],
+    );
+    // The frozen storage-disk-v1 reply does not get the new field.
+    const old = await call("POST", STORAGE_DISK_ROUTES.disk, {
+      ...userFiles,
+      capabilities: [STORAGE_DISK_CAPABILITY, STORAGE_USER_FILES_CAPABILITY],
+      token: bobToken,
+      json: {},
+    });
+    check(
+      "the storage-disk-v1 reply keeps its two fields when the peer also has storage-user-files-v1",
+      old.status === 200 && isDeepStrictEqual(old.body, { freeBytes: 2 * 1024 ** 3, totalBytes: 64 * 1024 ** 3 }),
+      summary(old),
+    );
+  }
+
   // ---- Machine use and alerts (machine-resources-v1) ----
   {
     const unsupported = await call("POST", MACHINE_RESOURCES_ROUTES.metrics, { token: adaToken, json: {} });
@@ -6463,6 +8247,43 @@ try {
         typeof bobId === "string" &&
         machine.pending(bobId).length === 0,
       [first, delivered],
+    );
+  }
+
+  // ---- Mistral code sign-in (mistral-code-sign-in-v1) ----
+  {
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises mistral-code-sign-in-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(MISTRAL_CODE_SIGN_IN_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(MISTRAL_CODE_SIGN_IN_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const v9 = {
+      token: adaToken,
+      protocol: TEAM_PROTOCOL_V9,
+      capabilities: [PROVIDERS_V8_CAPABILITY, MISTRAL_CODE_SIGN_IN_CAPABILITY],
+    };
+    const started = await call("POST", PROVIDERS_V8_ROUTES.codeLoginStart, { ...v9, json: { provider: "mistral" } });
+    check(
+      "an admin starts the Mistral sign-in on providers-v8 and gets the Mistral page as a link",
+      started.status === 200 &&
+        field(started.body, "kind") === "link" &&
+        field(started.body, "verificationUrl") === MISTRAL_SIGN_IN_PAGE &&
+        isDeepStrictEqual(callsOf("startProviderCodeLogin"), [["mistral"]]),
+      summary(started),
+    );
+    const member = await call("POST", PROVIDERS_V8_ROUTES.codeLoginStart, {
+      ...v9,
+      token: bobToken,
+      json: { provider: "mistral" },
+    });
+    check(
+      "a member gets 403 and starts no Mistral sign-in",
+      member.status === 403 && callsOf("startProviderCodeLogin").length === 1,
+      summary(member),
     );
   }
 
@@ -6708,6 +8529,146 @@ try {
         isDeepStrictEqual(reset.body, { tokens: null }) &&
         callsOf("claudeCompactWindowChanged").length === 2,
       [summary(member), summary(memberRead), summary(noCapability), summary(reset)],
+    );
+  }
+
+  // ---- The environment variables of a provider of the host, from a joined server (provider-environment-v1) ----
+  {
+    const setup = { token: adaToken, protocol: TEAM_PROTOCOL_V9, capabilities: [PROVIDER_ENVIRONMENT_CAPABILITY] };
+    const secret = "proxy-secret-e2e-1";
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    const before = await call("POST", PROVIDER_ENVIRONMENT_ROUTES.settings, { ...setup, json: { provider: "claude" } });
+    const reserved = await call("POST", PROVIDER_ENVIRONMENT_ROUTES.update, {
+      ...setup,
+      json: { provider: "claude", variables: [{ name: "CLAUDE_CONFIG_DIR", value: "/tmp/x", sensitive: false }] },
+    });
+    const badName = await call("POST", PROVIDER_ENVIRONMENT_ROUTES.update, {
+      ...setup,
+      json: { provider: "claude", variables: [{ name: "2BAD", value: "x", sensitive: false }] },
+    });
+    const missing = await call("POST", PROVIDER_ENVIRONMENT_ROUTES.update, {
+      ...setup,
+      json: { provider: "claude", variables: [{ name: "ANTHROPIC_AUTH_TOKEN", value: null, sensitive: true }] },
+    });
+    check(
+      "the host advertises provider-environment-v1 to protocol 9 only, starts with no variable, and refuses a reserved name, an invalid name and a kept value it does not have",
+      list(field(compatibility.body, "capabilities")).includes(PROVIDER_ENVIRONMENT_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(PROVIDER_ENVIRONMENT_CAPABILITY) &&
+        isDeepStrictEqual(before.body, { provider: "claude", variables: [] }) &&
+        errorIs(reserved, 400, sourceText("error.provider.environmentNameReserved", { name: "CLAUDE_CONFIG_DIR" })) &&
+        errorIs(badName, 400, sourceText("error.provider.environmentNameInvalid", { name: "2BAD" })) &&
+        errorIs(
+          missing,
+          400,
+          sourceText("error.provider.customAgentEnvValueMissing", { name: "ANTHROPIC_AUTH_TOKEN" }),
+        ) &&
+        callsOf("providerEnvironmentChanged").length === 0,
+      [summary(before), summary(reserved), summary(badName), summary(missing)],
+    );
+    const set = await call("POST", PROVIDER_ENVIRONMENT_ROUTES.update, {
+      ...setup,
+      json: {
+        provider: "claude",
+        variables: [
+          { name: " ANTHROPIC_BASE_URL ", value: "http://127.0.0.1:8317", sensitive: false },
+          { name: "ANTHROPIC_AUTH_TOKEN", value: secret, sensitive: true },
+          { name: "ANTHROPIC_API_KEY", value: "", sensitive: false },
+        ],
+      },
+    });
+    const savedFile = parseJson(readFileSync(join(root, "provider-environment.json"), "utf8"));
+    const keyFile = readFileSync(join(root, "provider-credentials.json"), "utf8");
+    check(
+      "an admin saves the variables: the host trims the names, keeps the sensitive value encrypted, never answers it, gives each process the values, and restarts the provider",
+      isDeepStrictEqual(set.body, {
+        provider: "claude",
+        variables: [
+          { name: "ANTHROPIC_BASE_URL", value: "http://127.0.0.1:8317", sensitive: false, stored: false },
+          { name: "ANTHROPIC_AUTH_TOKEN", value: "", sensitive: true, stored: true },
+          { name: "ANTHROPIC_API_KEY", value: "", sensitive: false, stored: false },
+        ],
+      }) &&
+        PROVIDER_ENVIRONMENT_CODECS.get(PROVIDER_ENVIRONMENT_ROUTES.update)?.response(200, set.body) !== undefined &&
+        !JSON.stringify(set.body).includes(secret) &&
+        !JSON.stringify(savedFile).includes(secret) &&
+        !keyFile.includes(secret) &&
+        isDeepStrictEqual(providerEnvironment.resolve("claude"), {
+          ANTHROPIC_BASE_URL: "http://127.0.0.1:8317",
+          ANTHROPIC_AUTH_TOKEN: secret,
+          ANTHROPIC_API_KEY: "",
+        }) &&
+        isDeepStrictEqual(callsOf("providerEnvironmentChanged"), [["claude"]]),
+      [summary(set)],
+    );
+    const kept = await call("POST", PROVIDER_ENVIRONMENT_ROUTES.update, {
+      ...setup,
+      json: {
+        provider: "claude",
+        variables: [
+          { name: "ANTHROPIC_BASE_URL", value: "http://127.0.0.1:8317", sensitive: false },
+          { name: "ANTHROPIC_AUTH_TOKEN", value: null, sensitive: true },
+          { name: "ANTHROPIC_API_KEY", value: "", sensitive: false },
+        ],
+      },
+    });
+    const otherProvider = await call("POST", PROVIDER_ENVIRONMENT_ROUTES.settings, {
+      ...setup,
+      json: { provider: "codex" },
+    });
+    check(
+      "a save that keeps the stored value changes nothing and restarts nothing, and another provider has its own list",
+      isDeepStrictEqual(kept.body, set.body) &&
+        providerEnvironment.resolve("claude").ANTHROPIC_AUTH_TOKEN === secret &&
+        callsOf("providerEnvironmentChanged").length === 1 &&
+        isDeepStrictEqual(otherProvider.body, { provider: "codex", variables: [] }),
+      [summary(kept), summary(otherProvider)],
+    );
+    const big = "x".repeat(8_000);
+    const tooLarge = await call("POST", PROVIDER_ENVIRONMENT_ROUTES.update, {
+      ...setup,
+      json: {
+        provider: "codex",
+        variables: Array.from({ length: 8 }, (_, index) => ({ name: `BIG_${index}`, value: big, sensitive: true })),
+      },
+    });
+    check(
+      "the host refuses sensitive values that would make the key file too large to read, and keeps the saved values and names",
+      errorIs(tooLarge, 400, sourceText("error.provider.environmentSecretsTooLarge")) &&
+        providerCredentials.secret(providerEnvironmentSecret("claude", "ANTHROPIC_AUTH_TOKEN")) === secret &&
+        providerCredentials.secret(providerEnvironmentSecret("codex", "BIG_0")) === null &&
+        isDeepStrictEqual(providerEnvironment.get("codex"), { provider: "codex", variables: [] }),
+      [summary(tooLarge)],
+    );
+    const member = await call("POST", PROVIDER_ENVIRONMENT_ROUTES.update, {
+      ...setup,
+      token: bobToken,
+      json: { provider: "claude", variables: [] },
+    });
+    const memberRead = await call("POST", PROVIDER_ENVIRONMENT_ROUTES.settings, {
+      ...setup,
+      token: bobToken,
+      json: { provider: "claude" },
+    });
+    const noCapability = await call("POST", PROVIDER_ENVIRONMENT_ROUTES.update, {
+      token: adaToken,
+      protocol: TEAM_PROTOCOL_V9,
+      json: { provider: "claude", variables: [] },
+    });
+    const removed = await call("POST", PROVIDER_ENVIRONMENT_ROUTES.update, {
+      ...setup,
+      json: { provider: "claude", variables: [] },
+    });
+    check(
+      "a member cannot read or set the variables (403), a client without provider-environment-v1 gets 400, and an admin removes them with the sensitive value",
+      member.status === 403 &&
+        memberRead.status === 403 &&
+        errorIs(noCapability, 400, sourceText("error.team.providerEnvironmentUnsupported")) &&
+        isDeepStrictEqual(removed.body, { provider: "claude", variables: [] }) &&
+        providerCredentials.secret(providerEnvironmentSecret("claude", "ANTHROPIC_AUTH_TOKEN")) === null &&
+        isDeepStrictEqual(providerEnvironment.resolve("claude"), {}) &&
+        callsOf("providerEnvironmentChanged").length === 2,
+      [summary(member), summary(memberRead), summary(noCapability), summary(removed)],
     );
   }
 
@@ -7190,6 +9151,141 @@ try {
       [summary(unsupported), summary(member)],
     );
 
+    // ---- Custom endpoint harness choice (custom-provider-harness-choice-v1) ----
+    const choice = {
+      token: adaToken,
+      capabilities: [CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY],
+      protocol: TEAM_PROTOCOL_V9,
+    };
+    const choiceDecoded = (route: string, reply: Reply) =>
+      CUSTOM_PROVIDER_HARNESS_CHOICE_CODECS.get(route)?.response(200, reply.body);
+    check(
+      "the host advertises custom-provider-harness-choice-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY),
+      [summary(compatibility), list(field(older.body, "capabilities")).length],
+    );
+    const lab = { ...spark, name: "Spark Lab" };
+    const choiceListed = await call("POST", CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES.customList, { ...choice, json: {} });
+    check(
+      "the harness choice list names each endpoint's harness and header names, as the edit list does",
+      choiceListed.status === 200 &&
+        isDeepStrictEqual(choiceDecoded(CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES.customList, choiceListed), [lab]),
+      summary(choiceListed),
+    );
+    const moved = await call("POST", CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES.customUpdate, {
+      ...choice,
+      json: {
+        id: "spark",
+        name: "Spark Lab",
+        baseUrl: "http://spark.local:8080/v1",
+        models: [{ id: "qwen3-coder", name: "Qwen3 Coder", contextWindow: 1 }],
+        headers: [{ name: "X-Tenant", value: null }],
+        harness: "opencode",
+      },
+    });
+    check(
+      "an edit that names OpenCode moves the endpoint there, with the model names only",
+      moved.status === 200 &&
+        isDeepStrictEqual(callsOf("peerHarnessUpdateCustomProvider"), [
+          [
+            {
+              id: "spark",
+              name: "Spark Lab",
+              baseUrl: "http://spark.local:8080/v1",
+              models: [{ id: "qwen3-coder", name: "Qwen3 Coder" }],
+              headers: [{ name: "X-Tenant", value: null }],
+            },
+            "opencode",
+          ],
+        ]) &&
+        isDeepStrictEqual(choiceDecoded(CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES.customUpdate, moved), {
+          providers: [{ ...lab, harness: "opencode" }],
+          restart: "not-running",
+        }),
+      [summary(moved), callsOf("peerHarnessUpdateCustomProvider")],
+    );
+    const movedBack = await call("POST", CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES.customUpdate, {
+      ...choice,
+      json: {
+        id: "spark",
+        name: "Spark Lab",
+        baseUrl: "http://spark.local:8080/v1",
+        models: [{ id: "qwen3-coder", name: "Qwen3 Coder" }],
+        harness: "pi",
+      },
+    });
+    check(
+      "an edit that names Pi moves the endpoint back",
+      movedBack.status === 200 &&
+        isDeepStrictEqual(callsOf("peerHarnessUpdateCustomProvider").at(-1)?.[1], "pi") &&
+        isDeepStrictEqual(choiceDecoded(CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES.customUpdate, movedBack), {
+          providers: [lab],
+          restart: "not-running",
+        }),
+      summary(movedBack),
+    );
+    const choiceSaved = await call("POST", CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES.customSave, {
+      ...choice,
+      json: {
+        id: "studio",
+        name: "Studio Local",
+        baseUrl: "http://127.0.0.1:11434/v1",
+        apiKey: null,
+        models: [{ id: "gpt-oss", name: "GPT-OSS", contextWindow: 1 }],
+        headers: [],
+        harness: "pi",
+      },
+    });
+    const studioOnPi = {
+      id: "studio",
+      name: "Studio Local",
+      baseUrl: "http://127.0.0.1:11434/v1",
+      hasApiKey: false,
+      models: [{ id: "gpt-oss", name: "GPT-OSS" }],
+      harness: "pi",
+      headerNames: [],
+    };
+    check(
+      "a save that names Pi adds the endpoint on Pi",
+      choiceSaved.status === 200 &&
+        isDeepStrictEqual(callsOf("saveCustomProvider").at(-1), ["studio", "pi"]) &&
+        isDeepStrictEqual(choiceDecoded(CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES.customSave, choiceSaved), {
+          providers: [lab, studioOnPi],
+          restart: "not-running",
+        }),
+      summary(choiceSaved),
+    );
+    const editOnly = await call("POST", CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES.customUpdate, {
+      ...edit,
+      json: { id: "spark", name: "Spark", baseUrl: "http://spark.local:8080/v1", models: [], harness: "opencode" },
+    });
+    const choiceMember = await call("POST", CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES.customUpdate, {
+      ...choice,
+      token: bobToken,
+      json: { id: "spark", name: "Spark", baseUrl: "http://spark.local:8080/v1", models: [], harness: "opencode" },
+    });
+    check(
+      "the harness choice route with only custom-provider-edit-v1 gets 400, and a member gets 403",
+      errorIs(editOnly, 400, sourceText("error.team.providersUnsupported")) &&
+        errorIs(choiceMember, 403, sourceText("error.team.adminRequired")) &&
+        callsOf("peerHarnessUpdateCustomProvider").length === 2,
+      [summary(editOnly), summary(choiceMember)],
+    );
+    const choiceDeleted = await call("POST", CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES.customDelete, {
+      ...choice,
+      json: { id: "studio" },
+    });
+    check(
+      "an admin removes the endpoint on the harness choice route",
+      choiceDeleted.status === 200 &&
+        isDeepStrictEqual(choiceDecoded(CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES.customDelete, choiceDeleted), {
+          providers: [lab],
+          restart: "not-running",
+        }),
+      summary(choiceDeleted),
+    );
+
     // The real merge, over the real store on a temporary file: an edit from a joined admin keeps
     // the harness, the key, the header value and the limits of each model that it keeps.
     const store = new CustomProviderStore({
@@ -7256,6 +9352,33 @@ try {
         ]),
       [harnesses, store.list()],
     );
+    await Effect.runPromise(
+      changes.peerHarnessUpdate(
+        {
+          id: "spark",
+          name: "Spark Lab",
+          baseUrl: "http://spark.local:8080/v1",
+          models: [{ id: "qwen3-coder", name: "Qwen3" }],
+        },
+        "opencode",
+      ),
+    );
+    check(
+      "a joined admin's edit that names a harness moves the endpoint, and keeps the key, headers and model limits",
+      isDeepStrictEqual(harnesses, ["pi", "opencode"]) &&
+        isDeepStrictEqual(store.configs(), [
+          {
+            id: "spark",
+            name: "Spark Lab",
+            baseUrl: "http://spark.local:8080/v1",
+            apiKey: "sk-spark-host",
+            models: [{ id: "qwen3-coder", name: "Qwen3", contextWindow: 131072, maxOutput: 8192 }],
+            headers: [{ name: "X-Tenant", value: "acme" }],
+            harness: "opencode",
+          },
+        ]),
+      [harnesses, store.list()],
+    );
   }
 
   // ---- Usage reset credits (provider-usage-reset-v1) ----
@@ -7318,6 +9441,29 @@ try {
     );
   }
 
+  // ---- Credit state of the host's accounts (usage-credits-v1) ----
+  {
+    const unsupported = await call("POST", USAGE_CREDITS_ROUTES.list, { token: bobToken, json: {} });
+    check(
+      "the usage credits route without the capability gets 400 providersUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.providersUnsupported")),
+      summary(unsupported),
+    );
+    const memberList = await call("POST", USAGE_CREDITS_ROUTES.list, {
+      token: bobToken,
+      json: {},
+      capabilities: [USAGE_CREDITS_CAPABILITY],
+    });
+    check(
+      "a member reads the credit state of the provider's own sign-ins only, and no provider that reports none",
+      memberList.status === 200 &&
+        isDeepStrictEqual(memberList.body, {
+          accounts: [{ provider: "codex", accountId: "default", available: true }],
+        }),
+      summary(memberList),
+    );
+  }
+
   // ---- Bitwarden on the host (bitwarden-connector-v1) ----
   {
     const bitwardenCapabilities = [BITWARDEN_CONNECTOR_CAPABILITY];
@@ -7369,6 +9515,7 @@ try {
         !wrongStatus.connected &&
         wrongStatus.error === sourceText("error.connector.bitwardenHostFailed") &&
         bitwardenCalls.some((entry) => entry.args[0] === "login") &&
+        bitwardenCalls.filter((entry) => entry.args[0] === "unlock").length === 1 &&
         !existsSync(bitwardenFile) &&
         !existsSync(bitwardenData),
       { wrong: summary(wrong), wrongStatus },
@@ -7465,6 +9612,20 @@ try {
         !bitwardenConnector.connected(),
       summary(disconnect),
     );
+    // `bw` fails the first unlock after a sign-in when the server refuses its user key id backfill.
+    bitwardenServerRefusesBackfill = true;
+    bitwardenCalls.length = 0;
+    const backfillSettled = bitwardenSettled(bitwardenConnector);
+    await connectAs(adaToken, input);
+    const backfill = await backfillSettled;
+    const unlocks = bitwardenCalls.filter((entry) => entry.args[0] === "unlock").length;
+    check(
+      "a server that refuses the user key id backfill still connects: the host unlocks once more",
+      backfill.connected && backfill.error === null && unlocks === 2 && existsSync(bitwardenFile),
+      { backfill, unlocks },
+    );
+    bitwardenServerRefusesBackfill = false;
+    await runCauseEffect(bitwardenConnector.disconnect());
   }
 
   // ---- WhatsApp numbers on the host (whatsapp-connector-v1) ----
@@ -7745,6 +9906,97 @@ try {
       on.status === 200 &&
         whatsappAccount.workingMessage === true &&
         asClient(restored).numbers[0]?.workingMessage === true,
+      [summary(on), summary(restored)],
+    );
+  }
+
+  // ---- The status reactions of a WhatsApp number (whatsapp-status-reactions-v1) ----
+  {
+    const v9 = { capabilities: [WHATSAPP_STATUS_REACTIONS_CAPABILITY], protocol: TEAM_PROTOCOL_V9 };
+    const settingCalls = () => calls.filter((entry) => entry.method === "whatsapp.setStatusReactions");
+    /** The answer as the client reads it: the frozen codec, then the client's guard. */
+    const asClient = (reply: Reply): WhatsAppStatusReactionsList => {
+      const codec = WHATSAPP_STATUS_REACTIONS_CODECS.get(WHATSAPP_STATUS_REACTIONS_ROUTES.list);
+      assert(codec, WHATSAPP_STATUS_REACTIONS_ROUTES.list);
+      const value = codec.response(reply.status, reply.body);
+      assert(isWhatsAppStatusReactionsList(value), "the list does not pass the client's guard");
+      return value;
+    };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises whatsapp-status-reactions-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(WHATSAPP_STATUS_REACTIONS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(WHATSAPP_STATUS_REACTIONS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const update = { workspaceId: WHATSAPP_NUMBER, statusReactions: false };
+    const unsupported = await call("POST", WHATSAPP_STATUS_REACTIONS_ROUTES.update, {
+      token: adaToken,
+      json: update,
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    const memberList = await call("POST", WHATSAPP_STATUS_REACTIONS_ROUTES.list, { token: bobToken, json: {}, ...v9 });
+    const memberUpdate = await call("POST", WHATSAPP_STATUS_REACTIONS_ROUTES.update, {
+      token: bobToken,
+      json: update,
+      ...v9,
+    });
+    check(
+      "a client without the capability gets 400, and a member cannot read or set the status reactions",
+      errorIs(unsupported, 400, sourceText("error.team.connectorsUnsupported")) &&
+        errorIs(memberList, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberUpdate, 403, sourceText("error.team.adminRequired")) &&
+        settingCalls().length === 0 &&
+        whatsappAccount.statusReactions === true,
+      [summary(unsupported), summary(memberList), summary(memberUpdate)],
+    );
+    const before = await call("POST", WHATSAPP_STATUS_REACTIONS_ROUTES.list, { token: adaToken, json: {}, ...v9 });
+    const bad = await call("POST", WHATSAPP_STATUS_REACTIONS_ROUTES.update, {
+      token: adaToken,
+      json: { workspaceId: WHATSAPP_NUMBER, statusReactions: "no" },
+      ...v9,
+    });
+    const off = await call("POST", WHATSAPP_STATUS_REACTIONS_ROUTES.update, { token: adaToken, json: update, ...v9 });
+    const after = await call("POST", WHATSAPP_STATUS_REACTIONS_ROUTES.list, { token: adaToken, json: {}, ...v9 });
+    // The frozen `whatsapp-connector-v1` overview carries no setting; the client adds it from the list.
+    const overview = await call("POST", WHATSAPP_CONNECTOR_ROUTES.overview, {
+      token: adaToken,
+      json: {},
+      capabilities: [WHATSAPP_CONNECTOR_CAPABILITY],
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    const connectorCodec = WHATSAPP_CONNECTOR_CODECS.get(WHATSAPP_CONNECTOR_ROUTES.overview);
+    assert(connectorCodec, WHATSAPP_CONNECTOR_ROUTES.overview);
+    const plain = decodeHostWhatsAppOverview(connectorCodec.response(overview.status, overview.body));
+    const merged = withWhatsAppStatusReactions(plain, asClient(after));
+    check(
+      "an admin reads the status reactions of each number and turns them off; a bad value is refused",
+      before.status === 200 &&
+        asClient(before).numbers[0]?.workspaceId === WHATSAPP_NUMBER &&
+        asClient(before).numbers[0]?.statusReactions === true &&
+        bad.status === 400 &&
+        off.status === 200 &&
+        settingCalls().length === 1 &&
+        whatsappAccount.statusReactions === false &&
+        asClient(after).numbers[0]?.statusReactions === false &&
+        plain.accounts[0]?.statusReactions === undefined &&
+        merged.accounts[0]?.statusReactions === false &&
+        withWhatsAppStatusReactions(plain, null).accounts[0]?.statusReactions === undefined,
+      [summary(before), summary(bad), summary(off), summary(after)],
+    );
+    // The reverse action.
+    const on = await call("POST", WHATSAPP_STATUS_REACTIONS_ROUTES.update, {
+      token: adaToken,
+      json: { workspaceId: WHATSAPP_NUMBER, statusReactions: true },
+      ...v9,
+    });
+    const restored = await call("POST", WHATSAPP_STATUS_REACTIONS_ROUTES.list, { token: adaToken, json: {}, ...v9 });
+    check(
+      "an admin turns the status reactions on again",
+      on.status === 200 &&
+        whatsappAccount.statusReactions === true &&
+        asClient(restored).numbers[0]?.statusReactions === true,
       [summary(on), summary(restored)],
     );
   }
@@ -8196,6 +10448,98 @@ try {
     );
   }
 
+  // ---- The agents of each item in the host's Vault (vault-v4), and vault-v3 on the same host ----
+  {
+    const v3Call = (token: string, path: string, json: unknown = {}) =>
+      call("POST", path, { token, json, capabilities: [VAULT_V3_CAPABILITY] });
+    const v4Call = (token: string, path: string, json: unknown = {}) =>
+      call("POST", path, { token, json, capabilities: [VAULT_V4_CAPABILITY] });
+    const apiKey = {
+      kind: "apiKey",
+      id: null,
+      name: "SCOPED_E2E_KEY",
+      notes: "",
+      key: VAULT_API_KEY,
+      agents: ["agent-a", "agent-b"],
+    };
+    const unsupported = await v3Call(adaToken, VAULT_V4_ROUTES.list);
+    const memberSave = await v4Call(bobToken, VAULT_V4_ROUTES.save, apiKey);
+    const empty = await v4Call(adaToken, VAULT_V4_ROUTES.save, { ...apiKey, agents: [] });
+    check(
+      "the vault-v4 routes need vault-v4 and an owner or admin, and an empty agent list is refused",
+      errorIs(unsupported, 400, sourceText("error.team.vaultUnsupported")) &&
+        errorIs(memberSave, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(empty, 400, sourceText("error.vault.agentsRequired")) &&
+        vault.state().items.length === 0,
+      [summary(unsupported), summary(memberSave), summary(empty)],
+    );
+    const saved = await v4Call(adaToken, VAULT_V4_ROUTES.save, apiKey);
+    const keyId = field(saved.body, "items", 0, "id");
+    check(
+      "an admin saves an API key for two agents; the list carries the agents and no key",
+      saved.status === 200 &&
+        isDeepStrictEqual(field(saved.body, "items", 0, "agents"), ["agent-a", "agent-b"]) &&
+        typeof keyId === "string" &&
+        !saved.text.includes(VAULT_API_KEY),
+      summary(saved),
+    );
+    assert.ok(typeof keyId === "string", "the vault-v4 save did not answer an item id.");
+    const v3List = await v3Call(adaToken, VAULT_V3_ROUTES.list);
+    const v3Save = await v3Call(adaToken, VAULT_V3_ROUTES.save, {
+      kind: "apiKey",
+      id: keyId,
+      name: "SCOPED_E2E_KEY",
+      notes: "Changed from vault-v3",
+      key: null,
+      agents: null,
+    });
+    const v4List = await v4Call(adaToken, VAULT_V4_ROUTES.list);
+    check(
+      "vault-v3 on the same host lists the key without agents, and its save keeps the agents",
+      v3List.status === 200 &&
+        field(v3List.body, "items", 0, "id") === keyId &&
+        field(v3List.body, "items", 0, "agents") === undefined &&
+        v3Save.status === 200 &&
+        field(v3Save.body, "items", 0, "agents") === undefined &&
+        field(v4List.body, "items", 0, "notes") === "Changed from vault-v3" &&
+        isDeepStrictEqual(field(v4List.body, "items", 0, "agents"), ["agent-a", "agent-b"]),
+      [summary(v3List), summary(v3Save), summary(v4List)],
+    );
+    const forAll = await v4Call(adaToken, VAULT_V4_ROUTES.save, {
+      ...apiKey,
+      id: keyId,
+      key: null,
+      agents: null,
+    });
+    const forOne = await v4Call(adaToken, VAULT_V4_ROUTES.save, {
+      ...apiKey,
+      id: keyId,
+      key: null,
+      agents: ["agent-b"],
+    });
+    const kept = await v4Call(adaToken, VAULT_V4_ROUTES.save, {
+      ...apiKey,
+      id: keyId,
+      key: null,
+      agents: undefined,
+    });
+    const reveal = await v4Call(adaToken, VAULT_V4_ROUTES.reveal, { id: keyId, field: "key" });
+    check(
+      "null gives the key to every agent, a list to those agents, and no agents keeps them; the key stays",
+      field(forAll.body, "items", 0, "agents") === undefined &&
+        isDeepStrictEqual(field(forOne.body, "items", 0, "agents"), ["agent-b"]) &&
+        isDeepStrictEqual(field(kept.body, "items", 0, "agents"), ["agent-b"]) &&
+        isDeepStrictEqual(reveal.body, { value: VAULT_API_KEY }),
+      [summary(forAll), summary(forOne), summary(kept), summary(reveal)],
+    );
+    const deleted = await v4Call(adaToken, VAULT_V4_ROUTES.delete, { id: keyId });
+    check(
+      "an admin deletes the key through vault-v4",
+      isDeepStrictEqual(deleted.body, { status: "ready", items: [] }) && vault.state().items.length === 0,
+      summary(deleted),
+    );
+  }
+
   // ---- A transfer file in parts (instance-transfer-chunks-v1), applied with instance-transfer-v1 ----
   {
     const capabilities = [INSTANCE_TRANSFER_CAPABILITY, INSTANCE_TRANSFER_CHUNKS_CAPABILITY];
@@ -8417,6 +10761,134 @@ try {
       [summary(done), summary(afterDone)],
     );
 
+    // instance-transfer-full-copy-v1: each part is a field of its own. The parts are read and the
+    // export ends with the chunks routes.
+    const fullCopyCapabilities = [...capabilities, INSTANCE_TRANSFER_FULL_COPY_CAPABILITY];
+    const fullCopyInput = {
+      ...exportInput,
+      includeFiles: false,
+      includeHistory: false,
+      includeChannelMessages: false,
+      includeServerPreferences: true,
+    };
+    /** The manifest of a whole export that `begin` started, read in parts; the export then ends. */
+    const exportedManifest = async (begin: Awaited<ReturnType<typeof call>>) => {
+      const id = String(field(begin.body, "exportId"));
+      const chunks = field(begin.body, "chunks");
+      const parts = [];
+      for (let index = 0; index < (Array.isArray(chunks) ? chunks.length : 0); index++)
+        parts.push((await readPart(adaToken, id, index)).bytes);
+      await partsCall(adaToken, INSTANCE_TRANSFER_CHUNKS_ROUTES.exportDone, { exportId: id });
+      const entry = unzipSync(Buffer.concat(parts))[INSTANCE_TRANSFER_MANIFEST];
+      return entry ? parseJson(new TextDecoder().decode(entry)) : null;
+    };
+    const withoutCapability = await partsCall(adaToken, INSTANCE_TRANSFER_FULL_COPY_ROUTES.exportBegin, fullCopyInput);
+    const fullCopyMember = await call("POST", INSTANCE_TRANSFER_FULL_COPY_ROUTES.exportBegin, {
+      token: bobToken,
+      json: fullCopyInput,
+      capabilities: fullCopyCapabilities,
+    });
+    const { includeServerPreferences: _preferences, ...missingField } = fullCopyInput;
+    const fullCopyMissing = await call("POST", INSTANCE_TRANSFER_FULL_COPY_ROUTES.exportBegin, {
+      token: adaToken,
+      json: missingField,
+      capabilities: fullCopyCapabilities,
+    });
+    const fullCopy = await call("POST", INSTANCE_TRANSFER_FULL_COPY_ROUTES.exportBegin, {
+      token: adaToken,
+      json: fullCopyInput,
+      capabilities: fullCopyCapabilities,
+    });
+    const fullCopyManifest = fullCopy.status === 200 ? await exportedManifest(fullCopy) : null;
+    const fullCopyPreferences = field(fullCopyManifest, "serverPreferences");
+    // The chunks codec does not know the field, so an older client's export has no server preferences.
+    const chunksExport = await partsCall(adaToken, INSTANCE_TRANSFER_CHUNKS_ROUTES.exportBegin, fullCopyInput);
+    const chunksManifest = chunksExport.status === 200 ? await exportedManifest(chunksExport) : null;
+    // The apply that also replaces the server preferences has the same guards.
+    const applyInput = {
+      token: "no-such-token",
+      keys: [],
+      includeSettings: true,
+      includeServerPreferences: true,
+      timezone: "UTC",
+    };
+    const applyWithout = await partsCall(adaToken, INSTANCE_TRANSFER_FULL_COPY_ROUTES.apply, applyInput);
+    const applyMember = await call("POST", INSTANCE_TRANSFER_FULL_COPY_ROUTES.apply, {
+      token: bobToken,
+      json: applyInput,
+      capabilities: fullCopyCapabilities,
+    });
+    const applyClosed = await call("POST", INSTANCE_TRANSFER_FULL_COPY_ROUTES.apply, {
+      token: adaToken,
+      json: applyInput,
+      capabilities: fullCopyCapabilities,
+    });
+    check(
+      "full copy: the apply that replaces the server preferences needs instance-transfer-full-copy-v1 and an owner or admin",
+      errorIs(applyWithout, 400, sourceText("error.team.instanceTransferUnsupported")) &&
+        errorIs(applyMember, 403, sourceText("error.team.adminRequired")) &&
+        applyClosed.status >= 400 &&
+        applyClosed.status !== 403,
+      [summary(applyWithout), summary(applyMember), summary(applyClosed)],
+    );
+
+    // The owner from another computer is the owner: their own notification level is in the file.
+    const ownerCopy = await call("POST", INSTANCE_TRANSFER_FULL_COPY_ROUTES.exportBegin, {
+      token: owner.sessionToken,
+      json: fullCopyInput,
+      capabilities: fullCopyCapabilities,
+    });
+    const ownerExportId = String(field(ownerCopy.body, "exportId"));
+    const ownerParts = [];
+    const ownerChunks = field(ownerCopy.body, "chunks");
+    for (let index = 0; index < (Array.isArray(ownerChunks) ? ownerChunks.length : 0); index++) {
+      const response = await fetch(`${base}${INSTANCE_TRANSFER_CHUNKS_ROUTES.exportChunk}`, {
+        method: "POST",
+        headers: {
+          ...protocolHeaders({ token: owner.sessionToken, capabilities }),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ exportId: ownerExportId, index }),
+      });
+      ownerParts.push(new Uint8Array(await response.arrayBuffer()));
+    }
+    await call("POST", INSTANCE_TRANSFER_CHUNKS_ROUTES.exportDone, {
+      token: owner.sessionToken,
+      json: { exportId: ownerExportId },
+      capabilities,
+    });
+    const ownerEntry =
+      ownerParts.length > 0 ? unzipSync(Buffer.concat(ownerParts))[INSTANCE_TRANSFER_MANIFEST] : undefined;
+    const ownerManifest = ownerEntry ? parseJson(new TextDecoder().decode(ownerEntry)) : null;
+    check(
+      "full copy: the owner who exports from another computer gets their own notification level in the file",
+      ownerCopy.status === 200 &&
+        field(field(ownerManifest, "serverPreferences"), "ownerNotificationLevel") === "needs-me" &&
+        uploads().length === 0,
+      [summary(ownerCopy), field(ownerManifest, "serverPreferences")],
+    );
+    check(
+      "full copy: the export start needs instance-transfer-full-copy-v1, an owner or admin and every field; an admin's file has the server preferences without the owner's notification level, and the chunks route leaves them out",
+      errorIs(withoutCapability, 400, sourceText("error.team.instanceTransferUnsupported")) &&
+        errorIs(fullCopyMember, 403, sourceText("error.team.adminRequired")) &&
+        fullCopyMissing.status === 400 &&
+        fullCopy.status === 200 &&
+        field(fullCopyPreferences, "timezone") === "Europe/Warsaw" &&
+        field(fullCopyPreferences, "ownerNotificationLevel") === undefined &&
+        chunksExport.status === 200 &&
+        chunksManifest !== null &&
+        field(chunksManifest, "serverPreferences") === undefined &&
+        uploads().length === 0,
+      [
+        summary(withoutCapability),
+        summary(fullCopyMember),
+        summary(fullCopyMissing),
+        summary(fullCopy),
+        fullCopyPreferences,
+        summary(chunksExport),
+      ],
+    );
+
     // The desktop workflow over this host: the three calls of `RemoteServerManager` that it uses go
     // over loopback HTTP as ada. The first send of part 1 fails as a lost connection does.
     const remoteFailure = async (response: Response) => {
@@ -8602,6 +11074,38 @@ try {
     );
   }
 
+  // ---- Give a webhook routine's signing secret to its agent (webhook-agent-secret-v1) ----
+  {
+    const capabilities = [WEBHOOK_AGENT_SECRET_CAPABILITY];
+    const json = { id: "routine-hook", owner: { kind: "agent", id: "agent-ada" } };
+    // A capability after protocol 9: the protocol 9 list is full.
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises webhook-agent-secret-v1 to a protocol 10 peer and not to a protocol 9 peer",
+      list(field(compatibility.body, "capabilities")).includes(WEBHOOK_AGENT_SECRET_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(WEBHOOK_AGENT_SECRET_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", WEBHOOK_AGENT_SECRET_ROUTES.give, { token: adaToken, json });
+    const member = await call("POST", WEBHOOK_AGENT_SECRET_ROUTES.give, { token: bobToken, json, capabilities });
+    check(
+      "a peer without the capability gets 400 eventsUnavailable, a member gets 403, and the host gives no secret",
+      errorIs(unsupported, 400, sourceText("error.backend.eventsUnavailable")) &&
+        member.status === 403 &&
+        callsOf("giveSecretToAgent").length === 0,
+      [summary(unsupported), summary(member)],
+    );
+    const given = await call("POST", WEBHOOK_AGENT_SECRET_ROUTES.give, { token: adaToken, json, capabilities });
+    check(
+      "an admin gives the secret to the agent; the answer has only the key name",
+      given.status === 200 &&
+        isDeepStrictEqual(given.body, { name: "WEBHOOK_SECRET_ROUTINEHOOK" }) &&
+        isDeepStrictEqual(callsOf("giveSecretToAgent"), [[json]]),
+      summary(given),
+    );
+  }
+
   // ---- Where each routine runs (routine-run-place-v1) ----
   {
     const capabilities = [AGENT_HIDDEN_CAPABILITY, ROUTINE_RUN_PLACE_CAPABILITY];
@@ -8768,6 +11272,186 @@ try {
     );
   }
 
+  // ---- Why a routine is paused (routine-pause-reasons-v1) ----
+  {
+    const capabilities = [AGENT_HIDDEN_CAPABILITY, ROUTINE_PAUSE_REASONS_CAPABILITY];
+    const saves = () => [...callsOf("updateRoutine"), ...callsOf("saveRoutineRecord")];
+    const savesBefore = saves().length;
+    const unchanged = routineRecords;
+    // Each routine was paused by a scheduled run of its own: a schedule routine, a webhook routine and
+    // a `once` routine. The store gives `pausedByRun` only on a paused routine.
+    routineRecords = routineRecords.map((routine) => ({
+      ...routine,
+      active: false,
+      pausedByRun: { scheduledFor: `2026-11-15T0${routine.id === "routine-hook" ? 9 : 8}:00:00.000Z` },
+    }));
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises routine-pause-reasons-v1 to a protocol 9 peer and not to a protocol 8 peer",
+      list(field(compatibility.body, "capabilities")).includes(ROUTINE_PAUSE_REASONS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(ROUTINE_PAUSE_REASONS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", ROUTINE_PAUSE_REASONS_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+    });
+    check(
+      "the list route without the capability gets 400 routinePauseReasonsUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.routinePauseReasonsUnsupported")),
+      summary(unsupported),
+    );
+    const member = await call("POST", ROUTINE_PAUSE_REASONS_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities,
+    });
+    const admin = await call("POST", ROUTINE_PAUSE_REASONS_ROUTES.list, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      capabilities,
+    });
+    check(
+      "a member reads the run that paused each schedule routine that the released routes show; an admin also reads the webhook routines; nobody reads a `once` routine",
+      member.status === 200 &&
+        isDeepStrictEqual(member.body, {
+          routines: [{ routineId: "routine-ada", scheduledFor: "2026-11-15T08:00:00.000Z" }],
+        }) &&
+        isDeepStrictEqual(admin.body, {
+          routines: [
+            { routineId: "routine-ada", scheduledFor: "2026-11-15T08:00:00.000Z" },
+            { routineId: "routine-hook", scheduledFor: "2026-11-15T09:00:00.000Z" },
+          ],
+        }),
+      [summary(member), summary(admin)],
+    );
+    accessLevels = { revision: 12, everyone: { "agent-ada": "view" }, roles: [] };
+    const viewer = await call("POST", ROUTINE_PAUSE_REASONS_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities,
+    });
+    accessLevels = { revision: 13, everyone: {}, roles: [] };
+    const missing = await call("POST", ROUTINE_PAUSE_REASONS_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-none" },
+      capabilities,
+    });
+    const hiddenAgent = await call("POST", ROUTINE_PAUSE_REASONS_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-pi" },
+      capabilities,
+      protocol: 6,
+    });
+    routineRecords = unchanged;
+    const resumed = await call("POST", ROUTINE_PAUSE_REASONS_ROUTES.list, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      capabilities,
+    });
+    check(
+      "a member who can only view the agent reads the reasons, an unknown or hidden agent gets 404, a routine with no reason is not listed, and the route saves nothing",
+      isDeepStrictEqual(viewer.body, member.body) &&
+        errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(hiddenAgent, 404, sourceText("error.team.agentNotFound")) &&
+        isDeepStrictEqual(resumed.body, { routines: [] }) &&
+        saves().length === savesBefore,
+      [summary(viewer), summary(missing), summary(hiddenAgent), summary(resumed)],
+    );
+  }
+
+  // ---- The open work of all queues (agent-active-queues-v1) ----
+  {
+    const capabilities = [AGENT_HIDDEN_CAPABILITY, AGENT_ACTIVE_QUEUES_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises agent-active-queues-v1 to a protocol 9 peer and not to a protocol 8 peer",
+      list(field(compatibility.body, "capabilities")).includes(AGENT_ACTIVE_QUEUES_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(AGENT_ACTIVE_QUEUES_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", AGENT_ACTIVE_QUEUES_ROUTES.list, { token: bobToken, json: {} });
+    const unknownKey = await call("POST", AGENT_ACTIVE_QUEUES_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities,
+    });
+    check(
+      "the list route without the capability gets 400 activeQueuesUnsupported, and a body with another key gets 400",
+      errorIs(unsupported, 400, sourceText("error.team.activeQueuesUnsupported")) && unknownKey.status === 400,
+      [summary(unsupported), summary(unknownKey)],
+    );
+    const all = await call("POST", AGENT_ACTIVE_QUEUES_ROUTES.list, { token: bobToken, json: {}, capabilities });
+    const visibleIds = list(field(all.body, "queues")).map((queue) => field(queue, "agentId"));
+    const firstAttachment = field(list(field(list(field(all.body, "queues"))[0], "deliveries"))[0], "attachments");
+    check(
+      "a member reads the open work of every agent that the member can see in one read, with no preview URL, and the welcome flag",
+      all.status === 200 &&
+        visibleIds.length > 0 &&
+        visibleIds.includes("agent-ada") &&
+        isDeepStrictEqual(field(all.body, "omitted"), []) &&
+        list(firstAttachment).every((attachment) => field(attachment, "previewUrl") === null) &&
+        list(field(all.body, "queues")).some(
+          (queue) => field(queue, "agentId") === "agent-oc" && field(queue, "welcome") === true,
+        ),
+      summary(all),
+    );
+    const named = await call("POST", AGENT_ACTIVE_QUEUES_ROUTES.list, {
+      token: bobToken,
+      json: { agentIds: ["agent-ada", "agent-none"] },
+      capabilities,
+    });
+    const oldClient = await call("POST", AGENT_ACTIVE_QUEUES_ROUTES.list, {
+      token: bobToken,
+      json: { agentIds: ["agent-ada", "agent-pi"] },
+      capabilities,
+      protocol: 6,
+    });
+    accessLevels = { revision: 37, everyone: { "agent-ada": "none" }, roles: [] };
+    const noAccess = await call("POST", AGENT_ACTIVE_QUEUES_ROUTES.list, { token: bobToken, json: {}, capabilities });
+    accessLevels = { revision: 38, everyone: {}, roles: [] };
+    const ids = (reply: Reply) => list(field(reply.body, "queues")).map((queue) => field(queue, "agentId"));
+    check(
+      "named agents limit the read; an unknown agent, an agent hidden from the client and an agent without access are left out with no error",
+      isDeepStrictEqual(ids(named), ["agent-ada"]) &&
+        isDeepStrictEqual(ids(oldClient), ["agent-ada"]) &&
+        noAccess.status === 200 &&
+        !ids(noAccess).includes("agent-ada") &&
+        ids(noAccess).length === visibleIds.length - 1,
+      [summary(named), summary(oldClient), summary(noAccess)],
+    );
+    // Agent Ada has more open work than one frame carries: the answer names Ada in `omitted`, and the
+    // client reads Ada on the released route.
+    activeQueueText = "x".repeat(90_000);
+    activeQueueDeliveries = 20;
+    const large = await call("POST", AGENT_ACTIVE_QUEUES_ROUTES.list, { token: bobToken, json: {}, capabilities });
+    activeQueueText = "open work";
+    activeQueueDeliveries = 1;
+    check(
+      "an agent whose open work does not fit in one WebRTC frame is named in omitted, and the other agents stay in the answer",
+      large.status === 200 &&
+        isDeepStrictEqual(field(large.body, "omitted"), ["agent-ada"]) &&
+        !ids(large).includes("agent-ada") &&
+        ids(large).length === visibleIds.length - 1 &&
+        Buffer.byteLength(large.text) <= WEBRTC_FRAME_BODY_BUDGET,
+      { status: large.status, bytes: large.text.length, omitted: field(large.body, "omitted"), queues: ids(large) },
+    );
+    // Agent Ada has more open deliveries than one answer carries: Ada is omitted, not cut.
+    activeQueueDeliveries = AGENT_ACTIVE_QUEUE_DELIVERY_LIMIT + 1;
+    const long = await call("POST", AGENT_ACTIVE_QUEUES_ROUTES.list, { token: bobToken, json: {}, capabilities });
+    activeQueueDeliveries = 1;
+    check(
+      "an agent with more open deliveries than one answer carries is named in omitted, not cut",
+      long.status === 200 &&
+        isDeepStrictEqual(field(long.body, "omitted"), ["agent-ada"]) &&
+        !ids(long).includes("agent-ada") &&
+        ids(long).length === visibleIds.length - 1,
+      { status: long.status, omitted: field(long.body, "omitted"), queues: ids(long) },
+    );
+  }
+
   // ---- Routine result destinations (routine-results-v1) ----
   {
     const resultCapabilities = [ROUTINE_RESULTS_CAPABILITY];
@@ -8806,9 +11490,11 @@ try {
       capabilities: resultCapabilities,
     });
     check(
-      "an admin reads the connections with their places, and no destination yet",
+      "an admin reads the connections with their places, without WhatsApp for a client of routine-results-v1 alone, and no destination yet",
       options.status === 200 &&
-        isDeepStrictEqual(options.body, { connections: routineResultOptions }) &&
+        isDeepStrictEqual(options.body, {
+          connections: routineResultOptions.filter((option) => option.platform !== "whatsapp"),
+        }) &&
         before.status === 200 &&
         isDeepStrictEqual(before.body, { destination: null }),
       [summary(options), summary(before)],
@@ -8851,6 +11537,54 @@ try {
         isDeepStrictEqual(cleared.body, { destination: null }),
       [summary(gone), summary(cleared)],
     );
+    // routine-results-whatsapp-v1: the client also gets the WhatsApp numbers, and its own codec reads them.
+    const whatsAppCapabilities = [ROUTINE_RESULTS_CAPABILITY, ROUTINE_RESULTS_WHATSAPP_CAPABILITY];
+    const decoded = (path: string, reply: Reply) =>
+      teamSideRouteCodec(path)?.response(path, reply.status, reply.body, { routineResultsWhatsApp: true });
+    const wideOptions = await call("POST", ROUTINE_RESULTS_ROUTES.options, {
+      token: adaToken,
+      json: {},
+      capabilities: whatsAppCapabilities,
+    });
+    const family = { connectionId: "whatsapp-ada", placeId: "120363000000000000@g.us", placeName: "Family" };
+    const wideSet = await call("POST", ROUTINE_RESULTS_ROUTES.setDestination, {
+      token: adaToken,
+      json: { agentId: "agent-ada", routineId: "routine-ada", destination: family },
+      capabilities: whatsAppCapabilities,
+    });
+    const wideAfter = await call("POST", ROUTINE_RESULTS_ROUTES.destination, {
+      token: adaToken,
+      json: { agentId: "agent-ada", routineId: "routine-ada" },
+      capabilities: whatsAppCapabilities,
+    });
+    const savedFamily = { ...family, platform: "whatsapp", connectionName: "Ada's phone" };
+    check(
+      "a client of routine-results-whatsapp-v1 reads the WhatsApp numbers and sets a WhatsApp destination",
+      wideOptions.status === 200 &&
+        isDeepStrictEqual(decoded(ROUTINE_RESULTS_ROUTES.options, wideOptions), {
+          connections: routineResultOptions,
+        }) &&
+        wideSet.status === 200 &&
+        isDeepStrictEqual(decoded(ROUTINE_RESULTS_ROUTES.setDestination, wideSet), { destination: savedFamily }) &&
+        wideAfter.status === 200 &&
+        isDeepStrictEqual(decoded(ROUTINE_RESULTS_ROUTES.destination, wideAfter), { destination: savedFamily }),
+      [summary(wideOptions), summary(wideSet), summary(wideAfter)],
+    );
+    const narrowAfter = await call("POST", ROUTINE_RESULTS_ROUTES.destination, {
+      token: adaToken,
+      json: { agentId: "agent-ada", routineId: "routine-ada" },
+      capabilities: resultCapabilities,
+    });
+    check(
+      "a client of routine-results-v1 alone reads no destination when it is WhatsApp",
+      narrowAfter.status === 200 && isDeepStrictEqual(narrowAfter.body, { destination: null }),
+      summary(narrowAfter),
+    );
+    await call("POST", ROUTINE_RESULTS_ROUTES.setDestination, {
+      token: adaToken,
+      json: { agentId: "agent-ada", routineId: "routine-ada", destination: null },
+      capabilities: whatsAppCapabilities,
+    });
   }
 
   // ---- Queue routes ----
@@ -8932,6 +11666,30 @@ try {
           ],
         ]),
       { status: update.status, calls: callsOf("updateQueuedMessage") },
+    );
+    // A reaction on an agent reply is also the member's answer, so the host must know who reacted.
+    const react = await call("POST", TEAM_API_ROUTES.agent.reactions("agent-ada"), {
+      token: bobToken,
+      json: { messageId: "message-1", emoji: "👍" },
+    });
+    const unreact = await call("POST", TEAM_API_ROUTES.agent.reactions("agent-ada"), {
+      token: bobToken,
+      json: { messageId: "message-1", emoji: null },
+    });
+    const badEmoji = await call("POST", TEAM_API_ROUTES.agent.reactions("agent-ada"), {
+      token: bobToken,
+      json: { messageId: "message-1", emoji: "nope" },
+    });
+    check(
+      "a reaction gives 204 and names the caller as sender, a removal too, and an emoji that is not in the list gets 400",
+      react.status === 204 &&
+        unreact.status === 204 &&
+        badEmoji.status === 400 &&
+        isDeepStrictEqual(callsOf("setMessageReaction"), [
+          [{ agentId: "agent-ada", messageId: "message-1", emoji: "👍" }, bobSender],
+          [{ agentId: "agent-ada", messageId: "message-1", emoji: null }, bobSender],
+        ]),
+      [summary(react), summary(unreact), summary(badEmoji), callsOf("setMessageReaction")],
     );
     const updateTooLong = await call("POST", TEAM_API_ROUTES.agent.queueUpdate("agent-ada"), {
       token: bobToken,
@@ -9533,6 +12291,70 @@ try {
       summary(discard),
     );
 
+    // attachment-preview-v1: a small copy of a picture, with the access of the file itself.
+    const previewV10 = await call("GET", TEAM_API_ROUTES.compatibility, {
+      protocol: TEAM_PROTOCOL_V10,
+      headers: teamCapabilityHeaders(TEAM_PROTOCOL_V10, TEAM_CURRENT_CAPABILITIES),
+    });
+    const previewV9 = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises attachment-preview-v1 to a protocol 10 peer only",
+      decodeTeamProtocolSupportExpanded(previewV10.body).capabilities.includes(ATTACHMENT_PREVIEW_CAPABILITY) &&
+        !list(field(previewV9.body, "capabilities")).includes(ATTACHMENT_PREVIEW_CAPABILITY),
+      [summary(previewV10), list(field(previewV9.body, "capabilities")).length],
+    );
+    const preview = await call("GET", TEAM_API_ROUTES.attachmentPreview("att-picture"), { token: bobToken });
+    check(
+      "a picture preview gives the bytes of its copy as a file, with the copy's type and name",
+      preview.status === 200 &&
+        preview.text === picturePreviewBytes &&
+        preview.headers.get("content-type") === "image/jpeg" &&
+        preview.headers.get("x-content-type-options") === "nosniff" &&
+        preview.headers.get("content-disposition") === "attachment; filename*=UTF-8''picture-preview.jpg" &&
+        isDeepStrictEqual(callsOf("attachmentPreview"), [
+          ["att-picture", { path: pictureAttachmentPath, mimeType: "image/png" }],
+        ]),
+      { status: preview.status, headers: Object.fromEntries(preview.headers), calls: callsOf("attachmentPreview") },
+    );
+    const previewOfText = await call("GET", TEAM_API_ROUTES.attachmentPreview("att-1"), { token: bobToken });
+    const previewMissing = await call("GET", TEAM_API_ROUTES.attachmentPreview("att-missing"), { token: bobToken });
+    const previewNoToken = await call("GET", TEAM_API_ROUTES.attachmentPreview("att-picture"));
+    const previewNoCopy = await call("GET", TEAM_API_ROUTES.attachmentPreview("att-large-webp"), { token: bobToken });
+    check(
+      "a preview of a file that is not a picture or of a large file with no copy gets 415, of a missing file 404, and without a session 401",
+      previewOfText.status === 415 &&
+        previewNoCopy.status === 415 &&
+        errorIs(previewMissing, 404, sourceText("error.team.attachmentNotFound")) &&
+        previewNoToken.status === 401 &&
+        callsOf("attachmentPreview").length === 2,
+      [summary(previewOfText), summary(previewNoCopy), summary(previewMissing), summary(previewNoToken)],
+    );
+    // The preview route is a side route, so the frozen protocol adapters do not change. The frozen
+    // no-body list of protocol 2 does not know the route: without its side codec, a client refused to send it.
+    const previewPath = TEAM_API_ROUTES.attachmentPreview("att-picture");
+    const previewCodec = teamSideRouteCodec(previewPath);
+    const refuses = (run: () => unknown) => {
+      try {
+        run();
+        return false;
+      } catch {
+        return true;
+      }
+    };
+    check(
+      "the WebRTC request frame of a picture preview has no body, and an answer other than a file or an error is refused",
+      previewCodec !== null &&
+        previewCodec.request(previewPath, undefined) === null &&
+        previewCodec.request(previewPath, {}) === null &&
+        refuses(() => previewCodec.request(previewPath, { width: 100 })) &&
+        refuses(() => previewCodec.response(previewPath, 200, { url: "https://example.com" })) &&
+        isDeepStrictEqual(previewCodec.response(previewPath, 404, { error: "Not found.", code: "not_found" }), {
+          error: "Not found.",
+          code: "not_found",
+        }) &&
+        refuses(() => encodeTeamProtocolV9WebRtcHttpRequest("GET", previewPath, undefined)),
+    );
+
     const cancelCalls = callsOf("cancelQueuedMessage").length;
     const largeJson = new TextEncoder().encode(JSON.stringify({ deliveryId: "delivery-1", padding: "p".repeat(MIB) }));
     const tooLarge = await rawCall(
@@ -9803,6 +12625,263 @@ try {
     );
   }
 
+  // ---- The whole copy of a pending approval (pending-approval-v1) ----
+  {
+    const capabilities = [PENDING_APPROVAL_CAPABILITY];
+    const v9 = { capabilities, protocol: TEAM_PROTOCOL_V9 };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises pending-approval-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(PENDING_APPROVAL_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(PENDING_APPROVAL_CAPABILITY),
+      summary(compatibility),
+    );
+    const unsupported = await call("POST", PENDING_APPROVAL_ROUTES.read, {
+      token: bobToken,
+      json: { agentId: "agent-ada", requestId: 7 },
+    });
+    const hiddenAgent = await call("POST", PENDING_APPROVAL_ROUTES.read, {
+      token: bobToken,
+      capabilities,
+      protocol: 6,
+      json: { agentId: "agent-pi", requestId: 7 },
+    });
+    const missingAgent = await call("POST", PENDING_APPROVAL_ROUTES.read, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-gone", requestId: 7 },
+    });
+    accessLevels = { revision: 22, everyone: { "agent-ada": "view" }, roles: [] };
+    const viewer = await call("POST", PENDING_APPROVAL_ROUTES.read, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", requestId: 7 },
+    });
+    accessLevels = { revision: 23, everyone: {}, roles: [] };
+    check(
+      "a read without the capability, of a hidden or missing agent, or by a member who can only view is refused",
+      errorIs(unsupported, 400, sourceText("error.team.pendingApprovalUnsupported")) &&
+        errorIs(hiddenAgent, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(missingAgent, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(viewer, 403, sourceText("error.team.agentViewOnly")) &&
+        callsOf("pendingApproval").length === 0,
+      [summary(unsupported), summary(hiddenAgent), summary(missingAgent), summary(viewer)],
+    );
+    const read = await call("POST", PENDING_APPROVAL_ROUTES.read, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", requestId: 7 },
+    });
+    const command = String(field(read.body, "approval", "command"));
+    check(
+      "a member reads the whole copy of a pending approval, with the text that a runtime snapshot cuts",
+      read.status === 200 &&
+        field(read.body, "approval", "requestId") === 7 &&
+        field(read.body, "approval", "agentId") === "agent-ada" &&
+        command.length > 5_000 &&
+        command.endsWith("r".repeat(5_000)),
+      { status: read.status, commandLength: command.length },
+    );
+    const otherAgent = await call("POST", PENDING_APPROVAL_ROUTES.read, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-oc", requestId: 7 },
+    });
+    const closed = await call("POST", PENDING_APPROVAL_ROUTES.read, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", requestId: "request-closed" },
+    });
+    check(
+      "a request of another agent and a request that no longer waits are refused as closed",
+      errorIs(otherAgent, 409, sourceText("error.backend.approvalInactive")) &&
+        errorIs(closed, 409, sourceText("error.backend.approvalInactive")) &&
+        !JSON.stringify(otherAgent.body).includes("r".repeat(100)),
+      [summary(otherAgent), summary(closed)],
+    );
+  }
+
+  // ---- A bug report about the phone app, sent from the phone (phone-feedback-v1) ----
+  {
+    const capabilities = [PHONE_FEEDBACK_CAPABILITY];
+    const v9 = { capabilities, protocol: TEAM_PROTOCOL_V9 };
+    const phone = {
+      platform: "Android",
+      appVersion: "1.4.9 (212) · a1b2c3d4",
+      system: "Android 16, Xiaomi 14 (23127PN0CC)",
+      network: "Mobile data · VPN: Tailscale",
+      log: "2026-11-13T10:00:00.000Z WARN  connection host-1 offline (ice_failed)",
+    };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises phone-feedback-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(PHONE_FEEDBACK_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(PHONE_FEEDBACK_CAPABILITY),
+      summary(compatibility),
+    );
+    const answers = () => callsOf("respondToApproval").length;
+    const before = answers();
+    const unsupported = await call("POST", PHONE_FEEDBACK_ROUTES.send, {
+      token: owner.sessionToken,
+      json: { requestId: 7, phone },
+    });
+    const noLog = await call("POST", PHONE_FEEDBACK_ROUTES.send, {
+      token: owner.sessionToken,
+      ...v9,
+      json: { requestId: 7, phone: { ...phone, log: " " } },
+    });
+    const otherSystem = await call("POST", PHONE_FEEDBACK_ROUTES.send, {
+      token: owner.sessionToken,
+      ...v9,
+      json: { requestId: 7, phone: { ...phone, platform: "macOS" } },
+    });
+    const noVersion = await call("POST", PHONE_FEEDBACK_ROUTES.send, {
+      token: owner.sessionToken,
+      ...v9,
+      json: {
+        requestId: 7,
+        phone: { platform: phone.platform, system: phone.system, network: phone.network, log: phone.log },
+      },
+    });
+    const noNetwork = await call("POST", PHONE_FEEDBACK_ROUTES.send, {
+      token: owner.sessionToken,
+      ...v9,
+      json: {
+        requestId: 7,
+        phone: { platform: phone.platform, appVersion: phone.appVersion, system: phone.system, log: phone.log },
+      },
+    });
+    accessLevels = { revision: 24, everyone: { "agent-ada": "view" }, roles: [] };
+    const viewer = await call("POST", PHONE_FEEDBACK_ROUTES.send, {
+      token: bobToken,
+      ...v9,
+      json: { requestId: 7, phone },
+    });
+    accessLevels = { revision: 25, everyone: {}, roles: [] };
+    check(
+      "a send without the capability, without a log, a version, a network or a phone system, or by a member who can only view reaches no approval",
+      errorIs(unsupported, 400, sourceText("error.team.phoneFeedbackUnsupported")) &&
+        noLog.status === 400 &&
+        otherSystem.status === 400 &&
+        noVersion.status === 400 &&
+        noNetwork.status === 400 &&
+        errorIs(viewer, 403, sourceText("error.team.agentViewOnly")) &&
+        answers() === before,
+      [
+        summary(unsupported),
+        summary(noLog),
+        summary(otherSystem),
+        summary(noVersion),
+        summary(noNetwork),
+        summary(viewer),
+      ],
+    );
+    const member = await call("POST", PHONE_FEEDBACK_ROUTES.send, {
+      token: bobToken,
+      ...v9,
+      json: { requestId: 7, phone },
+    });
+    const closed = await call("POST", PHONE_FEEDBACK_ROUTES.send, {
+      token: owner.sessionToken,
+      ...v9,
+      json: { requestId: "request-closed", phone },
+    });
+    check(
+      "a member who is not the owner is refused, and a request that no longer waits is closed",
+      errorIs(member, 403, sourceText("error.backend.approvalOwnerOnly")) &&
+        errorIs(closed, 409, sourceText("error.backend.approvalInactive")),
+      [summary(member), summary(closed)],
+    );
+    const sent = await call("POST", PHONE_FEEDBACK_ROUTES.send, {
+      token: owner.sessionToken,
+      ...v9,
+      json: { requestId: 7, phone },
+    });
+    check(
+      "the owner's phone sends the report: the approval is accepted with the phone's system, version, device and log",
+      sent.status === 204 &&
+        isDeepStrictEqual(callsOf("respondToApproval").at(-1), [
+          { requestId: 7, decision: "accept" },
+          { owner: true, phone },
+        ]),
+      { status: sent.status, call: callsOf("respondToApproval").at(-1) },
+    );
+    // The old route cannot send the report: it carries no phone data, and the host refuses its "accept".
+    const plain = await call("POST", TEAM_API_ROUTES.respond.approval, {
+      token: owner.sessionToken,
+      ...v9,
+      json: { requestId: 7, decision: "accept" },
+    });
+    const declined = await call("POST", TEAM_API_ROUTES.respond.approval, {
+      token: owner.sessionToken,
+      ...v9,
+      json: { requestId: 7, decision: "decline" },
+    });
+    check(
+      "a plain accept of a report about the phone app is refused, and a decline is taken",
+      errorIs(plain, 403, sourceText("error.backend.feedbackNeedsPhone")) && declined.status === 204,
+      [summary(plain), summary(declined)],
+    );
+    // The host reads an edited confirm preview beside the answers (`ui-block-preview-edit-v1`).
+    const editedAnswers = { action: ["Send"], [UI_CONFIRM_PREVIEW_ANSWER_ID]: ["Hi Ann, see you on Tuesday."] };
+    const edited = await call("POST", TEAM_API_ROUTES.respond.prompt, {
+      token: owner.sessionToken,
+      ...v9,
+      json: { requestId: 7, answers: editedAnswers },
+    });
+    check(
+      "the prompt route gives the agent service an edited confirm preview with the answers",
+      edited.status === 204 &&
+        isDeepStrictEqual(callsOf("respondToPrompt").at(-1)?.[0], { requestId: 7, answers: editedAnswers }),
+      { status: edited.status, call: callsOf("respondToPrompt").at(-1) },
+    );
+  }
+
+  /**
+   * An event socket of bob. `scope` is the capabilities that its first message sends; null sends no
+   * scope. `arrived` waits for an event that matches, until the deadline.
+   */
+  const openEventSocket = async (scope: readonly string[] | null) => {
+    const socket = new WebSocket(`ws://127.0.0.1:${port}${TEAM_API_ROUTES.events}`, [
+      TEAM_PROTOCOL_V1_WEBSOCKET,
+      `openbot-token.${bobToken}`,
+    ]);
+    const events: DynamicRecord[] = [];
+    const waiters = new Set<() => void>();
+    socket.addEventListener("message", (message) => {
+      const value = JSON.parse(String(message.data));
+      if (isDynamicRecord(value)) {
+        events.push(value);
+        for (const wake of waiters) wake();
+      }
+    });
+    await new Promise<void>((resolveOpen, reject) => {
+      socket.addEventListener("open", () => resolveOpen(), { once: true });
+      socket.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
+    });
+    if (scope)
+      socket.send(JSON.stringify({ type: "agent-event-scope", includeConversations: false, capabilities: scope }));
+    /** Whether an event that matches arrives before the deadline. */
+    const arrived = (matches: (event: DynamicRecord) => boolean, deadlineMs: number) =>
+      new Promise<boolean>((resolveArrived) => {
+        if (events.some(matches)) return resolveArrived(true);
+        const timer = setTimeout(() => {
+          waiters.delete(wake);
+          resolveArrived(false);
+        }, deadlineMs);
+        const wake = () => {
+          if (!events.some(matches)) return;
+          clearTimeout(timer);
+          waiters.delete(wake);
+          resolveArrived(true);
+        };
+        waiters.add(wake);
+      });
+    return { socket, events, arrived };
+  };
+
   // ---- Pinned messages of a chat (message-pins-v1) ----
   {
     const capabilities = [MESSAGE_PINS_CAPABILITY];
@@ -9978,44 +13057,6 @@ try {
     );
 
     // A pin change reaches a client with the capability, and no client without it.
-    const openEventSocket = async (scope: readonly string[] | null) => {
-      const socket = new WebSocket(`ws://127.0.0.1:${port}${TEAM_API_ROUTES.events}`, [
-        TEAM_PROTOCOL_V1_WEBSOCKET,
-        `openbot-token.${bobToken}`,
-      ]);
-      const events: DynamicRecord[] = [];
-      const waiters = new Set<() => void>();
-      socket.addEventListener("message", (message) => {
-        const value = JSON.parse(String(message.data));
-        if (isDynamicRecord(value)) {
-          events.push(value);
-          for (const wake of waiters) wake();
-        }
-      });
-      await new Promise<void>((resolveOpen, reject) => {
-        socket.addEventListener("open", () => resolveOpen(), { once: true });
-        socket.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
-      });
-      if (scope)
-        socket.send(JSON.stringify({ type: "agent-event-scope", includeConversations: false, capabilities: scope }));
-      /** Whether an event that matches arrives before the deadline. */
-      const arrived = (matches: (event: DynamicRecord) => boolean, deadlineMs: number) =>
-        new Promise<boolean>((resolveArrived) => {
-          if (events.some(matches)) return resolveArrived(true);
-          const timer = setTimeout(() => {
-            waiters.delete(wake);
-            resolveArrived(false);
-          }, deadlineMs);
-          const wake = () => {
-            if (!events.some(matches)) return;
-            clearTimeout(timer);
-            waiters.delete(wake);
-            resolveArrived(true);
-          };
-          waiters.add(wake);
-        });
-      return { socket, events, arrived };
-    };
     const isPinsChanged = (event: DynamicRecord) => event.type === "message-pins-changed";
     const emitPins = () => {
       for (const listener of agentEventListeners) listener({ type: "message-pins-changed", agentId: "agent-ada" });
@@ -10094,6 +13135,42 @@ try {
         errorIs(gone, 409, sourceText("error.backend.queuedMessageUnavailable")) &&
         isDeepStrictEqual(callsOf("runQueuedMessageAsTask"), [[body], [{ ...body, deliveryId: "delivery-gone" }]]),
       [summary(moved), summary(gone)],
+    );
+    // The limit text holds the count. The host sent "Request failed." for it before (#11739).
+    const limit = sourceText("error.backend.threadOpenLimitReached", { count: INPUT_LIMITS.agentTasks });
+    const loggedBeforeLimit = logged.length;
+    const fullMove = await call("POST", AGENT_QUEUE_TASK_ROUTES.run, {
+      token: bobToken,
+      ...v9,
+      json: { ...body, deliveryId: "delivery-full" },
+    });
+    const tasksV9 = { capabilities: [AGENT_TASKS_CAPABILITY], protocol: TEAM_PROTOCOL_V9 };
+    const fullStart = await call("POST", AGENT_TASKS_ROUTES.start, {
+      token: bobToken,
+      ...tasksV9,
+      json: { agentId: "agent-ada", text: THREAD_LIMIT_START_TEXT },
+    });
+    const fullFilesStart = await call("POST", AGENT_THREAD_FILES_ROUTES.start, {
+      token: bobToken,
+      capabilities: [AGENT_THREAD_FILES_CAPABILITY],
+      protocol: TEAM_PROTOCOL_V9,
+      json: { agentId: "agent-ada", text: THREAD_LIMIT_START_TEXT, attachmentDraftIds: ["draft-limit"] },
+    });
+    const fullRestore = await call("POST", AGENT_TASKS_ROUTES.reopen, {
+      token: bobToken,
+      ...tasksV9,
+      json: { agentId: "agent-ada", taskId: "task-archived" },
+    });
+    check(
+      "a thread start, a start with files, a move into a new thread and a restore at the open-thread limit tell the member to archive a thread",
+      errorIs(fullMove, 409, limit) &&
+        errorIs(fullStart, 409, limit) &&
+        errorIs(fullFilesStart, 409, limit) &&
+        errorIs(fullRestore, 409, limit) &&
+        callsOf("startTask").length === 2 &&
+        callsOf("reopenTask").length === 1 &&
+        logged.slice(loggedBeforeLimit).every((line) => !line.includes("Team API request failed")),
+      [summary(fullMove), summary(fullStart), summary(fullFilesStart), summary(fullRestore)],
     );
   }
 
@@ -10179,6 +13256,64 @@ try {
     );
   }
 
+  // ---- The requests of a side thread to other agents (agent-thread-requests-v1) ----
+  {
+    const capabilities = [AGENT_THREAD_REQUESTS_CAPABILITY];
+    const v9 = { capabilities, protocol: TEAM_PROTOCOL_V9 };
+    const listBody = { agentId: "agent-ada" };
+    const unsupported = await call("POST", AGENT_THREAD_REQUESTS_ROUTES.list, { token: bobToken, json: listBody });
+    const extraField = await call("POST", AGENT_THREAD_REQUESTS_ROUTES.list, {
+      token: bobToken,
+      ...v9,
+      json: { ...listBody, taskId: "task-idle" },
+    });
+    const hiddenAgent = await call("POST", AGENT_THREAD_REQUESTS_ROUTES.list, {
+      token: bobToken,
+      capabilities,
+      protocol: 6,
+      json: { agentId: "agent-pi" },
+    });
+    accessLevels = { revision: 26, everyone: { "agent-ada": "view" }, roles: [] };
+    const viewerList = await call("POST", AGENT_THREAD_REQUESTS_ROUTES.list, {
+      token: bobToken,
+      ...v9,
+      json: listBody,
+    });
+    accessLevels = { revision: 27, everyone: {}, roles: [] };
+    check(
+      "the thread requests route without the capability, with an unknown field, of a hidden agent, or for a member who can only view is refused",
+      errorIs(unsupported, 400, sourceText("error.team.threadRequestsUnsupported")) &&
+        extraField.status === 400 &&
+        errorIs(hiddenAgent, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(viewerList, 403, sourceText("error.team.agentViewOnly")),
+      [summary(unsupported), summary(extraField), summary(hiddenAgent), summary(viewerList)],
+    );
+    const listed = await call("POST", AGENT_THREAD_REQUESTS_ROUTES.list, { token: bobToken, ...v9, json: listBody });
+    const tasks = await call("POST", AGENT_TASKS_ROUTES.list, {
+      token: bobToken,
+      capabilities: [AGENT_TASKS_CAPABILITY],
+      protocol: TEAM_PROTOCOL_V9,
+      json: listBody,
+    });
+    check(
+      "a member reads the open requests of each side thread, and the frozen task list does not carry them",
+      listed.status === 200 &&
+        isDeepStrictEqual(listed.body, {
+          agentId: "agent-ada",
+          threads: [
+            {
+              taskId: "task-idle",
+              requests: [{ messageId: "message-asked", recipientAgentId: "agent-grace", status: "running" }],
+            },
+          ],
+        }) &&
+        tasks.status === 200 &&
+        field(tasks.body, "tasks", 1, "id") === "task-idle" &&
+        field(tasks.body, "tasks", 1, "awaitedReplies") === undefined,
+      [summary(listed), summary(tasks)],
+    );
+  }
+
   // ---- Usage limits and the move at a usage limit (agent-usage-limit-v1) ----
   {
     const capabilities = [AGENT_USAGE_LIMIT_CAPABILITY];
@@ -10249,6 +13384,108 @@ try {
         ]),
       [summary(moved), summary(adminMoved)],
     );
+  }
+
+  // ---- A runtime change that waits for the next turn (agent-pending-runtime-v1) ----
+  {
+    const capabilities = [AGENT_PENDING_RUNTIME_CAPABILITY];
+    const v9 = { capabilities, protocol: TEAM_PROTOCOL_V9 };
+    const change = { agentId: "agent-ada", provider: "grok", model: "grok-4", reasoningEffort: "high" };
+    const changesBefore = callsOf("updateAgentRuntime").length;
+    const unsupported = await call("POST", AGENT_PENDING_RUNTIME_ROUTES.update, { token: bobToken, json: change });
+    const hiddenAgent = await call("POST", AGENT_PENDING_RUNTIME_ROUTES.update, {
+      token: bobToken,
+      capabilities,
+      protocol: 6,
+      json: { ...change, agentId: "agent-pi" },
+    });
+    const empty = await call("POST", AGENT_PENDING_RUNTIME_ROUTES.update, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada" },
+    });
+    accessLevels = { revision: 28, everyone: { "agent-ada": "chat" }, roles: [] };
+    const chatOnly = await call("POST", AGENT_PENDING_RUNTIME_ROUTES.update, { token: bobToken, ...v9, json: change });
+    accessLevels = { revision: 29, everyone: {}, roles: [] };
+    const namedAccount = await call("POST", AGENT_PENDING_RUNTIME_ROUTES.update, {
+      token: bobToken,
+      ...v9,
+      json: { ...change, providerAccountId: "a0123456789abcdef" },
+    });
+    // The move of an agent on a named account to its provider's own sign-in, with no provider change.
+    const named = agents.find((item) => item.id === "agent-ada");
+    if (named) named.providerAccountId = "a0123456789abcdef";
+    const ownSignInOnly = await call("POST", AGENT_PENDING_RUNTIME_ROUTES.update, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", providerAccountId: "default" },
+    });
+    if (named) delete named.providerAccountId;
+    check(
+      "the runtime change route without the capability, with no change, of a hidden agent, for a member with only chat, or to another account by a member is refused",
+      errorIs(unsupported, 400, sourceText("error.team.providersUnsupported")) &&
+        empty.status === 400 &&
+        errorIs(hiddenAgent, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(chatOnly, 403, sourceText("error.team.agentManageDenied")) &&
+        errorIs(namedAccount, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(ownSignInOnly, 403, sourceText("error.team.adminRequired")) &&
+        callsOf("updateAgentRuntime").length === changesBefore,
+      [
+        summary(unsupported),
+        summary(empty),
+        summary(hiddenAgent),
+        summary(chatOnly),
+        summary(namedAccount),
+        summary(ownSignInOnly),
+      ],
+    );
+    const effortOnly = await call("POST", AGENT_PENDING_RUNTIME_ROUTES.update, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", reasoningEffort: "low" },
+    });
+    const ownSignIn = await call("POST", AGENT_PENDING_RUNTIME_ROUTES.update, {
+      token: bobToken,
+      ...v9,
+      json: { ...change, providerAccountId: "default" },
+    });
+    const adminChanged = await call("POST", AGENT_PENDING_RUNTIME_ROUTES.update, {
+      token: adaToken,
+      ...v9,
+      json: { ...change, providerAccountId: "a0123456789abcdef" },
+    });
+    const changed = await call("POST", AGENT_PENDING_RUNTIME_ROUTES.update, { token: bobToken, ...v9, json: change });
+    check(
+      "a member with manage access changes the runtime or the effort alone, and an admin names an account; the host may keep each change for the next turn",
+      effortOnly.status === 200 &&
+        ownSignIn.status === 200 &&
+        adminChanged.status === 200 &&
+        changed.status === 200 &&
+        isDeepStrictEqual(callsOf("updateAgentRuntime").slice(changesBefore), [
+          [{ agentId: "agent-ada", reasoningEffort: "low" }, true],
+          [{ ...change, providerAccountId: null }, true],
+          [{ ...change, providerAccountId: "a0123456789abcdef" }, true],
+          [change, true],
+        ]),
+      [summary(effortOnly), summary(ownSignIn), summary(adminChanged), summary(changed)],
+    );
+    const pendingOf = (reply: Reply) => list(reply.body).find((item) => field(item, "id") === "agent-ada");
+    const withCapability = await call("GET", TEAM_API_ROUTES.agents.all, { token: bobToken, ...v9 });
+    const released = await call("GET", TEAM_API_ROUTES.agents.all, { token: bobToken, protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the agent list carries the change that waits only for a client with the capability",
+      withCapability.status === 200 &&
+        isDeepStrictEqual(field(pendingOf(withCapability), "pendingRuntime"), {
+          provider: "grok",
+          model: "grok-4",
+          reasoningEffort: "high",
+        }) &&
+        released.status === 200 &&
+        field(pendingOf(released), "pendingRuntime") === undefined,
+      [summary(withCapability), summary(released)],
+    );
+    const ada = agents.find((item) => item.id === "agent-ada");
+    if (ada) delete ada.pendingRuntime;
   }
 
   // ---- The Hermes folder of the host (hermes-import-v1) ----
@@ -10726,6 +13963,173 @@ try {
     );
   }
 
+  // ---- Server restart (host-restart-v1) ----
+  {
+    const capabilities = [HOST_RESTART_CAPABILITY];
+    const restarts = () => callsOf("restartHost").length;
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises host-restart-v1 to a protocol 9 peer and not to a protocol 8 peer",
+      list(field(compatibility.body, "capabilities")).includes(HOST_RESTART_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(HOST_RESTART_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    // The channel host has no restart: a desktop app is not in server mode.
+    assert.ok(channelHost?.port, "The channel host of the server restart check does not run.");
+    const without = { base: `http://127.0.0.1:${channelHost.port}` };
+    const withoutCompatibility = await call("GET", TEAM_API_ROUTES.compatibility, {
+      ...without,
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    const withoutRestart = await call("POST", HOST_RESTART_ROUTES.restart, {
+      ...without,
+      token: adaToken,
+      json: {},
+      capabilities,
+    });
+    const unsupported = await call("POST", HOST_RESTART_ROUTES.restart, { token: owner.sessionToken, json: {} });
+    check(
+      "a host that is not in server mode does not advertise host-restart-v1, and it and a client without the capability get 400 hostRestartUnsupported",
+      withoutCompatibility.status === 200 &&
+        !list(field(withoutCompatibility.body, "capabilities")).includes(HOST_RESTART_CAPABILITY) &&
+        errorIs(withoutRestart, 400, sourceText("error.team.hostRestartUnsupported")) &&
+        errorIs(unsupported, 400, sourceText("error.team.hostRestartUnsupported")) &&
+        restarts() === 0,
+      [summary(withoutCompatibility), summary(withoutRestart), summary(unsupported)],
+    );
+    const memberRestart = await call("POST", HOST_RESTART_ROUTES.restart, { token: bobToken, json: {}, capabilities });
+    const wrongMethod = await call("GET", HOST_RESTART_ROUTES.restart, { token: adaToken, capabilities });
+    check(
+      "a member cannot restart the server, only POST restarts it, and the host does not restart",
+      errorIs(memberRestart, 403, sourceText("error.team.adminRequired")) &&
+        wrongMethod.status === 404 &&
+        restarts() === 0,
+      [summary(memberRestart), summary(wrongMethod)],
+    );
+    const adminRestart = await call("POST", HOST_RESTART_ROUTES.restart, { token: adaToken, json: {}, capabilities });
+    const ownerRestart = await call("POST", HOST_RESTART_ROUTES.restart, {
+      token: owner.sessionToken,
+      json: {},
+      capabilities,
+    });
+    check(
+      "an admin and the owner each restart the server once, the host knows who asked, and the reply is empty",
+      adminRestart.status === 200 &&
+        isDeepStrictEqual(adminRestart.body, {}) &&
+        ownerRestart.status === 200 &&
+        isDeepStrictEqual(ownerRestart.body, {}) &&
+        restarts() === 2 &&
+        callsOf("restartHost")[0]?.[0] === adaId &&
+        typeof callsOf("restartHost")[1]?.[0] === "string" &&
+        callsOf("restartHost")[1]?.[0] !== adaId,
+      [summary(adminRestart), summary(ownerRestart), callsOf("restartHost")],
+    );
+  }
+
+  // ---- Server shape and colour (host-appearance-v1) ----
+  {
+    const capabilities = [HOST_APPEARANCE_CAPABILITY];
+    const identityUpdates = () => callsOf("updateIdentity").length;
+    const storedAppearance = () => store.getIdentity()?.appearance;
+    const set = (token: string, json: Json, use: { capabilities?: string[] } = { capabilities }) =>
+      call("POST", HOST_APPEARANCE_ROUTES.appearance, { ...use, token, json });
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises host-appearance-v1 to a protocol 9 peer and not to a protocol 8 peer",
+      list(field(compatibility.body, "capabilities")).includes(HOST_APPEARANCE_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(HOST_APPEARANCE_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+
+    // A socket that declares the capability gets the look at once, and again after each change.
+    const socket = new WebSocket(`ws://127.0.0.1:${port}${TEAM_API_ROUTES.events}`, [
+      TEAM_PROTOCOL_V1_WEBSOCKET,
+      `openbot-token.${bobToken}`,
+    ]);
+    const looks: Array<ServerAppearance | null> = [];
+    const waiters = new Set<() => void>();
+    socket.addEventListener("message", (message) => {
+      const value = JSON.parse(String(message.data));
+      if (!isDynamicRecord(value) || value.type !== HOST_APPEARANCE_EVENT || value.serverId !== serverId) return;
+      looks.push(value.appearance === null ? null : serverAppearanceOrNull(value.appearance));
+      for (const wake of waiters) wake();
+    });
+    await new Promise<void>((resolveOpen, reject) => {
+      socket.addEventListener("open", () => resolveOpen(), { once: true });
+      socket.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
+    });
+    const until = (count: number) =>
+      new Promise<boolean>((resolveReady) => {
+        if (looks.length >= count) return resolveReady(true);
+        const timer = setTimeout(() => {
+          waiters.delete(wake);
+          resolveReady(false);
+        }, 5_000);
+        const wake = () => {
+          if (looks.length < count) return;
+          clearTimeout(timer);
+          waiters.delete(wake);
+          resolveReady(true);
+        };
+        waiters.add(wake);
+      });
+    socket.send(JSON.stringify({ type: "agent-event-scope", includeConversations: false, capabilities }));
+    const atConnect = await until(1);
+    check(
+      "a member's event socket that declares host-appearance-v1 gets the automatic look at once",
+      atConnect && looks.length === 1 && looks[0] === null && storedAppearance() === null,
+      looks,
+    );
+
+    const look: ServerAppearance = { shape: "hexagone", color: "#3b82f6" };
+    // The same look as the request body sends it.
+    const sent: Json = { shape: "hexagone", color: "#3b82f6" };
+    const member = await set(bobToken, { appearance: sent });
+    const noCapability = await set(adaToken, { appearance: sent }, {});
+    const invalid = await set(adaToken, { appearance: { shape: "star", color: "#3b82f6" } });
+    const badColor = await set(adaToken, { appearance: { shape: "hexagone", color: "blue" } });
+    check(
+      "a member gets 403, a client without the capability gets 400, a bad look gets 400, and the look does not change",
+      errorIs(member, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(noCapability, 400, sourceText("error.team.hostIdentityUnsupported")) &&
+        invalid.status === 400 &&
+        badColor.status === 400 &&
+        identityUpdates() === 0 &&
+        storedAppearance() === null,
+      [summary(member), summary(noCapability), summary(invalid), summary(badColor)],
+    );
+
+    const admin = await set(adaToken, { appearance: sent });
+    const changed = await until(2);
+    check(
+      "an admin sets the look: 200, the store keeps it, and the member's socket gets it",
+      admin.status === 200 &&
+        isDeepStrictEqual(admin.body, {}) &&
+        isDeepStrictEqual(storedAppearance(), look) &&
+        changed &&
+        isDeepStrictEqual(looks[1], look),
+      [summary(admin), storedAppearance(), looks],
+    );
+
+    const reset = await set(owner.sessionToken, { appearance: null });
+    const resetSent = await until(3);
+    check(
+      "the owner sends null: the server has the automatic look again, and the socket gets null",
+      reset.status === 200 &&
+        storedAppearance() === null &&
+        resetSent &&
+        looks[2] === null &&
+        isDeepStrictEqual(
+          callsOf("updateIdentity").map(([input]) => input),
+          [{ appearance: look }, { appearance: null }],
+        ),
+      [summary(reset), storedAppearance(), looks, callsOf("updateIdentity")],
+    );
+    socket.close();
+  }
+
   // ---- Library folders (library-folders-v1) ----
   {
     const use = { protocol: TEAM_PROTOCOL_V9, capabilities: [LIBRARY_FOLDERS_CAPABILITY] };
@@ -11161,6 +14565,132 @@ try {
         isDeepStrictEqual(reopened.getSnapshot(), stored()) &&
         stored().folders.length === 4,
       { revision: stored().revision, folders: stored().folders.length },
+    );
+
+    // library-folders-events-v1: each saved change reaches a client with the capability at once, with
+    // no data, and no client without it. A phone and the web client then read the folders again.
+    const v9Compatibility = list(field(compatibility.body, "capabilities"));
+    const isFoldersChanged = (event: DynamicRecord) => event.type === "library-folders-changed";
+    const withEvents = await openEventSocket([LIBRARY_FOLDERS_EVENTS_CAPABILITY]);
+    const withoutEvents = await openEventSocket(null);
+    // The host reads the scope of a socket from its first message, and no answer says that it did.
+    let changeArrived = false;
+    let eventFolders = 0;
+    for (let attempt = 0; attempt < 20 && !changeArrived; attempt += 1) {
+      const id = `folder-event-${attempt}`;
+      await act(bobToken, { type: "create", id, agentId: "agent-ada", name: `Event ${attempt}` });
+      eventFolders += 1;
+      changeArrived = await withEvents.arrived(isFoldersChanged, 250);
+    }
+    const eventsBeforeDelete = withEvents.events.filter(isFoldersChanged).length;
+    for (let attempt = 0; attempt < eventFolders; attempt += 1)
+      await act(bobToken, { type: "delete", folderId: `folder-event-${attempt}` });
+    const deleteArrived = await withEvents.arrived(
+      () => withEvents.events.filter(isFoldersChanged).length >= eventsBeforeDelete + eventFolders,
+      5_000,
+    );
+    for (const listener of agentEventListeners)
+      listener({ type: "conversation-invalidated", agentId: "agent-ada", revision: 92_000 });
+    const foldersBarrier = await withoutEvents.arrived(
+      (event) => event.type === "conversation-invalidated" && event.revision === 92_000,
+      5_000,
+    );
+    withEvents.socket.close();
+    withoutEvents.socket.close();
+    check(
+      "a folder change reaches a client with library-folders-events-v1 with no data, and no client without it",
+      v9Compatibility.includes(LIBRARY_FOLDERS_EVENTS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(LIBRARY_FOLDERS_EVENTS_CAPABILITY) &&
+        changeArrived &&
+        deleteArrived &&
+        withEvents.events.filter(isFoldersChanged).every((event) => isDeepStrictEqual(Object.keys(event), ["type"])) &&
+        foldersBarrier &&
+        !withoutEvents.events.some(isFoldersChanged) &&
+        stored().folders.length === 4,
+      {
+        with: withEvents.events.filter(isFoldersChanged).length,
+        without: withoutEvents.events.map((event) => event.type),
+        folders: stored().folders.length,
+      },
+    );
+  }
+
+  // ---- Remove on a feedback thank-you card (feedback-withdraw-v1) ----
+  {
+    const capabilities = [FEEDBACK_WITHDRAW_CAPABILITY];
+    const ownerToken = owner.sessionToken;
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises feedback-withdraw-v1 on protocol 9 only",
+      list(field(compatibility.body, "capabilities")).includes(FEEDBACK_WITHDRAW_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(FEEDBACK_WITHDRAW_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, {
+      token: ownerToken,
+      json: { agentId: "agent-ada", messageId: "feedback-card-1" },
+    });
+    const malformed = await call("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, {
+      token: ownerToken,
+      json: { agentId: "agent-ada", messageId: "" },
+      capabilities,
+    });
+    // Protocol 6 does not know Pi, so the host hides `agent-pi`.
+    const hidden = await call("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, {
+      token: ownerToken,
+      protocol: 6,
+      json: { agentId: "agent-pi", messageId: "feedback-card-1" },
+      capabilities,
+    });
+    const missing = await call("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, {
+      token: ownerToken,
+      json: { agentId: "agent-gone", messageId: "feedback-card-1" },
+      capabilities,
+    });
+    // Only the owner approves a report, so a member and an admin ask the agent instead.
+    const member = await call("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, {
+      token: bobToken,
+      json: { agentId: "agent-ada", messageId: "feedback-card-1" },
+      capabilities,
+    });
+    const admin = await call("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, {
+      token: adaToken,
+      json: { agentId: "agent-ada", messageId: "feedback-card-1" },
+      capabilities,
+    });
+    check(
+      "a feedback removal without the capability, with a bad body, to a hidden or missing agent, or from a member or an admin reaches no agent",
+      errorIs(unsupported, 400, sourceText("error.backend.feedbackWithdrawRemoteUnsupported")) &&
+        malformed.status === 400 &&
+        errorIs(hidden, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(member, 403, sourceText("error.team.ownerRequired")) &&
+        errorIs(admin, 403, sourceText("error.team.ownerRequired")) &&
+        callsOf("withdrawFeedback").length === 0,
+      [summary(unsupported), summary(malformed), summary(hidden), summary(missing), summary(member), summary(admin)],
+    );
+    const removed = await call("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, {
+      token: ownerToken,
+      json: { agentId: "agent-ada", messageId: "feedback-card-1" },
+      capabilities,
+    });
+    const refused = await call("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, {
+      token: ownerToken,
+      json: { agentId: "agent-ada", messageId: "feedback-card-2" },
+      capabilities,
+    });
+    check(
+      "the owner removes a report; the host gets the agent and card, and the client decodes each result",
+      removed.status === 200 &&
+        isDeepStrictEqual(decodeFeedbackWithdrawResult(removed.body), { status: "withdrawn" }) &&
+        refused.status === 200 &&
+        isDeepStrictEqual(decodeFeedbackWithdrawResult(refused.body), { status: "notYours" }) &&
+        isDeepStrictEqual(callsOf("withdrawFeedback"), [
+          [{ agentId: "agent-ada", messageId: "feedback-card-1" }],
+          [{ agentId: "agent-ada", messageId: "feedback-card-2" }],
+        ]),
+      [summary(removed), summary(refused)],
     );
   }
 

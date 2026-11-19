@@ -75,6 +75,12 @@ export function createMockEvents(
       const routine = findRoutine(id, owner);
       if (routine?.trigger.kind !== "webhook") throw new Error("This routine has no webhook trigger.");
     },
+    giveSecretToAgent: async ({ id, owner }) => {
+      const routine = findRoutine(id, owner);
+      if (routine?.trigger.kind !== "webhook" || owner.kind !== "agent")
+        throw new Error("This routine has no webhook trigger.");
+      return { name: `WEBHOOK_SECRET_${id.replaceAll("-", "").toUpperCase()}` };
+    },
     // The preview host starts no run: it answers as a host whose routine matched the test event.
     sendTestEvent: async ({ id, owner }) => {
       const routine = findRoutine(id, owner);

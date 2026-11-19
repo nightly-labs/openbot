@@ -126,6 +126,12 @@ export interface StorageUsage {
 export interface StorageDisk {
   freeBytes: number | null;
   totalBytes: number | null;
+  /**
+   * The bytes that the files of the server's user use on this disk: the home folder and the temporary
+   * folders. Only a hosted server without Docker measures it (`storage-user-files-v1`); the clients
+   * then count the plan storage from it. Absent or null elsewhere.
+   */
+  userBytes?: number | null;
 }
 
 export interface GetStorageUsageInput {
@@ -355,6 +361,9 @@ export function decodeStorageDisk(value: unknown): StorageDisk {
   return {
     freeBytes: disk.freeBytes === null ? null : byteCount(disk.freeBytes, "free space"),
     totalBytes: disk.totalBytes === null ? null : byteCount(disk.totalBytes, "disk size"),
+    ...(disk.userBytes === undefined
+      ? {}
+      : { userBytes: disk.userBytes === null ? null : byteCount(disk.userBytes, "user files") }),
   };
 }
 

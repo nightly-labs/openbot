@@ -1,6 +1,8 @@
 import { installPointerFocusGuard } from "@openbot/ui/pointer-focus";
 import { render } from "@solidjs/web";
 import { syncAppearance } from "./appearance-choice";
+// A dev build shows the color and the branch of its worktree.
+import "./dev-worktree";
 import { AgentDockSurface } from "./features/agent-dock/AgentDockSurface";
 import { BrowserDockSurface } from "./features/browser/BrowserDockSurface";
 import { ComputerUseHighlightSurface } from "./features/computer-use/ComputerUseHighlightSurface";

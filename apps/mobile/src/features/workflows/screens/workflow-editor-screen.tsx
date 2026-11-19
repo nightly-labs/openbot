@@ -1,4 +1,4 @@
-import type { WorkflowDetail, WorkflowNode } from "@openbot/contracts/ipc";
+import { WORKFLOW_PORTS, type WorkflowDetail, type WorkflowNode } from "@openbot/contracts/ipc";
 import { useQueryClient } from "@tanstack/react-query";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
@@ -6,7 +6,6 @@ import { Typography } from "heroui-native";
 import Ellipsis from "lucide-react-native/icons/ellipsis";
 import Plus from "lucide-react-native/icons/plus";
 import TriangleAlert from "lucide-react-native/icons/triangle-alert";
-import X from "lucide-react-native/icons/x";
 import { useEffect, useRef, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
@@ -17,8 +16,18 @@ import {
   SettingsRow,
   SettingsSection,
 } from "@/features/settings/components/settings-content";
+import { WorkflowFlow } from "@/features/workflows/components/workflow-flow";
+import { WorkflowFlowView } from "@/features/workflows/components/workflow-flow-view";
+import { WorkflowEditorHeader } from "@/features/workflows/components/workflow-header-actions";
 import { WorkflowKindTile } from "@/features/workflows/components/workflow-kind-tile";
+import { FlowRowNote, rowIndent } from "@/features/workflows/components/workflow-steps-list";
 import { useWorkflowCommands } from "@/features/workflows/model/use-workflow-commands";
+import {
+  openAddStep,
+  openAddStepAt,
+  openStep,
+  useWorkflowStepMenu,
+} from "@/features/workflows/model/use-workflow-step-menu";
 import { useWorkflowDetail } from "@/features/workflows/model/use-workflows";
 import {
   draftChanged,
@@ -28,7 +37,10 @@ import {
   useWorkflowDraft,
   type WorkflowDraft,
 } from "@/features/workflows/model/workflow-draft";
-import { canMove, type FlowList, outlineListOf, readingOrder } from "@/features/workflows/model/workflow-outline";
+import { useWorkflowEditorView } from "@/features/workflows/model/workflow-editor-view";
+import { flowRows, workflowFlowTree } from "@/features/workflows/model/workflow-flow-tree";
+import { placeAfter } from "@/features/workflows/model/workflow-graph-edit";
+import type { FlowList } from "@/features/workflows/model/workflow-outline";
 import { draftProblems } from "@/features/workflows/model/workflow-problems";
 import { stepLabel, stepText, triggerType } from "@/features/workflows/model/workflow-steps";
 import {
@@ -37,27 +49,73 @@ import {
 } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
-import { AndroidHeaderButton } from "@/shared/components/android-header-button";
-import { type MenuAction, type MenuComponentRef, MenuView } from "@/shared/components/menu-view";
+import { type MenuComponentRef, MenuView } from "@/shared/components/menu-view";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
-import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid } from "@/shared/lib/platform";
-import { currentText, useText } from "@/shared/lib/text";
+import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 
 /** The longest name that `workflows-v1` carries. */
 const TITLE_LIMIT = 160;
 
-/** Opens the page of a step: the trigger page for the trigger. */
-function openStep(node: WorkflowNode) {
-  if (node.kind === "trigger") router.push({ pathname: "/workflow-editor/trigger", params: { nodeId: node.id } });
-  else router.push({ pathname: "/workflow-editor/step", params: { nodeId: node.id } });
+/**
+ * The "+" of a step in the list of a workflow that the outline cannot hold: it adds a step right after
+ * this one. A condition asks for the path first.
+ */
+function AddAfterButton({ node, draft }: { node: WorkflowNode; draft: WorkflowDraft }) {
+  const { t } = useText();
+  const { theme } = useUniwind();
+  const accent = String(useCSSVariable("--openbot-accent-text"));
+  const menu = useRef<MenuComponentRef | null>(null);
+  const label = t("mobile.workflow.editor.addAfter");
+  const button = (onPress?: () => void) => (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      hitSlop={6}
+      className="size-10 items-center justify-center rounded-full"
+      onPress={onPress}
+    >
+      <Plus color={accent} size={20} strokeWidth={2} />
+    </Pressable>
+  );
+  // Both kinds of "+" sit in the same box at the end of the row, so they line up from row to row: the
+  // menu host of a condition has a size of its own.
+  if (node.kind !== "condition")
+    return (
+      <View className="mr-2 size-10">
+        {button(() => {
+          void haptics.selection();
+          openAddStepAt(placeAfter(draft.graph, node.id));
+        })}
+      </View>
+    );
+  return (
+    <View className="mr-2 size-10">
+      <MenuView
+        style={{ width: 40, height: 40 }}
+        {...(isAndroid ? { ref: menu, colorScheme: theme === "dark" ? ("dark" as const) : ("light" as const) } : null)}
+        actions={[
+          { id: "yes", title: t("mobile.workflow.editor.addOnYes"), image: "plus" },
+          { id: "no", title: t("mobile.workflow.editor.addOnNo"), image: "plus" },
+        ]}
+        onPressAction={(event) => {
+          const branch = event.nativeEvent.event === "no" ? "no" : "yes";
+          openAddStepAt(placeAfter(draft.graph, node.id, branch));
+        }}
+      >
+        {button(() => {
+          if (isAndroid) menu.current?.show();
+        })}
+      </MenuView>
+    </View>
+  );
 }
 
 /**
- * A step of the editor: a tap opens its page, and its menu moves, copies, adds after or deletes it. A
- * step with a problem shows the problem in red, with a warning sign.
+ * A step of the editor list: a tap opens its page, and its menu moves, copies, adds after or deletes
+ * it. A step with a problem shows the problem in red, with a warning sign.
  */
 function EditorStepRow({
   node,
@@ -65,6 +123,7 @@ function EditorStepRow({
   draft,
   editable,
   problem,
+  depth = 0,
 }: {
   node: WorkflowNode;
   agents: readonly MobileAgent[];
@@ -72,80 +131,17 @@ function EditorStepRow({
   /** False for a kind that only the desktop changes, such as an image step. */
   editable: boolean;
   problem: string | undefined;
+  /** The depth of the path of the step in a workflow of any shape: each path sits deeper than its split. */
+  depth?: number;
 }) {
   const { t } = useText();
   const { theme } = useUniwind();
   const [muted, danger] = useCSSVariable(["--openbot-text-grouped-secondary", "--openbot-danger-text"]);
   const menu = useRef<MenuComponentRef | null>(null);
-  const { move, duplicate, remove, connect } = useWorkflowDraft.getState();
-  const outline = draft.mode === "outline" ? draft.outline : null;
-  const list = outline ? outlineListOf(outline, node.id) : null;
-  const loose = list === "loose";
-  const structural = Boolean(outline) && node.kind !== "trigger";
-  const flowList: FlowList | null = list && list !== "loose" ? list : null;
-  const actions: MenuAction[] = loose
-    ? [
-        ...(node.kind === "condition"
-          ? []
-          : [{ id: "connect", title: t("mobile.workflow.editor.connect"), image: "plus" } satisfies MenuAction]),
-        {
-          id: "delete-group",
-          title: "",
-          displayInline: true,
-          subactions: [
-            {
-              id: "delete",
-              title: t("mobile.workflow.editor.delete"),
-              image: "trash",
-              attributes: { destructive: true },
-            },
-          ],
-        },
-      ]
-    : [
-        ...(outline && flowList && canMove(outline, node.id, -1)
-          ? [{ id: "up", title: t("mobile.workflow.editor.moveUp"), image: "arrow.up" } satisfies MenuAction]
-          : []),
-        ...(outline && flowList && canMove(outline, node.id, 1)
-          ? [{ id: "down", title: t("mobile.workflow.editor.moveDown"), image: "arrow.down" } satisfies MenuAction]
-          : []),
-        ...(flowList
-          ? [{ id: "copy", title: t("mobile.workflow.editor.duplicate"), image: "doc.on.doc" } satisfies MenuAction]
-          : []),
-        ...(flowList
-          ? [{ id: "add", title: t("mobile.workflow.editor.addAfter"), image: "plus" } satisfies MenuAction]
-          : []),
-        {
-          id: "delete-group",
-          title: "",
-          displayInline: true,
-          subactions: [
-            {
-              id: "delete",
-              title: t("mobile.workflow.editor.delete"),
-              image: "trash",
-              attributes: { destructive: true },
-            },
-          ],
-        },
-      ];
-  const onAction = (id: string) => {
-    if (id === "up") move(node.id, -1);
-    else if (id === "down") move(node.id, 1);
-    else if (id === "copy") duplicate(node.id);
-    else if (id === "connect") {
-      void haptics.selection();
-      connect(node.id);
-    } else if (id === "delete") confirmRemove(node, draft, remove);
-    else if (id === "add" && flowList && outline)
-      router.push({
-        pathname: "/workflow-editor/add",
-        params: { list: flowList, index: String(outline[flowList].indexOf(node.id) + 1) },
-      });
-  };
+  const { structural, actions, onAction } = useWorkflowStepMenu(node, draft);
   const opens = editable || node.kind === "trigger";
   return (
-    <View className="flex-row items-center">
+    <View className="flex-row items-center" style={depth > 0 ? { paddingLeft: rowIndent(depth) - 16 } : undefined}>
       <View className="min-w-0 flex-1">
         <SettingsRow
           leading={
@@ -194,29 +190,10 @@ function EditorStepRow({
             <Ellipsis color={String(muted)} size={20} strokeWidth={2} />
           </Pressable>
         </MenuView>
+      ) : draft.mode === "fields" && WORKFLOW_PORTS[node.kind].out.length > 0 ? (
+        <AddAfterButton node={node} draft={draft} />
       ) : null}
     </View>
-  );
-}
-
-/** Deleting a condition deletes its two paths, so it asks first. */
-function confirmRemove(node: WorkflowNode, draft: WorkflowDraft, remove: (id: string) => void) {
-  const text = currentText();
-  if (node.kind !== "condition" || !draft.outline) {
-    void haptics.selection();
-    remove(node.id);
-    return;
-  }
-  const count = draft.outline.yes.length + draft.outline.no.length;
-  Alert.alert(
-    text.t("mobile.workflow.editor.deleteConditionTitle"),
-    count > 0
-      ? text.t("mobile.workflow.editor.deleteConditionPaths", { count })
-      : text.t("mobile.workflow.editor.deleteConditionBody"),
-    [
-      { text: text.t("common.cancel"), style: "cancel" },
-      { text: text.t("mobile.workflow.editor.delete"), style: "destructive", onPress: () => remove(node.id) },
-    ],
   );
 }
 
@@ -227,7 +204,7 @@ function AddRow({ list, index, label }: { list: FlowList; index: number; label: 
     <SettingsRow
       disclosure={false}
       leading={<Plus color={accent} size={20} strokeWidth={2} />}
-      onPress={() => router.push({ pathname: "/workflow-editor/add", params: { list, index: String(index) } })}
+      onPress={() => openAddStep(list, index)}
     >
       <Typography.Paragraph className="text-accent-text">{label}</Typography.Paragraph>
     </SettingsRow>
@@ -256,6 +233,8 @@ export function WorkflowEditorScreen() {
   /** The id of the saved workflow: the sheet closes on the next render, when the discard guard is off. */
   const [savedId, setSavedId] = useState<string | null>(null);
   const isNew = !workflowId;
+  const view = useWorkflowEditorView((state) => state.view);
+  const setView = useWorkflowEditorView((state) => state.setView);
 
   // The draft starts once, from the saved workflow; a later read of the host does not reset it.
   const loaded = detail.data;
@@ -351,34 +330,32 @@ export function WorkflowEditorScreen() {
       options={{ title: isNew ? t("mobile.workflow.editor.newTitle") : t("mobile.workflow.editor.title") }}
     />
   );
-  const closeButton = isNew ? (
-    isAndroid ? (
-      <AndroidHeaderButton
-        placement="left"
-        icon={X}
-        accessibilityLabel={t("common.close")}
-        disabled={saving}
-        onPress={() => router.back()}
-      />
-    ) : (
-      <Stack.Toolbar placement="left">
-        <Stack.Toolbar.Button
-          icon="xmark"
-          accessibilityLabel={t("common.close")}
-          disabled={saving}
-          onPress={() => router.back()}
-        >
-          {t("common.close")}
-        </Stack.Toolbar.Button>
-      </Stack.Toolbar>
-    )
-  ) : null;
+  // The editor is a page: Back leaves it, and the discard guard asks first when the draft has a change.
+  const header = (canSave: boolean) => (
+    <WorkflowEditorHeader
+      view={view}
+      onView={setView}
+      backDisabled={saving}
+      onBack={() => router.back()}
+      save={
+        draft && draft.mode !== "read-only"
+          ? {
+              dirty: changed || isNew,
+              canSave: canSave && !saving,
+              pending: saving,
+              label: isNew ? t("mobile.workflow.editor.create") : t("mobile.workflow.editor.save"),
+              onSave: () => void save(draft.baseRevision),
+            }
+          : undefined
+      }
+    />
+  );
 
   if (!draft || !problems || (workflowId && draft.workflowId !== workflowId))
     return (
       <SettingsContent>
         {screenTitle}
-        {closeButton}
+        {header(false)}
         <SettingsNote>
           {detail.isError
             ? errorMessage(detail.error, t("mobile.workflow.detail.loadFailed"))
@@ -389,7 +366,7 @@ export function WorkflowEditorScreen() {
 
   const byId = new Map(draft.graph.nodes.map((node) => [node.id, node]));
   const editable = draft.mode !== "read-only";
-  const stepRow = (node: WorkflowNode, canEdit = editable) => (
+  const stepRow = (node: WorkflowNode, canEdit = editable, depth = 0) => (
     <EditorStepRow
       key={node.id}
       node={node}
@@ -397,8 +374,13 @@ export function WorkflowEditorScreen() {
       draft={draft}
       editable={canEdit}
       problem={problems.steps.get(node.id)}
+      depth={depth}
     />
   );
+  const labelOf = (id: string) => {
+    const node = byId.get(id);
+    return node ? stepLabel(node, serverAgents, t) : "";
+  };
   const row = (id: string) => {
     const node = byId.get(id);
     return node ? stepRow(node) : null;
@@ -413,16 +395,7 @@ export function WorkflowEditorScreen() {
   return (
     <SettingsContent>
       {screenTitle}
-      {closeButton}
-      {editable ? (
-        <SheetSaveAction
-          dirty={changed || isNew}
-          canSave={!firstProblem && !saving}
-          pending={saving}
-          label={isNew ? t("mobile.workflow.editor.create") : t("mobile.workflow.editor.save")}
-          onSave={() => void save(draft.baseRevision)}
-        />
-      ) : null}
+      {header(!firstProblem)}
       <SheetFormField
         label={t("mobile.workflow.editor.name")}
         value={draft.title}
@@ -454,12 +427,21 @@ export function WorkflowEditorScreen() {
           </SettingsRow>
         </SettingsSection>
       ) : null}
-      {draft.mode === "fields" ? <SettingsNote>{t("mobile.workflow.editor.fieldsOnly")}</SettingsNote> : null}
       {draft.mode === "read-only" ? <SettingsNote>{t("mobile.workflow.detail.newerApp")}</SettingsNote> : null}
-      {trigger ? (
+      {trigger && view !== "flow" ? (
         <SettingsSection title={t("mobile.workflow.detail.trigger")}>{stepRow(trigger)}</SettingsSection>
       ) : null}
-      {outline ? (
+      {outline && view === "flow" ? (
+        <>
+          <WorkflowFlow draft={draft} outline={outline} agents={serverAgents} problems={problems.steps} />
+          {outline.loose.length > 0 ? (
+            <SettingsSection title={t("mobile.workflow.editor.loose")} footer={t("mobile.workflow.editor.looseHint")}>
+              {outline.loose.map(row)}
+            </SettingsSection>
+          ) : null}
+          <SettingsNote>{t("mobile.workflow.editor.flowHint")}</SettingsNote>
+        </>
+      ) : outline ? (
         <>
           <SettingsSection title={t("mobile.workflow.detail.stepsTitle")}>
             {outline.main.map(row)}
@@ -497,11 +479,27 @@ export function WorkflowEditorScreen() {
             </SettingsSection>
           ) : null}
         </>
+      ) : view === "flow" ? (
+        <WorkflowFlowView
+          graph={draftGraph(draft)}
+          agents={serverAgents}
+          problems={problems.steps}
+          onOpenStep={openStep}
+          onAdd={draft.mode === "fields" ? openAddStepAt : undefined}
+          canOpenStep={(node) =>
+            node.kind === "trigger" || (draft.mode === "fields" && node.kind !== "image" && node.kind !== "asset")
+          }
+        />
       ) : (
         <SettingsSection title={t("mobile.workflow.detail.stepsTitle")}>
-          {readingOrder(draftGraph(draft))
-            .filter((node) => node.kind !== "trigger")
-            .map((node) => stepRow(node, draft.mode === "fields" && node.kind !== "image" && node.kind !== "asset"))}
+          {/* The steps in the order that a run goes, each path of a split under its label. */}
+          {flowRows(workflowFlowTree(draftGraph(draft))).map((item) => {
+            if (item.type !== "step")
+              return <FlowRowNote key={item.type === "loose" ? "loose" : item.key} row={item} labelOf={labelOf} />;
+            const node = byId.get(item.id);
+            if (!node || node.kind === "trigger") return null;
+            return stepRow(node, draft.mode === "fields" && node.kind !== "image" && node.kind !== "asset", item.depth);
+          })}
         </SettingsSection>
       )}
       {draft.graph.nodes.some((node) => node.kind === "note" || node.kind === "text" || node.kind === "shape") ||

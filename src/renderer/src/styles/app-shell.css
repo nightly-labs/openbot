@@ -1133,7 +1133,8 @@ textarea {
 }
 
 .app-frame-platform-darwin:not(.app-frame-with-server-rail, .web-app-frame) .sidebar-compact .sidebar-server-name,
-.app-frame-platform-darwin:not(.app-frame-with-server-rail, .web-app-frame) .sidebar-compact .sidebar-new-button {
+.app-frame-platform-darwin:not(.app-frame-with-server-rail, .web-app-frame) .sidebar-compact .sidebar-new-button,
+.app-frame-platform-darwin:not(.app-frame-with-server-rail, .web-app-frame) .sidebar-compact .sidebar-filter-button {
   display: none;
 }
 
@@ -1180,6 +1181,16 @@ textarea {
 .server-menu-mark > * {
   width: 100%;
   height: 100%;
+}
+
+/* The plush keeps its own squircle: a circle clip and ring cut its fur. */
+.server-menu-mark:has(> .ui-server-plush-logo) {
+  overflow: visible;
+  border-radius: 0;
+}
+
+.server-menu-mark:has(> .ui-server-plush-logo)::after {
+  content: none;
 }
 
 .server-menu-name {
@@ -1251,6 +1262,39 @@ textarea {
   flex: 0 0 auto;
   align-items: center;
   gap: 3px;
+}
+
+/* The branch of a dev build's worktree (`DevWorktreeLabel.tsx`). The dot has the Dock icon color. It
+ * comes after the buttons and shortens the name to fit. It has no auto margin: the server name already
+ * has one, and a second would move the buttons away from the end of the row. */
+.dev-worktree-label {
+  display: flex;
+  min-width: 0;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+  margin-inline-end: var(--openbot-space-2);
+  color: var(--openbot-text-muted);
+  font-family: var(--openbot-font-mono);
+  font-size: var(--openbot-text-sm);
+  white-space: nowrap;
+}
+
+.dev-worktree-label-dot {
+  width: var(--openbot-space-2);
+  height: var(--openbot-space-2);
+  flex: 0 0 auto;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-logo-dev);
+}
+
+.dev-worktree-label-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-compact .dev-worktree-label {
+  display: none;
 }
 
 .sidebar-icon-button {
@@ -1328,15 +1372,6 @@ textarea {
   outline-offset: 1px;
 }
 
-.sidebar-toggle-icon {
-  width: 17px;
-  height: 17px;
-  fill: none;
-  stroke: currentcolor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
 .sidebar-marketplace-button > svg {
   width: 18px;
   height: 18px;
@@ -1369,7 +1404,7 @@ textarea {
   stroke-width: var(--openbot-icon-stroke-lg);
 }
 
-/* The search field, then the New button. */
+/* The search field, then the filter and New buttons. */
 .sidebar-search-wrap {
   position: relative;
   display: flex;
@@ -1678,6 +1713,19 @@ textarea {
   line-height: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* The chat count of a closed section follows its name, as in the Hidden group, and pushes the end
+   of the header to the far side. A long name shortens before the count does. The start margin takes
+   the 8px gap of .sidebar-section-toggle back to the space-1 of the Hidden group count. */
+.sidebar-section-count {
+  flex: 0 0 auto;
+  margin-inline: calc(var(--openbot-space-1) - 8px) auto;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-weight: 400;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
 }
 
 .sidebar-section-chevron {
@@ -2011,6 +2059,12 @@ textarea {
   position: relative;
   transform: translate3d(var(--sidebar-drag-x), var(--sidebar-drag-y), 0);
   transition: transform var(--openbot-duration-fast) var(--openbot-ease-out);
+  /* A row out of view is not drawn. With 100 working agents, the style and paint work of the rows
+     scrolled away kept the window about 65% busy. The size keeps the scroll height; the margin keeps
+     the focus ring of the row, which the paint containment would clip. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 62px;
+  overflow-clip-margin: 8px;
 }
 
 .sidebar-agent-item + .sidebar-agent-item {
@@ -2085,6 +2139,12 @@ textarea {
   grid-template-rows: 1fr;
   padding: 0;
   opacity: 1;
+  transition: grid-template-rows var(--openbot-duration-normal) var(--openbot-ease-out);
+
+  /* The area grows from nothing, so the rows under it slide down instead of jumping. */
+  @starting-style {
+    grid-template-rows: 0fr;
+  }
 }
 
 .sidebar-pinned-group-empty-target .sidebar-pinned-list {
@@ -2465,52 +2525,7 @@ textarea {
   height: 11px;
 }
 
-/* The tooltip anchors to this wrapper, so it needs a box of its own. */
-.sidebar-agent-tooltip-trigger {
-  display: block;
-}
-
-.sidebar-wait-tooltip {
-  z-index: var(--openbot-layer-tooltip);
-  display: grid;
-  max-width: min(260px, calc(100vw - 16px));
-  gap: 2px;
-  border: 1px solid var(--openbot-border-strong);
-  border-radius: var(--openbot-radius-sm);
-  background: var(--openbot-bg-surface-raised);
-  box-shadow: var(--openbot-shadow-raised);
-  padding: var(--openbot-space-2) var(--openbot-space-3);
-  color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-md);
-  line-height: var(--openbot-leading-md);
-  pointer-events: none;
-}
-
-.sidebar-wait-tooltip-title {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--openbot-space-1);
-  color: var(--openbot-warning-text);
-  font-weight: var(--openbot-weight-semibold);
-}
-
-.sidebar-wait-tooltip-title svg {
-  width: 14px;
-  height: 14px;
-}
-
-.sidebar-wait-tooltip-detail {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
-  overflow-wrap: anywhere;
-}
-
-.sidebar-wait-tooltip-hint {
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
-}
+/* The sidebar row tooltips are in `@openbot/ui/features/sidebar/sidebar-tooltips.css`. */
 
 .agent-row-agent-status-entering {
   animation: sidebar-reply-in var(--openbot-duration-overlay) cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -2566,12 +2581,16 @@ textarea {
   overflow: visible;
 }
 
+/* The face paints past the avatar box. In the sidebar it covered the edge of the row above, so a
+   click there opened the agent below. Only the box takes the pointer. The eyes follow the pointer
+   through a window listener, so they still move. */
 .agent-avatar > svg {
   display: block;
   width: 128%;
   height: 128%;
   overflow: visible;
   translate: var(--agent-avatar-optical-offset-x, 0) var(--agent-avatar-optical-offset, 0);
+  pointer-events: none;
 }
 
 /* The outline: a ring in the colour of the surface under the avatar, so a face that overlaps another
@@ -2900,6 +2919,14 @@ textarea {
 
   width: 30px;
   height: 30px;
+}
+
+/* The server plush has no thinking dots, so it needs no optical offset. It is an image, so the
+   button padding would make it narrower than the agent faces without `max-width: none`. */
+.avatar-face-choice .server-appearance-choice {
+  --server-plush-logo-size: 30px;
+
+  max-width: none;
 }
 
 /* The eyes are the only change in this grid, so its faces are larger. */
@@ -3297,6 +3324,16 @@ textarea {
   line-height: var(--openbot-leading-sm);
 }
 
+/* A named quota group: its full name on one row above its windows. */
+.account-usage-window-group {
+  grid-column: 1 / -1;
+  min-width: 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  overflow-wrap: anywhere;
+}
+
 .account-usage-window[data-usage-tone="warning"] {
   --account-usage-window-tone: var(--openbot-warning);
 }
@@ -3321,11 +3358,21 @@ textarea {
 }
 
 .account-usage-window-bar {
+  position: relative;
   display: block;
   height: 4px;
-  overflow: hidden;
   border-radius: var(--openbot-radius-pill);
   background: var(--openbot-border);
+}
+
+/* The amount left at an even pace. It is taller than the bar, so it shows on the fill too. */
+.account-usage-window-pace {
+  position: absolute;
+  inset-block: -2px;
+  width: 2px;
+  margin-inline-start: -1px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-text-primary);
 }
 
 .account-usage-window-fill {
@@ -3404,7 +3451,7 @@ textarea {
   pointer-events: none;
 }
 
-.sidebar-compact .sidebar-new-button {
+.sidebar-compact :is(.sidebar-new-button, .sidebar-filter-button) {
   opacity: 0;
   pointer-events: none;
   transform: translateX(6px) scale(0.92);
@@ -3498,7 +3545,7 @@ textarea {
 
 /* Right to left, the compact offsets above go the other way. `:dir()` keeps the specificity under the
  * macOS rules for the compact top row. */
-.sidebar-compact .sidebar-new-button:dir(rtl) {
+.sidebar-compact :is(.sidebar-new-button, .sidebar-filter-button):dir(rtl) {
   transform: translateX(-6px) scale(0.92);
 }
 

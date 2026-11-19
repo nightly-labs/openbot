@@ -7,6 +7,7 @@ import {
   decodeAgentAdminSettings,
   decodeAgentBackupModelSettings,
   decodeAgentBrowserProfile,
+  decodeAgentDefaultsOverview,
   decodeAgentExclusionChangeFromMain,
   decodeAgentFastModeSettings,
   decodeAgentFolderBrowse,
@@ -18,7 +19,6 @@ import {
   decodeAgentNewChatSettings,
   decodeAgentPlanCardSettings,
   decodeAgentProfileDraft,
-  decodeAgentTaskLimitSettings,
   decodeBrowserProfileList,
   decodeBrowserProfileSummary,
   decodeBrowserProxySummary,
@@ -44,11 +44,13 @@ import {
   decodeHostPersonality,
   decodeHostSkillLearning,
   decodeHostTimezoneSettings,
+  decodeHostTurnLimits,
   decodeHostUpdateStatus,
   decodeInstanceExportResult,
   decodeInstanceTransferPreview,
   decodeInstanceTransferResult,
   decodeInstanceTransferSummary,
+  decodeInstanceTransferUploadProgress,
   decodeLibraryFoldersSnapshot,
   decodeMachineAlertSettings,
   decodeMcpAccessSnapshot,
@@ -65,6 +67,9 @@ import {
   decodeOptionalStorageDisk,
   decodeOptionalStorageUsage,
   decodePromptCacheTtlSetting,
+  decodeProviderAccountCodeLoginStart,
+  decodeProviderAccountCodeLoginStatus,
+  decodeProviderEnvironment,
   decodeProviderHostSignInStatus,
   decodeProviderModelVisibility,
   decodeProviderRelaySignInStatus,
@@ -93,6 +98,7 @@ import {
   type Untyped,
 } from "@openbot/contracts/ipc";
 import {
+  decodeAgentWebhookSecret,
   decodeEventActivity,
   decodeEventRoutineRuns,
   decodeEventRoutines,
@@ -161,6 +167,7 @@ import {
   decodeAppLogoColorPreference,
   decodeApprovalAutomationPreference,
   decodeAppSetupState,
+  decodeBillingDetails,
   decodeBillingState,
   decodeBitwardenConnectorStatus,
   decodeBusyMessageModePreference,
@@ -201,6 +208,7 @@ import {
   decodePendingListing,
   decodePendingMarketplaceListing,
   decodeProviderDetectionSettings,
+  decodeReferralState,
   decodeRemoteDesktopSetupFromMain,
   decodeRemoteDesktopTestFromMain,
   decodeRemoteNetworkRouteState,
@@ -223,6 +231,7 @@ import {
   decodeVoiceStreamTranscript,
   decodeVoiceTranscriptionResult,
   decodeVoid,
+  decodeWorkflowNotificationOpenedEvent,
 } from "./app-decoding";
 import { decodeBackgroundProcesses } from "./background-process-decoding";
 import {
@@ -250,6 +259,7 @@ import {
   decodeComputerUseState,
 } from "./computer-use-decoding";
 import {
+  decodeActiveQueues,
   decodeAgentTask,
   decodeAgentTaskReadState,
   decodeAgentTaskReadStates,
@@ -263,6 +273,8 @@ import {
   decodeConversationPageFromMain,
   decodeConversationSearchPageFromMain,
   decodeFilePreview,
+  decodeOptionalFilePreviewPageUrl,
+  decodePendingApproval,
   decodePinnedMessages,
   decodeQueue,
   decodeReadState,
@@ -272,7 +284,16 @@ import {
   decodeTaskPage,
   decodeTaskWindow,
   decodeWaits,
+  decodeWithdrawFeedbackResult,
 } from "./conversation-decoding";
+import {
+  decodeCrmActivityPage,
+  decodeCrmApplyResult,
+  decodeCrmCustomerPage,
+  decodeCrmOverview,
+  decodeCrmPaymentPage,
+  decodeCrmSettings,
+} from "./crm-decoding";
 import {
   decodeDynamicIslandAction,
   decodeDynamicIslandGeometry,
@@ -311,6 +332,7 @@ import {
   decodeAgentTemplateDetail,
   decodeAgentTemplatePreview,
   decodeAgentTemplatePublication,
+  decodeGithubSkillSourceFromMain,
   decodeInstalledSkill,
   decodeInstalledSkillsFromMain,
   decodeMarketplaceAgentDetail,
@@ -354,6 +376,11 @@ import {
   decodeWorkflowGitHubHistory,
   decodeWorkflowGitHubOptions,
   decodeWorkflowGraph,
+  decodeWorkflowMediaCatalog,
+  decodeWorkflowMediaCredits,
+  decodeWorkflowMediaPrice,
+  decodeWorkflowMediaProviders,
+  decodeWorkflowPictureId,
   decodeWorkflowRunDetail,
   decodeWorkflowRunPage,
   decodeWorkflowSaveResult,
@@ -504,32 +531,43 @@ listen(IPC_ENDPOINTS.attachmentImports.importProgress, (value) => {
 
 /**
  * Each file is its own import, so a failed file does not drop the others and can be sent again. A
- * set over the count or size limit stays one import, so main refuses it whole, as before.
+ * set over the count or total size limit stays one import, so main refuses it whole, as before. The
+ * total counts only the files under the file size limit: the files over it do not come.
  */
 async function importFiles(files: File[]): Promise<void> {
   if (files.length === 0) return;
   const serverId = selectedServerId;
-  const overLimit =
-    files.length > INPUT_LIMITS.attachments ||
-    files.reduce((sum, file) => sum + file.size, 0) > ATTACHMENT_LIMITS.totalBytes;
   // A pasted image has no name. It gets one here, so the chip and the server show the same name.
   const named = files.map((file) => ({ file, name: file.name || `pasted-${Date.now()}.png` }));
+  const fits = ({ file }: NamedFile) => file.size <= ATTACHMENT_LIMITS.fileBytes;
+  const fitting = named.filter(fits);
+  const tooLarge = named.filter((file) => !fits(file));
+  const overLimit =
+    files.length > INPUT_LIMITS.attachments ||
+    fitting.reduce((sum, { file }) => sum + file.size, 0) > ATTACHMENT_LIMITS.totalBytes;
   if (overLimit) {
     await runAttachmentImport(crypto.randomUUID(), serverId, named, false);
     return;
   }
-  await Promise.all(named.map((file) => runAttachmentImport(crypto.randomUUID(), serverId, [file], true)));
+  const imports = fitting.map((file) => runAttachmentImport(crypto.randomUUID(), serverId, [file], true));
+  // A retry of a file over the size limit cannot pass, so the file gets no chip: main refuses it, and
+  // the banner says why. The refusal waits for the other files, because a file that lands clears the banner.
+  if (tooLarge.length > 0)
+    imports.push(runAttachmentImport(crypto.randomUUID(), serverId, tooLarge, false, Promise.all(imports)));
+  await Promise.all(imports);
 }
 
 /**
  * `retryable` imports name their files, so the composer shows a chip for each, and keep them for a
- * retry. A set over a limit names none: a retry cannot pass, and the banner says why.
+ * retry. A set over a limit names none: a retry cannot pass, and the banner says why. A failure is
+ * reported after `reportAfter` settles.
  */
 async function runAttachmentImport(
   requestId: string,
   serverId: string,
   named: NamedFile[],
   retryable: boolean,
+  reportAfter: Promise<unknown> = Promise.resolve(),
 ): Promise<void> {
   if (retryable) attachmentImportFiles.set(requestId, { serverId, files: named });
   emitAttachmentImport({
@@ -560,6 +598,7 @@ async function runAttachmentImport(
     attachmentImportFiles.delete(requestId);
     emitAttachmentImport({ type: "completed", requestId, serverId, attachments });
   } catch (error) {
+    await reportAfter;
     emitAttachmentImport({
       type: "error",
       requestId,
@@ -653,7 +692,9 @@ const agentGroup = bridgeGroup(IPC_ENDPOINTS.agent, {
   sendMessage: decodeReceipt,
   setMessageReaction: decodeVoid,
   deleteConversationMessage: decodeVoid,
+  withdrawFeedback: decodeWithdrawFeedbackResult,
   listQueue: decodeQueue,
+  listActiveQueues: decodeActiveQueues,
   listWaits: decodeWaits,
   listPinnedMessages: decodePinnedMessages,
   setMessagePinned: decodePinnedMessages,
@@ -685,6 +726,7 @@ const agentGroup = bridgeGroup(IPC_ENDPOINTS.agent, {
   compactTaskContext: decodeVoid,
   respondToPrompt: decodeVoid,
   respondToApproval: decodeVoid,
+  readPendingApproval: decodePendingApproval,
   respondToBrowserSecret: decodeVoid,
   respondToBrowserTakeover: decodeVoid,
   scopedEvent: decodeScopedAgentEvent,
@@ -758,9 +800,7 @@ const openbotApi: OpenBotDesktopApi = {
     getApprovalAutomation: decodeApprovalAutomationPreference,
     approvalAutomation: decodeApprovalAutomationPreference,
     getBusyMessageModePreference: decodeBusyMessageModePreference,
-    setBusyMessageModePreference: decodeBusyMessageModePreference,
     getAgentDefaults: decodeAgentDefaults,
-    setAgentDefaults: decodeAgentDefaults,
     getAgentMemoryLimitPreference: decodeAgentMemoryLimitPreference,
     agentMemoryLimitPreference: decodeAgentMemoryLimitPreference,
     getAppBehaviorPreference: decodeAppBehaviorPreference,
@@ -805,6 +845,7 @@ const openbotApi: OpenBotDesktopApi = {
     setProviderOn: decodeAgentStatusFromMain,
     restartProvider: decodeAgentStatusFromMain,
     cancelProviderRestart: decodeAgentStatusFromMain,
+    chooseInstalledCli: decodeAgentStatusFromMain,
     updateProviderCli: decodeAgentStatusFromMain,
     setProviderApiKey: decodeAgentStatusFromMain,
     clearProviderApiKey: decodeAgentStatusFromMain,
@@ -812,6 +853,7 @@ const openbotApi: OpenBotDesktopApi = {
     startProviderCodeLogin: decodeProviderCodeLoginStart,
     cancelProviderCodeLogin: decodeAgentStatusFromMain,
     connectProviderAccount: decodeAgentStatusFromMain,
+    connectProviderAccountKey: decodeAgentStatusFromMain,
     cancelProviderAccountSignIn: decodeAgentStatusFromMain,
     renameProviderAccount: decodeAgentStatusFromMain,
     removeProviderAccount: decodeAgentStatusFromMain,
@@ -855,6 +897,7 @@ const openbotApi: OpenBotDesktopApi = {
     performAction: decodeVoid,
     performHaptic: decodeVoid,
     action: decodeDynamicIslandAction,
+    openBrowserTakeover: decodeVoid,
     setInteractive: decodeVoid,
     setInputRegion: decodeVoid,
     setXWayland: decodeVoid,
@@ -891,6 +934,7 @@ const openbotApi: OpenBotDesktopApi = {
     connect: decodeRoutineFlowLink,
     disconnect: decodeVoid,
     updateLink: decodeRoutineFlowLink,
+    stopRun: decodeVoid,
   }),
   workflows: bridgeGroup(IPC_ENDPOINTS.workflows, {
     list: decodeWorkflowSummaries,
@@ -915,6 +959,23 @@ const openbotApi: OpenBotDesktopApi = {
     githubOptions: decodeWorkflowGitHubOptions,
     githubHistory: decodeWorkflowGitHubHistory,
     githubRunLastEvent: decodeWorkflowRunDetail,
+    keepPicture: decodeWorkflowPictureId,
+    mediaProviders: decodeWorkflowMediaProviders,
+    mediaCredits: decodeWorkflowMediaCredits,
+    mediaCatalog: decodeWorkflowMediaCatalog,
+    mediaPrice: decodeWorkflowMediaPrice,
+  }),
+  crm: bridgeGroup(IPC_ENDPOINTS.crm, {
+    overview: decodeCrmOverview,
+    customers: decodeCrmCustomerPage,
+    payments: decodeCrmPaymentPage,
+    activity: decodeCrmActivityPage,
+    apply: decodeCrmApplyResult,
+    sourceConnect: decodeCrmApplyResult,
+    sourceDisconnect: decodeCrmApplyResult,
+    sourceSync: decodeCrmApplyResult,
+    settings: decodeCrmSettings,
+    setSettings: decodeCrmSettings,
   }),
   routineResults: bridgeGroup(IPC_ENDPOINTS.routineResults, {
     options: decodeRoutineResultOptions,
@@ -1100,6 +1161,12 @@ const openbotApi: OpenBotDesktopApi = {
   billing: bridgeGroup(IPC_ENDPOINTS.billing, {
     getState: decodeBillingState,
     openPortal: decodeVoid,
+    buyStorage: decodeBillingState,
+    getDetails: decodeBillingDetails,
+    setDetails: decodeBillingDetails,
+  }),
+  referral: bridgeGroup(IPC_ENDPOINTS.referral, {
+    getState: decodeReferralState,
   }),
   license: bridgeGroup(IPC_ENDPOINTS.license, {
     getState: decodeLicenseState,
@@ -1164,6 +1231,11 @@ const openbotApi: OpenBotDesktopApi = {
     startAccountSignIn: decodeVoid,
     accountSignInStatus: decodeProviderHostSignInStatus,
     cancelAccountSignIn: decodeVoid,
+    connectAccountKey: decodeVoid,
+    startAccountCodeLogin: decodeProviderAccountCodeLoginStart,
+    submitAccountCodeLogin: decodeVoid,
+    accountCodeLoginStatus: decodeProviderAccountCodeLoginStatus,
+    cancelAccountCodeLogin: decodeVoid,
     renameAccount: decodeVoid,
     removeAccount: decodeVoid,
     setAccountPool: decodeVoid,
@@ -1228,6 +1300,7 @@ const openbotApi: OpenBotDesktopApi = {
     answerWhatsAppRequest: decodeVoid,
     setWhatsAppOwnNumber: decodeVoid,
     setWhatsAppWorkingMessage: decodeVoid,
+    setWhatsAppStatusReactions: decodeVoid,
     // A joined server can list up to the Telegram limit; main has already read its states.
     hostOverview: decodeTelegramOverviewReply,
     hostConnect: decodeVoid,
@@ -1252,10 +1325,12 @@ const openbotApi: OpenBotDesktopApi = {
     hostAnswerWhatsAppRequest: decodeVoid,
     hostSetWhatsAppOwnNumber: decodeVoid,
     hostSetWhatsAppWorkingMessage: decodeVoid,
+    hostSetWhatsAppStatusReactions: decodeVoid,
   }),
   hostAdmin: bridgeGroup(IPC_ENDPOINTS.hostAdmin, {
     updateIdentity: decodeServer,
     rotateHostKey: decodeVoid,
+    restartHost: decodeVoid,
     getUpdateStatus: decodeHostUpdateStatus,
     getReleaseStatus: (value) => (value === null ? null : decodeHostReleaseStatusFromMain(value)),
     checkRelease: decodeHostReleaseStatusFromMain,
@@ -1265,6 +1340,8 @@ const openbotApi: OpenBotDesktopApi = {
     setUpdateSettings: decodeHostUpdateStatus,
     getTimezone: decodeHostTimezoneSettings,
     setTimezone: decodeHostTimezoneSettings,
+    getTurnLimits: decodeHostTurnLimits,
+    setTurnLimits: decodeHostTurnLimits,
     getPersonality: decodeHostPersonality,
     setPersonality: decodeHostPersonality,
     getAgentMemoryLimit: decodeHostAgentMemoryLimit,
@@ -1283,6 +1360,8 @@ const openbotApi: OpenBotDesktopApi = {
     setClaudeUserSetup: decodeClaudeUserSetupSetting,
     getClaudeCompactWindow: decodeClaudeCompactWindowSetting,
     setClaudeCompactWindow: decodeClaudeCompactWindowSetting,
+    getProviderEnvironment: decodeProviderEnvironment,
+    setProviderEnvironment: decodeProviderEnvironment,
     getModelVisibility: decodeProviderModelVisibility,
     setModelVisibility: decodeProviderModelVisibility,
     getAgentAccess: decodeAgentAccessSnapshot,
@@ -1307,6 +1386,8 @@ const openbotApi: OpenBotDesktopApi = {
     choose: decodeInstanceTransferPreview,
     apply: decodeInstanceTransferResult,
     discard: decodeVoid,
+    copy: decodeInstanceTransferResult,
+    uploadProgress: decodeInstanceTransferUploadProgress,
   }),
   marketplaceAgents: bridgeGroup(IPC_ENDPOINTS.marketplaceAgents, {
     list: decodeMarketplaceAgentPage,
@@ -1380,6 +1461,7 @@ const openbotApi: OpenBotDesktopApi = {
       openMcpSignInRelay: decodeVoid,
       completeMcpSignInRelay: decodeVoid,
       cancelMcpSignIn: decodeVoid,
+      copyMcpSignInLink: decodeVoid,
       signOutMcpServer: decodeMcpSignInStates,
       listMcpSignIns: decodeMcpSignInStates,
       mcpSignInApp: decodeMcpSignInAppState,
@@ -1392,8 +1474,6 @@ const openbotApi: OpenBotDesktopApi = {
       updateAgentHostSettings: decodeAgentHostSettingsFromMain,
       getAgentBackupModels: decodeAgentBackupModelSettings,
       updateAgentBackupModels: decodeAgentBackupModelSettings,
-      getAgentTaskLimit: decodeAgentTaskLimitSettings,
-      updateAgentTaskLimit: decodeAgentTaskLimitSettings,
       getAgentNewChat: decodeAgentNewChatSettings,
       updateAgentNewChat: decodeAgentNewChatSettings,
       previewAgentTemplate: decodeAgentTemplatePreview,
@@ -1410,6 +1490,9 @@ const openbotApi: OpenBotDesktopApi = {
       deleteBrowserProfile: decodeVoid,
       getAgentBrowserProfile: decodeAgentBrowserProfile,
       updateAgentBrowserProfile: decodeAgentBrowserProfile,
+      getAgentDefaultsOverview: decodeAgentDefaultsOverview,
+      updateAgentDefaultsOverview: decodeAgentDefaultsOverview,
+      setAgentDefaultChoice: decodeAgentDefaultsOverview,
       listBrowserProxies: decodeOptionalBrowserProxyList,
       saveBrowserProxy: decodeBrowserProxySummary,
       deleteBrowserProxy: decodeVoid,
@@ -1422,6 +1505,7 @@ const openbotApi: OpenBotDesktopApi = {
       installAgentSkill: decodeInstalledSkill,
       uninstallAgentSkill: decodeVoid,
       setAgentSkillEnabled: decodeInstalledSkill,
+      readGithubSkills: decodeGithubSkillSourceFromMain,
       addMarketplaceAgent: decodeAddedAgent,
       addTemplateAgent: decodeAddedAgent,
     }),
@@ -1438,6 +1522,7 @@ const openbotApi: OpenBotDesktopApi = {
       previewSharedFile: decodeFilePreview,
       previewWorkspaceFile: decodeFilePreview,
       releaseFilePreview: decodeVoid,
+      addPreviewPage: decodeOptionalFilePreviewPageUrl,
       listWorkspaceDirectory: decodeWorkspaceDirectory,
     }),
     ...agentFoldersGroup,
@@ -1527,6 +1612,7 @@ const openbotApi: OpenBotDesktopApi = {
     test: decodeVoid,
     openSettings: decodeVoid,
     opened: decodeNotificationOpenedEvent,
+    workflowOpened: decodeWorkflowNotificationOpenedEvent,
   }),
   maintenance: bridgeGroup(IPC_ENDPOINTS.maintenance, {
     exportData: decodeExportResult,
@@ -1595,6 +1681,7 @@ const openbotApi: OpenBotDesktopApi = {
     testRoutine: decodeVoid,
     rotateSecret: decodeWebhookSecret,
     setSecret: decodeVoid,
+    giveSecretToAgent: decodeAgentWebhookSecret,
     sendTestEvent: decodeWebhookTestResult,
     listActivity: decodeEventActivity,
     listRoutineRuns: decodeEventRoutineRuns,

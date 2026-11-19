@@ -4,7 +4,9 @@
 // message on its current model, and fails it with the CLI's report of an Anthropic overload (529)
 // when that model is in `failing.json`. A message with `act-then-fail` writes text before it fails.
 // Checks:
-//   1. A turn that wrote text before the error does not move: it fails with its error, as before.
+//   1. A turn that wrote text before the error continues on the backup model, and a thread turn
+//      moves to it too (#8406). So does a WhatsApp conversation turn, and the conversation gets the
+//      backup's answer (#11015). These run after check 5.
 //   2. An agent with no backup models fails with its error, as before.
 //   3. A turn that did nothing yet runs again on the backup model, with a note and no error. The
 //      stand-in, as Claude Code, does not run a uuid again, and history import keeps one request.
@@ -12,6 +14,14 @@
 //   5. After a restart, the agent goes back to its own model, with a note.
 // Also checks continuation after a usage limit interrupts partial work: on a backup, or with no
 // ready backup on the same model when its limit ends (#6660).
+// A spent credit balance moves to a backup with a note that names the spent model and what to do (#7965).
+// A message runs again after its Claude process closed and resumed the saved session, and a message
+// whose uuid the saved session holds runs with a new uuid (#9270).
+// When a usage limit refuses the turn that Claude starts by itself for a background subagent's report,
+// the request that started the subagent continues on the backup with that report. A report that a
+// completed turn read does not make its request run again (#9493). When the plan refuses only the
+// subagent's requests and Claude's own turn then ends with no answer, the request continues on the backup too (#11141).
+// A model that is chosen again while a provider error holds it gets one turn before the agent moves to a backup (#11992).
 // `bun run test:backup-model-failover`. Writes .openbot-build/backup-model-failover-e2e/report.json.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -121,7 +131,50 @@ const turn = (message) => {
   const fails = failing.includes(model);
   const input = JSON.stringify(message);
   const acts = input.includes("act-then-fail");
-  fs.appendFileSync(${JSON.stringify(turnLog)}, JSON.stringify({ model, failed: fails, input }) + "\\n");
+  fs.appendFileSync(${JSON.stringify(turnLog)}, JSON.stringify({ model, failed: fails, input, pid: process.pid }) + "\\n");
+  // The turn starts a background subagent and ends. When the subagent ends, Claude starts a turn by
+  // itself to read its report, and the plan refuses that turn at once (#9493). With "usage-report-read",
+  // that turn reads the report and completes, and the plan refuses a later turn that Claude starts.
+  // With "usage-subagent", the plan refuses the subagent's request, and Claude's own turn ends with no answer
+  // and no refusal of its own (#11141).
+  if ((input.includes("usage-background") || input.includes("usage-report-read") || input.includes("usage-subagent")) && model === ${JSON.stringify(PRIMARY)}) {
+    const callId = "toolu_" + randomUUID().replaceAll("-", "");
+    write({ type: "assistant", message: { id: "msg_" + randomUUID(), type: "message", role: "assistant", model,
+      content: [{ type: "tool_use", id: callId, name: "Agent", input: { description: "Background research", prompt: "Research.", run_in_background: true } }],
+      stop_reason: null, usage: { input_tokens: 1, output_tokens: 1 } }, parent_tool_use_id: null, session_id: sessionId, uuid: randomUUID() });
+    assistant("A helper works in the background.");
+    result({ is_error: false, result: "A helper works in the background." });
+    setTimeout(() => {
+      const limit = "You've hit your limit. Try again later.";
+      if (input.includes("usage-subagent")) {
+        process.stdout.write(JSON.stringify({ type: "assistant", error: "rate_limit", message: { id: "msg_" + randomUUID(), type: "message", role: "assistant", model,
+          content: [{ type: "text", text: "You've hit your 5-hour limit · resets 7:50pm" }], stop_reason: null, usage: { input_tokens: 1, output_tokens: 1 } },
+          parent_tool_use_id: callId, session_id: sessionId, uuid: randomUUID() }) + "\\n");
+        process.stdout.write(JSON.stringify({ type: "system", subtype: "task_notification", task_id: "task-" + callId, tool_use_id: callId,
+          status: "failed", summary: "You've hit your 5-hour limit · resets 7:50pm", session_id: sessionId, uuid: randomUUID() }) + "\\n");
+        fs.appendFileSync(${JSON.stringify(turnLog)}, JSON.stringify({ model, failed: true, input: "background report", pid: process.pid }) + "\\n");
+        assistant("");
+        write({ type: "rate_limit_event", rate_limit_info: { status: "rejected", rateLimitType: "five_hour", resetsAt: Math.floor(Date.now() / 1000) + 3600 },
+          session_id: sessionId, uuid: randomUUID() });
+        result({ is_error: false, result: "" });
+        return;
+      }
+      process.stdout.write(JSON.stringify({ type: "system", subtype: "task_notification", task_id: "task-" + callId, tool_use_id: callId,
+        status: "completed", summary: "Found three sources.", session_id: sessionId, uuid: randomUUID() }) + "\\n");
+      fs.appendFileSync(${JSON.stringify(turnLog)}, JSON.stringify({ model, failed: true, input: "background report", pid: process.pid }) + "\\n");
+      const refuse = () => {
+        write({ type: "assistant", error: "rate_limit", message: { id: "msg_" + randomUUID(), type: "message", role: "assistant", model,
+          content: [{ type: "text", text: limit }], stop_reason: null, usage: { input_tokens: 1, output_tokens: 1 } },
+          parent_tool_use_id: null, session_id: sessionId, uuid: randomUUID() });
+        result({ is_error: true, result: limit });
+      };
+      if (!input.includes("usage-report-read")) return refuse();
+      assistant("Read the report.");
+      result({ is_error: false, result: "Read the report." });
+      setTimeout(refuse, 200);
+    }, 200);
+    return;
+  }
   if ((input.includes("usage-work") || input.includes("usage-chain") || input.includes("usage-exhausted")) &&
       (model === ${JSON.stringify(PRIMARY)} || input.includes("usage-exhausted"))) {
     if (!input.includes("usage-chain-empty")) assistant("Checkpoint saved. Only the final step remains.");
@@ -145,6 +198,14 @@ const turn = (message) => {
 };
 // As in Claude Code, a message whose uuid this process already took does not run, and gets no result (#6676).
 const taken = new Set();
+// Claude Code also skips a uuid that the saved session holds with a reply after it, such as the error
+// reply of a refused turn, and only reports it completed (#9270). This stand-in reads each message
+// of the saved session as answered. "session-holds" acts as a message that an earlier run of
+// OpenBot sent, so the session holds its first uuid. "session-skips" is skipped with each uuid.
+const saved = new Set(previous.map((row) => row.uuid));
+let heldOnce = false;
+const lifecycle = (uuid, state) =>
+  process.stdout.write(JSON.stringify({ type: "command_lifecycle", command_uuid: uuid, state, uuid: randomUUID(), session_id: sessionId }) + "\\n");
 let buffer = "";
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (chunk) => {
@@ -161,7 +222,15 @@ process.stdin.on("data", (chunk) => {
       write({ type: "control_response", response: { subtype: "success", request_id: message.request_id, response: {} } });
     } else if (message.type === "user" && !taken.has(message.uuid)) {
       taken.add(message.uuid);
+      const held = !heldOnce && line.includes("session-holds");
+      if (held) heldOnce = true;
+      if (held || saved.has(message.uuid) || line.includes("session-skips")) {
+        lifecycle(message.uuid, "completed");
+        continue;
+      }
+      lifecycle(message.uuid, "started");
       turn(message);
+      lifecycle(message.uuid, "completed");
     }
   }
 });
@@ -228,7 +297,9 @@ const answer = (request) => {
         }
         if (current.includes("usage-wait")) return;
         if (limited) {
-          const error = { message: "You've hit your usage limit. Try again later.", codexErrorInfo: "usageLimitExceeded" };
+          const error = current.includes("usage-spent")
+            ? { message: "Your credit balance is too low to continue.", codexErrorInfo: "usageLimitExceeded" }
+            : { message: "You've hit your usage limit. Try again later.", codexErrorInfo: "usageLimitExceeded" };
           turn.error = error;
           write({ method: "error", params: { threadId: thread.id, turnId: turn.id, error, willRetry: false } });
           finish("failed");
@@ -283,6 +354,7 @@ class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
   /** The provider thread of the last turn that started. */
   lastThread: string | null = null;
   readonly toolAnswers = new Map<RequestId, unknown>();
+  readonly #started = new Set<string>();
 
   constructor(cli: ClaudeCliInfo) {
     super();
@@ -338,6 +410,15 @@ class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
             ],
           }),
         );
+      case "turn/start": {
+        const messageId = isDynamicRecord(params) ? params.clientUserMessageId : undefined;
+        const again = typeof messageId === "string" && this.#started.has(messageId);
+        if (typeof messageId === "string") this.#started.add(messageId);
+        if (!again || !closeBeforeRunAgain) return this.#real.request(method, params, decoder, timeoutMs);
+        return this.#real
+          .releaseIdleThreads()
+          .pipe(Effect.andThen(this.#real.request(method, params, decoder, timeoutMs)));
+      }
       default:
         return this.#real.request(method, params, decoder, timeoutMs);
     }
@@ -410,7 +491,7 @@ async function waitFor<T>(label: string, read: () => T | null | undefined | fals
   }
 }
 
-function turns(): { model: string; failed: boolean; input: string }[] {
+function turns(): { model: string; failed: boolean; input: string; pid: number }[] {
   try {
     return readFileSync(turnLog, "utf8")
       .split("\n")
@@ -422,6 +503,9 @@ function turns(): { model: string; failed: boolean; input: string }[] {
 }
 
 const failing = (models: string[]) => writeFileSync(failingFile, JSON.stringify(models));
+
+/** Closes the idle Claude processes before a message runs again, as the 5-minute idle close does (#9270). */
+let closeBeforeRunAgain = false;
 
 function readLog<T>(path: string): T[] {
   try {
@@ -593,8 +677,16 @@ async function verifyHistoryKeepsRequests(agentId: string) {
       quietRoutineDelivery: () => false,
     }),
   );
-  assert.ok(imported.turns > 0, "The provider's saved transcript was read and imported.");
+  // The boot backfill of the last restart runs in the background and can import the newest turns
+  // first. Then this import finds no new turn, so the backfill's complete import also counts.
+  assert.ok(
+    imported.turns > 0 || database.providerHistoryImport(session.id)?.state === "complete",
+    "The provider's saved transcript was read and imported.",
+  );
   assert.deepEqual(users(), before, "History import keeps one user request after independent continuation turn IDs.");
+  // Each request to this agent has its own text, so a copy from either import shows here.
+  const texts = users().map((message) => message.text);
+  assert.equal(new Set(texts).size, texts.length, "History import adds no second copy of a user request.");
 }
 
 try {
@@ -631,15 +723,6 @@ try {
     }),
   );
   failing([PRIMARY]);
-
-  await check("a turn that wrote text does not move", async () => {
-    const since = events.length;
-    const outcome = await send(mover.id, "act-then-fail");
-    assert.equal(outcome.status, "failed", "The turn fails.");
-    assert.equal(agentOf(mover.id).model, PRIMARY, "The agent stays on its own model.");
-    assert.ok(errorsFor(mover.id, since).length > 0, "The error shows.");
-    return outcome;
-  });
 
   await check("an agent with no backup models fails as before", async () => {
     const since = events.length;
@@ -705,6 +788,145 @@ try {
     const notes = await markers(mover.id, MODEL_SWITCH_ITEM_TYPES["provider-error-ended"]);
     assert.deepEqual(notes, [sourceText("status.agent.modelReturnedAfterError", { model: modelName(PRIMARY) })]);
     return { notes };
+  });
+
+  // A new agent for each check, made while no model fails. The restart ends the hold on the own model.
+  const withBackup = async (name: string) => {
+    const agent = await create(name);
+    await waitFor(`the first turn of ${name} to end`, () =>
+      service.listQueue(agent.id).deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    await runCauseEffect(
+      service.updateAgent({
+        agentId: agent.id,
+        backupModels: { automatic: true, order: [{ provider: "claude", model: BACKUP }] },
+      }),
+    );
+    return agent;
+  };
+
+  await check("a turn that wrote text continues on the backup model", async () => {
+    const continuer = await withBackup("Continuer");
+    failing([PRIMARY]);
+    const since = events.length;
+    const before = turns().length;
+    const outcome = await send(continuer.id, "act-then-fail");
+    assert.equal(outcome.status, "completed", `The message completes: ${outcome.error}`);
+    const ran = turns().slice(before);
+    assert.deepEqual(
+      ran.map((turn) => turn.model),
+      [PRIMARY, BACKUP],
+      "The message ran on the own model, then on the backup.",
+    );
+    assert.ok(ran[1]?.input.includes("Continue the unfinished task"), "The backup continues the work.");
+    assert.equal(agentOf(continuer.id).model, BACKUP, "The agent is on the backup model.");
+    assert.deepEqual(errorsFor(continuer.id, since), [], "No error shows for the moved turn.");
+    const shown = (await runCauseEffect(service.readConversation(continuer.id))).messages
+      .filter((message) => message.text.trim())
+      .slice(-4)
+      .map((message) => message.text);
+    assert.deepEqual(
+      shown,
+      [
+        "act-then-fail",
+        "Partial answer.",
+        sourceText("status.agent.modelSwitchedForError", { model: modelName(BACKUP) }),
+        "Done.",
+      ],
+      "The chat shows the stopped text, the switch and then the backup's answer.",
+    );
+    failing([]);
+    await restart();
+    return { ran: ran.map((turn) => turn.model), shown };
+  });
+
+  await check("a thread turn moves to the backup model", async () => {
+    const threader = await withBackup("Threader");
+    failing([PRIMARY]);
+    const before = turns().length;
+    const task = await runCauseEffect(service.startTask({ agentId: threader.id, text: "work" }));
+    await waitFor("the thread to complete on the backup", () =>
+      service.readTask(threader.id, task.id).messages.some((message) => message.text === "Done."),
+    );
+    const ran = turns()
+      .slice(before)
+      .map((turn) => turn.model);
+    assert.deepEqual(ran, [PRIMARY, BACKUP], "The thread ran on the own model, then on the backup.");
+    assert.equal(agentOf(threader.id).model, BACKUP, "The agent is on the backup model.");
+    failing([]);
+    await restart();
+    return { taskId: task.id, ran };
+  });
+
+  await check("a WhatsApp conversation turn moves to the backup model", async () => {
+    const replier = await withBackup("Replier");
+    failing([PRIMARY]);
+    const since = events.length;
+    const before = turns().length;
+    const ends: { status: string; answer: string | null }[] = [];
+    const stopListening = service.messaging.onActivity((activity) => {
+      if (activity.type === "finished" && activity.link.platformChannelId === "failover@g.us")
+        ends.push({ status: activity.status, answer: activity.answer });
+    });
+    try {
+      const connection = service.messaging.store.ensureConnection("whatsapp", "48100000000", "Phone");
+      service.messaging.store.updateConnection(connection.connectionId, { enabled: true });
+      const received = await runCauseEffect(
+        service.messaging.receive({
+          connectionId: connection.connectionId,
+          agentId: replier.id,
+          platformChannelId: "failover@g.us",
+          threadKey: "failover",
+          isDirect: false,
+          title: "Group",
+          text: "work",
+          sourcePaths: [],
+          origin: { authorId: "48200000000", authorName: "Client", platformMessageId: "failover-message" },
+          idempotencyKey: "whatsapp:failover",
+        }),
+      );
+      assert.equal(received.status, "queued");
+      const linkId = received.status === "queued" ? received.link.linkId : "";
+      await waitFor("the conversation's request to end", () => ends.length > 0);
+      await waitFor(
+        "the conversation's requests to settle",
+        () => mailbox.unresolvedMessagingDeliveries(linkId).length === 0,
+      );
+    } finally {
+      stopListening();
+    }
+    const ran = turns()
+      .slice(before)
+      .map((turn) => turn.model);
+    assert.deepEqual(ran, [PRIMARY, BACKUP], "The message ran on the own model, then on the backup.");
+    assert.deepEqual(ends, [{ status: "completed", answer: "Done." }], "The conversation gets the backup's answer.");
+    assert.equal(agentOf(replier.id).model, BACKUP, "The agent is on the backup model.");
+    assert.deepEqual(errorsFor(replier.id, since), [], "No error shows for the moved turn.");
+    failing([]);
+    await restart();
+    return { ran, ends };
+  });
+
+  await check("a thread turn that wrote text continues on the backup model", async () => {
+    const threader = await withBackup("Weaver");
+    failing([PRIMARY]);
+    const before = turns().length;
+    const task = await runCauseEffect(service.startTask({ agentId: threader.id, text: "act-then-fail" }));
+    await waitFor("the thread with work to complete on the backup", () =>
+      service.readTask(threader.id, task.id).messages.some((message) => message.text === "Done."),
+    );
+    const order = () =>
+      service
+        .readTask(threader.id, task.id)
+        .messages.filter((message) => message.author !== "system" && message.text.trim())
+        .map((message) => message.text);
+    const expected = ["act-then-fail", "Partial answer.", "Done."];
+    assert.deepEqual(order(), expected, "The thread shows the stopped text, then the backup's answer.");
+    assert.ok(turns().slice(before).at(-1)?.input.includes("Continue the unfinished task"));
+    failing([]);
+    await restart();
+    assert.deepEqual(order(), expected, "The thread keeps the order after a restart.");
+    return { taskId: task.id, order: order() };
   });
 
   await check("a usage limit after partial work continues on the backup", async () => {
@@ -797,6 +1019,26 @@ try {
       return { outcome, backups: backups.map((turn) => turn.model), checkpoint: mode };
     });
   }
+
+  await check("a spent balance names the model it left and what to do", async () => {
+    await restart();
+    const agent = await createCodex("Spent balance", automaticBackups);
+    const outcome = await send(agent.id, "usage-spent case:spent");
+    assert.equal(outcome.status, "completed", `The task completes on its backup: ${outcome.error}`);
+    const moved = agentOf(agent.id);
+    assert.equal(moved.provider, "claude", "The agent is on its backup model.");
+    assert.equal(moved.usageLimitReturn ?? null, null, "The agent does not go back to a spent balance by itself.");
+    const spent =
+      service.listModels().find((option) => option.provider === "codex" && option.id === CODEX_MODEL)?.name ??
+      CODEX_MODEL;
+    const notes = await markers(agent.id, MODEL_SWITCH_ITEM_TYPES["provider-error"]);
+    assert.deepEqual(
+      notes,
+      [sourceText("status.agent.modelSwitchedForSpentBalance", { previous: spent, model: modelName(moved.model) })],
+      "The note names the spent model, the backup, and what to do.",
+    );
+    return { notes };
+  });
 
   await check("without a backup, partial work waits and continues when the limit ends", async () => {
     await restart();
@@ -1051,6 +1293,229 @@ try {
       return outcome;
     });
   }
+
+  await check("a message runs again after its Claude process closed", async () => {
+    await restart();
+    const agent = await create("Reopened");
+    await waitFor("the first turn to end", () =>
+      service.listQueue(agent.id).deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    await runCauseEffect(
+      service.updateAgent({
+        agentId: agent.id,
+        backupModels: { automatic: true, order: [{ provider: "claude", model: BACKUP }] },
+      }),
+    );
+    failing([PRIMARY]);
+    closeBeforeRunAgain = true;
+    const before = turns().length;
+    const outcome = await send(agent.id, "work after close");
+    closeBeforeRunAgain = false;
+    failing([]);
+    assert.equal(outcome.status, "completed", `The message completes: ${outcome.error}`);
+    const ran = turns().slice(before);
+    assert.deepEqual(
+      ran.map((turn) => turn.model),
+      [PRIMARY, BACKUP],
+    );
+    assert.notEqual(ran[0]?.pid, ran[1]?.pid, "The message ran again in a new process that resumed the session.");
+    await verifyHistoryKeepsRequests(agent.id);
+    return { ran };
+  });
+
+  await check("a message whose uuid the saved session holds runs with a new uuid", async () => {
+    const agent = await create("Holder");
+    await waitFor("the first turn to end", () =>
+      service.listQueue(agent.id).deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    const before = turns().length;
+    const outcome = await send(agent.id, "session-holds");
+    assert.equal(outcome.status, "completed", `The message completes: ${outcome.error}`);
+    assert.equal(turns().length, before + 1, "The message runs once.");
+    await verifyHistoryKeepsRequests(agent.id);
+    return outcome;
+  });
+
+  await check("a message that Claude skips with each uuid fails with a reason", async () => {
+    const agent = await create("Skipper");
+    await waitFor("the first turn to end", () =>
+      service.listQueue(agent.id).deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    const before = turns().length;
+    const outcome = await send(agent.id, "session-skips");
+    assert.equal(outcome.status, "failed", "The turn ends.");
+    assert.equal(outcome.error, sourceText("error.provider.acpNoAnswer", { provider: "Claude" }));
+    assert.equal(turns().length, before, "The message did not run.");
+    return outcome;
+  });
+
+  await check("a usage limit after Claude read a subagent report runs nothing again", async () => {
+    await restart();
+    const agent = await create("Reader");
+    await waitFor("the first turn to end", () =>
+      service.listQueue(agent.id).deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    await runCauseEffect(
+      service.updateAgent({
+        agentId: agent.id,
+        backupModels: { automatic: true, order: [{ provider: "claude", model: BACKUP }] },
+      }),
+    );
+    const since = events.length;
+    const before = turns().length;
+    const outcome = await send(agent.id, "usage-report-read: research in the background, then report.");
+    assert.equal(outcome.status, "completed", "The request that starts the subagent completes.");
+    await waitFor("the limit to hold the agent", () =>
+      events.slice(since).some((event) => event.type === "usage-limit-reached"),
+    );
+    assert.equal(
+      mailbox.getDelivery(outcome.deliveryId)?.delivery.status,
+      "completed",
+      "The request whose report a turn read does not go back to the queue.",
+    );
+    assert.ok(
+      turns()
+        .slice(before)
+        .every((turn) => turn.model === PRIMARY),
+      "Nothing runs on the backup.",
+    );
+    return {
+      models: turns()
+        .slice(before)
+        .map((turn) => turn.model),
+    };
+  });
+
+  await check("a usage limit on Claude's own turn for a subagent report continues on the backup", async () => {
+    await restart();
+    const agent = await create("Lead");
+    await waitFor("the first turn to end", () =>
+      service.listQueue(agent.id).deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    await runCauseEffect(
+      service.updateAgent({
+        agentId: agent.id,
+        backupModels: { automatic: true, order: [{ provider: "claude", model: BACKUP }] },
+      }),
+    );
+    const since = events.length;
+    const before = turns().length;
+    const outcome = await send(agent.id, "usage-background: research in the background, then report.");
+    assert.equal(outcome.status, "completed", "The request that starts the subagent completes.");
+    const continued = await waitFor("the request to continue on the backup", () =>
+      turns()
+        .slice(before)
+        .find((turn) => turn.model === BACKUP),
+    );
+    assert.ok(continued.input.includes("Continue the unfinished task"), "The backup gets a continuation request.");
+    assert.ok(
+      continued.input.includes('Background subagent \\"Background research\\" completed: Found three sources.'),
+      "The backup gets the subagent's report.",
+    );
+    assert.ok(continued.input.includes("usage-background"), "The backup gets the original request.");
+    await waitFor(
+      "the continuation to end",
+      () => mailbox.getDelivery(outcome.deliveryId)?.delivery.status === "completed",
+    );
+    assert.deepEqual(
+      turns()
+        .slice(before)
+        .map((turn) => turn.model),
+      [PRIMARY, PRIMARY, BACKUP],
+      "The request ran, Claude's own turn was refused, and the backup continued.",
+    );
+    assert.equal(agentOf(agent.id).model, BACKUP, "The agent is on its backup model.");
+    const notes = await markers(agent.id, MODEL_SWITCH_ITEM_TYPES["usage-limit"]);
+    assert.equal(notes.length, 1, "The chat says that the agent switched.");
+    assert.deepEqual(errorsFor(agent.id, since), [], "No error shows.");
+    return {
+      models: turns()
+        .slice(before)
+        .map((turn) => turn.model),
+      notes,
+    };
+  });
+
+  await check("a usage limit that refuses only a background subagent continues on the backup", async () => {
+    await restart();
+    const agent = await create("Lead");
+    await waitFor("the first turn to end", () =>
+      service.listQueue(agent.id).deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    await runCauseEffect(
+      service.updateAgent({
+        agentId: agent.id,
+        backupModels: { automatic: true, order: [{ provider: "claude", model: BACKUP }] },
+      }),
+    );
+    const since = events.length;
+    const before = turns().length;
+    const outcome = await send(agent.id, "usage-subagent: research in the background, then report.");
+    assert.equal(outcome.status, "completed", "The request that starts the subagent completes.");
+    const continued = await waitFor("the request to continue on the backup", () =>
+      turns()
+        .slice(before)
+        .find((turn) => turn.model === BACKUP),
+    );
+    assert.ok(continued.input.includes("Continue the unfinished task"), "The backup gets a continuation request.");
+    assert.ok(
+      continued.input.includes('Background subagent \\"Background research\\" failed'),
+      "The backup gets the subagent's failure.",
+    );
+    assert.ok(continued.input.includes("usage-subagent"), "The backup gets the original request.");
+    await waitFor(
+      "the continuation to end",
+      () => mailbox.getDelivery(outcome.deliveryId)?.delivery.status === "completed",
+    );
+    assert.equal(agentOf(agent.id).model, BACKUP, "The agent is on its backup model.");
+    const notes = await markers(agent.id, MODEL_SWITCH_ITEM_TYPES["usage-limit"]);
+    assert.equal(notes.length, 1, "The chat says that the agent switched.");
+    assert.deepEqual(errorsFor(agent.id, since), [], "No error shows.");
+    return {
+      models: turns()
+        .slice(before)
+        .map((turn) => turn.model),
+      notes,
+    };
+  });
+
+  await check("a model chosen again during a provider error hold gets one try", async () => {
+    await restart();
+    const chooser = await withBackup("Chooser");
+    failing([PRIMARY]);
+    const moved = await send(chooser.id, "work");
+    assert.equal(moved.status, "completed", `The message completes: ${moved.error}`);
+    assert.equal(agentOf(chooser.id).model, BACKUP, "The provider error moved the agent to its backup.");
+    const choose = () =>
+      runCauseEffect(service.updateAgent({ agentId: chooser.id, provider: "claude", model: PRIMARY }));
+
+    // The chosen model still fails: it gets one turn, and the agent moves to the backup again.
+    await choose();
+    let before = turns().length;
+    const failedTry = await send(chooser.id, "try the chosen model");
+    assert.equal(failedTry.status, "completed", `The message completes: ${failedTry.error}`);
+    const failedModels = turns()
+      .slice(before)
+      .map((turn) => turn.model);
+    assert.deepEqual(failedModels, [PRIMARY, BACKUP], "The chosen model gets one try, then the backup answers.");
+    assert.equal(agentOf(chooser.id).model, BACKUP, "The agent is on its backup again.");
+    assert.equal(agentOf(chooser.id).usageLimitReturn?.model, PRIMARY, "The agent keeps its own model to go back to.");
+
+    // The chosen model works again before the hold ends: the message runs on it and the agent stays (#11992).
+    failing([]);
+    await choose();
+    before = turns().length;
+    const worked = await send(chooser.id, "use the chosen model");
+    assert.equal(worked.status, "completed", `The message completes: ${worked.error}`);
+    const workedModels = turns()
+      .slice(before)
+      .map((turn) => turn.model);
+    assert.deepEqual(workedModels, [PRIMARY], "The message runs on the chosen model.");
+    const agent = agentOf(chooser.id);
+    assert.equal(agent.model, PRIMARY, "The agent stays on the chosen model.");
+    assert.equal(agent.usageLimitReturn, undefined, "Nothing is left to go back to.");
+    return { failedModels, workedModels };
+  });
 
   report.passed = true;
 } catch (error) {

@@ -17,7 +17,8 @@ export interface ChatColorPreset {
   label: AppTextKey;
 }
 
-const PRESET_LABELS = {
+/** The color name of each chat color preset hue. */
+export const CHAT_COLOR_PRESET_LABELS = {
   red: "agent.color.red",
   orange: "agent.color.orange",
   yellow: "agent.color.yellow",
@@ -33,7 +34,7 @@ const PRESET_LABELS = {
 
 export const CHAT_COLOR_PRESETS: readonly ChatColorPreset[] = CHAT_COLORS.map((preset) => ({
   value: preset.value,
-  label: PRESET_LABELS[preset.id],
+  label: CHAT_COLOR_PRESET_LABELS[preset.id],
 }));
 
 /** Earlier versions offered the agent colors as presets. A saved one keeps its name. */

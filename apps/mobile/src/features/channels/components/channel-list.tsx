@@ -21,7 +21,7 @@ import {
   useMobileWorkspaceReader,
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
-import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
+import { canToggleChatPin } from "@/features/workspace/model/agent-pins";
 import { showsOnline } from "@/features/workspace/model/server-status";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { type MenuAction, type MenuComponentRef, MenuView } from "@/shared/components/menu-view";
@@ -39,7 +39,7 @@ function useChannelMenuActions(channel: ChannelSummary, serverId: string) {
   const sectionMenu = useChatSectionMenu(serverId, channel.id);
   const isPinned = useMobileWorkspaceSelector(({ pinnedChannelIds }) => pinnedChannelIds.includes(channel.id));
   const canPin = useMobileWorkspaceSelector(({ pinnedAgentIds, pinnedChannelIds }) =>
-    canToggleAgentPin([...pinnedAgentIds, ...pinnedChannelIds], channel.id),
+    canToggleChatPin(pinnedAgentIds, pinnedChannelIds, channel.id),
   );
   const online = useMobileWorkspaceSelector(({ servers }) =>
     servers.some((server) => server.id === serverId && showsOnline(server)),
@@ -48,6 +48,8 @@ function useChannelMenuActions(channel: ChannelSummary, serverId: string) {
     ({ servers }) => servers.find((server) => server.id === serverId)?.role === "member",
   );
   const canDelete = online && !isMember && !channel.archived;
+  // The host refuses to delete a channel while a task runs there: the user stops it first.
+  const deleteBlocked = channel.activeTasks > 0;
   const deleting = useRef(false);
   const handlePin = (withHaptic = true) => toggleChannelPinAnimated(channel, serverId, { haptic: withHaptic });
   const handleHide = () => {
@@ -90,7 +92,18 @@ function useChannelMenuActions(channel: ChannelSummary, serverId: string) {
         },
       },
     ]);
-  return { isPinned, canPin, canDelete, sectionMenu, handlePin, handleHide, handleInfo, handleCopyId, handleDelete };
+  return {
+    isPinned,
+    canPin,
+    canDelete,
+    deleteBlocked,
+    sectionMenu,
+    handlePin,
+    handleHide,
+    handleInfo,
+    handleCopyId,
+    handleDelete,
+  };
 }
 
 /** The chat link of a channel on iOS, with its context menu. Android uses `ChannelAndroidMenu`. */
@@ -104,8 +117,18 @@ function ChannelContextMenuLink({
   children: ReactNode;
 }) {
   const { t } = useText();
-  const { isPinned, canPin, canDelete, sectionMenu, handlePin, handleHide, handleInfo, handleCopyId, handleDelete } =
-    useChannelMenuActions(channel, serverId);
+  const {
+    isPinned,
+    canPin,
+    canDelete,
+    deleteBlocked,
+    sectionMenu,
+    handlePin,
+    handleHide,
+    handleInfo,
+    handleCopyId,
+    handleDelete,
+  } = useChannelMenuActions(channel, serverId);
   return (
     <Link href={{ pathname: "/channel/[channelId]", params: { channelId: channel.id, serverId } }} asChild>
       <Link.Trigger>{children}</Link.Trigger>
@@ -130,7 +153,7 @@ function ChannelContextMenuLink({
             {t("mobile.agent.menu.copyId")}
           </Link.MenuAction>
           {canDelete ? (
-            <Link.MenuAction destructive icon="trash" onPress={handleDelete}>
+            <Link.MenuAction destructive icon="trash" disabled={deleteBlocked} onPress={handleDelete}>
               {t("common.delete")}
             </Link.MenuAction>
           ) : null}
@@ -180,8 +203,18 @@ function OpenChannelMenu({
   useEffect(() => {
     menu.current?.show();
   }, []);
-  const { isPinned, canPin, canDelete, sectionMenu, handlePin, handleHide, handleInfo, handleCopyId, handleDelete } =
-    useChannelMenuActions(channel, serverId);
+  const {
+    isPinned,
+    canPin,
+    canDelete,
+    deleteBlocked,
+    sectionMenu,
+    handlePin,
+    handleHide,
+    handleInfo,
+    handleCopyId,
+    handleDelete,
+  } = useChannelMenuActions(channel, serverId);
   const actions: MenuAction[] = [
     {
       id: "pin",
@@ -202,7 +235,7 @@ function OpenChannelMenu({
           id: "delete",
           title: t("common.delete"),
           image: "trash",
-          attributes: { destructive: true, hidden: !canDelete },
+          attributes: { destructive: true, hidden: !canDelete, disabled: deleteBlocked },
         },
       ],
     },
@@ -254,7 +287,7 @@ export const ChannelListRow = memo(function ChannelListRow({
   const { toggleChannelPinAnimated } = useAgentPinTransition();
   const isPinned = useMobileWorkspaceSelector(({ pinnedChannelIds }) => pinnedChannelIds.includes(channel.id));
   const pinBlocked = useMobileWorkspaceSelector(
-    ({ pinnedAgentIds, pinnedChannelIds }) => !canToggleAgentPin([...pinnedAgentIds, ...pinnedChannelIds], channel.id),
+    ({ pinnedAgentIds, pinnedChannelIds }) => !canToggleChatPin(pinnedAgentIds, pinnedChannelIds, channel.id),
   );
   const disconnected = useMobileWorkspaceSelector(
     ({ servers }) => !servers.some((server) => server.id === serverId && showsOnline(server)),

@@ -188,6 +188,7 @@ const ingress: MessagingIngress = {
   telegram: { available: () => false, call: unused, download: unused, upload: unused },
   reconnect: () => {},
   onDiscordRoutes: () => () => {},
+  onLinkedRoutes: () => () => {},
   discord: (request, decode) => {
     hostRequests.push(request);
     const decoded = decodeDiscordApiRequest(JSON.parse(JSON.stringify(request)));

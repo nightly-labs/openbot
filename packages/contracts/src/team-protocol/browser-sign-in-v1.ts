@@ -52,6 +52,8 @@ const importRequest: AdminDecoder = (input) => {
   return fields({ tabId: identifier, cookies: list(cookie, 150) })(input);
 };
 const importResponse = fields({ cookies: count });
+/** The cookie codec of this wire. `browser-sign-in-storage-v1` sends the same cookies. */
+export const browserSignInCookieCodec = cookie;
 
 export const BROWSER_SIGN_IN_CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   [BROWSER_SIGN_IN_ROUTES.import, adminRoute(importRequest, importResponse)],

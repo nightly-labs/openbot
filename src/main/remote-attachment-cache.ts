@@ -1,3 +1,4 @@
+import { playableMediaKind } from "@openbot/contracts/attachment-files";
 import { Deferred, Effect, Semaphore } from "effect";
 import type { RemoteWorkflowError } from "./remote-service-effects";
 
@@ -10,12 +11,54 @@ import type { RemoteWorkflowError } from "./remote-service-effects";
 
 const REMOTE_ATTACHMENT_CACHE_BYTES = 64 * 1024 * 1024;
 const REMOTE_ATTACHMENT_CACHE_ENTRY_BYTES = 16 * 1024 * 1024;
+// A video or audio file that plays in the chat can use the whole budget. Its player asks for the file
+// again from each byte offset, and each miss downloads the whole file from the host again (#8521).
+const REMOTE_ATTACHMENT_CACHE_MEDIA_BYTES = REMOTE_ATTACHMENT_CACHE_BYTES;
+
+/**
+ * True for a video or audio preview that the cache keeps, so that each byte range request of its player
+ * reads the cache. A larger file, or a file of another type, gets the whole file for each request as before:
+ * a range answer would make the player ask again many times, and each request would download the file again.
+ */
+export function canAnswerRemoteRanges(attachment: RemoteAttachment): boolean {
+  return (
+    playableMediaKind(attachment.mimeType) !== null &&
+    attachment.bytes.byteLength <= REMOTE_ATTACHMENT_CACHE_MEDIA_BYTES
+  );
+}
 const REMOTE_ATTACHMENT_CACHE_TTL_MS = 10 * 60_000;
 // Previews that download at the same time from one server. The host answers a download only after its
 // last byte, and all transfers share one ordered data channel. Eight gallery images that started
 // together showed nothing until all of them arrived. Two images of 1.5 MB also stay under the channel's
 // 4 MB send buffer, where the host stops and sends again from the last acknowledgement.
 const REMOTE_ATTACHMENT_PREVIEWS_PER_SERVER = 2;
+
+/** The limits of one cache. The defaults are those of the files that a chat shows. */
+export interface RemoteAttachmentCacheLimits {
+  /** The bytes that the cache holds. */
+  bytes: number;
+  /** How long a copy stays. */
+  ttlMs: number;
+  /** The previews that download at the same time from one server. */
+  previewsPerServer: number;
+}
+
+const FILE_LIMITS: RemoteAttachmentCacheLimits = {
+  bytes: REMOTE_ATTACHMENT_CACHE_BYTES,
+  ttlMs: REMOTE_ATTACHMENT_CACHE_TTL_MS,
+  previewsPerServer: REMOTE_ATTACHMENT_PREVIEWS_PER_SERVER,
+};
+
+/**
+ * The limits of the small copies of pictures (`attachment-preview-v1`). A copy is at most about 150
+ * KB, and the host sends a file with no copy only when it is at most 256 KB, so six can download
+ * together and stay far under the channel's send buffer. 48 MB holds some hundreds of them. They stay for an hour: a canvas that the user opens again shows at once.
+ */
+export const REMOTE_ATTACHMENT_PREVIEW_LIMITS: RemoteAttachmentCacheLimits = {
+  bytes: 48 * 1024 * 1024,
+  ttlMs: 60 * 60_000,
+  previewsPerServer: 6,
+};
 
 /** The user stopped the download. The open or the save that waited for it does nothing. */
 export class AttachmentDownloadStopped extends Error {
@@ -49,10 +92,12 @@ export class RemoteAttachmentCache {
   readonly #generations = new Map<string, number>();
   #epoch = 0;
   readonly #now: () => number;
+  readonly #limits: RemoteAttachmentCacheLimits;
   #bytes = 0;
 
-  constructor(now: () => number = Date.now) {
+  constructor(now: () => number = Date.now, limits: RemoteAttachmentCacheLimits = FILE_LIMITS) {
     this.#now = now;
+    this.#limits = limits;
   }
 
   readonly get = Effect.fn("RemoteAttachments.get")(function* (
@@ -81,7 +126,7 @@ export class RemoteAttachmentCache {
     return yield* transfer.pipe(
       Effect.tap((attachment) =>
         Effect.sync(() => {
-          if (this.#generation(serverId) === generation) this.#store(key, serverId, attachment);
+          if (this.#generation(serverId) === generation) this.#store(key, serverId, attachment, preview);
         }),
       ),
       Effect.onExit((exit) => Deferred.done(request, exit)),
@@ -92,6 +137,19 @@ export class RemoteAttachmentCache {
       ),
     );
   });
+
+  /**
+   * Keeps the bytes of a file that this computer sends to the host, so its preview does not download
+   * the same bytes back. Call it before the upload starts: a `forget` or a `clear` during the upload
+   * drops the bytes, as it drops a download that started before it.
+   */
+  holdUpload(serverId: string): (attachmentId: string, attachment: RemoteAttachment) => void {
+    const generation = this.#generation(serverId);
+    return (attachmentId, attachment) => {
+      if (this.#generation(serverId) === generation)
+        this.#store(JSON.stringify([serverId, attachmentId]), serverId, attachment);
+    };
+  }
 
   forget(serverId: string): void {
     this.#generations.set(serverId, (this.#generations.get(serverId) ?? 0) + 1);
@@ -110,7 +168,7 @@ export class RemoteAttachmentCache {
   #downloadPermits(serverId: string): Semaphore.Semaphore {
     let permits = this.#downloads.get(serverId);
     if (!permits) {
-      permits = Semaphore.makeUnsafe(REMOTE_ATTACHMENT_PREVIEWS_PER_SERVER);
+      permits = Semaphore.makeUnsafe(this.#limits.previewsPerServer);
       this.#downloads.set(serverId, permits);
     }
     return permits;
@@ -123,18 +181,17 @@ export class RemoteAttachmentCache {
   // A use moves an entry to the end without a new `storedAt`, so an expired entry can be anywhere.
   #removeExpired(): void {
     const now = this.#now();
-    for (const [key, entry] of this.#entries)
-      if (now - entry.storedAt >= REMOTE_ATTACHMENT_CACHE_TTL_MS) this.#delete(key, entry);
+    for (const [key, entry] of this.#entries) if (now - entry.storedAt >= this.#limits.ttlMs) this.#delete(key, entry);
   }
 
-  #store(key: string, serverId: string, attachment: RemoteAttachment): void {
+  #store(key: string, serverId: string, attachment: RemoteAttachment, preview = false): void {
     const size = attachment.bytes.byteLength;
-    if (size > REMOTE_ATTACHMENT_CACHE_ENTRY_BYTES) return;
+    if (size > REMOTE_ATTACHMENT_CACHE_ENTRY_BYTES && !(preview && canAnswerRemoteRanges(attachment))) return;
     this.#removeExpired();
     const previous = this.#entries.get(key);
     if (previous) this.#delete(key, previous);
     for (const [oldestKey, oldest] of this.#entries) {
-      if (this.#bytes + size <= REMOTE_ATTACHMENT_CACHE_BYTES) break;
+      if (this.#bytes + size <= this.#limits.bytes) break;
       this.#delete(oldestKey, oldest);
     }
     this.#entries.set(key, { serverId, attachment, storedAt: this.#now() });

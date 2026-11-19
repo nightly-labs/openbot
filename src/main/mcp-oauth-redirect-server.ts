@@ -17,16 +17,23 @@
  * not. When another program holds that port, the operating system gives one, and the registration
  * is remade when the stored one names another address.
  *
- * The grant travels no further than this process. The page the browser is left on says only that
- * the window can be closed - the code is in the request line, and a page that repeated it would
- * put a credential in the browser's history.
+ * The grant travels no further than this process. The page the browser is left on says only whether
+ * the sign-in was saved - the code is in the request line or the posted form, and a page that
+ * repeated it would put a credential in the browser's history.
  */
 
+import { MCP_OAUTH_CALLBACK_PATH } from "../backend/mcp-oauth-provider";
 import type { LanguageService } from "./language-service";
 import { type CallbackAnswer, startLoopbackCallbackServer } from "./loopback-callback-server";
 
-/** The one path this listener answers. Everything else is a 404, including `/`. */
-export const MCP_OAUTH_REDIRECT_PATH = "/mcp-auth";
+/** The path that a sign-in registers first. */
+const MCP_OAUTH_REDIRECT_PATH = "/mcp-auth";
+
+/**
+ * The paths this listener answers. Everything else is a 404, including `/`. A server that refuses
+ * `/mcp-auth` gets the `/callback` form (`MCP_OAUTH_CALLBACK_PATH`).
+ */
+export const MCP_OAUTH_REDIRECT_PATHS = [MCP_OAUTH_REDIRECT_PATH, MCP_OAUTH_CALLBACK_PATH] as const;
 
 /** The port tried first. Not assigned by IANA as far as this was checked; any other works the same. */
 export const MCP_OAUTH_REDIRECT_PORT = 28_417;
@@ -43,9 +50,11 @@ export interface McpOAuthRedirectServerOptions {
    * A `state` this run did not start is what a forged or replayed request looks like, and it is
    * refused here exactly as the deep link refuses it. `query` is the whole query of the callback,
    * for a sign-in that this computer relays to a joined server on the same port; such a sign-in
-   * answers `"relayed"`, because it ends on the host and not here.
+   * answers `"relayed"`, because it ends on the host and not here. A promise answers whether the
+   * grant became a saved sign-in: the page waits for it, so it never says "signed in" for a grant
+   * that the token endpoint refused (#12017).
    */
-  deliver: (state: string, code: string, query: string) => boolean | "relayed";
+  deliver: (state: string, code: string, query: string) => boolean | "relayed" | Promise<boolean>;
   /** Hands a refusal to a sign-in that this computer relays, which ends on the host. */
   relayRefusal: (state: string, query: string) => void;
   /** Read on each request, so the page uses the language that is set at that time. */
@@ -68,7 +77,7 @@ export async function startMcpOAuthRedirectServer({
   preferredPort,
 }: McpOAuthRedirectServerOptions): Promise<McpOAuthRedirectServer> {
   const server = await startLoopbackCallbackServer({
-    path: MCP_OAUTH_REDIRECT_PATH,
+    paths: MCP_OAUTH_REDIRECT_PATHS,
     receive: (url) => receiveGrant(url, deliver, relayRefusal),
     language,
     port: { preferred: preferredPort },
@@ -85,7 +94,7 @@ function receiveGrant(
   url: URL,
   deliver: McpOAuthRedirectServerOptions["deliver"],
   relayRefusal: McpOAuthRedirectServerOptions["relayRefusal"],
-): CallbackAnswer {
+): CallbackAnswer | Promise<CallbackAnswer> {
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
   // An authorization server states a refusal here instead of sending a code. A local sign-in ends on
@@ -98,6 +107,13 @@ function receiveGrant(
 
   if (!code || !state) return { status: 400, message: "error.mcp.redirectNotSignIn" };
   const delivered = deliver(state, code, url.search.slice(1));
+  if (delivered instanceof Promise)
+    return delivered.then(
+      (saved): CallbackAnswer =>
+        saved
+          ? { status: 200, message: "error.mcp.redirectSignedIn" }
+          : { status: 400, message: "error.mcp.redirectNotSaved" },
+    );
   if (!delivered) return { status: 400, message: "error.mcp.redirectNoSignIn" };
   return { status: 200, message: delivered === "relayed" ? "error.mcp.redirectRelayed" : "error.mcp.redirectSignedIn" };
 }

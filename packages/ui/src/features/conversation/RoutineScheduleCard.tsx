@@ -20,6 +20,8 @@ export interface RoutineScheduleCardProps {
   nextRunLabel?: string | undefined;
   /** For example "Warsaw time". Give it only when the routine zone is not the viewer's zone. */
   timeZoneLabel?: string | undefined;
+  /** Why a paused routine is paused, for example "Paused by its 8:00 AM run". It shows when there is no next run. */
+  pausedLabel?: string | undefined;
   onOpenRoutine?: () => void;
   today?: Date;
   /** The frequencies the menu offers. Defaults to all of them. */
@@ -49,7 +51,7 @@ export function RoutineScheduleCard(props: RoutineScheduleCardProps) {
       case "deleted":
         return { kind: "note", text: t("routine.card.deleted") };
       case "idle": {
-        const text = nextRun();
+        const text = nextRun() ?? props.pausedLabel;
         return text ? { kind: "note", text } : undefined;
       }
     }

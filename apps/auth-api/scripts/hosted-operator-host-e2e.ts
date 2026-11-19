@@ -1,5 +1,6 @@
 // Runs the real account server hosted-server service on a migrated SQLite database, with a boat API
-// that records each call and the real billing service with a Stripe that must get no call. An operator
+// that records each call and the real billing service with a Stripe that may only read the Price list
+// (the billing state reads the storage tiers of a moved server) and must get no other call. An operator
 // moved three servers from boat to machines that the operator runs (`operator_host`), so the row has no
 // sandbox. For such a server the Worker must send no boat call and must never make a sandbox: a new one
 // would be an empty second server with the same identity. The Worker writes only what the server must
@@ -449,6 +450,7 @@ async function run() {
         plan: "pro",
         interval: "month",
         currency: "eur",
+        storageTier: 0,
       }),
     );
   }
@@ -566,7 +568,12 @@ async function run() {
     foreign().length === 2 && last.deleted === 0 && last.failed === 0,
     { calls: foreign(), result: last },
   );
-  check("Stripe got no call", stripeCalls.length === 0, stripeCalls);
+  // The billing state of a moved server reads the storage tier Prices. Nothing else may call Stripe.
+  check(
+    "Stripe got no call other than the Price list",
+    stripeCalls.every((call) => call === "GET /v1/prices"),
+    stripeCalls,
+  );
   database.close();
 }
 
