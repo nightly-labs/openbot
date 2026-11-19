@@ -479,7 +479,10 @@ export const messages = {
   "error.provider.sessionSettingsBusy": "יש להמתין לסיום הפעולה הנוכחית לפני שינוי הגדרת סשן.",
   "error.provider.piOutdated": "Pi {version} ישן מדי. יש להתקין Pi 1.1.0 ומעלה לתמיכה מקורית ב-RPC וב-MCP.",
   "error.provider.nativeMissing": "ה-CLI של {provider} אינו מותקן. יש להוריד אותו בהגדרות.",
-  "error.provider.nativeNotStarted": "לא ניתן להפעיל את ה-CLI של {provider}.",
+  "error.provider.nativeNotStarted":
+    "OpenBot מצא את {provider} שהתקנת, אבל הוא לא הופעל. יש לעדכן או להתקין מחדש את {provider}, ואז לנסות שוב.",
+  "error.provider.nativeManagedNotStarted":
+    "{provider} לא הופעל במחשב שמריץ את השרת הזה. יש להפעיל מחדש את OpenBot באותו מחשב. אם הוא עדיין לא מופעל, יש לבחור עזרה > דיווח על בעיה.",
   "error.provider.nativeVersionUnreadable": "לא ניתן לקרוא את הגרסה של ה-CLI של {provider}.",
   "error.provider.piSessionBusy": "יש להמתין לסיום הפעולה הנוכחית של Pi.",
   "error.provider.acpSessionBusy": "{provider} עדיין מסיים פעולה שנעצרה. יש לנסות שוב בעוד רגע.",
