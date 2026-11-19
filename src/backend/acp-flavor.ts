@@ -954,9 +954,16 @@ export const MISTRAL_ACP_FLAVOR: AcpFlavor = {
  * including an error for another session, are not lifecycle signals.
  */
 function ompSessionNotFound(error: RequestError, sessionId: string): boolean | null {
-  return error.code === -32603
-    ? isRecord(error.data) && error.data.details === `Unsupported ACP session: ${sessionId}`
-    : null;
+  if (error.code !== -32603) return null;
+  if (!isRecord(error.data) || typeof error.data.details !== "string") return false;
+  // Oh My Pi throws `Unsupported ACP session: <id>`; OpenClaw's ACP gateway throws
+  // `Session <id> not found`. Both arrive wrapped as "Internal error" (-32603) with the
+  // text in `data.details`. Only this exact session counts, so another -32603 that happens
+  // to mention the id never replaces a session.
+  return (
+    error.data.details === `Unsupported ACP session: ${sessionId}` ||
+    error.data.details === `Session ${sessionId} not found`
+  );
 }
 
 /**
