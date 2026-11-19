@@ -90,6 +90,7 @@ export const POOL_SEEN_WITHIN_MS = 150_000;
 const POOL_SEEN_WRITE_AFTER_MS = 60_000;
 const POOL_START_LOST_AFTER_MS = 4 * 60_000;
 const POOL_RESTORE_LOST_AFTER_MS = 3 * 60 * 60_000;
+const POOL_RESTORE_REPORT_KEPT_MS = 2 * 60 * 60_000;
 export const POOL_RESTORE_VERSION = 1;
 const LOW_POOL_FREE = 1;
 const POOL_CANDIDATES = 3;
@@ -1516,8 +1517,9 @@ export class HostedServerService {
             `UPDATE operator_hosts SET assign_token_hash = NULL WHERE assign_token_hash IS NOT NULL AND EXISTS(
              SELECT 1 FROM hosted_servers h WHERE h.operator_host = operator_hosts.host_id AND h.observed_state != 'starting'
                AND EXISTS(SELECT 1 FROM hosted_server_archives a WHERE a.server_id = h.server_id
-                 AND a.restored_at IS NOT NULL))`,
+                 AND a.restored_at IS NOT NULL AND a.restored_at <= ?))`,
           )
+          .bind(now - POOL_RESTORE_REPORT_KEPT_MS)
           .run(),
       );
       const unused = yield* hostedCall(() =>

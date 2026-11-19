@@ -428,10 +428,18 @@ async function renewRestoresFromThePool() {
     runningSummary?.state === "running" && runningSummary.restoring === undefined,
     runningSummary,
   );
-  await w.tick(w.clock.now + MINUTE);
+  const restoredAt = w.clock.now;
+  await w.tick(restoredAt + 60 * MINUTE);
+  const lateRetry = await w.poll(machine, POOL_RESTORE_VERSION, first.serverId);
+  check(
+    "a report retry 1 hour after the restore still gets `restored`, so a lost answer does not stop the start",
+    w.machineToken(machine) !== null && lateRetry.state === "restored",
+    { token: w.machineToken(machine), lateRetry },
+  );
+  await w.tick(restoredAt + 2 * HOUR + MINUTE);
   const afterTick = await w.pollFailure(machine, POOL_RESTORE_VERSION, first.serverId);
   check(
-    "the next tick removes the offer token of the restored machine",
+    "a tick 2 hours after the restore removes the offer token of the restored machine",
     w.machineToken(machine) === null && afterTick?.status === 401,
     { token: w.machineToken(machine), afterTick },
   );

@@ -68,7 +68,7 @@ while :; do
 done
 
 report_restore() {
-  local report=$WORK/report status sent=""
+  local report=$WORK/report status
   printf '{"hostId":"%s","token":"%s","restoreVersion":1,"restored":"%s"}' "$host" "$token" "$server" >"$report"
   for _ in $(seq "$REPORT_TRIES"); do
     : >"$answer"
@@ -76,11 +76,9 @@ report_restore() {
       --data-binary "@$report" --output "$answer" --write-out '%{http_code}' \
       "$url/v2/hosting/pool/assignment" || true)
     if [ "$status" = 200 ] && grep -q '"state":"restored"' "$answer"; then return 0; fi
-    if [ "$status" = 401 ] && [ -n "$sent" ]; then return 0; fi
     if [ "$status" = 401 ]; then
       fail "The account service took server $server back. Its data is on this machine. Do not start OpenBot."
     fi
-    case $status in 000 | 5??) sent=1 ;; esac
     sleep "$INTERVAL"
   done
   fail "The account service did not get the restore of server $server. Its data is on this machine."
