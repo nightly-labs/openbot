@@ -412,6 +412,7 @@ import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9 } from "@openbo
 import { encodeTeamProtocolV9WebRtcHttpRequest } from "@openbot/contracts/team-protocol/v9-webrtc-adapter";
 import { TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
 import { VAULT_IMPORT_CAPABILITY, VAULT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/vault-import-v1";
+import { VAULT_MEMBER_SAVE_CAPABILITY } from "@openbot/contracts/team-protocol/vault-member-save-v1";
 import { VAULT_CAPABILITY, VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY, VAULT_V2_ROUTES } from "@openbot/contracts/team-protocol/vault-v2";
 import { VAULT_V3_CAPABILITY, VAULT_V3_ROUTES } from "@openbot/contracts/team-protocol/vault-v3";
@@ -6032,6 +6033,12 @@ try {
         !list(field(older.body, "capabilities")).includes(ROUTINE_QUIET_ANSWERS_CAPABILITY),
       [summary(compatibility), summary(older)],
     );
+    check(
+      "the host advertises vault-member-save-v1 to a protocol 10 peer only",
+      decodeTeamProtocolSupportExpanded(compatibility.body).capabilities.includes(VAULT_MEMBER_SAVE_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(VAULT_MEMBER_SAVE_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
     const ids = (response: Awaited<ReturnType<typeof call>>) =>
       list(field(response.body, "messages")).map((message) => field(message, "id"));
     const conversationPath = TEAM_API_ROUTES.agent.conversation("agent-ada");
@@ -10709,6 +10716,7 @@ try {
       "a member submits the password with a save; the answer does not carry it",
       member.status === 200 &&
         !member.text.includes(VAULT_PASSWORD) &&
+        callsOf("respondToBrowserSecret").length === before + 1 &&
         isDeepStrictEqual(callsOf("respondToBrowserSecret").at(-1), [
           { requestId: "auth-1", agentId: "agent-ada", decision: "submit", secret: VAULT_PASSWORD, saveToVault: true },
         ]),
@@ -10724,6 +10732,7 @@ try {
       saved.status === 200 &&
         isDeepStrictEqual(saved.body, {}) &&
         !saved.text.includes(VAULT_PASSWORD) &&
+        callsOf("respondToBrowserSecret").length === before + 2 &&
         isDeepStrictEqual(callsOf("respondToBrowserSecret").at(-1), [
           { requestId: "auth-1", agentId: "agent-ada", decision: "submit", secret: VAULT_PASSWORD, saveToVault: true },
         ]),
