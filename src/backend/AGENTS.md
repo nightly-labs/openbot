@@ -105,6 +105,19 @@ The account service has a second, unrelated database — Cloudflare D1 — and i
 shape: those migrations are reversible but race a deploy. `apps/auth-api/AGENTS.md` owns it — nothing in this
 directory touches `apps/auth-api/migrations/`.
 
+## Drain holds
+
+A hold in `agent/drain-scheduler.ts` or `agent/provider-runtime.ts` stops new turns. A hold with no
+end stops an agent, or every agent of a provider, until a restart (#4971, #10495, #11122, and the
+Claude restart hold of 2026-11-19). Give each new hold an end that does not need a person: a time
+limit, or a release on every path, also on failure and cancel.
+
+| Rule | Enforced by |
+| --- | --- |
+| A provider restart or update that waits for turns holds new turns for at most `PROVIDER_HOLD_MS` | `scripts/provider-update-busy-e2e.ts` step 5 (`bun run test:provider-update-busy`, CI) |
+| A queue edit hold ends after its time limit | `MailboxStore` edit lock time limit (#10495) |
+| Each other new hold has an end | Review only: no check enforces it |
+
 ## Transactions
 
 - Run each SQLite transaction through `withTransaction` (synchronous work) or `withTransactionAsync`

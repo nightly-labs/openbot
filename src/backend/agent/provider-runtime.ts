@@ -250,6 +250,13 @@ function isCodexServiceUnreachable(error: unknown): boolean {
 /** How often a restart the user asked for checks whether the provider's turns have ended. */
 const PROVIDER_RESTART_POLL_MS = 1_000;
 /**
+ * How long a restart or an update that waits for the provider's turns holds new turns. After it, new
+ * turns start and the restart or update runs when the provider is next idle: one long turn of one
+ * agent must not stop every agent of the provider (on 2026-11-19 a Claude restart held all Claude
+ * agents for 80 minutes behind one turn).
+ */
+const PROVIDER_HOLD_MS = 10 * 60_000;
+/**
  * The waits before a model list that failed is read again. The first read after a CLI update can
  * fail for a short time, and a read at once failed again.
  */
@@ -550,6 +557,11 @@ export class ProviderRuntime implements ProviderPort {
    * `isReplacingCli` meanwhile, so new turns do not keep the update waiting.
    */
   readonly #updatesWhenIdle = new Set<AgentProvider>();
+  /** The end of each hold of a waiting restart or update. See `PROVIDER_HOLD_MS`. */
+  readonly #holdTimers = new Map<AgentProvider, NodeJS.Timeout>();
+  /** Providers whose restart or update still waits, but no longer holds new turns. */
+  readonly #holdEnded = new Set<AgentProvider>();
+  readonly #providerHoldMs: number;
   /** A custom agent change that a turn delayed. The idle check applies it when the turn stops. */
   #customAgentsReloadPending = false;
   /**
@@ -674,6 +686,8 @@ export class ProviderRuntime implements ProviderPort {
     emitError: (code: string, error: unknown, agentId?: string, context?: FailureContext) => void;
     requestTimeoutMs: number;
     longStartTimeoutMs?: number;
+    /** Tests only: a short `PROVIDER_HOLD_MS`. */
+    providerHoldMs?: number;
     preferredProvider: AgentProvider;
     preferredModel?: AgentModelId | null;
     clientFactory: AgentClientFactory | null;
@@ -693,6 +707,7 @@ export class ProviderRuntime implements ProviderPort {
     this.#emitError = options.emitError;
     this.#requestTimeoutMs = options.requestTimeoutMs;
     this.#longStartTimeoutMs = options.longStartTimeoutMs ?? LONG_START_TIMEOUT_MS;
+    this.#providerHoldMs = options.providerHoldMs ?? PROVIDER_HOLD_MS;
     this.#preferredProvider = options.preferredProvider;
     this.#preferredModel = options.preferredModel ?? null;
     this.#clientFactory = options.clientFactory;
@@ -2814,6 +2829,7 @@ export class ProviderRuntime implements ProviderPort {
       if (!this.#hooks.isProviderBusy(provider)) return;
       if (!this.#updatesWhenIdle.has(provider)) {
         this.#updatesWhenIdle.add(provider);
+        this.#startHold(provider);
         recordRestartActivity();
         onWait();
       }
@@ -2828,6 +2844,7 @@ export class ProviderRuntime implements ProviderPort {
    */
   #endUpdateWhenIdle(provider: AgentProvider): void {
     if (!this.#updatesWhenIdle.delete(provider)) return;
+    this.#endHold(provider);
     if (this.#restartsWhenIdle.get(provider) && this.#hooks.isProviderBusy(provider)) {
       this.cancelProviderRestart(provider);
       this.#environmentReloadPending.add(provider);
@@ -2868,6 +2885,7 @@ export class ProviderRuntime implements ProviderPort {
       providerStep(() => {
         // The hold passes from the wait to the install with no gap in which a turn could start.
         this.#updatesWhenIdle.delete(provider);
+        this.#endHold(provider);
         this.#setProviderConnectionState(provider, "connecting", false);
         this.#replacingCli.add(provider);
         recordRestartActivity();
@@ -3215,13 +3233,36 @@ export class ProviderRuntime implements ProviderPort {
   }
 
   /**
-   * True while a managed runtime is installed and its previous client is replaced, and while a
-   * restart the user asked for, or an update, waits for the provider's turns to end.
+   * True while a managed runtime is installed and its previous client is replaced, while a restart
+   * runs, and while a restart the user asked for, or an update, waits for the provider's turns to end,
+   * for at most `PROVIDER_HOLD_MS`.
    */
   isReplacingCli(provider: AgentProvider): boolean {
-    return (
-      this.#replacingCli.has(provider) || this.#restartsWhenIdle.has(provider) || this.#updatesWhenIdle.has(provider)
-    );
+    if (this.#replacingCli.has(provider) || this.#restartsWhenIdle.get(provider) === null) return true;
+    if (!this.#restartsWhenIdle.has(provider) && !this.#updatesWhenIdle.has(provider)) return false;
+    return !this.#holdEnded.has(provider);
+  }
+
+  /** Starts the time limit of the hold of a waiting restart or update, once for both. */
+  #startHold(provider: AgentProvider): void {
+    if (this.#holdTimers.has(provider) || this.#holdEnded.has(provider)) return;
+    const timer = setTimeout(() => {
+      this.#holdTimers.delete(provider);
+      this.#holdEnded.add(provider);
+      logger.info("A provider restart waits without holding new turns.", { provider });
+      this.#setStatus({});
+      this.#hooks.onProviderResumed(provider);
+    }, this.#providerHoldMs);
+    timer.unref?.();
+    this.#holdTimers.set(provider, timer);
+  }
+
+  /** Ends the time limit when no restart or update of the provider waits any more. */
+  #endHold(provider: AgentProvider): void {
+    if (this.#restartsWhenIdle.has(provider) || this.#updatesWhenIdle.has(provider)) return;
+    clearTimeout(this.#holdTimers.get(provider));
+    this.#holdTimers.delete(provider);
+    this.#holdEnded.delete(provider);
   }
 
   /**
@@ -3317,6 +3358,7 @@ export class ProviderRuntime implements ProviderPort {
       );
       timer.unref?.();
       this.#restartsWhenIdle.set(provider, timer);
+      this.#startHold(provider);
       return;
     }
     this.#restartsWhenIdle.set(provider, null);
@@ -3336,6 +3378,7 @@ export class ProviderRuntime implements ProviderPort {
 
   #endRestartWhenIdle(provider: AgentProvider): void {
     this.#restartsWhenIdle.delete(provider);
+    this.#endHold(provider);
     this.#setStatus({});
     this.#hooks.onProviderResumed(provider);
   }
@@ -3452,6 +3495,9 @@ export class ProviderRuntime implements ProviderPort {
     this.#restartTimers.clear();
     for (const timer of this.#restartsWhenIdle.values()) if (timer) clearTimeout(timer);
     this.#restartsWhenIdle.clear();
+    for (const timer of this.#holdTimers.values()) clearTimeout(timer);
+    this.#holdTimers.clear();
+    this.#holdEnded.clear();
     if (this.#idleCheck) clearInterval(this.#idleCheck);
     this.#idleCheck = null;
     if (this.#signInCheck) clearInterval(this.#signInCheck);
