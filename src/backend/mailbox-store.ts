@@ -2248,6 +2248,7 @@ export class MailboxStore {
     taskOpen: (taskId: string) => boolean,
     agentExists: (agentId: string) => boolean,
     recovered = false,
+    temporary = false,
   ): Effect.fn.Return<string | null, StoredStateFailure> {
     const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
     const request = delivery && this.#state.messages.find((message) => message.id === delivery.messageId);
@@ -2282,11 +2283,13 @@ export class MailboxStore {
             ? "Result: OpenBot note, not written by this teammate: the request went into a running turn of the teammate, and that turn ended before the teammate answered."
             : "Result: OpenBot note, not written by this teammate: the teammate's turn stopped when OpenBot or its provider restarted, before the teammate answered. Part of the work can be done.",
         "Evidence: none",
-        outcome === "failed"
-          ? "Unblock: The user must fix the cause, then ask for the request again."
-          : steered
-            ? "Unblock: Send the request again if you still need the result."
-            : "Unblock: Check what the teammate already did, then send the request again if you still need the result.",
+        outcome === "failed" && temporary
+          ? "Unblock: The failure can be temporary. Send the request again one time if you still need the result. If it fails again, tell the user."
+          : outcome === "failed"
+            ? "Unblock: The user must fix the cause, then ask for the request again."
+            : steered
+              ? "Unblock: Send the request again if you still need the result."
+              : "Unblock: Check what the teammate already did, then send the request again if you still need the result.",
       ].join("\n"),
       replyToMessageId: request.id,
       ...(taskId ? { taskId } : {}),

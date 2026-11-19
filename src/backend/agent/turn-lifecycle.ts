@@ -172,6 +172,15 @@ const CONTINUE_CAUSES: ReadonlySet<CauseCode> = new Set(["authentication", "prov
 
 const COMPACTION_RETRY_CAUSES: ReadonlySet<CauseCode> = new Set(["network", "timeout"]);
 
+const TEMPORARY_REQUEST_CAUSES: ReadonlySet<CauseCode> = new Set([
+  "stalled",
+  "timeout",
+  "network",
+  "provider_unavailable",
+  "rate_limit",
+  "empty_answer",
+]);
+
 interface HeldProviderError {
   message: string;
   context: FailureContext & { causeCode: CauseCode };
@@ -323,6 +332,7 @@ export class TurnLifecycle {
   #scope = Scope.makeUnsafe();
   readonly #turnAssociations = new Map<string, Deferred.Deferred<void, TurnOperationFailed>>();
   readonly #turnErrors = new Map<string, string>();
+  readonly #turnCauses = new Map<string, CauseCode>();
   readonly #turnRetries = new Map<string, number>();
   readonly #capacityNotices = new Set<string>();
   readonly #runningTurns = new Map<
@@ -506,6 +516,7 @@ export class TurnLifecycle {
     this.#failedTurns.clear();
     this.#turnAssociations.clear();
     this.#turnErrors.clear();
+    this.#turnCauses.clear();
     this.#turnRetries.clear();
     this.#capacityNotices.clear();
     this.#limitedTurns.clear();
@@ -807,6 +818,7 @@ export class TurnLifecycle {
       ...(loop ? { loop: true as const } : {}),
     });
     this.#turnErrors.set(turnId, message);
+    this.#turnCauses.set(turnId, context.causeCode);
   }
 
   #showFailoverError(agentId: string, threadId: string, failover: HeldProviderError): void {
@@ -882,6 +894,7 @@ export class TurnLifecycle {
     };
     logger.info("A turn ended with no answer.", { agentId, turnId, provider: source.provider });
     this.#turnErrors.set(turnId, message);
+    this.#turnCauses.set(turnId, context.causeCode);
     this.#failoverTurns.set(turnId, { message, context });
     return true;
   }
@@ -1427,6 +1440,7 @@ export class TurnLifecycle {
         }
         if (notification.method === "error" && errorTurnId && this.#runningTurns.has(errorTurnId)) {
           this.#turnErrors.set(errorTurnId, message);
+          this.#turnCauses.set(errorTurnId, causeCode);
           if (refusedSessionFailure(source.provider, message) !== null) return;
         }
         if (
@@ -1797,6 +1811,8 @@ export class TurnLifecycle {
       }
       const reportedError = this.#turnErrors.get(turnId);
       this.#turnErrors.delete(turnId);
+      const failureCause = this.#turnCauses.get(turnId);
+      this.#turnCauses.delete(turnId);
       this.#turnRetries.delete(turnId);
       this.#capacityNotices.delete(turnId);
       const refusedFailure =
@@ -2203,7 +2219,9 @@ export class TurnLifecycle {
         if (resulted.length > 0) keepBounded(this.#lastResults, resultsKey, { turnIds: [turnId], requests: resulted });
         else this.#lastResults.delete(resultsKey);
         if (!continuation && (terminal === "failed" || terminal === "interrupted")) {
-          for (const { delivery } of deliveries) yield* this.#answerFailedRequest(agentId, delivery.id);
+          const temporary =
+            !refused && !limited && failureCause !== undefined && TEMPORARY_REQUEST_CAUSES.has(failureCause);
+          for (const { delivery } of deliveries) yield* this.#answerFailedRequest(agentId, delivery.id, temporary);
         }
         for (const { delivery } of deliveries) {
           if (delivery.sender.kind === "agent") this.#hooks.scheduleDrain(delivery.sender.agentId);
@@ -2597,12 +2615,14 @@ export class TurnLifecycle {
     );
   }, Effect.uninterruptible);
 
-  #answerFailedRequest(agentId: string, deliveryId: string): Effect.Effect<void> {
+  #answerFailedRequest(agentId: string, deliveryId: string, temporary: boolean): Effect.Effect<void> {
     return this.#mailbox
       .answerFailedRequest(
         deliveryId,
         (taskId) => this.#hooks.taskOpen(taskId),
         (id) => this.#store.has(id),
+        false,
+        temporary,
       )
       .pipe(
         Effect.match({
