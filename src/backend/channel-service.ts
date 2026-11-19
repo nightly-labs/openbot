@@ -3170,19 +3170,34 @@ export class ChannelService {
         instruction: `The reply is in the shared chat. End your turn now with no text and do not promise to report back: you continue this task when ${check.target.author.name} has answered.`,
       };
     }
-    if (tool === "channel_remember" || tool === "channel_forget_memory") {
+    if (tool === "channel_forget_memory") {
+      const givenId = isString(args.memoryId) ? args.memoryId.trim() : "";
+      const memoryId = /^\[([^\]\s]+)\]/u.exec(givenId)?.[1] ?? givenId;
+      const text = isString(args.text) ? args.text : givenId.replace(/^\[[^\]\s]+\]\s*/u, "");
+      if (!memoryId && !text.trim()) return yield* channelFailure(new Error("Provide the memoryId of the memory."));
+      const deleted = yield* channelSync(
+        () =>
+          (memoryId !== "" && this.memories.delete(channelId, memoryId)) ||
+          (text.trim() !== "" && this.memories.deleteByText(channelId, text)),
+      );
+      if (!deleted)
+        return {
+          accepted: false,
+          reason: `No channel memory matches that ${memoryId ? "memoryId" : "text"}. Give the memoryId in brackets at the start of its line in the channel memories.`,
+        };
+      this.hooks.memoriesChanged?.(channelId);
+      return { accepted: true };
+    }
+    if (tool === "channel_remember") {
       if (!isString(args.text) || !args.text.trim())
         return yield* channelFailure(new Error("Provide the memory text."));
       const text = args.text;
-      if (tool === "channel_remember" && text.length > INPUT_LIMITS.agentMemoryText)
+      if (text.length > INPUT_LIMITS.agentMemoryText)
         return {
           accepted: false,
           reason: `A channel memory has at most ${INPUT_LIMITS.agentMemoryText} characters, and this text has ${text.length}. Save each fact as its own shorter memory.`,
         };
-      if (tool === "channel_remember")
-        yield* channelSync(() => this.memories.saveFromTool(channelId, text, turnId, `channel-memory:${operationId}`));
-      else if (!(yield* channelSync(() => this.memories.deleteByText(channelId, text))))
-        return { accepted: false, reason: "No memory matches that text." };
+      yield* channelSync(() => this.memories.saveFromTool(channelId, text, turnId, `channel-memory:${operationId}`));
       this.hooks.memoriesChanged?.(channelId);
       return { accepted: true };
     }

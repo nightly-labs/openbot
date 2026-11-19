@@ -193,6 +193,7 @@ import {
   type LocalAttentionResponse,
   type PromptResponder,
 } from "./agent/attention-registry";
+import type { AvatarImageDecoder } from "./agent/avatar-file";
 import { backgroundModel, withBackgroundEffort } from "./agent/background-model";
 import { BootRecovery } from "./agent/boot-recovery";
 import type { AgentBrowserProfiles } from "./agent/browser-profile-tool";
@@ -413,6 +414,7 @@ export interface AgentServiceOptions {
   screenCapture?: ScreenCaptureHost | null;
   videoReader?: VideoReaderHost | null;
   fitImage?: ImageFitter | null;
+  avatarDecoder?: AvatarImageDecoder | null;
   prepareMcpTest?: (config: McpServerConfig) => Effect.Effect<void, unknown>;
   mcpAgentAccess?: (mcpServerId: string, agentId: string | null) => boolean;
   marketplaceAppServer?: (appId: string) => MarketplaceAppServer | null;
@@ -1913,6 +1915,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.setCommitCoAuthor === undefined ? {} : { setCommitCoAuthor: options.setCommitCoAuthor }),
       ...(options.screenCapture === undefined ? {} : { screenCapture: options.screenCapture }),
       ...(options.videoReader === undefined ? {} : { videoReader: options.videoReader }),
+      ...(options.avatarDecoder === undefined ? {} : { avatarDecoder: options.avatarDecoder }),
       ...(options.fitImage === undefined ? {} : { fitImage: options.fitImage }),
       mcpServers: mcpServersFromGateway(
         this.#mcp,
