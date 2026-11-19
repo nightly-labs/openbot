@@ -174,6 +174,8 @@ const ACP_REPEATED_TOOL_FAILURES = 5;
 
 const ACP_STEER_ANSWER_MS = 3_000;
 
+const ACP_THROWAWAY_DELETE_MS = 3_000;
+
 const ACP_BACKGROUND_POLL_MS = 2_000;
 
 const ACP_BACKGROUND_WATCH_MS = 30 * 60_000;
@@ -287,6 +289,7 @@ interface AcpThread {
   backgroundReplay: Deferred.Deferred<void> | null;
   workHold: { since: number; changedAt: number } | null;
   leftOutMcpServers: Map<McpServer, string>;
+  throwaway: boolean;
 }
 
 type ReleasedAcpThread = Pick<
@@ -544,7 +547,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       configSetUnsaved: options.flavor.configSetUnsaved,
       keepProbeSession: () => options.flavor.closeKeepsSession === true && this.#supportsSessionResume,
       probeCloseDelayMs: options.flavor.probeCloseDelayMs,
-      deletesSessions: () => this.#initialization?.agentCapabilities?.sessionCapabilities?.delete != null,
+      deletesSessions: () => this.#deletesSessions,
       effortCategories: options.flavor.effortCategories,
     });
   }
@@ -734,6 +737,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   readonly stop = Effect.fn("AcpAgentClient.stop")(function* (
     this: AcpAgentClient,
   ): Effect.fn.Return<void, ProviderClientOperationError> {
+    yield* this.#deleteThrowawaySessions();
     yield* this.#transport
       .stop(
         Effect.gen({ self: this }, function* () {
@@ -761,6 +765,28 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       )
       .pipe(Effect.ensuring(Scope.close(this.#scope, Exit.void)));
   }, Effect.uninterruptible);
+
+  readonly #deleteThrowawaySessions = Effect.fn("AcpAgentClient.deleteThrowawaySessions")(function* (
+    this: AcpAgentClient,
+  ) {
+    if (!this.#deletesSessions) return;
+    const throwaway = [...this.#threads.ids()].flatMap((id) => {
+      const thread = this.#threads.get(id);
+      return thread?.throwaway ? [thread] : [];
+    });
+    yield* Effect.forEach(
+      throwaway,
+      (thread) => {
+        const connection = thread.transport ? thread.transport.connection : this.#transport.connection;
+        if (!connection) return Effect.void;
+        return providerCall(() => connection.deleteSession({ sessionId: thread.id })).pipe(
+          Effect.timeout(ACP_THROWAWAY_DELETE_MS),
+          Effect.ignore,
+        );
+      },
+      { concurrency: "unbounded", discard: true },
+    );
+  });
 
   readonly readSessionSettings = Effect.fn("AcpAgentClient.readSessionSettings")(function* (
     this: AcpAgentClient,
@@ -1441,6 +1467,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     return Boolean(this.#initialization?.agentCapabilities?.sessionCapabilities?.close);
   }
 
+  get #deletesSessions(): boolean {
+    return this.#initialization?.agentCapabilities?.sessionCapabilities?.delete != null;
+  }
+
   get #forcedClose(): { _meta?: { "cognition.ai/force": true } } {
     const meta = this.#initialization?.agentCapabilities?.sessionCapabilities?.close?._meta;
     return meta?.["cognition.ai/force"] === true ? { _meta: { "cognition.ai/force": true } } : {};
@@ -1703,6 +1733,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               backgroundReplay: null,
               workHold: null,
               leftOutMcpServers: new Map(),
+              throwaway: isRecord(params) && params.ephemeral === true,
             };
             threadRef = thread;
             providerResult(
