@@ -10,6 +10,7 @@ import {
   WEB_APP_MARKETPLACE_SKILL_PARAM,
 } from "@openbot/contracts/marketplace-links";
 import { pluginSlugFromWebAppSearch, WEB_APP_PLUGIN_PARAM } from "@openbot/contracts/plugin-links";
+import { forgetReferralCode, readReferralCode } from "@openbot/contracts/referral";
 import { isBoolean, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { formatLocale, resolveLocale } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
@@ -264,7 +265,7 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
     path: string,
     body?:
       | { email: string }
-      | { challengeId: string | null; code: string; firstTouch?: FirstTouch }
+      | { challengeId: string | null; code: string; firstTouch?: FirstTouch; referralCode?: string }
       | Record<string, never>,
     send?: { idempotencyKey: string; signal: AbortSignal },
   ) {
@@ -476,10 +477,16 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
       draft.login = { status: "company_sign_in", email, issue: companySignInIssue(code) };
     });
   }
-  async function verify(challengeId: string, code: string) {
+  async function verify(challengeId: string, code: string, referralCode?: string) {
     const firstTouch = readFirstTouch(() => window.localStorage, Date.now());
-    const value = await signInRequest("email/verify", { challengeId, code, ...(firstTouch ? { firstTouch } : {}) });
+    const value = await signInRequest("email/verify", {
+      challengeId,
+      code,
+      ...(firstTouch ? { firstTouch } : {}),
+      ...(referralCode ? { referralCode } : {}),
+    });
     if (value === null) return;
+    forgetReferralCode(() => window.localStorage);
     const account = accountFrom(value);
     sessionGeneration += 1;
     sessionEnded = false;
@@ -566,6 +573,9 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
                     onRetry={checkSession}
                     onRequestEmailCode={start}
                     onVerifyEmailCode={verify}
+                    inviteField
+                    initialInviteCode={readReferralCode(() => window.localStorage, Date.now()) ?? undefined}
+                    revealed={!loadingShown()}
                     onOpenCompanySignIn={() =>
                       state.login.status === "company_sign_in"
                         ? openCompanySignIn(state.login.email)

@@ -16,6 +16,7 @@ import {
   buttonVariants,
   Check,
   ChevronDown,
+  Confetti,
   Dialog,
   DropdownMenu,
   ErrorReference,
@@ -134,8 +135,6 @@ function setupStep(index: number): SetupStep {
 const DETAIL_MS = 2_000;
 
 const SETUP_ORDER: readonly HostedServerSetupStatus[] = ["creating", "starting", "connecting", "ready"];
-
-const CONFETTI_PIECES = 56;
 
 export function AddServerDialog(props: AddServerDialogProps) {
   const { t, errorDetails, format } = useText();
@@ -635,30 +634,6 @@ export function AddServerOtherOptions(props: {
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
-    </div>
-  );
-}
-
-function Confetti(props: { origin: HTMLElement | undefined }) {
-  const box = props.origin?.getBoundingClientRect();
-  const origin = {
-    "--confetti-origin-x": `${box ? box.left + box.width / 2 : window.innerWidth / 2}px`,
-    "--confetti-origin-y": `${box ? box.top + box.height / 2 : window.innerHeight / 3}px`,
-  };
-  const pieces = Array.from({ length: CONFETTI_PIECES }, (_, index) => {
-    const angle = (index / CONFETTI_PIECES) * Math.PI * 2 + Math.random() * 0.4;
-    const reach = 140 + Math.random() * 180;
-    return {
-      "--confetti-x": `${Math.cos(angle) * reach}px`,
-      "--confetti-y": `${Math.sin(angle) * reach * 0.7 - 90}px`,
-      "--confetti-spin": `${Math.round(Math.random() * 720 - 360)}deg`,
-      "--confetti-delay": `${Math.round(Math.random() * 120)}ms`,
-      "--confetti-duration": `${Math.round(1_300 + Math.random() * 700)}ms`,
-    };
-  });
-  return (
-    <div class="add-server-confetti" style={origin} aria-hidden="true">
-      <For each={pieces}>{(style) => <i style={style} />}</For>
     </div>
   );
 }

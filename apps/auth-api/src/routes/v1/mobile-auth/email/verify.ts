@@ -1,3 +1,4 @@
+import { isReferralCode } from "@openbot/contracts/referral";
 import { isString } from "@openbot/contracts/runtime-values";
 import { createFileRoute } from "@tanstack/solid-router";
 import { Effect } from "effect";
@@ -29,6 +30,7 @@ export const Route = createFileRoute("/v1/mobile-auth/email/verify")({
                 code: body.code,
                 sourceIp: requestSourceIp(request),
                 device: { id: body.deviceId, name: body.deviceName, platform: body.platform },
+                referralCode: isReferralCode(body.referralCode) ? body.referralCode : null,
               }),
             );
           }),

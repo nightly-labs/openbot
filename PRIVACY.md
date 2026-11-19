@@ -255,7 +255,11 @@ it gets on your account and sends it to OpenPanel with your account ID. To remov
 browser, clear the site data of openbot.run. When you open a discount link (an openbot.run address
 with `?promo=CODE`), the website saves the code and the time in its `localStorage` for 30 days. When
 you pay on the web, the web client sends the code to the account service, which gives it to Stripe
-for that Checkout page. It is not sent to analytics. When you choose a language on the website, it saves
+for that Checkout page. It is not sent to analytics. When you open an invite link (an openbot.run
+address with `?ref=CODE`), the website saves the code and the time in its `localStorage` for 30 days.
+When you sign in on the web, the web client sends the code to the account service and removes it from
+`localStorage`. On the desktop, on the web and on the phone, you can also type an invite link or code
+on the sign-in screen; the app sends only the code. The account service uses a code only for a new account. It is not sent to analytics. When you choose a language on the website, it saves
 the language code, and nothing else, in the `openbot_lang` cookie for one year, so that the next
 pages open in that language. The browser sends this cookie only to openbot.run. OpenPanel can also derive
 session, device, browser, operating-system, network, and approximate geographic metadata from a
@@ -445,6 +449,17 @@ The service stores:
 - for the EU VAT limit: for each paid invoice of a consumer in an EU country other than Poland, the
   Stripe invoice ID, the year, the country and the net amount in euro, with no account ID. The service
   deletes them after the end of the next year.
+- invite links: the invite code of each account that opened Invite friends, and for each account that
+  signed up with an invite link or an invite code, the account that invited
+  it and the time. When an invited account pays, the service compares the Stripe card fingerprints of
+  the two accounts. It does not keep them; when they match, it keeps only the time when it ended the
+  invite. For each paid
+  invoice of an invited account, the service keeps the Stripe invoice ID, the two account IDs, the
+  amount without tax, the credit that it gave in Stripe and the Stripe balance transaction ID, and
+  for a refund or a lost dispute, the credit that it took back. The account that invited sees the
+  first name and the initial of the last name of each invited account, the day it joined, whether
+  it pays now, has no plan or stopped paying, and the credit that the invited account gave it, which is
+  10% of what the invited account paid. It never sees an email or a plan of an invited account. Deleting either account removes these rows.
 - hosted sites: the hostname, title, description, framework, state, owner account ID, lifecycle
   times, and for each deployment the file list, sizes and content types. The published site files
   are in R2. Anyone can read a published site. Deleting a site removes its files.

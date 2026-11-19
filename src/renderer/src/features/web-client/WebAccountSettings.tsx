@@ -5,6 +5,7 @@ import type { AppTextKey } from "@openbot/i18n";
 import {
   Button,
   CreditCard,
+  Gift,
   Item,
   ItemActions,
   ItemContent,
@@ -19,6 +20,8 @@ import {
   UserRound,
 } from "@openbot/ui";
 import { documentColorScheme } from "@openbot/ui/document-color-scheme";
+import { ReferralPanel } from "@openbot/ui/features/referral/ReferralPanel";
+import { createReferralStore, type ReferralCalls } from "@openbot/ui/features/referral/referral-store";
 import { AppearanceSelect } from "@openbot/ui/features/settings/AppearanceSelect";
 import { ACTION_SOUND_CHOICES, TASK_SOUND_CHOICES } from "@openbot/ui/features/settings/app-settings";
 import { ChatBackgroundSetting } from "@openbot/ui/features/settings/ChatBackgroundSetting";
@@ -50,7 +53,7 @@ import { setWebChatBackground, useWebChatBackground } from "./web-chat-backgroun
 import { setWebLiveVoice, useWebLiveVoice } from "./web-live-voice";
 import type { WebNotificationSettings } from "./web-notification-settings";
 
-const TABS = ["profile", "preferences"] as const;
+const TABS = ["profile", "preferences", "referral"] as const;
 type WebAccountSettingsTab = (typeof TABS)[number];
 
 const TAB_ITEMS = {
@@ -63,6 +66,11 @@ const TAB_ITEMS = {
     titleKey: "webClient.settings.preferences.title",
     descriptionKey: "webClient.settings.preferences.description",
     icon: SlidersHorizontal,
+  },
+  referral: {
+    titleKey: "settings.tab.referral.title",
+    descriptionKey: "settings.tab.referral.description",
+    icon: Gift,
   },
 } as const satisfies Record<
   WebAccountSettingsTab,
@@ -80,6 +88,7 @@ export interface WebAccountSettingsProps {
   appearance: AppAppearance;
   onChangeAppearance: (appearance: AppAppearance) => void;
   onOpenBilling: () => void;
+  referral: ReferralCalls;
   onSignOut: () => Promise<void>;
   notifications: WebNotificationSettings;
   notificationFocusRequest?: { serverId: string; nonce: number } | null | undefined;
@@ -124,6 +133,10 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
       onRevokeAccountSession: (sessionId) => props.calls.revokeSession(sessionId),
     },
     () => activeTab() === "profile",
+  );
+  const referral = createReferralStore(
+    () => props.referral,
+    () => props.open && activeTab() === "referral",
   );
   const navItem = () => TAB_ITEMS[activeTab()];
   createEffect(
@@ -195,6 +208,10 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
             canRevokeSession
             onSignOut={props.onSignOut}
           />
+        </Tabs.Content>
+
+        <Tabs.Content value="referral" class="settings-modal-tab-panel" data-tab="referral">
+          <ReferralPanel store={referral} available />
         </Tabs.Content>
 
         <Tabs.Content value="preferences" class="settings-modal-tab-panel" data-tab="preferences">

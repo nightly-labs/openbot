@@ -250,6 +250,7 @@ function SettingsModalStory(props: {
               onSetRemoteNetworkRoute={(route) => mock.api.setRemoteNetworkRoute({ route })}
               onUpdateAction={runUpdateAction}
               billingApi={billingApi}
+              referralApi={mock.api.referral}
               hostedServersApi={props.hostedServers ? hostedServersApi : undefined}
               onAddHostedServer={props.hostedServers ? fn() : undefined}
               agentDock={props.agentDock ? storyAgentDock : undefined}
@@ -391,6 +392,10 @@ export const AgentDock: Story = {
 
 export const Billing: Story = {
   render: () => <SettingsModalStory initialOpen initialTab="billing" />,
+};
+
+export const InviteFriends: Story = {
+  render: () => <SettingsModalStory initialOpen initialTab="referral" />,
 };
 
 export const HostedServers: Story = {

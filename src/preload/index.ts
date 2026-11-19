@@ -208,6 +208,7 @@ import {
   decodePendingListing,
   decodePendingMarketplaceListing,
   decodeProviderDetectionSettings,
+  decodeReferralState,
   decodeRemoteDesktopSetupFromMain,
   decodeRemoteDesktopTestFromMain,
   decodeRemoteNetworkRouteState,
@@ -1116,6 +1117,9 @@ const openbotApi: OpenBotDesktopApi = {
     buyStorage: decodeBillingState,
     getDetails: decodeBillingDetails,
     setDetails: decodeBillingDetails,
+  }),
+  referral: bridgeGroup(IPC_ENDPOINTS.referral, {
+    getState: decodeReferralState,
   }),
   license: bridgeGroup(IPC_ENDPOINTS.license, {
     getState: decodeLicenseState,

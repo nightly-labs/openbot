@@ -98,6 +98,7 @@ export function AppAccessGate() {
                     onRetry={auth.retryCentralAccount}
                     onRequestEmailCode={auth.requestEmailCode}
                     onVerifyEmailCode={auth.verifyEmailCode}
+                    inviteField
                     onReset={auth.logoutCentralAccount}
                     onOpenCompanySignIn={auth.openCompanySignIn}
                     language={i18n.locale()}

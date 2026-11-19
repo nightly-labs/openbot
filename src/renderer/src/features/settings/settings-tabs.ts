@@ -4,6 +4,7 @@ import {
   Bell,
   CircleArrowDown,
   CreditCard,
+  Gift,
   Mic,
   MousePointer2,
   Palette,
@@ -27,6 +28,7 @@ export type SettingsTab =
   | "computer-use"
   | "profile"
   | "billing"
+  | "referral"
   | "mobile-connect"
   | "updates"
   | "hosted-servers";
@@ -144,6 +146,14 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
     titleKey: "settings.tab.billing.title",
     descriptionKey: "settings.tab.billing.description",
     icon: CreditCard,
+    group: "settings.sections.group.account",
+    rows: [],
+  },
+  {
+    value: "referral",
+    titleKey: "settings.tab.referral.title",
+    descriptionKey: "settings.tab.referral.description",
+    icon: Gift,
     group: "settings.sections.group.account",
     rows: [],
   },

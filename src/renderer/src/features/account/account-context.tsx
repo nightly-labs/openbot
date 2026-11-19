@@ -122,10 +122,14 @@ const Auth = createSimpleContext({
       applyCentralAuthState(await accountPort().auth.retry());
     }
 
-    async function verifyEmailCode(challengeId: string, code: string): Promise<void> {
+    async function verifyEmailCode(challengeId: string, code: string, referralCode?: string): Promise<void> {
       const anonymousAnalytics = desktopAnalytics.anonymousScope();
       try {
-        const state = await accountPort().auth.verifyEmailCode({ challengeId, code });
+        const state = await accountPort().auth.verifyEmailCode({
+          challengeId,
+          code,
+          ...(referralCode ? { referralCode } : {}),
+        });
         applyCentralAuthState(state);
         desktopAnalytics.track("account_sign_in_completed", {
           result: state.status === "signed_in" ? "succeeded" : "failed",

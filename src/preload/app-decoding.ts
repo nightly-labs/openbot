@@ -153,6 +153,7 @@ import {
   type MarketplaceListingLink,
 } from "@openbot/contracts/marketplace-links";
 import { isPluginSlug } from "@openbot/contracts/plugin-links";
+import { parseReferralState, type ReferralState } from "@openbot/contracts/referral";
 import {
   type DynamicRecord,
   isBoolean,
@@ -735,6 +736,12 @@ export function decodeBillingDetails(value: unknown): BillingDetails {
   const details = parseBillingDetails(value);
   if (!details) throw new Error("Invalid billing details response.");
   return details;
+}
+
+export function decodeReferralState(value: unknown): ReferralState {
+  const state = parseReferralState(value);
+  if (!state) throw new Error("Invalid referral state response.");
+  return state;
 }
 
 export function decodeLicenseState(value: unknown): LicenseState {

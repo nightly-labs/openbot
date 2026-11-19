@@ -1,8 +1,8 @@
 import { DiscordAPIError, HTTPError, RateLimitError, REST, RequestMethod } from "@discordjs/rest";
-import { WebSocketManager, WebSocketShardEvents } from "@discordjs/ws";
+import { WebSocketManager, WebSocketShardEvents, WebSocketShardStatus } from "@discordjs/ws";
 import { DISCORD_GATEWAY_INTENTS, DISCORD_MESSAGE_CONTENT_INTENT } from "@openbot/contracts/discord-app";
 import { GatewayCloseCodes } from "discord-api-types/v10";
-import { Context, Effect, FiberSet, Layer, Schedule, Schema } from "effect";
+import { Context, Effect, Fiber, FiberSet, Layer, Schedule, Schema } from "effect";
 import type { DiscordBotConfig } from "./config";
 import {
   type DiscordApi,
@@ -16,6 +16,9 @@ import type { SignalService } from "./signal-service";
 
 const DISCORD_REQUEST_TIMEOUT_MILLISECONDS = 10_000;
 const DISCORD_CONNECT_RETRY = Schedule.min([Schedule.exponential("5 seconds"), Schedule.spaced("5 minutes")]);
+const DISCORD_HEALTH_INTERVAL = "1 minute";
+const DISCORD_STOPPED_CHECKS = 2;
+const DISCORD_STOPPED_CHECKS_LIMIT = 32;
 
 class DiscordGatewayConnectError extends Schema.TaggedError<DiscordGatewayConnectError>()(
   "DiscordGatewayConnectError",
@@ -153,7 +156,17 @@ export class DiscordGateway extends Context.Service<DiscordGateway, { readonly a
           run(
             Effect.suspend(() =>
               current === gateway
-                ? Effect.tryPromise({ try: () => gateway.connect(), catch: () => new DiscordGatewayConnectError() })
+                ? Effect.tryPromise({
+                    try: () => {
+                      const connected = gateway.connect();
+                      void connected.then(
+                        () => (current === gateway ? undefined : run(release(gateway))),
+                        () => undefined,
+                      );
+                      return connected;
+                    },
+                    catch: () => new DiscordGatewayConnectError(),
+                  })
                 : Effect.void,
             ).pipe(
               Effect.tapError(() => Effect.sync(() => console.error("OpenBot Discord Gateway could not connect."))),
@@ -170,6 +183,7 @@ export class DiscordGateway extends Context.Service<DiscordGateway, { readonly a
         const open = (intents: number): WebSocketManager => {
           const gateway = new WebSocketManager({ token: config.botToken, intents, rest });
           gateway.on(WebSocketShardEvents.Dispatch, (payload) => {
+            if (current !== gateway) return;
             let actions: DiscordAction[];
             try {
               actions = state.handle(payload);
@@ -181,32 +195,65 @@ export class DiscordGateway extends Context.Service<DiscordGateway, { readonly a
           });
           gateway.on(WebSocketShardEvents.Ready, () => console.log("OpenBot Discord Gateway is ready."));
           gateway.on(WebSocketShardEvents.Resumed, (shardId) => {
+            if (current !== gateway) return;
             console.log("OpenBot Discord Gateway resumed.");
             for (const action of state.shardResumed(shardId)) act(action);
           });
           gateway.on(WebSocketShardEvents.Closed, (code, shardId) => {
+            if (current !== gateway) return;
             state.shardClosed(shardId);
             console.log(`OpenBot Discord Gateway closed with code ${code}.`);
-            if (
-              code === GatewayCloseCodes.DisallowedIntents &&
-              intents !== DISCORD_GATEWAY_INTENTS &&
-              current === gateway
-            ) {
+            if (code === GatewayCloseCodes.DisallowedIntents && intents !== DISCORD_GATEWAY_INTENTS) {
               console.error("OpenBot Discord Gateway refused the Message Content intent. It connects without it.");
-              current = open(DISCORD_GATEWAY_INTENTS);
-              run(release(gateway));
-              connect(current);
+              replace(DISCORD_GATEWAY_INTENTS);
             }
           });
           gateway.on(WebSocketShardEvents.Error, () => console.error("OpenBot Discord Gateway failed."));
           return gateway;
         };
 
-        let current = open(
-          config.messageContent ? DISCORD_GATEWAY_INTENTS | DISCORD_MESSAGE_CONTENT_INTENT : DISCORD_GATEWAY_INTENTS,
-        );
+        const replace = (intents: number) => {
+          const previous = current;
+          run(Fiber.interrupt(connecting));
+          currentIntents = intents;
+          stopped = 0;
+          current = open(intents);
+          run(release(previous));
+          connecting = connect(current);
+        };
+
+        let currentIntents = config.messageContent
+          ? DISCORD_GATEWAY_INTENTS | DISCORD_MESSAGE_CONTENT_INTENT
+          : DISCORD_GATEWAY_INTENTS;
+        let current = open(currentIntents);
         yield* Effect.addFinalizer(() => Effect.suspend(() => release(current)));
-        connect(current);
+        let connecting = connect(current);
+
+        let stopped = 0;
+        let stoppedLimit = DISCORD_STOPPED_CHECKS;
+        const check = Effect.suspend(() => {
+          const gateway = current;
+          return Effect.tryPromise(async () => gateway.fetchStatus()).pipe(
+            Effect.flatMap((shards) =>
+              Effect.sync(() => {
+                if (gateway !== current || shards.size === 0) return;
+                if (!shards.some((status) => status === WebSocketShardStatus.Idle)) {
+                  stopped = 0;
+                  if (shards.every((status) => status === WebSocketShardStatus.Ready))
+                    stoppedLimit = DISCORD_STOPPED_CHECKS;
+                  return;
+                }
+                stopped += 1;
+                if (stopped < stoppedLimit) return;
+                stoppedLimit = Math.min(stoppedLimit * 2, DISCORD_STOPPED_CHECKS_LIMIT);
+                console.error("OpenBot Discord Gateway stopped. It connects again.");
+                replace(currentIntents);
+              }),
+            ),
+            Effect.catch(() => Effect.void),
+          );
+        });
+        run(check.pipe(Effect.delay(DISCORD_HEALTH_INTERVAL), Effect.forever));
         return DiscordGateway.of({ api: makeDiscordApi(transport, state) });
       }),
     );

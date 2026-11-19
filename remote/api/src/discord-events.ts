@@ -322,7 +322,10 @@ export class DiscordState {
         this.#applicationId = payload.d.application.id;
         {
           const [shard, count] = payload.d.shard ?? [0, 1];
-          if (this.#shardCount !== count) this.#shardGuilds.clear();
+          if (this.#shardCount !== count) {
+            this.#shardGuilds.clear();
+            this.#closedShards.clear();
+          }
           this.#shardCount = count;
           this.#shardGuilds.set(shard, new Set(payload.d.guilds.map((guild) => guild.id)));
           this.#closedShards.delete(shard);

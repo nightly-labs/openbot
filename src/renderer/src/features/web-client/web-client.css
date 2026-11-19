@@ -68,12 +68,8 @@
   margin-top: 1px;
 }
 
-.web-consent-row + .account-login-footer {
-  margin-top: var(--openbot-space-3);
-}
-
-.account-login-footer .first-run-consent-notice {
-  width: 100%;
+.account-login-legal .first-run-consent-notice {
+  width: auto;
   margin: 0;
 }
 

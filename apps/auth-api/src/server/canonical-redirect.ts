@@ -29,3 +29,7 @@ export function installReturnPage(path: string, callbackUrl: URL): URL {
 export function companySignInApiOrigin(siteUrl: URL): string {
   return siteUrl.hostname === SITE_HOST ? `${siteUrl.protocol}//api.${SITE_HOST}` : siteUrl.origin;
 }
+
+export function inviteLinkOrigin(requestUrl: URL): string {
+  return requestUrl.hostname === `api.${SITE_HOST}` ? SITE_ORIGIN : requestUrl.origin;
+}

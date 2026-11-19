@@ -1004,6 +1004,7 @@ function AppSettings(props: AccountProps) {
         onRevokeAccountSession={auth.revokeAccountSession}
         onSignOut={platform.landingPreview ? undefined : auth.logoutCentralAccount}
         billingApi={appPort().billing}
+        referralApi={appPort().referral}
         licenseApi={appPort().license}
         onContactUs={() => void appPort().openExternal("hosted-server-contact")}
         hostedServersApi={appPort().hostedServers}
