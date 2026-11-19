@@ -343,10 +343,7 @@ function PlushCanvas({
   // The frames are sampled only when there is a plush to draw them on.
   const frame = usePlushFrame(geometry, animate && art !== null);
   // Each new frame records a new picture. The recorder and the paints stay from frame to frame.
-  const picture = useDerivedValue(
-    () => recordPlush(frame.get(), art, size, saturation.get()),
-    [art, frame, saturation, size],
-  );
+  const picture = useDerivedValue(() => recordPlush(frame.get(), art, size, saturation.get()));
   if (!art) return fallback;
   return (
     <Canvas accessibilityElementsHidden accessible={false} pointerEvents="none" style={{ width: size, height: size }}>
