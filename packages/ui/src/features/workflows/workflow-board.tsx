@@ -710,10 +710,9 @@ export function createBoard(options: BoardOptions) {
     const result: WfnResult = { id: crypto.randomUUID(), at: new Date().toISOString(), value };
     if (run !== undefined) result.run = run;
     if (failed) result.failed = true;
-    const newest = state.viewing === null || run === state.viewing ? result.id : latestOf(id)?.id;
     setState((draft) => {
       draft.results[id] = [...(draft.results[id] ?? []), result];
-      draft.picked[id] = { result: result.id, newest };
+      delete draft.picked[id];
     });
   };
 
@@ -834,7 +833,8 @@ export function createBoard(options: BoardOptions) {
       const latest = latestOf(id);
       const picked = state.picked[id];
       const stillNewest = picked !== undefined && latest?.id === picked.newest;
-      return stillNewest ? resultsOf(id).find((result) => result.id === picked.result) : latest;
+      if (!stillNewest) return latest;
+      return resultsOf(id).find((result) => result.id === picked.result) ?? latest;
     },
     pick: (id, result) => {
       const newest = latestOf(id)?.id;
