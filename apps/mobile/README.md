@@ -87,8 +87,7 @@ do not commit it: the app config is in the runtime version.
 The iOS commands keep the Xcode build in `ios/DerivedData`, not in
 `~/Library/Developer/Xcode/DerivedData`, so removing a worktree removes its build. Do not remove
 `ios/build`: CocoaPods writes codegen output there. When that output is missing, `bun mobile:ios`
-installs the pods again. Metro keeps its
-caches in `.expo/metro-cache` and `.expo/metro-file-map` of the worktree.
+installs the pods again. Metro keeps its file map cache in `.expo/metro-file-map` of the worktree.
 
 `bun mobile:android` also applies the config plugins without clearing `android/`, then runs
 `expo run:android`. Three local settings make a build in a new worktree faster:
@@ -98,9 +97,35 @@ caches in `.expo/metro-cache` and `.expo/metro-file-map` of the worktree.
 - The local `android/gradle.properties` gets `org.gradle.caching=true`. Worktrees share Gradle task
   outputs in `~/.gradle/caches/build-cache-1`. The app config, fingerprint and EAS builds stay the
   same.
-- `CCACHE_BASEDIR` and `CCACHE_NOHASHDIR` let ccache share the C++ results of the app CMake project
-  between worktrees. Install ccache with `brew install ccache`; React Native uses it when it is on
-  `PATH`.
+- `CCACHE_BASEDIR` and `CCACHE_NOHASHDIR` let ccache share C++ results between worktrees. Install
+  ccache with `brew install ccache`. React Native uses it for the app CMake project when it is on
+  `PATH`, and `CMAKE_C_COMPILER_LAUNCHER` and `CMAKE_CXX_COMPILER_LAUNCHER` add it to the CMake
+  projects of the libraries, such as Reanimated, Worklets, Expo modules and Skia.
+
+The first build in a new worktree also reuses the work of other worktrees through two shared caches
+in `openbot-mobile-cache.noindex` of the common git directory (`git rev-parse --git-common-dir`), on
+the disk of the main checkout. `OPENBOT_MOBILE_BUILD_CACHE=<directory>` puts them in another
+directory; a relative path starts at the checkout root. `OPENBOT_MOBILE_BUILD_CACHE=off` turns them
+off. You can remove the directory at any time.
+
+- `metro/`: Metro transforms of all mobile commands (`metro-cache.js`). Each set of mobile
+  dependencies in `bun.lock` and their patches has its own namespace, because the Metro cache key
+  does not include the versions of the Babel plugins. Packages that only other workspaces or the dev
+  dependencies of the app use are not in the namespace. When `bun.lock` or a patch is newer than the
+  last `bun install` (`node_modules/.openbot-install-stamp`), Metro warns and does not use the shared
+  cache. A namespace that no worktree used for 14 days is removed. A transform that contains the
+  path of the checkout, such as a `use dom` component, stays in `.expo/metro-cache` of the worktree.
+  The entries use the file store of `@expo/metro-config`, which writes each entry to a temporary file
+  and renames it, so several Metro processes can use one namespace. The store is not a public export
+  of Expo: when Expo moves it, Metro warns and does not use the shared cache. Uniwind replaces the
+  Metro cache stores with one in the system temporary directory, so `metro.config.js` sets them
+  again; EAS builds keep the store of Uniwind. React Native's build scripts and the early bundle of
+  `expo run` clear the Metro cache before each release bundle; `bun mobile:ios` and
+  `bun mobile:android` keep it. `bun mobile -- --clear` clears the namespace for all worktrees.
+- `xcode/`: the Xcode compilation cache of `bun mobile:ios` (Swift, Objective-C and C++). Prefix
+  mapping replaces the checkout path and its real path with `/^openbot` in the cache keys, in the
+  debug info and in `__FILE__`. Only the `xcodebuild` build command (with `-destination`) gets these
+  settings. Xcode removes old entries above 20 GB.
 
 The local launcher enables RocketSim Connect in the local native project. The config plugin
 loads it before React Native starts, only in Debug builds on the iOS Simulator.

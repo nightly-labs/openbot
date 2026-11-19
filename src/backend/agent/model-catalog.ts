@@ -1,6 +1,6 @@
 import type { AgentModelOption, ProviderModelSource } from "@openbot/contracts/ipc";
 import { isAgentModel, isReasoningEffort } from "@openbot/contracts/ipc";
-import { createOpenBotLogger } from "@openbot/logging";
+import { createOpenBotLogger, registerPublicValues } from "@openbot/logging";
 import { Effect, Result } from "effect";
 import type { AgentClient, AgentProvider } from "./../agent-client";
 import { providerCheckTimeoutMs } from "../disk-restore";
@@ -22,6 +22,11 @@ type ProviderModelCatalog = NonNullable<BuiltInProviderDriver["catalog"]>;
 const logger = createOpenBotLogger("provider-runtime");
 const MODEL_METADATA_FALLBACKS = [...FALLBACK_MODELS, ...OPENCODE_FREE_MODEL_FALLBACKS];
 
+function withPublicIds(models: AgentModelOption[]): AgentModelOption[] {
+  registerPublicValues(models.map((model) => model.id));
+  return models;
+}
+
 export interface ModelCatalogOptions {
   client(provider: AgentProvider): AgentClient | undefined;
   isSignedOut(provider: AgentProvider): boolean;
@@ -32,7 +37,7 @@ export interface ModelCatalogOptions {
 
 export class ModelCatalog {
   readonly #options: ModelCatalogOptions;
-  #models = structuredClone(FALLBACK_MODELS);
+  #models = withPublicIds(structuredClone(FALLBACK_MODELS));
   readonly #sources = new Map<AgentProvider, ProviderModelSource>();
   readonly #startSettings = new WeakMap<AgentClient, string>();
 
@@ -134,7 +139,7 @@ export class ModelCatalog {
     const sorted = catalog.ownOrder
       ? models
       : [...models].sort((left, right) => rank(left) - rank(right) || compareModelVersions(left, right));
-    return { models: sorted, listed: serverModels.size };
+    return { models: withPublicIds(sorted), listed: serverModels.size };
   });
 
   readonly refresh = Effect.fn("ModelCatalog.refresh")(function* (this: ModelCatalog) {
@@ -194,7 +199,7 @@ export class ModelCatalog {
         }),
       { concurrency: "unbounded" },
     );
-    this.#models = discovered.flatMap((entry) => entry.models);
+    this.#models = withPublicIds(discovered.flatMap((entry) => entry.models));
     return {
       fresh: new Set(discovered.filter((entry) => entry.fresh).map((entry) => entry.provider)),
       timedOut: timeouts,
@@ -231,8 +236,10 @@ export class ModelCatalog {
     yield* this.#readSource(provider, client, catalog);
     if (this.#options.client(provider) !== client) return false;
     const current = this.#models;
-    this.#models = BUILT_IN_PROVIDER_DRIVERS.flatMap(({ id }) =>
-      id === provider ? models : current.filter((model) => model.provider === id),
+    this.#models = withPublicIds(
+      BUILT_IN_PROVIDER_DRIVERS.flatMap(({ id }) =>
+        id === provider ? models : current.filter((model) => model.provider === id),
+      ),
     );
     return true;
   });

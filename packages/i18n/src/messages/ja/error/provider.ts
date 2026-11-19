@@ -243,6 +243,8 @@ export const messages = {
     "エンドポイント「{provider}」がリクエストを拒否しました。API キーまたはヘッダーが正しくないか、アカウントがこのモデルを使用できない可能性があります。サーバー設定 → プロバイダーで確認するか、別のモデルを選んでください。その後、もう一度お試しください。",
   "error.provider.customEndpointKeyMissing":
     "エンドポイント「{provider}」には API キーが必要です。サーバー設定 → プロバイダーでキーを追加してから、もう一度お試しください。",
+  "error.provider.customEndpointEffortRefused":
+    "エンドポイント「{provider}」がこのモデルの推論の強さを拒否しました。サーバー設定 → プロバイダーで「{provider}」を編集してください。推論の強さでは、このモデルが受け付ける強さだけを残すか、推論なしを選んでください。そのあと、もう一度お試しください。",
   "error.provider.opencodeKeyExpired":
     "OpenCode の API キーの有効期限が切れました。OpenCode Console で新しいキーを作成し、OpenCode の設定に貼り付けてから、もう一度お試しください。",
   "error.provider.opencodeKeyRefused":
@@ -296,6 +298,8 @@ export const messages = {
   "error.provider.noAnswerAfterSteps":
     "{provider} はいくつかのステップを実行した後、回答せずにターンを終了しました。同じ依頼をもう一度送る前に、エージェントに何をしたか尋ねてください。",
   "error.provider.acpRefusedNoReason": "{provider} は回答せずに停止しました。メッセージをもう一度送信してください。",
+  "error.provider.channelNoAnswer":
+    "{provider} が回答なしでターンを終了しました。チャンネルで「続行」をクリックするとタスクをもう一度実行し、「再割り当て」をクリックすると別のメンバーに渡します。",
   "error.provider.chatgptPageFailed": "OpenBot は ChatGPT の接続ページを開けませんでした。",
   "error.provider.noneReady": "準備ができているエージェントのプロバイダーがありません。",
   "error.provider.claudeTurnActive": "コンテキストを更新する前に、実行中の Claude のターンが終わるまでお待ちください。",

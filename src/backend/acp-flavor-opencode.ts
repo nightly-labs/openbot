@@ -109,6 +109,16 @@ const OPENCODE_CONTEXT_TOO_SMALL =
 const NVIDIA_MODEL_NOT_SERVED = /\bFunction '[^']*': Not found for account\b/u;
 const NVIDIA_MODEL_DEGRADED = /\bDEGRADED function cannot be invoked\b/iu;
 
+function isReasoningEffortRefusal(error: unknown): boolean {
+  if (!(error instanceof RequestError) || error.code !== -32603) return false;
+  return (
+    /\breasoning[_ .]?effort\b/iu.test(error.message) &&
+    /\b(?:does not support|doesn't support|not supported|unsupported|unrecognized|unknown|invalid|not allowed|not permitted)\b/iu.test(
+      error.message,
+    )
+  );
+}
+
 const OPENCODE_REQUEST_FAILURES = [
   [
     "error.provider.opencodeBilling",
@@ -227,6 +237,10 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
       });
     if (isOpenCodeServiceFailure(error) || isOpenCodeInternalFailure(error) || isOpenCodeServerLost(error))
       return sourceText("error.provider.opencodeServiceFailure");
+    if (endpoint && isReasoningEffortRefusal(error)) {
+      logger.warn("A custom endpoint refused the reasoning effort.", { detail });
+      return sourceText("error.provider.customEndpointEffortRefused", { provider: endpoint.name });
+    }
     return openCodeRequestFailure(error, detail, redact, log);
   },
   failureCause: openCodeFailureCause,

@@ -251,6 +251,8 @@ export const messages = {
     "Le point de terminaison « {provider} » a refusé la requête. Sa clé d’API ou ses en-têtes sont peut-être incorrects, ou son compte ne peut pas utiliser ce modèle. Vérifiez-les dans Réglages du serveur → Fournisseurs, ou choisissez un autre modèle. Puis réessayez.",
   "error.provider.customEndpointKeyMissing":
     "Le point de terminaison « {provider} » a besoin d’une clé d’API. Ajoutez la clé dans Réglages du serveur → Fournisseurs, puis réessayez.",
+  "error.provider.customEndpointEffortRefused":
+    "Le point de terminaison « {provider} » a refusé l’effort de raisonnement de ce modèle. Dans Réglages du serveur → Fournisseurs, modifiez « {provider} ». Sous Effort, gardez seulement les niveaux que ce modèle accepte, ou choisissez Sans raisonnement. Puis réessayez.",
   "error.provider.opencodeKeyExpired":
     "Votre clé d’API OpenCode a expiré. Créez une nouvelle clé dans OpenCode Console, collez-la dans les réglages d’OpenCode, puis réessayez.",
   "error.provider.opencodeKeyRefused":
@@ -304,6 +306,8 @@ export const messages = {
   "error.provider.noAnswerAfterSteps":
     "{provider} a effectué quelques étapes, puis a terminé le tour sans réponse. Demandez à l'agent ce qu'il a fait avant d'envoyer à nouveau la même demande.",
   "error.provider.acpRefusedNoReason": "{provider} s’est arrêté sans réponse. Renvoyez le message.",
+  "error.provider.channelNoAnswer":
+    "{provider} a terminé le tour sans réponse. Dans le canal, cliquez sur Continuer pour relancer la tâche, ou sur Réattribuer pour la confier à un autre membre.",
   "error.provider.chatgptPageFailed": "OpenBot n’a pas pu ouvrir la page de connexion ChatGPT.",
   "error.provider.noneReady": "Aucun fournisseur d’agent n’est prêt.",
   "error.provider.claudeTurnActive": "Attendez la fin du tour Claude actif avant d’actualiser son contexte.",

@@ -731,7 +731,7 @@ try {
     tool: "create_channel",
     arguments: { name: "retry", memberAgentIds: [lead.id, writer.id], icon: { name: "star", hue: 55 } },
   };
-  const dependencies = { channels: channels(), listAgents: () => agents.listAgents() };
+  const dependencies = { channels: channels(), listAgents: () => agents.listAgents(), decodeAvatar: null };
   const first = await runCauseEffect(handleChannelAgentTool(params, lead.id, dependencies));
   const count = channelCount();
   await runCauseEffect(agents.setAgentHidden({ agentId: writer.id, hidden: true }));
