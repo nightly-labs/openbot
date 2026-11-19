@@ -42,7 +42,6 @@ interface Report {
   };
   back?: { workspaceLoaded: boolean };
   reconnect?: { reconnectingShown: boolean; loadingShown: boolean; recovered: boolean };
-  loadingWhere?: string[];
   pageErrors: string[];
   screenshots: string[];
   passed: boolean;
@@ -160,9 +159,6 @@ try {
       () => false,
       () => true,
     );
-  report.loadingWhere = await web
-    .getByText(loading, { exact: true })
-    .evaluateAll((nodes) => nodes.map((node) => (node.parentElement?.outerHTML ?? "").slice(0, 300)));
   await shot(web, "5-reconnecting");
   assert.ok(!reconnectLoadingShown, `The web app shows "${loading}" for a held reconnect.`);
   await host.page.evaluate(() => window.openbot.host.start());
