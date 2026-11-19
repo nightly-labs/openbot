@@ -10,6 +10,8 @@ import {
   fetchLatestWaWebVersion,
   type GroupMetadata,
   generateMessageIDV2,
+  isLidUser,
+  isPnUser,
   jidNormalizedUser,
   type MiscMessageGenerationOptions,
   makeCacheableSignalKeyStore,
@@ -17,6 +19,7 @@ import {
   type SocketConfig,
   type UserFacingSocketConfig,
   type WAMessage,
+  type WAMessageKey,
   type WAVersion,
 } from "@openbot/whatsapp/baileys";
 import { Effect } from "effect";
@@ -44,7 +47,12 @@ export interface WhatsAppSocket {
   groupMetadata(jid: string): Promise<GroupMetadata>;
   onWhatsApp(...phoneNumbers: string[]): Promise<Array<{ jid: string; exists: boolean }> | undefined>;
   updateMediaMessage(message: WAMessage): Promise<WAMessage>;
-  signalRepository: { lidMapping: { getPNForLID(lid: string): Promise<string | null> } };
+  signalRepository: {
+    lidMapping: {
+      getPNForLID(lid: string): Promise<string | null>;
+      getLIDForPN(pn: string): Promise<string | null>;
+    };
+  };
 }
 
 export interface WhatsAppAck {
@@ -81,6 +89,9 @@ const WATCHDOG_SILENCE_MS = 90_000;
 const WATCHDOG_INTERVAL_MS = 15_000;
 const SEND_DEADLINE_MS = 5 * 60_000;
 const ACK_WAIT_MS = 10_000;
+const LID_WAIT_MS = 5_000;
+const NO_LID_TTL_MS = 10 * 60_000;
+const CHAT_MEMORY_LIMIT = 1_000;
 const SEND_ATTEMPTS = 3;
 const CHAT_PACING_MS = 1_000;
 const ECHO_TTL_MS = 20 * 60_000;
@@ -147,6 +158,8 @@ export class WhatsAppSession {
   readonly #acks = new Map<string, (result: AckResult) => void>();
   readonly #chatQueues = new Map<string, Promise<unknown>>();
   readonly #lastSend = new Map<string, number>();
+  readonly #postChats = new Map<string, string>();
+  readonly #noLid = new Map<string, number>();
   readonly #groups = new Map<string, { metadata: GroupMetadata; at: number }>();
   #socket: WhatsAppSocket | null = null;
   #state: WhatsAppSessionState = "stopped";
@@ -482,13 +495,18 @@ export class WhatsAppSession {
     const deadline = this.#now() + SEND_DEADLINE_MS;
     for (let attempt = 1; ; attempt += 1) {
       const socket = await this.#openSocket(deadline);
+      const address = this.#postChat(content) ?? (await this.#address(socket, jid));
       const gap = CHAT_PACING_MS * (1 + Math.random() / 2) - (this.#now() - (this.#lastSend.get(jid) ?? 0));
       if (gap > 0) await new Promise((resume) => setTimeout(resume, gap));
       messageId ??= generateMessageIDV2(socket.user?.id);
       this.#remember(messageId);
       const ack = this.#ackOf(messageId);
       try {
-        const sent = await socket.sendMessage(jid, content, { ...options, messageId });
+        const sent = await socket.sendMessage(address, onAddress(content, jid, address), {
+          ...options,
+          ...(options?.quoted ? { quoted: { ...options.quoted, key: onKey(options.quoted.key, jid, address) } } : {}),
+          messageId,
+        });
         this.#lastSend.set(jid, this.#now());
         if (!sent?.key.id) throw new Error("no_message_id");
         const result = await ack.promise;
@@ -499,11 +517,39 @@ export class WhatsAppSession {
         if (typeof result === "object" && result.error)
           throw attempt > 1 ? new Error("not_confirmed") : new WhatsAppRefusedError(result.error);
         if (sent.message) this.#store.putOutbound(sent.key.id, sent.message);
+        if (isPnUser(jid)) remember(this.#postChats, messageId, address);
         return sent;
       } finally {
         ack.cancel();
       }
     }
+  }
+
+  async #address(socket: WhatsAppSocket, jid: string): Promise<string> {
+    if (!isPnUser(jid) || (socket.user && jidNormalizedUser(socket.user.id) === jid)) return jid;
+    const missedAt = this.#noLid.get(jid);
+    if (missedAt !== undefined && this.#now() - missedAt < NO_LID_TTL_MS) return jid;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const lid = await Promise.race([
+      socket.signalRepository.lidMapping.getLIDForPN(jid).then(
+        (found) => (found && isLidUser(found) ? jidNormalizedUser(found) : null),
+        () => undefined,
+      ),
+      new Promise<undefined>((resolve) => {
+        const wait = setTimeout(() => resolve(undefined), LID_WAIT_MS);
+        wait.unref?.();
+        timer = wait;
+      }),
+    ]).finally(() => clearTimeout(timer));
+    if (lid) return lid;
+    if (lid === null) remember(this.#noLid, jid, this.#now());
+    else logger.warn("WhatsApp: no LID for a contact in time; the post goes to the phone number.");
+    return jid;
+  }
+
+  #postChat(content: AnyMessageContent): string | undefined {
+    const key = "edit" in content && content.edit ? content.edit : "delete" in content ? content.delete : null;
+    return key?.id ? this.#postChats.get(key.id) : undefined;
   }
 
   #ackOf(messageId: string): { promise: Promise<AckResult>; cancel: () => void } {
@@ -549,6 +595,26 @@ export class WhatsAppSession {
       this.#echoes.delete(id);
     }
   }
+}
+
+function onAddress(content: AnyMessageContent, jid: string, address: string): AnyMessageContent {
+  if (address === jid) return content;
+  if ("edit" in content && content.edit) return { ...content, edit: onKey(content.edit, jid, address) };
+  if ("delete" in content) return { ...content, delete: onKey(content.delete, jid, address) };
+  if ("react" in content && content.react.key)
+    return { ...content, react: { ...content.react, key: onKey(content.react.key, jid, address) } };
+  return content;
+}
+
+function remember<V>(memory: Map<string, V>, key: string, value: V): void {
+  memory.delete(key);
+  memory.set(key, value);
+  const oldest = memory.size > CHAT_MEMORY_LIMIT ? memory.keys().next().value : undefined;
+  if (oldest !== undefined) memory.delete(oldest);
+}
+
+function onKey<K extends WAMessageKey>(key: K, jid: string, address: string): K {
+  return key.remoteJid === jid ? { ...key, remoteJid: address } : key;
 }
 
 async function webVersion(): Promise<WAVersion | null> {

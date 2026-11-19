@@ -357,7 +357,12 @@ export class MessagingStore {
         .run(now, historyCursor, linkId);
   }
 
-  deleteForAgent(agentId: string): void {
+  deleteForAgent(agentId: string): string[] {
+    const orchestratorOf = databaseRows(
+      this.#database.connection
+        .prepare("SELECT connection_id FROM projection_messaging_connections WHERE orchestrator_agent_id = ?")
+        .all(agentId),
+    ).map((row) => requiredStringColumn(row, "connection_id"));
     const links = databaseRows(
       this.#database.connection
         .prepare("SELECT link_id, thread_id FROM projection_messaging_threads WHERE agent_id = ?")
@@ -409,6 +414,13 @@ export class MessagingStore {
         return null;
       },
     );
+    return orchestratorOf;
+  }
+
+  restoreOrchestrator(agentId: string, connectionIds: readonly string[]): void {
+    for (const connectionId of connectionIds)
+      if (this.connection(connectionId)?.orchestratorAgentId === null)
+        this.updateConnection(connectionId, { orchestratorAgentId: agentId });
   }
 
   threadIdsForAgent(agentId: string): string[] {

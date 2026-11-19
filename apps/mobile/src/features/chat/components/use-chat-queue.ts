@@ -365,6 +365,7 @@ export function useChatQueue(
       waiting,
       hideWaiting: () => hideReplies(waiting.map((row) => row.id)),
       deliveries: query.data?.deliveries ?? EMPTY_DELIVERIES,
+      restartingProvider: query.data?.hold?.reason === "provider-restart" ? query.data.hold.provider : null,
       edit,
       confirmed,
       busy,

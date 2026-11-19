@@ -707,8 +707,8 @@ export const messages = {
   "mobile.server.browserProxies.choiceHint":
     "«Automatico» usa le impostazioni proxy del computer su cui gira il server. Una modifica chiude le schede aperte del profilo.",
   "mobile.server.browserProxies.shareHint": "Per usare il tuo computer, condividilo nell'app desktop di OpenBot.",
-  "mobile.server.route.vault": "Vault",
-  "mobile.server.settings.vault": "Vault",
+  "mobile.server.route.vault": "Cassaforte",
+  "mobile.server.settings.vault": "Cassaforte",
   "mobile.server.vault.unavailable":
     "Connettiti a questo server come proprietario o amministratore per gestirne il Vault.",
   "mobile.server.vault.unsupported": "Aggiorna OpenBot su questo server per gestirne qui il Vault.",

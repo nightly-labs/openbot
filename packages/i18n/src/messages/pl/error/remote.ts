@@ -23,6 +23,8 @@ export const messages = {
     "Host nie zezwolił OpenBot na nagrywanie ekranu. Przyznaj na hoście uprawnienie do nagrywania ekranu, a następnie spróbuj ponownie.",
   "error.remote.windowsSessionDisconnected":
     "Sesja Windows na hoście jest rozłączona, więc nie ma ekranu do udostępnienia. Zaloguj się do Windows na ekranie hosta, a następnie spróbuj ponownie.",
+  "error.remote.macScreenLocked":
+    "Mac jest zablokowany, więc nie może udostępnić ekranu. Odblokuj Maca na jego ekranie, a następnie spróbuj ponownie.",
   "error.remote.streamTooSlowLowerQuality":
     "Połączenie z hostem jest zbyt wolne, aby pokazać obraz. Spróbuj ponownie: następne połączenie użyje niższej jakości.",
   "error.remote.streamTooSlow":

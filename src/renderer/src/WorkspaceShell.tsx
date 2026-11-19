@@ -39,6 +39,7 @@ import { WorkspaceSidebar } from "./features/sidebar/WorkspaceSidebar";
 import { TasksPanel } from "./features/tasks/TasksPanel";
 import { createHostRestartToasts, type HostRestartView, noteServerAgents } from "./features/updates/host-restart-toast";
 import { useUsage } from "./features/usage/usage-context";
+import { finishRestartedStart, startsAfterRestart } from "./features/window/restarted-start";
 import { WindowBackdrop } from "./features/window/WindowBackdrop";
 import { WindowPageView } from "./features/window/WindowPageView";
 import { WorkspacePageRail } from "./features/window/WorkspacePageRail";
@@ -217,13 +218,21 @@ export function WorkspaceShell(props: {
   const [coverOpen, setCoverOpen] = createSignal(false);
   const chatHeld = () => !!props.behindSplash?.() || (loadingCover() && !coverOpen());
   createEffect(
-    () => !platform.landingPreview && fullWindowLoading() && !loadingCover() && !props.behindSplash?.(),
+    () =>
+      !platform.landingPreview &&
+      !startsAfterRestart() &&
+      fullWindowLoading() &&
+      !loadingCover() &&
+      !props.behindSplash?.(),
     (show) => {
       if (!show) return;
       setCoverOpen(false);
       setLoadingCover(true);
     },
   );
+  createEffect(fullWindowLoading, (loading) => {
+    if (!loading) finishRestartedStart();
+  });
   createEffect(
     () => (fullWindowLoading() ? undefined : props.onStartupReady),
     (onStartupReady) => {

@@ -196,6 +196,10 @@ export const messages = {
   "error.agent.mcpServerNotSaved": "Il server MCP non ha risposto, quindi non è stato salvato. {error}",
   "error.agent.mcpServerKeysMove":
     "Il server MCP {name} contiene chiavi per il suo server attuale. Chiedi all'utente di cambiare indirizzo, comando, argomenti o trasporto in Impostazioni server > MCP.",
+  "error.agent.mcpServerHeadersNeedHttp":
+    "Il server MCP {name} esegue un comando locale, quindi non accetta intestazioni. Chiedi all'utente di inserire le chiavi in Marketplace, App, {name}.",
+  "error.agent.mcpServerHeadersNeedPerson":
+    "Solo l'utente di questo OpenBot, in una chat con te, può fornire le chiavi del server MCP {name}. Chiedi all'utente di inserirle in Marketplace, App, {name}.",
   "error.agent.mcpServerBuiltIn":
     "{name} fa parte di OpenBot, quindi gli strumenti MCP non possono testarlo, attivarlo, disattivarlo o rimuoverlo. L'utente lo controlla sul computer che esegue OpenBot: la connessione GitHub in Marketplace, App, GitHub e Controllo del computer in Impostazioni > Controllo del computer.",
   "error.agent.mcpServerUnknown": "Nessun server MCP ha il nome {name}. Chiama list_mcp_servers per i nomi.",
@@ -207,6 +211,8 @@ export const messages = {
     "L'area non è dentro un solo schermo. Usa punti del desktop entro i limiti di uno schermo indicato da list_capture_sources.",
   "error.agent.screenCapturePermissionMissing":
     "OpenBot non ha il permesso Registrazione schermo. Chiedi all'utente di aprire Impostazioni di Sistema > Privacy e sicurezza > Registrazione schermo e audio di sistema, attivare OpenBot, poi uscire e riaprire OpenBot.",
+  "error.agent.screenCaptureListPermission":
+    "OpenBot non ha ancora il permesso Registrazione schermo, quindi non può elencare le finestre. Per catturare uno schermo, chiama capture_screen con target screen. L'utente approva prima la cattura, poi macOS può chiedergli il permesso.",
   "error.agent.screenCaptureEmptyWindows":
     "Windows ha restituito un'immagine vuota. Chiedi all'utente di sbloccare il computer e chiudere i contenuti protetti. Anche un criterio dell'organizzazione può bloccare l'acquisizione dello schermo.",
   "error.agent.screenCaptureFailed": "L'acquisizione dello schermo non è riuscita. Riprova.",

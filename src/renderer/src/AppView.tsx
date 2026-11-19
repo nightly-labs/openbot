@@ -16,6 +16,7 @@ import { useSettings } from "./features/settings/settings-context";
 import { useUpdates } from "./features/updates/updates-context";
 import { WhatsNewOverlay } from "./features/updates/WhatsNewOverlay";
 import { QuitShortcutHint } from "./features/window/QuitShortcutHint";
+import { startsAfterRestart } from "./features/window/restarted-start";
 import { useI18n } from "./i18n-context";
 import { AccountLogin, FirstRunFlow, InitialSetup, LanguageStep } from "./lazy-views";
 import { usePlatform } from "./platform";
@@ -53,7 +54,7 @@ export function AppAccessGate() {
   const updateRequired = () => updates.status().requiredVersion !== undefined && !requiredUpdateDismissed();
   const languageLoaded = createMemo<boolean>((was) => was === true || i18n.ready());
   const started = () => setup.setupLoaded() && platform.appInfo() !== null && languageLoaded();
-  const [splashShown, setSplashShown] = createSignal(!platform.landingPreview);
+  const [splashShown, setSplashShown] = createSignal(!platform.landingPreview && !startsAfterRestart());
   const splashPlaysThrough = !startupSplashPlayed && platform.chatWindow === null;
   const [splashOpen, setSplashOpen] = createSignal(false);
   const splashMoving = () => splashShown() && !splashOpen();

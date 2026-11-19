@@ -28,6 +28,8 @@ export const messages = {
     "Acquisizione dello schermo principale e invio dell'immagine al modello dell'agente.",
   "status.agent.screenCaptureChannel":
     "L'immagine appare nel canale {channel} e ogni membro di questo server che legge il canale può vederla.",
+  "status.agent.screenCapturePermissionNext":
+    "Poi macOS può chiederti di consentire a OpenBot la registrazione dello schermo.",
   "status.agent.screenCaptureDisplay":
     "Acquisizione dello schermo {name} e invio dell'immagine al modello dell'agente.",
   "status.agent.screenCaptureWindow":
@@ -121,6 +123,7 @@ export const messages = {
     "Aggiungi il server MCP {name}: {target}. Ogni agente su questo server ottiene i suoi strumenti. OpenBot si connette per provarlo.",
   "status.agent.mcpServerChange":
     "Modifica il server MCP {name} in {target}. Ogni agente su questo server ottiene i suoi strumenti. OpenBot si connette per provarlo.",
+  "status.agent.mcpServerHeaders": "Modifica anche queste intestazioni: {names}.",
   "status.agent.mcpServerEnable": "Attiva il server MCP {name} per ogni agente su questo server.",
   "status.agent.mcpServerDisable": "Disattiva il server MCP {name} per ogni agente su questo server.",
   "status.agent.mcpServerRemove": "Rimuovi il server MCP {name} e il suo accesso da ogni agente su questo server.",

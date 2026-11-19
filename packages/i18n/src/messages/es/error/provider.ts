@@ -243,6 +243,8 @@ export const messages = {
     "El endpoint «{provider}» rechazó la solicitud. Puede que su clave de API o sus encabezados sean incorrectos, o que su cuenta no pueda usar este modelo. Revísalos en Ajustes del servidor → Proveedores o elige otro modelo. Luego inténtalo de nuevo.",
   "error.provider.customEndpointKeyMissing":
     "El endpoint «{provider}» necesita una clave de API. Añade la clave en Ajustes del servidor → Proveedores y luego inténtalo de nuevo.",
+  "error.provider.customEndpointEffortRefused":
+    "El endpoint «{provider}» rechazó el esfuerzo de razonamiento de este modelo. En Ajustes del servidor → Proveedores, edita «{provider}». En Esfuerzo, deja solo los niveles que acepta este modelo, o selecciona Sin razonamiento. Luego inténtalo de nuevo.",
   "error.provider.opencodeKeyExpired":
     "Tu clave de API de OpenCode caducó. Crea una clave nueva en OpenCode Console, pégala en los ajustes de OpenCode y luego inténtalo de nuevo.",
   "error.provider.opencodeKeyRefused":
@@ -295,6 +297,8 @@ export const messages = {
   "error.provider.noAnswerAfterSteps":
     "{provider} hizo algunos pasos y terminó el turno sin respuesta. Pregunta al agente qué hizo antes de enviar la misma solicitud otra vez.",
   "error.provider.acpRefusedNoReason": "{provider} se detuvo sin respuesta. Envía el mensaje de nuevo.",
+  "error.provider.channelNoAnswer":
+    "{provider} terminó el turno sin respuesta. En el canal, haz clic en Continuar para ejecutar la tarea de nuevo, o en Reasignar para dársela a otro miembro.",
   "error.provider.chatgptPageFailed": "OpenBot no pudo abrir la página de conexión de ChatGPT.",
   "error.provider.noneReady": "Ningún proveedor de agentes está listo.",
   "error.provider.claudeTurnActive": "Espera a que termine el turno activo de Claude antes de actualizar su contexto.",

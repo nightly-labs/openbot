@@ -212,6 +212,7 @@ export class AgentRemoval {
       })),
     );
     let stage = "provider-files";
+    let orchestratorOf: readonly string[] = [];
     let processKeptForWork = false;
     yield* Effect.gen({ self: this }, function* () {
       for (const session of providerSessions)
@@ -219,7 +220,7 @@ export class AgentRemoval {
           .deleteProviderSessionFiles(session.externalSessionId, session.id)
           .pipe(toAgentRemovalFailed);
       stage = "messaging";
-      yield* this.#messaging.deleteForAgent(agent.id).pipe(toAgentRemovalFailed);
+      orchestratorOf = yield* this.#messaging.deleteForAgent(agent.id).pipe(toAgentRemovalFailed);
       stage = "tasks";
       yield* this.#hooks.deleteTasks(agent.id);
       stage = "mailbox";
@@ -249,6 +250,18 @@ export class AgentRemoval {
         ),
       );
     }).pipe(
+      Effect.tapError(() =>
+        removalStep(() => {
+          if (this.#store.list().some((candidate) => candidate.id === agent.id))
+            this.#messaging.store.restoreOrchestrator(agent.id, orchestratorOf);
+        }).pipe(
+          Effect.catch((failure) =>
+            Effect.sync(() =>
+              this.#logger.warn("Could not restore a deleted agent's orchestrator role.", removalErrorCode(failure)),
+            ),
+          ),
+        ),
+      ),
       Effect.mapError((failure) => {
         const code = removalErrorCode(failure);
         this.#logger.warn("Agent deletion failed.", { stage, ...code });

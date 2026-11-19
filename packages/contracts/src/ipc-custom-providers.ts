@@ -66,6 +66,10 @@ export function isCustomProviderReasoningEfforts(value: unknown): value is Custo
   return isOrderedSubset(CUSTOM_PROVIDER_REASONING_EFFORTS, value);
 }
 
+export function isCustomProviderModelEfforts(value: unknown): value is CustomProviderReasoningEffort[] {
+  return (Array.isArray(value) && value.length === 0) || isCustomProviderReasoningEfforts(value);
+}
+
 function isOrderedSubset(known: readonly unknown[], value: unknown): boolean {
   if (!Array.isArray(value) || value.length === 0) return false;
   let previous = -1;
@@ -193,7 +197,7 @@ function isCustomProviderModel(value: unknown): value is CustomProviderModel {
     isBoundedString(value.name, INPUT_LIMITS.modelName) &&
     (value.contextWindow === undefined || isCustomProviderContextWindow(value.contextWindow)) &&
     (value.maxOutput === undefined || isCustomProviderMaxOutput(value.maxOutput)) &&
-    (value.reasoningEfforts === undefined || isCustomProviderReasoningEfforts(value.reasoningEfforts)) &&
+    (value.reasoningEfforts === undefined || isCustomProviderModelEfforts(value.reasoningEfforts)) &&
     (value.inputs === undefined || isCustomProviderInputs(value.inputs))
   );
 }

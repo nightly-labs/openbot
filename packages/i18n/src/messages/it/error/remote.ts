@@ -23,6 +23,8 @@ export const messages = {
     "L'host non ha consentito a OpenBot di registrare lo schermo. Concedi la registrazione dello schermo sull'host, poi riprova.",
   "error.remote.windowsSessionDisconnected":
     "La sessione Windows dell'host è disconnessa, quindi non c'è uno schermo da condividere. Accedi a Windows dallo schermo dell'host, poi riprova.",
+  "error.remote.macScreenLocked":
+    "Il Mac è bloccato, quindi non può condividere lo schermo. Sblocca il Mac dal suo schermo, poi riprova.",
   "error.remote.streamTooSlowLowerQuality":
     "La connessione all'host è troppo lenta per l'immagine. Riprova: la prossima connessione userà una qualità più bassa.",
   "error.remote.streamTooSlow":
