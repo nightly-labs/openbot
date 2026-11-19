@@ -14,28 +14,18 @@ import {
 } from "./detected-providers";
 
 interface DetectedProviderSetupProps {
-  /** The provider to add or edit. `null` keeps both forms closed. */
   provider: DetectedProvider | null;
   api: DetectedProviderApi;
-  /** The agent command runs on a joined server, not on this computer. */
   host?: boolean | undefined;
   takenProviderIds?: readonly string[] | undefined;
   takenAgentIds?: readonly string[] | undefined;
-  /** The providers that can run an endpoint, for the "Runs on" field. Without it, OpenCode runs it. */
   harnesses?: readonly CustomProviderHarnessChoice[] | undefined;
-  /** Downloads a provider of "Runs on" that is not ready. */
   onDownloadHarness?: ((harness: CustomProviderHarness) => void) | undefined;
-  /** Why the last download of "Runs on" failed. */
   harnessError?: string | undefined;
   onClose: () => void;
-  /** After a save, so the host can say when the new models appear. */
   onSaved?: ((kind: DetectedProvider["kind"], restart: CustomProviderRestart | undefined) => void) | undefined;
 }
 
-/**
- * The step between Add and a saved provider: the form of its kind, filled from what the scan found,
- * so the user sees and can change every value before OpenBot saves it.
- */
 export function DetectedProviderSetup(props: DetectedProviderSetupProps) {
   const { t, format, errorMessage } = useText();
   const [saving, setSaving] = createSignal(false);
@@ -53,18 +43,15 @@ export function DetectedProviderSetup(props: DetectedProviderSetupProps) {
     const provider = agent();
     return provider ? detectedAgentDraft(provider) : undefined;
   };
-  /** A provider that is already saved keeps its own ID, so its ID is not a duplicate of itself. */
   const taken = (ids: readonly string[] | undefined) =>
     (ids ?? []).filter((id) => !(props.provider?.added && id === props.provider.id));
 
-  // Each open starts from the scan result: the models it listed are already found and selected.
   createEffect(
     () => props.provider,
     (provider) => {
       setSaving(false);
       setSubmitError(null);
       setCheck({ status: "idle" });
-      // A preset with no scan result has no list yet, not an empty one.
       setDiscovery(
         provider?.kind === "models" && provider.models.length > 0
           ? { status: "found", models: provider.models }
@@ -126,7 +113,7 @@ export function DetectedProviderSetup(props: DetectedProviderSetupProps) {
         takenProviderIds={taken(props.takenProviderIds)}
         providerIdLocked={Boolean(models()?.added)}
         apiKeyKept={Boolean(models()?.added && models()?.keyStored)}
-        contextWindows
+        contextWindows={!props.host}
         harnesses={props.harnesses}
         onDownloadHarness={props.onDownloadHarness}
         harnessError={props.harnessError}

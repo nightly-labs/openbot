@@ -16,15 +16,9 @@ import { createEffect, createSignal, Show, untrack } from "solid-js";
 import { type HostPersonalityCalls, rememberServerPersonality } from "./server-personality";
 
 export interface ServerPersonalityOptions {
-  /** The calls of a client with no `window.openbot`, such as the web client. */
   calls?: HostPersonalityCalls;
 }
 
-/**
- * Server Settings > Personality: how the agents of this server talk while they work
- * (`host-personality-v1`). Natural agents send short updates and the chat shows them; Classic
- * agents answer once, as before. The host checks the role again.
- */
 export function ServerPersonalitySetting(
   props: ServerPersonalityOptions & {
     serverId: string;
@@ -37,12 +31,10 @@ export function ServerPersonalitySetting(
   const calls = (): HostPersonalityCalls => props.calls ?? window.openbot.hostAdmin;
   const [settings, setSettings] = createSignal<HostPersonality | null>(null);
   const [loadError, setLoadError] = createSignal<string | null>(null);
-  /** Bumped for each server, so an answer for an earlier one is dropped. */
   let generation = 0;
 
   function keep(serverId: string, next: HostPersonality): void {
     setSettings(next);
-    // Open chats of this server show or hide progress updates at once.
     rememberServerPersonality(serverId, next);
   }
 
@@ -92,6 +84,7 @@ export function ServerPersonalitySetting(
         {(current) => (
           <ItemActions>
             <Select<ResponseStyle>
+              class="settings-modal-select"
               options={[...RESPONSE_STYLES]}
               value={current().responseStyle}
               disabled={props.disabled}

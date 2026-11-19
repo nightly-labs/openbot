@@ -24,8 +24,6 @@ const save = (instructions: string) => ({
   draft: { name: "Renamed", title: "", instructions, members: [{ agentId: "agent-1" }], leadAgentId: "agent-1" },
 });
 
-// #5929: a database can hold channel instructions over the 2,000-character limit. A read that
-// refused them made the channel, and every save of it, fail with "Invalid channel response".
 describe("stored channel instructions over the limit", () => {
   const long = "y".repeat(INPUT_LIMITS.agentDescription + 66);
 
@@ -42,5 +40,25 @@ describe("stored channel instructions over the limit", () => {
     const tooLong = "y".repeat(INPUT_LIMITS.storedChannelInstructions + 1);
     expect(() => decodeChannel({ ...CHANNEL, instructions: tooLong })).toThrow("Invalid channel response.");
     expect(() => parseChannelCommand(save(tooLong))).toThrow();
+  });
+});
+
+describe("stored channel lead that is not a member", () => {
+  const members = [{ agentId: "agent-1" }, { agentId: "agent-3" }];
+
+  it("reads the lead as the first member", () => {
+    expect(decodeChannel({ ...CHANNEL, members, leadAgentId: "agent-2" }).leadAgentId).toBe("agent-1");
+  });
+
+  it("reads no lead when the channel has no members", () => {
+    expect(decodeChannel({ ...CHANNEL, members: [], leadAgentId: "agent-2" }).leadAgentId).toBeNull();
+  });
+
+  it("keeps a lead that is a member", () => {
+    expect(decodeChannel({ ...CHANNEL, members, leadAgentId: "agent-3" }).leadAgentId).toBe("agent-3");
+  });
+
+  it("still refuses a save with that lead", () => {
+    expect(() => parseChannelCommand({ ...save(""), draft: { ...save("").draft, leadAgentId: "agent-2" } })).toThrow();
   });
 });

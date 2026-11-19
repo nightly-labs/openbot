@@ -1,5 +1,3 @@
-/** An agent step: a task that one agent does, with the agent and its model. */
-
 import { ProviderLogo } from "@openbot/brand";
 import type { AgentModelId } from "@openbot/contracts/ipc";
 import { Bot, Button, buttonVariants, ChevronDown, DropdownMenu, Play, Textarea, TriangleAlert } from "@openbot/ui";
@@ -26,9 +24,6 @@ import {
   wfProviderLogo,
 } from "./workflow-node-parts";
 
-/* --------------------------------------------------------------- Agent */
-
-/** Each agent with its title and the model that it runs on. */
 function agentOptions(catalogs: WorkflowCatalogs): PickerOption<string>[] {
   return catalogs.agents.map((agent) => ({
     value: agent.id,
@@ -44,13 +39,8 @@ function agentOptions(catalogs: WorkflowCatalogs): PickerOption<string>[] {
   }));
 }
 
-/**
- * The agent of a step. A step with no agent asks for one. An agent that the user deleted shows a
- * warning and opens the same list.
- */
 function AgentPill(props: {
   agent: AgentProfile | undefined;
-  /** True when the step names an agent that is not in the catalog. */
   removed: boolean;
   disabled?: boolean;
   onChange: (agent: AgentProfile) => void;
@@ -104,10 +94,6 @@ function AgentPill(props: {
   );
 }
 
-/**
- * One step that an agent does. The field holds the task, with the agent and its model at the
- * bottom, as the Higgsfield LLM Assistant holds its prompt with the model and Effort controls.
- */
 export function AgentNode(props: { id: string; agentId?: string; task?: string }) {
   const board = useBoard();
   const { t } = useText();
@@ -118,7 +104,6 @@ export function AgentNode(props: { id: string; agentId?: string; task?: string }
     asString,
   );
   const agent = () => board.catalogs().agents.find((candidate) => candidate.id === agentId());
-  // The catalog agent is a store, so its fields too are read once here.
   const first = untrack(() => {
     const found = agent();
     return { model: found?.model ?? "", provider: found?.provider ?? "codex" };

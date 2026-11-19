@@ -94,12 +94,10 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The Memories page in the agent pane. A title opens the memory on its own page. */
 export const List: Story = {
   render: () => <AgentMemoriesStory memories={chiefMemories} width={380} />,
 };
 
-/** A wide pane keeps the page in a centered column. */
 export const WidePane: Story = {
   render: () => <AgentMemoriesStory memories={chiefMemories} width={1100} />,
 };
@@ -108,7 +106,6 @@ export const FullList: Story = {
   render: () => <AgentMemoriesStory memories={fullMemoryList} width={380} />,
 };
 
-/** At the cap, the limit note takes the place of the New memory row. */
 export const AtLimit: Story = {
   render: () => <AgentMemoriesStory memories={chiefMemories} width={380} limit={chiefMemories.length} />,
 };

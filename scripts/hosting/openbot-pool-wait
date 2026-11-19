@@ -1,0 +1,62 @@
+#!/bin/bash
+set -euo pipefail
+export LC_ALL=C
+umask 077
+
+STATE=/etc/openbot-pool
+INSTALL=/opt/OpenBot/hosted
+WORK=${RUNTIME_DIRECTORY:-/run/openbot-pool}
+INTERVAL=10
+
+fail() {
+  echo "$*" >&2
+  exit 1
+}
+
+finish() {
+  rm -f "$STATE/token"
+  systemctl disable --quiet openbot-pool-wait.service || true
+  echo "$*"
+  exit 0
+}
+
+[ "$(id -u)" -eq 0 ] || fail "Run this as root."
+[ -s "$STATE/token" ] || finish "This machine has no offer."
+host=$(sed -n '1p' "$STATE/host" 2>/dev/null || true)
+[[ $host =~ ^leaseweb:[0-9]{1,20}$ ]] || fail "$STATE/host has no machine ID."
+token=$(sed -n '1p' "$STATE/token")
+[[ $token =~ ^[A-Za-z0-9_-]{32,128}$ ]] || fail "$STATE/token is not a token."
+user=$(cat "$INSTALL/service-user" 2>/dev/null || true)
+home=$(getent passwd "$user" | cut -d: -f6 || true)
+[ -n "$user" ] && [ "$user" != root ] && [ -d "$home" ] || fail "This machine has no service user. Prepare it first."
+url=$(sed -n 's/^OPENBOT_AUTH_API_URL=//p' "$INSTALL/openbot.env" 2>/dev/null | head -n 1)
+[[ $url =~ ^https://[A-Za-z0-9.-]+$ ]] || fail "$INSTALL/openbot.env has no account service."
+
+install -d -m 0700 "$WORK"
+request=$WORK/request
+answer=$WORK/answer
+printf '{"hostId":"%s","token":"%s"}' "$host" "$token" >"$request"
+
+echo "Machine $host waits for a server."
+while :; do
+  : >"$answer"
+  status=$(curl --silent --max-time 30 --proto '=https' --header 'content-type: application/json' \
+    --data-binary "@$request" --output "$answer" --write-out '%{http_code}' \
+    "$url/v2/hosting/pool/assignment" || true)
+  if [ "$status" = 401 ]; then
+    finish "The account service does not know the token of this machine. The offer is over."
+  fi
+  if [ "$status" = 200 ] && grep -q '"state":"assigned"' "$answer"; then
+    server=$(sed -n 's/.*"serverId":"\([0-9a-fA-F-]\{36\}\)".*/\1/p' "$answer" | head -n 1)
+    claim=$(sed -n 's/.*"claim":"\([A-Za-z0-9_-]\{16,512\}\)".*/\1/p' "$answer" | head -n 1)
+    if [ -n "$server" ] && [ -n "$claim" ]; then break; fi
+    echo "The answer has no server ID or no claim. Ask again." >&2
+  fi
+  sleep "$INTERVAL"
+done
+
+OPENBOT_HOSTED_HOST_ID=$server OPENBOT_HOSTED_CLAIM=$claim HOME=$home \
+  setpriv --reuid "$user" --regid "$(id -gn "$user")" --init-groups "$INSTALL/openbot-hosted-env"
+unset claim
+systemctl enable --now openbot.service
+finish "Server $server starts on machine $host."

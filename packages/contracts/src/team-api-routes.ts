@@ -1,35 +1,7 @@
-// Every Team API path the desktop builds, in one place.
-//
-// The host router in `src/main/team-api/` and the client in `src/main/remote-server-client.ts`
-// are two hand-written halves of one HTTP surface, and until this table every path was a bare string
-// literal on both of them - plus a third copy in the IPC handlers that call through. Nothing linked
-// the copies, so a rename that missed one half broke every remote server silently. The IPC channel
-// version of that mistake is caught by `src/main/ipc-channel-coverage.test.ts`.
-//
-// These are path *builders*, not a matcher, and every entry is exactly what the host compares
-// `url.pathname` against - queries stay at the call site that knows the parameters. The host does not
-// compare full paths for the parametric routes: it regex-matches `/v1/agents/:agentId` and switches on
-// an action sub-segment, so a shared matcher would mean rewriting its 404 and 405 semantics. Static
-// entries are for both halves; the host's regex branches stay literal.
-//
-// The frozen artifacts under `./team-protocol` deliberately do not import this table. `v1.ts` keeps
-// its own copy of the route list because it classifies requests for a *released* wire protocol: if a
-// rename here followed into it, the meaning of a shipped protocol would change, and that is the one
-// thing a released adapter may never do. The duplication there is the point - do not "fix" it.
-//
-// The cloud account API in `apps/auth-api` serves `/v1/...` paths of its own. It is an unrelated
-// service reached by `central-auth-manager.ts` and the marketplace services, and its routes do not
-// belong here.
-
 function segment(value: string): string {
   return encodeURIComponent(value);
 }
 
-// The remote-screen namespace, exposed on the group below as `prefix` because it is rewritten as a
-// *string inside a served body*, not built as a path: `remote-viewer-proxy.ts` prefixes every
-// occurrence in the viewer's HTML and JavaScript with its own server-scoped base, so a rename here
-// that the proxy did not follow would leave those assets pointing outside the proxy and 404. The
-// group's entries are built from it so there is one source, not a fifth copy.
 const REMOTE_SCREEN = "/v1/remote-screen";
 
 export const TEAM_API_ROUTES = {
@@ -40,9 +12,9 @@ export const TEAM_API_ROUTES = {
   me: "/v1/me",
   attachments: "/v1/attachments",
   attachment: (attachmentId: string) => `/v1/attachments/${segment(attachmentId)}`,
+  attachmentPreview: (attachmentId: string) => `/v1/attachments/${segment(attachmentId)}/preview`,
   sharedFiles: "/v1/shared-files",
   workspaceFiles: "/v1/workspace-files",
-  // The WebSocket upgrade path, not a JSON endpoint.
   remoteDesktopUpgrade: "/v1/remote-desktop",
   join: {
     server: "/v1/join",
@@ -64,7 +36,6 @@ export const TEAM_API_ROUTES = {
     logo: "/v1/team/logo",
     members: "/v1/team/members",
     member: (memberId: string) => `/v1/team/members/${segment(memberId)}`,
-    // Behind `member-leave-v1`: the caller removes their own membership.
     leave: "/v1/team/leave",
     invites: "/v1/team/invites",
     invite: (inviteId: string) => `/v1/team/invites/${segment(inviteId)}`,
@@ -91,12 +62,8 @@ export const TEAM_API_ROUTES = {
     control: "/v1/browser/control",
     preview: "/v1/browser/preview",
     visible: "/v1/browser/visible",
-    // Behind `browser-navigation`; see `team-protocol/browser-navigation-v1.ts` for why neither of
-    // these could be a field on the released routes beside them.
     display: "/v1/browser/display",
     load: "/v1/browser/load",
-    // Behind `browser-view`. The session is a request; the frames are on the socket at the
-    // `streamPath` it answers with, which `team-protocol/browser-view-v1.ts` builds and reads.
     viewSessions: "/v1/browser/view/sessions",
     viewSession: (sessionId: string) => `/v1/browser/view/sessions/${segment(sessionId)}`,
   },
@@ -108,10 +75,6 @@ export const TEAM_API_ROUTES = {
     sessions: `${REMOTE_SCREEN}/sessions`,
     session: (sessionId: string) => `${REMOTE_SCREEN}/sessions/${segment(sessionId)}`,
     display: `${REMOTE_SCREEN}/display`,
-    // Served by `remote-screen-gateway.ts`, which the Team API router delegates the whole
-    // `sessions/:id/{viewer,authorize,viewer-state,moonlight}` family to. It is here because the
-    // client and the gateway's own `viewerUrl` both build it, and it answers 404 for a session that
-    // does not exist - so it is not part of the route round-trip case.
     viewer: (sessionId: string) => `${REMOTE_SCREEN}/sessions/${segment(sessionId)}/viewer`,
   },
   sidebarLayout: {
@@ -126,7 +89,6 @@ export const TEAM_API_ROUTES = {
   agents: {
     generateProfile: "/v1/agents/profile/generate",
     saveProfile: "/v1/agents/profile/save",
-    // GET lists, POST creates.
     all: "/v1/agents",
     status: "/v1/agents/status",
     usage: "/v1/agents/usage",
@@ -134,7 +96,6 @@ export const TEAM_API_ROUTES = {
     conversationReads: "/v1/agents/conversation-reads",
   },
   agent: {
-    // PATCH updates, DELETE removes.
     one: (agentId: string) => `/v1/agents/${segment(agentId)}`,
     analytics: (agentId: string) => `/v1/agents/${segment(agentId)}/analytics`,
     usage: (agentId: string) => `/v1/agents/${segment(agentId)}/usage`,
@@ -144,8 +105,6 @@ export const TEAM_API_ROUTES = {
     conversation: (agentId: string) => `/v1/agents/${segment(agentId)}/conversation`,
     conversationPage: (agentId: string) => `/v1/agents/${segment(agentId)}/conversation-page`,
     conversationRead: (agentId: string) => `/v1/agents/${segment(agentId)}/conversation/read`,
-    // Protocol v3 only. The v3 adapter rewrites this to the `read` path before handing the body to
-    // the v1 codec, so v1 never classifies it - see `v3-adapter.ts`.
     conversationUnread: (agentId: string) => `/v1/agents/${segment(agentId)}/conversation/unread`,
     messages: (agentId: string) => `/v1/agents/${segment(agentId)}/messages`,
     reactions: (agentId: string) => `/v1/agents/${segment(agentId)}/reactions`,

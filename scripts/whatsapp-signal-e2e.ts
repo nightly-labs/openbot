@@ -1,16 +1,3 @@
-// End-to-end check of OpenBot's clean-room Signal implementation for the WhatsApp connector
-// (`packages/whatsapp/src/signal`, `packages/whatsapp/src/signal-repository.ts`).
-//
-// 1. Known-answer vectors in `packages/whatsapp/test-vectors`: X25519, signatures, pairwise sessions
-//    (as receiver and as byte-exact sender), out-of-order delivery, forward limit and sender keys.
-// 2. Parties that run through `makeOpenBotSignalRepository` with the Baileys transaction layer over
-//    an in-memory key store that stores values as the OpenBot auth store does (BufferJSON).
-// 3. When `OPENBOT_WA_ORACLE` names a reference implementation, a differential conversation against
-//    it in both directions. CI has no oracle, so the report marks it as skipped.
-//
-// `bun scripts/whatsapp-signal-e2e.ts`. Writes .openbot-build/whatsapp-signal-e2e.json and exits
-// non-zero when a check fails.
-
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -76,7 +63,6 @@ import signatureVectors from "../packages/whatsapp/test-vectors/signatures.json"
 import x25519Vectors from "../packages/whatsapp/test-vectors/x25519.json";
 
 const REPORT = resolve(import.meta.dirname, "../.openbot-build/whatsapp-signal-e2e.json");
-/** The reference oracle, only from an explicit path: a fixed path in `/tmp` could hold anyone's file. */
 const ORACLE = process.env.OPENBOT_WA_ORACLE ?? "";
 const log = createOpenBotLogger("whatsapp-signal-e2e");
 
@@ -128,7 +114,6 @@ async function rejects(run: () => unknown, text?: string): Promise<Error> {
   throw new Error("Expected a failure, but the call succeeded");
 }
 
-/** Gives the listed private keys in order, as the vectors draw them. */
 function keyQueue(privateKeys: string[]): { source: KeyPairSource; used: () => number } {
   let next = 0;
   return {
@@ -142,9 +127,6 @@ function keyQueue(privateKeys: string[]): { source: KeyPairSource; used: () => n
     used: () => next,
   };
 }
-
-// ---------------------------------------------------------------------------------------------
-// Known-answer vectors
 
 async function checkPrimitiveVectors(): Promise<void> {
   for (const [index, sample] of x25519Vectors.samples.entries()) {
@@ -232,7 +214,6 @@ function vectorKeyPair(privateKey: string): { public: Uint8Array; private: Uint8
   return { public: publicKeyOf(key), private: key };
 }
 
-/** Bob's responder state builder for a pkmsg, from the vector keys. */
 function vectorResponder(
   bob: SessionVector["bob"],
 ): (message: ReturnType<typeof decodePreKeySignalMessage>) => () => Promise<ReturnType<typeof respondSession>> {
@@ -420,10 +401,6 @@ async function checkSenderKeyVectors(): Promise<void> {
   }
 }
 
-// ---------------------------------------------------------------------------------------------
-// Repository parties
-
-/** Stores each value as JSON text with BufferJSON, as the OpenBot auth store does. */
 class MemoryKeyStore implements SignalKeyStore {
   readonly #values = new Map<string, string>();
 
@@ -471,7 +448,6 @@ function makeParty(jid: string): Party {
   return { jid, creds, store, repo: openRepository(store, creds) };
 }
 
-/** The bundle a prekey fetch returns for `party`, with keys as Baileys parses them. */
 function bundleOf(party: Party, preKeyId?: number): E2ESession {
   const bundle: E2ESession = {
     registrationId: party.creds.registrationId,
@@ -624,7 +600,6 @@ async function checkRepositoryParties(): Promise<void> {
   });
 
   await check("repository/session reset after an identity change", async () => {
-    // Bob reinstalls: new identity, new keys, same JID.
     const newBob = makeParty(bob.jid);
     await newBob.repo.injectE2ESession({ jid: alice.jid, session: bundleOf(alice, 2) });
     await receive(alice, newBob, await send(newBob, alice, "new bob"), "new bob");
@@ -633,7 +608,6 @@ async function checkRepositoryParties(): Promise<void> {
     assert.ok(stored);
     assert.equal(toHex(stored), toHex(generateSignalPubKey(newBob.creds.signedIdentityKey.public)));
     await exchange(alice, newBob, "welcome back");
-    // Alice rebuilds the session from a new bundle, as the identity change handler does.
     await alice.repo.injectE2ESession({ jid: bob.jid, session: bundleOf(newBob, 3) });
     const rebuilt = await send(alice, newBob, "rebuilt session");
     assert.equal(rebuilt.type, "pkmsg");
@@ -651,7 +625,6 @@ async function checkRepositoryParties(): Promise<void> {
     await alice.repo.injectE2ESession({ jid: pnJid, session: bundleOf(frank, 1) });
     assert.equal(alice.store.has("session", "15550000006.2"), true);
     await alice.repo.lidMapping.storeLIDPNMappings([{ lid: "100000000000006@lid", pn: "15550000006@s.whatsapp.net" }]);
-    // Device 99 is a hosted device, on its own servers; it has no session here.
     alice.store.set({ "device-list": { "15550000006": ["0", "2", "99"] } });
     const result = await alice.repo.migrateSession("15550000006@s.whatsapp.net", "100000000000006@lid");
     assert.deepEqual(result, { migrated: 1, skipped: 0, total: 1 });
@@ -691,7 +664,6 @@ async function checkRepositoryParties(): Promise<void> {
       }
       for (const receiver of members) {
         if (receiver === sender) continue;
-        // The distribution message travels in a pairwise WhatsApp message, as Baileys sends it.
         const carrier = proto.Message.encode({
           senderKeyDistributionMessage: {
             groupId: group,
@@ -729,7 +701,6 @@ async function checkRepositoryParties(): Promise<void> {
         assert.equal(await read(m1.ciphertext), `${text} #1`);
       }
     }
-    // Reload a receiver: the stored sender keys still decrypt.
     carol.repo = openRepository(carol.store, carol.creds);
     const after = await alice.repo.encryptGroupMessage({ group, data: utf8("after reload"), meId: alice.jid });
     const plaintext = await carol.repo.decryptGroupMessage({ group, authorJid: alice.jid, msg: after.ciphertext });
@@ -737,10 +708,6 @@ async function checkRepositoryParties(): Promise<void> {
   });
 }
 
-// ---------------------------------------------------------------------------------------------
-// Differential conversation against the reference oracle
-
-/** Oracle input: JSON values, with hex strings for bytes. */
 type OracleValue = string | number | boolean | undefined | OracleValue[] | { [key: string]: OracleValue };
 
 const OracleOutput = Schema.Struct({
@@ -946,7 +913,6 @@ async function checkOracleDifferential(): Promise<"ran" | "skipped"> {
       const ourAddress = addressToString(jidToAddress(us.jid));
       const group = "120363000000000099@g.us";
 
-      // Oracle -> OpenBot.
       const created = oracle(
         "skdm-create",
         {
@@ -980,7 +946,6 @@ async function checkOracleDifferential(): Promise<"ran" | "skipped"> {
         assert.equal(new TextDecoder().decode(plaintext), message.text);
       }
 
-      // OpenBot -> oracle.
       const ours: Array<{ text: string; ciphertext: Uint8Array; senderKeyDistributionMessage: Uint8Array }> = [];
       for (const text of ["h0", "h1", "h2", "h3"]) {
         ours.push({ text, ...(await us.repo.encryptGroupMessage({ group, data: utf8(text), meId: us.jid })) });
@@ -1008,8 +973,6 @@ async function checkOracleDifferential(): Promise<"ran" | "skipped"> {
   }
   return "ran";
 }
-
-// ---------------------------------------------------------------------------------------------
 
 await checkPrimitiveVectors();
 await checkSessionVectors();

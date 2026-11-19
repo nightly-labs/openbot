@@ -1,7 +1,3 @@
-import { Effect } from "effect";
-// Signing in to a provider, storing the optional provider API keys, and downloading the CLI
-// runtimes the providers need.
-
 import {
   agentProviderDescriptor,
   agentProviderName,
@@ -13,6 +9,7 @@ import {
 import {
   type AgentProviderId,
   type ConnectProviderAccountInput,
+  type ConnectProviderAccountKeyInput,
   isProviderAccountId,
   MAX_PROVIDER_ACCOUNTS,
   PROVIDER_ACCOUNT_LABEL_MAX_LENGTH,
@@ -25,6 +22,7 @@ import {
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { registerSecretValue } from "@openbot/logging";
+import { Effect } from "effect";
 import { AgentLifecycleFailed, type AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { SignInRegion } from "../../backend/kimi-region";
@@ -34,14 +32,12 @@ import { parseProviderId } from "./app-inputs";
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { optionalPayload, requireString } from "./validation";
 
-/** Long enough for any key a provider issues, short enough that nothing large reaches the cipher. */
 const MAX_API_KEY_LENGTH = 512;
 
 export interface ProviderIpcDependencies {
   service: AgentService;
   providerRuntimes: ProviderRuntimeManager;
   credentials: ProviderCredentialStore;
-  /** Opens a web page in the program that the user chose in Settings. */
   openLink: (url: string) => Promise<void>;
 }
 
@@ -94,16 +90,15 @@ export function providerIpcHandlers({
       cancelProviderRestart: payloadHandler(parseProviderId, async (provider) =>
         service.cancelProviderRestart(provider),
       ),
-      // The code and the page it is typed on come back; nothing the code is later traded for does.
+      chooseInstalledCli: payloadHandler(parseInstalledCliChoice, ({ provider, installed }) =>
+        runCauseEffect(service.chooseInstalledCli(provider, installed)),
+      ),
       startProviderCodeLogin: payloadHandler(parseProviderId, (provider) =>
         runCauseEffect(service.startProviderCodeLogin(provider)),
       ),
       cancelProviderCodeLogin: payloadHandler(parseProviderId, (provider) =>
         runCauseEffect(service.cancelProviderCodeLogin(provider)),
       ),
-      // The key and the process that uses it change as one step, because the catalog the CLI
-      // advertises is decided at spawn time: the service writes the key only when it can restart
-      // the provider on it, and reports success only once the new process is up.
       setProviderApiKey: payloadHandler(parseProviderApiKeyInput, async ({ provider, key }) => {
         if (provider === "codex") return signInCodexWithApiKey(service, key);
         await runCauseEffect(providerRuntimes.ensureKeyProviderCli(provider));
@@ -132,7 +127,6 @@ export function providerIpcHandlers({
           ),
         ),
       ),
-      // The account's sign-in opens the same way as `connectProvider`, with an https page only.
       connectProviderAccount: payloadHandler(parseConnectProviderAccountInput, ({ provider, accountId }) =>
         runCauseEffect(
           service.connectProviderAccount(provider, accountId, async (value) => {
@@ -141,6 +135,9 @@ export function providerIpcHandlers({
             await openLink(url.toString());
           }),
         ),
+      ),
+      connectProviderAccountKey: payloadHandler(parseConnectProviderAccountKeyInput, ({ provider, accountId, key }) =>
+        runCauseEffect(service.connectProviderAccountKey(provider, accountId, key)),
       ),
       cancelProviderAccountSignIn: payloadHandler(parseRemoveProviderAccountInput, ({ provider, accountId }) =>
         runCauseEffect(service.cancelProviderAccountSignIn(provider, accountId)),
@@ -161,7 +158,6 @@ export function providerIpcHandlers({
       resetProviderUsage: payloadHandler(parseResetProviderUsageInput, ({ provider, accountId }) =>
         runCauseEffect(service.resetProviderUsage(provider, accountId)),
       ),
-      // A status, never the key: see `setProviderApiKey` in the desktop API contract.
       getProviderApiKeyState: payloadHandler(parseProviderId, async (provider) => ({
         provider,
         status: credentials.status(provider),
@@ -184,21 +180,11 @@ export function providerIpcHandlers({
   };
 }
 
-/**
- * Codex keeps its key in its own login, not in OpenBot's store, so the store does not register it for
- * redaction. It is registered here, before Codex can echo it in a log line.
- */
 export function signInCodexWithApiKey(service: Pick<AgentService, "signInCodexWithApiKey">, key: string) {
   registerSecretValue(key);
   return runCauseEffect(service.signInCodexWithApiKey(key));
 }
 
-/**
- * The decoder every provider key passes through before it reaches the operating system's cipher.
- *
- * Exported for the test that holds it to its limits: this is the one place a renderer-supplied
- * secret enters the main process, and each rule here decides what `safeStorage` is asked to keep.
- */
 export function parseProviderApiKeyInput(value: unknown): SetProviderApiKeyInput {
   if (!isDynamicRecord(value)) throw new Error(sourceText("error.provider.keyRequired"));
   const provider = parseProviderId(value.provider);
@@ -213,7 +199,6 @@ function parseManagedProviderId(value: unknown): ManagedProviderId {
   return provider;
 }
 
-/** A managed runtime, or a provider that OpenBot installs with the provider's own installer. */
 export function parseDownloadableProviderId(value: unknown): DownloadableProviderId {
   const provider = parseProviderId(value);
   if (!isDownloadableProvider(provider)) throw new Error("OpenBot does not manage this provider's CLI.");
@@ -232,6 +217,11 @@ export function parseProviderUseInput(value: unknown): { provider: AgentProvider
   return { provider, on: value.on };
 }
 
+function parseInstalledCliChoice(value: unknown): { provider: ManagedProviderId; installed: boolean } {
+  if (!isDynamicRecord(value) || typeof value.installed !== "boolean") throw new Error("Invalid provider CLI choice.");
+  return { provider: parseManagedProviderId(value.provider), installed: value.installed };
+}
+
 export function parseConnectProviderAccountInput(value: unknown): ConnectProviderAccountInput {
   if (!isDynamicRecord(value)) throw new Error("Invalid provider account.");
   return {
@@ -240,12 +230,15 @@ export function parseConnectProviderAccountInput(value: unknown): ConnectProvide
   };
 }
 
+export function parseConnectProviderAccountKeyInput(value: unknown): ConnectProviderAccountKeyInput {
+  return { ...parseConnectProviderAccountInput(value), key: parseProviderApiKeyInput(value).key };
+}
+
 export function parseRemoveProviderAccountInput(value: unknown): RemoveProviderAccountInput {
   if (!isDynamicRecord(value)) throw new Error("Invalid provider account.");
   return { provider: parseProviderId(value.provider), accountId: requireString(value.accountId, "accountId") };
 }
 
-/** The pool switch of a provider and the accounts that the pool leaves out. */
 export function parseSetProviderAccountPoolInput(value: unknown): SetProviderAccountPoolInput {
   if (
     !isDynamicRecord(value) ||
@@ -258,7 +251,6 @@ export function parseSetProviderAccountPoolInput(value: unknown): SetProviderAcc
   return { provider: parseProviderId(value.provider), enabled: value.enabled, leftOut: value.leftOut };
 }
 
-/** The provider's own sign-in (`default`) or an account after the first. */
 export function parseResetProviderUsageInput(value: unknown): ResetProviderUsageInput {
   if (!isDynamicRecord(value) || !isProviderAccountId(value.accountId)) throw new Error("Invalid provider account.");
   return { provider: parseProviderId(value.provider), accountId: value.accountId };

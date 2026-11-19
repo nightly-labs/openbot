@@ -15,8 +15,6 @@
   }
 }
 
-/* The digits are flex items, so the group lays them out left to right in every page direction.
-   `DigitRuns` puts the runs of a right-to-left value in the order they show in. */
 .t-digit-group {
   display: inline-flex;
   align-items: baseline;
@@ -27,7 +25,6 @@
   display: inline-flex;
   align-items: baseline;
 }
-/* A flex item drops the spaces at its ends; they are the gap between the number and its unit. */
 .t-digit-word {
   white-space: pre;
 }
@@ -51,25 +48,14 @@
   }
 }
 
-/* Border-color tween. Define your input's default / focused
-   / error border-color in your own component CSS — this rule
-   only owns the interpolation. Use a constant border-width
-   across states so the tween never shifts inner content. */
 .t-input {
   transition: border-color var(--openbot-duration-normal) ease-out;
   will-change: transform;
 }
 .t-input.is-error {
-  /* Error border auto-reverts on the hold timer, so the
-     fade-out uses the slower revert duration (matches the
-     message fade). */
   transition: border-color var(--revert-dur, 280ms) ease-out;
 }
 
-/* Error message reveal. Visibility is delayed by --revert-dur
-   on hide so the message stays painted for the full opacity
-   fade-out. Entering .is-error drops the delay to 0 so the
-   message becomes visible immediately. */
 .t-error-msg {
   opacity: 0;
   visibility: hidden;
@@ -85,11 +71,6 @@
     visibility 0s linear 0s;
 }
 
-/* Multi-segment keyframe with per-stop easing so each leg
-   of the shake follows its own cubic-bezier independently.
-   %-stops are cumulative durations as a fraction of the
-   total (80, 60, 80, 60 = 280ms): 28.57%, 57.14%, 78.57%,
-   100%. Recompute if any segment duration changes. */
 .t-input.is-shaking {
   animation: t-input-shake calc(var(--shake-dur-a) * 2 + var(--shake-dur-b) * 2) linear;
 }
@@ -161,7 +142,6 @@
 .t-page-slide .t-page[data-page-id="2"] {
   --t-page-from-x: var(--page-slide-distance);
 }
-/* Right to left, the first page comes from the right and the second from the left. */
 .t-page-slide .t-page[data-page-id="1"]:dir(rtl) {
   --t-page-from-x: var(--page-slide-distance);
 }
@@ -238,9 +218,6 @@
   }
 }
 
-/* Panel reveal. The snippet travels on Y. A panel that enters from a side
-   edge sets --panel-translate-x and zeroes --panel-translate-y, so the same
-   duration, ease, and cross-blur read as a full open on either axis. */
 .t-panel-slide {
   transform: translate(var(--panel-translate-x), var(--panel-translate-y));
   opacity: 0;
@@ -269,8 +246,6 @@
   }
 }
 
-/* Accordion expand. grid-template-rows 0fr → 1fr gives a clean height animation
-   with no JS measurement; the inner element clips overflow. */
 .t-acc-panel {
   display: grid;
   grid-template-rows: 0fr;

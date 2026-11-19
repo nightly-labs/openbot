@@ -13,7 +13,6 @@ import { EXTERNAL_EVENT_END, EXTERNAL_EVENT_START } from "../webhook-trigger";
 import { withoutEvents } from "./github-output";
 import type { WorkflowGitHubFile, WorkflowGitHubFiles } from "./workflow-github-api";
 
-/** The message of a Discord trigger, as the run payload keeps it. */
 interface DiscordTriggerMessage {
   connectionId: string;
   channelId: string;
@@ -25,7 +24,6 @@ function text(node: WorkflowNode, key: string): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-/** One id a line, without empty lines. */
 function lines(value: string): string[] {
   return value
     .split("\n")
@@ -33,7 +31,6 @@ function lines(value: string): string[] {
     .filter(Boolean);
 }
 
-/** Whether `node` is a Discord trigger that starts on this mention. */
 export function discordTriggerMatches(node: WorkflowNode, mention: MessagingDiscordMention): boolean {
   if (node.kind !== "trigger" || node.fields.trigger !== "discord") return false;
   if (!isOneOf(WORKFLOW_DISCORD_EVENTS, node.fields.event)) return false;
@@ -46,10 +43,6 @@ export function discordTriggerMatches(node: WorkflowNode, mention: MessagingDisc
   return !contains || mention.text.toLocaleLowerCase().includes(contains);
 }
 
-/**
- * The run payload of a mention: the trigger's answer, which the next nodes read. The text came from a
- * person in the server, so the frame tells an agent to read it as data.
- */
 export function workflowDiscordPayload(nodeId: string, mention: MessagingDiscordMention): string {
   return [
     EXTERNAL_EVENT_START,
@@ -69,8 +62,6 @@ export function workflowDiscordPayload(nodeId: string, mention: MessagingDiscord
         authorId: mention.authorId,
         author: mention.authorName,
         text: mention.text,
-        // Signed addresses on Discord's CDN, which expire after about a day. An agent step can read
-        // them; a GitHub output copies them to the repository.
         attachments: mention.files.map((file) => ({
           name: file.name,
           contentType: file.mimeType,
@@ -83,7 +74,6 @@ export function workflowDiscordPayload(nodeId: string, mention: MessagingDiscord
   ].join("\n");
 }
 
-/** The data of the Discord mention in a run payload, or null when a Discord mention did not start the run. */
 function discordEventData(payload: string | null): DynamicRecord | null {
   if (!payload?.startsWith(EXTERNAL_EVENT_START)) return null;
   const [, , json] = payload.split("\n");
@@ -96,7 +86,6 @@ function discordEventData(payload: string | null): DynamicRecord | null {
   return isDynamicRecord(event) && event.type === "discord.mention" && isDynamicRecord(event.data) ? event.data : null;
 }
 
-/** The message that started a run, from its payload, or null when a Discord mention did not start it. */
 export function discordTriggerMessage(payload: string | null): DiscordTriggerMessage | null {
   const data = discordEventData(payload);
   if (!data) return null;
@@ -117,10 +106,6 @@ function isFile(value: unknown): value is WorkflowGitHubFile {
   );
 }
 
-/**
- * The files of the mention that started a run, and the folder that a GitHub output copies them to. Null
- * when the run has none: a payload of an older version keeps no files.
- */
 export function discordTriggerFiles(payload: string | null): WorkflowGitHubFiles | null {
   const data = discordEventData(payload);
   if (!data || !isString(data.messageId) || !/^\d{1,32}$/u.test(data.messageId)) return null;
@@ -132,13 +117,8 @@ export function discordTriggerFiles(payload: string | null): WorkflowGitHubFiles
   };
 }
 
-/** What a Discord output sends, or the error text of a node that cannot send. */
 export type DiscordOutputPlan = { connectionId: string; send: MessagingDiscordSend } | { error: string };
 
-/**
- * The post or reaction of a Discord output. `trigger` is the message of the run's mention, if any. A
- * reply and a reaction act on that message, so they need it and its server.
- */
 export function discordOutputPlan(
   node: WorkflowNode,
   input: string,
@@ -150,8 +130,6 @@ export function discordOutputPlan(
   const chosen = text(node, "connectionId") || WORKFLOW_DISCORD_TRIGGER_SERVER;
   const connectionId = chosen === WORKFLOW_DISCORD_TRIGGER_SERVER ? (trigger?.connectionId ?? "") : chosen;
   if (!connectionId) return { error: sourceText("error.workflow.discordNoMessage") };
-  // The event of a trigger is data for an agent: the server does not see it as a post. The GitHub
-  // text names no service, so a Discord output uses it too. Empty text posts nothing.
   const body = withoutEvents(input).trim();
   const onlyEvent = !body && Boolean(input.trim());
   const eventOnly = { error: sourceText("error.workflow.githubEventText") };

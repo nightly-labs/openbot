@@ -14,6 +14,7 @@ export const messages = {
   "channel.stoppedTask.assignmentLoopMembers":
     "Os membros passaram esta tarefa entre si vezes demais. Ela parou para evitar um loop.",
   "channel.conversation.noMembers": "Adicione agentes nas configurações do canal para começar o trabalho.",
+  "channel.conversation.waitFull": "Aguardando - {name} começa quando uma tarefa em andamento terminar",
   "channel.conversation.archivedNotice": "Canal excluído. Somente visualização.",
   "channel.composer.label": "Mensagem para o canal",
   "channel.composer.placeholder": "Mensagem para {name}",

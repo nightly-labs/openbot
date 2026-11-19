@@ -17,7 +17,6 @@ export const messages = {
   "customProvider.registry.updateFailed": "에이전트를 업데이트할 수 없었어요. 다시 시도해 주세요.",
   "customProvider.registry.removeFailed": "런타임을 제거할 수 없었어요. 다시 시도해 주세요.",
   "customProvider.registry.cancelFailed": "설치를 취소할 수 없었어요. 다시 시도해 주세요.",
-  // Form validation. Each message names one field of the custom provider form.
   "customProvider.error.providerIdRequired": "제공자 ID를 입력해 주세요.",
   "customProvider.error.providerIdPattern":
     "영문 소문자, 숫자, 하이픈, 밑줄을 사용하고 영문자 또는 숫자로 시작해야 해요.",
@@ -47,7 +46,6 @@ export const messages = {
   "customProvider.error.baseUrlProtocol": "http:// 또는 https:// URL을 사용해 주세요.",
   "customProvider.error.baseUrlCredential": "자격 증명은 URL이 아닌 헤더에 넣어 주세요.",
 
-  // The note after a save or a removal. It tells the user when the provider reads the new list.
   "customProvider.saved.restarted": "저장했어요. OpenBot이 모델을 불러오는 중이에요.",
   "customProvider.saved.skippedBusy": "저장했어요. 제공자는 현재 작업이 끝난 후 목록을 읽어요.",
   "customProvider.saved.notRunning": "저장했어요. 제공자는 다음에 시작할 때 목록을 읽어요.",
@@ -59,7 +57,6 @@ export const messages = {
   "customProvider.saveUnavailable": "이 빌드에서는 엔드포인트를 저장할 수 없어요.",
   "customProvider.removeUnavailable": "이 빌드에서는 엔드포인트를 제거할 수 없어요.",
 
-  // The add dialog.
   "customProvider.form.title": "사용자 지정 제공자 추가",
   "customProvider.form.editTitle": "사용자 지정 제공자 편집",
   "customProvider.form.description": "OpenAI 호환 엔드포인트와 그 엔드포인트가 제공하는 모델을 설명해 주세요.",
@@ -107,7 +104,6 @@ export const messages = {
   "customProvider.header.add": "헤더 추가",
   "customProvider.submit": "제출",
 
-  // Model discovery. OpenBot asks the endpoint for its model list, and the user picks from it.
   "customProvider.discovery.find": "모델 찾기",
   "customProvider.discovery.refresh": "다시 찾기",
   "customProvider.discovery.loading": "{url}에 모델 목록을 요청하는 중이에요.",
@@ -121,7 +117,6 @@ export const messages = {
   "customProvider.discovery.deselectAll": "선택 해제",
   "customProvider.discovery.noMatch": "검색과 일치하는 모델이 없어요.",
 
-  // The first step of the add flow: a preset fills the form that comes next.
   "customProvider.preset.title": "제공자 또는 에이전트 추가",
   "customProvider.preset.description": "로컬 모델 서버, 엔드포인트, 또는 ACP 에이전트를 선택하세요.",
   "customProvider.preset.heading": "사용자 지정 추가",
@@ -139,8 +134,6 @@ export const messages = {
   "customProvider.probe.checking": "확인 중",
   "customProvider.probe.running": { other: "실행 중 · 모델 {count}개" },
 
-  // Automatic detection on the provider step and in Settings. OpenBot looks for local model servers
-  // at their default addresses and for known ACP agent commands on the PATH.
   "customProvider.detected.title": "이 컴퓨터에서 찾았어요",
   "customProvider.detected.titleServer": "서버에서 찾았어요",
   "customProvider.detected.scanning": "로컬 모델과 에이전트를 찾는 중이에요.",
@@ -159,7 +152,6 @@ export const messages = {
   "customProvider.detected.hide": "{name} 숨기기",
   "customProvider.detected.showHidden": "숨긴 항목 보기 ({count})",
 
-  // Where the scan looks. The default addresses and PATH are always part of it.
   "customProvider.detection.title": "로컬 감지",
   "customProvider.detection.saveFailed": "감지 설정을 저장할 수 없었어요.",
   "customProvider.detection.description": "OpenBot이 로컬 모델 서버와 ACP 에이전트를 찾는 위치예요.",
@@ -178,7 +170,6 @@ export const messages = {
   "customProvider.detection.folder.add": "폴더 추가",
   "customProvider.detection.error.folderInvalid": "{example}처럼 전체 경로를 입력해 주세요.",
 
-  // The custom ACP agent form.
   "customProvider.acp.title": "사용자 지정 ACP 에이전트 추가",
   "customProvider.acp.description": "Agent Client Protocol을 사용하는 명령을 설명해 주세요.",
   "customProvider.acp.heading": "사용자 지정 ACP 에이전트",
@@ -228,7 +219,6 @@ export const messages = {
   "customProvider.acp.error.agentIdPattern":
     "영문 소문자, 숫자, 하이픈을 사용하고 영문자 또는 숫자로 시작해야 해요. 최대 40자예요.",
 
-  // The user's own ACP agents in Settings. Each is a command that OpenBot starts on this computer.
   "customProvider.agents.title": "사용자 지정 에이전트",
   "customProvider.agents.description": "OpenBot이 이 컴퓨터에서 시작하는 ACP 에이전트예요.",
   "customProvider.agents.hostDescription": "OpenBot이 서버 컴퓨터에서 시작하는 ACP 에이전트예요.",
@@ -251,7 +241,6 @@ export const messages = {
   "customProvider.agents.removed.skippedBusy": "제거했어요. 현재 작업이 끝나면 사용자 지정 에이전트가 다시 시작돼요.",
   "customProvider.agents.removed.notRunning": "제거했어요. 사용자 지정 에이전트는 다음에 시작할 때 이 내용을 읽어요.",
 
-  // The list of saved endpoints.
   "customProvider.list.title": "사용자 지정 제공자",
   "customProvider.list.description": "저장한 엔드포인트예요. 더 이상 쓰지 않는 것은 제거하세요.",
   "customProvider.list.subtitle": "내 모델 엔드포인트.",

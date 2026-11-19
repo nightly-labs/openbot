@@ -1,13 +1,5 @@
 import { BENCHMARK_SOURCES, type MatchupComparison } from "./comparison";
 
-// Every statement about Codex here is taken from OpenAI's Codex documentation
-// (developers.openai.com/codex now redirects to learn.chatgpt.com/docs), the OpenAI
-// help center and the openai/codex repository. Every statement about Claude Code is
-// taken from code.claude.com, claude.com and the Claude help center. Each page used is
-// in `sources`. The benchmark numbers are read by hand from the Artificial Analysis
-// Coding Agent Index. Where the sources state nothing, the text says so. Check them
-// again, and move `checkedAt`, whenever this file changes.
-
 const CODEX_DOCS = "https://learn.chatgpt.com/docs";
 const CLAUDE_CODE_DOCS = "https://code.claude.com/docs/en";
 

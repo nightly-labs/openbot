@@ -10,23 +10,6 @@ import {
 } from "@openbot/contracts/ipc";
 import { isOneOf } from "@openbot/contracts/runtime-values";
 
-/**
- * The phone edits a workflow as lists of steps, not as a canvas. A graph of this shape becomes an
- * outline, and a change to the outline writes the edges of its steps again:
- *
- *   trigger → main… → condition ┬ yes… ┐
- *                               └ no…  ┴→ after…
- *
- * The flow goes through agent, model and approval steps. The ports of the contract decide the rest
- * (`WORKFLOW_PORTS`): an output sends nothing, so it takes the output of the step before it and the
- * flow goes on from that step; a prompt takes nothing, so it feeds the next step of its list. A step
- * that no edge from the trigger reaches is "loose": it keeps its own edges until the person connects
- * or deletes it. One trigger, at most one condition, and each flow step has one way in, except the
- * step where the two paths join. Any other graph keeps its edges: the phone changes only the settings
- * of its steps. The positions of the nodes, the notes, the shapes and the drawings stay as they are.
- */
-
-/** The step kinds that the phone shows, changes and moves. */
 const OUTLINE_KINDS = [
   "trigger",
   "agent",
@@ -38,7 +21,6 @@ const OUTLINE_KINDS = [
 ] as const satisfies readonly WorkflowNodeKind[];
 export type OutlineKind = (typeof OUTLINE_KINDS)[number];
 
-/** The kinds that the phone adds, in the order of the Add a step page. */
 export const ADDABLE_KINDS = [
   "agent",
   "llm",
@@ -51,37 +33,22 @@ export type AddableKind = (typeof ADDABLE_KINDS)[number];
 
 export interface WorkflowOutline {
   trigger: string;
-  /** The steps between the trigger and the condition, or all steps without a condition. */
   main: string[];
   condition: string | null;
   yes: string[];
   no: string[];
-  /** The steps after the two paths join. Empty: each path ends by itself. */
   after: string[];
-  /** The steps that the trigger does not reach. They keep their own edges. */
   loose: string[];
 }
 
-/** A list of the outline that holds steps. */
 export type OutlineList = "main" | "yes" | "no" | "after" | "loose";
-/** The lists that a run goes through, where a new step can go. */
 export const FLOW_LISTS = ["main", "yes", "no", "after"] as const satisfies readonly OutlineList[];
 export type FlowList = (typeof FLOW_LISTS)[number];
 const ALL_LISTS: readonly OutlineList[] = [...FLOW_LISTS, "loose"];
 
-/** How the phone can change a workflow. */
-export type WorkflowEditMode =
-  /** Steps can be added, moved and deleted. */
-  | "outline"
-  /** Only the settings of the steps change; the graph has a shape that the outline cannot hold. */
-  | "fields"
-  /** The workflow has a step of a newer app, and a save would drop it. */
-  | "read-only";
+export type WorkflowEditMode = "outline" | "fields" | "read-only";
 
-/** A step of the outline that cannot run where it is. */
-export type OutlineProblem =
-  /** A prompt feeds the next step of its list, and there is none. */
-  "prompt-target";
+export type OutlineProblem = "prompt-target";
 
 function isOutlineKind(kind: WorkflowNodeKind): kind is OutlineKind {
   return isOneOf(OUTLINE_KINDS, kind);
@@ -97,7 +64,6 @@ const byPosition = (nodes: ReadonlyMap<string, WorkflowNode>) => (left: string, 
   return (a?.x ?? 0) - (b?.x ?? 0) || (a?.y ?? 0) - (b?.y ?? 0);
 };
 
-/** The trigger, the flow steps and the condition, as one chain with two paths. */
 interface Core {
   main: string[];
   condition: string | null;
@@ -106,7 +72,6 @@ interface Core {
   after: string[];
 }
 
-/** The chain of the steps that the trigger reaches, without its outputs and prompts. */
 function coreChain(
   trigger: string,
   core: ReadonlySet<string>,
@@ -132,7 +97,6 @@ function coreChain(
 
   const seen = new Set([trigger]);
   const next = (id: string) => out.get(id)?.[0]?.to;
-  /** A list that each step enters only from the step before it. It ends at a join, an end or a condition. */
   const run = (first: string | undefined, stopAtCondition: boolean) => {
     const list: string[] = [];
     let current = first;
@@ -171,7 +135,6 @@ function coreChain(
   return seen.size === core.size ? { main: start.list, condition, yes: yes.list, no: no.list, after } : null;
 }
 
-/** The outline of a graph, or null when the graph has another shape. */
 export function workflowOutline(graph: WorkflowGraph): WorkflowOutline | null {
   const steps = stepNodes(graph);
   if (steps.some((node) => !isOutlineKind(node.kind))) return null;
@@ -184,7 +147,6 @@ export function workflowOutline(graph: WorkflowGraph): WorkflowOutline | null {
   if (edges.some((edge) => edge.type !== "text" || !kinds.has(edge.from) || !kinds.has(edge.to))) return null;
   if (workflowGraphProblem(graph) || workflowLoopEdges(steps, edges).size > 0) return null;
 
-  // The steps that the trigger reaches; a prompt is never one, as nothing goes into a prompt.
   const reached = new Set([trigger.id]);
   for (let queue = [trigger.id], id = queue.pop(); id; id = queue.pop())
     for (const edge of edges)
@@ -192,7 +154,6 @@ export function workflowOutline(graph: WorkflowGraph): WorkflowOutline | null {
         reached.add(edge.to);
         queue.push(edge.to);
       }
-  // A prompt that feeds one reached step belongs to that step.
   const prompts = new Map<string, string>();
   for (const node of steps) {
     if (node.kind !== "prompt") continue;
@@ -204,7 +165,6 @@ export function workflowOutline(graph: WorkflowGraph): WorkflowOutline | null {
   }
   const loose = steps.map((node) => node.id).filter((id) => !reached.has(id) && !prompts.has(id));
   const looseSet = new Set(loose);
-  // An edge from a loose step into the flow would give a flow step a second way in.
   if (edges.some((edge) => looseSet.has(edge.from) && !looseSet.has(edge.to))) return null;
 
   const core = new Set([...reached].filter((id) => kinds.get(id) !== "output"));
@@ -213,7 +173,6 @@ export function workflowOutline(graph: WorkflowGraph): WorkflowOutline | null {
   const lists: Record<FlowList, string[]> = { main: chain.main, yes: chain.yes, no: chain.no, after: chain.after };
   const listOf = (id: string) => FLOW_LISTS.find((name) => lists[name].includes(id));
 
-  // Each output goes right after the step that feeds it, or before the join when both paths feed it.
   const placements = new Map<string, string[]>();
   const place = (key: string, id: string) => placements.set(key, [...(placements.get(key) ?? []), id]);
   const laneEnd = (name: WorkflowBranch) => {
@@ -253,7 +212,6 @@ export function workflowOutline(graph: WorkflowGraph): WorkflowOutline | null {
     after: withOutputs("after", lists.after),
     loose,
   };
-  // Each prompt goes right before the step that it feeds; a prompt of the condition ends the steps before it.
   for (const [prompt, target] of [...prompts].sort(([left], [right]) => order(left, right))) {
     if (target === chain.condition) {
       outline.main.push(prompt);
@@ -267,20 +225,16 @@ export function workflowOutline(graph: WorkflowGraph): WorkflowOutline | null {
   return outline;
 }
 
-/** The id that the desktop canvas gives an edge, so both apps write the same edge once. */
 function workflowEdgeId(from: string, to: string, branch?: WorkflowBranch): string {
   return `${from}${branch ? `.${branch}` : ""}>${to}:text`;
 }
 
-/** The edges of an outline: the flow, each output from the step before it, and each prompt to the next step. */
 function outlineEdges(outline: WorkflowOutline, graph: WorkflowGraph): WorkflowEdge[] {
   const kinds = new Map(graph.nodes.map((node) => [node.id, node.kind]));
   const edges: WorkflowEdge[] = [];
   const link = (from: string, to: string, branch?: WorkflowBranch) =>
     edges.push({ id: workflowEdgeId(from, to, branch), from, to, type: "text", ...(branch ? { branch } : {}) });
-  /** A source of the flow: a step, or the condition with the branch of its path. */
   type Source = { from: string; branch?: WorkflowBranch };
-  /** Links the items of a list from `sources`, and answers the source after the list and its unfed prompts. */
   const walk = (items: readonly string[], start: Source[]) => {
     let sources = start;
     let prompts: string[] = [];
@@ -307,7 +261,6 @@ function outlineEdges(outline: WorkflowOutline, graph: WorkflowGraph): WorkflowE
   return edges;
 }
 
-/** The graph with the edges of its outline. The edges between loose steps stay. */
 export function graphWithOutline(graph: WorkflowGraph, outline: WorkflowOutline): WorkflowGraph {
   const loose = new Set(outline.loose);
   return {
@@ -319,12 +272,10 @@ export function graphWithOutline(graph: WorkflowGraph, outline: WorkflowOutline)
   };
 }
 
-/** The steps of the outline that cannot run where they are. */
 export function outlineProblems(outline: WorkflowOutline, graph: WorkflowGraph): Map<string, OutlineProblem> {
   const kinds = new Map(graph.nodes.map((node) => [node.id, node.kind]));
   const problems = new Map<string, OutlineProblem>();
   for (const name of FLOW_LISTS) {
-    // The prompts at the end of the steps before a condition feed the condition.
     if (name === "main" && outline.condition) continue;
     const items = outline[name];
     for (let index = items.length - 1; index >= 0; index--) {
@@ -336,7 +287,6 @@ export function outlineProblems(outline: WorkflowOutline, graph: WorkflowGraph):
   return problems;
 }
 
-/** The step ids in run order: the trigger, the steps, the condition, yes, no, then after the join. */
 function outlineOrder(outline: WorkflowOutline): string[] {
   return [
     outline.trigger,
@@ -348,21 +298,6 @@ function outlineOrder(outline: WorkflowOutline): string[] {
   ];
 }
 
-/**
- * The step nodes of any graph in a reading order: the outline order and then the loose steps when
- * there is an outline, else from left to right and from top to bottom, as the canvas shows them.
- */
-export function readingOrder(graph: WorkflowGraph): WorkflowNode[] {
-  const steps = stepNodes(graph);
-  const outline = workflowOutline(graph);
-  if (outline) {
-    const byId = new Map(steps.map((node) => [node.id, node]));
-    return [...outlineOrder(outline), ...outline.loose].flatMap((id) => byId.get(id) ?? []);
-  }
-  return [...steps].sort((left, right) => left.at.x - right.at.x || left.at.y - right.at.y);
-}
-
-/** The width of a node on the canvas: its own size, else the width that the desktop gives its kind. */
 const KIND_WIDTH: Partial<Record<WorkflowNodeKind, number>> = {
   prompt: 296,
   agent: 350,
@@ -373,11 +308,8 @@ const KIND_WIDTH: Partial<Record<WorkflowNodeKind, number>> = {
   approval: 300,
 };
 const DEFAULT_WIDTH = 300;
-/** The space that the desktop keeps between two cards when it puts a card into an edge. */
 const NODE_GAP = 64;
-/** How far a path of a condition sits above or below the condition. */
 const LANE_OFFSET = 200;
-/** The desktop snaps a card to this grid. */
 const SNAP = 8;
 const snap = (value: number) => Math.round(value / SNAP) * SNAP;
 
@@ -385,12 +317,10 @@ function nodeWidth(node: WorkflowNode): number {
   return node.size?.width ?? KIND_WIDTH[node.kind] ?? DEFAULT_WIDTH;
 }
 
-/** The list that holds a step, or null for the trigger and the condition. */
 export function outlineListOf(outline: WorkflowOutline, id: string): OutlineList | null {
   return ALL_LISTS.find((list) => outline[list].includes(id)) ?? null;
 }
 
-/** The step that runs before position `index` of `list`. */
 function stepBefore(outline: WorkflowOutline, list: FlowList, index: number): string {
   if (index > 0) return outline[list][index - 1] ?? outline.trigger;
   if (list === "main") return outline.trigger;
@@ -398,7 +328,6 @@ function stepBefore(outline: WorkflowOutline, list: FlowList, index: number): st
   return outline.condition ?? outline.trigger;
 }
 
-/** The steps that run after position `index` of `list`, which move right to make room for a new card. */
 function stepsAfter(outline: WorkflowOutline, list: FlowList, index: number): string[] {
   const rest = outline[list].slice(index);
   if (list === "main") return [...rest, ...outlineOrder(outline).slice(1 + outline.main.length)];
@@ -406,10 +335,6 @@ function stepsAfter(outline: WorkflowOutline, list: FlowList, index: number): st
   return rest;
 }
 
-/**
- * Puts a step at position `index` of `list`. The card goes to the right of the step before it, and
- * the steps after it move right by its width, so the canvas keeps its order.
- */
 export function insertStep(
   graph: WorkflowGraph,
   outline: WorkflowOutline,
@@ -433,7 +358,6 @@ export function insertStep(
   return { graph: { ...graph, nodes: [...nodes, placed] }, outline: { ...outline, [list]: items } };
 }
 
-/** A new condition starts the two paths after the last step; the steps after it join the paths. */
 export function insertCondition(
   graph: WorkflowGraph,
   outline: WorkflowOutline,
@@ -453,16 +377,10 @@ export function insertCondition(
   };
 }
 
-/** Whether the graph has a condition, in the flow or loose. A workflow has one condition on the phone. */
 export function hasCondition(graph: WorkflowGraph): boolean {
   return graph.nodes.some((node) => node.kind === "condition");
 }
 
-/**
- * Connects a loose step: it goes to the end of the steps, after the join when there is a condition.
- * Its own edges go, as the outline writes its edges. A loose condition does not connect: its paths
- * have no steps on the phone.
- */
 export function connectStep(
   graph: WorkflowGraph,
   outline: WorkflowOutline,
@@ -485,7 +403,6 @@ export function connectStep(
   );
 }
 
-/** Removes a step. A condition takes its two paths with it, and the steps after the join follow the steps before it. */
 export function removeStep(
   graph: WorkflowGraph,
   outline: WorkflowOutline,
@@ -508,7 +425,6 @@ export function removeStep(
   };
 }
 
-/** Moves a step one place in its list. The two cards change places on the canvas too. */
 export function moveStep(
   graph: WorkflowGraph,
   outline: WorkflowOutline,
@@ -532,7 +448,6 @@ export function moveStep(
   return { graph: { ...graph, nodes }, outline: { ...outline, [list]: items } };
 }
 
-/** Whether a step can move up or down in its list. A loose step does not run, so it does not move. */
 export function canMove(outline: WorkflowOutline, id: string, direction: -1 | 1): boolean {
   const list = outlineListOf(outline, id);
   if (!list || list === "loose") return false;

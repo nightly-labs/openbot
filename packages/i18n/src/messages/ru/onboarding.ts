@@ -102,7 +102,7 @@ export const messages = {
   "onboarding.action.connect": "Подключить",
   "onboarding.action.open": "Открыть OpenBot",
   "onboarding.action.next": "Далее",
-  "onboarding.server.title": "Настройка: {server}",
+  "onboarding.server.title": "Добро пожаловать на {server}",
   "onboarding.server.description":
     "OpenBot не включает подписку на ИИ. Подключите к этому серверу своего провайдера, прежде чем создавать агента.",
   "onboarding.server.label": "Выберите провайдера ИИ для этого сервера",

@@ -1,5 +1,4 @@
 import type { AgentStatus, BrowserTakeoverRequest, CentralAuthUser } from "@openbot/contracts/ipc";
-import { hasVisibleToasts } from "@openbot/ui";
 import { createMemo, Show } from "solid-js";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
@@ -13,6 +12,7 @@ import { Conversation } from "../conversation/Conversation";
 import { trackUsageLimitShown, useUsageLimitAsk } from "../conversation/usage-limit-ask";
 import { useRemoteDesktop } from "../remote-desktop/remote-desktop-context";
 import {
+  remoteMcpSignIn,
   remoteRoutineRecovery,
   serverCanAdminister,
   serverSendsWebhookTests,
@@ -31,11 +31,6 @@ import { ChannelErrorNotice } from "./ChannelConversationParts";
 import { createChannelConversation } from "./channel-conversation";
 import { useChannels } from "./channels-context";
 
-/**
- * The desktop's open channel in the conversation view. The reader, the waiting requests and the
- * browser tabs come from the desktop contexts. Keyed by the channel id: the view reads its channel
- * once, so another channel opens a new view.
- */
 export function WorkspaceChannelConversation(props: { account: () => CentralAuthUser }) {
   const channels = useChannels();
   return (
@@ -52,10 +47,18 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
   const connectors = useConnectors();
   const { selectAgent, messageFocusRequest, globalSearchOpen } = useNavigation();
   const auth = useAuth();
-  const { teamPresence, currentTeamMember } = usePresence();
+  const { teamPresence, readerMemberId } = usePresence();
   const { activeServer, activeServerSupportsCapability, joinServerOpen } = useServers();
   const { serverSettingsOpen } = useServerSettings();
-  const { appSettingsOpen, skillsMarketplaceOpen, generalSettings } = useSettings();
+  const {
+    appSettingsOpen,
+    skillsMarketplaceOpen,
+    setSkillsMarketplaceOpen,
+    setPendingMcpSignIn,
+    mcpSignIns,
+    refreshMcpSignIns,
+    generalSettings,
+  } = useSettings();
   const { agentStatus, agentList, updateAgent, setAgentAvatar, userPausedAgentIds } = useAgents();
   const { approvals, pendingPrompts, usageLimits } = useTurns();
   const {
@@ -71,7 +74,7 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
   const isOwnSender = (senderId: string) => {
     const state = auth.centralAuth();
     return isReaderAuthor(senderId, {
-      memberId: currentTeamMember()?.id ?? null,
+      memberId: readerMemberId(),
       accountUserId: state.status === "signed_in" ? state.user.id : null,
       onOwnComputer: activeServer()?.kind === "local",
     });
@@ -82,6 +85,9 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
       if (event?.type === "browser-takeover-requested") requests.push(event.request);
     return requests;
   });
+  const prompts = createMemo(() =>
+    Object.values(pendingPrompts()).flatMap((event) => (event?.type === "prompt" ? [event] : [])),
+  );
   const view = createChannelConversation({
     channelId: props.channelId,
     isOwnSender,
@@ -96,13 +102,10 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
     },
     approvals,
     takeovers,
+    prompts,
     pausedAgentIds: userPausedAgentIds,
   });
-  // A usage limit that holds the member whose turn a queued request waits for, the lead while no member
-  // owns it, asks where that member's work goes, as the agent's own chat does. Before, the channel only
-  // went quiet.
   const usageLimitAskFor = useUsageLimitAsk();
-  // The first held agent that asks: one that the user chose to wait for asks no more.
   const usageLimitAsk = createMemo(() => {
     const page = channels.state.page;
     if (page?.channel.id !== props.channelId || page.channel.archived) return undefined;
@@ -119,8 +122,6 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
     return undefined;
   });
   trackUsageLimitShown(usageLimitAsk);
-  // A named function, not a ternary in the prop: the compiler makes a memo for a ternary, and the
-  // composer reads this prop in an effect, where Solid cannot make a memo.
   const shownAgentStatus = (): AgentStatus =>
     scope.loaded() ? agentStatus() : { ...agentStatus(), phase: "starting" };
   const responseStyle = createServerResponseStyle(activeServer, window.openbot.hostAdmin);
@@ -151,6 +152,7 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
       responseStyle={responseStyle()}
       presence={teamPresence()}
       currentUserEmail={props.account().email}
+      currentUserChatColor={props.account().chatColor}
       isOwnSender={isOwnSender}
       browserEnabled={!platform.landingPreview && activeServerSupportsCapability("browser-control")}
       openLinksInBrowser={generalSettings().externalLinkTarget.kind === "openbot"}
@@ -164,14 +166,13 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
       browserTakeover={view.browserTakeover()}
       activeTurnId={view.activeTurnId()}
       skillsMarketplaceOpen={skillsMarketplaceOpen()}
-      mcpSettingsOpen={serverSettingsOpen() || skillsMarketplaceOpen()}
+      mcpSettingsOpen={skillsMarketplaceOpen()}
       globalOverlayOpen={
         globalSearchOpen() ||
         joinServerOpen() ||
         serverSettingsOpen() ||
         appSettingsOpen() ||
         skillsMarketplaceOpen() ||
-        hasVisibleToasts() ||
         quitShortcutHintShown()
       }
       settingsRequest={view.settingsRequest()}
@@ -196,6 +197,19 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
       onStop={view.onStop}
       onDeleteMessage={view.deleteMessageAction()}
       canDeleteMessage={view.canDeleteMessage}
+      onOpenMcpSignIn={(() => {
+        const server = activeServer();
+        if (!server || (server.kind === "remote" && !remoteMcpSignIn(server))) return undefined;
+        return (mcpServerId: string) => {
+          setPendingMcpSignIn(mcpServerId);
+          setSkillsMarketplaceOpen(true);
+        };
+      })()}
+      mcpSignedIn={(mcpServerId) => {
+        const known = mcpSignIns();
+        return known?.serverId === activeServer()?.id && known?.states[mcpServerId]?.signedIn === true;
+      }}
+      refreshMcpSignIns={() => refreshMcpSignIns(activeServer()?.id)}
     />
   );
 }

@@ -6,6 +6,7 @@ import { messages as errorBackend } from "./error/backend";
 import { messages as errorBilling } from "./error/billing";
 import { messages as errorComputerUse } from "./error/computerUse";
 import { messages as errorConnector } from "./error/connector";
+import { messages as errorCrm } from "./error/crm";
 import { messages as errorHost } from "./error/host";
 import { messages as errorImport } from "./error/import";
 import { messages as errorKind } from "./error/kind";
@@ -31,7 +32,6 @@ import { messages as statusProvider } from "./status/provider";
 import { messages as statusRemote } from "./status/remote";
 import { messages as statusUpdate } from "./status/update";
 
-/** Text the main process, a host or the team client sends as English and a screen translates. */
 export const source = {
   ...errorKind,
   ...errorReference,
@@ -45,6 +45,7 @@ export const source = {
   ...errorComputerUse,
   ...errorVoice,
   ...errorWorkflow,
+  ...errorCrm,
   ...errorBackend,
   ...errorSkill,
   ...errorMarketplace,

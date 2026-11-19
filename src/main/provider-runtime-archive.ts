@@ -13,15 +13,14 @@ import { ProviderRuntimeFailure, runtimeIO } from "./provider-runtime-effects";
 const execFileAsync = promisify(execFile);
 
 const MAX_ARCHIVE_LIST_BYTES = 16 * 1024 * 1024;
-/** tar writes `./` before each name when the archive was made from `.`. */
+export function tarExecutable(): string {
+  if (process.platform !== "win32") return "tar";
+  return join(process.env.SystemRoot ?? process.env.windir ?? "C:\\Windows", "System32", "tar.exe");
+}
 export function archiveEntryName(name: string): string {
   return name.replace(/^(?:\.\/)+/u, "");
 }
 
-/**
- * Whether a link in a runtime points inside the folder that holds it. Only a relative target with no
- * `..` is safe, so a chain of links cannot leave that folder either.
- */
 export function isSafeLinkTarget(target: string): boolean {
   return (
     target !== "" &&
@@ -33,11 +32,6 @@ export function isSafeLinkTarget(target: string): boolean {
   );
 }
 
-/**
- * Refuses an archive with a path outside `allowedRoots`, or with an entry that is not a file or a
- * folder. With `links`, a symbolic link is allowed when `isSafeLinkTarget` accepts its target: a
- * macOS framework must keep its links, or its code signature breaks.
- */
 export const assertSafeArchive = Effect.fn("ProviderArchive.assertSafeArchive")(function* (
   path: string,
   allowedRoots: readonly string[],
@@ -47,17 +41,20 @@ export const assertSafeArchive = Effect.fn("ProviderArchive.assertSafeArchive")(
   const [{ stdout: namesValue }, { stdout: detailsValue }] = yield* Effect.all(
     [
       runtimeIO((signal) =>
-        execFileAsync("tar", ["-tzf", path], { encoding: "utf8", maxBuffer: MAX_ARCHIVE_LIST_BYTES, signal }),
+        execFileAsync(tarExecutable(), ["-tzf", path], { encoding: "utf8", maxBuffer: MAX_ARCHIVE_LIST_BYTES, signal }),
       ),
       runtimeIO((signal) =>
-        execFileAsync("tar", ["-tvzf", path], { encoding: "utf8", maxBuffer: MAX_ARCHIVE_LIST_BYTES, signal }),
+        execFileAsync(tarExecutable(), ["-tvzf", path], {
+          encoding: "utf8",
+          maxBuffer: MAX_ARCHIVE_LIST_BYTES,
+          signal,
+        }),
       ),
     ],
     { concurrency: "unbounded" },
   );
   const names = namesValue.split(/\r?\n/u).filter(Boolean);
   const details = detailsValue.split(/\r?\n/u).filter(Boolean);
-  // Both listings have one line per entry, in the same order, so a link line holds its own name.
   const unsafeEntry = (line: string, index: number) => {
     const type = line.trimStart().charAt(0);
     if (type === "-" || type === "d") return false;
@@ -92,7 +89,7 @@ export const extractArchive = Effect.fn("ProviderArchive.extractArchive")(functi
   destination: string,
 ): Effect.fn.Return<void, ProviderRuntimeFailure> {
   yield* runtimeIO((signal) =>
-    execFileAsync("tar", ["-xzf", archive, "-C", destination, "--no-same-owner"], {
+    execFileAsync(tarExecutable(), ["-xzf", archive, "-C", destination, "--no-same-owner"], {
       encoding: "utf8",
       maxBuffer: MAX_ARCHIVE_LIST_BYTES,
       signal,
@@ -109,7 +106,6 @@ interface ZipEntry {
   localHeaderOffset: number;
 }
 
-/** The largest end-of-central-directory record: 22 bytes and a comment of up to 64 KB. */
 const ZIP_END_MAX_BYTES = 22 + 0xffff;
 const ZIP_UNIX_TYPE_MASK = 0o170000;
 const ZIP_UNIX_REGULAR_FILE = 0o100000;
@@ -134,7 +130,6 @@ export const extractZipFiles = Effect.fn("ProviderArchive.extractZipFiles")(func
     (handle) => runtimeIO(() => handle.close()).pipe(Effect.orDie),
   );
 });
-/** Extracts the entries under `root`, or under any of the roots in a list. `""` extracts each entry. */
 export const extractZipTree = Effect.fn("ProviderArchive.extractZipTree")(function* (
   archive: string,
   destination: string,
@@ -165,7 +160,6 @@ function isZipTreeName(name: string, root: string | readonly string[]): boolean 
   if (name.includes("\0") || name.includes("\\")) return false;
   const parts = name.replace(/\/$/u, "").split("/");
   const roots: readonly string[] = typeof root === "string" ? [root] : root;
-  // A `:` names an NTFS stream on Windows, which would write beside the file rather than into it.
   return (
     (roots.includes("") || roots.includes(parts[0] ?? "")) &&
     parts.every((part) => part && part !== "." && part !== ".." && !part.includes(":"))
@@ -217,10 +211,6 @@ const readZipDirectoryEffect = Effect.fn("ProviderArchive.readZipDirectory")(fun
       localHeaderOffset: directory.readUInt32LE(offset + 42),
     };
     offset += 46 + nameBytes + extraBytes + commentBytes;
-    // Unix is host 3; its mode is the high half of the external attributes. A link or device is
-    // refused here, as `assertSafeArchive` refuses one in a tarball. A name that ends in `/` is a
-    // folder, and holds no data. A mode with no type bits is a file: the Antigravity CLI 1.5.x
-    // Windows zip stores `antigravity.exe` as 0600 only, and unzip tools read it as a file.
     const folder = entry.name.endsWith("/");
     const type = folder ? ZIP_UNIX_DIRECTORY : ZIP_UNIX_REGULAR_FILE;
     const unixType = unixMode & ZIP_UNIX_TYPE_MASK;
@@ -288,10 +278,6 @@ const readAtEffect = Effect.fn("ProviderArchive.readAt")(function* (
     return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.archiveUnreadable")) });
   return buffer;
 });
-/**
- * Refuses anything under `root` that is not a file or a folder. With `links`, a symbolic link is
- * allowed when `isSafeLinkTarget` accepts its target.
- */
 export const rejectNonRegularFiles = Effect.fn("ProviderArchive.rejectNonRegularFiles")(function* (
   root: string,
   options: { links?: boolean } = {},

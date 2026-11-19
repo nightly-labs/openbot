@@ -1,50 +1,27 @@
-// What Signal and a host exchange for the OpenBot Discord app: the events Signal passes to a host,
-// and the typed Discord calls a host asks Signal to make. Signal holds the bot token, so a host can
-// ask only for these operations, and only in the guilds routed to its `ingress` socket.
-//
-// Signal normalizes each Gateway event before it passes it on: the host gets only the fields below,
-// never the raw payload. Signal validates the requests with its own schema; the decoders here are
-// what the host runs over Signal's output.
-
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "../runtime-values";
 
-/** The prefix of the custom id of every button OpenBot posts: `openbot:<action>:<token>`. */
 export const DISCORD_CUSTOM_ID_PREFIX = "openbot:";
 
-/** Discord's limit for one message's text. */
 export const DISCORD_MESSAGE_TEXT_LIMIT = 2_000;
 
-/** The most messages one `listMessages` call returns. Discord's own page limit. */
 export const DISCORD_LIST_MESSAGES_LIMIT = 100;
 
-/** The most channels and threads one `listChannels` call returns. */
 export const DISCORD_LIST_CHANNELS_LIMIT = 500;
 
-/** The largest file a host uploads through Signal: Discord's default upload limit for a bot. */
 export const DISCORD_UPLOAD_BYTES_LIMIT = 10 * 1024 * 1024;
 
-/** The most attachments Signal passes on with one message. Discord's own limit. */
 export const DISCORD_ATTACHMENTS_LIMIT = 10;
 
-/** The most roles a guild has, and so the most a member or `listRoles` can name. Discord's own limit. */
 export const DISCORD_ROLES_LIMIT = 250;
 
-/** The longest text of a replied-to message that Signal passes on. Discord's limit is 4,000 with Nitro. */
 export const DISCORD_QUOTE_TEXT_LIMIT = 4_000;
 
-/** The longest replied-to text a host accepts: a later Signal can pass more without breaking a host. */
 const QUOTE_DECODE_LIMIT = 8_000;
 
-/** The most embeds Signal passes on with one message. Discord's own limit. */
 export const DISCORD_EMBEDS_LIMIT = 10;
 
-/**
- * The longest text of all embeds of one message that Signal passes on, links included. Discord's
- * own limit for the text of all embeds of a message, without links. A post's embeds have the same limit.
- */
 export const DISCORD_EMBED_TEXT_LIMIT = 6_000;
 
-/** Discord's limits for the parts of one embed that OpenBot posts. */
 export const DISCORD_EMBED_LIMITS = {
   title: 256,
   description: 4_096,
@@ -56,7 +33,6 @@ export const DISCORD_EMBED_LIMITS = {
   url: 2_048,
 } as const;
 
-/** The longest embed text a host accepts: a later Signal can pass more without breaking a host. */
 const EMBED_DECODE_LIMIT = 16_000;
 
 export interface DiscordInboundAttachment {
@@ -64,53 +40,26 @@ export interface DiscordInboundAttachment {
   filename: string;
   contentType: string | null;
   size: number;
-  /** A signed Discord CDN address. The host downloads it directly; it needs no token. */
   url: string;
 }
 
-/**
- * The message that a person's message replies to, when a person wrote it. Discord gives its text only
- * when the bot has the Message Content intent, or when that message mentions OpenBot.
- */
 export interface DiscordInboundQuote {
   authorId: string;
   authorName: string;
-  /** Discord markdown. Mentions stay as `<@id>`. Empty when the message has only attachments. */
   content: string;
   sentAt: string;
-  /** Empty from an older Signal. */
   attachments: DiscordInboundAttachment[];
-  /**
-   * The text of each embed, such as the form of a ticket bot: one part on each line, with the
-   * links of its images. Discord markdown. Empty from an older Signal.
-   */
   embeds: string[];
-  /**
-   * A forward: `content` and `attachments` are the forwarded message's, and both are empty when
-   * Discord did not give them. False from an older Signal.
-   */
   forwarded: boolean;
 }
 
-/** One guild message that mentions OpenBot. */
 export interface DiscordInboundMessage {
   id: string;
   channelId: string;
   authorId: string;
   authorName: string;
-  /**
-   * The author's role ids in the guild. Null from a Signal older than role lists: a host with a
-   * role list then refuses the message.
-   */
   authorRoleIds: string[] | null;
-  /** Discord markdown. Mentions stay as `<@id>`. */
   content: string;
-  /**
-   * The message this one replies to. `rootId` is the message that the replied-to message itself
-   * replies to, when OpenBot wrote it: OpenBot replies to the first message of a conversation, so
-   * that names the conversation. `quote` is null when OpenBot wrote it, when Discord gave no text,
-   * or from an older Signal.
-   */
   replyTo: {
     messageId: string;
     authorIsBot: boolean;
@@ -121,12 +70,10 @@ export interface DiscordInboundMessage {
   sentAt: string;
 }
 
-/** A press of a button on an OpenBot message. Signal has already acknowledged it to Discord. */
 export interface DiscordInboundInteraction {
   id: string;
   channelId: string;
   messageId: string;
-  /** The message that the pressed message replies to, if any: the conversation's first message. */
   replyToId: string | null;
   userId: string;
   customId: string;
@@ -135,7 +82,6 @@ export interface DiscordInboundInteraction {
 export type DiscordDelivery =
   | { kind: "message"; message: DiscordInboundMessage }
   | { kind: "interaction"; interaction: DiscordInboundInteraction }
-  // OpenBot was removed from the guild. The host stops the connection; the user must connect again.
   | { kind: "removed" };
 
 export type DiscordButtonStyle = "primary" | "secondary" | "success" | "danger";
@@ -146,10 +92,6 @@ export interface DiscordButton {
   style: DiscordButtonStyle;
 }
 
-/**
- * One embed of a post, in Discord's own field names, so Signal sends it as it is. `color` is an RGB
- * integer, `timestamp` an ISO 8601 time, and each link `http:` or `https:`.
- */
 export interface DiscordEmbed {
   title?: string | undefined;
   description?: string | undefined;
@@ -163,7 +105,6 @@ export interface DiscordEmbed {
   fields?: { name: string; value: string; inline?: boolean | undefined }[] | undefined;
 }
 
-/** The text of embeds that Discord counts for `DISCORD_EMBED_TEXT_LIMIT`. Links do not count. */
 export function discordEmbedTextLength(embeds: readonly DiscordEmbed[]): number {
   let length = 0;
   for (const embed of embeds) {
@@ -174,24 +115,14 @@ export function discordEmbedTextLength(embeds: readonly DiscordEmbed[]): number 
   return length;
 }
 
-/**
- * One Discord call that a host asks Signal to make. Every operation names its guild, and Signal
- * checks that each channel is in that guild. Only `createMessage` can ping, and only a mentioned user.
- */
 export type DiscordApiRequest =
   | {
       op: "createMessage";
       guildId: string;
       channelId: string;
-      /** Empty only when the post has embeds. */
       content: string;
-      /** The message this post replies to, or null for a plain post. */
       replyTo: string | null;
       buttons: DiscordButton[];
-      /**
-       * At most `DISCORD_EMBEDS_LIMIT`, shown under the text. A host sends the key only with at
-       * least one embed: an older Signal refuses it.
-       */
       embeds?: DiscordEmbed[] | undefined;
     }
   | {
@@ -200,7 +131,6 @@ export type DiscordApiRequest =
       channelId: string;
       messageId: string;
       content: string;
-      /** An empty list removes the buttons. */
       buttons: DiscordButton[];
     }
   | { op: "deleteMessage"; guildId: string; channelId: string; messageId: string }
@@ -208,19 +138,9 @@ export type DiscordApiRequest =
   | { op: "listMessages"; guildId: string; channelId: string; after: string; limit: number }
   | { op: "member"; guildId: string; userId: string }
   | { op: "channel"; guildId: string; channelId: string }
-  /** The guild's text and announcement channels and its active threads. */
   | { op: "listChannels"; guildId: string }
-  /**
-   * The guild's roles that a person can have, highest first. Leaves out `@everyone` and the roles
-   * that an integration manages. An older Signal answers `invalid_request`.
-   */
   | { op: "listRoles"; guildId: string }
-  /** A reply that only the person who pressed a button sees. */
   | { op: "interactionReply"; guildId: string; interactionId: string; content: string }
-  /**
-   * One file, sent as `multipart/form-data`: this JSON in the `request` field and the bytes in the
-   * `file` field.
-   */
   | { op: "upload"; guildId: string; channelId: string; replyTo: string | null; filename: string };
 
 export interface DiscordHistoryMessage {
@@ -231,22 +151,22 @@ export interface DiscordHistoryMessage {
   content: string;
   replyToId: string | null;
   sentAt: string;
-  /** Empty from an older Signal. */
   attachments: DiscordInboundAttachment[];
-  /** As in `DiscordInboundQuote`. */
   embeds: string[];
-  /** As in `DiscordInboundQuote`. */
   forwarded: boolean;
 }
 
-/** One place of `listChannels`. A thread is a channel too: a post to its id goes into the thread. */
 export interface DiscordChannelSummary {
   id: string;
   name: string;
   kind: "channel" | "thread";
 }
 
-/** One role of `listRoles`. */
+export interface DiscordChannelList {
+  channels: DiscordChannelSummary[];
+  omitted: number;
+}
+
 export interface DiscordRoleSummary {
   id: string;
   name: string;
@@ -264,7 +184,6 @@ export const DISCORD_API_ERROR_CODES = [
 ] as const;
 export type DiscordApiErrorCode = (typeof DISCORD_API_ERROR_CODES)[number];
 
-/** The body of every refused call. `retryAfterMs` comes with `rate_limited`. */
 export interface DiscordApiErrorBody {
   error: { code: DiscordApiErrorCode; retryAfterMs?: number };
 }
@@ -308,14 +227,12 @@ function attachment(value: unknown): DiscordInboundAttachment {
 }
 
 function roleIds(value: unknown): string[] | null {
-  // An older Signal sends no roles.
   if (value === undefined || value === null) return null;
   if (!Array.isArray(value) || value.length > DISCORD_ROLES_LIMIT) invalid();
   return value.map(snowflake);
 }
 
 function quote(value: unknown): DiscordInboundQuote | null {
-  // An older Signal sends no quote.
   if (value === undefined || value === null) return null;
   const item = record(value);
   const content = text(item.content);
@@ -332,7 +249,6 @@ function quote(value: unknown): DiscordInboundQuote | null {
 }
 
 function embeds(value: unknown): string[] {
-  // An older Signal sends no embeds.
   if (value === undefined) return [];
   if (!Array.isArray(value) || value.length > DISCORD_EMBEDS_LIMIT) invalid();
   return value.map((entry) => {
@@ -343,14 +259,12 @@ function embeds(value: unknown): string[] {
 }
 
 function forwarded(value: unknown): boolean {
-  // An older Signal sends no flag.
   if (value === undefined) return false;
   if (!isBoolean(value)) invalid();
   return value;
 }
 
 function attachments(value: unknown): DiscordInboundAttachment[] {
-  // An older Signal sends no attachments.
   if (value === undefined) return [];
   if (!Array.isArray(value) || value.length > DISCORD_ATTACHMENTS_LIMIT) invalid();
   return value.map(attachment);
@@ -395,7 +309,6 @@ function inboundInteraction(value: unknown): DiscordInboundInteraction {
   };
 }
 
-/** Throws for a delivery that does not match: the host cannot act on it. */
 export function decodeDiscordDelivery(value: unknown): DiscordDelivery {
   const item = record(value);
   switch (item.kind) {
@@ -410,12 +323,10 @@ export function decodeDiscordDelivery(value: unknown): DiscordDelivery {
   }
 }
 
-/** The answer of `createMessage` and `upload`. */
 export function decodeDiscordMessageId(value: unknown): string {
   return snowflake(record(value).messageId);
 }
 
-/** The answer of `member` and `channel`. */
 export function decodeDiscordName(value: unknown): string {
   return text(record(value).name);
 }
@@ -441,14 +352,18 @@ export function decodeDiscordHistory(value: unknown): DiscordHistoryMessage[] {
   });
 }
 
-export function decodeDiscordChannels(value: unknown): DiscordChannelSummary[] {
-  const channels = record(value).channels;
+export function decodeDiscordChannels(value: unknown): DiscordChannelList {
+  const { channels, omitted = 0 } = record(value);
   if (!Array.isArray(channels) || channels.length > DISCORD_LIST_CHANNELS_LIMIT) invalid();
-  return channels.map((entry) => {
-    const item = record(entry);
-    if (item.kind !== "channel" && item.kind !== "thread") invalid();
-    return { id: snowflake(item.id), name: text(item.name), kind: item.kind };
-  });
+  if (!isNumber(omitted) || !Number.isSafeInteger(omitted) || omitted < 0) invalid();
+  return {
+    channels: channels.map((entry) => {
+      const item = record(entry);
+      if (item.kind !== "channel" && item.kind !== "thread") invalid();
+      return { id: snowflake(item.id), name: text(item.name), kind: item.kind };
+    }),
+    omitted,
+  };
 }
 
 export function decodeDiscordRoles(value: unknown): DiscordRoleSummary[] {
@@ -460,7 +375,6 @@ export function decodeDiscordRoles(value: unknown): DiscordRoleSummary[] {
   });
 }
 
-/** The code of a refused call, or null for a body that is not one. */
 export function decodeDiscordApiError(value: unknown): DiscordApiErrorBody["error"] | null {
   if (!isDynamicRecord(value) || !isDynamicRecord(value.error)) return null;
   const code = value.error.code;

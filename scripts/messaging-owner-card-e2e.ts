@@ -1,19 +1,11 @@
-// Checks that an external chat turn never waits on a card that only the owner can answer. A Discord
-// message that makes the agent call `openbot.send_feedback` gets the refusal at once: no card shows,
-// the turn ends and the chat's queue is free for the author's next message. Before the fix the router
-// checked the provider's thread id, the Discord thread passed as the agent's own chat, and the turn
-// waited on the owner's card until the provider's tool timeout (100 minutes for Grok), so every later
-// message of that author got "Too many requests are waiting". The person's own chat still gets the card.
-// Runs the real agent service, messaging threads and tool router on a temporary profile with a fake
-// Codex app-server. The fake calls the tool through `tool_call`, as a model does, and logs the result.
-// `bun scripts/messaging-owner-card-e2e.ts`. Writes .openbot-build/messaging-owner-card-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { bugReportPlatform } from "@openbot/contracts/feedback";
+import { bugReportPlatform, type Feedback, type FeedbackPhone } from "@openbot/contracts/feedback";
 import { AGENT_PROVIDERS } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 
@@ -24,7 +16,6 @@ const home = join(root, "home");
 const fakeCodex = join(root, "codex");
 const fakeLog = join(root, "codex.jsonl");
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -39,14 +30,8 @@ const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 const CALL_MARK = "FEEDBACK-CALL";
 const PERSON = { id: "local", name: "Alex" };
 const REFUSAL = "Only a person's message";
-/** Longer than a fake turn, much shorter than the provider's tool timeout. */
 const TURN_MS = 20_000;
 
-/**
- * A Codex app-server with the methods that the service calls. A turn whose input has
- * `FEEDBACK-CALL <<ARGS{"__tool":"…",…}ARGS>>` calls `openbot.<__tool>` with the rest of that JSON
- * through `tool_call`, logs the result, and ends. Other turns answer "Done.".
- */
 const FAKE_CODEX = `#!/usr/bin/env node
 const { appendFileSync } = require("node:fs");
 if (process.argv.includes("--version")) {
@@ -58,7 +43,6 @@ const config = { config: { mcp_servers: {} }, layers: [{ name: { type: "user", f
 let buffer = "";
 let threads = 0;
 let turns = 0;
-/** Tool request id -> the turn that waits for its result. */
 const waiting = new Map();
 process.stdout.on("error", (error) => {
   if (error.code === "EPIPE") process.exit(0);
@@ -97,7 +81,6 @@ const answer = (message) => {
       if (!match) return setTimeout(() => finish(params.threadId, turnId), 20);
       const id = "tool-" + turnId;
       waiting.set(id, { threadId: params.threadId, turnId });
-      // The packet carries the request as JSON text, so its quotes arrive escaped.
       const { __tool, ...args } = JSON.parse(match[1].replace(/\\\\"/g, '"'));
       return write({
         id,
@@ -169,7 +152,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service or the fake's log. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = TURN_MS): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -206,6 +188,7 @@ const report: {
 } = { calls: [], checks: [], passed: false };
 
 await writeFile(fakeCodex, FAKE_CODEX, { mode: 0o755 });
+const sent: Feedback[] = [];
 const database = new OpenBotDatabase(userData);
 const store = new AgentStore(userData, home, database);
 const mailbox = new MailboxStore(userData, store.sharedRoot, store.database);
@@ -216,16 +199,24 @@ const agents = new AgentService({
   preferredProvider: "codex",
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
   timezone: () => "UTC",
-  // Signed in, with the facts a release build has, so the call reaches the person check.
   feedbackFacts: { platform: bugReportPlatform(process.platform), version: "0.0.0-e2e", os: "e2e (arm64)" },
   feedback: {
     signedIn: () => true,
     similar: () => Effect.succeed([]),
-    send: () => Effect.die(new Error("No report is sent in this check.")),
+    send: (feedback) =>
+      Effect.sync(() => {
+        sent.push(feedback);
+        return {
+          status: "sent" as const,
+          url: "https://github.com/nightly-labs/openbot/issues/9001",
+          number: 9001,
+          comment: false,
+        };
+      }),
+    withdraw: () => Effect.die(new Error("No report is removed in this check.")),
   },
 });
 
-/** The approval cards that the service shows, in order. */
 const approvals: { requestId: string | number; threadId: string; reason: string | null }[] = [];
 agents.on("event", (event) => {
   if (event.type === "approval")
@@ -236,7 +227,6 @@ agents.on("event", (event) => {
     });
 });
 
-/** Logs and returns the tool result of the fake's call number `index`. */
 async function logged(name: string, index: number) {
   const entry = await waitFor(`${name} tool result`, () => toolLogs()[index]);
   const text = entry.result?.contentItems.map((item) => item.text).join("\n") ?? JSON.stringify(entry.error);
@@ -247,7 +237,6 @@ async function logged(name: string, index: number) {
 const callText = (title: string) =>
   `${CALL_MARK} <<ARGS${JSON.stringify({ __tool: "send_feedback", kind: "idea", title, text: "Let me pick an agent from the Android share sheet." })}ARGS>>`;
 
-/** The deliveries of a Discord link that have not ended. */
 const openDeliveries = (linkId: string) => mailbox.unresolvedMessagingDeliveries(linkId);
 
 try {
@@ -267,7 +256,6 @@ try {
       .deliveries.every((delivery) => !["queued", "starting", "running"].includes(delivery.status)),
   );
 
-  // 1. A Discord message makes the agent call send_feedback. The router refuses it at once.
   const connection = agents.messaging.store.ensureConnection("discord", "guild-e2e", "OpenBot e2e");
   const receive = (id: string, text: string) =>
     runCauseEffect(
@@ -296,7 +284,6 @@ try {
   pass("No owner card showed for the Discord turn", approvals.length === 0, JSON.stringify(approvals));
   await waitFor("the Discord turn to end", () => openDeliveries(linkId).length === 0);
 
-  // 2. The same author sends two more messages. Neither is refused as busy.
   const second = await receive("message-2", "Thanks.");
   const third = await receive("message-3", "One more thing.");
   pass(
@@ -306,14 +293,83 @@ try {
   );
   await waitFor("the Discord queue to drain", () => openDeliveries(linkId).length === 0);
 
-  // 3. The person's own chat still gets the card. A decline sends nothing.
   const ownIndex = toolLogs().length;
   await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: callText("From the owner") }, PERSON));
   const card = await waitFor("the owner's feedback card", () => approvals[0]);
   pass("The person's own chat shows the feedback card", card.reason !== null, JSON.stringify(card));
   await runCauseEffect(agents.respondToApproval({ requestId: card.requestId, decision: "decline" }));
   const fromOwner = await logged("send_feedback from the own chat", ownIndex);
-  pass("A declined card sends nothing", fromOwner.text.includes('"declined"'), fromOwner.text);
+  pass("A declined card sends nothing", fromOwner.text.includes('"declined"') && sent.length === 0, fromOwner.text);
+
+  const phoneIndex = toolLogs().length;
+  const phoneCall = `${CALL_MARK} <<ARGS${JSON.stringify({ __tool: "send_feedback", kind: "bug", title: "The phone app stays on Reconnecting", text: "The phone app never connects while the VPN is on.", surface: "Phone app" })}ARGS>>`;
+  await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: phoneCall }, PERSON));
+  const phoneCard = await waitFor("the card of the phone report", () => approvals[1]);
+  pass(
+    "A bug in the phone app shows the card with the notice of a phone report",
+    phoneCard.reason === sourceText("status.agent.reportPhoneProblem"),
+    JSON.stringify(phoneCard),
+  );
+  const plain = await runCauseEffect(
+    agents.respondToApproval({ requestId: phoneCard.requestId, decision: "accept" }),
+  ).then(
+    () => "accepted",
+    (error: unknown) => (error instanceof Error ? error.message : String(error)),
+  );
+  const member = await runCauseEffect(
+    agents.respondToApproval({ requestId: phoneCard.requestId, decision: "accept" }, { owner: true }),
+  ).then(
+    () => "accepted",
+    (error: unknown) => (error instanceof Error ? error.message : String(error)),
+  );
+  pass(
+    "An accept without the phone's data is refused, the card still waits, and nothing is sent",
+    plain === sourceText("error.backend.feedbackNeedsPhone") &&
+      member === sourceText("error.backend.feedbackNeedsPhone") &&
+      agents.pendingApproval(phoneCard.requestId) !== undefined &&
+      sent.length === 0 &&
+      toolLogs().length === phoneIndex,
+    `${plain} | ${member}`,
+  );
+
+  const secret = ["sk", "live", "abcdefghijklmnopqrstuvwx"].join("_");
+  const userHost = "team.kowalska.example.com";
+  const serverId = "0f8fad5b-d9cb-469f-a165-70867728950e";
+  const userAddress = "203.0.113.77";
+  const phone: FeedbackPhone = {
+    platform: "Android",
+    appVersion: "1.4.9 (212) · a1b2c3d4",
+    system: "Android 16, Xiaomi 14 (23127PN0CC)",
+    network: "Wi-Fi · VPN: Tailscale",
+    log: `2026-11-13T10:00:00.000Z WARN  connection host-1 offline (ice_failed)\n2026-11-13T10:00:01.000Z WARN  console Authorization: Bearer ${secret}\n2026-11-13T10:00:02.000Z WARN  network GET https://${userHost}/v1/hosts/${serverId}/state -> failed from ${userAddress}`,
+  };
+  await runCauseEffect(
+    agents.respondToApproval({ requestId: phoneCard.requestId, decision: "accept" }, { owner: true, phone }),
+  );
+  const fromPhone = await logged("send_feedback for the phone app", phoneIndex);
+  const report0 = sent[0];
+  const sentPhone = report0?.kind === "bug" ? report0.phone : null;
+  pass(
+    "The phone's accept sends the report with the phone's system, version, device, network and log",
+    fromPhone.text.includes('"sent"') &&
+      sent.length === 1 &&
+      report0?.surface === "Phone app" &&
+      sentPhone?.platform === "Android" &&
+      sentPhone.appVersion === phone.appVersion &&
+      sentPhone.system === phone.system &&
+      sentPhone.network === phone.network &&
+      sentPhone.log.includes("host-1 offline (ice_failed)"),
+    `${fromPhone.text} ${JSON.stringify(report0)}`,
+  );
+  pass("A secret in the phone's log does not leave the host", sentPhone !== null && !sentPhone.log.includes(secret));
+  pass(
+    "A host name, a server ID and a network address in the phone's log do not leave the host",
+    sentPhone !== null &&
+      !sentPhone.log.includes(userHost) &&
+      !sentPhone.log.includes(serverId) &&
+      !sentPhone.log.includes(userAddress) &&
+      sentPhone.log.includes("GET https://[host]/v1/hosts/[id]/state -> failed from [public-ip]"),
+  );
 
   report.passed = true;
 } catch (error) {

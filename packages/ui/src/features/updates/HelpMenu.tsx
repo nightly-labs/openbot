@@ -3,19 +3,14 @@ import { createSignal, For, Show } from "solid-js";
 import { useText } from "../../text";
 import { DiscordMark } from "../settings/brand-marks";
 
-/** One line of the What's new list: the headline of a release note and the date of its release. */
 export interface HelpMenuNews {
   headline: string;
-  /** `YYYY-MM-DD`, as the release notes write it. */
   date: string;
 }
 
 export interface HelpMenuProps {
-  /** Newest first. The menu shows no What's new list while it is empty. */
   news: readonly HelpMenuNews[];
-  /** The class of the button that opens the menu, so it matches the buttons around it. */
   triggerClass?: string;
-  /** Called when the menu opens, so the caller can load the news. */
   onOpen?: () => void;
   onOpenWhatsNew: () => void;
   onOpenChangelog: () => void;
@@ -25,13 +20,11 @@ export interface HelpMenuProps {
   onSendFeedback: () => void;
 }
 
-/** A release date in local time. `new Date("YYYY-MM-DD")` reads UTC and can show the day before. */
 function releaseDate(value: string): Date {
   const [year = 0, month = 1, day = 1] = value.split("-").map(Number);
   return new Date(year, month - 1, day);
 }
 
-/** The Help menu: the newest release notes, the changelog, the guides, the Discord community, bug reports and feedback. */
 export function HelpMenu(props: HelpMenuProps) {
   const { t, format } = useText();
   const [open, setOpen] = createSignal(false);

@@ -5,24 +5,16 @@ import type { WaveformJob, WaveformResult } from "../model/audio-waveforms";
 
 interface AudioWaveformReaderProps {
   jobs: readonly WaveformJob[];
-  /** How many bars a waveform has. A prop, so this bundle does not load the native file module. */
   bars: number;
   readSource: (id: string) => Promise<string>;
   onResult: (result: WaveformResult) => Promise<void>;
   dom?: import("expo/dom").DOMProps;
 }
 
-/** A low rate is enough for loudness, and it keeps a long file small in memory. */
 const DECODE_SAMPLE_RATE = 8000;
 
-// See `mermaid-renderer.dom.tsx`: the first render in Expo Go on Android can have no props.
 const NO_JOBS: readonly WaveformJob[] = [];
 
-/**
- * The one web view that reads the loudness of audio files, as desktop does. An offline audio
- * context decodes without playing, so it does not touch the app's audio session. Files are read
- * one after another; the native side sends a file only when its job starts.
- */
 export default function AudioWaveformReader({
   jobs = NO_JOBS,
   bars = 0,
@@ -67,7 +59,6 @@ async function read(base64: string, count: number): Promise<number[] | null> {
   }
 }
 
-/** The root mean square of each part, scaled so the loudest part is 1. */
 function peaks(buffer: AudioBuffer, count: number): number[] {
   const channels = Array.from({ length: buffer.numberOfChannels }, (_, index) => buffer.getChannelData(index));
   const size = Math.max(1, Math.floor(buffer.length / count));

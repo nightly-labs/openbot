@@ -1,6 +1,6 @@
-import type { VaultSaveInput } from "@openbot/contracts/ipc";
+import type { VaultItemKind, VaultSaveInput } from "@openbot/contracts/ipc";
 import { cardBrand, vaultExpiryText } from "@openbot/contracts/ipc";
-import type { UiBlockStatus, UiVaultRequestKind, UiVaultSavedItem } from "@openbot/contracts/ui-blocks";
+import { UI_API_KEY_SCOPE_FIELD_ID, type UiBlockStatus, type UiVaultSavedItem } from "@openbot/contracts/ui-blocks";
 import { VaultRequestCard } from "@openbot/ui/features/vault/VaultRequestCard";
 import { createSignal } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
@@ -33,9 +33,18 @@ const REQUESTS = {
     title: "Login for the Hetzner console",
     prefill: { website: "https://console.hetzner.com", username: "ada@example.com" },
   },
-} satisfies Record<UiVaultRequestKind, { title: string; prefill: Record<string, string> }>;
+  apiKey: {
+    title: "Token for the CRM sync",
+    prefill: { name: "CRM_API_TOKEN" },
+  },
+} satisfies Record<VaultItemKind, { title: string; prefill: Record<string, string> }>;
 
-/** The item and its summary values, as the host stores them: no secret value. */
+const API_KEY_SCOPE = {
+  label: "Save for",
+  options: ["All agents (Vault)", "Only this agent"],
+  value: "All agents (Vault)",
+};
+
 function savedFrom(input: VaultSaveInput): { saved: UiVaultSavedItem; values: Record<string, string> } {
   switch (input.kind) {
     case "card": {
@@ -66,9 +75,8 @@ function savedFrom(input: VaultSaveInput): { saved: UiVaultSavedItem; values: Re
   }
 }
 
-/** A request that the dialog saves and the Not now button closes, as in the chat. */
 function Request(props: {
-  kind: UiVaultRequestKind;
+  kind: VaultItemKind;
   status?: UiBlockStatus;
   saved?: UiVaultSavedItem;
   values?: Record<string, string>;
@@ -76,19 +84,26 @@ function Request(props: {
   const [status, setStatus] = createSignal<UiBlockStatus>(props.status ?? "pending");
   const [saved, setSaved] = createSignal(props.saved);
   const [values, setValues] = createSignal(props.values);
+  const scope = () => (props.kind === "apiKey" ? API_KEY_SCOPE : undefined);
+  const keyPlaceholder = () => (props.kind === "apiKey" ? "crm_live_…" : undefined);
   return (
     <VaultRequestCard
       kind={props.kind}
       title={REQUESTS[props.kind].title}
       agentName="Atlas"
       prefill={REQUESTS[props.kind].prefill}
+      scope={scope()}
+      keyPlaceholder={keyPlaceholder()}
       status={status()}
       saved={saved()}
       values={values()}
-      onSave={async (input) => {
-        const result = savedFrom(input);
-        setSaved(result.saved);
-        setValues(result.values);
+      onSave={async (input, scope) => {
+        if (input.kind === "apiKey") setValues({ [UI_API_KEY_SCOPE_FIELD_ID]: scope ?? API_KEY_SCOPE.value });
+        else {
+          const result = savedFrom(input);
+          setSaved(result.saved);
+          setValues(result.values);
+        }
         setStatus("answered");
       }}
       onSkip={() => setStatus("closed")}
@@ -96,16 +111,18 @@ function Request(props: {
   );
 }
 
-/** The agent asks for a card. It filled in the label and the name; the user types the rest. */
 export const Card: Story = { render: () => <Request kind="card" /> };
 
-/** The agent asks for an address. */
 export const Address: Story = { render: () => <Request kind="contact" /> };
 
-/** The agent asks for a login. It filled in the site and the username. */
 export const Login: Story = { render: () => <Request kind="login" /> };
 
-/** The user saved the card. The row shows the item, not the request. */
+export const ApiKey: Story = { render: () => <Request kind="apiKey" /> };
+
+export const ApiKeySaved: Story = {
+  render: () => <Request kind="apiKey" status="answered" values={{ [UI_API_KEY_SCOPE_FIELD_ID]: "Only this agent" }} />,
+};
+
 export const Saved: Story = {
   render: () => (
     <Request
@@ -117,5 +134,4 @@ export const Saved: Story = {
   ),
 };
 
-/** The user chose Not now. */
 export const NotNow: Story = { render: () => <Request kind="card" status="closed" /> };

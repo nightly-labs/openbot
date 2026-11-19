@@ -9,7 +9,6 @@ import {
 import { type Accessor, createEffect, createSignal, onSettled, untrack } from "solid-js";
 import { prefersReducedMotion } from "../utils";
 
-/** One row: a key that is unique in the list, and a first guess of its height. It is measured when it renders. */
 interface ListRow {
   key: string;
   size: number;
@@ -18,9 +17,7 @@ interface ListRow {
 interface ListVirtualizerOptions {
   rows: Accessor<ListRow[]>;
   getScrollElement: () => HTMLElement | undefined;
-  /** The distance from the top of the scroll content to the top of the list. */
   scrollMargin: Accessor<number>;
-  /** A row that stays rendered out of view, such as the active option, or -1. */
   pinnedIndex: Accessor<number>;
   overscan: number;
 }
@@ -28,32 +25,19 @@ interface ListVirtualizerOptions {
 export interface ListVirtualizer {
   items: Accessor<VirtualItem[]>;
   totalSize: Accessor<number>;
-  /** The last row in view. */
   endIndex: Accessor<number>;
   measureElement: (element: HTMLElement) => void;
-  /**
-   * Scrolls the fewest pixels that show the rows from `fromIndex` to `toIndex`, with the scroll
-   * padding of the scroll element around them. A short scroll is smooth; a long one jumps.
-   */
   reveal: (fromIndex: number, toIndex: number) => void;
 }
 
-/** A scroll longer than this many screens jumps: a smooth scroll that long is slow to follow. */
 const SMOOTH_SCROLL_SCREENS = 2;
-/**
- * The view to use while the scroll element has no height, as before its first layout and in jsdom.
- * With no height, the virtualizer renders no row, and the scroll element can take its height only
- * from its rows.
- */
 const FALLBACK_RECT = { width: 0, height: 400 };
 
-/** A vertical list that renders only the rows near the view of its scroll element. */
 export function createListVirtualizer(options: ListVirtualizerOptions): ListVirtualizer {
   const [items, setItems] = createSignal<VirtualItem[]>([]);
   const [totalSize, setTotalSize] = createSignal(0);
   const [endIndex, setEndIndex] = createSignal(0);
   let refreshQueued = false;
-  // The virtualizer reads rows outside a tracking scope, so it gets a plain copy.
   let rows: ListRow[] = [];
 
   const virtualizer = new Virtualizer<HTMLElement, HTMLElement>({
@@ -74,7 +58,6 @@ export function createListVirtualizer(options: ListVirtualizerOptions): ListVirt
     setEndIndex(virtualizer.range?.endIndex ?? 0);
   };
 
-  // The virtualizer reports each scroll and measure; one update per task is enough to render.
   const scheduleRefresh = (): void => {
     if (refreshQueued) return;
     refreshQueued = true;
@@ -93,7 +76,6 @@ export function createListVirtualizer(options: ListVirtualizerOptions): ListVirt
           ...virtualizer.options,
           count: next.length,
           scrollMargin,
-          // New functions tell the virtualizer that the keys or the pinned row changed.
           getItemKey: (index) => rows[index]?.key ?? index,
           rangeExtractor: (range) => {
             const indexes = defaultRangeExtractor(range);
@@ -125,7 +107,6 @@ export function createListVirtualizer(options: ListVirtualizerOptions): ListVirt
     const paddingBottom = Number.parseFloat(style.scrollPaddingBottom) || 0;
     const viewTop = element.scrollTop;
     const viewBottom = viewTop + element.clientHeight;
-    // The first row goes to the very top, so that nothing above it stays hidden.
     const top = fromIndex === 0 ? 0 : from.start - paddingTop;
     const bottom = to.end + paddingBottom;
     let target: number | undefined;
@@ -141,7 +122,6 @@ export function createListVirtualizer(options: ListVirtualizerOptions): ListVirt
     totalSize,
     endIndex,
     measureElement: (element) => {
-      // Solid can run a ref before the row's data-index and contents are committed.
       queueMicrotask(() => {
         if (element.isConnected) virtualizer.measureElement(element);
       });

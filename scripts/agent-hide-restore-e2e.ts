@@ -1,15 +1,3 @@
-// Checks hide and restore of an agent through the released agent-hidden-v1 Team API contract. A
-// real `TeamApiServer` runs on loopback with the real team, agent, mailbox and sidebar stores on a
-// temporary profile. The owner and a member send what a current desktop client sends, and the
-// frozen agent-hidden-v1 codec reads each reply. A member's event socket must receive each change.
-// A hidden agent keeps working: it answers a message and the routine timer runs its routine, each
-// through a fake Codex app-server, so no real provider CLI starts. The first host does not initialize
-// the agent service. It leaves what an earlier version leaves: a hidden agent, and no receipt of the
-// one-time step that turns off the routines of such an agent. Each later host initializes the service
-// as the app does. The clock moves with `setSystemTime` to make a routine occurrence come due.
-// Run: `bun scripts/agent-hide-restore-e2e.ts`.
-// Writes .openbot-build/agent-hide-restore-e2e/report.json.
-
 import { setSystemTime } from "bun:test";
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -55,13 +43,11 @@ const home = join(root, "home");
 const fakeCodex = join(root, "codex");
 const fakeLog = join(root, "codex.jsonl");
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
 mkdirSync(home, { recursive: true });
 
-/** A Codex app-server with the methods that the service calls. Each turn is logged and answers "Done.". */
 const FAKE_CODEX = `#!/usr/bin/env node
 const { appendFileSync } = require("node:fs");
 if (process.argv.includes("--version")) {
@@ -95,7 +81,6 @@ const answer = (message) => {
     case "thread/items/list": return write({ id: message.id, result: { data: [], nextCursor: null } });
     case "thread/read": return write({ id: message.id, result: { thread: { id: params.threadId, turns: [] } } });
     case "turn/start": {
-      // The process id tells the turns of one host from those of the host before a restart.
       const turnId = "turn-" + process.pid + "-" + (++turns);
       const text = (params.input || []).map((item) => item.text || "").join("\\n");
       appendFileSync(LOG, JSON.stringify({ turnId, text }) + "\\n");
@@ -139,7 +124,6 @@ const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 const { SidebarLayoutStore } = await import("../src/backend/sidebar-layout-store");
 
-// The main process imports Electron for its windows and IPC. No check here opens a window.
 plugin({
   name: "agent-hide-electron-boundary",
   setup(build) {
@@ -188,7 +172,6 @@ const report: { passed: boolean; findings: string[]; unverified: string[]; steps
   steps: [],
 };
 
-/** Runs one check. `summarize` keeps session tokens out of the report. */
 async function step<T>(
   name: string,
   run: () => Promise<T>,
@@ -197,7 +180,6 @@ async function step<T>(
   process.stdout.write(`- ${name}\n`);
   let deadline: ReturnType<typeof setTimeout> | undefined;
   try {
-    // A bound on failure only: each check waits for its reply or event, and a missing event must fail.
     const value = await Promise.race([
       run(),
       new Promise<never>((_, reject) => {
@@ -214,7 +196,6 @@ async function step<T>(
   }
 }
 
-/** A value that `JSON.parse` gives: the wire body of a response, a frame or a fixture. */
 type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
 type JsonObject = { [key: string]: Json };
 
@@ -265,6 +246,7 @@ const teamBrowser: TeamApiBrowser = {
   stopTeach: () => [],
   releaseUserControl: () => {},
   releaseUserControlHeldBy: () => {},
+  releaseUserControlRefused: () => {},
   close: unused,
   capturePreview: unused,
   setVisible: unused,
@@ -284,17 +266,12 @@ interface Host {
   server: InstanceType<typeof TeamApiServer>;
   team: InstanceType<typeof TeamStore>;
   port: number;
-  /** The agent service events since the host started. */
   events: AgentEvent[];
 }
 
 let host: Host | null = null;
 const sockets: WebSocket[] = [];
 
-/**
- * Starts the host on the profile. The stores keep their files. `stores-only` does not initialize the
- * agent service, so the one-time routine step does not run and no routine timer arms.
- */
 async function startHost(mode: "app" | "stores-only" = "app"): Promise<Host> {
   const database = new OpenBotDatabase(userData);
   const agentStore = new AgentStore(userData, home, database);
@@ -347,7 +324,6 @@ function current(): Host {
   return host;
 }
 
-/** One request from a current desktop client, which advertises agent-hidden-v1. */
 async function call(
   method: string,
   path: string,
@@ -370,7 +346,6 @@ async function call(
   return { status: response.status, body: body ? JSON.parse(body) : null };
 }
 
-/** A hidden-agents request through the frozen codec, in both directions. */
 async function hidden(path: string, token: string, body: unknown): Promise<{ status: number; body: unknown }> {
   const codec = AGENT_HIDDEN_CODECS.get(path);
   assert.ok(codec, `No agent-hidden-v1 codec for ${path}.`);
@@ -391,7 +366,6 @@ async function login(credentials: { username: string; password: string }): Promi
   return text(record(response.body, "login").sessionToken, "session token");
 }
 
-/** Opens a member's event socket that declares agent-hidden-v1, and waits for its first snapshot. */
 async function openEvents(token: string): Promise<WebSocket> {
   const socket = new WebSocket(`ws://127.0.0.1:${current().port}${TEAM_API_ROUTES.events}`, [
     TEAM_PROTOCOL_V1_WEBSOCKET,
@@ -416,7 +390,6 @@ async function openEvents(token: string): Promise<WebSocket> {
   return socket;
 }
 
-/** Waits for the first socket message that `pick` accepts. */
 function nextMessage<T>(socket: WebSocket, pick: (value: unknown) => T | null): Promise<T> {
   return new Promise((resolveMessage, reject) => {
     const onMessage = (event: MessageEvent) => {
@@ -440,7 +413,6 @@ function snapshotIds(snapshot: HiddenAgentsSnapshot): string[] {
   return snapshot.agents.map((agent) => agent.agentId);
 }
 
-/** The turns that the fake provider started. */
 function turns(): { turnId: string; text: string }[] {
   let log = "";
   try {
@@ -454,7 +426,6 @@ function turns(): { turnId: string; text: string }[] {
     .map((line) => JSON.parse(line));
 }
 
-/** Waits for a state of the service. The step deadline bounds a state that never comes. */
 async function waitFor<T>(read: () => T | null | undefined | false): Promise<T> {
   for (;;) {
     const value = read();
@@ -561,7 +532,6 @@ try {
   await step("update: the routines of an agent hidden by an earlier version go off, and none runs", async () => {
     socket.close();
     await stopHost();
-    // Two occurrences come due while the app is closed and the agent is hidden.
     setSystemTime(at("11:30"));
     host = await startHost();
     const { agents } = current();
@@ -604,7 +574,6 @@ try {
     assert.equal(current().agents.nextRoutineDueAt(), at("12:00").toISOString(), "The timer does not plan it.");
     socket.close();
     await stopHost();
-    // The occurrence comes due while the app is closed. The start runs it, as for a visible agent.
     setSystemTime(at("12:30"));
     const before = turns().length;
     host = await startHost();

@@ -100,7 +100,7 @@ export const messages = {
   "onboarding.action.connect": "ربط",
   "onboarding.action.open": "فتح OpenBot",
   "onboarding.action.next": "التالي",
-  "onboarding.server.title": "إعداد {server}",
+  "onboarding.server.title": "مرحبًا بك في {server}",
   "onboarding.server.description":
     "لا يتضمن OpenBot اشتراكًا في الذكاء الاصطناعي. اربط مزوّدك الخاص بهذا الخادم قبل إنشاء وكيل.",
   "onboarding.server.label": "اختر مزوّد الذكاء الاصطناعي لهذا الخادم",

@@ -2,10 +2,6 @@ import { Typography } from "heroui-native";
 
 import { useText } from "@/shared/lib/text";
 
-/**
- * The code of a failure, such as `signal/host_busy`, as muted text that a user can select and copy.
- * Renders nothing when the failure has no code.
- */
 export function ErrorReference({
   reference,
   align,

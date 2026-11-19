@@ -36,9 +36,7 @@ const NO_ROUTES: VoiceServerRoutes = {
   voice: null,
 };
 
-/** The example in the empty address field: a Speaches server on the local network. */
 const ADDRESS_EXAMPLE = "http://studio.local:8000/v1";
-/** OpenAI-style keys start with `sk-`; a local server often needs no key. */
 const API_KEY_EXAMPLE = "sk-…";
 
 type Test =
@@ -47,7 +45,6 @@ type Test =
   | { status: "found"; models: VoiceServerModels }
   | { status: "failed"; field: "address" | "apiKey"; message: string };
 
-/** One choice of a list, with the check mark of the chosen row. */
 function ChoiceRows({
   options,
   value,
@@ -80,13 +77,6 @@ function ChoiceRows({
   ));
 }
 
-/**
- * The user's own OpenAI-compatible voice server, as the Voice server of the desktop: Speaches,
- * Kokoro-FastAPI or another server with `/audio/transcriptions` and `/audio/speech`. Connect lists
- * what the server has, and the user chooses which of dictation and spoken replies it does, with
- * their models and voice. The key goes to the keychain and never shows again. A route that is on
- * becomes the recognizer or the reply voice when it is saved.
- */
 export function VoiceServerScreen() {
   const { t } = useText();
   const { theme } = useUniwind();
@@ -145,7 +135,6 @@ export function VoiceServerScreen() {
     setError(null);
     try {
       await saveVoiceServer({ address: trimmed, routes }, apiKey.trim() || null);
-      // A route that is on is in use from now, as on desktop.
       await saveVoiceSettings({
         ...(routes.dictation ? { recognition: "voice-server" as const } : {}),
         ...(routes.speech ? { engine: "voice-server" as const } : {}),

@@ -1,9 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Omnisend here is taken from api-docs.omnisend.com and
-// support.omnisend.com. Each page used is in `sources`. Check the sources again, and move
-// `checkedAt`, whenever this file changes.
-
 export const OMNISEND_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {
@@ -16,7 +12,7 @@ export const OMNISEND_PLUGIN_GUIDE: PluginGuide = {
     },
     {
       title: "Prepare campaigns and automations",
-      text: "The agent creates, copies and edits campaigns, email content and templates, and sends a test email. It also creates, enables and disables automations. With write access it can send a campaign, so ask it for a draft when you want to check the campaign first.",
+      text: "The agent creates, copies and edits campaigns, email content and templates, and sends a test email. It also creates, enables and disables automations. When the key allows it, the agent can send a campaign, so ask it for a draft when you want to check the campaign first.",
     },
     {
       title: "Keep the product catalog current",
@@ -26,36 +22,36 @@ export const OMNISEND_PLUGIN_GUIDE: PluginGuide = {
   faq: [
     {
       question: "Is the Omnisend MCP server official?",
-      answer:
-        "Yes. Omnisend hosts the server at https://mcp.omnisend.com/mcp. It uses Streamable HTTP and OAuth with dynamic client registration.",
+      answer: "Yes. Omnisend hosts the server at https://mcp.omnisend.com/mcp. It uses Streamable HTTP.",
     },
     {
       question: "Does the Omnisend plugin need an API key?",
       answer:
-        "No. Each user signs in to their own Omnisend account through the browser and selects the access level on the consent screen. OpenBot registers itself with Omnisend, does the sign-in, keeps the tokens in encrypted storage, and adds the Authorization header. The plugin catalog holds no secret. The account needs the Owner, Admin, Manager or Partner role.",
+        "Yes. Create an API key in Omnisend at app.omnisend.com/integrations/api-keys, then enter it when you connect the app. OpenBot keeps the key in encrypted storage and sends it in the X-Api-Key header. The plugin catalog holds no secret. Omnisend's browser sign-in does not accept OpenBot yet.",
     },
     {
-      question: "Can I give the agent read-only access?",
+      question: "What can the agent do with the key?",
       answer:
-        'Yes. Select read-only access on the Omnisend consent screen. A write then fails with "Permission denied". To change the access level, disconnect the app and sign in again.',
+        "The agent can do what the API key allows in Omnisend, which can include sending campaigns and deleting data. To stop the access, delete the key in Omnisend.",
     },
     {
       question: "Does it work with more than one brand?",
       answer:
-        "One connection works on one brand. Omnisend recommends a separate connection for each brand, so that the agent does not change the wrong brand. Add each extra brand as its own MCP server in the MCP servers settings, as the Omnisend guide shows, and sign in there.",
+        "One key works on one brand. Omnisend recommends a separate connection for each brand, so that the agent does not change the wrong brand. Add each extra brand as its own MCP server in the MCP servers settings, with the API key of that brand.",
     },
     {
       question: "What data does Omnisend get?",
       answer:
-        "Your workspaces, conversations and files stay on the computer that runs OpenBot. Omnisend gets the requests that the agent sends, such as a report query or a campaign update. The tools work on the brand that you sign in to.",
+        "Your workspaces, conversations and files stay on the computer that runs OpenBot. Omnisend gets the requests that the agent sends, such as a report query or a campaign update. The tools work on the brand of the API key.",
     },
   ],
   sources: [
     { label: "Omnisend: MCP server", url: "https://api-docs.omnisend.com/reference/mcp-server" },
+    { label: "Omnisend: API authentication", url: "https://api-docs.omnisend.com/v3/reference/authentication" },
     {
       label: "Omnisend: Connect Omnisend MCP to AI tools",
       url: "https://support.omnisend.com/en/articles/15096086-connect-omnisend-mcp-to-ai-tools",
     },
   ],
-  checkedAt: "2026-11-06",
+  checkedAt: "2026-11-16",
 };

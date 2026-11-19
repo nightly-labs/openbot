@@ -55,12 +55,10 @@ function UploadRow({ pending }: { pending: QueuedUpload }) {
   );
 }
 
-/** The route name of an agent chat in the app stack, `app/(app)/chat/[agentId].tsx`. */
 const CHAT_ROUTE = "chat/[agentId]";
 
 export function QueuedMessagesScreen() {
   const { t, format } = useText();
-  // The stack that presents this sheet. The sheet has its own stack inside.
   const sheetStack = useNavigation().getParent();
   const { chat } = useLocalSearchParams<{ chat: string }>();
   const { queue, pending } = useQueuedChat(chat);
@@ -95,16 +93,13 @@ export function QueuedMessagesScreen() {
         self={serverAgents.find((agent) => agent.id === agentId)}
         onHide={() => {
           queue?.hideWaiting();
-          // With nothing else to show, the sheet would only say that the queue is empty.
           if (count === 0 && !queue?.error) router.back();
         }}
-        // Steer is the only action of an answer, so the row opens it only while a turn runs.
         onOpenReply={
-          queue?.activeTurnId
+          queue?.activeTurnId && queue.steers
             ? (deliveryId) => router.push({ pathname: "/queued-messages/actions", params: { chat, deliveryId } })
             : undefined
         }
-        // The teammate's chat takes the place of the sheet, so Back returns to this agent's chat.
         onOpenAgent={(teammateId) => sheetStack?.dispatch(StackActions.replace(CHAT_ROUTE, { agentId: teammateId }))}
       />
       {count > 0 ? (

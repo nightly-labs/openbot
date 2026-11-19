@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/voice";
 
 export const messages = {
-  // Voice transcription errors.
   "error.voice.downloadFailed": "לא ניתן להוריד את מודל הקול. יש לנסות שוב.",
   "error.voice.downloadStopped": "הורדת מודל הקול הופסקה.",
   "error.voice.removeBusy": "יש להמתין לסיום תמלול הקול ואז להסיר את המודל.",
@@ -35,7 +34,6 @@ export const messages = {
   "error.voice.live.refused":
     "OpenAI סירבה להפעיל קול חי. יש לנסות שוב מאוחר יותר, או לכבות את הקול החי בהגדרות כדי לדבר בקול.",
   "error.voice.live.off": "הקול החי של Codex כבוי. אפשר להפעיל אותו בהגדרות ← קול.",
-  // The user's own voice server.
   "error.voice.server.routeOff": "שרת הקול לא הוגדר לכך. יש לבדוק את הגדרות ← קול.",
   "error.voice.server.keyRefused": "{host} דחה את מפתח ה-API.",
   "error.voice.server.invalidAnswer": "{host} לא שלח תשובה תואמת OpenAI.",
