@@ -185,13 +185,6 @@
 .wfn-stage .wfn-model-pill[data-static] {
   display: inline-flex;
   align-items: center;
-  overflow: hidden;
-  white-space: nowrap;
-}
-
-.wfn-stage .wfn-model-pill[data-static] > span[aria-hidden] {
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .wfn-stage .wfn-agent-pill:has(+ .wfn-model-pill) {

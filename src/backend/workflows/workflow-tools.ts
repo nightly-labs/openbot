@@ -340,7 +340,10 @@ function checkTriggerEvent(node: WorkflowNode, op: number): void {
 
 function checkAgentStepModel(kind: WorkflowNodeKind, patch: WorkflowOp["fields"], op: number): void {
   if (kind !== "agent") return;
-  const given = STEP_MODEL_FIELDS.filter((name) => patch?.[name] !== undefined && patch[name] !== null);
+  const given = STEP_MODEL_FIELDS.filter((name) => {
+    const value = patch?.[name];
+    return value !== undefined && value !== null && value !== "";
+  });
   if (given.length > 0)
     refuse(
       `Op ${op}: an agent step runs on its agent's model, so it has no ${given.join(", ")}. For another model, add an llm step.`,
