@@ -246,6 +246,14 @@ value, each company must enter its client secret again. Without it, company sign
 everyone signs in with an email code. GitHub Actions reads it from the `cloudflare-production`
 Environment; a local deployment reads it from the encrypted `.env.production`.
 
+`HOSTED_ARCHIVE_KEY_SECRET` (32 random bytes in base64), `B2_WORKER_KEY_ID_EU` and
+`B2_WORKER_APPLICATION_KEY_EU` are set together or not at all. They are for the archives of ended
+pool servers ([plan 012](../../plans/012-pool-server-archive.md)). The first encrypts the `age` key
+of each archive in `hosted_server_archives`; with another value, no archive can be restored. The B2
+key reads the `openbot-pool-archive-eu` bucket and nothing else. The encrypted `.env.production` has
+all three, and GitHub Actions reads them from the `cloudflare-production` Environment. When you
+change one, change it in both places and deploy the Worker.
+
 `SERVER_CLAIMS_ADMIN_TOKEN` lets an operator sign a new server in for a user without an email code: see
 [server claims](../../docs/self-hosted-server.md#sign-in-with-a-server-claim). Without it, the endpoint answers 401.
 The encrypted `.env.production` has it, so `scripts/hosting/leaseweb-pool.ts custom` can sign a custom
