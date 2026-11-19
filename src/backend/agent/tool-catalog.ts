@@ -21,10 +21,18 @@ export const BUILTIN_TOOL_CATALOG = [OPENBOT_DYNAMIC_TOOLS, ...BROWSER_DYNAMIC_T
   })),
 );
 
+/**
+ * The OpenBot tools that each agent has directly. `read_video` and `read_image` are here because a
+ * link or an attached photo is in many first messages: on OpenCode, gpt-oss-20b and Gemma 4 12B called
+ * `tools.openbot.read_video` in `execute`, which OpenCode refuses for a tool that is not direct, and
+ * then searched again on each turn until OpenBot stopped the loop.
+ */
 const DIRECT_NAMES = new Set([
   "ask_user",
   "ask_ui",
   "attach_files_to_response",
+  "read_image",
+  "read_video",
   "list_agents",
   "send_message",
   "search_memories",
