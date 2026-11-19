@@ -3981,8 +3981,7 @@ export class ProviderRuntime implements ProviderPort {
 
   #recheckSignIn(provider: AgentProvider, woke: boolean): void {
     const current = this.#signInRechecks.get(provider);
-    if (!current && !woke) return;
-    if (current?.timer) clearTimeout(current.timer);
+    if ((!current && !woke) || current?.timer) return;
     const attempts = current?.attempts ?? 0;
     const delayMs = SIGN_IN_RECHECK_DELAYS_MS[attempts];
     if (delayMs === undefined) {
