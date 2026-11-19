@@ -1619,4 +1619,40 @@ export const messages = {
   "mobile.server.transfer.copyNext": "Gekopieerde agents gebruiken de goedkeuringsregels van {server}.",
   "mobile.server.transfer.copyNoServer":
     "Maak verbinding met een andere server als eigenaar of beheerder om er agents naar te kopiëren.",
+  "mobile.server.route.ownerTransfer": "Eigendom overdragen",
+  "mobile.server.ownerTransfer.unavailable":
+    "Maak als eigenaar verbinding met deze server om het eigendom over te dragen.",
+  "mobile.server.ownerTransfer.hosted": "OpenBot host deze server, dus de eigenaar kan niet veranderen.",
+  "mobile.server.ownerTransfer.lede":
+    "De nieuwe eigenaar krijgt een e-mail en moet accepteren terwijl die met dat e-mailadres is ingelogd. Daarna word je van deze server verwijderd.",
+  "mobile.server.ownerTransfer.email": "E-mail van de nieuwe eigenaar",
+  "mobile.server.ownerTransfer.send": "Versturen",
+  "mobile.server.ownerTransfer.sending": "Versturen…",
+  "mobile.server.ownerTransfer.stays":
+    "Agents, chats, routines, aanmeldingen bij aanbieders, opgeslagen sleutels, Vault-logins, browseraanmeldingen en gekoppelde apps blijven op de server. De nieuwe eigenaar kan ze gebruiken.",
+  "mobile.server.ownerTransfer.expiry": "Het verzoek verloopt na 7 dagen.",
+  "mobile.server.ownerTransfer.confirmTitle": "{email} eigenaar maken?",
+  "mobile.server.ownerTransfer.confirmBody":
+    "Als {email} accepteert, wordt die eigenaar van {server} en verlies je de toegang. De gegevens blijven op de server. Het verzoek verloopt na 7 dagen.",
+  "mobile.server.ownerTransfer.confirm": "Overdragen",
+  "mobile.server.ownerTransfer.sendFailed": "Het verzoek is niet verstuurd.",
+  "mobile.server.ownerTransfer.loadFailed": "Kan de openstaande overdracht niet lezen.",
+  "mobile.server.ownerTransfer.pending": "Wacht op de nieuwe eigenaar",
+  "mobile.server.ownerTransfer.expires": "Verloopt op {date}",
+  "mobile.server.ownerTransfer.pendingNote":
+    "{email} moet accepteren terwijl die met dit e-mailadres is ingelogd. Tot dan blijf jij de eigenaar.",
+  "mobile.server.ownerTransfer.cancel": "Annuleren",
+  "mobile.server.ownerTransfer.cancelTitle": "Overdracht annuleren?",
+  "mobile.server.ownerTransfer.cancelBody": "{email} kan het dan niet meer accepteren.",
+  "mobile.server.ownerTransfer.keep": "Behouden",
+  "mobile.server.ownerTransfer.cancelFailed": "De overdracht is niet geannuleerd.",
+  "mobile.server.ownerTransfer.incomingTitle": "Eigenaar van {server} worden?",
+  "mobile.server.ownerTransfer.incomingBody":
+    "{name} wil jou eigenaar van {server} maken. Je krijgt volledige controle over de server, en de agents, chats, routines en opgeslagen aanmeldingen blijven erop. {name} verliest de toegang.",
+  "mobile.server.ownerTransfer.accept": "Accepteren",
+  "mobile.server.ownerTransfer.decline": "Weigeren",
+  "mobile.server.ownerTransfer.accepted": "Je bent nu eigenaar van {server}.",
+  "mobile.server.ownerTransfer.acceptFailed": "Kan de overdracht niet accepteren",
+  "mobile.server.ownerTransfer.declineFailed": "Kan de overdracht niet weigeren",
+  "mobile.server.ownerTransfer.tryAgain": "Probeer het later opnieuw.",
 } as const satisfies PartialTranslation<typeof source>;

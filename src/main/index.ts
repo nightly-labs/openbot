@@ -535,6 +535,7 @@ const {
   forwardAttachmentDownload,
   forwardAttachmentImportProgress,
   forwardInstanceTransferUploadProgress,
+  forwardOwnerTransfersChanged,
 } = createRendererForwarders({
   getMainWindow: () => windowHolder.current,
   getChatWindows: () => windows.getChatWindows(),
@@ -877,7 +878,7 @@ function registerIpcHandlers({
       remoteServers,
       forwardLiveEvent: forwardVoiceLiveEvent,
     }),
-    ...accountIpcHandlers({ centralAuth, host }),
+    ...accountIpcHandlers({ centralAuth, host, refreshServers: () => remoteServers.requestDirectoryRefresh() }),
     ...skillIpcHandlers({ skills, getMainWindow: getDialogParent, translate: language.translate }),
     ...agentFolderIpcHandlers({
       folders: agentFolders,
@@ -945,6 +946,7 @@ function registerIpcHandlers({
     ...teamIpcHandlers({
       host,
       localServers,
+      ownerTransfers: centralAuth,
       remoteDesktop,
       remoteServers,
       takePendingInvite: () => takePendingDeepLink("invite")?.url ?? null,
@@ -1574,6 +1576,7 @@ if (!hasSingleInstanceLock) {
       built.passwordManagers.onChanged(forwardPasswordManagerStatus);
       built.vault.onChanged(forwardVaultState);
       remoteServers.on("changed", forwardServers);
+      remoteServers.on("directoryInvalidated", forwardOwnerTransfersChanged);
       remoteServers.on("agent", (serverId, event, bufferedLive) => {
         forwardAgentEvent(serverId, event, bufferedLive);
       });

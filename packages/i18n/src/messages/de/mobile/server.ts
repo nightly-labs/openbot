@@ -1686,4 +1686,40 @@ export const messages = {
   "mobile.server.transfer.copyNext": "Kopierte Agenten verwenden die Genehmigungsregeln von {server}.",
   "mobile.server.transfer.copyNoServer":
     "Verbinde dich als Eigentümer oder Admin mit einem anderen Server, um Agenten dorthin zu kopieren.",
+  "mobile.server.route.ownerTransfer": "Eigentum übertragen",
+  "mobile.server.ownerTransfer.unavailable":
+    "Verbinde dich als Eigentümer mit diesem Server, um das Eigentum zu übertragen.",
+  "mobile.server.ownerTransfer.hosted": "OpenBot hostet diesen Server, daher kann sein Eigentümer nicht wechseln.",
+  "mobile.server.ownerTransfer.lede":
+    "Der neue Eigentümer erhält eine E-Mail und muss annehmen, während er mit dieser E-Mail angemeldet ist. Danach wirst du von diesem Server entfernt.",
+  "mobile.server.ownerTransfer.email": "E-Mail des neuen Eigentümers",
+  "mobile.server.ownerTransfer.send": "Senden",
+  "mobile.server.ownerTransfer.sending": "Wird gesendet…",
+  "mobile.server.ownerTransfer.stays":
+    "Agenten, Chats, Routinen, Anbieter-Anmeldungen, gespeicherte Schlüssel, Vault-Logins, Browser-Anmeldungen und verbundene Apps bleiben auf dem Server. Der neue Eigentümer kann sie nutzen.",
+  "mobile.server.ownerTransfer.expiry": "Die Anfrage läuft nach 7 Tagen ab.",
+  "mobile.server.ownerTransfer.confirmTitle": "{email} zum Eigentümer machen?",
+  "mobile.server.ownerTransfer.confirmBody":
+    "Wenn {email} annimmt, wird diese Person Eigentümer von {server} und du verlierst den Zugriff. Die Daten bleiben auf dem Server. Die Anfrage läuft nach 7 Tagen ab.",
+  "mobile.server.ownerTransfer.confirm": "Übertragen",
+  "mobile.server.ownerTransfer.sendFailed": "Die Anfrage wurde nicht gesendet.",
+  "mobile.server.ownerTransfer.loadFailed": "Die offene Übertragung konnte nicht gelesen werden.",
+  "mobile.server.ownerTransfer.pending": "Wartet auf den neuen Eigentümer",
+  "mobile.server.ownerTransfer.expires": "Läuft ab am {date}",
+  "mobile.server.ownerTransfer.pendingNote":
+    "{email} muss annehmen und dabei mit dieser E-Mail angemeldet sein. Bis dahin bleibst du Eigentümer.",
+  "mobile.server.ownerTransfer.cancel": "Abbrechen",
+  "mobile.server.ownerTransfer.cancelTitle": "Übertragung abbrechen?",
+  "mobile.server.ownerTransfer.cancelBody": "{email} kann sie dann nicht mehr annehmen.",
+  "mobile.server.ownerTransfer.keep": "Behalten",
+  "mobile.server.ownerTransfer.cancelFailed": "Die Übertragung wurde nicht abgebrochen.",
+  "mobile.server.ownerTransfer.incomingTitle": "Eigentümer von {server} werden?",
+  "mobile.server.ownerTransfer.incomingBody":
+    "{name} möchte dich zum Eigentümer von {server} machen. Du erhältst die volle Kontrolle über den Server, und seine Agenten, Chats, Routinen und gespeicherten Anmeldungen bleiben darauf. {name} verliert den Zugriff.",
+  "mobile.server.ownerTransfer.accept": "Annehmen",
+  "mobile.server.ownerTransfer.decline": "Ablehnen",
+  "mobile.server.ownerTransfer.accepted": "Du bist jetzt Eigentümer von {server}.",
+  "mobile.server.ownerTransfer.acceptFailed": "Übertragung nicht angenommen",
+  "mobile.server.ownerTransfer.declineFailed": "Übertragung nicht abgelehnt",
+  "mobile.server.ownerTransfer.tryAgain": "Versuche es später erneut.",
 } as const satisfies PartialTranslation<typeof source>;

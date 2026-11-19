@@ -54,6 +54,7 @@ import {
   type PlanChangeDirection,
   type PlanEndReason,
 } from "./account-analytics";
+import { subscriptionPaysForOwnerSql } from "./billing-entitlement";
 import {
   BillingError,
   BillingOperationError,
@@ -781,7 +782,7 @@ export class BillingService {
                   CASE WHEN hs.provider_template IS NULL THEN NULL ELSE COALESCE(hs.pending_size, hs.size) END AS server_size,
                   COALESCE(hs.storage_tier, 0) AS storage_tier
            FROM billing_subscriptions s
-           LEFT JOIN remote_hosts h ON h.host_id = s.server_id AND h.owner_user_id = s.user_id
+           LEFT JOIN remote_hosts h ON h.host_id = s.server_id AND ${subscriptionPaysForOwnerSql("s", "h.owner_user_id")}
            LEFT JOIN hosted_servers hs ON hs.server_id = s.server_id AND hs.owner_user_id = s.user_id
            WHERE s.user_id = ? AND s.status IN ${OPEN_STATUSES_SQL}
            ORDER BY h.name IS NULL, h.name COLLATE NOCASE, s.updated_at DESC`,

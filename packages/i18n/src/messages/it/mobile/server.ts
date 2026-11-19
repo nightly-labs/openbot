@@ -1646,4 +1646,40 @@ export const messages = {
   "mobile.server.transfer.copyNext": "Gli agenti copiati usano le regole di approvazione di {server}.",
   "mobile.server.transfer.copyNoServer":
     "Connettiti a un altro server come proprietario o amministratore per copiarvi gli agenti.",
+  "mobile.server.route.ownerTransfer": "Trasferisci proprietà",
+  "mobile.server.ownerTransfer.unavailable":
+    "Connettiti a questo server come proprietario per trasferire la proprietà.",
+  "mobile.server.ownerTransfer.hosted": "OpenBot ospita questo server, quindi il proprietario non può cambiare.",
+  "mobile.server.ownerTransfer.lede":
+    "Il nuovo proprietario riceve un’email e deve accettare dopo aver effettuato l’accesso con quell’email. Poi verrai rimosso da questo server.",
+  "mobile.server.ownerTransfer.email": "Email del nuovo proprietario",
+  "mobile.server.ownerTransfer.send": "Invia",
+  "mobile.server.ownerTransfer.sending": "Invio…",
+  "mobile.server.ownerTransfer.stays":
+    "Agenti, chat, routine, accessi ai provider, chiavi salvate, login del Vault, accessi del browser e app collegate restano sul server. Il nuovo proprietario può usarli.",
+  "mobile.server.ownerTransfer.expiry": "La richiesta scade dopo 7 giorni.",
+  "mobile.server.ownerTransfer.confirmTitle": "Rendere {email} proprietario?",
+  "mobile.server.ownerTransfer.confirmBody":
+    "Quando {email} accetta, diventa proprietario di {server} e tu perdi l’accesso. I dati restano sul server. La richiesta scade dopo 7 giorni.",
+  "mobile.server.ownerTransfer.confirm": "Trasferisci",
+  "mobile.server.ownerTransfer.sendFailed": "La richiesta non è stata inviata.",
+  "mobile.server.ownerTransfer.loadFailed": "Impossibile leggere il trasferimento in attesa.",
+  "mobile.server.ownerTransfer.pending": "In attesa del nuovo proprietario",
+  "mobile.server.ownerTransfer.expires": "Scade il {date}",
+  "mobile.server.ownerTransfer.pendingNote":
+    "{email} deve accettare dopo aver effettuato l’accesso con questa email. Fino ad allora resti tu il proprietario.",
+  "mobile.server.ownerTransfer.cancel": "Annulla",
+  "mobile.server.ownerTransfer.cancelTitle": "Annullare il trasferimento?",
+  "mobile.server.ownerTransfer.cancelBody": "{email} non potrà più accettarlo.",
+  "mobile.server.ownerTransfer.keep": "Mantieni",
+  "mobile.server.ownerTransfer.cancelFailed": "Il trasferimento non è stato annullato.",
+  "mobile.server.ownerTransfer.incomingTitle": "Diventare proprietario di {server}?",
+  "mobile.server.ownerTransfer.incomingBody":
+    "{name} vuole renderti proprietario di {server}. Avrai il pieno controllo del server, e i suoi agenti, chat, routine e accessi salvati restano lì. {name} perde l’accesso.",
+  "mobile.server.ownerTransfer.accept": "Accetta",
+  "mobile.server.ownerTransfer.decline": "Rifiuta",
+  "mobile.server.ownerTransfer.accepted": "Ora sei il proprietario di {server}.",
+  "mobile.server.ownerTransfer.acceptFailed": "Impossibile accettare il trasferimento",
+  "mobile.server.ownerTransfer.declineFailed": "Impossibile rifiutare il trasferimento",
+  "mobile.server.ownerTransfer.tryAgain": "Riprova più tardi.",
 } as const satisfies PartialTranslation<typeof source>;

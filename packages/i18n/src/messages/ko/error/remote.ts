@@ -209,6 +209,10 @@ export const messages = {
   "error.remote.formUnavailable": "이 양식은 더 이상 사용할 수 없어요.",
   "error.remote.hostedServerRemoval": "호스팅 서버를 삭제하려면 결제에서 삭제해 주세요.",
   "error.remote.hostRemoved": "소유자가 이 서버를 계정에서 삭제했어요.",
+  "error.remote.ownerTransferSelf": "이미 이 서버의 소유자예요. 새 소유자의 이메일을 입력하세요.",
+  "error.remote.ownerTransferHosted": "OpenBot이 호스팅하는 서버는 소유자를 바꿀 수 없어요.",
+  "error.remote.ownerTransferInvalid":
+    "이 소유권 이전은 더 이상 사용할 수 없어요. 소유자에게 다시 보내 달라고 요청하세요.",
   "error.remote.channelsUnsupported": "채널을 사용하려면 이 데스크톱 서버를 업데이트해 주세요.",
   "error.remote.channelDeleteUnsupported": "채널을 삭제하려면 이 데스크톱 서버를 업데이트해 주세요.",
   "error.remote.historyRefreshFailed": "메시지를 보냈지만 채팅 기록을 새로 고칠 수 없었어요.",

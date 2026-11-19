@@ -1840,4 +1840,39 @@ export const messages = {
   "mobile.server.transfer.copyNext": "Skopiowani agenci używają reguł zatwierdzania serwera {server}.",
   "mobile.server.transfer.copyNoServer":
     "Połącz się z innym serwerem jako właściciel lub administrator, aby skopiować na niego agentów.",
+  "mobile.server.route.ownerTransfer": "Przekaż własność",
+  "mobile.server.ownerTransfer.unavailable": "Połącz się z tym serwerem jako właściciel, aby przekazać własność.",
+  "mobile.server.ownerTransfer.hosted": "OpenBot hostuje ten serwer, więc jego właściciel nie może się zmienić.",
+  "mobile.server.ownerTransfer.lede":
+    "Nowy właściciel dostanie e-mail i musi zaakceptować, będąc zalogowanym na ten adres. Potem zostaniesz usunięty z tego serwera.",
+  "mobile.server.ownerTransfer.email": "E-mail nowego właściciela",
+  "mobile.server.ownerTransfer.send": "Wyślij",
+  "mobile.server.ownerTransfer.sending": "Wysyłanie…",
+  "mobile.server.ownerTransfer.stays":
+    "Agenci, czaty, rutyny, logowania do dostawców, zapisane klucze, loginy z Vault, logowania w przeglądarce i połączone aplikacje zostają na serwerze. Nowy właściciel może z nich korzystać.",
+  "mobile.server.ownerTransfer.expiry": "Prośba wygasa po 7 dniach.",
+  "mobile.server.ownerTransfer.confirmTitle": "Uczynić {email} właścicielem?",
+  "mobile.server.ownerTransfer.confirmBody":
+    "Gdy {email} zaakceptuje, ta osoba zostanie właścicielem {server}, a ty stracisz dostęp. Dane zostają na serwerze. Prośba wygasa po 7 dniach.",
+  "mobile.server.ownerTransfer.confirm": "Przekaż",
+  "mobile.server.ownerTransfer.sendFailed": "Prośba nie została wysłana.",
+  "mobile.server.ownerTransfer.loadFailed": "Nie udało się odczytać oczekującego przekazania.",
+  "mobile.server.ownerTransfer.pending": "Czeka na nowego właściciela",
+  "mobile.server.ownerTransfer.expires": "Wygasa {date}",
+  "mobile.server.ownerTransfer.pendingNote":
+    "{email} musi zaakceptować, będąc zalogowanym na ten adres. Do tego czasu pozostajesz właścicielem.",
+  "mobile.server.ownerTransfer.cancel": "Anuluj",
+  "mobile.server.ownerTransfer.cancelTitle": "Anulować przekazanie?",
+  "mobile.server.ownerTransfer.cancelBody": "{email} nie będzie już mógł go zaakceptować.",
+  "mobile.server.ownerTransfer.keep": "Zostaw",
+  "mobile.server.ownerTransfer.cancelFailed": "Przekazanie nie zostało anulowane.",
+  "mobile.server.ownerTransfer.incomingTitle": "Zostać właścicielem {server}?",
+  "mobile.server.ownerTransfer.incomingBody":
+    "{name} chce uczynić cię właścicielem {server}. Dostaniesz pełną kontrolę nad serwerem, a jego agenci, czaty, rutyny i zapisane logowania na nim zostają. {name} traci dostęp.",
+  "mobile.server.ownerTransfer.accept": "Akceptuj",
+  "mobile.server.ownerTransfer.decline": "Odrzuć",
+  "mobile.server.ownerTransfer.accepted": "Jesteś teraz właścicielem {server}.",
+  "mobile.server.ownerTransfer.acceptFailed": "Nie udało się zaakceptować",
+  "mobile.server.ownerTransfer.declineFailed": "Nie udało się odrzucić",
+  "mobile.server.ownerTransfer.tryAgain": "Spróbuj ponownie później.",
 } as const satisfies PartialTranslation<typeof source>;

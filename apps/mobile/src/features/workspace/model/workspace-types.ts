@@ -391,6 +391,7 @@ export interface MobileWorkspaceContextValue {
   ) => Promise<void>;
   setServerAppearance: (serverId: string, appearance: ServerAppearance | null) => Promise<void>;
   canRotateServerKey: (serverId: string) => boolean;
+  canTransferOwnership: (serverId: string) => boolean;
   rotateServerKey: (serverId: string) => Promise<{ publicKey: string }>;
   reloadServerList: () => Promise<void>;
   canCreateLocalServers: (serverId: string) => boolean;
@@ -817,6 +818,7 @@ type ServerCheckKey =
   | "canEditServerIdentity"
   | "canEditServerAppearance"
   | "canRotateServerKey"
+  | "canTransferOwnership"
   | "canCreateLocalServers"
   | "canRestartServerItself"
   | "canManageServerTimezone"

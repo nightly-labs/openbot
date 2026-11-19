@@ -95,6 +95,7 @@ import {
   withWorkspaceOnlyLimit,
 } from "@openbot/contracts/ipc";
 import { guardedListDecoder, optionalHistoryExtent, requiredString } from "@openbot/contracts/ipc-decoding";
+import type { AcceptedOwnerTransfer, OwnerTransfer } from "@openbot/contracts/owner-transfer";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
@@ -324,6 +325,15 @@ type WebMessageDelete =
 
 type WebHistoryDelete = { kind: "agent"; agentId: string } | { kind: "channel"; channelId: string };
 
+export interface WebOwnerTransfers {
+  pending(hostId: string): Promise<OwnerTransfer | null>;
+  start(hostId: string, email: string): Promise<OwnerTransfer>;
+  cancel(hostId: string): Promise<void>;
+  incoming(): Promise<OwnerTransfer[]>;
+  accept(transferId: string): Promise<AcceptedOwnerTransfer>;
+  decline(transferId: string): Promise<void>;
+}
+
 export interface WebWorkspaceRuntime {
   admin?: WebAdminRuntime;
   hosts?: WebHostConnections;
@@ -351,6 +361,7 @@ export interface WebWorkspaceRuntime {
   listHosts(): Promise<RemoteTeamHost[]>;
   leaveHost(hostId: string, membershipId: string): Promise<void>;
   removeOwnedHost?: (hostId: string) => Promise<void>;
+  ownerTransfers?: WebOwnerTransfers;
   previewInvite(url: string): Promise<InvitePreview>;
   acceptInvite(url: string): Promise<RemoteTeamHost>;
   connect(host: RemoteTeamHost, options?: WebConnectOptions): Promise<string[]>;
@@ -1291,6 +1302,14 @@ export function createWebWorkspaceRuntime(
       Effect.runPromise(respondToBrowserTakeover(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
     listHosts: () => runTeamEffect(directory.listHosts()),
     leaveHost: (hostId, membershipId) => runTeamEffect(directory.leaveHost(hostId, membershipId)),
+    ownerTransfers: {
+      pending: (hostId) => runTeamEffect(directory.pendingOwnerTransfer(hostId)),
+      start: (hostId, email) => runTeamEffect(directory.startOwnerTransfer(hostId, email)),
+      cancel: (hostId) => runTeamEffect(directory.cancelOwnerTransfer(hostId)),
+      incoming: () => runTeamEffect(directory.incomingOwnerTransfers()),
+      accept: (transferId) => runTeamEffect(directory.acceptOwnerTransfer(transferId)),
+      decline: (transferId) => runTeamEffect(directory.declineOwnerTransfer(transferId)),
+    },
     async removeOwnedHost(hostId) {
       const response = await accountFetch(`/api/browser/v2/remote/hosts/${encodeURIComponent(hostId)}`, {
         method: "DELETE",

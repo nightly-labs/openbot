@@ -80,7 +80,7 @@ export type AccountSurface = (typeof ACCOUNT_SURFACES)[number];
 const ATTRIBUTION_SOURCES = ["sign_in", "checkout"] as const;
 export type AttributionSource = (typeof ATTRIBUTION_SOURCES)[number];
 
-const EMAIL_KINDS = ["sign_in_code", "team_invite", "contact", "welcome", "license"] as const;
+const EMAIL_KINDS = ["sign_in_code", "team_invite", "contact", "welcome", "license", "owner_transfer"] as const;
 export type EmailKind = (typeof EMAIL_KINDS)[number];
 const EMAIL_RESULTS = ["accepted", "rate_limited", "unknown", "failed"] as const;
 export type EmailResult = (typeof EMAIL_RESULTS)[number];
