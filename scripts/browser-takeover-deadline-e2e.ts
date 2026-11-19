@@ -3,15 +3,22 @@
 // answer before then, the card must stay open, and the next call for the same tab must wait on the
 // same card. Cursor asks for no progress and stops each call after 60 s (#10577), so a Vault request
 // card must also answer its call first, stay open, and send only the saved item's name as the late
-// answer. A secure fill that fails gives the page to the user and tells the agent only a fixed reason
-// (#10536). The browser host is a stub: no page, provider or account is used; the Vault is a temporary file.
+// answer. Mistral Vibe stops each call after 60 s (#11550), so an `ask_ui` card answers its call first,
+// stays open, and sends its late answer, with an edited preview, to the card's thread; a form with a
+// secret field still waits in its call. A secure fill that fails gives the page to the user and tells
+// the agent only a fixed reason (#10536). The browser host is a stub: no page, provider or account is used; the Vault is a temporary file.
 // `bun scripts/browser-takeover-deadline-e2e.ts`. Writes .openbot-build/browser-takeover-deadline-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { AgentEvent, BrowserTab, ConversationSnapshot } from "@openbot/contracts/ipc";
-import { uiBlockAnswersFromResponse } from "@openbot/contracts/ui-blocks";
+import {
+  UI_CONFIRM_EDIT_ACTION_ID,
+  UI_CONFIRM_PREVIEW_ANSWER_ID,
+  type UiBlockSpec,
+  uiBlockAnswersFromResponse,
+} from "@openbot/contracts/ui-blocks";
 import { Effect } from "effect";
 import { AttentionRegistry } from "../src/backend/agent/attention-registry";
 import { vaultRequestFormSpec } from "../src/backend/agent/prompts";
@@ -396,6 +403,93 @@ try {
     } finally {
       await rm(root, { recursive: true, force: true });
     }
+  });
+
+  await step("an ask_ui card stays open past its call, and its late answer goes to the card's thread", async () => {
+    const lateAnswers: Array<{ target: unknown; text: string }> = [];
+    const blockRegistry = new AttentionRegistry({
+      conversation: {
+        agentForThread: (threadId) => (threadId === THREAD ? AGENT : undefined),
+        publicThreadId: (_agentId, threadId) => threadId,
+        ensureSnapshot: () => snapshot,
+        emitConversation: () => {
+          snapshot.revision += 1;
+        },
+      },
+      browser: { listTabs: () => tabs, beginTakeover: () => Effect.void, endTakeover: () => {} },
+      hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
+      routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {} },
+      emit: (event) => events.push(event),
+      emitError: () => {},
+      emitRuntimeSnapshot: () => {},
+      // The thread of a routine, as the agent service gives it (#11550).
+      lateAnswerTarget: () => ({ taskId: "routine-task" }),
+      sendLateAnswer: (_agentId, target, text) => lateAnswers.push({ target, text }),
+    });
+    const surface = (turnId: string, spec: UiBlockSpec) => {
+      const id = nextRequest++;
+      blockRegistry.surfaceUiBlock(
+        client,
+        {
+          id,
+          method: "item/tool/call",
+          params: { threadId: THREAD, turnId, callId: `call-${id}`, namespace: "openbot", tool: "ask_ui" },
+          // Mistral Vibe's call: no progress token, so the bridge sets only this deadline.
+          detachAfterMs: DEADLINE_MS,
+        },
+        { blockId: `block-${id}`, spec },
+      );
+      return id;
+    };
+    // A secret field must not show in a chat message, so its form waits in its call. It is shown first
+    // with the same deadline, so its timer would fire before the confirm card's answer arrives.
+    const secretId = surface("turn-9", {
+      type: "form",
+      title: "Connect the service",
+      fields: [{ id: "token", kind: "text", label: "Token", secret: true }],
+    });
+    const spec: UiBlockSpec = {
+      type: "confirm",
+      title: "Send this to Ann?",
+      preview: "Hi Ann, see you on Friday.",
+      actions: [
+        { id: "send", label: "Send", style: "primary" },
+        { id: UI_CONFIRM_EDIT_ACTION_ID, label: "Edit" },
+      ],
+    };
+    const id = surface("turn-9", spec);
+    const waiting = answerOf(await client.answered(id));
+    assert.equal(waiting.status, "waiting");
+    assert.equal(waiting.success, true, "the agent got a failed call");
+    assert(!client.answers.has(secretId), "a form with a secret field answered its call");
+    const card = () => blockRegistry.runtimeAttention().pendingPrompts.find((prompt) => prompt.requestId === id);
+    assert.equal(card()?.detached, true);
+    // The run ends, as the agent ends it after the waiting answer. The card stays; the form closes.
+    blockRegistry.clearForTurn(THREAD, "turn-9", true);
+    assert(card(), "the end of the run closed the card");
+    assert.equal(blockRegistry.runtimeAttention().pendingPrompts.length, 1, "the secret form outlived its turn");
+    const edited = "Hi Ann, see you on Monday.";
+    await runCauseEffect(
+      blockRegistry.respondToPrompt(
+        {
+          requestId: id,
+          answers: {
+            ...uiBlockAnswersFromResponse(spec, { actionId: "send" }),
+            [UI_CONFIRM_PREVIEW_ANSWER_ID]: [edited],
+          },
+        },
+        { sender: { id: "owner", name: "Ada" }, privileged: true },
+      ),
+    );
+    assert.equal(blockRegistry.runtimeAttention().pendingPrompts.length, 0);
+    assert.equal(lateAnswers.length, 1, "the agent got no late answer");
+    assert.deepEqual(lateAnswers[0]?.target, { taskId: "routine-task" }, "the answer went to another thread");
+    assert.equal(
+      lateAnswers[0]?.text,
+      `> Send this to Ann?\n> \n> ${edited}\n\nSend`,
+      "the late answer does not quote the edited text with the action",
+    );
+    return { waiting, lateAnswer: lateAnswers[0] };
   });
 
   /** Submits the card while the fill fails, then the user selects Done; returns the agent's answer. */

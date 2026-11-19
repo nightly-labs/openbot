@@ -1199,8 +1199,9 @@ export class OpenBotToolRouter {
   });
 
   /**
-   * Checks an `ask_ui` call and shows its block. Like `ask_user`, it answers the call only when the
-   * person answers or the turn ends. The agent can correct a refused block, so it gets the reason.
+   * Checks an `ask_ui` call and shows its block. Like `ask_user`, it answers the call when the person
+   * answers or the turn ends, or with "waiting" first when the provider cannot wait (#11550). The agent
+   * can correct a refused block, so it gets the reason.
    */
   #askUi(client: AgentClient, request: AppServerRequest, params: DynamicToolCallParams): void {
     const refuse = (message: string) => client.respond(request.id, openBotToolFailure(message));

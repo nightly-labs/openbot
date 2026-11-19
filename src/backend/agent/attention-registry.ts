@@ -142,7 +142,8 @@ interface PendingPrompt {
   detach?: { target: LateAnswerTarget; timer: ReturnType<typeof setTimeout> };
   /**
    * The call was answered with `detachedPromptResult`, so no provider waits for this question. The card
-   * stays until the user answers it, and the answer reaches the agent as a new message in this chat.
+   * stays until the user answers it, and the answer reaches the agent as a new message in the chat or
+   * thread that shows the card, a routine thread too.
    */
   detached?: LateAnswerTarget;
   /**
@@ -899,12 +900,17 @@ export class AttentionRegistry {
       } catch (error) {
         this.#emitError("prompt_persistence_failed", error, pending.agentId);
       }
-      // The form of a Vault request holds secrets, so its late answer names the saved item only.
+      // The form of a Vault request holds secrets, so its late answer names the saved item only. An edited
+      // preview replaces the agent's draft in the quote: the user approved that text.
+      const quotedQuestions =
+        preview !== undefined && pending.uiBlock?.spec.type === "confirm"
+          ? uiBlockFallbackQuestions({ ...pending.uiBlock.spec, preview })
+          : pending.questions;
       const lateAnswer = !pending.detached
         ? ""
         : pending.uiBlock?.vault
           ? vaultLateAnswerText(pending.uiBlock.spec.title ?? "", savedItem ? savedItem.item.name : null)
-          : lateAnswerText(pending.questions, answers);
+          : lateAnswerText(quotedQuestions, answers);
       if (pending.detached && lateAnswer)
         this.#sendLateAnswer(pending.agentId, pending.detached, lateAnswer, responder?.sender);
       this.#emitRuntimeSnapshot();
@@ -2024,10 +2030,11 @@ export class AttentionRegistry {
   }
 
   /**
-   * Shows an `ask_ui` block and waits for its answer. The block is a question prompt: its fallback
-   * questions let a client that does not know `uiBlock` answer it through `respondToPrompt`. The
-   * caller has checked the spec and refused a channel. With `autoAnswer`, the host answers that action
-   * itself after `afterMs` when nobody answered first.
+   * Shows an `ask_ui` block and waits for its answer, or detaches as a question does when the provider
+   * cannot wait (#11550). The block is a question prompt: its fallback questions let a client that does
+   * not know `uiBlock` answer it through `respondToPrompt`. The caller has checked the spec and refused a
+   * channel. With `autoAnswer`, the host answers that action itself after `afterMs` when nobody answered
+   * first.
    */
   surfaceUiBlock(
     client: AgentClient,
@@ -2099,8 +2106,11 @@ export class AttentionRegistry {
       ...(autoAnswerTimer ? { autoAnswer: autoAnswerTimer } : {}),
       ...(request.subagent ? { subagent: true as const } : {}),
     };
-    // The late answer of a Vault request names the saved item only, never a value of the form (#10577).
-    if (block.vault) this.#scheduleDetach(request, pending);
+    // A block detaches as a question does (#11550). The late answer of a Vault request names the saved item
+    // only, never a value of the form (#10577). An API key or a secret field must not show in a chat
+    // message, and a block with an automatic answer gives it in its call, so these wait in their calls.
+    if (block.vault || (!block.apiKey && !auto && !questions.some((question) => question.isSecret)))
+      this.#scheduleDetach(request, pending);
     this.#prompts.set(request.id, pending);
     this.#routines.markNeedsAttention(turnId);
     this.#emit({

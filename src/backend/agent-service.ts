@@ -1340,11 +1340,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       apiKeys: options.agentApiKeys ?? null,
       // The turn lifecycle is made later; a request comes only from a running turn, after both exist.
       codexSubagentParent: (childThreadId) => this.#turn.codexSubagentParent(childThreadId),
-      // A routine thread takes runs, not messages, so its questions wait in their calls.
+      // A late answer goes to the thread that shows the card. In a routine thread it starts a turn there,
+      // beside the runs: Mistral Vibe stops each tool call after 60 s, so a routine card that waited in
+      // its call failed, and the agent asked again on each run (#11550).
       lateAnswerTarget: (agentId, publicThreadId) => {
         if (store.get(agentId)?.threadId === publicThreadId) return {};
         const taskId = this.#tasks.taskForThread(publicThreadId);
-        return taskId && !this.#tasks.isRoutineThreadId(publicThreadId) ? { taskId } : null;
+        return taskId ? { taskId } : null;
       },
       sendLateAnswer: (agentId, target, text, sender) =>
         Effect.runFork(
