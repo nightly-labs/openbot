@@ -195,7 +195,7 @@ function parseCliCodePrompt(flow: CliCodePrompt["flow"], output: string): CliCod
     return null;
   }
   if (flow === "paste") {
-    return /paste code/i.test(text) ? { flow, verificationUrl: parsed.href } : null;
+    return /paste code|paste it below/i.test(text) ? { flow, verificationUrl: parsed.href } : null;
   }
   if (flow === "link") return { flow, verificationUrl: parsed.href };
   const userCode = codeAfterConfirmLine(text) ?? codeOnEnterLine(text);

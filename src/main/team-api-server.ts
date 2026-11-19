@@ -197,6 +197,7 @@ import { CUSTOM_AGENTS_CAPABILITY } from "@openbot/contracts/team-protocol/custo
 import { CUSTOM_PROVIDER_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
 import { CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY } from "@openbot/contracts/team-protocol/custom-provider-harness-choice-v1";
 import { CUSTOM_PROVIDER_HARNESS_CAPABILITY } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
+import { DEVIN_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/devin-code-sign-in-v1";
 import { FOCUS_USE_INTERVAL_MS } from "@openbot/contracts/team-protocol/focus-use-v1";
 import { GITHUB_SKILLS_CAPABILITY } from "@openbot/contracts/team-protocol/github-skills-v1";
 import { HERMES_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/hermes-import-v1";
@@ -2708,7 +2709,8 @@ export class TeamApiServer {
           capability === MISTRAL_CODE_SIGN_IN_CAPABILITY
         )
           return this.#options.admin?.providers !== undefined;
-        if (capability === PROVIDERS_SIGN_IN_V3_CAPABILITY) return this.#options.admin?.providers?.pasteSignIn === true;
+        if (capability === PROVIDERS_SIGN_IN_V3_CAPABILITY || capability === DEVIN_CODE_SIGN_IN_CAPABILITY)
+          return this.#options.admin?.providers?.pasteSignIn === true;
         if (capability === HOST_ADMIN_CAPABILITY) return this.#options.admin?.identity !== undefined;
         if (capability === HOST_APPEARANCE_CAPABILITY) return this.#options.admin?.identity !== undefined;
         if (capability === HOST_RELEASE_CAPABILITY) return this.#options.admin?.release !== undefined;

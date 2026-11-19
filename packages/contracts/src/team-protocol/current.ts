@@ -93,6 +93,7 @@ import { CUSTOM_AGENTS_CAPABILITY } from "./custom-agents-v1";
 import { CUSTOM_PROVIDER_EDIT_CAPABILITY } from "./custom-provider-edit-v1";
 import { CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY } from "./custom-provider-harness-choice-v1";
 import { CUSTOM_PROVIDER_HARNESS_CAPABILITY } from "./custom-provider-harness-v1";
+import { DEVIN_CODE_SIGN_IN_CAPABILITY } from "./devin-code-sign-in-v1";
 import { DISCORD_ACCESS_CAPABILITY } from "./discord-access-v1";
 import { EVENTS_CAPABILITY } from "./events-v1";
 import { FEEDBACK_WITHDRAW_CAPABILITY } from "./feedback-withdraw-v1";
@@ -759,6 +760,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [ROUTINE_RESULTS_WHATSAPP_CAPABILITY, V10],
   [QUEUE_HOLD_CAPABILITY, V10],
   [VAULT_MEMBER_SAVE_CAPABILITY, V10],
+  [DEVIN_CODE_SIGN_IN_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);
