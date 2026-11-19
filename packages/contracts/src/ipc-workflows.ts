@@ -696,6 +696,13 @@ export interface WorkflowStep {
   endedAt: string | null;
 }
 
+export interface WorkflowStepSource {
+  from: string;
+  type: WorkflowPortType;
+  stepId: string | null;
+  attachmentId: string | null;
+}
+
 export interface WorkflowRunDetail {
   run: WorkflowRun;
   steps: WorkflowStep[];
@@ -963,6 +970,20 @@ export function isWorkflowStep(value: unknown): value is WorkflowStep {
     isNullableString(value.error) &&
     isNullableString(value.startedAt) &&
     isNullableString(value.endedAt)
+  );
+}
+
+export function isWorkflowFields(value: unknown): value is WorkflowFields {
+  return isFields(value);
+}
+
+export function isWorkflowStepSource(value: unknown): value is WorkflowStepSource {
+  return (
+    isDynamicRecord(value) &&
+    isIdentifier(value.from) &&
+    isOneOf(WORKFLOW_PORT_TYPES, value.type) &&
+    (value.stepId === null || isIdentifier(value.stepId)) &&
+    (value.attachmentId === null || isIdentifier(value.attachmentId))
   );
 }
 

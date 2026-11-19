@@ -738,6 +738,9 @@ jobs:
       - name: Run the provider image MIME E2E test
         if: ${{ !cancelled() }}
         run: bun run test:provider-image-mime
+      - name: Run the workflow step settings E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:workflow-step-settings
 
       - name: Run the Discord files to GitHub E2E test
         if: ${{ !cancelled() }}
@@ -889,6 +892,7 @@ jobs:
             .openbot-build/workflow-join-e2e/
             .openbot-build/workflow-agent-step-e2e/
             .openbot-build/provider-image-mime-e2e/
+            .openbot-build/workflow-step-settings-e2e/
             .openbot-build/discord-github-files-e2e/
             .openbot-build/opencode-usage-metering-e2e/
             .openbot-build/claude-api-key-e2e/

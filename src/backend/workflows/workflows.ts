@@ -148,6 +148,7 @@ import {
   nextActions,
   runScope,
   soloInputs,
+  stepRecord,
   unsupportedNode,
 } from "./workflow-walk";
 
@@ -1118,6 +1119,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                     agentId: nodeAgentId(node),
                     status: action.action === "skip" ? "skipped" : "running",
                     input: action.action === "skip" ? "" : stepInput(node, run.workflowId, action.inputs),
+                    ...(action.action === "run" ? stepRecord(run.graph, node, latest) : {}),
                   },
                   now(),
                 );
@@ -1321,6 +1323,8 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                       agentId: earlier.agentId,
                       status: "done",
                       input: earlier.input,
+                      settings: earlier.settings,
+                      sources: earlier.sources,
                       output: earlier.output,
                       branch: earlier.branch,
                     },
@@ -1776,7 +1780,8 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               const node = detail.graph.nodes.find((candidate) => candidate.id === input.nodeId);
               if (!node) return yield* refuse("missing", sourceText("error.workflow.nodeMissing"));
               if (unsupportedNode(node)) return yield* refuse("refused", sourceText("error.workflow.nodeUnsupported"));
-              const inputs = soloInputs(detail.graph, node.id, runs.latestDone(input.workflowId));
+              const answered = runs.latestDone(input.workflowId);
+              const inputs = soloInputs(detail.graph, node.id, answered);
               const step = yield* attempt(() =>
                 runs.addStep(
                   {
@@ -1788,6 +1793,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                     agentId: nodeAgentId(node),
                     status: "running",
                     input: stepInput(node, input.workflowId, inputs),
+                    ...stepRecord(detail.graph, node, answered),
                   },
                   now(),
                 ),
@@ -1843,6 +1849,8 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                 run?.graph.nodes.find((candidate) => candidate.id === failed.nodeId);
               if (!node) return yield* refuse("missing", sourceText("error.workflow.nodeMissing"));
               if (run && runs.reopenRun(run.id, now())) changed(run.workflowId);
+              const graph = run?.graph ?? current;
+              const latest = run ? latestSteps(run.id) : runs.latestDone(failed.workflowId);
               const step = yield* attempt(() =>
                 runs.addStep(
                   {
@@ -1855,16 +1863,9 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                     status: "running",
                     input:
                       node.kind === "agent"
-                        ? stepInput(
-                            node,
-                            failed.workflowId,
-                            soloInputs(
-                              run?.graph ?? current,
-                              failed.nodeId,
-                              run ? latestSteps(run.id) : runs.latestDone(failed.workflowId),
-                            ),
-                          )
+                        ? stepInput(node, failed.workflowId, soloInputs(graph, failed.nodeId, latest))
                         : failed.input,
+                    ...stepRecord(graph, node, latest),
                   },
                   now(),
                 ),
