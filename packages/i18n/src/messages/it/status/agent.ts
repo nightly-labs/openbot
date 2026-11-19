@@ -152,6 +152,8 @@ export const messages = {
   "status.agent.vaultField.country": "Codice paese",
   "status.agent.vaultField.phone": "Telefono",
   "status.agent.vaultField.email": "Indirizzo email",
+  "status.agent.finishCheckContinues":
+    "La richiesta non è ancora completata. L’agente continua ({current} di {limit}).",
   "status.agent.nextStepContinues":
     "L'agente si è fermato prima del passaggio successivo. Continua ({current} di {limit}).",
   "status.agent.planContinues": "Il piano ha passaggi aperti. L'agente continua ({current} di {limit}).",

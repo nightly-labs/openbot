@@ -14,6 +14,7 @@ export const messages = defineMessages("status.messaging", {
   "status.messaging.stopped": "Stopped.",
   "status.messaging.stop": "Stop",
   "status.messaging.approvalTitle": "OpenBot asks for approval to continue.",
+  "status.messaging.approvalTitleTeammate": "Teammate {agent} asks for approval to continue.",
   "status.messaging.approvalCommand": "Run a command",
   "status.messaging.approvalFileChange": "Change files",
   "status.messaging.approvalPermissions": "Get more permissions",

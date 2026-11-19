@@ -2279,6 +2279,7 @@ export async function createApplicationServices({
     store,
     mailbox,
     browser,
+    finishCheck: true,
     visualPreview: new ChatVisualPreviewer(),
     // `agentDefaultsSettings` is built after the service; a tool call reads it.
     setCommitCoAuthor: (enabled) => agentDefaultsSettings.update({ commitCoAuthor: enabled }),

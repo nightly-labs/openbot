@@ -38,6 +38,7 @@ import {
   Square,
   Textarea,
   Type,
+  Zap,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
@@ -492,9 +493,10 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
     const { aspect, duration, resolution, transparent } = specs();
     return { model: chosen.id, kind: kind(), aspect, duration, resolution, transparent };
   });
-  const runText = () => {
+  /** The price of one run as an object, so that a price of 0 credits also shows. */
+  const quote = () => {
     const credits = price();
-    return credits === null ? t("workflow.node.run") : t("workflow.node.runPrice", { credits: format.number(credits) });
+    return credits === null ? undefined : { credits };
   };
   const runLabel = () => {
     const credits = price();
@@ -881,8 +883,23 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
                       onClick={run.start}
                       aria-label={runLabel()}
                     >
-                      <Play aria-hidden="true" />
-                      {runText()}
+                      {/* A step with a price shows the credits of one run; its label says "Run" for screen readers. */}
+                      <Show
+                        when={quote()}
+                        fallback={
+                          <>
+                            <Play aria-hidden="true" />
+                            {t("workflow.node.run")}
+                          </>
+                        }
+                      >
+                        {(shown) => (
+                          <>
+                            <Zap class="wfn-run-credits-icon" aria-hidden="true" />
+                            {format.number(shown().credits)}
+                          </>
+                        )}
+                      </Show>
                     </Button>
                   }
                 >

@@ -8,6 +8,7 @@ import { registerSecretValue } from "@openbot/logging";
 import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mcpSecretValues, redactMcpRecord } from "./mcp-redaction";
+import { piCustomEndpointSecrets } from "./pi-custom-endpoints";
 import { createPiMcpExtension } from "./pi-mcp";
 
 describe("redactMcpRecord", () => {
@@ -50,6 +51,28 @@ describe("redactMcpRecord", () => {
     const record = { item: { type: "agentMessage", text: "Sign in as admin@example.com. password=hunter2" } };
     expect(redactMcpRecord(record, [])).toEqual({
       item: { type: "agentMessage", text: "Sign in as admin@example.com. password=[redacted]" },
+    });
+  });
+
+  // A local server ignores its key, so the provider's name can be the key. Masking it hid the name in
+  // each answer of a Pi agent (#12580). The other values of the endpoint stay masked.
+  it("keeps the custom provider's name and still masks its other values", () => {
+    const values = piCustomEndpointSecrets([
+      {
+        id: "magpie",
+        name: "Magpie",
+        baseUrl: "http://127.0.0.1:8080/v1",
+        apiKey: "magpie",
+        headers: [
+          { name: "X-Provider", value: "MAGPIE" },
+          { name: "X-Gateway-Token", value: "mg-7Kq2x" },
+        ],
+        models: [{ id: "auto", name: "auto" }],
+      },
+    ]);
+    const record = { item: { type: "agentMessage", text: "Provider `magpie` (Magpie), token mg-7Kq2x" } };
+    expect(redactMcpRecord(record, values)).toEqual({
+      item: { type: "agentMessage", text: "Provider `magpie` (Magpie), token •••" },
     });
   });
 });

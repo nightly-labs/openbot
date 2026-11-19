@@ -2035,13 +2035,15 @@ export const IPC_ENDPOINTS = {
      */
     keepPicture: scopedRequest<string, string>()("workflows:keep-picture"),
     /**
-     * Whether the host can use Sunra for an image step now. A joined server answers through
-     * `workflows-sunra-v1`; an older one has no Sunra.
+     * Whether the host can use Sunra and Higgsfield for an image step now, and their accounts. A joined
+     * server answers through `workflows-sunra-v1` and `workflows-higgsfield-v1`; an older one has none.
+     * It lists the accounts through `workflows-media-service-account-v1`; an older one lists none.
      */
     mediaProviders: scopedQuery<WorkflowMediaProviders>()("workflows:media-providers"),
     /**
-     * The credits that the host's Sunra sign-in can spend now. A joined server answers through
-     * `workflows-sunra-v1`; an older one has none.
+     * The credits that the host's Sunra and Higgsfield accounts can spend now. A joined server answers
+     * through `workflows-sunra-v1` and `workflows-higgsfield-v1`, and gives the credits of each account
+     * through `workflows-media-service-account-v1`; an older one has none.
      */
     mediaCredits: scopedQuery<WorkflowMediaCredits>()("workflows:media-credits"),
     /**

@@ -116,6 +116,12 @@ export type WorkflowFieldValue = string | number | boolean;
  */
 export type WorkflowFields = Record<string, WorkflowFieldValue>;
 
+/**
+ * The view-state fields that put a node in a group of the canvas: the id of the group, its name, and whether
+ * the group is collapsed. A run does not read them.
+ */
+export const WORKFLOW_GROUP_FIELDS = { id: "group", name: "groupName", folded: "groupFolded" } as const;
+
 export const WORKFLOW_MEDIA_KINDS = ["image", "video"] as const;
 export type WorkflowMediaKind = (typeof WORKFLOW_MEDIA_KINDS)[number];
 
@@ -1111,10 +1117,49 @@ export function isWorkflowWebhookSecret(value: unknown): value is WorkflowWebhoo
 export interface WorkflowMediaProviders {
   sunra: boolean;
   higgsfield: boolean;
+  /**
+   * The signed-in accounts of Sunra and Higgsfield, in the order of Apps; the first of a service is its
+   * default. Null when the host makes each file on the first account and a step cannot choose
+   * (no `workflows-media-service-account-v1`).
+   */
+  accounts: readonly WorkflowMediaServiceAccount[] | null;
 }
 
+/** The most accounts of all media services together that the host lists. */
+export const WORKFLOW_MEDIA_SERVICE_ACCOUNT_MAX = 32;
+/** The longest account name that the host sends; it cuts a longer Apps name. */
+export const WORKFLOW_MEDIA_SERVICE_ACCOUNT_NAME_MAX = 80;
+
+/**
+ * One signed-in account of a media service. `id` is the id of its Apps row, and the `account` field
+ * of a step that it pays for; the first account of a service is also the step's default. `name` is
+ * the name that Apps shows, or null for the row of the first connect, which Apps names by the app.
+ */
+export interface WorkflowMediaServiceAccount {
+  provider: WorkflowCatalogProvider;
+  id: string;
+  name: string | null;
+}
+
+export function isWorkflowMediaServiceAccount(value: unknown): value is WorkflowMediaServiceAccount {
+  return (
+    isDynamicRecord(value) &&
+    isOneOf(WORKFLOW_CATALOG_PROVIDERS, value.provider) &&
+    isIdentifier(value.id) &&
+    (value.name === null || isBoundedString(value.name, WORKFLOW_MEDIA_SERVICE_ACCOUNT_NAME_MAX))
+  );
+}
+
+const isNullableListOf = <T>(value: unknown, item: (entry: unknown) => entry is T): value is readonly T[] | null =>
+  value === null || (Array.isArray(value) && value.length <= WORKFLOW_MEDIA_SERVICE_ACCOUNT_MAX && value.every(item));
+
 export function isWorkflowMediaProviders(value: unknown): value is WorkflowMediaProviders {
-  return isDynamicRecord(value) && isBoolean(value.sunra) && isBoolean(value.higgsfield);
+  return (
+    isDynamicRecord(value) &&
+    isBoolean(value.sunra) &&
+    isBoolean(value.higgsfield) &&
+    isNullableListOf(value.accounts, isWorkflowMediaServiceAccount)
+  );
 }
 
 /**
@@ -1129,8 +1174,20 @@ export interface WorkflowMediaCreditBalance {
 
 /** The credits of each media service beyond the agent providers. Null when the host cannot read them. */
 export interface WorkflowMediaCredits {
+  /** The credits of the first Sunra account. */
   sunra: WorkflowMediaCreditBalance | null;
+  /** The credits of the first Higgsfield account. */
   higgsfield: WorkflowMediaCreditBalance | null;
+  /**
+   * The credits of each account, in the order of `WorkflowMediaProviders.accounts`. Null when the
+   * host does not list its accounts.
+   */
+  accounts: readonly WorkflowMediaAccountCredits[] | null;
+}
+
+/** The credits of one account of a media service, or null when the service did not tell them. */
+export interface WorkflowMediaAccountCredits extends WorkflowMediaServiceAccount {
+  credits: WorkflowMediaCreditBalance | null;
 }
 
 const isCreditCount = (value: unknown): value is number =>
@@ -1146,7 +1203,16 @@ export function isWorkflowMediaCredits(value: unknown): value is WorkflowMediaCr
   return (
     isDynamicRecord(value) &&
     (value.sunra === null || isWorkflowMediaCreditBalance(value.sunra)) &&
-    (value.higgsfield === null || isWorkflowMediaCreditBalance(value.higgsfield))
+    (value.higgsfield === null || isWorkflowMediaCreditBalance(value.higgsfield)) &&
+    isNullableListOf(value.accounts, isWorkflowMediaAccountCredits)
+  );
+}
+
+export function isWorkflowMediaAccountCredits(value: unknown): value is WorkflowMediaAccountCredits {
+  return (
+    isWorkflowMediaServiceAccount(value) &&
+    isDynamicRecord(value) &&
+    (value.credits === null || isWorkflowMediaCreditBalance(value.credits))
   );
 }
 

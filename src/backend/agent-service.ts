@@ -158,6 +158,9 @@ import {
   type SkillLearningMode,
   sameAgentBrowserProfile,
   sameAgentModelChoice,
+  WORKFLOW_CATALOG_PROVIDERS,
+  WORKFLOW_MEDIA_SERVICE_ACCOUNT_MAX,
+  WORKFLOW_MEDIA_SERVICE_ACCOUNT_NAME_MAX,
   WORKFLOWS_USAGE_ID,
   type WorkflowCatalogProvider,
   type WorkflowMediaCatalog,
@@ -176,6 +179,7 @@ import { ContextResetBusyError } from "@openbot/contracts/team-protocol/context-
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
+import { workflowMediaCreditsOf, workflowMediaProvidersOf } from "@openbot/team-client/workflow-decoding";
 import { type CauseCode, classifyFailure, isCauseCode } from "@openbot/telemetry";
 import { Cause, Deferred, Effect, Exit, Fiber, Result, Schema, Scope, Semaphore } from "effect";
 import { AgentMemories } from "./agent/agent-memories";
@@ -207,6 +211,7 @@ import { DrainScheduler } from "./agent/drain-scheduler";
 import { DuplicationGate, toAgentDuplicationFailed } from "./agent/duplication-gate";
 import type { FailureContext, FailureSignal } from "./agent/failure-signal";
 import { FeedbackWithdrawal } from "./agent/feedback-withdrawal";
+import { type FinishCheckInput, FinishCheckResult, finishCheckPrompt } from "./agent/finish-check";
 import { type AgentHostedSites, HostedSiteCoordinator } from "./agent/hosted-site-coordinator";
 import { ImageGenRuntime } from "./agent/image-gen-runtime";
 import {
@@ -344,6 +349,7 @@ import type { ImportedRoutineRun, RoutineHoldWindow } from "./routine-store";
 import { type RoutineDueSource, RoutineTimer } from "./routine-timer";
 import type { SidebarLayoutStore } from "./sidebar-layout-store";
 import { shortenDiagnostic } from "./stderr-diagnostics";
+import { extractJsonObject } from "./structured-output";
 import type { UserBrowsingLog } from "./user-browsing-log";
 import type { VaultItems } from "./vault-items";
 import { generateHiggsfieldMedia, HIGGSFIELD_MCP_HOST, readHiggsfieldCredits } from "./workflows/higgsfield-media";
@@ -365,6 +371,16 @@ const logger = createOpenBotLogger("agent-service");
 const routingLogger = createOpenBotLogger("channel-routing");
 /** Its lines also go to `providers.log`: the screen can show a general sentence in place of the cause (#5222). */
 const errorLogger = createOpenBotLogger("agent-error");
+
+/** The MCP host and the brand name of each media service. */
+const MEDIA_SERVICE_HOSTS: Readonly<Record<WorkflowCatalogProvider, string>> = {
+  sunra: SUNRA_MCP_HOST,
+  higgsfield: HIGGSFIELD_MCP_HOST,
+};
+const MEDIA_SERVICE_NAMES: Readonly<Record<WorkflowCatalogProvider, string>> = {
+  sunra: "Sunra",
+  higgsfield: "Higgsfield",
+};
 
 /**
  * Only the application knows which managed CLIs it downloaded, so a caller that says nothing gets
@@ -404,6 +420,12 @@ export interface AgentServiceOptions {
   contextCompactionTimeoutMs?: number;
   /** The pause with no turn before a conversation's memory review runs early. Tests make it short. */
   memoryReviewIdleMs?: number;
+  /**
+   * Whether a turn of the user's request that used tools and that no other rule continues gets a
+   * finish check (`agent/finish-check.ts`). The app turns it on. Off by default, so a test fake gets no
+   * extra side call that it does not expect.
+   */
+  finishCheck?: boolean;
   preferredProvider?: AgentProvider;
   /** The model chosen beside `preferredProvider`, or `null` for that provider's own default. */
   preferredModel?: AgentModelId | null;
@@ -977,10 +999,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         isRunning: () => this.#initialized && !this.#stopping,
         // A ready backup model or pool account takes the run: the drain moves the agent to it, as it
         // does for a chat message. Only an agent with no ready backup skips the run (#11785).
-        usageLimited: (agentId) =>
-          !this.#usageLimits.mayDrain(agentId) &&
-          this.#usageLimitBackup(agentId) === undefined &&
-          !this.#poolBackup(agentId),
+        usageLimited: (agentId) => !this.#usageLimits.mayDrain(agentId) && this.#waitsForLimit(agentId),
         routineThread: (agentId, routineId, routineName) => this.#tasks.routineThread(agentId, routineId, routineName),
         routineDeleted: (agentId, routineId) => {
           const keys = options.agentApiKeys;
@@ -1208,6 +1227,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           this.#retryHeldMoves();
         },
         onAccountsChanged: () => this.#retryHeldMoves(),
+        onProvidersUnready: () => this.#refreshHeldAgents(),
       },
       emit: (event) => this.#emit(event),
       emitError: (code, error, agentId, context) => this.#emitError(code, error, agentId, context),
@@ -2026,6 +2046,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           this.#threads.dropRefusedProviderSession(agentId, externalThreadId),
         listAgents: () => this.listAgents(),
         redactMcp: (text) => this.#mcp.redact(text),
+        ...(options.finishCheck === true
+          ? { checkFinish: (agentId: string, input: FinishCheckInput) => this.#checkFinish(agentId, input) }
+          : {}),
         emitToolUsage: (usage) => this.emit("toolUsage", usage),
         turnModel: (agentId, turnId) => this.#drain.modelForTurn(agentId, turnId),
         mayFailOver: (agentId) => this.#mayFailOver(agentId),
@@ -2434,6 +2457,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       turn: this.#turn,
       attention: this.#attention,
       usageLimits: this.#usageLimits,
+      waitsForLimit: (agentId) => this.#waitsForLimit(agentId),
     });
   }
 
@@ -3138,6 +3162,43 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   ).bind(this);
 
   /**
+   * The finish check of one turn: the agent's provider, at the small model and the least reasoning,
+   * with no tools, reads the request and the turn and answers whether the request is done. Null when
+   * it cannot run now, as when the spare generation slot is taken, or when its answer does not decode.
+   */
+  readonly #checkFinish = Effect.fn("AgentService.checkFinish")(
+    function* (this: AgentService, agentId: string, input: FinishCheckInput) {
+      const agent = this.listAgents().find((candidate) => candidate.id === agentId);
+      if (!agent || this.#stopping) return null;
+      yield* this.#providers.ensureProvider(agent.provider);
+      const model = backgroundModel(agent, this.#agentModels(agent));
+      if (!model || this.#stopping || !this.#profileClients.hasSpare()) return null;
+      const client = yield* Effect.try(() =>
+        this.#providers.createProfileClient(agent.provider, agent.providerAccountId),
+      );
+      const answer = yield* this.#profileClients.run(client, (cancelled) =>
+        generateTextWithoutTools(
+          client,
+          withBackgroundEffort(model),
+          finishCheckPrompt(input),
+          cancelled,
+          sideSessionUsageObserver("finish-check", this.#store.database.usage, agent.id, agent.provider, model.id),
+        ),
+      );
+      const json = yield* Effect.try(() => extractJsonObject(answer));
+      const result = yield* Schema.decodeUnknownEffect(FinishCheckResult)(json);
+      logger.info("A finish check answered.", { agentId, verdict: result.verdict, model: model.id });
+      return result;
+    },
+    Effect.catchCause((cause) =>
+      Effect.sync(() => {
+        logger.warn("Could not run the finish check of a turn.", { error: Cause.squash(cause) });
+        return null;
+      }),
+    ),
+  ).bind(this);
+
+  /**
    * Save on a skill question of the `ask` mode in the agent's own chat. The memory review writes and
    * saves the skill in the background. `saved: false` tells the card to send the user's yes to the
    * agent instead.
@@ -3218,7 +3279,45 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   ).bind(this);
 
   #mediaSignIn(provider: WorkflowCatalogProvider) {
-    return this.#mcp.serviceSignIn(provider === "sunra" ? SUNRA_MCP_HOST : HIGGSFIELD_MCP_HOST);
+    return this.#mcp.serviceSignIn(MEDIA_SERVICE_HOSTS[provider]);
+  }
+
+  /**
+   * The signed-in accounts of each media service, in the order of Apps; the first of a service is its
+   * default. Each service keeps an equal part of the limit, so many accounts of one service never hide
+   * the default account of another.
+   */
+  #mediaServiceAccounts() {
+    const perService = Math.floor(WORKFLOW_MEDIA_SERVICE_ACCOUNT_MAX / WORKFLOW_CATALOG_PROVIDERS.length);
+    return WORKFLOW_CATALOG_PROVIDERS.flatMap((provider) =>
+      this.#mcp
+        .serviceSignIns(MEDIA_SERVICE_HOSTS[provider])
+        .slice(0, perService)
+        .map((signIn) => ({
+          provider,
+          signIn,
+          account: {
+            provider,
+            id: signIn.id,
+            name: signIn.name?.slice(0, WORKFLOW_MEDIA_SERVICE_ACCOUNT_NAME_MAX) ?? null,
+          },
+        })),
+    );
+  }
+
+  /**
+   * The sign-in of the account of a service step: `account` is a row id, or null for the first
+   * account. A step on an account that the host no longer has fails: another account must never pay.
+   */
+  #mediaStepSignIn(provider: WorkflowCatalogProvider, account: string | null) {
+    const signIn = this.#mcp.serviceSignIn(MEDIA_SERVICE_HOSTS[provider], account);
+    return account !== null && !signIn
+      ? Effect.fail(
+          new ProfileGenerationFailed({
+            cause: new Error(sourceText("error.provider.accountNotFound", { provider: MEDIA_SERVICE_NAMES[provider] })),
+          }),
+        )
+      : Effect.succeed(() => this.#mcp.serviceSignIn(MEDIA_SERVICE_HOSTS[provider], account));
   }
 
   /**
@@ -3244,23 +3343,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   /** The media services beyond the agent providers that a workflow step can use now. */
   workflowMediaProviders(): WorkflowMediaProviders {
-    return {
-      sunra: this.#mcp.serviceSignIn(SUNRA_MCP_HOST) !== null,
-      higgsfield: this.#mcp.serviceSignIn(HIGGSFIELD_MCP_HOST) !== null,
-    };
+    return workflowMediaProvidersOf(this.#mediaServiceAccounts().map(({ account }) => account));
   }
 
   /**
-   * The credits of the media services that a workflow step can spend now. A failed read has none.
-   * With `only`, it reads that service alone and the other one is null.
+   * The credits of the media services that a workflow step can spend now: of each account, and of the
+   * first account of each service. A failed read has none. With `only`, it reads the first account of
+   * that service alone; the other service and the account list are null.
    */
   readonly workflowMediaCredits = Effect.fn("AgentService.workflowMediaCredits")(function* (
     this: AgentService,
-    only?: keyof WorkflowMediaCredits,
+    only?: WorkflowCatalogProvider,
   ) {
-    if (this.#stopping) return { sunra: null, higgsfield: null } satisfies WorkflowMediaCredits;
-    const sunraSignIn = only === "higgsfield" ? null : this.#mcp.serviceSignIn(SUNRA_MCP_HOST);
-    const higgsfieldSignIn = only === "sunra" ? null : this.#mcp.serviceSignIn(HIGGSFIELD_MCP_HOST);
+    if (this.#stopping) return { sunra: null, higgsfield: null, accounts: null } satisfies WorkflowMediaCredits;
+    const all = this.#mediaServiceAccounts();
+    const accounts = only ? all.filter((account) => account.provider === only).slice(0, 1) : all;
     const orNull = <A>(read: Effect.Effect<A, { readonly message: string }>, service: string) =>
       read.pipe(
         Effect.catch((failure) =>
@@ -3270,14 +3367,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           }),
         ),
       );
-    const [sunra, higgsfield] = yield* Effect.all(
-      [
-        sunraSignIn ? orNull(readSunraCredits(sunraSignIn), "sunra") : Effect.succeed(null),
-        higgsfieldSignIn ? orNull(readHiggsfieldCredits(higgsfieldSignIn), "higgsfield") : Effect.succeed(null),
-      ],
+    const credits = yield* Effect.all(
+      accounts.map(({ provider, signIn }) =>
+        orNull(provider === "sunra" ? readSunraCredits(signIn) : readHiggsfieldCredits(signIn), provider),
+      ),
       { concurrency: "unbounded" },
     );
-    return { sunra, higgsfield } satisfies WorkflowMediaCredits;
+    const listed = accounts.map(({ account }, index) => ({ ...account, credits: credits[index] ?? null }));
+    return { ...workflowMediaCreditsOf(listed), accounts: only ? null : listed } satisfies WorkflowMediaCredits;
   }).bind(this);
 
   /**
@@ -3294,7 +3391,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         model: string;
         /** The canvas id of the model ("sunra-…", "higgsfield-…"), which finds its plan in the live list. */
         catalogId: string;
-        /** The account of the provider that pays. Null is its own sign-in; Sunra and Higgsfield ignore it. */
+        /**
+         * The account of the provider that pays. Null is its own sign-in; for Sunra and Higgsfield, the
+         * id of an Apps row, and null their first account.
+         */
         account: string | null;
         specs: WorkflowMediaSpecs;
         prompt: string;
@@ -3305,10 +3405,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       const failed = (message: string) => new ProfileGenerationFailed({ cause: new Error(message) });
       if (input.provider === "sunra") {
         if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
+        const signIn = yield* this.#mediaStepSignIn("sunra", input.account);
         const plan = yield* this.#mediaCatalog.sunraPlan(input.catalogId, input.kind);
         return yield* generateSunraMedia(
           {
-            signIn: () => this.#mcp.serviceSignIn(SUNRA_MCP_HOST),
+            signIn,
             resolveAttachment: (attachmentId) => this.#mailbox.resolveAttachment(attachmentId),
             store: (file) => this.#mailbox.storeGeneratedAttachment(file),
           },
@@ -3329,10 +3430,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       }
       if (input.provider === "higgsfield") {
         if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
+        const signIn = yield* this.#mediaStepSignIn("higgsfield", input.account);
         const plan = yield* this.#mediaCatalog.higgsfieldPlan(input.catalogId, input.model, input.kind);
         return yield* generateHiggsfieldMedia(
           {
-            signIn: () => this.#mcp.serviceSignIn(HIGGSFIELD_MCP_HOST),
+            signIn,
             resolveAttachment: (attachmentId) => this.#mailbox.resolveAttachment(attachmentId),
             store: (file) => this.#mailbox.storeGeneratedAttachment(file),
           },
@@ -4350,6 +4452,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     } else if (isHeld && input.backupModels !== undefined) {
       // New backup models can let the held queue move now, and the chat no longer asks.
       this.#drain.scheduleDrain(agent.id);
+      this.#emitRuntimeSnapshot();
     }
     return agent;
   }, Effect.uninterruptible);
@@ -4468,6 +4571,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   /** Whether a provider error moves this agent to a backup model or to another account of its pool. */
   #mayFailOver(agentId: string): boolean {
     return this.#usageLimitBackup(agentId) !== undefined || this.#poolBackup(agentId);
+  }
+
+  /**
+   * Whether a usage limit on the agent's model makes its work wait for the reset: no backup model that
+   * it switches to without asking, and no other account of its pool, is ready now.
+   */
+  #waitsForLimit(agentId: string): boolean {
+    return !this.#mayFailOver(agentId);
   }
 
   /** Whether the agent's pooled provider has another account to move to now. */
@@ -4622,6 +4733,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           this.#poolBackup(agent.id))
       )
         this.#drain.scheduleDrain(agent.id);
+    this.#refreshHeldAgents();
+  }
+
+  /**
+   * Sends the runtime snapshot again while a usage limit holds an agent. A backup that became ready or
+   * not ready decides whether an idle held agent shows that it waits for its limit (#12360).
+   */
+  #refreshHeldAgents(): void {
+    if (this.#usageLimits.limitedAgents().length > 0) this.#emitRuntimeSnapshot();
   }
 
   /**
@@ -7166,10 +7286,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           ),
         );
     // A turn that waits on a question in this chat reads no message until that question is answered,
-    // so the person who wrote instead would wait for it. A stopped turn clears its own questions.
+    // so the person who wrote instead would wait for it. A stopped turn clears its own questions. A
+    // detached question of the chat closes also with no running turn, but not for the hidden welcome or
+    // setup message, which the person did not write (#12449).
     const waitingTurnId = snapshot.activeTurnId;
     const releaseQuestions = Effect.sync(() => {
-      if (targetThreadId && waitingTurnId && waitingTurnId !== this.#stoppedTurn(agent.id, task?.taskId ?? null))
+      if (!targetThreadId) return;
+      if (!welcome && !agentSetup) this.#attention.closeDetachedForUserMessage(agent.id, targetThreadId);
+      if (waitingTurnId && waitingTurnId !== this.#stoppedTurn(agent.id, task?.taskId ?? null))
         this.#attention.releaseForUserMessage(agent.id, targetThreadId, waitingTurnId);
     });
     // Claude's steer puts the message in the CLI's input at once, so the question closes after it.

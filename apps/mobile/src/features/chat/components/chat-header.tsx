@@ -5,6 +5,7 @@ import { useThemeColor } from "heroui-native/hooks";
 import ArrowLeft from "lucide-react-native/icons/arrow-left";
 import ChevronDown from "lucide-react-native/icons/chevron-down";
 import Ellipsis from "lucide-react-native/icons/ellipsis";
+import Trash from "lucide-react-native/icons/trash";
 import { memo, useMemo } from "react";
 import { Pressable, View, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -59,6 +60,8 @@ interface ChatHeaderProps {
   actionsMenu?: { label: string; actions: MenuAction[]; onPressAction: (id: string) => void } | null;
   /** The agent's threads. The agent's name then opens this menu, and the menu has the agent's info. */
   threadMenu?: ChatThreadMenu;
+  /** A delete button in place of the More menu, such as on a side question. */
+  deleteAction?: { label: string; disabled: boolean; onPress: () => void };
 }
 
 /** In `memo`: the chat renders again on each streamed chunk, and the header reads nothing of it. */
@@ -76,6 +79,7 @@ export const ChatHeader = memo(function ChatHeader({
   kicker,
   actionsMenu,
   threadMenu,
+  deleteAction,
 }: ChatHeaderProps) {
   const { t } = useText();
   const { theme } = useUniwind();
@@ -94,12 +98,16 @@ export const ChatHeader = memo(function ChatHeader({
   // A channel opens the browser of one member: the browser is the browser of an agent.
   const browserAgent =
     target.kind === "agent" ? { agentId: target.id, agentIds: [], tabId: undefined } : channelBrowser;
-  const browserShown =
-    actionsMenu === undefined && browserAllowed && !disconnected && browserView && Boolean(browserAgent);
+  // A screen with its own trailing action, such as a side question, has no More menu.
+  const plainChat = actionsMenu === undefined && deleteAction === undefined;
+  const browserShown = plainChat && browserAllowed && !disconnected && browserView && Boolean(browserAgent);
   // The pins of the agent's chats, on a host with `message-pins-v1`. A channel has no pins.
   const pinsEnabled = useMessagePinsEnabled(target.serverId);
-  const pinsShown = actionsMenu === undefined && target.kind === "agent" && pinsEnabled;
-  const attention = actionsMenu === undefined && target.kind === "channel" && needsAction;
+  const pinsShown = plainChat && target.kind === "agent" && pinsEnabled;
+  const attention = plainChat && target.kind === "channel" && needsAction;
+  // A question about the agent's chat that stays out of it, on a host with `side-question-v1`.
+  const sideQuestionEnabled = useMobileWorkspaceSelector((current) => current.canAskSideQuestion(target.serverId));
+  const sideQuestionShown = plainChat && target.kind === "agent" && sideQuestionEnabled;
   const members = useMemo(
     () => new Map(target.kind === "channel" ? target.members.map((member) => [member.id, member]) : []),
     [target],
@@ -173,6 +181,10 @@ export const ChatHeader = memo(function ChatHeader({
       params: { channelId: target.id, serverId: target.serverId },
     });
   };
+  const openSideQuestion = () => {
+    void haptics.impact("soft");
+    router.push({ pathname: "/side-question/[agentId]", params: { agentId: target.id, serverId: target.serverId } });
+  };
   const openPins = () => {
     void haptics.impact("soft");
     router.push({ pathname: "/pinned-messages", params: { agentId: target.id, serverId: target.serverId } });
@@ -181,12 +193,17 @@ export const ChatHeader = memo(function ChatHeader({
     void haptics.impact("soft");
     onBack();
   };
-  // The More menu in the top right corner: the agent's browser, the pinned messages and, last in its
-  // own section, the channel actions when a task needs the user, with a triangle in the warning color.
-  // The button has a warning dot then. The iOS system menu draws item titles in its own color: only
+  // The More menu in the top right corner: the agent's browser, the pinned messages, the side question
+  // in its own section and, last in its own section, the channel actions when a task needs the user,
+  // with a triangle in the warning color. The button has a warning dot then. The iOS system menu draws item titles in its own color: only
   // Android shows the title in the warning color.
   const browserAction: MenuAction = { id: "browser", title: t("mobile.browser.open"), image: "globe" };
   const pinsAction: MenuAction = { id: "pins", title: t("mobile.chat.pins.title"), image: "pin" };
+  const sideQuestionAction: MenuAction = {
+    id: "side-question",
+    title: t("mobile.chat.sideQuestion.title"),
+    image: "questionmark.bubble",
+  };
   const attentionAction: MenuAction = {
     id: "attention",
     title: t("mobile.chat.header.actionsNeeded"),
@@ -197,12 +214,16 @@ export const ChatHeader = memo(function ChatHeader({
   const moreActions: MenuAction[] = [
     ...(browserShown ? [browserAction] : []),
     ...(pinsShown ? [pinsAction] : []),
+    ...(sideQuestionShown
+      ? [{ id: "side-question-section", title: "", displayInline: true, subactions: [sideQuestionAction] }]
+      : []),
     ...(attention ? [{ id: "attention-section", title: "", displayInline: true, subactions: [attentionAction] }] : []),
   ];
   const onMoreAction = (id: string) => {
     if (id === "attention") openChannelActions();
     else if (id === "browser") openBrowser();
     else if (id === "pins") openPins();
+    else if (id === "side-question") openSideQuestion();
   };
   const moreLabel = attention ? t("mobile.chat.header.moreAttention") : t("mobile.chat.header.more");
   const moreHidden = moreActions.length === 0;
@@ -322,6 +343,17 @@ export const ChatHeader = memo(function ChatHeader({
     </GlassView>
   );
 
+  const deleteButton = deleteAction ? (
+    <ChatGlassIconButton
+      accessibilityLabel={deleteAction.label}
+      disabled={deleteAction.disabled}
+      fallbackBackground={fallbackBackground}
+      liquidGlassAvailable={liquidGlassAvailable}
+      onPress={deleteAction.onPress}
+    >
+      <Trash color={iconColor} size={22} strokeWidth={2} />
+    </ChatGlassIconButton>
+  ) : null;
   const trailingButtons =
     actionsMenu === null ? null : actionsMenu ? (
       <MenuView
@@ -374,7 +406,15 @@ export const ChatHeader = memo(function ChatHeader({
           )}
         </Stack.Toolbar>
         <Stack.Toolbar placement="right">
-          {actionsMenu ? null : !verticalBar ? (
+          {deleteAction ? (
+            <Stack.Toolbar.Button
+              icon="trash"
+              accessibilityLabel={deleteAction.label}
+              disabled={deleteAction.disabled}
+              hidden={accessibilityHidden}
+              onPress={deleteAction.onPress}
+            />
+          ) : actionsMenu ? null : !verticalBar ? (
             <Stack.Toolbar.View hidesSharedBackground hidden={accessibilityHidden || moreHidden}>
               <View style={{ width: NATIVE_BAR_HEIGHT, height: NATIVE_BAR_HEIGHT }}>
                 {moreButton(NATIVE_BAR_HEIGHT)}
@@ -446,7 +486,7 @@ export const ChatHeader = memo(function ChatHeader({
         {titlePill}
 
         <View className="flex-1" />
-        {trailingButtons}
+        {deleteButton ?? trailingButtons}
       </View>
       <SheetScrollEdgeEffect
         style={{ height: topInset + 82, left: 0, position: "absolute", right: 0, top: 0, zIndex: 10 }}

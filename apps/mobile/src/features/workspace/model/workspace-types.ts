@@ -40,6 +40,7 @@ import type {
   AnswerWhatsAppRequestInput,
   ApplyAgentImportInput,
   ApplyInstanceTransferInput,
+  AskSideQuestionInput,
   AvatarColor,
   AvatarHue,
   AvatarImageInput,
@@ -1126,6 +1127,8 @@ export interface MobileWorkspaceContextValue {
   canAttachThreadFiles: (serverId: string) => boolean;
   /** True when the host advertises `message-pins-v1`: a member who can message an agent can pin its messages. */
   canPinMessages: (serverId: string) => boolean;
+  /** True when the host advertises `side-question-v1`: a member can ask about an agent's chat outside it. */
+  canAskSideQuestion: (serverId: string) => boolean;
   /** True when the host advertises `agent-thread-branches-v1`: a member who can message an agent can branch its chats. */
   canBranchThreads: (serverId: string) => boolean;
   /** True when the host advertises `workflows-v1`. The host shows each member the workflows of their agents. */
@@ -1207,6 +1210,8 @@ export interface MobileWorkspaceContextValue {
   loadMessagePins: (agentId: string, serverId: string) => Promise<PinnedMessagesSnapshot>;
   /** Pins or unpins one message of the agent's chat or of one of its threads. Answers the new list. */
   setMessagePinned: (input: SetMessagePinnedInput, serverId: string) => Promise<PinnedMessagesSnapshot>;
+  /** Asks about an agent's chat outside it. The host keeps nothing, so the input carries the earlier turns. */
+  askSideQuestion: (input: AskSideQuestionInput, serverId: string) => Promise<string>;
   /** Answers a question of a task turn. The host finds the question by its request, on any thread. */
   respondToTaskPrompt: (input: RespondToPromptInput, serverId: string) => Promise<void>;
   loadConversation: (agentId: string, serverId?: string) => Promise<ConversationSnapshot>;
@@ -1312,6 +1317,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "canReadThreads"
   | "canAttachThreadFiles"
   | "canPinMessages"
+  | "canAskSideQuestion"
   | "canBranchThreads"
   | "canUseWorkflows"
   | "canUseWorkflowGitHub"

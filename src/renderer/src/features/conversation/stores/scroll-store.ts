@@ -209,11 +209,12 @@ export function createScrollStore(deps: ScrollStoreDeps) {
    * A message that the user sends while a question card is open shows when the question's row has
    * its outcome, under that row. The card is drawn under all rows, so until the host closed it, the
    * message showed above the question; and the host closes the card a moment before the row says
-   * "cancelled", so the message then stood where the card was. Only a question of the running turn
-   * closes for a message (`releaseForUserMessage`), so a card that stays, such as a detached question,
-   * holds nothing; one that stays all the same, such as an MCP sign-in, lets the message show after
-   * `PROMPT_SEND_HOLD_MS`. Each time is when this view first had the row while a question waited, so a
-   * message from before the question is not held, and the host's clock does not count.
+   * "cancelled", so the message then stood where the card was. A question of the running turn closes
+   * for a message (`releaseForUserMessage`). A detached question closes too, but holds nothing: its
+   * row is older than the message, and a subagent's question, which has the same mark, stays. One
+   * that stays all the same, such as an MCP sign-in, lets the message show after `PROMPT_SEND_HOLD_MS`.
+   * Each time is when this view first had the row while a question waited, so a message from before
+   * the question is not held, and the host's clock does not count.
    */
   const userRowSeenAt = new Map<string, number>();
   let waitingQuestion:
@@ -615,9 +616,10 @@ const THINKING_ITEM_ID = /:(?:reasoning|thought(?::\d+)?)$/u;
 /**
  * The rows, with the agent's last words before the question that waits as a message at the end of
  * its turn. Those words are narration, which the steps hold, but the question is often about them,
- * such as a draft to approve (#4897). After the answer they are only in the steps again.
+ * such as a draft to approve (#4897). After the answer they are only in the steps again. An open
+ * thread shows them the same way (#12544).
  */
-function withQuestionContext(
+export function withQuestionContext(
   shown: AgentMessage[],
   messages: readonly AgentMessage[],
   turnId: string | undefined,

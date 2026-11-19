@@ -241,18 +241,55 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* The credits of a media service with no team quota: its logo with the number of credits under it. */
-.window-rail-credits {
-  display: flex;
+/* The credits of a media service: its logo with the number of credits under it. The hover fill has
+ * the shape of the page buttons, not of a ring. */
+.window-rail-button.window-rail-credits {
+  height: auto;
   flex-direction: column;
-  align-items: center;
-  gap: 2px;
+  gap: var(--openbot-space-1);
+  padding-block: var(--openbot-space-1-5);
+}
+
+.window-rail-button .window-rail-credits-logo {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  overflow: visible;
+  fill: var(--openbot-provider-current);
 }
 
 .window-rail-credits-count {
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.window-rail-credits-count[data-usage-tone="warning"] {
+  color: var(--openbot-warning-text);
+}
+
+.window-rail-credits-count[data-usage-tone="critical"] {
+  color: var(--openbot-danger-text);
+}
+
+/* The number of the account when a service has more than one, as the workflow model picker shows it. */
+.window-rail-credits-badge {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  display: grid;
+  place-items: center;
+  min-width: 12px;
+  height: 12px;
+  padding: 0 2px;
+  box-sizing: border-box;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-control);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--openbot-text-primary) 10%, transparent);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-glyph-sm);
+  font-weight: var(--openbot-weight-medium);
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }

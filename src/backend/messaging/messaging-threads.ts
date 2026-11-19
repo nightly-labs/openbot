@@ -1109,6 +1109,13 @@ export class MessagingThreads {
     return running?.delivery.turnId && origin ? { turnId: running.delivery.turnId, origin } : null;
   }
 
+  /** The conversation and requester of a request that an agent sent from it, when this teammate's turn answers it. */
+  teammateRequest(agentId: string, turnId: string): { link: MessagingLink; origin: MessagingOrigin } | null {
+    const origin = this.#mailbox.messagingRequestOrigin(agentId, turnId);
+    const link = origin ? this.store.link(origin.linkId) : null;
+    return link && origin ? { link, origin } : null;
+  }
+
   readonly stop = Effect.fn("MessagingThreads.stop")(function* (
     this: MessagingThreads,
     linkId: string,

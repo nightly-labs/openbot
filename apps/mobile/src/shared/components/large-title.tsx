@@ -251,7 +251,7 @@ export function LargeTitleBar({
       [0, 1],
       Extrapolation.CLAMP,
     );
-  }, [androidSurfaceWithTitle]);
+  });
   const solidBarStyle = useAnimatedStyle(() => ({ opacity: surfaceProgress.get() }));
   // The scroll crosses the line on the UI thread; React learns of it only at the crossing. React then
   // owns the style, so a later render cannot put back a stale first-render opacity.

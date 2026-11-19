@@ -147,6 +147,17 @@ function isForeignReasoningError(message: string): boolean {
 }
 
 /**
+ * Anthropic refuses a request whose history has a text block with no text or only blank space. A
+ * provider session can keep such a block, such as an assistant turn with only a tool call that a
+ * converter for Anthropic sends as an empty text. The session sends it again on each turn, so each
+ * later turn failed the same way and the chat showed the raw error (#12527). Only a new session,
+ * given the OpenBot transcript, recovers.
+ */
+function isBlankHistoryText(message: string): boolean {
+  return /\btext content blocks must (?:contain non-whitespace text|be non-empty)\b/i.test(message);
+}
+
+/**
  * Codex sends the Responses API `store: false` and an item ID for each history item. When the
  * history refers to an item that OpenAI did not keep, OpenAI answers 404 "Item with id ... not found.
  * Items are not persisted when `store` is set to false". Codex sends that history again on each turn,
@@ -285,6 +296,8 @@ function isClaudeContextOverflow(provider: AgentProvider, message: string): bool
 export function refusedSessionFailure(provider: AgentProvider, message: string): string | null {
   if (isForeignReasoningError(message))
     return sourceText("error.provider.foreignReasoning", { provider: providerLabel(provider) });
+  if (isBlankHistoryText(message))
+    return sourceText("error.provider.blankHistoryText", { provider: providerLabel(provider) });
   if (isCodexUnstoredItem(provider, message)) return sourceText("error.provider.codexHistoryItemMissing");
   if (isCodexBareBadRequest(provider, message))
     return sourceText("error.provider.codexRequestRefused", { provider: providerLabel(provider) });
@@ -494,7 +507,7 @@ const TOOL_RESULT_PROGRESS = sourceText("status.agent.toolResultReviewing");
  * it, a Claude item names it `mcp__openbot__<tool>`, and a `tool_call` bridge item names it in its
  * arguments. A tool of another MCP server with the same name is not OpenBot's.
  */
-function openBotTool(item: ThreadItem): string | null {
+export function openBotTool(item: ThreadItem): string | null {
   const bridged = bridgedToolName(item);
   if (bridged) return bridged.startsWith("openbot.") ? bridged.slice("openbot.".length) : null;
   if (item.type === "toolCall") return /^mcp__openbot__(.+)$/u.exec(getString(item, "name") ?? "")?.[1] ?? null;
