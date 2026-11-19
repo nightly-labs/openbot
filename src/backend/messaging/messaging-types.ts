@@ -192,6 +192,7 @@ export interface MessagingAdapter {
   placeName(platformChannelId: string): Effect.Effect<string, MessagingAdapterError>;
   places(): Effect.Effect<MessagingPlaces, MessagingAdapterError>;
   placeId?(placeId: string): string;
+  directChat?(target: MessageTarget): { userId: string; threadKey: string } | null;
   roles?(): Effect.Effect<Array<{ id: string; name: string }>, MessagingAdapterError>;
   mention(userId: string): string;
   joinPublicPlaces?(): Effect.Effect<void, MessagingAdapterError>;

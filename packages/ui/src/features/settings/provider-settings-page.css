@@ -57,6 +57,7 @@
 }
 
 .provider-settings-models.settings-modal-card {
+  grid-template-columns: minmax(0, 1fr);
   max-height: 360px;
   padding: 0;
   overflow-y: auto;

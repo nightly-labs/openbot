@@ -526,6 +526,15 @@ export function nextStepContinuationPrompt(count: number, limit: number): string
   ].join("\n");
 }
 
+export function finishCheckContinuationPrompt(gap: string, count: number, limit: number): string {
+  return [
+    "OpenBot note, not a message from the user. A check of your last turn found that the request is not finished yet:",
+    gap,
+    "Do this work now, and continue until the request is done. Do not repeat finished work or restate earlier answers. Do not ask whether to continue. Before you say that the request is done, check the result. This note does not approve a risky action. If the check is wrong and the request is already done, say so in one short line and end your turn. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
+    `Automatic continuation ${count} of ${limit}.`,
+  ].join("\n");
+}
+
 export function compactionContinuationPrompt(): string {
   return [
     "OpenBot note, not a message from the user. Your last turn stopped because the connection failed while your context was compacted.",

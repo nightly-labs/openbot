@@ -112,6 +112,8 @@ export const messages = {
     "Erinnerungen: {saved} gespeichert, {updated} aktualisiert, {forgotten} vergessen, {notChanged} nicht geändert, weil ein anderer Thread sie zuerst geändert hat.",
   "status.agent.mcpToolCall": "Das Tool {tool} des MCP-Servers {name} ausführen.",
   "status.agent.uiBlockClosedByMessage": "Durch neue Nachricht geschlossen",
+  "status.agent.finishCheckContinues":
+    "Die Anfrage ist noch nicht fertig. Der Agent macht weiter ({current} von {limit}).",
   "status.agent.nextStepContinues":
     "Der Agent hat vor dem nächsten Schritt angehalten. Er macht weiter ({current} von {limit}).",
   "status.agent.planContinues": "Der Plan hat offene Schritte. Der Agent macht weiter ({current} von {limit}).",

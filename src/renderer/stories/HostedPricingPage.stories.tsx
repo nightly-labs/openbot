@@ -47,6 +47,10 @@ export const EuCountryWrongVatId: Story = {
   render: () => <PricingStory details={{ country: "FR", vatId: "DE123456789" }} />,
 };
 
+export const UnitedKingdom: Story = {
+  render: () => <PricingStory details={{ country: "GB", vatId: "" }} />,
+};
+
 export const OutsideEu: Story = {
   render: () => <PricingStory details={{ country: "US", vatId: "" }} />,
 };

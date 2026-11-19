@@ -99,18 +99,27 @@ const customAgentUsage: CustomAgentUsageRailRow[] = [
   { id: "devin", name: "Devin", text: "Plan: Team\nACUs used this cycle: 42 of 250\nThe cycle resets in 12 days." },
 ];
 
-const teamCredits: MediaCreditsRailRow[] = [{ provider: "sunra", name: "Sunra", available: 120, quota: 500 }];
+const teamCredits: MediaCreditsRailRow[] = [
+  { key: "sunra", provider: "sunra", name: "Sunra", available: 120, quota: 500 },
+];
 
-const personalCredits: MediaCreditsRailRow[] = [{ provider: "sunra", name: "Sunra", available: 2140, quota: null }];
+const personalCredits: MediaCreditsRailRow[] = [
+  { key: "sunra", provider: "sunra", name: "Sunra", available: 2140, quota: null },
+];
 
 const bothCredits: MediaCreditsRailRow[] = [
   ...teamCredits,
-  { provider: "higgsfield", name: "Higgsfield", available: 860, quota: null },
+  { key: "higgsfield", provider: "higgsfield", name: "Higgsfield", available: 860, quota: null, number: 1 },
+];
+
+const twoAccountCredits: MediaCreditsRailRow[] = [
+  { key: "higgsfield:first", provider: "higgsfield", name: "Higgsfield", available: 860, quota: null, number: 1 },
+  { key: "higgsfield:second", provider: "higgsfield", name: "Higgsfield 2", available: 95, quota: null, number: 2 },
 ];
 
 const lowCredits: MediaCreditsRailRow[] = [
-  { provider: "sunra", name: "Sunra", available: 140, quota: 2000 },
-  { provider: "higgsfield", name: "Higgsfield", available: 0, quota: null },
+  { key: "sunra", provider: "sunra", name: "Sunra", available: 140, quota: 2000 },
+  { key: "higgsfield", provider: "higgsfield", name: "Higgsfield", available: 0, quota: null },
 ];
 
 function RailPreview(props: {
@@ -233,6 +242,10 @@ export const MediaCreditsPersonal: Story = {
 
 export const MediaCreditsTwoServices: Story = {
   args: { mediaCredits: bothCredits },
+};
+
+export const MediaCreditsTwoAccounts: Story = {
+  args: { mediaCredits: twoAccountCredits },
 };
 
 export const MediaCreditsLow: Story = {

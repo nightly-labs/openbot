@@ -118,10 +118,6 @@ export class RemoteServerConnections {
     this.setCompatibility(serverId, checkingCompatibility(this.#appVersion));
   }
 
-  clearCompatibility(serverId: string): void {
-    this.#mutable(serverId).compatibility = null;
-  }
-
   clearIssue(serverId: string): void {
     this.#mutable(serverId).issue = null;
   }

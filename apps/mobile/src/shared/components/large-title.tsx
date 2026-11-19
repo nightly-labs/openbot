@@ -186,7 +186,7 @@ export function LargeTitleBar({
       [0, 1],
       Extrapolation.CLAMP,
     );
-  }, [androidSurfaceWithTitle]);
+  });
   const solidBarStyle = useAnimatedStyle(() => ({ opacity: surfaceProgress.get() }));
   useAnimatedReaction(
     () => {

@@ -158,6 +158,9 @@ import {
   type SkillLearningMode,
   sameAgentBrowserProfile,
   sameAgentModelChoice,
+  WORKFLOW_CATALOG_PROVIDERS,
+  WORKFLOW_MEDIA_SERVICE_ACCOUNT_MAX,
+  WORKFLOW_MEDIA_SERVICE_ACCOUNT_NAME_MAX,
   WORKFLOWS_USAGE_ID,
   type WorkflowCatalogProvider,
   type WorkflowMediaCatalog,
@@ -176,6 +179,7 @@ import { ContextResetBusyError } from "@openbot/contracts/team-protocol/context-
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
+import { workflowMediaCreditsOf, workflowMediaProvidersOf } from "@openbot/team-client/workflow-decoding";
 import { type CauseCode, classifyFailure, isCauseCode } from "@openbot/telemetry";
 import { Cause, Deferred, Effect, Exit, Fiber, Result, Schema, Scope, Semaphore } from "effect";
 import { AgentMemories } from "./agent/agent-memories";
@@ -207,6 +211,7 @@ import { DrainScheduler } from "./agent/drain-scheduler";
 import { DuplicationGate, toAgentDuplicationFailed } from "./agent/duplication-gate";
 import type { FailureContext, FailureSignal } from "./agent/failure-signal";
 import { FeedbackWithdrawal } from "./agent/feedback-withdrawal";
+import { type FinishCheckInput, FinishCheckResult, finishCheckPrompt } from "./agent/finish-check";
 import { type AgentHostedSites, HostedSiteCoordinator } from "./agent/hosted-site-coordinator";
 import { ImageGenRuntime } from "./agent/image-gen-runtime";
 import {
@@ -344,6 +349,7 @@ import type { ImportedRoutineRun, RoutineHoldWindow } from "./routine-store";
 import { type RoutineDueSource, RoutineTimer } from "./routine-timer";
 import type { SidebarLayoutStore } from "./sidebar-layout-store";
 import { shortenDiagnostic } from "./stderr-diagnostics";
+import { extractJsonObject } from "./structured-output";
 import type { UserBrowsingLog } from "./user-browsing-log";
 import type { VaultItems } from "./vault-items";
 import { generateHiggsfieldMedia, HIGGSFIELD_MCP_HOST, readHiggsfieldCredits } from "./workflows/higgsfield-media";
@@ -363,6 +369,15 @@ const logger = createOpenBotLogger("agent-service");
 
 const routingLogger = createOpenBotLogger("channel-routing");
 const errorLogger = createOpenBotLogger("agent-error");
+
+const MEDIA_SERVICE_HOSTS: Readonly<Record<WorkflowCatalogProvider, string>> = {
+  sunra: SUNRA_MCP_HOST,
+  higgsfield: HIGGSFIELD_MCP_HOST,
+};
+const MEDIA_SERVICE_NAMES: Readonly<Record<WorkflowCatalogProvider, string>> = {
+  sunra: "Sunra",
+  higgsfield: "Higgsfield",
+};
 
 const DEFAULT_BUNDLED_EXECUTABLES: BundledProviderExecutables = { claude: null, grok: null };
 
@@ -385,6 +400,7 @@ export interface AgentServiceOptions {
   requestTimeoutMs?: number;
   contextCompactionTimeoutMs?: number;
   memoryReviewIdleMs?: number;
+  finishCheck?: boolean;
   preferredProvider?: AgentProvider;
   preferredModel?: AgentModelId | null;
   clientFactory?: AgentClientFactory | null;
@@ -1756,6 +1772,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           this.#threads.dropRefusedProviderSession(agentId, externalThreadId),
         listAgents: () => this.listAgents(),
         redactMcp: (text) => this.#mcp.redact(text),
+        ...(options.finishCheck === true
+          ? { checkFinish: (agentId: string, input: FinishCheckInput) => this.#checkFinish(agentId, input) }
+          : {}),
         emitToolUsage: (usage) => this.emit("toolUsage", usage),
         turnModel: (agentId, turnId) => this.#drain.modelForTurn(agentId, turnId),
         mayFailOver: (agentId) => this.#mayFailOver(agentId),
@@ -2711,6 +2730,38 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "ask side question", cause: failure.cause })),
   ).bind(this);
 
+  readonly #checkFinish = Effect.fn("AgentService.checkFinish")(
+    function* (this: AgentService, agentId: string, input: FinishCheckInput) {
+      const agent = this.listAgents().find((candidate) => candidate.id === agentId);
+      if (!agent || this.#stopping) return null;
+      yield* this.#providers.ensureProvider(agent.provider);
+      const model = backgroundModel(agent, this.#agentModels(agent));
+      if (!model || this.#stopping || !this.#profileClients.hasSpare()) return null;
+      const client = yield* Effect.try(() =>
+        this.#providers.createProfileClient(agent.provider, agent.providerAccountId),
+      );
+      const answer = yield* this.#profileClients.run(client, (cancelled) =>
+        generateTextWithoutTools(
+          client,
+          withBackgroundEffort(model),
+          finishCheckPrompt(input),
+          cancelled,
+          sideSessionUsageObserver("finish-check", this.#store.database.usage, agent.id, agent.provider, model.id),
+        ),
+      );
+      const json = yield* Effect.try(() => extractJsonObject(answer));
+      const result = yield* Schema.decodeUnknownEffect(FinishCheckResult)(json);
+      logger.info("A finish check answered.", { agentId, verdict: result.verdict, model: model.id });
+      return result;
+    },
+    Effect.catchCause((cause) =>
+      Effect.sync(() => {
+        logger.warn("Could not run the finish check of a turn.", { error: Cause.squash(cause) });
+        return null;
+      }),
+    ),
+  ).bind(this);
+
   readonly saveSkillSuggestion = Effect.fn("AgentService.saveSkillSuggestion")(function* (
     this: AgentService,
     input: SaveSkillSuggestionInput,
@@ -2781,7 +2832,36 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   ).bind(this);
 
   #mediaSignIn(provider: WorkflowCatalogProvider) {
-    return this.#mcp.serviceSignIn(provider === "sunra" ? SUNRA_MCP_HOST : HIGGSFIELD_MCP_HOST);
+    return this.#mcp.serviceSignIn(MEDIA_SERVICE_HOSTS[provider]);
+  }
+
+  #mediaServiceAccounts() {
+    const perService = Math.floor(WORKFLOW_MEDIA_SERVICE_ACCOUNT_MAX / WORKFLOW_CATALOG_PROVIDERS.length);
+    return WORKFLOW_CATALOG_PROVIDERS.flatMap((provider) =>
+      this.#mcp
+        .serviceSignIns(MEDIA_SERVICE_HOSTS[provider])
+        .slice(0, perService)
+        .map((signIn) => ({
+          provider,
+          signIn,
+          account: {
+            provider,
+            id: signIn.id,
+            name: signIn.name?.slice(0, WORKFLOW_MEDIA_SERVICE_ACCOUNT_NAME_MAX) ?? null,
+          },
+        })),
+    );
+  }
+
+  #mediaStepSignIn(provider: WorkflowCatalogProvider, account: string | null) {
+    const signIn = this.#mcp.serviceSignIn(MEDIA_SERVICE_HOSTS[provider], account);
+    return account !== null && !signIn
+      ? Effect.fail(
+          new ProfileGenerationFailed({
+            cause: new Error(sourceText("error.provider.accountNotFound", { provider: MEDIA_SERVICE_NAMES[provider] })),
+          }),
+        )
+      : Effect.succeed(() => this.#mcp.serviceSignIn(MEDIA_SERVICE_HOSTS[provider], account));
   }
 
   readonly workflowMediaCatalog = Effect.fn("AgentService.workflowMediaCatalog")(function* (
@@ -2801,19 +2881,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }).bind(this);
 
   workflowMediaProviders(): WorkflowMediaProviders {
-    return {
-      sunra: this.#mcp.serviceSignIn(SUNRA_MCP_HOST) !== null,
-      higgsfield: this.#mcp.serviceSignIn(HIGGSFIELD_MCP_HOST) !== null,
-    };
+    return workflowMediaProvidersOf(this.#mediaServiceAccounts().map(({ account }) => account));
   }
 
   readonly workflowMediaCredits = Effect.fn("AgentService.workflowMediaCredits")(function* (
     this: AgentService,
-    only?: keyof WorkflowMediaCredits,
+    only?: WorkflowCatalogProvider,
   ) {
-    if (this.#stopping) return { sunra: null, higgsfield: null } satisfies WorkflowMediaCredits;
-    const sunraSignIn = only === "higgsfield" ? null : this.#mcp.serviceSignIn(SUNRA_MCP_HOST);
-    const higgsfieldSignIn = only === "sunra" ? null : this.#mcp.serviceSignIn(HIGGSFIELD_MCP_HOST);
+    if (this.#stopping) return { sunra: null, higgsfield: null, accounts: null } satisfies WorkflowMediaCredits;
+    const all = this.#mediaServiceAccounts();
+    const accounts = only ? all.filter((account) => account.provider === only).slice(0, 1) : all;
     const orNull = <A>(read: Effect.Effect<A, { readonly message: string }>, service: string) =>
       read.pipe(
         Effect.catch((failure) =>
@@ -2823,14 +2900,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           }),
         ),
       );
-    const [sunra, higgsfield] = yield* Effect.all(
-      [
-        sunraSignIn ? orNull(readSunraCredits(sunraSignIn), "sunra") : Effect.succeed(null),
-        higgsfieldSignIn ? orNull(readHiggsfieldCredits(higgsfieldSignIn), "higgsfield") : Effect.succeed(null),
-      ],
+    const credits = yield* Effect.all(
+      accounts.map(({ provider, signIn }) =>
+        orNull(provider === "sunra" ? readSunraCredits(signIn) : readHiggsfieldCredits(signIn), provider),
+      ),
       { concurrency: "unbounded" },
     );
-    return { sunra, higgsfield } satisfies WorkflowMediaCredits;
+    const listed = accounts.map(({ account }, index) => ({ ...account, credits: credits[index] ?? null }));
+    return { ...workflowMediaCreditsOf(listed), accounts: only ? null : listed } satisfies WorkflowMediaCredits;
   }).bind(this);
 
   readonly generateWorkflowMedia = Effect.fn("AgentService.generateWorkflowMedia")(
@@ -2851,10 +2928,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       const failed = (message: string) => new ProfileGenerationFailed({ cause: new Error(message) });
       if (input.provider === "sunra") {
         if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
+        const signIn = yield* this.#mediaStepSignIn("sunra", input.account);
         const plan = yield* this.#mediaCatalog.sunraPlan(input.catalogId, input.kind);
         return yield* generateSunraMedia(
           {
-            signIn: () => this.#mcp.serviceSignIn(SUNRA_MCP_HOST),
+            signIn,
             resolveAttachment: (attachmentId) => this.#mailbox.resolveAttachment(attachmentId),
             store: (file) => this.#mailbox.storeGeneratedAttachment(file),
           },
@@ -2875,10 +2953,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       }
       if (input.provider === "higgsfield") {
         if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
+        const signIn = yield* this.#mediaStepSignIn("higgsfield", input.account);
         const plan = yield* this.#mediaCatalog.higgsfieldPlan(input.catalogId, input.model, input.kind);
         return yield* generateHiggsfieldMedia(
           {
-            signIn: () => this.#mcp.serviceSignIn(HIGGSFIELD_MCP_HOST),
+            signIn,
             resolveAttachment: (attachmentId) => this.#mailbox.resolveAttachment(attachmentId),
             store: (file) => this.#mailbox.storeGeneratedAttachment(file),
           },

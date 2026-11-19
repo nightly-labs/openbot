@@ -11,7 +11,8 @@ const CODE_ASSIST_URL = "https://cloudcode-pa.googleapis.com/v1internal";
 
 const DAILY_CODE_ASSIST_URL = "https://daily-cloudcode-pa.googleapis.com/v1internal";
 
-const DESKTOP_VERSION = "2.31.0";
+const DESKTOP_VERSION = "2.24.0";
+const DESKTOP_BUILD = "963137146";
 
 const DEV_CODE_ASSIST_URL = "OPENBOT_DEV_ANTIGRAVITY_CODE_ASSIST_URL";
 
@@ -123,7 +124,7 @@ function validAccessToken(text: string): string | null {
 function antigravityUserAgent(): string {
   const os = process.platform === "win32" ? "windows" : process.platform;
   const arch = process.arch === "x64" ? "amd64" : process.arch;
-  return `antigravity/${DESKTOP_VERSION} ${os}/${arch}`;
+  return `antigravity/hub/${DESKTOP_VERSION} (aidev_client; os_type=${os}; arch=${arch}; cl=${DESKTOP_BUILD})`;
 }
 
 function antigravityRateLimits(

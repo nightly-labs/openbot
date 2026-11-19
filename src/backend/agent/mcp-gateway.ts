@@ -11,7 +11,7 @@ import type {
   TestMcpServerInput,
 } from "@openbot/contracts/ipc";
 import { GITHUB_CONNECTOR_MCP_SERVER_ID, mcpConfigErrors, normalizeMcpConfig } from "@openbot/contracts/ipc";
-import { withoutMcpAccountFragment } from "@openbot/contracts/mcp-accounts";
+import { mcpAccountFragment, withoutMcpAccountFragment } from "@openbot/contracts/mcp-accounts";
 import { matchingSourceKeys, sourceText } from "@openbot/i18n/source";
 import { type Logger, redactSecrets, toLogValue } from "@openbot/logging";
 import { Effect, Result, Schema } from "effect";
@@ -54,6 +54,14 @@ export interface TestMcpServerOptions {
   signInPlace?: McpSignInPlace;
   open?: McpSignInOpener;
   deepLinkRedirectUrl?: string;
+}
+
+export interface McpServiceSignIn {
+  id: string;
+  name: string | null;
+  url: string;
+  token: () => Effect.Effect<string | null, McpOperationError>;
+  refresh: (rejected: string) => Effect.Effect<string | null, McpOperationError>;
 }
 
 export interface McpGatewayHooks {
@@ -454,26 +462,32 @@ export class McpGateway {
       }));
   }
 
-  serviceSignIn(host: string): {
-    url: string;
-    token: () => Effect.Effect<string | null, McpOperationError>;
-    refresh: (rejected: string) => Effect.Effect<string | null, McpOperationError>;
-  } | null {
+  serviceSignIns(host: string): McpServiceSignIn[] {
     const oauth = this.#oauth;
-    const config = this.#servers.listEnabled().find((row) => {
-      if (!this.#proxied(row) || !oauth?.signedIn(row.url)) return false;
+    if (!oauth) return [];
+    const rows = this.#servers.listEnabled().filter((row) => {
+      if (!this.#proxied(row) || !oauth.signedIn(row.url)) return false;
       try {
         return new URL(row.url).hostname === host;
       } catch {
         return false;
       }
     });
-    if (!config || !oauth) return null;
-    return {
+    return [
+      ...rows.filter((row) => mcpAccountFragment(row.url) === null),
+      ...rows.filter((row) => mcpAccountFragment(row.url) !== null),
+    ].map((config) => ({
+      id: config.id,
+      name: mcpAccountFragment(config.url) === null ? null : config.name,
       url: withoutMcpAccountFragment(config.url),
       token: () => oauth.accessToken(config.url),
-      refresh: (rejected) => oauth.refreshAccessToken(config.url, rejected),
-    };
+      refresh: (rejected: string) => oauth.refreshAccessToken(config.url, rejected),
+    }));
+  }
+
+  serviceSignIn(host: string, accountId: string | null = null): McpServiceSignIn | null {
+    const accounts = this.serviceSignIns(host);
+    return (accountId === null ? accounts[0] : accounts.find((account) => account.id === accountId)) ?? null;
   }
 
   signInOffer(config: McpServerConfig): Effect.Effect<McpSignInOffer> {

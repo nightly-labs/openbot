@@ -97,6 +97,13 @@ export interface MessagingHistory {
 
 export type MessagingPostFailure = "gone" | "not-running" | "refused" | "unknown";
 
+interface MessagingPostPing {
+  userIds: string[];
+  text: string;
+  platformChannelId?: string;
+  threadKey?: string;
+}
+
 export interface MessagingOutbound {
   places(connectionId: string): Effect.Effect<{ places: MessagingPlace[]; note?: string } | { error: string }>;
   history(
@@ -117,9 +124,9 @@ export interface MessagingOutbound {
         messageId: string;
         url?: string;
         skippedFiles?: string[];
-        ping?: { userIds: string[]; text: string };
+        ping?: MessagingPostPing;
       }
-    | { posted: true; messageId?: string; skippedFiles?: string[]; ping?: undefined }
+    | { posted: true; messageId?: string; skippedFiles?: string[]; ping?: MessagingPostPing }
     | { error: string; failure: Exclude<MessagingPostFailure, "gone"> }
   >;
   discord(
@@ -437,11 +444,12 @@ export class MessagingThreads {
     if ("error" in answer) return openBotToolFailure(answer.error);
     if (!("posted" in answer) || !answer.ping) return openBotToolResult(answer);
     const { ping, ...result } = answer;
-    if (ping && call.tool === "messaging_post")
+    const threadKey = call.tool === "messaging_post" ? (ping.threadKey ?? call.replyTo ?? result.messageId) : null;
+    if (call.tool === "messaging_post" && threadKey)
       yield* this.recordPings({
         connectionId: record.connectionId,
-        platformChannelId: call.place,
-        threadKey: call.replyTo ?? result.messageId,
+        platformChannelId: ping.platformChannelId ?? call.place,
+        threadKey,
         userIds: ping.userIds,
         agentId,
         text: ping.text,
@@ -464,7 +472,7 @@ export class MessagingThreads {
     }).pipe(
       Effect.catch((failure) =>
         Effect.sync(() =>
-          logger.warn("A Slack ping was not recorded.", {
+          logger.warn("A ping was not recorded.", {
             error: failure.cause instanceof Error ? failure.cause.name : "unknown",
           }),
         ),

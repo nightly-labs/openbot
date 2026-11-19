@@ -1247,10 +1247,20 @@ export class MessagingService {
     const store = this.#threads.store;
     const existing = store.linkByKey(live.record.connectionId, message.platformChannelId, message.threadKey);
     const pings =
-      live.record.platform === "slack" && !message.isDirect && (message.requiresLink || !existing)
+      (live.record.platform === "slack" && !message.isDirect && (message.requiresLink || !existing)) ||
+      (live.record.platform === "whatsapp" &&
+        message.isDirect &&
+        !existing &&
+        message.authorId !== live.identity.botUserId)
         ? store.pings(live.record.connectionId, message.platformChannelId, message.threadKey)
         : [];
     const ping = pings.find((candidate) => candidate.userId === message.authorId) ?? null;
+    const poster =
+      live.record.platform === "whatsapp" &&
+      ping &&
+      this.#agents.listAgents().some((agent) => agent.id === ping.agentId)
+        ? ping.agentId
+        : null;
     if (message.requiresLink && (pings.length ? !ping : !existing)) return;
     const dedupKey = `${live.record.connectionId}:${message.dedupKey}`;
     if (this.#recent.has(dedupKey)) return;
@@ -1368,7 +1378,7 @@ export class MessagingService {
           .pipe(Effect.catch(() => Effect.void));
       if (workflows !== "none") return;
     }
-    const agentId = existing?.agentId ?? this.#orchestrator(live.record);
+    const agentId = existing?.agentId ?? this.#orchestrator(live.record) ?? poster;
     if (!agentId) {
       if (live.record.platform === "whatsapp" && message.authorId !== live.identity.botUserId) return;
       const noAgent =
@@ -1486,7 +1496,7 @@ export class MessagingService {
   }
 
   #pingAuthor(record: MessagingConnectionRecord, agentId: string): string {
-    if (agentId === this.#orchestrator(record)) return "OpenBot, a post of yours";
+    if (agentId === (this.#orchestrator(record) ?? agentId)) return "OpenBot, a post of yours";
     const name = this.#agents.listAgents().find((agent) => agent.id === agentId)?.name;
     return name ? `OpenBot, a post by your teammate ${name}` : "OpenBot";
   }
@@ -1641,6 +1651,18 @@ export class MessagingService {
     const botUserId = live.identity.botUserId;
     const pinged =
       live.record.platform === "slack" ? slackPingedUsers(text).filter((userId) => userId !== botUserId) : [];
+    const direct = live.adapter.directChat?.(target) ?? null;
+    const directPing = (posted: string) =>
+      direct
+        ? {
+            ping: {
+              userIds: [direct.userId],
+              text: posted,
+              platformChannelId: target.platformChannelId,
+              threadKey: direct.threadKey,
+            },
+          }
+        : {};
     if (!text.trim() && !embeds.length && files.length) {
       const result = yield* Effect.result(live.adapter.upload(target, files));
       if (Result.isFailure(result))
@@ -1661,6 +1683,7 @@ export class MessagingService {
         posted: true as const,
         ...(uploaded.firstId ? { messageId: uploaded.firstId } : {}),
         ...(uploaded.skipped.length ? { skippedFiles: uploaded.skipped } : {}),
+        ...directPing(`Files: ${sentFiles.join(", ")}`),
       };
     }
     const single = files.length === 1 && !embeds.length ? files[0] : undefined;
@@ -1673,7 +1696,11 @@ export class MessagingService {
         };
       if (captioned.success) {
         live.adapter.rememberPost?.(target, captioned.success, `${text}\nFiles: ${single.name}`);
-        return { posted: true as const, messageId: captioned.success };
+        return {
+          posted: true as const,
+          messageId: captioned.success,
+          ...directPing(`${text}\nFiles: ${single.name}`),
+        };
       }
     }
     const posted = yield* (
@@ -1685,7 +1712,7 @@ export class MessagingService {
         posted: true as const,
         messageId,
         ...(guildId ? { url: `https://discord.com/channels/${guildId}/${target.platformChannelId}/${messageId}` } : {}),
-        ...(pinged.length ? { ping: { userIds: pinged, text } } : {}),
+        ...(pinged.length ? { ping: { userIds: pinged, text } } : directPing(text)),
       })),
       Effect.catch((failure) =>
         Effect.succeed({

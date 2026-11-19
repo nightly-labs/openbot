@@ -278,10 +278,12 @@ function CustomAgentUsageButton(props: { row: CustomAgentUsageRailRow; onOpen: (
 }
 
 export interface MediaCreditsRailRow {
+  key: string;
   provider: "sunra" | "higgsfield";
   name: string;
   available: number;
   quota: number | null;
+  number?: number | undefined;
 }
 
 function mediaCreditsPercent(row: MediaCreditsRailRow): number {
@@ -351,6 +353,13 @@ function MediaCreditsButton(props: { row: MediaCreditsRailRow; onOpen: (button: 
       <span class="window-rail-credits-count" data-usage-tone={mediaCreditsTone(props.row)} aria-hidden="true">
         {format.compact(props.row.available)}
       </span>
+      <Show when={props.row.number}>
+        {(number) => (
+          <span class="window-rail-credits-badge" aria-hidden="true">
+            {number()}
+          </span>
+        )}
+      </Show>
     </RailButton>
   );
 }
@@ -666,7 +675,7 @@ export function PageRail(props: PageRailProps) {
           <For each={props.customAgentUsage ?? []} keyed={(row) => row.id}>
             {(row) => <CustomAgentUsageButton row={row()} onOpen={props.onUsage} />}
           </For>
-          <For each={props.mediaCredits ?? []} keyed={(row) => row.provider}>
+          <For each={props.mediaCredits ?? []} keyed={(row) => row.key}>
             {(row) => <MediaCreditsButton row={row()} onOpen={() => props.onMediaCredits?.(row().provider)} />}
           </For>
           <Show when={props.onMarketplace}>

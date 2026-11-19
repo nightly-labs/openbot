@@ -1,9 +1,18 @@
-import type { WorkflowMediaCredits } from "@openbot/contracts/ipc";
+import type {
+  WorkflowCatalogProvider,
+  WorkflowMediaCredits,
+  WorkflowMediaServiceAccount,
+} from "@openbot/contracts/ipc";
 import type { MediaCreditsRailRow } from "@openbot/ui/features/window/PageRail";
 import { createEffect, createSignal, onCleanup, untrack } from "solid-js";
 
-const SUNRA_NAME = "Sunra";
-const HIGGSFIELD_NAME = "Higgsfield";
+const MEDIA_SERVICE_NAMES: Readonly<Record<WorkflowCatalogProvider, string>> = {
+  sunra: "Sunra",
+  higgsfield: "Higgsfield",
+};
+
+export const mediaServiceAccountName = (account: WorkflowMediaServiceAccount) =>
+  account.name ?? MEDIA_SERVICE_NAMES[account.provider];
 
 const [mediaStepsEnded, setMediaStepsEnded] = createSignal(0);
 
@@ -50,9 +59,32 @@ export function createWorkflowMediaCredits(
   });
   return (): MediaCreditsRailRow[] => {
     const answer = credits();
+    if (!answer) return [];
+    if (answer.accounts) {
+      const accounts = answer.accounts;
+      return accounts.flatMap((account) => {
+        if (!account.credits) return [];
+        const service = accounts.filter((entry) => entry.provider === account.provider);
+        return [
+          {
+            key: `${account.provider}:${account.id}`,
+            provider: account.provider,
+            name: mediaServiceAccountName(account),
+            ...account.credits,
+            ...(service.length > 1 ? { number: service.indexOf(account) + 1 } : {}),
+          },
+        ];
+      });
+    }
     const rows: MediaCreditsRailRow[] = [];
-    if (answer?.sunra) rows.push({ provider: "sunra", name: SUNRA_NAME, ...answer.sunra });
-    if (answer?.higgsfield) rows.push({ provider: "higgsfield", name: HIGGSFIELD_NAME, ...answer.higgsfield });
+    if (answer.sunra) rows.push({ key: "sunra", provider: "sunra", name: MEDIA_SERVICE_NAMES.sunra, ...answer.sunra });
+    if (answer.higgsfield)
+      rows.push({
+        key: "higgsfield",
+        provider: "higgsfield",
+        name: MEDIA_SERVICE_NAMES.higgsfield,
+        ...answer.higgsfield,
+      });
     return rows;
   };
 }

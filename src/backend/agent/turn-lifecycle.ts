@@ -14,6 +14,7 @@ import {
   type ConversationPlan,
   type ConversationSnapshot,
   type ConversationSubagent,
+  type ConversationTraceStep,
   type ConversationTurnTrace,
   clampConversationSubagents,
   conversationPlanText,
@@ -30,7 +31,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { type CauseCode, classifyFailure, isCauseCode } from "@openbot/telemetry";
 import { userErrorMessage } from "@openbot/user-errors";
-import { Cause, Deferred, Effect, Exit, Schema, Scope } from "effect";
+import { Cause, Deferred, Effect, Exit, Schedule, Schema, Scope } from "effect";
 import type { AgentClient } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import type { BrowserOperationError } from "../browser-effects";
@@ -65,13 +66,21 @@ import { type ContextCompaction, compactsOnRequest } from "./context-compaction"
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { DeltaBuffer } from "./delta-buffer";
 import type { FailureContext, FailureSignal } from "./failure-signal";
+import {
+  FINISH_CHECK_ABORT_POLL,
+  FINISH_CHECK_CONTEXT_MESSAGES,
+  FINISH_CHECK_DEADLINE_MS,
+  type FinishCheckInput,
+  type FinishCheckResult,
+  finishCheckGap,
+} from "./finish-check";
 import { readCapturedSteps } from "./handoff-tool-steps";
 import type { ImageGenRuntime } from "./image-gen-runtime";
 import { markIncompleteMediaGeneration } from "./image-generation";
 import { type InstructionsChanges, instructionsChangeMessage } from "./instructions-changes";
 import type { MailboxSync } from "./mailbox-sync";
 import { memoryChangesMessage } from "./memory-changes-message";
-import { type PlanContinuation, waitsForUser } from "./plan-continuation";
+import { type FinishCheckMode, type PlanContinuation, waitsForUser } from "./plan-continuation";
 import { PLAN_UPDATED_METHOD, planFromNotification } from "./plan-updates";
 import {
   GEMINI_INVALID_CREDENTIALS,
@@ -204,6 +213,7 @@ export interface TurnHooks {
   dropRefusedSession(agentId: string, externalThreadId: string): Effect.Effect<void, TurnOperationFailed>;
   listAgents(): AgentSummary[];
   redactMcp(text: string): string;
+  checkFinish?(agentId: string, input: FinishCheckInput): Effect.Effect<FinishCheckResult | null>;
   emitToolUsage(usage: ToolUsageSignal): void;
   turnModel(agentId: string, turnId: string): string | null;
   mayFailOver(agentId: string): boolean;
@@ -463,7 +473,10 @@ export class TurnLifecycle {
 
   continuesAfterProviderExit(agentId: string, turnId: string, deliveryIds: readonly string[]): boolean {
     const contexts = deliveryIds.flatMap((id) => this.#mailbox.getDelivery(id) ?? []);
-    return contexts.length === deliveryIds.length && this.#planContinues(agentId, null, turnId, contexts, undefined);
+    return (
+      contexts.length === deliveryIds.length &&
+      this.#planContinues(agentId, null, turnId, contexts, undefined) === "allowed"
+    );
   }
 
   markFailedTurn(agentId: string, turnId: string): void {
@@ -607,8 +620,8 @@ export class TurnLifecycle {
     turnId: string,
     deliveries: readonly DeliveryContext[],
     answer: string | undefined,
-  ): boolean {
-    if (deliveries.length === 0 || this.#planContinuation.limit <= 0) return false;
+  ): FinishCheckMode {
+    if (deliveries.length === 0 || this.#planContinuation.limit <= 0) return "no";
     if (
       !deliveries.every(
         ({ delivery, channelId }) =>
@@ -618,8 +631,17 @@ export class TurnLifecycle {
               (delivery.sender.agentId === agentId || this.#mailbox.answersRequestOf(agentId, delivery.messageId)))),
       )
     )
-      return false;
-    if (waitsForUser(answer)) return false;
+      return "no";
+    if (!this.#mayContinue(agentId, taskId, turnId, deliveries)) return "no";
+    return waitsForUser(answer) ? "only" : "allowed";
+  }
+
+  #mayContinue(
+    agentId: string,
+    taskId: string | null,
+    turnId: string,
+    deliveries: readonly DeliveryContext[],
+  ): boolean {
     return (
       !this.#hooks.turnStopped(agentId, taskId, turnId) &&
       !this.#hooks.hasOpenWait(
@@ -628,6 +650,70 @@ export class TurnLifecycle {
       ) &&
       !this.#attention.hasAttentionFor(agentId) &&
       this.#mailbox.laneQueuedIds(agentId, taskId).length === 0
+    );
+  }
+
+  #checkFinish(
+    agentId: string,
+    taskId: string | null,
+    turnId: string,
+    snapshot: ConversationSnapshot,
+    deliveries: readonly DeliveryContext[],
+    steps: readonly ConversationTraceStep[],
+    plan: ConversationPlan | null,
+    answer: string,
+    continuations: number,
+  ): Effect.Effect<string | null> {
+    const check = this.#hooks.checkFinish;
+    if (!check) return Effect.succeed(null);
+    const redact = (text: string) => redactText(this.#hooks.redactMcp(text));
+    const request = deliveries.map(({ delivery }) => redact(delivery.text)).filter((text) => text.trim().length > 0);
+    if (request.length === 0) return Effect.succeed(null);
+    const deliveryIds = new Set(deliveries.map(({ delivery }) => delivery.id));
+    const requestIndex = snapshot.messages.findIndex(
+      (message) => message.delivery !== undefined && deliveryIds.has(message.delivery.id),
+    );
+    const context = (requestIndex < 0 ? [] : snapshot.messages.slice(0, requestIndex))
+      .filter(
+        (message) =>
+          message.text.trim().length > 0 &&
+          (message.author === "user" || (message.author === "assistant" && message.itemType !== "commentary")),
+      )
+      .slice(-FINISH_CHECK_CONTEXT_MESSAGES)
+      .map((message) => ({ author: message.author, text: redact(message.text) }));
+    const input: FinishCheckInput = {
+      request,
+      context,
+      steps: steps.map((step) => ({
+        ...step,
+        ...(step.text === undefined ? {} : { text: redact(step.text) }),
+        ...(step.command === undefined ? {} : { command: redact(step.command) }),
+        ...(step.error === undefined ? {} : { error: redact(step.error) }),
+      })),
+      plan: plan && { ...plan, steps: plan.steps.map((step) => ({ ...step, text: redact(step.text) })) },
+      answer: redact(answer),
+      continuations,
+    };
+    const mayContinue = () =>
+      this.#planContinuation.waitsForCheck(agentId, taskId) && this.#mayContinue(agentId, taskId, turnId, deliveries);
+    const aborted = Effect.sync(() => !mayContinue()).pipe(
+      Effect.repeat({ until: (stop) => stop, schedule: Schedule.spaced(FINISH_CHECK_ABORT_POLL) }),
+      Effect.as(null),
+    );
+    return Effect.raceFirst(
+      Effect.suspend(() => check(agentId, input)).pipe(
+        Effect.timeoutOption(FINISH_CHECK_DEADLINE_MS),
+        Effect.map((result) => (result._tag === "None" ? null : result.value)),
+      ),
+      aborted,
+    ).pipe(
+      Effect.map((result) => (result === null || !mayContinue() ? null : finishCheckGap(result))),
+      Effect.catchCause((cause) =>
+        Effect.sync(() => {
+          logger.warn("The finish check of a turn failed.", { error: Cause.squash(cause) });
+          return null;
+        }),
+      ),
     );
   }
 
@@ -1765,7 +1851,7 @@ export class TurnLifecycle {
         !channelTurn &&
         !routineSession &&
         (!taskTurn || laneTaskId !== null) &&
-        this.#planContinues(agentId, laneTaskId, turnId, deliveries, undefined)
+        this.#planContinues(agentId, laneTaskId, turnId, deliveries, undefined) === "allowed"
           ? this.#planContinuation[compactionFailure.exited ? "afterProviderExit" : "afterFailedCompaction"]({
               agentId,
               taskId: laneTaskId,
@@ -1988,30 +2074,58 @@ export class TurnLifecycle {
       const routineDelivery = deliveries[0]?.delivery.id;
       if (routineSession && routineDelivery && outcome === "completed" && !quiet && !markerAnswer && latestAssistant)
         yield* this.#hooks.routineAnswered(agentId, routineDelivery, latestAssistant.text);
-      const planContinues =
+      const planMode: FinishCheckMode =
         outcome === "completed" &&
         reportedFailure === undefined &&
         running !== undefined &&
         !channelTurn &&
         !routineSession &&
-        (!taskTurn || laneTaskId !== null) &&
-        this.#planContinues(agentId, laneTaskId, turnId, deliveries, latestAssistant?.text) &&
-        !(yield* (running.client.wakesAfterBackgroundWork?.(threadId) ?? Effect.succeed(false)).pipe(
+        (!taskTurn || laneTaskId !== null)
+          ? this.#planContinues(agentId, laneTaskId, turnId, deliveries, latestAssistant?.text)
+          : "no";
+      const continueMode: FinishCheckMode =
+        planMode !== "no" &&
+        (yield* (running?.client.wakesAfterBackgroundWork?.(threadId) ?? Effect.succeed(false)).pipe(
           Effect.orElseSucceed(() => false),
-        ));
-      const considered = planContinues
-        ? this.#planContinuation.consider({
-            agentId,
-            taskId: laneTaskId,
-            deliveryIds: deliveries.map(({ delivery }) => delivery.id),
-            plan: snapshot.messages.find((message) => message.id === `${turnId}:plan`)?.plan ?? null,
-            earlierPlan:
-              snapshot.messages.findLast(
-                (message) => message.itemType === CONVERSATION_PLAN_ITEM_TYPE && message.turnId !== turnId,
-              )?.plan ?? null,
-            answer: latestAssistant?.text,
-          })
-        : null;
+        ))
+          ? "no"
+          : planMode;
+      const turnPlan = snapshot.messages.find((message) => message.id === `${turnId}:plan`)?.plan ?? null;
+      const toolSteps = trace?.steps.filter((step) => step.kind === "tool") ?? [];
+      const finishCheck: FinishCheckMode =
+        latestAssistant === undefined || this.#hooks.checkFinish === undefined || toolSteps.length === 0
+          ? "no"
+          : continueMode;
+      const proposed =
+        continueMode === "no" || (continueMode === "only" && finishCheck === "no")
+          ? null
+          : this.#planContinuation.consider({
+              agentId,
+              taskId: laneTaskId,
+              deliveryIds: deliveries.map(({ delivery }) => delivery.id),
+              plan: turnPlan,
+              earlierPlan:
+                snapshot.messages.findLast(
+                  (message) => message.itemType === CONVERSATION_PLAN_ITEM_TYPE && message.turnId !== turnId,
+                )?.plan ?? null,
+              answer: latestAssistant?.text,
+              finishCheck,
+            });
+      let considered = proposed?.kind === "check" ? null : proposed;
+      if (proposed?.kind === "check" && latestAssistant) {
+        const gap = yield* this.#checkFinish(
+          agentId,
+          laneTaskId,
+          turnId,
+          snapshot,
+          deliveries,
+          toolSteps,
+          turnPlan,
+          latestAssistant.text,
+          proposed.continuations,
+        );
+        considered = gap === null ? null : this.#planContinuation.afterFinishCheck(agentId, laneTaskId, gap);
+      }
       const continuation = compactionContinuation ?? (considered && considered.kind !== "stopped" ? considered : null);
       const planStopped = considered?.kind === "stopped" && latestAssistant === undefined;
       if (!continuation)
@@ -2104,7 +2218,11 @@ export class TurnLifecycle {
               : continuation.kind === "providerExit"
                 ? sourceText("status.agent.providerExitContinues")
                 : sourceText(
-                    continuation.kind === "plan" ? "status.agent.planContinues" : "status.agent.nextStepContinues",
+                    continuation.kind === "plan"
+                      ? "status.agent.planContinues"
+                      : continuation.kind === "finishCheck"
+                        ? "status.agent.finishCheckContinues"
+                        : "status.agent.nextStepContinues",
                     {
                       current: continuation.current,
                       limit: continuation.limit,
@@ -2158,6 +2276,7 @@ export class TurnLifecycle {
         ...(quiet ? { quiet: true as const } : {}),
         ...(continuation ? { continues: true as const } : {}),
       });
+      if (proposed?.kind === "check") this.#hooks.emitRuntimeSnapshot();
       if (!channelTurn && !routineSession) {
         const counts =
           outcome === "completed" &&

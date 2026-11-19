@@ -148,6 +148,7 @@ export const messages = defineMessages("status.agent", {
   "status.agent.vaultField.country": "Country code",
   "status.agent.vaultField.phone": "Phone",
   "status.agent.vaultField.email": "Email address",
+  "status.agent.finishCheckContinues": "The request is not finished yet. The agent continues ({current} of {limit}).",
   "status.agent.nextStepContinues": "The agent stopped before its next step. It continues ({current} of {limit}).",
   "status.agent.planContinues": "The plan has open steps. The agent continues ({current} of {limit}).",
   "status.agent.planStopped": "The agent stopped with open steps in its plan. Send a message to continue.",

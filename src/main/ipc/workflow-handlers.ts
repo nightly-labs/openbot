@@ -11,6 +11,10 @@ import {
   WORKFLOWS_MEDIA_CATALOG_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-catalog-v1";
 import {
+  WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
+  WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-service-account-v1";
+import {
   WORKFLOWS_MEDIA_CAPABILITY,
   WORKFLOWS_MEDIA_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-v1";
@@ -23,6 +27,8 @@ import { sourceText } from "@openbot/i18n/source";
 import {
   decodeRemoteHiggsfieldCredits,
   decodeRemoteHiggsfieldProviders,
+  decodeRemoteMediaServiceAccounts,
+  decodeRemoteMediaServiceCredits,
   decodeRemoteWorkflowDetail,
   decodeRemoteWorkflowGitHubCatalog,
   decodeRemoteWorkflowGitHubHistory,
@@ -41,6 +47,8 @@ import {
   decodeRemoteWorkflowSummary,
   decodeRemoteWorkflowVersionGraph,
   decodeRemoteWorkflowVersions,
+  workflowMediaCreditsOf,
+  workflowMediaProvidersOf,
 } from "@openbot/team-client/workflow-decoding";
 import type { Effect } from "effect";
 import { runCauseEffect } from "../../backend/effect-boundary";
@@ -81,7 +89,8 @@ interface WorkflowRemoteServers {
       | typeof WORKFLOWS_MEDIA_CAPABILITY
       | typeof WORKFLOWS_SUNRA_CAPABILITY
       | typeof WORKFLOWS_HIGGSFIELD_CAPABILITY
-      | typeof WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
+      | typeof WORKFLOWS_MEDIA_CATALOG_CAPABILITY
+      | typeof WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
   ): boolean;
   request<T>(
     serverId: string,
@@ -225,6 +234,15 @@ export function workflowIpcHandlers({
       mediaProviders: scopedQueryHandler({
         local: () => workflows.mediaProviders(),
         remote: async (serverId) => {
+          if (remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY)) {
+            const accounts = await remote(
+              serverId,
+              WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.accounts,
+              decodeRemoteMediaServiceAccounts,
+              {},
+            );
+            return workflowMediaProvidersOf(accounts);
+          }
           const [sunra, higgsfield] = await Promise.all([
             remoteServers.supportsCapability(serverId, WORKFLOWS_SUNRA_CAPABILITY)
               ? remote(serverId, WORKFLOWS_SUNRA_ROUTES.providers, decodeRemoteWorkflowMediaProviders, {})
@@ -233,12 +251,21 @@ export function workflowIpcHandlers({
               ? remote(serverId, WORKFLOWS_HIGGSFIELD_ROUTES.providers, decodeRemoteHiggsfieldProviders, {})
               : { higgsfield: false },
           ]);
-          return { ...sunra, ...higgsfield };
+          return { ...sunra, ...higgsfield, accounts: null };
         },
       }),
       mediaCredits: scopedQueryHandler({
         local: () => runCauseEffect(workflows.mediaCredits()),
         remote: async (serverId) => {
+          if (remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY)) {
+            const accounts = await remote(
+              serverId,
+              WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.credits,
+              decodeRemoteMediaServiceCredits,
+              {},
+            );
+            return workflowMediaCreditsOf(accounts);
+          }
           const [sunra, higgsfield] = await Promise.all([
             remoteServers.supportsCapability(serverId, WORKFLOWS_SUNRA_CAPABILITY)
               ? remote(serverId, WORKFLOWS_SUNRA_ROUTES.credits, decodeRemoteWorkflowMediaCredits, {})
@@ -247,7 +274,7 @@ export function workflowIpcHandlers({
               ? remote(serverId, WORKFLOWS_HIGGSFIELD_ROUTES.credits, decodeRemoteHiggsfieldCredits, {})
               : { higgsfield: null },
           ]);
-          return { ...sunra, ...higgsfield };
+          return { ...sunra, ...higgsfield, accounts: null };
         },
       }),
       mediaCatalog: scopedQueryHandler({

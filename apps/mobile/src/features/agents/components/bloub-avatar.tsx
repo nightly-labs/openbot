@@ -316,10 +316,7 @@ function PlushCanvas({
   const geometry = useMemo(() => plushGeometry(seed, mood), [seed, mood]);
   const art = usePlushArt(seed, hue, color, pixels);
   const frame = usePlushFrame(geometry, animate && art !== null);
-  const picture = useDerivedValue(
-    () => recordPlush(frame.get(), art, size, saturation.get()),
-    [art, frame, saturation, size],
-  );
+  const picture = useDerivedValue(() => recordPlush(frame.get(), art, size, saturation.get()));
   if (!art) return fallback;
   return (
     <Canvas accessibilityElementsHidden accessible={false} pointerEvents="none" style={{ width: size, height: size }}>

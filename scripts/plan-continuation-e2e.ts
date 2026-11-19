@@ -15,6 +15,7 @@ const home = join(root, "home");
 const fakeCodex = join(root, "codex");
 const fakeLog = join(root, "codex.jsonl");
 const NOTE_MARKER = "OpenBot note, not a message from the user";
+const CHECK_MARKER = "OpenBot finish check";
 
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
@@ -35,11 +36,16 @@ interface FakeTurn {
   noAnswer?: boolean;
   delayMs?: number;
   holdUntil?: string;
+  commands?: string[];
   calls?: { tool: string; arguments: Record<string, string | string[] | boolean> }[];
 }
 
 const plan = (...turns: FakeTurn[]) =>
   `<<PLAN${JSON.stringify(turns).replaceAll("<", "\\u003c").replaceAll(">", "\\u003e")}PLAN>>`;
+
+type Verdict = { verdict: "done" | "continue" | "user" | "blocked"; missing?: string; delayMs?: number } | string;
+
+const verdicts = (...answers: Verdict[]) => `<<VERDICT${JSON.stringify(answers)}VERDICT>>`;
 
 const FAKE_CODEX = `#!/usr/bin/env node
 const fs = require("node:fs");
@@ -49,6 +55,7 @@ if (process.argv.includes("--version")) {
 }
 const LOG = ${JSON.stringify(fakeLog)};
 const NOTE = ${JSON.stringify(NOTE_MARKER)};
+const CHECK = ${JSON.stringify(CHECK_MARKER)};
 const config = { config: { mcp_servers: {} }, layers: [{ name: { type: "user", file: "/fake/.codex/config.toml", profile: null }, version: "1", config: { mcp_servers: {} } }] };
 let buffer = "";
 let threads = 0;
@@ -66,6 +73,10 @@ const finish = (turn) => {
   timers.delete(turn.turnId);
   const plan = (turn.script.steps || []).map(([step, status]) => ({ step, status }));
   if (plan.length > 0) write({ method: "turn/plan/updated", params: { threadId: turn.threadId, turnId: turn.turnId, plan } });
+  (turn.script.commands || []).forEach((command, index) => {
+    const step = { type: "commandExecution", id: "command-" + turn.turnId + "-" + index, command, cwd: "/tmp", status: "completed", aggregatedOutput: "", exitCode: 0 };
+    write({ method: "item/completed", params: { threadId: turn.threadId, turnId: turn.turnId, item: step } });
+  });
   const item = { type: "agentMessage", id: "message-" + turn.turnId, text: turn.script.answer || "Done.", phase: "final_answer" };
   if (!turn.script.noAnswer) write({ method: "item/completed", params: { threadId: turn.threadId, turnId: turn.turnId, item } });
   write({ method: "turn/completed", params: { threadId: turn.threadId, turn: { id: turn.turnId, status: "completed" } } });
@@ -103,6 +114,20 @@ const answer = (message) => {
       const text = (params.input || []).map((item) => item.text || "").join("\\n");
       write({ id: message.id, result: { turn: { id: turnId, status: "inProgress", items: [] } } });
       write({ method: "turn/started", params: { threadId: params.threadId, turn: { id: turnId } } });
+      if (text.includes(CHECK)) {
+        const named = /<<VERDICT([\\s\\S]*?)VERDICT>>/.exec(text);
+        const key = named ? named[1] : "";
+        const earlier = fs.existsSync(LOG)
+          ? fs.readFileSync(LOG, "utf8").split("\\n").filter(Boolean).map((line) => JSON.parse(line)).filter((entry) => entry.method === "check" && entry.key === key).length
+          : 0;
+        const answers = named ? JSON.parse(named[1]) : [];
+        const chosen = answers[earlier] ?? { verdict: "done" };
+        log({ method: "check", key, text });
+        const { delayMs, ...verdict } = typeof chosen === "string" ? {} : chosen;
+        const answer = typeof chosen === "string" ? chosen : JSON.stringify(verdict);
+        const checked = { threadId: params.threadId, turnId, script: { steps: [], answer } };
+        return delayMs ? timers.set(turnId, setTimeout(() => finish(checked), delayMs)) : finish(checked);
+      }
       const note = text.includes(NOTE);
       if (!note) {
         const named = /<<PLAN([\\s\\S]*?)PLAN>>/.exec(text.split("--- current message ---").at(-1));
@@ -210,6 +235,20 @@ function loggedTurns(): LoggedTurn[] {
     .filter((entry) => entry.method === "turn");
 }
 
+function loggedChecks(): { text: string }[] {
+  let text = "";
+  try {
+    text = readFileSync(fakeLog, "utf8");
+  } catch {
+    return [];
+  }
+  return text
+    .split("\n")
+    .filter(Boolean)
+    .map((line): { method: string; text: string } => JSON.parse(line))
+    .filter((entry) => entry.method === "check");
+}
+
 async function check(name: string, run: () => Promise<unknown>) {
   const detail = await run();
   report.checks.push({ name, passed: true, detail });
@@ -227,6 +266,7 @@ function openService() {
     browser,
     preferredProvider: "codex",
     offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
+    finishCheck: true,
   });
   const events: AgentEvent[] = [];
   service.on("event", (event) => events.push(event));
@@ -968,9 +1008,208 @@ try {
     return { sessions: [first.threadId, continued.threadId] };
   });
 
+  await check("a finish check that finds missing work continues the request with the gap in the note", async () => {
+    const agent = await createAgent("Checked");
+    const mark = loggedTurns().length;
+    const checks = loggedChecks().length;
+    const id = await send(
+      agent.id,
+      `Fix the lint errors in a.ts, b.ts and c.ts. ${verdicts(
+        { verdict: "continue", missing: "Fix the lint errors in c.ts, then run the lint again." },
+        { verdict: "done" },
+      )} ${plan(
+        { steps: [], commands: ["biome check a.ts b.ts"], answer: "I fixed a.ts and b.ts." },
+        { steps: [], commands: ["biome check c.ts"], answer: "I fixed c.ts. The lint passes." },
+      )}`,
+    );
+    assert.equal(await settled(id), "completed");
+    const turns = turnsSince(mark);
+    assert.deepEqual(
+      turns.map((turn) => turn.note),
+      [false, true],
+      "One continuation turn runs.",
+    );
+    const note = turns[1]?.text ?? "";
+    assert.ok(note.includes("Fix the lint errors in c.ts, then run the lint again."), "The note names the gap.");
+    assert.ok(note.includes("Automatic continuation 1 of 3."));
+    const ran = loggedChecks().slice(checks);
+    assert.equal(ran.length, 2, "Each turn of the request gets one check.");
+    assert.ok(ran[0]?.text.includes("Fix the lint errors in a.ts, b.ts and c.ts."), "The check reads the request.");
+    assert.ok(ran[0]?.text.includes("biome check a.ts b.ts"), "The check reads the tool steps.");
+    assert.ok(ran[0]?.text.includes("I fixed a.ts and b.ts."), "The check reads the answer.");
+    assert.ok(ran[1]?.text.includes("biome check c.ts"), "The second check reads the steps of its own turn.");
+    const lines = continuationLines(agent.id);
+    assert.deepEqual(
+      lines.map((line) => line.text),
+      ["The request is not finished yet. The agent continues (1 of 3)."],
+      "One finish check line shows.",
+    );
+    assert.ok(
+      !chatMessages(agent.id).some((message) => message.text?.includes(CHECK_MARKER)),
+      "The check does not show in the chat.",
+    );
+    return { turns: turns.length, checks: ran.length };
+  });
+
+  await check("the finish check continues a request at most 3 times", async () => {
+    const agent = await createAgent("Persistent");
+    const mark = loggedTurns().length;
+    const checks = loggedChecks().length;
+    const gap: Verdict = { verdict: "continue", missing: "Fix the next file." };
+    const turn = (index: number): FakeTurn => ({
+      steps: [],
+      commands: [`fix file-${index}.ts`],
+      answer: `I fixed file-${index}.ts.`,
+    });
+    const id = await send(
+      agent.id,
+      `Fix all files. ${verdicts(gap, gap, gap, gap, gap)} ${plan(turn(1), turn(2), turn(3), turn(4), turn(5))}`,
+    );
+    assert.equal(await settled(id), "completed");
+    const turns = turnsSince(mark);
+    assert.deepEqual(
+      turns.map((entry) => entry.note),
+      [false, true, true, true],
+      "Three continuation turns run.",
+    );
+    assert.ok(turns[3]?.text.includes("Automatic continuation 3 of 3."));
+    assert.equal(loggedChecks().length - checks, 3, "No check runs after the last continuation.");
+    assert.equal(continuationLines(agent.id).length, 3);
+    return { turns: turns.length };
+  });
+
+  await check("a Stop or a new message during a slow finish check ends the check at once", async () => {
+    const slow = (missing: string): Verdict => ({ verdict: "continue", missing, delayMs: 20_000 });
+    const quick = 8_000;
+    const stopped = await createAgent("Halted");
+    let mark = loggedTurns().length;
+    let checks = loggedChecks().length;
+    const first = await send(
+      stopped.id,
+      `Fix the stopped files. ${verdicts(slow("Fix the stopped rest."))} ${plan({ steps: [], commands: ["fix a.ts"], answer: "I fixed a.ts." })}`,
+    );
+    await waitFor("the slow check", () => loggedChecks().length > checks);
+    const turnId = turnsSince(mark)[0]?.turnId;
+    assert.ok(turnId, "The request ran a turn.");
+    await runCauseEffect(current.service.interrupt(stopped.id, turnId));
+    assert.ok(ended(await settled(first, quick)), "The Stop ends the request before the check answers.");
+    assert.equal(turnsSince(mark).length, 1, "No continuation turn runs after the Stop.");
+    assert.equal(continuationLines(stopped.id).length, 0);
+
+    const queued = await createAgent("Overtaken");
+    mark = loggedTurns().length;
+    checks = loggedChecks().length;
+    const second = await send(
+      queued.id,
+      `Fix the queued files. ${verdicts(slow("Fix the queued rest."))} ${plan({ steps: [], commands: ["fix b.ts"], answer: "I fixed b.ts." })}`,
+    );
+    await waitFor("the slow check", () => loggedChecks().length > checks);
+    const next = await send(queued.id, "Use tabs.");
+    assert.equal(await settled(second, quick), "completed", "The new message ends the check before it answers.");
+    assert.equal(await settled(next, quick), "completed");
+    const turns = turnsSince(mark);
+    assert.deepEqual(
+      turns.map((turn) => turn.note),
+      [false, false],
+      "No continuation turn runs, and the new message runs next.",
+    );
+    assert.ok(turns[1]?.text.includes("Use tabs."));
+    assert.equal(continuationLines(queued.id).length, 0);
+
+    const sided = await createAgent("Sided");
+    mark = loggedTurns().length;
+    checks = loggedChecks().length;
+    const task = await runCauseEffect(
+      current.service.startTask({
+        agentId: sided.id,
+        text: `Fix the thread files. ${verdicts(slow("Fix the thread rest."))} ${plan({ steps: [], commands: ["fix c.ts"], answer: "I fixed c.ts." })}`,
+      }),
+    );
+    await waitFor("the slow check", () => loggedChecks().length > checks);
+    const taskDelivery = current.service
+      .readTask(sided.id, task.id)
+      .messages.find((message) => message.delivery !== undefined)?.delivery?.id;
+    assert.ok(taskDelivery, "The side thread holds the request's delivery.");
+    await runCauseEffect(current.service.stopTask({ agentId: sided.id, taskId: task.id }));
+    assert.ok(ended(await settled(taskDelivery, quick)), "The Stop ends the request before the check answers.");
+    assert.equal(turnsSince(mark).length, 1, "No continuation turn runs after the Stop.");
+    assert.equal(continuationLines(sided.id, task.threadId).length, 0);
+    return { checks: loggedChecks().length - checks };
+  });
+
+  await check("a done or user verdict, a bad answer, or a turn with no tool ends the request", async () => {
+    const agent = await createAgent("Settled");
+    const cases: { name: string; verdict: Verdict; commands: string[]; checks: number }[] = [
+      { name: "done", verdict: { verdict: "done" }, commands: ["bun test"], checks: 1 },
+      {
+        name: "user",
+        verdict: { verdict: "user", missing: "Ask which account to use." },
+        commands: ["gh auth status"],
+        checks: 1,
+      },
+      { name: "blocked", verdict: { verdict: "blocked" }, commands: ["curl https://example.com"], checks: 1 },
+      { name: "no JSON", verdict: "The request looks finished to me.", commands: ["ls"], checks: 1 },
+      { name: "continue with no gap", verdict: { verdict: "continue" }, commands: ["ls"], checks: 1 },
+      { name: "no tool", verdict: { verdict: "continue", missing: "Do more." }, commands: [], checks: 0 },
+    ];
+    const results = [];
+    for (const item of cases) {
+      const mark = loggedTurns().length;
+      const checks = loggedChecks().length;
+      const lines = continuationLines(agent.id).length;
+      const id = await send(
+        agent.id,
+        `Case ${item.name}. ${verdicts(item.verdict)} ${plan({ steps: [], commands: item.commands, answer: "Here it is." })}`,
+      );
+      assert.equal(await settled(id), "completed");
+      assert.equal(turnsSince(mark).length, 1, `${item.name}: no continuation runs.`);
+      assert.equal(loggedChecks().length - checks, item.checks, `${item.name}: the check count.`);
+      assert.equal(continuationLines(agent.id).length, lines, `${item.name}: no line shows.`);
+      results.push(item.name);
+    }
+    return { cases: results };
+  });
+
+  await check("an offer question continues only on a continue verdict", async () => {
+    const agent = await createAgent("Offering");
+    const offer = "I fixed a.ts. Do you want me to fix b.ts too?";
+    const mark = loggedTurns().length;
+    const id = await send(
+      agent.id,
+      `Fix a.ts and b.ts. ${verdicts({ verdict: "continue", missing: "Fix b.ts: the request asked for it." })} ${plan(
+        { steps: [], commands: ["edit a.ts"], answer: offer },
+        { steps: [], commands: ["edit b.ts"], answer: "I fixed b.ts." },
+      )}`,
+    );
+    assert.equal(await settled(id), "completed");
+    assert.deepEqual(
+      turnsSince(mark).map((turn) => turn.note),
+      [false, true],
+      "The offer of work that the request asked for continues.",
+    );
+    const asked = loggedTurns().length;
+    const question = await send(
+      agent.id,
+      `Clean the cache. ${verdicts({ verdict: "user" })} ${plan({
+        steps: [],
+        commands: ["du -sh cache"],
+        answer: "The cache holds 4 GB. Do you want me to delete it?",
+      })}`,
+    );
+    assert.equal(await settled(question), "completed");
+    assert.equal(turnsSince(asked).length, 1, "A question that needs the user does not continue.");
+    return { offer: 2, question: 1 };
+  });
+
   await check("a restart while a continuation waits completes the request with no new turn", async () => {
     const agent = await createAgent("Restart");
     const mark = loggedTurns().length;
+    let stopping: Promise<void> | null = null;
+    const stopAtContinuation = (event: AgentEvent) => {
+      if (stopping || event.type !== "turn-completed" || event.agentId !== agent.id || !event.continues) return;
+      stopping = runCauseEffect(current.service.stop());
+    };
+    current.service.on("event", stopAtContinuation);
     const id = await send(
       agent.id,
       `Index it. ${plan(
@@ -979,7 +1218,6 @@ try {
             ["Scan", "completed"],
             ["Index", "pending"],
           ],
-          delayMs: 1_500,
         },
         {
           steps: [
@@ -989,20 +1227,19 @@ try {
         },
       )}`,
     );
-    await waitFor("the first turn", () => turnsSince(mark).length === 1);
-    await runCauseEffect(current.service.setAgentHidden({ agentId: agent.id, hidden: true }));
-    await waitFor("the continuation to wait", () => continuationLines(agent.id).length === 1);
+    await waitFor("the app to stop at the continuation", () => stopping);
+    await stopping;
+    current.service.off("event", stopAtContinuation);
+    assert.equal(turnsSince(mark).length, 1, "Only the first turn runs before the stop.");
     assert.equal(
       current.mailbox.getDelivery(id)?.planContinuation?.queued,
       true,
       "The request waits for its continuation.",
     );
-    await runCauseEffect(current.service.stop());
     current.database.close();
     current = openService();
-    await runCauseEffect(current.service.initialize());
     const since = current.events.length;
-    await runCauseEffect(current.service.setAgentHidden({ agentId: agent.id, hidden: false }));
+    await runCauseEffect(current.service.initialize());
     assert.equal(await settled(id), "completed", "The request completes.");
     assert.equal(turnsSince(mark).length, 1, "No continuation turn runs after the restart.");
     assert.equal(

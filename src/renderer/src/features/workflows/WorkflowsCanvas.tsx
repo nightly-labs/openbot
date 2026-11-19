@@ -1,7 +1,11 @@
 import {
+  DEFAULT_PROVIDER_ACCOUNT_ID,
+  type ProviderAccountStatus,
   WORKFLOW_MEDIA_MODELS,
+  type WorkflowCatalogProvider,
   type WorkflowMediaCatalogModel,
   type WorkflowMediaModel,
+  type WorkflowMediaServiceAccount,
   workflowCatalogMediaModel,
   workflowCatalogProvider,
 } from "@openbot/contracts/ipc";
@@ -15,7 +19,7 @@ import {
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onCleanup, Show, untrack } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
-import { noteMediaStepEnded } from "./workflow-media-credits";
+import { mediaServiceAccountName, noteMediaStepEnded } from "./workflow-media-credits";
 import { createWorkflowsController, type WorkflowRequest } from "./workflows-controller";
 import type { WorkflowHost } from "./workflows-port";
 
@@ -37,6 +41,7 @@ export function WorkflowsCanvas(props: {
   );
   const [sunra, setSunra] = createSignal(false);
   const [higgsfield, setHiggsfield] = createSignal(false);
+  const [serviceAccounts, setServiceAccounts] = createSignal<readonly WorkflowMediaServiceAccount[] | null>(null);
   const [catalog, setCatalog] = createSignal<readonly WorkflowMediaCatalogModel[]>([]);
   let disposed = false;
   const readMediaProviders = () => {
@@ -47,6 +52,7 @@ export function WorkflowsCanvas(props: {
         if (disposed) return;
         setSunra(providers.sunra);
         setHiggsfield(providers.higgsfield);
+        setServiceAccounts(providers.accounts);
       })
       .catch(() => undefined);
     void props.host.workflows
@@ -62,6 +68,17 @@ export function WorkflowsCanvas(props: {
       .flatMap((entry) => workflowCatalogMediaModel(entry) ?? []);
     const ids = new Set(live.map((model) => model.id));
     return [...live, ...WORKFLOW_MEDIA_MODELS.filter((model) => model.provider === provider && !ids.has(model.id))];
+  };
+  const serviceAccountRows = (provider: WorkflowCatalogProvider): readonly ProviderAccountStatus[] | undefined => {
+    const accounts = serviceAccounts()?.filter((account) => account.provider === provider) ?? [];
+    if (accounts.length < 2) return undefined;
+    return accounts.map((account, index) => ({
+      id: index === 0 ? DEFAULT_PROVIDER_ACCOUNT_ID : account.id,
+      label: mediaServiceAccountName(account),
+      email: null,
+      state: "connected",
+      message: null,
+    }));
   };
   readMediaProviders();
   let shown: { workflowId: string; since: string; ends: Set<string> } | null = null;
@@ -143,12 +160,15 @@ export function WorkflowsCanvas(props: {
           },
         ];
       });
-      const service = (provider: "sunra" | "higgsfield", on: boolean) =>
-        on
-          ? serviceModels(provider).map(({ transparent, ...rest }) =>
-              transparent && props.host.mediaTransparentSupported() ? { ...rest, transparent } : rest,
-            )
-          : [];
+      const service = (provider: WorkflowCatalogProvider, on: boolean) => {
+        if (!on) return [];
+        const accounts = serviceAccountRows(provider);
+        return serviceModels(provider).map(({ transparent, ...rest }) => ({
+          ...rest,
+          ...(transparent && props.host.mediaTransparentSupported() ? { transparent } : {}),
+          ...(accounts ? { accounts } : {}),
+        }));
+      };
       return [...fixed, ...service("sunra", sunra()), ...service("higgsfield", higgsfield())];
     },
     get mediaPrice() {

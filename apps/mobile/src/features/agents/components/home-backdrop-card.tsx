@@ -52,12 +52,9 @@ interface CardFill {
 }
 
 function useCardFill({ background, serverId, cardServer, settled }: CardFill) {
-  return useAnimatedStyle(
-    () => ({
-      backgroundColor: settled || cardServer.get() === serverId ? background : "transparent",
-    }),
-    [background, serverId, settled],
-  );
+  return useAnimatedStyle(() => ({
+    backgroundColor: settled || cardServer.get() === serverId ? background : "transparent",
+  }));
 }
 
 export function HomeCardTop(props: CardFill) {

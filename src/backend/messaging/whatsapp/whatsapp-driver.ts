@@ -407,6 +407,12 @@ class WhatsAppAdapter implements MessagingAdapter {
     return saved ? userJid(saved) : placeId;
   }
 
+  directChat(target: MessageTarget): { userId: string; threadKey: string } | null {
+    if (isJidGroup(target.platformChannelId)) return null;
+    const userId = userPart(target.platformChannelId);
+    return userId ? { userId, threadKey: WHATSAPP_DIRECT_THREAD } : null;
+  }
+
   mention(userId: string): string {
     return /^[0-9]+$/u.test(userId) ? `@${userId}` : userId;
   }

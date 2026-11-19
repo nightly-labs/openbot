@@ -4,9 +4,11 @@ import {
   isWorkflowGitHubHistory,
   isWorkflowGitHubRepositoryOptions,
   isWorkflowGraph,
+  isWorkflowMediaAccountCredits,
   isWorkflowMediaCatalogModel,
   isWorkflowMediaCreditBalance,
   isWorkflowMediaPrice,
+  isWorkflowMediaServiceAccount,
   isWorkflowRunDetail,
   isWorkflowRunPage,
   isWorkflowSaveResult,
@@ -18,6 +20,7 @@ import {
   WORKFLOW_GITHUB_EVENTS,
   WORKFLOW_GITHUB_SKIP_REASONS,
   WORKFLOW_MEDIA_CATALOG_MAX,
+  WORKFLOW_MEDIA_SERVICE_ACCOUNT_MAX,
   WORKFLOW_NODE_KINDS,
   WORKFLOW_OUTPUT_TARGETS,
   WORKFLOW_PORT_TYPES,
@@ -26,9 +29,14 @@ import {
   WORKFLOW_STEP_STATUSES,
   WORKFLOW_TRIGGER_TYPES,
   WORKFLOW_VERSION_KINDS,
+  type WorkflowCatalogProvider,
+  type WorkflowMediaAccountCredits,
   type WorkflowMediaCatalog,
   type WorkflowMediaCreditBalance,
+  type WorkflowMediaCredits,
   type WorkflowMediaPrice,
+  type WorkflowMediaProviders,
+  type WorkflowMediaServiceAccount,
 } from "@openbot/contracts/ipc";
 import { guardedDecoder, guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
@@ -164,6 +172,47 @@ export function decodeRemoteWorkflowMediaCredits(value: unknown): { sunra: Workf
 export function decodeRemoteHiggsfieldCredits(value: unknown): { higgsfield: WorkflowMediaCreditBalance | null } {
   if (!isDynamicRecord(value)) throw new Error("Invalid remote workflow credits.");
   return { higgsfield: remoteCreditBalance(value.higgsfield) };
+}
+
+function remoteAccountList<T>(value: unknown, item: (entry: unknown) => entry is T): T[] {
+  if (
+    !isDynamicRecord(value) ||
+    !Array.isArray(value.accounts) ||
+    value.accounts.length > WORKFLOW_MEDIA_SERVICE_ACCOUNT_MAX
+  )
+    throw new Error("Invalid remote workflow accounts.");
+  return value.accounts.filter(item);
+}
+
+export function decodeRemoteMediaServiceAccounts(value: unknown): WorkflowMediaServiceAccount[] {
+  return remoteAccountList(value, isWorkflowMediaServiceAccount).map(({ provider, id, name }) => ({
+    provider,
+    id,
+    name,
+  }));
+}
+
+export function decodeRemoteMediaServiceCredits(value: unknown): WorkflowMediaAccountCredits[] {
+  return remoteAccountList(value, isWorkflowMediaAccountCredits).map(({ provider, id, name, credits }) => ({
+    provider,
+    id,
+    name,
+    credits: credits && { available: credits.available, quota: credits.quota },
+  }));
+}
+
+export function workflowMediaProvidersOf(accounts: readonly WorkflowMediaServiceAccount[]): WorkflowMediaProviders {
+  return {
+    sunra: accounts.some((account) => account.provider === "sunra"),
+    higgsfield: accounts.some((account) => account.provider === "higgsfield"),
+    accounts,
+  };
+}
+
+export function workflowMediaCreditsOf(accounts: readonly WorkflowMediaAccountCredits[]): WorkflowMediaCredits {
+  const first = (provider: WorkflowCatalogProvider) =>
+    accounts.find((account) => account.provider === provider)?.credits ?? null;
+  return { sunra: first("sunra"), higgsfield: first("higgsfield"), accounts };
 }
 
 export function decodeRemoteWorkflowMediaCatalog(value: unknown): WorkflowMediaCatalog {

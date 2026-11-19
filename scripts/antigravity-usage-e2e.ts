@@ -317,7 +317,7 @@ try {
   assert.equal(cli.source, "managed");
   const os = process.platform === "win32" ? "windows" : process.platform;
   const arch = process.arch === "x64" ? "amd64" : process.arch;
-  report.userAgent = `antigravity/2.31.0 ${os}/${arch}`;
+  report.userAgent = `antigravity/hub/2.24.0 (aidev_client; os_type=${os}; arch=${arch}; cl=963137146)`;
 
   await writeToken(ACCESS_TOKEN, inOneHour());
   const google = await readUsage(cli, "Google sign-in", 1, "gemini-3.8-flash-high");

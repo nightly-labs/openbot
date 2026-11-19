@@ -1,5 +1,5 @@
 import { BILLING_PLANS, type BillingCurrency, type BillingPlanId } from "@openbot/contracts/billing";
-import { isEuConsumer } from "@openbot/contracts/billing-details";
+import { isWithdrawalConsumer } from "@openbot/contracts/billing-details";
 import type { HostedServerCatalogPlan } from "@openbot/contracts/hosted-servers";
 import { LICENSE_MAX_USERS, type LicenseTier, type PricingOrder } from "@openbot/contracts/license";
 import {
@@ -84,7 +84,7 @@ export function HostedPricingPage(props: HostedPricingPageProps) {
   });
   const [accepted, setAccepted] = createSignal(false);
   const earlyStartAsked = () =>
-    order().server !== null && props.serverLimit == null && isEuConsumer(props.billingDetails);
+    order().server !== null && props.serverLimit == null && isWithdrawalConsumer(props.billingDetails);
   const [earlyStart, setEarlyStart] = createSignal(false);
   createEffect(earlyStartAsked, (asked) => {
     if (!asked) setEarlyStart(false);

@@ -4,7 +4,7 @@ import {
   type BillingPlanId,
   isOpenBillingStatus,
 } from "@openbot/contracts/billing";
-import { type BillingDetails, isEuConsumer } from "@openbot/contracts/billing-details";
+import { type BillingDetails, isWithdrawalConsumer } from "@openbot/contracts/billing-details";
 import type {
   HostedServerCatalog,
   HostedServerCatalogPlan,
@@ -234,7 +234,7 @@ function AddServerSession(
     draft.paid = resume?.paid ?? false;
     const needsCountry = untrack(() => props.billingDetails) !== undefined && !details?.country;
     const order = resume ? null : (untrack(() => props.order) ?? null);
-    const needsPage = needsCountry || (isEuConsumer(details) && order?.server != null);
+    const needsPage = needsCountry || (isWithdrawalConsumer(details) && order?.server != null);
     draft.order = needsPage ? null : dialogOrderOf(order, licenseState);
     draft.pageOrder = needsPage ? order : null;
     draft.licenseOffer = licenseOfferOf(licenseState);

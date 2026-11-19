@@ -1946,6 +1946,7 @@ export async function createApplicationServices({
     store,
     mailbox,
     browser,
+    finishCheck: true,
     visualPreview: new ChatVisualPreviewer(),
     setCommitCoAuthor: (enabled) => agentDefaultsSettings.update({ commitCoAuthor: enabled }),
     clearPictureBackground: (bytes) => {

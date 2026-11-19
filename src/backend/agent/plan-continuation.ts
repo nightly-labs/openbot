@@ -1,6 +1,7 @@
 import type { ConversationPlan, ConversationPlanStep } from "@openbot/contracts/ipc";
 import {
   compactionContinuationPrompt,
+  finishCheckContinuationPrompt,
   nextStepContinuationPrompt,
   planContinuationPrompt,
   providerExitContinuationPrompt,
@@ -10,9 +11,18 @@ export interface PlanContinuationOptions {
   limit: number;
 }
 
-type ContinuationKind = "plan" | "nextStep" | "compaction" | "providerExit";
+type ContinuationKind = "plan" | "nextStep" | "finishCheck" | "compaction" | "providerExit";
+
+export type FinishCheckMode = "no" | "allowed" | "only";
+
+export interface FinishCheckPending {
+  kind: "check";
+  continuations: number;
+}
 
 const STOPPED = { kind: "stopped" } as const;
+
+const FINISH_CHECK_LIMIT = 3;
 
 const NEXT_STEP_LIMIT = 2;
 const NEXT_STEP_ANSWER_MAX = 400;
@@ -148,6 +158,8 @@ interface Chain {
   kind: ContinuationKind;
   shown: ContinuationCount;
   nextSteps: number;
+  checks: number;
+  gap: string | null;
   failureContinued: boolean;
   plan: ConversationPlan | null;
   openSteps: string;
@@ -183,7 +195,8 @@ export class PlanContinuation {
     plan: ConversationPlan | null;
     earlierPlan: ConversationPlan | null;
     answer: string | undefined;
-  }): ({ kind: ContinuationKind } & ContinuationCount) | typeof STOPPED | null {
+    finishCheck?: FinishCheckMode;
+  }): ({ kind: ContinuationKind } & ContinuationCount) | typeof STOPPED | FinishCheckPending | null {
     const key = laneKey(input.agentId, input.taskId);
     const previous = this.#chains.get(key);
     this.#chains.delete(key);
@@ -201,13 +214,36 @@ export class PlanContinuation {
     const open = plan ? openSteps(plan, earlierSteps) : [];
     if (count >= this.#limit) return chained && open.length > 0 ? STOPPED : null;
     const nextSteps = chained ? previous.nextSteps : 0;
+    const checks = chained ? previous.checks : 0;
+    const mode = input.finishCheck ?? "no";
     let kind: ContinuationKind;
-    if (open.length > 0) {
+    if (open.length > 0 && mode !== "only") {
       const signature = JSON.stringify(open.map(stepKey));
-      if (chained && previous.kind !== "nextStep" && previous.openSteps === signature) return STOPPED;
+      if (
+        chained &&
+        previous.kind !== "nextStep" &&
+        previous.kind !== "finishCheck" &&
+        previous.openSteps === signature
+      )
+        return STOPPED;
       kind = "plan";
-    } else if (nextSteps < NEXT_STEP_LIMIT && stoppedBeforeNextStep(input.answer)) kind = "nextStep";
-    else return null;
+    } else if (mode !== "only" && nextSteps < NEXT_STEP_LIMIT && stoppedBeforeNextStep(input.answer)) kind = "nextStep";
+    else if (mode !== "no" && checks < FINISH_CHECK_LIMIT) {
+      this.#chains.set(key, {
+        deliveryIds: new Set(input.deliveryIds),
+        count,
+        kind: "finishCheck",
+        shown: { current: checks, limit: FINISH_CHECK_LIMIT },
+        nextSteps,
+        checks,
+        gap: null,
+        failureContinued: chained ? previous.failureContinued : false,
+        plan,
+        openSteps: JSON.stringify(open.map(stepKey)),
+        earlierSteps,
+      });
+      return { kind: "check", continuations: count };
+    } else return null;
     const shown =
       kind === "plan"
         ? { current: count + 1, limit: this.#limit }
@@ -218,12 +254,38 @@ export class PlanContinuation {
       kind,
       shown,
       nextSteps: kind === "nextStep" ? nextSteps + 1 : nextSteps,
+      checks,
+      gap: null,
       failureContinued: chained ? previous.failureContinued : false,
       plan,
       openSteps: JSON.stringify(open.map(stepKey)),
       earlierSteps,
     });
     return { kind, ...shown };
+  }
+
+  afterFinishCheck(
+    agentId: string,
+    taskId: string | null,
+    gap: string,
+  ): ({ kind: ContinuationKind } & ContinuationCount) | null {
+    const key = laneKey(agentId, taskId);
+    const chain = this.#chains.get(key);
+    if (chain?.kind !== "finishCheck" || chain.gap !== null) {
+      this.#chains.delete(key);
+      return null;
+    }
+    const shown = {
+      current: chain.checks + 1,
+      limit: chain.checks + Math.min(FINISH_CHECK_LIMIT - chain.checks, this.#limit - chain.count),
+    };
+    this.#chains.set(key, { ...chain, count: chain.count + 1, checks: chain.checks + 1, gap, shown });
+    return { kind: "finishCheck", ...shown };
+  }
+
+  waitsForCheck(agentId: string, taskId: string | null): boolean {
+    const chain = this.#chains.get(laneKey(agentId, taskId));
+    return chain?.kind === "finishCheck" && chain.gap === null;
   }
 
   afterFailedCompaction(input: {
@@ -276,6 +338,8 @@ export class PlanContinuation {
       kind,
       shown,
       nextSteps: chained ? previous.nextSteps : 0,
+      checks: chained ? previous.checks : 0,
+      gap: null,
       failureContinued: true,
       plan,
       openSteps: JSON.stringify((plan ? openSteps(plan, earlierSteps) : []).map(stepKey)),
@@ -293,6 +357,8 @@ export class PlanContinuation {
     }
     if (chain.kind === "compaction") return compactionContinuationPrompt();
     if (chain.kind === "providerExit") return providerExitContinuationPrompt();
+    if (chain.kind === "finishCheck" && chain.gap !== null)
+      return finishCheckContinuationPrompt(chain.gap, chain.shown.current, chain.shown.limit);
     return chain.kind === "plan" && chain.plan
       ? planContinuationPrompt(openSteps(chain.plan, chain.earlierSteps), chain.shown.current, chain.shown.limit)
       : nextStepContinuationPrompt(chain.shown.current, chain.shown.limit);

@@ -928,10 +928,37 @@ export function isWorkflowWebhookSecret(value: unknown): value is WorkflowWebhoo
 export interface WorkflowMediaProviders {
   sunra: boolean;
   higgsfield: boolean;
+  accounts: readonly WorkflowMediaServiceAccount[] | null;
 }
 
+export const WORKFLOW_MEDIA_SERVICE_ACCOUNT_MAX = 32;
+export const WORKFLOW_MEDIA_SERVICE_ACCOUNT_NAME_MAX = 80;
+
+export interface WorkflowMediaServiceAccount {
+  provider: WorkflowCatalogProvider;
+  id: string;
+  name: string | null;
+}
+
+export function isWorkflowMediaServiceAccount(value: unknown): value is WorkflowMediaServiceAccount {
+  return (
+    isDynamicRecord(value) &&
+    isOneOf(WORKFLOW_CATALOG_PROVIDERS, value.provider) &&
+    isIdentifier(value.id) &&
+    (value.name === null || isBoundedString(value.name, WORKFLOW_MEDIA_SERVICE_ACCOUNT_NAME_MAX))
+  );
+}
+
+const isNullableListOf = <T>(value: unknown, item: (entry: unknown) => entry is T): value is readonly T[] | null =>
+  value === null || (Array.isArray(value) && value.length <= WORKFLOW_MEDIA_SERVICE_ACCOUNT_MAX && value.every(item));
+
 export function isWorkflowMediaProviders(value: unknown): value is WorkflowMediaProviders {
-  return isDynamicRecord(value) && isBoolean(value.sunra) && isBoolean(value.higgsfield);
+  return (
+    isDynamicRecord(value) &&
+    isBoolean(value.sunra) &&
+    isBoolean(value.higgsfield) &&
+    isNullableListOf(value.accounts, isWorkflowMediaServiceAccount)
+  );
 }
 
 export interface WorkflowMediaCreditBalance {
@@ -942,6 +969,11 @@ export interface WorkflowMediaCreditBalance {
 export interface WorkflowMediaCredits {
   sunra: WorkflowMediaCreditBalance | null;
   higgsfield: WorkflowMediaCreditBalance | null;
+  accounts: readonly WorkflowMediaAccountCredits[] | null;
+}
+
+export interface WorkflowMediaAccountCredits extends WorkflowMediaServiceAccount {
+  credits: WorkflowMediaCreditBalance | null;
 }
 
 const isCreditCount = (value: unknown): value is number =>
@@ -957,7 +989,16 @@ export function isWorkflowMediaCredits(value: unknown): value is WorkflowMediaCr
   return (
     isDynamicRecord(value) &&
     (value.sunra === null || isWorkflowMediaCreditBalance(value.sunra)) &&
-    (value.higgsfield === null || isWorkflowMediaCreditBalance(value.higgsfield))
+    (value.higgsfield === null || isWorkflowMediaCreditBalance(value.higgsfield)) &&
+    isNullableListOf(value.accounts, isWorkflowMediaAccountCredits)
+  );
+}
+
+export function isWorkflowMediaAccountCredits(value: unknown): value is WorkflowMediaAccountCredits {
+  return (
+    isWorkflowMediaServiceAccount(value) &&
+    isDynamicRecord(value) &&
+    (value.credits === null || isWorkflowMediaCreditBalance(value.credits))
   );
 }
 

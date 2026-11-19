@@ -297,8 +297,13 @@ export function isEuVatCountry(country: string): boolean {
   return EU_VAT_COUNTRY_SET.has(country);
 }
 
-export function isEuConsumer(details: { country: string | null; vatId: string | null } | null | undefined): boolean {
-  return details?.country != null && isEuVatCountry(details.country) && !details.vatId?.trim();
+const OTHER_WITHDRAWAL_COUNTRIES = new Set(["GB", "TR"]);
+
+export function isWithdrawalConsumer(
+  details: { country: string | null; vatId: string | null } | null | undefined,
+): boolean {
+  if (details?.country == null || details.vatId?.trim()) return false;
+  return isEuVatCountry(details.country) || OTHER_WITHDRAWAL_COUNTRIES.has(details.country);
 }
 
 export function vatIdPrefix(country: string): string {

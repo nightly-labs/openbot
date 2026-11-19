@@ -1716,7 +1716,6 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       const server = yield* remoteDecode(() => this.#store.require(serverId));
       if (server.transport === "webrtc-v2" && transport) {
         yield* this.#syncWebRtcHosts();
-        this.#connections.clearCompatibility(serverId);
         yield* this.#client.ensureCompatibility(server, true);
         this.#connections.clearIssue(serverId);
         this.#emitChanged();

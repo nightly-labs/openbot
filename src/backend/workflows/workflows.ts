@@ -225,7 +225,7 @@ export interface WorkflowsDependencies {
     types: ReadonlySet<string>,
   ) => Effect.Effect<string | "missing" | "type", { readonly cause: unknown }>;
   mediaProviders?: () => WorkflowMediaProviders;
-  mediaCredits?: (only?: keyof WorkflowMediaCredits) => Effect.Effect<WorkflowMediaCredits>;
+  mediaCredits?: (only?: WorkflowCatalogProvider) => Effect.Effect<WorkflowMediaCredits>;
   mediaCatalog?: (only?: WorkflowCatalogProvider) => Effect.Effect<WorkflowMediaCatalog>;
   mediaPrice?: (request: WorkflowMediaPriceRequest) => Effect.Effect<WorkflowMediaPrice>;
   notify(notice: WorkflowNotice): void;
@@ -318,7 +318,7 @@ interface WorkflowsShape {
   githubRepositories(): Effect.Effect<string[], WorkflowFailed>;
   keepPicture(draftId: string): Effect.Effect<string, WorkflowFailed>;
   mediaProviders(): WorkflowMediaProviders;
-  mediaCredits(only?: keyof WorkflowMediaCredits): Effect.Effect<WorkflowMediaCredits>;
+  mediaCredits(only?: WorkflowCatalogProvider): Effect.Effect<WorkflowMediaCredits>;
   mediaCatalog(): Effect.Effect<WorkflowMediaCatalog>;
   mediaPrice(request: WorkflowMediaPriceRequest): Effect.Effect<WorkflowMediaPrice>;
   runStep(input: RunWorkflowStepInput): Effect.Effect<WorkflowStep, WorkflowFailed>;
@@ -1710,9 +1710,9 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
         });
 
         const mediaProviders = (): WorkflowMediaProviders =>
-          dependencies.mediaProviders?.() ?? { sunra: false, higgsfield: false };
-        const mediaCredits = (only?: keyof WorkflowMediaCredits): Effect.Effect<WorkflowMediaCredits> =>
-          dependencies.mediaCredits?.(only) ?? Effect.succeed({ sunra: null, higgsfield: null });
+          dependencies.mediaProviders?.() ?? { sunra: false, higgsfield: false, accounts: null };
+        const mediaCredits = (only?: WorkflowCatalogProvider): Effect.Effect<WorkflowMediaCredits> =>
+          dependencies.mediaCredits?.(only) ?? Effect.succeed({ sunra: null, higgsfield: null, accounts: null });
         const mediaCatalog = (only?: WorkflowCatalogProvider): Effect.Effect<WorkflowMediaCatalog> =>
           dependencies.mediaCatalog?.(only) ?? Effect.succeed({ models: [] });
         const mediaPrice = (request: WorkflowMediaPriceRequest): Effect.Effect<WorkflowMediaPrice> =>

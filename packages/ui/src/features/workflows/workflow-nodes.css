@@ -640,6 +640,10 @@
   height: var(--openbot-icon-xs);
 }
 
+.wfn-run-pill .wfn-run-credits-icon {
+  fill: currentcolor;
+}
+
 .wfn-stage .wfn-run-pill[aria-busy="true"] svg {
   display: none;
 }
@@ -1247,7 +1251,19 @@ fieldset.wfn-picker-group {
 }
 
 .wfn-field-foot > .wfn-media-pill {
+  position: relative;
+  flex-shrink: 1;
   min-width: 0;
+}
+
+.wfn-stage .wfn-media-pill > .wfn-media-account-badge {
+  inset-inline: 13px auto;
+  bottom: -2px;
+  min-width: 11px;
+  height: 11px;
+  padding: 0 2px;
+  overflow: visible;
+  font-size: var(--openbot-glyph-sm);
 }
 
 .wfn-media-pill-name {

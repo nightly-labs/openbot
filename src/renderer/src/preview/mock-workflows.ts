@@ -12,6 +12,7 @@ import {
   type WorkflowGitHubItem,
   type WorkflowGitHubRepositoryOptions,
   type WorkflowGraph,
+  type WorkflowMediaAccountCredits,
   type WorkflowMediaCatalogModel,
   type WorkflowNode,
   type WorkflowRun,
@@ -27,6 +28,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { nextValidRoutineOccurrence } from "@openbot/team-client/routine-schedule";
+import { workflowMediaCreditsOf, workflowMediaProvidersOf } from "@openbot/team-client/workflow-decoding";
 
 const PREVIEW_HOOKS = "https://hooks.openbot.run/wf";
 
@@ -113,6 +115,12 @@ function previewQuote(kind: "image" | "video", duration: number, resolution: str
   return (kind === "video" ? duration * 2.5 : 1.5) * scale;
 }
 
+const PREVIEW_MEDIA_ACCOUNTS: readonly WorkflowMediaAccountCredits[] = [
+  { provider: "sunra", id: "preview-sunra", name: null, credits: { available: 1240, quota: 2000 } },
+  { provider: "higgsfield", id: "preview-higgsfield", name: null, credits: { available: 860, quota: null } },
+  { provider: "higgsfield", id: "preview-higgsfield-2", name: "Higgsfield 2", credits: { available: 95, quota: null } },
+];
+
 export function mockWorkflows(
   seeds: readonly MockWorkflowSeed[],
   emit: (workflowId: string) => void,
@@ -164,18 +172,20 @@ export function mockWorkflows(
   };
   for (const seed of seeds) put(seed.id, seed.title, seed.graph, 0, seed.updatedAt);
 
-  const credits: Record<"sunra" | "higgsfield", { available: number; quota: number | null }> = {
-    sunra: { available: 1240, quota: 2000 },
-    higgsfield: { available: 860, quota: null },
-  };
+  const accounts = structuredClone(PREVIEW_MEDIA_ACCOUNTS);
   const spend = (node: WorkflowNode) => {
     const provider = typeof node.fields.model === "string" ? workflowCatalogProvider(node.fields.model) : null;
     if (node.kind !== "image" || !provider) return;
+    const chosen =
+      typeof node.fields.account === "string" && node.fields.account !== "default" ? node.fields.account : "";
+    const balance = accounts.find(
+      (account) => account.provider === provider && (chosen === "" || account.id === chosen),
+    )?.credits;
+    if (!balance) return;
     const kind = node.fields.media === "video" ? "video" : "image";
     const duration = typeof node.fields.duration === "number" ? node.fields.duration : 5;
     const resolution = typeof node.fields.resolution === "string" ? node.fields.resolution : null;
-    const account = credits[provider];
-    account.available = Math.max(0, account.available - previewQuote(kind, duration, resolution));
+    balance.available = Math.max(0, balance.available - previewQuote(kind, duration, resolution));
   };
   const runs = new Map<string, { run: WorkflowRun; graph: WorkflowGraph; scope: Set<string> }>();
   const steps = new Map<string, WorkflowStep>();
@@ -496,8 +506,9 @@ export function mockWorkflows(
       return { secret: `whsec_preview_${crypto.randomUUID()}` };
     },
     keepPicture: async (draftId) => draftId,
-    mediaProviders: async () => ({ sunra: true, higgsfield: true }),
-    mediaCredits: async () => structuredClone(credits),
+    mediaProviders: async () =>
+      workflowMediaProvidersOf(accounts.map(({ provider, id, name }) => ({ provider, id, name }))),
+    mediaCredits: async () => workflowMediaCreditsOf(structuredClone(accounts)),
     mediaCatalog: async () => ({ models: PREVIEW_MEDIA_CATALOG }),
     mediaPrice: async (input) => ({ credits: previewQuote(input.kind, input.duration, input.resolution) }),
     githubCatalog: async () => structuredClone(PREVIEW_GITHUB_CATALOG),
