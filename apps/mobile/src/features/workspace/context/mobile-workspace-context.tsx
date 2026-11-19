@@ -89,6 +89,7 @@ import { SKILLS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/skills
 import { UI_BLOCK_PREVIEW_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/ui-block-preview-edit-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { VAULT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-import-v1";
+import { VAULT_MEMBER_SAVE_CAPABILITY } from "@openbot/contracts/team-protocol/vault-member-save-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
 import { VAULT_V3_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v3";
@@ -2465,6 +2466,13 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         canManageWhatsAppConnector: (serverId) => administers(serverId, WHATSAPP_CONNECTOR_CAPABILITY),
         canManagePasswordManagers: (serverId) => administers(serverId, PASSWORD_MANAGERS_CAPABILITY),
         canManageVault: (serverId) => administers(serverId, VAULT_CAPABILITY),
+        canSaveVaultRequest: (serverId) => {
+          if (administers(serverId, VAULT_CAPABILITY)) return true;
+          const server = servers.find((candidate) => candidate.id === serverId);
+          return Boolean(
+            server && online(server) && hasCapability(capabilities, serverId, VAULT_MEMBER_SAVE_CAPABILITY),
+          );
+        },
         canImportVault: (serverId) => administers(serverId, VAULT_IMPORT_CAPABILITY),
         canImportAgents: (serverId) =>
           servers.some((server) => server.id === serverId && online(server)) &&

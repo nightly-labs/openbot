@@ -431,6 +431,7 @@ export interface MobileWorkspaceContextValue {
   canManageWhatsAppConnector: (serverId: string) => boolean;
   canManagePasswordManagers: (serverId: string) => boolean;
   canManageVault: (serverId: string) => boolean;
+  canSaveVaultRequest: (serverId: string) => boolean;
   canImportVault: (serverId: string) => boolean;
   canImportAgents: (serverId: string) => boolean;
   canTransferServer: (serverId: string) => boolean;
@@ -836,6 +837,7 @@ type ServerCheckKey =
   | "canManageWhatsAppConnector"
   | "canManagePasswordManagers"
   | "canManageVault"
+  | "canSaveVaultRequest"
   | "canImportVault"
   | "canImportAgents"
   | "canTransferServer"
