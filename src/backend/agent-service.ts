@@ -2014,6 +2014,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           startedAt: turnId ? this.#turn.turnStartedAt(turnId) : null,
           lastEventAt: this.#turn.lastEventAt(agentId),
         }),
+        turnUnfinished: (turnId) => this.#turn.turnStartedAt(turnId) !== null || this.#turn.isCompleting(turnId),
         requestNoUpdate: (agentId, threadId, turnId, channelRun) =>
           this.#turn.requestNoUpdate(agentId, threadId, turnId, channelRun),
         reportRoutineFailure: (agentId, turnId, reason, channelRun) =>

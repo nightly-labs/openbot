@@ -404,6 +404,7 @@ export interface OpenBotToolRouterHooks {
   runsTurn(agentId: string): boolean;
   interrupt(agentId: string, turnId: string, mayStop: () => boolean): Effect.Effect<boolean, ToolOperationFailed>;
   turnActivity(agentId: string, turnId: string | null): { startedAt: number | null; lastEventAt: number | null };
+  turnUnfinished(turnId: string): boolean;
   requestNoUpdate(
     agentId: string,
     threadId: string,
@@ -2250,7 +2251,7 @@ export class OpenBotToolRouter {
       params,
       senderAgentId,
       this.#hooks.redactMcpForAgent,
-      this.#hooks.turnActivity(senderAgentId, params.turnId).startedAt !== null,
+      this.#hooks.turnUnfinished(params.turnId),
     );
     if (memoryResult) return memoryResult;
 
