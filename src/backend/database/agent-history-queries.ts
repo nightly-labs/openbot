@@ -13,6 +13,7 @@ import {
   databaseRows,
   decodeConversationMessageJson,
   optionalStringColumn,
+  requiredNumberColumn,
   requiredStringColumn,
 } from "./database-rows";
 
@@ -21,6 +22,7 @@ export interface AgentHistorySelection {
   messageId?: string;
   author?: string;
   outgoing?: boolean;
+  acrossResets?: boolean;
   limit: number;
 }
 
@@ -49,10 +51,10 @@ export class AgentHistoryQueries {
       AND json_extract(message_json, '$.source') = 'system' AND json_extract(message_json, '$.status') = 'completed'
       ORDER BY ${ORDER_KEY_DESC} LIMIT 1
     ), allowed AS (
-      SELECT * FROM visible WHERE NOT EXISTS (SELECT 1 FROM boundary)
+      SELECT * FROM visible WHERE ? OR NOT EXISTS (SELECT 1 FROM boundary)
       OR (${ORDER_KEY_COLUMNS}) > (SELECT ${ORDER_KEY_COLUMNS} FROM boundary)
     )`;
-    const bindings = [threadId, threadId, CONTEXT_RESET_ITEM_TYPE];
+    const bindings = [threadId, threadId, CONTEXT_RESET_ITEM_TYPE, selection.acrossResets ? 1 : 0];
     const reset = databaseRow(this.#core.connection.prepare(`${cte} SELECT message_id FROM boundary`).get(...bindings));
     const resetMessageId = reset ? requiredStringColumn(reset, "message_id") : null;
     const anchorId = selection.messageId ?? selection.before;
@@ -75,6 +77,7 @@ export class AgentHistoryQueries {
       this.#core.connection
         .prepare(`${cte}
       SELECT message_json,
+        COALESCE((${ORDER_KEY_COLUMNS}) < (SELECT ${ORDER_KEY_COLUMNS} FROM boundary), 0) AS before_reset,
         (SELECT provider_session_id FROM projection_turns WHERE thread_id = ? AND turn_id = json_extract(allowed.message_json, '$.turnId')) AS provider_session_id
       FROM allowed WHERE (author IN ('user', 'assistant', 'agent') OR (? AND author = 'system'
           AND item_type = '${AGENT_EXCHANGE_ITEM_TYPE}' AND json_extract(message_json, '$.exchange.direction') = 'outgoing'))
@@ -102,6 +105,7 @@ export class AgentHistoryQueries {
       messages: rows.map((row) => ({
         message: decodeConversationMessageJson(requiredStringColumn(row, "message_json")),
         providerSessionId: optionalStringColumn(row, "provider_session_id"),
+        beforeReset: requiredNumberColumn(row, "before_reset") === 1,
       })),
     };
   }

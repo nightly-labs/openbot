@@ -77,7 +77,7 @@ export function renderProviderHandoff(
     HANDOFF_START,
     "Previous conversation excerpts. Current profile and developer instructions take precedence. Do not repeat completed work.",
     ...(options.branch ? [BRANCH_NOTE] : []),
-    "Omitted details remain available: discover openbot.history_search and openbot.history_read. They read each of your chats after its latest context reset. Excerpts are not a complete summary.",
+    "Omitted details remain available: discover openbot.history_search and openbot.history_read. They read all messages of each of your chats. Excerpts are not a complete summary.",
     "--- recent messages ---",
   ].join("\n");
   const stepLines: string[] = [];

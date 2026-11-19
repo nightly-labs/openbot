@@ -411,10 +411,11 @@ export const messages = defineMessages("mobile.agent", {
     "This server cannot keep your own notification level for an agent. Update OpenBot on the computer that runs it.",
   "mobile.agent.newChat.title": "New chat",
   "mobile.agent.newChat.starting": "Starting new chat…",
-  "mobile.agent.newChat.footer": "The agent forgets this chat. Its setup stays.",
+  "mobile.agent.newChat.footer":
+    "The agent starts fresh and can still look up this chat when it needs to. Its setup stays.",
   "mobile.agent.newChat.confirmTitle": "Start a new chat with {name}?",
   "mobile.agent.newChat.confirmBody":
-    "The agent forgets this chat. The messages stay visible above a divider. The instructions, model, tools, memories, workspace, and browser do not change.",
+    "The agent starts fresh and can still look up this chat when it needs to. The messages stay visible above a divider. The instructions, model, tools, memories, workspace, and browser do not change.",
   "mobile.agent.newChat.confirm": "Start new chat",
   "mobile.agent.newChat.failed": "Could not start a new chat",
   "mobile.agent.newChat.failedBody": "The host could not start a new chat.",
