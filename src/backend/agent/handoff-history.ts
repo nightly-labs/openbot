@@ -188,6 +188,9 @@ export function renderRoutineHandoff(
   const header = [
     HANDOFF_START,
     "This routine run has its own session. These are the newest messages of your conversation. Do not repeat completed work.",
+    // The routine task is saved text, so a reminder told the user to do what the chat had since
+    // found impossible (#12440).
+    "When a newer message shows that what the routine task asks for is done, has changed, or is not possible, do not repeat the outdated request or steps. Unless the user asked to stop or skip it, still give a requested reminder, and say that newer result in it.",
     "Omitted details remain available: discover openbot.history_search and openbot.history_read.",
   ].join("\n");
   const runsHeader = "--- earlier runs of this routine (its own thread) ---";
