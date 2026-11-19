@@ -620,6 +620,18 @@
   backdrop-filter: var(--wfn-glass-blur);
 }
 
+.wfn-media-overlay[data-reveal] .wfn-panel {
+  transition: opacity var(--openbot-duration-normal) var(--openbot-ease-out);
+
+  @starting-style {
+    opacity: 0;
+  }
+}
+
+.wfn-node:not(:hover) .wfn-media-overlay[data-reveal]:not(:has(:focus-visible, [aria-expanded="true"])) .wfn-panel {
+  display: none;
+}
+
 .wfn-panel .wfn-input {
   max-height: calc(var(--openbot-leading-sm) * 3);
   overflow-y: auto;
