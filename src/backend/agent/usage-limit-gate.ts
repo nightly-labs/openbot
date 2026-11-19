@@ -16,6 +16,8 @@ const PROVIDER_FAILURE_HOLD_MS = 10 * 60_000;
 
 const MAX_TIMER_MS = 2_147_483_647;
 
+const RETURN_READ_TIMEOUT_MS = 10_000;
+
 export interface UsageLimitHooks {
   emit(event: AgentEvent): void;
   emitRuntimeSnapshot(): void;
@@ -54,6 +56,7 @@ interface UsageLimit extends UsageLimitKey {
 }
 
 interface ReturnHold {
+  spent: boolean;
   timer: ReturnType<typeof setTimeout> | null;
 }
 
@@ -114,14 +117,18 @@ export class UsageLimitGate {
 
   isLimited(limit: UsageLimitKey): boolean {
     const key = limitKey(limit.provider, limit.accountId, limit.model);
-    return this.#limits.has(key) || this.#returnHolds.has(key);
+    return this.#limits.has(key) || this.#returnHolds.get(key)?.spent === true;
+  }
+
+  returnPending(limit: UsageLimitKey): boolean {
+    return this.#returnHolds.get(limitKey(limit.provider, limit.accountId, limit.model))?.spent === false;
   }
 
   returnConfirmed(limit: UsageLimitKey): boolean {
     const key = limitKey(limit.provider, limit.accountId, limit.model);
     if (this.#seen.has(key)) return true;
     if (!this.#returnHolds.has(key)) {
-      const hold: ReturnHold = { timer: null };
+      const hold: ReturnHold = { spent: false, timer: null };
       this.#returnHolds.set(key, hold);
       this.#readReturn(key, limit, hold);
     }
@@ -402,12 +409,14 @@ export class UsageLimitGate {
     hold: ReturnHold,
   ) {
     hold.timer = null;
-    const usage = yield* this.#hooks
-      .readUsage(limit.provider, limit.model, limit.accountId)
-      .pipe(Effect.catch(() => Effect.succeed(null)));
+    const usage = yield* this.#hooks.readUsage(limit.provider, limit.model, limit.accountId).pipe(
+      Effect.timeoutOrElse({ duration: RETURN_READ_TIMEOUT_MS, orElse: () => Effect.succeed(null) }),
+      Effect.catch(() => Effect.succeed(null)),
+    );
     if (this.#returnHolds.get(key) !== hold) return;
     const resetsAt = usage ? spentWindowReset(usage) : null;
     if (resetsAt !== null) {
+      hold.spent = true;
       const untilReset = resetsAt * 1_000 - Date.now() + RESET_GRACE_MS;
       hold.timer = setTimeout(
         () => this.#readReturn(key, limit, hold),
