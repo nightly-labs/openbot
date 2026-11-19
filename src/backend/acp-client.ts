@@ -1648,12 +1648,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               configOptions = response.configOptions ?? [];
               currentModelId = currentModelFromSessionSetup(response);
             } else {
+              const created = providerCall(() => connection().newSession({ cwd, ...directories, mcpServers, ...meta }));
               const response = providerResult(
-                yield* Effect.result(
-                  afterSignInRead(
-                    providerCall(() => connection().newSession({ cwd, ...directories, mcpServers, ...meta })),
-                  ),
-                ),
+                yield* Effect.result(afterSignInRead(sessionTransport ? created : this.#whileProcessWrites(created))),
               );
               id = response.sessionId;
               configOptions = response.configOptions ?? [];
@@ -2834,7 +2831,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       return;
     }
     const kind = mcpProviderFailureKind(reason);
-    if (kind === "failed") {
+    if (kind !== "sign_in" && kind !== "timeout") {
       this.#reportFailedMcpServer(thread.cwd, name, sourceText("error.backend.mcpServerFailedToStart", { reason }));
       return;
     }
