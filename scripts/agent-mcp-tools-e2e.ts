@@ -63,7 +63,8 @@ async function mcpServer(mode: Mode): Promise<{ url: string; close: () => Promis
       if (path !== "/mcp") return json(response, 404, { error: "not found" });
       if (mode === "sign-in")
         return json(response, 401, { error: "unauthorized" }, { "www-authenticate": 'Bearer realm="e2e"' });
-      if (mode === "key") return json(response, 401, { error: "unauthorized" });
+      if (mode === "key" && request.headers.authorization !== `Bearer ${HEADER_SECRET}`)
+        return json(response, 401, { error: "unauthorized" });
       if (request.method !== "POST") {
         response.writeHead(405).end();
         return;
@@ -290,10 +291,30 @@ try {
   assert.equal(down.success, false);
   assert.equal(row("down"), undefined);
 
+  const keys = [{ key: "Authorization", value: `Bearer ${HEADER_SECRET}` }];
+  const wrongKey = await call("a wrong key the user gave still needs a key", "save_mcp_server", {
+    name: "crm",
+    headers: [{ name: "Authorization", value: "Bearer wrong-token-91c2" }],
+  });
+  assert.equal(wrongKey.result.status, "needs_key");
+  const keyed = await call("the agent sets the key the user gave", "save_mcp_server", {
+    name: "crm",
+    headers: [{ name: "authorization", value: `Bearer ${HEADER_SECRET}` }],
+  });
+  assert.equal(keyed.result.status, "ready");
+  assert.deepEqual(keyed.result.tools, ["search", "read_page", "create_page"]);
+  assert.deepEqual(row("crm")?.headers, [{ key: "authorization", value: `Bearer ${HEADER_SECRET}` }]);
   const crm = row("crm");
   assert.ok(crm);
-  store.save({ ...crm, headers: [{ key: "Authorization", value: `Bearer ${HEADER_SECRET}` }] });
-  const keys = [{ key: "Authorization", value: `Bearer ${HEADER_SECRET}` }];
+  store.save({ ...crm, headers: keys });
+  const stdioHeaders = await call("a stdio server takes no headers", "save_mcp_server", {
+    name: "local_headers",
+    command: "node",
+    headers: [{ name: "Authorization", value: `Bearer ${HEADER_SECRET}` }],
+  });
+  assert.equal(stdioHeaders.success, false);
+  assert.equal(stdioHeaders.approvals.length, 0);
+  assert.equal(row("local_headers"), undefined);
   const moved = await call("keys do not move to another server", "save_mcp_server", {
     name: "crm",
     url: servers.open.url,
@@ -331,8 +352,16 @@ try {
     name: "crm",
     url: `${servers.key.url}?region=eu`,
   });
-  assert.equal(edited.result.status, "needs_key");
+  assert.equal(edited.result.status, "ready");
   assert.match(edited.approvals[0] ?? "", /^Change the MCP server crm/u);
+  assert.deepEqual(row("crm")?.headers, keys);
+  const movedWithKeys = await call("new keys go with a new address", "save_mcp_server", {
+    name: "crm",
+    url: servers.open.url,
+    headers: [{ name: "Authorization", value: `Bearer ${HEADER_SECRET}` }],
+  });
+  assert.equal(movedWithKeys.result.status, "ready");
+  assert.equal(row("crm")?.url, servers.open.url);
   assert.deepEqual(row("crm")?.headers, keys);
 
   const listed = await call("list shows no secret", "list_mcp_servers", {});

@@ -414,6 +414,7 @@
   "error.agent.mcpServerBuiltIn": ["de", "es", "fr", "it", "ja", "pl", "pt", "ru", "tr"],
   "error.agent.mcpServerDeclined": ["de", "es", "fr", "it", "ja", "pl", "pt", "ru", "tr"],
   "error.agent.mcpServerKeysMove": ["de", "es", "fr", "it", "ja", "pl", "pt", "ru", "tr"],
+  "error.agent.mcpServerHeadersNeedHttp": ["de", "es", "fr", "it", "ja", "pl", "pt", "ru", "tr"],
   "error.agent.mcpServerNotSaved": ["de", "es", "fr", "it", "ja", "pl", "pt", "ru", "tr"],
   "error.agent.mcpServerUnknown": ["de", "es", "fr", "it", "ja", "pl", "pt", "ru", "tr"],
   "error.auth.companySignInAccountDisabled": ["de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],

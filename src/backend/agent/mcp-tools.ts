@@ -3,6 +3,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AgentAccess,
   MCP_TRANSPORTS,
+  type McpKeyValue,
   type McpServerConfig,
   type McpSignInState,
   mcpConfigErrors,
@@ -10,6 +11,7 @@ import {
   workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import { registerSecretValues } from "@openbot/logging";
 import { Effect } from "effect";
 import { z } from "zod";
 import type { McpSignInOffer } from "../mcp-oauth-provider";
@@ -44,6 +46,18 @@ const saveMcpServerToolSchema = z.strictObject({
     .optional()
     .describe("The arguments of a stdio server. They replace the arguments it had."),
   workingDirectory: z.string().max(INPUT_LIMITS.path).optional(),
+  headers: z
+    .array(
+      z.strictObject({
+        name: z.string().trim().min(1).max(INPUT_LIMITS.mcpEnvName),
+        value: z.string().max(INPUT_LIMITS.mcpHeaderValue),
+      }),
+    )
+    .max(INPUT_LIMITS.mcpHeaders)
+    .optional()
+    .describe(
+      "Headers of an http server that the user gave in this conversation, such as Authorization: Bearer <token>. Each one sets or replaces the header of that name; an empty value removes it. Other saved headers stay.",
+    ),
   enabled: z.boolean().optional().describe("A new server is on unless this is false."),
 });
 
@@ -62,7 +76,7 @@ export const MCP_SERVER_TOOL_DEFINITIONS = [
   },
   {
     name: "save_mcp_server",
-    description: `Add an MCP server, or change one by its name, only when the user asks for it. ${MCP_SCOPE} ${MCP_APPROVAL} Then OpenBot connects to the server and saves it when it answers or needs only a sign-in or a key. The result is ready with its tools, needs_sign_in (a Sign in card is in the conversation: wait for the user), needs_key (the user enters the key in Marketplace, Apps; never ask for a key in the chat), or the error. Headers and environment values are not set here: a stdio server that cannot start without a key in its environment is added by the user in Marketplace, Apps. A server that holds keys keeps its transport, address origin, command, arguments and folder. New tools reach the agents from their next turn.`,
+    description: `Add an MCP server, or change one by its name, only when the user asks for it. ${MCP_SCOPE} ${MCP_APPROVAL} Then OpenBot connects to the server and saves it when it answers or needs only a sign-in or a key. The result is ready with its tools, needs_sign_in (a Sign in card is in the conversation: wait for the user), needs_key (the user enters the key in Marketplace, Apps; never ask for a key in the chat), or the error. When the user gives a key or a token for an http server in the conversation, pass it in headers; never put it in the address. Environment values are not set here: a stdio server that cannot start without a key in its environment is added by the user in Marketplace, Apps. A server keeps the keys it holds only on its transport, address origin, command, arguments and folder. New tools reach the agents from their next turn.`,
     shape: saveMcpServerToolSchema.shape,
   },
   {
@@ -288,12 +302,15 @@ const runMcpServerTool = Effect.fn("McpServerTools.handle")(function* (
     }
     case "save_mcp_server": {
       const input = yield* toolStep(() => saveMcpServerToolSchema.parse(call.arguments));
+      registerSecretValues(input.headers?.map(({ value }) => value) ?? []);
       const existing = servers.list().find((config) => config.name === input.name);
       const config = normalizeMcpConfig(mergeServer(existing, input));
       const errors = mcpConfigErrors(config);
       const invalid = errors.name ?? errors.command ?? errors.url;
       if (invalid) return openBotToolFailure(invalid);
-      if (existing && holdsKeys(existing) && serverMoves(existing, config))
+      if (input.headers && config.transport !== "http")
+        return openBotToolFailure(sourceText("error.agent.mcpServerHeadersNeedHttp", { name: config.name }));
+      if (existing && holdsKeys(carriedKeys(existing, input)) && serverMoves(existing, config))
         return openBotToolFailure(sourceText("error.agent.mcpServerKeysMove", { name: existing.name }));
       const key = existing ? "status.agent.mcpServerChange" : "status.agent.mcpServerAdd";
       const reason = servers.redact(sourceText(key, { name: config.name, target: serverTarget(config) }));
@@ -416,7 +433,7 @@ const report = Effect.fnUntraced(function* (
       status: "needs_key",
       server,
       error,
-      next: "Ask the user to enter the key with Edit on the server's page in Marketplace, Apps. Do not ask for the key in the chat.",
+      next: "When the user gave the key or token in this conversation, call openbot.save_mcp_server again with it in headers, such as Authorization: Bearer <token>, as the server's documentation says. Otherwise ask the user to enter the key with Edit on the server's page in Marketplace, Apps, or to give it to you. Do not show the key in your answer.",
     });
   return openBotToolResult({ status: "error", server, error });
 });
@@ -444,7 +461,26 @@ function mergeServer(existing: McpServerConfig | undefined, input: z.infer<typeo
     command: input.command ?? base.command,
     args: input.args ?? base.args,
     workingDirectory: input.workingDirectory ?? base.workingDirectory,
+    headers: mergeHeaders(base.headers, input.headers),
   } satisfies McpServerConfig;
+}
+
+type HeaderInput = z.infer<typeof saveMcpServerToolSchema>["headers"];
+
+const sameHeader = (left: string, right: string) => left.trim().toLowerCase() === right.trim().toLowerCase();
+
+function mergeHeaders(saved: readonly McpKeyValue[], input: HeaderInput): McpKeyValue[] {
+  if (!input) return [...saved];
+  const kept = saved.filter((pair) => !input.some(({ name }) => sameHeader(name, pair.key)));
+  const latest = input.filter(
+    (header, index) => !input.slice(index + 1).some(({ name }) => sameHeader(name, header.name)),
+  );
+  return [...kept, ...latest.flatMap(({ name, value }) => (value ? [{ key: name, value }] : []))];
+}
+
+function carriedKeys(saved: McpServerConfig, input: z.infer<typeof saveMcpServerToolSchema>): McpServerConfig {
+  const headers = input.headers ?? [];
+  return { ...saved, headers: saved.headers.filter((pair) => !headers.some(({ name }) => sameHeader(name, pair.key))) };
 }
 
 function describeBuiltInServer(config: McpServerConfig) {
