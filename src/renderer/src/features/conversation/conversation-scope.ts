@@ -111,7 +111,7 @@ function newAnswerAtEnd(
     const row = rows[index];
     if (!row) return undefined;
     if (drawnBefore.has(row.id) || drawnBefore.has(rowKey(row))) return answer;
-    if (row.author === "agent" && row.kind === "text") answer = row;
+    if (row.author === "agent" && row.kind === "text" && row.itemType !== "commentary") answer = row;
   }
   return undefined;
 }
@@ -1819,36 +1819,39 @@ export function createConversationViewScope(props: ConversationProps) {
     },
   );
 
-  let drawnRows: { identity: string; drawn: ReadonlyMap<VirtualItem["key"], number> } | undefined;
+  let drawnRows: { identity: string; live: boolean; drawn: ReadonlyMap<VirtualItem["key"], number> } | undefined;
   createEffect(
     () => ({
       identity: `${props.server?.id ?? "local"}:${conversationOwnerId(props) ?? ""}`,
       loaded: props.loaded,
+      live: !props.discontinuous,
       rows: timelineMessages(),
       drawn: timelineIndexById(),
     }),
-    ({ identity, loaded, rows, drawn }) => {
+    ({ identity, loaded, live, rows, drawn }) => {
       const before = drawnRows;
-      drawnRows = loaded ? { identity, drawn } : undefined;
-      if (before?.identity !== identity || !stickToLatest || readerLeftLatest || unreadOpening.holding) return;
+      drawnRows = loaded ? { identity, live, drawn } : undefined;
+      if (before?.identity !== identity || !before.live || !live) return;
+      if (!stickToLatest || readerLeftLatest || unreadOpening.holding) return;
       const answer = newAnswerAtEnd(rows, before.drawn, (row) => handedOverRowKeys().get(row.id) ?? row.id);
       if (answer) showAnswerStart(answer.id);
     },
   );
   function showAnswerStart(messageId: string): void {
     const revealedAt = performance.now();
-    const readerMoved = () => readerDragging || readerLeftLatest || (readerIntent?.at ?? 0) >= revealedAt;
+    const readerMoved = () =>
+      readerDragging || sentMessagePinUntil > revealedAt || (readerIntent?.at ?? 0) >= revealedAt;
     const place = (settle: boolean) => {
       if (answerStartFrame !== undefined) cancelAnimationFrame(answerStartFrame);
       answerStartFrame = requestAnimationFrame(() => {
         answerStartFrame = undefined;
         const element = scrollElement;
-        if (!element || readerMoved()) return;
-        const start = answerStartOffset(element, messageId);
+        if (!element) return;
+        const start = readerMoved() ? undefined : answerStartOffset(element, messageId);
         if (settle) {
           if (!stickToLatest && start !== undefined) element.scrollTop = start;
-        } else if (start !== undefined && start < element.scrollHeight - element.clientHeight) {
-          stopFollowingLatest();
+        } else if (start !== undefined && !readerLeftLatest && start < element.scrollHeight - element.clientHeight) {
+          leaveLatest();
           element.scrollTop = start;
           place(true);
         } else if (stickToLatest) glideConversationBottom(element);
