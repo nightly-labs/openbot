@@ -802,12 +802,12 @@ export const HermesConnect: Story = {
   render: () => <ServerProvidersStory hermes={{ phase: "ready", progress: 100, message: null, version: "0.22.7" }} />,
 };
 
-/** A server that the window has not selected. Its providers are managed after a switch to it. */
 /** Devin's long model names are cut, and each row keeps the switch that hides the model from the picker. */
 export const DevinModels: Story = {
   render: () => <ServerProvidersStory devinModels />,
 };
 
+/** A server that the window has not selected. Its providers are managed after a switch to it. */
 export const NotSelectedServer: Story = {
   render: () => <ServerProvidersStory inactive />,
 };
