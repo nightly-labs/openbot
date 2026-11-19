@@ -10,6 +10,7 @@ import {
 import { BROWSER_EGRESS_CHANNEL } from "@openbot/contracts/team-protocol/browser-egress-v1";
 import { TEAM_PROTOCOL_V2_CHANNELS } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
+import { iceCandidateRoute } from "@openbot/team-client/ice-diagnostics";
 import { encodeTeamWebRtcPayload, TeamWebRtcPayloadDecoder } from "./team-webrtc-framing";
 import { isPrivateNetworkCandidate, privateNetworkSdp } from "./team-webrtc-private-network";
 
@@ -47,6 +48,11 @@ interface MainBridgeMessage {
   channel?: "rpc" | "events" | "files" | "desktop";
   data?: string | ArrayBuffer;
   path?: "p2p" | "relay";
+  route?: string;
+  side?: "host" | "client";
+  url?: string;
+  errorCode?: number;
+  errorText?: string;
   code?: string;
   message?: string;
   terminal?: boolean;
@@ -435,7 +441,11 @@ async function handleSignal(state: PeerState, message: SignalServerMessage): Pro
       client &&
         (state.restartIceOnReady ||
           client.connectionState !== "connected" ||
-          (turnRefresh && (await selectedPath(client).catch(() => "relay")) === "relay")),
+          (turnRefresh &&
+            (await selectedPath(client).then(
+              ({ path }) => path,
+              () => "relay",
+            )) === "relay")),
     );
     state.restartIceOnReady = false;
     state.resumeToken = message.resumeToken;
@@ -629,6 +639,21 @@ function createPeerConnection(state: PeerState, iceServers: RTCIceServer[]): RTC
       candidate: event.candidate.candidate,
       sdpMid: event.candidate.sdpMid,
       sdpMLineIndex: event.candidate.sdpMLineIndex,
+    });
+  };
+  const candidateErrors = new Set<string>();
+  connection.onicecandidateerror = (event) => {
+    if (state.peerConnection !== connection) return;
+    const key = `${event.url} ${event.errorCode}`;
+    if (candidateErrors.has(key)) return;
+    candidateErrors.add(key);
+    post({
+      type: "ice-candidate-error",
+      peerId: state.id,
+      side: state.role,
+      url: event.url,
+      errorCode: event.errorCode,
+      errorText: event.errorText,
     });
   };
   connection.ondatachannel = (event) => {
@@ -895,10 +920,10 @@ function requiredDescriptionSdp(description: RTCSessionDescriptionInit): string 
 }
 
 async function reportSelectedPath(state: PeerState, connection: RTCPeerConnection): Promise<void> {
-  post({ type: "ice-path", peerId: state.id, path: await selectedPath(connection) });
+  post({ type: "ice-path", peerId: state.id, side: state.role, ...(await selectedPath(connection)) });
 }
 
-async function selectedPath(connection: RTCPeerConnection): Promise<"relay" | "p2p"> {
+async function selectedPath(connection: RTCPeerConnection): Promise<{ path: "relay" | "p2p"; route: string }> {
   const stats = await connection.getStats();
   const transport = [...stats.values()].find((report) => report.type === "transport" && report.selectedCandidatePairId);
   const selectedPair = transport ? stats.get(transport.selectedCandidatePairId) : null;
@@ -910,7 +935,10 @@ async function selectedPath(connection: RTCPeerConnection): Promise<"relay" | "p
     [...stats.values()].find((report) => report.type === "candidate-pair" && report.state === "succeeded");
   const local = pair ? stats.get(pair.localCandidateId) : null;
   const remote = pair ? stats.get(pair.remoteCandidateId) : null;
-  return local?.candidateType === "relay" || remote?.candidateType === "relay" ? "relay" : "p2p";
+  return {
+    path: local?.candidateType === "relay" || remote?.candidateType === "relay" ? "relay" : "p2p",
+    route: iceCandidateRoute(local, remote),
+  };
 }
 
 function sendSignal(state: PeerState, message: SignalClientMessage): void {

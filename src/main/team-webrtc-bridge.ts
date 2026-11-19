@@ -5,6 +5,7 @@ import type { IceServer } from "@openbot/contracts/signal-protocol/messages";
 import type { RemoteMemberRole } from "@openbot/contracts/signal-protocol/ticket";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
+import { iceServerErrorDetail, knownIceCandidateRoute } from "@openbot/team-client/ice-diagnostics";
 import { Deferred, Effect, Exit, Fiber, Scope } from "effect";
 import { BrowserWindow, MessageChannelMain, type MessagePortMain } from "electron";
 import { z } from "zod";
@@ -72,6 +73,11 @@ const bridgeMessageSchema = z
     channel: z.enum(["rpc", "events", "files", "desktop"]).optional(),
     data: z.union([z.string(), z.instanceof(ArrayBuffer)]).optional(),
     path: z.enum(["p2p", "relay"]).optional(),
+    route: z.string().optional(),
+    side: z.enum(["host", "client"]).optional(),
+    url: z.string().optional(),
+    errorCode: z.number().int().optional(),
+    errorText: z.string().optional(),
     code: z.string().optional(),
     message: z.string().optional(),
     terminal: z.boolean().optional(),
@@ -424,7 +430,15 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
     else if (message.type === "peer-disconnected") this.emit("disconnected", message.peerId);
     else if (message.type === "peer-path-lost") this.emit("pathLost", message.peerId);
     else if (message.type === "peer-path-restored") this.emit("pathRestored", message.peerId);
-    else if (message.type === "ice-path" && message.path) this.emit("path", message.peerId, message.path);
+    else if (message.type === "ice-path" && message.path) {
+      logger.info(
+        `WebRTC ${message.side ?? "unknown"} connection uses ${message.path}: ${knownIceCandidateRoute(message.route)}.`,
+      );
+      this.emit("path", message.peerId, message.path);
+    } else if (message.type === "ice-candidate-error" && message.errorCode !== undefined)
+      logger.warn(
+        `WebRTC ${message.side ?? "unknown"} connection cannot use ${iceServerErrorDetail(message.url ?? "", message.errorCode, message.errorText ?? "")}`,
+      );
     else if (message.type === "ice-servers" && message.iceServers) {
       this.#iceServers.set(message.peerId, message.iceServers);
       this.emit("iceServers", message.peerId, structuredClone(message.iceServers));

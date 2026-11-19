@@ -87,6 +87,7 @@ import { markRemoteSync, type RemoteRequestProfile, startRemoteRequest } from ".
 export type { RemoteFileUpload } from "./file-upload";
 export { MOBILE_ATTACHMENT_BYTES } from "./file-upload";
 
+import { iceCandidateRoute, iceServerErrorDetail } from "./ice-diagnostics";
 import {
   judgePath,
   PATH_CHECK_INTERVAL_MS,
@@ -271,6 +272,7 @@ export interface RemoteTeamDiagnostic {
     | "peer-state"
     | "ice-state"
     | "ice-gathering"
+    | "ice-candidate-error"
     | "route"
     | "ice-recovery"
     | "channels-open"
@@ -630,15 +632,8 @@ export function createRemoteTeamPeer(
   function reportRoute(state: PeerState, connection: RTCPeerConnection) {
     return Effect.fn("RemotePeer.reportRoute")(function* () {
       const pair = selectedCandidates(yield* peerCall(() => connection.getStats()));
-      if (pair)
-        yield* notify(
-          diagnosticCall(state, "route", `${candidateRoute(pair.local)} -> ${candidateRoute(pair.remote)}`),
-        );
+      if (pair) yield* notify(diagnosticCall(state, "route", iceCandidateRoute(pair.local, pair.remote)));
     })();
-  }
-
-  function candidateRoute(candidate: { candidateType?: string; protocol?: string } | undefined): string {
-    return `${candidate?.candidateType ?? "unknown"}/${candidate?.protocol ?? "unknown"}`;
   }
 
   function selectedPair(stats: RTCStatsReport) {
@@ -1408,6 +1403,14 @@ export function createRemoteTeamPeer(
     connection.ondatachannel = (event) => {
       const kind = channelKind(event.channel.label);
       if (kind) bindChannel(state, kind, event.channel, actions);
+    };
+    const candidateErrors = new Set<string>();
+    connection.onicecandidateerror = (event) => {
+      if (state.connection !== connection || state.closed || peer !== state) return;
+      const key = `${event.url} ${event.errorCode}`;
+      if (candidateErrors.has(key)) return;
+      candidateErrors.add(key);
+      diagnose(state, "ice-candidate-error", iceServerErrorDetail(event.url, event.errorCode, event.errorText));
     };
     connection.onicegatheringstatechange = () => {
       if (state.connection !== connection || state.closed || peer !== state) return;
