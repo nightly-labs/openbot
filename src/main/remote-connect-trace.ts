@@ -21,7 +21,7 @@ export function isSignalHomeName(value: unknown): value is string {
   return typeof value === "string" && SIGNAL_HOME_NAME.test(value);
 }
 
-export function signalHomeOf(ticket: string): string {
+function signalHomeOf(ticket: string): string {
   const home = ticketSignalHome(ticket);
   if (home === null) return "entry";
   return isSignalHomeName(home) && home !== "entry" ? home : "other";
