@@ -4,6 +4,8 @@ import type { messages as source } from "../en/composer";
 export const messages = {
   "composer.queueEdit.body":
     "Вы редактируете сообщение в очереди. Сохраните или отмените правку, чтобы разрешить его выполнение.",
+  "composer.interrupted.body": "Последняя задача была прервана до завершения.",
+  "composer.interrupted.continue": "Продолжить",
   "composer.queueEdit.cancel": "Отменить правку",
   "composer.feedbackFix.body":
     "Исправление отчёта #{number}. Отправьте запрос или отмените, чтобы оставить отчёт как есть.",

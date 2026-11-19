@@ -86,6 +86,7 @@ export const messages = {
   "error.team.hostTurnLimitsUnsupported":
     "Bu bağlantı sunucunun mesaj dizisi sınırlarını gösteremez veya değiştiremez.",
   "error.team.usageLimitUnsupported": "Bu bağlantı ajanların kullanım sınırlarını gösteremez veya değiştiremez.",
+  "error.team.interruptedResumeUnsupported": "Bu sunucu kesilen görevlere devam etmeyi desteklemiyor.",
   "error.team.hermesImportUnsupported": "Bu bağlantı sunucudan Hermes profillerini içe aktaramaz.",
   "error.team.providerDetectionUnsupported": "Bu bağlantı sunucunun model sunucularını ve ajanlarını bulamaz.",
   "error.team.providerModelSourceUnsupported":

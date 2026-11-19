@@ -332,6 +332,14 @@ export interface ConversationProps {
   approval: Extract<AgentEvent, { type: "approval" }>["approval"] | undefined;
   /** A usage limit holds the agent's queued message on this computer. The chat asks where to send it. */
   usageLimitAsk?: UsageLimitAskCardProps | undefined;
+  /** Shown above the composer when the agent's last turn ended interrupted. */
+  interruptedTurn?:
+    | {
+        turnId: string;
+        onContinue: () => void;
+        onDismiss: () => void;
+      }
+    | undefined;
   /** Whether a usage limit holds this model and account now. Absent for a joined server. */
   usageLimited?: ((choice: AgentModelChoice) => boolean) | undefined;
   /** Whether a provider error holds this model and account now, for the backup models page. */

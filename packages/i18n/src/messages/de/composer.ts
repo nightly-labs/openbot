@@ -4,6 +4,8 @@ import type { messages as source } from "../en/composer";
 export const messages = {
   "composer.queueEdit.body":
     "Du bearbeitest eine Nachricht in der Warteschlange. Speichere die Änderung oder brich sie ab, damit die Nachricht ausgeführt werden kann.",
+  "composer.interrupted.body": "Die letzte Aufgabe wurde vor dem Abschluss unterbrochen.",
+  "composer.interrupted.continue": "Fortsetzen",
   "composer.queueEdit.cancel": "Bearbeitung abbrechen",
   "composer.feedbackFix.body":
     "Bericht #{number} wird korrigiert. Sende die Anfrage, oder brich ab, damit der Bericht bleibt, wie er ist.",

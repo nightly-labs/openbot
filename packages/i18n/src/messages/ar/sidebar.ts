@@ -118,6 +118,7 @@ export const messages = {
   "sidebar.agentMenu.duplicate": "تكرار الوكيل",
   "sidebar.agentMenu.duplicating": "جارٍ التكرار…",
   "sidebar.agentMenu.markRead": "تعليم كمقروء",
+  "sidebar.agentMenu.continue": "متابعة",
   "sidebar.agentMenu.markUnread": "تعليم كغير مقروء",
   "sidebar.agentMenu.mute": "كتم الوكيل",
   "sidebar.agentMenu.unmute": "إلغاء كتم الوكيل",
@@ -180,6 +181,8 @@ export const messages = {
   "sidebar.state.waitingTakeover": "في انتظارك في المتصفح",
   "sidebar.state.waitingDetail": "{state}: {detail}",
   "sidebar.waiting.title": "يحتاج إليك",
+  "sidebar.interrupted.title": "متوقف",
+  "sidebar.interrupted.continueAll": "متابعة الكل",
   "sidebar.waiting.label": {
     zero: "يحتاج إليك، لا دردشات",
     one: "يحتاج إليك، دردشة واحدة",
@@ -250,6 +253,7 @@ export const messages = {
   "sidebar.state.usageLimit": "في انتظار الحد",
   "sidebar.state.usageLimitResets": "في انتظار الحد · {reset}",
   "sidebar.state.usageLimitChip": "الحد",
+  "sidebar.state.interrupted": "متوقف",
   "sidebar.delete.pending": "جارٍ الحذف…",
   "sidebar.delete.title": "حذف {name}؟",
   "sidebar.delete.agentDescription":

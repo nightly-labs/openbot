@@ -36,6 +36,7 @@ export function sidebarAgentStateLabel(state: SidebarAgentState, t: AppTranslate
     return reset ? t("sidebar.state.usageLimitResets", { reset }) : t("sidebar.state.usageLimit");
   }
   if (state.kind === "working") return t("sidebar.state.working");
+  if (state.kind === "interrupted") return t("sidebar.state.interrupted");
   if (state.kind === "responded") return t("sidebar.state.responded");
   if (state.kind === "routine") return routineStateLabel(state.phase, state.count, t);
   if (state.count === 0) return t("sidebar.state.unreadThreads");

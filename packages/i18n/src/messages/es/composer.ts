@@ -3,6 +3,8 @@ import type { messages as source } from "../en/composer";
 
 export const messages = {
   "composer.queueEdit.body": "Estás editando un mensaje en cola. Guarda o cancela la edición para que se ejecute.",
+  "composer.interrupted.body": "La última tarea se interrumpió antes de terminar.",
+  "composer.interrupted.continue": "Continuar",
   "composer.queueEdit.cancel": "Cancelar edición",
   "composer.feedbackFix.body":
     "Corrigiendo el informe #{number}. Envía la solicitud o cancela para dejar el informe como está.",

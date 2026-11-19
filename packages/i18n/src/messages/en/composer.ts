@@ -2,6 +2,8 @@ import { defineMessages } from "../../message";
 
 export const messages = defineMessages("composer", {
   "composer.queueEdit.body": "You are editing a queued message. Save or cancel the edit to let it run.",
+  "composer.interrupted.body": "The last task was interrupted before finishing.",
+  "composer.interrupted.continue": "Continue",
   "composer.queueEdit.cancel": "Cancel edit",
   "composer.feedbackFix.body": "Correcting report #{number}. Send the request, or cancel to keep the report as it is.",
   "composer.feedbackFix.cancel": "Cancel",

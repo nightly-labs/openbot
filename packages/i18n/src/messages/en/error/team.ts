@@ -85,6 +85,7 @@ export const messages = defineMessages("error.team", {
   "error.team.threadRequestsUnsupported": "This connection cannot show the requests of a side thread to other agents.",
   "error.team.hostTurnLimitsUnsupported": "This connection cannot show or change the thread limits of the server.",
   "error.team.usageLimitUnsupported": "This connection cannot show or change the usage limits of agents.",
+  "error.team.interruptedResumeUnsupported": "This server does not support continuing interrupted tasks.",
   "error.team.hermesImportUnsupported": "This connection cannot import Hermes profiles from the server.",
   "error.team.providerDetectionUnsupported": "This connection cannot find the model servers and agents of the server.",
   "error.team.providerModelSourceUnsupported": "This connection cannot show where the models of a provider come from.",

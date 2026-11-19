@@ -25,6 +25,8 @@ export interface SidebarAgentStatesInput {
   pendingPrompts: Record<string, SidebarAttention | undefined>;
   pendingApprovals: Record<string, SidebarApproval | undefined>;
   failedTurns: Record<string, string | undefined>;
+  /** The agents whose last turn on their own chat was interrupted and awaits continuation. */
+  interruptedTurns?: Record<string, string | undefined>;
   /**
    * The agents whose queue waits for a plan limit, with the reset in epoch seconds or `null`. Absent
    * where the host does not report it, as on a remote server.
@@ -77,8 +79,10 @@ export function computeSidebarAgentStates(input: SidebarAgentStatesInput): Recor
   const states: Record<string, SidebarAgentState> = {};
   for (const agentId of input.agentIds) {
     const marked = sidebarAgentWait(agentId, input) ?? routineBadge(agentId, input);
+    const interruptedTurnId = input.interruptedTurns?.[agentId];
     if (marked) states[agentId] = marked;
     else if (isAgentWorking(agentId, input.activeTurns, input.queues)) states[agentId] = { kind: "working" };
+    else if (interruptedTurnId) states[agentId] = { kind: "interrupted", turnId: interruptedTurnId };
     else if ((input.unreadReplies[agentId] ?? 0) > 0) {
       states[agentId] = { kind: "unread", count: input.unreadReplies[agentId] ?? 1 };
     } else if ((input.unreadThreadReplies?.[agentId] ?? 0) > 0) states[agentId] = { kind: "unread", count: 0 };

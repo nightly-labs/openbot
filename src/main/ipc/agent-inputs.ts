@@ -2,6 +2,7 @@ import { CHAT_VISUAL_PAGE_LIMIT } from "@openbot/contracts/chat-visual";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AcknowledgeFailedTurnInput,
+  type AcknowledgeInterruptedTurnInput,
   type AgentIpcRequest,
   type AgentMemorySelectionChange,
   type AgentTaskInput,
@@ -11,6 +12,7 @@ import {
   type CancelMessageLinkInput,
   type CancelQueuedMessageInput,
   type ChooseAttachmentsInput,
+  type ContinueInterruptedInput,
   type CreateAgentInput,
   type CreateAgentMemoryInput,
   type CreateChannelMemoryInput,
@@ -1035,6 +1037,23 @@ export function parseAcknowledgeFailedTurn(value: unknown): AcknowledgeFailedTur
   return {
     agentId: requireString(value.agentId, "agentId"),
     turnId: requireString(value.turnId, "turnId"),
+  };
+}
+
+export function parseAcknowledgeInterruptedTurn(value: unknown): AcknowledgeInterruptedTurnInput {
+  if (!isObject(value)) throw new Error("Invalid interrupted turn acknowledgement.");
+  return {
+    agentId: requireString(value.agentId, "agentId"),
+    turnId: requireString(value.turnId, "turnId"),
+  };
+}
+
+export function parseContinueInterrupted(value: unknown): ContinueInterruptedInput {
+  if (!isObject(value) || !Array.isArray(value.agentIds) || value.agentIds.length > INPUT_LIMITS.agents) {
+    throw new Error("Invalid continue interrupted request.");
+  }
+  return {
+    agentIds: value.agentIds.map((id) => requireString(id, "agentId")),
   };
 }
 

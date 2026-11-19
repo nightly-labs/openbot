@@ -403,6 +403,7 @@ import { routeHostUpdate } from "./team-api/route-host-update";
 import { routeHostedSites } from "./team-api/route-hosted-sites";
 import { routeInstanceTransfer } from "./team-api/route-instance-transfer";
 import { routeInstanceTransferChunks } from "./team-api/route-instance-transfer-chunks";
+import { routeInterruptedResume } from "./team-api/route-interrupted-resume";
 import { routeLibraryFolders } from "./team-api/route-library-folders";
 import { routeLiveActivityPush } from "./team-api/route-live-activity-push";
 import { liveVoiceWireEvent, routeLiveVoice, TeamLiveVoiceSessions } from "./team-api/route-live-voice";
@@ -1341,6 +1342,7 @@ export class TeamApiServer {
         return;
       if ((await routeAgentThreadRequests(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeAgentUsageLimit(context, this.#options.agents, hidden)) === "handled") return;
+      if ((await routeInterruptedResume(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeAgentPendingRuntime(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeAgentThreads(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeAgentThreadReads(context, this.#options.agentTasks, hidden)) === "handled") return;

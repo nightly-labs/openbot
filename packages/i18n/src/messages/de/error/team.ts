@@ -92,6 +92,7 @@ export const messages = {
     "Diese Verbindung kann die Thread-Limits des Servers nicht anzeigen oder ändern.",
   "error.team.usageLimitUnsupported":
     "Diese Verbindung kann die Nutzungslimits von Agenten nicht anzeigen oder ändern.",
+  "error.team.interruptedResumeUnsupported": "Dieser Server unterstützt das Fortsetzen unterbrochener Aufgaben nicht.",
   "error.team.hermesImportUnsupported": "Diese Verbindung kann keine Hermes-Profile vom Server importieren.",
   "error.team.providerDetectionUnsupported":
     "Diese Verbindung kann die Modellserver und Agenten des Servers nicht finden.",

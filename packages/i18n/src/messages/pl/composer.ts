@@ -3,6 +3,8 @@ import type { messages as source } from "../en/composer";
 
 export const messages = {
   "composer.queueEdit.body": "Edytujesz wiadomość z kolejki. Zapisz lub anuluj edycję, aby mogła zostać wysłana.",
+  "composer.interrupted.body": "Ostatnie zadanie zostało przerwane przed ukończeniem.",
+  "composer.interrupted.continue": "Kontynuuj",
   "composer.queueEdit.cancel": "Anuluj edycję",
   "composer.feedbackFix.body":
     "Poprawiasz zgłoszenie #{number}. Wyślij prośbę albo anuluj, aby zostawić zgłoszenie bez zmian.",

@@ -3,6 +3,8 @@ import type { messages as source } from "../en/composer";
 
 export const messages = {
   "composer.queueEdit.body": "Stai modificando un messaggio in coda. Salva o annulla la modifica per farlo partire.",
+  "composer.interrupted.body": "L’ultima attività è stata interrotta prima di finire.",
+  "composer.interrupted.continue": "Continua",
   "composer.queueEdit.cancel": "Annulla modifica",
   "composer.feedbackFix.body":
     "Correzione della segnalazione #{number}. Invia la richiesta, oppure annulla per lasciare la segnalazione com'è.",

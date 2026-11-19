@@ -10,7 +10,7 @@
  * The compact sidebar has no room for the heading; the rows keep their order and their badges.
  */
 
-import { CheckCheck, ContextMenu, EyeOff } from "@openbot/ui";
+import { Button, CheckCheck, ContextMenu, EyeOff } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { For, Match, Show, Switch } from "solid-js";
 import { useText } from "../../text";
@@ -29,6 +29,37 @@ export function SidebarWaitingGroup() {
       count={waitingChats().length}
       title={t("sidebar.waiting.title")}
       label={t("sidebar.waiting.label", { count: waitingChats().length })}
+    />
+  );
+}
+
+export function SidebarInterruptedGroup() {
+  const { interruptedChats, props } = useSidebarScope();
+  const { t } = useText();
+  const agentIds = () => interruptedChats().map((chat) => chat.id);
+  return (
+    <SidebarChatGroup
+      chats={interruptedChats()}
+      count={interruptedChats().length}
+      title={t("sidebar.interrupted.title")}
+      label={t("sidebar.interrupted.title")}
+      class="sidebar-interrupted-group"
+      heading={(heading) => (
+        <header class="sidebar-interrupted-group-header">
+          {heading()}
+          <Show when={props.onContinueInterrupted && agentIds().length > 0}>
+            <Button
+              variant="ghost"
+              size="sm"
+              type="button"
+              class="sidebar-interrupted-continue-all"
+              onClick={() => props.onContinueInterrupted?.(agentIds())}
+            >
+              {t("sidebar.interrupted.continueAll")}
+            </Button>
+          </Show>
+        </header>
+      )}
     />
   );
 }

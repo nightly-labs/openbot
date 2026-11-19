@@ -141,6 +141,7 @@ export function AgentEventBridge() {
     setTurnProgress,
     setTurnStepLines,
     setFailedTurns,
+    setInterruptedTurns,
     setUsageLimits,
     setSubagentTurns,
     setBackgroundWork,
@@ -339,6 +340,7 @@ export function AgentEventBridge() {
         });
         clearRecentReply(event.agentId);
         setFailedTurns((current) => withoutAgent(current, event.agentId));
+        setInterruptedTurns((current) => withoutAgent(current, event.agentId));
         setActiveTurns((current) =>
           current[event.agentId] === event.turnId ? current : { ...current, [event.agentId]: event.turnId },
         );
@@ -353,6 +355,11 @@ export function AgentEventBridge() {
         });
         setFailedTurns((current) =>
           event.status === "failed"
+            ? { ...current, [event.agentId]: event.turnId }
+            : withoutAgent(current, event.agentId),
+        );
+        setInterruptedTurns((current) =>
+          event.status === "interrupted"
             ? { ...current, [event.agentId]: event.turnId }
             : withoutAgent(current, event.agentId),
         );
@@ -570,6 +577,12 @@ export function AgentEventBridge() {
     });
     setFailedTurns((current) =>
       keepEqualRecord(current, Object.fromEntries(snapshot.failedTurns.map((turn) => [turn.agentId, turn.turnId]))),
+    );
+    setInterruptedTurns((current) =>
+      keepEqualRecord(
+        current,
+        Object.fromEntries((snapshot.interruptedTurns ?? []).map((turn) => [turn.agentId, turn.turnId])),
+      ),
     );
     setContextStates((current) =>
       keepEqualRecord(

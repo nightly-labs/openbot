@@ -4,6 +4,8 @@ import type { messages as source } from "../en/composer";
 export const messages = {
   "composer.queueEdit.body":
     "Kuyruktaki bir mesajı düzenliyorsunuz. Çalışmasına izin vermek için düzenlemeyi kaydedin veya iptal edin.",
+  "composer.interrupted.body": "Son görev tamamlanmadan kesildi.",
+  "composer.interrupted.continue": "Devam et",
   "composer.queueEdit.cancel": "Düzenlemeyi iptal et",
   "composer.feedbackFix.body":
     "#{number} numaralı rapor düzeltiliyor. İsteği gönderin veya raporu olduğu gibi bırakmak için iptal edin.",

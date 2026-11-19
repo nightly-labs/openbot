@@ -79,6 +79,10 @@ import { isAgentThreadBranchLinks } from "@openbot/contracts/team-protocol/agent
 import { isAgentThreadQueues } from "@openbot/contracts/team-protocol/agent-thread-queue-v1";
 import { isAgentThreadRequests } from "@openbot/contracts/team-protocol/agent-thread-requests-v1";
 import { isAgentUsageLimits } from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
+import {
+  isContinueInterruptedResult,
+  isInterruptedTurnsList,
+} from "@openbot/contracts/team-protocol/interrupted-resume-v1";
 import { decodeProviderUseResponse } from "@openbot/contracts/team-protocol/provider-use-v1";
 
 export const decodeAgentHostSettingsFromHost = guardedDecoder(isAgentHostSettings, "agent host settings response");
@@ -96,6 +100,11 @@ export const decodeRemoteAgentThreadBranches = guardedDecoder(isAgentThreadBranc
 export const decodeRemoteAgentThreadQueues = guardedDecoder(isAgentThreadQueues, "remote thread queues");
 export const decodeRemoteAgentThreadRequests = guardedDecoder(isAgentThreadRequests, "remote thread requests");
 export const decodeRemoteAgentUsageLimits = guardedDecoder(isAgentUsageLimits, "remote usage limits");
+export const decodeRemoteInterruptedTurns = guardedDecoder(isInterruptedTurnsList, "remote interrupted turns");
+export const decodeRemoteContinueInterrupted = guardedDecoder(
+  isContinueInterruptedResult,
+  "remote continue interrupted result",
+);
 export const decodeRemoteTaskConversation = guardedDecoder(isConversationSnapshot, "remote task conversation");
 export const decodeRemoteTaskPage = guardedDecoder(isAgentTaskPage, "remote thread page");
 export const decodeRemoteTaskWindow = guardedDecoder(isAgentTaskWindow, "remote thread part");

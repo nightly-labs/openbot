@@ -2488,6 +2488,33 @@ textarea {
   stroke-linejoin: round;
 }
 
+.agent-row-agent-status-interrupted {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-warning-soft);
+  color: var(--openbot-warning-text);
+}
+
+.agent-row-agent-status-interrupted svg {
+  width: 10px;
+  height: 10px;
+}
+
+.sidebar-interrupted-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-2);
+  padding-inline-end: 6px;
+}
+
+.sidebar-interrupted-continue-all {
+  height: 22px;
+  padding-inline: 8px;
+  font-size: var(--openbot-text-sm);
+}
+
 .agent-row-agent-status-routine,
 .agent-row-agent-status-limited {
   width: 16px;

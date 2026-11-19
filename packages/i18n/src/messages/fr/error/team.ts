@@ -96,6 +96,7 @@ export const messages = {
     "Cette connexion ne peut pas afficher ni modifier les limites de fils du serveur.",
   "error.team.usageLimitUnsupported":
     "Cette connexion ne peut pas afficher ni modifier les limites d’utilisation des agents.",
+  "error.team.interruptedResumeUnsupported": "Ce serveur ne prend pas en charge la reprise des tâches interrompues.",
   "error.team.hermesImportUnsupported": "Cette connexion ne peut pas importer de profils Hermes depuis le serveur.",
   "error.team.providerDetectionUnsupported":
     "Cette connexion ne peut pas trouver les serveurs de modèles et les agents du serveur.",

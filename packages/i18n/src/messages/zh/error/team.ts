@@ -84,6 +84,7 @@ export const messages = {
   "error.team.threadRequestsUnsupported": "当前连接无法显示支线对话发给其他智能体的请求。",
   "error.team.hostTurnLimitsUnsupported": "此连接无法显示或更改服务器的话题数限制。",
   "error.team.usageLimitUnsupported": "当前连接无法显示或更改助手的用量限制。",
+  "error.team.interruptedResumeUnsupported": "该服务器不支持继续已中断的任务。",
   "error.team.hermesImportUnsupported": "当前连接无法从服务器导入 Hermes 配置文件。",
   "error.team.providerDetectionUnsupported": "当前连接无法查找服务器上的模型服务器和智能体。",
   "error.team.providerModelSourceUnsupported": "当前连接无法显示提供商模型的来源。",

@@ -72,7 +72,7 @@ const AgentActions = createSimpleContext({
     } = useAgents();
     const { initializeConversation, removeConversation } = useConversation();
     const threads = useAgentThreads();
-    const { setActiveTurns, setFailedTurns, setQueues, setPendingPrompts } = useTurns();
+    const { setActiveTurns, setFailedTurns, setInterruptedTurns, setQueues, setPendingPrompts } = useTurns();
     const { sidebarLayout, setSidebarLayout, applySidebarLayoutAction, removePinnedSidebarItemEverywhere } =
       useSidebar();
     const { selectAgent, openCreatedAgent } = useNavigation();
@@ -300,6 +300,7 @@ const AgentActions = createSimpleContext({
         setUiErrors((current) => withoutAgent(current, agentConversationKey(serverId, agentId)));
         setActiveTurns((current) => withoutAgent(current, agentId));
         setFailedTurns((current) => withoutAgent(current, agentId));
+        setInterruptedTurns((current) => withoutAgent(current, agentId));
         setQueues((current) => withoutAgent(current, agentId));
         setPendingPrompts((current) => withoutAttention(current, (event) => attentionAgentId(event) === agentId));
       }

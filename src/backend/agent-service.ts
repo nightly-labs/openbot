@@ -200,7 +200,12 @@ import { ContextCompaction, compactsOnRequest } from "./agent/context-compaction
 import { ConversationReader } from "./agent/conversation-reader";
 import { ConversationRuntime } from "./agent/conversation-runtime";
 import { CustomEndpoints, toEndpointChangeFailed } from "./agent/custom-endpoints";
-import { agentNamesById, displayMessageReferences, type TagReferenceSource } from "./agent/delivery-content";
+import {
+  agentNamesById,
+  displayMessageReferences,
+  manualInterruptedContinuationPrompt,
+  type TagReferenceSource,
+} from "./agent/delivery-content";
 import { DeltaBuffer } from "./agent/delta-buffer";
 import type { SectionTeammates } from "./agent/developer-instructions";
 import { DrainScheduler } from "./agent/drain-scheduler";
@@ -1517,6 +1522,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       hooks: {
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
         turnFailed: (agentId, turnId) => this.#turn.markFailedTurn(agentId, turnId),
+        turnInterrupted: (agentId, turnId) => this.#turn.markInterruptedTurn(agentId, turnId),
+        clearInterrupted: (agentId) => this.#turn.clearInterruptedTurn(agentId),
         continuesAfterProviderExit: (agentId, turnId, deliveryIds) =>
           this.#turn.continuesAfterProviderExit(agentId, turnId, deliveryIds),
         // A deleted routine takes its runs with it, so a run without a record counts as quiet:
@@ -6951,6 +6958,35 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   acknowledgeFailedTurn(agentId: string, turnId: string): void {
     this.#turn.acknowledgeFailedTurn(agentId, turnId);
   }
+
+  acknowledgeInterruptedTurn(agentId: string, turnId: string): void {
+    this.#turn.acknowledgeInterruptedTurn(agentId, turnId);
+  }
+
+  readonly continueInterrupted = Effect.fn("AgentService.continueInterrupted")(function* (
+    this: AgentService,
+    agentIds: readonly string[],
+    sender?: ConversationMessageSender,
+    timezone?: string,
+  ): Effect.fn.Return<{ continued: string[] }, AgentLifecycleFailed> {
+    const continued: string[] = [];
+    const seen = new Set<string>();
+    for (const agentId of agentIds) {
+      if (seen.has(agentId)) continue;
+      seen.add(agentId);
+      if (!this.#store.get(agentId)) continue;
+      if (!this.#turn.interruptedTurns().has(agentId)) continue;
+      if (this.#runsTurn(agentId)) continue;
+      this.#turn.clearInterruptedTurn(agentId);
+      yield* this.sendMessage(
+        { agentId, text: manualInterruptedContinuationPrompt(), attachmentDraftIds: [] },
+        sender,
+        timezone,
+      );
+      continued.push(agentId);
+    }
+    return { continued };
+  }).bind(this);
 
   cancelQueuedMessage(agentId: string, deliveryId: string): Effect.Effect<void, AgentLifecycleFailed> {
     return this.#queue

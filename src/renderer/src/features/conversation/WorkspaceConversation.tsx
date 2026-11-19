@@ -11,6 +11,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { CONVERSATION_UNREAD_FROM_CAPABILITY } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
+import { INTERRUPTED_RESUME_CAPABILITY } from "@openbot/contracts/team-protocol/interrupted-resume-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { THREAD_MESSAGE_SEARCH_CAPABILITY } from "@openbot/contracts/team-protocol/thread-message-search-v1";
@@ -168,6 +169,8 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     stopActiveTurn,
     stoppableSubagentTurn,
     backgroundWork,
+    interruptedTurns,
+    setInterruptedTurns,
     usageLimits,
     usageLimitedModels,
     waitedUsageLimits,
@@ -661,6 +664,31 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         promptUiBlock={activePromptUiBlock()}
         approval={activeApproval()}
         usageLimitAsk={usageLimitAsk()}
+        interruptedTurn={(() => {
+          const agent = activeAgent();
+          if (!agent || activeTurns()[agent.id]) return undefined;
+          const turnId = interruptedTurns()[agent.id];
+          if (!turnId) return undefined;
+          const server = activeServer();
+          if (server?.kind === "remote" && !serverSupportsCapability(server, INTERRUPTED_RESUME_CAPABILITY)) {
+            return undefined;
+          }
+          const serverId = server?.id ?? "local";
+          return {
+            turnId,
+            onContinue: () => {
+              void turnsPort().agent.continueInterrupted({ agentIds: [agent.id] }, serverId);
+            },
+            onDismiss: () => {
+              setInterruptedTurns((current) => {
+                if (current[agent.id] !== turnId) return current;
+                const { [agent.id]: _, ...rest } = current;
+                return rest;
+              });
+              void turnsPort().agent.acknowledgeInterruptedTurn({ agentId: agent.id, turnId }, serverId);
+            },
+          };
+        })()}
         usageLimited={usageLimitsShown() ? usageLimited : undefined}
         providerFailed={usageLimitsShown() ? providerFailed : undefined}
         browserTakeover={activeBrowserTakeover()}

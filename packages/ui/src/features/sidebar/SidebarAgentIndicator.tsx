@@ -1,4 +1,4 @@
-import { Clock3, MessageCircleQuestionMark, MousePointer2, ShieldCheck, X } from "@openbot/ui";
+import { CirclePause, Clock3, MessageCircleQuestionMark, MousePointer2, ShieldCheck, X } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, onSettled, Show, untrack } from "solid-js";
 import type { AvatarMood } from "../../bloub-avatar";
@@ -280,6 +280,9 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
               }
             >
               <Clock3 aria-hidden="true" />
+            </Show>
+            <Show when={current().kind === "interrupted"}>
+              <CirclePause aria-hidden="true" />
             </Show>
             <Show when={waitReason(current())}>{(reason) => <SidebarWaitIcon reason={reason()} />}</Show>
             <Show when={routinePhase(current()) === "failed"}>

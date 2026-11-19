@@ -84,6 +84,7 @@ export const messages = {
   "error.team.threadRequestsUnsupported": "החיבור הזה אינו יכול להציג את הבקשות של שרשור צדדי לסוכנים אחרים.",
   "error.team.hostTurnLimitsUnsupported": "החיבור הזה לא יכול להציג או לשנות את מגבלות השרשורים של השרת.",
   "error.team.usageLimitUnsupported": "החיבור הזה אינו יכול להציג או לשנות את מגבלות השימוש של סוכנים.",
+  "error.team.interruptedResumeUnsupported": "שרת זה אינו תומך בהמשך משימות שנקטעו.",
   "error.team.hermesImportUnsupported": "החיבור הזה אינו יכול לייבא פרופילי Hermes מהשרת.",
   "error.team.providerDetectionUnsupported": "החיבור הזה אינו יכול למצוא את שרתי המודלים והסוכנים של השרת.",
   "error.team.providerModelSourceUnsupported": "החיבור הזה אינו יכול להראות מאיפה מגיעים המודלים של ספק.",

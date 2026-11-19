@@ -87,6 +87,7 @@ export const messages = {
   "sidebar.agentMenu.duplicate": "שכפול הסוכן",
   "sidebar.agentMenu.duplicating": "משכפל…",
   "sidebar.agentMenu.markRead": "סימון כנקרא",
+  "sidebar.agentMenu.continue": "המשך",
   "sidebar.agentMenu.markUnread": "סימון כלא נקרא",
   "sidebar.agentMenu.mute": "השתקת הסוכן",
   "sidebar.agentMenu.unmute": "ביטול השתקת הסוכן",
@@ -129,6 +130,8 @@ export const messages = {
   "sidebar.state.waitingTakeover": "ממתין לך בדפדפן",
   "sidebar.state.waitingDetail": "{state}: {detail}",
   "sidebar.waiting.title": "זקוקים לך",
+  "sidebar.interrupted.title": "נקטעו",
+  "sidebar.interrupted.continueAll": "המשך הכל",
   "sidebar.waiting.label": {
     one: "זקוק לך, צ'אט אחד",
     two: "זקוקים לך, שני צ'אטים",
@@ -154,6 +157,7 @@ export const messages = {
   "sidebar.state.usageLimit": "ממתין למגבלה",
   "sidebar.state.usageLimitResets": "ממתין למגבלה · {reset}",
   "sidebar.state.usageLimitChip": "מגבלה",
+  "sidebar.state.interrupted": "נקטע",
   "sidebar.delete.pending": "מוחק…",
   "sidebar.delete.title": "למחוק את {name}?",
   "sidebar.delete.agentDescription":

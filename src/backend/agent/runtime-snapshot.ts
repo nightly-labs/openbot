@@ -150,7 +150,7 @@ export interface RuntimeSnapshotSources {
   conversation: Pick<ConversationRuntime, "loadedSnapshot">;
   database: Pick<OpenBotDatabase, "readConversationRuntime">;
   mailbox: Pick<MailboxStore, "listRuntimeWork">;
-  turn: Pick<TurnLifecycle, "failedTurns" | "subagentTurns" | "backgroundWork">;
+  turn: Pick<TurnLifecycle, "failedTurns" | "interruptedTurns" | "subagentTurns" | "backgroundWork">;
   attention: Pick<AttentionRegistry, "runtimeAttention">;
   usageLimits: Pick<UsageLimitGate, "limitedAgents" | "limitedModels" | "failedModels">;
   /** Whether a held agent waits for its limit: no ready backup model or pool account takes its work. */
@@ -227,6 +227,7 @@ export function buildRuntimeSnapshot({
     latestMessages,
     ...attention.runtimeAttention(),
     failedTurns: [...turn.failedTurns()].map(([agentId, turnId]) => ({ agentId, turnId })),
+    interruptedTurns: [...turn.interruptedTurns()].map(([agentId, turnId]) => ({ agentId, turnId })),
     // An agent that moves to a ready backup with its next work does not show that it waits (#12360).
     usageLimits: usageLimits.limitedAgents().filter((limit) => waitsForLimit(limit.agentId)),
     usageLimitedModels: usageLimits.limitedModels(),

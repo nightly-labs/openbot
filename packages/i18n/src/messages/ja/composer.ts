@@ -3,6 +3,8 @@ import type { messages as source } from "../en/composer";
 
 export const messages = {
   "composer.queueEdit.body": "キュー内のメッセージを編集中です。実行するには編集を保存するかキャンセルしてください。",
+  "composer.interrupted.body": "前回のタスクは完了前に中断されました。",
+  "composer.interrupted.continue": "続行",
   "composer.queueEdit.cancel": "編集をキャンセル",
   "composer.feedbackFix.body":
     "レポート #{number} を修正しています。リクエストを送信するか、キャンセルしてレポートをそのままにします。",

@@ -103,6 +103,7 @@ export const messages = {
   "sidebar.agentMenu.duplicate": "Дублировать агента",
   "sidebar.agentMenu.duplicating": "Дублирование…",
   "sidebar.agentMenu.markRead": "Отметить прочитанным",
+  "sidebar.agentMenu.continue": "Продолжить",
   "sidebar.agentMenu.markUnread": "Отметить непрочитанным",
   "sidebar.agentMenu.mute": "Отключить уведомления",
   "sidebar.agentMenu.unmute": "Включить уведомления",
@@ -157,6 +158,8 @@ export const messages = {
   "sidebar.state.waitingTakeover": "Ждёт вас в браузере",
   "sidebar.state.waitingDetail": "{state}: {detail}",
   "sidebar.waiting.title": "Нужны вы",
+  "sidebar.interrupted.title": "Прервано",
+  "sidebar.interrupted.continueAll": "Продолжить все",
   "sidebar.waiting.label": {
     one: "Нужны вы: {count} чат",
     few: "Нужны вы: {count} чата",
@@ -208,6 +211,7 @@ export const messages = {
   "sidebar.state.usageLimit": "Ждёт сброса лимита",
   "sidebar.state.usageLimitResets": "Ждёт сброса лимита · {reset}",
   "sidebar.state.usageLimitChip": "Лимит",
+  "sidebar.state.interrupted": "Прервано",
   "sidebar.delete.pending": "Удаление…",
   "sidebar.delete.title": "Удалить «{name}»?",
   "sidebar.delete.agentDescription":

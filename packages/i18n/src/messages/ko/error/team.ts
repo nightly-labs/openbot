@@ -85,6 +85,7 @@ export const messages = {
     "이 연결에서는 사이드 스레드가 다른 에이전트에게 보낸 요청을 표시할 수 없어요.",
   "error.team.hostTurnLimitsUnsupported": "이 연결에서는 서버의 스레드 제한을 표시하거나 변경할 수 없습니다.",
   "error.team.usageLimitUnsupported": "이 연결에서는 에이전트의 사용 한도를 표시하거나 변경할 수 없어요.",
+  "error.team.interruptedResumeUnsupported": "이 서버는 중단된 작업 이어하기를 지원하지 않아요.",
   "error.team.hermesImportUnsupported": "이 연결에서는 서버의 Hermes 프로필을 가져올 수 없어요.",
   "error.team.providerDetectionUnsupported": "이 연결에서는 서버의 모델 서버와 에이전트를 찾을 수 없어요.",
   "error.team.providerModelSourceUnsupported": "이 연결에서는 제공자의 모델 출처를 표시할 수 없어요.",

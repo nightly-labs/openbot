@@ -95,6 +95,7 @@ export const messages = {
     "Questa connessione non può mostrare né modificare i limiti dei thread del server.",
   "error.team.usageLimitUnsupported":
     "Questa connessione non può mostrare né modificare i limiti di utilizzo degli agenti.",
+  "error.team.interruptedResumeUnsupported": "Questo server non supporta la ripresa delle attività interrotte.",
   "error.team.hermesImportUnsupported": "Questa connessione non può importare profili Hermes dal server.",
   "error.team.providerDetectionUnsupported":
     "Questa connessione non può trovare i server di modelli e gli agenti del server.",

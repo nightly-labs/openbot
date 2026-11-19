@@ -83,6 +83,7 @@ export const messages = {
   "sidebar.agentMenu.duplicate": "Duplicar agente",
   "sidebar.agentMenu.duplicating": "Duplicando…",
   "sidebar.agentMenu.markRead": "Marcar como leído",
+  "sidebar.agentMenu.continue": "Continuar",
   "sidebar.agentMenu.markUnread": "Marcar como no leído",
   "sidebar.agentMenu.mute": "Silenciar agente",
   "sidebar.agentMenu.unmute": "Dejar de silenciar",
@@ -126,6 +127,8 @@ export const messages = {
   "sidebar.state.waitingTakeover": "Esperándote en el navegador",
   "sidebar.state.waitingDetail": "{state}: {detail}",
   "sidebar.waiting.title": "Te necesita",
+  "sidebar.interrupted.title": "Interrumpidas",
+  "sidebar.interrupted.continueAll": "Continuar todo",
   "sidebar.waiting.label": {
     one: "Te necesita, {count} chat",
     other: "Te necesitan, {count} chats",
@@ -159,6 +162,7 @@ export const messages = {
   "sidebar.state.usageLimit": "En espera por el límite",
   "sidebar.state.usageLimitResets": "En espera por el límite · {reset}",
   "sidebar.state.usageLimitChip": "Límite",
+  "sidebar.state.interrupted": "Interrumpida",
   "sidebar.delete.pending": "Eliminando…",
   "sidebar.delete.title": "¿Eliminar {name}?",
   "sidebar.delete.agentDescription":

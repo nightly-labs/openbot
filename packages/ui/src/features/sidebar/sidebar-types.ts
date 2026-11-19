@@ -87,6 +87,8 @@ export interface SidebarProps {
   /** Marks every agent chat and channel read. The free-area menu offers it while `hasUnread` is set. */
   onMarkAllRead?: (() => void) | undefined;
   hasUnread?: boolean | undefined;
+  /** Continues one or more interrupted agent tasks. Absent when the host does not support resuming. */
+  onContinueInterrupted?: ((agentIds: string[]) => void) | undefined;
   onEditChannel?: ((channelId: string) => void) | undefined;
   onDeleteChannel?: ((channelId: string) => Promise<void>) | undefined;
   /** Brings a deleted channel back to the list. Without it, a row in Deleted channels has no menu. */
@@ -257,7 +259,9 @@ export type SidebarAgentState =
   | { kind: "unread"; count: number }
   | { kind: "routine"; phase: SidebarRoutinePhase; count: number }
   /** The provider plan is spent, so the queue waits. `resetsAt` is in epoch seconds, `null` when unknown. */
-  | { kind: "limited"; resetsAt: number | null };
+  | { kind: "limited"; resetsAt: number | null }
+  /** The agent's last turn stopped before completion and can be continued. */
+  | { kind: "interrupted"; turnId: string };
 
 /** What a channel waits for. Its row shows it in "Needs you" the same way an agent row does. */
 export type SidebarChannelWait = Extract<SidebarAgentState, { kind: "waiting" }>;

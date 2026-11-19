@@ -498,8 +498,11 @@ import type {
 } from "./ipc-provider-environment";
 import type {
   AcknowledgeFailedTurnInput,
+  AcknowledgeInterruptedTurnInput,
   BusyMessageModePreference,
   CancelQueuedMessageInput,
+  ContinueInterruptedInput,
+  ContinueInterruptedResult,
   EditQueuedMessageInput,
   InterruptTurnInput,
   QueuedMessageReceipt,
@@ -1909,6 +1912,12 @@ export const IPC_ENDPOINTS = {
     listTaskReads: scopedRequest<string, AgentTaskReadState[]>()("agent:tasks:reads"),
     markTaskRead: scopedRequest<MarkAgentTaskReadInput, AgentTaskReadState>()("agent:tasks:mark-read"),
     acknowledgeFailedTurn: scopedRequest<AcknowledgeFailedTurnInput, void>()("agent:acknowledge-failed-turn"),
+    acknowledgeInterruptedTurn: scopedRequest<AcknowledgeInterruptedTurnInput, void>()(
+      "agent:acknowledge-interrupted-turn",
+    ),
+    continueInterrupted: scopedRequest<ContinueInterruptedInput, ContinueInterruptedResult>()(
+      "agent:continue-interrupted",
+    ),
     cancelQueuedMessage: scopedRequest<CancelQueuedMessageInput, void>()("agent:cancel-queued-message"),
     steerQueuedMessage: scopedRequest<SteerQueuedMessageInput, void>()("agent:steer-queued-message"),
     editQueuedMessage: scopedRequest<EditQueuedMessageInput, QueueSnapshot>()("agent:edit-queued-message"),

@@ -174,6 +174,8 @@ type TeamApiAgentMethods = Pick<
   | "listQueue"
   | "listActiveQueues"
   | "acknowledgeFailedTurn"
+  | "acknowledgeInterruptedTurn"
+  | "continueInterrupted"
   | "setMessageReaction"
   | "deleteConversationMessage"
   | "listPinnedMessages"

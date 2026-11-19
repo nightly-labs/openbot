@@ -1270,6 +1270,12 @@ const fakeAgents: TeamApiAgents = {
     return agentIds.map(activeQueue);
   },
   acknowledgeFailedTurn: (agentId, turnId) => record("acknowledgeFailedTurn", agentId, turnId),
+  acknowledgeInterruptedTurn: (agentId, turnId) => record("acknowledgeInterruptedTurn", agentId, turnId),
+  continueInterrupted: (agentIds) =>
+    Effect.sync(() => {
+      record("continueInterrupted", agentIds);
+      return { continued: [...agentIds] };
+    }),
   cancelQueuedMessage: (agentId, deliveryId) => Effect.sync(() => record("cancelQueuedMessage", agentId, deliveryId)),
   steerQueuedMessage: (input) => {
     record("steerQueuedMessage", input);

@@ -653,6 +653,18 @@ export function compactionContinuationPrompt(): string {
  * The note for a turn whose provider process exited during the agent's answer (#9729). The rest of the
  * answer was never made, so the agent continues from what it said before.
  */
+/**
+ * The prompt sent when the user explicitly clicks Continue (or Continue all) for an interrupted task.
+ */
+export function manualInterruptedContinuationPrompt(): string {
+  return [
+    "Continue from where you stopped.",
+    "Do not repeat completed actions or restate earlier answers.",
+    "Check the result of any action that was interrupted before retrying it.",
+    "If the task is already finished, summarize the result in one short line.",
+  ].join(" ");
+}
+
 export function providerExitContinuationPrompt(): string {
   return [
     "OpenBot note, not a message from the user. Your last turn stopped because your provider process exited while you wrote your answer, so the user got only its first part.",

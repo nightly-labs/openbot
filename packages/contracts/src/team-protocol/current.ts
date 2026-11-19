@@ -114,6 +114,7 @@ import { HOSTED_SITES_CAPABILITY } from "./hosted-sites-v1";
 import { INSTANCE_TRANSFER_CHUNKS_CAPABILITY } from "./instance-transfer-chunks-v1";
 import { INSTANCE_TRANSFER_FULL_COPY_CAPABILITY } from "./instance-transfer-full-copy-v1";
 import { INSTANCE_TRANSFER_CAPABILITY } from "./instance-transfer-v1";
+import { INTERRUPTED_RESUME_CAPABILITY } from "./interrupted-resume-v1";
 import { LIBRARY_FOLDERS_EVENTS_CAPABILITY } from "./library-folders-events-v1";
 import { LIBRARY_FOLDERS_CAPABILITY } from "./library-folders-v1";
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "./live-activity-push-v1";
@@ -808,6 +809,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [ROUTINE_QUIET_ANSWERS_CAPABILITY, V10],
   [SKILL_PROBLEMS_CAPABILITY, V10],
   [ROUTINE_RESULTS_WHATSAPP_CAPABILITY, V10],
+  [INTERRUPTED_RESUME_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

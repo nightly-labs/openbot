@@ -4,6 +4,8 @@ import type { messages as source } from "../en/composer";
 export const messages = {
   "composer.queueEdit.body":
     "Je bewerkt een bericht in de wachtrij. Sla de wijziging op of annuleer hem om het bericht te laten uitvoeren.",
+  "composer.interrupted.body": "De laatste taak werd onderbroken voordat deze klaar was.",
+  "composer.interrupted.continue": "Doorgaan",
   "composer.queueEdit.cancel": "Bewerking annuleren",
   "composer.feedbackFix.body":
     "Melding #{number} wordt gecorrigeerd. Verstuur het verzoek, of annuleer om de melding te laten zoals hij is.",

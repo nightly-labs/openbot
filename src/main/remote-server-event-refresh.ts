@@ -31,9 +31,18 @@ import {
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_USAGE_LIMIT_ROUTES, type AgentUsageLimits } from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
+import {
+  INTERRUPTED_RESUME_ROUTES,
+  type InterruptedTurnsList,
+} from "@openbot/contracts/team-protocol/interrupted-resume-v1";
 import { PROVIDER_MODEL_SOURCE_ROUTES } from "@openbot/contracts/team-protocol/provider-model-source-v1";
 import { Deferred, Effect, Result } from "effect";
-import { decodeAgentSummaries, decodeQueueSnapshot, decodeRemoteAgentUsageLimits } from "./remote-agent-decoding";
+import {
+  decodeAgentSummaries,
+  decodeQueueSnapshot,
+  decodeRemoteAgentUsageLimits,
+  decodeRemoteInterruptedTurns,
+} from "./remote-agent-decoding";
 import { decodeConversationPageFromHost } from "./remote-conversation-decoding";
 import type { RemoteRequestFn } from "./remote-server-client";
 import { addRemotePreviewUrls, pageQuery } from "./remote-server-urls";
@@ -65,6 +74,8 @@ export interface RemoteEventRefreshOptions {
   onMemberChatColors?: (serverId: string) => void;
   /** Whether the server sends the usage limits of its agents on their own route (`agent-usage-limit-v1`). */
   hasUsageLimits?: (serverId: string) => boolean;
+  /** Whether the server reports interrupted turns on their own route (`interrupted-resume-v1`). */
+  hasInterruptedResume?: (serverId: string) => boolean;
   /** Whether the server says where its providers' models come from (`provider-model-source-v1`). */
   hasModelSources?: (serverId: string) => boolean;
 }
@@ -75,6 +86,7 @@ export class RemoteEventRefresh {
   readonly #emit: (serverId: string, event: AgentEvent, bufferedLive?: boolean) => void;
   readonly #onMemberChatColors: (serverId: string) => void;
   readonly #hasUsageLimits: (serverId: string) => boolean;
+  readonly #hasInterruptedResume: (serverId: string) => boolean;
   readonly #hasModelSources: (serverId: string) => boolean;
   readonly #conversations = new Map<string, ConversationRefresh>();
   readonly #queues = new Map<string, QueueRefresh>();
@@ -99,6 +111,8 @@ export class RemoteEventRefresh {
   readonly #runtimeSnapshots = new Map<string, AgentRuntimeSnapshot>();
   readonly #usageLimits = new Map<string, AgentUsageLimits>();
   readonly #usageLimitReads = new Map<string, QueueRefresh>();
+  readonly #interruptedTurns = new Map<string, InterruptedTurnsList>();
+  readonly #interruptedTurnReads = new Map<string, QueueRefresh>();
   /**
    * The last status of each server, and the model sources that `provider-model-source-v1` gave. The
    * released status event carries no source (#9956), so each one goes out with the last sources, and
@@ -114,6 +128,7 @@ export class RemoteEventRefresh {
     this.#emit = options.emit;
     this.#onMemberChatColors = options.onMemberChatColors ?? (() => undefined);
     this.#hasUsageLimits = options.hasUsageLimits ?? (() => false);
+    this.#hasInterruptedResume = options.hasInterruptedResume ?? (() => false);
     this.#hasModelSources = options.hasModelSources ?? (() => false);
   }
 
@@ -154,12 +169,14 @@ export class RemoteEventRefresh {
       this.#statuses.set(serverId, event.status);
       this.#emitStatus(serverId, bufferedLive);
       yield* this.#refreshModelSources(serverId);
-    } else if (event.type === "runtime-snapshot" && this.#hasUsageLimits(serverId)) {
-      // The snapshot goes out at once with the last usage limits. A changed hold also sends a runtime
-      // snapshot, so the limits are read again after it.
+    } else if (
+      event.type === "runtime-snapshot" &&
+      (this.#hasUsageLimits(serverId) || this.#hasInterruptedResume(serverId))
+    ) {
       this.#runtimeSnapshots.set(serverId, event.snapshot);
       this.#emitRuntimeSnapshot(serverId, bufferedLive);
-      yield* this.#refreshUsageLimits(serverId);
+      if (this.#hasUsageLimits(serverId)) yield* this.#refreshUsageLimits(serverId);
+      if (this.#hasInterruptedResume(serverId)) yield* this.#refreshInterruptedTurns(serverId);
     } else {
       if (event.type === "browser-changed")
         this.#browserStates.set(serverId, { tabs: event.tabs, activeTabId: event.activeTabId });
@@ -306,10 +323,13 @@ export class RemoteEventRefresh {
     const snapshot = this.#runtimeSnapshots.get(serverId);
     if (!snapshot) return;
     const limits = this.#usageLimits.get(serverId);
-    const event = addRemotePreviewUrls(
-      { type: "runtime-snapshot" as const, snapshot: limits ? { ...snapshot, ...limits } : snapshot },
-      serverId,
-    );
+    const interrupted = this.#interruptedTurns.get(serverId);
+    const mergedSnapshot = {
+      ...snapshot,
+      ...(limits ?? {}),
+      ...(interrupted ?? {}),
+    };
+    const event = addRemotePreviewUrls({ type: "runtime-snapshot" as const, snapshot: mergedSnapshot }, serverId);
     if (bufferedLive) this.#emit(serverId, event, true);
     else this.#emit(serverId, event);
   }
@@ -395,6 +415,42 @@ export class RemoteEventRefresh {
     );
   });
 
+  readonly #refreshInterruptedTurns = Effect.fn("RemoteEvents.refreshInterruptedTurns")(function* (
+    this: RemoteEventRefresh,
+    serverId: string,
+  ) {
+    const pending = this.#interruptedTurnReads.get(serverId);
+    if (pending) {
+      pending.dirty = true;
+      return;
+    }
+    const read = { dirty: false };
+    this.#interruptedTurnReads.set(serverId, read);
+    yield* Effect.gen({ self: this }, function* () {
+      do {
+        read.dirty = false;
+        const result = yield* this.#request(serverId, INTERRUPTED_RESUME_ROUTES.list, decodeRemoteInterruptedTurns, {
+          method: "POST",
+          body: {},
+        }).pipe(Effect.result);
+        if (Result.isFailure(result)) {
+          if (read.dirty) continue;
+          return;
+        }
+        if (!this.#hasServer(serverId)) return;
+        const previous = this.#interruptedTurns.get(serverId);
+        this.#interruptedTurns.set(serverId, result.success);
+        if (JSON.stringify(previous) !== JSON.stringify(result.success)) this.#emitRuntimeSnapshot(serverId);
+      } while (read.dirty);
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          if (this.#interruptedTurnReads.get(serverId) === read) this.#interruptedTurnReads.delete(serverId);
+        }),
+      ),
+    );
+  });
+
   #emitRoster(serverId: string, agents: ClientAgentSummary[], bufferedLive = false): void {
     this.#agentRosters.set(serverId, agents);
     const event = { type: "agents-changed" as const, agents: this.withAgentColors(serverId, agents) };
@@ -413,6 +469,7 @@ export class RemoteEventRefresh {
     this.#browserStates.delete(serverId);
     this.#runtimeSnapshots.delete(serverId);
     this.#usageLimits.delete(serverId);
+    this.#interruptedTurns.delete(serverId);
     this.#usageLimitReads.delete(serverId);
     this.#statuses.delete(serverId);
     this.#modelSources.delete(serverId);
@@ -437,6 +494,7 @@ export class RemoteEventRefresh {
     this.#browserStates.clear();
     this.#runtimeSnapshots.clear();
     this.#usageLimits.clear();
+    this.#interruptedTurns.clear();
     this.#usageLimitReads.clear();
     this.#generations.clear();
     this.#conversations.clear();

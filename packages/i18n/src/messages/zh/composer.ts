@@ -3,6 +3,8 @@ import type { messages as source } from "../en/composer";
 
 export const messages = {
   "composer.queueEdit.body": "你正在编辑一条排队中的消息。保存或取消编辑后它才会继续执行。",
+  "composer.interrupted.body": "上一个任务在完成前被中断。",
+  "composer.interrupted.continue": "继续",
   "composer.queueEdit.cancel": "取消编辑",
   "composer.feedbackFix.body": "正在更正报告 #{number}。发送请求，或取消以保持报告不变。",
   "composer.feedbackFix.cancel": "取消",

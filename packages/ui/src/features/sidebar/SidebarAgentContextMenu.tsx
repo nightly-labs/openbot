@@ -15,6 +15,7 @@ import {
   Moon,
   Pin,
   PinOff,
+  Play,
   RotateCcw,
 } from "@openbot/ui";
 import { Show } from "solid-js";
@@ -37,9 +38,18 @@ export function SidebarAgentContextMenu(menuProps: { agent: AgentProfile; pinned
     const section = assigned ? customSectionById().get(assigned) : undefined;
     return section ? t("sidebar.agentMenu.restoreTo", { section: section.name }) : t("sidebar.agentMenu.restore");
   };
+  const interrupted = () => props.agentStates[menuProps.agent.id]?.kind === "interrupted";
   return (
     <ContextMenu.Portal>
       <ContextMenu.Content class="agent-context-menu" aria-label={t("sidebar.agentMenu.label")}>
+        <Show when={interrupted() && props.onContinueInterrupted}>
+          {(continueInterrupted) => (
+            <ContextMenu.Item onSelect={() => continueInterrupted()([menuProps.agent.id])}>
+              <Play class="agent-context-icon size-4" aria-hidden="true" />
+              <span>{t("sidebar.agentMenu.continue")}</span>
+            </ContextMenu.Item>
+          )}
+        </Show>
         <ContextMenu.Item
           data-cuelume-tap="toggle"
           onSelect={() => (menuProps.pinned ? props.onUnpin(ref()) : props.onPin(ref()))}

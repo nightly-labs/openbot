@@ -71,6 +71,7 @@ export function createSidebarScope(props: SidebarProps) {
     sectionUnreadCount,
     setListFilter,
     shownPeople,
+    interruptedChats,
     unreadChats,
     userHiddenAgentList,
     userHiddenSince,
@@ -213,6 +214,7 @@ export function createSidebarScope(props: SidebarProps) {
     () => [
       resolvedPinnedItems(),
       waitingChats(),
+      interruptedChats(),
       unreadChats(),
       filteredChats(),
       orderedPeople(),
@@ -307,6 +309,7 @@ export function createSidebarScope(props: SidebarProps) {
     startSectionDragging,
     stopSidebarDragging,
     toggleAgentThreads,
+    interruptedChats,
     unreadChats,
     updateSectionEditorName,
     updateSidebarNativeDrag,

@@ -701,6 +701,19 @@ const agentGroup = bridgeGroup(IPC_ENDPOINTS.agent, {
   listTaskReads: decodeAgentTaskReadStates,
   markTaskRead: decodeAgentTaskReadState,
   acknowledgeFailedTurn: decodeVoid,
+  acknowledgeInterruptedTurn: decodeVoid,
+  continueInterrupted: (value: unknown) => {
+    if (
+      typeof value !== "object" ||
+      value === null ||
+      !("continued" in value) ||
+      !Array.isArray(value.continued) ||
+      !value.continued.every((id) => typeof id === "string")
+    ) {
+      throw new Error("Invalid continue interrupted payload from main process.");
+    }
+    return { continued: value.continued };
+  },
   cancelQueuedMessage: decodeVoid,
   steerQueuedMessage: decodeVoid,
   editQueuedMessage: decodeQueue,

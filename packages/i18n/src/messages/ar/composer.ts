@@ -3,6 +3,8 @@ import type { messages as source } from "../en/composer";
 
 export const messages = {
   "composer.queueEdit.body": "أنت تعدّل رسالة في قائمة الانتظار. احفظ التعديل أو ألغه لتشغيلها.",
+  "composer.interrupted.body": "توقفت المهمة الأخيرة قبل اكتمالها.",
+  "composer.interrupted.continue": "متابعة",
   "composer.queueEdit.cancel": "إلغاء التعديل",
   "composer.feedbackFix.body": "تصحيح البلاغ #{number}. أرسل الطلب، أو ألغِه لإبقاء البلاغ كما هو.",
   "composer.feedbackFix.cancel": "إلغاء",

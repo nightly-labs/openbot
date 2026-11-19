@@ -3533,6 +3533,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         };
       },
       acknowledgeFailedTurn: async () => undefined,
+      acknowledgeInterruptedTurn: async () => undefined,
+      continueInterrupted: async ({ agentIds }) => ({ continued: [...agentIds] }),
       cancelQueuedMessage: async (input) => {
         const queue = queues.get(input.agentId) ?? emptyQueue(input.agentId);
         queue.deliveries = queue.deliveries.map((delivery) =>

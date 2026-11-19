@@ -14,6 +14,8 @@ export interface TurnsPort {
     | "compactTaskContext"
     | "deleteHistory"
     | "interrupt"
+    | "acknowledgeInterruptedTurn"
+    | "continueInterrupted"
     | "listActiveQueues"
     | "listQueue"
     | "listRoutines"

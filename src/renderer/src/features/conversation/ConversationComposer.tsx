@@ -689,6 +689,26 @@ export function ConversationComposer() {
               />
             )}
           </ComposerStackCard>
+          <ComposerStackCard when={props.interruptedTurn}>
+            {(interrupted) => (
+              <ComposerNotice
+                tone="warning"
+                body={t("composer.interrupted.body")}
+                action={
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    type="button"
+                    disabled={submitting() || attachmentBusy()}
+                    onClick={() => interrupted().onContinue()}
+                  >
+                    {t("composer.interrupted.continue")}
+                  </Button>
+                }
+                onDismiss={() => interrupted().onDismiss()}
+              />
+            )}
+          </ComposerStackCard>
           <ComposerStackCard when={editingDeliveryId()}>
             {() => (
               <ComposerNotice

@@ -88,6 +88,7 @@ export const messages = {
     "Deze verbinding kan de verzoeken van een zijthread aan andere agents niet tonen.",
   "error.team.hostTurnLimitsUnsupported": "Deze verbinding kan de threadlimieten van de server niet tonen of wijzigen.",
   "error.team.usageLimitUnsupported": "Deze verbinding kan de gebruikslimieten van agents niet tonen of wijzigen.",
+  "error.team.interruptedResumeUnsupported": "Deze server ondersteunt het hervatten van onderbroken taken niet.",
   "error.team.hermesImportUnsupported": "Deze verbinding kan geen Hermes-profielen van de server importeren.",
   "error.team.providerDetectionUnsupported": "Deze verbinding kan de modelservers en agents van de server niet vinden.",
   "error.team.providerModelSourceUnsupported":

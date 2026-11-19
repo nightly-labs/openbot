@@ -432,6 +432,7 @@ export class TurnLifecycle {
   readonly #hooks: TurnHooks;
   readonly fileHistory = new ThreadFileHistory();
   readonly #failedTurns = new Map<string, string>();
+  readonly #interruptedTurns = new Map<string, string>();
   readonly #observedCompactions = new Map<string, string>();
   readonly #itemTurns = new Map<string, string>();
   /** The real start and end of each step of a running turn, for the trace of the finished turn. */
@@ -621,6 +622,10 @@ export class TurnLifecycle {
     return this.#failedTurns;
   }
 
+  interruptedTurns(): ReadonlyMap<string, string> {
+    return this.#interruptedTurns;
+  }
+
   /** The newest turn with running subagents of each agent in `agentIds`. */
   subagentTurns(agentIds: ReadonlySet<string>): Array<{ agentId: string; turnId: string }> {
     const turns: Array<{ agentId: string; turnId: string }> = [];
@@ -649,6 +654,7 @@ export class TurnLifecycle {
   forgetAgent(agentId: string): void {
     this.fileHistory.forgetAgent(agentId);
     this.#failedTurns.delete(agentId);
+    this.#interruptedTurns.delete(agentId);
     this.#subagentTurns.delete(agentId);
     for (const [threadId, work] of this.#waitingThreads)
       if (work.agentId === agentId) this.#waitingThreads.delete(threadId);
@@ -727,11 +733,29 @@ export class TurnLifecycle {
     this.#hooks.emitRuntimeSnapshot();
   }
 
+  /** A turn of the agent's own chat that ended as interrupted outside live turn completion (e.g. restart). */
+  markInterruptedTurn(agentId: string, turnId: string): void {
+    this.#interruptedTurns.set(agentId, turnId);
+    this.#hooks.emitRuntimeSnapshot();
+  }
+
+  acknowledgeInterruptedTurn(agentId: string, turnId: string): void {
+    if (this.#interruptedTurns.get(agentId) !== turnId) return;
+    this.#interruptedTurns.delete(agentId);
+    this.#hooks.emitRuntimeSnapshot();
+  }
+
+  clearInterruptedTurn(agentId: string): void {
+    if (!this.#interruptedTurns.delete(agentId)) return;
+    this.#hooks.emitRuntimeSnapshot();
+  }
+
   readonly dispose = Effect.fn("TurnLifecycle.dispose")(function* (this: TurnLifecycle) {
     yield* Scope.close(this.#scope, Exit.void);
     this.#scope = Scope.makeUnsafe();
     this.fileHistory.clear();
     this.#failedTurns.clear();
+    this.#interruptedTurns.clear();
     this.#turnAssociations.clear();
     this.#turnErrors.clear();
     this.#turnRetries.clear();
@@ -1401,7 +1425,10 @@ export class TurnLifecycle {
         if (started && reports && unprompted) started.reports = reports;
         const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
         snapshot.activeTurnId = turnId;
-        if (laneId === null || laneId === MESSAGING_LANE) this.#failedTurns.delete(agentId);
+        if (laneId === null || laneId === MESSAGING_LANE) {
+          this.#failedTurns.delete(agentId);
+          this.#interruptedTurns.delete(agentId);
+        }
         const origin = starting?.sender.kind ?? "unknown";
         if (!unprompted) {
           const association = Deferred.makeUnsafe<void, TurnOperationFailed>();
@@ -2513,8 +2540,16 @@ export class TurnLifecycle {
       // The failed turn of the agent's own chat and its messaging work only: a task shows its outcome
       // in its own row, and a channel turn in its channel.
       const ownLane = !taskTurn && this.#conversation.channelForThread(snapshot.threadId) === null;
-      if (ownLane && outcome === "failed") this.#failedTurns.set(agentId, turnId);
-      else if (ownLane) this.#failedTurns.delete(agentId);
+      if (ownLane && outcome === "failed") {
+        this.#failedTurns.set(agentId, turnId);
+        this.#interruptedTurns.delete(agentId);
+      } else if (ownLane && outcome === "interrupted") {
+        this.#failedTurns.delete(agentId);
+        this.#interruptedTurns.set(agentId, turnId);
+      } else if (ownLane) {
+        this.#failedTurns.delete(agentId);
+        this.#interruptedTurns.delete(agentId);
+      }
       const failure = refusedFailure ?? reportedError;
       if (refused) {
         yield* this.#hooks.dropRefusedSession(agentId, threadId);

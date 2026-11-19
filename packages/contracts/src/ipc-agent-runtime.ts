@@ -247,6 +247,11 @@ export interface AgentRuntimeSnapshot {
   pendingBrowserTakeovers: BrowserTakeoverRequest[];
   failedTurns: Array<{ agentId: string; turnId: string }>;
   /**
+   * The agents whose last turn on their own chat ended as interrupted and has not been continued
+   * or dismissed yet. Absent from a released Team API snapshot: its adapters project a fixed key list.
+   */
+  interruptedTurns?: Array<{ agentId: string; turnId: string }>;
+  /**
    * The agents whose queue waits for a provider plan limit to reset, in epoch seconds. Absent from
    * a released Team API snapshot: its adapters project a fixed key list.
    */
@@ -326,6 +331,12 @@ export function isAgentRuntimeSnapshot(value: unknown): value is AgentRuntimeSna
     value.failedTurns.every(
       (turn) => isDynamicRecord(turn) && isIdentifier(turn.agentId) && isIdentifier(turn.turnId),
     ) &&
+    (value.interruptedTurns === undefined ||
+      (Array.isArray(value.interruptedTurns) &&
+        value.interruptedTurns.length <= INPUT_LIMITS.agents &&
+        value.interruptedTurns.every(
+          (turn) => isDynamicRecord(turn) && isIdentifier(turn.agentId) && isIdentifier(turn.turnId),
+        ))) &&
     (value.usageLimits === undefined ||
       (Array.isArray(value.usageLimits) &&
         value.usageLimits.length <= INPUT_LIMITS.agents &&

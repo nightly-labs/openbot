@@ -85,6 +85,7 @@ export const messages = {
   "error.team.threadRequestsUnsupported": "To połączenie nie może pokazać próśb wątku pobocznego do innych agentów.",
   "error.team.hostTurnLimitsUnsupported": "To połączenie nie może pokazać ani zmienić limitów wątków serwera.",
   "error.team.usageLimitUnsupported": "To połączenie nie może pokazać ani zmienić limitów użycia agentów.",
+  "error.team.interruptedResumeUnsupported": "Ten serwer nie obsługuje wznawiania przerwanych zadań.",
   "error.team.hermesImportUnsupported": "To połączenie nie może zaimportować profili Hermes z serwera.",
   "error.team.providerDetectionUnsupported": "To połączenie nie może znaleźć serwerów modeli i agentów serwera.",
   "error.team.providerModelSourceUnsupported": "To połączenie nie może pokazać, skąd pochodzą modele dostawcy.",

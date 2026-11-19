@@ -87,6 +87,7 @@ export const messages = {
   "error.team.threadRequestsUnsupported": "Это подключение не может показать запросы побочной ветки к другим агентам.",
   "error.team.hostTurnLimitsUnsupported": "Это подключение не может показать или изменить ограничения веток сервера.",
   "error.team.usageLimitUnsupported": "Это подключение не может показать или изменить лимиты использования агентов.",
+  "error.team.interruptedResumeUnsupported": "Этот сервер не поддерживает возобновление прерванных задач.",
   "error.team.hermesImportUnsupported": "Это подключение не может импортировать профили Hermes с сервера.",
   "error.team.providerDetectionUnsupported": "Это подключение не может найти серверы моделей и агентов на сервере.",
   "error.team.providerModelSourceUnsupported": "Это подключение не может показать, откуда берутся модели провайдера.",

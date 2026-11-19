@@ -85,6 +85,7 @@ export const messages = {
   "error.team.threadRequestsUnsupported": "لا يمكن لهذا الاتصال عرض طلبات محادثة جانبية إلى الوكلاء الآخرين.",
   "error.team.hostTurnLimitsUnsupported": "لا يمكن لهذا الاتصال عرض حدود السلاسل للخادم أو تغييرها.",
   "error.team.usageLimitUnsupported": "لا يمكن لهذا الاتصال عرض حدود استخدام الوكلاء أو تغييرها.",
+  "error.team.interruptedResumeUnsupported": "لا يدعم هذا الخادم متابعة المهام المتوقفة.",
   "error.team.hermesImportUnsupported": "لا يمكن لهذا الاتصال استيراد ملفات تعريف Hermes من الخادم.",
   "error.team.providerDetectionUnsupported": "لا يمكن لهذا الاتصال العثور على خوادم النماذج والوكلاء على الخادم.",
   "error.team.providerModelSourceUnsupported": "لا يمكن لهذا الاتصال عرض مصدر نماذج المزوّد.",

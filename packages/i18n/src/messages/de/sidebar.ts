@@ -83,6 +83,7 @@ export const messages = {
   "sidebar.agentMenu.duplicate": "Agenten duplizieren",
   "sidebar.agentMenu.duplicating": "Wird dupliziert…",
   "sidebar.agentMenu.markRead": "Als gelesen markieren",
+  "sidebar.agentMenu.continue": "Fortsetzen",
   "sidebar.agentMenu.markUnread": "Als ungelesen markieren",
   "sidebar.agentMenu.mute": "Agenten stummschalten",
   "sidebar.agentMenu.unmute": "Stummschaltung aufheben",
@@ -126,6 +127,8 @@ export const messages = {
   "sidebar.state.waitingTakeover": "Wartet im Browser auf dich",
   "sidebar.state.waitingDetail": "{state}: {detail}",
   "sidebar.waiting.title": "Braucht dich",
+  "sidebar.interrupted.title": "Unterbrochen",
+  "sidebar.interrupted.continueAll": "Alle fortsetzen",
   "sidebar.waiting.label": {
     one: "Braucht dich, {count} Chat",
     other: "Brauchen dich, {count} Chats",
@@ -159,6 +162,7 @@ export const messages = {
   "sidebar.state.usageLimit": "Wartet auf Limit",
   "sidebar.state.usageLimitResets": "Wartet auf Limit · {reset}",
   "sidebar.state.usageLimitChip": "Limit",
+  "sidebar.state.interrupted": "Unterbrochen",
   "sidebar.delete.pending": "Wird gelöscht…",
   "sidebar.delete.title": "{name} löschen?",
   "sidebar.delete.agentDescription":

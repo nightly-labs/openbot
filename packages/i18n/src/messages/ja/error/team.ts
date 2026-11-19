@@ -85,6 +85,7 @@ export const messages = {
   "error.team.threadRequestsUnsupported": "この接続ではサイドスレッドから他のエージェントへの依頼を表示できません。",
   "error.team.hostTurnLimitsUnsupported": "この接続ではサーバーのスレッド上限を表示または変更できません。",
   "error.team.usageLimitUnsupported": "この接続ではエージェントの使用量の上限を表示または変更できません。",
+  "error.team.interruptedResumeUnsupported": "このサーバーは中断されたタスクの続行に対応していません。",
   "error.team.hermesImportUnsupported": "この接続ではサーバーから Hermes のプロファイルを取り込めません。",
   "error.team.providerDetectionUnsupported": "この接続ではサーバーのモデルサーバーとエージェントを検出できません。",
   "error.team.providerModelSourceUnsupported": "この接続ではプロバイダーのモデルの取得元を表示できません。",

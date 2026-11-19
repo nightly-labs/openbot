@@ -89,6 +89,7 @@ export const messages = {
   "error.team.hostTurnLimitsUnsupported":
     "Esta conexión no puede mostrar ni cambiar los límites de hilos del servidor.",
   "error.team.usageLimitUnsupported": "Esta conexión no puede mostrar ni cambiar los límites de uso de los agentes.",
+  "error.team.interruptedResumeUnsupported": "Este servidor no admite continuar tareas interrumpidas.",
   "error.team.hermesImportUnsupported": "Esta conexión no puede importar perfiles de Hermes desde el servidor.",
   "error.team.providerDetectionUnsupported":
     "Esta conexión no puede encontrar los servidores de modelos y los agentes del servidor.",

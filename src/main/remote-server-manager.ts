@@ -98,6 +98,7 @@ import type { HostAppearanceEvent, ServerAppearance } from "@openbot/contracts/t
 import type { HostRestartEvent } from "@openbot/contracts/team-protocol/host-update-v1";
 import { INSTANCE_TRANSFER_CHUNKS_ROUTES } from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
 import { INSTANCE_TRANSFER_ROUTES } from "@openbot/contracts/team-protocol/instance-transfer-v1";
+import { INTERRUPTED_RESUME_CAPABILITY } from "@openbot/contracts/team-protocol/interrupted-resume-v1";
 import type { LiveVoiceEvent } from "@openbot/contracts/team-protocol/live-voice-v1";
 import type { MachineAlertEvent } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { PROVIDER_MODEL_SOURCE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-model-source-v1";
@@ -466,6 +467,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         if (this.#presence.has(serverId)) this.emit("presence", serverId, this.getPresence(serverId));
       },
       hasUsageLimits: (serverId) => this.supportsCapability(serverId, AGENT_USAGE_LIMIT_CAPABILITY),
+      hasInterruptedResume: (serverId) => this.supportsCapability(serverId, INTERRUPTED_RESUME_CAPABILITY),
       hasModelSources: (serverId) => this.supportsCapability(serverId, PROVIDER_MODEL_SOURCE_CAPABILITY),
       emit: (serverId, event, bufferedLive) => {
         // Another device of the user changed their levels: the server list shows the new server level.

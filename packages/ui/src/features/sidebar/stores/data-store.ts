@@ -267,8 +267,15 @@ export function createSidebarDataStore(deps: {
   /** The "Unread" group takes a chat out of its section, as "Needs you" does. A waiting chat stays in "Needs you". */
   const chatInUnreadGroup = (chatId: string) =>
     chatOrder() === "unread-group" && unreadIds().has(chatId) && !chatWaits(chatId);
+  const agentInterrupted = (agentId: string) =>
+    props.agentStates[agentId]?.kind === "interrupted" &&
+    !chatWaits(agentId) &&
+    !pinnedKeys().has(sidebarPinnedItemKey({ kind: "agent", id: agentId }));
   const filteredAgents = createMemo(() =>
-    listedAgents().filter((agent) => !chatWaits(agent.id) && !chatInUnreadGroup(agent.id) && chatShown(agent.id)),
+    listedAgents().filter(
+      (agent) =>
+        !chatWaits(agent.id) && !agentInterrupted(agent.id) && !chatInUnreadGroup(agent.id) && chatShown(agent.id),
+    ),
   );
   /**
    * The hidden agents, pinned ones included, in their layout order. They are not drag sources. One
@@ -387,6 +394,11 @@ export function createSidebarDataStore(deps: {
           ? hiddenAgentWaits(agent.id)
           : chatWaits(agent.id) && !pinnedKeys().has(sidebarPinnedItemKey({ kind: "agent", id: agent.id }))),
     ),
+  }));
+  /** The "Interrupted" group: visible agents whose last turn ended interrupted, above sections. */
+  const interruptedChats = createChatItems(() => ({
+    channels: [],
+    agents: listedAgents().filter((agent) => agentInterrupted(agent.id) && chatShown(agent.id)),
   }));
   /** The "Unread" group of the "unread in a group" order, by last activity. */
   const unreadChats = createChatItems(
@@ -680,6 +692,7 @@ export function createSidebarDataStore(deps: {
     sectionUnreadCount,
     setListFilter,
     shownPeople,
+    interruptedChats,
     unreadChats,
     visiblePinnedKeys,
     userHiddenAgentList,

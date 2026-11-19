@@ -1053,6 +1053,8 @@ function dockSeatState(state: SidebarAgentState | undefined): AgentDockSeatState
       return { kind: "routine", phase: state.phase, count: count(state.count) };
     case "limited":
       return { kind: "limited", resetsAt: state.resetsAt === null ? null : Math.max(0, Math.floor(state.resetsAt)) };
+    case "interrupted":
+      return null;
   }
 }
 

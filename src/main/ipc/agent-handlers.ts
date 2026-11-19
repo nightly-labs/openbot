@@ -157,6 +157,10 @@ import {
   FEEDBACK_WITHDRAW_CAPABILITY,
   FEEDBACK_WITHDRAW_ROUTES,
 } from "@openbot/contracts/team-protocol/feedback-withdraw-v1";
+import {
+  INTERRUPTED_RESUME_CAPABILITY,
+  INTERRUPTED_RESUME_ROUTES,
+} from "@openbot/contracts/team-protocol/interrupted-resume-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import {
   decodeMessagePinsResponse,
@@ -211,6 +215,7 @@ import {
   decodeRemoteAgentThreadBranches,
   decodeRemoteAgentThreadQueues,
   decodeRemoteAgentThreadRequests,
+  decodeRemoteContinueInterrupted,
   decodeRemoteTaskConversation,
   decodeRemoteTaskPage,
   decodeRemoteTaskReadState,
@@ -227,6 +232,7 @@ import { OWNER_PIN_KEY, type SidebarPinStore } from "../sidebar-pin-store";
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
 import {
   parseAcknowledgeFailedTurn,
+  parseAcknowledgeInterruptedTurn,
   parseAgentId,
   parseAgentIdList,
   parseAgentTask,
@@ -237,6 +243,7 @@ import {
   parseCancelMessageLink,
   parseCancelQueuedMessage,
   parseChannelId,
+  parseContinueInterrupted,
   parseCreateAgent,
   parseDeleteChannelMessage,
   parseDeleteConversationMessage,
@@ -1551,6 +1558,39 @@ export function agentIpcHandlers({
               body: { turnId: parsed.turnId },
             }),
           ),
+      }),
+      acknowledgeInterruptedTurn: scopedHandler(parseAcknowledgeInterruptedTurn, {
+        local: (parsed) => service.acknowledgeInterruptedTurn(parsed.agentId, parsed.turnId),
+        remote: (parsed, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, INTERRUPTED_RESUME_CAPABILITY)) return Promise.resolve();
+          return runCauseEffect(
+            remoteServers.request(serverId, INTERRUPTED_RESUME_ROUTES.dismiss, decodeVoid, {
+              method: "POST",
+              body: { agentId: parsed.agentId, turnId: parsed.turnId },
+            }),
+          );
+        },
+      }),
+      continueInterrupted: scopedHandler(parseContinueInterrupted, {
+        local: (parsed) =>
+          runCauseEffect(
+            service.continueInterrupted(
+              parsed.agentIds,
+              host.conversationSender(),
+              Intl.DateTimeFormat().resolvedOptions().timeZone,
+            ),
+          ),
+        remote: (parsed, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, INTERRUPTED_RESUME_CAPABILITY)) {
+            throw new Error(sourceText("error.team.interruptedResumeUnsupported"));
+          }
+          return runCauseEffect(
+            remoteServers.request(serverId, INTERRUPTED_RESUME_ROUTES.continue, decodeRemoteContinueInterrupted, {
+              method: "POST",
+              body: { agentIds: parsed.agentIds },
+            }),
+          );
+        },
       }),
       cancelQueuedMessage: scopedHandler(parseCancelQueuedMessage, {
         local: (parsed) => runCauseEffect(service.cancelQueuedMessage(parsed.agentId, parsed.deliveryId)),

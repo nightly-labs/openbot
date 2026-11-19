@@ -3,6 +3,8 @@ import type { messages as source } from "../en/composer";
 
 export const messages = {
   "composer.queueEdit.body": "הודעה בתור נמצאת בעריכה. יש לשמור את העריכה או לבטל אותה כדי שההודעה תרוץ.",
+  "composer.interrupted.body": "המשימה האחרונה נקטעה לפני שהסתיימה.",
+  "composer.interrupted.continue": "המשך",
   "composer.queueEdit.cancel": "ביטול העריכה",
   "composer.feedbackFix.body": "מתקנים את הדיווח #{number}. שלחו את הבקשה, או בטלו כדי להשאיר את הדיווח כפי שהוא.",
   "composer.feedbackFix.cancel": "ביטול",

@@ -307,6 +307,7 @@
     "./team-protocol/attachment-preview-v1": "./src/team-protocol/attachment-preview-v1.ts",
     "./team-protocol/agent-thread-requests-v1": "./src/team-protocol/agent-thread-requests-v1.ts",
     "./team-protocol/agent-usage-limit-v1": "./src/team-protocol/agent-usage-limit-v1.ts",
+    "./team-protocol/interrupted-resume-v1": "./src/team-protocol/interrupted-resume-v1.ts",
     "./team-protocol/hermes-import-v1": "./src/team-protocol/hermes-import-v1.ts",
     "./team-protocol/provider-detection-v1": "./src/team-protocol/provider-detection-v1.ts",
     "./team-protocol/live-voice-v1": "./src/team-protocol/live-voice-v1.ts",

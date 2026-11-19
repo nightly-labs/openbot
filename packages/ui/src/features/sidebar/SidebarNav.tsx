@@ -13,7 +13,7 @@ import { SidebarEmptyState } from "./SidebarEmptyState";
 import { SidebarHiddenGroup } from "./SidebarHiddenGroup";
 import { SidebarPinnedGroup } from "./SidebarPinnedGroup";
 import { SidebarSectionList } from "./SidebarSectionList";
-import { SidebarUnreadGroup, SidebarWaitingGroup } from "./SidebarWaitingGroup";
+import { SidebarInterruptedGroup, SidebarUnreadGroup, SidebarWaitingGroup } from "./SidebarWaitingGroup";
 import { SIDEBAR_NO_LIST_FILTER } from "./sidebar-list-filter";
 import { useSidebarScope } from "./sidebar-scope";
 
@@ -80,6 +80,7 @@ export function SidebarNav() {
         </Show>
         <SidebarPinnedGroup />
         <SidebarWaitingGroup />
+        <SidebarInterruptedGroup />
         <SidebarUnreadGroup />
         <SidebarSectionList />
         <SidebarHiddenGroup />

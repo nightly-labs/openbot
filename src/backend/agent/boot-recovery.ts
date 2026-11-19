@@ -57,6 +57,10 @@ export interface BootRecoveryHooks {
   emitError(code: string, error: unknown, agentId?: string): void;
   /** Shows a failed turn of the agent's own chat in the sidebar and the runtime work. */
   turnFailed?(agentId: string, turnId: string): void;
+  /** Shows an interrupted turn of the agent's own chat in the sidebar until continued or dismissed. */
+  turnInterrupted?(agentId: string, turnId: string): void;
+  /** Clears an interrupted turn of the agent's own chat when reconciliation confirms it completed. */
+  clearInterrupted?(agentId: string): void;
   /** Whether a turn of the agent's own chat that a provider exit cut may continue, as a plan does. */
   continuesAfterProviderExit?(agentId: string, turnId: string, deliveryIds: readonly string[]): boolean;
 }
@@ -473,6 +477,9 @@ export class BootRecovery {
       snapshot.activeTurnId = null;
       snapshot.revision = revision;
       this.#conversation.setSnapshot(agent.id, snapshot);
+      if (turnId && this.#store.get(agent.id)?.threadId === agent.threadId) {
+        this.#hooks.turnInterrupted?.(agent.id, turnId);
+      }
     }
   }
 

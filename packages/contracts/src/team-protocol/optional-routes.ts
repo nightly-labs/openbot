@@ -86,6 +86,7 @@ import { HOSTED_SITES_CODECS } from "./hosted-sites-v1";
 import { INSTANCE_TRANSFER_CHUNKS_CODECS } from "./instance-transfer-chunks-v1";
 import { INSTANCE_TRANSFER_FULL_COPY_CODECS } from "./instance-transfer-full-copy-v1";
 import { INSTANCE_TRANSFER_CODECS } from "./instance-transfer-v1";
+import { INTERRUPTED_RESUME_CODECS } from "./interrupted-resume-v1";
 import { LIBRARY_FOLDERS_CODECS } from "./library-folders-v1";
 import { LIVE_ACTIVITY_PUSH_CODECS } from "./live-activity-push-v1";
 import { LIVE_VOICE_CODECS } from "./live-voice-v1";
@@ -262,6 +263,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...AGENT_THREAD_REQUESTS_CODECS,
   ...AGENT_ACTIVE_QUEUES_CODECS,
   ...AGENT_USAGE_LIMIT_CODECS,
+  ...INTERRUPTED_RESUME_CODECS,
   ...AGENT_PENDING_RUNTIME_CODECS,
   ...HERMES_IMPORT_CODECS,
   ...PROVIDER_DETECTION_CODECS,

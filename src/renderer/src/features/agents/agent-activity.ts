@@ -15,8 +15,17 @@ import { useAgents } from "./agents-context";
  */
 export function createAgentActivity() {
   const { agentList } = useAgents();
-  const { activeTurns, subagentTurns, queues, failedTurns, usageLimits, pendingPrompts, pendingApprovals, approvals } =
-    useTurns();
+  const {
+    activeTurns,
+    subagentTurns,
+    queues,
+    failedTurns,
+    interruptedTurns,
+    usageLimits,
+    pendingPrompts,
+    pendingApprovals,
+    approvals,
+  } = useTurns();
   const { unreadReplies, recentReplies } = useConversation();
   const agentTasks = useAgentTasks();
 
@@ -49,6 +58,7 @@ export function createAgentActivity() {
         recentReplies: recentReplies(),
         ...agentThreadAttention({ agents: agentList(), pendingPrompts: pendingPrompts(), approvals: approvals() }),
         failedTurns: failedTurns(),
+        interruptedTurns: interruptedTurns(),
         usageLimits: usageLimits(),
       }),
     ),

@@ -242,6 +242,19 @@ export interface AcknowledgeFailedTurnInput {
   turnId: string;
 }
 
+export interface AcknowledgeInterruptedTurnInput {
+  agentId: string;
+  turnId: string;
+}
+
+export interface ContinueInterruptedInput {
+  agentIds: string[];
+}
+
+export interface ContinueInterruptedResult {
+  continued: string[];
+}
+
 export interface SteerQueuedMessageInput {
   agentId: string;
   deliveryId: string;

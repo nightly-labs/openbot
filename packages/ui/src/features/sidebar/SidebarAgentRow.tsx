@@ -8,7 +8,7 @@
  * hidden agent, it shows when the user hid it in place of the last message and the time.
  */
 
-import { AppWindow, Badge, buttonVariants, Clock3, ContextMenu, Lock } from "@openbot/ui";
+import { AppWindow, Badge, buttonVariants, CirclePause, Clock3, ContextMenu, Lock } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createSignal, Show } from "solid-js";
 import type { AgentProfile } from "../../data";
@@ -81,6 +81,10 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
     const current = state();
     return current?.kind === "limited" ? current : undefined;
   };
+  const interrupted = () => {
+    const current = state();
+    return current?.kind === "interrupted" ? current : undefined;
+  };
   const stateLabel = () => {
     const current = state();
     return current?.kind === "routine" || current?.kind === "waiting" || current?.kind === "limited"
@@ -146,11 +150,21 @@ export function SidebarAgentRow(rowProps: { agent: AgentProfile; waiting?: boole
                 <Show
                   when={limit()}
                   fallback={
-                    <Show when={!paused()}>
-                      <span class="agent-row-time">
-                        {rowProps.agent.updatedAt
-                          ? sidebarMessageTime(rowProps.agent.updatedAt, format)
-                          : rowProps.agent.time}
+                    <Show
+                      when={interrupted()}
+                      fallback={
+                        <Show when={!paused()}>
+                          <span class="agent-row-time">
+                            {rowProps.agent.updatedAt
+                              ? sidebarMessageTime(rowProps.agent.updatedAt, format)
+                              : rowProps.agent.time}
+                          </span>
+                        </Show>
+                      }
+                    >
+                      <span class="agent-row-wait-chip">
+                        <CirclePause aria-hidden="true" />
+                        {t("sidebar.state.interrupted")}
                       </span>
                     </Show>
                   }
