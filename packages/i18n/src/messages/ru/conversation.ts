@@ -142,8 +142,6 @@ export const messages = {
   "conversation.voice.error": "Не удалось начать голосовой разговор.",
   "conversation.voice.notSent": "Сообщение не отправлено. Скажите ещё раз.",
   "conversation.voice.offline": "Сервер не подключён. Разговор продолжится, когда он снова подключится.",
-  "conversation.voice.liveVoice": "Голос: {voice}",
-  "conversation.voice.liveVoiceAutomatic": "Голос: автоматически",
   "conversation.speech.label": "{name} читает ответ вслух",
   "conversation.speech.stop": "Остановить чтение",
   "conversation.panels.openWorkspaceFailed": "Не удалось открыть папку рабочего пространства",

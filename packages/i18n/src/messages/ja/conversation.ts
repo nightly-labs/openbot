@@ -138,8 +138,6 @@ export const messages = {
   "conversation.voice.error": "音声会話を開始できませんでした。",
   "conversation.voice.notSent": "メッセージを送信できませんでした。もう一度話してください。",
   "conversation.voice.offline": "サーバーに接続していません。再接続すると会話を続けます。",
-  "conversation.voice.liveVoice": "声: {voice}",
-  "conversation.voice.liveVoiceAutomatic": "声: 自動",
   "conversation.speech.label": "{name} が返信を読み上げています",
   "conversation.speech.stop": "読み上げを停止",
   "conversation.panels.openWorkspaceFailed": "ワークスペースのフォルダーを開けませんでした",

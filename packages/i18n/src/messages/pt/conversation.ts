@@ -139,8 +139,6 @@ export const messages = {
   "conversation.voice.error": "Não foi possível iniciar a conversa por voz.",
   "conversation.voice.notSent": "A mensagem não foi enviada. Fale de novo.",
   "conversation.voice.offline": "O servidor não está conectado. A conversa continua quando ele se conectar de novo.",
-  "conversation.voice.liveVoice": "Voz: {voice}",
-  "conversation.voice.liveVoiceAutomatic": "Voz: automática",
   "conversation.speech.label": "{name} lê a resposta em voz alta",
   "conversation.speech.stop": "Parar leitura",
   "conversation.panels.openWorkspaceFailed": "Não foi possível abrir a pasta do espaço de trabalho",

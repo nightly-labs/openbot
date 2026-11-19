@@ -140,8 +140,6 @@ export const messages = {
   "conversation.voice.error": "לא ניתן להתחיל את השיחה הקולית.",
   "conversation.voice.notSent": "ההודעה לא נשלחה. יש לדבר שוב.",
   "conversation.voice.offline": "השרת לא מחובר. השיחה תמשיך כשהוא יתחבר שוב.",
-  "conversation.voice.liveVoice": "קול: {voice}",
-  "conversation.voice.liveVoiceAutomatic": "קול: אוטומטי",
   "conversation.speech.label": "{name} מקריא את התשובה",
   "conversation.speech.stop": "הפסקת ההקראה",
   "conversation.panels.openWorkspaceFailed": "לא ניתן לפתוח את תיקיית סביבת העבודה",

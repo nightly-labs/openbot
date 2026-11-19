@@ -138,8 +138,6 @@ export const messages = defineMessages("conversation", {
   "conversation.voice.error": "The voice conversation could not start.",
   "conversation.voice.notSent": "The message was not sent. Speak again.",
   "conversation.voice.offline": "The server is not connected. The conversation continues when it connects again.",
-  "conversation.voice.liveVoice": "Voice: {voice}",
-  "conversation.voice.liveVoiceAutomatic": "Voice: Automatic",
   "conversation.speech.label": "{name} reads the reply aloud",
   "conversation.speech.stop": "Stop reading",
   "conversation.panels.openWorkspaceFailed": "Could not open the workspace folder",

@@ -47,7 +47,6 @@ export interface VoicePillProps {
   onCycleSpeed?: (() => void) | undefined;
   open?: boolean | undefined;
   onClosed?: (() => void) | undefined;
-  voice?: string | undefined;
 }
 
 export function VoicePill(props: VoicePillProps) {
@@ -196,7 +195,6 @@ export function VoicePill(props: VoicePillProps) {
           levels={hearing() || props.phase === "speaking" ? props.levels.slice(-PILL_LEVELS) : []}
           class="voice-pill-waveform"
         />
-        <Show when={props.voice}>{(voice) => <span class="voice-pill-voice">{voice()}</span>}</Show>
         <Show when={props.onCycleSpeed}>
           {(cycleSpeed) => (
             <PillAction

@@ -191,32 +191,6 @@ function flagFor(language: VoiceLanguage): string {
 
 type LiveVoiceChoice = CodexLiveVoice | "automatic";
 
-const LIVE_VOICE_HINT: Partial<Record<CodexLiveVoice, AppTextKey>> = {
-  arbor: "settings.voice.live.voice.style.arbor",
-  breeze: "settings.voice.live.voice.style.breeze",
-  cove: "settings.voice.live.voice.style.cove",
-  ember: "settings.voice.live.voice.style.ember",
-  juniper: "settings.voice.live.voice.style.juniper",
-  maple: "settings.voice.live.voice.style.maple",
-  sol: "settings.voice.live.voice.style.sol",
-  spruce: "settings.voice.live.voice.style.spruce",
-  vale: "settings.voice.live.voice.style.vale",
-  aube: "language.name.fr",
-  rivage: "language.name.fr",
-  sonna: "language.name.de",
-  miko: "language.name.de",
-  leher: "language.name.hi",
-  neer: "language.name.hi",
-  himari: "language.name.ja",
-  rindo: "language.name.ja",
-  haetsal: "language.name.ko",
-  hanul: "language.name.ko",
-  viola: "language.name.pt",
-  rio: "language.name.pt",
-  tinta: "language.name.es",
-  bubbie: "language.name.en",
-};
-
 interface SettingsVoiceTabProps {
   store: SettingsVoiceStore;
   selectMount: HTMLElement | undefined;
@@ -649,7 +623,6 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
             <Item class="settings-modal-row">
               <ItemContent>
                 <ItemTitle>{t("settings.voice.speech.voice.title")}</ItemTitle>
-                <ItemDescription>{t("settings.voice.live.voice.description")}</ItemDescription>
               </ItemContent>
               <ItemActions>
                 <Select<LiveVoiceChoice>
@@ -660,14 +633,7 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
                   disabled={!speech().settings?.codexLive}
                   placement="bottom-end"
                   itemComponent={(selectProps) => (
-                    <SelectItem item={selectProps.item}>
-                      {liveVoiceName(selectProps.item.rawValue)}
-                      <Show
-                        when={selectProps.item.rawValue !== "automatic" && LIVE_VOICE_HINT[selectProps.item.rawValue]}
-                      >
-                        {(hint) => <span class="settings-live-voice-hint"> {t(hint())}</span>}
-                      </Show>
-                    </SelectItem>
+                    <SelectItem item={selectProps.item}>{liveVoiceName(selectProps.item.rawValue)}</SelectItem>
                   )}
                 >
                   <SelectTrigger size="sm" aria-label={t("settings.voice.speech.voice.title")}>

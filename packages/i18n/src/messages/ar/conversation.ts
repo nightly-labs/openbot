@@ -143,8 +143,6 @@ export const messages = {
   "conversation.voice.error": "تعذّر بدء المحادثة الصوتية.",
   "conversation.voice.notSent": "لم تُرسَل الرسالة. تحدّث مرة أخرى.",
   "conversation.voice.offline": "الخادم غير متصل. تستمر المحادثة عند عودة الاتصال.",
-  "conversation.voice.liveVoice": "الصوت: {voice}",
-  "conversation.voice.liveVoiceAutomatic": "الصوت: تلقائي",
   "conversation.speech.label": "{name} يقرأ الرد بصوت عالٍ",
   "conversation.speech.stop": "إيقاف القراءة",
   "conversation.panels.openWorkspaceFailed": "تعذّر فتح مجلد مساحة العمل",

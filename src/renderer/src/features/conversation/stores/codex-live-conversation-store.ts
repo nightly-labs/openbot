@@ -1,4 +1,4 @@
-import type { CodexLiveVoice, OpenBotDesktopApi, VoiceLiveEvent } from "@openbot/contracts/ipc";
+import type { OpenBotDesktopApi, VoiceLiveEvent } from "@openbot/contracts/ipc";
 import type { VoicePhase } from "@openbot/ui/features/conversation/VoicePill";
 import { currentText } from "@openbot/ui/text";
 import { createStore, onCleanup } from "solid-js";
@@ -23,7 +23,6 @@ interface LiveState {
   muted: boolean;
   error: string | null;
   levels: number[];
-  voice: CodexLiveVoice | null | undefined;
 }
 
 function quietLevels(): number[] {
@@ -46,7 +45,6 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
     muted: false,
     error: null,
     levels: quietLevels(),
-    voice: deps.port ? null : undefined,
   });
   let disposed = false;
   let failed = false;
@@ -166,16 +164,6 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
     silencedTurn = null;
     silenceNextReply = false;
     reply.muted = false;
-    if (!deps.port)
-      void window.openbot.voice.getSpeechSettings().then(
-        (settings) => {
-          if (disposed) return;
-          setState((draft) => {
-            draft.voice = settings.codexLiveVoice;
-          });
-        },
-        () => undefined,
-      );
     try {
       microphone = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
@@ -290,7 +278,6 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
     muted: () => state.muted,
     error: () => state.error,
     levels: () => state.levels,
-    liveVoice: () => state.voice,
     toggleMute,
     interrupt,
   };

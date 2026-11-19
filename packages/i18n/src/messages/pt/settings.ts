@@ -723,17 +723,6 @@ export const messages = {
   "settings.voice.speech.listenFailed": "Não foi possível reproduzir a amostra.",
   "settings.voice.live.section": "Voz ao vivo",
   "settings.voice.live.signIn": "Inicie sessão no Codex com a sua conta ChatGPT para usar a voz ao vivo.",
-  "settings.voice.live.voice.description":
-    "A OpenAI fala com esta voz nas conversas por voz. Com Automático, a OpenAI escolhe a voz.",
-  "settings.voice.live.voice.style.arbor": "Descontraída e versátil",
-  "settings.voice.live.voice.style.breeze": "Animada e sincera",
-  "settings.voice.live.voice.style.cove": "Serena e direta",
-  "settings.voice.live.voice.style.ember": "Confiante e otimista",
-  "settings.voice.live.voice.style.juniper": "Aberta e alegre",
-  "settings.voice.live.voice.style.maple": "Jovial e franca",
-  "settings.voice.live.voice.style.sol": "Esperta e tranquila",
-  "settings.voice.live.voice.style.spruce": "Calma e encorajadora",
-  "settings.voice.live.voice.style.vale": "Brilhante e curiosa",
   "settings.transfer.title": "Mover este servidor para outro computador",
   "settings.transfer.lede":
     "Seus agentes, as habilidades, rotinas, memórias e arquivos deles vão para um único arquivo.",

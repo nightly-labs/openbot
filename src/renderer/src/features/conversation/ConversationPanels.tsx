@@ -108,14 +108,6 @@ function VoiceConversation(paneProps: VoicePillPresence & { kind: VoiceConversat
   const transcribed = kind === "transcribed";
   const replySpeed = () => (transcribed ? speechSpeed() : undefined);
   const cycleSpeed = transcribed ? cycleSpeechSpeed : undefined;
-  const { t } = useText();
-  const voiceLabel = () => {
-    const voice = "liveVoice" in conversation ? conversation.liveVoice() : undefined;
-    if (voice === undefined) return undefined;
-    return voice === null
-      ? t("conversation.voice.liveVoiceAutomatic")
-      : t("conversation.voice.liveVoice", { voice: voice.charAt(0).toUpperCase() + voice.slice(1) });
-  };
   return (
     <Show when={props.agent}>
       {(agent) => (
@@ -132,7 +124,6 @@ function VoiceConversation(paneProps: VoicePillPresence & { kind: VoiceConversat
           onCycleSpeed={cycleSpeed}
           open={paneProps.open}
           onClosed={paneProps.onClosed}
-          voice={voiceLabel()}
         />
       )}
     </Show>

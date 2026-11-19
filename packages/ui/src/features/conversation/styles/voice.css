@@ -246,14 +246,6 @@
   color: var(--openbot-accent);
 }
 
-.voice-pill-voice {
-  flex: 0 0 auto;
-  color: var(--openbot-text-secondary);
-  font-size: var(--openbot-text-sm);
-  line-height: var(--openbot-leading-sm);
-  white-space: nowrap;
-}
-
 .voice-pill-button {
   flex: 0 0 auto;
   border-radius: var(--openbot-radius-pill);
