@@ -118,7 +118,7 @@ export const ChatHeader = memo(function ChatHeader({
     : kicker
       ? (title ?? "")
       : null;
-  const unreadThreadsShown = threadMenu !== undefined && !threadMenu.inThread && threadMenu.attention > 0;
+  const unreadThreadsShown = threadMenu !== undefined && threadMenu.attention > 0;
   const picture =
     target.kind === "channel" ? (
       <ChannelAvatar
@@ -452,9 +452,6 @@ export const ChatHeader = memo(function ChatHeader({
           paddingRight: insets.right + 16,
         }}
       >
-        <View pointerEvents="box-none" className="absolute inset-0 flex-row items-center justify-center">
-          {titlePill}
-        </View>
         {splitDetailRoot ? null : (
           <ChatGlassIconButton
             accessibilityLabel={t("common.back")}
@@ -465,6 +462,13 @@ export const ChatHeader = memo(function ChatHeader({
             <ArrowLeft color={iconColor} size={24} strokeWidth={2} style={MIRROR_IN_RTL} />
           </ChatGlassIconButton>
         )}
+        <View
+          pointerEvents="box-none"
+          className="absolute inset-y-0 flex-row items-center justify-center"
+          style={{ left: insets.left, right: insets.right }}
+        >
+          {titlePill}
+        </View>
         <View className="flex-1" />
         {deleteButton ?? trailingButtons}
       </View>
