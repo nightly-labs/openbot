@@ -3271,6 +3271,12 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                             : t("workflow.canvas.action.runStep")}
                         </span>
                       </ContextMenu.Item>
+                      <Show when={kindOf(id()) !== "trigger"}>
+                        <ContextMenu.Item onSelect={() => props.onRun({ fromNodeId: id() })}>
+                          <Play aria-hidden="true" />
+                          <span class="wfn-menu-text">{t("workflow.canvas.action.runFromStep")}</span>
+                        </ContextMenu.Item>
+                      </Show>
                       <ContextMenu.Separator />
                     </Show>
                     <MenuItem

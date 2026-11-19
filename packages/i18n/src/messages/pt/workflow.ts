@@ -470,6 +470,7 @@ export const messages = {
   "workflow.canvas.action.unlockAll": "Desbloquear tudo",
   "workflow.canvas.action.runStep": "Executar etapa",
   "workflow.canvas.action.runFromTrigger": "Executar a partir deste gatilho",
+  "workflow.canvas.action.runFromStep": "Executar a partir desta etapa",
   "workflow.canvas.hud.show": "Mostrar interface",
   "workflow.canvas.hud.hide": "Ocultar interface",
   "workflow.canvas.presence.label": "Pessoas nesta tela",

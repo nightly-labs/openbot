@@ -460,6 +460,7 @@ export const messages = {
   "workflow.canvas.action.unlockAll": "ביטול נעילה של הכול",
   "workflow.canvas.action.runStep": "הרצת השלב",
   "workflow.canvas.action.runFromTrigger": "הרצה מהטריגר הזה",
+  "workflow.canvas.action.runFromStep": "הרצה מהשלב הזה",
   "workflow.canvas.hud.show": "הצגת הממשק",
   "workflow.canvas.hud.hide": "הסתרת הממשק",
   "workflow.canvas.presence.label": "אנשים בקנבס הזה",

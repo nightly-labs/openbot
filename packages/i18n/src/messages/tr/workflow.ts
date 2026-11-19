@@ -470,6 +470,7 @@ export const messages = {
   "workflow.canvas.action.unlockAll": "Tüm kilitleri aç",
   "workflow.canvas.action.runStep": "Adımı çalıştır",
   "workflow.canvas.action.runFromTrigger": "Bu tetikleyiciden çalıştır",
+  "workflow.canvas.action.runFromStep": "Bu adımdan çalıştır",
   "workflow.canvas.hud.show": "Arayüzü göster",
   "workflow.canvas.hud.hide": "Arayüzü gizle",
   "workflow.canvas.presence.label": "Bu tuvaldeki kişiler",

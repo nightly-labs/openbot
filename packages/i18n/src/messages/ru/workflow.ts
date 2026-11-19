@@ -502,6 +502,7 @@ export const messages = {
   "workflow.canvas.action.unlockAll": "Разблокировать всё",
   "workflow.canvas.action.runStep": "Запустить шаг",
   "workflow.canvas.action.runFromTrigger": "Запустить с этого триггера",
+  "workflow.canvas.action.runFromStep": "Запустить с этого шага",
   "workflow.canvas.hud.show": "Показать интерфейс",
   "workflow.canvas.hud.hide": "Скрыть интерфейс",
   "workflow.canvas.presence.label": "Люди на этом холсте",

@@ -471,6 +471,7 @@ export const messages = {
   "workflow.canvas.action.unlockAll": "Desbloquear todo",
   "workflow.canvas.action.runStep": "Ejecutar paso",
   "workflow.canvas.action.runFromTrigger": "Ejecutar desde este activador",
+  "workflow.canvas.action.runFromStep": "Ejecutar desde este paso",
   "workflow.canvas.hud.show": "Mostrar interfaz",
   "workflow.canvas.hud.hide": "Ocultar interfaz",
   "workflow.canvas.presence.label": "Personas en este lienzo",

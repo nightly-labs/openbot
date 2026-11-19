@@ -471,6 +471,7 @@ export const messages = {
   "workflow.canvas.action.unlockAll": "Tout déverrouiller",
   "workflow.canvas.action.runStep": "Lancer l’étape",
   "workflow.canvas.action.runFromTrigger": "Lancer depuis ce déclencheur",
+  "workflow.canvas.action.runFromStep": "Lancer depuis cette étape",
   "workflow.canvas.hud.show": "Afficher l’interface",
   "workflow.canvas.hud.hide": "Masquer l’interface",
   "workflow.canvas.presence.label": "Personnes sur ce canevas",

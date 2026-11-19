@@ -471,6 +471,7 @@ export const messages = defineMessages("workflow", {
   "workflow.canvas.action.unlockAll": "Unlock all",
   "workflow.canvas.action.runStep": "Run step",
   "workflow.canvas.action.runFromTrigger": "Run from this trigger",
+  "workflow.canvas.action.runFromStep": "Run from this step",
   "workflow.canvas.hud.show": "Show interface",
   "workflow.canvas.hud.hide": "Hide interface",
   "workflow.canvas.presence.label": "People on this canvas",
