@@ -387,6 +387,36 @@ describe("registerSecretValue", () => {
     expect(redactText("sign in with acmeshop")).toBe("sign in with [redacted]");
   });
 
+  it("masks a short saved value only as a whole word, so ids that contain it stay readable", () => {
+    registerSecretValue("claude", { allowShort: true });
+
+    const models = '{"defaultModel":"claude-opus-5-5","models":[{"id":"claude_sonnet","name":"Claude Opus 5.5"}]}';
+    expect(redactText(models)).toBe(models);
+    expect(redactText("Available models: claude-opus-5-5, claude.v2, …")).toBe(
+      "Available models: claude-opus-5-5, claude.v2, …",
+    );
+    expect(redactText("sign in with claude.")).toBe("sign in with [redacted]");
+    expect(redactText("pw=claude; retry")).toBe("pw=[redacted]; retry");
+    expect(redactText('{"saved":"claude"}')).not.toContain("claude");
+    expect(redactText("https://user:claude@db.example.com/x")).not.toContain("claude");
+  });
+
+  it("keeps a turn id that contains a short saved value", () => {
+    registerSecretValue("a1b2", { allowShort: true });
+
+    expect(redactText("turn 9f3c0d2e-a1b2-77de-8a10-55aa66bb77cc done")).toBe(
+      "turn 9f3c0d2e-a1b2-77de-8a10-55aa66bb77cc done",
+    );
+    expect(redactText("code a1b2 rejected")).toBe("code [redacted] rejected");
+  });
+
+  it("masks a long saved value that starts inside a skipped short one", () => {
+    registerSecretValue("zz", { allowShort: true });
+    registerSecretValue("zlongsecret9");
+
+    expect(redactText("got x-zzlongsecret9 back")).toBe("got [redacted] back");
+  });
+
   it("keeps a value that cannot be URL-encoded masked, without throwing", () => {
     const secret = "12345678\uD800";
     registerSecretValue(secret);

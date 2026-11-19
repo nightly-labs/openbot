@@ -45,6 +45,8 @@ const MIN_REGISTERED_SECRET_LENGTH = 8;
 const RULE_WORD =
   /password|passwd|passphrase|secret|token|credential|authorization|cookie|api[_-]?key|private[_-]?key|signing[_-]?key|bearer|basic|digest|headers|keys?/iu;
 const TOKEN_CHARACTER = /[A-Za-z0-9._~+/@%-]/u;
+const WORD_CHARACTER = /[A-Za-z0-9_]/u;
+const WORD_JOINER = /[.-]/u;
 const URL_HOST = /(?<![A-Za-z0-9+.-])(https?:\/\/(?:[^\s/?#@]*@)?)([\p{L}\p{N}.-]+)/giu;
 const VALUE_MARKER = "__openbot_registered_value__";
 const LABEL_MARKER = "__openbot_registered_secret_authorization";
@@ -102,6 +104,16 @@ function redact(value: string, emails: boolean, keepUnscanned = false): string {
   return marked === value ? redacted : redacted.replace(MARKERS, "[redacted]");
 }
 
+function continuesWord(value: string, next: number, step: 1 | -1): boolean {
+  const character = value.charAt(next);
+  if (WORD_CHARACTER.test(character)) return true;
+  return WORD_JOINER.test(character) && WORD_CHARACTER.test(value.charAt(next + step));
+}
+
+function isInsideLongerWord(value: string, start: number, end: number): boolean {
+  return continuesWord(value, start - 1, -1) || continuesWord(value, end, 1);
+}
+
 function markRegisteredSecrets(value: string): string {
   const pattern = registeredSecretPattern;
   if (!pattern) return value;
@@ -111,6 +123,10 @@ function markRegisteredSecrets(value: string): string {
   for (let match = pattern.exec(value); match !== null; match = pattern.exec(value)) {
     let start = match.index;
     let end = start + match[0].length;
+    if (match[0].length < MIN_REGISTERED_SECRET_LENGTH && isInsideLongerWord(value, start, end)) {
+      pattern.lastIndex = start + 1;
+      continue;
+    }
     if (hosts === undefined) hosts = value.includes("://") ? urlHosts(value) : null;
     if (hosts?.subarray(start, end).every((flag) => flag === HOST)) continue;
     const previous = ranges.at(-1);
