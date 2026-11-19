@@ -510,6 +510,7 @@ const windowHolder = createMainWindowHolder();
 const {
   closeChatNotifications,
   forwardAgentEvent,
+  withdrawSettledNotifications,
   forwardWorkflowNotice,
   forwardBrowserDisplayState,
   forwardUpdateStatus,
@@ -1584,6 +1585,7 @@ if (!hasSingleInstanceLock) {
       remoteServers.on("agent", (serverId, event, bufferedLive) => {
         forwardAgentEvent(serverId, event, bufferedLive);
       });
+      remoteServers.on("receivedRuntimeSnapshot", withdrawSettledNotifications);
       remoteServers.on("presence", forwardTeamPresence);
       remoteServers.on("directMessage", forwardDirectMessage);
       remoteServers.on("directTyping", forwardDirectTyping);

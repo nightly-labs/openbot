@@ -1,6 +1,7 @@
 import { agentProviderName } from "@openbot/contracts/agent-providers";
 import type {
   AgentEvent,
+  AgentRuntimeSnapshot,
   ClientAgentSummary,
   ServerNotificationLevel,
   TeamRealtimeEvent,
@@ -76,21 +77,49 @@ export function agentEventCanNotify(event: AgentEvent | TeamRealtimeEvent): bool
   }
 }
 
+type NotificationRequestKind = "prompt" | "approval" | "browser";
+
+function requestKey(serverId: string, agentId: string, kind: NotificationRequestKind, requestId: string | number) {
+  return `${serverId}:${agentId}:${kind}:${requestId}`;
+}
+
 export function notificationRequestKey(serverId: string, event: AgentEvent): string | null {
   switch (event.type) {
     case "prompt":
-      return `${serverId}:${event.agentId}:prompt:${event.requestId}`;
+      return requestKey(serverId, event.agentId, "prompt", event.requestId);
     case "approval":
-      return `${serverId}:${event.approval.agentId}:approval:${event.approval.requestId}`;
+      return requestKey(serverId, event.approval.agentId, "approval", event.approval.requestId);
     case "agent-input-resolved":
-      return `${serverId}:${event.agentId}:${event.kind}:${event.requestId}`;
+      return requestKey(serverId, event.agentId, event.kind, event.requestId);
     case "browser-takeover-requested":
-      return `${serverId}:${event.request.agentId}:browser:${event.request.requestId}`;
+      return requestKey(serverId, event.request.agentId, "browser", event.request.requestId);
     case "browser-takeover-resolved":
-      return `${serverId}:${event.agentId}:browser:${event.requestId}`;
+      return requestKey(serverId, event.agentId, "browser", event.requestId);
     default:
       return null;
   }
+}
+
+export function settledRequestKeys(
+  serverId: string,
+  snapshot: Pick<
+    AgentRuntimeSnapshot,
+    "attentionComplete" | "pendingPrompts" | "pendingApprovals" | "pendingBrowserTakeovers"
+  >,
+  shownKeys: Iterable<string>,
+): string[] {
+  if (!snapshot.attentionComplete) return [];
+  const pending = new Set([
+    ...snapshot.pendingPrompts.map((prompt) => requestKey(serverId, prompt.agentId, "prompt", prompt.requestId)),
+    ...snapshot.pendingApprovals.map((approval) =>
+      requestKey(serverId, approval.agentId, "approval", approval.requestId),
+    ),
+    ...snapshot.pendingBrowserTakeovers.map((request) =>
+      requestKey(serverId, request.agentId, "browser", request.requestId),
+    ),
+  ]);
+  const serverPrefix = `${serverId}:`;
+  return [...shownKeys].filter((key) => key.startsWith(serverPrefix) && !pending.has(key));
 }
 
 export function teammateTurnCompleted(event: AgentEvent): boolean {
