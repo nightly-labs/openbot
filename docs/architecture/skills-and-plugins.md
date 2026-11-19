@@ -222,7 +222,8 @@ granted the permission, the proxy adds an explanation to the `create_repository`
 agent can give to the user. With no key it answers 503, and the desktop keeps the user token.
 `src/main/github-bot-tokens.ts` renews the set ten minutes before the first token expires.
 - `git`: the helper runs with `useHttpPath`, and takes the bot token for the repository from
-  `provider-state/github/repositories`, or else the user token.
+  `provider-state/github/repositories`, or else the computer's own git login,
+  or else the user token.
 - MCP: `src/main/github-mcp-proxy.ts` is a loopback MCP server with a secret bearer. It forwards to
   `api.githubcopilot.com/mcp/` with one upstream client for each token, because GitHub binds an MCP
   session to its token. A tool call with `owner` and `repo` arguments uses that repository's bot
