@@ -3,9 +3,12 @@ import { chmod, mkdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { AGENT_PROVIDERS, type AgentProviderId } from "@openbot/contracts/agent-providers";
 import {
+  CLIPROXY_BASE_URL_MAX_LENGTH,
+  type CliProxyProviderId,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   MAX_PROVIDER_ACCOUNTS,
   PROVIDER_ACCOUNT_LABEL_MAX_LENGTH,
+  type ProviderAccountProxy,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Schema, Semaphore } from "effect";
@@ -21,6 +24,8 @@ export interface StoredProviderAccount {
   id: string;
   provider: AccountProvider;
   label: string | null;
+  /** Optional proxy metadata for a dedicated CLIProxy profile. Secrets stay in ProviderCredentialStore. */
+  proxy?: ProviderAccountProxy;
 }
 
 const ACCOUNT_ID = /^a[0-9a-f]{16}$/u;
@@ -28,10 +33,19 @@ const POOL_ACCOUNT_ID = /^(?:default|a[0-9a-f]{16})$/u;
 const Provider = Schema.Literals(AGENT_PROVIDERS.filter((provider) => provider !== "acp"));
 const LabelText = Schema.String.check(Schema.isMaxLength(PROVIDER_ACCOUNT_LABEL_MAX_LENGTH));
 const Label = Schema.NullOr(LabelText);
+const StoredProxy = Schema.Struct({
+  kind: Schema.Literal("cliproxy"),
+  baseUrl: Schema.String.check(Schema.isMaxLength(CLIPROXY_BASE_URL_MAX_LENGTH)),
+});
 const ProviderAccountsFile = Schema.Struct({
   version: Schema.Literal(1),
   accounts: Schema.Array(
-    Schema.Struct({ id: Schema.String.check(Schema.isPattern(ACCOUNT_ID)), provider: Provider, label: Label }),
+    Schema.Struct({
+      id: Schema.String.check(Schema.isPattern(ACCOUNT_ID)),
+      provider: Provider,
+      label: Label,
+      proxy: Schema.optionalKey(StoredProxy),
+    }),
   ),
   /** The names the user gave the first account of each provider. */
   defaultLabels: Schema.Record(Schema.String, LabelText),
@@ -158,14 +172,53 @@ export class ProviderAccountStore {
     return this.get(provider, accountId) ?? (yield* this.#add(provider, accountId));
   }).bind(this);
 
-  #add(provider: AccountProvider, accountId: string) {
+  /** Makes an isolated folder and saves a dedicated CLIProxy profile. Null when at `MAX_PROVIDER_ACCOUNTS`. */
+  readonly createProxy = Effect.fn("ProviderAccountStore.createProxy")(function* (
+    this: ProviderAccountStore,
+    provider: CliProxyProviderId,
+    label: string | null,
+    proxy: ProviderAccountProxy,
+  ) {
+    return yield* this.#add(provider, `a${randomBytes(8).toString("hex")}`, label, proxy);
+  }).bind(this);
+
+  /** Updates the proxy metadata (and optional label) of an existing stored proxy account. */
+  readonly updateProxy = Effect.fn("ProviderAccountStore.updateProxy")(function* (
+    this: ProviderAccountStore,
+    provider: CliProxyProviderId,
+    accountId: string,
+    label: string | null | undefined,
+    proxy: ProviderAccountProxy,
+  ) {
+    return yield* this.#change((file) => {
+      const index = file.accounts.findIndex(
+        (account) => account.id === accountId && account.provider === provider && Boolean(account.proxy),
+      );
+      const current = index >= 0 ? file.accounts[index] : undefined;
+      if (!current) return Effect.succeed({ file, result: null });
+      const next: StoredProviderAccount = {
+        ...current,
+        ...(label !== undefined ? { label } : {}),
+        proxy,
+      };
+      const accounts = file.accounts.map((account, i) => (i === index ? next : account));
+      return Effect.succeed({ file: { ...file, accounts }, result: next });
+    });
+  }).bind(this);
+
+  #add(provider: AccountProvider, accountId: string, label: string | null = null, proxy?: ProviderAccountProxy) {
     return this.#change((file) =>
       Effect.gen({ self: this }, function* () {
         const existing = file.accounts.find((account) => account.id === accountId && account.provider === provider);
         if (existing) return { file, result: existing };
         if (file.accounts.filter((account) => account.provider === provider).length + 1 >= MAX_PROVIDER_ACCOUNTS)
           return { file, result: null };
-        const account: StoredProviderAccount = { id: accountId, provider, label: null };
+        const account: StoredProviderAccount = {
+          id: accountId,
+          provider,
+          label,
+          ...(proxy ? { proxy } : {}),
+        };
         const home = this.home(account);
         yield* Effect.tryPromise({
           try: async () => {

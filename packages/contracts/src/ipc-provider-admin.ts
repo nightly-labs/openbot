@@ -9,13 +9,17 @@ import { INPUT_LIMITS } from "./input-limits";
 import { type AgentModelOption, isAgentModelOption, isReasoningEffort } from "./ipc-agent-identity";
 import {
   type AccountUsage,
+  type HostCliProxyProfile,
+  type HostCliProxyProfiles,
   type HostProviderAccountModels,
   type HostProviderAccounts,
   isAccountUsage,
+  isCliProxyProvider,
   isProviderAccountId,
   isProviderAccountPool,
   isProviderAccountStatus,
   MAX_PROVIDER_ACCOUNTS,
+  normalizeCliProxyBaseUrl,
   PROVIDER_USAGE_RESET_OUTCOMES,
   type ProviderAccountCodeLoginStart,
   type ProviderAccountCodeLoginStatus,
@@ -119,6 +123,40 @@ export function decodeHostProviderAccounts(value: unknown): HostProviderAccounts
  * provider this client does not know is left out, and so is a model whose default reasoning effort
  * it does not know; an unknown effort is left out of the supported ones.
  */
+/** The CLIProxy profiles of a joined server's host (`cliproxy-profiles-v1`). */
+export function decodeHostCliProxyProfiles(value: unknown): HostCliProxyProfiles {
+  const invalid = () => new Error("Invalid CLIProxy profiles.");
+  if (!isDynamicRecord(value) || !Array.isArray(value.profiles) || value.profiles.length > 64) throw invalid();
+  const profiles: HostCliProxyProfile[] = [];
+  for (const row of value.profiles) {
+    if (!isDynamicRecord(row) || !isProviderAccountId(row.accountId) || typeof row.baseUrl !== "string")
+      throw invalid();
+    const baseUrl = normalizeCliProxyBaseUrl(row.baseUrl);
+    if (!baseUrl) throw invalid();
+    if (isCliProxyProvider(row.provider)) profiles.push({ provider: row.provider, accountId: row.accountId, baseUrl });
+  }
+  return { profiles };
+}
+
+/** Overlays `cliproxy-profiles-v1` proxy metadata onto a host's `provider-accounts-v1` list. */
+export function withHostCliProxyProfiles(
+  accounts: HostProviderAccounts,
+  cliProxy: HostCliProxyProfiles,
+): HostProviderAccounts {
+  if (cliProxy.profiles.length === 0) return accounts;
+  const byKey = new Map(cliProxy.profiles.map((entry) => [`${entry.provider}:${entry.accountId}`, entry.baseUrl]));
+  return {
+    ...accounts,
+    providers: accounts.providers.map((row) => ({
+      ...row,
+      accounts: row.accounts.map((account) => {
+        const baseUrl = byKey.get(`${row.provider}:${account.id}`);
+        return baseUrl ? { ...account, proxy: { kind: "cliproxy" as const, baseUrl } } : account;
+      }),
+    })),
+  };
+}
+
 export function decodeHostProviderAccountModels(value: unknown): HostProviderAccountModels {
   const invalid = () => new Error("Invalid provider account models.");
   if (!isDynamicRecord(value) || !Array.isArray(value.providers)) throw invalid();

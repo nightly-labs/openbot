@@ -18,6 +18,7 @@ export interface ProvidersPort {
   providerRuntimes: OpenBotDesktopApi["providerRuntimes"];
   connectProviderAccount: OpenBotDesktopApi["connectProviderAccount"];
   connectProviderAccountKey: OpenBotDesktopApi["connectProviderAccountKey"];
+  saveCliProxyProfile: OpenBotDesktopApi["saveCliProxyProfile"];
   cancelProviderAccountSignIn: OpenBotDesktopApi["cancelProviderAccountSignIn"];
   renameProviderAccount: OpenBotDesktopApi["renameProviderAccount"];
   removeProviderAccount: OpenBotDesktopApi["removeProviderAccount"];

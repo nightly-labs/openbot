@@ -173,6 +173,7 @@ import {
   decodeHostAgentTemplatePublication,
   decodeHostBitwardenConnectorStatus,
   decodeHostBrowsingMemory,
+  decodeHostCliProxyProfiles,
   decodeHostGitHubConnectorRepositories,
   decodeHostGitHubConnectorStatus,
   decodeHostMemoryReview,
@@ -221,6 +222,7 @@ import {
   type HostAddMessagingOrchestratorInput,
   type HostAgentMemoryLimit,
   type HostBrowsingMemory,
+  type HostCliProxyProfiles,
   type HostedSiteList,
   type HostGitHubConnectorStatus,
   type HostMemoryReview,
@@ -276,6 +278,7 @@ import {
   type RoutineResultDestination,
   type RoutineResultRoutineInput,
   type SaveBrowserProxyInput,
+  type SaveCliProxyProfileInput,
   type SaveCustomAgentInput,
   type SaveCustomProviderInput,
   type SaveMcpServerInput,
@@ -305,6 +308,7 @@ import {
   type VaultSaveInput,
   type VaultState,
   type VaultTwoStepCodes,
+  withHostCliProxyProfiles,
   withHostProviderAccountModels,
 } from "@openbot/contracts/ipc";
 import {
@@ -346,6 +350,7 @@ import { AGENT_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/agent-upda
 import { BITWARDEN_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/bitwarden-connector-v1";
 import { BROWSER_PROFILES_ROUTES } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_PROXIES_ROUTES } from "@openbot/contracts/team-protocol/browser-proxies-v1";
+import { CLIPROXY_PROFILES_ROUTES } from "@openbot/contracts/team-protocol/cliproxy-profiles-v1";
 import { CONNECTORS_ROUTES } from "@openbot/contracts/team-protocol/connectors-v1";
 import { EVENTS_ROUTES } from "@openbot/contracts/team-protocol/events-v1";
 import { GITHUB_SKILLS_ROUTES } from "@openbot/contracts/team-protocol/github-skills-v1";
@@ -1493,8 +1498,9 @@ export function listProviderAccountsWithModels(
   request: TeamApiRequest,
   withModels: boolean,
   withPools: boolean,
+  withCliProxy = false,
 ): Effect.Effect<HostProviderAccounts, TeamAdminRequestError> {
-  if (!withModels && !withPools) return listProviderAccounts(request);
+  if (!withModels && !withPools && !withCliProxy) return listProviderAccounts(request);
   return Effect.all(
     [
       listProviderAccounts(request),
@@ -1508,12 +1514,14 @@ export function listProviderAccountsWithModels(
             Effect.orElseSucceed(() => null),
           )
         : Effect.succeed(null),
+      withCliProxy ? listHostCliProxyProfiles(request).pipe(Effect.orElseSucceed(() => null)) : Effect.succeed(null),
     ],
     { concurrency: "unbounded" },
   ).pipe(
-    Effect.map(([accounts, models, pools]) => {
+    Effect.map(([accounts, models, pools, cliProxy]) => {
       const withAccountModels = models ? withHostProviderAccountModels(accounts, models) : accounts;
-      return pools ? { ...withAccountModels, pools } : withAccountModels;
+      const withProfiles = cliProxy ? withHostCliProxyProfiles(withAccountModels, cliProxy) : withAccountModels;
+      return pools ? { ...withProfiles, pools } : withProfiles;
     }),
   );
 }
@@ -1527,6 +1535,29 @@ export function connectProviderAccountKey(
   input: ConnectProviderAccountKeyInput,
 ): Effect.Effect<void, TeamAdminRequestError> {
   return adminCall(() => request("POST", PROVIDER_ACCOUNT_KEYS_ROUTES.connect, ignoreResponse, { ...input }));
+}
+
+/** `cliproxy-profiles-v1`: lists the host's dedicated CLIProxy profiles so clients can badge and edit them. */
+export function listHostCliProxyProfiles(
+  request: TeamApiRequest,
+): Effect.Effect<HostCliProxyProfiles, TeamAdminRequestError> {
+  return adminCall(() => request("POST", CLIPROXY_PROFILES_ROUTES.list, decodeHostCliProxyProfiles, {}));
+}
+
+/** `cliproxy-profiles-v1`: creates or updates a dedicated CLIProxy profile on the host. */
+export function saveHostCliProxyProfile(
+  request: TeamApiRequest,
+  input: SaveCliProxyProfileInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", CLIPROXY_PROFILES_ROUTES.save, ignoreResponse, {
+      provider: input.provider,
+      accountId: input.accountId,
+      label: input.label ?? null,
+      baseUrl: input.baseUrl,
+      apiKey: input.apiKey ?? null,
+    }),
+  );
 }
 
 /**

@@ -309,6 +309,8 @@ export type TeamApiProviderAccounts = Pick<
   | "signInStatus"
   | "cancelSignIn"
   | "connectKey"
+  | "cliProxyProfiles"
+  | "saveCliProxyProfile"
   | "startCodeSignIn"
   | "submitCodeSignIn"
   | "codeSignInStatus"

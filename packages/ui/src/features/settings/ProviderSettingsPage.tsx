@@ -16,6 +16,7 @@ import {
   claudeCompactWindowSizes,
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
   DEFAULT_PROVIDER_ACCOUNT_ID,
+  isCliProxyProvider,
   isProviderEnvironmentProvider,
   MAX_PROVIDER_ACCOUNTS,
   PROMPT_CACHE_TTLS,
@@ -87,6 +88,7 @@ import {
   accountCodeSignInOffered,
   hasKeyAccounts,
   isApiKeyAccount,
+  isCliProxyAccount,
   isProviderKeyAccount,
   type ProviderPickerAccount,
   providerAccountName,
@@ -108,6 +110,7 @@ import { toast } from "../../toast";
 import { AccountUsageWindowList } from "../account/AccountUsageDetails";
 import type { AccountUsageProviderRow, AccountUsageWindowRow } from "../account/account-usage-view";
 import { providerUpdateAvailable, providerVersionLabel } from "../provider-updates/provider-update";
+import { CliProxyProfileDialog } from "./CliProxyProfileDialog";
 import { DangerZone, DetailHeader, type IntegrationStatus } from "./IntegrationLayout";
 import { type KeyDialogText, OpenCodeKeyDialog, type ProviderKeyApi } from "./OpenCodeKeyDialog";
 
@@ -786,6 +789,10 @@ function AccountsSection(props: SectionProps) {
   const keyOffered = () => Boolean(keyText() && props.accountActions?.connectKey);
   /** The account whose key the dialog asks for: null adds an account. Undefined while the dialog is closed. */
   const [keyTarget, setKeyTarget] = createSignal<string | null | undefined>(undefined);
+  /** Dedicated CLIProxy profile dialog: null creates one, an account edits it, undefined is closed. */
+  const cliProxyProvider = () => (isCliProxyProvider(props.option.id) ? props.option.id : undefined);
+  const cliProxyOffered = () => Boolean(cliProxyProvider() && props.accountActions?.saveCliProxyProfile);
+  const [cliProxyTarget, setCliProxyTarget] = createSignal<ProviderPickerAccount | null | undefined>(undefined);
   /**
    * The key dialog saves through the account action. The key is new each time and no call reads it
    * back, so the dialog has no saved state and no Remove: the account's menu removes it.
@@ -863,7 +870,8 @@ function AccountsSection(props: SectionProps) {
   const pool = () => (props.accountActions?.setPool ? props.option.accountPool : undefined);
   /** The pool switch shows where the host has a pool and the provider has a second account to use. */
   /** A saved key has no plan limit, so it is not a pool member. */
-  const planAccounts = () => accounts().filter((account) => !isApiKeyAccount(account.id, props.option.id));
+  const planAccounts = () =>
+    accounts().filter((account) => !isApiKeyAccount(account.id, props.option.id) && !isCliProxyAccount(account));
   const poolOffered = () => Boolean(props.accountActions?.setPool) && (planAccounts().length > 1 || Boolean(pool()));
   const poolLabelId = `provider-settings-${props.option.id}-pool-label`;
   const setPool = (enabled: boolean, leftOut: readonly string[]) =>
@@ -889,6 +897,19 @@ function AccountsSection(props: SectionProps) {
       actions={
         // A host that takes no key cannot add an account that is a key, so it offers none.
         <Show when={!hasKeyAccounts(props.option.id) || keyOffered()}>
+          <Show when={cliProxyOffered()}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              aria-label={t("provider.account.addCliProxyLabel", { name: props.option.name })}
+              disabled={props.disabled || !props.row.accountsOffered() || accounts().length >= MAX_PROVIDER_ACCOUNTS}
+              onClick={() => setCliProxyTarget(null)}
+            >
+              <Globe2 aria-hidden="true" />
+              {t("provider.account.addCliProxy")}
+            </Button>
+          </Show>
           <Button
             type="button"
             variant="outline"
@@ -967,6 +988,11 @@ function AccountsSection(props: SectionProps) {
               resetsLeft={props.accountActions?.resetUsage ? resetsLeft(account().id) : 0}
               onResetUsage={() => setResetting({ ...account() })}
               onChangeKey={keyOffered() ? () => setKeyTarget(account().id) : undefined}
+              onEditCliProxy={
+                cliProxyOffered() && isCliProxyAccount(account())
+                  ? () => setCliProxyTarget({ ...account() })
+                  : undefined
+              }
             />
           )}
         </For>
@@ -993,6 +1019,19 @@ function AccountsSection(props: SectionProps) {
       <Show when={keyTarget() !== undefined ? keyText() : undefined}>
         {(text) => (
           <OpenCodeKeyDialog api={keyApi(keyTarget() ?? null)} text={text()} onClose={() => setKeyTarget(undefined)} />
+        )}
+      </Show>
+      <Show when={cliProxyTarget() !== undefined ? cliProxyProvider() : undefined}>
+        {(provider) => (
+          <CliProxyProfileDialog
+            provider={provider()}
+            providerName={props.option.name}
+            account={cliProxyTarget() ?? null}
+            onSave={async (input) => {
+              await props.accountActions?.saveCliProxyProfile?.(input);
+            }}
+            onClose={() => setCliProxyTarget(undefined)}
+          />
         )}
       </Show>
       <ConfirmDialog
@@ -1105,6 +1144,8 @@ function AccountRow(
     onTogglePool: () => void;
     /** Opens the key dialog for an account that is an API key. Absent where the host takes no key. */
     onChangeKey: (() => void) | undefined;
+    /** Opens the CLIProxy profile dialog to edit this profile's URL or key. */
+    onEditCliProxy: (() => void) | undefined;
   },
 ) {
   const { t, format, sourceText } = useText();
@@ -1125,18 +1166,20 @@ function AccountRow(
     Object.hasOwn(ACCOUNT_STATE_TEXT, props.account.state) ? props.account.state : "error";
   const needsSignIn = () => state() === "signed-out" || state() === "error";
   /** The own account signs in again with the provider's Reconnect, so only the others have their own. */
-  const signInAgain = () => !own() && !apiKey() && !keyAccount() && needsSignIn();
+  const cliProxy = () => isCliProxyAccount(props.account);
+  const signInAgain = () => !own() && !apiKey() && !keyAccount() && !cliProxy() && needsSignIn();
   /** A key that the provider no longer accepts is replaced, where a browser account signs in again. */
   const changeKey = () => (keyAccount() ? props.onChangeKey : undefined);
-  const connecting = () => !own() && !apiKey() && !keyAccount() && state() === "connecting";
+  const connecting = () => !own() && !apiKey() && !keyAccount() && !cliProxy() && state() === "connecting";
   /** A Reconnect of the provider waits for the browser. */
   const ownSigningIn = () => own() && props.row.signingIn();
   const agents = () => props.account.usedBy ?? [];
-  /** A pool member: a saved key is never one. */
-  const poolMember = () => Boolean(props.pool) && !apiKey() && !keyAccount();
+  /** A pool member: a saved key or CLIProxy profile is never one. */
+  const poolMember = () => Boolean(props.pool) && !apiKey() && !keyAccount() && !cliProxy();
   const inPool = () => poolMember() && !props.pool?.leftOut.includes(props.account.id);
   const detail = () =>
     [
+      props.account.proxy?.baseUrl ?? null,
       props.account.email && props.account.email !== name() ? props.account.email : null,
       agents().length > 0 ? t("provider.account.usedBy", { agents: format.list(agents()) }) : null,
     ]
@@ -1193,6 +1236,9 @@ function AccountRow(
         </Show>
       </ItemContent>
       <ItemActions>
+        <Show when={cliProxy()}>
+          <Badge variant="secondary">{t("provider.account.cliProxyBadge")}</Badge>
+        </Show>
         <Show when={poolMember() && !inPool()}>
           <Badge variant="secondary">{t("provider.account.notInPool")}</Badge>
         </Show>
@@ -1246,6 +1292,14 @@ function AccountRow(
           <MenuTrigger label={t("provider.account.moreActions", { name: name() })} disabled={props.disabled} />
           <DropdownMenu.Portal mount={props.menuMount ?? document.body}>
             <DropdownMenu.Content>
+              <Show when={props.onEditCliProxy}>
+                {(edit) => (
+                  <DropdownMenu.Item onSelect={() => edit()()}>
+                    <Globe2 aria-hidden="true" />
+                    {t("provider.account.editCliProxy")}
+                  </DropdownMenu.Item>
+                )}
+              </Show>
               <DropdownMenu.Item onSelect={() => setRenaming(true)}>
                 <Pencil aria-hidden="true" />
                 {t("common.rename")}
@@ -1266,7 +1320,7 @@ function AccountRow(
                   </Show>
                 </DropdownMenu.Item>
               </Show>
-              <Show when={state() === "connected" && !apiKey() && !keyAccount() && props.resetsLeft > 0}>
+              <Show when={state() === "connected" && !apiKey() && !keyAccount() && !cliProxy() && props.resetsLeft > 0}>
                 <DropdownMenu.Item onSelect={() => props.onResetUsage()}>
                   <Gauge aria-hidden="true" />
                   {t("provider.account.resetUsage")}

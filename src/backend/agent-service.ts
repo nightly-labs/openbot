@@ -101,6 +101,7 @@ import type {
   RunQueuedMessageAsTaskInput,
   SaveAgentProfileInput,
   SaveAgentProfileResult,
+  SaveCliProxyProfileInput,
   SaveMcpServerInput,
   SaveMcpSignInAppInput,
   SaveSkillSuggestionInput,
@@ -5651,6 +5652,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       .pipe(
         Effect.mapError(
           (failure) => new AgentLifecycleFailed({ operation: "connectProviderAccount", cause: failure.cause }),
+        ),
+      );
+  }
+
+  /** See `ProviderRuntime.saveCliProxyProfile`. */
+  saveCliProxyProfile(input: SaveCliProxyProfileInput): Effect.Effect<AgentStatus, AgentLifecycleFailed> {
+    return this.#providers
+      .saveCliProxyProfile(input)
+      .pipe(
+        Effect.mapError(
+          (failure) => new AgentLifecycleFailed({ operation: "saveCliProxyProfile", cause: failure.cause }),
         ),
       );
   }

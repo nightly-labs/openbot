@@ -514,4 +514,8 @@ export const messages = {
   "error.provider.hermesInstallFailed": "Hermes Agent 未能安装。请重试，或使用安装指南。",
   "error.provider.hermesNeedsGitCurl": "Hermes Agent 需要 git 和 curl。请先安装它们，然后重试。",
   "error.provider.registryRemoveBusy": "请等待助手安装与正在进行的 ACP 工作结束，再移除它。",
+  "error.provider.cliProxyUnsupported": "{provider} 不支持 CLIProxy 配置文件。",
+  "error.provider.cliProxyInvalidUrl": "请输入以 http:// 或 https:// 开头的 CLIProxy URL。",
+  "error.provider.cliProxyNoSignIn": "此 {provider} 配置文件使用 CLIProxy，不支持浏览器登录。",
+  "error.provider.cliProxyNotProxy": "此 {provider} 账号不是 CLIProxy 配置文件。",
 } as const satisfies PartialTranslation<typeof source>;

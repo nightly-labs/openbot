@@ -1648,6 +1648,34 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       );
       return clone(changed);
     },
+    saveCliProxyProfile: async ({ provider, accountId, label, baseUrl }) => {
+      const changed = changeProviderAccounts(provider, (accounts) =>
+        accountId
+          ? accounts.map((account) =>
+              account.id === accountId
+                ? {
+                    ...account,
+                    label: label ?? account.label,
+                    state: "connected",
+                    message: null,
+                    proxy: { kind: "cliproxy", baseUrl },
+                  }
+                : account,
+            )
+          : [
+              ...accounts,
+              {
+                id: `a${(accounts.length + 1).toString(16).padStart(16, "0")}`,
+                label: label ?? `${provider} (CLIProxy)`,
+                email: null,
+                state: "connected",
+                message: null,
+                proxy: { kind: "cliproxy", baseUrl },
+              },
+            ],
+      );
+      return clone(changed);
+    },
     // The preview signs in at once, so no sign-in runs to cancel.
     cancelProviderAccountSignIn: async () => clone(agentStatus),
     renameProviderAccount: async ({ provider, accountId, label }) =>
@@ -1969,6 +1997,10 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       cancelAccountSignIn: async () => undefined,
       connectAccountKey: async (input) => {
         await api.connectProviderAccountKey(input);
+      },
+      listCliProxyProfiles: async () => ({ profiles: [] }),
+      saveCliProxyProfile: async (input) => {
+        await api.saveCliProxyProfile(input);
       },
       // The preview has no provider to finish a code sign-in: the code stays until the dialog closes.
       startAccountCodeLogin: async ({ provider, accountId }) => {

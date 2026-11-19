@@ -12,14 +12,18 @@ import {
 } from "@openbot/contracts/agent-providers";
 import {
   type AgentProviderId,
+  CLIPROXY_BASE_URL_MAX_LENGTH,
   type ConnectProviderAccountInput,
   type ConnectProviderAccountKeyInput,
+  isCliProxyProvider,
   isProviderAccountId,
   MAX_PROVIDER_ACCOUNTS,
+  normalizeCliProxyBaseUrl,
   PROVIDER_ACCOUNT_LABEL_MAX_LENGTH,
   type RemoveProviderAccountInput,
   type RenameProviderAccountInput,
   type ResetProviderUsageInput,
+  type SaveCliProxyProfileInput,
   type SetProviderAccountPoolInput,
   type SetProviderApiKeyInput,
 } from "@openbot/contracts/ipc";
@@ -149,6 +153,9 @@ export function providerIpcHandlers({
       connectProviderAccountKey: payloadHandler(parseConnectProviderAccountKeyInput, ({ provider, accountId, key }) =>
         runCauseEffect(service.connectProviderAccountKey(provider, accountId, key)),
       ),
+      saveCliProxyProfile: payloadHandler(parseSaveCliProxyProfileInput, (input) =>
+        runCauseEffect(service.saveCliProxyProfile(input)),
+      ),
       cancelProviderAccountSignIn: payloadHandler(parseRemoveProviderAccountInput, ({ provider, accountId }) =>
         runCauseEffect(service.cancelProviderAccountSignIn(provider, accountId)),
       ),
@@ -254,6 +261,36 @@ export function parseConnectProviderAccountInput(value: unknown): ConnectProvide
 
 export function parseConnectProviderAccountKeyInput(value: unknown): ConnectProviderAccountKeyInput {
   return { ...parseConnectProviderAccountInput(value), key: parseProviderApiKeyInput(value).key };
+}
+
+export function parseSaveCliProxyProfileInput(value: unknown): SaveCliProxyProfileInput {
+  if (!isDynamicRecord(value)) throw new Error("Invalid CLIProxy profile.");
+  const provider = parseProviderId(value.provider);
+  if (!isCliProxyProvider(provider)) throw new Error("Provider does not support CLIProxy profiles.");
+  const accountId =
+    value.accountId === null || value.accountId === undefined ? null : requireString(value.accountId, "accountId");
+  const rawBaseUrl = requireString(value.baseUrl, "baseUrl");
+  if (rawBaseUrl.length > CLIPROXY_BASE_URL_MAX_LENGTH) throw new Error("baseUrl is too long.");
+  const baseUrl = normalizeCliProxyBaseUrl(rawBaseUrl);
+  if (!baseUrl) throw new Error(sourceText("error.provider.cliProxyInvalidUrl"));
+  let label: string | null | undefined;
+  if (value.label !== undefined) {
+    if (value.label !== null && typeof value.label !== "string") throw new Error("label must be a string or null.");
+    label = value.label === null ? null : value.label.trim().slice(0, PROVIDER_ACCOUNT_LABEL_MAX_LENGTH) || null;
+  }
+  let apiKey: string | null | undefined;
+  if (value.apiKey !== undefined) {
+    if (value.apiKey !== null && typeof value.apiKey !== "string") throw new Error("apiKey must be a string or null.");
+    if (typeof value.apiKey === "string" && value.apiKey.length > 512) throw new Error("apiKey is too long.");
+    apiKey = value.apiKey;
+  }
+  return {
+    provider,
+    accountId,
+    ...(label !== undefined ? { label } : {}),
+    baseUrl,
+    ...(apiKey !== undefined ? { apiKey } : {}),
+  };
 }
 
 export function parseRemoveProviderAccountInput(value: unknown): RemoveProviderAccountInput {

@@ -616,4 +616,9 @@ export const messages = {
     "Hermes Agent には git と curl が必要です。インストールしてから、もう一度試してください。",
   "error.provider.registryRemoveBusy":
     "削除する前に、エージェントのインストールと実行中の ACP の作業が終わるまでお待ちください。",
+  "error.provider.cliProxyUnsupported": "{provider} は CLIProxy プロファイルに対応していません。",
+  "error.provider.cliProxyInvalidUrl": "http:// または https:// で始まる CLIProxy URL を入力してください。",
+  "error.provider.cliProxyNoSignIn":
+    "この {provider} プロファイルは CLIProxy を使用しているため、ブラウザログインは不要です。",
+  "error.provider.cliProxyNotProxy": "この {provider} アカウントは CLIProxy プロファイルではありません。",
 } as const satisfies PartialTranslation<typeof source>;

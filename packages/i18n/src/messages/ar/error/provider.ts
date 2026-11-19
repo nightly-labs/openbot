@@ -548,4 +548,8 @@ export const messages = {
   "error.provider.hermesInstallFailed": "لم يُثبَّت Hermes Agent. حاول مرة أخرى، أو استخدم دليل التثبيت.",
   "error.provider.hermesNeedsGitCurl": "يحتاج Hermes Agent إلى git وcurl. ثبّتهما، ثم حاول مرة أخرى.",
   "error.provider.registryRemoveBusy": "انتظر حتى ينتهي تثبيت الوكيل وعمل ACP النشط قبل إزالته.",
+  "error.provider.cliProxyUnsupported": "{provider} لا يدعم ملفات CLIProxy.",
+  "error.provider.cliProxyInvalidUrl": "أدخل رابط CLIProxy يبدأ بـ http:// أو https://.",
+  "error.provider.cliProxyNoSignIn": "يستخدم ملف {provider} هذا CLIProxy ولا يستخدم تسجيل الدخول عبر المتصفح.",
+  "error.provider.cliProxyNotProxy": "حساب {provider} هذا ليس ملف CLIProxy.",
 } as const satisfies PartialTranslation<typeof source>;

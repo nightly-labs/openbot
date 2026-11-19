@@ -337,4 +337,22 @@ export const messages = {
   "provider.settings.removeDownloadFailed": "İndirme kaldırılamadı.",
   "provider.settings.disconnectLocalOnly":
     "OpenBot bu bilgisayarda {provider} oturumunu kapatır. Terminalindeki {provider} CLI kendi oturumunu korur.",
+  "provider.account.addCliProxy": "CLIProxy ekle",
+  "provider.account.addCliProxyLabel": "{name} için CLIProxy profili ekle",
+  "provider.account.editCliProxy": "CLIProxy'yi düzenle",
+  "provider.account.cliProxyBadge": "CLIProxy",
+  "provider.cliproxy.createTitle": "{name} CLIProxy profili ekle",
+  "provider.cliproxy.editTitle": "{name} CLIProxy profilini düzenle",
+  "provider.cliproxy.description":
+    "Yerel {name} oturumunuzu değiştirmeden CLIProxy üzerinden yönlendirilen ayrı bir profil oluşturur.",
+  "provider.cliproxy.nameLabel": "Profil adı",
+  "provider.cliproxy.urlLabel": "CLIProxy URL'si",
+  "provider.cliproxy.keyLabel": "API anahtarı (isteğe bağlı)",
+  "provider.cliproxy.keyPlaceholder": "CLIProxy anahtar gerektirmiyorsa boş bırakın",
+  "provider.cliproxy.keyEditPlaceholder": "Kayıtlı anahtarı korumak için boş bırakın",
+  "provider.cliproxy.clearKey": "Kayıtlı API anahtarını temizle",
+  "provider.cliproxy.create": "Profil oluştur",
+  "provider.cliproxy.save": "Değişiklikleri kaydet",
+  "provider.cliproxy.saving": "Kaydediliyor…",
+  "provider.cliproxy.invalidUrl": "Geçerli bir http:// veya https:// URL'si girin.",
 } as const satisfies PartialTranslation<typeof source>;

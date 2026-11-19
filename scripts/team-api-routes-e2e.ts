@@ -3009,6 +3009,7 @@ try {
         listAgents: () => [],
         updateAgent: unused("providerAccounts.updateAgent"),
         signInProviderAccountOnHost: unused("providerAccounts.signInProviderAccountOnHost"),
+        saveCliProxyProfile: () => Effect.sync(accountModelsStatus),
         // As the backend: Cursor refuses one key, and each other key gives an account.
         connectProviderAccountKey: (provider, accountId, key) => {
           record("connectProviderAccountKey", { provider, accountId, keyLength: key.length });

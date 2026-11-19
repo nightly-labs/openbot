@@ -119,6 +119,7 @@ import type {
   AgentStatus,
   ConnectProviderAccountInput,
   ConnectProviderAccountKeyInput,
+  HostCliProxyProfiles,
   HostProviderAccounts,
   PasteProviderRelaySignInInput,
   ProviderAccountCodeLoginStart,
@@ -132,6 +133,7 @@ import type {
   RemoveProviderAccountInput,
   RenameProviderAccountInput,
   ResetProviderUsageInput,
+  SaveCliProxyProfileInput,
   SetProviderAccountPoolInput,
   SetProviderApiKeyInput,
   SubmitProviderAccountCodeLoginInput,
@@ -945,6 +947,8 @@ export const IPC_ENDPOINTS = {
     connectProviderAccountKey: request<ConnectProviderAccountKeyInput, AgentStatus>()(
       "app:connect-provider-account-key",
     ),
+    /** Creates or updates a dedicated CLIProxy profile isolated from the provider's native login. */
+    saveCliProxyProfile: request<SaveCliProxyProfileInput, AgentStatus>()("app:save-cli-proxy-profile"),
     /** Stops a `connecting` account's sign-in: a new account goes, another one shows as signed out. */
     cancelProviderAccountSignIn: request<RemoveProviderAccountInput, AgentStatus>()(
       "app:cancel-provider-account-sign-in",
@@ -1236,6 +1240,11 @@ export const IPC_ENDPOINTS = {
     // An account of a joined server's host that is an API key (`provider-account-keys-v1`).
     connectAccountKey: scopedRequest<ConnectProviderAccountKeyInput, void, "required">()(
       "provider-admin:connect-account-key",
+    ),
+    // Dedicated CLIProxy profiles on a joined server's host (`cliproxy-profiles-v1`).
+    listCliProxyProfiles: scopedQuery<HostCliProxyProfiles, "required">()("provider-admin:list-cli-proxy-profiles"),
+    saveCliProxyProfile: scopedRequest<SaveCliProxyProfileInput, void, "required">()(
+      "provider-admin:save-cli-proxy-profile",
     ),
     // A code sign-in of an account: the provider's CLI gives a page and a code, and the person opens
     // the page on any device. This computer runs it for its own accounts; a joined server's host

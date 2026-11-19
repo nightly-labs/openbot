@@ -342,6 +342,7 @@ type ProviderCodeSignIn =
  */
 function antigravityKeyOptions(context: ProviderClientContext, agentEnvironment: boolean) {
   const account = context.accountEnvironment;
+  const proxyOverride = account && "AGY_LLM_GATEWAY_URL" in account ? account : undefined;
   const variables = () => context.providerEnvironment?.("antigravity") ?? {};
   // A gateway or a key in the provider's variables takes the place of the saved key.
   const key = () =>
@@ -358,11 +359,17 @@ function antigravityKeyOptions(context: ProviderClientContext, agentEnvironment:
         ...(saved ? { GEMINI_API_KEY: saved } : {}),
         // Last: the host refuses a variable that names a folder of the account (`GEMINI_HOME`).
         ...variables(),
+        // A dedicated proxy profile (CLIProxy) explicitly owns its gateway URL and token.
+        ...proxyOverride,
       };
     },
     redactValues: () => {
+      const values: string[] = [];
       const saved = key();
-      return saved ? [saved] : [];
+      if (saved) values.push(saved);
+      const gatewayKey = proxyOverride?.AGY_LLM_GATEWAY_API_KEY;
+      if (gatewayKey) values.push(gatewayKey);
+      return values;
     },
     authenticate: (connection: ClientSideConnection, initialization: InitializeResponse) =>
       key() && initialization.authMethods?.some((method) => method.id === GEMINI_API_KEY_METHOD)
@@ -730,7 +737,7 @@ export interface ProviderClientContext {
  */
 const CODEX_ADDRESS_VARIABLE = "OPENAI_BASE_URL";
 
-function codexVariableOverrides(variables: Readonly<Record<string, string>>): string[] {
+export function codexVariableOverrides(variables: Readonly<Record<string, string>>): string[] {
   const baseUrl = variables[CODEX_ADDRESS_VARIABLE]?.trim().replace(/\/+$/, "");
   if (!baseUrl || !/^https?:\/\/[^/\s]+/.test(baseUrl) || /\s/.test(baseUrl)) return [];
   return [
@@ -764,10 +771,14 @@ function withAccountEnvironment(
  * last, so a variable that an admin set wins over a value of the same name; the host refuses the names
  * of the account folders.
  */
-function claudeAgentEnvironment(
+export function claudeAgentEnvironment(
   context: ProviderClientContext,
 ): (inherited?: NodeJS.ProcessEnv) => Readonly<Record<string, string>> {
   const environment = withAccountEnvironment(context);
+  const proxyOverride =
+    context.accountEnvironment && "ANTHROPIC_BASE_URL" in context.accountEnvironment
+      ? context.accountEnvironment
+      : undefined;
   return (inherited) => {
     const compactWindow = context.claudeCompactWindow?.() ?? null;
     return {
@@ -779,6 +790,8 @@ function claudeAgentEnvironment(
       // After the account, so a key account's key does not go to a gateway that the variables name.
       // The host refuses `CLAUDE_CONFIG_DIR`, the account's folder.
       ...context.providerEnvironment?.("claude"),
+      // A dedicated proxy profile (CLIProxy) explicitly owns its gateway URL and token.
+      ...proxyOverride,
     };
   };
 }
@@ -1098,16 +1111,19 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       // The variables go in the spawn environment: the app-server is one process for every agent.
       // Codex leaves a name with KEY, SECRET or TOKEN out of the shells that its agents run.
       const variables = context.providerEnvironment?.("codex") ?? {};
-      const overrides = codexVariableOverrides(variables);
+      const accountEnv = context.accountEnvironment ?? {};
+      // A dedicated proxy profile (CLIProxy) sets OPENAI_BASE_URL on the account; let it win over
+      // provider-level defaults and generate matching Codex -c overrides without touching native logins.
+      const mergedVariables =
+        CODEX_ADDRESS_VARIABLE in accountEnv ? { ...variables, ...accountEnv } : { ...accountEnv, ...variables };
+      const overrides = codexVariableOverrides(mergedVariables);
       return new CodexAppServerClient(
         cli.executable,
         requestTimeoutMs,
         {
           ...cliPathEnvironment(cli),
           ...serverEnvironment,
-          ...context.accountEnvironment,
-          // The host refuses `CODEX_HOME`, the account's folder.
-          ...variables,
+          ...mergedVariables,
         },
         context.codexTurnContext,
         overrides,

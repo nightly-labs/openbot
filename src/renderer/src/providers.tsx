@@ -3,6 +3,7 @@ import {
   type ManagedProviderId,
   pasteCodeSignInSupported,
 } from "@openbot/contracts/agent-providers";
+import type { SaveCliProxyProfileInput } from "@openbot/contracts/ipc";
 import {
   type AgentProviderId,
   type AgentStatus,
@@ -13,6 +14,7 @@ import {
   type ProviderRuntimeDownload,
 } from "@openbot/contracts/ipc";
 import { CLAUDE_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/claude-api-key-v1";
+import { CLIPROXY_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/cliproxy-profiles-v1";
 import { CODEX_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/codex-api-key-v1";
 import { CUSTOM_PROVIDER_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
 import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-code-v1";
@@ -395,6 +397,8 @@ const Providers = createSimpleContext({
     const accountKeysServerId = createMemo(
       () => remoteAdminServer(activeServer(), PROVIDER_ACCOUNT_KEYS_CAPABILITY)?.id,
     );
+    /** The joined server whose host manages dedicated CLIProxy profiles (`cliproxy-profiles-v1`). */
+    const cliProxyServerId = createMemo(() => remoteAdminServer(activeServer(), CLIPROXY_PROFILES_CAPABILITY)?.id);
 
     /**
      * The accounts of the providers of this computer, or of a joined server's host that serves
@@ -453,6 +457,12 @@ const Providers = createSimpleContext({
                   changed(providerAdmin().connectAccountKey({ provider, accountId, key }, hostServerId)),
               }
             : {}),
+          ...(cliProxyServerId() === hostServerId
+            ? {
+                saveCliProxyProfile: (input: SaveCliProxyProfileInput) =>
+                  changed(providerAdmin().saveCliProxyProfile(input, hostServerId)),
+              }
+            : {}),
         };
       }
       if (activeServer()?.kind !== "local") return undefined;
@@ -471,6 +481,7 @@ const Providers = createSimpleContext({
         pasteCodeSignIn: pasteCodeSignInSupported(appInfo()?.platform ?? ""),
         connectKey: (provider, accountId, key) =>
           apply(providersPort().connectProviderAccountKey({ provider, accountId, key })),
+        saveCliProxyProfile: (input) => apply(providersPort().saveCliProxyProfile(input)),
         cancel: async (provider, accountId) => {
           await providersPort().cancelProviderAccountSignIn({ provider, accountId });
         },

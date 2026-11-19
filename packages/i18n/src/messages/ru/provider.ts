@@ -360,4 +360,22 @@ export const messages = {
   "provider.settings.removeDownloadFailed": "Не удалось удалить загрузку.",
   "provider.settings.disconnectLocalOnly":
     "OpenBot выходит из {provider} на этом компьютере. {provider} CLI в терминале остаётся в своём аккаунте.",
+  "provider.account.addCliProxy": "Добавить CLIProxy",
+  "provider.account.addCliProxyLabel": "Добавить профиль CLIProxy для {name}",
+  "provider.account.editCliProxy": "Изменить CLIProxy",
+  "provider.account.cliProxyBadge": "CLIProxy",
+  "provider.cliproxy.createTitle": "Добавить профиль CLIProxy для {name}",
+  "provider.cliproxy.editTitle": "Изменить профиль CLIProxy для {name}",
+  "provider.cliproxy.description":
+    "Создаёт отдельный профиль через CLIProxy, не затрагивая ваш основной вход в {name}.",
+  "provider.cliproxy.nameLabel": "Название профиля",
+  "provider.cliproxy.urlLabel": "URL CLIProxy",
+  "provider.cliproxy.keyLabel": "API-ключ (необязательно)",
+  "provider.cliproxy.keyPlaceholder": "Оставьте пустым, если CLIProxy не требует ключ",
+  "provider.cliproxy.keyEditPlaceholder": "Оставьте пустым, чтобы сохранить текущий ключ",
+  "provider.cliproxy.clearKey": "Удалить сохранённый API-ключ",
+  "provider.cliproxy.create": "Создать профиль",
+  "provider.cliproxy.save": "Сохранить изменения",
+  "provider.cliproxy.saving": "Сохранение…",
+  "provider.cliproxy.invalidUrl": "Введите корректный URL с http:// или https://.",
 } as const satisfies PartialTranslation<typeof source>;

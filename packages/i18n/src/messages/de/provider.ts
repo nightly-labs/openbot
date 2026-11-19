@@ -343,4 +343,22 @@ export const messages = {
   "provider.settings.removeDownloadFailed": "Der Download konnte nicht entfernt werden.",
   "provider.settings.disconnectLocalOnly":
     "OpenBot meldet {provider} auf diesem Computer ab. Die {provider}-CLI in deinem Terminal bleibt angemeldet.",
+  "provider.account.addCliProxy": "CLIProxy hinzufügen",
+  "provider.account.addCliProxyLabel": "CLIProxy-Profil für {name} hinzufügen",
+  "provider.account.editCliProxy": "CLIProxy bearbeiten",
+  "provider.account.cliProxyBadge": "CLIProxy",
+  "provider.cliproxy.createTitle": "{name}-CLIProxy-Profil hinzufügen",
+  "provider.cliproxy.editTitle": "{name}-CLIProxy-Profil bearbeiten",
+  "provider.cliproxy.description":
+    "Erstellt ein getrenntes Profil über CLIProxy, ohne deine native {name}-Anmeldung zu ändern.",
+  "provider.cliproxy.nameLabel": "Profilname",
+  "provider.cliproxy.urlLabel": "CLIProxy-URL",
+  "provider.cliproxy.keyLabel": "API-Schlüssel (optional)",
+  "provider.cliproxy.keyPlaceholder": "Leer lassen, falls CLIProxy keinen Schlüssel benötigt",
+  "provider.cliproxy.keyEditPlaceholder": "Leer lassen, um den gespeicherten Schlüssel zu behalten",
+  "provider.cliproxy.clearKey": "Gespeicherten API-Schlüssel löschen",
+  "provider.cliproxy.create": "Profil erstellen",
+  "provider.cliproxy.save": "Änderungen speichern",
+  "provider.cliproxy.saving": "Wird gespeichert…",
+  "provider.cliproxy.invalidUrl": "Gib eine gültige http://- oder https://-URL ein.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -591,4 +591,8 @@ export const messages = {
   "error.provider.hermesNeedsGitCurl": "O Hermes Agent precisa de git e curl. Instale-os e tente de novo.",
   "error.provider.registryRemoveBusy":
     "Aguarde a instalação do agente e o trabalho ACP ativo terminarem antes de removê-lo.",
+  "error.provider.cliProxyUnsupported": "{provider} não oferece suporte a perfis CLIProxy.",
+  "error.provider.cliProxyInvalidUrl": "Informe uma URL do CLIProxy com http:// ou https://.",
+  "error.provider.cliProxyNoSignIn": "Este perfil do {provider} usa CLIProxy e não usa login no navegador.",
+  "error.provider.cliProxyNotProxy": "Esta conta do {provider} não é um perfil CLIProxy.",
 } as const satisfies PartialTranslation<typeof source>;

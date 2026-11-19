@@ -1,4 +1,9 @@
+import { isCliProxyProvider, normalizeCliProxyBaseUrl } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
+import {
+  CLIPROXY_PROFILES_CAPABILITY,
+  CLIPROXY_PROFILES_ROUTES,
+} from "@openbot/contracts/team-protocol/cliproxy-profiles-v1";
 import {
   PROVIDER_ACCOUNT_CODE_CAPABILITY,
   PROVIDER_ACCOUNT_CODE_ROUTES,
@@ -145,6 +150,49 @@ export async function routeProviderAccountKeys(
   } catch (error) {
     // The admin must see why the provider refused the key, as on the provider routes. A CLI can quote
     // its key, so the message leaves this computer redacted.
+    if (error instanceof Error) throw new HttpError(409, redactText(error.message));
+    throw error;
+  }
+  return json(200, {});
+}
+
+const CLIPROXY_ROUTES: ReadonlySet<string> = new Set(Object.values(CLIPROXY_PROFILES_ROUTES));
+
+/**
+ * Lists, creates, and updates dedicated CLIProxy profiles on this host. Frozen by `cliproxy-profiles-v1`.
+ * `requireAdmin` runs on every route; any API key travels only to the host and is never returned.
+ */
+export async function routeCliProxyProfiles(
+  context: TeamApiRequestContext,
+  accounts: TeamApiProviderAccounts | undefined,
+): Promise<RouteOutcome> {
+  const { method, url, capabilities, member, request, json } = context;
+  if (method !== "POST" || !CLIPROXY_ROUTES.has(url.pathname)) return "unmatched";
+  if (!accounts || !capabilities.has(CLIPROXY_PROFILES_CAPABILITY))
+    throw new HttpError(400, sourceText("error.team.providersUnsupported"));
+  requireAdmin(member);
+  if (url.pathname === CLIPROXY_PROFILES_ROUTES.list) {
+    return json(200, accounts.cliProxyProfiles());
+  }
+  const body = await readJson(request);
+  const provider = parseProviderId(body.provider);
+  if (!isCliProxyProvider(provider))
+    throw new HttpError(400, sourceText("error.provider.cliProxyUnsupported", { provider }));
+  const baseUrl = isString(body.baseUrl) ? normalizeCliProxyBaseUrl(body.baseUrl) : null;
+  if (!baseUrl) throw new HttpError(400, sourceText("error.provider.cliProxyInvalidUrl"));
+  const apiKey = isString(body.apiKey) ? body.apiKey : null;
+  if (apiKey?.trim()) registerSecretValue(apiKey.trim());
+  try {
+    await runCauseEffect(
+      accounts.saveCliProxyProfile({
+        provider,
+        accountId: isString(body.accountId) ? body.accountId : null,
+        label: isString(body.label) ? body.label : null,
+        baseUrl,
+        apiKey,
+      }),
+    );
+  } catch (error) {
     if (error instanceof Error) throw new HttpError(409, redactText(error.message));
     throw error;
   }

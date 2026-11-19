@@ -6,12 +6,14 @@ import type {
   ExternalDestination,
   HostDefaultProvider,
   ProviderAdminDesktopApi,
+  SaveCliProxyProfileInput,
   ServerSummary,
   UpdateCustomProviderInput,
 } from "@openbot/contracts/ipc";
 import { decodeRegistryEntries, decodeRegistryInstallResult, decodeRegistryOperations } from "@openbot/contracts/ipc";
 import { ACP_REGISTRY_ROUTES } from "@openbot/contracts/team-protocol/acp-registry-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/claude-api-key-v1";
+import { CLIPROXY_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/cliproxy-profiles-v1";
 import { CODEX_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/codex-api-key-v1";
 import { CUSTOM_AGENTS_CAPABILITY } from "@openbot/contracts/team-protocol/custom-agents-v1";
 import {
@@ -79,6 +81,7 @@ import {
   type HostProviderDefault,
   listCustomAgents,
   listCustomProviders,
+  listHostCliProxyProfiles,
   listProviderAccountsWithModels,
   type ProviderCodeLoginRoutes,
   type ProviderRuntimeRoutes,
@@ -92,6 +95,7 @@ import {
   resetProviderUsage,
   saveCustomAgent,
   saveCustomProvider,
+  saveHostCliProxyProfile,
   setHostProviderDefault,
   setProviderAccountPool,
   setProviderApiKey,
@@ -180,6 +184,8 @@ function webProviderAdmin(
   accountModels: () => boolean,
   /** Whether the host has `provider-account-pool-v1`. */
   accountPools: () => boolean,
+  /** Whether the host has `cliproxy-profiles-v1`. */
+  cliProxyProfiles: () => boolean,
 ): ProviderAdminDesktopApi {
   return {
     startCodeLogin: async (provider, serverId) =>
@@ -268,7 +274,7 @@ function webProviderAdmin(
       ),
     accounts: async (serverId) =>
       runTeamEffect(
-        listProviderAccountsWithModels(request(serverId), accountModels(), accountPools()).pipe(
+        listProviderAccountsWithModels(request(serverId), accountModels(), accountPools(), cliProxyProfiles()).pipe(
           Effect.mapError((error) => error.cause),
         ),
       ),
@@ -286,6 +292,10 @@ function webProviderAdmin(
       ),
     connectAccountKey: async (input, serverId) =>
       runTeamEffect(connectProviderAccountKey(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+    listCliProxyProfiles: async (serverId) =>
+      runTeamEffect(listHostCliProxyProfiles(request(serverId)).pipe(Effect.mapError((error) => error.cause))),
+    saveCliProxyProfile: async (input, serverId) =>
+      runTeamEffect(saveHostCliProxyProfile(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
     startAccountCodeLogin: async (input, serverId) =>
       runTeamEffect(
         startProviderAccountCodeLogin(request(serverId), input).pipe(Effect.mapError((error) => error.cause)),
@@ -430,6 +440,7 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
     accountRelayOfServer,
     () => serverSupportsCapability(options.server(), PROVIDER_ACCOUNT_MODELS_CAPABILITY),
     () => serverSupportsCapability(options.server(), PROVIDER_ACCOUNT_POOL_CAPABILITY),
+    () => serverSupportsCapability(options.server(), CLIPROXY_PROFILES_CAPABILITY),
   );
   const serverId = createMemo(() => remoteAdminServer(options.server(), "providers-v1")?.id);
   const runtimes = createProviderRuntimeStore(
@@ -674,6 +685,11 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
         ? {
             connectKey: (provider: AgentProviderId, accountId: string | null, key: string) =>
               changed(admin.connectAccountKey({ provider, accountId, key }, id)),
+          }
+        : {}),
+      ...(remoteAdminServer(options.server(), CLIPROXY_PROFILES_CAPABILITY)?.id === id
+        ? {
+            saveCliProxyProfile: (input: SaveCliProxyProfileInput) => changed(admin.saveCliProxyProfile(input, id)),
           }
         : {}),
     };

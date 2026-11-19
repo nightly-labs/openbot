@@ -14,6 +14,7 @@ import {
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
   decodeCustomProviderResult,
   decodeCustomProviderSummaries,
+  decodeHostCliProxyProfiles,
   decodeHostProviderAccountModels,
   decodeHostProviderAccountPools,
   decodeHostProviderAccountUsage,
@@ -30,9 +31,14 @@ import {
   type ProviderRelaySignInStatus,
   type SubmitProviderAccountCodeLoginInput,
   type SubmitProviderCodeLoginInput,
+  withHostCliProxyProfiles,
   withHostProviderAccountModels,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import {
+  CLIPROXY_PROFILES_CAPABILITY,
+  CLIPROXY_PROFILES_ROUTES,
+} from "@openbot/contracts/team-protocol/cliproxy-profiles-v1";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import {
   CUSTOM_PROVIDER_EDIT_CAPABILITY,
@@ -133,6 +139,7 @@ import {
   parseRemoveProviderAccountInput,
   parseRenameProviderAccountInput,
   parseResetProviderUsageInput,
+  parseSaveCliProxyProfileInput,
   parseSetProviderAccountPoolInput,
   signInCodexWithApiKey,
 } from "./provider-handlers";
@@ -460,11 +467,20 @@ export function providerAdminIpcHandlers({
                 })
                 .pipe(Effect.orElseSucceed(() => null))
             : Effect.succeed(null);
+          const cliProxy = remoteServers.supportsCapability(serverId, CLIPROXY_PROFILES_CAPABILITY)
+            ? remoteServers
+                .request(serverId, CLIPROXY_PROFILES_ROUTES.list, decodeHostCliProxyProfiles, {
+                  method: "POST",
+                  body: {},
+                })
+                .pipe(Effect.orElseSucceed(() => null))
+            : Effect.succeed(null);
           return runCauseEffect(
-            Effect.all([list, models, pools], { concurrency: "unbounded" }).pipe(
-              Effect.map(([accounts, extra, pooled]) => {
+            Effect.all([list, models, pools, cliProxy], { concurrency: "unbounded" }).pipe(
+              Effect.map(([accounts, extra, pooled, proxies]) => {
                 const withModels = extra ? withHostProviderAccountModels(accounts, extra) : accounts;
-                return pooled ? { ...withModels, pools: pooled } : withModels;
+                const withProxies = proxies ? withHostCliProxyProfiles(withModels, proxies) : withModels;
+                return pooled ? { ...withProxies, pools: pooled } : withProxies;
               }),
             ),
           );
@@ -499,6 +515,38 @@ export function providerAdminIpcHandlers({
               method: "POST",
               body: input,
               timeoutMs: ACCOUNT_KEY_CONNECT_TIMEOUT_MS,
+            }),
+          );
+        },
+      }),
+      listCliProxyProfiles: scopedQueryHandler({
+        local: () => Promise.reject(new Error(sourceText("error.team.providersUnsupported"))),
+        remote: (serverId) => {
+          if (!remoteServers.supportsCapability(serverId, CLIPROXY_PROFILES_CAPABILITY))
+            throw new Error(sourceText("error.team.providersUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, CLIPROXY_PROFILES_ROUTES.list, decodeHostCliProxyProfiles, {
+              method: "POST",
+              body: {},
+            }),
+          );
+        },
+      }),
+      saveCliProxyProfile: scopedHandler(parseSaveCliProxyProfileInput, {
+        local: () => Promise.reject(new Error(sourceText("error.team.providersUnsupported"))),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, CLIPROXY_PROFILES_CAPABILITY))
+            throw new Error(sourceText("error.team.providersUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, CLIPROXY_PROFILES_ROUTES.save, acceptEmpty, {
+              method: "POST",
+              body: {
+                provider: input.provider,
+                accountId: input.accountId,
+                label: input.label ?? null,
+                baseUrl: input.baseUrl,
+                apiKey: input.apiKey ?? null,
+              },
             }),
           );
         },

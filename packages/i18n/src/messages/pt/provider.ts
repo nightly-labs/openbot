@@ -332,4 +332,22 @@ export const messages = {
   "provider.settings.removeDownloadFailed": "Não foi possível remover o download.",
   "provider.settings.disconnectLocalOnly":
     "O OpenBot desconecta o {provider} neste computador. A CLI do {provider} no seu terminal mantém o próprio login.",
+  "provider.account.addCliProxy": "Adicionar CLIProxy",
+  "provider.account.addCliProxyLabel": "Adicionar perfil CLIProxy do {name}",
+  "provider.account.editCliProxy": "Editar CLIProxy",
+  "provider.account.cliProxyBadge": "CLIProxy",
+  "provider.cliproxy.createTitle": "Adicionar perfil CLIProxy do {name}",
+  "provider.cliproxy.editTitle": "Editar perfil CLIProxy do {name}",
+  "provider.cliproxy.description":
+    "Cria um perfil separado roteado pelo CLIProxy sem alterar seu login nativo do {name}.",
+  "provider.cliproxy.nameLabel": "Nome do perfil",
+  "provider.cliproxy.urlLabel": "URL do CLIProxy",
+  "provider.cliproxy.keyLabel": "Chave de API (opcional)",
+  "provider.cliproxy.keyPlaceholder": "Deixe em branco se o CLIProxy não exigir chave",
+  "provider.cliproxy.keyEditPlaceholder": "Deixe em branco para manter a chave salva",
+  "provider.cliproxy.clearKey": "Limpar chave de API salva",
+  "provider.cliproxy.create": "Criar perfil",
+  "provider.cliproxy.save": "Salvar alterações",
+  "provider.cliproxy.saving": "Salvando…",
+  "provider.cliproxy.invalidUrl": "Informe uma URL http:// ou https:// válida.",
 } as const satisfies PartialTranslation<typeof source>;

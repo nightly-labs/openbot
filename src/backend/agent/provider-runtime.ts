@@ -20,6 +20,7 @@ import type {
   ProviderCodeLoginStart,
   ProviderUsageResetOutcome,
   ProviderUsageResets,
+  SaveCliProxyProfileInput,
 } from "@openbot/contracts/ipc";
 import {
   AGENT_PROVIDERS,
@@ -2092,6 +2093,17 @@ export class ProviderRuntime implements ProviderPort {
     yield* providerStep(() => this.requireProviderOn(provider));
     const accounts = yield* this.#requireAccounts(provider);
     yield* accounts.connectKey(provider, accountId, key).pipe(toProviderOperationFailed);
+    return this.status();
+  }).bind(this);
+
+  /** Creates or updates a dedicated CLIProxy profile isolated from the provider's native sign-in. */
+  readonly saveCliProxyProfile = Effect.fn("ProviderRuntime.saveCliProxyProfile")(function* (
+    this: ProviderRuntime,
+    input: SaveCliProxyProfileInput,
+  ) {
+    yield* providerStep(() => this.requireProviderOn(input.provider));
+    const accounts = yield* this.#requireAccounts(input.provider);
+    yield* accounts.saveCliProxyProfile(input).pipe(toProviderOperationFailed);
     return this.status();
   }).bind(this);
 

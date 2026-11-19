@@ -6,6 +6,7 @@ import {
   type ProviderAccountStatus,
   type ProviderUsageResetOutcome,
   type ProviderUsageResets,
+  type SaveCliProxyProfileInput,
 } from "@openbot/contracts/ipc";
 import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import type { AppTranslate } from "@openbot/i18n";
@@ -28,6 +29,11 @@ export interface ProviderAccountActions {
    * when it did not. Absent where the computer that runs the providers cannot take such a key.
    */
   connectKey?: ((provider: AgentProviderId, accountId: string | null, key: string) => Promise<void>) | undefined;
+  /**
+   * Creates or updates a dedicated CLIProxy profile on Claude, Codex, or Antigravity without
+   * changing the provider's native sign-in. Absent on older hosts without `cliproxy-profiles-v1`.
+   */
+  saveCliProxyProfile?: ((input: SaveCliProxyProfileInput) => Promise<void>) | undefined;
   /**
    * Signs an account in with a code that the person types on the provider's page, on any device: a
    * new account when `accountId` is null. Only a provider with `accountCodeSignIn` has it. Absent
@@ -84,6 +90,11 @@ export function providerAccountName(
     (account && isApiKeyAccount(account.id) ? t("provider.account.apiKey") : null) ||
     t("provider.account.numbered", { number: index + 1 })
   );
+}
+
+/** Whether the account is a dedicated CLIProxy profile. */
+export function isCliProxyAccount(account: Pick<ProviderAccountStatus, "proxy">): boolean {
+  return account.proxy?.kind === "cliproxy";
 }
 
 /** Whether an agent's account is this one. An agent with no account uses the provider's first. */

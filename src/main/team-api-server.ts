@@ -71,6 +71,7 @@ import { CHAT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/chat-co
 import { CLAUDE_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import { CLAUDE_COMPACT_WINDOW_CAPABILITY } from "@openbot/contracts/team-protocol/claude-compact-window-v1";
 import { CLAUDE_USER_SETUP_CAPABILITY } from "@openbot/contracts/team-protocol/claude-user-setup-v1";
+import { CLIPROXY_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/cliproxy-profiles-v1";
 import { CODEX_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/codex-api-key-v1";
 import { CRM_CAPABILITY } from "@openbot/contracts/team-protocol/crm-v1";
 import {
@@ -422,6 +423,7 @@ import { routePendingApproval } from "./team-api/route-pending-approval";
 import { routePhoneFeedback } from "./team-api/route-phone-feedback";
 import { routePromptCacheTtl } from "./team-api/route-prompt-cache-ttl";
 import {
+  routeCliProxyProfiles,
   routeProviderAccountCode,
   routeProviderAccountKeys,
   routeProviderAccountModels,
@@ -1254,6 +1256,7 @@ export class TeamApiServer {
       if ((await routeProviderAccountModels(context, this.#options.providerAccounts)) === "handled") return;
       if ((await routeProviderAccountPool(context, this.#options.providerAccounts)) === "handled") return;
       if ((await routeProviderAccountKeys(context, this.#options.providerAccounts)) === "handled") return;
+      if ((await routeCliProxyProfiles(context, this.#options.providerAccounts)) === "handled") return;
       if ((await routeProviderAccountCode(context, this.#options.providerAccounts)) === "handled") return;
       if ((await routeProviderUsageReset(context, this.#options.providerUsageResets)) === "handled") return;
       if ((await routeUsageCredits(context, this.#options.agents, this.#options.providerAccounts)) === "handled")
@@ -2874,6 +2877,7 @@ export class TeamApiServer {
         if (capability === PROVIDER_ACCOUNT_MODELS_CAPABILITY) return this.#options.providerAccounts !== undefined;
         if (capability === PROVIDER_ACCOUNT_POOL_CAPABILITY) return this.#options.providerAccounts !== undefined;
         if (capability === PROVIDER_ACCOUNT_KEYS_CAPABILITY) return this.#options.providerAccounts !== undefined;
+        if (capability === CLIPROXY_PROFILES_CAPABILITY) return this.#options.providerAccounts !== undefined;
         if (capability === PROVIDER_ACCOUNT_CODE_CAPABILITY) return this.#options.providerAccounts !== undefined;
         if (capability === PROVIDER_USAGE_RESET_CAPABILITY) return this.#options.providerUsageResets !== undefined;
         if (capability === PROVIDER_SIGN_OUT_CAPABILITY) return this.#options.providerSignOut !== undefined;

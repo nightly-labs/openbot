@@ -415,4 +415,22 @@ export const messages = defineMessages("provider", {
   "provider.settings.endpointModels": { one: "{url} · 1 model", other: "{url} · {count} models" },
   "provider.settings.disconnectLocalOnly":
     "OpenBot signs {provider} out on this computer. The {provider} CLI in your terminal keeps its own sign-in.",
+  "provider.account.addCliProxy": "Add CLIProxy",
+  "provider.account.addCliProxyLabel": "Add a {name} CLIProxy profile",
+  "provider.account.editCliProxy": "Edit CLIProxy",
+  "provider.account.cliProxyBadge": "CLIProxy",
+  "provider.cliproxy.createTitle": "Add {name} CLIProxy profile",
+  "provider.cliproxy.editTitle": "Edit {name} CLIProxy profile",
+  "provider.cliproxy.description":
+    "Creates a separate profile routed through CLIProxy without changing your native {name} sign-in.",
+  "provider.cliproxy.nameLabel": "Profile name",
+  "provider.cliproxy.urlLabel": "CLIProxy URL",
+  "provider.cliproxy.keyLabel": "API key (optional)",
+  "provider.cliproxy.keyPlaceholder": "Leave blank if CLIProxy requires no key",
+  "provider.cliproxy.keyEditPlaceholder": "Leave blank to keep the saved key",
+  "provider.cliproxy.clearKey": "Clear saved API key",
+  "provider.cliproxy.create": "Create profile",
+  "provider.cliproxy.save": "Save changes",
+  "provider.cliproxy.saving": "Saving…",
+  "provider.cliproxy.invalidUrl": "Enter a valid http:// or https:// URL.",
 });

@@ -198,6 +198,61 @@ export const MAX_PROVIDER_ACCOUNTS = 10;
 export const PROVIDER_ACCOUNT_STATES = ["connected", "connecting", "checking", "signed-out", "error"] as const;
 export type ProviderAccountState = (typeof PROVIDER_ACCOUNT_STATES)[number];
 
+/** Native providers that support dedicated CLIProxy-backed accounts isolated from native logins. */
+export const CLIPROXY_PROVIDERS = ["claude", "codex", "antigravity"] as const;
+export type CliProxyProviderId = (typeof CLIPROXY_PROVIDERS)[number];
+
+export function isCliProxyProvider(value: unknown): value is CliProxyProviderId {
+  return value === "claude" || value === "codex" || value === "antigravity";
+}
+
+/** Default local CLIProxy base URL suggested when creating a new CLIProxy profile. */
+export const CLIPROXY_DEFAULT_BASE_URL = "http://127.0.0.1:8317";
+export const CLIPROXY_BASE_URL_MAX_LENGTH = 2_048;
+
+const CLIPROXY_DEFAULT_LABELS: Record<CliProxyProviderId, string> = {
+  claude: "Claude (CLIProxy)",
+  codex: "Codex (CLIProxy)",
+  antigravity: "Antigravity (CLIProxy)",
+};
+
+/** Default label for a newly created CLIProxy profile on a native provider. */
+export function cliProxyDefaultLabel(provider: CliProxyProviderId): string {
+  return CLIPROXY_DEFAULT_LABELS[provider];
+}
+
+/**
+ * Validates and normalizes an http(s) CLIProxy base URL (trims surrounding whitespace and trailing
+ * slashes). Returns null when the URL is empty, too long, contains whitespace, or uses another scheme.
+ */
+export function normalizeCliProxyBaseUrl(raw: string): string | null {
+  const trimmed = raw.trim().replace(/\/+$/u, "");
+  if (!trimmed || trimmed.length > CLIPROXY_BASE_URL_MAX_LENGTH || /\s/u.test(trimmed)) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return null;
+  }
+  if ((parsed.protocol !== "http:" && parsed.protocol !== "https:") || !parsed.hostname) return null;
+  return trimmed;
+}
+
+/** Proxy metadata carried by a dedicated proxy-only provider account. Never holds secrets. */
+export interface ProviderAccountProxy {
+  kind: "cliproxy";
+  baseUrl: string;
+}
+
+export function isProviderAccountProxy(value: unknown): value is ProviderAccountProxy {
+  return (
+    isDynamicRecord(value) &&
+    value.kind === "cliproxy" &&
+    typeof value.baseUrl === "string" &&
+    normalizeCliProxyBaseUrl(value.baseUrl) !== null
+  );
+}
+
 /** One account of a provider. Its credentials stay in its own folder on the computer that runs it. */
 export interface ProviderAccountStatus {
   id: string;
@@ -213,6 +268,8 @@ export interface ProviderAccountStatus {
    * them, and on the own sign-in.
    */
   models?: AgentModelOption[];
+  /** Present on dedicated CLIProxy profiles so UI and routing keep them separate from native logins. */
+  proxy?: ProviderAccountProxy;
 }
 
 /** The longest name a user can give a provider account. */
@@ -226,7 +283,8 @@ export function isProviderAccountStatus(value: unknown): value is ProviderAccoun
     isNullableBoundedString(value.email, INPUT_LIMITS.email) &&
     isBoundedString(value.state, INPUT_LIMITS.identifier) &&
     isNullableBoundedString(value.message, INPUT_LIMITS.messageText) &&
-    (value.models === undefined || (Array.isArray(value.models) && value.models.every(isAgentModelOption)))
+    (value.models === undefined || (Array.isArray(value.models) && value.models.every(isAgentModelOption))) &&
+    (value.proxy === undefined || isProviderAccountProxy(value.proxy))
   );
 }
 
@@ -501,6 +559,31 @@ export interface ConnectProviderAccountInput {
  */
 export interface ConnectProviderAccountKeyInput extends ConnectProviderAccountInput {
   key: string;
+}
+
+/**
+ * Creates a dedicated CLIProxy profile (`accountId: null`) or updates an existing one on Claude,
+ * Codex, or Antigravity. When `apiKey` is null/undefined on edit, the existing stored key stays;
+ * an empty string clears any stored key; a non-empty string saves encrypted in the credential store.
+ */
+export interface SaveCliProxyProfileInput {
+  provider: CliProxyProviderId;
+  accountId: string | null;
+  label?: string | null;
+  baseUrl: string;
+  apiKey?: string | null;
+}
+
+/** One CLIProxy profile listed by a joined server (`cliproxy-profiles-v1`). */
+export interface HostCliProxyProfile {
+  provider: CliProxyProviderId;
+  accountId: string;
+  baseUrl: string;
+}
+
+/** The CLIProxy profiles of a joined server's host (`cliproxy-profiles-v1`). */
+export interface HostCliProxyProfiles {
+  profiles: HostCliProxyProfile[];
 }
 
 /** A null label returns the account to its email. */

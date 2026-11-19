@@ -385,4 +385,22 @@ export const messages = {
   "provider.settings.endpointModels": { one: "{url} · 1 model", other: "{url} · {count} modellen" },
   "provider.settings.disconnectLocalOnly":
     "OpenBot meldt {provider} af op deze computer. De {provider}-CLI in je terminal blijft aangemeld.",
+  "provider.account.addCliProxy": "CLIProxy toevoegen",
+  "provider.account.addCliProxyLabel": "Een {name} CLIProxy-profiel toevoegen",
+  "provider.account.editCliProxy": "CLIProxy bewerken",
+  "provider.account.cliProxyBadge": "CLIProxy",
+  "provider.cliproxy.createTitle": "{name} CLIProxy-profiel toevoegen",
+  "provider.cliproxy.editTitle": "{name} CLIProxy-profiel bewerken",
+  "provider.cliproxy.description":
+    "Maakt een apart profiel via CLIProxy aan zonder je standaard {name}-aanmelding te wijzigen.",
+  "provider.cliproxy.nameLabel": "Profielnaam",
+  "provider.cliproxy.urlLabel": "CLIProxy-URL",
+  "provider.cliproxy.keyLabel": "API-sleutel (optioneel)",
+  "provider.cliproxy.keyPlaceholder": "Laat leeg als CLIProxy geen sleutel vereist",
+  "provider.cliproxy.keyEditPlaceholder": "Laat leeg om de opgeslagen sleutel te behouden",
+  "provider.cliproxy.clearKey": "Opgeslagen API-sleutel wissen",
+  "provider.cliproxy.create": "Profiel maken",
+  "provider.cliproxy.save": "Wijzigingen opslaan",
+  "provider.cliproxy.saving": "Opslaan…",
+  "provider.cliproxy.invalidUrl": "Voer een geldige http://- of https://-URL in.",
 } as const satisfies PartialTranslation<typeof source>;

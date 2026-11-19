@@ -251,6 +251,7 @@ try {
       updateAgent: unused("updateAgent"),
       signInProviderAccountOnHost: unused("signInProviderAccountOnHost"),
       connectProviderAccountKey: unused("connectProviderAccountKey"),
+      saveCliProxyProfile: unused("saveCliProxyProfile"),
       startProviderAccountCodeLogin: unused("startProviderAccountCodeLogin"),
       submitProviderAccountCodeLogin: unused("submitProviderAccountCodeLogin"),
       providerAccountCodeLoginStatus: unused("providerAccountCodeLoginStatus"),

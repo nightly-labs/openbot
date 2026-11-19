@@ -341,4 +341,22 @@ export const messages = {
   "provider.settings.removeDownloadFailed": "No se pudo quitar la descarga.",
   "provider.settings.disconnectLocalOnly":
     "OpenBot cierra la sesión de {provider} en este ordenador. La CLI de {provider} en tu terminal mantiene su propia sesión.",
+  "provider.account.addCliProxy": "Añadir CLIProxy",
+  "provider.account.addCliProxyLabel": "Añadir perfil de CLIProxy para {name}",
+  "provider.account.editCliProxy": "Editar CLIProxy",
+  "provider.account.cliProxyBadge": "CLIProxy",
+  "provider.cliproxy.createTitle": "Añadir perfil de CLIProxy de {name}",
+  "provider.cliproxy.editTitle": "Editar perfil de CLIProxy de {name}",
+  "provider.cliproxy.description":
+    "Crea un perfil separado enrutado por CLIProxy sin cambiar tu inicio de sesión nativo de {name}.",
+  "provider.cliproxy.nameLabel": "Nombre del perfil",
+  "provider.cliproxy.urlLabel": "URL de CLIProxy",
+  "provider.cliproxy.keyLabel": "Clave de API (opcional)",
+  "provider.cliproxy.keyPlaceholder": "Déjalo vacío si CLIProxy no requiere clave",
+  "provider.cliproxy.keyEditPlaceholder": "Déjalo vacío para conservar la clave guardada",
+  "provider.cliproxy.clearKey": "Borrar la clave de API guardada",
+  "provider.cliproxy.create": "Crear perfil",
+  "provider.cliproxy.save": "Guardar cambios",
+  "provider.cliproxy.saving": "Guardando…",
+  "provider.cliproxy.invalidUrl": "Introduce una URL válida con http:// o https://.",
 } as const satisfies PartialTranslation<typeof source>;

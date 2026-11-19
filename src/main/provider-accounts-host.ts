@@ -1,6 +1,12 @@
 // The provider accounts of this host for an administrator of a joined server (`provider-accounts-v1`).
 
-import { type AgentProviderId, DEFAULT_PROVIDER_ACCOUNT_ID } from "@openbot/contracts/ipc";
+import {
+  type AgentProviderId,
+  DEFAULT_PROVIDER_ACCOUNT_ID,
+  type HostCliProxyProfiles,
+  isCliProxyProvider,
+  type SaveCliProxyProfileInput,
+} from "@openbot/contracts/ipc";
 import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import { PROVIDER_ACCOUNT_MODELS_LIMIT } from "@openbot/contracts/team-protocol/provider-account-models-v1";
 import { PROVIDER_ACCOUNTS_MESSAGE_LIMIT } from "@openbot/contracts/team-protocol/provider-accounts-v1";
@@ -20,6 +26,7 @@ export interface ProviderAccountsHostDependencies {
     | "updateAgent"
     | "signInProviderAccountOnHost"
     | "connectProviderAccountKey"
+    | "saveCliProxyProfile"
     | "startProviderAccountCodeLogin"
     | "submitProviderAccountCodeLogin"
     | "providerAccountCodeLoginStatus"
@@ -57,8 +64,8 @@ export class ProviderAccountsHost {
         ? [
             {
               provider: row.id,
-              // `provider-accounts-v1` carries no model list: the account's models stay on this computer.
-              accounts: row.accounts.map(({ models: _models, ...account }) => ({
+              // `provider-accounts-v1` carries no model list or proxy metadata: those travel on their own routes.
+              accounts: row.accounts.map(({ models: _models, proxy: _proxy, ...account }) => ({
                 ...account,
                 message: account.message?.slice(0, PROVIDER_ACCOUNTS_MESSAGE_LIMIT) ?? null,
               })),
@@ -151,6 +158,26 @@ export class ProviderAccountsHost {
   /** Gives an account its API key (`provider-account-keys-v1`): a new account when `accountId` is null. */
   connectKey(provider: AgentProviderId, accountId: string | null, key: string) {
     return this.#dependencies.service.connectProviderAccountKey(provider, accountId, key).pipe(Effect.asVoid);
+  }
+
+  /** Lists dedicated CLIProxy profiles (`cliproxy-profiles-v1`). */
+  cliProxyProfiles(): HostCliProxyProfiles {
+    const profiles: HostCliProxyProfiles["profiles"] = [];
+    for (const row of this.#dependencies.service.getStatus().providers ?? []) {
+      const provider = row.id;
+      if (!isCliProxyProvider(provider)) continue;
+      for (const account of row.accounts ?? []) {
+        if (account.proxy?.kind === "cliproxy") {
+          profiles.push({ provider, accountId: account.id, baseUrl: account.proxy.baseUrl });
+        }
+      }
+    }
+    return { profiles };
+  }
+
+  /** Creates or updates a dedicated CLIProxy profile (`cliproxy-profiles-v1`). */
+  saveCliProxyProfile(input: SaveCliProxyProfileInput) {
+    return this.#dependencies.service.saveCliProxyProfile(input).pipe(Effect.asVoid);
   }
 
   /**

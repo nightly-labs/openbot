@@ -5,14 +5,20 @@ import {
   type AccountUsageLimit,
   type AgentModelOption,
   agentProviderDescriptor,
+  type CliProxyProviderId,
+  cliProxyDefaultLabel,
   DEFAULT_PROVIDER_ACCOUNT_ID,
+  isCliProxyProvider,
   MAX_PROVIDER_ACCOUNTS,
+  normalizeCliProxyBaseUrl,
+  PROVIDER_ACCOUNT_LABEL_MAX_LENGTH,
   type ProviderAccountCodeLoginStart,
   type ProviderAccountCodeLoginStatus,
   type ProviderAccountState,
   type ProviderAccountStatus,
   type ProviderUsageResetOutcome,
   type ProviderUsageResets,
+  type SaveCliProxyProfileInput,
   usageQuotaForModel,
 } from "@openbot/contracts/ipc";
 import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/claude-api-key-v1";
@@ -179,12 +185,19 @@ export class ProviderAccounts {
     return this.#store.get(provider, accountId);
   }
 
-  /** The variable that points the CLI at the account's folder, and the key of a key account. */
+  /** The variable that points the CLI at the account's folder, and the key or proxy variables of special accounts. */
   environment(account: StoredProviderAccount): Readonly<Record<string, string>> {
     const support = ProviderAccounts.support(account.provider);
     if (!support) throw new Error("Invalid provider account.");
     if (isKeyAccountSupport(support))
       return support.keyEnvironment(this.#host.accountKey(account.provider, account.id) ?? "");
+    if (account.proxy?.kind === "cliproxy" && isCliProxyProvider(account.provider)) {
+      const apiKey = this.#host.accountKey(account.provider, account.id);
+      return {
+        [support.homeVariable]: this.#store.home(account),
+        ...cliProxyEnvironment(account.provider, account.proxy.baseUrl, apiKey),
+      };
+    }
     const key = isKeyAccount(account) ? this.#host.apiKey(account.provider) : null;
     return { [support.homeVariable]: this.#store.home(account), ...(key ? { ANTHROPIC_API_KEY: key } : {}) };
   }
@@ -222,8 +235,19 @@ export class ProviderAccounts {
         .list(provider)
         .filter((account) => !isKeyAccount(account) || !this.#host.defaultUsesApiKey(provider))
         .map((account) => {
-          const state = this.#states.get(account.id);
           const models = this.#models.get(account.id);
+          if (account.proxy) {
+            return {
+              id: account.id,
+              label: account.label,
+              email: null,
+              state: "connected" as const,
+              message: null,
+              proxy: { ...account.proxy },
+              ...(models ? { models: structuredClone(models) } : {}),
+            };
+          }
+          const state = this.#states.get(account.id);
           return {
             id: account.id,
             label: account.label,
@@ -294,6 +318,7 @@ export class ProviderAccounts {
       // A client without claude-api-key-v1 shows the key account as a signed-out account.
       if (isKeyAccount(stored))
         return yield* accountFailure(sourceText("error.provider.accountUsesKey", { provider: name }));
+      if (stored.proxy) return yield* accountFailure(sourceText("error.provider.cliProxyNoSignIn", { provider: name }));
       account = stored;
     }
     const command = support.signIn;
@@ -622,12 +647,79 @@ export class ProviderAccounts {
     this.#host.changed();
   }).bind(this);
 
+  /**
+   * Creates a dedicated CLIProxy profile (`accountId: null`) or updates an existing one on Claude,
+   * Codex, or Antigravity. Credentials stay encrypted in `ProviderCredentialStore`; native logins
+   * and other accounts remain untouched.
+   */
+  readonly saveCliProxyProfile = Effect.fn("ProviderAccounts.saveCliProxyProfile")(function* (
+    this: ProviderAccounts,
+    input: SaveCliProxyProfileInput,
+  ) {
+    const provider = input.provider;
+    const name = providerLabel(provider);
+    if (!isCliProxyProvider(provider) || !this.#support(provider))
+      return yield* accountFailure(sourceText("error.provider.cliProxyUnsupported", { provider: name }));
+    if (!this.#host.cli(provider))
+      return yield* accountFailure(sourceText("error.provider.accountNeedsConnection", { provider: name }));
+    const baseUrl = normalizeCliProxyBaseUrl(input.baseUrl);
+    if (!baseUrl) return yield* accountFailure(sourceText("error.provider.cliProxyInvalidUrl"));
+    const trimmedLabel =
+      typeof input.label === "string" ? input.label.trim().slice(0, PROVIDER_ACCOUNT_LABEL_MAX_LENGTH) : null;
+    const proxy = { kind: "cliproxy" as const, baseUrl };
+    if (input.accountId === null) {
+      const label = trimmedLabel || cliProxyDefaultLabel(provider);
+      const created = yield* this.#store
+        .createProxy(provider, label, proxy)
+        .pipe(Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })));
+      if (!created)
+        return yield* accountFailure(
+          sourceText("error.provider.accountLimit", { provider: name, limit: MAX_PROVIDER_ACCOUNTS }),
+        );
+      const trimmedKey = typeof input.apiKey === "string" ? input.apiKey.trim() : "";
+      if (trimmedKey) {
+        yield* this.#host.saveAccountKey(provider, created.id, trimmedKey).pipe(
+          Effect.tapError(() =>
+            Effect.gen({ self: this }, function* () {
+              yield* this.#store.remove(created).pipe(Effect.ignore);
+              this.#forget(created.id);
+              this.#host.changed();
+            }),
+          ),
+        );
+      }
+      this.#setState(created.id, { state: "connected", email: null, organization: null, message: null });
+      return created;
+    }
+    const existing = this.account(provider, input.accountId);
+    if (!existing) return yield* accountFailure(sourceText("error.provider.accountNotFound", { provider: name }));
+    if (!existing.proxy)
+      return yield* accountFailure(sourceText("error.provider.cliProxyNotProxy", { provider: name }));
+    if (this.#host.isAccountBusy(provider, existing.id))
+      return yield* accountFailure(sourceText("error.provider.cliBusyReconnect", { provider: name }));
+    yield* this.#interrupt(existing.id);
+    yield* this.#host.stopAgentClients(provider, existing.id);
+    const nextLabel = input.label === undefined ? undefined : trimmedLabel || cliProxyDefaultLabel(provider);
+    const updated = yield* this.#store
+      .updateProxy(provider, existing.id, nextLabel, proxy)
+      .pipe(Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })));
+    if (!updated) return yield* accountFailure(sourceText("error.provider.accountNotFound", { provider: name }));
+    if (typeof input.apiKey === "string") {
+      const trimmedKey = input.apiKey.trim();
+      yield* this.#host.saveAccountKey(provider, existing.id, trimmedKey || null);
+    }
+    this.#host.changed();
+    return updated;
+  }).bind(this);
+
   /** The connected accounts after the first that have a plan. A key account has no plan to pool. */
   planAccounts(provider: AgentProviderId): string[] {
     if (!this.#support(provider)) return [];
     return this.#store
       .list(provider)
-      .filter((account) => !isKeyAccount(account) && this.#states.get(account.id)?.state === "connected")
+      .filter(
+        (account) => !isKeyAccount(account) && !account.proxy && this.#states.get(account.id)?.state === "connected",
+      )
       .map((account) => account.id);
   }
 
@@ -653,7 +745,7 @@ export class ProviderAccounts {
     yield* this.#interrupt(account.id);
     yield* this.#host.stopAgentClients(provider, account.id);
     yield* this.#signOut(account);
-    if (isKeyAccountSupport(ProviderAccounts.support(provider)))
+    if (isKeyAccountSupport(ProviderAccounts.support(provider)) || account.proxy)
       yield* this.#host.saveAccountKey(provider, account.id, null);
     yield* this.#store
       .remove(account)
@@ -676,6 +768,7 @@ export class ProviderAccounts {
           .list(provider)
           .filter(
             (account) =>
+              !account.proxy &&
               !this.#signIns.has(account.id) &&
               !this.#checks.has(account.id) &&
               now - (this.#states.get(account.id)?.checkedAt ?? 0) >= ACCOUNT_CHECK_TTL_MS,
@@ -770,8 +863,8 @@ export class ProviderAccounts {
     const limits: AccountUsageLimit[] = [];
     if (!this.#support(provider)) return limits;
     for (const account of this.#store.list(provider)) {
-      // A key has no plan, so no usage to read.
-      if (isKeyAccount(account)) continue;
+      // A key or proxy profile has no native plan, so no usage to read.
+      if (isKeyAccount(account) || account.proxy) continue;
       const kept = () => this.#usage.get(account.id)?.limit ?? null;
       const state = this.#states.get(account.id)?.state;
       // A check that runs reads the usage itself, and a failed check, such as a refused usage read, keeps
@@ -818,6 +911,7 @@ export class ProviderAccounts {
     accountId: string,
     model: string,
   ) {
+    if (this.account(provider, accountId)?.proxy) return { limits: [] };
     const client = this.#host.agentClient(provider, accountId);
     if (client)
       return yield* this.#usageGate(accountId).unlessWaiting({
@@ -1031,8 +1125,8 @@ export class ProviderAccounts {
   ) {
     const command = homeSupport(account.provider)?.signOut;
     const cli = this.#host.cli(account.provider);
-    // A key account never signed in; the key goes with the stored credential.
-    if (!command || !cli || isKeyAccount(account)) return;
+    // A key or CLIProxy account never signed in; its stored credential is cleared separately.
+    if (!command || !cli || isKeyAccount(account) || account.proxy) return;
     yield* this.#runSignOut(account.provider, cli, command, this.environment(account)).pipe(
       // The folder goes in any case; a credential the CLI kept elsewhere is the CLI's to clear.
       Effect.catch((error) =>
@@ -1184,6 +1278,26 @@ function isSignInError(error: unknown): boolean {
 function signInCause(error: unknown): ProviderSignInError | null {
   if (error instanceof ProviderSignInError) return error;
   return typeof error === "object" && error !== null && "cause" in error ? signInCause(error.cause) : null;
+}
+
+/**
+ * Environment variables that route a dedicated CLIProxy profile through its proxy URL (and optional
+ * bearer/gateway key) without affecting the provider's native sign-in.
+ */
+export function cliProxyEnvironment(
+  provider: CliProxyProviderId,
+  baseUrl: string,
+  apiKey: string | null,
+): Record<string, string> {
+  const key = apiKey?.trim() || null;
+  switch (provider) {
+    case "claude":
+      return { ANTHROPIC_BASE_URL: baseUrl, ...(key ? { ANTHROPIC_AUTH_TOKEN: key } : {}) };
+    case "codex":
+      return { OPENAI_BASE_URL: baseUrl, ...(key ? { OPENAI_API_KEY: key } : {}) };
+    case "antigravity":
+      return { AGY_LLM_GATEWAY_URL: baseUrl, ...(key ? { AGY_LLM_GATEWAY_API_KEY: key } : {}) };
+  }
 }
 
 export function defaultUsageModel(provider: AgentProviderId): string | undefined {
