@@ -57,7 +57,9 @@ export function isArchivedThreadError(error: unknown): boolean {
 }
 
 export function isCodexMissingRollout(error: unknown): boolean {
-  return error instanceof AppServerError && error.code === -32600 && error.message.startsWith("thread not loaded:");
+  if (!(error instanceof AppServerError)) return false;
+  if (/^invalid paginated history lineage for \S+: missing source rollout$/.test(error.message)) return true;
+  return error.code === -32600 && error.message.startsWith("thread not loaded:");
 }
 
 export function isCodexRolloutPending(error: unknown): boolean {
