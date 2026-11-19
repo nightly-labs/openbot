@@ -71,7 +71,11 @@ const isEscape = (event: KeyboardEvent) => event.key === "Escape";
 const isSend = (event: KeyboardEvent) =>
   event.key === "Enter" && (event.metaKey || event.ctrlKey) && !event.isComposing;
 
-export function WorkflowMediaComposer(props: { id: string; root: () => HTMLElement | undefined }) {
+export function WorkflowMediaComposer(props: {
+  id: string;
+  root: () => HTMLElement | undefined;
+  moves: () => unknown;
+}) {
   const { t } = useText();
   const step = useMediaStep(untrack(() => props.id));
   const text = (key: keyof (typeof KIND_TEXT)["image"]) => t(KIND_TEXT[step.kind()][key]);
@@ -80,12 +84,29 @@ export function WorkflowMediaComposer(props: { id: string; root: () => HTMLEleme
   const focusCard = () => node()?.focus({ preventScroll: true });
 
   let placed = "";
-  let frame = requestAnimationFrame(function place() {
-    frame = requestAnimationFrame(place);
+  let frame = 0;
+  const schedule = () => {
+    if (frame === 0) frame = requestAnimationFrame(place);
+  };
+  const sizes = new ResizeObserver(schedule);
+  const parts = new MutationObserver(schedule);
+  let watched: Element | undefined;
+  const watch = (root: Element, card: Element) => {
+    if (watched === card) return;
+    if (watched) sizes.unobserve(watched);
+    parts.disconnect();
+    watched = card;
+    sizes.observe(root);
+    sizes.observe(card);
+    parts.observe(card, { subtree: true, childList: true, attributes: true, attributeFilter: ["data-side"] });
+  };
+  function place() {
+    frame = 0;
     const root = props.root();
     const card = node();
     const media = card?.querySelector(".wfn-card-frame") ?? card;
     if (!section || !root || !card || !media) return;
+    watch(root, card);
     const outer = root.getBoundingClientRect();
     const inner = media.getBoundingClientRect();
     const visible =
@@ -114,8 +135,13 @@ export function WorkflowMediaComposer(props: { id: string; root: () => HTMLEleme
       section.style.translate = next;
     }
     if (section.dataset.placed === undefined) section.dataset.placed = "";
+  }
+  createEffect(props.moves, schedule);
+  onCleanup(() => {
+    cancelAnimationFrame(frame);
+    sizes.disconnect();
+    parts.disconnect();
   });
-  onCleanup(() => cancelAnimationFrame(frame));
 
   const pictures = () => step.inputs().filter((source) => step.inputUrl(source) !== undefined);
   const ready = () => !step.run.running() && step.runnable() && !step.locked() && step.model() !== undefined;
@@ -142,6 +168,8 @@ export function WorkflowMediaComposer(props: { id: string; root: () => HTMLEleme
     <section
       ref={(element: HTMLElement) => {
         section = element;
+        sizes.observe(element);
+        schedule();
       }}
       class="wfn-composer"
       data-wfn-portal=""

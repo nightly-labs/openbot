@@ -3395,7 +3395,13 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           </ContextMenu.Portal>
         </ContextMenu.Root>
         <Show when={composerId()} keyed>
-          {(id) => <WorkflowMediaComposer id={id} root={() => root} />}
+          {(id) => (
+            <WorkflowMediaComposer
+              id={id}
+              root={() => root}
+              moves={() => [camera.x, camera.y, camera.scale, positions[id]?.x, positions[id]?.y]}
+            />
+          )}
         </Show>
         <Show when={followedPeer()}>{(peer) => <FollowFrame peer={peer()} />}</Show>
         <Show when={live().length === 0 && !frozen() && allows("trigger")}>

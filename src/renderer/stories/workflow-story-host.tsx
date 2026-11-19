@@ -48,7 +48,7 @@ function mergeRuns(fixture: WorkflowRunView | undefined, live: WorkflowRunPage):
   };
 }
 
-export function storyWorkflowHost(workflows: readonly StoryWorkflow[]): WorkflowHost {
+function storyWorkflowHost(workflows: readonly StoryWorkflow[]): WorkflowHost {
   const fixtures = new Map(workflows.map((workflow) => [workflow.id, workflow]));
   const fixtureRuns = new Set(workflows.flatMap((workflow) => workflow.runs?.runs ?? []).map((entry) => entry.run.id));
   const fixtureSteps = new Map(
@@ -179,7 +179,7 @@ export function WorkflowStory(props: {
 
 const usageRows = accountUsageProviderRows(null);
 
-export function WorkflowAppWindow(props: { children: JSX.Element }) {
+function WorkflowAppWindow(props: { children: JSX.Element }) {
   const [page, setPage] = createSignal<PageRailPage | null>("routines");
   const [view, setView] = createSignal<SidebarView>("routines");
   return (

@@ -14,6 +14,7 @@ import {
   type WorkflowMediaKind,
   type WorkflowMediaModel,
   type WorkflowMediaOption,
+  type WorkflowMediaPrice,
   type WorkflowMediaPriceRequest,
   type WorkflowMediaSize,
   workflowMediaAspects,
@@ -111,7 +112,7 @@ export const optionValueKey = (value: string): AppTextKey | null => VALUE_NAMES[
 
 const PICTURE_INPUTS: readonly WorkflowMediaInput[] = ["frames", "references"];
 
-export function shownMediaInputs(
+function shownMediaInputs(
   model: Pick<WorkflowMediaModel, "inputs" | "modes"> | undefined,
   mode: string,
 ): readonly WorkflowMediaInput[] {
@@ -152,7 +153,7 @@ function textEntries(value: unknown): Record<string, string> {
   );
 }
 
-export const BACKGROUNDS = ["solid", "transparent"] as const;
+const BACKGROUNDS = ["solid", "transparent"] as const;
 export type Background = (typeof BACKGROUNDS)[number];
 
 export const BACKGROUND_TEXT = {
@@ -215,6 +216,23 @@ export function useElapsed(running: () => boolean) {
   return () => Math.max(0, Math.floor((now() - start) / 1000));
 }
 
+const openQuotes = new WeakMap<object, Map<string, Promise<WorkflowMediaPrice>>>();
+
+function sharedQuote(
+  board: object,
+  choices: string,
+  quote: (request: WorkflowMediaPriceRequest) => Promise<WorkflowMediaPrice>,
+  request: WorkflowMediaPriceRequest,
+) {
+  const open = openQuotes.get(board) ?? new Map<string, Promise<WorkflowMediaPrice>>();
+  openQuotes.set(board, open);
+  const known = open.get(choices);
+  if (known) return known;
+  const asked = quote(request).finally(() => open.delete(choices));
+  open.set(choices, asked);
+  return asked;
+}
+
 function useMediaPrice(request: () => WorkflowMediaPriceRequest | null) {
   const board = useBoard();
   const [credits, setCredits] = createSignal<number | null>(null);
@@ -230,7 +248,7 @@ function useMediaPrice(request: () => WorkflowMediaPriceRequest | null) {
     const next = untrack(request);
     const quote = untrack(() => board.catalogs().mediaPrice);
     if (!choices || !next || !quote) return;
-    quote(next).then(
+    sharedQuote(board, choices, quote, next).then(
       (answer) => {
         if (sent === asked) setCredits(answer.credits);
       },
