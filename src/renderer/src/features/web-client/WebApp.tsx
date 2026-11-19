@@ -360,22 +360,16 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
     const generation = sessionGeneration;
     void loadWorkspace().catch(() => undefined);
     const screenWaits = !state.loaded || (!state.account && state.login.status === "error");
-    const limit = screenWaits ? new AbortController() : null;
     if (screenWaits && state.loaded)
       setState((draft) => {
         draft.retrying = true;
       });
-    let timedOut = false;
-    const timer = limit
-      ? window.setTimeout(() => {
-          timedOut = true;
-          limit.abort();
-        }, SESSION_CHECK_TIMEOUT_MS)
-      : null;
     try {
-      const session = await request("session", undefined, limit ? { signal: limit.signal } : undefined).finally(() => {
-        if (timer !== null) window.clearTimeout(timer);
-      });
+      const session = await request(
+        "session",
+        undefined,
+        screenWaits ? { signal: AbortSignal.timeout(SESSION_CHECK_TIMEOUT_MS) } : undefined,
+      );
       markRemoteSync("session");
       const account = await showAccount(accountFrom(session));
       markRemoteSync("workspace-code");
@@ -399,9 +393,10 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
               status: "error",
               issue: {
                 code: "auth_api_unavailable",
-                message: timedOut
-                  ? sourceText("error.auth.sessionTimeout")
-                  : sourceText("error.auth.serviceUnavailable"),
+                message:
+                  error instanceof DOMException && error.name === "TimeoutError"
+                    ? sourceText("error.auth.sessionTimeout")
+                    : sourceText("error.auth.serviceUnavailable"),
               },
             };
           });
