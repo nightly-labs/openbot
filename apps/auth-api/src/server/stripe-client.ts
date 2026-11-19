@@ -195,7 +195,9 @@ const invoicePaymentIntentListSchema = Schema.Struct({
 });
 const paymentIntentSchema = Schema.Struct({
   latest_charge: Schema.optional(
-    Schema.NullOr(Schema.Union([Schema.String, Schema.Struct({ amount_refunded: Schema.Int })])),
+    Schema.NullOr(
+      Schema.Union([Schema.String, Schema.Struct({ amount_refunded: Schema.Int, disputed: Schema.Boolean })]),
+    ),
   ),
 });
 const invoiceSchema = Schema.Struct({
@@ -725,7 +727,7 @@ export class StripeClient {
       const query = new URLSearchParams({ "expand[]": "latest_charge" });
       const path = `/v1/payment_intents/${encodeURIComponent(intentId)}?${query}`;
       const charge = (yield* this.#requestEffect("GET", path, null, paymentIntentSchema)).latest_charge;
-      if (typeof charge === "object" && charge !== null && charge.amount_refunded > 0) return true;
+      if (typeof charge === "object" && charge !== null && charge.amount_refunded > 0 && !charge.disputed) return true;
     }
     return false;
   }).bind(this);
