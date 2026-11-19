@@ -11570,6 +11570,16 @@ try {
         isDeepStrictEqual(decoded(ROUTINE_RESULTS_ROUTES.destination, wideAfter), { destination: savedFamily }),
       [summary(wideOptions), summary(wideSet), summary(wideAfter)],
     );
+    const narrowAfter = await call("POST", ROUTINE_RESULTS_ROUTES.destination, {
+      token: adaToken,
+      json: { agentId: "agent-ada", routineId: "routine-ada" },
+      capabilities: resultCapabilities,
+    });
+    check(
+      "a client of routine-results-v1 alone reads no destination when it is WhatsApp",
+      narrowAfter.status === 200 && isDeepStrictEqual(narrowAfter.body, { destination: null }),
+      summary(narrowAfter),
+    );
     await call("POST", ROUTINE_RESULTS_ROUTES.setDestination, {
       token: adaToken,
       json: { agentId: "agent-ada", routineId: "routine-ada", destination: null },

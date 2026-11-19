@@ -4,8 +4,10 @@
 // answers of the three `routine-results-v1` routes can name the platform `whatsapp`, so an owner or
 // admin of a server sees the host's WhatsApp numbers and their places, and an agent routine can send
 // its answers to one. Each answer keeps the frozen shape and bounds of `routine-results-v1`. Requests
-// do not change. A client that does not send it gets no WhatsApp connection in the options. A protocol
-// 10 capability only. Widening any of it needs a second capability string.
+// do not change. A client that does not send it gets no WhatsApp connection in the options, and
+// `destination: null` for a WhatsApp destination. A client that reads these options for its workflow
+// places gets the WhatsApp places too. A host serves it only with `routine-results-v1`. A protocol 10
+// capability only. Widening any of it needs a second capability string.
 import { boolean, fields, identifier, list, nullable, oneOf, string } from "./admin-wire";
 import { ROUTINE_RESULTS_ROUTES } from "./routine-results-v1";
 import type { TeamProtocolV2Json } from "./webrtc-framing";
