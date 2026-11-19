@@ -1,7 +1,6 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.provider", {
-  // Provider, provider runtime and custom endpoint errors.
   "error.provider.mcpConfig":
     "OpenBot could not register MCP servers in the Codex configuration. Check that your Codex config.toml is valid and writable, then restart OpenBot.",
   "error.provider.computerUseConfig":
@@ -173,6 +172,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.cliTimedOutRefresh":
     "{provider} did not answer in time. The computer may be busy. Refresh the providers to try again.",
   "error.provider.stoppedBeforeStart": "{provider} stopped before this message started. Send the message again.",
+  "error.provider.sessionStartTimedOut":
+    "{provider} did not open a new chat in time, so this message did not start. On the computer that runs OpenBot, open Providers, select {provider} and click Restart. Then try again.",
   "error.provider.serviceUnreachable":
     "{provider} cannot connect to its service. Check your internet connection. OpenBot will try again.",
   "error.provider.serviceUnreachableRefresh":
@@ -225,10 +226,14 @@ export const messages = defineMessages("error.provider", {
     'The endpoint "{provider}" refused the request. Its API key or headers can be wrong, or its account cannot use this model. Check them in Server settings → Providers, or choose another model. Then try again.',
   "error.provider.customEndpointKeyMissing":
     'The endpoint "{provider}" needs an API key. Add the key in Server settings → Providers, then try again.',
+  "error.provider.customEndpointEffortRefused":
+    'The endpoint "{provider}" refused the reasoning effort of this model. In Server settings → Providers, edit "{provider}". Under Efforts, keep only the efforts that this model accepts, or select No reasoning. Then try again.',
   "error.provider.opencodeKeyExpired":
     "Your OpenCode API key expired. Create a new key in OpenCode Console, paste it in the OpenCode settings, then try again.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go refused your saved API key. The key may have expired. Create a new key in OpenCode Console, paste it in the OpenCode settings, then try again.",
+  "error.provider.opencodeGoRequestRefused":
+    "OpenCode Go refused the request. A new API key does not fix this. Your OpenCode Go plan may not be active, or OpenCode Go may block your network: some services block VPNs, proxies or some countries. Make sure that your plan is active in OpenCode Console, or turn off the VPN, then try again. You can also choose a different model.",
   "error.provider.opencodeServiceFailure":
     "OpenCode could not complete this turn because its local service failed. Try again. If the error continues, reconnect OpenCode in Settings.",
   "error.provider.opencodeRateLimited":
@@ -251,6 +256,10 @@ export const messages = defineMessages("error.provider", {
     "This model is not available to you. Select a different model for this agent.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "The model's reply was cut off or was not valid. Send your message again, or choose another model.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "The model's reply was longer than its output limit three times, so the turn stopped. Choose a lower effort or another model, then send your message again.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "The model's reply was longer than its output limit three times, so the turn stopped. In Settings, open Custom provider, click Edit on this endpoint, and set a larger Max output for this model. Or choose a lower effort or another model.",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode could not read the reasoning of this model at this effort. Select a lower effort or another model, then send your message again.",
   "error.provider.opencodeModelNotServed":
@@ -275,6 +284,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.noAnswerAfterSteps":
     "{provider} did some steps, then ended the turn with no answer. Ask the agent what it did before you send the same request again.",
   "error.provider.acpRefusedNoReason": "{provider} stopped without an answer. Send the message again.",
+  "error.provider.channelNoAnswer":
+    "{provider} ended the turn with no answer. In the channel, click Continue to run the task again, or Reassign to give it to another member.",
   "error.provider.chatgptPageFailed": "OpenBot could not open the ChatGPT connection page.",
   "error.provider.noneReady": "No agent provider is ready.",
   "error.provider.claudeTurnActive": "Wait for the active Claude turn before refreshing its context.",
@@ -371,12 +382,14 @@ export const messages = defineMessages("error.provider", {
     "Claude's service blocked this request. This is usually a short problem on Claude's side, not a problem with your account. Send the message again in a few minutes.",
   "error.provider.foreignReasoning":
     "{provider} did not accept the earlier reasoning in this chat, because a different account or API key received it. OpenBot started a new {provider} session with the chat history. Try again.",
+  "error.provider.blankHistoryText":
+    "The model did not accept this chat, because its saved history has an empty message. OpenBot started a new {provider} session with the chat history. Try again.",
   "error.provider.codexHistoryItemMissing":
     "Codex could not continue this chat, because an item in its saved history is missing. OpenBot started a new Codex session with the chat history. Try again.",
   "error.provider.codexRequestRefused":
     "{provider} refused the request for this chat and did not give the cause. This can occur in a long chat with many images. OpenBot started a new {provider} session with the chat history. Try again.",
   "error.provider.codexAudioRefused":
-    "The model did not accept audio in this chat. OpenBot started a new Codex session with the chat history. Try again.",
+    "This model cannot listen to audio, so it did not accept the sound in this chat. OpenBot started a new Codex session with the chat history. To continue, send your request again and ask the agent to work without the sound. To check sound, select a model that can listen to audio in the agent's model menu.",
   "error.provider.imageTooSmall":
     "The model did not accept an image in this chat because the image is too small. OpenBot started a new {provider} session with the chat history. Try again.",
   "error.provider.imageTooLarge":

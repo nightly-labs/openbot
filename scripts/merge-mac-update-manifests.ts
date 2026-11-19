@@ -3,7 +3,6 @@ import { resolve } from "node:path";
 import { parse, stringify } from "yaml";
 import { z } from "zod";
 
-// `.loose()` keeps every key electron-builder wrote, including ones this script does not read.
 const manifestSchema = z
   .object({
     version: z.string().min(1),
@@ -13,19 +12,6 @@ const manifestSchema = z
   .loose();
 type UpdateManifest = z.infer<typeof manifestSchema>;
 
-/**
- * Joins the `latest-mac.yml` of the ARM64 and the x64 build into the one manifest a release can
- * publish under that name.
- *
- * Each macOS job writes its own manifest, and a release holds one asset per name, so without this the
- * job that uploads last decides which Macs get updates. electron-updater reads the `files` list and
- * chooses by name: an Apple silicon Mac takes the files whose URL contains `arm64`, and an Intel Mac
- * takes the others. A file on the wrong side of that test leaves one architecture with no update, so
- * both lists are checked here, where the release can still stop.
- *
- * Every other key comes from the ARM64 manifest. Its `path` and `sha512` are what every release
- * before this one published, and an updater that reads only those keeps getting the ARM64 ZIP.
- */
 export function mergeMacUpdateManifests(arm64Source: string, x64Source: string): string {
   const arm64 = parseManifest(arm64Source, "ARM64");
   const x64 = parseManifest(x64Source, "x64");
@@ -41,8 +27,6 @@ export function mergeMacUpdateManifests(arm64Source: string, x64Source: string):
   if (!arm64.files.some(({ url }) => url === arm64.path)) {
     throw new Error("The ARM64 manifest path is not one of its files.");
   }
-  // `version: "1.1"` quotes `releaseDate`. electron-updater reads the manifest with js-yaml, which
-  // turns an unquoted timestamp into a Date.
   return stringify({ ...arm64, files: [...arm64.files, ...x64.files] }, { version: "1.1" });
 }
 

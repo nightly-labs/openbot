@@ -1,9 +1,3 @@
-// Starts the real remote viewer proxy on loopback, with a stand-in server connection, and checks its
-// limits: each joined server has its own path secret, and the viewer page reaches only the
-// remote-screen routes of its server. A host's viewer script runs on the origin of this proxy, so
-// without these limits it could send requests to another joined server, or to other Team API routes,
-// with this user's session.
-// Run: `bun run test:remote-viewer-proxy`. Writes .openbot-build/remote-viewer-proxy-e2e/report.json.
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -19,7 +13,6 @@ const OUT = join(ROOT, ".openbot-build/remote-viewer-proxy-e2e");
 const SESSION = "session-1";
 const VIEWER = TEAM_API_ROUTES.remoteScreen.viewer(SESSION);
 
-// The server connection sends no desktop data in this run.
 const transport = Object.assign(new EventEmitter(), { sendDesktop: () => Effect.void });
 const fetched: { serverId: string; path: string }[] = [];
 const proxy = new RemoteViewerProxy({
@@ -53,7 +46,6 @@ function send(url: URL): Promise<Reply> {
   });
 }
 
-/** The status of a WebSocket upgrade, read from the raw socket: the proxy answers a refused one with a bare 404. */
 function upgrade(url: URL): Promise<number> {
   return new Promise((done, fail) => {
     const socket = connect(Number(url.port), url.hostname, () => {

@@ -476,7 +476,6 @@ export const messages = {
   "settings.profile.share.copyFailed": "Impossibile copiare l'immagine.",
   "settings.profile.share.createFailed": "Impossibile creare l'immagine.",
   "settings.profile.share.fileName": "openbot-activity.png",
-  // The text in the image to share.
   "settings.profile.share.caption": "I miei ultimi sei mesi con OpenBot",
   "settings.profile.activity.title": "Attività su questo computer",
   "settings.profile.activity.activeDays": {
@@ -486,7 +485,6 @@ export const messages = {
   "settings.profile.activity.empty": "Ancora nessuna attività",
   "settings.profile.activity.loading": "Caricamento attività…",
   "settings.profile.activity.loadFailed": "Impossibile caricare la tua attività.",
-  // {tokens} is a short number, such as 1.2M.
   "settings.profile.activity.heatmapLabel": {
     one: "{tokens} token in {count} giorno attivo nell'ultimo anno",
     other: "{tokens} token in {count} giorni attivi nell'ultimo anno",
@@ -726,6 +724,13 @@ export const messages = {
   "settings.voice.speech.sample": "Ciao. Ecco come suoneranno le tue risposte.",
   "settings.voice.speech.listenFailed": "Impossibile riprodurre l’esempio.",
   "settings.voice.live.section": "Voce dal vivo",
+  "settings.voice.talk.section": "Conversazione vocale",
+  "settings.voice.talkKey.title": "Tasto per parlare",
+  "settings.voice.talkKey.description": "Tieni premuti questi tasti per parlare in una conversazione vocale.",
+  "settings.voice.talkKey.change": "Cambia il tasto per parlare",
+  "settings.voice.talkKey.recording": "Premi i tasti",
+  "settings.voice.talkKey.refused": "Aggiungi un altro tasto",
+  "settings.voice.talkKey.reset": "Ripristina",
   "settings.voice.live.signIn": "Accedi a Codex con il tuo account ChatGPT per usare la voce dal vivo.",
   "settings.transfer.title": "Sposta questo server su un altro computer",
   "settings.transfer.lede": "I tuoi agenti, le loro skill, routine, memorie e file vanno in un unico file.",

@@ -1,7 +1,3 @@
-// Runs a turn on the real OpenCode driver against a fake `opencode acp` that fails the prompt as
-// OpenCode 2.1.3 does: `-32603` "Internal error: Internal service failure" (#2850). Checks that the
-// failed turn reads as OpenCode's service failure, with its fix, not the generic text.
-// `bun run test:opencode-service-failure`. Writes .openbot-build/opencode-service-failure-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";

@@ -13,16 +13,13 @@ export interface MarkdownFilePreviewProps {
   renderedClass: string;
   statusClass: string;
   truncatedClass: string;
-  /** The quote id of the file. With it, a selection in the text opens the selection actions. */
   selectionQuoteId?: string | undefined;
   onSelectAgent: (agentId: string) => void;
   onOpenLink: (url: string) => void;
   onOpenSharedFile: (path: string) => void;
-  /** Absent when no agent workspace can resolve a path, so a path stays text. */
   onOpenWorkspaceFile?: ((path: string) => void) | undefined;
 }
 
-/** The text limit of the callers that set `truncated`. */
 const TRUNCATED_AFTER = 1_000_000;
 
 export function MarkdownFilePreview(props: MarkdownFilePreviewProps) {

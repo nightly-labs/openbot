@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/import";
 
 export const messages = {
-  // Agent import errors and warnings.
   "error.import.manifestNotJson": "{manifest} geçerli bir JSON değil.",
   "error.import.notAgentExport": "{manifest} bir OpenBot ajan dışa aktarımı değil.",
   "error.import.newerExportSkill":
@@ -93,4 +92,6 @@ export const messages = {
     "{name}: bağımsız değişkenlerinden veya adresinden gizli bilgi içerebilecek değerler kaldırıldı. Bunları Ayarlar'da yeniden girin.",
   "error.import.transferSharedKept":
     "Paylaşılan klasördeki {number} dosya zaten burada, bu yüzden oldukları gibi korunuyor.",
+  "error.import.transferPartSkipped":
+    "Dosyanın bazı bölümleri içe aktarılamadı. Diğer bölümler bu sunucuda, bu yüzden dosyayı yeniden içe aktarmayın.",
 } as const satisfies PartialTranslation<typeof source>;

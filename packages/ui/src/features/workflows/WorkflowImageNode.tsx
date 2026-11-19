@@ -1,8 +1,6 @@
-/** A media step: an image or a video that a model makes from a description. */
-
 import type { WorkflowMediaInput } from "@openbot/contracts/ipc";
 import type { AppTranslate } from "@openbot/i18n";
-import { Button, Download, Film, Image, Maximize2, Mic, Play, Square, Textarea } from "@openbot/ui";
+import { Button, Download, Film, Image, Maximize2, Mic, Square, Textarea } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createSignal, Show, untrack } from "solid-js";
 import { useText } from "../../text";
@@ -12,7 +10,16 @@ import { VideoPlayer } from "../conversation/VideoPlayer";
 import { usePictureShape } from "./picture-shape";
 import { MediaModelPicker } from "./WorkflowMediaModelPicker";
 import { resultValue, useBoard } from "./workflow-board";
-import { type Aspect, BACKGROUND_TEXT, clock, KIND_TEXT, useElapsed, useMediaStep } from "./workflow-media-step";
+import {
+  type Aspect,
+  BACKGROUND_TEXT,
+  clock,
+  KIND_TEXT,
+  RunContent,
+  resolutionName,
+  useElapsed,
+  useMediaStep,
+} from "./workflow-media-step";
 import { download, NodeShell, NodeToolbar, ToolAction, type WfnInputPort } from "./workflow-node-parts";
 import { CardPicture, CardPictureLoading } from "./workflow-picture";
 
@@ -20,18 +27,11 @@ function aspectRatio(aspect: Aspect): string {
   return aspect.replace(":", " / ");
 }
 
-/** The name of the port of reference videos and audio files, from what the model takes. */
 function clipLabel(t: AppTranslate, inputs: readonly WorkflowMediaInput[]) {
   if (!inputs.includes("audios")) return t("workflow.video.role.video");
   return inputs.includes("videos") ? t("workflow.video.role.clips") : t("workflow.video.role.audio");
 }
 
-/**
- * The inputs of a video: the description, and the first frame, the last frame, the references and
- * the reference videos and audio files that the model takes in its mode. A port with a connection
- * stays, so the user can see and remove it. The frame ports keep their source in the field of the
- * same name.
- */
 function videoPorts(
   t: AppTranslate,
   inputs: readonly WorkflowMediaInput[],
@@ -55,15 +55,10 @@ function videoPorts(
   ];
 }
 
-/**
- * The width of a card for a frame of `ratio` (width / height): a tall card is narrow. A picture is
- * as wide as a video, so the summary on it has room and the composer under it is the same width.
- */
 function cardWidth(ratio: number) {
   return ratio < 0.7 ? "240px" : "380px";
 }
 
-/** A spec on the summary of a card, as text in a glass chip. The composer under the card changes it. */
 function SpecChip(props: { text: string; icon?: JSX.Element }) {
   return (
     <span class="wfn-chip">
@@ -73,12 +68,6 @@ function SpecChip(props: { text: string; icon?: JSX.Element }) {
   );
 }
 
-/**
- * An image or a video that a model makes. The card is the media; on hover a glass summary shows the
- * specs, the description, the model and the price. It does not take a press: a press selects the
- * card, and the composer under the selected card changes the step. While the model works, the dots
- * of the chat frame fill the card at its final size, with the time.
- */
 export function ImageNode(props: { id: string; image?: string | undefined; prompt?: string; aspect?: Aspect }) {
   const board = useBoard();
   const { t } = useText();
@@ -88,10 +77,6 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
   );
   const { kind, prompt, specs, model, run } = step;
   const text = (key: keyof (typeof KIND_TEXT)["image"]) => t(KIND_TEXT[kind()][key]);
-  /**
-   * The shape of the card: the custom size, else the aspect ratio that the model makes. A custom size
-   * stays from 9:16 to 16:9, so the card holds its summary; the picture fills the card.
-   */
   const frameRatio = () => {
     const size = specs().size;
     if (size) {
@@ -102,10 +87,6 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
     return { css: aspectRatio(specs().aspect), value: w / h };
   };
   const seconds = useElapsed(run.running);
-  /**
-   * The address of a result: the attachment that the step made, else a workspace image by name, as
-   * a host without media results gives it. Undefined while it loads, null when it cannot show.
-   */
   const urlOf = (value: string | undefined) => {
     if (value === undefined) return undefined;
     return step.orFile(board.catalogs().media?.(value, kind()), value);
@@ -120,15 +101,12 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
   };
   const shownUrl = () => urlOf(shownValue());
   const shownPicture = () => smallUrlOf(shownValue());
-  /** An image with clear pixels shows on the canvas with no card behind it. The copy keeps clear pixels. */
   const shape = usePictureShape(() => (kind() === "image" ? (shownPicture() ?? undefined) : undefined));
   const clear = () => kind() === "image" && !run.running() && shape()?.clear === true;
   const backgroundText = () => t(BACKGROUND_TEXT[specs().transparent ? "transparent" : "solid"]);
-  /** The name that a download of the media takes. */
   const fileName = () => (kind() === "video" ? "video.mp4" : "image.png");
   const [viewer, setViewer] = createSignal<ImageLightboxOpening>();
   let media: HTMLElement | undefined;
-  /** Opens the viewer on the image on view. The arrows step through every image of the step. */
   const openViewer = () => {
     const shown = board.shown(props.id);
     const images = board.results(props.id).flatMap((result) => {
@@ -218,7 +196,6 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
           <Show
             when={shownPicture()}
             fallback={
-              // A result with no address yet still comes from the host. Null: it cannot show here.
               <Show
                 when={shownValue() === undefined || shownPicture() === null || !board.catalogs().media}
                 fallback={<CardPictureLoading />}
@@ -260,7 +237,6 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
             )}
           </Show>
         </Show>
-        {/* A summary only: it is inert, so a press goes to the card and selects it. */}
         <div class="wfn-overlay wfn-media-overlay" inert>
           <div class="wfn-overlay-bar">
             <Show when={making()}>
@@ -271,8 +247,9 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
               <Show when={kind() === "video"}>
                 <SpecChip text={durationText(specs().duration)} />
               </Show>
-              {/* A custom size sets the resolution that the model makes. */}
-              <Show when={!specs().size && specs().resolution}>{(current) => <SpecChip text={current()} />}</Show>
+              <Show when={!specs().size && specs().resolution}>
+                {(current) => <SpecChip text={resolutionName(current())} />}
+              </Show>
               <Show when={kind() === "image" && model()?.transparent}>
                 <SpecChip text={backgroundText()} />
               </Show>
@@ -310,8 +287,7 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
                     disabled={!step.runnable() || step.locked() || !model()}
                     aria-label={step.runLabel()}
                   >
-                    <Play aria-hidden="true" />
-                    {step.runText()}
+                    <RunContent credits={step.price()} />
                   </Button>
                 }
               >

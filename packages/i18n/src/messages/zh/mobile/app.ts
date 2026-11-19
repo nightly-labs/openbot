@@ -39,7 +39,6 @@ export const messages = {
   "mobile.app.route.usage": "用量",
   "mobile.app.route.marketplace": "市场",
   "mobile.app.route.library": "资料库",
-  // The quick actions of the app icon, which the phone shows when the icon is held.
   "mobile.app.quickAction.search": "搜索",
   "mobile.app.quickAction.share": "分享 OpenBot",
   "mobile.app.quickAction.support": "等等，别删除我！",

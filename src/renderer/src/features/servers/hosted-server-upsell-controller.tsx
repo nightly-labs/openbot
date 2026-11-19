@@ -21,23 +21,13 @@ type HostedUpsellAction = "shown" | "see_plans" | "dismissed";
 interface HostedUpsellRoutine {
   id: string;
   name: string;
-  /** The agent whose turn made the routine. The modal waits until that turn ends. */
   agentId: string | null;
 }
 
 interface HostedServerUpsellProps {
   accountId: string | null;
-  /**
-   * The account can buy a hosted server and has none, and the open host is a computer that the user
-   * owns, not a hosted server.
-   */
   canOffer: boolean;
-  /** A routine that waits for the modal is dropped when the user opens another server. */
   serverId: string;
-  /**
-   * The id of each active routine on the open host, or null when the open host is not this computer.
-   * The modal opens only on this computer, after the first routine there. Without it, the modal never opens.
-   */
   activeHostRoutineIds?: (() => Promise<readonly string[] | null>) | undefined;
   host: HostedUpsellHost;
   busy: (agentId: string) => boolean;
@@ -55,27 +45,14 @@ interface HostedUpsellController {
   track: (action: HostedUpsellAction, entryPoint: HostedUpsellEntryPoint) => void;
 }
 
-/*
- * The routine editor and the offline notice are not under the workspace overlays, so the mounted
- * offer registers itself here. Desktop and web each mount one.
- */
 const [controller, setController] = createSignal<HostedUpsellController | null>(null);
-/*
- * A server switch mounts the offer again on desktop, so what one sitting already showed stays here,
- * for the life of this window.
- */
 const reported = new Set<string>();
 const [modalThisSession, setModalThisSession] = createSignal(false);
 
-/** Called when a routine is new on the open host, from the editor or from an agent. */
 export function hostedUpsellRoutineCreated(routine: HostedUpsellRoutine): void {
   untrack(controller)?.routineCreated(routine);
 }
 
-/**
- * The offer in the offline notice while `offline()` is true, or null when there is nothing to offer.
- * It counts as shown each time it appears.
- */
 export function createHostedUpsellOffline(offline: () => boolean): () => { onSeePlans: () => void } | null {
   const offer = createMemo(() => {
     const current = offline() ? controller() : null;
@@ -91,18 +68,12 @@ export function createHostedUpsellOffline(offline: () => boolean): () => { onSee
 }
 
 const WINDOW_OPENED_AT = Date.now();
-// A remote host's clock can differ a little from this computer's clock.
 const HOST_CLOCK_SLACK_MS = 2 * 60 * 1000;
 
-/** A routine made before this window opened is not new, also when its list loads for the first time. */
 function routineMadeThisSession(createdAt: string): boolean {
   return Date.parse(createdAt) >= WINDOW_OPENED_AT - HOST_CLOCK_SLACK_MS;
 }
 
-/**
- * The active routines in `next` that are new since `previous`. With no previous list, a routine is
- * new only when it was made after this window opened, so a first load does not count old routines.
- */
 export function createdRoutines(
   previous: readonly RoutineFields[] | undefined,
   next: readonly RoutineFields[],
@@ -136,7 +107,6 @@ export function HostedServerUpsell(props: HostedServerUpsellProps) {
     untrack(() => props.track)?.(action, entryPoint);
   }
 
-  /** Saves the new state first. A failed write shows nothing, so the modal cannot repeat. */
   function showModal(routine: HostedUpsellRoutine): void {
     setPending(null);
     const accountId = untrack(() => props.accountId);
@@ -152,7 +122,6 @@ export function HostedServerUpsell(props: HostedServerUpsellProps) {
     track("shown", "routine_created");
   }
 
-  // The modal waits until the agent's turn ends and the window has focus, so it does not cover a reply.
   createEffect(
     () => {
       const waiting = pending();
@@ -172,7 +141,6 @@ export function HostedServerUpsell(props: HostedServerUpsellProps) {
     if (!saved) return;
     const next = change(saved, Date.now());
     writeHostedUpsellState(window.localStorage, accountId, next);
-    // A failed write still hides the notice until a reload.
     setState(next);
   }
 
@@ -182,10 +150,6 @@ export function HostedServerUpsell(props: HostedServerUpsellProps) {
     untrack(() => props.openPlans)();
   }
 
-  /**
-   * The modal waits for a routine only when it is the first on this computer: the host has the routine,
-   * and every active routine there is new in this window. A failed read shows nothing.
-   */
   function waitIfFirst(routine: HostedUpsellRoutine): void {
     const activeHostRoutineIds = untrack(() => props.activeHostRoutineIds);
     const saved = untrack(state);
@@ -203,7 +167,6 @@ export function HostedServerUpsell(props: HostedServerUpsellProps) {
 
   const api: HostedUpsellController = {
     routineCreated(routine) {
-      // Each routine counts once, also when the editor and the routine list both report it.
       if (reported.has(routine.id)) return;
       reported.add(routine.id);
       if (untrack(modalThisSession) || untrack(pending)) return;
@@ -222,7 +185,6 @@ export function HostedServerUpsell(props: HostedServerUpsellProps) {
     seePlans,
     track,
   };
-  // A component body cannot write a signal, so the offer registers after it mounts.
   onSettled(() => {
     setController(api);
     return () => setController((current) => (current === api ? null : current));
@@ -247,7 +209,6 @@ export function HostedServerUpsell(props: HostedServerUpsellProps) {
   );
 }
 
-/** The offer at the bottom of the routines panel, while active routines depend on this host. */
 export function HostedUpsellRoutinesNotice(props: { count: number }) {
   return (
     <Show when={props.count > 0 && controller()?.noticeVisible() ? controller() : null}>

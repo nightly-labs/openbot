@@ -163,6 +163,8 @@ export const messages = {
   "error.provider.cliTimedOutRefresh":
     "لم يستجب {provider} في الوقت المحدد. قد يكون الحاسوب مشغولًا. حدّث المزوّدين لإعادة المحاولة.",
   "error.provider.stoppedBeforeStart": "توقف {provider} قبل أن تبدأ هذه الرسالة. أرسل الرسالة مرة أخرى.",
+  "error.provider.sessionStartTimedOut":
+    "لم يفتح {provider} محادثة جديدة في الوقت المحدد، لذلك لم تبدأ هذه الرسالة. على الكمبيوتر الذي يشغّل OpenBot، افتح المزوّدون، واختر {provider}، وانقر إعادة التشغيل. ثم حاول مرة أخرى.",
   "error.provider.serviceUnreachable":
     "لا يستطيع {provider} الاتصال بخدمته. تحقّق من اتصال الإنترنت. سيعيد OpenBot المحاولة.",
   "error.provider.serviceUnreachableRefresh":
@@ -214,10 +216,14 @@ export const messages = {
     "رفضت نقطة النهاية «{provider}» الطلب. قد يكون مفتاح API أو الترويسات غير صحيحة، أو لا يمكن لحسابها استخدام هذا النموذج. تحقّق منها في إعدادات الخادم ← المزوّدون، أو اختر نموذجًا آخر. ثم أعد المحاولة.",
   "error.provider.customEndpointKeyMissing":
     "تحتاج نقطة النهاية «{provider}» إلى مفتاح API. أضف المفتاح في إعدادات الخادم ← المزوّدون، ثم أعد المحاولة.",
+  "error.provider.customEndpointEffortRefused":
+    "رفضت نقطة النهاية «{provider}» جهد التفكير لهذا النموذج. في إعدادات الخادم ← المزوّدون، عدّل «{provider}». في جهد التفكير، أبقِ فقط المستويات التي يقبلها هذا النموذج، أو اختر بدون تفكير. ثم أعد المحاولة.",
   "error.provider.opencodeKeyExpired":
     "انتهت صلاحية مفتاح OpenCode API الخاص بك. أنشئ مفتاحًا جديدًا في OpenCode Console، والصقه في إعدادات OpenCode، ثم أعد المحاولة.",
   "error.provider.opencodeKeyRefused":
     "رفض OpenCode Go مفتاح API المحفوظ. ربما انتهت صلاحية المفتاح. أنشئ مفتاحًا جديدًا في OpenCode Console، والصقه في إعدادات OpenCode، ثم أعد المحاولة.",
+  "error.provider.opencodeGoRequestRefused":
+    "رفض OpenCode Go الطلب. لا يحل مفتاح API جديد هذه المشكلة. قد لا تكون خطة OpenCode Go نشطة، أو قد يحظر OpenCode Go شبكتك: بعض الخدمات تحظر شبكات VPN أو الخوادم الوكيلة أو بعض البلدان. تأكد من أن خطتك نشطة في OpenCode Console، أو أوقف VPN، ثم حاول مرة أخرى. يمكنك أيضًا اختيار نموذج آخر.",
   "error.provider.opencodeServiceFailure":
     "تعذّر على OpenCode إكمال هذا الدور لأن خدمته المحلية فشلت. أعد المحاولة. إذا استمر الخطأ، أعد ربط OpenCode في الإعدادات.",
   "error.provider.opencodeRateLimited":
@@ -239,6 +245,10 @@ export const messages = {
   "error.provider.opencodeModelUnavailable": "هذا النموذج غير متاح لك. اختر نموذجًا آخر لهذا الوكيل.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "انقطع رد النموذج أو لم يكن صالحًا. أرسل رسالتك مرة أخرى أو اختر نموذجًا آخر.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "كان رد النموذج أطول من حد الإخراج ثلاث مرات، فتوقف الدور. اختر جهدًا أقل أو نموذجًا آخر، ثم أرسل رسالتك مرة أخرى.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "كان رد النموذج أطول من حد الإخراج ثلاث مرات، فتوقف الدور. في الإعدادات، افتح مزوّد مخصص، وانقر تعديل على نقطة النهاية هذه، واضبط أقصى إخراج أكبر لهذا النموذج. أو اختر جهدًا أقل أو نموذجًا آخر.",
   "error.provider.opencodeReasoningOverlap":
     "تعذّر على OpenCode قراءة تفكير هذا النموذج بهذا المستوى من الجهد. اختر جهدًا أقل أو نموذجًا آخر، ثم أرسل رسالتك مرة أخرى.",
   "error.provider.opencodeModelNotServed":
@@ -260,6 +270,8 @@ export const messages = {
   "error.provider.noAnswerAfterSteps":
     "نفّذ {provider} بعض الخطوات، ثم أنهى الدور بدون إجابة. اسأل الوكيل عمّا فعله قبل أن ترسل الطلب نفسه مرة أخرى.",
   "error.provider.acpRefusedNoReason": "توقف {provider} بدون إجابة. أرسل الرسالة مرة أخرى.",
+  "error.provider.channelNoAnswer":
+    "أنهى {provider} الدور بدون إجابة. في القناة، انقر على «متابعة» لتشغيل المهمة مرة أخرى، أو على «إعادة الإسناد» لإعطائها لعضو آخر.",
   "error.provider.chatgptPageFailed": "تعذّر على OpenBot فتح صفحة ربط ChatGPT.",
   "error.provider.noneReady": "لا يوجد مزوّد وكلاء جاهز.",
   "error.provider.claudeTurnActive": "انتظر انتهاء دور Claude النشط قبل تحديث سياقه.",
@@ -355,12 +367,14 @@ export const messages = {
     "حظرت خدمة Claude هذا الطلب. عادةً تكون هذه مشكلة قصيرة من جهة Claude، وليست مشكلة في حسابك. أرسل الرسالة مرة أخرى بعد بضع دقائق.",
   "error.provider.foreignReasoning":
     "لم يقبل {provider} الاستدلال السابق في هذه الدردشة، لأن حسابًا أو مفتاح API مختلفًا استلمه. بدأ OpenBot جلسة {provider} جديدة بسجل الدردشة. أعد المحاولة.",
+  "error.provider.blankHistoryText":
+    "لم يقبل النموذج هذه الدردشة، لأن سجلها المحفوظ يحتوي على رسالة فارغة. بدأ OpenBot جلسة {provider} جديدة بسجل الدردشة. أعد المحاولة.",
   "error.provider.codexHistoryItemMissing":
     "لم يتمكن Codex من متابعة هذه الدردشة، لأن عنصرًا في سجله المحفوظ مفقود. بدأ OpenBot جلسة Codex جديدة بسجل الدردشة. أعد المحاولة.",
   "error.provider.codexRequestRefused":
     "رفض {provider} طلب هذه الدردشة ولم يذكر السبب. قد يحدث هذا في دردشة طويلة تحتوي على صور كثيرة. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. حاول مرة أخرى.",
   "error.provider.codexAudioRefused":
-    "لم يقبل النموذج الصوت في هذه الدردشة. بدأ OpenBot جلسة Codex جديدة مع سجل الدردشة. حاول مرة أخرى.",
+    "لا يستطيع هذا النموذج الاستماع إلى الصوت، لذلك لم يقبل الصوت في هذه الدردشة. بدأ OpenBot جلسة Codex جديدة مع سجل الدردشة. للمتابعة، أرسل طلبك مرة أخرى واطلب من الوكيل أن يعمل بدون الصوت. لفحص الصوت، اختر في قائمة نموذج الوكيل نموذجًا يستطيع الاستماع إلى الصوت.",
   "error.provider.imageTooSmall":
     "لم يقبل النموذج صورة في هذه الدردشة لأن الصورة صغيرة جدًا. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. حاول مرة أخرى.",
   "error.provider.imageTooLarge":

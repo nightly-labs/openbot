@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/app";
 
 export const messages = {
-  // The app shell, shared state, and shared controls without a feature of their own.
   "app.loading": "Chargement d’OpenBot",
   "app.leftPanel.resize": "Redimensionner la barre latérale gauche",
   "app.host.thisMac": "Ce Mac",

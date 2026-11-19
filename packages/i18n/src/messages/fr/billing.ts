@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/billing";
 
 export const messages = {
-  // The Billing tab in Settings and the Billing dialog in the web client.
   "billing.title": "Facturation",
   "billing.description": "Chaque serveur a sa propre offre. Stripe gère le paiement.",
   "billing.loading": "Chargement de la facturation…",
@@ -80,7 +79,6 @@ export const messages = {
   "billing.lifecycle.deleted": "{name} a été supprimé. Son abonnement a pris fin.",
   "billing.lifecycle.label": "Aperçu de conception · Actions fictives uniquement",
   "billing.lifecycle.reset": "Réinitialiser l’aperçu",
-  // The commercial license of the account, above the server plans.
   "billing.license.title": "Licence",
   "billing.license.description": "Pour le travail en entreprise. Elle n’inclut pas de serveur.",
   "billing.license.loadFailed": "Impossible de charger la licence.",
@@ -154,7 +152,6 @@ export const messages = {
   "billing.license.cancel.descriptionNow":
     "La licence prend fin à la fin de la période payée. Vos serveurs ne sont pas concernés.",
   "billing.license.cancel.keep": "Garder la licence",
-  // The order form: a hosted server and a license in one order. The pricing page and Billing show it.
   "billing.order.billing": "Période de facturation",
   "billing.order.currency": "Devise",
   "billing.order.monthly": "Mensuel",
@@ -207,7 +204,6 @@ export const messages = {
   "billing.order.cta.license": "Acheter une licence",
   "billing.order.cta.download": "Télécharger",
   "billing.order.cta.keepComputer": "Rester sur cet ordinateur",
-  // Shown before an invite that makes the license too small.
   "billing.license.invite.title": "Ajouter un utilisateur à la licence ?",
   "billing.license.invite.description":
     "Cette invitation ajoute 1 utilisateur à votre licence : {price} de plus par mois.",

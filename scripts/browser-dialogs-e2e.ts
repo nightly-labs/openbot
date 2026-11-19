@@ -9,7 +9,6 @@ import { withoutElectronRuntimeFlags } from "./electron-spawn-env";
 
 class FixtureProcessTimeout extends Error {}
 
-/** The case count of `browser-dialogs-electron.ts`. A case that stops running fails the check. */
 const DIALOG_CASES = 24;
 
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -19,8 +18,6 @@ const runId = randomUUID();
 let sourceSha: string | undefined;
 try {
   await mkdir(dirname(reportPath), { recursive: true });
-  // The QuickJS sandbox loads its WebAssembly file next to its own module, so it stays in
-  // node_modules, and the entry sits in the project to resolve it.
   const entry = join(dirname(reportPath), "browser-dialogs.mjs");
   await run(process.execPath, [
     "build",
@@ -56,7 +53,6 @@ try {
       sourceSha: z.literal(sourceSha),
     })
     .parse(JSON.parse(await readFile(reportPath, "utf8")));
-  // Machine-readable summary of the completed case count.
   process.stdout.write(
     `${JSON.stringify({ status: report.status, cases: report.cases.length, report: reportPath })}\n`,
   );
@@ -69,9 +65,7 @@ try {
       .parse(JSON.parse(await readFile(reportPath, "utf8")));
     completedCases = current.cases ?? [];
     nativeFailure = current.status === "failed";
-  } catch {
-    // This invocation owns no valid report yet. An earlier report cannot supply its result.
-  }
+  } catch {}
   if (error instanceof FixtureProcessTimeout) {
     await writeFile(
       reportPath,

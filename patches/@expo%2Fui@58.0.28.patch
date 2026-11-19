@@ -1,0 +1,16 @@
+diff --git a/android/src/main/java/expo/modules/ui/ExpoUIModule.kt b/android/src/main/java/expo/modules/ui/ExpoUIModule.kt
+index 48a0fd7..8d62826 100644
+--- a/android/src/main/java/expo/modules/ui/ExpoUIModule.kt
++++ b/android/src/main/java/expo/modules/ui/ExpoUIModule.kt
+@@ -83,7 +83,10 @@ class ExpoUIModule : Module() {
+       // `RNHostView` publishes its content origin into a process-global registry keyed by view tag.
+       // Tags restart in the next app context, so an entry whose view was never torn down would be
+       // read by an unrelated view after a reload.
+-      NativeStatePropsGetter().clearAllContentOrigins()
++      try {
++        NativeStatePropsGetter().clearAllContentOrigins()
++      } catch (nativeLibraryNotLoaded: UnsatisfiedLinkError) {
++      }
+       // React Native destroys modules on a background thread, but `ZeroContentOrigins` is UI-thread only.
+       Handler(Looper.getMainLooper()).post { ZeroContentOrigins.clear() }
+ 

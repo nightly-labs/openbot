@@ -4,6 +4,7 @@ import type { messages as source } from "../../en/error/attachment";
 export const messages = {
   "error.attachment.notFound": "הקובץ המצורף לא נמצא.",
   "error.attachment.fileTooLarge": "קובץ חורג ממגבלת 100 MB.",
+  "error.attachment.namedFileTooLarge": "{name} חורג ממגבלת 100 MB.",
   "error.attachment.totalTooLarge": "הקבצים המצורפים חורגים ממגבלת הסך הכול של 250 MB.",
   "error.attachment.unavailable": "הקובץ הזה כבר אינו זמין.",
   "error.attachment.tooMany": "אפשר לבחור עד {limit} קבצים.",

@@ -1,14 +1,3 @@
-// Checks the routine flow sweep of a profile with a frequent routine (#2283). Runs the real SQLite and
-// the real routine flow service on a temporary profile, with a week of runs of a 15-minute routine that
-// has no flow and of a routine with a flow. Checks that the sweep still gives each ended run its own
-// agent's step, sends only the handoffs that are not sent yet, and sends nothing on a second sweep.
-// Years of older runs sit outside the 7 days: no query of the sweep may read every row of a table for
-// them. Records the time of a sweep with nothing to do, which runs on each turn and queue change. Also
-// checks that the read of a run's answer finds the turn by its index and does not read the whole chat
-// (#11463). No app, provider, account or network is started.
-//
-// Run: bun scripts/routine-flow-sweep-e2e.ts
-// Writes .openbot-build/routine-flow-sweep-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -22,11 +11,8 @@ import { createRoutineFlows } from "../src/backend/routine-flows/routine-flows";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/routine-flow-sweep-e2e");
 const QUARTER_HOUR_MS = 15 * 60 * 1000;
-/** A 15-minute routine runs 672 times in the 7 days a sweep looks back. */
 const SOLO_RUNS = 672;
-/** A routine with a flow, every hour: runs whose flow is done. */
 const DONE_FLOW_RUNS = 160;
-/** The same routine before the 7 days: more than two years of hourly runs whose flow is done. */
 const OLD_FLOW_RUNS = 20_000;
 const TIMED_SWEEPS = 20;
 const INDEXES = ["routine_runs_status_updated", "routine_flow_steps_running", "routine_flow_steps_updated"];
@@ -92,18 +78,12 @@ function seed(database: OpenBotDatabase): void {
     step.run(`old-${index}-editor`, `old-${index}`, "editor", `old-editor-${index}`, time, time);
   }
   const recent = at(now - 60_000);
-  // The app stopped after the answer and before its handoff.
   run.run("pending", "routine-flow", "chief", recent, "Hourly brief", "pending-delivery", recent, recent);
   step.run("pending-chief", "pending", "chief", null, recent, recent);
-  // The answer is in, and no sweep saw it yet.
   run.run("fresh", "routine-flow", "chief", recent, "Hourly brief", "fresh-delivery", recent, recent);
   db.exec("COMMIT");
 }
 
-/**
- * The query plan of each statement that one sweep prepares. The sweep reads through the store, so the
- * statements come from the connection, not from a copy of their text here.
- */
 async function sweepPlans(database: OpenBotDatabase, sweep: () => Promise<void>): Promise<Record<string, string[]>> {
   const connection = database.connection;
   const prepare = connection.prepare.bind(connection);
@@ -130,11 +110,6 @@ async function sweepPlans(database: OpenBotDatabase, sweep: () => Promise<void>)
   );
 }
 
-/**
- * The answer of a routine turn in the agent's chat, where a routine runs by default (#11463). Reads it
- * as the app does, and checks that the read goes through the turn index: the plan of the chat order
- * index reads every message of the chat.
- */
 function checkTurnAnswerRead(database: OpenBotDatabase): string[] {
   const db = database.connection;
   const at = (second: number) => new Date(Date.UTC(2026, 10, 1, 0, 0, second)).toISOString();
@@ -157,7 +132,6 @@ function checkTurnAnswerRead(database: OpenBotDatabase): string[] {
   turn.run("routine-turn", at(10), at(12));
   add("chat-question", "chat-turn", "user", 1, 0);
   add("chat-answer", "chat-turn", "assistant", 2, 1);
-  // Written out of order: the read gives them in the order of the chat.
   add("routine-answer", "routine-turn", "assistant", 12, 4);
   add("routine-instruction", "routine-turn", "user", 10, 2);
   add("routine-progress", "routine-turn", "assistant", 11, 3);
@@ -212,7 +186,6 @@ try {
     createRoutineFlows({
       store: new RoutineFlowStore({ database }),
       routines: { list: () => [], get: () => null, listRuns: () => [] },
-      // Every run's own delivery answered; every handoff is still in the queue.
       delivery: (deliveryId) =>
         deliveryId.startsWith("handoff-")
           ? { status: "queued", turnId: null, error: null }
@@ -251,7 +224,6 @@ try {
 
     const plans = await sweepPlans(database, () => Effect.runPromise(flows.sweep()));
     report.plans = plans;
-    // The running steps index holds only running steps, so its scan reads no ended step.
     const scans = Object.entries(plans).filter(([, plan]) =>
       plan.some((line) => line.startsWith("SCAN") && !line.includes("USING INDEX routine_flow_steps_running")),
     );

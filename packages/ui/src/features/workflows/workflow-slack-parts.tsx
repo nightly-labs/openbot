@@ -1,10 +1,3 @@
-/**
- * The Slack settings of a trigger and of an output card. A Slack trigger starts a run when a person
- * mentions OpenBot in a workspace and a channel that match it. A Slack output replies in that message's
- * thread, adds a reaction to it, or posts in a channel. The labels that name no service are the Discord
- * ones.
- */
-
 import {
   WORKFLOW_SLACK_ACTIONS,
   WORKFLOW_SLACK_EMOJI,
@@ -52,7 +45,6 @@ const EMOJI_LABEL = {
   "❌": "workflow.discord.emoji.cross",
 } as const satisfies Record<WorkflowSlackEmoji, AppTextKey>;
 
-/** The Slack workspaces of the host, with their channels. */
 function useWorkspaces() {
   const board = useBoard();
   const workspaces = () => board.catalogs().slack ?? [];
@@ -67,9 +59,6 @@ function useWorkspaces() {
   return { choices, channels };
 }
 
-/* ------------------------------------------------------------- Trigger */
-
-/** The fields that a Slack trigger stores when the user chooses it. The host reads the same names. */
 export const SLACK_TRIGGER_DEFAULTS = { event: "mention", connectionId: "", placeId: "" } as const;
 
 export function SlackTriggerRows(props: { id: string; locked: boolean }) {
@@ -86,7 +75,6 @@ export function SlackTriggerRows(props: { id: string; locked: boolean }) {
   );
   const [placeId, setPlaceId] = useField<string>(id, "placeId", SLACK_TRIGGER_DEFAULTS.placeId, asString);
   const [text, setText] = useTextField(id, "text", "");
-  /** Channels belong to one workspace, so a new workspace starts with none, in one change. */
   const setWorkspace = (value: string) => board.setFields(props.id, { connectionId: value, placeId: "" });
   const channels = (): Choice<string>[] => [
     { value: "", label: t("workflow.discord.anyChannel"), icon: () => <Hash aria-hidden="true" /> },
@@ -131,9 +119,6 @@ export function SlackTriggerRows(props: { id: string; locked: boolean }) {
   );
 }
 
-/* -------------------------------------------------------------- Output */
-
-/** The fields that a Slack output stores when the user chooses it. The host reads the same names. */
 export const SLACK_OUTPUT_DEFAULTS = {
   connectionId: WORKFLOW_SLACK_TRIGGER_WORKSPACE,
   action: "reply",
@@ -160,9 +145,7 @@ export function SlackOutputRows(props: { id: string; locked: boolean }) {
     oneOf(WORKFLOW_SLACK_EMOJI),
   );
   const posts = () => action() === "post";
-  /** A channel belongs to one workspace, so a new workspace starts with none, in one change. */
   const setWorkspace = (value: string) => board.setFields(props.id, { connectionId: value, placeId: "" });
-  /** A post needs a channel of a known workspace. A reply and a reaction act on the trigger's message. */
   const workspaceChoices = (): Choice<string>[] =>
     posts()
       ? workspaces.choices()

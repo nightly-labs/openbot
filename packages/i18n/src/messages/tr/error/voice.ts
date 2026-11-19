@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/voice";
 
 export const messages = {
-  // Ses dökümü hataları.
   "error.voice.downloadFailed": "Ses modeli indirilemedi. Tekrar deneyin.",
   "error.voice.downloadStopped": "Ses modeli indirmesi durduruldu.",
   "error.voice.removeBusy": "Ses dökümü bitene kadar bekleyin, sonra modeli kaldırın.",

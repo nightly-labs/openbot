@@ -1,9 +1,3 @@
-/**
- * The composer of the selected image or video step, under its card: the pictures that come in, the
- * description, and one bar with the model, the settings and Run with its price. The card shows only
- * its media while the composer is open.
- */
-
 import {
   WORKFLOW_MEDIA_CUSTOM_ASPECT,
   WORKFLOW_MEDIA_SIZE_MAX,
@@ -15,7 +9,6 @@ import {
   Button,
   ChevronDown,
   Input,
-  Play,
   Popover,
   Select,
   SelectContent,
@@ -49,27 +42,20 @@ import {
   optionValueKey,
   ROLE_BADGE,
   ROLE_TEXT,
+  RunContent,
   readableName,
+  resolutionName,
   typedSide,
   useElapsed,
   useMediaStep,
 } from "./workflow-media-step";
 
-/** The space between the card, with its strip of results, and the composer. */
 const GAP = 10;
-/** The top bar and the bottom bar of the canvas, which the composer keeps clear of. */
 const TOP_ROOM = 56;
 const BOTTOM_ROOM = 80;
-/** The parts of a node that the composer goes below: the media, the strip of results and a tool bar below. */
 const BELOW = '.wfn-card-frame, .wfn-strip, .wfn-toolbar[data-side="below"]';
-/** The parts of a node that the composer goes above when the room below is too small. */
 const ABOVE = ".wfn-card-frame, .wfn-label, .wfn-toolbar";
 
-/**
- * Runs `action` for a key that `matches` while `owns` takes it. The canvas reads its shortcuts on the
- * document, so the key stops here, in the capture phase, before them: Escape does not clear the
- * selection, and Mod+Enter does not run the whole routine.
- */
 function takeKey(matches: (event: KeyboardEvent) => boolean, owns: (target: Node) => boolean, action: () => void) {
   const listener = (event: KeyboardEvent) => {
     if (!matches(event) || !(event.target instanceof Node) || !owns(event.target)) return;
@@ -85,12 +71,6 @@ const isEscape = (event: KeyboardEvent) => event.key === "Escape";
 const isSend = (event: KeyboardEvent) =>
   event.key === "Enter" && (event.metaKey || event.ctrlKey) && !event.isComposing;
 
-/**
- * The composer of one media step. `root` is the canvas: the composer stays below the card in each
- * frame as the camera moves, centred on the card and at the same size at each zoom, as the tool bar
- * of a card. When the room below is too small, it goes above the card. Near an edge it stays inside
- * the canvas, clear of its bars. While the card is out of view, the composer hides. Escape gives the focus back to the card.
- */
 export function WorkflowMediaComposer(props: { id: string; root: () => HTMLElement | undefined }) {
   const { t } = useText();
   const step = useMediaStep(untrack(() => props.id));
@@ -137,7 +117,6 @@ export function WorkflowMediaComposer(props: { id: string; root: () => HTMLEleme
   });
   onCleanup(() => cancelAnimationFrame(frame));
 
-  /** The inputs that have a picture. An input without one, such as a step that did not run yet, has no tile. */
   const pictures = () => step.inputs().filter((source) => step.inputUrl(source) !== undefined);
   const ready = () => !step.run.running() && step.runnable() && !step.locked() && step.model() !== undefined;
   takeKey(
@@ -145,7 +124,6 @@ export function WorkflowMediaComposer(props: { id: string; root: () => HTMLEleme
     (target) => section?.contains(target) === true,
     () => focusCard(),
   );
-  // As in the chat composer, Mod+Enter sends: here it runs the step. Its settings popover is in a portal.
   takeKey(
     isSend,
     (target) =>
@@ -156,7 +134,6 @@ export function WorkflowMediaComposer(props: { id: string; root: () => HTMLEleme
     },
   );
 
-  // A description longer than 5 lines scrolls: an edge with more text behind it fades out.
   const promptFades = createScrollFades();
   onCleanup(promptFades.stop);
   createEffect(step.prompt, () => promptFades.remeasure());
@@ -167,7 +144,6 @@ export function WorkflowMediaComposer(props: { id: string; root: () => HTMLEleme
         section = element;
       }}
       class="wfn-composer"
-      // The canvas keeps its selection, its drag and its keys for a press or a key in the composer.
       data-wfn-portal=""
       aria-label={text("title")}
     >
@@ -209,10 +185,6 @@ function ComposerModel(props: { step: MediaStep; id: string }) {
   );
 }
 
-/**
- * The pictures that come into the step, with the frame that each one gives a video. A connection on
- * the canvas adds or removes a picture.
- */
 function ComposerPictures(props: { step: MediaStep; sources: readonly string[] }) {
   const { t } = useText();
   return (
@@ -250,15 +222,9 @@ function ComposerPictures(props: { step: MediaStep; sources: readonly string[] }
 interface Choice<T extends string> {
   value: T;
   label: string;
-  /** A longer name for a screen reader, such as the shape of an aspect ratio. */
   name?: string;
 }
 
-/**
- * One chip with the specs of the step. It opens all the settings at once, as tiles: the length, the
- * frame, the resolution, the voice of a video or the background of a picture, and the other settings
- * of the model.
- */
 function SettingsChip(props: { step: MediaStep; id: string }) {
   const { t } = useText();
   const board = useBoard();
@@ -275,7 +241,7 @@ function SettingsChip(props: { step: MediaStep; id: string }) {
     return [
       size ? sizeText(size) : specs().aspect,
       video() ? seconds(specs().duration) : undefined,
-      size ? undefined : specs().resolution,
+      size || !specs().resolution ? undefined : resolutionName(specs().resolution ?? ""),
       !video() && specs().transparent ? t(BACKGROUND_TEXT.transparent) : undefined,
       video() && step.model()?.voices && step.voice() ? step.voiceText() : undefined,
     ]
@@ -288,7 +254,6 @@ function SettingsChip(props: { step: MediaStep; id: string }) {
       ? [{ value: WORKFLOW_MEDIA_CUSTOM_ASPECT, label: t("workflow.image.aspect.custom") } as const]
       : []),
   ];
-  /** Auto, where the host chooses the mode from the inputs that come in, then each mode of the model. */
   const modes = (): readonly Choice<string>[] => [
     { value: "auto", label: t("workflow.video.modeAuto") },
     ...step.modes().map((entry) => {
@@ -307,8 +272,6 @@ function SettingsChip(props: { step: MediaStep; id: string }) {
   const [open, setOpen] = createSignal(false);
   let trigger: HTMLButtonElement | undefined;
   let content: HTMLElement | undefined;
-  // A press on the chip also reaches the canvas. So after the popover opens, the focus goes to its
-  // first setting, and Tab and the arrow keys start in the settings.
   createEffect(open, (isOpen) => {
     if (!isOpen) return;
     const frame = requestAnimationFrame(() => {
@@ -317,8 +280,6 @@ function SettingsChip(props: { step: MediaStep; id: string }) {
     });
     return () => cancelAnimationFrame(frame);
   });
-  // The popover takes each Escape while it is open, so the canvas keeps its selection. An open list of
-  // a tile closes first.
   takeKey(
     isEscape,
     (target) => open() && !(target instanceof Element && target.closest(".wfn-composer-list")),
@@ -328,7 +289,6 @@ function SettingsChip(props: { step: MediaStep; id: string }) {
     },
   );
   return (
-    // Under the chip, so the card stays in view. With no space under it, the popover goes over the chip.
     <Popover.Root placement="bottom-start" gutter={8} open={open()} onOpenChange={setOpen}>
       <Popover.Trigger
         ref={(element: HTMLButtonElement) => {
@@ -351,10 +311,8 @@ function SettingsChip(props: { step: MediaStep; id: string }) {
           data-wfn-portal=""
           aria-label={t("workflow.media.settings")}
         >
-          {/* A short window keeps the popover in view: the settings scroll, and an edge with more fades out. */}
           <ScrollEdges axis="y" class="wfn-composer-scroll" viewClass="wfn-composer-settings">
             <Show when={video() && durations().length > 1}>
-              {/* A tick marks each length that the model makes. */}
               <div
                 class="wfn-composer-length"
                 style={{ "--wfn-composer-steps": String(durations().length - 1) }}
@@ -388,16 +346,14 @@ function SettingsChip(props: { step: MediaStep; id: string }) {
                 />
               )}
             </Show>
-            {/* A custom size sets the resolution that the model makes. */}
             <Show when={!specs().size && step.resolutions().length > 0}>
               <PickTile
                 label={t("workflow.video.resolution")}
                 value={specs().resolution ?? ""}
-                options={step.resolutions().map((value) => ({ value, label: value }))}
+                options={step.resolutions().map((value) => ({ value, label: resolutionName(value) }))}
                 onChange={step.setResolution}
               />
             </Show>
-            {/* The mode sets which inputs the card has. It comes after the frame tiles, so that it does not stand alone on a row. */}
             <Show when={step.modes().length > 0}>
               <PickTile
                 label={t("workflow.video.mode")}
@@ -432,7 +388,6 @@ function SettingsChip(props: { step: MediaStep; id: string }) {
   );
 }
 
-/** The other settings that the service lists for the model, such as sound or bitrate. A switch is a tile with a switch. */
 function ModelOptions(props: { options: readonly MediaStepOption[]; onChange: (name: string, value: string) => void }) {
   const { t } = useText();
   const name = (entry: MediaStepOption) => {
@@ -440,7 +395,6 @@ function ModelOptions(props: { options: readonly MediaStepOption[]; onChange: (n
     return key ? t(key) : readableName(entry.option.name);
   };
   return (
-    // Each change gives new entries; a key by name keeps the tiles, so an open list stays open.
     <For each={props.options} keyed={(entry) => entry.option.name}>
       {(entry) => (
         <Show
@@ -469,7 +423,6 @@ function ModelOptions(props: { options: readonly MediaStepOption[]; onChange: (n
   );
 }
 
-/** A custom size as one tile, next to the aspect ratio: its name over the width and the height. */
 function SizeFields(props: { size: WorkflowMediaSize; onChange: (size: WorkflowMediaSize) => void }) {
   const { t } = useText();
   const commit = (side: keyof WorkflowMediaSize, input: HTMLInputElement) => {
@@ -503,10 +456,6 @@ function SizeFields(props: { size: WorkflowMediaSize; onChange: (size: WorkflowM
   );
 }
 
-/**
- * A setting as a tile: its name over its value. A press opens the list of its choices, which shows the
- * longer name of a choice, such as the shape of an aspect ratio.
- */
 function PickTile<T extends string>(props: {
   label: string;
   value: T;
@@ -514,7 +463,6 @@ function PickTile<T extends string>(props: {
   onChange: (value: T) => void;
 }) {
   const choice = (value: T) => props.options.find((option) => option.value === value);
-  // Kobalte fails when its list changes in a render; the list changes only when its values do.
   const values = createMemo(() => props.options.map((option) => option.value), {
     equals: (before, after) => before.length === after.length && before.every((value, index) => value === after[index]),
   });
@@ -523,7 +471,6 @@ function PickTile<T extends string>(props: {
       class="wfn-composer-tile"
       options={values()}
       value={props.value}
-      // A new list of choices with the same value sends no change.
       onChange={(next) => {
         if (next !== null && next !== props.value) props.onChange(next);
       }}
@@ -537,7 +484,6 @@ function PickTile<T extends string>(props: {
         </SelectItem>
       )}
     >
-      {/* Kobalte names the trigger by this label and then its value. */}
       <SelectTrigger class="wfn-composer-pick" aria-label={props.label}>
         <span class="wfn-composer-pick-name">{props.label}</span>
         <SelectValue<T>>{(state) => choice(state.selectedOption())?.label}</SelectValue>
@@ -547,10 +493,6 @@ function PickTile<T extends string>(props: {
   );
 }
 
-/**
- * Run with the price, as on the card, so the card shows the same run. While the step runs, the time
- * shows before Stop. A step in a run of the whole routine stops from the bar of the canvas.
- */
 function RunButton(props: { step: MediaStep; id: string; ready: boolean }) {
   const { t } = useText();
   const step = props.step;
@@ -575,8 +517,7 @@ function RunButton(props: { step: MediaStep; id: string; ready: boolean }) {
             aria-label={step.runLabel()}
             onClick={step.run.start}
           >
-            <Play aria-hidden="true" />
-            {step.runText()}
+            <RunContent credits={step.price()} />
           </Button>
         }
       >

@@ -1,11 +1,3 @@
-// Stops a change to a migration that a release shipped, and a new migration with a wrong version.
-//
-//   bun scripts/check-frozen-migrations.ts              compares with the newest v* release tag
-//   bun scripts/check-frozen-migrations.ts --tag v1.2.3  compares with this tag
-//
-// The newest tag comes from origin, so a stale local tag list does not hide a release. CI checks out
-// one commit and no tags, so the script fetches that one tag commit.
-
 import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";

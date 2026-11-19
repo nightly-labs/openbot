@@ -1,10 +1,3 @@
-/**
- * Diagrams: agents wired behind the routines that start them, on a canvas in the chat area, with
- * the last run beside it and an assistant that edits the diagram. The stories hold the diagram in
- * local state, so every edit on the canvas works; a run and the assistant are simulated on a timer.
- * The app logic and the runtime that executes a run are not wired yet.
- */
-
 import type { AgentProfile } from "@openbot/ui/data";
 import { DiagramView } from "@openbot/ui/features/diagrams/DiagramView";
 import { diagramRoutineSteps } from "@openbot/ui/features/diagrams/diagram-graph";
@@ -56,19 +49,14 @@ function at(seconds: number): string {
   return new Date(Date.parse(STARTED) + seconds * 1000).toISOString();
 }
 
-/** The stories show the week from this moment, so the strips do not move with the real date. */
 const NOW = "2026-10-06T10:00:00.000Z";
 const DAY = 24 * 60 * 60;
 
-/** Weekdays at 07:00 Warsaw time, from Wednesday 7 October. */
 const morningUpcoming = [1, 2, 3, 6, 7, 8].map((day) => at(day * DAY));
-/** Every 4 hours from noon UTC today. */
 const sweepUpcoming = Array.from({ length: 6 * 7 }, (_, index) => at(7 * 3600 + index * 4 * 3600));
 
-/** Friday 9 October, 16:00 Warsaw time. */
 const fridayUpcoming = [at(3 * DAY + 9 * 3600)];
 
-/** The newest run starts `offset` seconds after the morning brief's last run; each older one, `every` before it. */
 function pastRuns(
   prefix: string,
   everySeconds: number,
@@ -84,7 +72,6 @@ function pastRuns(
   }));
 }
 
-/** Pipeline sweep last ran an hour before the morning brief; Friday review, last Friday. */
 const SWEEP_OFFSET = -3600;
 const FRIDAY_OFFSET = -4 * DAY + 9 * 3600;
 
@@ -179,7 +166,6 @@ const nodes: DiagramNode[] = [
 const edges = [
   { id: "edge-1", from: "node-routine", to: "node-research" },
   { id: "edge-2", from: "node-routine", to: "node-sales" },
-  // Research hands its findings to Writer only in the morning brief; its headline check stops at it.
   { id: "edge-3", from: "node-research", to: "node-writer", routineId: "node-routine" },
   { id: "edge-4", from: "node-sales", to: "node-writer" },
   { id: "edge-5", from: "node-writer", to: "node-chief" },
@@ -241,7 +227,6 @@ function step(
   };
 }
 
-/** Sales Outbound's step failed in the last sweep, so nothing after it ran. */
 const sweepRun: DiagramRun = {
   id: "run-sweep",
   routineNodeId: "node-sweep",
@@ -402,10 +387,6 @@ const emptyDiagram: Diagram = {
   lastRuns: [],
 };
 
-/**
- * The simplest diagram: one routine, one agent, nothing after it. The agent checks a page on a timer
- * and writes a report only when something changed, so most runs end with "No change".
- */
 const HEADLINE = "Senate passes the infrastructure bill after a late-night vote";
 const headlineDiagram: Diagram = {
   id: "diagram-headline",
@@ -461,7 +442,6 @@ const headlineDiagram: Diagram = {
   ],
 };
 
-/** One routine that a webhook starts instead of a schedule: a published release, for one agent. */
 const webhookDiagram: Diagram = {
   id: "diagram-webhook",
   name: "Release published",
@@ -541,7 +521,6 @@ function nextId(prefix: string) {
   return `${prefix}-${idCounter}`;
 }
 
-/** A diagram in local state. Every canvas edit applies; a run and the assistant run on timers. */
 function InteractiveDiagram(props: {
   diagram: Diagram;
   owner?: AgentProfile | undefined;
@@ -567,7 +546,6 @@ function InteractiveDiagram(props: {
   });
 
   const runNow = (routineNodeId: string) => {
-    // The routine's own path, in step order: each step starts once the one before it is done.
     const order = [...diagramRoutineSteps(snapshot(diagram.edges), routineNodeId).entries()].sort(
       (left, right) => left[1] - right[1],
     );
@@ -719,12 +697,6 @@ function InteractiveDiagram(props: {
   );
 }
 
-/* The app's layout: the sidebar, and the open chat or its routines beside it. */
-
-/**
- * Every routine in the workspace on one canvas, the headline check included. Research is one node
- * here, so its morning brief and its headline check meet on the same card.
- */
 const headlineRoutine = headlineDiagram.nodes[0];
 const workspacePool: Diagram = {
   ...succeededDiagram,
@@ -747,10 +719,6 @@ const workspacePool: Diagram = {
   ],
 };
 
-/**
- * One agent's canvas: every routine whose run reaches it, and every node those runs reach. An agent
- * without routines still stands on its canvas, ready to be connected to one.
- */
 function agentDiagram(agent: AgentProfile): Diagram {
   const pool = workspacePool;
   const own = pool.nodes.filter((node) => node.kind === "agent" && node.agentId === agent.id).map((node) => node.id);
@@ -785,13 +753,11 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Sales Outbound is started by three routines; the tabs over its canvas pick one. */
 export const AgentWithSeveralRoutines: Story = {
   render: () => <InteractiveDiagram diagram={agentDiagram(sales)} owner={sales} />,
   decorators: [(Story) => <div style={{ display: "flex", height: "100vh" }}>{Story()}</div>],
 };
 
-/** Research has the morning brief, and a headline check it runs alone. */
 export const AgentWithSimpleRoutine: Story = {
   render: () => <InteractiveDiagram diagram={agentDiagram(research)} owner={research} />,
   decorators: [(Story) => <div style={{ display: "flex", height: "100vh" }}>{Story()}</div>],
@@ -822,34 +788,26 @@ export const NoRunYet: Story = {
   decorators: [(Story) => <div style={{ display: "flex", height: "100vh" }}>{Story()}</div>],
 };
 
-/** One routine and one agent that works alone: a page check every 30 minutes. */
 export const SingleAgentRoutine: Story = {
   render: () => <InteractiveDiagram diagram={headlineDiagram} />,
   decorators: [(Story) => <div style={{ display: "flex", height: "100vh" }}>{Story()}</div>],
 };
 
-/** A routine that a webhook starts: its card says which events start it, and its details set the webhook. */
 export const WebhookRoutine: Story = {
   render: () => <InteractiveDiagram diagram={webhookDiagram} />,
   decorators: [(Story) => <div style={{ display: "flex", height: "100vh" }}>{Story()}</div>],
 };
 
-/**
- * An agent with no routine yet: a faint morning brief builds itself behind the pitch, one run
- * passes through it, and it starts again. Under reduced motion it shows the finished run.
- */
 export const Empty: Story = {
   render: () => <InteractiveDiagram diagram={emptyDiagram} owner={chief} onCreateRoutine={fn()} />,
   decorators: [(Story) => <div style={{ display: "flex", height: "100vh" }}>{Story()}</div>],
 };
 
-/** The same canvas in a narrow pane: a smaller title and a fainter diagram. */
 export const EmptyNarrow: Story = {
   render: () => <InteractiveDiagram diagram={emptyDiagram} owner={chief} onCreateRoutine={fn()} />,
   decorators: [(Story) => <div style={{ display: "flex", width: "640px", height: "100vh" }}>{Story()}</div>],
 };
 
-/** A viewer who cannot edit: the ports and tools are off, and there is no assistant. */
 export const ReadOnly: Story = {
   render: () => <InteractiveDiagram diagram={succeededDiagram} editable={false} assistant={false} />,
   decorators: [(Story) => <div style={{ display: "flex", height: "100vh" }}>{Story()}</div>],

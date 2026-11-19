@@ -219,7 +219,8 @@ that vendor's app. A key the user types, or the grant of a browser sign-in, goes
 own host over the encrypted Team channel.
 Mobile properties include app version/build, iOS or Android, result, timing, bounded connection stage,
 counts, coarse attachment size buckets, and provider/model/reasoning metadata where available.
-Mobile never sends scanned QR values, install-referrer URLs or route identifiers. It does not
+Mobile does not read the Android install referrer from Google Play. It never sends scanned QR values,
+install-referrer URLs or route identifiers. It does not
 emit host lifecycle events again. Agent/host token and cost reports remain separate local data.
 
 Analytics events do not contain message or direct-message text, prompts, replies, generated content,
@@ -255,7 +256,11 @@ it gets on your account and sends it to OpenPanel with your account ID. To remov
 browser, clear the site data of openbot.run. When you open a discount link (an openbot.run address
 with `?promo=CODE`), the website saves the code and the time in its `localStorage` for 30 days. When
 you pay on the web, the web client sends the code to the account service, which gives it to Stripe
-for that Checkout page. It is not sent to analytics. When you choose a language on the website, it saves
+for that Checkout page. It is not sent to analytics. When you open an invite link (an openbot.run
+address with `?ref=CODE`), the website saves the code and the time in its `localStorage` for 30 days.
+When you sign in on the web, the web client sends the code to the account service and removes it from
+`localStorage`. On the desktop, on the web and on the phone, you can also type an invite link or code
+on the sign-in screen; the app sends only the code. The account service uses a code only for a new account. It is not sent to analytics. When you choose a language on the website, it saves
 the language code, and nothing else, in the `openbot_lang` cookie for one year, so that the next
 pages open in that language. The browser sends this cookie only to openbot.run. OpenPanel can also derive
 session, device, browser, operating-system, network, and approximate geographic metadata from a
@@ -346,8 +351,8 @@ when there is no install ID.
   connection took, rounded, and how long each fixed step of it took; whether it was the first
   connection to that server since the app started; whether the session was new or saved; how many
   attempts failed before it; and, for a hosted server, how long the server took to start. The first
-  attempt that fails after a connection also sends the last step that finished. The server ID,
-  address, session, ticket and keys are not sent.
+  attempt that fails after a connection also sends the last step that finished. It also sends the short
+  name of the OpenBot Signal machine that the connection used, as the connection ticket names it. The server ID, address, session, ticket and keys are not sent.
 - **Turn times.** When a turn completes, the host sends how long the message waited in the queue, how
   long the provider took to start the turn and, when it had to start, its process, and how long until
   the first output. These are times only; the messages are not sent.
@@ -445,6 +450,17 @@ The service stores:
 - for the EU VAT limit: for each paid invoice of a consumer in an EU country other than Poland, the
   Stripe invoice ID, the year, the country and the net amount in euro, with no account ID. The service
   deletes them after the end of the next year.
+- invite links: the invite code of each account that opened Invite friends, and for each account that
+  signed up with an invite link or an invite code, the account that invited
+  it and the time. When an invited account pays, the service compares the Stripe card fingerprints of
+  the two accounts. It does not keep them; when they match, it keeps only the time when it ended the
+  invite. For each paid
+  invoice of an invited account, the service keeps the Stripe invoice ID, the two account IDs, the
+  amount without tax, the credit that it gave in Stripe and the Stripe balance transaction ID, and
+  for a refund or a lost dispute, the credit that it took back. The account that invited sees the
+  first name and the initial of the last name of each invited account, the day it joined, whether
+  it pays now, has no plan or stopped paying, and the credit that the invited account gave it, which is
+  10% of what the invited account paid. It never sees an email or a plan of an invited account. Deleting either account removes these rows.
 - hosted sites: the hostname, title, description, framework, state, owner account ID, lifecycle
   times, and for each deployment the file list, sizes and content types. The published site files
   are in R2. Anyone can read a published site. Deleting a site removes its files.
@@ -551,7 +567,7 @@ account service stores a hash of the token of that request and the time of the l
 no customer data. The account service stores the Leaseweb server ID with the server. So that an operator can
 find the server in the Leaseweb portal, the operator gives it a reference in Leaseweb: your account
 email and the first 8 characters of the server ID, such as `ada@example.com 1a2b3c4d`. When you
-delete the server, or 30 days after its plan ends with no renewal, the account service deletes the old
+delete the server, when its plan is cancelled with a refund, or 14 days after its plan ends with no renewal, the account service deletes the old
 sandbox when the server has one, and within a day an operator reinstalls the virtual server, which erases its disk, and sets
 its reference to `pool-free`.
 
@@ -1030,8 +1046,9 @@ no review reads are deleted after 30 days. Turning the setting off deletes all r
   Vault file, or, where Windows does not allow links, a copy of the key that is readable only by the user
   and follows the same rules. API keys are redacted from logs, exports and diagnostics. A password that the
   user types into the secure sign-in card goes to the Vault only while Save to Vault is checked. On a
-  joined server, only an owner or admin can check it, the box starts unchecked, and the password goes
-  to that server's Vault, not to the Vault of the computer where it was typed. The
+  joined server, the box starts checked, any member can save, and the password goes to that server's
+  Vault, not to the Vault of the computer where it was typed. All agents of that server can then sign
+  in with it. Only an owner or admin can show it in the server's Vault. The
   first card fill on a site waits for the server owner's approval; team members and messaging
   services cannot give it. The card then keeps that site and the origins of its card frames, and
   later fills there need no approval; the user can remove a site in the card. The
@@ -1135,6 +1152,10 @@ on desktop. The phone does not store the viewer's files, the screen, or the conn
 sheet shows; Copy in that sheet puts them on the phone's clipboard only when the user taps it. It asks for Face ID, Touch ID
 or the phone unlock before a session, ends the session when the app leaves the foreground, and on
 Android does not allow screenshots or screen recording of the screen while it is open.
+
+On Android, the phone app turns off Content Capture for its window. The system's content capture
+service, such as Android System Intelligence, does not get the text of the app's screens, such as chat
+messages. Accessibility services and autofill do not change.
 
 Agents, conversations, queues, direct messages, attachments, browser data, prompts, approvals, and
 Remote Desktop data remain on the host. The central account service does not copy them into D1 or
@@ -1845,8 +1866,8 @@ Gemini agents stay on this computer: OpenBot does not show them to team members.
 To show the remaining Gemini quota in Usage, OpenBot reads the access token from the server's token file
 and asks Google's Code Assist service (`cloudcode-pa.googleapis.com` and
 `daily-cloudcode-pa.googleapis.com`) for the account's project and quota, as the Antigravity app does.
-The requests carry that token and a User-Agent with the Antigravity desktop app's version, your
-operating system and processor type. They contain no conversation, file, or model data. With an API key
+The requests carry that token and a User-Agent with the Antigravity desktop app's client name, version
+and build number, your operating system and processor type. They contain no conversation, file, or model data. With an API key
 sign-in, or an expired token, OpenBot sends nothing and shows no Gemini usage. OpenBot does not send that
 usage to its maintainer.
 

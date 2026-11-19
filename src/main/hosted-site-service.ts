@@ -62,7 +62,6 @@ interface PendingUpload {
   uploadedPaths: Set<string>;
   createdAt: number;
   inFlight: Deferred.Deferred<HostedSiteSummary, HostedSiteFailure> | null;
-  /** The bucket of the last session request. A site limit names the limit of that bucket. */
   serverScoped: boolean;
 }
 
@@ -75,7 +74,6 @@ export interface HostedSiteAuthClient {
   ): Effect.Effect<T, CentralAuthOperationError>;
 }
 
-/** The registered server of this computer and its machine token. The token is a secret: never log it. */
 export interface HostedSiteServerCredential {
   hostId: string;
   machineToken: string;
@@ -83,11 +81,6 @@ export interface HostedSiteServerCredential {
 
 const UNLINKED_SCOPE = "?scope=unlinked";
 
-/**
- * The sites of this computer's server. A computer that is a registered server proves it with its machine
- * token, and its new sites count against the server's plan. Without a credential, the account's unlinked
- * bucket holds the sites. The list shows both, because the unlinked sites belong to this computer's account.
- */
 export class HostedSiteDesktopService {
   readonly #pendingUploads = new Map<string, PendingUpload>();
 
@@ -132,7 +125,6 @@ export class HostedSiteDesktopService {
     return this.upload(input, input.siteId, allowedRoots);
   }
 
-  /** Deletes a site of this server, or an unlinked site of this account. Only for this computer's own user. */
   delete(siteId: string): Effect.Effect<void, HostedSiteFailure> {
     return Effect.gen({ self: this }, function* () {
       const key = operationKey("delete");
@@ -145,11 +137,6 @@ export class HostedSiteDesktopService {
       yield* this.deleteSite(siteId, key, {}, UNLINKED_SCOPE);
     });
   }
-
-  /**
-   * The sites of this server only, for a member on a joined server. The unlinked sites belong to the owner's
-   * account, not to the server, so a member never sees or deletes them.
-   */
 
   listServerSites(): Effect.Effect<HostedSiteList, HostedSiteFailure> {
     return Effect.gen({ self: this }, function* () {
@@ -173,10 +160,6 @@ export class HostedSiteDesktopService {
     });
   }
 
-  /**
-   * A site that this computer published before it was a registered server is in the account's unlinked
-   * bucket. The Worker refuses it in the server scope before it claims the key, so the same key can update it.
-   */
   private createSession(
     create: (headers: Record<string, string>, query?: string) => Effect.Effect<UploadSession, HostedSiteFailure>,
     siteId: string | null,
@@ -240,8 +223,6 @@ export class HostedSiteDesktopService {
     const entry = pending;
     const resumed = entry.session !== null;
     return yield* this.performUpload(input, siteId, prepared, entry).pipe(
-      // A session that a retry resumes can end before it: it expired, or a newer replace of the site freed its slot.
-      // Start one new session for the same files.
       Effect.catch((failure) => {
         if (!resumed || authErrorCode(failure.cause) !== "upload_expired") return Effect.fail(failure);
         entry.uploadKey = operationKey(siteId ? "replace" : "publish");
@@ -305,10 +286,7 @@ export class HostedSiteDesktopService {
             `/v1/sites/uploads/${encodeURIComponent(session.uploadId)}/file?path=${encodeURIComponent(file.path)}`,
             {
               method: "PUT",
-              headers: {
-                "Content-Type": file.mimeType,
-                "Content-Length": String(file.size),
-              },
+              headers: { "Content-Type": file.mimeType },
               body: arrayBuffer(file.bytes),
             },
             decodeUploadResult,
@@ -328,11 +306,6 @@ export class HostedSiteDesktopService {
     });
   }
 
-  /**
-   * The Worker's `site_limit` text is English and does not tell the agent or the user what to do. The list of the
-   * bucket that refused the site supplies the limit and its `limitReason`. When a server's list fails, the Worker's
-   * own failure stays; when the unlinked list fails, the text names the unlinked limit.
-   */
   private siteLimitFailure(failure: HostedSiteFailure, serverScoped: boolean): Effect.Effect<never, HostedSiteFailure> {
     if (authErrorCode(failure.cause) !== "site_limit") return Effect.fail(failure);
     const credential = serverScoped ? this.serverCredential() : null;
@@ -538,12 +511,10 @@ function decodeSiteList(value: unknown): HostedSiteList {
   return list;
 }
 
-/** The limit of a site list and why other sites can take its slots. */
 function decodeSiteSlots(value: unknown): { limit: number; reason: HostedSiteLimitReason | null } {
   return { limit: decodeSiteList(value).limit, reason: parseHostedSiteLimitReason(value) };
 }
 
-/** The text of a site limit. Only a shared pool or the account cap can give a limit of 0. */
 function siteLimitText(slots: { limit: number; reason: HostedSiteLimitReason | null }, server: boolean): string {
   if (slots.reason === "account") return sourceText("error.site.accountLimit", { count: HOSTED_SITE_ACCOUNT_LIMIT });
   if (slots.reason === "shared") return sourceText("error.site.sharedLimit");
@@ -598,7 +569,6 @@ function uploadSignature(input: PublishHostedSiteInput, siteId: string | null, p
   return hash.digest("hex");
 }
 
-/** The error code of an account service response, such as `site_limit`. */
 function authErrorCode(error: unknown): string | null {
   return error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : null;
 }
@@ -625,7 +595,6 @@ function arrayBuffer(bytes: Uint8Array): ArrayBuffer {
 
 function isInside(root: string, target: string): boolean {
   const path = relative(root, target);
-  // `..notes.md` is a child; only `..` itself or a `../` prefix leaves the root.
   return path === "" || (path !== ".." && !path.startsWith(`..${sep}`) && !isAbsolute(path));
 }
 

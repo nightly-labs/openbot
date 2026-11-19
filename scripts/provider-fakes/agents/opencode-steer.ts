@@ -1,11 +1,3 @@
-// The `opencode acp` of `opencode-steer-e2e.ts`. It steers as OpenCode 2.3.0 does (#8231): `initialize`
-// reports `_meta.steering.supported`, and `_session/steering` takes the blocks of a `session/prompt`.
-// While the session runs a turn it answers `{ outcome: "injected" }`, and the open prompt then ends
-// with the steer's text. With no turn it answers `{ outcome: "promptRequired", reason: "noRunningTurn" }`.
-// A `work` prompt opens one tool call and stays open until a steer arrives. Each other prompt answers
-// at once. `FAKE_NO_STEERING=1` is an OpenCode before the request, such as 2.2.6: no `_meta`, and the
-// method is not found. `FAKE_NEVER_RUNNING=1` answers `promptRequired` also while the prompt is open,
-// as when the turn ends in OpenCode before the steer arrives; the prompt then ends by itself.
 import { type AcpPeer, type AcpRequest, logEntry, serveFakeAcpAgent } from "../acp-agent";
 
 const MODELS = {
@@ -14,7 +6,6 @@ const MODELS = {
 };
 const steers = process.env.FAKE_NO_STEERING !== "1";
 const neverRunning = process.env.FAKE_NEVER_RUNNING === "1";
-/** The `work` prompt that waits for a steer, by session. */
 const open = new Map<string, AcpRequest>();
 let count = 0;
 

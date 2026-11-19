@@ -9,18 +9,12 @@ import { TemplateInstructions, TemplateRoutines, TemplateSkills } from "./AgentT
 export interface AgentTemplateInstallDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** The template a link named. Null while it loads. */
   detail: AgentTemplateDetail | null;
   loading: boolean;
   onInstall: () => Promise<void>;
-  /** Opens a link from the instructions. */
   onOpenLink: (url: string) => void;
 }
 
-/**
- * What an `openbot://agents/<id>` link opens. It shows all of what the agent will follow before
- * anything is installed: a link alone never adds an agent.
- */
 export function AgentTemplateInstallDialog(props: AgentTemplateInstallDialogProps) {
   const { t, errorMessage } = useText();
   const [installing, setInstalling] = createSignal(false);

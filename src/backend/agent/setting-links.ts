@@ -1,15 +1,9 @@
 import { SETTING_LINK_IDS, type SettingLinkId } from "@openbot/contracts/ipc";
 
-/**
- * What `show_setting` tells the model about each setting. This text goes to the provider, not to a
- * screen, so it is English and not in the catalog. The card in the chat reads the title and the place
- * from the catalog, in the reader's language.
- */
 interface SettingLinkEntry {
   title: string;
   place: string;
   about: string;
-  /** Other words that a person uses for the setting, for the search. */
   words: string;
 }
 
@@ -157,37 +151,37 @@ const SETTING_LINKS: Record<SettingLinkId, SettingLinkEntry> = {
   },
   "phones.devices": {
     title: "Your phones",
-    place: `${APP} > Phones`,
+    place: `${APP} > Mobile Connect`,
     about: "Connect the OpenBot phone app (iPhone, Android) to this computer, and see the connected phones.",
     words: "mobile iphone android ios app pair qr code",
   },
   "app.launch-at-login": {
     title: "Launch OpenBot at login",
-    place: `${APP} > App`,
+    place: `${APP} > App behavior`,
     about: "Open OpenBot when the user signs in to the computer.",
     words: "startup autostart boot login items",
   },
   "app.restore-workspace": {
     title: "Restore the last workspace on launch",
-    place: `${APP} > App`,
+    place: `${APP} > App behavior`,
     about: "Open the workspace and tasks of the previous session at start.",
     words: "reopen session tabs",
   },
   "app.fast-server-connection": {
     title: "Fast connection to servers",
-    place: `${APP} > App`,
+    place: `${APP} > App behavior`,
     about: "Keep the connections to joined servers open in the background.",
     words: "remote server connection background",
   },
   "app.keep-awake": {
     title: "Keep this computer awake",
-    place: `${APP} > App`,
+    place: `${APP} > App behavior`,
     about: "Prevent sleep while agents work, so routines and long tasks continue.",
     words: "sleep caffeinate prevent sleep idle lid power",
   },
   "app.keep-awake-on-battery": {
     title: "Also on battery",
-    place: `${APP} > App`,
+    place: `${APP} > App behavior`,
     about: "Keep the computer awake also when it is not plugged in.",
     words: "battery power sleep",
   },
@@ -343,20 +337,12 @@ const terms = (text: string) =>
     .split(/[^\p{L}\p{N}]+/u)
     .filter((term) => term.length > 1);
 
-/**
- * The term matches a word, or the start of a longer word: "notif" finds "notifications". A short word
- * matches only itself, so "or" does not find "order".
- */
 function hits(term: string, words: readonly string[]): boolean {
   return words.some(
     (word) => word === term || (term.length > 3 && word.startsWith(term)) || (word.length > 3 && term.startsWith(word)),
   );
 }
 
-/**
- * How well an entry fits the query terms. A title match counts most. With `sentences`, the about and
- * place text count too.
- */
 function score(queryTerms: readonly string[], entry: SettingLinkEntry, sentences: boolean) {
   const title = terms(entry.title);
   const words = terms(entry.words);
@@ -365,13 +351,11 @@ function score(queryTerms: readonly string[], entry: SettingLinkEntry, sentences
   for (const term of queryTerms) {
     if (hits(term, title)) total += 3;
     else if (hits(term, words)) total += 2;
-    // The descriptions are sentences, so a word of two letters, such as "is" or "to", is not a match.
     else if (term.length > 2 && hits(term, rest)) total += 1;
   }
   return total;
 }
 
-/** The entries that fit the query best. */
 function rank<T>(
   items: readonly T[],
   entry: (item: T) => SettingLinkEntry,
@@ -388,7 +372,6 @@ function rank<T>(
     .map((match) => match.item);
 }
 
-/** The settings that fit the query best. */
 export function searchSettingLinks(query: string, limit = 5): SettingLinkSummary[] {
   return rank(SETTING_LINK_IDS, (id) => SETTING_LINKS[id], terms(query), limit, true).map(settingLinkSummary);
 }
@@ -397,11 +380,6 @@ const SERVER_LIST = "On a computer: in the server list on the left, right-click 
 const SERVER_SETTINGS = "Server settings (right-click the server in the server list on the left, then Server settings)";
 const PHONE_SERVERS = "On the phone app: in Servers, touch and hold the server";
 
-/**
- * Server actions that `show_setting` finds but shows no card for. A card opens the settings of the
- * server of the chat, and these actions are often for another server of the list, such as the server
- * of an old computer, so the agent gives the steps in words.
- */
 export type ServerPlace = Omit<SettingLinkEntry, "words">;
 
 const SERVER_PLACES: readonly SettingLinkEntry[] = [
@@ -427,15 +405,8 @@ const SERVER_PLACES: readonly SettingLinkEntry[] = [
   },
 ];
 
-/** Words for a server or its computer. A server action fits only a query with one of them. */
 const SERVER_TERMS = ["server", "computer", "machine", "device", "laptop", "macbook", "imac", "mac", "pc"];
 
-/**
- * The server actions that fit the query. Only the title and the words count: the place of each action
- * repeats the same steps, so its common words would match nearly every query. The words for a server
- * or a computer only open the search and do not add to the score: another word, such as "remove" or
- * "move", must match.
- */
 export function searchServerPlaces(query: string, limit = 2): ServerPlace[] {
   const queryTerms = terms(query);
   if (!queryTerms.some((term) => hits(term, SERVER_TERMS))) return [];

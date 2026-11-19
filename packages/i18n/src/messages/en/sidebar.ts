@@ -166,7 +166,6 @@ export const messages = defineMessages("sidebar", {
   "sidebar.storage.used": "{percent} used",
   "sidebar.storage.freeUpSpace": "Free up space",
   "sidebar.storage.dismiss": "Hide until storage is full",
-  // The machine card: a disk, memory or CPU use of the selected server passed its alert level.
   "sidebar.machine.diskTitle": "Disk above {level}",
   "sidebar.machine.memoryTitle": "Memory above {level}",
   "sidebar.machine.cpuTitle": "CPU above {level}",

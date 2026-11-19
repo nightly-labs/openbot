@@ -269,6 +269,7 @@ export const messages = {
   "mobile.settings.conversations.media": "照片和文件",
   "mobile.settings.conversations.swipeLeft": "在助手聊天中向左滑动",
   "mobile.settings.conversations.swipeRight": "在助手聊天中向右滑动",
+  "mobile.settings.conversations.swipeQuestion": "旁问",
   "mobile.settings.conversations.swipeThreads": "话题",
   "mobile.settings.conversations.swipeBrowser": "浏览器",
   "mobile.settings.conversations.swipeOff": "关闭",

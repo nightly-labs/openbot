@@ -1,7 +1,3 @@
-// The files of the OpenBot Telegram bot, over HTTPS to Signal: Signal holds the bot token, so it
-// fetches a file from Telegram, and posts a document to Telegram, for a token it signed. Nothing here
-// logs a token or a file.
-
 import { open, readFile, rm } from "node:fs/promises";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import {
@@ -25,14 +21,12 @@ function failure(errorCode: number, description: string): MessagingAdapterError 
   return new MessagingAdapterError({ cause: new TelegramCallError(errorCode, description, null) });
 }
 
-/** The HTTPS origin of a Signal socket URL: `wss://signal.openbot.run/v1/signal` gives `https://signal.openbot.run`. */
 export function signalHttpOrigin(signalUrl: string): string {
   const url = new URL(signalUrl);
   url.protocol = url.protocol === "ws:" ? "http:" : "https:";
   return url.origin;
 }
 
-/** Writes the file of a `getFile` token to `destination`, and removes it again when the download fails. */
 export const downloadTelegramFile = Effect.fnUntraced(function* (
   origin: string,
   fileToken: string,
@@ -72,7 +66,6 @@ export const downloadTelegramFile = Effect.fnUntraced(function* (
   );
 });
 
-/** Posts the bytes of one file for a `sendDocument` token, and returns the message ID. */
 export const uploadTelegramFile = Effect.fnUntraced(function* (origin: string, uploadToken: string, path: string) {
   const bytes = yield* filesIo(() => readFile(path));
   if (bytes.byteLength === 0 || bytes.byteLength > TELEGRAM_FILE_BYTES_LIMIT)

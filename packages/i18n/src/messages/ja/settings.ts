@@ -472,7 +472,6 @@ export const messages = {
   "settings.profile.share.copyFailed": "画像をコピーできませんでした。",
   "settings.profile.share.createFailed": "画像を作成できませんでした。",
   "settings.profile.share.fileName": "openbot-activity.png",
-  // The text in the image to share.
   "settings.profile.share.caption": "OpenBot と過ごした直近 6 か月",
   "settings.profile.activity.title": "このコンピューターでのアクティビティ",
   "settings.profile.activity.activeDays": {
@@ -481,7 +480,6 @@ export const messages = {
   "settings.profile.activity.empty": "まだアクティビティはありません",
   "settings.profile.activity.loading": "アクティビティを読み込んでいます…",
   "settings.profile.activity.loadFailed": "アクティビティを読み込めませんでした。",
-  // {tokens} is a short number, such as 1.2M.
   "settings.profile.activity.heatmapLabel": {
     other: "過去 1 年間に {count} 日アクティブ、{tokens} トークン",
   },
@@ -653,7 +651,6 @@ export const messages = {
   "settings.hostedServers.plan.standard.summary": "毎日のルーティンがある小さなチーム向け。",
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "多数のエージェントとブラウザーの多用向け。",
-  // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "音声入力",
   "settings.voice.model.parakeet.description": "高速です。ヨーロッパの 25 言語で、話している言語を自動で判別します。",
   "settings.voice.model.parakeetUnified.description":
@@ -720,6 +717,13 @@ export const messages = {
   "settings.voice.speech.sample": "こんにちは。返信はこのように聞こえます。",
   "settings.voice.speech.listenFailed": "サンプルを再生できませんでした。",
   "settings.voice.live.section": "ライブ音声",
+  "settings.voice.talk.section": "音声会話",
+  "settings.voice.talkKey.title": "押して話すキー",
+  "settings.voice.talkKey.description": "音声会話で話すときは、これらのキーを押し続けます。",
+  "settings.voice.talkKey.change": "押して話すキーを変更",
+  "settings.voice.talkKey.recording": "キーを押してください",
+  "settings.voice.talkKey.refused": "キーをもう 1 つ追加",
+  "settings.voice.talkKey.reset": "リセット",
   "settings.voice.live.signIn": "ライブ音声を使うには、ChatGPT アカウントで Codex にサインインしてください。",
   "settings.transfer.title": "このサーバーを別のコンピューターに移動",
   "settings.transfer.lede": "エージェントとそのスキル、ルーティン、メモリー、ファイルを 1 つのファイルにまとめます。",

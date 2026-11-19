@@ -1,14 +1,5 @@
 import { chatMathStart, inlineChatMath } from "@openbot/contracts/chat-math";
 
-/**
- * A message as one line of inline Markdown for the Live Activity. SwiftUI shows only inline
- * Markdown in a `Text` (bold, italic, code, strikethrough), and the island has two lines. So blocks
- * become one line: a heading is bold, a list item starts with a bullet, a table row joins its
- * cells, and links and images keep their text. The widget cannot typeset LaTeX, so math becomes
- * Unicode where it can, such as `x^2` → x² and `\frac{a}{b}` → a/b.
- *
- * The result has at most `limit` visible characters. A cut closes the open marks, so no `**` stays.
- */
 export function liveActivityMarkdown(source: string, limit: number): string {
   return truncateMarkdown(inlineText(blockText(source)), limit);
 }
@@ -17,7 +8,6 @@ function blockText(source: string): string {
   const parts: string[] = [];
   let fence: { marker: string; math: boolean; lines: string[] } | null = null;
   for (const line of source.replace(/\r\n?/gu, "\n").split("\n")) {
-    // A backtick fence has no backtick after its marker, so "```npm install``` first" is a code span.
     const opening = /^\s{0,3}(`{3,}(?!.*`)|~{3,})\s*([\w-]*)/u.exec(line);
     if (!fence && opening?.[1]) {
       fence = { marker: opening[1], math: opening[2] === "math", lines: [] };
@@ -46,7 +36,6 @@ function fenceText(fence: { math: boolean; lines: string[] }): string {
 function blockLine(line: string): string {
   let text = line.trim();
   if (!text) return "";
-  // A rule, or the line under a table header.
   if (/^(?:[-*_]\s*){3,}$/u.test(text) || /^\|?(?:\s*:?-{3,}:?\s*\|)+\s*:?-{3,}:?\s*\|?$/u.test(text)) return "";
   const heading = /^#{1,6}\s+(.*?)(?:\s+#+)?$/u.exec(text);
   if (heading?.[1]) return `**${heading[1].replaceAll("**", "")}**`;
@@ -65,7 +54,6 @@ function blockLine(line: string): string {
   return text;
 }
 
-/** Keeps code spans as they are, turns math into Unicode, and flattens links, images and HTML. */
 function inlineText(source: string): string {
   let result = "";
   let rest = source;
@@ -91,7 +79,6 @@ function inlineText(source: string): string {
         continue;
       }
     }
-    // A backtick or a `$` that opens nothing is text.
     result += escapeMarkdown(rest.charAt(0));
     rest = rest.slice(1);
   }
@@ -116,10 +103,6 @@ function escapeMarkdown(text: string): string {
   return text.replace(/[\\*_`~[\]]/gu, (character) => `\\${character}`);
 }
 
-/**
- * Cuts inline Markdown at `limit` visible characters and closes the marks that are open there. A
- * lone `*` that opens no emphasis can still count as a mark, and the cut then adds one `*`.
- */
 function truncateMarkdown(text: string, limit: number): string {
   const marks: string[] = [];
   let visible = 0;
@@ -137,7 +120,6 @@ function truncateMarkdown(text: string, limit: number): string {
     if (run) {
       const end = text.indexOf(run, index + run.length);
       if (end > 0) {
-        // Count code points, as `visibleLength` does, so a cut never splits an emoji.
         const content = Array.from(text.slice(index + run.length, end));
         const room = limit - 1 - visible;
         if (content.length > room) {
@@ -180,7 +162,6 @@ function visibleLength(text: string): number {
   return Array.from(plain).length;
 }
 
-/** Writes LaTeX as Unicode text. A command it does not know keeps its name. */
 function texToUnicode(tex: string): string {
   let text = tex;
   for (let pass = 0; pass < 4; pass += 1) {

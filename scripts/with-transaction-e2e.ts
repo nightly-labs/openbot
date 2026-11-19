@@ -1,9 +1,3 @@
-// Checks `withTransaction` and `withDatabaseTransaction` on a real `openbot.db` in a temporary
-// profile: nested rollback levels, a full disk, async work, the commit/rollback effect queue, and a
-// reopen. No app, provider or network is started.
-//
-// Run: bun scripts/with-transaction-e2e.ts
-// Writes .openbot-build/with-transaction/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -43,7 +37,6 @@ const rowsOf = (target: OpenBotDatabase) =>
   );
 const pragma = (name: string) => databaseRows(db().prepare(`PRAGMA ${name}`).all())[0] ?? {};
 
-/** Runs one case on an empty table and asserts its rows, its error, and that no transaction stays open. */
 async function check(name: string, run: () => unknown, rows: string[], error?: RegExp): Promise<CaseResult> {
   db().exec("DELETE FROM probe");
   let message: string | undefined;
@@ -141,8 +134,6 @@ try {
     /within a transaction/,
   );
 
-  // A caught nested failure: effects queued inside the failed level do not run on the outer commit,
-  // and its rollbacks run, newest first.
   const effects: string[] = [];
   const effect = (name: string) => () => void effects.push(name);
   const queue = await check(

@@ -22,7 +22,7 @@ import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
 import { AgentPinSwipeRow } from "@/features/agents/components/agent-pin-swipe-row";
 import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
 import { AgentUnreadBadge } from "@/features/agents/components/agent-unread-badge";
-import { AGENT_WAIT_STATE, AgentWaitBadge, AgentWaitChip } from "@/features/agents/components/agent-wait-badge";
+import { AgentWaitBadge, AgentWaitChip, agentListStateLabel } from "@/features/agents/components/agent-wait-badge";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { AgentDragPreview, useChatDrag, useHoldMenu } from "@/features/agents/components/chat-drag";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
@@ -62,7 +62,6 @@ function AgentRowTextReveal({ active, children }: PropsWithChildren<{ active: bo
   const blurStyle = useAnimatedStyle(() => ({
     opacity: interpolate(progress.get(), [0, 0.35, 0.8, 1], [0.72, 0.58, 0.1, 0]),
   }));
-  // The text shows from its start: from the right in a right-to-left layout. The mask counts from the left.
   const maskProps = useAnimatedProps(() => ({
     x: END_X === 1 ? 0 : width.get() * (1 - progress.get()),
     width: width.get() * progress.get(),
@@ -106,10 +105,6 @@ interface AgentListRowProps {
   rightInset?: number;
 }
 
-/**
- * A chat of the home list. It renders again only when its agent, its own live state or a pin
- * transition changes, so a long list stays quiet while other agents work.
- */
 export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, rightInset = 20 }: AgentListRowProps) {
   const { t } = useText();
   const background = useChatRowBackground(agent.id);
@@ -117,7 +112,6 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
     ({ pinnedAgentIds, pinnedChannelIds }) => !canToggleChatPin(pinnedAgentIds, pinnedChannelIds, agent.id),
   );
   const { toggleAgentPinAnimated, transition } = useAgentPinTransition();
-  // Each long press mounts the Android menu again, so it opens even if an earlier one did not close.
   const [menuKey, setMenuKey] = useState(0);
   const drag = useChatDrag("row", () => ({
     chat: { kind: "agent", id: agent.id },
@@ -127,9 +121,7 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
   }));
   const holdMenu = useHoldMenu(drag, () => setMenuKey((key) => key + 1));
   const agentChatPreview = useAgentChatPreview(agent);
-  // The row reads the activity once and gives it to the avatar, the badge and the channel line.
   const activity = useAgentListActivity(agent.id);
-  // An agent that waits in a channel says so, as its last message in its own chat is not the wait.
   const waitingChannel = useWaitingChannel(activity, agent.serverId);
   const lastMessage = useMemo(() => markdownPreviewText(agent.preview), [agent.preview]);
   const previewLine = waitingChannel
@@ -153,7 +145,6 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
       activityMood={agentActivityMood(activity)}
     />
   );
-  // As on the desktop, a wait outranks the unread count in the corner of the avatar.
   const waitBadge = waitReason ? (
     <AgentWaitBadge reason={waitReason} />
   ) : unreadCount > 0 || unreadThreads ? (
@@ -172,19 +163,7 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
   const row = (
     <ChatLinkPressable
       chatId={agent.id}
-      accessibilityLabel={
-        waitReason
-          ? t("mobile.agent.list.withState", { label: openLabel, state: t(AGENT_WAIT_STATE[waitReason]) })
-          : unreadCount > 0 || unreadThreads
-            ? t("mobile.agent.list.withState", {
-                label: openLabel,
-                state:
-                  unreadCount > 0
-                    ? t("mobile.agent.list.unread", { count: unreadCount })
-                    : t("mobile.agent.list.unreadThreads"),
-              })
-            : openLabel
-      }
+      accessibilityLabel={agentListStateLabel(t, openLabel, waitReason, unreadCount, unreadThreads)}
       accessibilityRole="button"
       accessibilityActions={[{ name: "pin", label: t("mobile.agent.pin.pinNamed", { name: agent.name }) }]}
       onAccessibilityAction={(event) => {

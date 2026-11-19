@@ -6,7 +6,6 @@ export const messages = {
     "OpenBot, MCP sunucularını Codex yapılandırmasına kaydedemedi. Codex config.toml dosyanızın geçerli ve yazılabilir olduğunu denetleyin, ardından OpenBot'u yeniden başlatın.",
   "error.provider.computerUseConfig":
     "OpenBot, Bilgisayar Kullanımını Codex yapılandırmasına kaydedemedi. Codex config.toml dosyanızın geçerli ve yazılabilir olduğunu denetleyin, ardından OpenBot'u yeniden başlatın. Onsuz devam etmek için ekip arkadaşı ayarlarından Bilgisayar Kullanımını kapatabilirsiniz.",
-  // Provider, provider runtime and custom endpoint errors.
   "error.provider.codexUnresponsive": "Codex yanıt vermeyi bıraktı, bu yüzden OpenBot işlemini sonlandırdı.",
   "error.provider.acpUnresponsive": "{provider} zamanında yanıt vermedi, bu yüzden OpenBot işlemini sonlandırdı.",
   "error.provider.acpSignInLost":
@@ -177,6 +176,8 @@ export const messages = {
   "error.provider.cliTimedOutRefresh":
     "{provider} zamanında yanıt vermedi. Bilgisayar meşgul olabilir. Tekrar denemek için sağlayıcıları yenileyin.",
   "error.provider.stoppedBeforeStart": "{provider}, bu mesaj başlamadan önce durdu. Mesajı yeniden gönderin.",
+  "error.provider.sessionStartTimedOut":
+    "{provider} yeni bir sohbeti zamanında açamadı, bu yüzden bu mesaj başlamadı. OpenBot'u çalıştıran bilgisayarda Sağlayıcılar sayfasını açın, {provider} öğesini seçin ve Yeniden başlat'a tıklayın. Sonra tekrar deneyin.",
   "error.provider.serviceUnreachable":
     "{provider} hizmetine bağlanamıyor. İnternet bağlantınızı kontrol edin. OpenBot tekrar deneyecek.",
   "error.provider.serviceUnreachableRefresh":
@@ -235,10 +236,14 @@ export const messages = {
     '"{provider}" uç noktası isteği reddetti. API anahtarı veya başlıkları yanlış olabilir ya da hesabı bu modeli kullanamıyor olabilir. Bunları Sunucu ayarları → Sağlayıcılar bölümünde kontrol edin veya başka bir model seçin. Ardından tekrar deneyin.',
   "error.provider.customEndpointKeyMissing":
     '"{provider}" uç noktası bir API anahtarı gerektiriyor. Anahtarı Sunucu ayarları → Sağlayıcılar bölümünde ekleyin, ardından tekrar deneyin.',
+  "error.provider.customEndpointEffortRefused":
+    '"{provider}" uç noktası bu modelin akıl yürütme eforunu reddetti. Sunucu ayarları → Sağlayıcılar bölümünde "{provider}" öğesini düzenleyin. Efor altında yalnızca bu modelin kabul ettiği düzeyleri bırakın veya Akıl yürütme yok seçeneğini seçin. Ardından tekrar deneyin.',
   "error.provider.opencodeKeyExpired":
     "OpenCode API anahtarınızın süresi doldu. OpenCode Console'da yeni bir anahtar oluşturun, OpenCode ayarlarına yapıştırın, ardından tekrar deneyin.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go kayıtlı API anahtarınızı reddetti. Anahtarın süresi dolmuş olabilir. OpenCode Console'da yeni bir anahtar oluşturun, OpenCode ayarlarına yapıştırın, ardından tekrar deneyin.",
+  "error.provider.opencodeGoRequestRefused":
+    "OpenCode Go isteği reddetti. Yeni bir API anahtarı bunu düzeltmez. OpenCode Go planınız etkin olmayabilir veya OpenCode Go ağınızı engelliyor olabilir: bazı hizmetler VPN'leri, proxy'leri veya bazı ülkeleri engeller. Planınızın OpenCode Console'da etkin olduğundan emin olun ya da VPN'i kapatın, sonra yeniden deneyin. Başka bir model de seçebilirsiniz.",
   "error.provider.opencodeServiceFailure":
     "Yerel hizmeti başarısız olduğu için OpenCode bu turu tamamlayamadı. Tekrar deneyin. Hata devam ederse Ayarlar'dan OpenCode'a yeniden bağlanın.",
   "error.provider.opencodeRateLimited":
@@ -261,6 +266,10 @@ export const messages = {
     "Bu model sizin için kullanılamıyor. Bu ajan için başka bir model seçin.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "Modelin yanıtı yarıda kesildi veya geçerli değildi. Mesajınızı tekrar gönderin veya başka bir model seçin.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "Modelin yanıtı üç kez çıktı sınırını aştı, bu yüzden tur durdu. Daha düşük bir efor veya başka bir model seçin, sonra mesajınızı yeniden gönderin.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "Modelin yanıtı üç kez çıktı sınırını aştı, bu yüzden tur durdu. Ayarlar'da Özel sağlayıcı'yı açın, bu uç noktada Düzenle'ye tıklayın ve bu model için daha büyük bir En fazla çıktı değeri girin. Ya da daha düşük bir efor veya başka bir model seçin.",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode bu efor düzeyinde bu modelin akıl yürütmesini okuyamadı. Daha düşük bir efor ya da başka bir model seçin, sonra mesajınızı yeniden gönderin.",
   "error.provider.opencodeModelNotServed":
@@ -286,6 +295,8 @@ export const messages = {
   "error.provider.noAnswerAfterSteps":
     "{provider} bazı adımları uyguladı, sonra turu yanıt vermeden bitirdi. Aynı isteği yeniden göndermeden önce ajana ne yaptığını sorun.",
   "error.provider.acpRefusedNoReason": "{provider} yanıt vermeden durdu. Mesajı yeniden gönderin.",
+  "error.provider.channelNoAnswer":
+    "{provider} turu yanıt vermeden bitirdi. Kanalda görevi yeniden çalıştırmak için Devam et'e, başka bir üyeye vermek için Yeniden ata'ya tıklayın.",
   "error.provider.chatgptPageFailed": "OpenBot ChatGPT bağlantı sayfasını açamadı.",
   "error.provider.noneReady": "Hiçbir ajan sağlayıcısı hazır değil.",
   "error.provider.claudeTurnActive": "Bağlamını yenilemeden önce etkin Claude turunun bitmesini bekleyin.",
@@ -388,12 +399,14 @@ export const messages = {
     "Claude hizmeti bu isteği engelledi. Bu genellikle Claude tarafında kısa süreli bir sorundur, hesabınızla ilgili değildir. Mesajı birkaç dakika sonra yeniden gönderin.",
   "error.provider.foreignReasoning":
     "Farklı bir hesap veya API anahtarı aldığı için {provider} bu sohbetteki önceki akıl yürütmeyi kabul etmedi. OpenBot sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
+  "error.provider.blankHistoryText":
+    "Kayıtlı geçmişinde boş bir mesaj olduğu için model bu sohbeti kabul etmedi. OpenBot sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
   "error.provider.codexHistoryItemMissing":
     "Kayıtlı geçmişindeki bir öğe eksik olduğu için Codex bu sohbete devam edemedi. OpenBot sohbet geçmişiyle yeni bir Codex oturumu başlattı. Tekrar deneyin.",
   "error.provider.codexRequestRefused":
     "{provider}, bu sohbetin isteğini reddetti ve nedenini belirtmedi. Bu, çok sayıda görsel içeren uzun bir sohbette olabilir. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
   "error.provider.codexAudioRefused":
-    "Model bu sohbetteki sesi kabul etmedi. OpenBot, sohbet geçmişiyle yeni bir Codex oturumu başlattı. Tekrar deneyin.",
+    "Bu model ses dinleyemez, bu yüzden bu sohbetteki sesi kabul etmedi. OpenBot, sohbet geçmişiyle yeni bir Codex oturumu başlattı. Devam etmek için isteğinizi yeniden gönderin ve ajandan ses olmadan çalışmasını isteyin. Sesi kontrol etmek için ajanın model menüsünde ses dinleyebilen bir model seçin.",
   "error.provider.imageTooSmall":
     "Görsel çok küçük olduğu için model bu sohbetteki bir görseli kabul etmedi. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
   "error.provider.imageTooLarge":

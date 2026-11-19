@@ -20,17 +20,12 @@ import { ToolOperationFailed, toToolOperationFailed } from "./tool-operation";
 
 const logger = createOpenBotLogger("browser-profile-tool");
 
-/**
- * The named browser profiles of this computer, as the profile service in the main process holds
- * them. Its checks and its order of changes apply to a tool change too.
- */
 export interface AgentBrowserProfiles {
   list(): { readonly profiles: readonly { readonly id: string; readonly name: string }[] };
   create(name: string): Effect.Effect<{ readonly id: string }, { readonly cause: unknown }>;
   updateAgent(input: UpdateAgentBrowserProfileInput): Effect.Effect<AgentBrowserProfile, { readonly cause: unknown }>;
 }
 
-/** One `set_browser_profile` call reaches at most this many agents. */
 const SET_BROWSER_PROFILE_AGENTS_LIMIT = 100;
 
 export const setBrowserProfileToolSchema = z.strictObject({
@@ -52,7 +47,6 @@ export const setBrowserProfileToolSchema = z.strictObject({
     .describe("Only with named. A new name makes an empty profile."),
 });
 
-/** The browser profile of an agent as `read_agent` shows it. A profile name is user data. */
 export function agentBrowserProfileView(
   agent: AgentSummary,
   profiles: readonly { readonly id: string; readonly name: string }[],
@@ -64,7 +58,6 @@ export function agentBrowserProfileView(
   return named ? { kind: "named", name: named.name } : { kind: "deleted" };
 }
 
-/** The same comparison as the profile service, so a name that differs only in case finds the profile. */
 function sameName(left: string, right: string): boolean {
   return left.localeCompare(right, undefined, { sensitivity: "accent" }) === 0;
 }
@@ -94,25 +87,13 @@ function approvalReason(target: Target, agents: string): string {
 
 export interface SetBrowserProfileToolOptions {
   listAgents(): AgentSummary[];
-  /** Null where this process holds no browser profiles. */
   profiles: AgentBrowserProfiles | null;
-  /** Whether a person's message in the agent's own chat, or a thread they opened, started the turn. */
   requestedByPerson: boolean;
-  /**
-   * Whether each person who sent a message of the turn is an owner or admin, who sees the profile in
-   * the agent's settings. A member does not, so the refusal tells them to ask an owner or admin.
-   */
   requestersCanAdminister: boolean;
-  /** Waits for the owner's answer to a card with this text. */
   approve(reason: string): Effect.Effect<ToolApprovalDecision, ToolOperationFailed>;
   redactMcp(text: string): string;
 }
 
-/**
- * `set_browser_profile`: moves agents to the shared profile, to a profile of their own, or to a named
- * profile, which it makes when no profile has the name. A profile holds sign-ins, so the move gives an
- * agent the accounts of other agents. Only the owner approves it, and only for a person's request.
- */
 export const handleSetBrowserProfileTool = Effect.fn("SetBrowserProfileTool.handle")(
   function* (
     params: DynamicToolCallParams,
@@ -123,8 +104,6 @@ export const handleSetBrowserProfileTool = Effect.fn("SetBrowserProfileTool.hand
       return openBotToolFailure("Pass name with profile named, and only then.");
     const profiles = options.profiles;
     if (!profiles) return openBotToolFailure("This OpenBot has no browser profiles.");
-    // A routine, a channel task, an external chat, another agent or a web page must not move an agent
-    // to the sign-ins of another profile.
     if (!options.requestedByPerson)
       return openBotToolFailure(
         options.requestersCanAdminister
@@ -140,7 +119,6 @@ export const handleSetBrowserProfileTool = Effect.fn("SetBrowserProfileTool.hand
     const named = profiles.list().profiles;
     const target: Target =
       name === undefined ? { kind: profile === "own" ? "own" : "shared" } : namedTarget(name, named);
-    // Before the card, so that the owner does not approve a change that cannot happen.
     if (target.kind === "new" && named.length >= BROWSER_PROFILE_LIMIT)
       return openBotToolFailure(sourceText("error.backend.browserProfileLimit", { limit: BROWSER_PROFILE_LIMIT }));
     const wanted = (agent: AgentSummary): boolean => {

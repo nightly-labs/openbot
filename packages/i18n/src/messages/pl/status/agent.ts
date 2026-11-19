@@ -27,6 +27,8 @@ export const messages = {
   "status.agent.screenCaptureScreen": "Przechwyć główny ekran i wyślij obraz do modelu agenta.",
   "status.agent.screenCaptureChannel":
     "Obraz pojawi się na kanale {channel} i każdy członek tego serwera, który czyta kanał, może go zobaczyć.",
+  "status.agent.screenCapturePermissionNext":
+    "Potem macOS może poprosić cię o zezwolenie OpenBot na nagrywanie ekranu.",
   "status.agent.screenCaptureDisplay": "Przechwyć wyświetlacz {name} i wyślij obraz do modelu agenta.",
   "status.agent.screenCaptureWindow": "Przechwyć okno {name} i wyślij obraz do modelu agenta.",
   "status.agent.screenCaptureRegion":
@@ -70,6 +72,7 @@ export const messages = {
   "status.agent.browserActing": "Korzystanie ze strony internetowej…",
   "status.agent.browserReviewing": "Sprawdzanie strony internetowej…",
   "status.agent.memoriesSearching": "Przeszukiwanie wspomnień…",
+  "status.agent.chatsSearching": "Przeszukiwanie wcześniejszych czatów…",
   "status.agent.memoriesSearched": {
     one: "Przeszukano wspomnienia, znalezione: {count}",
     few: "Przeszukano wspomnienia, znalezione: {count}",
@@ -112,6 +115,7 @@ export const messages = {
     "Wspomnienia: zapisane {saved}, zaktualizowane {updated}, zapomniane {forgotten}, niezmienione {notChanged}, bo inny wątek zmienił je wcześniej.",
   "status.agent.mcpToolCall": "Uruchomić narzędzie {tool} serwera MCP {name}.",
   "status.agent.uiBlockClosedByMessage": "Zamknięto po nowej wiadomości",
+  "status.agent.finishCheckContinues": "Prośba nie jest jeszcze wykonana. Agent kontynuuje ({current} z {limit}).",
   "status.agent.nextStepContinues": "Agent zatrzymał się przed następnym krokiem. Kontynuuje ({current} z {limit}).",
   "status.agent.planContinues": "Plan ma otwarte kroki. Agent kontynuuje ({current} z {limit}).",
   "status.agent.planStopped": "Agent zatrzymał się z otwartymi krokami w planie. Wyślij wiadomość, aby kontynuować.",

@@ -1,8 +1,3 @@
-// The agent dock windows: transparent panels at the left or right edge of a display, above the other
-// apps. One display has the dock, or each display has one. The user drags a dock up or down its edge. The main renderer publishes what the docks show. The
-// dock windows send their actions here: main sends the messages typed in a dock and gives the other
-// actions to the main renderer.
-
 import { isDeepStrictEqual } from "node:util";
 import type {
   AgentDockAction,
@@ -19,64 +14,47 @@ import { createOpenBotLogger, type Logger, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Schema, Semaphore } from "effect";
 import type { BrowserWindow, Display, Rectangle, Screen } from "electron";
 import { causeHelpers } from "../backend/effect-boundary";
+import { forceActivateX11Window } from "./linux-x11-activation";
 import { letPointerThrough, type PointerForwardingGate } from "./pointer-forwarding-gate";
 import { sendToRenderer } from "./renderer-ipc";
 import type { WindowsTopmostKeeper } from "./windows-topmost-keeper";
 
 const logger = createOpenBotLogger("agent-dock-window");
 
-/**
- * The open chat panel, the neck and the dock (462 × 560), and the 40px of liquid that the goo filter
- * spreads above, below and left of them.
- */
 const AGENT_DOCK_WINDOW_SIZE = { width: 502, height: 640 } as const;
 
-/** A dock window whose page stopped opens again, as many times as this in `DOCK_REOPEN_WINDOW_MS`. */
 const DOCK_REOPEN_MAX = 3;
 const DOCK_REOPEN_WINDOW_MS = 60_000;
 
 export type AgentDockSendAction = Extract<AgentDockAction, { type: "send" }>;
 
-/** An agent dock operation that failed. The cause is what the dock window reads. */
 export class AgentDockFailed extends Schema.TaggedError<AgentDockFailed>()("AgentDockFailed", {
   cause: Schema.Defect(),
 }) {}
 
 export const { rewrap: toAgentDockFailed } = causeHelpers(AgentDockFailed);
 
-/**
- * The window that holds the dock. `panel` is a macOS panel and `tool` a Windows tool window: each lets
- * the pointer through and forwards its moves. `x11` is a dock window on X11 or XWayland: its shape takes
- * the pointer, so it follows the dock. Null: this process can put no window at a screen edge above the
- * other apps, as on native Wayland.
- */
 type AgentDockWindowKind = "panel" | "tool" | "x11";
 
 export interface AgentDockWindowControllerOptions {
   windowKind: AgentDockWindowKind | null;
   createWindow: (bounds: Rectangle) => BrowserWindow;
   loadWindow: (window: BrowserWindow) => Promise<void>;
-  /** The displays that can hold the dock. */
   screen: Pick<Screen, "getAllDisplays" | "getPrimaryDisplay" | "getDisplayMatching" | "getCursorScreenPoint">;
   getMainWindow: () => BrowserWindow | null;
   ensureMainWindow?: () => Promise<BrowserWindow>;
   presentMainWindow: (window: BrowserWindow) => void;
   sendMessage: (action: AgentDockSendAction) => Effect.Effect<void, AgentDockFailed>;
-  /** Windows: forwards the pointer moves to a dock window only near the dock. */
   pointerForwarding?: PointerForwardingGate | null;
-  /** Windows: sets the topmost flag of the shown windows again when another process clears it. */
   topmost?: WindowsTopmostKeeper | null;
   logger?: Logger;
 }
 
-/** A dock window and the display that it is on. */
 interface DockWindow {
   window: BrowserWindow;
   rendererId: number;
   displayId: number;
-  /** X11 and Windows: the last input region of the renderer, in CSS px. A new zoom changes its size in window px. */
   shape?: AgentDockInputRect[];
-  /** The window takes key input: the renderer has a chat or a menu open. */
   keyboard?: boolean;
 }
 
@@ -84,21 +62,12 @@ export class AgentDockWindowController {
   readonly #options: AgentDockWindowControllerOptions;
   #presentation: AgentDockPresentation | null = null;
   #windows: DockWindow[] = [];
-  /**
-   * The dock window that has the open chat. Only one chat is open: a dock that closes its chat after
-   * another dock opened one does not close that chat.
-   */
   #chatOwner: number | null = null;
-  /** One send per draft, shared by the retries that send it again. */
   readonly #sends = new Map<string, Deferred.Deferred<void, AgentDockFailed>>();
   readonly #reconciliation = Semaphore.makeUnsafe(1);
-  /** The saved position of the dock on each display, from the presentation and the current drag. */
   #offsets = new Map<number, number>();
-  /** The drag in progress: the dock window, and the pointer and window y when it started. */
   #drag: { rendererId: number; pointerY: number; windowY: number } | null = null;
-  /** The main windows whose moves the dock follows. A new main window is added when it publishes. */
   readonly #followedWindows = new WeakSet<BrowserWindow>();
-  /** When a dock window was opened again after its page stopped. */
   #reopens: number[] = [];
   #destroyed = false;
 
@@ -123,7 +92,6 @@ export class AgentDockWindowController {
     return this.#windows.filter(({ window }) => !window.isDestroyed());
   }
 
-  /** Null hides the dock, for example when no server is active. */
   publish(presentation: AgentDockPresentation | null): Effect.Effect<void> {
     return Effect.suspend(() => {
       this.#followMainWindow();
@@ -133,7 +101,6 @@ export class AgentDockWindowController {
       for (const { window } of this.#liveWindows()) {
         sendToRenderer(window, IPC_ENDPOINTS.agentDock.presentation, presentation);
       }
-      // The dragged dock keeps the position of the drag until the drag ends.
       const dragged = this.#draggedDisplayId();
       const dragOffset = dragged === null ? undefined : this.#offsets.get(dragged);
       this.#offsets = new Map((presentation?.offsets ?? []).map(({ displayId, offset }) => [displayId, offset]));
@@ -148,7 +115,6 @@ export class AgentDockWindowController {
     });
   }
 
-  /** The connected displays, for the display setting. */
   listDisplays(): AgentDockDisplayInfo[] {
     const primary = this.#options.screen.getPrimaryDisplay();
     return this.#options.screen
@@ -162,11 +128,6 @@ export class AgentDockWindowController {
       }));
   }
 
-  /**
-   * The displays that the user chose: each display, or one. The main window's display when the choice
-   * is the main window, or when the chosen display is not connected; the primary display when there is
-   * no main window.
-   */
   #targetDisplays(): Display[] {
     const { screen } = this.#options;
     const choice = this.#presentation?.display;
@@ -180,7 +141,6 @@ export class AgentDockWindowController {
     return [main && !main.isDestroyed() ? screen.getDisplayMatching(main.getBounds()) : screen.getPrimaryDisplay()];
   }
 
-  /** The dock goes with the main window to another display. macOS sends "moved" when a drag ends. */
   #followMainWindow(): void {
     const main = this.#options.getMainWindow();
     if (!main || main.isDestroyed() || this.#followedWindows.has(main)) return;
@@ -193,7 +153,6 @@ export class AgentDockWindowController {
     main.on("resized", follow);
     main.on("enter-full-screen", follow);
     main.on("leave-full-screen", follow);
-    // A new main renderer has no open dock chat, so the dock that shows one closes it.
     main.webContents.on("did-finish-load", () => {
       const owner = this.#liveWindows().find((entry) => entry.rendererId === this.#chatOwner);
       this.#chatOwner = null;
@@ -201,29 +160,21 @@ export class AgentDockWindowController {
     });
   }
 
-  /**
-   * Outside the dock shapes, the pointer goes to the apps under the window. The window takes key input
-   * only while the chat composer needs it: a panel becomes key without activating the app.
-   */
   setInteractive(rendererId: number, input: SetAgentDockInteractiveInput): void {
     const entry = this.#liveWindows().find((item) => item.rendererId === rendererId);
     if (!entry) return;
     const { window } = entry;
-    // On X11 the window shape lets the pointer through: a window that ignores the pointer gets no moves.
     if (this.#options.windowKind !== "x11")
       letPointerThrough(this.#options.pointerForwarding, window, !input.interactive);
     const keyboard = input.keyboard === true;
     window.setFocusable(keyboard);
-    // The window takes the focus only when a chat or a menu opens. A pinned chat stays open when another
-    // window takes the focus, and a later pointer move on the dock must not take the focus back.
-    if (keyboard && !entry.keyboard && !window.isFocused()) window.focus();
+    if (keyboard && !entry.keyboard && !window.isFocused()) {
+      window.focus();
+      if (this.#options.windowKind === "x11") forceActivateX11Window(window);
+    }
     entry.keyboard = keyboard;
   }
 
-  /**
-   * X11: only these parts of the window take the pointer, and only they show. Windows: the pointer moves
-   * go to the window only in these parts.
-   */
   setInputRegion(rendererId: number, rects: AgentDockInputRect[]): void {
     const entry = this.#liveWindows().find((item) => item.rendererId === rendererId);
     if (!entry) return;
@@ -231,7 +182,6 @@ export class AgentDockWindowController {
     this.#applyShape(entry);
   }
 
-  /** The renderer measures in CSS px. The shape is in window px, which the page zoom makes larger or smaller. */
   #applyShape(entry: DockWindow): void {
     if (!entry.shape) return;
     const rects = entry.shape.map((rect) => zoomedRect(rect, this.#zoom()));
@@ -239,10 +189,6 @@ export class AgentDockWindowController {
     else this.#options.pointerForwarding?.setZone(entry.window, rects);
   }
 
-  /**
-   * Moves the dock window up or down its edge with the pointer, inside the work area of its display. At
-   * the end, the main renderer gets the position to save.
-   */
   drag(rendererId: number, phase: AgentDockDragPhase): void {
     const entry = this.#liveWindows().find((item) => item.rendererId === rendererId);
     if (!entry) return;
@@ -291,21 +237,17 @@ export class AgentDockWindowController {
     );
   }
 
-  /** The page zoom of the dock windows. The window grows with the zoom, so the dock has the same room. */
   #zoom(): number {
     return (this.#presentation?.sizePercent ?? AGENT_DOCK_SIZE_LIMITS.default) / 100;
   }
 
-  /** The dock window has its own zoom (`setZoomMode("isolated")`), so the main window zoom does not change it. */
   #applyZoom(entry: DockWindow): void {
     const zoom = this.#zoom();
     if (entry.window.webContents.getZoomFactor() === zoom) return;
     entry.window.webContents.setZoomFactor(zoom);
-    // The renderer does not send a shape again when it is the same in CSS px.
     this.#applyShape(entry);
   }
 
-  /** `rendererId` is the dock window that sends the action. */
   performAction(rendererId: number, action: AgentDockAction): Effect.Effect<void, AgentDockFailed> {
     return Effect.suspend(() => {
       if (action.type === "send") return this.#send(action);
@@ -363,7 +305,6 @@ export class AgentDockWindowController {
     });
   }
 
-  /** Creates, moves or hides the window. Runs one at a time; a window that fails to load is logged. */
   reconcileWindow(): Effect.Effect<void> {
     return this.#reconciliation
       .withPermit(
@@ -379,8 +320,6 @@ export class AgentDockWindowController {
           }
           const targets = this.#targetDisplays();
           const targetIds = new Set(targets.map((display) => display.id));
-          // A window stays on its display. A window whose display is no longer a choice moves to a display
-          // that has no window, or closes.
           const spare = this.#windows.filter((entry) => !targetIds.has(entry.displayId));
           const opens: Display[] = [];
           for (const display of targets) {
@@ -418,12 +357,8 @@ export class AgentDockWindowController {
         this.#windows.push(entry);
         const owned = () => this.#windows.includes(entry) && !window.isDestroyed();
         window.setHasShadow(false);
-        // Only macOS uses the level. On Windows, Electron puts a "floating" window just behind the taskbar,
-        // and the window then goes under other apps when a full-screen app makes the taskbar not topmost.
         window.setAlwaysOnTop(true, this.#options.windowKind === "panel" ? "floating" : "normal");
         this.#options.topmost?.keep(window);
-        // Electron documents these for macOS (and `setVisibleOnAllWorkspaces` also for Linux). Some are not
-        // defined on Windows, so a call there throws.
         if (this.#options.windowKind === "panel") {
           window.excludedFromShownWindowsMenu = true;
           window.setWindowButtonVisibility(false);
@@ -431,25 +366,19 @@ export class AgentDockWindowController {
           window.setHiddenInMissionControl(true);
         }
         if (this.#options.windowKind === "x11") {
-          // Until the dock renderer reports its shape, no part of the window takes the pointer or shows.
           window.setShape([]);
         } else {
           letPointerThrough(this.#options.pointerForwarding, window, true);
         }
         window.setFocusable(false);
-        // A navigation can reset the zoom, so it is set on each one, as for the main window.
         window.webContents.on("did-navigate", () => {
           if (owned()) this.#applyZoom(entry);
         });
         window.webContents.on("did-finish-load", () => {
           if (!owned()) return;
-          // A reloaded dock renderer has no open chat and no drag.
           this.#release(entry);
           sendToRenderer(window, IPC_ENDPOINTS.agentDock.presentation, this.#presentation);
         });
-        // A stopped page shows nothing, but its window still takes the pointer if the pointer was on the
-        // dock: a clear window above the other apps then catches their clicks (#11606). A new window lets
-        // the pointer through until its page loads.
         window.webContents.on("render-process-gone", () => {
           if (!owned()) return;
           this.#closeWindow(window);
@@ -459,7 +388,6 @@ export class AgentDockWindowController {
           if (!owned() || this.#presentation === null) return;
           this.#show(window);
         });
-        // macOS can move a window off a display that goes away. Put the dock back at its place on its edge.
         window.on("move", () => {
           if (!owned()) return;
           const display = this.#displayOf(entry);
@@ -484,7 +412,6 @@ export class AgentDockWindowController {
     );
   }
 
-  /** A dock page that stops each time it loads stays closed until the dock moves or the app starts again. */
   #mayReopen(): boolean {
     const now = Date.now();
     this.#reopens = this.#reopens.filter((time) => now - time < DOCK_REOPEN_WINDOW_MS);
@@ -495,7 +422,6 @@ export class AgentDockWindowController {
 
   #show(window: BrowserWindow): void {
     window.showInactive();
-    // An X11 window manager reads the desktop of a window when it maps it: before, the setting is lost.
     if (this.#options.windowKind === "x11") window.setVisibleOnAllWorkspaces(true);
   }
 
@@ -520,12 +446,7 @@ export class AgentDockWindowController {
     this.#release(entry);
   }
 
-  /**
-   * A dock window that closes, reloads or crashes with its chat open closes the chat, so the main
-   * renderer stops reading it. Its drag ends too.
-   */
   #release(entry: DockWindow): void {
-    // A new renderer has no chat or menu open.
     entry.keyboard = false;
     if (this.#drag?.rendererId === entry.rendererId) this.#drag = null;
     if (this.#chatOwner !== entry.rendererId) return;
@@ -542,10 +463,6 @@ function agentDockWindowHeight(display: Pick<Display, "workArea">, zoom: number)
   return Math.min(Math.round(AGENT_DOCK_WINDOW_SIZE.height * zoom), display.workArea.height);
 }
 
-/**
- * At an edge of the work area, so the macOS Dock or the Windows taskbar at that edge does not cover it. `offset` is the place
- * in height: 0 is the top, 1 the bottom.
- */
 function agentDockWindowBounds(
   display: Pick<Display, "workArea">,
   edge: AgentDockEdge,
@@ -553,9 +470,6 @@ function agentDockWindowBounds(
   zoom: number,
 ): Rectangle {
   const area = display.workArea;
-  // The width of the largest dock at each size: a new width moves the window's inner edge, and macOS then
-  // shows the last frame at the moved edge, so the dock jumps while the user drags the size. The dock
-  // stays at the screen edge of the window, and the pointer goes through the empty part.
   const width = Math.round((AGENT_DOCK_WINDOW_SIZE.width * AGENT_DOCK_SIZE_LIMITS.max) / 100);
   const height = agentDockWindowHeight(display, zoom);
   return {
@@ -566,7 +480,6 @@ function agentDockWindowBounds(
   };
 }
 
-/** A rect in CSS px, in window px at a page zoom. It grows to whole px, so no part of the dock loses the pointer. */
 function zoomedRect(rect: AgentDockInputRect, zoom: number): AgentDockInputRect {
   const x = Math.floor(rect.x * zoom);
   const y = Math.floor(rect.y * zoom);

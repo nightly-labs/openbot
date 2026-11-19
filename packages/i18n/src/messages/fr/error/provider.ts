@@ -195,6 +195,8 @@ export const messages = {
     "{provider} n’a pas répondu à temps. L’ordinateur est peut-être occupé. Actualisez les fournisseurs pour réessayer.",
   "error.provider.stoppedBeforeStart":
     "{provider} s’est arrêté avant le début de ce message. Envoyez de nouveau le message.",
+  "error.provider.sessionStartTimedOut":
+    "{provider} n’a pas ouvert de nouvelle conversation à temps, donc ce message n’a pas commencé. Sur l’ordinateur qui exécute OpenBot, ouvrez Fournisseurs, sélectionnez {provider} et cliquez sur Redémarrer. Puis réessayez.",
   "error.provider.serviceUnreachable":
     "{provider} ne parvient pas à se connecter à son service. Vérifiez votre connexion internet. OpenBot va réessayer.",
   "error.provider.serviceUnreachableRefresh":
@@ -249,10 +251,14 @@ export const messages = {
     "Le point de terminaison « {provider} » a refusé la requête. Sa clé d’API ou ses en-têtes sont peut-être incorrects, ou son compte ne peut pas utiliser ce modèle. Vérifiez-les dans Réglages du serveur → Fournisseurs, ou choisissez un autre modèle. Puis réessayez.",
   "error.provider.customEndpointKeyMissing":
     "Le point de terminaison « {provider} » a besoin d’une clé d’API. Ajoutez la clé dans Réglages du serveur → Fournisseurs, puis réessayez.",
+  "error.provider.customEndpointEffortRefused":
+    "Le point de terminaison « {provider} » a refusé l’effort de raisonnement de ce modèle. Dans Réglages du serveur → Fournisseurs, modifiez « {provider} ». Sous Effort, gardez seulement les niveaux que ce modèle accepte, ou choisissez Sans raisonnement. Puis réessayez.",
   "error.provider.opencodeKeyExpired":
     "Votre clé d’API OpenCode a expiré. Créez une nouvelle clé dans OpenCode Console, collez-la dans les réglages d’OpenCode, puis réessayez.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go a refusé votre clé d’API enregistrée. La clé a peut-être expiré. Créez une nouvelle clé dans OpenCode Console, collez-la dans les réglages d’OpenCode, puis réessayez.",
+  "error.provider.opencodeGoRequestRefused":
+    "OpenCode Go a refusé la requête. Une nouvelle clé d'API ne corrige pas ce problème. Votre forfait OpenCode Go n'est peut-être pas actif, ou OpenCode Go bloque peut-être votre réseau : certains services bloquent les VPN, les proxys ou certains pays. Vérifiez que votre forfait est actif dans OpenCode Console ou désactivez le VPN, puis réessayez. Vous pouvez aussi choisir un autre modèle.",
   "error.provider.opencodeServiceFailure":
     "OpenCode n’a pas pu terminer ce tour, car son service local a échoué. Réessayez. Si l’erreur continue, reconnectez OpenCode dans les réglages.",
   "error.provider.opencodeRateLimited":
@@ -275,6 +281,10 @@ export const messages = {
     "Ce modèle ne vous est pas disponible. Choisissez un autre modèle pour cet agent.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "La réponse du modèle a été coupée ou n’était pas valide. Renvoyez votre message ou choisissez un autre modèle.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "La réponse du modèle a dépassé sa limite de sortie trois fois, le tour s'est donc arrêté. Choisissez un effort plus faible ou un autre modèle, puis renvoyez votre message.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "La réponse du modèle a dépassé sa limite de sortie trois fois, le tour s'est donc arrêté. Dans Réglages, ouvrez Fournisseur personnalisé, cliquez sur Modifier pour ce point de terminaison et définissez une Sortie max. plus grande pour ce modèle. Ou choisissez un effort plus faible ou un autre modèle.",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode n'a pas pu lire le raisonnement de ce modèle avec cet effort. Sélectionnez un effort plus faible ou un autre modèle, puis renvoyez votre message.",
   "error.provider.opencodeModelNotServed":
@@ -300,6 +310,8 @@ export const messages = {
   "error.provider.noAnswerAfterSteps":
     "{provider} a effectué quelques étapes, puis a terminé le tour sans réponse. Demandez à l'agent ce qu'il a fait avant d'envoyer à nouveau la même demande.",
   "error.provider.acpRefusedNoReason": "{provider} s’est arrêté sans réponse. Renvoyez le message.",
+  "error.provider.channelNoAnswer":
+    "{provider} a terminé le tour sans réponse. Dans le canal, cliquez sur Continuer pour relancer la tâche, ou sur Réattribuer pour la confier à un autre membre.",
   "error.provider.chatgptPageFailed": "OpenBot n’a pas pu ouvrir la page de connexion ChatGPT.",
   "error.provider.noneReady": "Aucun fournisseur d’agent n’est prêt.",
   "error.provider.claudeTurnActive": "Attendez la fin du tour Claude actif avant d’actualiser son contexte.",
@@ -403,12 +415,14 @@ export const messages = {
     "Le service de Claude a bloqué cette requête. C'est en général un problème passager chez Claude, pas un problème avec votre compte. Renvoyez le message dans quelques minutes.",
   "error.provider.foreignReasoning":
     "{provider} n’a pas accepté le raisonnement précédent de cette conversation, car un autre compte ou une autre clé API l’a reçu. OpenBot a ouvert une nouvelle session {provider} avec l’historique de la conversation. Réessayez.",
+  "error.provider.blankHistoryText":
+    "Le modèle n’a pas accepté cette conversation, car son historique enregistré contient un message vide. OpenBot a ouvert une nouvelle session {provider} avec l’historique de la conversation. Réessayez.",
   "error.provider.codexHistoryItemMissing":
     "Codex n’a pas pu continuer cette conversation, car un élément manque dans son historique enregistré. OpenBot a ouvert une nouvelle session Codex avec l’historique de la conversation. Réessayez.",
   "error.provider.codexRequestRefused":
     "{provider} a refusé la requête de ce chat sans en donner la cause. Cela peut arriver dans un long chat avec beaucoup d'images. OpenBot a démarré une nouvelle session {provider} avec l'historique du chat. Réessayez.",
   "error.provider.codexAudioRefused":
-    "Le modèle n'a pas accepté l'audio de ce chat. OpenBot a démarré une nouvelle session Codex avec l'historique du chat. Réessayez.",
+    "Ce modèle ne peut pas écouter l’audio, il n’a donc pas accepté le son de ce chat. OpenBot a démarré une nouvelle session Codex avec l’historique du chat. Pour continuer, renvoyez votre demande et demandez à l’agent de travailler sans le son. Pour vérifier le son, choisissez dans le menu des modèles de l’agent un modèle qui peut écouter l’audio.",
   "error.provider.imageTooSmall":
     "Le modèle n'a pas accepté une image de ce chat, car l'image est trop petite. OpenBot a démarré une nouvelle session {provider} avec l'historique du chat. Réessayez.",
   "error.provider.imageTooLarge":

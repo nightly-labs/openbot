@@ -1,10 +1,3 @@
-/**
- * The parts that the media services of the canvas share when they make a file with the tools of an
- * MCP server, on a sign-in that the user made in Apps: the connection with one retry on a new token,
- * the tool calls, the upload of an input picture and the download of the result. Sunra
- * (`sunra-media.ts`) and Higgsfield (`higgsfield-media.ts`) own their tools and their words.
- */
-
 import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport, StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -18,15 +11,12 @@ import { readLimitedBody } from "../limited-body";
 import { secureOAuthFetch } from "../mcp-oauth-provider";
 import { hostAddresses, isPublicAddress, systemAddressLookup } from "../network-address";
 
-/** The sign-in of a media service row: its address and its OAuth token. Never logged. */
 export interface McpMediaSignIn {
   url: string;
   token: () => Effect.Effect<string | null, unknown>;
-  /** A new token after the service refused `rejected`, or null. */
   refresh: (rejected: string) => Effect.Effect<string | null, unknown>;
 }
 
-/** What a media service needs from the host: its sign-in, the input pictures, and Storage. */
 export interface McpMediaDependencies {
   signIn: () => McpMediaSignIn | null;
   resolveAttachment: (attachmentId: string) => Effect.Effect<{ path: string; mimeType: string } | null, unknown>;
@@ -38,7 +28,6 @@ export interface McpMediaDependencies {
   }) => Effect.Effect<{ id: string }, unknown>;
 }
 
-/** A failure whose `message` the user reads. It never holds a token. */
 export class McpMediaFailed extends Schema.TaggedError<McpMediaFailed>()("McpMediaFailed", {
   message: Schema.String,
 }) {}
@@ -46,10 +35,6 @@ export class McpMediaFailed extends Schema.TaggedError<McpMediaFailed>()("McpMed
 export const mediaFail = (message: string) => new McpMediaFailed({ message });
 export const mediaFailed = () => mediaFail(sourceText("error.workflow.mediaFailed"));
 
-/**
- * Finds the file of each input picture. A missing file or a file that is not a picture fails the step.
- * A file in a role that `takesClip` names must be a video or an audio file instead.
- */
 export const resolveMediaInputs = Effect.fnUntraced(function* <Role>(
   dependencies: McpMediaDependencies,
   images: readonly { role: Role; attachmentId: string }[],
@@ -71,12 +56,9 @@ export const resolveMediaInputs = Effect.fnUntraced(function* <Role>(
   return files;
 });
 
-/** The longest reason from a service that an error quotes. */
 const REASON_LIMIT = 300;
-/** How many redirects the download of a file follows, each on the service's file hosts. */
 const DOWNLOAD_REDIRECTS = 3;
 
-/** The reason that the service gave, short and on one line, or null. */
 export function mediaReason(value: unknown): string | null {
   const text = typeof value === "string" ? value.replace(/\s+/gu, " ").trim() : "";
   if (!text) return null;
@@ -88,10 +70,6 @@ export const mediaText = (value: unknown) => (typeof value === "string" && value
 const unauthorized = (cause: unknown) =>
   cause instanceof UnauthorizedError || (cause instanceof StreamableHTTPError && cause.code === 401);
 
-/**
- * The SDK transport behind the SDK's own `Transport` type. The SDK class declares `sessionId` and its
- * callbacks without `undefined`, so `exactOptionalPropertyTypes` refuses the class itself.
- */
 function forwardingTransport(inner: StreamableHTTPClientTransport): Transport {
   const transport: Transport = {
     start: () => inner.start(),
@@ -105,7 +83,6 @@ function forwardingTransport(inner: StreamableHTTPClientTransport): Transport {
   return transport;
 }
 
-/** A Client on the service's server with one token, closed when the scope ends. */
 function connect(url: string, token: string) {
   return Effect.acquireRelease(
     Effect.tryPromise({
@@ -124,7 +101,6 @@ function connect(url: string, token: string) {
   );
 }
 
-/** Connects with the current token, and once more with a new one when the service refuses it. */
 export const connectSignedIn = Effect.fnUntraced(function* (signIn: McpMediaSignIn, notSignedIn: () => McpMediaFailed) {
   const token = yield* signIn.token().pipe(Effect.mapError(notSignedIn));
   if (!token) return yield* notSignedIn();
@@ -142,10 +118,6 @@ export const connectSignedIn = Effect.fnUntraced(function* (signIn: McpMediaSign
   );
 });
 
-/**
- * The value of a tool result: its structured content, else the JSON of its first text block. An
- * `isError` result answers its reason: `error_hint`, `message` or `error`, else its text.
- */
 function toolValue(result: unknown): { value: DynamicRecord | null; error: string | null } {
   if (!isDynamicRecord(result)) return { value: null, error: null };
   const content = Array.isArray(result.content) ? result.content : [];
@@ -170,7 +142,6 @@ function toolValue(result: unknown): { value: DynamicRecord | null; error: strin
   return { value: parsed, error: null };
 }
 
-/** One value in the arguments of a tool call. An absent value is left out of the JSON. */
 type McpToolValue =
   | string
   | number
@@ -179,19 +150,15 @@ type McpToolValue =
   | readonly McpToolValue[]
   | { readonly [name: string]: McpToolValue };
 
-/** The arguments of one tool call. */
 export interface McpToolArguments {
   readonly [name: string]: McpToolValue;
 }
 
-/** How one service's tool calls end: the time limit and the error for a refusal. */
 export interface McpMediaTools {
   timeoutMs: number;
-  /** The error for a refused call, from the service's reason, or null when it gave none. */
   refusal: (reason: string | null) => McpMediaFailed;
 }
 
-/** Calls one tool. A refused call fails with `tools.refusal`; a call with no value fails. */
 export const callMediaTool = (client: Client, tools: McpMediaTools, name: string, args: McpToolArguments) =>
   Effect.tryPromise({
     try: (signal) => client.callTool({ name, arguments: { ...args } }, undefined, { signal, timeout: tools.timeoutMs }),
@@ -213,10 +180,6 @@ export function isHttps(value: string): boolean {
   }
 }
 
-/**
- * Sends one input picture to the upload address that the service chose. The address must not point at
- * this computer or its local network, and a redirect is refused.
- */
 export const uploadToService = Effect.fnUntraced(function* (
   target: { url: string; method: string; headers: Readonly<Record<string, string>>; body: Uint8Array<ArrayBuffer> },
   deadline: Duration.Input,
@@ -251,7 +214,6 @@ const MEDIA_TYPES: Record<string, string> = {
   "video/quicktime": "mov",
 };
 
-/** The audio types of an input file. A result is never audio, so `MEDIA_TYPES` does not have them. */
 const AUDIO_TYPES: Record<string, string> = {
   "audio/mpeg": "mp3",
   "audio/mp3": "mp3",
@@ -262,14 +224,9 @@ const AUDIO_TYPES: Record<string, string> = {
   "audio/ogg": "ogg",
 };
 
-/** The file type of an input file, for the file name that a service asks for. */
 export const pictureExtension = (mimeType: string) =>
   MEDIA_TYPES[mimeType] ?? AUDIO_TYPES[mimeType] ?? mimeType.split("/")[1] ?? "png";
 
-/**
- * Downloads a result, with the size limit of a stored attachment. Each hop must be on the service's
- * file hosts (`allowed`) before OpenBot asks for it, so a redirect is followed here.
- */
 export const downloadMedia = Effect.fnUntraced(function* (
   url: string,
   kind: WorkflowMediaKind,
@@ -309,7 +266,6 @@ export const downloadMedia = Effect.fnUntraced(function* (
   return { bytes, mimeType, extension: MEDIA_TYPES[mimeType] ?? (kind === "video" ? "mp4" : "png") };
 });
 
-/** A count of credits: a finite number that is not negative, rounded down. */
 export function creditCount(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.floor(value) : null;
 }

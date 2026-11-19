@@ -507,6 +507,22 @@ the live list has the same `sunra-` or `higgsfield-` form as a fixed id. A clien
 the capability shows the fixed models and no price. The Run button of an image step shows the price,
 and the page rail shows the number of credits under the logo when the account has no quota.
 
+`workflows-media-service-account-v1` lets a step choose which Sunra or Higgsfield account pays. Apps
+can have more than one account of a service (`mcp-accounts-v1`). The accounts of a service are its
+enabled, signed-in Apps rows in the order of Apps: the row of the first connect, then the accounts
+that the person added (`McpGateway.serviceSignIns`). The first one is the default. The `account`
+field of an image step then also applies to a Sunra or a Higgsfield model: empty or `default` is the
+first account, and the id of an Apps row is that account. When the host does not have that account,
+the step fails with "account not found" and the host never makes the file on another account.
+`POST /v1/workflows/media/service-accounts {}` answers `{ accounts }`, each with `provider`, `id` and
+`name` (null for the row of the first connect, which Apps names by the app).
+`POST /v1/workflows/media/service-credits {}` answers the same list with the `credits` of each
+account. Both are reads that each member who can use workflows can call; they give no token or
+address. The catalog, the price and the answers of `workflows-sunra-v1` and `workflows-higgsfield-v1`
+stay on the first account. The capability goes to protocol 10 peers. When a service has more than one
+account, the model picker lists each one ("Higgsfield credits · Higgsfield 2"), and the page rail
+shows one credits button for each account, with its name.
+
 `workflows-media-catalog-v2` (protocol 10) adds the other settings of a model and the aspect ratios
 `21:9` and `3:4`. `POST /v1/workflows/media/v2/catalog {}` answers `{ models }` as v1 does, and each
 model can have `options`: a `switch` (values `off` and `on`) or a `choice`, each with its `default`. The
@@ -720,6 +736,17 @@ the runtime snapshot decoder refuses fails closed. A new socket gets a new snaps
 comes back after a reconnect. The WebRTC host peer encodes the events again with the same option.
 Compacting the context of a joined server's agent stays local only: the Team API has no route for it.
 The iPhone app advertises the capability through the shared team client, but it shows no meter.
+
+### Background work
+
+`agent-background-work-v1` (protocol 10) tells a client that an agent waits for its own background
+work after its turn ended (see `team-protocol/agent-background-work-v1.ts`). It adds `backgroundWork`
+beside the frozen keys of the `snapshot` of the `runtime-snapshot` event: one entry for each waiting
+chat or thread, with `botId`, `taskId` (`null` for the agent's chat) and `since`. The host adds it only
+for a connection that advertises the capability, and filters it as the rest of the snapshot. The
+desktop and the web client show a waiting row with a timer in the chat or the thread until the job
+wakes the agent. A host without the capability never sends it, so the client shows no row. Only a
+Claude agent reports background work. The iPhone app does not show the row.
 
 ### Queue window
 
@@ -980,6 +1007,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `events-v1` | Manage webhook routines, their secrets, and activity | `events` |
 | `routine-recovery-v1` | Read and set a routine's missed-run policy; read its runs with the missed occurrences | `events` |
 | `routine-results-v1` | List the messaging connections and their places; read and set where an agent routine sends its answers. Deliveries stay on the host | none: only the mobile app sends it |
+| `routine-results-whatsapp-v1` | No route or field of its own. The `routine-results-v1` answers can name `whatsapp`, so the options list the host's WhatsApp numbers and a routine can send its answers to one. The host sends WhatsApp only to a client that sends it. Protocol 10 only | none |
 | `webhook-tests-v1` | Send one signed test event to a webhook routine | `events` |
 | `webhook-sender-secret-v1` | Set a webhook routine's signing secret to a secret that the sender made | `events` |
 | `webhook-agent-secret-v1` | Give a new signing secret of an agent's webhook routine to that agent as an API key. The answer has only the key name | `events` |
@@ -987,6 +1015,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `vault-v2` | All of `vault-v1`, under `/v1/admin/vault/v2/`, and API keys as a fourth item kind: list each key's variable name and notes, add, change and delete keys, and show one saved key. The host leaves API keys out of every `vault-v1` answer, and `vault-v1` cannot delete or show one, so an older client keeps a valid list. It uses the `vault-changed` event of `vault-v1` | `vault` |
 | `vault-v3` | All of `vault-v2`, under `/v1/admin/vault/v3/`, and a two-step (TOTP) key on a login: list items carry `hasTwoStep`, save adds, replaces or removes the key (absent keeps it, empty removes it), and `codes` answers the current code of each login with a key. No route answers with a key. `vault-v1` and `vault-v2` lists leave out `hasTwoStep`, and their save keeps the saved key. It uses the `vault-changed` event of `vault-v1` | `vault` |
 | `vault-import-v1` | A CSV password export that an owner or admin sends as text, at most 256 KiB, below the JSON body limit. The host adds its logins as from its own file dialog and answers only the counts. The iPhone app uses it; the phone never calls the `vault-v1` reveal or reset | none: only the mobile app sends it |
+| `vault-member-save-v1` | No route or field of its own. The host takes a password save on `browser-secret-vault-v1` and a `request_vault_item` or API key card answer from any member, not only from an owner or admin. The item goes to all agents of the host | `agent` |
 
 These IPC groups take a required server id and route with `scopedHandler`. A key travels only towards
 the host; no response carries one, except the `vault-v1`, `vault-v2` and `vault-v3` reveal: it answers the one secret that the

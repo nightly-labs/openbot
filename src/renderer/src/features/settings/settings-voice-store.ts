@@ -29,15 +29,9 @@ import { changeSpeechSpeed, speechSpeed, updateSpeechSettings } from "../speech/
 import { voicePort } from "./voice-port";
 
 interface SettingsVoiceState {
-  /** One status for each model in `VOICE_MODELS`, or null before main answers. */
   statuses: Record<VoiceModelId, VoiceModelStatus | null>;
   settings: VoiceSettings | null;
-  /**
-   * The status of the model in the settings that reads replies aloud, and the settings, or null
-   * before main answers. A cloud model is "ready" when its key is saved.
-   */
   speech: { status: SpeechModelStatus | null; settings: SpeechSettings | null; listening: boolean };
-  /** The user's own voice server, or null when none is set up or before main answers. */
   server: VoiceServerSettings | null;
 }
 
@@ -64,10 +58,6 @@ type FailureKey =
   | "settings.voice.server.saveFailed"
   | "settings.voice.server.removeFailed";
 
-/**
- * The Voice tab's view of the dictation models and settings. It is created by the settings page,
- * so a download that runs keeps its row while another tab is open.
- */
 export function createSettingsVoiceStore(active: () => boolean) {
   const [state, setState] = createStore<SettingsVoiceState>({
     statuses: { ...EMPTY_STATUSES },
@@ -84,7 +74,6 @@ export function createSettingsVoiceStore(active: () => boolean) {
       draft.statuses[status.modelId] = status;
     });
 
-  /** A status of another model, such as a Supertonic download that ends after a change to xAI, is old. */
   const setSpeechStatus = (status: SpeechModelStatus) => {
     const chosen = state.speech.settings?.modelId;
     if (chosen && status.modelId !== chosen) return;
@@ -93,7 +82,6 @@ export function createSettingsVoiceStore(active: () => boolean) {
     });
   };
 
-  // The tab listens only while it is open, and reads every status again each time it opens.
   createEffect(active, (isActive) => {
     if (!isActive) return;
     const voice = voicePort().voice;
@@ -132,7 +120,6 @@ export function createSettingsVoiceStore(active: () => boolean) {
   }
 
   function download(modelId: VoiceModelId): void {
-    // Progress arrives as status events; the answer is the status when the download ends.
     void voicePort()
       .voice.downloadModel({ modelId })
       .then(setStatus)
@@ -146,7 +133,6 @@ export function createSettingsVoiceStore(active: () => boolean) {
       .catch((error: unknown) => fail(error, "settings.voice.cancelFailed"));
   }
 
-  /** Deletes a downloaded model from this computer. The model in use downloads again at the next dictation. */
   function remove(modelId: VoiceModelId): void {
     void voicePort()
       .voice.removeModel({ modelId })
@@ -179,7 +165,6 @@ export function createSettingsVoiceStore(active: () => boolean) {
   function downloadSpeech(): void {
     const analytics = desktopAnalytics.scope();
     const startedAt = performance.now();
-    // A cancelled download ends as "missing".
     const track = (phase: SpeechModelStatus["phase"]) =>
       analytics.track("speech_model_action", {
         action: "download",
@@ -221,7 +206,6 @@ export function createSettingsVoiceStore(active: () => boolean) {
     setState((draft) => {
       draft.speech.settings = next;
     });
-    // In series with the speed saves of the voice pill and the players, so that no save loses another.
     return updateSpeechSettings(voicePort().voice, patch)
       .then((saved) => {
         setState((draft) => {
@@ -238,14 +222,12 @@ export function createSettingsVoiceStore(active: () => boolean) {
       });
   }
 
-  /** Saves the user's own voice server, or removes it with its key when `input` is null. */
   function saveServer(input: VoiceServerInput | null): Promise<boolean> {
     const spoke = state.server?.routes.speech === true;
     return voicePort()
       .voice.setServer({ server: input })
       .then((server) => {
         setServer(server);
-        // Replies go back to Supertonic: download it now, as Read replies aloud does.
         if (spoke && !server?.routes.speech && state.speech.settings?.readReplies && supertonicMissing())
           downloadSpeech();
         return true;
@@ -256,7 +238,6 @@ export function createSettingsVoiceStore(active: () => boolean) {
       });
   }
 
-  /** A local model chosen with its Use button takes dictation back from the server. */
   function useModel(modelId: VoiceModelId): void {
     save({ modelId });
     const server = state.server;
@@ -264,7 +245,6 @@ export function createSettingsVoiceStore(active: () => boolean) {
       void saveServer({ address: server.address, apiKey: null, routes: { ...server.routes, dictation: false } });
   }
 
-  /** Voice conversations with Codex agents use Codex live voice. Nothing is downloaded for it. */
   function setCodexLive(codexLive: boolean): void {
     void saveSpeech({ codexLive });
   }
@@ -273,21 +253,15 @@ export function createSettingsVoiceStore(active: () => boolean) {
     void saveSpeech({ codexLiveVoice });
   }
 
-  /** The pause that ends a turn of a voice conversation. A conversation that runs keeps the pause it started with. */
   function setTurnPause(turnPauseMs: VoiceTurnPause): void {
     void saveSpeech({ turnPauseMs });
   }
 
-  /** Supertonic is the model in the settings, and it is not on this computer. A cloud model downloads nothing. */
   function supertonicMissing(): boolean {
     const phase = state.speech.status?.phase;
     return state.speech.settings?.modelId === SPEECH_MODEL_ID && (phase === "missing" || phase === "error");
   }
 
-  /**
-   * Chooses the model that reads replies aloud. Main sends the status of the new model; a download
-   * of Supertonic that runs stops when another model is chosen.
-   */
   function setSpeechModel(modelId: SpeechModelId): void {
     void saveSpeech({ modelId }).then((saved) => {
       if (!saved) return;
@@ -295,7 +269,6 @@ export function createSettingsVoiceStore(active: () => boolean) {
         .voice.getSpeechModelStatus()
         .then((status) => {
           setSpeechStatus(status);
-          // Back to Supertonic while replies are read aloud: download it, as Read replies aloud does.
           if (state.speech.settings?.readReplies && !state.server?.routes.speech && supertonicMissing())
             downloadSpeech();
         })
@@ -303,7 +276,6 @@ export function createSettingsVoiceStore(active: () => boolean) {
     });
   }
 
-  /** Saves or removes the key of a provider of spoken replies. The ElevenLabs key is also the dictation key. */
   function setSpeechApiKey(provider: SpeechKeyProvider, key: string | null): Promise<boolean> {
     return voicePort()
       .voice.setSpeechApiKey({ provider, key })
@@ -317,7 +289,6 @@ export function createSettingsVoiceStore(active: () => boolean) {
       });
   }
 
-  /** Saves or removes the key of a dictation provider. Main announces the status of each of its models. */
   function setDictationApiKey(provider: DictationKeyProvider, key: string | null): Promise<boolean> {
     return voicePort()
       .voice.setApiKey({ provider, key })
@@ -331,7 +302,6 @@ export function createSettingsVoiceStore(active: () => boolean) {
       });
   }
 
-  /** Turning it on downloads the model, as the first dictation does, unless the server reads replies. */
   function setReadReplies(readReplies: boolean): void {
     void saveSpeech({ readReplies }).then((saved) => {
       desktopAnalytics.track("speech_settings_action", {
@@ -344,7 +314,6 @@ export function createSettingsVoiceStore(active: () => boolean) {
     });
   }
 
-  /** Reads a sample in the language of the interface with the voice in the settings. */
   async function listen(sample: string): Promise<void> {
     if (state.speech.listening) {
       stopSpeech();
@@ -395,7 +364,6 @@ export function createSettingsVoiceStore(active: () => boolean) {
           ...(saved ? {} : { failure_code: "update_failed" }),
         }),
       ),
-    /** The speed of replies, shared with the voice pill and the players of spoken replies. */
     speechSpeed,
     setSpeechSpeed: changeSpeechSpeed,
     listen,

@@ -2,11 +2,9 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/settings";
 
 export const messages = {
-  // The language setting itself.
   "settings.language.title": "Langue",
   "settings.language.description": "OpenBot affiche les menus, les boutons et les messages dans cette langue.",
   "settings.language.system": "Langue du système",
-  // The logo color setting, General tab.
   "settings.appearance.title": "Apparence",
   "settings.appearance.theme.title": "Thème",
   "settings.appearance.theme.description":
@@ -91,7 +89,6 @@ export const messages = {
   "settings.bubbleStyle.solid": "Plein",
   "settings.bubbleStyle.tint": "Teinte",
   "settings.bubbleStyle.classic": "Classique",
-  // The Settings window, General tab.
   "settings.appBehavior.title": "Comportement de l’application",
   "settings.conversations.title": "Conversations",
   "settings.launchAtLogin.title": "Lancer OpenBot à l’ouverture de session",
@@ -117,7 +114,6 @@ export const messages = {
   "settings.externalLinks.title": "Ouvrir les liens externes dans",
   "settings.externalLinks.description":
     "Les liens des discussions, des pages de connexion et de facturation s’ouvrent ici.",
-  // The two link targets. The saved value stays in English; only the label is translated.
   "settings.externalLinks.defaultBrowser": "Navigateur par défaut",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "Navigateur par défaut ({name})",
@@ -321,7 +317,6 @@ export const messages = {
     "Activé : les métadonnées d’utilisation et de fiabilité sont envoyées aux services analytiques auto-hébergés d’OpenBot avec l’identifiant et l’e-mail de votre compte, ainsi que les sites web que vous et vos agents visitez, l’utilisation des outils et un résumé quotidien de votre configuration. Désactivé : seule l’utilisation de base, comme les tours et le nombre de tokens, est envoyée avec un identifiant d’installation aléatoire. Les conversations, fichiers et prompts ne sont jamais envoyés.",
   "settings.analytics.webDescription":
     "Activé : les métadonnées d’utilisation et de fiabilité sont envoyées aux services analytiques auto-hébergés d’OpenBot avec l’identifiant et l’e-mail de votre compte. Désactivé : les mêmes métadonnées sont envoyées avec un identifiant d’installation aléatoire uniquement. Les conversations, fichiers et prompts ne sont jamais envoyés. Ce réglage s’applique à ce navigateur.",
-  // The Settings window shell: its tab list, headers and save bar.
   "settings.tab.general.title": "Général",
   "settings.tab.general.description": "Choisir le fonctionnement des discussions et ce qu’OpenBot partage.",
   "settings.tab.agents.title": "Agents",
@@ -491,7 +486,6 @@ export const messages = {
   "settings.profile.share.copyFailed": "Impossible de copier l’image.",
   "settings.profile.share.createFailed": "Impossible de créer l’image.",
   "settings.profile.share.fileName": "openbot-activity.png",
-  // The text in the image to share.
   "settings.profile.share.caption": "Mes six derniers mois avec OpenBot",
   "settings.profile.activity.title": "Activité sur cet ordinateur",
   "settings.profile.activity.activeDays": {
@@ -501,7 +495,6 @@ export const messages = {
   "settings.profile.activity.empty": "Aucune activité pour l’instant",
   "settings.profile.activity.loading": "Chargement de l’activité…",
   "settings.profile.activity.loadFailed": "Impossible de charger votre activité.",
-  // {tokens} is a short number, such as 1.2M.
   "settings.profile.activity.heatmapLabel": {
     one: "{tokens} jetons en {count} jour actif sur un an",
     other: "{tokens} jetons en {count} jours actifs sur un an",
@@ -675,7 +668,6 @@ export const messages = {
   "settings.hostedServers.plan.standard.summary": "Pour une petite équipe avec des routines quotidiennes.",
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Pour de nombreux agents et un usage intensif du navigateur.",
-  // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "Dictée",
   "settings.voice.model.parakeet.description": "Rapide. Détecte seul la langue parlée, parmi 25 langues européennes.",
   "settings.voice.model.parakeetUnified.description":
@@ -744,6 +736,13 @@ export const messages = {
   "settings.voice.speech.sample": "Bonjour. Voici comment vos réponses sonneront.",
   "settings.voice.speech.listenFailed": "Impossible de lire l’extrait.",
   "settings.voice.live.section": "Voix en direct",
+  "settings.voice.talk.section": "Conversation vocale",
+  "settings.voice.talkKey.title": "Touche pour parler",
+  "settings.voice.talkKey.description": "Maintenez ces touches enfoncées pour parler dans une conversation vocale.",
+  "settings.voice.talkKey.change": "Changer la touche pour parler",
+  "settings.voice.talkKey.recording": "Appuyez sur les touches",
+  "settings.voice.talkKey.refused": "Ajoutez une autre touche",
+  "settings.voice.talkKey.reset": "Rétablir",
   "settings.voice.live.signIn": "Connectez-vous à Codex avec votre compte ChatGPT pour utiliser la voix en direct.",
   "settings.transfer.title": "Déplacer ce serveur vers un autre ordinateur",
   "settings.transfer.lede":

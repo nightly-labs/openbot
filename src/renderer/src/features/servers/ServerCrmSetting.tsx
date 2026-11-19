@@ -4,11 +4,6 @@ import { Show } from "solid-js";
 import { createCrmEnabled } from "../crm/crm-enabled";
 import type { CrmHost } from "../crm/crm-port";
 
-/**
- * Server Settings > Experimental: whether the server shows its CRM (`crm-v1`). Off hides the CRM page,
- * refuses the CRM tools of the agents and stops the payment source sync; the data stays. The host
- * checks the role again.
- */
 export function ServerCrmSetting(props: {
   host: CrmHost;
   disabled: boolean;

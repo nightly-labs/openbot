@@ -1,5 +1,4 @@
 .reference-chip,
-/* Every composer token, including the ones for a reference whose agent or skill is gone. */
 .composer-mention-token {
   display: inline-flex;
   box-sizing: border-box;
@@ -25,7 +24,6 @@
   text-decoration: none;
 }
 
-/* A plugin and an MCP server read as the skill chips do: each names something the agent was given. */
 .reference-chip[data-kind="mcp"],
 .reference-chip[data-kind="plugin"],
 .reference-chip[data-kind="skill"] {
@@ -33,12 +31,10 @@
   color: var(--openbot-accent-text);
 }
 
-/* A page title can be long: a tab and a thread stop at a width, and the title shows all of it. */
 .reference-chip:is([data-kind="tab"], [data-kind="thread"]) {
   max-width: min(260px, 100%);
 }
 
-/* A quote is a passage, not a name: it stops at a short width, and its title shows all of it. */
 .reference-chip[data-kind="quote"] {
   max-width: min(240px, 100%);
   font-weight: 450;
@@ -68,8 +64,6 @@ button.reference-chip:is([data-kind="quote"], [data-kind="tab"], [data-kind="thr
   object-fit: contain;
 }
 
-/* In the text, a line icon has the size and stroke of a file chip's page icon. Agent faces and logos
-   keep the full box. */
 :is(.message-reference-chip, .composer-mention-token) .reference-chip-icon > svg.lucide {
   width: var(--openbot-icon-xs);
   height: var(--openbot-icon-xs);

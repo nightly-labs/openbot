@@ -165,7 +165,8 @@ the trace file and gives `HostAnalytics` one summary, sent as `system_remote_con
 makes its first request, and for the first failed attempt after a connection or a cancel. Later
 failures are counted in the next connection. An attempt is keyed by the id that `begin` returns, so
 an old attempt that ends late does not change a newer one. The host id stays in memory and is never
-sent. `RemoteServerManager` adds the time since its hosted start request. The account service times
+sent. The Signal home is the `signal` claim of the ticket (`signalHomeOf`), `entry` when there is
+no claim; the Signal address and the ticket are not sent. `RemoteServerManager` adds the time since its hosted start request. The account service times
 the hosted start itself: `start_requested_at` on `hosted_servers` holds the request time, and the
 first observation of a usable sandbox clears it and sends the `ready` action once.
 

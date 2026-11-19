@@ -65,8 +65,6 @@ export class HostedSiteService {
     private readonly localSiteOrigin?: string,
   ) {}
 
-  /** The sites of the scope, with the limit and slot count of the server that new sites go to. */
-
   readonly list = Effect.fn("HostedSites.list")(
     { self: this },
     function* (scope: HostedSiteScope) {
@@ -90,7 +88,6 @@ export class HostedSiteService {
       const bucket = yield* resolveHostedSiteBucket(database, scope.userId, serverId, now);
       const { limit, used, reason } = yield* hostedSiteSlots(database, scope.userId, bucket, now);
       const sites = rows.results.map((row) => mapSite(row, this.localSiteOrigin));
-      // `limitReason` is optional: released desktops read only `sites`, `limit` and `used`.
       return reason === null ? { sites, limit, used } : { sites, limit, used, limitReason: reason };
     },
     (operation) => operation.pipe(Effect.provide(HostedSiteStorage.layer(this.database, this.bucket))),
@@ -117,7 +114,6 @@ export class HostedSiteService {
           .first<{ count: number }>(),
       );
       const uploads = concurrent?.count ?? 0;
-      // A replace of a full account can free the idle replaces of its site, after the site checks below.
       if (uploads >= HOSTED_SITE_LIMITS.concurrentUploads && !request.siteId) {
         return yield* new HostedSiteInputError(
           429,
@@ -133,7 +129,6 @@ export class HostedSiteService {
         const site = yield* this.requireOwnedSiteEffect(userId, request.siteId);
         yield* siteDecode(() => requireSiteInBucket(site, serverId));
         if (!site.expires_at || site.expires_at <= now) return yield* inactiveSiteError("expired");
-        // Only a full account frees idle replaces of this site: with a free slot, they stay for a retry.
         const needed = uploads - HOSTED_SITE_LIMITS.concurrentUploads + 1;
         if (needed > 0 && (yield* this.abandonSupersededUploadsEffect(userId, site.id, now, needed)) < needed) {
           return yield* new HostedSiteInputError(
@@ -961,7 +956,6 @@ export class HostedSiteService {
       const { database } = yield* HostedSiteStorage;
 
       const previousDeployment = deployment.base_deployment_id;
-      // The site keeps the server it was created for, so the activation counts against that server's bucket.
       const bucket = yield* resolveHostedSiteBucket(database, userId, site.server_id, now);
       const room = bucketHasRoomSql(bucket, userId, site.id, now);
       const results = yield* siteCall(() =>
@@ -1205,7 +1199,6 @@ export class HostedSiteService {
     },
   );
 
-  /** True when the bucket has a free slot for one more site, not counting `excludeSiteId`. */
   private readonly bucketHasRoomEffect = Effect.fn("HostedSites.bucketHasRoom")(
     { self: this },
     function* (
@@ -1663,12 +1656,6 @@ export class HostedSiteService {
     },
   );
 
-  /**
-   * A failed upload keeps its slot until it expires. Two replaces of one site cannot both publish: the first
-   * activation makes the other one stale. So a new replace of a full account frees up to `count` older replaces of
-   * the same site that no file upload uses now, the oldest first. The first upload of a new site has no base
-   * deployment and stays. Returns the number of slots freed.
-   */
   private readonly abandonSupersededUploadsEffect = Effect.fn("HostedSites.abandonSupersededUploads")(
     { self: this },
     function* (
@@ -1709,11 +1696,6 @@ export class HostedSiteService {
     },
   );
 
-  /**
-   * A new site whose first upload failed or stopped keeps its slot until the upload expires, and the list does not
-   * show it. So a new site of a full bucket stops the oldest idle first upload of a new site in that bucket. A new
-   * site needs one slot. A later file upload of the stopped session gets `upload_expired`.
-   */
   private readonly abandonIdleNewSiteUploadsEffect = Effect.fn("HostedSites.abandonIdleNewSiteUploads")(
     { self: this },
     function* (
@@ -1732,7 +1714,6 @@ export class HostedSiteService {
           .all<{ id: string; site_id: string }>(),
       );
       for (const upload of uploads.results) {
-        // A file upload that started or finished after the select keeps the session.
         const claim = yield* siteCall(() =>
           database
             .prepare(
@@ -1852,7 +1833,6 @@ export class HostedSiteService {
   );
 }
 
-/** A request changes only the sites of its own server, or unlinked sites when it proved no server. */
 function requireSiteInBucket(site: SiteRow, serverId: string | null): void {
   if ((site.server_id ?? null) === serverId) return;
   throw new HostedSiteInputError(409, "site_other_server", "This site belongs to another server.");

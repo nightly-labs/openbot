@@ -32,22 +32,10 @@ import {
   normalizeCrmSearch,
 } from "./crm-store";
 
-/**
- * What an agent reads and proposes through its CRM tools. Only agents that an owner or admin let in
- * use it. A private name reads as `Customer <number>`; another private text field reads as `hidden`,
- * and a search never matches a private value. A private part (amounts, dates, status, tags, plans,
- * method, owner) is not in the answer at all, because a `hidden` mark only where a value exists
- * would show that it exists. A filter or order on a private part is refused, and activity loses the
- * entries and values of private parts. Each answer lists `hiddenFields`. Amounts are decimal text in
- * the customer's currency, such as "129.00 EUR". Nothing here goes to the shared agent data tables:
- * each answer is built from the CRM tables for one tool call.
- */
-
 const CRM_HIDDEN = "hidden";
 
 type Hidden = ReadonlySet<CrmPrivateField>;
 
-/** The private parts that an activity entry is about. The agent does not get an entry when one is hidden. */
 function activityParts(kind: string, field: unknown): CrmPrivateField[] {
   const parts: CrmPrivateField[] = [];
   if (kind === "status-changed") parts.push("status");
@@ -60,11 +48,9 @@ function activityParts(kind: string, field: unknown): CrmPrivateField[] {
   return parts;
 }
 
-/** The detail keys that show a private part in an activity entry about something else. */
 const PART_KEYS: { [Part in CrmPrivateField]?: readonly string[] } = {
   amounts: ["amountMinor"],
   dates: ["dueOn", "paidAt", "startsOn", "endsOn"],
-  // A payment label can be the plan name, and the entry does not say if the payment had a plan.
   plans: ["plan", "label"],
 };
 
@@ -73,11 +59,8 @@ function hiddenList(hidden: Hidden): CrmPrivateField[] {
 }
 
 export interface CrmAgentFindInput {
-  /** Text in a visible field, or a customer number such as "12" or "Customer 12". */
   query?: string | undefined;
-  /** A status id or label. */
   status?: string | undefined;
-  /** A tag id or label. */
   tag?: string | undefined;
   payment?: "late" | "open" | "paid-up" | undefined;
   cursor?: string | undefined;
@@ -92,14 +75,12 @@ export interface CrmAgentPaymentsInput {
 }
 
 type AgentCustomerFields = { [Field in CrmTextField]?: string | undefined } & {
-  /** A status id or label. */
   status?: string | undefined;
   ownerAgentId?: string | null | undefined;
   method?: CrmMethod | null | undefined;
   currency?: string | undefined;
 };
 
-/** A proposed change as the tool takes it: decimal amounts, and statuses and tags by id or label. */
 export type CrmAgentChange =
   | {
       kind: "customer-create";
@@ -157,11 +138,8 @@ export interface CrmAgentOperations {
   agentPropose(agentId: string, input: CrmAgentProposeInput): Effect.Effect<{ proposalId: string }, CrmError>;
 }
 
-// --- Amounts -------------------------------------------------------------------------------------
-
 const exponents = new Map<string, number>();
 
-/** The number of minor-unit digits of an ISO 4217 currency: 2 for EUR, 0 for JPY, 3 for KWD. */
 function crmCurrencyExponent(currency: string): number {
   const known = exponents.get(currency);
   if (known !== undefined) return known;
@@ -169,14 +147,11 @@ function crmCurrencyExponent(currency: string): number {
   try {
     exponent =
       new Intl.NumberFormat("en", { style: "currency", currency }).resolvedOptions().maximumFractionDigits ?? 2;
-  } catch {
-    // An unknown code keeps two digits, as most currencies have.
-  }
+  } catch {}
   exponents.set(currency, exponent);
   return exponent;
 }
 
-/** Exact decimal text of minor units, such as "129.00 EUR". */
 function formatCrmAmount(minor: number, currency: string): string {
   const exponent = crmCurrencyExponent(currency);
   const digits = String(minor).padStart(exponent + 1, "0");
@@ -184,9 +159,7 @@ function formatCrmAmount(minor: number, currency: string): string {
   return `${value} ${currency}`;
 }
 
-/** Minor units of decimal text such as "129", "129.5" or "129.50 EUR". */
 function parseCrmAmount(text: string, currency: string): number {
-  // A comma groups thousands only ("1,290.50"). "129,50" is refused, not read as 12950.
   const plain = text.trim().replace(/^\d{1,3}(?:,\d{3})+(?=\.|\s|$)/u, (whole) => whole.replaceAll(",", ""));
   const match = /^(\d+)(?:\.(\d+))?(?:\s+([A-Za-z]{3}))?$/u.exec(plain);
   const whole = match?.[1];
@@ -201,9 +174,6 @@ function parseCrmAmount(text: string, currency: string): number {
   return Number(digits);
 }
 
-// --- Output --------------------------------------------------------------------------------------
-
-/** Drops empty values, so each answer stays short. */
 function compact(record: { [key: string]: CrmAgentValue | undefined }): CrmAgentRecord {
   const result: CrmAgentRecord = {};
   for (const [key, value] of Object.entries(record)) {
@@ -245,7 +215,6 @@ export class CrmAgentView {
     return status?.label ?? statusId;
   }
 
-  /** A status by id, or by label with any case. */
   #resolveStatus(value: string): string {
     const lower = value.toLowerCase();
     const status = this.#store
@@ -255,7 +224,6 @@ export class CrmAgentView {
     return status.id;
   }
 
-  /** A tag by id, or by label with any case. */
   #resolveTag(value: string): string {
     const lower = value.toLowerCase();
     const tag = this.#store.tags().find((item) => item.id === value || item.label.toLowerCase() === lower);
@@ -281,7 +249,6 @@ export class CrmAgentView {
       status: hidden.has("status") ? null : this.#statusName(customer.statusId),
       tags: hidden.has("tags") ? null : this.#tagLabels(customer.tagIds),
       open: amounts && customer.openMinor > 0 ? formatCrmAmount(customer.openMinor, customer.currency) : null,
-      // A late amount shows that a due date has passed.
       late: amounts && dates && customer.lateMinor > 0 ? formatCrmAmount(customer.lateMinor, customer.currency) : null,
       nextDueOn: dates ? customer.nextDueOn : null,
     });
@@ -292,7 +259,6 @@ export class CrmAgentView {
       id: payment.id,
       number: payment.number,
       customer: { id: payment.customerId, name: this.#name(payment.customerName, payment.customerNumber, hidden) },
-      // A plan payment has the plan name as its label.
       label: hidden.has("plans") && payment.planId !== null ? null : payment.label,
       amount: hidden.has("amounts") ? null : formatCrmAmount(payment.amountMinor, payment.currency),
       dueOn: hidden.has("dates") ? null : payment.dueOn,
@@ -312,7 +278,6 @@ export class CrmAgentView {
       details.to = CRM_HIDDEN;
     }
     for (const part of hidden) for (const key of PART_KEYS[part] ?? []) delete details[key];
-    // The id of a link is the Stripe customer id.
     if (activity.kind === "customer-linked" && hidden.has("stripeCustomerId")) delete details.id;
     const currency = details.currency;
     if (isString(currency)) {
@@ -389,7 +354,6 @@ export class CrmAgentView {
     ).map(decodeCrmCustomer);
     const customers = rows.slice(0, limit);
     const last = customers.at(-1);
-    // An empty list stays, so the agent reads that nothing matched.
     return {
       customers: customers.map((customer) => this.#summary(customer, hidden)),
       ...(rows.length > limit && last ? { next: String(last.number) } : {}),
@@ -442,7 +406,6 @@ export class CrmAgentView {
               source: plan.source,
             }),
           ),
-      // An order by date would show the dates.
       openPayments: payments("p.paid_at IS NULL", dates ? "p.due_on, p.number" : "p.number", CUSTOMER_OPEN_PAYMENTS),
       recentPaid: payments(
         "p.paid_at IS NOT NULL",
@@ -456,7 +419,6 @@ export class CrmAgentView {
 
   payments(agentId: string, input: CrmAgentPaymentsInput): CrmAgentRecord {
     const hidden = this.#allow(agentId);
-    // Without dates the list goes by invoice number, so neither its order nor its cursor shows a date.
     const dates = !hidden.has("dates");
     const where = ["p.paid_at IS NULL"];
     const values: SQLInputValue[] = [];
@@ -489,7 +451,6 @@ export class CrmAgentView {
     ).map(decodeCrmPayment);
     const payments = rows.slice(0, limit);
     const last = payments.at(-1);
-    // An empty list stays, so the agent reads that nothing matched.
     return {
       payments: payments.map((payment) => this.#payment(payment, hidden)),
       ...(rows.length > limit && last ? { next: encodeCrmCursor([dates ? last.dueOn : "", last.number]) } : {}),
@@ -506,7 +467,6 @@ export class CrmAgentView {
     return this.#store.propose({
       agentId,
       customerId,
-      // The client reads a thread id as an identifier; a longer one is left out.
       threadId: input.threadId !== null && input.threadId.length <= 128 ? input.threadId : null,
       reason: input.reason,
       change,
@@ -523,7 +483,6 @@ export class CrmAgentView {
     return result;
   }
 
-  /** The contract change, with the customer it is for, after a check that each target exists. */
   #proposedChange(change: CrmAgentChange): { change: unknown; customerId: string | null } {
     const store = this.#store;
     const defined = (record: { [key: string]: unknown }) =>

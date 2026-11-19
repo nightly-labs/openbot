@@ -1,13 +1,3 @@
-/**
- * The story hosts of the workflow canvas. The canvas is a controlled component: these hosts keep its
- * workflow, its runs and its versions in the preview mock (`mockWorkflows`), as the desktop host keeps
- * them in the database, and use the controller of the Workflows page over it.
- *
- * The runs and versions of a story fixture are history that the mock does not know. The host shows
- * them below the runs and versions of the mock. Retry on a step of a fixture run starts a new run
- * from that node; a fixture run has no open step to stop or to decide.
- */
-
 import {
   WORKFLOW_NODE_KINDS,
   WORKFLOW_OUTPUT_TARGETS,
@@ -35,7 +25,6 @@ import { mockWorkflows } from "../src/preview/mock-workflows";
 import { STORY_AGENTS } from "./fixtures";
 import { STORY_CATALOGS, type StoryWorkflow } from "./workflow-story-data";
 
-/** Every node kind, trigger and output, for the stories whose workflows use them all. */
 export const STORY_ALL_FEATURES: WorkflowFeatures = {
   kinds: WORKFLOW_NODE_KINDS,
   triggers: WORKFLOW_TRIGGER_TYPES,
@@ -46,7 +35,6 @@ export const STORY_ALL_FEATURES: WorkflowFeatures = {
 
 const newestFirst = (left: string | null, right: string | null) => (right ?? "").localeCompare(left ?? "");
 
-/** The runs of the mock above the fixture runs. A mock run takes the numbers after the fixture runs. */
 function mergeRuns(fixture: WorkflowRunView | undefined, live: WorkflowRunPage): WorkflowRunPage {
   if (!fixture) return live;
   const offset = Math.max(0, ...fixture.runs.map((entry) => entry.run.number));
@@ -60,10 +48,6 @@ function mergeRuns(fixture: WorkflowRunView | undefined, live: WorkflowRunPage):
   };
 }
 
-/**
- * A host over the preview mock that also shows the fixture history of `workflows`. The mock lists
- * the newest workflow first, so the seeds are older in story order and the first one opens.
- */
 export function storyWorkflowHost(workflows: readonly StoryWorkflow[]): WorkflowHost {
   const fixtures = new Map(workflows.map((workflow) => [workflow.id, workflow]));
   const fixtureRuns = new Set(workflows.flatMap((workflow) => workflow.runs?.runs ?? []).map((entry) => entry.run.id));
@@ -111,7 +95,6 @@ export function storyWorkflowHost(workflows: readonly StoryWorkflow[]): Workflow
       restoreVersion: async (input) => {
         const fixture = fixtureVersion(input.workflowId, input.versionId);
         if (!fixture) return api.restoreVersion(input);
-        // The mock does not know a fixture version, so its graph is saved as a new revision.
         const latest = await api.get(input.workflowId);
         const result = await api.saveGraph({
           workflowId: input.workflowId,
@@ -162,19 +145,15 @@ export function storyWorkflowHost(workflows: readonly StoryWorkflow[]): Workflow
     mediaTransparentSupported: () => true,
     mediaSizeSupported: () => true,
     pictures: async () => [],
-    // A story keeps the picture only in the page: its preview is a blob address.
     uploadPicture: async (file) => keptPicture(crypto.randomUUID(), file, URL.createObjectURL(file)),
-    // A story makes no files.
     mediaUrl: () => null,
     mediaPreviewUrl: () => null,
     githubConnector: createMockGitHubConnector(),
     hostName: () => undefined,
-    // A story opens no browser.
     openUrl: async () => undefined,
   };
 }
 
-/** A canvas over the preview mock that opens the first of `workflows`. */
 export function WorkflowStory(props: {
   workflows: readonly StoryWorkflow[];
   features?: WorkflowFeatures;
@@ -200,11 +179,6 @@ export function WorkflowStory(props: {
 
 const usageRows = accountUsageProviderRows(null);
 
-/**
- * The desktop window around a workflow page: the page rail and the server menu are the real app
- * components. The page covers the agent list, as the schedule, usage and Marketplace pages do. Its bar
- * goes in the window's top row after the server menu, and the page fills the card.
- */
 export function WorkflowAppWindow(props: { children: JSX.Element }) {
   const [page, setPage] = createSignal<PageRailPage | null>("routines");
   const [view, setView] = createSignal<SidebarView>("routines");
@@ -281,7 +255,6 @@ export function WorkflowAppWindow(props: { children: JSX.Element }) {
   );
 }
 
-/** The workflow canvas in the desktop window, where the Routines page shows its board today. */
 export function WorkflowInAppStory(props: { workflows: readonly StoryWorkflow[]; features?: WorkflowFeatures }) {
   const story = createWorkflowsController(storyWorkflowHost(untrack(() => props.workflows)));
   const features = () => props.features ?? WORKFLOW_FEATURES_V1;

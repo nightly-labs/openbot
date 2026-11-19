@@ -1,12 +1,5 @@
 import type { ProviderPage } from "./provider-page";
 
-// Every statement about Ollama and LM Studio here is taken from ollama.com,
-// docs.ollama.com and lmstudio.ai. Each page used is in `sources`. OpenBot finds both
-// servers at their default addresses (`DEFAULT_MODEL_SERVERS` in
-// packages/contracts/src/ipc-provider-detection.ts) and runs them through OpenCode as a
-// custom OpenAI-compatible provider. Check the sources again, and move `checkedAt`,
-// whenever this file changes.
-
 export const LOCAL_MODELS_PROVIDER: ProviderPage = {
   provider: "custom",
   name: "Ollama and LM Studio",

@@ -16,7 +16,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { memberSender, readJson, requireAgentLevel } from "./request-helpers";
 
-/** The member, the agent and the logical session that started each live voice session of a member. */
 export class TeamLiveVoiceSessions {
   readonly #owners = new Map<
     string,
@@ -31,14 +30,12 @@ export class TeamLiveVoiceSessions {
     this.#owners.delete(sessionId);
   }
 
-  /** The live voice sessions that one logical session started, with their member. */
   ofTeamSession(teamSessionId: string): { readonly sessionId: string; readonly memberId: string }[] {
     return [...this.#owners]
       .filter(([, owner]) => owner.teamSessionId === teamSessionId)
       .map(([sessionId, owner]) => ({ sessionId, memberId: owner.memberId }));
   }
 
-  /** Each live voice session, with its member and agent. */
   all(): { readonly sessionId: string; readonly memberId: string; readonly agentId: string }[] {
     return [...this.#owners].map(([sessionId, owner]) => ({
       sessionId,
@@ -48,10 +45,6 @@ export class TeamLiveVoiceSessions {
   }
 }
 
-/**
- * The wire form of a live voice event of the agent service. The text is cut to the limits of the
- * contract, as the client refuses a longer event and closes its event stream.
- */
 export function liveVoiceWireEvent(event: VoiceLiveEvent): LiveVoiceEvent {
   return event.type === "transcript"
     ? {
@@ -70,7 +63,6 @@ export function liveVoiceWireEvent(event: VoiceLiveEvent): LiveVoiceEvent {
       };
 }
 
-/** The IPC form of a live voice event of a joined server. The reverse of `liveVoiceWireEvent`. */
 export function voiceLiveEventFromWire(event: LiveVoiceEvent): VoiceLiveEvent {
   return event.kind === "transcript"
     ? { type: "transcript", sessionId: event.sessionId, role: event.role, text: event.text, final: event.final }
@@ -82,16 +74,9 @@ export interface LiveVoiceRouteOptions {
   agents: Pick<TeamApiAgents, "listAgents">;
   hiddenAgentIds: ReadonlySet<string>;
   sessions: TeamLiveVoiceSessions;
-  /** True while the member has an open `live-voice-v1` event connection in the logical session, which carries the transcript. */
   hasEventConnection(teamSessionId: string, memberId: string): boolean;
 }
 
-/**
- * Codex live voice for a member, with the Codex sign-in of this host. The member must be able to chat
- * with the agent, as each spoken request goes to the agent as the member's message. The agent id is in
- * the body, so the router's check of the path does not see it, and this module refuses an agent hidden
- * from the caller. Frozen by `live-voice-v1`.
- */
 export async function routeLiveVoice(
   context: TeamApiRequestContext,
   options: LiveVoiceRouteOptions,
@@ -102,7 +87,6 @@ export async function routeLiveVoice(
   const liveVoice = options.liveVoice;
   if (!liveVoice || !capabilities.has(LIVE_VOICE_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.liveVoiceUnsupported"));
-  // `readJson` has already run the body through the live voice wire codec.
   const body = await readJson(request);
   if (url.pathname === LIVE_VOICE_ROUTES.stop) {
     let voiceSessionId: string;
@@ -111,7 +95,6 @@ export async function routeLiveVoice(
     } catch {
       throw new HttpError(400, sourceText("error.team.requestFailed"));
     }
-    // A session of another member or of this computer stays.
     await runCauseEffect(liveVoice.stopLiveVoice(voiceSessionId, member.id));
     return json(200, {});
   }
@@ -127,7 +110,6 @@ export async function routeLiveVoice(
   )
     throw new HttpError(404, sourceText("error.team.agentNotFound"));
   requireAgentLevel(context, input.agentId, "chat");
-  // Without an event connection the member gets no transcript and no end, and nothing would stop the session.
   if (!options.hasEventConnection(sessionId, member.id))
     throw new HttpError(409, sourceText("error.voice.live.disconnected"));
   let session: VoiceLiveSession;
@@ -140,11 +122,9 @@ export async function routeLiveVoice(
       ),
     );
   } catch (error) {
-    // A missing Codex sign-in, a timeout or a refused call is a sentence for the member, not a host fault.
     if (error instanceof Error && isFixedSourceText(error.message)) throw new HttpError(409, error.message);
     throw error;
   }
-  // The connection can close while Codex waits for OpenAI. The close then found no session to stop.
   if (!options.hasEventConnection(sessionId, member.id)) {
     await runCauseEffect(liveVoice.stopLiveVoice(session.sessionId, member.id));
     throw new HttpError(409, sourceText("error.voice.live.disconnected"));

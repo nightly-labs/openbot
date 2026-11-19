@@ -6,25 +6,6 @@ import { useAuth } from "../account/account-context";
 import { useServers } from "../servers/servers-context";
 import { teamPort } from "./team-port";
 
-/**
- * Who else is on the active workspace, and which of them is the signed-in user.
- *
- * The identity match runs on email or username rather than an id because
- * presence is the team server's view of its members and the account is the cloud
- * service's view of one person; nothing joins them but the address the user
- * signed in with. A signed-out user therefore has no current member, which is
- * also what makes `directPeople` empty - a list of people to message is
- * meaningless without a "me" to exclude from it.
- *
- * The snapshot itself is per server, but the read that seeds it is one of the
- * eight the workspace bootstrap and `selectServer` both run, so the *load* stays
- * with whoever owns that sequence and only the state lives here. That is why
- * `setTeamPresence` is exported: the server switch clears it and the bootstrap
- * fills it. Both callers disappear once the per-server scope owns its own init.
- *
- * `activeDirectMember` is deliberately not here. It reads the selected member,
- * and selection sits under this domain.
- */
 const Presence = createSimpleContext({
   name: "Presence",
   init: () => {
@@ -46,11 +27,6 @@ const Presence = createSimpleContext({
       return teamPresence().members.filter((member) => member.id !== currentMemberId && !member.disabled);
     });
 
-    /**
-     * The member id that the reader writes as, or null when it is not known. This app always signs in
-     * to a server on this computer as its owner, a password member with no email, so the owner there
-     * is the reader also when no address matches.
-     */
     const { activeServer } = useServers();
     const readerMemberId = createMemo((): string | null => {
       const matched = currentTeamMember()?.id;
