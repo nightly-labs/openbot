@@ -48,17 +48,9 @@ process.env.PATH = [fileURLToPath(new URL("mobile-ios-bin", import.meta.url)), p
 
 process.env.OPENBOT_KEEP_METRO_CACHE = "1";
 
-function mobileBuildCacheRoot(): string | undefined {
-  const setting = process.env.OPENBOT_MOBILE_BUILD_CACHE;
-  if (setting === "off") return undefined;
-  if (setting) return setting;
-  const git = spawnSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], {
-    cwd: mobileRoot,
-    encoding: "utf8",
-  });
-  return git.status === 0 ? join(git.stdout.trim(), "openbot-mobile-cache.noindex") : undefined;
-}
-const buildCacheRoot = mobileBuildCacheRoot();
+const { mobileBuildCacheRoot }: { mobileBuildCacheRoot: (projectRoot: string) => string | undefined } =
+  require("./metro-cache.js");
+const buildCacheRoot = mobileBuildCacheRoot(mobileRoot);
 if (buildCacheRoot) {
   const checkout = dirname(dirname(mobileRoot));
   process.env.OPENBOT_XCODE_COMPILATION_CACHE = join(buildCacheRoot, "xcode");

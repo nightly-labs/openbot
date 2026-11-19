@@ -105,8 +105,8 @@ installs the pods again. Metro keeps its file map cache in `.expo/metro-file-map
 The first build in a new worktree also reuses the work of other worktrees through two shared caches
 in `openbot-mobile-cache.noindex` of the common git directory (`git rev-parse --git-common-dir`), on
 the disk of the main checkout. `OPENBOT_MOBILE_BUILD_CACHE=<directory>` puts them in another
-directory, and `OPENBOT_MOBILE_BUILD_CACHE=off` turns them off. You can remove the directory at any
-time.
+directory; a relative path starts at the checkout root. `OPENBOT_MOBILE_BUILD_CACHE=off` turns them
+off. You can remove the directory at any time.
 
 - `metro/`: Metro transforms of all mobile commands (`metro-cache.js`). Each set of mobile
   dependencies in `bun.lock` and their patches has its own namespace, because the Metro cache key

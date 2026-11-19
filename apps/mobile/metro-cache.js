@@ -10,7 +10,7 @@ const UNUSED_NAMESPACE_MS = 14 * 24 * 60 * 60 * 1000;
 function mobileBuildCacheRoot(projectRoot) {
   const setting = process.env.OPENBOT_MOBILE_BUILD_CACHE;
   if (setting === "off") return undefined;
-  if (setting) return setting;
+  if (setting) return path.resolve(projectRoot, "../..", setting);
   const gitDirectory = runGit(projectRoot, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
   return gitDirectory && path.join(gitDirectory, "openbot-mobile-cache.noindex");
 }
@@ -211,4 +211,4 @@ function createTransformCacheStore(projectRoot) {
   });
 }
 
-module.exports = { createTransformCacheStore };
+module.exports = { createTransformCacheStore, mobileBuildCacheRoot };
