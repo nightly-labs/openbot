@@ -1334,7 +1334,11 @@ fieldset.wfn-picker-group {
   flex-direction: column;
   gap: 0;
   width: 384px;
-  max-height: min(600px, calc(100vh - var(--openbot-space-8)), var(--kb-popper-content-available-height, 600px));
+  max-height: min(
+    600px,
+    calc(100vh - var(--openbot-space-8)),
+    max(320px, var(--kb-popper-content-available-height, 600px))
+  );
   padding: 0;
   overflow: hidden;
 }

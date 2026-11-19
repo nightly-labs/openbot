@@ -377,6 +377,7 @@ const SAVED_SETTINGS: Record<string, WorkflowStepSettings> = {
       prompt: "Hero image for the Atlas comparison page, one product window",
       aspect: "16:9",
       background: "solid",
+      options: JSON.stringify({ quality: "high" }),
     },
     sources: [{ from: "reference", type: "image", stepId: null, attachmentId: REFERENCE }],
   },
@@ -384,6 +385,11 @@ const SAVED_SETTINGS: Record<string, WorkflowStepSettings> = {
 
 const SAVED_CATALOGS: WorkflowCatalogs = {
   ...STORY_CATALOGS,
+  imageModels: STORY_CATALOGS.imageModels.map((model) =>
+    model.id === "gpt-image"
+      ? { ...model, options: [{ name: "quality", kind: "choice", values: ["standard", "high"], default: "standard" }] }
+      : model,
+  ),
   mediaPreview: (attachmentId) => (attachmentId === REFERENCE ? STORY_IMAGES[1]?.previewUrl : undefined),
   stepSettings: async (stepId) => SAVED_SETTINGS[stepId] ?? { settings: null, sources: null },
 };
