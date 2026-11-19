@@ -72,6 +72,7 @@ import { localSkillTools } from "./local-skill-tools";
 import { MAC_PERMISSION_URLS } from "./mac-permission-urls";
 import { PushNotificationStore } from "./push-notification-store";
 import { DESKTOP_USE_MS } from "./push-notifications";
+import { ReferralDesktopService } from "./referral-service";
 import { RemoteWorkflowError, toRemoteWorkflowError } from "./remote-service-effects";
 import { sizeWorkflowPicture } from "./workflow-picture-size";
 /**
@@ -813,6 +814,7 @@ export interface ApplicationServices {
   skills: SkillMarketplaceService;
   hostedSites: HostedSiteDesktopService;
   billing: BillingDesktopService;
+  referral: ReferralDesktopService;
   license: LicenseDesktopService;
   hostedServers: HostedServerDesktopService;
   routineFeed: RoutineFeedServer;
@@ -1430,6 +1432,7 @@ export async function createApplicationServices({
     return hostId ? centralAuth.hostSiteCredential(hostId) : null;
   });
   const billing = new BillingDesktopService(centralAuth, openLink);
+  const referral = new ReferralDesktopService(centralAuth, openLink);
   const license = new LicenseDesktopService(centralAuth, openLink);
   const hostedServers = new HostedServerDesktopService(
     withHostingDeveloperKey(centralAuth, hostingDeveloperKey),
@@ -4878,6 +4881,7 @@ export async function createApplicationServices({
     skills,
     hostedSites,
     billing,
+    referral,
     license,
     hostedServers,
     routineFeed,

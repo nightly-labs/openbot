@@ -791,69 +791,6 @@
   animation: add-server-detail-in var(--openbot-duration-slow) var(--openbot-ease-out) both;
 }
 
-/* Confetti: pieces start at the logo, burst out, then fall. */
-
-.add-server-confetti {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.add-server-confetti i {
-  position: absolute;
-  top: var(--confetti-origin-y);
-  left: var(--confetti-origin-x);
-  width: 7px;
-  height: 12px;
-  border-radius: var(--openbot-radius-xs);
-  background: var(--openbot-accent);
-  opacity: 0;
-  animation: add-server-confetti var(--confetti-duration) var(--openbot-ease-out) var(--confetti-delay) both;
-}
-
-.add-server-confetti i:nth-child(5n + 1) {
-  background: var(--openbot-success);
-}
-
-.add-server-confetti i:nth-child(5n + 2) {
-  background: var(--openbot-warning);
-}
-
-.add-server-confetti i:nth-child(5n + 3) {
-  background: var(--openbot-danger);
-}
-
-.add-server-confetti i:nth-child(5n + 4) {
-  background: var(--openbot-accent-text);
-}
-
-.add-server-confetti i:nth-child(3n) {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--openbot-radius-pill);
-}
-
-@keyframes add-server-confetti {
-  0% {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(0.3) rotate(0deg);
-  }
-
-  30% {
-    opacity: 1;
-    transform: translate(calc(-50% + var(--confetti-x)), calc(-50% + var(--confetti-y)))
-      rotate(calc(var(--confetti-spin) / 2)) scale(1);
-  }
-
-  100% {
-    opacity: 0;
-    transform: translate(calc(-50% + var(--confetti-x) * 1.15), calc(-50% + var(--confetti-y) + 360px))
-      rotate(var(--confetti-spin)) scale(0.9);
-  }
-}
-
 @keyframes hosted-billing-save-pop {
   50% {
     transform: scale(1.1);
@@ -1041,9 +978,5 @@
   .add-server-ring-result svg path {
     stroke-dashoffset: 0;
     animation: none;
-  }
-
-  .add-server-confetti {
-    display: none;
   }
 }

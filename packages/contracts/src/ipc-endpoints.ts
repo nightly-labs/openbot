@@ -685,6 +685,7 @@ import type {
 } from "./license";
 import type { MarketplaceListingLink } from "./marketplace-links";
 import type { AccountSession, MobileConnectedDevice, MobileConnectLink, MobileConnectTicket } from "./mobile-connect";
+import type { ReferralPageRequest, ReferralState } from "./referral";
 
 declare const payloadType: unique symbol;
 declare const resultType: unique symbol;
@@ -1672,6 +1673,10 @@ export const IPC_ENDPOINTS = {
     getDetails: request<undefined, BillingDetails>()("billing:get-details"),
     setDetails: request<BillingDetailsRequest, BillingDetails>()("billing:set-details"),
   },
+  // Invite friends: the invite link, the credit from friends, and one page of the friends who joined.
+  referral: {
+    getState: request<ReferralPageRequest, ReferralState>()("referral:get-state"),
+  },
   // The commercial license of the account. Main opens the Checkout page; the renderer never sends a URL.
   license: {
     getState: request<undefined, LicenseState>()("license:get-state"),
@@ -2533,6 +2538,7 @@ export const IPC_GROUP_PATHS = {
   crm: "crm",
   routineResults: "routineResults",
   billing: "billing",
+  referral: "referral",
   license: "license",
   hostedServers: "hostedServers",
   localServers: "localServers",

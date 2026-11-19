@@ -50,3 +50,11 @@ export function installReturnPage(path: string, callbackUrl: URL): URL {
 export function companySignInApiOrigin(siteUrl: URL): string {
   return siteUrl.hostname === SITE_HOST ? `${siteUrl.protocol}//api.${SITE_HOST}` : siteUrl.origin;
 }
+
+/**
+ * The site origin of an invite link. The account API runs on `api.openbot.run`, and the link opens the
+ * home page on `openbot.run`. Another origin, such as a development one, keeps its own.
+ */
+export function inviteLinkOrigin(requestUrl: URL): string {
+  return requestUrl.hostname === `api.${SITE_HOST}` ? SITE_ORIGIN : requestUrl.origin;
+}

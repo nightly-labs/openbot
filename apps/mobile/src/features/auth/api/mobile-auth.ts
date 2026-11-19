@@ -171,7 +171,12 @@ export async function startMobileEmailSignIn(email: string, requestId: string): 
 }
 
 /** Verifies the code and saves the new session. The session is a mobile session with no host. */
-export async function verifyMobileEmailCode(challengeId: string, code: string): Promise<MobileSession> {
+/** `referralCode` is the invite code that the person typed. The account server uses it only for a new account. */
+export async function verifyMobileEmailCode(
+  challengeId: string,
+  code: string,
+  referralCode?: string,
+): Promise<MobileSession> {
   if (mobileConnectInFlight) throw new Error(currentText().t("mobile.auth.error.connectionInProgress"));
   mobileConnectInFlight = true;
   try {
@@ -193,6 +198,7 @@ export async function verifyMobileEmailCode(challengeId: string, code: string): 
       deviceId: device.id,
       deviceName: device.name,
       platform: device.platform,
+      ...(referralCode ? { referralCode } : {}),
     });
     if (!response.ok) throw mobileEmailError(response, body, "mobile.auth.email.error.verifyFailed");
     const session = decodeMobileSession(body, apiUrl, "email");

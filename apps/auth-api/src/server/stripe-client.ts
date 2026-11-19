@@ -62,6 +62,15 @@ const stripeErrorSchema = Schema.Struct({
 });
 const sessionSchema = Schema.Struct({ id: Schema.String, url: Schema.NullOr(Schema.String) });
 const customerSchema = Schema.Struct({ id: Schema.String, deleted: Schema.optional(Schema.Boolean) });
+const customerBalanceSchema = Schema.Struct({
+  id: Schema.String,
+  deleted: Schema.optional(Schema.Boolean),
+  currency: Schema.optional(Schema.NullOr(Schema.String)),
+  /** For each currency: below 0 is credit that Stripe takes off the next invoice in that currency. */
+  invoice_credit_balance: Schema.optional(Schema.NullOr(Schema.Record(Schema.String, Schema.Number))),
+});
+const balanceTransactionSchema = Schema.Struct({ id: Schema.String });
+const couponSchema = Schema.Struct({ id: Schema.String });
 const taxIdSchema = Schema.Struct({
   id: Schema.String,
   type: Schema.String,
@@ -173,6 +182,38 @@ const subscriptionSchema = Schema.Struct({
 export type StripeSubscription = typeof subscriptionSchema.Type;
 export type StripeSubscriptionItem = StripeSubscription["items"]["data"][number];
 const subscriptionListSchema = Schema.Struct({ data: Schema.Array(subscriptionSchema) });
+/** The card part of a payment method or a charge. Only the fingerprint is read: it names the card number. */
+const cardFingerprintSchema = Schema.optional(
+  Schema.NullOr(Schema.Struct({ fingerprint: Schema.optional(Schema.NullOr(Schema.String)) })),
+);
+const paymentMethodListSchema = Schema.Struct({ data: Schema.Array(Schema.Struct({ card: cardFingerprintSchema })) });
+const chargeListSchema = Schema.Struct({
+  data: Schema.Array(
+    Schema.Struct({
+      payment_method_details: Schema.optional(Schema.NullOr(Schema.Struct({ card: cardFingerprintSchema }))),
+    }),
+  ),
+});
+/** `coupon` is the place of the coupon before API version 2025-09-30.clover, `source.coupon` after it. */
+const subscriptionDiscountsSchema = Schema.Struct({
+  status: Schema.String,
+  discounts: Schema.optional(
+    Schema.NullOr(
+      Schema.Array(
+        Schema.Union([
+          Schema.String,
+          Schema.Struct({
+            id: Schema.String,
+            coupon: Schema.optional(Schema.NullOr(expandable)),
+            source: Schema.optional(
+              Schema.NullOr(Schema.Struct({ coupon: Schema.optional(Schema.NullOr(expandable)) })),
+            ),
+          }),
+        ]),
+      ),
+    ),
+  ),
+});
 const invoicePaymentListSchema = Schema.Struct({ data: Schema.Array(Schema.Struct({ invoice: expandable })) });
 const invoiceSchema = Schema.Struct({
   id: Schema.String,
@@ -214,11 +255,11 @@ export function priceHasCurrency(price: StripePrice, currency: BillingCurrency):
   return price.currency.toLowerCase() === currency || price.currency_options?.[currency] !== undefined;
 }
 
-/** The Checkout form with this promotion code. Stripe refuses a page with both a discount and the code field. */
-function withPromotionCode(body: URLSearchParams, promotionCodeId: string): URLSearchParams {
+/** The Checkout form with this discount. Stripe refuses a page with both a discount and the code field. */
+function withDiscount(body: URLSearchParams, kind: "promotion_code" | "coupon", id: string): URLSearchParams {
   const form = new URLSearchParams(body);
   form.delete("allow_promotion_codes");
-  form.set("discounts[0][promotion_code]", promotionCodeId);
+  form.set(`discounts[0][${kind}]`, id);
   return form;
 }
 
@@ -525,6 +566,11 @@ export class StripeClient {
       trialEndSeconds?: number;
       /** The code of a discount link (`promotion-code.ts`). Absent: the buyer can type a code in Checkout. */
       promotionCode?: string;
+      /**
+       * The invite discount of an account that signed up with an invite link (`ensureReferralCoupon`). A
+       * promotion code that Stripe accepts goes first: Checkout takes one discount.
+       */
+      referralCouponId?: string;
       successUrl: string;
       cancelUrl: string;
       nowSeconds: number;
@@ -591,13 +637,16 @@ export class StripeClient {
     const promotionCodeId = input.promotionCode
       ? yield* this.#activePromotionCodeId(input.promotionCode).pipe(Effect.orElseSucceed(() => null))
       : null;
+    // Without a promotion code, the invite discount. Stripe refuses a page with both a discount and the
+    // code field, so the page then has no code field.
+    const fallback = input.referralCouponId ? withDiscount(body, "coupon", input.referralCouponId) : body;
     const session = yield* promotionCodeId
       ? // A code whose restrictions this order does not meet (a first order only, a minimum amount, other
         // products or another currency) gives the page with the code field instead.
-        create(withPromotionCode(body, promotionCodeId)).pipe(
-          Effect.catchIf(isRefusedPromotionCode, () => create(body)),
+        create(withDiscount(body, "promotion_code", promotionCodeId)).pipe(
+          Effect.catchIf(isRefusedPromotionCode, () => create(fallback)),
         )
-      : create(body);
+      : create(fallback);
     if (!session.url) return yield* new StripeRequestError(200, "invalid_response", "missing_url");
     return { id: session.id, url: session.url };
   }).bind(this);
@@ -809,6 +858,127 @@ export class StripeClient {
       total: invoiceRecord.total ?? null,
       totalExcludingTax: invoiceRecord.total_excluding_tax ?? null,
     };
+  }).bind(this);
+
+  /**
+   * The currency of a customer, and its credit for each currency in minor units (above 0). Null for a
+   * customer that was deleted. In `invoice_credit_balance` a credit is above 0, unlike `balance`, where a
+   * credit is below 0.
+   */
+  readonly getCustomerCredit = Effect.fn("StripeClient.getCustomerCredit")(function* (
+    this: StripeClient,
+    customerId: string,
+  ): Effect.fn.Return<
+    { currency: string | null; credit: Readonly<Record<string, number>> } | null,
+    StripeRequestError | StripeTransportError
+  > {
+    const query = new URLSearchParams({ "expand[]": "invoice_credit_balance" });
+    const path = `/v1/customers/${encodeURIComponent(customerId)}?${query}`;
+    const customer = yield* this.#requestEffect("GET", path, null, customerBalanceSchema);
+    if (customer.deleted) return null;
+    const credit: Record<string, number> = {};
+    for (const [currency, balance] of Object.entries(customer.invoice_credit_balance ?? {})) {
+      if (Number.isSafeInteger(balance) && balance > 0) credit[currency.toLowerCase()] = balance;
+    }
+    return { currency: customer.currency?.toLowerCase() ?? null, credit };
+  }).bind(this);
+
+  /**
+   * Changes the credit of a customer in one currency: a negative amount adds credit, which Stripe takes off
+   * the next invoice in that currency, and a positive amount takes credit back. The idempotency key makes a
+   * retry change nothing.
+   */
+
+  readonly addCustomerBalance = Effect.fn("StripeClient.addCustomerBalance")(function* (
+    this: StripeClient,
+    input: { customerId: string; amount: number; currency: string; description: string },
+    idempotencyKey: string,
+  ): Effect.fn.Return<string, StripeRequestError | StripeTransportError> {
+    const body = new URLSearchParams({
+      amount: String(input.amount),
+      currency: input.currency,
+      description: input.description,
+    });
+    const path = `/v1/customers/${encodeURIComponent(input.customerId)}/balance_transactions`;
+    return (yield* this.#requestEffect("POST", path, body, balanceTransactionSchema, idempotencyKey)).id;
+  }).bind(this);
+
+  /**
+   * Makes the coupon of the invite discount when the Stripe account does not have it. The ID is fixed, so
+   * a second call finds the first coupon.
+   */
+
+  readonly ensureReferralCoupon = Effect.fn("StripeClient.ensureReferralCoupon")(function* (
+    this: StripeClient,
+    input: { id: string; percentOff: number; name: string },
+  ): Effect.fn.Return<string, StripeRequestError | StripeTransportError> {
+    const path = `/v1/coupons/${encodeURIComponent(input.id)}`;
+    const found = yield* Effect.result(this.#requestEffect("GET", path, null, couponSchema));
+    if (Result.isSuccess(found)) return found.success.id;
+    if (!(found.failure instanceof StripeRequestError) || found.failure.status !== 404) return yield* found.failure;
+    const body = new URLSearchParams({
+      id: input.id,
+      percent_off: String(input.percentOff),
+      duration: "forever",
+      name: input.name,
+    });
+    return (yield* this.#requestEffect("POST", "/v1/coupons", body, couponSchema, `openbot-coupon-${input.id}`)).id;
+  }).bind(this);
+
+  /**
+   * The fingerprints of the cards of a customer: the saved cards and the cards of its last 100 charges. Two
+   * customers with the same fingerprint used the same card number.
+   */
+  readonly cardFingerprints = Effect.fn("StripeClient.cardFingerprints")(function* (
+    this: StripeClient,
+    customerId: string,
+  ): Effect.fn.Return<ReadonlySet<string>, StripeRequestError | StripeTransportError> {
+    const methods = new URLSearchParams({ customer: customerId, type: "card", limit: "100" });
+    const charges = new URLSearchParams({ customer: customerId, limit: "100" });
+    const [saved, paid] = yield* Effect.all(
+      [
+        this.#requestEffect("GET", `/v1/payment_methods?${methods}`, null, paymentMethodListSchema),
+        this.#requestEffect("GET", `/v1/charges?${charges}`, null, chargeListSchema),
+      ],
+      { concurrency: 2 },
+    );
+    const fingerprints = new Set<string>();
+    for (const method of saved.data) if (method.card?.fingerprint) fingerprints.add(method.card.fingerprint);
+    for (const charge of paid.data) {
+      const fingerprint = charge.payment_method_details?.card?.fingerprint;
+      if (fingerprint) fingerprints.add(fingerprint);
+    }
+    return fingerprints;
+  }).bind(this);
+
+  /**
+   * Takes one coupon off a subscription and keeps its other discounts. False when the subscription did not
+   * have the coupon or has ended.
+   */
+  readonly removeSubscriptionCoupon = Effect.fn("StripeClient.removeSubscriptionCoupon")(function* (
+    this: StripeClient,
+    subscriptionId: string,
+    couponId: string,
+  ): Effect.fn.Return<boolean, StripeRequestError | StripeTransportError> {
+    const path = `/v1/subscriptions/${encodeURIComponent(subscriptionId)}`;
+    const query = new URLSearchParams({ "expand[]": "discounts" });
+    const subscription = yield* this.#requestEffect("GET", `${path}?${query}`, null, subscriptionDiscountsSchema);
+    if (subscription.status === "canceled" || subscription.status === "incomplete_expired") return false;
+    const discounts = subscription.discounts ?? [];
+    const idOf = (value: string | { id: string } | null | undefined) =>
+      typeof value === "string" ? value : (value?.id ?? null);
+    const keep = discounts
+      .filter(
+        (discount) => typeof discount === "string" || idOf(discount.source?.coupon ?? discount.coupon) !== couponId,
+      )
+      .map((discount) => (typeof discount === "string" ? discount : discount.id));
+    if (keep.length === discounts.length) return false;
+    const body = new URLSearchParams();
+    // An empty value removes all discounts.
+    if (keep.length === 0) body.set("discounts", "");
+    for (const [index, id] of keep.entries()) body.set(`discounts[${index}][discount]`, id);
+    yield* this.#requestEffect("POST", path, body, subscriptionDiscountsSchema);
+    return true;
   }).bind(this);
 
   /** True when the refunds of the PaymentIntent's charge add up to its full amount. */

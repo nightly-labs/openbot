@@ -251,6 +251,7 @@ function SettingsModalStory(props: {
               onSetRemoteNetworkRoute={(route) => mock.api.setRemoteNetworkRoute({ route })}
               onUpdateAction={runUpdateAction}
               billingApi={billingApi}
+              referralApi={mock.api.referral}
               hostedServersApi={props.hostedServers ? hostedServersApi : undefined}
               onAddHostedServer={props.hostedServers ? fn() : undefined}
               agentDock={props.agentDock ? storyAgentDock : undefined}
@@ -399,6 +400,11 @@ export const AgentDock: Story = {
 /** No plan yet. Choose a plan: the mock then shows it as active, as after a Stripe payment. */
 export const Billing: Story = {
   render: () => <SettingsModalStory initialOpen initialTab="billing" />,
+};
+
+/** 45 friends in three statuses, with credit. The filter and the pages change the mock list. */
+export const InviteFriends: Story = {
+  render: () => <SettingsModalStory initialOpen initialTab="referral" />,
 };
 
 /** An account that can create hosted servers. Start, renew and delete change the mock list. */

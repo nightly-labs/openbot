@@ -10,8 +10,10 @@
   -webkit-app-region: drag;
 }
 
+/* The card fills the first row; the page footer takes the last row, so a short window scrolls, not overlaps. */
 .account-login-screen {
-  padding: 32px 24px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  padding: 32px 24px var(--openbot-space-4);
   background: var(--openbot-bg-canvas);
 }
 
@@ -175,9 +177,16 @@
   vertical-align: -2px;
 }
 
+/* The email error takes no space until it shows; it fades out before its row closes. */
 .account-login-email-field {
   display: grid;
-  gap: 12px;
+  grid-template-rows: auto 0px;
+  transition: grid-template-rows var(--openbot-duration-fast) ease-out var(--revert-dur, 280ms);
+}
+
+.account-login-email-field.is-error {
+  grid-template-rows: auto 24px;
+  transition: grid-template-rows var(--openbot-duration-fast) ease-out;
 }
 
 .account-login-form input:not(.otp-input-native) {
@@ -210,9 +219,10 @@
 }
 
 .account-login-field-error {
+  align-self: start;
   height: 16px;
   overflow: hidden;
-  margin: -2px 0 0;
+  margin: 8px 0 0;
   color: var(--openbot-danger);
   font-size: var(--openbot-text-sm);
   line-height: 16px;
@@ -254,11 +264,167 @@
   justify-content: flex-end;
 }
 
+/* Page controls in the corners read as quiet text, like the fine print beside them. */
 .account-login-language {
-  align-self: center;
+  position: absolute;
+  top: var(--openbot-space-4);
+  inset-inline-end: var(--openbot-space-6);
   width: auto;
-  margin-top: var(--openbot-space-6);
   color: var(--openbot-text-muted);
+  -webkit-app-region: no-drag;
+}
+
+.account-login-page-footer {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: var(--openbot-space-4);
+  align-items: center;
+  margin-top: var(--openbot-space-6);
+  -webkit-app-region: no-drag;
+}
+
+.account-login-page-footer:not([data-shown]) {
+  visibility: hidden;
+}
+
+.account-login-page-footer-start {
+  display: flex;
+  min-width: 0;
+}
+
+.account-login-legal {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+}
+
+.account-login-legal .account-login-local-data {
+  margin: 0;
+}
+
+.account-login-quiet {
+  display: inline-flex;
+  height: var(--openbot-control-sm);
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+  border: 0;
+  border-radius: var(--openbot-radius-sm);
+  background: transparent;
+  padding: 0 var(--openbot-space-1-5);
+  margin-inline-start: calc(var(--openbot-space-1-5) * -1);
+  color: var(--openbot-text-muted);
+  font: inherit;
+  font-size: var(--openbot-text-sm);
+  cursor: pointer;
+  transition: color var(--openbot-duration-hover) ease;
+}
+
+.account-login-quiet:hover,
+.account-login-quiet[data-expanded],
+.account-login-quiet[data-has-code] {
+  color: var(--openbot-text-primary);
+}
+
+.account-login-quiet:focus-visible {
+  outline: 1px solid var(--openbot-border-focus);
+  outline-offset: 0;
+}
+
+/* A new code gives the corner a small pop. */
+.account-login-quiet[data-has-code] {
+  animation: account-login-invite-pop 420ms var(--openbot-ease-out) both;
+}
+
+@keyframes account-login-invite-pop {
+  40% {
+    transform: scale(1.12);
+  }
+}
+
+.account-login-invite {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--openbot-space-1);
+}
+
+.account-login-invite-code {
+  font-family: var(--openbot-font-mono);
+  letter-spacing: 0.02em;
+}
+
+.account-login-invite-remove {
+  color: var(--openbot-text-muted);
+}
+
+/* The sign-in screen is on the dialog layer, so its popover goes above it. */
+.account-login-invite-popover.ui-action-menu {
+  --ui-menu-panel-shadow: inset 0 1px 0 var(--ui-menu-highlight), 0 0 0 1px var(--ui-menu-edge);
+
+  z-index: calc(var(--openbot-layer-dialog) + var(--openbot-layer-popover) + 1);
+  width: 288px;
+  max-width: none;
+  overflow: visible;
+  padding: var(--openbot-space-1-5);
+}
+
+.account-login-invite-entry {
+  display: grid;
+  gap: var(--openbot-space-1-5);
+}
+
+/* The arrow sits inside the field, at its end. */
+.account-login-invite-field {
+  display: flex;
+  height: var(--openbot-control-md);
+  align-items: center;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-control);
+  padding-inline-end: 3px;
+  transition: border-color var(--openbot-duration-hover) ease;
+}
+
+.account-login-invite-field:focus-within {
+  border-color: var(--openbot-border-focus);
+}
+
+.account-login-invite-field[data-invalid] {
+  border-color: var(--openbot-danger);
+}
+
+.account-login-invite-field input {
+  min-width: 0;
+  height: 100%;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0 var(--openbot-space-2);
+  color: var(--openbot-text-primary);
+  font-family: var(--openbot-font-mono);
+  font-size: var(--openbot-text-md);
+}
+
+.account-login-invite-field input::placeholder {
+  color: var(--openbot-text-placeholder);
+  font-family: var(--openbot-font-sans);
+}
+
+.account-login-invite-error {
+  margin: 0;
+  padding-inline: 2px;
+  color: var(--openbot-danger);
+  font-size: var(--openbot-text-sm);
+  line-height: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .account-login-quiet[data-has-code] {
+    animation: none;
+  }
 }
 
 .account-login-development-code {
