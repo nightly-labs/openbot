@@ -207,6 +207,7 @@ import { DrainScheduler } from "./agent/drain-scheduler";
 import { DuplicationGate, toAgentDuplicationFailed } from "./agent/duplication-gate";
 import type { FailureContext, FailureSignal } from "./agent/failure-signal";
 import { FeedbackWithdrawal } from "./agent/feedback-withdrawal";
+import { type FinishCheckInput, FinishCheckResult, finishCheckPrompt } from "./agent/finish-check";
 import { type AgentHostedSites, HostedSiteCoordinator } from "./agent/hosted-site-coordinator";
 import { ImageGenRuntime } from "./agent/image-gen-runtime";
 import {
@@ -344,6 +345,7 @@ import type { ImportedRoutineRun, RoutineHoldWindow } from "./routine-store";
 import { type RoutineDueSource, RoutineTimer } from "./routine-timer";
 import type { SidebarLayoutStore } from "./sidebar-layout-store";
 import { shortenDiagnostic } from "./stderr-diagnostics";
+import { extractJsonObject } from "./structured-output";
 import type { UserBrowsingLog } from "./user-browsing-log";
 import type { VaultItems } from "./vault-items";
 import { generateHiggsfieldMedia, HIGGSFIELD_MCP_HOST, readHiggsfieldCredits } from "./workflows/higgsfield-media";
@@ -404,6 +406,12 @@ export interface AgentServiceOptions {
   contextCompactionTimeoutMs?: number;
   /** The pause with no turn before a conversation's memory review runs early. Tests make it short. */
   memoryReviewIdleMs?: number;
+  /**
+   * Whether a turn of the user's request that used tools and that no other rule continues gets a
+   * finish check (`agent/finish-check.ts`). The app turns it on. Off by default, so a test fake gets no
+   * extra side call that it does not expect.
+   */
+  finishCheck?: boolean;
   preferredProvider?: AgentProvider;
   /** The model chosen beside `preferredProvider`, or `null` for that provider's own default. */
   preferredModel?: AgentModelId | null;
@@ -2026,6 +2034,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           this.#threads.dropRefusedProviderSession(agentId, externalThreadId),
         listAgents: () => this.listAgents(),
         redactMcp: (text) => this.#mcp.redact(text),
+        ...(options.finishCheck === true
+          ? { checkFinish: (agentId: string, input: FinishCheckInput) => this.#checkFinish(agentId, input) }
+          : {}),
         emitToolUsage: (usage) => this.emit("toolUsage", usage),
         turnModel: (agentId, turnId) => this.#drain.modelForTurn(agentId, turnId),
         mayFailOver: (agentId) => this.#mayFailOver(agentId),
@@ -3135,6 +3146,43 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         );
     },
     Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "ask side question", cause: failure.cause })),
+  ).bind(this);
+
+  /**
+   * The finish check of one turn: the agent's provider, at the small model and the least reasoning,
+   * with no tools, reads the request and the turn and answers whether the request is done. Null when
+   * it cannot run now, as when the spare generation slot is taken, or when its answer does not decode.
+   */
+  readonly #checkFinish = Effect.fn("AgentService.checkFinish")(
+    function* (this: AgentService, agentId: string, input: FinishCheckInput) {
+      const agent = this.listAgents().find((candidate) => candidate.id === agentId);
+      if (!agent || this.#stopping) return null;
+      yield* this.#providers.ensureProvider(agent.provider);
+      const model = backgroundModel(agent, this.#agentModels(agent));
+      if (!model || this.#stopping || !this.#profileClients.hasSpare()) return null;
+      const client = yield* Effect.try(() =>
+        this.#providers.createProfileClient(agent.provider, agent.providerAccountId),
+      );
+      const answer = yield* this.#profileClients.run(client, (cancelled) =>
+        generateTextWithoutTools(
+          client,
+          withBackgroundEffort(model),
+          finishCheckPrompt(input),
+          cancelled,
+          sideSessionUsageObserver("finish-check", this.#store.database.usage, agent.id, agent.provider, model.id),
+        ),
+      );
+      const json = yield* Effect.try(() => extractJsonObject(answer));
+      const result = yield* Schema.decodeUnknownEffect(FinishCheckResult)(json);
+      logger.info("A finish check answered.", { agentId, verdict: result.verdict, model: model.id });
+      return result;
+    },
+    Effect.catchCause((cause) =>
+      Effect.sync(() => {
+        logger.warn("Could not run the finish check of a turn.", { error: Cause.squash(cause) });
+        return null;
+      }),
+    ),
   ).bind(this);
 
   /**

@@ -210,12 +210,12 @@ export function workflowUsageObserver(
 }
 
 /**
- * Collects the usage of one background side session under its agent: a memory review, an
- * `openbot.web_search` turn, or the spoken summary of a long answer for live voice. The side session
+ * Collects the usage of one background side session under its agent: a memory review, a finish
+ * check, an `openbot.web_search` turn, or the spoken summary of a long answer for live voice. The side session
  * has its own id, so its counters never meet those of the agent's turns.
  */
 export function sideSessionUsageObserver(
-  kind: "memory-review" | "web-search" | "voice-summary",
+  kind: "memory-review" | "finish-check" | "web-search" | "voice-summary",
   usage: AgentUsage,
   agentId: string,
   provider: ProviderSession["provider"],
