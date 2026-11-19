@@ -1865,20 +1865,35 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     later(endBuild, end + BUILD_LINGER + BUILD_FADE);
   };
   createEffect(resetToken, () => untrack(playBuild));
+  const hudBoxes = (): Box[] => {
+    const frame = viewport?.getBoundingClientRect();
+    const stage = viewport?.closest(".wfn-stage");
+    if (!frame || !stage) return [];
+    return [...stage.querySelectorAll<HTMLElement>(".wfn-hud-top, .wfn-hud")].map((element) => {
+      const rect = element.getBoundingClientRect();
+      const start = toWorld({ x: rect.left - frame.left, y: rect.top - frame.top });
+      return { x: start.x, y: start.y, width: rect.width / camera.scale, height: rect.height / camera.scale };
+    });
+  };
   const toolbarBelow = (id: string, bar: { width: number; height: number }) => {
     const box = boxOf(id);
     if (!box) return false;
     const width = bar.width / camera.scale;
     const height = bar.height / camera.scale;
     const zone = (y: number): Box => ({ x: box.x + (box.width - width) / 2, y, width, height });
-    const covers = (area: Box) =>
+    const onNode = (area: Box) =>
       live().some((node) => {
         const other = node.id === id || node.kind === "text" || node.kind === "shape" ? undefined : boxOf(node.id);
         return other !== undefined && overlaps(area, other);
       });
-    if (!covers(zone(box.y - (TOOLBAR_GAP / camera.scale + height)))) return false;
+    const hud = hudBoxes();
+    const underHud = (area: Box) => hud.some((other) => overlaps(area, other));
+    const above = zone(box.y - (TOOLBAR_GAP / camera.scale + height));
     const room = board.results(id).length > 1 ? STRIP_ROOM : TOOLBAR_GAP;
-    return !covers(zone(box.y + box.height + room / camera.scale));
+    const below = zone(box.y + box.height + room / camera.scale);
+    if (underHud(above)) return !underHud(below);
+    if (!onNode(above)) return false;
+    return !onNode(below) && !underHud(below);
   };
 
   const groupBox = createMemo(() => {
