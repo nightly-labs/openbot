@@ -26,6 +26,7 @@ export interface AgentDockShelfProps {
   stage: () => HTMLElement | undefined;
   onOpen: (agentId: string) => void;
   onShownChange?: ((shown: boolean) => void) | undefined;
+  onAgentChange?: ((agentId: string | null) => void) | undefined;
   ref: (element: HTMLUListElement) => void;
 }
 
@@ -75,6 +76,16 @@ export function AgentDockShelf(props: AgentDockShelfProps) {
       if (empty) setExpanded(false);
     },
   );
+
+  const soleAgent = createMemo((previous: string | null | undefined): string | null => {
+    const agents = new Set(live().map((result) => result.agentId));
+    if (agents.size === 0) return previous ?? null;
+    return agents.size === 1 ? (agents.values().next().value ?? null) : null;
+  });
+
+  createEffect(soleAgent, (agentId) => {
+    untrack(() => props.onAgentChange?.(agentId));
+  });
 
   createEffect(visible, (value) => {
     untrack(() => props.onShownChange?.(value));

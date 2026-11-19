@@ -272,6 +272,10 @@ export function AgentDock(props: AgentDockProps) {
   let handleArc!: SVGPathElement;
   let handleHit!: SVGPathElement;
   let shelf: HTMLUListElement | undefined;
+  let shelfShown = false;
+  let shelfAgent: string | null = null;
+  let shelfHeight = 0;
+  let shelfCard = 0;
   let seatScroll!: HTMLDivElement;
   let seatList!: HTMLDivElement;
   const seatElements = new Map<string, HTMLElement>();
@@ -289,6 +293,7 @@ export function AgentDock(props: AgentDockProps) {
   const initialCount = initialSeats.length;
   const dockH = motion.spring(dockHeight(initialCount), WOBBLY);
   const addY = motion.spring(addCenterY(initialCount), WOBBLY);
+  const shelfOffset = motion.spring(0, WOBBLY);
   const listH = motion.spring(SEAT_VIEW_INSET + seatsHeight(initialCount), SOFT);
   const panelOpen = motion.spring(0, LIQUID_OPEN);
   const closing = motion.spring(0, SOFT);
@@ -333,6 +338,37 @@ export function AgentDock(props: AgentDockProps) {
     return Math.min(last, Math.max(first, seatCenterY(seats.indexOf(id), count) - scroll));
   }
 
+  function shelfTarget(seats: readonly string[] = state.seats) {
+    const id = shelfAgent === null ? null : agentDockSeatKey({ kind: "agent", id: shelfAgent });
+    if (id === null || !seats.includes(id) || leaving.has(id)) return 0;
+    const line = Math.min(PANEL_HEIGHT, Math.max(shelfHeight, seatY(id, seats) + shelfCard / 2));
+    return line - (addCenterY(seats.length) - SEAT / 2);
+  }
+
+  function placeShelf() {
+    const target = shelfTarget();
+    if (!shelfShown) {
+      shelfOffset.jump(target);
+      return;
+    }
+    if (shelfOffset.target === target) return;
+    shelfOffset.to(target);
+    motion.kick();
+  }
+
+  function drawShelf() {
+    if (!shelf) return;
+    const line = addY.value - SEAT / 2 + shelfOffset.value - stretch.value * SEAT_LAG;
+    shelf.style.bottom = `${PANEL_HEIGHT - line}px`;
+  }
+
+  function measureShelf() {
+    if (!shelf) return;
+    shelfHeight = shelf.offsetHeight;
+    const card = shelf.lastElementChild;
+    shelfCard = card instanceof HTMLElement ? card.offsetHeight : 0;
+  }
+
   function revealScroll(index: number) {
     const count = state.seats.length;
     const top = SEAT_VIEW_INSET + index * SEAT_PITCH;
@@ -349,6 +385,7 @@ export function AgentDock(props: AgentDockProps) {
 
   function followScroll() {
     seatFades.measure();
+    placeShelf();
     const open = state.open;
     if (!open) return;
     neckY.to(seatY(open));
@@ -368,7 +405,7 @@ export function AgentDock(props: AgentDockProps) {
     seatScroll.style.top = `${seatViewTop(height) - pull * SEAT_LAG}px`;
     seatScroll.style.height = `${Math.max(0, height - DOCK_PAD * 2 - SEAT + SEAT_VIEW_INSET)}px`;
     seatList.style.height = `${Math.max(0, listH.value)}px`;
-    if (shelf) shelf.style.bottom = `${PANEL_HEIGHT - (addY.value - SEAT / 2 - pull * SEAT_LAG)}px`;
+    drawShelf();
     const arc = dockHandlePath(height, pull);
     handleArc.setAttribute("d", arc);
     handleHit.setAttribute("d", arc);
@@ -584,6 +621,7 @@ export function AgentDock(props: AgentDockProps) {
     const move = (spring: Spring, value: number) => (instant ? spring.jump(value) : spring.to(value));
     move(dockH, dockHeight(count));
     move(addY, addCenterY(count));
+    move(shelfOffset, shelfTarget(seats));
     const listHeight = SEAT_VIEW_INSET + seatsHeight(count);
     if (listHeight > listH.value) listH.jump(listHeight);
     else move(listH, listHeight);
@@ -1003,7 +1041,11 @@ export function AgentDock(props: AgentDockProps) {
   onSettled(() => {
     render();
     reportShape();
-    const resized = new ResizeObserver(() => reportShape());
+    const resized = new ResizeObserver(() => {
+      measureShelf();
+      placeShelf();
+      reportShape();
+    });
     if (shelf) resized.observe(shelf);
     window.addEventListener("resize", reportShape);
     return () => {
@@ -1307,7 +1349,19 @@ export function AgentDock(props: AgentDockProps) {
           hidden={state.open !== null}
           stage={() => stage}
           onOpen={(agentId) => openChat(agentDockSeatKey({ kind: "agent", id: agentId }))}
-          onShownChange={(shown) => props.onShelfChange?.(shown)}
+          onShownChange={(shown) => {
+            shelfShown = shown;
+            if (shown) {
+              measureShelf();
+              shelfOffset.jump(shelfTarget());
+              drawShelf();
+            }
+            props.onShelfChange?.(shown);
+          }}
+          onAgentChange={(agentId) => {
+            shelfAgent = agentId;
+            placeShelf();
+          }}
           ref={(element) => {
             shelf = element;
             element.style.right = `${STAGE_WIDTH - DOCK_LEFT + SHELF_GAP}px`;
