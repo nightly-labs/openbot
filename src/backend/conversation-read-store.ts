@@ -18,7 +18,6 @@ import type { OpenBotDatabase } from "./openbot-database";
 
 export type { ConversationMarkerExclusions } from "./database/conversation-queries";
 
-/** The rows that make a chat unread, by the rule that the apps use to move the read mark. */
 const UNREAD_FILTER = [
   "author != 'user'",
   ...READ_EXCLUDED_ITEM_TYPES.map((itemType) => `COALESCE(item_type, '') != '${itemType}'`),
@@ -122,11 +121,6 @@ export class ConversationReadStore {
     return this.#withSupportedCursor(snapshot.threadId, stateFromSnapshot(snapshot, nextThroughMessageId), options);
   }
 
-  /**
-   * Marks a database boundary without loading the thread messages. The public conversation reader
-   * uses this for marker actions because a marker can target a message older than the working
-   * cache. The ordering key keeps the monotonic cursor rule from the snapshot implementation.
-   */
   markReadForThread(
     memberId: string,
     threadId: string | null,
@@ -135,8 +129,6 @@ export class ConversationReadStore {
   ): ConversationReadState {
     if (!threadId) return emptyReadState();
     const requestedKey = throughMessageId ? this.#messageOrderKey(threadId, throughMessageId) : undefined;
-    // A device can name a message the thread does not hold: a queued message that is not saved yet,
-    // or one that was cancelled or removed. The cursor stays, and the next mark moves it.
     if (throughMessageId && !requestedKey) return this.readStateForThread(memberId, threadId, options);
     const stored = this.#storedCursor(threadId, memberId);
     let nextThroughMessageId = throughMessageId;
@@ -149,15 +141,10 @@ export class ConversationReadStore {
 
   markUnread(memberId: string, snapshot: ConversationSnapshot): ConversationReadState {
     if (!snapshot.threadId) return emptyReadState();
-    // Explicit user action only. Ordinary read acknowledgements remain monotonic.
     this.#saveCursor(snapshot.threadId, memberId, null, "marked");
     return stateFromSnapshot(snapshot, null);
   }
 
-  /**
-   * Marks a thread unread without reading its message rows. With `fromMessageId`, that message and
-   * the messages after it are unread: the cursor moves back to the message shown before it.
-   */
   markUnreadForThread(
     memberId: string,
     threadId: string | null,
@@ -169,7 +156,6 @@ export class ConversationReadStore {
     if (fromMessageId && !fromKey) throw new Error(sourceText("error.backend.readBoundaryUnavailable"));
     const throughMessageId = fromKey ? this.#messageBefore(threadId, fromKey) : null;
     this.#saveCursor(threadId, memberId, throughMessageId, "marked");
-    // The answer names a mark that the reader's client holds, as a read does.
     return this.#withSupportedCursor(threadId, this.#stateFromDatabase(threadId, throughMessageId), options);
   }
 
@@ -210,7 +196,6 @@ export class ConversationReadStore {
     );
   }
 
-  /** Where a message is in the shown order, which pages use too: a cursor is read through what was shown. */
   #messageOrderKey(threadId: string, messageId: string): MessageOrderKey | undefined {
     const row = this.database.connection
       .prepare(
@@ -281,7 +266,6 @@ export class ConversationReadStore {
     const boundaryKey = throughMessageId ? this.#messageOrderKey(threadId, throughMessageId) : undefined;
     const afterBoundary = boundaryKey ? `AND (${ORDER_KEY_COLUMNS}) > (?, ?, ?, ?, ?, ?, ?)` : "";
     const parameters = boundaryKey ? [threadId, ...boundaryKey] : [threadId];
-    // One pass over the ordered thread: the first unread row carries the count of all of them.
     const firstRow = this.database.connection
       .prepare(
         `${ORDERED_THREAD_MESSAGES}
@@ -336,8 +320,6 @@ export class ConversationReadStore {
     if (this.#storedCursor(threadId, memberId) === throughMessageId) return;
     const updatedAt = new Date().toISOString();
     this.database.dispatch(
-      // A cursor can be visited again after an explicit mark-unread. Do not reuse
-      // an old command receipt and silently skip the next read/unread transition.
       `thread-read:${event}:${threadId}:${memberId}:${randomUUID()}`,
       [
         {
@@ -377,7 +359,6 @@ function stateFromSnapshot(snapshot: ConversationSnapshot, throughMessageId: str
   };
 }
 
-/** The shown-order key of a message: its group's start, first ordinal and id, its rank in the turn, then its own time, ordinal and id. */
 type MessageOrderKey = [
   groupStart: string,
   groupFirst: number,

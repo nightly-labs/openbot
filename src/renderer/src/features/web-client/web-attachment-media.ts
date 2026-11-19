@@ -6,23 +6,12 @@ import type { AttachmentMediaSource } from "@openbot/ui/features/conversation/At
 import { createSignal } from "solid-js";
 import type { WebWorkspaceRuntime } from "./web-runtime";
 
-/** An image above this size keeps its file icon: a thumbnail must not cost a large download. */
 const WEB_THUMBNAIL_BYTES = 2 * 1024 * 1024;
-/**
- * The image that the user asked an agent to make. Above this size, the download and the base64 decode
- * stop the page for too long: about 0.5 s for 15 MB and 1 s for 30 MB.
- */
 const WEB_GENERATED_IMAGE_BYTES = 20 * 1024 * 1024;
-/** The chat holds each shown file in memory, so a larger file keeps its card and downloads on a click. */
 const WEB_MEDIA_BYTES = MOBILE_ATTACHMENT_BYTES;
 const CACHE_BYTES = 64 * 1024 * 1024;
-/** The chat shares the host connection, so only a few files download at the same time. */
 const CONCURRENT_DOWNLOADS = 2;
 
-/**
- * The only types that get an object URL. A blob URL has the origin of the app, so a type that a
- * browser can run as a page (HTML, SVG, XHTML) would get the account and host keys of this tab.
- */
 const MEDIA_TYPES: ReadonlySet<string> = new Set([
   "image/png",
   "image/jpeg",
@@ -38,27 +27,16 @@ const MEDIA_TYPES: ReadonlySet<string> = new Set([
   "video/quicktime",
   "video/mp4",
 ]);
-/**
- * An SVG thumbnail gets a `data:` URL, not an object URL. An `<img>` does not run SVG scripts, and
- * a `data:` document has no origin of its own, so the file cannot get the keys of this tab.
- */
 const SVG_TYPE = "image/svg+xml";
 
-/** A file that the chat already read from the host. */
 interface WebMediaFile {
   name: string;
   blob: Blob;
 }
 
 export interface WebAttachmentMedia extends AttachmentMediaSource {
-  /**
-   * The file of an attachment that the chat holds, or that a running load gets. Null when neither,
-   * so the caller reads it from the host. It starts no download.
-   */
   file(attachmentId: string): Promise<WebMediaFile | null>;
-  /** Holds the bytes of a file that the caller read from the host, so the chat and a later open use them. */
   keep(attachment: AttachmentSummary, bytes: Uint8Array<ArrayBuffer>): void;
-  /** Revokes every object URL. */
   dispose(): void;
 }
 
@@ -67,14 +45,9 @@ interface Entry {
   name: string;
   blob: Blob;
   bytes: number;
-  /** A `data:` URL has nothing to revoke. */
   object: boolean;
 }
 
-/**
- * Object URLs for the images, audio and video of host attachments. The browser client gets no
- * `previewUrl`, so each file is read through the host connection when the chat shows it.
- */
 export function createWebAttachmentMedia(
   remote: Pick<WebWorkspaceRuntime, "download">,
   hostId: () => string,
@@ -83,7 +56,6 @@ export function createWebAttachmentMedia(
     revoke: (url) => URL.revokeObjectURL(url),
   },
 ): WebAttachmentMedia {
-  // Insertion order is the use order: the first entry is the least recently used.
   const entries = new Map<string, Entry>();
   const [shown, setShown] = createSignal<ReadonlyMap<string, string>>(new Map());
   const loading = new Map<string, Promise<boolean>>();
@@ -91,13 +63,10 @@ export function createWebAttachmentMedia(
   let active = 0;
   let cachedHost = "";
   let total = 0;
-  // A clear makes every running download stale, so it cannot store a URL that nothing revokes.
   let generation = 0;
   let disposed = false;
 
   const publish = () => setShown(new Map([...entries].map(([key, entry]) => [key, entry.url])));
-  // No publish here: a card row calls `load` while it renders, and Solid refuses a write there.
-  // `url` reads only keys of the current host, so the old host's URLs are never shown.
   const clear = () => {
     for (const entry of entries.values()) if (entry.object) urls.revoke(entry.url);
     entries.clear();
@@ -105,7 +74,6 @@ export function createWebAttachmentMedia(
     total = 0;
     generation += 1;
   };
-  /** The files of another host are not shown here, so a host switch drops them. */
   const currentHost = () => {
     const host = hostId();
     if (host !== cachedHost) {
@@ -141,7 +109,6 @@ export function createWebAttachmentMedia(
       ? { ...base, url: `data:${SVG_TYPE};base64,${bytesToBase64(bytes)}`, object: false }
       : { ...base, url: urls.create(blob), object: true };
   };
-  /** The largest file of this type that the chat holds. */
   const limitFor = (type: string, size: "thumbnail" | "generated") =>
     playableMediaKind(type) ? WEB_MEDIA_BYTES : size === "generated" ? WEB_GENERATED_IMAGE_BYTES : WEB_THUMBNAIL_BYTES;
 
@@ -156,7 +123,6 @@ export function createWebAttachmentMedia(
       store(key, entryFor(attachment, type, bytes));
       return true;
     } catch {
-      // The card keeps its icon and its download button.
       return false;
     } finally {
       release();
@@ -201,7 +167,6 @@ export function createWebAttachmentMedia(
       if (disposed) return;
       const key = `${currentHost()}:${attachment.id}`;
       const type = mediaType(attachment);
-      // A running load stores the same file itself.
       if (!type || entries.has(key) || loading.has(key) || bytes.byteLength > limitFor(type, "generated")) return;
       store(key, entryFor(attachment, type, bytes));
     },
@@ -212,7 +177,6 @@ export function createWebAttachmentMedia(
   };
 }
 
-/** The allowed type of an attachment, from its own type or else its name. The host's file type is not used. */
 function mediaType(attachment: AttachmentSummary): string | null {
   const declared =
     attachment.mimeType.split(";")[0]?.trim().toLowerCase() || attachmentMimeTypeForName(attachment.name);

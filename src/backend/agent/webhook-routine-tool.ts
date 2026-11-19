@@ -40,7 +40,6 @@ export const UPDATE_WEBHOOK_ROUTINE_ARGUMENTS = [
   "runIn",
 ] as const;
 
-/** What a sender must send, as `docs/webhooks.md` describes it. The agent passes it on to the user. */
 const WEBHOOK_REQUEST_FORMAT = {
   method: "POST",
   contentType: "application/json",
@@ -66,11 +65,6 @@ const WEBHOOK_REQUEST_FORMAT = {
     "The URL also accepts Standard Webhooks requests, such as Composio and Svix send: webhook-id, webhook-timestamp and webhook-signature headers, and a JSON object body with a type field. The whole body becomes data, so filters can read /metadata/trigger_slug. The person pastes the sender's signing secret in the routine's settings.",
 };
 
-/**
- * Saves or deletes a webhook routine through the main process, which owns the signing secret, the
- * route limit and the relay route. Without `routineId`, `save` makes a new routine. The secret never
- * comes back here: the model must not see it.
- */
 export interface WebhookRoutineWriter {
   save(input: {
     routineId?: string;
@@ -82,19 +76,13 @@ export interface WebhookRoutineWriter {
     eventType: string | null;
     filters: EventFilter[];
     limitPolicy?: RoutineLimitPolicy;
-    /** Left out, a save keeps the saved place, and a new routine runs in the chat. */
     runIn?: RoutineRunPlace;
   }): Effect.Effect<EventRoutine, RoutineOperationFailed>;
-  /** Deletes the routine as Routines settings do. The sync after the change revokes its route. */
   delete(input: { agentId: string; routineId: string }): Effect.Effect<void, RoutineOperationFailed>;
 }
 
 type WebhookTriggerFields = { eventType: string | null; filters: EventFilter[] };
 
-/**
- * The trigger fields of a tool call. A field the call leaves out keeps its value in `current`. The
- * store checks the bounds again.
- */
 export function webhookToolTrigger(
   args: DynamicRecord,
   current: WebhookTriggerFields = { eventType: null, filters: [] },
@@ -106,32 +94,20 @@ export function webhookToolTrigger(
   if (!Array.isArray(filters) || !filters.every(isEventFilter)) {
     throw new RoutineInputError('filters must be a list of { "pointer": JSON Pointer, "value": scalar }.');
   }
-  // The receiver compares the type exactly, as the editor saves it: trimmed.
   return { eventType: eventType === null ? null : eventType.trim(), filters };
 }
 
-/**
- * The name of the API key that has the signing secret of an agent's webhook routine, after a person
- * gives the secret to the agent. Routine IDs are UUIDs, so the name is unique and fits the key name
- * pattern.
- */
 export function webhookSecretKeyName(routineId: string): string {
   return `WEBHOOK_SECRET_${routineId.replaceAll("-", "").toUpperCase()}`;
 }
 
 const logger = createOpenBotLogger("webhook-routine");
 
-/** The agent keys that `removeWebhookSecretKey` reads and removes. */
 export interface WebhookSecretKeys {
   has(agentId: string, name: string): Effect.Effect<boolean, unknown>;
   remove(agentId: string, name: string): Effect.Effect<unknown, unknown>;
 }
 
-/**
- * Removes the key that an agent got with the signing secret of a routine, when the routine or its
- * webhook trigger is gone: the secret is of no use now. A key that stays does no harm, so a failure
- * only writes a warning.
- */
 export function removeWebhookSecretKey(
   keys: WebhookSecretKeys,
   agentId: string,
@@ -146,7 +122,6 @@ export function removeWebhookSecretKey(
   );
 }
 
-/** One webhook routine as `list_routines` shows it. */
 export function webhookRoutineSummary(routine: {
   id: string;
   name: string;
@@ -157,12 +132,6 @@ export function webhookRoutineSummary(routine: {
   return { routineId: routine.id, name: routine.name, active: routine.active, eventType, filters, url };
 }
 
-/**
- * The tool result. `cardInChat` is false when this chat has no record of the routine: it belongs to
- * another agent, or the record failed. The card shows its secret button only to a person who
- * manages the host's webhook routines in the desktop app, so the text names both ways. An update
- * keeps the secret.
- */
 export function webhookRoutineToolResult(routine: EventRoutine, cardInChat: boolean, updated = false) {
   const trigger = routine.trigger.kind === "webhook" ? routine.trigger : null;
   return {

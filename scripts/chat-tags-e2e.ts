@@ -1,17 +1,3 @@
-// Tags a browser tab and a side thread in chat, in this worktree's running dev app, through the
-// preload bridge, the agent service and a real provider. It adds messages to the agent's own chat,
-// and opens tabs and a side thread that it closes and deletes at the end. Start the app with
-// `bun run dev` (never `--shared`), and pass an agent whose provider is signed in:
-// `bun scripts/chat-tags-e2e.ts --allow-mutations --agent=<agent id>`.
-//
-// 1. A side thread gets a tag of a tab that the agent's own chat owns. It reads the code word on
-//    that page with its browser tool: the tag shared the tab with the thread.
-// 2. The agent's own chat gets a tag of the side thread. It finds the code word that only the
-//    thread holds, with `history_read` and the task id.
-// 3. A tag of another agent's tab shares nothing: the agent does not read that page.
-// 4. The stored messages keep the markers, so each delivery reads the current tab and thread.
-// The provider input is not visible here, so the script does not measure the tokens of a tag.
-// Writes .openbot-build/chat-tags-e2e/report.json.
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { serializeChatTagReference } from "@openbot/contracts/chat-tag-references";
@@ -78,7 +64,6 @@ const bridge = {
   tabs: () => page.evaluate(() => window.openbot.browser.listTabs()),
 };
 
-/** The assistant reply that names one of `needles`, after the turn ends. */
 const replyWith = (snapshot: ConversationSnapshot, needles: string[]) =>
   snapshot.activeTurnId === null
     ? snapshot.messages.find(
@@ -86,7 +71,6 @@ const replyWith = (snapshot: ConversationSnapshot, needles: string[]) =>
       )
     : undefined;
 
-/** The assistant replies after the user message that holds `marker`. */
 const repliesAfter = (snapshot: ConversationSnapshot, marker: string) => {
   const sent = snapshot.messages.findIndex((message) => message.author === "user" && message.text.includes(marker));
   if (sent < 0) return [];
@@ -106,7 +90,6 @@ try {
   assert.ok(agent, `Unknown agent: ${agentId}`);
   report.provider = agent.provider;
 
-  // The agent's own chat needs a thread to own a tab.
   await bridge.send(SHORT_PROMPT);
   const ready = await waitFor(page, "own chat replies", bridge.main, (snapshot) =>
     Boolean(replyWith(snapshot, ["ready"])),
@@ -136,7 +119,6 @@ try {
     (snapshot) => Boolean(replyWith(snapshot, ["ready"])),
   );
 
-  // 1. The side thread reads a tab of the agent's own chat.
   const tabTag = serializeChatTagReference("tab", pages["/own"]?.title ?? "", ownTab.id);
   await bridge.send(
     `${tabTag} Read the text of this tab with your browser tool. Reply with the code word only.`,
@@ -151,7 +133,6 @@ try {
   report.sharedTabRead = repliesAfter(sideAfter, tabTag).some((text) => text.includes(words.tab));
   assert.ok(report.sharedTabRead, "The side thread read the tagged tab of the agent's own chat.");
 
-  // 2. The agent's own chat reads the side thread.
   const threadTag = serializeChatTagReference("thread", task.title, sideTaskId);
   await bridge.send(
     `${threadTag} Read that thread. Its first message names the thread code word; the thread also holds a tab code word. Reply with the thread code word only.`,
@@ -168,7 +149,6 @@ try {
   report.threadWordFound = repliesAfter(mainAfter, threadTag).some((text) => text.includes(words.thread));
   assert.ok(report.threadWordFound, "The agent's own chat found the code word of the tagged thread.");
 
-  // 3. A tag of another agent's tab shares nothing.
   const other = agents.find((candidate) => candidate.id !== agentId);
   if (!other) {
     report.foreignTab = null;
@@ -186,13 +166,11 @@ try {
     const foreign = await waitFor(page, "own chat answers about the other tab", bridge.main, (snapshot) =>
       answeredAfter(snapshot, otherTag),
     );
-    // The agent can fall back to a tab of its own; only the other page's code word is a leak.
     const reply = repliesAfter(foreign, otherTag).join("\n");
     report.foreignTab = { otherAgentId: other.id, pageTextLeaked: reply.includes(words.other), reply };
     assert.ok(!report.foreignTab.pageTextLeaked, "The agent did not read another agent's tab.");
   }
 
-  // 4. The stored messages keep the markers.
   const stored = [...(await bridge.main()).messages, ...(await bridge.side(sideTaskId)).messages];
   report.markersStored = {
     tab: stored.some((message) => message.author === "user" && message.text.includes(tabTag)),

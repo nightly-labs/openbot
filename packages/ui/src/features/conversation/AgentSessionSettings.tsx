@@ -16,7 +16,6 @@ export interface AgentSessionSettingsApi {
   subscribe?(agentId: string, listener: () => void): () => void;
 }
 
-/** Saved choices and provider values stay separate, including choices a provider removed. */
 export function AgentSessionSettings(props: {
   agentId: string;
   providerIdentity: string;

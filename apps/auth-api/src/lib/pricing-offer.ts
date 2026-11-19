@@ -1,13 +1,6 @@
 import { createServerFn } from "@tanstack/solid-start";
 import { isEuCountry, LIST_PRICE_PLANS, type PricingOffer } from "./pricing-page";
 
-/**
- * Reads what the pricing page sells. It runs on the Worker: the server prices are Stripe Prices, and
- * the country is the Cloudflare country of the request. The imports are inside the handler, so the browser bundle
- * never holds `cloudflare:workers`, and a test that imports the route does not load the Start server.
- *
- * When the Stripe prices do not load, this logs the failure and gives the list prices.
- */
 export const readPricingOffer = createServerFn({ method: "GET" }).handler(async (): Promise<PricingOffer> => {
   const [{ getRequest }, { requestCountry }, { requestBillingService }, { runApiEffect }, { BillingError }] =
     await Promise.all([
@@ -19,7 +12,6 @@ export const readPricingOffer = createServerFn({ method: "GET" }).handler(async 
     ]);
   const inEu = isEuCountry(requestCountry(getRequest()));
   try {
-    // Building the service can throw too: a Worker without the remote ticket key (the preview) cannot make one.
     const billing = requestBillingService();
     if (!billing) return { plans: LIST_PRICE_PLANS, inEu };
     const catalog = await runApiEffect(billing.catalog());

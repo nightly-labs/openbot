@@ -1,11 +1,3 @@
-// The host-wide preferences in an instance transfer file: the choices of Server settings and Agent
-// defaults that apply to the whole server. App choices of one computer (theme, language, shortcuts)
-// stay with that computer's app and are not here.
-//
-// The file keeps each preference as the value its store reads. The import checks each one with the
-// parser that the Settings screens use and saves it through the same store, so a value that the
-// importing app does not accept is left out, and the others are still saved.
-
 import {
   type AgentDefaults,
   type AgentMemoryLimitPreference,
@@ -36,50 +28,35 @@ import {
 import { parseServerPersonality } from "./server-personality-preference-store";
 import { parseServerTimezone } from "./server-timezone-preference-store";
 
-/** One preference as the import writes it: read, check, save. */
 interface Preference<T> {
   get(): T;
   set(value: T): Effect.Effect<unknown, unknown>;
 }
 
-/** The stores of the host-wide preferences. Main wires each to the store its Settings screen writes. */
 export interface TransferServerPreferencePort {
   timezone: Preference<string | null>;
   personality: Preference<HostPersonality>;
   busyMessageMode: Preference<BusyMessageModePreference>;
-  /** The set also gives the new defaults to the agents that follow them. */
   agentDefaults: Preference<AgentDefaults>;
   memoryLimit: Preference<AgentMemoryLimitPreference>;
   memoryReview: Preference<MemoryReviewPreference>;
   skillLearning: Preference<SkillLearningPreference>;
   promptCacheTtl: Preference<PromptCacheTtl>;
-  /** The server notification level of the local owner. */
   ownerNotificationLevel: Preference<ServerNotificationLevel | null>;
   browsingMemory: Preference<{ enabled: boolean }>;
-  /** The set sends the provider change event, as the Settings switch does. */
   claudeUserSetup: Preference<boolean>;
-  /** The set sends the provider change event, as the Settings field does. */
   claudeCompactWindow: Preference<number | null>;
-  /** The member who gets the alerts is left out: member ids belong to one server. Null is the owner. */
   machineAlerts: Preference<MachineAlertSettings>;
-  /** The models that an admin turned off, for each provider. */
   modelVisibility: Preference<HiddenModels>;
-  /** The set starts the turns that a higher limit lets start, as Server settings does. */
   turnLimits: Preference<HostTurnLimitsInput>;
 }
 
-/** The models that an admin turned off, for each provider. */
 type HiddenModels = { provider: string; hidden: string[] }[];
 
-/** The preferences as the export writes them: each one as its store reads it. */
 export type TransferServerPreferences = {
   [K in keyof TransferServerPreferencePort]?: ReturnType<TransferServerPreferencePort[K]["get"]>;
 };
 
-/**
- * The preferences as the import reads them from a file. Each value is checked when it is saved, and a
- * key that this app does not know (from a newer app) is left out.
- */
 export const ServerPreferencesInFile = Schema.Record(Schema.String, Schema.Unknown);
 
 function parseTimezone(value: unknown): string | null {
@@ -116,7 +93,6 @@ function parseCompactWindow(value: unknown): number | null {
   return value;
 }
 
-/** The thresholds of the file; the alerts go to the owner of this server. */
 function parseMachineAlerts(value: unknown): MachineAlertSettings {
   return { ...decodeMachineAlertSettings(value), responsibleMemberId: null };
 }
@@ -141,7 +117,6 @@ function parseHiddenModels(value: unknown): HiddenModels {
   });
 }
 
-/** Each key with the parser that the Settings screen of that preference uses, and its store. */
 function savers(
   port: TransferServerPreferencePort,
 ): Record<keyof TransferServerPreferencePort, (value: unknown) => Effect.Effect<unknown, unknown>> {
@@ -182,7 +157,6 @@ const KEYS: readonly (keyof TransferServerPreferencePort)[] = [
   "turnLimits",
 ];
 
-/** What the export writes. The owner's notification level only when the owner exports. */
 export function readServerPreferences(port: TransferServerPreferencePort, owner: boolean): TransferServerPreferences {
   return {
     timezone: port.timezone.get(),
@@ -203,10 +177,6 @@ export function readServerPreferences(port: TransferServerPreferencePort, owner:
   };
 }
 
-/**
- * Saves each preference of the file that this app accepts. The owner's notification level only when
- * the owner imports. One warning counts the preferences that were left out.
- */
 export const applyServerPreferences = Effect.fn("InstanceTransfer.applyServerPreferences")(function* (
   port: TransferServerPreferencePort,
   preferences: typeof ServerPreferencesInFile.Type,

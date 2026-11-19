@@ -31,8 +31,6 @@ export async function saveAppearance(value: Appearance): Promise<void> {
       Uniwind.setTheme(value);
       useAppearance.setState({ value });
     };
-    // A light or dark choice that the screen already shows has nothing to animate. "System" can
-    // only tell its theme after the change.
     if (value !== "system" && value === Uniwind.currentTheme) apply();
     else await sweepTheme(apply);
   } finally {

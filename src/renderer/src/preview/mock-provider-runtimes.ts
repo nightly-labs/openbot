@@ -12,10 +12,8 @@ export interface MockProviderRuntimeOptions {
   providerRuntimeFailure?: boolean;
 }
 
-/** The size of each downloaded provider CLI in the preview. */
 const MOCK_DOWNLOAD = { bytes: 612_000_000, versions: 2 };
 
-/** The provider CLIs and tool runtimes the app downloads, with progress the preview makes up. */
 export function createMockProviderRuntimes(options: MockProviderRuntimeOptions, { schedule }: MockRuntime) {
   const runtimeSnapshot: ProviderRuntimeSnapshot = clone(
     options.providerRuntimeSnapshot ?? {
@@ -35,8 +33,6 @@ export function createMockProviderRuntimes(options: MockProviderRuntimeOptions, 
         copilot: { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null },
         mistral: { phase: "not-downloaded", progress: null, message: null, version: null, availableVersion: null },
       },
-      // No `availableVersion`: a tool runtime is downloaded once and replaced by a release, so the
-      // preview never offers an update for one.
       toolRuntimes: { bun: { phase: "not-downloaded", progress: null, message: null, version: null } },
     },
   );
@@ -51,7 +47,6 @@ export function createMockProviderRuntimes(options: MockProviderRuntimeOptions, 
 
   const providerRuntimes: OpenBotDesktopApi["providerRuntimes"] = {
     getStatus: async () => clone(runtimeSnapshot),
-    // The preview has no upstream to ask: every offer it makes is already in the snapshot.
     checkForUpdates: async () => clone(runtimeSnapshot),
     download: async (provider) => {
       if (!isManagedRuntimeProvider(provider)) throw new Error("OpenBot does not manage this provider's CLI.");
@@ -103,7 +98,6 @@ export function createMockProviderRuntimes(options: MockProviderRuntimeOptions, 
       setRuntimeStatus(provider, { ...current, phase: "not-downloaded", progress: null, message: null });
       return clone(runtimeSnapshot);
     },
-    // The preview does not know which providers are off: the page asks only for one that is.
     measureDownload: async (provider) =>
       runtimeSnapshot.providers[provider].phase === "ready" ? MOCK_DOWNLOAD : { bytes: 0, versions: 0 },
     removeDownload: async (provider) => {

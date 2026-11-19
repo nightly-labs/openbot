@@ -25,7 +25,6 @@ export function attachmentReferences(value: string): AttachmentReference[] {
   }));
 }
 
-/** The marker at the start of `value`, for a Markdown tokenizer. Only offset 0 is tested. */
 export function attachmentReferenceAt(value: string): AttachmentReference | undefined {
   const match = ATTACHMENT_REFERENCE_AT_START.exec(value);
   if (!match) return undefined;

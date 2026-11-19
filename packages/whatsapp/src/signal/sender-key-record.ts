@@ -1,26 +1,16 @@
-// Sender key states for one (group, sender) pair, with OpenBot's own versioned binary format.
-// Our own record holds one state with the signing private key. A received record holds up to five
-// states, oldest first.
-
 import { ProtoFields, ProtoWriter } from "./protobuf";
 
-/** OpenBot sender key record format 1. */
 const RECORD_FORMAT = 1;
 export const MAX_SENDER_KEY_STATES = 5;
 export const MAX_SENDER_MESSAGE_KEYS = 2000;
-/** Largest accepted step from the current chain iteration to a message iteration. */
 export const MAX_SENDER_FORWARD_JUMP = 2000;
 
 export interface SenderKeyState {
   keyId: number;
-  /** Iteration of the current chain key. */
   iteration: number;
   chainKey: Uint8Array;
-  /** 33 bytes with the type byte 0x05. */
   signingPublicKey: Uint8Array;
-  /** Set only for our own sender key. */
   signingPrivateKey: Uint8Array | undefined;
-  /** Message key seeds of skipped iterations, oldest first. */
   skipped: Map<number, Uint8Array>;
 }
 

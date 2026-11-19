@@ -5,7 +5,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin } from "./request-helpers";
 
-/** The changes to the access of this server, newest first. Owners and admins only. Frozen by `server-audit-v1`. */
 export async function routeServerAudit(
   context: TeamApiRequestContext,
   audit: TeamApiServerAudit | undefined,

@@ -5,13 +5,8 @@ import { useMobileWorkspace, useMobileWorkspaceActions } from "@/features/worksp
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
 
-/** As on desktop: memory and CPU change fast, so the reading is live. The host reads CPU since the reading before. */
 const MACHINE_REFRESH_MS = 5_000;
 
-/**
- * The machine use of a server (`machine-resources-v1`), for an owner or admin. It reads again every few
- * seconds while the screen is on top and the app is in the foreground, and stops otherwise.
- */
 export function useMachineMetrics(serverId: string) {
   const { canReadMachineMetrics } = useMobileWorkspace();
   const { loadMachineMetrics } = useMobileWorkspaceActions();

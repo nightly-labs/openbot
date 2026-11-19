@@ -1,19 +1,9 @@
-// Where the Computer Use driver executable is, across a packaged build, a checkout and a machine
-// the developer installed it on by hand.
-
 import { constants } from "node:fs";
 import { access } from "node:fs/promises";
 import { delimiter, isAbsolute, join } from "node:path";
 import { Effect } from "effect";
 import { cuaIO } from "./cua-driver-effects";
 
-/**
- * The targets `cua-driver` ships a binary for.
- *
- * The driver is one program on three desktops, so the only reason a target is absent here is that
- * upstream publishes nothing for it. Keep this table and the packaged layout in step: the directory
- * names are the Node ones, because the resolver reads `process.platform` and `process.arch`.
- */
 const SUPPORTED_TARGETS: Readonly<Record<string, readonly string[]>> = {
   darwin: ["arm64", "x64"],
   win32: ["x64", "arm64"],
@@ -27,19 +17,13 @@ export interface CuaDriverArtifactInput {
   platform: NodeJS.Platform;
   architecture: string;
   homeDirectory: string;
-  /** `PATH` as the process received it, or `null` when it is unset. */
   pathVariable: string | null;
-  /** `OPENBOT_CUA_DRIVER_PATH`, then the driver's own `CUA_DRIVER_PATH`. */
   overrides?: readonly (string | undefined)[];
-  /** `CUA_DRIVER_RS_INSTALL_DIR` and its legacy alias `CUA_DRIVER_BIN_DIR`, the installer's own override. */
   installDirectory?: string | undefined;
-  /** `%LOCALAPPDATA%`. Read only on Windows, where the installer writes below it. */
   localAppDataDirectory?: string | undefined;
-  /** `/Applications`. Read only on macOS, where the driver's real binary is inside a bundle there. */
   applicationsDirectory?: string;
 }
 
-/** Whether this computer is one the driver is published for, which is not whether it is installed. */
 export function isSupportedCuaDriverTarget(platform: NodeJS.Platform, architecture: string): boolean {
   return SUPPORTED_TARGETS[platform]?.includes(architecture) ?? false;
 }
@@ -59,31 +43,11 @@ export const resolveCuaDriver = Effect.fn("CuaDriver.resolve")(function* (input:
   return null;
 });
 
-/**
- * The two calls the driver makes to its own vendor, off for every copy OpenBot starts.
- *
- * `CUA_DRIVER_RS_TELEMETRY_ENABLED` stops the product analytics. The driver ships with them on, and
- * OpenBot now ships the driver, so a user who never chose the driver would otherwise send a vendor
- * that is not OpenBot a record of each tool call.
- *
- * `CUA_DRIVER_RS_UPDATE_CHECK` stops the release check `serve` makes at startup. OpenBot pins the
- * driver in `native-runtime.lock.json` and packages that exact build, so the answer could only offer
- * the user an update OpenBot would refuse: on macOS the binary sits inside a signed application
- * bundle, and replacing it would break the signature. Off, the daemon also writes no
- * `~/.cua-driver/version_check.json`.
- *
- * The driver reads the environment before its own configuration, so these decide the question:
- * nothing a process inherits can turn them back on, and OpenBot writes no file, so a driver the user
- * runs themselves keeps the settings they gave it. This is why both are spread last, after any
- * inherited environment, at every place that runs the binary: the daemon, the MCP proxy each
- * provider spawns, the permission probe, and the doctor script.
- */
 export const CUA_DRIVER_VENDOR_CALLS_OFF: Readonly<Record<string, string>> = {
   CUA_DRIVER_RS_TELEMETRY_ENABLED: "0",
   CUA_DRIVER_RS_UPDATE_CHECK: "0",
 };
 
-/** The file name, which carries an extension only where the operating system needs one. */
 function executableName(platform: NodeJS.Platform): "cua-driver" | "cua-driver.exe" {
   return platform === "win32" ? "cua-driver.exe" : "cua-driver";
 }
@@ -91,10 +55,6 @@ function executableName(platform: NodeJS.Platform): "cua-driver" | "cua-driver.e
 function* candidatePaths(input: CuaDriverArtifactInput): Generator<string> {
   const name = executableName(input.platform);
 
-  // A release carries the driver it was pinned, built and signed against, and that one only. An
-  // environment variable or an install the user already had would otherwise decide which program
-  // drives their desktop, and OpenBot would have no way to say which build it spawned. A release
-  // that shipped without the binary is a broken build, and reporting no driver says so.
   if (input.isPackaged) {
     yield join(input.resourcesPath, "cua-driver", input.platform, input.architecture, name);
     return;
@@ -110,12 +70,6 @@ function* candidatePaths(input: CuaDriverArtifactInput): Generator<string> {
   const installDirectory = input.installDirectory?.trim();
   if (installDirectory) yield join(installDirectory, name);
 
-  // Where the driver's own installers put it. The POSIX script uses `~/.local/bin`. The Windows
-  // script uses a junction below the per-user program directory, so that an upgrade retargets a
-  // junction and needs no administrator. Its vendor folder was renamed in driver v0.2.14, and the
-  // installer migrates a legacy install only when it is run again, so both names are read here.
-  // macOS keeps the real binary in an application bundle and puts only a symlink in `~/.local/bin`.
-  // A user who moved the bundle in by hand, or who cleared `~/.local/bin`, still has a driver.
   const applications = input.applicationsDirectory?.trim();
   if (input.platform === "darwin" && applications) {
     yield join(applications, "CuaDriver.app", "Contents", "MacOS", name);

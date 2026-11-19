@@ -11,15 +11,10 @@ import { serverCanAdminister } from "./server-capabilities";
 import type { ServerSettingsSectionHost } from "./server-settings-section";
 
 interface ServerMemorySection {
-  /** True when the caller can change at least one memory setting of this server. */
   available: Accessor<boolean>;
   Panel: () => JSX.Element;
 }
 
-/**
- * What the agents of the server remember and learn. Each setting shows only when the host has its
- * capability and the caller can administer it, so an older host shows the settings it supports.
- */
 export function createServerMemorySection(host: ServerSettingsSectionHost): ServerMemorySection {
   const { t } = useText();
   const { props, actionsAvailable, busy, run } = host;

@@ -5,7 +5,6 @@ import type { SettingsTab } from "./settings-tabs";
 
 export type AppSettingLinkId = Exclude<SettingLinkId, AgentSettingLinkId>;
 
-/** The tab of an app setting, and the title key of its row, which is also the row's `data-settings-row`. */
 export interface AppSettingLinkTarget {
   tab: SettingsTab;
   row: AppTextKey;
@@ -47,7 +46,6 @@ const TARGETS: Record<Exclude<AppSettingLinkId, "island.show">, AppSettingLinkTa
   "updates.auto-install": { tab: "updates", row: "settings.updates.autoInstall.title" },
 };
 
-/** Where an app setting is on this platform. The Dynamic Island row has another name off macOS. */
 export function appSettingLinkTarget(
   settingId: AppSettingLinkId,
   platform: AppInfo["platform"] | undefined,

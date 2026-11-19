@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/status/remote";
 
 export const messages = {
-  // Status lines of remote desktop setup and remote connection recovery.
   "status.remote.setupMacOnly": "権限の設定は macOS で利用できます。",
   "status.remote.setupInstallHost":
     "リモートデスクトップのホストコンポーネントをインストールしてから、もう一度確認してください。",

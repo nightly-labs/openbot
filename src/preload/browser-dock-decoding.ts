@@ -1,6 +1,3 @@
-// What main sends for the browser dock overlay: the presentation it shows, the actions that the main
-// renderer does, and whether the overlay is on screen.
-
 import {
   type BrowserDockAction,
   type BrowserDockPresentation,
@@ -8,7 +5,6 @@ import {
   isBrowserDockPresentation,
 } from "@openbot/contracts/ipc";
 
-/** Null hides the overlay. */
 export function decodeBrowserDockPresentation(value: unknown): BrowserDockPresentation | null {
   if (value === null) return null;
   if (!isBrowserDockPresentation(value)) throw new Error("Invalid browser dock presentation.");

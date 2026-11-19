@@ -10,7 +10,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin } from "./request-helpers";
 
-/** Which models the model picker of this server shows, read and set from a joined server, and how it lists them. Frozen by `model-visibility-v1`. */
 export async function routeModelVisibility(
   context: TeamApiRequestContext,
   admin: TeamApiAdmin | undefined,
@@ -26,7 +25,6 @@ export async function routeModelVisibility(
   const visibility = admin?.modelVisibility;
   if (!visibility || !capabilities.has(MODEL_VISIBILITY_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.modelVisibilityUnsupported"));
-  // Each member's picker reads the listing; it holds no more than the model list that the member reads.
   if (url.pathname === MODEL_VISIBILITY_ROUTES.listing)
     return json(200, { models: await runCauseEffect(visibility.listings()) });
   requireAdmin(member);

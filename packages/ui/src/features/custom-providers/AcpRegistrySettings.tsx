@@ -29,7 +29,6 @@ export interface AcpRegistrySettingsApi {
   remove(registryId: string): Promise<void>;
 }
 
-/** Commands are installed on the host supplied by the application. Manual agents remain separate. */
 export function AcpRegistrySettings(props: { api: AcpRegistrySettingsApi }) {
   const { t, errorMessage } = useText();
   const [state, setState] = createStore<{

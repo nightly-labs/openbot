@@ -507,6 +507,22 @@ the live list has the same `sunra-` or `higgsfield-` form as a fixed id. A clien
 the capability shows the fixed models and no price. The Run button of an image step shows the price,
 and the page rail shows the number of credits under the logo when the account has no quota.
 
+`workflows-media-service-account-v1` lets a step choose which Sunra or Higgsfield account pays. Apps
+can have more than one account of a service (`mcp-accounts-v1`). The accounts of a service are its
+enabled, signed-in Apps rows in the order of Apps: the row of the first connect, then the accounts
+that the person added (`McpGateway.serviceSignIns`). The first one is the default. The `account`
+field of an image step then also applies to a Sunra or a Higgsfield model: empty or `default` is the
+first account, and the id of an Apps row is that account. When the host does not have that account,
+the step fails with "account not found" and the host never makes the file on another account.
+`POST /v1/workflows/media/service-accounts {}` answers `{ accounts }`, each with `provider`, `id` and
+`name` (null for the row of the first connect, which Apps names by the app).
+`POST /v1/workflows/media/service-credits {}` answers the same list with the `credits` of each
+account. Both are reads that each member who can use workflows can call; they give no token or
+address. The catalog, the price and the answers of `workflows-sunra-v1` and `workflows-higgsfield-v1`
+stay on the first account. The capability goes to protocol 10 peers. When a service has more than one
+account, the model picker lists each one ("Higgsfield credits · Higgsfield 2"), and the page rail
+shows one credits button for each account, with its name.
+
 The optional event `workflows-changed { workflowId }` names the workflow that changed, so the
 client reads it again. A client without the capability shows `serverTooOld` on the Workflows page.
 
@@ -973,6 +989,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `events-v1` | Manage webhook routines, their secrets, and activity | `events` |
 | `routine-recovery-v1` | Read and set a routine's missed-run policy; read its runs with the missed occurrences | `events` |
 | `routine-results-v1` | List the messaging connections and their places; read and set where an agent routine sends its answers. Deliveries stay on the host | none: only the mobile app sends it |
+| `routine-results-whatsapp-v1` | No route or field of its own. The `routine-results-v1` answers can name `whatsapp`, so the options list the host's WhatsApp numbers and a routine can send its answers to one. The host sends WhatsApp only to a client that sends it. Protocol 10 only | none |
 | `webhook-tests-v1` | Send one signed test event to a webhook routine | `events` |
 | `webhook-sender-secret-v1` | Set a webhook routine's signing secret to a secret that the sender made | `events` |
 | `webhook-agent-secret-v1` | Give a new signing secret of an agent's webhook routine to that agent as an API key. The answer has only the key name | `events` |

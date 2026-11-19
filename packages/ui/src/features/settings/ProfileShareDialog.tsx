@@ -2,7 +2,6 @@ import { Button, Copy, Dialog, Download, IconButton, Text, toast, X } from "@ope
 import { createSignal, onCleanup, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 
-/** The page's content security policy refuses `blob:` images, so the preview is a `data:` URL. */
 export function blobDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -12,7 +11,6 @@ export function blobDataUrl(blob: Blob): Promise<string> {
   });
 }
 
-/** The activity image: a preview, then a copy to the clipboard or a save to a file. */
 export function ProfileShareDialog(props: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -42,7 +40,6 @@ function ProfileShareContent(props: { createImage: () => Promise<Blob>; onClose:
     for (const url of downloads) URL.revokeObjectURL(url);
   });
 
-  // One image for each open: a later change to the account or the report does not draw it again.
   void untrack(() => props.createImage())
     .then(async (blob) => {
       const url = await blobDataUrl(blob);

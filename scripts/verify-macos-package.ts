@@ -14,8 +14,6 @@ const logger = createOpenBotLogger("verify-macos-package");
 const FUSE_DISABLED = 48;
 const FUSE_ENABLED = 49;
 
-// Each launch step ends on a state or an event. This limit only turns a real hang into a clear failure:
-// a slow release runner can need much more time than usual to start the first instance.
 const launchStepLimitMs = 5 * 60_000;
 
 const EXPECTED_MACOS_ICON_FILES = [
@@ -31,8 +29,6 @@ const EXPECTED_MACOS_ICON_FILES = [
   "icon_512x512@2x.png",
 ] as const;
 
-// electron-builder writes the default x64 build to `dist/mac` and adds a suffix for any other one.
-// The package is built for the runner's own architecture, so that is the one to verify.
 const architecture = process.arch === "arm64" ? "arm64" : process.arch === "x64" ? "x64" : null;
 if (!architecture) throw new Error(`OpenBot does not ship for macOS ${process.arch}.`);
 const machOArchitecture = architecture === "arm64" ? "arm64" : "x86_64";
@@ -49,12 +45,9 @@ const sourceIconCatalogPath = resolve("build/macos/Assets.car");
 const plistPath = resolve(contentsPath, "Info.plist");
 const voiceRuntimePath = resolve(resourcesPath, "voice/runtime");
 const voiceRuntimeLibraries = ["sherpa-onnx.node", "libsherpa-onnx-c-api.dylib", "libonnxruntime.dylib"];
-// ONNX Runtime session settings that the voice hosts read. It is text, not a library.
 const voiceSessionSettingsPath = resolve(voiceRuntimePath, "no-arena.cfg");
 const remoteRuntimePath = resolve(resourcesPath, "remote-desktop-runtime/darwin", architecture);
 const cuaDriverPath = resolve(resourcesPath, "cua-driver/darwin", architecture);
-// The database host is spawned by path as its own process, so it has to survive the asar unchanged.
-// Packed into app.asar it would still be readable, but `utilityProcess` cannot start it from there.
 const databaseHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/agent-database-host.js");
 const voiceHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/voice-transcription-host.js");
 const speechHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/voice-speech-host.js");
@@ -63,7 +56,6 @@ await Promise.all([
   access(executablePath),
   access(resolve(resourcesPath, "app.asar.unpacked/node_modules/effect/package.json")),
   access(resolve(resourcesPath, "app.asar.unpacked/node_modules/effect/dist/index.js")),
-  // The Dynamic Island loads this FFI addon to stop its panel from activating the app (#3497).
   access(
     resolve(
       resourcesPath,
@@ -104,18 +96,13 @@ await Promise.all([
   access(resolve(cuaDriverPath, "cua-driver")),
   access(resolve(cuaDriverPath, "LICENSE.md")),
 ]);
-// Only this Mac's driver ships. A `from: build/cua-driver` that forgot the target would put the
-// Windows and Linux builds in every installer.
 await Promise.all(["win32", "linux"].map((name) => assertAbsent(resolve(resourcesPath, "cua-driver", name))));
-// Each application carries one architecture's runtimes. The other one would only add size.
 const otherArchitecture = architecture === "arm64" ? "x64" : "arm64";
 await Promise.all(
   ["remote-desktop-runtime", "cua-driver"].map((name) =>
     assertAbsent(resolve(resourcesPath, name, "darwin", otherArchitecture)),
   ),
 );
-// `signIgnore` keeps the driver's own Developer ID signature, and with it the Automation
-// entitlement that re-signing under OpenBot's inherited entitlements would drop.
 assertCuaDriverSignature(resolve(cuaDriverPath, "cua-driver"));
 await verifyPackagedIcon(packagedIconPath, sourceIconPath);
 await verifyPackagedIconCatalog(packagedIconCatalogPath, sourceIconCatalogPath);
@@ -148,8 +135,6 @@ const packageJson = JSON.parse(await readFile("package.json", "utf8"));
 if (!isDynamicRecord(packageJson)) throw new Error("package.json is not a JSON object.");
 expectEqual(plist.CFBundleShortVersionString, packageJson.version, "application version");
 
-// Electron is unavailable to this process, and its own imports are what keep it startable there.
-// The unpacked Effect package checked above is its only import outside node: builtins.
 const databaseHost = await readFile(databaseHostPath, "utf8");
 if (/from "(?!node:|effect["/])/.test(databaseHost)) {
   throw new Error("The database host must import nothing but node: builtins and effect.");
@@ -174,7 +159,6 @@ for (const name of voiceRuntimeLibraries) {
     throw new Error(`Expected a ${machOArchitecture} voice runtime library: ${voiceArchitecture}`);
   }
 }
-// The dictation models and Supertonic are downloaded on demand.
 if (
   [
     "voice/model",
@@ -250,7 +234,6 @@ async function verifyPackagedIcon(packagedPath: string, sourcePath: string): Pro
   }
 }
 
-/** macOS 26 reads the icon from this catalog. It holds the dark version that the `.icns` cannot. */
 async function verifyPackagedIconCatalog(packagedPath: string, sourcePath: string): Promise<void> {
   const [packagedCatalog, sourceCatalog] = await Promise.all([readFile(packagedPath), readFile(sourcePath)]);
   if (!packagedCatalog.equals(sourceCatalog)) {
@@ -258,7 +241,6 @@ async function verifyPackagedIconCatalog(packagedPath: string, sourcePath: strin
   }
 }
 
-/** The Computer Use driver keeps the signature it was published with, not OpenBot's. */
 function assertCuaDriverSignature(binary: string): void {
   const description = run("codesign", ["-dvvv", binary], true);
   if (!description.includes("Authority=Developer ID Application: Cua AI, Inc. (YCK386LBJ7)")) {
@@ -311,18 +293,12 @@ async function verifyLaunch(executable: string): Promise<void> {
   });
 
   try {
-    // Chromium makes `SingletonLock` in userData when main takes its single-instance lock. A second
-    // instance that starts before that does not forward to the first one: it takes the lock and stays open.
     await waitForFirstInstance(
       launchExit,
       () => pathExists(join(userDataPath, "SingletonLock")),
       "take its lock",
       () => stderr,
     );
-    // The lock is not enough. The second instance waits about 20 seconds for the first one to answer, and
-    // the answer needs a free main thread; with no answer, Chromium can kill the first instance. Main
-    // answers only after its start, and a launch that stops during the start must fail here. So this
-    // waits until the window has loaded and called main (`trace.ndjson`, see `rendererCalledMain`).
     await waitForFirstInstance(
       launchExit,
       () => rendererCalledMain(userDataPath),
@@ -350,7 +326,6 @@ async function verifyLaunch(executable: string): Promise<void> {
   }
 }
 
-/** Waits for a state of the first instance. It fails immediately when the first instance exits. */
 async function waitForFirstInstance(
   launchExit: Promise<never>,
   reached: () => Promise<boolean>,
@@ -374,7 +349,6 @@ async function waitForFirstInstance(
   }
 }
 
-// `SingletonLock` is a symbolic link to a host and process name, not to a file, so it must not be followed.
 async function pathExists(path: string): Promise<boolean> {
   try {
     await lstat(path);
@@ -385,11 +359,6 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
-/**
- * Whether the window of the first instance has called main. The renderer asks main for `getAppInfo` when
- * it mounts (src/renderer/src/platform.tsx), main records each trusted call in `logs/trace.ndjson`
- * (`setIpcCallObserver` in src/main/index.ts), and a main-thread timer writes the line about one second later.
- */
 async function rendererCalledMain(userDataPath: string): Promise<boolean> {
   try {
     return (await readFile(join(userDataPath, "logs", "trace.ndjson"), "utf8")).includes('"kind":"ipc"');
@@ -422,8 +391,6 @@ async function verifySecondInstanceExits(
   });
   const stop = new AbortController();
   try {
-    // The second instance exits only after the first one accepts its arguments. A busy first instance
-    // accepts them later, so this waits for the exit and not for a fixed time.
     const result = await Promise.race([
       new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolveExit) => {
         second.once("exit", (code, signal) => resolveExit({ code, signal }));

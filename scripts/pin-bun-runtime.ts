@@ -8,12 +8,6 @@ import { sha256, sha256File } from "./remote-desktop-runtime-release";
 
 export type BunRuntimeTarget = "darwin-arm64" | "darwin-x64" | "linux-x64" | "linux-arm64" | "win32-x64";
 
-/**
- * The npm platform package and the executable inside it, per target OpenBot supports.
- *
- * `baseline` on x64, as the lock file's own comment explains: Bun's plain x64 builds need AVX2, and
- * an older machine answers a spawn with an illegal instruction and no message.
- */
 const TARGETS = {
   "darwin-arm64": { package: "@oven/bun-darwin-aarch64", executable: "bun" },
   "darwin-x64": { package: "@oven/bun-darwin-x64-baseline", executable: "bun" },
@@ -22,17 +16,10 @@ const TARGETS = {
   "win32-x64": { package: "@oven/bun-windows-x64-baseline", executable: "bun.exe" },
 } as const satisfies Record<BunRuntimeTarget, { package: string; executable: string }>;
 
-/** The same keys as `TARGETS`, in the order the lock file lists them. */
 const TARGET_IDS: readonly BunRuntimeTarget[] = ["darwin-arm64", "darwin-x64", "linux-x64", "linux-arm64", "win32-x64"];
 
 const REGISTRY = "https://registry.npmjs.org";
 const REPOSITORY = "https://github.com/oven-sh/bun";
-/**
- * `installedBytes` only funds the manager's free-space precheck, so it is rounded generously - and
- * doubled, because the staged layout holds the binary twice under the second name `bunx`. That is
- * a hard link on an ordinary filesystem and costs nothing; the precheck has to assume the
- * filesystem that refuses one and takes the copy instead.
- */
 const DISK_COPIES = 2;
 const DISK_HEADROOM = 1.05;
 const DISK_GRANULARITY = 10_000_000;
@@ -68,34 +55,14 @@ interface BunArtifactPin {
   executable: string;
 }
 
-/**
- * Recomputes the `bun` block of `native-runtime.lock.json` from the npm registry.
- *
- * Run this at release preparation, not on a schedule: a pinned runtime is OpenBot's supply chain,
- * and moving it is a reviewed commit like any other dependency change. `verifyInstalledRuntime`
- * compares `bun --version` against `lock.bun.version` for exact equality, so a pin is only
- * trustworthy if the staged binary really prints that string. This script asserts it on the target
- * that matches the host; the others are asserted by whoever runs it on a matching machine, or
- * by the first install on one.
- */
 export async function pinBunRuntime(
-  input: {
-    version?: string | undefined;
-    fetchImpl?: typeof fetch;
-    /** Set to false to skip the `--version` assertion on the target that matches this host. */
-    runBinary?: boolean;
-  } = {},
+  input: { version?: string | undefined; fetchImpl?: typeof fetch; runBinary?: boolean } = {},
 ): Promise<BunRuntimePin> {
   const fetchImpl = input.fetchImpl ?? fetch;
-  // The `bun` package itself only decides which version "latest" means. It does not list the
-  // baseline builds below - they are published beside it under the same version - so nothing here
-  // can be read out of its `optionalDependencies`.
   const umbrella = await fetchParsed(fetchImpl, `${REGISTRY}/bun/${input.version ?? "latest"}`, umbrellaSchema);
   const version = umbrella.version;
 
   const pinTarget = (target: BunRuntimeTarget) => pinArtifact(fetchImpl, target, version, input.runBinary);
-  // One target at a time, in the lock file's order: four 40 MB downloads at once only make the
-  // registry slower, and a literal is what proves every key is present without an assertion.
   const artifacts: Record<BunRuntimeTarget, BunArtifactPin> = {
     "darwin-arm64": await pinTarget("darwin-arm64"),
     "darwin-x64": await pinTarget("darwin-x64"),
@@ -128,8 +95,6 @@ async function pinArtifact(
   if (platform.name !== descriptor.package || platform.version !== version) {
     throw new Error(`The registry served the wrong package for ${target}.`);
   }
-  // The scope is not part of the file name: `@oven/bun-darwin-aarch64` is served as
-  // `bun-darwin-aarch64-<version>.tgz`, and the descriptor in the app builds the same URL.
   const asset = `${descriptor.package.replace(/^@[^/]+\//u, "")}-${version}.tgz`;
   if (platform.dist.tarball !== `${REGISTRY}/${descriptor.package}/-/${asset}`) {
     throw new Error(`Unexpected tarball URL for ${target}: ${platform.dist.tarball}`);
@@ -172,7 +137,6 @@ async function pinArtifact(
   }
 }
 
-/** The Bun platform tarball is three files, and anything else is not the package we pinned. */
 export function validateBunArchive(archive: string, executable: string): string[] {
   const names = execFileSync("tar", ["-tzf", archive], { encoding: "utf8" }).split(/\r?\n/u).filter(Boolean);
   const details = execFileSync("tar", ["-tvzf", archive], { encoding: "utf8" }).split(/\r?\n/u).filter(Boolean);
@@ -192,7 +156,6 @@ export function validateBunArchive(archive: string, executable: string): string[
   return names;
 }
 
-/** Fetches one registry document and parses it, so no caller ever holds the raw JSON. */
 async function fetchParsed<Schema extends z.ZodType>(
   fetchImpl: typeof fetch,
   url: string,
@@ -210,7 +173,6 @@ async function fetchBytes(fetchImpl: typeof fetch, url: string): Promise<Buffer>
   return Buffer.from(await response.arrayBuffer());
 }
 
-/** True when the pin matches what `native-runtime.lock.json` already holds. */
 export function isPinnedAlready(pin: BunRuntimePin, lock: AgentRuntimeLock): boolean {
   return JSON.stringify(pin) === JSON.stringify(lock.bun);
 }

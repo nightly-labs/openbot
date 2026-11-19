@@ -2,8 +2,6 @@ import { createFileRoute, Outlet, useMatch } from "@tanstack/solid-router";
 import { Show } from "solid-js";
 import { ContactPage } from "../components/contact/ContactPage";
 
-// The contact page at `/contact`, `/pl/contact` and `/pt/contact`. Each child route loads the text of its
-// language, and this layout shows the page, so a change of language changes only the text.
 export const Route = createFileRoute("/_contact")({
   component: ContactLayout,
 });

@@ -1,6 +1,3 @@
-/* The pinned messages of a chat: the list that the pin button of the chat header opens. */
-
-/* The title stays in place and the list scrolls under it. A ring only: the list has no drop shadow. */
 .ui-popover-menu-surface.pinned-messages {
   display: flex;
   box-sizing: border-box;
@@ -34,7 +31,6 @@
   overscroll-behavior: contain;
 }
 
-/* A pin is one target: the jump button lies under its content. */
 .pinned-messages-item {
   position: relative;
   min-width: 0;
@@ -66,7 +62,6 @@
   margin: 0;
 }
 
-/* The time ends before the Unpin button. A long name gives its room to the time. */
 .pinned-messages-head {
   display: flex;
   min-width: 0;
@@ -104,8 +99,6 @@
 .pinned-messages-item:is(:hover, :focus-within) > .pinned-messages-unpin {
   opacity: 1;
 }
-
-/* No pins yet */
 
 .pinned-messages-empty {
   display: grid;
@@ -147,7 +140,6 @@
   text-wrap: balance;
 }
 
-/* The chat of a pin in another chat, and who pinned it. */
 .pinned-messages-meta {
   min-width: 0;
   margin: var(--openbot-space-1) 0 0;

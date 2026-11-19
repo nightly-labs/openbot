@@ -1,13 +1,3 @@
-// The app shows the workspace only to a signed-in account, and the account
-// service is the Auth API. A bench against a missing API measures the
-// "Connecting to OpenBot" screen, so `dev:bench` signs its profile in to the
-// local development API: this worktree's running `dev:api`, or one the bench
-// starts and stops itself.
-//
-// Sign-in uses the development code that the local API returns in place of an
-// email. An API that does not expose it is not a development API, and the bench
-// stops rather than send a real email.
-
 import { type ChildProcess, spawn } from "node:child_process";
 import { createWriteStream } from "node:fs";
 import { mkdir } from "node:fs/promises";
@@ -19,7 +9,6 @@ import { isSameWorktree, readDevStackRecords } from "./stack-registry";
 
 const API_READY_TIMEOUT_MS = 180_000;
 const API_STOP_TIMEOUT_MS = 20_000;
-// A reserved domain: nothing is ever delivered to it.
 export const BENCH_ACCOUNT_EMAIL = "openbot-bench@example.com";
 
 export interface BenchAuthApi {
@@ -52,14 +41,10 @@ function stopStarted(child: ChildProcess): Promise<void> {
   if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve();
   return new Promise((resolveStop) => {
     const timer = setTimeout(() => {
-      // Only the supervisor this run started, and its group, which holds the
-      // Vite server it spawned.
       if (child.pid !== undefined) {
         try {
           process.kill(-child.pid, "SIGKILL");
-        } catch {
-          // Already gone.
-        }
+        } catch {}
       }
       resolveStop();
     }, API_STOP_TIMEOUT_MS);
@@ -117,7 +102,6 @@ interface SignInResult {
   signedInNow: boolean;
 }
 
-// Runs in the app window, through the same preload API as the sign-in screen.
 const SIGN_IN_EXPRESSION = `(async () => {
   const auth = window.openbot.auth;
   const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

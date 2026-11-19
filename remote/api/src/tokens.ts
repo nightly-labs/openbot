@@ -51,8 +51,6 @@ import {
   SIGNAL_TURN_CREDENTIAL_TTL_SECONDS,
 } from "./protocol";
 
-// The resume token is this service's own, minted and verified here and never seen by the account
-// API, so its audience stays local while the ticket's comes from the shared contract.
 const RESUME_AUDIENCE = "openbot-remote-resume";
 const RESUME_TTL_SECONDS = 10 * 60;
 const MAXIMUM_STALE_RESUME_SECONDS = 24 * 60 * 60;
@@ -71,7 +69,6 @@ const remoteTicketClaimsSchema = z.object({
   protocolMaximum: z.number().int().nonnegative(),
   sessionExpiresAt: z.number().int().nonnegative(),
   clientPublicKey: z.string().min(1).max(8_192).optional(),
-  // The Signal machine of the host's room. Without it, the ticket belongs to the entry machine.
   signal: z.string().min(1).max(64).optional(),
   iat: z.number().int().nonnegative(),
   exp: z.number().int().nonnegative(),
@@ -123,12 +120,10 @@ export class RemoteTokenError extends Schema.TaggedError<RemoteTokenError>()("Re
   message: Schema.String,
 }) {}
 
-/** The account service did not answer, so it did not say whether the session is active. */
 export class RemoteTokenUnavailableError extends Schema.TaggedError<RemoteTokenUnavailableError>()(
   "RemoteTokenUnavailableError",
   {
     message: Schema.String,
-    // The unchecked claims. Signal still refuses a session that it knows is revoked or ended.
     hostId: Schema.String,
     sessionId: Schema.String,
     role: Schema.String,
@@ -147,10 +142,8 @@ export class RemoteTokenService {
   readonly #ticketKey: JWTVerifyGetKey;
   readonly #remoteTicketKey: RemoteJWKSet | null;
   readonly #sessionSecret: Uint8Array;
-  // `SIGNAL_ID`: a ticket or resume token whose `signal` claim names another machine is refused.
   readonly #signalId: string | null;
   readonly #turnSecret: string;
-  // The relay for a host and its clients (`TurnRelays.pick`).
   readonly #turnHost: (hostId: string) => string;
   readonly #turnPort: number;
   readonly #turnTlsPort: number;
@@ -191,24 +184,18 @@ export class RemoteTokenService {
       Effect.succeed(false),
     options: {
       fetch?: FetchImplementation;
-      // Picks the TURN relay of a host. Without it, every host gets `TURN_HOST`.
       turnHost?: (hostId: string) => string;
-      // Asks the account service which links of a route are current. Without it, none is.
       validateSlackRoute?: (hostId: string, teams: SlackRouteTeam[]) => Effect.Effect<string[], RemoteTokenError>;
-      // Asks the account service which chats of a Telegram route are current. Without it, none is.
       validateTelegramRoute?: (
         hostId: string,
         chats: TelegramRouteChat[],
       ) => Effect.Effect<TelegramRouteChat[], RemoteTokenError>;
-      // Asks the account service to link a chat with a link code. Without it, no code links a chat.
       linkTelegramChat?: (
         botId: string,
         chatId: string,
         code: string,
       ) => Effect.Effect<TelegramChatLink | null, RemoteTokenError>;
-      // Asks the account service which guild links of a route are current. Without it, none is.
       validateDiscordRoute?: (hostId: string, guilds: DiscordRouteGuild[]) => Effect.Effect<string[], RemoteTokenError>;
-      // Asks the account service which webhook links in a ticket are current. Without it, none is.
       validateWebhookRoute?: (hostId: string, routes: WebhookRoute[]) => Effect.Effect<string[], RemoteTokenError>;
     } = {},
   ) {
@@ -328,10 +315,6 @@ export class RemoteTokenService {
     (hostId: string, routes: WebhookRoute[]) => this.#validateWebhookRoute(hostId, routes),
   );
 
-  /**
-   * The account service checked the repositories with the user's GitHub sign-in when it signed the
-   * ticket, and keeps no link, so there is nothing to validate after a restart: the ticket expires.
-   */
   readonly verifyGitHubRoute = Effect.fn("RemoteTokens.verifyGitHubRoute")(
     (token: string, hostId: string, now = new Date()) =>
       Effect.gen({ self: this }, function* () {
@@ -424,7 +407,6 @@ export class RemoteTokenService {
             protocolMaximum: claims.protocolMaximum,
             sessionExpiresAt: claims.sessionExpiresAt,
             ...(claims.clientPublicKey ? { clientPublicKey: claims.clientPublicKey } : {}),
-            // A resumed socket stays on the Signal machine of its ticket.
             ...(claims.signal ? { signal: claims.signal } : {}),
           })
             .setProtectedHeader({ alg: "HS256", typ: "JWT" })
@@ -517,10 +499,6 @@ export class RemoteTokenService {
   }
 }
 
-/**
- * Slack's request signature: `v0=` and the hex HMAC-SHA256 of `v0:<timestamp>:<body>` with the app's
- * signing secret, for a timestamp at most five minutes old.
- */
 export function verifySlackSignature(
   body: Uint8Array,
   timestamp: string,
@@ -536,7 +514,6 @@ export function verifySlackSignature(
   return actualBytes.length === expectedBytes.length && timingSafeEqual(actualBytes, expectedBytes);
 }
 
-/** GitHub's webhook signature: `sha256=` and the hex HMAC-SHA256 of the body with the App's webhook secret. */
 export function verifyGitHubSignature(body: Uint8Array, signature: string, secret: string): boolean {
   const expected = `sha256=${createHmac("sha256", secret).update(body).digest("hex")}`;
   const actualBytes = Buffer.from(signature.toLowerCase());
@@ -544,16 +521,11 @@ export function verifyGitHubSignature(body: Uint8Array, signature: string, secre
   return actualBytes.length === expectedBytes.length && timingSafeEqual(actualBytes, expectedBytes);
 }
 
-/** The host that a link code linked a chat to, and when, in milliseconds. */
 export interface TelegramChatLink {
   hostId: string;
   linkedAt: number;
 }
 
-/**
- * The `secret_token` of one bot's webhook: Telegram sends it in `X-Telegram-Bot-Api-Secret-Token`.
- * Each bot has its own, so a secret that one bot's settings show cannot sign another bot's updates.
- */
 export function telegramWebhookSecret(webhookSecret: string, botId: string): string {
   return createHmac("sha256", webhookSecret).update(`telegram-webhook:${botId}`).digest("base64url");
 }
@@ -564,14 +536,11 @@ export function verifyTelegramWebhookSecret(actual: string, expected: string): b
   return actualBytes.length === expectedBytes.length && timingSafeEqual(actualBytes, expectedBytes);
 }
 
-/** One file of an update that a host can download from `TELEGRAM_FILES_PATH`. */
 export interface TelegramFileGrant {
   botId: string;
-  // The Bot API's `file_path`.
   filePath: string;
 }
 
-/** One document that a host can post to `TELEGRAM_UPLOADS_PATH`, into the chat it named. */
 export interface TelegramUploadGrant {
   botId: string;
   chatId: number;
@@ -597,16 +566,9 @@ const telegramUploadGrantSchema = z.object({
   nonce: z.string().min(1).max(64),
 });
 
-/**
- * The file and upload tokens: `<base64url JSON>.<base64url HMAC-SHA256>`, signed with keys derived
- * from the session secret, each with its own label. They expire after
- * `TELEGRAM_FILE_TOKEN_TTL_SECONDS`. Signal remembers each used upload token until it expires, so one
- * token posts one document.
- */
 export class TelegramFileTokens {
   readonly #fileKey: Buffer;
   readonly #uploadKey: Buffer;
-  // Upload nonce to its expiry in seconds. Tokens have one TTL, so the oldest entry is first.
   readonly #usedUploads = new Map<string, number>();
 
   constructor(sessionSecret: string) {
@@ -632,7 +594,6 @@ export class TelegramFileTokens {
     });
   }
 
-  /** Returns the grant once. A second use of the same token returns `null`. */
   consumeUpload(token: string, nowSeconds = Math.floor(Date.now() / 1_000)): TelegramUploadGrant | null {
     for (const [nonce, expiresAt] of this.#usedUploads) {
       if (expiresAt > nowSeconds) break;
@@ -695,7 +656,6 @@ function parseJwks(value: string): JSONWebKeySet {
 
 function decodeTicketClaims(value: unknown, now: Date, signalId: string | null): RemoteTicketClaims {
   const claims = remoteTicketClaimsSchema.parse(value);
-  // The account service gave the host another Signal machine. The peer gets a new ticket for it.
   if (signalId && claims.signal !== undefined && claims.signal !== signalId)
     throw new Error("The ticket belongs to another Signal.");
   if (claims.protocolMinimum > claims.protocolMaximum) throw new Error("Invalid protocol range.");

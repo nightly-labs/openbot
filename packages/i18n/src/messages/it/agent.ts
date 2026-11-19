@@ -95,7 +95,6 @@ export const messages = {
   "agent.error.provider": "Errore del provider",
   "agent.error.run": "{provider} · {model}",
   "agent.error.providerNamed": "Errore di {provider}",
-  // Avatar color names. They fill `{color}` and `{hue}` inside a sentence.
   "agent.color.red": "Rosso",
   "agent.color.orange": "Arancione",
   "agent.color.yellow": "Giallo",

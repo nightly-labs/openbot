@@ -1,23 +1,6 @@
-import { Effect, Result } from "effect";
-/**
- * Everything `OPENBOT_DEV_REMOTE_ROLE` adds to startup: signing a throwaway account in against the
- * local account API, configuring the dev host, and handing the client the connection the host wrote
- * to a file in the dev runtime directory. None of it runs in a packaged build - `developmentRemoteRole`
- * is null unless the app is unpackaged and the variable is set to `host` or `client`.
- *
- * The two entry points below keep the positions they had in the construction sequence:
- * `applyDevelopmentRemoteAccount` must run after `teamStore.initialize()` and before `HostService`
- * is built, and `startDevelopmentRemoteRole` after `remoteServers.initialize()`. The client half
- * polls for thirty seconds and then throws, deliberately: a dev client with no remote server is a
- * failure worth seeing at startup rather than an empty window.
- *
- * `OPENBOT_DEV_CLIENT_TRANSPORT=webrtc` signs the client in as the host's owner instead. The account
- * directory then lists the host as a second device of that account, so the client reaches it over
- * Signal and WebRTC, as a user does, and the HTTP connection file is not read.
- */
-
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
+import { Effect, Result } from "effect";
 import { z } from "zod";
 import type { CentralAuthManager } from "./central-auth-manager";
 import { developmentRemoteConnectionPath } from "./development-runtime-directory";
@@ -37,12 +20,6 @@ export function readDevelopmentClientTransport(value: string | undefined): Devel
   return value === "webrtc" ? "webrtc" : "http";
 }
 
-/**
- * The account of a development host with no owner: `OPENBOT_DEV_HOST_EMAIL`, or the default. The
- * account API permits few sign-ins for one email, so hosts that start together on new profiles
- * (`bun run test:provider-live`) each name their own. Only an `example.com` address is accepted: the
- * account is a throwaway one.
- */
 export function readDevelopmentHostEmail(value: string | undefined): string {
   const email = value?.trim().toLowerCase();
   return email && /^[a-z0-9.-]{1,64}@example\.com$/u.test(email) ? email : DEVELOPMENT_HOST_EMAIL;
@@ -126,7 +103,6 @@ export const startDevelopmentRemoteRole = Effect.fn("DevelopmentRemote.startRole
     if (testClientEnabled) yield* writeDevelopmentRemoteConnection(yield* host.createDevelopmentConnection());
     return;
   }
-  // The account directory, read before this runs, already added the host as a WebRTC server.
   if (clientTransport === "webrtc") return;
   yield* connectDevelopmentRemoteServer(remoteServers);
 });
@@ -168,7 +144,6 @@ const writeDevelopmentRemoteConnection = Effect.fn("DevelopmentRemote.writeConne
   (connection: DevelopmentRemoteServerConnection) =>
     remoteCall(async () => {
       const path = developmentRemoteConnectionPath();
-      // `bun run dev` has already made the runtime directory owner-only; this covers a start without it.
       await mkdir(dirname(path), { recursive: true, mode: 0o700 });
       await writeFile(path, `${JSON.stringify(connection)}\n`, { encoding: "utf8", mode: 0o600 });
     }),

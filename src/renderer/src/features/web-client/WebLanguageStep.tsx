@@ -5,11 +5,6 @@ import { LanguageWheel } from "@openbot/ui/features/account/LanguageWheel";
 import { createSignal } from "solid-js";
 import { StaticI18nProvider } from "../../i18n-context";
 
-/**
- * The language wheel that the language button of the web sign-in opens. Turning
- * the wheel redraws only this screen; Continue saves the choice once. The language that shows
- * already stays as it is saved, so "system" keeps following the browser.
- */
 export function WebLanguageStep(props: {
   variant: AppVariant;
   language: AppLanguage;

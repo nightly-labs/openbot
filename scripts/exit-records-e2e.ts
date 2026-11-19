@@ -1,10 +1,3 @@
-// Runs the real Electron with the exit records of #2675:
-// 1. A renderer crash reaches `logs/trace.ndjson` as a `renderer_gone` span within seconds, not at the
-//    next one-minute resource sample, and the crash reporter keeps a dump in the crash dump folder.
-// 2. A line of the `main` logger reaches `logs/main/main.log`.
-//
-// Run: bun scripts/exit-records-e2e.ts
-// It writes .openbot-build/exit-records-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { closeSync, existsSync, openSync, readdirSync, readFileSync } from "node:fs";
@@ -18,9 +11,7 @@ import { withoutElectronRuntimeFlags } from "./electron-spawn-env";
 const ROOT = resolve(import.meta.dirname, "..");
 const OUT = join(ROOT, ".openbot-build", "exit-records-e2e");
 const STATE_TIMEOUT_MS = 30_000;
-// The resource monitor samples once a minute. The trace must have the exit long before that.
 const CRASH_RECORD_LIMIT_MS = 5_000;
-// The Electron binary itself, not the `.bin/electron` Node wrapper.
 const electronPath = join(
   ROOT,
   "node_modules",
@@ -73,7 +64,6 @@ try {
   assert.ok(isDynamicRecord(ready) && typeof ready.crashDumps === "string", "the ready file names the dump folder");
   const crashDumps = ready.crashDumps;
 
-  // 1. The renderer crash is in the trace at once, and a dump exists.
   const tracePath = join(userData, "logs", "trace.ndjson");
   const crashedAt = Date.now();
   app.stdin?.write("crash\n");
@@ -96,7 +86,6 @@ try {
     "dumps are under the user data",
   );
 
-  // 2. The main logger line is in the main log.
   app.stdin?.end("quit\n");
   assert.equal(await exited, 0, "Electron quits cleanly");
   const mainLog = readFileSync(join(userData, "logs", "main", "main.log"), "utf8");
@@ -123,7 +112,6 @@ function readLines(path: string): TraceLine[] {
     .flatMap((line) => parseLine(line) ?? []);
 }
 
-// An append that is still running can leave a last line cut short.
 function parseLine(line: string): TraceLine | null {
   let value = null;
   try {

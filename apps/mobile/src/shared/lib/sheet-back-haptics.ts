@@ -1,10 +1,5 @@
 import { haptics } from "./haptics";
 
-/**
- * Screen listeners for a stack nested in a sheet. The native back button and a back swipe start a
- * closing transition while the screen is still the top route. A push closes the screen below the new
- * top route, and router.back() removes the route before the transition, so neither fires here.
- */
 export function sheetBackHaptics({
   navigation,
   route,

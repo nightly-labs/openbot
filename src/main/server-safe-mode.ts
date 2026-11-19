@@ -1,15 +1,3 @@
-// The server safe mode. A server that stopped its start loop (`server-start-halt.ts`) keeps a minimal
-// Team API open, so each member's app shows why the server does not start and which version it runs.
-//
-// It opens no `openbot.db` and starts no service of the app. It reads the team file without a write
-// (`TeamStore.loadReadOnly`) to sign members in, and the account session file for the host credential
-// of the Signal ticket. Only the account manager can write its own session file, when the account
-// service renews the session. The API is `team-api/server-safe-mode-api.ts`.
-//
-// A newer release is the fix. On a server that `openbot-hosted-update` manages, the safe mode writes
-// an empty marker in the runtime directory of `openbot.service`; the hourly `check` sees it, stages a
-// release, and restarts the service. Elsewhere, such as in a Docker container, the safe mode ends
-// after one hour with the start-loop exit code, and the restart policy tries the start again.
 import { existsSync } from "node:fs";
 import { rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
@@ -32,10 +20,8 @@ import { TeamWebRtcHostGateway } from "./team-webrtc-host-gateway";
 
 const logger = createOpenBotLogger("server-safe-mode");
 
-/** The marker that `openbot-hosted-update` and `openbot` look for. It is empty. */
 const SERVER_SAFE_MODE_MARKER = "server-safe-mode";
 
-/** The safe mode could not start. The caller exits as before, with the start-loop exit code. */
 class ServerSafeModeUnavailable extends Schema.TaggedError<ServerSafeModeUnavailable>()("ServerSafeModeUnavailable", {
   cause: Schema.Defect(),
 }) {}
@@ -43,19 +29,13 @@ class ServerSafeModeUnavailable extends Schema.TaggedError<ServerSafeModeUnavail
 export interface ServerSafeModeOptions {
   userDataPath: string;
   reason: ServerSafeModeReason;
-  /** The runtime directory of `openbot.service`, for the marker. Null: no marker is written. */
   markerDirectory: string | null;
 }
 
 export interface ServerSafeMode {
-  /** Closes the API, the Signal connection and the account manager, and removes the marker. */
   readonly stop: Effect.Effect<void>;
 }
 
-/**
- * The runtime directory of `openbot.service` when `openbot-hosted-update` manages this server and
- * restarts the safe mode. Null elsewhere, such as in a container: the safe mode then ends by itself.
- */
 export function safeModeMarkerDirectory(environment: NodeJS.ProcessEnv, platform: NodeJS.Platform): string | null {
   if (platform !== "linux" || environment.XDG_RUNTIME_DIR?.trim() !== HOSTED_RUNTIME_DIRECTORY) return null;
   return existsSync(HOSTED_UPDATE_TRIGGER) ? HOSTED_RUNTIME_DIRECTORY : null;
@@ -63,10 +43,6 @@ export function safeModeMarkerDirectory(environment: NodeJS.ProcessEnv, platform
 
 const unavailable = (cause: unknown) => new ServerSafeModeUnavailable({ cause });
 
-/**
- * Starts the safe mode. It fails when this server has no team identity or no host credential: then
- * no member can connect, and the caller exits as before.
- */
 export const startServerSafeMode = Effect.fn("ServerSafeMode.start")(function* (options: ServerSafeModeOptions) {
   const scope = yield* Scope.make();
   return yield* open(options).pipe(
@@ -108,7 +84,6 @@ const open = Effect.fn("ServerSafeMode.open")(function* (options: ServerSafeMode
   yield* centralAuth.initialize().pipe(Effect.mapError(unavailable));
   const bootstrap = yield* centralAuth.issueRemoteHostTicket(identity.serverId, {}).pipe(Effect.mapError(unavailable));
 
-  // The protocol is set when the services started before the failure. The bridge page needs it.
   if (!session.defaultSession.protocol.isProtocolHandled("openbot-app")) configureApplicationProtocol();
   const developmentUrl = process.env.ELECTRON_RENDERER_URL;
   const bridge = yield* Effect.acquireRelease(
@@ -129,7 +104,6 @@ const open = Effect.fn("ServerSafeMode.open")(function* (options: ServerSafeMode
           bridge,
           store,
           appVersion: options.reason.appVersion,
-          // No route of the safe mode sends or takes a file.
           transferDirectory: join(app.getPath("temp"), "openbot-safe-mode-transfers"),
           renewSignal: (hostId, failedSignalUrl) =>
             centralAuth

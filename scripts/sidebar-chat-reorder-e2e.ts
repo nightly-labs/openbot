@@ -1,11 +1,3 @@
-// Checks that a drag inside a section puts the chat where the sidebar showed it would go (#3229). The drop
-// action runs against the real agent service, channel store and sidebar layout store on a temporary profile,
-// through the same backend path as the `agent:mutate-sidebar-layout` handler. The chats are filed with
-// `assign`, as "Move to" and agent creation do, so the layout has no order for them yet.
-// The agent service is not initialized, so no provider CLI starts.
-// Run: `bun scripts/sidebar-chat-reorder-e2e.ts`.
-// Writes .openbot-build/sidebar-chat-reorder-e2e/report.json.
-
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -90,11 +82,6 @@ const mutateLayout = (action: SidebarLayoutAction) => runCauseEffect(sidebar.mut
 
 const names = new Map<string, string>();
 
-/**
- * The names the sidebar shows in a section, top to bottom, by the rule of `sortByLayoutOrder` over
- * `[...channels, ...agents]` in `packages/ui/src/features/sidebar/stores/data-store.ts`: the ids in
- * `agentOrder` first, in that order, then the rest with the channels above the agents.
- */
 function shown(sectionId: string): string[] {
   const layout = sidebar.getSnapshot();
   const chatIds = [
@@ -110,10 +97,6 @@ function shown(sectionId: string): string[] {
     .map((chatId) => names.get(chatId) ?? chatId);
 }
 
-/**
- * The drop of `name` on `targetName` in its own section: the placement the drag engine gives a row there
- * (`placementForSwap`), and the action `moveChatAction` in `stores/layout-actions.ts` sends for it.
- */
 async function drop(sectionId: string, name: string, targetName: string): Promise<string[]> {
   const idOf = (wanted: string) => [...names].find(([, value]) => value === wanted)?.[0];
   const chatId = idOf(name);
@@ -157,7 +140,6 @@ try {
     for (const agent of created) names.set(agent.id, agent.name);
     const lead = created[0];
     assert.ok(lead);
-    // Random ids, so the primary-key order of the channel table is not the order they were made in.
     for (const name of ["general", "design", "launch"]) {
       const channel = await runCauseEffect(
         agents.channels.command(
