@@ -5,9 +5,6 @@ import { useDerivedValue, useFrameCallback, useSharedValue } from "react-native-
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useAppActive } from "@/shared/lib/use-app-active";
 
-// A dot grid with rings that travel out from the centre: the canvas the image is painted on.
-// The dots near a crest brighten toward the accent, so the motion reads as work in progress
-// without a percentage that the host never reports.
 const SOURCE = `
 uniform float2 resolution;
 uniform float time;
@@ -33,7 +30,6 @@ half4 main(float2 position) {
 }
 `;
 
-// Compiled on first use, not when the chat loads this module.
 let effect: SkRuntimeEffect | null | undefined;
 function canvasEffect(): SkRuntimeEffect | null {
   if (effect === undefined) effect = Skia.RuntimeEffect.Make(SOURCE);
@@ -44,7 +40,6 @@ function rgb(color: ColorValue): number[] {
   return Array.from(Skia.Color(String(color))).slice(0, 3);
 }
 
-/** Decorative: the frame around it carries the state for assistive technology. */
 export function ImageGenerationCanvas({
   width,
   height,

@@ -28,15 +28,8 @@ import { ChannelAvatar, ChannelIconTile } from "./channel-avatar";
 const PREVIEW_SIZE = 88;
 const ICON_COLUMNS = 5;
 const COLOR_COLUMNS = 5;
-/** The crop screen shows the rounded square of a channel picture. */
 const CROP_CORNER_RATIO = 0.3;
 
-/**
- * The picture of a channel, as the desktop channel settings edit it: an uploaded image, or an icon on
- * a colour. A choice saves at once. An icon replaces the image, and the reset gives the channel its
- * member faces back. The icon is saved first, and the image goes after it, so a failed step does not
- * lose the image.
- */
 export function ChannelPictureEditor({
   channel,
   serverId,
@@ -56,7 +49,6 @@ export function ChannelPictureEditor({
   const lock = useRef(false);
   const icon = knownChannelIcon(channel.icon);
   const hasImage = Boolean(channel.imageUrl);
-  // The image hides the icon, so no icon or colour shows as chosen while there is one.
   const chosen = hasImage ? null : icon;
   const hue: AvatarHue = icon?.hue ?? DEFAULT_CHANNEL_ICON_HUE;
   const off = disabled || busy;
@@ -77,7 +69,6 @@ export function ChannelPictureEditor({
       setBusy(false);
     }
   }
-  /** Saves the stored draft with another icon. Unsaved edits of the form stay in the form. */
   function saveIcon(next: ChannelDraft["icon"]) {
     return store.command(serverId, {
       type: "save",
@@ -195,7 +186,6 @@ export function ChannelPictureEditor({
   );
 }
 
-/** A group of the editor, as the groups of the agent appearance editor. */
 function PictureSection({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
     <View className="gap-2">

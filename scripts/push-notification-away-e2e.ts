@@ -1,18 +1,3 @@
-// Checks that a phone gets the notifications of events that came while it only looked on screen, and
-// that a Live Activity replaces a notification only when it shows that event. A completed turn that a
-// teammate's message started sends nothing.
-//
-// iOS can suspend the app before its `away` registration goes out, and the host sees the lost path
-// about 30 s later. Events in that time were lost: the host counted the app as on screen. The host
-// now keeps them, and sends the ones that the member did not see when the phone turns out to be away.
-// The Live Activity showed one item, but it replaced the notification of each event, also of an event
-// it did not show, such as a reply while another agent worked.
-//
-// It runs the real phone notification service and the real Live Activity push service, wired as the
-// host wires them, with a synthetic runtime snapshot and read state, and a send that records the
-// requests. A first send fails, as a short fault at Apple or Google does. It sends nothing.
-// Run it with `bun scripts/push-notification-away-e2e.ts`.
-// Writes .openbot-build/push-notification-away-e2e/report.json.
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { EventEmitter } from "node:events";
@@ -34,7 +19,6 @@ import {
 } from "../src/main/push-notifications";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/push-notification-away-e2e");
-/** Longer than the wait before kept events go out, and than the first resend. */
 const STEP_DEADLINE_MS = 20_000;
 const MEMBER = "fixture-member";
 const ANDROID = "android-session";
@@ -50,7 +34,6 @@ const readOptions = {
 };
 
 const events = new EventEmitter<{ event: [AgentEvent] }>();
-/** The host state that both services read. */
 const state: {
   working: Set<string>;
   unread: Map<string, number>;
@@ -168,7 +151,6 @@ const secrets = new Map([ANDROID, IPHONE].map((session) => [session, randomBytes
 const androidSecret = encodeLiveActivityBytes(secrets.get(ANDROID) ?? new Uint8Array());
 const iphoneSecret = encodeLiveActivityBytes(secrets.get(IPHONE) ?? new Uint8Array());
 
-/** What a send says, opened with the keys of its phone as the phone opens it: `kind agent`. */
 function opened(request: NotificationRelayRequest): string {
   const secret = secrets.get(request.push.sessionId);
   assert.ok(secret, "A send went to an unknown phone.");
@@ -204,10 +186,6 @@ function registerAndroid(away: boolean, capabilities: string[] = []): void {
   );
 }
 
-/**
- * What the sends to `sessionId` from number `from` say, once one says `last`. Each case makes `last`
- * the final send, so a send that must not go would be in the list before it.
- */
 function sendsUntil(sessionId: string, from: number, last: string): Promise<string[]> {
   return new Promise((resolveSends, reject) => {
     const deadline = setTimeout(() => {
@@ -237,7 +215,6 @@ const reply = (agentId: string, turnId: string, origin: "user" | "agent" = "user
   status: "completed",
   origin,
 });
-/** A reply in another thread of the agent: the host does not know whether the member read it. */
 const sideReply = (
   agentId: string,
   turnId: string,
@@ -286,9 +263,7 @@ try {
     const from = sent.length;
     state.unread.set(AGENT_A, 1);
     events.emit("event", reply(AGENT_A, "turn-1"));
-    // iOS can have suspended the app before it showed a reply in another thread, so it goes out too.
     events.emit("event", sideReply(AGENT_B, "turn-1b"));
-    // The phone looked on screen, so nothing went out. The path then fails, as when iOS suspended it.
     assert.equal(sent.length, from);
     phones.disconnected(ANDROID);
     const said = await sendsUntil(ANDROID, from, `reply ${AGENT_B}`);
@@ -302,18 +277,14 @@ try {
       phones.reconnected(ANDROID);
       registerAndroid(false);
       const from = sent.length;
-      // The member read this reply in the app before it went away.
       state.unread.set(AGENT_A, 0);
       events.emit("event", reply(AGENT_A, "turn-2"));
-      // The app was on screen and can have shown a reply in another thread, so the host does not repeat it.
       events.emit("event", sideReply(AGENT_A, "turn-2b"));
       events.emit("event", prompt(7));
       events.emit("event", { type: "agent-input-resolved", kind: "prompt", requestId: 7, agentId: AGENT_A });
       state.failedTurns = [{ agentId: AGENT_B, turnId: "turn-3" }];
       events.emit("event", failure(AGENT_B, "turn-3"));
-      // The phone says that it goes away, as when the `away` request goes out late.
       registerAndroid(true);
-      // The failed turn is the last kept event, so the others were decided before it went out.
       const said = await sendsUntil(ANDROID, from, `failed ${AGENT_B}`);
       assert.deepEqual(said, [`failed ${AGENT_B}`]);
       return { said };
@@ -325,10 +296,8 @@ try {
     const from = sent.length;
     state.unread.set(AGENT_A, 1);
     events.emit("event", reply(AGENT_A, "turn-4"));
-    // iOS ran the app again: the late `away` and then the return arrive together.
     registerAndroid(true);
     registerAndroid(false);
-    // A later event that waits for the member is kept and goes out with the next failed path.
     events.emit("event", prompt(8));
     phones.disconnected(ANDROID);
     const said = await sendsUntil(ANDROID, from, `input ${AGENT_A}`);
@@ -337,7 +306,6 @@ try {
   });
 
   await step("a send that fails goes again", async () => {
-    // The phone is away now, so the event goes out at once and the first send fails.
     const from = sent.length;
     failNextSend = true;
     events.emit("event", prompt(9));
@@ -350,13 +318,10 @@ try {
   await step(
     "a turn that a teammate's message started stays quiet, a task result and a failed turn go out",
     async () => {
-      // The phone is away, so each event that notifies goes out at once. It can open a task thread.
       registerAndroid(true, [PUSH_NOTIFICATION_THREADS_CAPABILITY]);
       const from = sent.length;
       state.unread.set(AGENT_B, 1);
       events.emit("event", reply(AGENT_B, "turn-teammate", "agent"));
-      // A task that the agent started sends its brief to itself, so its turn has the same origin. Its
-      // result is for the user.
       events.emit("event", {
         type: "thread-turn-completed",
         taskId: "task-1",
@@ -404,17 +369,14 @@ try {
         photos: [],
       },
     );
-    // Agent B works, so the activity shows the work and not the reply of agent A.
     const from = sent.length;
     state.failedTurns = [];
     state.working.add(AGENT_B);
     state.unread.set(AGENT_A, 1);
     events.emit("event", reply(AGENT_A, "turn-5"));
     await sendsUntil(IPHONE, from, `reply ${AGENT_A}`);
-    // With nothing else to show, the activity shows the reply in place of a notification.
     state.working.delete(AGENT_B);
     events.emit("event", reply(AGENT_A, "turn-6"));
-    // The activity shows the failure of agent B, and not the later failure of agent A.
     state.failedTurns = [{ agentId: AGENT_B, turnId: "turn-7" }];
     events.emit("event", failure(AGENT_B, "turn-7"));
     events.emit("event", failure(AGENT_A, "turn-8"));

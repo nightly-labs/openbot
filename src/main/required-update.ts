@@ -1,7 +1,3 @@
-// The minimum app version (plan 011, item 24). Below the minimum that the account service names, the
-// renderer shows "Update required" and `RequestedUpdate` installs the next release when the agents
-// are idle. A failed check never blocks: it keeps the last confirmed state.
-
 import {
   APP_MINIMUM_VERSION_PATH,
   isBelowMinimumVersion,
@@ -25,9 +21,7 @@ export interface RequiredUpdateOptions {
   currentVersion: string;
   resolveApiUrl: (path: string) => string;
   updater: { getStatus(): UpdateStatus; setRequiredVersion(version: string | null): void };
-  /** Installs the next release by itself while true. */
   setRequired: (required: boolean) => void;
-  /** A line for the main log. It has no account data. */
   log: (message: string) => void;
   fetch?: RequiredUpdateFetch;
 }
@@ -72,7 +66,6 @@ export class RequiredUpdate {
       this.#options.log(`The minimum version check failed: ${cause instanceof Error ? cause.message : String(cause)}`);
       return "unknown" satisfies RequiredUpdateOutcome;
     }
-    // A tenant whose host manages updates cannot install one; its host checks for itself.
     const required =
       !this.#options.updater.getStatus().managedByHost &&
       isBelowMinimumVersion(this.#options.currentVersion, answer.success);

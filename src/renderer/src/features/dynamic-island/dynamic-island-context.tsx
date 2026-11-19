@@ -9,31 +9,6 @@ import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
 import { dynamicIslandPort } from "./dynamic-island-port";
 
-/**
- * The macOS Dynamic Island projection: what the desktop shows about servers the
- * user is *not* looking at.
- *
- * This is the one domain that is deliberately cross-server, so it sits above
- * everything per-server. `DynamicIslandCoordinator` keeps a runtime per server
- * id and hands the six turn signals back on a switch (`serverState(serverId)`),
- * which is why it must outlive any subtree keyed by the active server.
- * `onScopedEvent` is the other half of that: events for a background server
- * arrive here and nowhere else, because no per-server domain exists to receive
- * them.
- *
- * Publishing is batched through `queueMicrotask` rather than an effect. Several
- * of the callers below fire in the same flush - a scoped event, the retain
- * effect, a resolved action - and main only needs the last presentation, so the
- * scheduled flag collapses them into one IPC call. A publish within 100 ms of
- * the last one waits for the rest of those 100 ms: each streamed piece of text
- * is an event, and with many agents the presentation was built again hundreds
- * of times a second. The first publish after a quiet time goes out at once.
- *
- * The coordinator itself is exposed rather than wrapped. Its three remaining
- * callers (`serverState` on a switch, `replaceServer` from the projection
- * effect, `resolveAction` from the action handler) each still live outside this
- * module, and a wrapper per call would only re-declare their signatures.
- */
 const PUBLISH_INTERVAL_MS = 100;
 
 const DynamicIsland = createSimpleContext({
@@ -48,7 +23,6 @@ const DynamicIsland = createSimpleContext({
     let lastPublishedAt = Number.NEGATIVE_INFINITY;
     let publishTimer: ReturnType<typeof setTimeout> | undefined;
 
-    /** Active server first: main renders the head of this list as the leading item. */
     function serverOrder(): string[] {
       const activeId = activeServerId();
       const current = servers();
@@ -57,10 +31,6 @@ const DynamicIsland = createSimpleContext({
         .map((server) => server.id);
       ids.sort((left, right) => Number(right === activeId) - Number(left === activeId));
       const ordered = ids.length > 0 ? ids : ["local"];
-      // A muted server is muted here too: it contributes neither a presentation nor an attention
-      // count. A server that the user hid from the island in Settings is left out the same way. The
-      // filter runs after the `["local"]` fallback so that fallback cannot put a muted or hidden
-      // local server back. An empty list is fine - the coordinator reads it as idle.
       const muted = new Set(current.filter((server) => server.notificationsMuted).map((server) => server.id));
       const settings = generalSettings();
       const choices = {
@@ -71,7 +41,6 @@ const DynamicIsland = createSimpleContext({
     }
 
     function publishPresentation(): void {
-      // The main window owns the island; main rejects a publish from a chat window.
       if (platform.landingPreview || platform.chatWindow || presentationScheduled) return;
       presentationScheduled = true;
       const send = () => {
@@ -92,12 +61,9 @@ const DynamicIsland = createSimpleContext({
     createEffect(
       () =>
         servers()
-          // Mute belongs in this key: it changes what `serverOrder` returns, and the user has to
-          // see that without restarting the app.
           .map((server) => `${server.id}:${server.state}:${server.notificationsMuted}`)
           .join("\u0000"),
       () => {
-        // The key above decides when this runs; the list is read once for the current state.
         const currentServers = untrack(servers);
         const configuredServerIds = new Set(currentServers.map((server) => server.id));
         for (const serverId of connectedServers) {
@@ -112,8 +78,6 @@ const DynamicIsland = createSimpleContext({
       },
     );
 
-    // The server choices change what `serverOrder` returns. The island follows a change at once.
-    // A string key, so that a change to another setting, such as a size slider, publishes nothing.
     createEffect(
       () => {
         const settings = generalSettings();
@@ -145,7 +109,6 @@ const DynamicIsland = createSimpleContext({
 export const DynamicIslandProvider = DynamicIsland.provider;
 export const useDynamicIsland = DynamicIsland.use;
 
-/** The island text in the current interface language, read for each presentation. */
 function islandText(): DynamicIslandText {
   const { t, errorMessage } = currentText();
   return {

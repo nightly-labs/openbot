@@ -19,32 +19,24 @@ const GROUP_LABEL = {
   fixed: "update.whatsNew.group.fixed",
 } as const satisfies Record<WhatsNewGroupType, AppTextKey>;
 
-/** A longer fix list starts closed, so the new features stay in view. */
 const OPEN_FIX_LIMIT = 3;
 
 export interface WhatsNewDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** The version that runs now. */
   version: string;
-  /** The version before the update. Null when the reader opens the dialog again from Settings. */
   previousVersion: string | null;
   notes: WhatsNewNotes;
   onRetry: () => void;
   onOpenChangelog: () => void;
 }
 
-/**
- * The notes of the versions since the last one this device ran, after an app update. It never
- * blocks the app: Escape, the overlay, the close button and "Got it" all close it.
- */
 export function WhatsNewDialog(props: WhatsNewDialogProps) {
   const { t } = useText();
   const releases = (): readonly WhatsNewRelease[] => (props.notes.status === "ready" ? props.notes.releases : []);
   let doneButton: HTMLButtonElement | undefined;
 
   function retry(): void {
-    // Retry leaves the DOM when the notes start to load, so the focus goes to "Got it" first.
     doneButton?.focus({ preventScroll: true });
     props.onRetry();
   }
@@ -57,14 +49,11 @@ export function WhatsNewDialog(props: WhatsNewDialogProps) {
             as="section"
             class="whats-new-dialog"
             onOpenAutoFocus={(event) => {
-              // "Got it" takes the focus, so Enter closes the dialog and the close button shows no
-              // focus ring on open.
               event.preventDefault();
               doneButton?.focus({ preventScroll: true });
             }}
           >
             <Dialog.Description class="sr-only">{t("update.whatsNew.description")}</Dialog.Description>
-            {/* Mounted before the text changes, so a screen reader reads the loading state. */}
             <p class="sr-only" role="status">
               {props.notes.status === "loading" ? t("update.whatsNew.loading") : ""}
             </p>
@@ -116,10 +105,6 @@ export function WhatsNewDialog(props: WhatsNewDialogProps) {
   );
 }
 
-/**
- * The scroll area. It owns the fades, so their observer stops when the dialog closes. The
- * full-screen update concept also shows it, to list the notes before the restart.
- */
 export function WhatsNewBody(props: {
   notes: WhatsNewNotes;
   releases: readonly WhatsNewRelease[];
@@ -130,7 +115,6 @@ export function WhatsNewBody(props: {
   const noticeTitleId = createUniqueId();
   const fades = createScrollFades();
   onSettled(() => fades.stop);
-  // New notes can change the scroll height while the body keeps its size.
   createEffect(summary, () => fades.remeasure());
 
   return (

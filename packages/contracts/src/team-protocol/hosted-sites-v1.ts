@@ -1,10 +1,3 @@
-// Frozen optional hosted-sites-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: any member of a server can
-// list the openbot.site sites that the host publishes, with the host's site limit and the slots in
-// use. An owner or admin can delete one of those sites. The host calls the account service with its
-// own account and server credential, so the client never sends or receives a credential. Only site
-// summaries and a site id cross the wire. Widening any of it needs a second capability string.
 import {
   adminRoute,
   count,

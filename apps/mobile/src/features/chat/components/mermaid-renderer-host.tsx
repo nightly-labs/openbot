@@ -12,10 +12,6 @@ export const HIDDEN_DOM: DOMProps = {
   style: { flex: 0, height: 1, width: 1 },
 };
 
-/**
- * Starts the Mermaid web view when the first diagram needs it and keeps it for the session, so
- * an account with no diagrams never loads Mermaid. The web view is hidden and takes no touches.
- */
 export function MermaidRendererHost() {
   const jobs = useMermaidJobs();
   const [started, setStarted] = useState(false);

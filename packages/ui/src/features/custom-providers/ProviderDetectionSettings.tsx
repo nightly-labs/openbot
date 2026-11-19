@@ -5,12 +5,9 @@ import { useText } from "../../text";
 import { endpointUrlError } from "./custom-provider-form";
 import { RepeatableRows } from "./RepeatableRows";
 
-/** Where the host looks, besides the default addresses and PATH. The host stores and applies it. */
 export interface ProviderDetectionSettingsValue {
   enabled: boolean;
-  /** Base URLs of more OpenAI-compatible servers, such as one on another port or computer. */
   addresses: readonly string[];
-  /** More folders to search for known ACP agent commands. */
   folders: readonly string[];
 }
 
@@ -18,13 +15,10 @@ interface ProviderDetectionSettingsProps {
   value: ProviderDetectionSettingsValue;
   onChange: (value: ProviderDetectionSettingsValue) => void;
   busy?: boolean | undefined;
-  /** The last save failed. The host keeps the rows, so the user can correct them. */
   error?: string | null | undefined;
-  /** The settings are of a joined server, which looks on its own network and PATH. */
   onServer?: boolean | undefined;
 }
 
-// The examples are the same in each language.
 const ADDRESS_PLACEHOLDER = "http://192.168.1.20:11434/v1";
 const FOLDER_PLACEHOLDER = "~/tools/bin";
 
@@ -34,15 +28,12 @@ interface ListRow {
 
 type ListName = "addresses" | "folders";
 
-/** A list always shows one row to type into. The host ignores a blank row. */
 function listRows(values: readonly string[]): ListRow[] {
   return (values.length > 0 ? values : [""]).map((value) => ({ value }));
 }
 
 export function ProviderDetectionSettings(props: ProviderDetectionSettingsProps) {
   const { t } = useText();
-  // The rows are read once and then owned here, so each keeps its input while the user types: a
-  // list rebuilt from the strings would replace the focused field on each key.
   const [lists, setLists] = createStore<Record<ListName, ListRow[]>>(
     untrack(() => ({ addresses: listRows(props.value.addresses), folders: listRows(props.value.folders) })),
   );

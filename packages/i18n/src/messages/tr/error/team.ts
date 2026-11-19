@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/team";
 
 export const messages = {
-  // Errors that the Team API and the team store send to clients.
   "error.team.ownerNotLinked": "Bu ana makine bir OpenBot sahibi hesabına bağlı değil.",
   "error.team.ownerEmailRequired": "Bu ana makineyi oluşturan OpenBot e-postası ile oturum açın.",
   "error.team.hostNotConfigured": "Ekip ana makinesi yapılandırılmamış.",

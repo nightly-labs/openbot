@@ -17,12 +17,6 @@ import { APP_FONT } from "@/shared/lib/app-font";
 import { nameInitials } from "@/shared/lib/name-initials";
 import { currentText } from "@/shared/lib/text";
 
-/*
- * The image of the desktop Share dialog, drawn the same way: the account, the last 26 weeks of
- * activity and four numbers, on the light paper surface. Nothing leaves the phone unless the user
- * sends the file from the share sheet.
- */
-
 const WIDTH = 1200;
 const HEIGHT = 690;
 const PAD = 56;
@@ -31,9 +25,7 @@ const AVATAR = 88;
 const LOGO = 56;
 const GRID = { top: 222, gap: 6 };
 const TILES = { top: 548, height: 96, gap: 16, radius: 20 };
-/** The opacity of each heatmap level; level 0 is the text colour, the others the accent. */
 const LEVEL_ALPHA = [0.07, 0.32, 0.55, 0.78, 1] as const;
-/** `--openbot-accent-soft`: the accent at this opacity, behind the initials. */
 const ACCENT_SOFT_ALPHA = 0.16;
 
 export interface ProfileShareColors {
@@ -65,7 +57,6 @@ function textWidth(text: string, typeface: SkFont): number {
   return typeface.measureText(text).width;
 }
 
-/** The text, cut with an ellipsis to fit `width`. */
 function ellipsize(text: string, typeface: SkFont, width: number): string {
   if (textWidth(text, typeface) <= width) return text;
   let end = text.length;
@@ -73,7 +64,6 @@ function ellipsize(text: string, typeface: SkFont, width: number): string {
   return `${text.slice(0, end).trimEnd()}…`;
 }
 
-/** The account photo; a photo that does not load gives its place to the initials. */
 async function loadPhoto(url: string) {
   try {
     return Skia.Image.MakeImageFromEncoded(await Skia.Data.fromURI(url));
@@ -157,7 +147,6 @@ async function drawHeader(
   drawLogo(canvas, WIDTH - PAD - LOGO, PAD + (AVATAR - LOGO) / 2, colors);
 }
 
-/** The last `WEEKS` columns of the year, Sunday at the top, with the month above its first week. */
 function drawWeeks(
   canvas: SkCanvas,
   days: ProfileStats<{ id: string }>["days"],
@@ -237,11 +226,6 @@ function drawTiles(
   });
 }
 
-/**
- * Draws the activity image and saves it as a PNG file in the cache. The caller deletes the file.
- * Android does not give the fonts of the app to the system font manager, so the caller passes the
- * Inter files in `appFonts`. Without them, Skia uses the system font.
- */
 export async function renderProfileShareImage(
   account: ProfileShareAccount,
   stats: ProfileStats<{ id: string }>,

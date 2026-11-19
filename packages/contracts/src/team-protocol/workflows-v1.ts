@@ -1,27 +1,3 @@
-// Frozen optional workflows-v1 wire contract. Keep IPC types and limits out of this file.
-//
-// What it grants, recorded here because freezing it makes it permanent: a member of a server reads
-// the workflows whose agent steps name only agents that the member can see, and whose model steps
-// name only providers that the member's protocol shows; an owner or admin also reads one that names
-// an agent that no longer exists, so they can fix or delete it. Any other workflow answers as
-// missing, and so do its runs, steps and versions. A run, a single step, a stop, a retry or a
-// decision needs the chat level for each agent that the workflow names, because a run sends tasks to
-// them. A change, a delete or a restore needs the manage level for each agent that the workflow
-// names, before and after the change. A workflow that names no agent, such as one with only model
-// and condition steps, needs no agent level: each member who reads it can change and run it on the
-// host's providers, by product decision. Only an owner or admin can add an output that posts to a
-// messaging place or change its place, as routine results need the admin role; a member can run one
-// that is there. A step of an agent that is hidden now does not cross, as no object that names a
-// hidden agent does. A webhook trigger's URL goes only to an owner or admin; a member reads it as
-// null, as `events-v1` keeps it behind the admin role, and only an owner or admin can make a new
-// webhook secret. Step output and error cross with at most 32,000 characters each, and the host
-// empties the step texts of the oldest runs first when a page of runs would not fit one WebRTC
-// frame. A node's fields cross as an open record of texts, numbers and switches, so a node kind that
-// does not run yet keeps its settings. Node kinds, port types, statuses, run sources, trigger types
-// and version kinds cross as open names, so a newer host can add one; a client shows a workflow with
-// a node kind or a port type that it does not know as read-only. The optional event
-// `workflows-changed` names only the workflow that changed, so the client reads it again. Widening
-// any other part needs a second capability string.
 import { isDynamicRecord, isString } from "../runtime-values";
 import {
   type AdminDecoder,
@@ -63,14 +39,11 @@ export const WORKFLOWS_ROUTES = {
   rotateWebhookSecret: "/v1/workflows/rotate-webhook-secret",
 } as const;
 
-/** The longest step output, step error or run error that crosses. */
 export const WORKFLOW_STEP_TEXT_LIMIT = 32_000;
-/** The most steps of one run that cross; the host sends the newest. */
 export const WORKFLOW_RUN_STEP_LIMIT = 2_000;
 
 export type WorkflowsEvent = { type: "workflows-changed"; workflowId: string };
 
-/** The workflows event in `value`, or null for any other event. A malformed one throws. */
 export function workflowsEvent(value: unknown): WorkflowsEvent | null {
   if (!isDynamicRecord(value) || value.type !== "workflows-changed") return null;
   if (!isString(value.workflowId) || !value.workflowId.length || value.workflowId.length > 128) {
@@ -80,22 +53,16 @@ export function workflowsEvent(value: unknown): WorkflowsEvent | null {
 }
 
 const timestamp = string(64);
-/** `<started at>|<run id>` of the last run of a page; see `WorkflowRunStore.page`. */
 const runCursor = string(64);
 const stepText = string(WORKFLOW_STEP_TEXT_LIMIT);
 const title: AdminDecoder = (value) => {
   if (!isString(value) || !value.trim().length || value.length > 160) throw new Error("Invalid workflow title.");
   return value;
 };
-/**
- * A kind or a status. A newer host can add one in this capability, so the decoder accepts any short
- * lowercase name and the client maps a name it does not know (see `remote-agent-decoding.ts`).
- */
 const token: AdminDecoder = (value) => {
   if (!isString(value) || !/^[a-z][a-z0-9-]{0,31}$/u.test(value)) throw new Error("Invalid workflow value.");
   return value;
 };
-/** A whole number from 1, such as a run number, an attempt or a page size. */
 const ordinal =
   (maximum: number): AdminDecoder =>
   (value) => {
@@ -119,7 +86,6 @@ const fieldValue: AdminDecoder = (value) => {
   if (isString(value) && value.length <= 20_000) return value;
   throw new Error("Invalid workflow field.");
 };
-/** The settings of a node by name. The host reads the names its runtime knows and keeps the rest. */
 const nodeFields: AdminDecoder = (value) => {
   if (!isDynamicRecord(value)) throw new Error("Invalid workflow fields.");
   const entries = Object.entries(value);
@@ -129,7 +95,6 @@ const nodeFields: AdminDecoder = (value) => {
   for (const [name, field] of entries) decoded[name] = fieldValue(field);
   return decoded;
 };
-/** A calendar date as "YYYY-MM-DD" that exists. */
 const routineDate: AdminDecoder = (value) => {
   if (!isString(value)) throw new Error("Invalid workflow schedule.");
   const match = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(value);
@@ -140,7 +105,6 @@ const routineDate: AdminDecoder = (value) => {
   return value;
 };
 const onceSchedule = fields({ kind: oneOf("once"), date: routineDate, time: routineTime });
-/** A routine schedule, and also a one-time date, which the routine contracts do not carry. */
 const schedule: AdminDecoder = (value) =>
   isDynamicRecord(value) && value.kind === "once" ? onceSchedule(value) : routineSchedule(value);
 const node = fields(

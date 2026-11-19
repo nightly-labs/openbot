@@ -50,21 +50,16 @@ import { clamp, rubberBand } from "@/shared/lib/worklet-math";
 
 const COUNT = APP_ICONS.length;
 const LAST = COUNT - 1;
-/** Settles a release or a tap on the next icon. A flick keeps its speed. */
 const SNAP = { duration: 400, dampingRatio: 0.8, reduceMotion: ReduceMotion.System } as const;
 const DIGIT_SPRING = { duration: 350, dampingRatio: 0.9, reduceMotion: ReduceMotion.System } as const;
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
-/** The share of a drag past the first or the last icon that moves the row. */
 const RUBBER = 0.35;
-/** The eyes of the main icon: 72% of its width, on its middle line. */
 const EYES_WIDTH = 0.72;
 const EYES_ASPECT = 1584 / 3480;
 const DIGIT_HEIGHT = 34;
-/** The row runs from the bottom left to the top right: the rise for each point of width. */
 const SLOPE = 0.42;
 const DIGITS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
-/** 1 when the icon `index` is in the middle, 0 one step or more away. */
 function closeness(progress: number, index: number): number {
   "worklet";
   return 1 - clamp(Math.abs(progress - index), 0, 1);
@@ -80,12 +75,6 @@ function shade(hex: string, factor: number): string {
   return `#${channels.join("")}`;
 }
 
-/**
- * The app icon picker. The icons sit on a line from the bottom left to the top right: the selected one
- * in the middle, sharp and large; the others smaller, turned and blurred. A drag or a tap on a side icon moves the row, and the
- * number, the name and the button follow. All motion runs on the UI thread; React renders once per
- * step for the button and for assistive technology.
- */
 export function AppIconSettingsScreen() {
   const { t } = useText();
   const reduced = useReducedMotion();
@@ -98,7 +87,6 @@ export function AppIconSettingsScreen() {
   const [index, setIndex] = useState(startIndex);
   const progress = useSharedValue(startIndex);
   const dragStart = useSharedValue(0);
-  // The selected icon. The button blends from the old one to the new one, so it does not jump.
   const fromCurrent = useSharedValue(startIndex);
   const toCurrent = useSharedValue(startIndex);
   const currentMix = useSharedValue(1);
@@ -112,7 +100,6 @@ export function AppIconSettingsScreen() {
     if (value === null) return;
     const next = APP_ICONS.indexOf(value);
     if (!placed.current) {
-      // The icon loaded after the first render: the row starts there, without motion.
       placed.current = true;
       progress.set(next);
       fromCurrent.set(next);
@@ -143,7 +130,6 @@ export function AppIconSettingsScreen() {
   const direction = I18nManager.isRTL ? -1 : 1;
   const size = Math.min(width * 0.4, 168);
   const spacing = width * 0.4;
-  // Room for the neighbors above and below the middle icon, with their turn and blur.
   const canvasHeight = spacing * SLOPE * 2 + size * 0.95;
 
   const pan = Gesture.Pan()
@@ -286,7 +272,6 @@ function CarouselIcon({
     const offsetX = distance * spacing * direction;
     return [
       { translateX: centerX - size / 2 + offsetX },
-      // On the screen the right side is always up, also in right-to-left languages.
       { translateY: centerY - size / 2 - offsetX * SLOPE },
       { rotate: reduced ? 0 : clamp(distance, -2, 2) * direction * 0.28 },
       { scale: 1 - Math.min(Math.abs(distance), 1.6) * 0.34 },
@@ -332,7 +317,6 @@ function CarouselIcon({
   );
 }
 
-/** The position, as `06 / 10`. Each digit rolls to its new value. */
 function Counter({ progress }: { progress: SharedValue<number> }) {
   const text = String(useCSSVariable("--openbot-text-primary"));
   const tens = useSharedValue(0);
@@ -387,7 +371,6 @@ function RollingDigit({ digit, color }: { digit: SharedValue<number>; color: str
   );
 }
 
-/** The names, one over the other. Each fades in as its icon reaches the middle. */
 function Names({ progress, current }: { progress: SharedValue<number>; current: string }) {
   const { t } = useText();
   return (
@@ -396,7 +379,6 @@ function Names({ progress, current }: { progress: SharedValue<number>; current: 
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
     >
-      {/* Sizes the row for the current text size. */}
       <Typography.Heading type="h4" align="center" className="opacity-0">
         {current}
       </Typography.Heading>
@@ -422,7 +404,6 @@ function NameLabel({ index, progress, label }: { index: number; progress: Shared
   );
 }
 
-/** “Use this icon”, or the muted “Current icon” while the selected icon is in the middle. */
 function ActionButton({
   progress,
   fromCurrent,
@@ -438,7 +419,6 @@ function ActionButton({
   fromCurrent: SharedValue<number>;
   toCurrent: SharedValue<number>;
   currentMix: SharedValue<number>;
-  /** The icon in the middle is the selected icon. */
   isCurrent: boolean;
   disabled: boolean;
   useLabel: string;

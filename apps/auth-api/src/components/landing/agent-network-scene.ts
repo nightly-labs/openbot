@@ -1,31 +1,15 @@
-// The network picture of the landing page: three agents pass one task through
-// OpenBot, then the network grows around them until it fills the frame. Some grown
-// agents are large leads with a team of small agents around them. A click on an
-// agent of a complete network grows a new network from that agent, and a click on
-// the hub sends a signal through the network.
-//
-// The scene is a pure function of time. `buildAgentNetwork` places every node,
-// edge and message once from a seed, and `drawAgentNetwork` draws the
-// frame at second `t`. Playback, pause and reduced motion are only a choice of
-// `t`, so they cannot drift apart.
-
 import { APP_LOGO_CORNER, APP_LOGO_EYE_POINTS, APP_LOGO_SIZE } from "@openbot/brand/app-logo-shape";
 
-/** A node with no avatar is the OpenBot mark at the centre. */
 const HUB = -1;
 
 interface NetworkNode {
   x: number;
   y: number;
-  /** The second at which the node appears. */
   at: number;
   radius: number;
-  /** An index in `NetworkAssets.avatars`, or `HUB`. */
   avatar: number;
-  /** An index in `NetworkAssets.marks`, or -1 for no badge. */
   mark: number;
   label?: string;
-  /** Busy nodes show the typing pill from time to time. */
   busy: boolean;
   phase: number;
 }
@@ -33,9 +17,7 @@ interface NetworkNode {
 interface NetworkEdge {
   from: number;
   to: number;
-  /** The second at which the dots start to draw from `from` to `to`. */
   at: number;
-  /** The dot centres, from `from` to `to`, in world units. */
   dots: Float32Array;
   length: number;
 }
@@ -49,34 +31,22 @@ export interface NetworkMessage {
 
 interface NetworkPulse {
   edge: number;
-  /** True when the pulse runs from `to` to `from`. */
   reverse: boolean;
   at: number;
   duration: number;
-  /** The node whose colour the pulse carries. */
   sender: number;
 }
 
 export interface AgentNetwork {
   nodes: readonly NetworkNode[];
-  /** In the order in which they start to draw. */
   edges: readonly NetworkEdge[];
   messages: readonly NetworkMessage[];
   pulses: readonly NetworkPulse[];
-  /** The second at which the network is complete and the camera is still. */
   end: number;
-  /** The second at which the grown network starts to appear, and the background pulses start. */
   growStart: number;
-  /** The second at which the camera starts to move back. */
   zoomStart: number;
-  /** The first edges, which carry the story pulses and no background pulse. */
   storyEdges: number;
-  /** Moves the background pulses to other slots, so they differ with the seed too. */
   salt: number;
-  /**
-   * The complete network that this one replaces, which fades out at the start. `root` is
-   * the agent in it that this network grows from, and `at` is its second at the click.
-   */
   previous?: { network: AgentNetwork; root: { x: number; y: number }; at: number };
 }
 
@@ -87,24 +57,19 @@ interface AgentNetworkAgent {
 }
 
 export interface AgentNetworkGrowth {
-  /** Each seed grows a different network. */
   seed: number;
-  /** How many avatars and provider marks the grown network chooses from. */
   avatarCount: number;
   markCount: number;
 }
 
 export interface AgentNetworkInput extends AgentNetworkGrowth {
-  /** The three agents of the conversation, in the order in which they talk. */
   agents: readonly [AgentNetworkAgent, AgentNetworkAgent, AgentNetworkAgent];
-  /** One message for each agent, in the same order. */
   messages: readonly [string, string, string];
   hubLabel: string;
 }
 
 export interface NetworkAssets {
   avatars: readonly (CanvasImageSource | undefined)[];
-  /** The head colour of each avatar, which its pulses carry. */
   avatarColors: readonly string[];
   marks: readonly (CanvasImageSource | undefined)[];
   font: string;
@@ -113,7 +78,6 @@ export interface NetworkAssets {
     hubEye: string;
     dot: string;
     badge: string;
-    /** The page colour: a ring in it keeps a badge apart from its avatar. */
     canvas: string;
     bubble: string;
     bubbleBorder: string;
@@ -124,31 +88,23 @@ export interface NetworkAssets {
 }
 
 export interface NetworkView {
-  /** CSS pixels. */
   width: number;
   height: number;
-  /** The heading covers this many pixels at the top. The scene centres in the space under it. */
   top: number;
-  /** Narrow frames keep one message at a time, so the bubbles do not cover each other. */
   narrow: boolean;
 }
 
-// The timeline, in seconds.
 const NODE_POP = 0.38;
 const EDGE_DRAW = 0.24;
 const GROW_START = 5.3;
 const GROW_DURATION = 4.4;
 const ZOOM_START = 5.1;
 const ZOOM_DURATION = 5;
-// A network that grows from a clicked agent.
 const REGROW_START = 0.2;
 const REGROW_DURATION = 2.8;
-/** The camera moves the clicked agent to the centre in this time. */
 const PAN_DURATION = 0.7;
-/** The replaced network fades out in this time. */
 const LEAVE_DURATION = 0.45;
 
-// The world, in units that are CSS pixels at the first camera scale.
 const AGENT_RADIUS = 34;
 const GROWN_RADIUS = 28;
 const LEAD_RADIUS = 46;
@@ -156,36 +112,27 @@ const TEAM_RADIUS = 18;
 const HUB_SIDE = 78;
 const DOT_SPACING = 15;
 const DOT_RADIUS = 3;
-/** Screen pixels. */
 const BADGE_MIN_RADIUS = 8;
 const PULSE_TRAIL = 5;
 const PULSE_SPEED = 420;
 const WORLD_RX = 1700;
 const WORLD_RY = 1000;
 const MAX_GROWN = 320;
-/** World units per second. */
 const RIPPLE_SPEED = 1500;
 const BROADCAST_SPEED = 1100;
 const ECHO_SPEED = 900;
-/** The ripple lights the dots in this width behind its front, in world units. */
 const RIPPLE_WIDTH = 220;
-/** The reach of the ripple, where it is gone. */
 const RIPPLE_END = Math.hypot(WORLD_RX, WORLD_RY);
-/** An agent reacts to the signal for this time. */
 const REACT_DURATION = 0.55;
-/** The hub presses in for this time after a click. */
 const PRESS_DURATION = 0.35;
-/** The story fits in this box at the first camera scale. A narrow frame lets the bubbles reach its sides. */
 const STORY_WIDTH = 1080;
 const NARROW_STORY_WIDTH = 800;
 const STORY_HEIGHT = 600;
 const STORY_CENTRE = { x: -20, y: -30 };
 
-// Background pulses run on a fixed grid of slots, so a frame needs no state.
 const AMBIENT_SLOT = 0.035;
 const AMBIENT_MAX_DURATION = 0.7;
 
-/** A small seeded generator (mulberry32), so one seed always grows the same network. */
 function random(seed: number): () => number {
   let state = seed >>> 0;
   return () => {
@@ -197,7 +144,6 @@ function random(seed: number): () => number {
   };
 }
 
-/** A stable value in [0, 1) for slot `index`. */
 function hash(index: number): number {
   let value = Math.imul(index ^ 0x9e3779b9, 0x85ebca6b);
   value ^= value >>> 13;
@@ -241,7 +187,6 @@ function makeEdge(nodes: readonly NetworkNode[], from: number, to: number, at: n
   return { from, to, at, dots, length };
 }
 
-/** The network that tells the story, then grows around it. */
 export function buildAgentNetwork(input: AgentNetworkInput): AgentNetwork {
   const next = random(input.seed);
   const [first, second, third] = input.agents;
@@ -272,18 +217,12 @@ export function buildAgentNetwork(input: AgentNetworkInput): AgentNetwork {
   ];
 
   growAround(nodes, edges, next, { ...input, growStart: GROW_START, growDuration: GROW_DURATION });
-  // The story edges start before the growth, so they keep indices 0 to 2, which the pulses use.
   return complete(
     { nodes, edges, messages, pulses, growStart: GROW_START, zoomStart: ZOOM_START, storyEdges: 3 },
     next,
   );
 }
 
-/**
- * A network that replaces the complete `network`. It grows from the agent at `root`, which
- * the camera moves to the centre. It has no hub and no story, and the camera is already back.
- * `at` is the second of `network` at the click.
- */
 export function regrowAgentNetwork(
   network: AgentNetwork,
   root: number,
@@ -298,7 +237,6 @@ export function regrowAgentNetwork(
   ];
   const edges: NetworkEdge[] = [];
   growAround(nodes, edges, next, { ...input, growStart: REGROW_START, growDuration: REGROW_DURATION });
-  // The replaced network does not keep its own previous network, so the chain stays one long.
   const { previous: _older, ...replaced } = network;
   return {
     ...complete(
@@ -319,11 +257,6 @@ function complete(parts: NetworkParts, next: () => number): AgentNetwork {
   };
 }
 
-/**
- * Grows the network outward from `nodes`, in place, and sorts `edges` by time. Each new
- * node branches from its parent. A place is free when it keeps away from every node and
- * its edge crosses none.
- */
 function growAround(
   nodes: NetworkNode[],
   edges: NetworkEdge[],
@@ -335,7 +268,6 @@ function growAround(
   const grown: Place[] = [];
   const parentEdges: [number, number][] = edges.map((edge) => [edge.from, edge.to]);
   const isLead = (node: NetworkNode) => node.radius === LEAD_RADIUS;
-  // The team of a lead is small. Of the other agents, some are leads.
   const sizeFor = (parent: NetworkNode) => {
     if (isLead(parent)) return TEAM_RADIUS;
     return next() < 0.12 ? LEAD_RADIUS : GROWN_RADIUS;
@@ -362,13 +294,11 @@ function growAround(
   const childCount = (parent: number) => {
     if (parent === 0) return 7;
     const node = nodes[parent];
-    // A lead gathers a team around it.
     if (node && isLead(node)) return 4 + Math.floor(next() * 3);
     return 1 + Math.floor(next() * 3);
   };
   while (grown.length < MAX_GROWN) {
     let parent = queue.shift();
-    // When the branches stop, start a new one from a random node.
     if (parent === undefined) parent = Math.floor(next() * nodes.length);
     const origin = nodes[parent];
     if (!origin) break;
@@ -377,18 +307,14 @@ function growAround(
     const wanted = childCount(parent);
     for (let attempt = 0; attempt < 12 && placed < wanted; attempt += 1) {
       const lead = isLead(origin);
-      // A lead's team sits all around it, not only on its outer side.
       const spread = lead ? Math.PI * 2 : 2.3;
       const angle = parent === 0 ? outward + (attempt / 12) * Math.PI * 2 : outward + (next() - 0.5) * spread;
       const near = 128 + next() * 60;
       let radius = sizeFor(origin);
-      // Larger agents keep more room around them, and smaller agents sit closer.
       const room = Math.max(0, origin.radius - GROWN_RADIUS) + (radius - GROWN_RADIUS);
-      // A lead's team sits in a tight ring around it.
       const distance = lead ? origin.radius + radius + 44 + next() * 16 : near + room;
       const x = origin.x + Math.cos(angle) * distance;
       const y = origin.y + Math.sin(angle) * distance;
-      // A lead needs free room for its team. Where there is none, the agent is not a lead.
       if (radius === LEAD_RADIUS && !isFree(x, y, parent, radius + 50)) radius = GROWN_RADIUS;
       if (!isFree(x, y, parent, radius)) continue;
       const index = nodes.length;
@@ -404,7 +330,6 @@ function growAround(
       });
       grown.push({ x, y, parent });
       parentEdges.push([parent, index]);
-      // A lead's team grows next, before other agents take its room.
       if (radius === LEAD_RADIUS) queue.unshift(index);
       else queue.push(index);
       placed += 1;
@@ -412,8 +337,6 @@ function growAround(
     if (queue.length === 0 && grown.length > 0 && next() < 0.02) break;
   }
 
-  // The network grows slowly first and then fast: the count rises with the
-  // square of the time. A child never appears before its parent.
   for (const [order, place] of grown.entries()) {
     const node = nodes[firstGrown + order];
     const parent = nodes[place.parent];
@@ -423,7 +346,6 @@ function growAround(
     edges.push(makeEdge(nodes, place.parent, firstGrown + order, node.at - EDGE_DRAW));
   }
 
-  // Some neighbours are linked too, so it reads as a network and not a tree.
   const linked = new Set(parentEdges.map(([a, b]) => (a < b ? `${a}:${b}` : `${b}:${a}`)));
   for (let index = firstGrown; index < nodes.length; index += 1) {
     const node = nodes[index];
@@ -455,14 +377,11 @@ function growAround(
 
 interface Camera {
   scale: number;
-  /** The world point at the centre of the frame. */
   x: number;
   y: number;
-  /** The scale at the start, which the labels compare against. */
   start: number;
 }
 
-/** A world offset of the camera centre. */
 interface Pan {
   x: number;
   y: number;
@@ -470,7 +389,6 @@ interface Pan {
 
 const NO_PAN: Pan = { x: 0, y: 0 };
 
-/** The share of the move of the clicked agent to the centre that is still to come at second `t`. */
 function panLeft(t: number): number {
   return 1 - easeInOutCubic(clamp01(t / PAN_DURATION));
 }
@@ -478,12 +396,9 @@ function panLeft(t: number): number {
 function camera(view: NetworkView, network: AgentNetwork, t: number, pan: Pan): Camera {
   const storyWidth = view.narrow ? NARROW_STORY_WIDTH : STORY_WIDTH;
   const start = Math.min(1, view.width / storyWidth, (view.height - view.top) / STORY_HEIGHT);
-  // The camera moves back until the network fills the frame, and always by a clear step:
-  // a tall, narrow frame fills at nearly the first scale.
   const fill = Math.max(view.width / (2 * WORLD_RX * 0.92), view.height / (2 * WORLD_RY * 0.92));
   const end = Math.min(start * 0.62, fill);
   const progress = easeInOutCubic(clamp01((t - network.zoomStart) / ZOOM_DURATION));
-  // A network that grows from a clicked agent starts with that agent where it was clicked.
   const left = network.previous ? panLeft(t) : 0;
   const root = network.previous?.root ?? NO_PAN;
   return {
@@ -494,7 +409,6 @@ function camera(view: NetworkView, network: AgentNetwork, t: number, pan: Pan): 
   };
 }
 
-/** Converts a world point to frame pixels at second `t`. */
 function projector(view: NetworkView, network: AgentNetwork, t: number, pan: Pan) {
   const cam = camera(view, network, t, pan);
   return {
@@ -504,19 +418,16 @@ function projector(view: NetworkView, network: AgentNetwork, t: number, pan: Pan
   };
 }
 
-/** The index of the agent under the frame point (`x`, `y`) at second `t`, or -1. The hub does not count. */
 export function agentNetworkNodeAt(network: AgentNetwork, view: NetworkView, t: number, x: number, y: number): number {
   const { cam, toX, toY } = projector(view, network, t, NO_PAN);
   for (const [index, node] of network.nodes.entries()) {
     if (node.at > t || node.avatar === HUB) continue;
-    // A small agent is hard to hit, so the target is a little larger than the avatar.
     const reach = Math.max(12, node.radius * cam.scale * 1.15);
     if (Math.hypot(toX(node.x) - x, toY(node.y) - y) <= reach) return index;
   }
   return -1;
 }
 
-/** The frame point and the radius in pixels of node `index` at second `t`, or undefined. */
 export function agentNetworkNodePoint(
   network: AgentNetwork,
   view: NetworkView,
@@ -529,7 +440,6 @@ export function agentNetworkNodePoint(
   return { x: toX(node.x), y: toY(node.y), radius: node.radius * cam.scale };
 }
 
-/** True when the frame point (`x`, `y`) is on the hub at second `t`. */
 export function agentNetworkHubAt(network: AgentNetwork, view: NetworkView, t: number, x: number, y: number): boolean {
   const hub = network.nodes.find((node) => node.avatar === HUB);
   if (!hub || hub.at > t) return false;
@@ -538,38 +448,24 @@ export function agentNetworkHubAt(network: AgentNetwork, view: NetworkView, t: n
   return Math.abs(toX(hub.x) - x) <= reach && Math.abs(toY(hub.y) - y) <= reach;
 }
 
-/**
- * How a signal from the hub goes through the network.
- * - `ripple`: a ring goes out through space and lights the dots that it crosses.
- * - `broadcast`: the signal runs along the connections, from agent to agent.
- * - `echo`: a ring goes out, and each agent sends a reply back to the hub in its colour.
- */
 export const HUB_SIGNAL_STYLES = ["ripple", "broadcast", "echo"] as const;
 export type HubSignalStyle = (typeof HUB_SIGNAL_STYLES)[number];
 
-/** One of the signal styles, at random. */
 export const randomHubSignalStyle = (): HubSignalStyle =>
   HUB_SIGNAL_STYLES[Math.floor(Math.random() * HUB_SIGNAL_STYLES.length)] ?? "ripple";
 
-/** A signal that a click on the hub starts at second `at`. */
 export interface HubSignal {
   style: HubSignalStyle;
   at: number;
-  /** For each node, the seconds after `at` at which the signal reaches it, or -1. */
   reach: readonly number[];
-  /** The pulses that carry the signal, at seconds of the network. */
   pulses: readonly NetworkPulse[];
-  /** The seconds at which the replies of the echo come back to the hub. */
   returns: readonly number[];
-  /** The second after which the signal draws nothing. */
   end: number;
 }
 
-/** The shortest paths from `hub` along the edges that are drawn at second `at`. */
 function signalPaths(network: AgentNetwork, hub: number, at: number) {
   const count = network.nodes.length;
   const distance: number[] = Array.from({ length: count }, () => Number.POSITIVE_INFINITY);
-  // The edge to the parent on the path to the hub, or -1.
   const via: number[] = Array.from({ length: count }, () => -1);
   const links: [number, number][][] = Array.from({ length: count }, () => []);
   for (const [index, edge] of network.edges.entries()) {
@@ -599,7 +495,6 @@ function signalPaths(network: AgentNetwork, hub: number, at: number) {
   return { distance, via };
 }
 
-/** The signal of a click on the hub at second `at`, or undefined when the network has no hub. */
 export function startHubSignal(network: AgentNetwork, style: HubSignalStyle, at: number): HubSignal | undefined {
   const hub = network.nodes.findIndex((node) => node.avatar === HUB);
   const origin = network.nodes[hub];
@@ -632,7 +527,6 @@ export function startHubSignal(network: AgentNetwork, style: HubSignalStyle, at:
       reach = network.nodes.map(spatial);
       for (const [index, first] of via.entries()) {
         if (first < 0) continue;
-        // Each agent answers a little after the ring passes it, along its path to the hub.
         let time = at + (reach[index] ?? 0) + 0.12 + hash(index * 7 + 3) * 0.35;
         let node = index;
         let edgeIndex = first;
@@ -675,7 +569,6 @@ function wrapText(context: CanvasRenderingContext2D, text: string, width: number
   return lines;
 }
 
-/** Wraps `text` into the fewest lines, then narrows them so the last line is not one short word. */
 function balancedLines(context: CanvasRenderingContext2D, text: string, width: number): string[] {
   const lines = wrapText(context, text, width);
   let low = width / 2;
@@ -688,7 +581,6 @@ function balancedLines(context: CanvasRenderingContext2D, text: string, width: n
   return wrapText(context, text, high);
 }
 
-/** Draws the frame at second `t`. `ambient` adds the background pulses after the story. */
 export function drawAgentNetwork(
   context: CanvasRenderingContext2D,
   network: AgentNetwork,
@@ -700,8 +592,6 @@ export function drawAgentNetwork(
 ): void {
   context.clearRect(0, 0, view.width, view.height);
   const previous = network.previous;
-  // The replaced network fades out while the camera moves its clicked agent to the centre,
-  // where this network shows the same agent.
   if (previous && t < LEAVE_DURATION) {
     const moved = 1 - panLeft(t);
     const pan = { x: previous.root.x * moved, y: previous.root.y * moved };
@@ -734,7 +624,6 @@ function drawNetwork(
   context.globalAlpha = opacity;
   const dotRadius = Math.max(0.9, DOT_RADIUS * cam.scale);
 
-  // Edges at rest: one path for every visible dot.
   context.fillStyle = assets.colors.dot;
   context.beginPath();
   for (const edge of network.edges) {
@@ -751,8 +640,6 @@ function drawNetwork(
   }
   context.fill();
 
-  // The ring of a hub signal: the ripple lights the dots behind its front, and the echo
-  // draws only a thin ring.
   const hub = network.nodes.find((node) => node.avatar === HUB);
   for (const signal of signals) {
     if (!hub || signal.style === "broadcast") continue;
@@ -787,7 +674,6 @@ function drawNetwork(
   }
   context.globalAlpha = opacity;
 
-  // Pulses: the dots light in the sender's colour, with a white head.
   const drawPulse = (pulse: NetworkPulse) => {
     const edge = network.edges[pulse.edge];
     if (!edge) return;
@@ -846,7 +732,6 @@ function drawNetwork(
     }
   }
 
-  // Nodes, with their badge and the typing pill.
   context.textAlign = "center";
   context.textBaseline = "top";
   const labelAlpha = clamp01((cam.scale / cam.start - 0.78) / 0.14);
@@ -855,7 +740,6 @@ function drawNetwork(
     const pop = clamp01((t - node.at) / NODE_POP);
     const x = toX(node.x);
     const y = toY(node.y);
-    // How far the node is through its reaction to a hub signal, or -1.
     let react = -1;
     let bump = 0;
     for (const signal of signals) {
@@ -869,7 +753,6 @@ function drawNetwork(
       if (node.avatar === HUB) {
         const press = (t - signal.at) / PRESS_DURATION;
         if (press >= 0 && press < 1) bump = Math.min(bump, -0.1 * Math.sin(Math.PI * press));
-        // Each reply of the echo makes the hub grow a little.
         let replies = 0;
         for (const back of signal.returns) {
           const since = (t - back) / 0.25;
@@ -915,7 +798,6 @@ function drawNetwork(
         context.fill();
       }
       const mark = assets.marks[node.mark];
-      // A badge keeps a readable size when the camera moves back, so it grows against its avatar.
       const badge = Math.max(radius * 0.42, Math.min(BADGE_MIN_RADIUS, radius * 0.75));
       if (mark && radius >= 4) {
         const bx = x + radius * 0.74;
@@ -960,7 +842,6 @@ function drawNetwork(
       }
     }
 
-    // The halo of the reaction to a hub signal.
     if (react >= 0) {
       const halo = radius * (1.15 + 0.8 * easeOutCubic(react));
       context.globalAlpha = (1 - react) * 0.7 * opacity;
@@ -985,7 +866,6 @@ function drawNetwork(
     context.globalAlpha = opacity;
   }
 
-  // Message bubbles stay at reading size whatever the camera scale.
   context.textAlign = "left";
   context.font = `400 14px ${assets.font}`;
   const lineHeight = 20;
@@ -1003,7 +883,6 @@ function drawNetwork(
     const boxHeight = lines.length * lineHeight + 18;
     const anchorX = toX(node.x);
     const left = Math.min(width - 16 - boxWidth, Math.max(16, anchorX - boxWidth / 2));
-    // In a narrow frame a bubble over a lower agent covers the hub, so it goes under the agent's name.
     const below = view.narrow && node.y > 0;
     const reach = node.radius * cam.scale;
     const top =

@@ -1,14 +1,3 @@
-// The versioned JSON stores keep a file that a newer release wrote. Drives the real stores over real
-// files, for each store:
-// - each released version loads, and a change writes the current version to the store's path;
-// - a file of a newer version (99) stays byte for byte the same: the store starts from its defaults,
-//   a change goes to `<path>.v<current>`, and a restart reads that change again;
-// - a file that no released version can read (not JSON, not an object, no version, an unknown older
-//   version) goes to `<path>.corrupt-<time>` with its bytes, the store starts empty, and a change
-//   writes to the path again, so a later release reads it.
-// The browser state is read with `readBrowserState`: its writer is the Electron `BrowserHost`, which
-// writes to the `writePath` that this read returns.
-// `bun run test:versioned-json-stores`. Writes .openbot-build/versioned-json-stores-e2e/report.json.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -26,7 +15,6 @@ import { versionedJsonFallbackPath } from "../src/backend/versioned-json-store";
 const OUT = resolve(import.meta.dirname, "../.openbot-build/versioned-json-stores-e2e");
 const FUTURE_VERSION = 99;
 
-/** One open store: `marker` is what the test reads back, and `change` adds `name` to it. */
 interface OpenStore {
   marker(): readonly string[];
   change(name: string): Promise<void>;
@@ -165,12 +153,10 @@ const STORES: StoreCase[] = [
   },
 ];
 
-/** Bytes of the file, or null when there is none. */
 async function bytes(path: string): Promise<Buffer | null> {
   return readFile(path).catch(() => null);
 }
 
-/** The `version` of the JSON file, or null when there is no file or no numeric version. */
 async function version(path: string): Promise<number | null> {
   const contents = await bytes(path);
   if (contents === null) return null;
@@ -229,13 +215,8 @@ async function caseFor(root: string, store: StoreCase): Promise<StoreReport> {
   return report;
 }
 
-/** Files that no released version can read. None of them may move the saves to a fallback file. */
 const DAMAGED_FILES = ['{"version": 1, "cut off', "[1, 2]", '{"data": {}}', '{"version": 0}'];
 
-/**
- * `startsEmpty` opens the store and, when it can change, changes it: the change must go to the path,
- * where a later release reads it, and never to `<path>.v<current>`.
- */
 async function damagedCases(directory: string, startsEmpty: (path: string) => Promise<boolean>) {
   const results: StoreReport["damaged"] = [];
   for (const [index, contents] of DAMAGED_FILES.entries()) {
@@ -288,7 +269,6 @@ async function browserCase(root: string): Promise<StoreReport> {
   const fallback = versionedJsonFallbackPath(futurePath, 2);
   assert.deepEqual(future.state.tabs, [], "browser state: the newer file did not start with no tabs");
   assert.equal(future.writePath, fallback, "browser state: the saves do not go to the fallback file");
-  // What `BrowserHost` saves after a tab opens, read again at the next start.
   const saved = { version: 2, activeTabId: null, tabs: [browserTab("https://example.com/downgraded")] };
   await writeFile(future.writePath, `${JSON.stringify(saved)}\n`);
   const reread = await run(readBrowserState(futurePath));

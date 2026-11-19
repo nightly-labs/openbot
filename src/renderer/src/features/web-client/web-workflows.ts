@@ -1,9 +1,3 @@
-// The Workflows page of the joined server in the browser client. The host serves the workflows
-// through `workflows-v1`, and the GitHub catalog, options, history and last-event runs through
-// `workflows-github-v1`, and keeps an uploaded picture through `workflows-media-v1`. It gives the live
-// Sunra and Higgsfield models and a price for a step through `workflows-media-catalog-v1`. The targets
-// of an output use the same capabilities as on desktop.
-
 import {
   type AgentEvent,
   type AttachmentSummary,
@@ -93,29 +87,18 @@ import type { GitHubConnectorPort } from "../connectors/github-connector-port";
 import { checkPicture, keptPicture, libraryPictures, type WorkflowHost } from "../workflows/workflows-port";
 import { openWebLink } from "./web-attachments";
 
-/**
- * Each value is read on each call, so one host serves each server that the tab connects to. The page
- * remounts on a server switch.
- */
 export interface WebWorkflowHostOptions {
-  /** The admin requests of the connected host. It throws when no server is connected. */
   request: () => TeamApiRequest;
   capabilities: () => readonly string[];
-  /** Whether this account is an owner or admin of the connected host. */
   admin: () => boolean;
   hostName: () => string | undefined;
-  /** Every event of the connected host. Returns the unsubscribe function. */
   onHostEvent: (listener: (event: AgentEvent | TeamRealtimeEvent) => void) => () => void;
-  /** Calls `listener` each time the connected host is online again. Returns the unsubscribe function. */
   onReconnect: (listener: () => void) => () => void;
   githubConnector: GitHubConnectorPort;
-  /** The object URLs of the chat's host files. A media step shows its file through them. */
   attachmentMedia: AttachmentMediaSource | undefined;
-  /** The object URLs of the small copies of host pictures (`attachment-preview-v1`). */
   previewMedia: AttachmentMediaSource | undefined;
 }
 
-/** The host sends only the id of a media step's file, so the name and type come from the step kind. */
 function mediaSummary(id: string, kind: WorkflowMediaKind): AttachmentSummary {
   const video = kind === "video";
   return {
@@ -131,15 +114,11 @@ function mediaSummary(id: string, kind: WorkflowMediaKind): AttachmentSummary {
 
 export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
   const has = (capability: string) => options.capabilities().includes(capability);
-  /** Only an owner or admin reads the host's connections (`routine-results-v1`). */
   const placesSupported = () => options.admin() && has(ROUTINE_RESULTS_CAPABILITY);
   const chatsSupported = () => placesSupported() && has(WORKFLOWS_CHATS_CAPABILITY);
   const channelsSupported = () => options.admin() && has(WORKFLOWS_CHANNELS_CAPABILITY);
   const githubSupported = () => has(WORKFLOWS_GITHUB_CAPABILITY);
   const tooOld = () => new Error(currentText().t("error.workflow.serverTooOld"));
-  // The files that did not load: too large for the page, or a failed download. A card shows its icon
-  // for them, not a loading pulse that does not end. When the host is online again, which is also after
-  // a change of server, each of them loads again. The listener lives as long as the workspace.
   const [unloaded, setUnloaded] = createSignal<ReadonlySet<string>>(new Set());
   options.onReconnect(() => setUnloaded(new Set()));
   const loaded = (
@@ -175,7 +154,6 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
   const empty = () => undefined;
   const run = <T>(effect: (request: TeamApiRequest) => Effect.Effect<T, TeamAdminRequestError>) =>
     runTeamEffect(Effect.suspend(() => effect(options.request())).pipe(Effect.mapError((error) => error.cause)));
-  /** The places, Telegram chats and Slack workspaces read the connections at the same time, so they share one call. */
   let optionsCall: ReturnType<typeof readOptions> | undefined;
   const readOptions = () => run(listRoutineResultOptions);
   const connectionOptions = () => {
@@ -212,10 +190,6 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
       githubRunLastEvent: (input) =>
         postGitHub(WORKFLOWS_GITHUB_ROUTES.runLastEvent, decodeRemoteWorkflowRunDetail, input),
       keepPicture: (draftId) => postMedia(WORKFLOWS_MEDIA_ROUTES.keepPicture, decodeRemoteWorkflowPicture, { draftId }),
-      // A host without `workflows-sunra-v1` does not run the Sunra models, and a host without
-      // `workflows-higgsfield-v1` does not run the Higgsfield models. A host with
-      // `workflows-media-service-account-v1` lists the accounts and their credits, so one read gives
-      // all; a host without it makes each file on the first account, so it lists none.
       mediaProviders: async () => {
         if (has(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY)) {
           const accounts = await post(
@@ -254,7 +228,6 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
         ]);
         return { ...sunra, ...higgsfield, accounts: null };
       },
-      // A host without `workflows-media-catalog-v1` runs only the fixed models and gives no quote.
       mediaCatalog: async () =>
         has(WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
           ? post(WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
@@ -266,7 +239,6 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
     },
     onChanged(changed) {
       const events = options.onHostEvent((event) => {
-        // A joined server does not name the agent of the change.
         if (event.type === "workflows-changed") changed(event.workflowId);
         else if (event.type === "agent-access-changed") changed(null);
       });
@@ -296,8 +268,6 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
       return channels.filter((channel) => !channel.archived).map((channel) => ({ id: channel.id, name: channel.name }));
     },
     async discordServers() {
-      // As on desktop for a joined server: the role filter needs the host's Discord roles, which no
-      // Team API route sends.
       return [];
     },
     async telegramChats() {
@@ -313,23 +283,18 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
         .map((option) => ({
           connectionId: option.connectionId,
           name: option.connectionName,
-          // The rows show their own "#" icon.
           channels: option.places.map((place) => ({ id: place.id, name: place.name.replace(/^#/u, "") })),
         }));
     },
     async agentLevels() {
-      // A host without `agent-access-v1` has no levels per agent: a member uses each agent it sees.
       if (options.admin() || !has(AGENT_ACCESS_CAPABILITY)) return null;
       return (await run(getHostAgentAccess)).mine;
     },
     async pictures() {
       if (!has(WORKFLOWS_MEDIA_CAPABILITY) || !has(STORAGE_CAPABILITY)) return [];
-      // The browser gets no preview address: the canvas reads each picture through `mediaUrl`.
       const usage = await run((request) => getStorageUsage(request, { scope: "host" }));
       return libraryPictures(usage).map((file) => ({ ...file, previewUrl: null }));
     },
-    // The draft goes to the host as a chat attachment does; a draft that the host does not keep goes
-    // away. The canvas reads the picture through `mediaUrl`.
     async uploadPicture(file) {
       if (!has(WORKFLOWS_MEDIA_CAPABILITY)) throw tooOld();
       checkPicture(file, TEAM_PROTOCOL_V2_MAX_FILE_BYTES);
@@ -362,8 +327,6 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
     mediaPreviewUrl(attachmentId) {
       const previews = options.previewMedia;
       const key = `preview:${attachmentId}`;
-      // A host without the capability, or with no copy of the picture (a large WebP or GIF file), gives
-      // the whole file.
       if (!previews || !has(ATTACHMENT_PREVIEW_CAPABILITY) || unloaded().has(key)) {
         return mediaUrl(attachmentId, "image");
       }

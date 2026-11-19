@@ -3,10 +3,6 @@ import { useRef, useState } from "react";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
-/**
- * Runs one action at a time and keeps its error. A tap while an action runs does nothing. `failure`
- * gives the error text; without it the text is the general update failure.
- */
 export function useLockedAction() {
   const { t } = useText();
   const locked = useRef(false);

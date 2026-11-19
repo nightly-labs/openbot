@@ -7,7 +7,6 @@ import { SettingsRow } from "@/features/settings/components/settings-content";
 import { localDay } from "@/shared/lib/local-day";
 import { localDate } from "./usage-date";
 
-/** A calendar day of a usage range, with the compact native date picker. */
 export function UsageDateRow({
   label,
   date,
@@ -15,7 +14,6 @@ export function UsageDateRow({
   onChange,
 }: {
   label: string;
-  /** A `YYYY-MM-DD` day in the phone's time zone. */
   date: string;
   max: string;
   onChange: (date: string) => void;
@@ -24,12 +22,7 @@ export function UsageDateRow({
   return (
     <SettingsRow
       trailing={
-        <Host
-          matchContents
-          colorScheme={theme === "dark" ? "dark" : "light"}
-          // Match the trailing inset of the native menu picker arrows.
-          style={{ marginRight: 12 }}
-        >
+        <Host matchContents colorScheme={theme === "dark" ? "dark" : "light"} style={{ marginRight: 12 }}>
           <DatePicker
             title={label}
             selection={localDate(date)}

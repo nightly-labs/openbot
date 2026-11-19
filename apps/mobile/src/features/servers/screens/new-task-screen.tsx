@@ -26,10 +26,6 @@ import { useDiscardGuard } from "@/shared/lib/use-discard-guard";
 
 const AVATAR_SIZE = 26;
 
-/**
- * Starts a task: what to do, and the agent that does it, chosen in the list of the agents.
- * The task shows in the lists at once, and the sheet closes.
- */
 export function NewTaskScreen() {
   const { t, errorMessage } = useText();
   const { serverId, agentId: initialAgentId } = useLocalSearchParams<{ serverId: string; agentId?: string }>();
@@ -62,7 +58,6 @@ export function NewTaskScreen() {
     const attempt = taskStartId(serverId, chosen.id, draft);
     try {
       const task = await startAgentTask({ agentId: chosen.id, text: draft, clientMessageId: attempt.id }, serverId);
-      // The task shows before its list event arrives.
       addStartedTask(queryClient, queryScope, serverId, task);
       void haptics.notification("success");
       setFinished(true);

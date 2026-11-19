@@ -8,14 +8,9 @@ import { SheetCloseAction } from "@/shared/components/sheet-close-action";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
-/**
- * The Vault item form of an agent's `request_vault_item` card. The user types the secrets here; the
- * host saves the item and gives the agent its name only.
- */
 export function VaultRequestScreen() {
   const { t } = useText();
   const { requestId } = useLocalSearchParams<{ requestId: string }>();
-  // The card can leave the screen while the sheet is open; the form keeps the request it opened with.
   const [handoff] = useState(() => vaultRequestHandoff(requestId));
   const vault = useServerVault(handoff?.serverId ?? "");
   const close = () => {

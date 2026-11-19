@@ -27,13 +27,6 @@ import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 
-/**
- * Server settings > Providers > a provider > API key: the state of the provider's key on the host, a
- * new key, and its removal. Only the key's state comes back; the phone does not keep the key.
- *
- * For a provider whose accounts are keys (`provider-account-keys-v1`), `add: "1"` adds an account from
- * its key and `account` gives that account a new key.
- */
 export function ServerProviderKeyScreen() {
   const { t, errorMessage } = useText();
   const params = useLocalSearchParams<{ serverId: string; provider: string; account?: string; add?: string }>();
@@ -81,13 +74,10 @@ export function ServerProviderKeyScreen() {
     try {
       await applyStatus(await operation());
       setDraft("");
-      // `applyStatus` already shows the host's answer. The page closes while the key state and the
-      // accounts load again.
       void queryClient.invalidateQueries({
         queryKey: queryKeys.providerKey(queryScope, serverId, target),
         exact: true,
       });
-      // The host keeps a Claude key as its own account.
       void refreshAccounts();
       void haptics.notification("success");
       router.back();
@@ -144,7 +134,6 @@ export function ServerProviderKeyScreen() {
           }}
         />
       </SettingsSection>
-      {/* `apiKeyClear` does not remove the Codex login (`codex-api-key-v1`); the ChatGPT sign-in replaces it. */}
       {saved && provider !== "codex" ? (
         <SettingsSection>
           <SettingsRow
@@ -172,11 +161,6 @@ export function ServerProviderKeyScreen() {
   );
 }
 
-/**
- * The API key of one account of a provider whose accounts are keys, such as Cursor: a new account when
- * `accountId` is null. The host answers when the provider accepted the key, and the page then closes.
- * When the provider refuses the key, the page shows the host's reason and keeps the key for a change.
- */
 function AccountKeyPage({
   provider,
   accountId,
@@ -203,7 +187,6 @@ function AccountKeyPage({
     setError(null);
     try {
       await connectKey(provider, accountId, draft.trim());
-      // The page under this one shows the accounts, which load again while this page closes.
       void onChanged();
       void haptics.notification("success");
       router.back();

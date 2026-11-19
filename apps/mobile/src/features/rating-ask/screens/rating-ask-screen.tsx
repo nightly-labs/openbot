@@ -41,23 +41,15 @@ const HINT = {
   4: "mobile.app.rate.hint.4",
   5: "mobile.app.rate.hint.5",
 } as const;
-// The block drops from the top to a header of this share of the screen. Then the panel slides out
-// from under its edge, as the release notes do under the update header.
 const HEADER_SHARE = 0.38;
-// The panel starts when the block has almost stopped, so no part of it shows above the edge.
 const PANEL_DELAY_MS = BLOUB_MOVE_MS - 60;
-// The panel decelerates into place, so it lands instead of gliding to a stop.
 const PANEL_OPEN = { duration: 600, easing: SPLASH_EASE_OUT };
-// Its rows fade in one after another as the panel lands. They do not move, so the text stays calm.
 const ROW_DELAY_MS = PANEL_DELAY_MS + 200;
 const ROW_STAGGER_MS = 40;
 const ROW_FADE_MS = 260;
-// Closing: the panel goes back under the edge, then the block rolls up as the route leaves.
 const PANEL_CLOSE = { duration: 320, easing: SPLASH_EASE_OUT };
-/** The space between the block's edge and the title. */
 const PANEL_TOP_GAP = 20;
 
-/** The entrance of row `index` of the panel. */
 function rowEntering(index: number, reduced: boolean) {
   if (reduced) return undefined;
   return FadeIn.duration(ROW_FADE_MS)
@@ -69,7 +61,6 @@ function leave(): void {
   router.back();
 }
 
-// The thanks stays this long before the screen closes. Joy has its stretch and swing to finish.
 const THANKS_MS = 1500;
 const JOY_THANKS_MS = 2200;
 const STAR_SIZE = 44;
@@ -94,9 +85,7 @@ function RatingStar({
   const on = rating !== null && value <= rating;
   const scale = useSharedValue(1);
   useEffect(() => {
-    // Each new rating pops every lit star again.
     if (rating === null || value > rating || reduced) return;
-    // The lit stars pop one after another, from the left.
     const delay = (value - 1) * 35;
     scale.set(
       withSequence(
@@ -122,12 +111,6 @@ function RatingStar({
   );
 }
 
-/**
- * The rating ask, over home. The bloub drops from the top to a header, and the panel with the
- * question slides out from under its edge. Its eyes answer each star: tears for 1, a squish, swing
- * and stretch of the block for 5. The store and a prepared post on X are open to every rating, and
- * also before one: the stores do not allow an ask that sends only good ratings to them.
- */
 export function RatingAskScreen() {
   const { t } = useText();
   const isFocused = useIsFocused();
@@ -141,7 +124,6 @@ export function RatingAskScreen() {
   const [opening, setOpening] = useState(false);
   const [closing, setClosing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /** 0 is the panel under the block's edge, 1 is open. */
   const open = useSharedValue(0);
 
   const measured = viewport.height > 0;
@@ -162,14 +144,12 @@ export function RatingAskScreen() {
       return;
     }
     open.set(
-      // The route leaves also when another animation interrupts this one, so a close never sticks.
       withTiming(0, PANEL_CLOSE, () => {
         scheduleOnRN(leave);
       }),
     );
   }, [closing, open, reduced]);
 
-  // Android Back closes the panel first, as the close button does.
   useEffect(() => {
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
       close();
@@ -194,7 +174,6 @@ export function RatingAskScreen() {
       : rating
         ? STAR_MOOD[rating]
         : "idle";
-  // The block keeps its header until the route leaves; then it rolls up over home.
   const request: BloubStageRequest | null =
     !isFocused || !measured
       ? null
@@ -205,7 +184,6 @@ export function RatingAskScreen() {
         };
   useBloubStageRequest(request, BLOUB_PRIORITY.screen);
 
-  // The panel hangs from the edge: closed, it is all above the edge, behind the block.
   const panelStyle = useAnimatedStyle(() => ({
     opacity: open.get() > 0 ? 1 : 0,
     transform: [{ translateY: -(1 - open.get()) * panelHeight }],
@@ -221,7 +199,6 @@ export function RatingAskScreen() {
     if (opening) return;
     setError(null);
     setOpening(true);
-    // Each page opens over the app, and the thanks shows when the user comes back.
     try {
       if (destination === "store") await openStoreReview();
       else await openXPost();
@@ -254,7 +231,6 @@ export function RatingAskScreen() {
             bounces={false}
             showsVerticalScrollIndicator={false}
             contentContainerClassName="px-6"
-            // The buttons sit at the bottom, under the thumb; a short screen scrolls to them.
             contentContainerStyle={{
               flexGrow: 1,
               paddingTop: BLOUB_RADIUS + PANEL_TOP_GAP,

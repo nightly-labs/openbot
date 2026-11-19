@@ -53,16 +53,10 @@ interface SortableServerListProps {
   ids: string[];
   renderRow: (id: string) => ReactNode;
   onDragActive: (active: boolean) => void;
-  /** Returns false when the order could not be saved. */
   onReorder: (ids: string[]) => boolean;
-  /** The height of each row. The server list uses `SERVER_ROW_HEIGHT`. */
   rowHeight?: number;
 }
 
-/**
- * The UI thread owns row positions during a drag and after the drop. React later renders the saved order,
- * which gives the same positions, so the rows do not jump back while the workspace renders again.
- */
 export function SortableServerList({
   color,
   ids,
@@ -158,7 +152,6 @@ function SortableServerRow({
       const settled = (positions.get()[id] ?? 0) * rowHeight - startY.get();
       offset.set(
         withSpring(settled, SETTLE, (finished) => {
-          // A new drag interrupts the settle and owns the state from then on.
           if (!finished) return;
           activeId.set(null);
           scheduleOnRN(onDrop, orderOf(positions.get()));

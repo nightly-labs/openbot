@@ -9,14 +9,9 @@ export interface McpSignInChatCardProps {
   config: McpServerConfig;
   signedIn: boolean;
   onSignIn?: ((trigger: HTMLElement | null) => void) | undefined;
-  /** Sends the message that tells the agent to test again. False when it could not be sent now. */
   onContinue: (body: string) => boolean | Promise<boolean>;
 }
 
-/**
- * An MCP server an agent saved that needs the user's sign-in. Sign in runs the sign-in of Server
- * settings, MCP; Continue tells the agent to test the server again.
- */
 export function McpSignInChatCard(props: McpSignInChatCardProps) {
   const { t } = useText();
   const [sent, setSent] = createSignal(false);
@@ -41,7 +36,6 @@ export function McpSignInChatCard(props: McpSignInChatCardProps) {
           ? () => props.onSignIn?.(document.activeElement instanceof HTMLElement ? document.activeElement : null)
           : undefined
       }
-      // The card shows "sent" during the send, so a second click sends nothing. A failed send shows Continue again.
       onContinue={async () => {
         if (sent()) return;
         setSent(true);
@@ -51,15 +45,10 @@ export function McpSignInChatCard(props: McpSignInChatCardProps) {
   );
 }
 
-/**
- * The sign-in card of a side thread message, as the agent's own chat draws it. Continue goes to that
- * thread. Another message, or a row this client cannot read, keeps its row.
- */
 export function useThreadMcpSignInCard(onContinue: (body: string) => Promise<boolean>) {
   const { props, mcpServers } = useConversationViewScope();
   const config = (mcpServerId: string) =>
     mcpServers().find((candidate) => candidate.id === mcpServerId && candidate.transport === "http");
-  // The http rows by id. A list read again with the same rows keeps each card, and what it shows.
   const httpIds = createMemo(() =>
     mcpServers()
       .flatMap((candidate) => (candidate.transport === "http" ? [candidate.id] : []))

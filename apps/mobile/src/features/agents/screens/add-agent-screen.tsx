@@ -21,9 +21,7 @@ type AgentRuntimeChoice = Pick<CreateAgentInput, "provider" | "model" | "reasoni
 
 export function AddAgentScreen() {
   const { t, errorMessage } = useText();
-  // Read on submit, so a server status or an agent update does not render the form again.
   const workspace = useMobileWorkspaceReader();
-  // The agent is created on the server that was active when the form opened.
   const [serverId] = useState(() => workspace().activeServer.id);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -35,7 +33,6 @@ export function AddAgentScreen() {
   const [finished, setFinished] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // The name error shows after the first Create, not while the person still fills in the form.
   const [triedCreate, setTriedCreate] = useState(false);
   const nameMissing = name.trim().length === 0;
   const valid = !nameMissing && !instructionsTooLong(description);
@@ -99,7 +96,6 @@ export function AddAgentScreen() {
       />
       <SheetSaveAction
         dirty={dirty}
-        // Create stays on without a name, so that it can show why the agent needs one.
         canSave={!instructionsTooLong(description) && !finished}
         pending={saving}
         label={t("mobile.agent.add.create")}
@@ -157,10 +153,6 @@ export function AddAgentScreen() {
   );
 }
 
-/**
- * The provider and model of the new agent, for a host that reads them on creation. It reads the
- * workspace itself, so a server status change renders only these rows, not the whole form.
- */
 function NewAgentRuntimeFields({
   serverId,
   saving,

@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/team";
 
 export const messages = {
-  // Errors that the Team API and the team store send to clients.
   "error.team.ownerNotLinked": "このホストは OpenBot のオーナーアカウントにリンクされていません。",
   "error.team.ownerEmailRequired": "このホストを作成した OpenBot のメールアドレスでサインインしてください。",
   "error.team.hostNotConfigured": "チームのホストが設定されていません。",

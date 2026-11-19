@@ -5,10 +5,6 @@ import { writesInOrder } from "@/shared/lib/writes-in-order";
 
 const key = "openbot.mobile.chatOrder.v1";
 
-/**
- * How the chat list orders its chats. Each phone keeps its own choice: it is not synced to the host
- * or to the other devices. The default is the desktop default.
- */
 export const useChatOrderPreference = create<{ order: MobileChatOrder; ready: boolean }>(() => ({
   order: "unread-group",
   ready: false,
@@ -19,7 +15,6 @@ export async function loadChatOrderPreference(): Promise<void> {
   try {
     const stored = await SecureStore.getItemAsync(key);
     const order = MOBILE_CHAT_ORDERS.find((candidate) => candidate === stored);
-    // A second startup read must not overwrite a change made in the menu.
     if (order && !useChatOrderPreference.getState().ready) useChatOrderPreference.setState({ order });
   } finally {
     useChatOrderPreference.setState({ ready: true });
@@ -29,7 +24,6 @@ export async function loadChatOrderPreference(): Promise<void> {
 const write = writesInOrder(key);
 
 export function saveChatOrderPreference(order: MobileChatOrder): Promise<void> {
-  // Apply immediately, also when storage fails: the list then keeps the choice until the app restarts.
   useChatOrderPreference.setState({ order, ready: true });
   return write(() => order);
 }

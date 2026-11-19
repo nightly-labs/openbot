@@ -5,15 +5,8 @@ export interface ImageDimensions {
   height: number;
 }
 
-// A JPEG keeps its size after the EXIF block, which can hold a 64 KB thumbnail.
-// Decoding this much of the base64 covers it without copying a whole photo.
 const HEADER_BASE64_LENGTH = 96 * 1024;
 
-/**
- * The displayed size of an encoded image, read from its header. The chat reserves an image's
- * real shape from this before the image decodes, so the message does not change height when it
- * appears. It returns null for a format it cannot read; the caller then waits for the decoder.
- */
 export function imageDimensions(base64: string): ImageDimensions | null {
   const bytes = decodePrefix(base64);
   if (!bytes) return null;
@@ -22,7 +15,6 @@ export function imageDimensions(base64: string): ImageDimensions | null {
 }
 
 function decodePrefix(base64: string): Uint8Array | null {
-  // A multiple of four, so the cut never splits a base64 group.
   const prefix = base64.slice(0, HEADER_BASE64_LENGTH);
   try {
     return base64ToBytes(prefix.slice(0, prefix.length - (prefix.length % 4)));
@@ -31,7 +23,6 @@ function decodePrefix(base64: string): Uint8Array | null {
   }
 }
 
-// A byte past the end reads as 0, as `undefined` did in the bitwise operators below.
 function byte(bytes: Uint8Array, offset: number) {
   return bytes[offset] ?? 0;
 }
@@ -83,7 +74,6 @@ function jpeg(bytes: Uint8Array): ImageDimensions | null {
   while (offset + 4 <= bytes.length) {
     if (bytes[offset] !== 0xff) return null;
     const marker = byte(bytes, offset + 1);
-    // Fill bytes and markers without a length.
     if (marker === 0xff) {
       offset += 1;
       continue;
@@ -95,12 +85,10 @@ function jpeg(bytes: Uint8Array): ImageDimensions | null {
     const length = u16be(bytes, offset + 2);
     if (length < 2) return null;
     if (marker === 0xe1) orientation = exifOrientation(bytes, offset + 4, length - 2) ?? orientation;
-    // Start of frame, apart from the DHT (C4), JPG (C8), and DAC (CC) markers in the same range.
     if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
       if (offset + 9 > bytes.length) return null;
       const height = u16be(bytes, offset + 5);
       const width = u16be(bytes, offset + 7);
-      // Orientations 5 to 8 turn the image a quarter, so the displayed size swaps.
       return orientation >= 5 ? { width: height, height: width } : { width, height };
     }
     offset += 2 + length;
@@ -130,7 +118,6 @@ function exifOrientation(bytes: Uint8Array, start: number, length: number): numb
   return null;
 }
 
-/** Two sizes with the same shape, allowing for rounding in a scaled copy. */
 export function sameShape(left: ImageDimensions, right: ImageDimensions) {
   return Math.abs(left.width / left.height - right.width / right.height) < 0.01;
 }

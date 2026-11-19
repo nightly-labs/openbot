@@ -8,7 +8,6 @@ import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { localDate } from "./usage-date";
 
-/** A calendar day of a usage range. Android opens the date dialog from the row. */
 export function UsageDateRow({
   label,
   date,
@@ -16,7 +15,6 @@ export function UsageDateRow({
   onChange,
 }: {
   label: string;
-  /** A `YYYY-MM-DD` day in the phone's time zone. */
   date: string;
   max: string;
   onChange: (date: string) => void;

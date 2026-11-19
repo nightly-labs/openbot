@@ -13,8 +13,6 @@ import { useDiscardGuard } from "@/shared/lib/use-discard-guard";
 
 export function SectionFormScreen() {
   const { t, errorMessage } = useText();
-  // A new folder goes in `parentId` when the folder menu opens the form, and takes the chat
-  // `agentId` when a chat menu opens it.
   const { serverId, sectionId, parentId, agentId } = useLocalSearchParams<{
     serverId: string;
     sectionId?: string;

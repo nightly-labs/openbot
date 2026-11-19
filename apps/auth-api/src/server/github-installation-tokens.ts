@@ -6,46 +6,24 @@ import {
 import { Effect, Result, Schema } from "effect";
 import { importPKCS8, SignJWT } from "jose";
 
-/**
- * Installation tokens of the OpenBot GitHub App for one signed-in GitHub user.
- *
- * A user token (`ghu_`) makes GitHub show "user with OpenBotGit". An installation token (`ghs_`)
- * makes GitHub show `openbotgit[bot]`, but it needs the app's private key, which only this Worker
- * holds. An installation token can do everything that the installation allows, so this service
- * gives one only for the repositories where the user of the token can push, and never with
- * `administration`. GitHub limits a user token to what its user can do. It does not limit an
- * installation token, so a user with push access would get admin access through one. The desktop
- * keeps the user token for every other repository and for repository creation.
- *
- * The Worker keeps nothing: it does not store or log a token.
- */
-
 type GitHubFetch = (input: string, init: RequestInit) => Promise<Response>;
 
 export interface GitHubInstallationToken {
   installationId: number;
-  /** The login of the user or organization that installed the app. */
   account: string;
   token: string;
   expiresAt: string;
-  /** `owner/name`, as GitHub spells it. */
   repositories: string[];
 }
 
-/** A repository that a GitHub trigger of a host watches, as the Signal route ticket names it. */
 export interface GitHubRepositoryRoute extends GitHubRouteRepository {
-  /** `owner/name`, as GitHub spells it. */
   fullName: string;
-  /** Whether the installation sends every event in `GITHUB_ROUTE_EVENTS`. */
   events: boolean;
 }
 
 export interface GitHubInstallationTokensOptions {
-  /** The client ID of the app. GitHub accepts it as the `iss` of the app JWT. */
   clientId: string;
-  /** The app's private key as a PKCS #8 PEM. */
   privateKey: string;
-  /** Wraps the global `fetch`, as `(input, init) => fetch(input, init)`: workerd refuses a bare method reference. */
   fetch: GitHubFetch;
   now?: () => number;
 }
@@ -62,12 +40,9 @@ export class GitHubInstallationTokensError extends Schema.TaggedError<GitHubInst
 const GITHUB_API = "https://api.github.com";
 const REQUEST_TIMEOUT_MS = 10_000;
 const PAGE_SIZE = 100;
-/** A Worker request can make a limited count of subrequests, so a very large account gets a part of its installations. */
 const MAX_INSTALLATIONS = 20;
 const MAX_REPOSITORY_PAGES = 10;
-/** GitHub limits `repository_ids` to 500 in one token. */
 const MAX_REPOSITORIES_PER_TOKEN = 500;
-/** The installation permissions that a bot token never gets. See the class comment. */
 const USER_ONLY_PERMISSIONS: ReadonlySet<string> = new Set(["administration"]);
 
 const appSchema = Schema.Struct({ id: Schema.Number });
@@ -78,7 +53,6 @@ const installationsSchema = Schema.Struct({
       app_id: Schema.Number,
       account: Schema.Struct({ login: Schema.String }),
       events: Schema.optional(Schema.Array(Schema.String)),
-      /** What the owner of the installation granted, such as `{ contents: "write" }`. */
       permissions: Schema.optional(Schema.Record(Schema.String, Schema.String)),
     }),
   ),
@@ -135,45 +109,32 @@ const feedbackCommentsSchema = Schema.Array(
 );
 const repositoryNodeSchema = Schema.Struct({ node_id: Schema.String });
 const graphqlSchema = Schema.Struct({ errors: Schema.optional(Schema.Array(Schema.Unknown)) });
-/** The comments of one issue that a withdrawal reads: a Worker request has a limited count of subrequests. */
 const MAX_COMMENT_PAGES = 10;
 
 const SIMILAR_ISSUES = 5;
-/** Enough of an issue for the agent to see what a new report adds to it. */
 const SIMILAR_SUMMARY_LENGTH = 300;
-/** The app's slug. Its issues show `openbotgit[bot]`; reports add to those issues only. */
 const FEEDBACK_APP = "openbotgit";
 
-/** An issue that the app opened. */
 export interface GitHubIssue {
   number: number;
   url: string;
 }
 
-/**
- * What a withdrawal removed from the public repository: the whole issue, the account's comments on
- * it, or nothing because the issue is not there anymore.
- */
 export type WithdrawnFeedback = "issue" | "comment" | "gone";
 
-/** True when the account of the request sent this text. */
 export type FeedbackSender = (body: string) => Effect.Effect<boolean, GitHubInstallationTokensError>;
 
-/** The answer for an issue with no report of the account, also when the issue is not a report. */
 function notSentBy(): GitHubInstallationTokensError {
   return new GitHubInstallationTokensError(404, "feedback_not_yours", "This account sent no report on this issue.");
 }
 
-/** An open issue that a search found. */
 export interface GitHubSimilarIssue {
   number: number;
   title: string;
   url: string;
-  /** The issue's "What happened?", "Problem" or "Proposed behavior" answer, cut. */
   summary: string;
 }
 
-/** The first text answer of an issue that the app opened from a report. */
 function issueSummary(body: string | null | undefined): string {
   const answer = /(?:^|\n)### (?:What happened\?|Problem|Proposed behavior)\n+([\s\S]*?)(?=\n### |\n---\n|$)/.exec(
     body ?? "",
@@ -191,11 +152,6 @@ interface WritableRepository {
   fullName: string;
 }
 
-/**
- * The granted permissions of an installation without `USER_ONLY_PERMISSIONS`. GitHub refuses a
- * token request for a permission that the installation does not have, so the request names only
- * granted ones. Null when GitHub did not name them.
- */
 function botPermissions(granted: Readonly<Record<string, string>> | undefined): Record<string, string> | null {
   if (!granted) return null;
   const permissions = Object.fromEntries(Object.entries(granted).filter(([name]) => !USER_ONLY_PERMISSIONS.has(name)));
@@ -214,8 +170,6 @@ export class GitHubInstallationTokens {
     this.#now = options.now ?? Date.now;
   }
 
-  /** The tokens for installations where this user can push to a repository. */
-
   readonly issue = Effect.fn("GitHubInstallationTokens.issue")(function* (
     this: GitHubInstallationTokens,
     userToken: string,
@@ -226,12 +180,10 @@ export class GitHubInstallationTokens {
     const tokens: GitHubInstallationToken[] = [];
     for (const installation of installations.filter((entry) => entry.app_id === appId).slice(0, MAX_INSTALLATIONS)) {
       const permissions = botPermissions(installation.permissions);
-      // Without the granted permissions, the request cannot leave out `administration`.
       if (!permissions) continue;
       const result = yield* Effect.result(
         this.#issueForInstallation(installation.id, installation.account.login, permissions, user),
       );
-      // A suspended installation or SAML SSO refusal must not block the others.
       if (Result.isFailure(result)) {
         if (result.failure.code !== "github_failed") return yield* result.failure;
       } else tokens.push(...result.success);
@@ -239,10 +191,6 @@ export class GitHubInstallationTokens {
     return tokens;
   }).bind(this);
 
-  /**
-   * The repositories of `names` that this user can see through an installation of the app. A name
-   * that the user cannot see, or that no installation holds, is not in the answer.
-   */
   readonly repositoryRoutes = Effect.fn("GitHubInstallationTokens.repositoryRoutes")(function* (
     this: GitHubInstallationTokens,
     userToken: string,
@@ -256,7 +204,6 @@ export class GitHubInstallationTokens {
     const routes: GitHubRepositoryRoute[] = [];
     for (const installation of installations.filter((entry) => entry.app_id === appId).slice(0, MAX_INSTALLATIONS)) {
       if (wanted.size === 0) break;
-      // GitHub names the events of an installation; an answer without them does not block a route.
       const events = installation.events
         ? GITHUB_ROUTE_EVENTS.every((event) => installation.events?.includes(event))
         : true;
@@ -268,16 +215,11 @@ export class GitHubInstallationTokens {
           return wanted.size > 0;
         }),
       );
-      // A suspended installation or SAML SSO refusal must not block the others.
       if (Result.isFailure(result) && result.failure.code !== "github_failed") return yield* result.failure;
     }
     return routes;
   }).bind(this);
 
-  /**
-   * Opens an issue as `openbotgit[bot]` in a repository of the app's own installation. The token can
-   * only write issues of that one repository, and it is dropped after the request.
-   */
   readonly openIssue = Effect.fn("GitHubInstallationTokens.openIssue")(function* (
     this: GitHubInstallationTokens,
     repository: string,
@@ -288,11 +230,6 @@ export class GitHubInstallationTokens {
     return { number: opened.number, url: opened.html_url };
   }).bind(this);
 
-  /**
-   * Adds a comment as `openbotgit[bot]` to an open issue that the app opened, not to a pull request or
-   * an issue of a person, such as a status page issue. Another, closed, locked or missing issue fails
-   * with `issue_not_open`, so the app can open a new issue instead.
-   */
   readonly commentIssue = Effect.fn("GitHubInstallationTokens.commentIssue")(function* (
     this: GitHubInstallationTokens,
     repository: string,
@@ -318,13 +255,6 @@ export class GitHubInstallationTokens {
     return { number: target.number, url: target.html_url };
   }).bind(this);
 
-  /**
-   * Takes a report of one account off the public repository. GitHub shows each earlier version of an
-   * edited text to everyone, so an edit cannot remove words: an issue that the account opened moves to
-   * `privateRepository`, with its history, and a comment of the account is deleted. `sentBy` decides
-   * which texts the account sent. An issue that is not public anymore is `gone`. An issue that moved to
-   * another public repository is still public, so it fails with `feedback_moved`.
-   */
   readonly withdrawFeedback = Effect.fn("GitHubInstallationTokens.withdrawFeedback")(function* (
     this: GitHubInstallationTokens,
     repository: string,
@@ -333,8 +263,6 @@ export class GitHubInstallationTokens {
     privateRepository: string | null,
   ): Effect.fn.Return<WithdrawnFeedback, GitHubInstallationTokensError> {
     const token = yield* this.#repositoryToken(repository, WRITE_ISSUES);
-    // A moved issue redirects to its new place. The token reads only this repository and public ones,
-    // so a deleted issue, or one that moved to a private repository, answers 404.
     const issue = yield* this.#send(
       `/repos/${repository}/issues/${number}`,
       token,
@@ -360,7 +288,6 @@ export class GitHubInstallationTokens {
           "feedback_withdraw_unavailable",
           "A sent issue cannot be removed now.",
         );
-      // GitHub moves an issue only with a token for both repositories.
       const both = yield* this.#repositoryToken(repository, WRITE_ISSUES, [privateRepository]);
       const target = yield* this.#get(`/repos/${privateRepository}`, both, repositoryNodeSchema);
       const moved = yield* this.#post(
@@ -389,7 +316,6 @@ export class GitHubInstallationTokens {
       if (comments.length < PAGE_SIZE) break;
     }
     if (own.length === 0) return yield* notSentBy();
-    // 204 is the answer of a deleted comment, and 404 of a comment that is gone already.
     for (const id of own)
       yield* this.#send(
         `/repos/${repository}/issues/comments/${id}`,
@@ -401,7 +327,6 @@ export class GitHubInstallationTokens {
     return "comment";
   }).bind(this);
 
-  /** The open issues that the app opened whose titles have one of `terms`, best match first. */
   readonly searchIssues = Effect.fn("GitHubInstallationTokens.searchIssues")(function* (
     this: GitHubInstallationTokens,
     repository: string,
@@ -424,10 +349,6 @@ export class GitHubInstallationTokens {
       }));
   }).bind(this);
 
-  /**
-   * A token for one repository of the app's own installation, with only `permissions`. `others` are
-   * more repositories of the same owner and installation.
-   */
   readonly #repositoryToken = Effect.fn("GitHubInstallationTokens.repositoryToken")(function* (
     this: GitHubInstallationTokens,
     repository: string,
@@ -440,7 +361,6 @@ export class GitHubInstallationTokens {
       installationId = (yield* this.#get(`/repos/${repository}/installation`, APP, repositoryInstallationSchema)).id;
       this.#repositoryInstallations.set(repository, installationId);
     }
-    // A reinstalled app has a new installation ID, so a failed mint looks it up again next time.
     const minted = yield* this.#post(
       `/app/installations/${installationId}/access_tokens`,
       APP,
@@ -494,7 +414,6 @@ export class GitHubInstallationTokens {
     return writable;
   });
 
-  /** Reads the repositories of an installation that the user can see, page by page, until `visit` returns false. */
   readonly #eachRepository = Effect.fn("GitHubInstallationTokens.eachRepository")(function* (
     this: GitHubInstallationTokens,
     installationId: number,
@@ -519,7 +438,6 @@ export class GitHubInstallationTokens {
     return this.#appId;
   });
 
-  /** The JWT expires within ten minutes and allows sixty seconds of clock skew. */
   readonly #appJwt = Effect.fn("GitHubInstallationTokens.appJwt")(function* (
     this: GitHubInstallationTokens,
   ): Effect.fn.Return<string, GitHubInstallationTokensError> {
@@ -588,9 +506,6 @@ export class GitHubInstallationTokens {
     );
   }
 
-  /**
-   * The decoded answer, or null for a status in `nullStatuses`, such as 404 for a missing issue. Do not retain response bodies or causes that can contain a credential.
-   */
   readonly #send = Effect.fn("GitHubInstallationTokens.send")(function* <T>(
     this: GitHubInstallationTokens,
     path: string,

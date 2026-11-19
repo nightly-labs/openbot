@@ -1,8 +1,3 @@
-// What main answers for the Vault in Server settings. A list item never carries a password, a card
-// number, a security code, an API key or a two-step key: a summary that has one of those keys is refused, so a
-// main-process bug cannot put a secret in renderer state. Only `reveal` answers with a secret, and `codes`
-// with the current two-step codes, never with their keys.
-
 import type {
   VaultCardBrand,
   VaultImportResult,
@@ -50,7 +45,6 @@ function addedBy(item: DynamicRecord): { addedBy?: string } {
   return { addedBy: item.addedBy };
 }
 
-/** The agents that can use the item. Absent when every agent can. */
 function agents(item: DynamicRecord): { agents?: string[] } {
   if (item.agents === undefined) return {};
   return { agents: decodeAgents(item.agents) };

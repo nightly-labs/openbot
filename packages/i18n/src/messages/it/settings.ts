@@ -476,7 +476,6 @@ export const messages = {
   "settings.profile.share.copyFailed": "Impossibile copiare l'immagine.",
   "settings.profile.share.createFailed": "Impossibile creare l'immagine.",
   "settings.profile.share.fileName": "openbot-activity.png",
-  // The text in the image to share.
   "settings.profile.share.caption": "I miei ultimi sei mesi con OpenBot",
   "settings.profile.activity.title": "Attività su questo computer",
   "settings.profile.activity.activeDays": {
@@ -486,7 +485,6 @@ export const messages = {
   "settings.profile.activity.empty": "Ancora nessuna attività",
   "settings.profile.activity.loading": "Caricamento attività…",
   "settings.profile.activity.loadFailed": "Impossibile caricare la tua attività.",
-  // {tokens} is a short number, such as 1.2M.
   "settings.profile.activity.heatmapLabel": {
     one: "{tokens} token in {count} giorno attivo nell'ultimo anno",
     other: "{tokens} token in {count} giorni attivi nell'ultimo anno",

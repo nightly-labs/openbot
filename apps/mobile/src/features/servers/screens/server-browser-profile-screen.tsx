@@ -35,16 +35,8 @@ import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { useDiscardGuard } from "@/shared/lib/use-discard-guard";
 
-/**
- * Browser profiles > one profile, or a new one without `profileId`. A new profile takes its name and
- * color on this page, and Add makes it and goes back; from an agent's choice (`assignTo`) it also
- * goes to that agent. For a saved profile the name saves with the header action and the color saves
- * at once. Clear data signs the profile out of every site, and Delete moves its agents to the shared
- * profile.
- */
 export function ServerBrowserProfileScreen() {
   const { t, errorMessage } = useText();
-  // `agentId` is set when the agent settings show this page.
   const { serverId, profileId, assignTo, agentId } = useLocalSearchParams<{
     serverId: string;
     profileId?: string;
@@ -58,21 +50,17 @@ export function ServerBrowserProfileScreen() {
   const proxies = useServerBrowserProxies(serverId);
   const proxyChoices = useBrowserProxyChoices(proxies.list);
   const accent = String(useCSSVariable("--openbot-accent"));
-  // The selector returns the stored list, so the page does not render again for a new copy.
   const allAgents = useMobileWorkspaceSelector((workspace) => workspace.agents);
   const agents = useMemo(() => allAgents.filter((agent) => agent.serverId === serverId), [allAgents, serverId]);
-  // Kept after Delete, so the page does not say "gone" while it goes back.
   const [removed, setRemoved] = useState<BrowserProfileSummary | null>(null);
   const profile =
     (profileId ? profiles.profiles?.find((candidate) => candidate.id === profileId) : undefined) ??
     (removed?.id === profileId ? removed : undefined);
   const [draftName, setDraftName] = useState<string | undefined>();
-  /** The color of a new profile. Undefined is the color that the host gives: the one that the fewest profiles use. */
   const [draftHue, setDraftHue] = useState<AvatarHue | undefined>();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const locked = useRef(false);
-  /** True after Delete or an assigned new profile: the page leaves without the question about the name. */
   const leaving = useRef(false);
   const name = draftName ?? profile?.name ?? "";
   const trimmed = name.trim();
@@ -80,7 +68,6 @@ export function ServerBrowserProfileScreen() {
 
   useDiscardGuard(dirty, { leaving: () => leaving.current, warn: true });
 
-  /** Runs one change at a time. Resolves true when it succeeds. */
   async function perform(operation: () => Promise<void>): Promise<boolean> {
     if (locked.current) return false;
     locked.current = true;
@@ -127,7 +114,6 @@ export function ServerBrowserProfileScreen() {
     const hue = draftHue;
     void perform(async () => {
       created = await profiles.create(trimmed);
-      // The create route takes only the name, so a color that the host did not give saves after it.
       if (hue !== undefined && hue !== created.hue) await profiles.recolor(created.id, hue);
       if (assignTo) await assignment.choose({ kind: "profile", profileId: created.id });
     }).then((saved) => {
@@ -138,7 +124,6 @@ export function ServerBrowserProfileScreen() {
         router.back();
         return;
       }
-      // The profile exists, also when its color or the agent did not save: the page now shows it.
       router.setParams({ profileId: created.id, assignTo: undefined });
     });
   }

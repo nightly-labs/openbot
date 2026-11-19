@@ -56,13 +56,8 @@ import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 import { useDiscardGuard } from "@/shared/lib/use-discard-guard";
 
-/** The longest name that `workflows-v1` carries. */
 const TITLE_LIMIT = 160;
 
-/**
- * The "+" of a step in the list of a workflow that the outline cannot hold: it adds a step right after
- * this one. A condition asks for the path first.
- */
 function AddAfterButton({ node, draft }: { node: WorkflowNode; draft: WorkflowDraft }) {
   const { t } = useText();
   const { theme } = useUniwind();
@@ -80,8 +75,6 @@ function AddAfterButton({ node, draft }: { node: WorkflowNode; draft: WorkflowDr
       <Plus color={accent} size={20} strokeWidth={2} />
     </Pressable>
   );
-  // Both kinds of "+" sit in the same box at the end of the row, so they line up from row to row: the
-  // menu host of a condition has a size of its own.
   if (node.kind !== "condition")
     return (
       <View className="mr-2 size-10">
@@ -113,10 +106,6 @@ function AddAfterButton({ node, draft }: { node: WorkflowNode; draft: WorkflowDr
   );
 }
 
-/**
- * A step of the editor list: a tap opens its page, and its menu moves, copies, adds after or deletes
- * it. A step with a problem shows the problem in red, with a warning sign.
- */
 function EditorStepRow({
   node,
   agents,
@@ -128,10 +117,8 @@ function EditorStepRow({
   node: WorkflowNode;
   agents: readonly MobileAgent[];
   draft: WorkflowDraft;
-  /** False for a kind that only the desktop changes, such as an image step. */
   editable: boolean;
   problem: string | undefined;
-  /** The depth of the path of the step in a workflow of any shape: each path sits deeper than its split. */
   depth?: number;
 }) {
   const { t } = useText();
@@ -197,7 +184,6 @@ function EditorStepRow({
   );
 }
 
-/** The last row of a list: it adds a step at its end. */
 function AddRow({ list, index, label }: { list: FlowList; index: number; label: string }) {
   const accent = String(useCSSVariable("--openbot-accent-text"));
   return (
@@ -211,10 +197,6 @@ function AddRow({ list, index, label }: { list: FlowList; index: number; label: 
   );
 }
 
-/**
- * Workflows > a workflow > Edit, or Workflows > New: the first page of the editor sheet. It shows the
- * name, the trigger and the steps, and saves the draft that the step and trigger pages change.
- */
 export function WorkflowEditorScreen() {
   const { t, errorMessage } = useText();
   const { serverId, workflowId } = useLocalSearchParams<{ serverId: string; workflowId?: string }>();
@@ -230,13 +212,11 @@ export function WorkflowEditorScreen() {
   const commands = useWorkflowCommands(serverId);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<unknown>(null);
-  /** The id of the saved workflow: the sheet closes on the next render, when the discard guard is off. */
   const [savedId, setSavedId] = useState<string | null>(null);
   const isNew = !workflowId;
   const view = useWorkflowEditorView((state) => state.view);
   const setView = useWorkflowEditorView((state) => state.setView);
 
-  // The draft starts once, from the saved workflow; a later read of the host does not reset it.
   const loaded = detail.data;
   useEffect(() => {
     const current = useWorkflowDraft.getState().draft;
@@ -261,11 +241,9 @@ export function WorkflowEditorScreen() {
     if (!savedId || closed.current) return;
     closed.current = true;
     router.back();
-    // A new workflow opens after the sheet closes, over the list.
     if (isNew) open(savedId);
   }, [savedId, isNew, open]);
 
-  /** Saves the draft over `base`: the revision that it started from, or the newer one of a conflict. */
   const save = async (base: number) => {
     if (!draft || firstProblem) return;
     setSaving(true);
@@ -298,7 +276,6 @@ export function WorkflowEditorScreen() {
     }
   };
 
-  /** Another device saved first: keep this draft over its revision, or load the saved workflow. */
   const askAboutConflict = (saved: WorkflowDetail) => {
     void haptics.notification("warning");
     Alert.alert(t("mobile.workflow.conflict.title"), t("mobile.workflow.conflict.body"), [
@@ -316,7 +293,6 @@ export function WorkflowEditorScreen() {
       options={{ title: isNew ? t("mobile.workflow.editor.newTitle") : t("mobile.workflow.editor.title") }}
     />
   );
-  // The editor is a page: Back leaves it, and the discard guard asks first when the draft has a change.
   const header = (canSave: boolean) => (
     <WorkflowEditorHeader
       view={view}
@@ -373,9 +349,7 @@ export function WorkflowEditorScreen() {
   };
   const outline = draft.mode === "outline" ? draft.outline : null;
   const trigger = draft.graph.nodes.find((node) => node.kind === "trigger");
-  // The first problem names its step; a tap opens that step. The name has no page, so it only shows.
   const problemNode = firstProblem?.nodeId ? byId.get(firstProblem.nodeId) : undefined;
-  // A new workflow has no name yet: that shows only after the first change.
   const problemShown = Boolean(firstProblem?.nodeId) || changed;
 
   return (
@@ -478,7 +452,6 @@ export function WorkflowEditorScreen() {
         />
       ) : (
         <SettingsSection title={t("mobile.workflow.detail.stepsTitle")}>
-          {/* The steps in the order that a run goes, each path of a split under its label. */}
           {flowRows(workflowFlowTree(draftGraph(draft))).map((item) => {
             if (item.type !== "step")
               return <FlowRowNote key={item.type === "loose" ? "loose" : item.key} row={item} labelOf={labelOf} />;

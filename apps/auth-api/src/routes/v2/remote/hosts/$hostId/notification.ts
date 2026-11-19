@@ -11,10 +11,6 @@ import {
   requestRemoteControlPlane,
 } from "../../../../../server/request-auth";
 
-/**
- * A host sends one sealed notification for a member's phone. The body has the host credential, the
- * push token, the device session and sealed bytes. Nothing of it is stored or logged.
- */
 export const Route = createFileRoute("/v2/remote/hosts/$hostId/notification")({
   server: {
     handlers: {
@@ -33,7 +29,6 @@ export const Route = createFileRoute("/v2/remote/hosts/$hostId/notification")({
             if (!(yield* relay.allowNotification(params.hostId))) {
               return apiError(429, "rate_limited", "Too many notifications.");
             }
-            // A host does not learn when the account service ends a session, so it asks for each one.
             if (!(yield* controlPlane.sessionOpen(params.hostId, push.sessionId))) {
               return apiError(410, "notification_gone", "The phone no longer receives notifications.");
             }

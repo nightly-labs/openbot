@@ -33,13 +33,9 @@ import { isIOS } from "@/shared/lib/platform";
 import { type MobileText, useText } from "@/shared/lib/text";
 import { useAppActive } from "@/shared/lib/use-app-active";
 
-/** The attempts left are shown when this many or fewer remain. */
 const SHOW_ATTEMPTS_LEFT = 5;
-// After unlock, the block rolls up and the app shows under it.
 const LOCK_EXIT_MS = 560;
-// The lock content comes in once the block has made room for it.
 const LOCK_ENTER_DELAY_MS = 320;
-// The header on the lock screen: never under the status bar alone, never more than this share.
 const MIN_LOCK_HEADER = 96;
 const MAX_LOCK_HEADER_SHARE = 0.42;
 
@@ -55,10 +51,6 @@ function DeviceUnlockIcon({ kind, size, color }: { kind: DeviceUnlockKind | null
   return <LockKeyhole size={size} color={color} strokeWidth={1.75} />;
 }
 
-/**
- * Covers the app while it is locked, and while it is not active so the app switcher shows no chat.
- * iOS draws it in a window layer above the sheets; Android draws it in a dialog window.
- */
 export function AppLockOverlay() {
   const { loading, session } = useMobileSession();
   const status = useAppLock((state) => state.status);
@@ -68,11 +60,9 @@ export function AppLockOverlay() {
   const confirming = useAppLock((state) => state.confirming);
   const pathname = usePathname();
   const reduced = useReducedMotion();
-  // In dark mode the lock dims the block, as the loader does: it shows each time the app opens.
   const { dark } = useBloubColors();
   const [header, setHeader] = useState<number | null>(null);
 
-  // A new sign-in proves who the user is, so it does not ask for the lock again.
   const signedOut = useRef(false);
   useEffect(() => {
     if (loading) return;
@@ -89,13 +79,10 @@ export function AppLockOverlay() {
   const showLock = Boolean(session) && (status === "failed" || (status === "ready" && enabled && locked));
   const showCover = Boolean(session) && (status === "loading" || (enabled && covered));
   const mode = showLock ? "lock" : showCover ? "cover" : null;
-  // An unlock keeps the lock on screen a moment longer, so the block can roll up over the app.
   const [shownMode, setShownMode] = useState(mode);
   const [leaving, setLeaving] = useState(false);
   if (shownMode !== mode) {
     setShownMode(mode);
-    // Only iOS plays the exit. The Android dialog is its own window: it would hold touches and the
-    // Back button for the whole exit.
     setLeaving(isIOS && shownMode === "lock" && mode === null && Boolean(session) && !reduced);
   }
   useEffect(() => {
@@ -106,7 +93,6 @@ export function AppLockOverlay() {
 
   if (!session || (mode === null && !leaving)) return null;
   const lockShown = mode === "lock" || leaving;
-  // The privacy cover fills the screen, as the splash does; the lock moves the block up to a header.
   const edge = leaving ? "gone" : mode === "lock" && header !== null ? header : "cover";
 
   const content = (
@@ -124,8 +110,6 @@ export function AppLockOverlay() {
   );
 
   if (isIOS) {
-    // A sheet that opens while the app is locked goes above this layer. A new key adds the layer
-    // again, on top of it.
     return <FullWindowOverlay key={lockShown ? pathname : "cover"}>{content}</FullWindowOverlay>;
   }
   return (
@@ -175,7 +159,6 @@ function LockScreen({ leaving, onHeaderLayout }: { leaving: boolean; onHeaderLay
   }, [config.deviceUnlock]);
 
   const blockedUntil = pinBlockedUntil(attempts, now);
-  // The model enforces the wait. This only updates the text each second.
   useEffect(() => {
     if (blockedUntil === null) return;
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -211,8 +194,6 @@ function LockScreen({ leaving, onHeaderLayout }: { leaving: boolean; onHeaderLay
     else if (result === "failed") setMessage(t("mobile.appLock.device.failed", { method }));
   }, [method, t]);
 
-  // Offer Face ID once for each lock, when the app is active. iOS can start the app while the phone is
-  // locked, and that start locks the app. A prompt then would wake the phone.
   const prompted = useRef(-1);
   useEffect(() => {
     if (!appActive || status !== "ready" || !config.deviceUnlock || prompted.current === lockCount) return;
@@ -355,11 +336,6 @@ function LockScreen({ leaving, onHeaderLayout }: { leaving: boolean; onHeaderLay
   );
 }
 
-/**
- * The block is the header: it takes the space that the controls leave, up to a share of the
- * screen. The title, message and main control sit in the middle of the space under it. The number
- * pad, when there is one, sits low where the thumb reaches it.
- */
 function LockLayout({
   insets,
   leaving,

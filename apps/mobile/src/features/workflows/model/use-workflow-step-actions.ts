@@ -21,10 +21,6 @@ export function showWorkflowFailure(error: unknown, title: MobileTextKey) {
   Alert.alert(text.t(title), text.errorMessage(error, text.t("mobile.workflow.alert.tryAgain")));
 }
 
-/**
- * The actions on the steps of a workflow's runs and on the steps that ran alone: decide, retry and
- * stop. One action goes at a time, and each one reads the workflow again.
- */
 export function useWorkflowStepActions(serverId: string, workflowId: string) {
   const queryClient = useQueryClient();
   const queryScope = useQueryScope();

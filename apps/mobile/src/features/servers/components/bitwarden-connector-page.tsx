@@ -22,17 +22,9 @@ import type { MobileServer } from "@/features/workspace/model/workspace-types";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { useText } from "@/shared/lib/text";
 
-/** The hosted Bitwarden service. A self-hosted Vaultwarden server replaces it in the form. */
 const DEFAULT_SERVER_URL = "https://vault.bitwarden.com";
-/** A personal API key of Bitwarden: its client_id starts with `user.`. */
 const CLIENT_ID_PLACEHOLDER = "user.…";
 
-/**
- * Marketplace › Apps › Bitwarden of a joined server (`bitwarden-connector-v1`). The host
- * signs in with its own `bw` CLI, so the user enters the vault server, a personal API key and the
- * master password here. They go to the host once; this phone keeps no copy. The host answers
- * `connecting` at once, and the page reads the status again while it shows.
- */
 export function BitwardenConnectorPage({
   server,
   query,
@@ -63,7 +55,6 @@ export function BitwardenConnectorPage({
     action.reset();
   };
   const connect = () => {
-    // The secrets leave the form when the request starts, as on the desktop.
     setClientSecret("");
     setMasterPassword("");
     void action.perform(async () => {

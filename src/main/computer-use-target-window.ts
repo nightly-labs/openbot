@@ -3,88 +3,39 @@ import type { Point, Rectangle } from "electron";
 import type { ObservedAction, ObservedPointer } from "./cua-driver-action-tap";
 import { HIGHLIGHT_OWNER_SHORT_ID } from "./cua-driver-daemon-client";
 
-/** Below this a "window" is a tool palette or a shadow helper, not something an agent works in. */
 const MINIMUM_TARGET_SIZE = 120;
-/** The driver's own cursor overlay covers a whole display and must never be taken for a target. */
 const DRIVER_OVERLAY_APP = "cua-driver";
 
-/** One window as the driver reports it, in desktop points with a top-left origin. */
 interface DriverWindow {
   windowId: number;
   pid: number;
   appName: string;
   title: string;
   bounds: Rectangle;
-  /** The driver's back-to-front order: the largest number is the window in front. */
   zIndex: number;
   onScreen: boolean;
   onCurrentSpace: boolean;
 }
 
-/** The window the rim is drawn around. */
 export interface ComputerUseHighlightTarget {
   windowId: number;
   title: string;
   bounds: Rectangle;
-  /**
-   * The parts of that window other windows cover, in desktop points, as rectangles that never
-   * overlap. The rim gives way there, because it is drawn on an overlay that floats over them all.
-   */
   covered: Rectangle[];
 }
 
-/**
- * How long after its last action a session still counts as holding the desktop.
- *
- * The daemon keeps a lease alive for five minutes after the last call, which is far longer than the
- * rim should outlive the work. It must also outlast the model's thinking between two actions: a
- * model step can take longer than fifteen seconds, and a rim that drops out between steps flickers
- * through the whole turn. The rim goes down with the turn in any case, so this only
- * limits how long an idle agent inside a running turn keeps it.
- */
 const LIVE_SESSION_IDLE_SECONDS = 60;
 
-/**
- * How recently a session must have acted for a change of front window to count as the agent's.
- *
- * Front-to-back order moves for two reasons: the agent raised a window, or the user clicked one.
- * The driver reports no owner for the change, so the answer is timing. A window that comes forward
- * while the agent is between two actions is the agent's; one that comes forward seconds later is
- * the user, and the rim must not follow the user out of the window the agent works in.
- */
 const AGENT_ACTION_SECONDS = 2;
 
-/**
- * How long one request keeps saying where the agent works.
- *
- * An agent reads far more often than it acts, and a read names no window, so the answer has to
- * outlive the request that gave it. It must not outlive the work: a request from a quarter of an
- * hour ago points at an application the user may have closed since.
- */
 export const COMPUTER_USE_ACTION_MAX_AGE_MS = 60_000;
 
-/**
- * How long one point keeps the agent cursor on the screen.
- *
- * Much shorter than the window above, because the two say different things. A window is where the
- * work is and stays that for as long as the work does; a point is where one action landed, and a
- * cursor left on the last click of a minute ago says the agent is still there when it is not.
- */
 export const COMPUTER_USE_CURSOR_MAX_AGE_MS = 15_000;
 
-/** One live lease, with the time since the last action that lease asked for. */
 export interface LiveSession {
   idleSeconds: number;
 }
 
-/**
- * The lease of an agent that holds the desktop now, or `null` when no agent does.
- *
- * OpenBot's own read is in the same list: its connection takes a lease of its own. Counting it
- * would make the question answer itself - the rim would be up for as long as the daemon runs - so
- * that lease is left out by its name and by the kind a command line reports. The busiest of the
- * rest wins, because the rim follows the agent that acts, not the one that stopped a moment ago.
- */
 export function liveSession(payload: unknown, maxIdleSeconds = LIVE_SESSION_IDLE_SECONDS): LiveSession | null {
   const limit = Math.min(maxIdleSeconds, LIVE_SESSION_IDLE_SECONDS);
   if (!isDynamicRecord(payload) || !Array.isArray(payload.sessions)) return null;
@@ -104,34 +55,13 @@ export function liveSession(payload: unknown, maxIdleSeconds = LIVE_SESSION_IDLE
 export interface TargetChoice {
   windows: unknown;
   session: LiveSession | null;
-  /** What the agent last asked the daemon to do, from the tap, or `null` when it asked nothing. */
   action: ObservedAction | null;
-  /** OpenBot's own process, whose windows are never the target. */
   ownPid: number;
-  /**
-   * The driver ids of OpenBot's own windows that the user reads, such as the conversation. They are
-   * never the target, but they cover it as any other window does. OpenBot's other windows - the
-   * rim's overlays and the dynamic island - cannot take focus and are left out, because the rim
-   * overlays cover the whole display and would hide all of the rim.
-   */
   ownCoveringWindowIds?: ReadonlySet<number>;
-  /** The window the rim is on now, which the choice holds on to while it can. */
   previous: ComputerUseHighlightTarget | null;
-  /**
-   * One driver rectangle in the units the overlays draw in. Applied to every window before any
-   * size or overlap is measured, so the covered strips still meet edge to edge after it.
-   */
   toDesktop?: (bounds: Rectangle) => Rectangle;
 }
 
-/**
- * The desktop point an agent aimed at, in the driver's units, or `null` when nothing places it.
- *
- * A point in a window is a pixel of that window's last screenshot. The driver acts on it as the
- * window's top-left corner plus the point scaled from the screenshot to the window's size: the
- * screenshot can be smaller than the window, and on macOS it is in pixels while the window is in
- * points. The tap keeps that screenshot's width with the point; without the window there is no cursor.
- */
 export function pointerOnDesktop(pointer: ObservedPointer, windows: unknown): Point | null {
   if (pointer.windowId === null || pointer.screenshotWidth === null) return { x: pointer.x, y: pointer.y };
   const window = readWindows(windows).find((entry) => entry.windowId === pointer.windowId);
@@ -140,20 +70,6 @@ export function pointerOnDesktop(pointer: ObservedPointer, windows: unknown): Po
   return { x: window.bounds.x + pointer.x * scale, y: window.bounds.y + pointer.y * scale };
 }
 
-/**
- * The window the rim marks.
- *
- * The agent's own last request is the answer whenever it named a window or an application: it says
- * where the agent works even while the driver acts in the background and leaves the window behind
- * everything else. When the rim cannot mark that place - an OpenBot window, a window on another
- * Space, one that is minimized or gone - the rim goes down. Any other window would be one the agent
- * does not touch, and often the one the user works in.
- *
- * Without such a request - a browser tool names a tab, not a window - the front window is the only
- * evidence left. Front order also moves each time the user clicks, so the rim holds the window it
- * has and gives it up only when the agent itself acted in the last seconds, or when the window is
- * gone. Otherwise the rim would follow the user out of the work the moment they looked away.
- */
 export function chooseTarget({
   windows,
   session,
@@ -176,10 +92,6 @@ export function chooseTarget({
   return asTarget(front, visible);
 }
 
-/**
- * The window one request names: the exact window when it gave a window, and otherwise the front
- * window of the application it gave, which is the one an action without a window lands in.
- */
 function actedWindow(candidates: readonly DriverWindow[], action: ObservedAction | null): DriverWindow | null {
   if (!action) return null;
   const exact = candidates.find((window) => window.windowId === action.windowId);
@@ -197,18 +109,6 @@ function asTarget(window: DriverWindow, visible: readonly DriverWindow[]): Compu
   };
 }
 
-/**
- * The parts of one window that the windows in front of it cover.
- *
- * Every window counts, not only those an agent could work in: a palette, a sheet or a notification
- * hides the window under it just as well, and so does OpenBot's own conversation. OpenBot's overlays
- * and the driver's cursor overlay are already out of the list this reads, so the rim is never cut by
- * the surface that draws it.
- *
- * The answer holds no two rectangles that overlap. One cut that is made twice is a cut that is
- * undone, which is what an even-odd rule does with two overlapping holes, so the rectangles are
- * broken into strips that meet edge to edge instead.
- */
 function coveredAreas(window: DriverWindow, visible: readonly DriverWindow[]): Rectangle[] {
   const covers: Rectangle[] = [];
   for (const other of visible) {
@@ -227,13 +127,6 @@ function intersection(left: Rectangle, right: Rectangle): Rectangle | null {
   return width > 0 && height > 0 ? { x, y, width, height } : null;
 }
 
-/**
- * The same area as the rectangles given, in rectangles that only ever meet at an edge.
- *
- * Every left and right edge in the set cuts the area into vertical strips. Inside one strip each
- * rectangle either covers its whole width or none of it, so what is left to join is a set of
- * intervals on one line.
- */
 function withoutOverlap(rectangles: readonly Rectangle[]): Rectangle[] {
   if (rectangles.length < 2) return [...rectangles];
   const edges = [...new Set(rectangles.flatMap((rectangle) => [rectangle.x, rectangle.x + rectangle.width]))].sort(
@@ -264,19 +157,10 @@ function withoutOverlap(rectangles: readonly Rectangle[]): Rectangle[] {
 
 function frontWindow(candidates: readonly DriverWindow[]): DriverWindow | null {
   let best: DriverWindow | null = null;
-  // `list_windows` documents the largest z index as the window in front, and the driver's own
-  // `bring_to_front` reads the same end of the range.
   for (const window of candidates) if (!best || window.zIndex > best.zIndex) best = window;
   return best;
 }
 
-/**
- * Every window on screen, less OpenBot's overlays and the driver's full-screen cursor overlay.
- *
- * Those are drawn over the desktop and let every click through, so each one would otherwise cover
- * the whole rim or be taken for the window an agent works in. OpenBot's windows that the user reads
- * stay, because the rim must give way where they cover the target.
- */
 function visibleWindows(
   payload: unknown,
   ownPid: number,
@@ -292,7 +176,6 @@ function visibleWindows(
   return toDesktop ? visible.map((window) => ({ ...window, bounds: toDesktop(window.bounds) })) : visible;
 }
 
-/** Of those, the windows an agent could work in: not OpenBot's, on this Space and big enough to hold work. */
 function workableWindows(visible: readonly DriverWindow[], ownPid: number): DriverWindow[] {
   return visible.filter(
     (window) =>
@@ -312,8 +195,6 @@ function readWindows(payload: unknown): DriverWindow[] {
     const windowId = entry.window_id;
     const pid = entry.pid;
     const zIndex = entry.z_index;
-    // A window with no place in the front-to-back order cannot be compared with the others, so it
-    // is left out rather than given a place it does not have.
     if (!bounds || typeof windowId !== "number" || typeof pid !== "number" || typeof zIndex !== "number") continue;
     windows.push({
       windowId,

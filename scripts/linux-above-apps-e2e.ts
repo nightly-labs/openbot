@@ -1,11 +1,3 @@
-// The Linux desktop, the real pointer and keyboard, the screen recorder and the CPU count that
-// `scripts/linux-agent-dock-e2e.ts` and `scripts/linux-dynamic-island-e2e.ts` share. Each driver runs
-// one Electron harness that answers JSON commands on stdin with `@@{...}` lines on stdout.
-//
-// Without DISPLAY a session starts Xvfb, openbox and picom, and drives them with xdotool. In a GNOME
-// session (XDG_CURRENT_DESKTOP=GNOME, DISPLAY of its XWayland) it sends the pointer and the keys through
-// GNOME Shell, which needs `unsafe_mode` for `Eval`. Block notification banners in that setup: the banner
-// that tells of unsafe mode covers the top centre of the screen, where the island is.
 import assert from "node:assert/strict";
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { closeSync, existsSync, openSync, readdirSync, readFileSync } from "node:fs";
@@ -19,19 +11,12 @@ import { withoutElectronRuntimeFlags } from "./electron-spawn-env";
 
 export const ROOT = resolve(import.meta.dirname, "..");
 export const GNOME = (process.env.XDG_CURRENT_DESKTOP ?? "").split(":").includes("GNOME");
-/** The modes of `startHarness` in which the app opens no window above the apps. Native Wayland needs GNOME. */
 export const NO_WINDOW_MODES: readonly ("server" | "wayland")[] = GNOME ? ["server", "wayland"] : ["server"];
-/** The time in which such an app could open its window after the start. */
 export const NO_WINDOW_WAIT_MS = 3_000;
 export const STATE_TIMEOUT_MS = 20_000;
 export const SCREEN = { width: 1600, height: 1000 };
-/**
- * The screen scale of a HiDPI desktop, such as `2` or `1.25` (`OPENBOT_E2E_SCALE`). Electron takes it as the
- * scale that GNOME or KDE give it. `SCREEN` stays in screen pixels; `Desktop.move` takes DIP.
- */
 export const SCALE = Number(process.env.OPENBOT_E2E_SCALE ?? "1");
 
-/** The point in DIP, as Electron gives positions, of a point in screen pixels. */
 export function fromPixels(x: number, y: number): { x: number; y: number } {
   return { x: x / SCALE, y: y / SCALE };
 }
@@ -47,11 +32,9 @@ export type Rect = typeof RectSchema.Type;
 export const decodeNumber = Schema.decodeUnknownSync(Schema.Number);
 export const decodeBoolean = Schema.decodeUnknownSync(Schema.Boolean);
 
-/** True when no CSS motion with an end runs in the page. A motion that repeats with no end does not count. */
 export const MOTION_DONE =
   "document.getAnimations().every((motion) => motion.playState !== 'running' || !Number.isFinite(motion.effect?.getComputedTiming().endTime ?? Infinity))";
 
-/** A script that resolves after the renderer draws two frames. */
 export const TWO_FRAMES = "new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))";
 export const decodeBox = Schema.decodeUnknownSync(Schema.NullOr(RectSchema));
 export const decodePage = Schema.decodeUnknownSync(Schema.Struct({ url: Schema.String, html: Schema.String }));
@@ -67,16 +50,13 @@ const decodeAnswer = Schema.decodeUnknownSync(
 );
 
 export interface Session {
-  /** `.openbot-build/<name>/<desktop>`: the report, the screenshots, the video and the logs. */
   out: string;
-  /** A temporary folder for the profile and the window manager configuration. */
   root: string;
   environment: NodeJS.ProcessEnv;
   children: ChildProcess[];
   recorder?: ChildProcess | undefined;
 }
 
-/** Makes an empty output folder and a temporary folder. Linux only: other systems skip. */
 export async function openSession(name: string): Promise<Session> {
   if (process.platform !== "linux") {
     process.stdout.write("SKIP: Linux only\n");
@@ -98,7 +78,6 @@ export async function openSession(name: string): Promise<Session> {
   };
 }
 
-/** Stops the recorder and the processes of the session, in the reverse order of their start. */
 export async function closeSession(session: Session): Promise<void> {
   const recorder = session.recorder;
   if (recorder?.exitCode === null) {
@@ -114,7 +93,6 @@ export async function closeSession(session: Session): Promise<void> {
   await rm(session.root, { recursive: true, force: true });
 }
 
-/** Bundles a harness to `out/<name>/harness.cjs`, next to `out/preload` and `out/renderer` of the build. */
 export function buildHarness(source: string, name: string): string {
   assert.ok(existsSync(join(ROOT, "out", "renderer", "helper.html")), "build the app first: bun run build");
   assert.ok(existsSync(join(ROOT, "out", "preload", "index.cjs")), "build the app first: bun run build");
@@ -125,7 +103,6 @@ export function buildHarness(source: string, name: string): string {
     "--target=node",
     "--format=cjs",
     "--external=electron",
-    // Bun writes the source folder for `__dirname`. The window finds `out/preload` from the bundle's folder.
     "--define=__dirname=__bundleDirectory",
     '--banner=var __bundleDirectory = require("node:path").dirname(__filename);',
     `--outfile=${bundle}`,
@@ -134,7 +111,6 @@ export function buildHarness(source: string, name: string): string {
   return bundle;
 }
 
-/** Starts the desktop when there is none, and the recorder on X11. */
 export async function startDesktopAndRecorder(session: Session): Promise<Desktop> {
   if (!session.environment.DISPLAY) await startDesktop(session);
   if (!GNOME) session.recorder = startRecorder(session);
@@ -143,15 +119,10 @@ export async function startDesktopAndRecorder(session: Session): Promise<Desktop
 
 export interface Harness<Command extends { op: string }> {
   ready: Promise<void>;
-  /** Sends one command and decodes its answer. */
   send: <A>(command: Command, decode: (value: unknown) => A) => Promise<A>;
   quit: () => Promise<void>;
 }
 
-/**
- * Starts the Electron side of a test, with a profile and a log for each mode. `server` plays a self-hosted or
- * hosted server (`OPENBOT_E2E_SERVER=1`). `wayland` draws native Wayland windows: it needs a Wayland desktop.
- */
 export function startHarness<Command extends { op: string }>(
   session: Session,
   bundle: string,
@@ -249,7 +220,6 @@ async function startDesktop(session: Session): Promise<void> {
   });
   children.push(xvfb);
   await until(() => spawnSync("xdpyinfo", [], { env: environment }).status === 0, "the X server");
-  // Two workspaces, as most desktops have.
   const config = join(session.root, "openbox-rc.xml");
   await writeFile(
     config,
@@ -257,7 +227,6 @@ async function startDesktop(session: Session): Promise<void> {
   );
   children.push(spawn("openbox", ["--config-file", config], { env: environment, stdio: "ignore" }));
   await until(() => spawnSync("wmctrl", ["-m"], { env: environment }).status === 0, "the window manager");
-  // A compositor, as on a real desktop: without one the window has no transparent pixels.
   if (spawnSync("which", ["picom"]).status === 0) {
     children.push(spawn("picom", ["--backend", "xrender"], { env: environment, stdio: "ignore" }));
   }
@@ -301,14 +270,12 @@ export function run(session: Session, command: string, args: string[]): string {
 }
 
 export interface Desktop {
-  /** Moves the pointer to a point in DIP, as Electron and the renderer give positions. */
   move: (x: number, y: number) => void;
   button: (pressed: boolean) => void;
   click: () => void;
   type: (text: string) => Promise<void>;
   key: (name: "Return" | "Escape") => void;
   workspace: (index: number) => void;
-  /** For a failure report: where the pointer is and what is under it. */
   pointer: () => string;
 }
 
@@ -325,7 +292,6 @@ function x11Desktop(session: Session): Desktop {
   };
 }
 
-/** GNOME Shell's own virtual pointer and keyboard: the events take the path of real input through mutter. */
 function gnomeDesktop(session: Session): Desktop {
   const devices =
     "const C = imports.gi.Clutter; const seat = C.get_default_backend().get_default_seat();" +
@@ -335,8 +301,6 @@ function gnomeDesktop(session: Session): Desktop {
   const input = (body: string) => shell(session, `(() => { ${devices} ${body}; return 'ok'; })()`);
   const button = (pressed: boolean) =>
     input(`global.e2ePointer.notify_button(now, C.BUTTON_PRIMARY, C.ButtonState.${pressed ? "PRESSED" : "RELEASED"})`);
-  // A new virtual device can lose the y of a motion, also after its first one: each move sends the
-  // motion again until GNOME Shell has the pointer at the point.
   input("");
   const pointerAt = (x: number, y: number) =>
     shell(
@@ -425,7 +389,6 @@ export function screenshot(session: Session, name: string): void {
   spawnSync("import", ["-window", "root", file], { env: session.environment });
 }
 
-/** True when the window manager put the window above the others and on all workspaces. */
 function placedByWindowManager(properties: string): boolean {
   return (
     /_NET_WM_WINDOW_TYPE_DOCK/u.test(properties) &&
@@ -434,10 +397,6 @@ function placedByWindowManager(properties: string): boolean {
   );
 }
 
-/**
- * The window type, state and workspace that the window manager reads. The window manager sets the state
- * some time after the window shows, so this waits for it until the deadline.
- */
 export async function windowManagerProperties(session: Session, xid: number): Promise<string> {
   const read = () =>
     run(session, "xprop", ["-id", String(xid), "_NET_WM_WINDOW_TYPE", "_NET_WM_STATE", "_NET_WM_DESKTOP"]);
@@ -456,7 +415,6 @@ export async function windowManagerProperties(session: Session, xid: number): Pr
   return properties;
 }
 
-/** Shows the second workspace and checks that the window still shows there, then goes back. */
 export async function checkOtherWorkspace(
   session: Session,
   desktop: Desktop,
@@ -474,7 +432,6 @@ export async function checkOtherWorkspace(
   desktop.workspace(0);
 }
 
-/** A point in the window, at least 10 px from each rect of the shape. */
 export function pointOutside(bounds: Rect, region: readonly Rect[]): { x: number; y: number } {
   for (let y = 10; y < bounds.height - 10; y += 10) {
     for (let x = 10; x < bounds.width - 10; x += 10) {
@@ -487,13 +444,11 @@ export function pointOutside(bounds: Rect, region: readonly Rect[]): { x: number
   throw new Error("The shape covers the whole window.");
 }
 
-/** The CPU time of the app and its child processes over `seconds`, as a percent of one core. */
 export async function cpuOf(
   pid: number,
   seconds: number,
 ): Promise<{ percent: number; seconds: number; byType: Record<string, number>; perSecond: number[] }> {
   const before = ticksByProcess(pid);
-  // One sample for each second shows if the use is steady or comes in short peaks.
   const perSecond: number[] = [];
   let previous = before;
   for (let second = 0; second < seconds; second += 1) {
@@ -541,10 +496,6 @@ function ticksByProcess(rootPid: number): Map<number, { ticks: number; type: str
   return result;
 }
 
-/**
- * Clicks at `point` until the window under the test window counts a click. This shows that the pointer
- * of the test reaches that window. A desktop that has just started can lose the first click.
- */
 export async function firstClick(
   desktop: Desktop,
   point: { x: number; y: number },

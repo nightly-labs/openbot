@@ -1,8 +1,3 @@
-// The `opencode acp` of `opencode-downgraded-session-e2e.ts`, which acts as OpenCode 1.19.3 does on
-// sessions that OpenCode 2.0 wrote. Sessions named `v2-…` are in the table this version cannot read:
-// not listed, and not resumable. `kept-…` sessions are listed but fail to resume, as an internal fault
-// does. `v1only-…` and `othercwd-…` get the OpenCode 2.x answers for a session it does not have and
-// for another directory.
 import { type AcpHandler, logEntry, serveFakeAcpAgent } from "../acp-agent";
 
 const MODEL = "opencode/minimax-m3.1-flash-free";

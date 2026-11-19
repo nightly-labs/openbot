@@ -9,10 +9,7 @@ import {
 } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 
-/** The MCP server list of one host, for a user who manages it. The Marketplace and the chat composer need only this. */
 export function useMcpServerList(serverId: string) {
-  // A selector, not the whole workspace: the chat composer reads this list, and must not render again
-  // for every workspace change.
   const canManage = useMobileWorkspaceSelector((workspace) => workspace.canManageMcpServers(serverId));
   const { listMcpServers } = useMobileWorkspaceActions();
   const queryScope = useQueryScope();
@@ -25,10 +22,6 @@ export function useMcpServerList(serverId: string) {
   return { canManage, list };
 }
 
-/**
- * The MCP servers of one host, as the MCP server page shows them. The Marketplace uses the same list
- * query, so a change on the page shows in the Marketplace.
- */
 export function useServerMcp(serverId: string) {
   const { servers } = useMobileWorkspace();
   const { listMcpSignIns } = useMobileWorkspaceActions();
@@ -38,7 +31,6 @@ export function useServerMcp(serverId: string) {
   const { canManage, list } = useMcpServerList(serverId);
   const listKey = queryKeys.mcpServers(queryScope, serverId);
   const signInsKey = queryKeys.mcpSignIns(queryScope, serverId);
-  // A badge only: a failed read shows no badge.
   const signIns = useQuery({
     queryKey: signInsKey,
     enabled: canManage,
@@ -52,7 +44,6 @@ export function useServerMcp(serverId: string) {
     list,
     signIns,
     action,
-    /** The host answers each change with the whole list. A read still in flight has the old list. */
     async setList(configs: McpServerConfig[]): Promise<void> {
       await queryClient.cancelQueries({ queryKey: listKey, exact: true });
       queryClient.setQueryData(listKey, configs);

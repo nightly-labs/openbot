@@ -1,5 +1,3 @@
-// An agent's long-lived memories: the notes it carries between threads.
-
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_MEMORIES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-memories-v1";
 import {

@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/remote";
 
 export const messages = {
-  // Errors from remote servers, WebRTC transport, remote desktop, and the team client.
   "error.remote.desktopSetupClientUpdate": "リモートデスクトップの設定を使うには、クライアントを更新してください。",
   "error.remote.desktopSetupUnavailable": "リモートデスクトップの設定を利用できません。",
   "error.remote.desktopTestUnavailable": "リモートデスクトップのテストを利用できません。",

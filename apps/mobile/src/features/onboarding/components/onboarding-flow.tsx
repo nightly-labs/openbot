@@ -54,26 +54,18 @@ import { useText } from "@/shared/lib/text";
 
 type Step = "hello" | "server" | "agent" | "look" | "name" | "role" | "task" | "ready";
 
-// The whole screen takes the colour of the agent: softly, so text keeps its contrast.
 const TINT_ALPHA = "14";
 const TINT_MS = 320;
 const CHOICE_TINTS = CHOICE_SWATCHES.map((color) => `${color}${TINT_ALPHA}`);
-// The steps where the agent stands on the screen as the hero.
 const HERO_STEPS: ReadonlySet<Step> = new Set(["look", "name", "role", "task", "ready"]);
-// The steps with a text field. Only these make room for the keyboard.
 const TYPING_STEPS: ReadonlySet<Step> = new Set(["name", "role", "task"]);
-// The chat opens over the flow. If the end of that transition is never reported, the flow still
-// ends behind the chat.
 const CHAT_OPEN_DEADLINE_MS = 1200;
-// How long characters take to leave before the next step comes in.
 const CHARACTERS_OUT_MS = 300;
 
-/** The steps that make the agent, in order. The progress bar counts them. */
 function agentSteps(custom: boolean): readonly Step[] {
   return custom ? ["agent", "look", "name", "role", "task", "ready"] : ["agent", "name", "task", "ready"];
 }
 
-/** Where Back goes. The welcome has no step before it, and the last step follows a created agent. */
 function previousStep(step: Step, needsServer: boolean, custom: boolean): Step | null {
   switch (step) {
     case "server":
@@ -94,10 +86,6 @@ function previousStep(step: Step, needsServer: boolean, custom: boolean): Step |
   }
 }
 
-/**
- * A layer that fades in and out with the steps that use it. `delayIn` holds the fade-in back until
- * the content it belongs to starts to arrive, so the colour never comes before the content.
- */
 function FadeLayer({
   visible,
   motion,
@@ -138,11 +126,6 @@ function FadeLayer({
   );
 }
 
-/**
- * Where the user is while the agent takes shape: one dot per step of the way, the current step
- * stretched into a pill in the agent's colour. Done steps keep the colour, softer, and the steps
- * left stay visible as plain dots, so the row tells how far it is to the end.
- */
 function StepProgress({
   steps,
   current,
@@ -156,7 +139,6 @@ function StepProgress({
 }) {
   const { t } = useText();
   const insets = useSafeAreaInsets();
-  // Every dot sets its colour in the style. A class colour under an unset style colour draws nothing.
   const foreground = String(useThemeColor("foreground"));
   return (
     <View
@@ -186,18 +168,7 @@ function StepProgress({
   );
 }
 
-/**
- * The first run of an account: a welcome, a server when the account has none, and a first agent
- * from a starting role or from scratch, with a name and a first task. From the picker on, the
- * agent is one character that moves from step to step and talks to the user. Every step before
- * the agent exists can be skipped. The flow creates nothing until the user chooses Create.
- */
-export function OnboardingFlow({
-  onFinish,
-}: {
-  /** `welcome` is set when the user skips the welcome: the empty home takes over its screen. */
-  onFinish: (welcome?: WelcomeHandOff) => void;
-}) {
+export function OnboardingFlow({ onFinish }: { onFinish: (welcome?: WelcomeHandOff) => void }) {
   const { t, errorMessage } = useText();
   const insets = useSafeAreaInsets();
   const motion = useOnboardingMotion();
@@ -218,20 +189,15 @@ export function OnboardingFlow({
   const [created, setCreated] = useState<{ agentId: string; withTask: boolean } | null>(null);
   const [openingChat, setOpeningChat] = useState(false);
   const creating = useRef(false);
-  // Read by the step changes, which run after a delay and must report the step that the user left.
   const stepRef = useRef<Step>("hello");
   useEffect(() => {
     stepRef.current = step;
     mobileAnalytics.track("onboarding_step", { step, action: "viewed" });
   }, [step]);
 
-  // The hero: where each step wants it, where its layer is, and the swipe of the look step.
   const [slots, setSlots] = useState<Partial<Record<Step, HeroSlotRect>>>({});
   const [heroOrigin, setHeroOrigin] = useState({ x: 0, y: 0 });
   const heroLayer = useRef<ViewInstance>(null);
-  // The height of the step area with no keyboard. A step without a text field keeps it while the
-  // keyboard closes over it, so its characters stand where they will stay and the hero lands on
-  // them, not above them.
   const [restingHeight, setRestingHeight] = useState<number | null>(null);
   const heroDrag = useSharedValue(0);
   const [pulse, setPulse] = useState(0);
@@ -250,8 +216,6 @@ export function OnboardingFlow({
     return reporter;
   };
 
-  // The flow has its own horizontal swipes, and the server drawer has nothing to do in it yet, so
-  // the pan that opens the drawer stays off until the flow ends.
   const { setOpeningBlocked } = useAppDrawer();
   useEffect(() => {
     setOpeningBlocked(true);
@@ -278,21 +242,15 @@ export function OnboardingFlow({
         ideas: CUSTOM_AGENT_IDEAS,
       };
   const draftColor = avatarHeadColor(draft.seed, draft.hue, draft.color);
-  // Before there is an agent colour, and for an agent made from scratch in the picker, the theme's
-  // action colour (white in dark mode, black in light mode) stands in for it.
   const action = String(useCSSVariable("--openbot-action") ?? "#f0f0f0");
   const trimmedName = name.trim();
 
   const online = servers.some((server) => server.state === "online");
-  // A server on its way shows the loader. One that could not connect shows the choices again, so the
-  // user can try another way.
   const connecting = online
     ? null
     : (servers.find((server) => server.state === "connecting" || server.state === "unknown") ?? null);
-  // The server step shows only while the account has no connected server.
   const needsServer = !online;
 
-  // A cloud server is a choice only when the account can have one, as in the server drawer.
   const accountHasPlans = useHostedServerAvailability(
     (state) => session !== null && state.userId === session.user.id && state.available,
   );
@@ -304,9 +262,6 @@ export function OnboardingFlow({
     void refreshMobileFeatures(session.apiUrl);
   }, [session, step]);
 
-  // The keyboard closes while the field that opened it is still there. On Android, a focused field
-  // that goes with its step's exit animation leaves the keyboard open, with nothing to type into
-  // and no way to close it.
   const go = useCallback(
     (next: Step, nextDirection: 1 | -1) => {
       void KeyboardController.dismiss();
@@ -321,8 +276,6 @@ export function OnboardingFlow({
     [heroDrag],
   );
 
-  // The welcome and the picker play their characters out before the next step comes in: the
-  // welcome's crowd flies off, the picker's neighbours step aside for the one that was chosen.
   const [leaving, setLeaving] = useState<"forward" | "back" | null>(null);
   const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
@@ -348,7 +301,6 @@ export function OnboardingFlow({
     [go, motion],
   );
 
-  // A server that was just joined or set up comes online: the flow moves on by itself.
   useEffect(() => {
     if (step !== "server" || !online) return;
     void haptics.notification("success");
@@ -363,8 +315,6 @@ export function OnboardingFlow({
     else go(previous, -1);
   }, [go, leaveTo, leaving, pending, previous, step]);
 
-  // The Android back button goes one step back. On the welcome it leaves the app as usual, and on
-  // the last step the agent already exists, so it stays.
   useEffect(() => {
     if (step === "hello") return;
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
@@ -374,8 +324,6 @@ export function OnboardingFlow({
     return () => subscription.remove();
   }, [back, step]);
 
-  // The chat opens on top of the flow. The flow ends only when the chat covers it, so the home
-  // screen never shows on the way to the chat.
   useEffect(() => {
     if (!openingChat) return;
     const unsubscribe = navigation.addListener("transitionEnd", (event) => {
@@ -388,8 +336,6 @@ export function OnboardingFlow({
     };
   }, [navigation, onFinish, openingChat]);
 
-  // The empty home has the layout of the welcome. Skipped on the welcome, the flow fades off the
-  // same group and text, and the home's action starts where the welcome's main action stands.
   const primaryPlace = useRef<ViewInstance>(null);
   const finishing = useRef(false);
   const skip = () => {
@@ -458,8 +404,6 @@ export function OnboardingFlow({
     router.push({ pathname: "/chat/[agentId]", params: { agentId: created.agentId } });
   };
 
-  // The main action wears the agent's colour from the picker on: the one in the middle while
-  // choosing, then the chosen one. Before that, it is the theme's black or white.
   const accent =
     step === "agent" ? (custom ? undefined : CHOICE_SWATCHES[choice]) : HERO_STEPS.has(step) ? draftColor : undefined;
   const footerAction: FooterAction | null = (() => {
@@ -613,7 +557,6 @@ export function OnboardingFlow({
 
   return (
     <View className="flex-1 bg-background">
-      {/* The picker's colour arrives with its stage, not before it. */}
       <FadeLayer
         visible={step === "agent"}
         motion={motion}
@@ -621,16 +564,10 @@ export function OnboardingFlow({
         tint={CHOICE_TINTS[choice]}
       />
       <FadeLayer visible={drafting} motion={motion} tint={`${draftColor}${TINT_ALPHA}`} />
-      {/* The steps keep clear of the side insets (the iPhone Duo rail, the landscape cutout). The tints
-          above stay edge to edge. */}
       <KeyboardAvoidingView
         behavior="padding"
         style={{ flex: 1, paddingLeft: insets.left, paddingRight: insets.right }}
       >
-        {/* Steps overlap while one leaves and the next arrives, so neither pushes the other. The
-            inner view takes the keyboard padding. A step with a text field fills it; the others
-            keep their height with no keyboard. The last step only fades in: its hero lands with
-            its own motion. */}
         <View
           ref={heroLayer}
           collapsable={false}

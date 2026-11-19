@@ -16,13 +16,6 @@ import { useDiscardGuard } from "@/shared/lib/use-discard-guard";
 
 const LIMIT = INPUT_LIMITS.agentInstructionsFile;
 
-/**
- * Agent info > Instructions file: `AGENTS.md` at the root of the agent's workspace on the host, or
- * `CLAUDE.md` in an older workspace, from `agent-instructions-v1`. Only an owner or admin sees it.
- * The agent reads the file in each session and can change it. A save sends the text that the edit
- * started from: when the agent changed the file since then, the host refuses the save, the user's
- * text stays, and a second Save replaces the agent's version, as on desktop.
- */
 export function AgentInstructionsFileEditor({ agent, available }: { agent: MobileAgent; available: boolean }) {
   const { t, errorMessage } = useText();
   const workspace = useMobileWorkspaceActions();
@@ -34,15 +27,12 @@ export function AgentInstructionsFileEditor({ agent, available }: { agent: Mobil
     queryFn: () => workspace.loadAgentInstructions(agent.id, agent.serverId),
     enabled: available,
     retry: false,
-    // The agent can change the file at any time, so a reopened page reads the host again.
     staleTime: 0,
   });
   const [edited, setEdited] = useState<string | undefined>();
-  // The file text that the edit started from. A refused save moves it to the agent's version.
   const [base, setBase] = useState<string | undefined>();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // A second tap can come before the render that hides the Save action.
   const pending = useRef(false);
   const savedText = file.data?.text ?? "";
   const text = edited ?? savedText;
@@ -52,7 +42,6 @@ export function AgentInstructionsFileEditor({ agent, available }: { agent: Mobil
   useDiscardGuard(dirty || saving, { busy: () => pending.current });
 
   async function saved(next: AgentInstructionsFile): Promise<void> {
-    // A read that an event started before the save must not put the old file back.
     await queryClient.cancelQueries({ queryKey, exact: true });
     queryClient.setQueryData<AgentInstructionsFile>(queryKey, next);
     setEdited(undefined);
@@ -71,7 +60,6 @@ export function AgentInstructionsFileEditor({ agent, available }: { agent: Mobil
       await saved(next);
     } catch (cause) {
       const latest = await workspace.loadAgentInstructions(agent.id, agent.serverId).catch(() => null);
-      // The host wrote the file, but its answer did not arrive.
       if (latest?.text === text) {
         await saved(latest);
         return;
@@ -88,7 +76,6 @@ export function AgentInstructionsFileEditor({ agent, available }: { agent: Mobil
     }
   }
 
-  // A failed read again keeps the file and the user's text on the page.
   if (file.isError && !file.data)
     return (
       <>

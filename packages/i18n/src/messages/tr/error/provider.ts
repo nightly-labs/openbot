@@ -6,7 +6,6 @@ export const messages = {
     "OpenBot, MCP sunucularını Codex yapılandırmasına kaydedemedi. Codex config.toml dosyanızın geçerli ve yazılabilir olduğunu denetleyin, ardından OpenBot'u yeniden başlatın.",
   "error.provider.computerUseConfig":
     "OpenBot, Bilgisayar Kullanımını Codex yapılandırmasına kaydedemedi. Codex config.toml dosyanızın geçerli ve yazılabilir olduğunu denetleyin, ardından OpenBot'u yeniden başlatın. Onsuz devam etmek için ekip arkadaşı ayarlarından Bilgisayar Kullanımını kapatabilirsiniz.",
-  // Provider, provider runtime and custom endpoint errors.
   "error.provider.codexUnresponsive": "Codex yanıt vermeyi bıraktı, bu yüzden OpenBot işlemini sonlandırdı.",
   "error.provider.acpUnresponsive": "{provider} zamanında yanıt vermedi, bu yüzden OpenBot işlemini sonlandırdı.",
   "error.provider.acpSignInLost":

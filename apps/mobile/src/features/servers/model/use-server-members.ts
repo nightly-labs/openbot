@@ -8,15 +8,10 @@ import { useLockedMutation } from "@/features/servers/model/use-locked-action";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 
-/** An invitation that someone can still accept. A permanent link stays open after each join. */
 function isPendingInvite(invite: RemoteTeamInvite, now: number): boolean {
   return (invite.permanent || !invite.usedAt) && !invite.revokedAt && invite.expiresAt > now;
 }
 
-/**
- * The members and invitations of one server, as the Members, Invite and Member pages of the server
- * sheet show them. The pages use the same queries, so a change on one page shows on the others.
- */
 export function useServerMembers(serverId: string) {
   const { servers, teamDirectory } = useMobileWorkspace();
   const queryScope = useQueryScope();
@@ -38,7 +33,6 @@ export function useServerMembers(serverId: string) {
   });
   const { action, perform } = useLockedMutation({
     success: () => {
-      // A refresh failure must not retry a committed membership change or invitation.
       void members.refetch();
       if (canManage) void invites.refetch();
     },

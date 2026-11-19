@@ -4,12 +4,7 @@ import { create } from "zustand";
 import { accountScope } from "@/shared/lib/account-scope";
 import type { ShortcutTarget } from "./shortcut-target";
 
-/**
- * The agent that gets the messages of the Send Message shortcut. The user chooses it in Settings >
- * Shortcuts. It is saved on this phone for one account.
- */
 export const useShortcutAgent = create<{
-  /** The account that `target` is for. Null before the first read. */
   account: string | null;
   target: ShortcutTarget | null;
   saving: boolean;
@@ -19,7 +14,6 @@ function accountKey(apiUrl: string, userId: string): string {
   return `openbot.shortcut-agent.v1.${accountScope(apiUrl, userId)}`;
 }
 
-/** A value that cannot be read is no choice. The shortcuts then ask the user to choose an agent. */
 export async function loadShortcutAgent(apiUrl: string, userId: string): Promise<void> {
   const account = accountKey(apiUrl, userId);
   if (useShortcutAgent.getState().account === account) return;
@@ -28,14 +22,10 @@ export async function loadShortcutAgent(apiUrl: string, userId: string): Promise
     const value = JSON.parse((await SecureStore.getItemAsync(account)) ?? "null");
     if (isDynamicRecord(value) && isString(value.serverId) && isString(value.agentId))
       target = { serverId: value.serverId, agentId: value.agentId };
-  } catch {
-    // The setting shows no agent, and the user can choose again.
-  }
-  // A choice that Settings saved during the read stays.
+  } catch {}
   if (useShortcutAgent.getState().account !== account) useShortcutAgent.setState({ account, target });
 }
 
-/** Applies the choice at once, also when the save fails. Settings then offers a retry. */
 export async function saveShortcutAgent(apiUrl: string, userId: string, target: ShortcutTarget | null): Promise<void> {
   const account = accountKey(apiUrl, userId);
   useShortcutAgent.setState({ account, target, saving: true });

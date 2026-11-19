@@ -472,7 +472,6 @@ export const messages = {
   "settings.profile.share.copyFailed": "画像をコピーできませんでした。",
   "settings.profile.share.createFailed": "画像を作成できませんでした。",
   "settings.profile.share.fileName": "openbot-activity.png",
-  // The text in the image to share.
   "settings.profile.share.caption": "OpenBot と過ごした直近 6 か月",
   "settings.profile.activity.title": "このコンピューターでのアクティビティ",
   "settings.profile.activity.activeDays": {
@@ -481,7 +480,6 @@ export const messages = {
   "settings.profile.activity.empty": "まだアクティビティはありません",
   "settings.profile.activity.loading": "アクティビティを読み込んでいます…",
   "settings.profile.activity.loadFailed": "アクティビティを読み込めませんでした。",
-  // {tokens} is a short number, such as 1.2M.
   "settings.profile.activity.heatmapLabel": {
     other: "過去 1 年間に {count} 日アクティブ、{tokens} トークン",
   },
@@ -653,7 +651,6 @@ export const messages = {
   "settings.hostedServers.plan.standard.summary": "毎日のルーティンがある小さなチーム向け。",
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "多数のエージェントとブラウザーの多用向け。",
-  // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "音声入力",
   "settings.voice.model.parakeet.description": "高速です。ヨーロッパの 25 言語で、話している言語を自動で判別します。",
   "settings.voice.model.parakeetUnified.description":

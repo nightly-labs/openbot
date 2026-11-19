@@ -1,7 +1,6 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("island", {
-  // The Dynamic Island window. The second label is for a display with no notch, and for Windows.
   "island.surface.label": "OpenBot MacBook notch",
   "island.surface.labelIsland": "OpenBot Dynamic Island",
   "island.surface.interactionArea": "Dynamic Island interaction area",

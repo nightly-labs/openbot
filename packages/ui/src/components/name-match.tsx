@@ -1,6 +1,5 @@
 import { createMemo, Show } from "solid-js";
 
-/** Lower case, no accents, and `_`, `/` and `-` as spaces: "cafe" finds "Café Orders". */
 const foldChar = (char: string) =>
   char
     .normalize("NFD")
@@ -8,11 +7,6 @@ const foldChar = (char: string) =>
     .toLowerCase()
     .replace(/[\s_/-]/g, " ");
 
-/**
- * The folded text, and for each of its code units the index of the character in `text` that made
- * it. Folding can change the length, so this map finds the matched part in the original name.
- * A run of spaces and separators becomes one space: "Sales - EU" is "sales eu".
- */
 function foldName(text: string) {
   let folded = "";
   const source: number[] = [];
@@ -27,7 +21,6 @@ function foldName(text: string) {
   return { folded, source };
 }
 
-/** Where `query` is in `name`, and its rank: 0 at the start, 1 at the start of a word, 2 in a word. */
 function findMatch(name: string, query: string): { at: number; rank: number } | undefined {
   if (name.startsWith(query)) return { at: 0, rank: 0 };
   const first = name.indexOf(query);
@@ -37,17 +30,12 @@ function findMatch(name: string, query: string): { at: number; rank: number } | 
   return first < 0 ? undefined : { at: first, rank: 2 };
 }
 
-/**
- * How well `name` fits the search: 0 when it starts with the query, 1 when a word does, 2 when it
- * only contains it. undefined when it does not match. An empty query matches each name at rank 0.
- */
 export function nameRank(name: string, query: string): number | undefined {
   const text = foldName(query.trim()).folded;
   if (!text) return 0;
   return findMatch(foldName(name).folded, text)?.rank;
 }
 
-/** The items whose name matches. Names that start with the query, or have a word that does, come first. */
 export function matchByName<T>(items: readonly T[], nameOf: (item: T) => string, query: string): T[] {
   if (!foldName(query.trim()).folded) return [...items];
   return items
@@ -59,7 +47,6 @@ export function matchByName<T>(items: readonly T[], nameOf: (item: T) => string,
     .map((row) => row.item);
 }
 
-/** The name with the matched part in bold, so the eye finds why a row is in the list. */
 export function MatchedName(props: { name: string; query: string; class?: string }) {
   const parts = createMemo(() => {
     const text = foldName(props.query.trim()).folded;

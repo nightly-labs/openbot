@@ -7,9 +7,6 @@ import { useText } from "@/shared/lib/text";
 
 export const unstable_settings = { anchor: "index" };
 
-// One sheet shows the plans and the account's hosted servers, with no purchase: app store rules do
-// not allow a purchase outside the store. The setup of a server in setup is an inner page. Join with
-// an invitation is an inner page too, so the user can go back to the plans.
 export default function HostedServerLayout() {
   const { t } = useText();
   const background = String(useCSSVariable("--openbot-bg-sheet"));
@@ -18,10 +15,7 @@ export default function HostedServerLayout() {
       <Stack.Screen name="index" options={{ title: t("mobile.app.route.hostedServerPlans") }} />
       <Stack.Screen name="setup" options={{ title: t("mobile.app.route.hostedServerSetup") }} />
       <Stack.Screen name="local" options={{ title: t("mobile.server.local.title") }} />
-      {/* Join draws its own title; the header keeps only the back button. */}
       <Stack.Screen name="join" options={{ title: "" }} />
-      {/* The header stays, so the push does not hide the bar and move the join page under it. */}
-      {/* On Android the header is opaque elsewhere. Here the camera fills the page under it, as on iOS. */}
       <Stack.Screen
         name="scan"
         options={{

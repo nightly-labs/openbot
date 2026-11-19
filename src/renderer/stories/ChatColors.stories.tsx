@@ -56,11 +56,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * A chat color tints the bubble. Code, quotes, tables and file chips in a tinted bubble take the
- * same tint. The first rows have no color: the reader's and the agent's bubbles stay grey, and
- * another person's bubble takes their name colour.
- */
 export const TintedContent: Story = {
   render: () => (
     <main class="foundation-story">
@@ -95,7 +90,6 @@ export const TintedContent: Story = {
   ),
 };
 
-/** Each preset of the chat color picker, on the reader's own bubble. */
 export const Presets: Story = {
   render: () => (
     <main class="foundation-story" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 24px">
@@ -119,10 +113,6 @@ export const Presets: Story = {
   ),
 };
 
-/**
- * The reader's bubbles in a chat with each story agent, in each bubble style of Settings › Appearance ›
- * Your bubbles. Solid fills the bubble with the agent's face color, with dark text on a light color.
- */
 export const BubbleStyles: Story = {
   render: () => (
     <main class="foundation-story" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 24px">

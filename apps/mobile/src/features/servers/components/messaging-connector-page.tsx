@@ -42,7 +42,6 @@ const TITLE_KEYS = {
 
 const AVATAR_SIZE = 32;
 
-/** What to do about a stopped connection, or null for a state that shows the connection's description. */
 function connectionHelp(
   { t }: MobileText,
   platform: ConnectorMessagingPlatform,
@@ -95,16 +94,9 @@ function isWorkspacePlatform(platform: ConnectorMessagingPlatform): platform is 
   return platform !== "telegram";
 }
 
-/**
- * Opens the platform's page that the host named. A Slack or Discord install returns to an
- * `openbot://` link with a grant that is sealed to the host; the browser session gives it back here,
- * and the phone sends it on. A Telegram link opens Telegram, and the chat shows when it is linked.
- * Resolves false when the user closed the browser.
- */
 async function openHostPage(
   platform: ConnectorMessagingPlatform,
   page: HostPage,
-  /** Resolves false when the host refused the grant, such as after its install key expired. */
   complete: (grant: { nonce: string; grant: string }) => Promise<boolean>,
 ): Promise<boolean> {
   if (page.url === null) return true;
@@ -124,11 +116,6 @@ async function openHostPage(
   return true;
 }
 
-/**
- * Marketplace › Apps › Slack, Discord or Telegram of a joined server. A Slack workspace or a
- * Discord server installs the one OpenBot app, and its orchestrator agent receives every request.
- * Every Telegram chat adds the one OpenBot bot and shares one orchestrator. No token reaches the phone.
- */
 export function MessagingConnectorPage({
   server,
   platform,
@@ -162,7 +149,6 @@ export function MessagingConnectorPage({
   const telegramAgent = workspace ? null : telegramOrchestrator(connections, agents);
   const orchestrator = (connection: MessagingConnection) =>
     workspace ? workspaceOrchestrator(connection, agents) : telegramAgent;
-  /** Each orchestrator once. An earlier build gave each workspace its own; now they share one. */
   const orchestrators = [
     ...new Map(
       connections.flatMap((connection) => {
@@ -171,7 +157,6 @@ export function MessagingConnectorPage({
       }),
     ).values(),
   ];
-  /** The first connection that no agent answers: Add agent creates its orchestrator. */
   const needsAgent = connections.find((connection) => !orchestrator(connection)) ?? null;
   const complete = (grant: { nonce: string; grant: string }) =>
     isWorkspacePlatform(platform)
@@ -182,7 +167,6 @@ export function MessagingConnectorPage({
     void action.perform(async () => {
       await addMessagingOrchestrator({ platform, workspaceId: workspace ? connection.workspaceId : null }, server.id);
     });
-  /** After a new workspace, the next step is its orchestrator, as in the desktop connect dialog. */
   const offerAgent = (connection: MessagingConnection) => {
     if (!workspace) return;
     Alert.alert(t(workspace.agentPromptTitle), t(workspace.agentPromptBody, { workspace: connection.workspaceName }), [
@@ -214,7 +198,6 @@ export function MessagingConnectorPage({
     });
   const disconnect = (connection: MessagingConnection) => {
     const agent = orchestrator(connection);
-    // A disconnect deletes the orchestrator only when no other connection uses it.
     const deletes =
       agent !== null &&
       !connections.some(
@@ -333,7 +316,6 @@ export function MessagingConnectorPage({
                 />
               </SettingsRow>
             ) : null}
-            {/* A removed Telegram chat is unlinked. Only a new link with the bot brings it back. */}
             {kind === "attention" && connection.state !== "removed" ? (
               <SettingsRow
                 disclosure={false}

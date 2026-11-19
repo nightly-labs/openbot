@@ -26,16 +26,11 @@ import { useText } from "@/shared/lib/text";
 
 const FIELDS: readonly GitHubPickField[] = ["repository", "labels", "person"];
 
-/** Keeps the values that the person chose and the repository no longer lists, before the repository's. */
 const withValues = (options: readonly string[], values: readonly string[]) => [
   ...values.filter((value) => !options.includes(value)),
   ...options,
 ];
 
-/**
- * The editor sheet > a GitHub step > Repository, Labels or Person: a list with a filter. A new
- * repository keeps none of the labels and people of the one before, as on desktop.
- */
 export function WorkflowGitHubPickScreen() {
   const { t } = useText();
   const { theme } = useUniwind();
@@ -81,8 +76,6 @@ export function WorkflowGitHubPickScreen() {
   let rows: { value: string; label: string; checked: boolean; onPress: () => void }[];
   let loading = false;
   if (field === "repository" && trigger) {
-    // A trigger listens to a list of repositories, as on desktop: a tap adds or removes one. Labels stay
-    // while one repository of the old list stays; a list with none of them starts with no labels.
     const current = trigger.repositories;
     const chosen = new Set(current.map((name) => name.toLowerCase()));
     const names = access.catalog?.repositories.map((repository) => repository.fullName) ?? [];
@@ -112,7 +105,6 @@ export function WorkflowGitHubPickScreen() {
     const known = names.some((name) => name.toLowerCase() === current.toLowerCase());
     const list = current && current !== SAME_REPOSITORY && !known ? [current, ...names] : names;
     loading = access.admin && !access.catalog && !access.catalogFailed;
-    // Labels and people belong to one repository, so a new repository starts with none.
     const reset: Record<string, string> = output ? { labels: "", person: "" } : { labels: "" };
     rows = [
       ...(output && (output.fromEvent || output.repository === SAME_REPOSITORY) && !query

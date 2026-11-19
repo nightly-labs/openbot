@@ -35,14 +35,12 @@ import { SaveError } from "@/shared/components/save-error";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
-/** `default` follows the host default. */
 type TaskLimitChoice = "default" | number;
 const TASK_LIMIT_CHOICES: readonly TaskLimitChoice[] = [
   "default",
   ...Array.from({ length: AGENT_TASK_LIMIT_MAX }, (_, index) => index + 1),
 ];
 
-/** `default` follows the host default. */
 type BusyMessageChoice = "default" | BusyMessageMode;
 
 const BUSY_MESSAGE_LABEL = {
@@ -61,12 +59,6 @@ export interface AgentHostFieldsProps {
   available: boolean;
 }
 
-/**
- * One agent setting that is read from and saved on the agent's host. Only an owner or admin sees
- * it, unless `members` is set, and only when the host serves its capability. The host checks the
- * role again on every call. A change saves at once, as on desktop, and does not wait for the sheet's
- * Save action. The control shows the new value during the save and goes back on a failure.
- */
 export function useAgentHostRecord<Settings extends object, Input extends Partial<Settings>>(
   { agent, server, available }: AgentHostFieldsProps,
   part: "host" | "task-limit" | "new-chat" | "plan-card" | "backup-models" | "fast-mode",
@@ -79,28 +71,22 @@ export function useAgentHostRecord<Settings extends object, Input extends Partia
   const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // A second tap can come before the render that disables the control, and it would save from the same value.
   const pending = useRef(false);
   const canRead = members || canAdministerServer(server?.role);
-  // Under "agent-info" and ending in an `AGENT_SETTINGS_PARTS` part: the host's `agents-changed`
-  // event reads it again, so a change made on another device shows here while the page is open.
   const queryKey = queryKeys.agentRecord(queryScope, agent.serverId, agent.id, part);
   const settings = useQuery({
     queryKey,
     queryFn: () => load(agent.id, agent.serverId),
     enabled: available && canRead,
     retry: false,
-    // Another device can change these at any time, so a reopened page reads the host again.
     staleTime: 0,
   });
 
-  /** Resolves true when the host saved the change. */
   async function save(current: Settings, input: Input): Promise<boolean> {
     if (pending.current) return false;
     pending.current = true;
     setSaving(true);
     setError(null);
-    // A read that an `agents-changed` event started must not put the old value back after the save.
     await queryClient.cancelQueries({ queryKey, exact: true });
     queryClient.setQueryData<Settings | null>(queryKey, { ...current, ...input });
     try {
@@ -119,7 +105,6 @@ export function useAgentHostRecord<Settings extends object, Input extends Partia
     }
   }
 
-  // A host without the capability answers null. A failed read keeps the controls hidden, as for a member.
   const current = canRead ? (settings.data ?? null) : null;
   return {
     current,
@@ -131,7 +116,6 @@ export function useAgentHostRecord<Settings extends object, Input extends Partia
   };
 }
 
-/** Computer Use, local scripts and the busy-message mode of an agent, from `agent-host-settings-v1`. */
 function useAgentHostSettings(props: AgentHostFieldsProps) {
   const workspace = useMobileWorkspaceActions();
   return useAgentHostRecord<AgentHostSettings, Omit<UpdateAgentHostSettingsInput, "agentId">>(
@@ -142,7 +126,6 @@ function useAgentHostSettings(props: AgentHostFieldsProps) {
   );
 }
 
-/** A save error under a row of a group. */
 function RowSaveError({ error }: { error: string | null }) {
   return error ? (
     <View className="px-4 pb-3">
@@ -151,7 +134,6 @@ function RowSaveError({ error }: { error: string | null }) {
   ) : null;
 }
 
-/** Agent info > Permissions: Computer Use and local scripts, which act on the host computer. */
 export function AgentHostPermissionFields(props: AgentHostFieldsProps) {
   const { t } = useText();
   const { theme } = useUniwind();
@@ -186,7 +168,6 @@ export function AgentHostPermissionFields(props: AgentHostFieldsProps) {
   );
 }
 
-/** Agent info > Advanced: what a message sent while the agent works does. */
 export function AgentBusyMessageField(props: AgentHostFieldsProps) {
   const { t } = useText();
   const { theme } = useUniwind();
@@ -196,8 +177,6 @@ export function AgentBusyMessageField(props: AgentHostFieldsProps) {
   const { agent } = props;
   const choice: BusyMessageChoice = current.busyMessageMode ?? "default";
   const mode = current.busyMessageMode ?? current.defaultBusyMessageMode;
-  // As on desktop: a custom agent that reports steering steers. While the phone cannot tell (an older
-  // host or models that did not load), the note does not show.
   const steerUnsupported = mode === "steer" && steering.known && !steering.steers;
   return (
     <SettingsGroupRow>
@@ -231,10 +210,6 @@ export function AgentBusyMessageField(props: AgentHostFieldsProps) {
   );
 }
 
-/**
- * Agent info > Advanced: how many threads of the agent run at the same time. Only an owner or admin
- * sees it, and only when the host serves `agent-task-limit-v1`. It saves at once, as the fields above.
- */
 export function AgentTaskLimitField(props: AgentHostFieldsProps) {
   const { t, format } = useText();
   const { theme } = useUniwind();
@@ -248,7 +223,6 @@ export function AgentTaskLimitField(props: AgentHostFieldsProps) {
   if (!current) return null;
   const { agent } = props;
 
-  // A provider that runs one turn at a time runs one thread, whatever the limit.
   const oneTurnAtATime = agent.provider !== undefined && !agentProviderDescriptor(agent.provider).concurrentTurns;
   const choice: TaskLimitChoice = oneTurnAtATime ? 1 : (current.taskLimit ?? "default");
   return (
@@ -285,11 +259,6 @@ export function AgentTaskLimitField(props: AgentHostFieldsProps) {
   );
 }
 
-/**
- * Agent info > Advanced: whether the agent starts a new chat itself when its chat gets long, as on
- * desktop. Only an owner or admin sees it, and only when the host serves `agent-new-chat-v1`. A
- * change on desktop shows here while the page is open, and a change here shows on desktop at once.
- */
 export function AgentNewChatAllowedField(props: AgentHostFieldsProps) {
   const { t } = useText();
   const { theme } = useUniwind();
@@ -317,7 +286,6 @@ export function AgentNewChatAllowedField(props: AgentHostFieldsProps) {
   );
 }
 
-/** Agent info > Advanced: whether the agent shows its plan before a long task, from `agent-plan-card-v1`. */
 export function AgentPlanCardField(props: AgentHostFieldsProps) {
   const { t } = useText();
   const { theme } = useUniwind();
@@ -351,14 +319,6 @@ const SPEED_LABEL = {
   ultrafast: "mobile.agent.fastMode.ultrafast",
 } as const satisfies Record<AgentSpeed, MobileTextKey>;
 
-/**
- * Agent info > Model: the speed of the agent (Standard, Fast or Ultrafast), from `agent-speed-v1`, or
- * from `agent-fast-mode-v1` on an older host. It shows only for a model with a fast tier, as on
- * desktop, and offers Ultrafast only for a model with that tier. A member with view access reads it;
- * the host saves a change only for a member with manage access. A change applies from the next turn.
- * Claude fast mode costs more per token and a Claude subscription pays for it from usage credits, so
- * a faster speed on a Claude agent asks first, as the desktop picker does.
- */
 export function AgentSpeedField(props: AgentHostFieldsProps & { model: AgentModelOption }) {
   const { t } = useText();
   const { theme } = useUniwind();

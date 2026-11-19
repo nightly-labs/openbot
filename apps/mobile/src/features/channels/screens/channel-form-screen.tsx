@@ -91,9 +91,7 @@ function ChannelForm({
   channelId: string;
   channel?: ChannelSummary;
   available: boolean;
-  /** The host takes a channel picture (`channel-picture-v1`). */
   pictureSupported: boolean;
-  /** The host takes "New conversation", "Compact context" and "Delete history" (`chat-history-v1`). */
   contextActionsSupported: boolean;
   store: MobileChannelStore;
 }) {
@@ -128,7 +126,6 @@ function ChannelForm({
   const choices = useMemo(() => agents.filter((agent) => agent.serverId === serverId), [agents, serverId]);
   const agentsById = useMemo(() => new Map(choices.map((agent) => [agent.id, agent])), [choices]);
   const disabled = saving || !available || finished || Boolean(channel?.archived);
-  // Discard turns prevention off before it repeats the action, so the hook does not warn.
   const [discarding, setDiscarding] = useState(false);
   usePreventRemove(!discarding && !finished && (dirty || saving), ({ repeat }) => {
     if (lock.current) return;
@@ -336,7 +333,6 @@ function ChannelForm({
           </SettingsRow>
         </SettingsSection>
       ) : null}
-      {/* The host refuses these for an archived channel. */}
       {!create && channel && !channel.archived && contextActionsSupported ? (
         <ChannelContextActions
           serverId={serverId}
@@ -352,7 +348,6 @@ function ChannelForm({
           {canManage ? (
             <SettingsRow
               leading={<RowIcon icon={Trash2} tone="danger" />}
-              // The host refuses to delete a channel while a task runs there: the user stops it first.
               disabled={disabled || dirty || (channel?.activeTasks ?? 0) > 0}
               disclosure={false}
               onPress={() => {

@@ -25,10 +25,6 @@ const WINK_OPEN_DURATION_MS = WINK_DURATION_MS - WINK_CLOSE_DURATION_MS - WINK_H
 const WINK_RIGHT_REACTION_DURATION_MS = 173;
 const WINK_RIGHT_RECOVERY_DURATION_MS = WINK_DURATION_MS - WINK_RIGHT_REACTION_DURATION_MS;
 
-/**
- * One blink. A timer starts each one, so the display does not draw frames in the long open time
- * between blinks, as a repeated animation with a delay does.
- */
 function createBlinkAnimation(): number {
   return withSequence(
     ReduceMotion.Never,

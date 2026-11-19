@@ -27,7 +27,6 @@ function digest(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-/** The `ftyp` box that starts an MP4 file. Import does not decode the video, so the header is enough. */
 const video = new Uint8Array([
   0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d, 0x00, 0x00, 0x02, 0x00, 0x69, 0x73, 0x6f,
   0x6d, 0x6d, 0x70, 0x34, 0x31,
@@ -41,7 +40,6 @@ async function run() {
     await Effect.runPromise(files.initialize());
     await mkdir(join(root, "sources"), { recursive: true });
 
-    // The user attaches a video. It is stored unchanged, as a file the chat plays.
     const userVideo = join(root, "sources", "clip.mp4");
     await writeFile(userVideo, video);
     const drafts = await Effect.runPromise(files.prepareDrafts([userVideo], []));
@@ -64,8 +62,6 @@ async function run() {
     assert.deepEqual(await readFile(inbound.path), Buffer.from(video));
     assert.equal(playableMediaKind(inbound.mimeType), "video");
 
-    // A browser or a remote member sends the bytes with its own MIME type. The extension wins, so a
-    // video never becomes an image for the provider or a text preview.
     const uploaderTypes = ["image/png", "text/plain", "application/octet-stream", ""];
     const uploaded = await Effect.runPromise(
       files.prepareDrafts(
@@ -79,7 +75,6 @@ async function run() {
       assert.equal(draft.previewKind, "none");
     }
 
-    // The agent returns a video with attach_files_to_response.
     const agentVideo = join(root, "sources", "render.mp4");
     await writeFile(agentVideo, video);
     const handle = await open(agentVideo, "r");
@@ -92,16 +87,13 @@ async function run() {
     assert.equal(outbound.mimeType, "video/mp4");
     assert.equal(outbound.previewKind, "none");
 
-    // The desktop app opens a video with the default app.
     assert.equal(isOpenableAttachmentName("render.mp4"), true);
     assert.doesNotThrow(() => assertSupportedAttachmentName("render.mp4"));
-    // A remote host with media-attachments but without mp4-attachments does not get MP4 files.
     const oldHost = { eml: true, media: true, zip: true, mp4: false, svg: true, anyFile: false };
     assert.equal(supportedAttachmentExtensions(oldHost).includes("mp4"), false);
     assert.equal(supportedAttachmentExtensions(oldHost).includes("mov"), true);
     assert.equal(isSupportedAttachmentNameFor("clip.mp4", oldHost), false);
     assert.equal(isSupportedAttachmentNameFor("clip.mp4", { ...oldHost, mp4: true }), true);
-    // A protocol 6 peer reads at most 64 capabilities, so the capability is advertised from protocol 7.
     const legacy = legacyTeamCapabilities(TEAM_CURRENT_CAPABILITIES);
     assert.ok(legacy.length <= 64);
     assert.equal(legacy.includes(TEAM_MP4_ATTACHMENTS_CAPABILITY), false);

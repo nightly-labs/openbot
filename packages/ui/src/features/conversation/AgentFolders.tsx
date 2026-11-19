@@ -1,10 +1,3 @@
-/**
- * The folders an agent can change besides its workspace and the shared folder, and the folders in
- * them that it must not change: the Folders row of the settings panel, its page, and the folder half
- * of the chat's drop overlay. With Ask first or Full access the agent can change all files, so the
- * folders apply only in Workspace only.
- */
-
 import {
   AGENT_FOLDER_LIMIT,
   type AgentExclusionChange,
@@ -33,22 +26,14 @@ import { SettingsLinkGroup, SettingsLinkRow } from "@openbot/ui/components/Setti
 import { createSignal, createStore, For, onSettled, Show } from "solid-js";
 import { useText } from "../../text";
 
-/** The calls of the computer that runs the agent. Each change returns the list as it is after it. */
 export interface AgentFolderCalls {
   list: (agentId: string) => Promise<AgentFolderList>;
-  /** Opens the folder picker. With `replace`, the picked folder takes that folder's place. */
   choose: (agentId: string, replace?: string) => Promise<AgentFolderChange>;
   add: (agentId: string, path: string) => Promise<AgentFolderChange>;
   remove: (agentId: string, path: string) => Promise<AgentFolderChange>;
-  /**
-   * Adds a folder dragged from the computer's file manager. Absent when the agent runs on another
-   * computer: a folder of this computer is not on the host.
-   */
   drop?: ((agentId: string, folder: File) => Promise<AgentFolderChange>) | undefined;
-  /** Opens the folder picker for a folder the agent must not change. */
   exclude: (agentId: string) => Promise<AgentExclusionChange>;
   addExclusion: (agentId: string, path: string) => Promise<AgentExclusionChange>;
-  /** The agent can change the excluded folder again. */
   include: (agentId: string, path: string) => Promise<AgentExclusionChange>;
 }
 
@@ -65,10 +50,6 @@ const COVERED_TEXT = {
   "in-folder": "agentSettings.folders.inFolder",
 } as const satisfies Record<AgentFolderCoverageReason, string>;
 
-/**
- * The folders of the dropped items, or null when one of them is a file: the user then attaches the
- * files.
- */
 export function droppedFolders(transfer: DataTransfer | null): File[] | null {
   if (!transfer) return null;
   const folders: File[] = [];
@@ -85,11 +66,6 @@ export function carriesFiles(event: DragEvent): boolean {
   return event.dataTransfer?.types.includes("Files") === true;
 }
 
-/**
- * The folders of one agent and the changes the user makes to them. Each change says its result in a
- * toast; adding and removing can be undone there. A folder the agent can already change makes the row
- * that gives it flash.
- */
 export function createAgentFolders(source: () => AgentFolderSource | undefined) {
   const { t, errorMessage } = useText();
   const [state, setState] = createStore<{ list: AgentFolderList | null; flash: string | null }>({
@@ -97,7 +73,6 @@ export function createAgentFolders(source: () => AgentFolderSource | undefined) 
     flash: null,
   });
   let request = 0;
-  /** The agent the list belongs to. A late answer for the agent shown before is dropped. */
   let shown: string | undefined;
 
   function setList(agentId: string, list: AgentFolderList): void {
@@ -111,7 +86,6 @@ export function createAgentFolders(source: () => AgentFolderSource | undefined) 
     setState((current) => {
       current.flash = null;
     });
-    // The next frame sets it again, so the row flashes on each try.
     requestAnimationFrame(() =>
       setState((current) => {
         current.flash = path;
@@ -146,7 +120,6 @@ export function createAgentFolders(source: () => AgentFolderSource | undefined) 
     const folder = agentFolderName(change.path);
     switch (change.outcome) {
       case "excluded": {
-        // A folder that holds folders already excluded took their place: Undo gives them back.
         const { replaced } = change;
         const undo = async (): Promise<AgentExclusionChange> => {
           const included = await calls.include(agentId, change.path);
@@ -192,12 +165,10 @@ export function createAgentFolders(source: () => AgentFolderSource | undefined) 
     if (change.outcome === "cancelled") return;
     const folder = agentFolderName(change.path);
     switch (change.outcome) {
-      // Undo cannot give back the folder that Locate replaced: it is no longer on the disk.
       case "replaced":
         toast.success(t("agentSettings.folders.toastAdded", { agent, folder }));
         return;
       case "added": {
-        // A folder that holds folders already added took their place: Undo gives them back.
         const { replaced } = change;
         const undo = async (): Promise<AgentFolderChange> => {
           const removed = await calls.remove(agentId, change.path);
@@ -252,10 +223,6 @@ export function createAgentFolders(source: () => AgentFolderSource | undefined) 
 
   return {
     state,
-    /**
-     * Reads the list of `current`, also to see which folders are no longer on the disk. The caller
-     * reads `current` in an effect's compute function, where props are tracked.
-     */
     load(current: AgentFolderSource | undefined): void {
       const id = ++request;
       if (shown !== current?.agentId) {
@@ -276,9 +243,7 @@ export function createAgentFolders(source: () => AgentFolderSource | undefined) 
     remove: (path: string) => act(({ agentId, calls }) => calls.remove(agentId, path)),
     exclude: () => actExclusion(({ agentId, calls }) => calls.exclude(agentId)),
     include: (path: string) => actExclusion(({ agentId, calls }) => calls.include(agentId, path)),
-    /** The agent's computer takes a folder dropped from this computer. */
     canDrop: (): boolean => source()?.calls.drop !== undefined,
-    /** One folder at a time, so each toast names its folder and the list ends with all of them. */
     async drop(folders: readonly File[]): Promise<void> {
       for (const folder of folders)
         await act(async ({ agentId, calls }) =>
@@ -295,7 +260,6 @@ export function createAgentFolders(source: () => AgentFolderSource | undefined) 
 
 export type AgentFolders = ReturnType<typeof createAgentFolders>;
 
-/** Drag handlers for a place that takes a dropped folder, with the state that shows it. */
 function createFolderDropTarget(onDrop: (folders: readonly File[]) => void, enabled: () => boolean = () => true) {
   const [over, setOver] = createSignal(false);
   const takes = (event: DragEvent) => enabled() && carriesFiles(event);
@@ -308,7 +272,6 @@ function createFolderDropTarget(onDrop: (folders: readonly File[]) => void, enab
       onDragOver: (event: DragEvent) => {
         if (!takes(event)) return;
         event.preventDefault();
-        // The chat under the panel does not attach what the user drops here.
         event.stopPropagation();
       },
       onDragLeave: (event: DragEvent) => {
@@ -330,13 +293,8 @@ function createFolderDropTarget(onDrop: (folders: readonly File[]) => void, enab
   };
 }
 
-/**
- * The Folders row of the panel's first page. The + opens the folder picker; the rest of the row opens
- * the Folders page. A button cannot hold a button, so the + sits over an empty slot in the row.
- */
 export function AgentFoldersRow(props: {
   folders: AgentFolders;
-  /** The access label when the agent can change all files, such as "Full access". */
   wideAccess: string | null;
   onOpen: () => void;
   ref?: (element: HTMLButtonElement) => void;
@@ -398,17 +356,11 @@ export function AgentFoldersRow(props: {
   );
 }
 
-/**
- * One folder: name, where it is under it, and its actions. A named row (Workspace, Shared folder)
- * shows its full path. `fresh` marks a row the user just added.
- */
 function FolderRow(props: {
   name?: string;
   path: string;
   fresh?: boolean;
-  /** The folder is no longer at its path. */
   missing?: boolean;
-  /** The user tried to add this folder, or a folder in it, again. */
   flash?: boolean;
   onFlashEnd?: () => void;
   onLocate?: () => void;
@@ -464,7 +416,6 @@ function FolderRow(props: {
   );
 }
 
-/** One folder the agent must not change, and where it is. */
 function ExclusionRow(props: {
   path: string;
   place: string | null;
@@ -510,24 +461,16 @@ function ExclusionRow(props: {
   );
 }
 
-/** The Folders page of the settings panel. */
 export function AgentFoldersPage(props: {
   folders: AgentFolders;
   agentName: string;
-  /** The access label when the agent can change all files, such as "Full access". */
   wideAccess: string | null;
-  /** The label of the level the folders apply in. */
   workspaceAccess: string;
-  /**
-   * Whether to show the excluded folders. Only Workspace only blocks them, so they show there or
-   * under the wide-access note that says so.
-   */
   showExclusions: boolean;
   onChangeAccess: () => void;
 }) {
   const { t } = useText();
   const drop = createFolderDropTarget((folders) => void props.folders.drop(folders), props.folders.canDrop);
-  // The rows that are there when the page opens do not animate in; a folder added later does.
   let opened = false;
   onSettled(() => {
     opened = true;
@@ -651,16 +594,11 @@ export function AgentFoldersPage(props: {
   );
 }
 
-/**
- * The chat's drop overlay in two halves: the files half attaches what is dropped, as the chat's own
- * overlay does; the folder half adds the dropped folders. A file dropped on the folder half attaches.
- */
 export function AgentFolderDropOverlay(props: {
   agentName: string;
   onDropFolders: (folders: readonly File[]) => void;
 }) {
   const { t } = useText();
-  // The chat and the desktop's file import do not see a folder dropped here.
   const drop = createFolderDropTarget((folders) => props.onDropFolders(folders));
   return (
     <div class="agent-folders-chat-drop">

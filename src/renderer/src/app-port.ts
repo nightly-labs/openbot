@@ -1,10 +1,6 @@
 import type { OpenBotDesktopApi } from "@openbot/contracts/ipc";
 import type { CompanySignInCalls } from "./features/servers/ServerCompanySignInSection";
 
-/**
- * What the app shell and the cross-domain root modules reach in main, plus the shell actions
- * (`openUrl`, `openExternal`) that several domains share.
- */
 export interface AppPort {
   getAppInfo: OpenBotDesktopApi["getAppInfo"];
   getAppAppearancePreference: OpenBotDesktopApi["getAppAppearancePreference"];
@@ -47,7 +43,6 @@ export interface AppPort {
   servers: Pick<OpenBotDesktopApi["servers"], "onInvite" | "takePendingInvite">;
 }
 
-/** Read on each call: tests and stories replace `window.openbot` per case. */
 export function appPort(): AppPort {
   return window.openbot;
 }

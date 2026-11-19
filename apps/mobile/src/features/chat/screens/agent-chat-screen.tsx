@@ -21,7 +21,6 @@ export function AgentChatScreen() {
   const { t } = useText();
   const leaveChat = useLeaveChat();
 
-  // `focusAt` changes when a pinned message opens again, so the chat goes to it again.
   const { agentId, messageId, focusAt } = useLocalSearchParams<{
     agentId: string;
     messageId?: string;
@@ -31,14 +30,11 @@ export function AgentChatScreen() {
   const insets = useSafeAreaInsets();
   const resolvedAgentId = firstParam(agentId);
   const resolvedMessageId = firstParam(messageId);
-  // Only this agent: a change elsewhere in the workspace does not render the whole chat again. The
-  // chat does not show the agent's latest message preview, so a new message keeps the same agent.
   const agent = useMobileWorkspaceSelector(
     (current) => current.agents.find((candidate) => candidate.id === resolvedAgentId),
     sameChatAgent,
   );
   const openedAgentId = agent?.id;
-  // The app icon offers the chats that the user opened last.
   useFocusEffect(
     useCallback(() => {
       if (openedAgentId) noteChatOpened(openedAgentId);
@@ -48,7 +44,6 @@ export function AgentChatScreen() {
   if (agent) {
     return (
       <MobileChatView
-        // A new message, such as the source of a branch, opens the chat again at that message.
         key={`${agent.serverId}:${agent.id}:${resolvedMessageId ?? ""}:${focusAt ?? ""}`}
         agent={agent}
         focusMessageId={resolvedMessageId || undefined}

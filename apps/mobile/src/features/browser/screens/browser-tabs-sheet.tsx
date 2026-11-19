@@ -28,10 +28,6 @@ import { browserAddressUrl, browserTabHost, browserTabTitle } from "../model/bro
 
 const COPIED_MS = 1_500;
 
-/**
- * The sheet of the browser's tab button: the address of the tab on screen with its page actions,
- * and the agent's tabs. The browser screen under it does the work.
- */
 export function BrowserTabsSheet() {
   const { agentId, serverId } = useLocalSearchParams<{ agentId: string; serverId: string }>();
   const { t } = useText();
@@ -54,7 +50,6 @@ export function BrowserTabsSheet() {
     return () => clearTimeout(timer);
   }, [copied]);
 
-  /** Runs an action on the browser screen. A page action closes the sheet, so the page shows. */
   const run = (action: (screen: NonNullable<typeof controls>) => void, close = true) => {
     const screen = latestBrowserSheetControls(serverId, agentId);
     if (!screen) return;
@@ -86,7 +81,6 @@ export function BrowserTabsSheet() {
     run((screen) => screen.loadUrl(browserAddressUrl(text)));
   };
 
-  // A page address shows only its site, as the tab list does. The full address is there to edit.
   const shownAddress = tab ? browserTabHost(tab) || tab.url : "";
 
   return (
@@ -139,7 +133,6 @@ export function BrowserTabsSheet() {
             const url = tab?.url ?? "";
             setDraft(url);
             setEditing(true);
-            // The field shows the site until it has focus, so the whole address is selected after it shows.
             requestAnimationFrame(() => addressField.current?.setSelection(0, url.length));
           }}
           onBlur={() => setEditing(false)}

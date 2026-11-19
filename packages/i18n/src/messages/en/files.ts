@@ -144,7 +144,6 @@ export const messages = defineMessages("files", {
   "files.storage.updateServer": "Update OpenBot on this server to see its storage.",
   "files.storage.openFailed": "Could not open “{name}”",
   "files.storage.tryAgain": "Try again.",
-  // The machine part of Server settings > Storage: disk, memory and CPU of the computer that runs the server.
   "files.machine.title": "Machine",
   "files.machine.updates": "Updates every minute",
   "files.machine.disk": "Disk",

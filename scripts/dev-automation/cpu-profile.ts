@@ -1,13 +1,3 @@
-// Collects the samples `cpu-sampling.ts` does the arithmetic on. Everything
-// impure lives here: the CDP calls and the one `ps` invocation.
-//
-// Two sources, on purpose. CDP knows which Chromium process is which without
-// parsing a command line, and it is the only one that works when `ps` does not.
-// `ps` is the cross-check: it is the operating system's own accounting, so when
-// the two disagree the number in the report is not to be trusted. Neither is
-// dropped, because a profiler nobody can falsify is a profiler nobody should
-// believe.
-
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { Logger } from "@openbot/logging";
@@ -29,11 +19,6 @@ const run = promisify(execFile);
 
 export interface PageMetrics {
   target: string;
-  // Style recalculations and layouts per second of wall clock. Chromium reports
-  // no frame rate here - `Frames` is the document's iframe count, not a rate -
-  // so these two counters are the per-frame proxy. An animation that morphs a
-  // shape every frame drives both; a JS timer that touches no style drives
-  // neither.
   recalcStyleCountPerSecond: number;
   layoutCountPerSecond: number;
   taskMsPerSecond: number;
@@ -45,18 +30,12 @@ export interface PageMetrics {
 export interface CpuProfile extends CpuReport {
   intervalMs: number;
   source: "cdp" | "ps";
-  // The same run measured the other way, when both sources answered. A wide
-  // gap between the two totals means the report is not to be acted on.
   crossCheck: CpuReport | null;
   pages: PageMetrics[];
 }
 
 export interface CpuProfileOptions {
   browser: Browser;
-  // From the instance registry. Null when no record published this port, which
-  // is the one case the `ps` cross-check cannot run: without a pid to anchor
-  // on, the only way to find the tree is by name, and a name matches another
-  // worktree's dev app too.
   rootPid: number | null;
   durationMs: number;
   intervalMs: number;
@@ -64,12 +43,6 @@ export interface CpuProfileOptions {
   logger: Logger;
 }
 
-// CDP names the browser process "browser"; in Electron that process is main.
-// The other names are taken from what this Electron build actually reports, not
-// from the protocol document: the GPU process answers "GPU" in capitals, and a
-// utility process answers its Mojo service name rather than "utility". An
-// unlisted name falls through to "other", which is why the `ps` cross-check is
-// kept - it names the same process independently.
 const CDP_PROCESS_TYPES = new Map<string, ChromiumProcessType>([
   ["browser", "main"],
   ["renderer", "renderer"],
@@ -103,7 +76,6 @@ const METRIC_NAMES = [
   "RecalcStyleDuration",
   "LayoutDuration",
 ] as const;
-// The two counts are plain event counts; the four durations are seconds.
 const COUNT_METRICS: ReadonlySet<MetricName> = new Set(["RecalcStyleCount", "LayoutCount"]);
 type MetricName = (typeof METRIC_NAMES)[number];
 type MetricReading = Partial<Record<MetricName | "Timestamp", number>>;
@@ -120,10 +92,6 @@ async function readMetrics(session: CDPSession): Promise<MetricReading> {
   return reading;
 }
 
-// Chromium reports the durations in seconds, and the report is in milliseconds
-// per second of wall clock - "how much of each second this page spent here". A
-// missing counter reads as no work rather than as a gap, which is the right
-// default: every one of them is absent only when it never ran.
 function perSecond(before: MetricReading, after: MetricReading, name: MetricName, spanSeconds: number): number {
   const delta = (after[name] ?? 0) - (before[name] ?? 0);
   if (delta <= 0 || spanSeconds <= 0) return 0;
@@ -145,8 +113,6 @@ async function openPageProbes(pages: Page[], logger: Logger): Promise<PageProbe[
       await session.send("Performance.enable");
       probes.push({ target, session, before: await readMetrics(session) });
     } catch {
-      // A page that closes or navigates while we attach is not one this run can
-      // report on, and it must not take the whole measurement down with it.
       logger.warn(`could not attach a performance probe to ${target}`);
     }
   }
@@ -171,9 +137,7 @@ async function closePageProbes(probes: PageProbe[], wallMs: number): Promise<Pag
         recalcStyleMsPerSecond: perSecond(probe.before, after, "RecalcStyleDuration", spanSeconds),
         layoutMsPerSecond: perSecond(probe.before, after, "LayoutDuration", spanSeconds),
       });
-    } catch {
-      // The page went away mid-run. The process-level numbers still stand.
-    }
+    } catch {}
     await probe.session.send("Performance.disable").catch(() => undefined);
     await probe.session.detach().catch(() => undefined);
   }
@@ -196,8 +160,6 @@ export async function profileCpu(options: CpuProfileOptions): Promise<CpuProfile
   if (psFailed) logger.warn("no registry record published a pid, so the ps cross-check is skipped.");
   const startedAt = Date.now();
   try {
-    // A sample before the first wait and one after the last, so the span the
-    // arithmetic divides by is the span that was actually observed.
     for (;;) {
       const atMs = Date.now();
       if (!cdpFailed) {
@@ -255,7 +217,6 @@ export interface CpuComparison {
   processes: { type: ChromiumProcessType; cpuPercent: number }[];
 }
 
-/** The signed change from one report to another. Negative is an improvement. */
 export function compareProfiles(before: CpuReport, after: CpuReport): CpuComparison {
   const baseline = new Map(before.processes.map((process) => [process.type, process.cpuPercent]));
   const types = new Set([...baseline.keys(), ...after.processes.map((process) => process.type)]);

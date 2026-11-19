@@ -46,7 +46,6 @@ function NewMenu(props: { crm: CrmViewModel }) {
   );
 }
 
-/** The CRM page: the customer and payment sheets, the drawer that slides over them, and the forms. */
 export function CrmView(props: CrmViewProps) {
   const { t, format } = useText();
   const crm = createCrmView(props);
@@ -60,7 +59,6 @@ export function CrmView(props: CrmViewProps) {
   );
   const late = createMemo(() => crm.data().open.filter((payment) => payState(payment, crm.today()) === "late").length);
 
-  // The drawer keeps its last panel while it slides out.
   const drawerOpen = () => crm.selected() !== null || crm.view.agents;
   let lastKind: "customer" | "agents" = "customer";
   let lastCustomer: CrmCustomer | undefined;
@@ -119,7 +117,6 @@ export function CrmView(props: CrmViewProps) {
               })
             }
           />
-          {/* The CRM can be in the More menu, which has no right-click menu, so the page opens its connectors too. */}
           <IconButton
             variant="ghost"
             label={t("crm.connectors.title")}
@@ -141,7 +138,6 @@ export function CrmView(props: CrmViewProps) {
           </SlidingTabs.Content>
         </SlidingTabs.ContentSlot>
         <div class="crm-drawer" data-open={drawerOpen() ? "" : undefined} inert={drawerOpen() ? undefined : true}>
-          {/* A new read of the host gives a new customer object; the panel stays, so it keeps its scroll position. */}
           <Show when={drawerCustomerId()} keyed>
             {(id) => (
               <Show when={drawerCustomer()?.id === id ? drawerCustomer() : undefined}>

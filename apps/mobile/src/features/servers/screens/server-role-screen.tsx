@@ -24,19 +24,10 @@ import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { useText } from "@/shared/lib/text";
 import { useDiscardGuard } from "@/shared/lib/use-discard-guard";
 
-/** The access that a member of a role gets to an agent: the higher level of the role and of Everyone. */
 function memberLevel(role: AgentAccessLevel, everyone: AgentAccessLevel): AgentAccessLevel {
   return agentAccessRank(everyone) >= agentAccessRank(role) ? everyone : role;
 }
 
-/**
- * Server sheet > Server settings > Roles > one role, or Everyone: the access that it gives to each agent.
- * Each level saves at once. A role also has its name, which saves with the header action, and Delete.
- *
- * A role only adds access. On a role page each row shows the access that a member of the role gets:
- * when Everyone gives the level, the row shows "· Everyone", the lower levels are off, and the last
- * item opens Everyone. A role keeps no level that Everyone already gives.
- */
 export function ServerRoleScreen() {
   const { t, errorMessage } = useText();
   const { theme } = useUniwind();
@@ -55,7 +46,6 @@ export function ServerRoleScreen() {
   const name = draftName ?? role?.name ?? "";
   const trimmed = name.trim();
   const dirty = Boolean(role) && draftName !== undefined && trimmed !== role?.name;
-  /** True after Delete: the page leaves without the question about the name. */
   const leaving = useRef(false);
 
   useDiscardGuard(dirty, { leaving: () => leaving.current, warn: true });
@@ -77,20 +67,12 @@ export function ServerRoleScreen() {
 
   const title = role ? role.name : t("mobile.server.roles.everyone");
   const everyoneName = t("mobile.server.roles.everyone");
-  /** The level that this page stores. */
   const level = (agentId: string) => (role ? roleLevel(role, agentId) : everyoneLevel(everyone, agentId));
-  /** On a role page: the level that Everyone gives. */
   const floor = (agentId: string) => (role ? everyoneLevel(everyone, agentId) : undefined);
-  /** The access that a member of this page gets. */
   const shown = (agentId: string) => {
     const base = floor(agentId);
     return base === undefined ? level(agentId) : memberLevel(level(agentId), base);
   };
-  /**
-   * Gives `next` to each agent of `agentIds`, in one save. A role stores "none" where Everyone gives
-   * the level already. Else the level stays out of sight, and members still get it after Everyone
-   * gives less.
-   */
   const give = (agentIds: readonly string[], next: AgentAccessLevel) => {
     const levels = new Map<string, AgentAccessLevel>();
     for (const agentId of agentIds) {

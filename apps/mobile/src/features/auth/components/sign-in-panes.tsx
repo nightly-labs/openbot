@@ -33,19 +33,16 @@ import { haptics } from "@/shared/lib/haptics";
 import { SPLASH_EASE_IN_OUT } from "@/shared/lib/splash-motion";
 import { useText } from "@/shared/lib/text";
 
-// A label change is a quiet fade: the old label leaves, and the new one comes as it is nearly gone.
 const LABEL_OUT = FadeOut.duration(120).easing(SIGN_IN_TEXT_EASE);
 const LABEL_IN = FadeIn.duration(180).delay(100).easing(SIGN_IN_TEXT_EASE);
 const MESSAGE_HEIGHT = 20;
 
-/** How the elements of a pane come in. Without it, nothing animates: the copy that measures. */
 export interface PaneMotion {
   from: PaneDirection;
   startMs: number;
   reduced: boolean;
 }
 
-/** One element of a pane. The elements come in one after another. */
 function PaneItem({
   index,
   motion,
@@ -67,7 +64,6 @@ function PaneItem({
   );
 }
 
-/** A full-width sign-in button. The lilac one is the main action; the gray one the other choice. */
 function SignInButton({
   label,
   labelKey = label,
@@ -79,14 +75,11 @@ function SignInButton({
   reduced,
 }: {
   label: string;
-  /** The label fades to the new one when this changes. A countdown keeps one key. */
   labelKey?: string;
   brand: boolean;
   icon?: LucideIcon;
   onPress: () => void;
-  /** Shows a spinner and ignores presses. */
   busy?: boolean;
-  /** Ignores presses and dims the label, such as during a countdown. */
   waiting?: boolean;
   reduced: boolean;
 }) {
@@ -130,7 +123,6 @@ function SignInButton({
   );
 }
 
-/** A quiet text action, such as "Change email". */
 function TextAction({
   label,
   labelKey = label,
@@ -168,7 +160,6 @@ function TextAction({
   );
 }
 
-/** One line under a field: an error, a notice, or the verification state. */
 function PaneMessage({
   message,
   spinner,
@@ -204,7 +195,6 @@ function PaneMessage({
   );
 }
 
-/** Opens the help with the block: the pane and the block move up by the height of the help. */
 function HelpToggle({
   open,
   onToggle,
@@ -220,7 +210,6 @@ function HelpToggle({
   const colors = useSignInColors();
   const shown = useSharedValue(open ? 1 : 0);
   useEffect(() => {
-    // The steps fade in once the pane has started to rise, and leave at once.
     shown.set(
       reduced
         ? withTiming(open ? 1 : 0, { duration: 160 })
@@ -274,10 +263,6 @@ function HelpToggle({
   );
 }
 
-/**
- * The sign-in choices under the block. The help lies below the pane and the pane rises to show
- * it, so opening the help changes no layout: only the pane and the block move.
- */
 export function OptionsPane({
   motion,
   notice,
@@ -293,7 +278,6 @@ export function OptionsPane({
   motion: PaneMotion | null;
   notice?: ReactNode;
   helpOpen: boolean;
-  /** How far the pane rises for the open help. */
   helpShift: SharedValue<number>;
   onToggleHelp: () => void;
   onScan: () => void;
@@ -330,7 +314,6 @@ export function OptionsPane({
   );
 }
 
-/** The email step: the field, the send button and a way to the scanner. */
 export function EmailPane({
   signIn,
   motion,
@@ -373,7 +356,6 @@ export function EmailPane({
           : deliveryUnconfirmed
             ? "check"
             : "send";
-  // Only the field that the issue is about shakes.
   const inviteRejected = signIn.emailIssue?.code === "invalid_invite_code";
   const message = signIn.emailIssue
     ? { key: `email-${signIn.rejection}`, text: signIn.emailIssue.message, color: colors.danger }
@@ -444,7 +426,6 @@ export function EmailPane({
   );
 }
 
-/** The code step: eight slots, their state, a resend and a way back to the address. */
 export function CodePane({
   signIn,
   motion,
@@ -461,13 +442,11 @@ export function CodePane({
   const { t } = useText();
   const colors = useSignInColors();
   const { resendIn, resending, needsNewCode } = signIn;
-  // The slots rise in after the text above them.
   const slotMotion = (() => {
     const base = signInMotion(reduced);
     const start = motion.startMs + 2 * PANE_STAGGER_MS;
     return { ...base, enter: (delay = 0) => base.enter(reduced ? delay : start + delay) };
   })();
-  // A failure that is not about the code itself, such as no network, keeps the code for a retry.
   const canRetry = Boolean(
     signIn.codeIssue && !signIn.codeRejected && !needsNewCode && signIn.code.length === ONE_TIME_CODE_LENGTH,
   );
@@ -549,5 +528,4 @@ export function CodePane({
   );
 }
 
-/** The help rises with the block's own move. */
 export const HELP_MOVE = { duration: BLOUB_MOVE_MS, easing: SPLASH_EASE_IN_OUT };

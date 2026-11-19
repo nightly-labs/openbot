@@ -2,7 +2,6 @@ import { type RemoteHostKeyStore, remoteHostFingerprint } from "@openbot/team-cl
 import { accountScope } from "@/shared/lib/account-scope";
 import * as LockedKeychain from "@/shared/lib/locked-keychain";
 
-/** The keys are in the keychain that a locked phone can read (`locked-keychain.ts`). */
 export function trustedHostKeys(apiUrl: string, userId: string): RemoteHostKeyStore {
   const scope = accountScope(apiUrl, userId);
   const key = (hostId: string) => `openbot.host-key.v1.${scope}.${remoteHostFingerprint(hostId)}`;

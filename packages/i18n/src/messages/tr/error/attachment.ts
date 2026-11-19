@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/attachment";
 
 export const messages = {
-  // Ek ve dosya önizleme hataları.
   "error.attachment.notFound": "Ek bulunamadı.",
   "error.attachment.fileTooLarge": "Bir dosya 100 MB sınırını aşıyor.",
   "error.attachment.namedFileTooLarge": "{name} 100 MB sınırını aşıyor.",

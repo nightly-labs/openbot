@@ -1,7 +1,6 @@
 import type { AgentTask, ConversationMessage, ConversationSnapshot, QueueDelivery } from "@openbot/contracts/ipc";
 import type { MockOpenBotOptions } from "../src/preview/mock-openbot";
 
-/** Side threads of Chief for the desktop and web thread stories. */
 export const AGENT_ID = "chief";
 export const TABS_KEY = "openbot:thread-tabs:v1";
 
@@ -32,7 +31,6 @@ function thread(id: string, title: string, updatedAt: string, fields: Partial<Ag
 
 const PRICING = thread("pricing", "Pricing page copy", "2026-08-19T09:58:00.000Z");
 
-/** A branch of "Pricing page copy" through its headline answer. The menu nests it under its source. */
 const PRICING_SHORT = thread("pricing-short", "Pricing page copy #2", "2026-08-19T10:04:00.000Z", {
   branch: {
     sourceTaskId: PRICING.id,
@@ -42,7 +40,6 @@ const PRICING_SHORT = thread("pricing-short", "Pricing page copy #2", "2026-08-1
   },
 });
 
-/** A branch whose source thread was deleted. Its divider has no link. */
 const PRICING_ORPHAN = thread("pricing-orphan", "Pricing FAQ", "2026-08-19T08:20:00.000Z", {
   branch: {
     sourceTaskId: "deleted-thread",
@@ -63,7 +60,6 @@ const THREADS: AgentTask[] = [
       throughMessageId: "pricing-long-2",
     },
   }),
-  // A branch of a branch: the line of "#2" runs on past it to "#3".
   thread("pricing-short-alt", "Pricing page copy #4", "2026-08-19T10:06:00.000Z", {
     branch: {
       sourceTaskId: PRICING_SHORT.id,
@@ -104,7 +100,6 @@ function snapshot(task: AgentTask, messages: ConversationMessage[]): Conversatio
 
 export const THREAD_OPTIONS: MockOpenBotOptions = {
   tasks: { [AGENT_ID]: THREADS },
-  // The open thread shows its context meter, with the Compact action.
   runtimeSnapshot: {
     threadContextStates: [
       {
@@ -200,10 +195,6 @@ function queued(id: string, position: number, text: string): QueueDelivery {
   };
 }
 
-/**
- * "Competitor scan" works, and two messages wait in its queue. Reply to a message of the thread to see
- * the reply card under the queue.
- */
 export const THREAD_QUEUE_OPTIONS: MockOpenBotOptions = {
   ...THREAD_OPTIONS,
   tasks: {
@@ -240,10 +231,6 @@ export const THREAD_QUEUE_OPTIONS: MockOpenBotOptions = {
 
 const COMPETITORS_DONE = thread("competitors", "Competitor scan", "2026-08-19T10:07:00.000Z");
 
-/**
- * Chief has unread agent messages in three side threads. "Competitor scan" has finished, so Chief does
- * not work and the sidebar shows the unread count. "Pricing FAQ" has no tab: only the menu shows its dot.
- */
 export const UNREAD_OPTIONS: MockOpenBotOptions = {
   ...THREAD_OPTIONS,
   tasks: { [AGENT_ID]: THREADS.map((task) => (task.id === COMPETITORS_DONE.id ? COMPETITORS_DONE : task)) },

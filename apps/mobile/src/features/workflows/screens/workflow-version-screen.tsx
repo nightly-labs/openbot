@@ -24,10 +24,6 @@ import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 
-/**
- * Drawer > Workflows > a workflow > Version history > a version: its steps, read-only, and Make
- * current. The host keeps the workflow before the restore as a version, so a restore can be undone.
- */
 export function WorkflowVersionScreen() {
   const { t, format, errorMessage } = useText();
   const { serverId, workflowId, versionId } = useLocalSearchParams<{

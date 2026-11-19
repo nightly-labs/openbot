@@ -1,18 +1,3 @@
-// Frozen optional sidebar-pins-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: any signed-in member reads
-// and replaces, for themselves only, the ordered list of agents and channels that they pinned on this
-// server. `kind` is "agent" or "channel"; a list holds each pin once and at most 1000 pins. `updatedAt`
-// is the ISO time of the last saved list, or null when the member never saved one. `set` replaces the
-// list. `seed` saves the list only when the member has none yet, and otherwise changes nothing; both
-// answer with the list that the host keeps. The host keeps the list of each member on its own
-// computer, keeps the owner's list for the desktop app of that computer too, and forgets the list of
-// a removed member. A pin can name an agent or a channel that is gone; each client leaves it out and
-// may save the list without it. The read leaves out the agents that the member cannot see, and a save
-// keeps them. A member cannot read or set the list of
-// another member. After each change, the host sends `sidebar-pins-changed` with the whole list to each
-// connection of that member that advertises this capability, and to no other member. The list holds
-// ids only. Widening any of it needs a second capability string.
 import { isDynamicRecord } from "../runtime-values";
 import {
   type AdminDecoder,
@@ -61,7 +46,6 @@ export type SidebarPinsEvent = {
   updatedAt: string | null;
 };
 
-/** The pins event in `input`, or null for another event. A malformed pins event throws. */
 export function sidebarPinsEvent(input: unknown): SidebarPinsEvent | null {
   if (!isDynamicRecord(input) || input.type !== "sidebar-pins-changed") return null;
   const decoded = snapshot({ items: input.items, updatedAt: input.updatedAt });

@@ -13,7 +13,6 @@ export function RoutineTimePicker({
   onChange,
 }: {
   time: string;
-  /** The row label. Defaults to "Time". */
   label?: string;
   disabled: boolean;
   onChange: (time: string) => void;
@@ -25,12 +24,7 @@ export function RoutineTimePicker({
   return (
     <SettingsRow
       trailing={
-        <Host
-          matchContents
-          colorScheme={theme === "dark" ? "dark" : "light"}
-          // Match the trailing inset of the native menu picker arrows.
-          style={{ marginRight: 12 }}
-        >
+        <Host matchContents colorScheme={theme === "dark" ? "dark" : "light"} style={{ marginRight: 12 }}>
           <DatePicker
             title={title}
             selection={new Date(2000, 0, 1, hour, minute)}

@@ -31,11 +31,6 @@ export function isAttachmentSummary(value: unknown): value is AttachmentSummary 
   );
 }
 
-/**
- * Whether a surface can show the attachment itself, instead of opening it in another application.
- * Audio, video, and XLSX keep `previewKind: "none"` on the wire, because the released Team API
- * validators accept only image, pdf, text, and none. Their MIME types carry the local preview kind.
- */
 export function canPreviewAttachment(attachment: AttachmentSummary): boolean {
   return (
     attachment.previewKind !== "none" ||
@@ -59,27 +54,20 @@ export interface AttachmentDataInput {
 export interface ImportAttachmentsInput {
   paths: string[];
   data: AttachmentDataInput[];
-  /** The import that main names in its `importProgress` events. */
   requestId?: string;
 }
 
-/** A file of an import. The composer shows it before the file reaches the server. */
 export interface AttachmentImportFile {
   name: string;
   size: number;
 }
 
-/**
- * The life of one import. A retry of a failed import starts again with the same `requestId`.
- * `progress` comes only from an upload to a joined server that reports its bytes.
- */
 export type AttachmentImportEvent =
   | { type: "started"; requestId: string; serverId: string; files: AttachmentImportFile[] }
   | { type: "progress"; requestId: string; serverId: string; sent: number; total: number }
   | { type: "completed"; requestId: string; serverId: string; attachments: DraftAttachment[] }
   | { type: "error"; requestId: string; serverId: string; message: string };
 
-/** The bytes of an import that main sends to a joined server, as the host confirms them. */
 export interface AttachmentImportProgress {
   serverId: string;
   requestId: string;
@@ -94,11 +82,9 @@ export interface DownloadAttachmentsInput {
 export interface OpenAttachmentInput {
   attachmentId: string;
   action: "open" | "reveal" | "download";
-  /** The size that the message names. With it, a download from a joined server reports its bytes. */
   size?: number;
 }
 
-/** The bytes of an attachment that main downloads from a joined server for an open or a save. */
 export interface AttachmentDownloadProgress {
   serverId: string;
   attachmentId: string;
@@ -106,7 +92,6 @@ export interface AttachmentDownloadProgress {
   total: number;
 }
 
-/** What the file view does with a shared or workspace file. Absent means `open`. */
 export type FileAction = "open" | "reveal" | "download";
 
 export interface OpenSharedFileInput {
@@ -120,37 +105,29 @@ export interface OpenWorkspaceFileInput {
   action?: FileAction;
 }
 
-/** A preview reads no file over `maxBytes`: it answers with no bytes, as for a file over the preview limit. */
 export interface PreviewSharedFileInput extends OpenSharedFileInput {
   maxBytes?: number;
 }
 
 export interface PreviewWorkspaceFileInput extends OpenWorkspaceFileInput {
   maxBytes?: number;
-  /** Reads only the path as written. A missing file is not replaced by a file with the same name from the thread's tool history. */
   exactPath?: boolean;
 }
 
-/** The most entries one folder view shows. The rest are counted by `truncated`. */
 export const WORKSPACE_DIRECTORY_LIMIT = 500;
 
 export interface WorkspaceDirectoryEntry {
   name: string;
-  /** A path the workspace file and folder requests accept again. */
   path: string;
   kind: "file" | "directory";
-  /** Bytes for a file, 0 for a folder. */
   size: number;
-  /** Milliseconds since the epoch. */
   modifiedAt: number;
 }
 
 export interface WorkspaceDirectory {
   name: string;
   path: string;
-  /** The agent's workspace root, as the agent summary names it. */
   root: string;
-  /** The folder above, or null at the workspace root. */
   parentPath: string | null;
   entries: WorkspaceDirectoryEntry[];
   truncated: boolean;
@@ -169,7 +146,6 @@ function isWorkspaceDirectoryEntry(value: unknown): value is WorkspaceDirectoryE
   );
 }
 
-/** The folder a host or the main process answers, checked where it enters the renderer or the client. */
 export function isWorkspaceDirectory(value: unknown): value is WorkspaceDirectory {
   return (
     isDynamicRecord(value) &&
@@ -184,12 +160,8 @@ export function isWorkspaceDirectory(value: unknown): value is WorkspaceDirector
   );
 }
 
-/** The same check at the preload and the remote host client: the shape has one producer. */
 export const decodeWorkspaceDirectory = guardedDecoder(isWorkspaceDirectory, "workspace directory");
 
-// Wider than AttachmentPreviewKind on purpose: FilePreview never crosses the Team API, so it can
-// gain kinds that the frozen v1-v4 attachment validators would reject. The preload boundary decodes
-// against this list, so a new kind must be added here to reach the renderer.
 export const FILE_PREVIEW_KINDS = [
   "markdown",
   "text",
@@ -213,7 +185,6 @@ export interface FilePreview {
   mimeType: string;
   previewKind: FilePreviewKind;
   bytes: Uint8Array | null;
-  /** Temporary HTML page on this client. Never a workspace path or a Team API field. */
   pageUrl?: string;
 }
 
@@ -224,11 +195,6 @@ export function isFilePreviewPageUrl(value: unknown): value is string {
   );
 }
 
-/**
- * The preview kind a file gets from its name and MIME type. Both sides of the IPC boundary read it:
- * `src/main/file-preview.ts` for a file it reads from disk, and the renderer for an attachment it
- * fetches through `previewUrl`. One function keeps the two from drifting apart.
- */
 export function filePreviewKindForFile(name: string, mimeType: string): FilePreviewKind {
   if (/\.(md|markdown)$/iu.test(name)) return "markdown";
   if (mimeType.startsWith("image/")) return "image";
@@ -236,7 +202,6 @@ export function filePreviewKindForFile(name: string, mimeType: string): FilePrev
   if (isXlsxMimeType(mimeType)) return "spreadsheet";
   const media = playableMediaKind(mimeType);
   if (media) return media;
-  // An email is RFC 822 text. The panel shows the headers and the body without a parser.
   if (mimeType.startsWith("text/") || mimeType === "application/json" || mimeType === "message/rfc822") return "text";
   return "none";
 }

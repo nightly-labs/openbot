@@ -22,7 +22,6 @@ const MARGIN = 16;
 const MAX_SCALE = 5;
 const SETTLE_SPRING = { damping: 34, stiffness: 320, mass: 1 } as const;
 
-/** Move and scale a picked photo inside the avatar's shape, as the avatar will show it. */
 export function AvatarCropScreen() {
   const { t } = useText();
   const [request] = useState(currentAvatarCropRequest);
@@ -32,7 +31,6 @@ export function AvatarCropScreen() {
   const [frame, setFrame] = useState<{ width: number; height: number } | null>(null);
   useEffect(() => {
     if (!request) router.back();
-    // Going back without a choice cancels the photo.
     return () => {
       if (request) finishAvatarCrop(request, null);
     };
@@ -88,14 +86,11 @@ function CropArea({
   cornerRadius: number;
   centerX: number;
   centerY: number;
-  /** Wide enough for the dimmed ring around the shape to reach every corner of the screen. */
   extent: number;
   readCrop: { current: (() => AvatarCrop) | null };
 }) {
-  // A circle keeps its circular corners; a rounded square uses the smooth corners of the avatar.
   const borderCurve = cornerRadius * 2 < side ? "continuous" : "circular";
   const { t } = useText();
-  // At scale 1 the photo just covers the shape's square.
   const base = side / Math.max(Math.min(source.width, source.height), 1);
   const shown = { width: source.width * base, height: source.height * base };
   const scale = useSharedValue(1);
@@ -143,7 +138,6 @@ function CropArea({
     cancelAnimation(ty);
   }
 
-  // Two fingers scale about the point between them and move the photo with it.
   const pinch = Gesture.Pinch()
     .onStart((event) => {
       stop();
@@ -215,7 +209,6 @@ function CropArea({
             style={StyleSheet.absoluteFill}
           />
         </Animated.View>
-        {/* A thick border leaves the avatar's shape clear and dims the rest of the photo. */}
         <View
           pointerEvents="none"
           className="border-black/60"

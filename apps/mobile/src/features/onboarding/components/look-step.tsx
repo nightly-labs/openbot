@@ -28,27 +28,18 @@ import { haptics } from "@/shared/lib/haptics";
 import { SPLASH_EASE_OUT } from "@/shared/lib/splash-motion";
 import { useText } from "@/shared/lib/text";
 
-// A swipe changes the look when it goes this far, or this fast.
 const SWIPE_DISTANCE = 70;
 const SWIPE_VELOCITY = 600;
 const THROW = { duration: 170, easing: SPLASH_EASE_OUT, reduceMotion: ReduceMotion.Never };
 const SETTLE = { duration: 400, dampingRatio: 0.8, reduceMotion: ReduceMotion.Never };
-// The next look comes in from this share of the screen, on the other side.
 const ENTER_FROM = 0.6;
-// Nine colours fit one row on a 375 pt wide phone.
 const SWATCH_SIZE = 28;
-// The colours show in two rows of nine; the automatic colour ends the second row.
 const COLOR_ROWS: readonly (readonly AvatarColorChoice[])[] = [
   AVATAR_COLOR_CHOICES.slice(0, 9),
   AVATAR_COLOR_CHOICES.slice(9),
 ];
 const ARROW_SIZE = 44;
 
-/**
- * The look of an agent made from scratch. The character itself is the control: drag it aside and
- * it flies off, and the next look comes in from the other side. Arrows do the same with a tap, and
- * Surprise me draws new looks. The colours sit in two rows below.
- */
 export function LookStep({
   motion,
   seed,
@@ -62,13 +53,10 @@ export function LookStep({
   motion: OnboardingMotion;
   seed: string;
   hue: AvatarHue | null;
-  /** The agent's `avatarColor`. It wins over `hue`. */
   color: AvatarColor | null;
-  /** The hero's swipe offset, shared with the hero above the steps. */
   drag: SharedValue<number>;
   onSeedChange: (seed: string) => void;
   onColorChange: (value: AgentColorValue) => void;
-  /** Plays the hero's squash, when a new look appears in place. */
   onPulse: () => void;
 }) {
   const { t } = useText();
@@ -79,7 +67,6 @@ export function LookStep({
   const full = motion === "full";
   const heroSize = height < 760 ? 128 : 168;
 
-  /** Shows the next look (1) or the previous one (-1). With motion, it comes in from that side. */
   const advance = useCallback(
     (direction: 1 | -1) => {
       const seeds = candidates.seeds;
@@ -91,7 +78,6 @@ export function LookStep({
         onPulse();
         return;
       }
-      // The new look renders first, then flies in, so the old one never comes back.
       requestAnimationFrame(() => {
         drag.set(direction * width * ENTER_FROM);
         drag.set(withSpring(0, SETTLE));
@@ -114,7 +100,6 @@ export function LookStep({
             drag.set(withSpring(0, { ...SETTLE, velocity: event.velocityX }));
             return;
           }
-          // It leaves on the side it is thrown to; the next look comes from the other side.
           const side = (flick ? event.velocityX : event.translationX) < 0 ? -1 : 1;
           const direction = side < 0 ? 1 : -1;
           if (!full) {
@@ -219,7 +204,6 @@ export function LookStep({
   );
 }
 
-/** One colour. The chosen one grows a little and gets a ring. */
 function Swatch({
   label,
   checked,

@@ -9,17 +9,10 @@ const thinking = switchPreference("openbot.mobile.showThinking.v1", true);
 const subagents = switchPreference("openbot.mobile.showSubagents.v1", true);
 const memoryChanges = switchPreference("openbot.mobile.showMemoryChanges.v1", true);
 
-/**
- * On: a chat shows the steps row of each finished turn and the agent's current reasoning on its
- * activity row. Off: the chat shows only the replies and a plain activity label. The reasoning level
- * of the agent does not change.
- */
 export const useThinkingDisplayPreference = thinking.store;
 export const saveThinkingDisplayPreference = thinking.save;
-/** On: a chat shows the row of the subagents that a turn started. */
 export const useSubagentsDisplayPreference = subagents.store;
 export const saveSubagentsDisplayPreference = subagents.save;
-/** On: a chat shows the row of the memories that a turn saved. */
 export const useMemoryChangesDisplayPreference = memoryChanges.store;
 export const saveMemoryChangesDisplayPreference = memoryChanges.save;
 
@@ -27,10 +20,6 @@ export async function loadChatDetailPreferences(): Promise<void> {
   await Promise.all([thinking.load(), subagents.load(), memoryChanges.load()]);
 }
 
-/**
- * Whether the chat draws a row for a message. A thinking step has a row only with a steps row on it,
- * and the settings can hide the subagents and saved memories rows.
- */
 export function useChatRowShown(
   turnSummaries: ReadonlyMap<string, TurnStepsSummary> | undefined,
 ): (message: ChatMessage) => boolean {

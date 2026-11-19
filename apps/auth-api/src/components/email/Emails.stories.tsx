@@ -9,9 +9,6 @@ import {
   renderWelcomeEmail,
 } from "../../server/email-templates";
 
-// Each email renders inside an iframe, as a mail client shows it: the template's own markup and
-// `<style>` block apply, and Storybook's stylesheet does not leak in.
-
 const INVITE_URL =
   "https://openbot.run/join?api=https%3A%2F%2Fstudio-mac-k7m4q2pz-host.openbot.run%2F&server=00000000-0000-4000-8000-000000000000&fingerprint=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&invite=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 
@@ -68,7 +65,6 @@ interface EmailPreviewProps {
   scheme: "light" | "dark";
 }
 
-/** Makes the frame as tall as the email, so that a long email is not cut off. */
 function fitToContent(frame: HTMLIFrameElement) {
   const height = frame.contentDocument?.body.scrollHeight;
   if (height) frame.style.height = `${height}px`;
@@ -191,17 +187,14 @@ export const LicenseWelcomeBundleDark: Story = {
   args: { scheme: "dark", email: renderLicenseEmail(BUNDLE_LICENSE) },
 };
 
-/** A Starter license that ends at its period end, so it has no next payment. */
 export const LicenseWelcomeStarterMobile: Story = {
   args: { width: 375, email: renderLicenseEmail(STARTER_LICENSE) },
 };
 
-/** A renewal payment failed. Stripe tries again, so the license stays active. */
 export const LicensePaymentFailed: Story = {
   args: { email: renderLicenseEmail(PAYMENT_FAILED) },
 };
 
-/** The last try failed, and the event had no invoice page, so the button opens the web app. */
 export const LicensePaymentFailedLastTryDark: Story = {
   args: { scheme: "dark", email: renderLicenseEmail(LAST_PAYMENT_FAILED) },
 };

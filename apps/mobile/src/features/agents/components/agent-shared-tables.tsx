@@ -12,11 +12,6 @@ import { queryKeys } from "@/features/workspace/model/query-keys";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 
-/**
- * Agent info > Tables: the records that the agents of the host keep between tasks, as the desktop
- * agent settings list them. The list is the same for every agent, because the agents share one
- * database. Only an owner or admin opens it, and the host checks the role again.
- */
 export function AgentSharedTables({ agent, available }: { agent: MobileAgent; available: boolean }) {
   const { t } = useText();
   const workspace = useMobileWorkspace();
@@ -67,13 +62,11 @@ function SharedTableRow({
 }: {
   agent: MobileAgent;
   table: SharedTable;
-  /** Reads the list again after a deletion, whether it succeeded or not. */
   onChanged: () => void;
 }) {
   const { t } = useText();
   const { agents, deleteSharedTable } = useMobileWorkspace();
   const [deleting, setDeleting] = useState(false);
-  // The owner can be an agent that was deleted, so its name is looked up and may be missing.
   const owner = table.ownerAgentId
     ? agents.find((candidate) => candidate.id === table.ownerAgentId && candidate.serverId === agent.serverId)
     : undefined;

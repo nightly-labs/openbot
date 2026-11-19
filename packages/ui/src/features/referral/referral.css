@@ -1,15 +1,9 @@
-/* Invite friends: the split of each payment, the invite link, and the list of friends. */
 .referral-panel {
   position: relative;
   display: grid;
   gap: var(--openbot-space-6);
 }
 
-/*
- * The split: two rows on the right of the page title and the "Your link" header. The page title is
- * outside the panel, so the split goes up by the title and the gap after it, and is as tall as both
- * rows. It plays once when the panel opens.
- */
 .referral-split {
   position: absolute;
   top: calc(-1 * (var(--openbot-leading-3xl) + var(--openbot-space-6)));
@@ -146,7 +140,6 @@
   }
 }
 
-/* The credit: one column for each amount, with a line between the columns. */
 .referral-credit {
   display: grid;
   grid-auto-columns: minmax(0, 1fr);
@@ -183,7 +176,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* The credit from one friend, on the left of the status. */
 .referral-friend-credit {
   display: grid;
   justify-items: end;
@@ -198,7 +190,6 @@
   font-weight: var(--openbot-weight-medium);
 }
 
-/* Progress of the ready credit to the minimum, in the colors of the split. */
 .referral-credit-progress {
   display: grid;
   gap: var(--openbot-space-1);

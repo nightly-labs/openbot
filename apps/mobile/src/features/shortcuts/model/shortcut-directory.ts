@@ -2,30 +2,14 @@ import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { supportLog, supportLogValue } from "@/features/support/model/support-log";
 import { appGroupFile, lockAppGroupFile } from "@/shared/lib/app-group";
 
-/**
- * What the App Intents of the shortcuts read from the App Group
- * (`plugins/shortcuts/ShortcutData.swift`). The intents run in native code with no JavaScript, also
- * when the app is not in memory: they list the agents, send a message to the agent of the setting,
- * and say why a shortcut cannot run. The file has no secret: names and IDs. It stays on this phone,
- * and sign-out deletes it.
- *
- * The intents take the rest from the data of the share extension, which the app keeps current
- * (`src/features/share/model/share-extension.ts`): the servers with their keys, the agent pictures,
- * and the session token in the keychain.
- */
 export interface ShortcutDirectory {
-  /** `ShortcutData.swift` reads only this version. An older file reads as no file. */
   version: 2;
   apiUrl: string;
   userId: string;
-  /** The app lock is on, or its settings are not read yet. A shortcut then opens the app. */
   locked: boolean;
-  /** The agent that gets the messages of the shortcuts. Null until the user chooses one. */
   agent: ShortcutDirectoryAgent | null;
   agents: ShortcutDirectoryAgent[];
-  /** The text of the cards that an intent draws by itself, in the app's language, by catalog key. */
   text: Record<string, string>;
-  /** The app's accent color, as `#rrggbb`. */
   accent: string;
 }
 
@@ -33,9 +17,7 @@ export interface ShortcutDirectoryAgent {
   serverId: string;
   id: string;
   name: string;
-  /** The name of the agent's server. */
   server: string;
-  /** The agent's picture: a file of the share extension, named by `shareAvatarName`. */
   avatar?: string;
 }
 
@@ -48,10 +30,6 @@ function decodeAgent(value: unknown): ShortcutDirectoryAgent | null {
   return { serverId, id, name, server, ...(isString(avatar) ? { avatar } : {}) };
 }
 
-/**
- * The agents of the file that the app wrote last, and the agent of the setting. Null when there is
- * no file, or it is for another account.
- */
 export function readShortcutDirectory(
   apiUrl: string,
   userId: string,
@@ -86,10 +64,6 @@ export function writeShortcutDirectory(directory: ShortcutDirectory): void {
   }
 }
 
-/**
- * Locks the saved directory when the app cannot write a new one, such as while the account directory
- * loads. A shortcut then opens the app, which asks for the app lock.
- */
 export function lockShortcutDirectory(): void {
   try {
     if (lockAppGroupFile(DIRECTORY_FILE)) written = null;
@@ -98,7 +72,6 @@ export function lockShortcutDirectory(): void {
   }
 }
 
-/** Without a session the shortcuts have no agents. */
 export function resetShortcutDirectory(): void {
   written = null;
   try {

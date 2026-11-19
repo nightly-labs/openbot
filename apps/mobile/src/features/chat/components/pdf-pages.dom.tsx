@@ -1,17 +1,13 @@
 "use dom";
 
 import { getDocument, type PDFDocumentProxy, type RenderTask } from "pdfjs-dist/legacy/build/pdf.mjs";
-// The worker module sets `globalThis.pdfjsWorker`, so pdf.js reads the file on this thread. Metro
-// cannot bundle a separate worker file into a DOM component.
 import "pdfjs-dist/legacy/build/pdf.worker.mjs";
 import { base64ToBytes } from "@openbot/team-client/base64";
 import { useEffect, useRef, useState } from "react";
 
 interface PdfPagesProps {
-  /** The PDF file as Base64. */
   base64: string;
   title: string;
-  /** The space that the floating header and the home indicator cover. */
   insets: { top: number; bottom: number };
   background: string;
   muted: string;
@@ -21,17 +17,9 @@ interface PdfPagesProps {
 
 const PAGE_GAP = 12;
 const SIDE_MARGIN = 12;
-/** Sharper than this costs memory that a phone does not have for a long document. */
 const MAX_PIXEL_RATIO = 2;
-/** Pages this far outside the screen are drawn before they scroll in, and cleared after they leave. */
 const DRAW_MARGIN = "100% 0px";
 
-/**
- * The pages of a PDF, for Android: its web view cannot show a PDF itself. iOS shows the file in
- * a native web view instead. Each page has its size at once, and a page is drawn only while it is
- * near the screen, so a long document does not hold every page as a picture.
- */
-// Missing in Expo Go on Android until the props come again; see expo-go-dom.ts.
 const NO_INSETS = { top: 0, bottom: 0 };
 export default function PdfPages({
   base64 = "",
@@ -93,7 +81,6 @@ export default function PdfPages({
   );
 }
 
-/** One frame for each page, sized at once, and an observer that draws the pages near the screen. */
 async function layOutPages(
   pdf: PDFDocumentProxy,
   view: HTMLDivElement,
@@ -149,7 +136,6 @@ function drawPage(pdf: PDFDocumentProxy, frame: HTMLDivElement, width: number) {
       () => {
         if (!stopped) frame.replaceChildren(canvas);
       },
-      // A page that scrolls away stops drawing, and a page that cannot be drawn stays white.
       () => undefined,
     );
   });

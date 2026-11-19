@@ -21,7 +21,6 @@ const CATEGORIES: { category: StorageCategory; label: MobileTextKey }[] = [
 ];
 const CHAT_ROWS = 4;
 
-/** Agent info > Files: what this agent keeps on the host, like the desktop agent settings. */
 export function AgentFiles({
   agent,
   usage,
@@ -30,9 +29,7 @@ export function AgentFiles({
 }: {
   agent: MobileAgent;
   usage: StorageUsage;
-  /** Owners and admins delete files. A member only reads. */
   canDelete: boolean;
-  /** Measures again after a deletion, whether it succeeded or not. */
   onChanged: () => void;
 }) {
   const bytes = (category: StorageCategory) => usage.breakdown.find((entry) => entry.category === category)?.bytes ?? 0;
@@ -113,7 +110,6 @@ export function RowDeleteButton({
   );
 }
 
-/** A stored file opens on the preview screen, as in the chat, or else in the share sheet, like a queued file. */
 export function StoredFile({
   serverId,
   file,
@@ -164,10 +160,6 @@ export function StoredFile({
   );
 }
 
-/**
- * Asks before it deletes a stored file from the host, or removes the record of a file that is gone.
- * It measures again after the deletion, whether it succeeded or not.
- */
 export function useStoredFileDelete(serverId: string, file: StoredFileRow, onChanged: () => void) {
   const { t } = useText();
   const { deleteStoredFile } = useMobileWorkspaceActions();

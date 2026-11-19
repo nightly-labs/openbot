@@ -1,18 +1,3 @@
-// Status webhooks for the tools of the OpenBot team. The public way to follow the page is the feed.
-// The `notify` job of the `status-page` workflow runs it after each run that publishes the page:
-//   bun apps/status/scripts/notify.ts --status <status.json> --state <notify.json> [--bootstrap] [--test]
-// It compares `status.json` with `notify.json` (kept on the `status-notify` branch), queues one
-// delivery for each new event and each subscription that wants it, and sends the deliveries that are
-// due. A failed delivery is tried again in a later run, at most `MAX_ATTEMPTS` times in total.
-//
-// The subscriptions are in the `STATUS_WEBHOOKS` repository secret. Their URLs and secrets never go
-// to the log, the summary, the report or `notify.json`. See docs/status-webhooks.md.
-//
-//   --bootstrap        there is no `notify.json` yet: mark the current events as sent, send nothing
-//   --test             also send a `test` event to each active subscription
-//   --summary <path>   append a Markdown table of the run (the job summary)
-//   --report <path>    write a JSON report of the run
-//   --now <iso>        the time of the run
 import { createHash, createHmac } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -55,20 +40,15 @@ const IN_ACTIONS = process.env.GITHUB_ACTIONS === "true";
 
 const SITE_URL = "https://status.openbot.run";
 const TIMEOUT_MS = 10_000;
-/** The wait after each failed try. The try after the last wait is the final one. */
 const RETRY_MINUTES = [5, 10, 20, 40, 80, 160, 320] as const;
 const MAX_ATTEMPTS = RETRY_MINUTES.length + 1;
-/** Tries for one subscription in one run. The rest wait for the next run. */
 const MAX_PER_RUN = 25;
 const MAX_OUTBOX = 1_000;
-/** A sent event is remembered this long, and also while its incident is in `status.json`. */
 const SEEN_DAYS = 100;
 const DAY_MS = 86_400_000;
 const MIN_SECRET_LENGTH = 32;
 const DISCORD_LIMIT = 2_000;
 const REMOVED_AFTER_RUNS = 2;
-
-// Events -----------------------------------------------------------------------
 
 const EVENT_TYPES = [
   "incident.created",
@@ -86,10 +66,6 @@ const EVENT_TYPES = [
 const EventType = Schema.Literals(EVENT_TYPES);
 type EventType = typeof EventType.Type;
 
-/**
- * The events of a subscription without `events`. A service change follows one check run, so it
- * comes before the automatic incident and can be a short network error: a subscription must ask for it.
- */
 const DEFAULT_EVENTS: readonly EventType[] = EVENT_TYPES.filter(
   (type) => type !== "service.changed" && type !== "test",
 );
@@ -103,7 +79,6 @@ const EventIncident = Schema.Struct({
   services: Schema.Array(Schema.Struct({ id: ServiceId, name: Schema.String })),
   startedAt: Schema.String,
   resolvedAt: Schema.NullOr(Schema.String),
-  /** The update that the event announces, or the newest one. */
   update: Schema.NullOr(IncidentUpdate),
 });
 type EventIncident = typeof EventIncident.Type;
@@ -117,10 +92,8 @@ const EventService = Schema.Struct({
 });
 type EventService = typeof EventService.Type;
 
-/** The body of a `json` delivery, version 1. Add fields only; never change the meaning of one. */
 const WebhookEvent = Schema.Struct({
   version: Schema.Literal(1),
-  /** The same for every subscription and every try. */
   id: Schema.String,
   type: EventType,
   createdAt: Schema.String,
@@ -131,7 +104,6 @@ const WebhookEvent = Schema.Struct({
 type WebhookEvent = typeof WebhookEvent.Type;
 
 const Delivery = Schema.Struct({
-  /** The `x-openbot-delivery-id` header. The same for each try, so a receiver can drop a repeat. */
   id: Schema.String,
   subscription: Schema.String,
   event: WebhookEvent,
@@ -143,20 +115,15 @@ type Delivery = typeof Delivery.Type;
 
 const OpenIncident = Schema.Struct({
   incident: EventIncident,
-  /** The runs in a row whose `status.json` did not have the incident. */
   missing: Schema.Int,
 });
 type OpenIncident = typeof OpenIncident.Type;
 
-/** `notify.json` on the `status-notify` branch. It holds subscription IDs only. */
 const NotifyState = Schema.Struct({
   version: Schema.Literal(1),
-  /** The newest `checkedAt` of a `status.json` that this script read. */
   checkedAt: Schema.NullOr(Schema.String),
   services: Schema.Record(Schema.String, CheckResult),
-  /** Event ID to the time that this script found the event. */
   seen: Schema.Record(Schema.String, Schema.String),
-  /** Incident ID to the incidents that have not ended, for the event when one leaves the page. */
   open: Schema.Record(Schema.String, OpenIncident),
   outbox: Schema.Array(Delivery),
 });
@@ -168,7 +135,6 @@ interface FoundEvent {
   type: EventType;
   incident: EventIncident | null;
   service: EventService | null;
-  /** An event that announces this one. When both are new in one run, only that event is sent. */
   announcedBy?: string;
 }
 
@@ -186,7 +152,6 @@ const eventIncident = (incident: Incident, update: IncidentUpdate | null): Event
   update,
 });
 
-/** Every incident event that `status.json` shows by `NOW`, oldest first for each incident. */
 function incidentEvents(incidents: readonly Incident[]): FoundEvent[] {
   const events: FoundEvent[] = [];
   for (const incident of [...incidents].reverse()) {
@@ -202,9 +167,7 @@ function incidentEvents(incidents: readonly Incident[]): FoundEvent[] {
     add(opened, openedId, oldestFirst[0] ?? null);
     const updated = maintenance ? "maintenance.updated" : "incident.updated";
     for (const [index, update] of oldestFirst.entries()) {
-      // The end event announces the final update. An issue that opens again keeps it.
       if (FINAL_STAGES.has(update.stage)) continue;
-      // The first update is in the opening event, unless it came after that event.
       const announcedBy = index === 0 ? openedId : undefined;
       add(updated, `${updated}:${incident.id}:${update.at}:${update.stage}`, update, announcedBy);
     }
@@ -213,17 +176,12 @@ function incidentEvents(incidents: readonly Incident[]): FoundEvent[] {
         add("maintenance.started", `maintenance.started:${incident.id}`, latest);
       if (ended) add("maintenance.completed", `maintenance.completed:${incident.id}`, latest);
     } else if (incident.resolvedAt !== null) {
-      // With the time, an incident that opens again and closes again is resolved again.
       add("incident.resolved", `incident.resolved:${incident.id}:${incident.resolvedAt}`, latest);
     }
   }
   return events;
 }
 
-/**
- * The services whose last check changed. An issue event can publish after a newer check run, so
- * only a `status.json` with newer checks than the last one counts.
- */
 function serviceEvents(status: StatusFile, state: NotifyState): FoundEvent[] {
   const checkedAt = status.checkedAt;
   if (checkedAt === null || (state.checkedAt !== null && Date.parse(checkedAt) <= Date.parse(state.checkedAt))) {
@@ -243,12 +201,6 @@ function serviceEvents(status: StatusFile, state: NotifyState): FoundEvent[] {
   });
 }
 
-/**
- * The incidents that have not ended, and an event for each one that left `status.json`: a false
- * alarm closed as not planned, a maintenance closed before its start, a removed label or a deleted
- * issue. The schedule runs and the issue runs publish in parallel, so an older `status.json` can come
- * after a newer one. Only an incident that is missing for `REMOVED_AFTER_RUNS` runs in a row is gone.
- */
 function openIncidents(status: StatusFile, state: NotifyState) {
   const open: Record<string, OpenIncident> = {};
   for (const incident of status.incidents) {
@@ -270,10 +222,7 @@ function openIncidents(status: StatusFile, state: NotifyState) {
   return { open, events };
 }
 
-// Subscriptions ------------------------------------------------------------------
-
 const Subscription = Schema.Struct({
-  /** Shown in the log and the summary in place of the URL. */
   id: Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9-]{0,39}$/u)),
   url: Schema.String,
   secret: Schema.optionalKey(Schema.String),
@@ -283,14 +232,12 @@ const Subscription = Schema.Struct({
 });
 type Subscription = typeof Subscription.Type;
 
-/** Masks a value in the log of this script and, in GitHub Actions, in the job log. */
 function hide(value: unknown) {
   if (typeof value !== "string" || value.length < 8) return;
   registerSecretValue(value);
   if (IN_ACTIONS) process.stdout.write(`::add-mask::${value}\n`);
 }
 
-/** Reads `STATUS_WEBHOOKS`. An error names the entry and the field, never a value. */
 function readSubscriptions(): Subscription[] {
   const raw = process.env.STATUS_WEBHOOKS?.trim();
   if (!raw) return [];
@@ -324,7 +271,6 @@ function readSubscriptions(): Subscription[] {
     } catch {
       throw new Error(`${label}: the URL is not valid.`);
     }
-    // Slack and Discord keep the token in the path.
     hide(`${url.pathname}${url.search}`);
     const local = url.hostname === "127.0.0.1" || url.hostname === "localhost";
     if (url.protocol !== "https:" && !(url.protocol === "http:" && local)) {
@@ -340,8 +286,6 @@ function readSubscriptions(): Subscription[] {
 
 const wants = (subscription: Subscription, type: EventType) =>
   type === "test" || (subscription.events ?? DEFAULT_EVENTS).includes(type);
-
-// Messages -----------------------------------------------------------------------
 
 const TITLES: Record<EventType, string> = {
   "incident.created": "New incident",
@@ -380,7 +324,6 @@ const RESULTS: Record<CheckResult, string> = {
 
 const utc = (iso: string) => `${iso.slice(0, 16).replace("T", " ")} UTC`;
 
-/** The headline, the detail lines and the link of a chat message. */
 function message(event: WebhookEvent): { headline: string; lines: string[]; link: string } {
   const { incident, service } = event;
   if (incident) {
@@ -410,14 +353,11 @@ function render(format: NonNullable<Subscription["format"]>, event: WebhookEvent
     const text = [`*${slackText(headline)}*`, ...lines.map(slackText), `<${link}|Open>`].join("\n");
     return JSON.stringify({ text });
   }
-  // Angle brackets stop the link preview. No mention in the text can notify anyone.
   const tail = `\n<${link}>`;
   let content = [`**${headline}**`, ...lines].join("\n");
   if (content.length + tail.length > DISCORD_LIMIT) content = `${content.slice(0, DISCORD_LIMIT - tail.length - 1)}…`;
   return JSON.stringify({ content: `${content}${tail}`, allowed_mentions: { parse: [] } });
 }
-
-// Delivery -----------------------------------------------------------------------
 
 interface Outcome {
   ok: boolean;
@@ -425,7 +365,6 @@ interface Outcome {
   reason: string | null;
 }
 
-/** One try. It signs at send time, so a new secret applies to waiting deliveries too. */
 async function send(subscription: Subscription, delivery: Delivery): Promise<Outcome> {
   const body = render(subscription.format ?? "json", delivery.event);
   const timestamp = String(Math.floor(Date.now() / 1000));
@@ -443,7 +382,6 @@ async function send(subscription: Subscription, delivery: Delivery): Promise<Out
     headers["x-openbot-signature"] = `sha256=${signature}`;
   }
   try {
-    // A redirect is a failure: the request must not go to an address that is not in the secret.
     const response = await fetch(subscription.url, {
       method: "POST",
       headers,
@@ -463,11 +401,8 @@ async function send(subscription: Subscription, delivery: Delivery): Promise<Out
 const deliveryId = (subscription: string, event: string) =>
   createHash("sha256").update(`${subscription}\n${event}`).digest("hex").slice(0, 32);
 
-// State --------------------------------------------------------------------------
-
 function readState(): NotifyState {
   if (!existsSync(STATE_PATH)) {
-    // A missing file after a failed fetch must not send every current event again.
     if (!args.bootstrap) throw new Error(`${STATE_PATH} does not exist. Run with --bootstrap only for the first run.`);
     return { version: 1, checkedAt: null, services: {}, seen: {}, open: {}, outbox: [] };
   }
@@ -479,8 +414,6 @@ const writeFile = (path: string, content: string) => {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, content);
 };
-
-// Run ----------------------------------------------------------------------------
 
 const subscriptions = readSubscriptions();
 const active = subscriptions.filter((subscription) => !subscription.paused);
@@ -560,7 +493,6 @@ await Promise.all(
         type: delivery.event.type,
         attempt: delivery.attempts + 1,
       });
-      // The receiver is down or rejects: the next run tries the rest.
       if (!outcome.ok) break;
     }
   }),
@@ -609,8 +541,6 @@ const state: NotifyState = {
   outbox,
 };
 writeFile(STATE_PATH, `${JSON.stringify(state, null, 2)}\n`);
-
-// Log, summary and report --------------------------------------------------------
 
 for (const item of sent) {
   const text = `${item.subscription}: ${item.type}, try ${item.attempt} of ${MAX_ATTEMPTS}`;
