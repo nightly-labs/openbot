@@ -257,7 +257,8 @@ const FAILED_MODEL_LIST_RETRY_DELAYS_MS = [2_000, 15_000];
 /**
  * How old the model list of a running provider with `relistWhileRunning` can be before the idle
  * check reads it again. Such a CLI changes its list while it runs: a model that the user adds in its
- * own settings, such as a GitHub Copilot model with the user's own key. With active agents the
+ * own settings, such as a GitHub Copilot model with the user's own key, or a model that Google
+ * releases to the account of an Antigravity CLI (#12308). With active agents the
  * process never stops, so the picker kept the old list until a restart, and a joined server has no
  * refresh action (#8495). An ACP agent reads its list in a probe session, so the wait is the idle
  * release time: a process that no turn uses stops after it, and the next turn reads its list.
