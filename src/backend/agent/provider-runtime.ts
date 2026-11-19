@@ -280,6 +280,7 @@ export interface ProviderHooks {
   sharedRoot(): string;
   onProviderResumed(provider: AgentProvider): void;
   onProviderHeld?(provider: AgentProvider): void;
+  releasePersonWaits?(provider: AgentProvider): void;
   onProviderActivated(provider: AgentProvider, configRevision: number): Effect.Effect<void, ProviderOperationFailed>;
   onAccountModelsListed?(provider: AgentProvider, accountId: string): Effect.Effect<void>;
   onAccountsChanged?(): void;
@@ -2209,6 +2210,7 @@ export class ProviderRuntime implements ProviderPort {
         recordRestartActivity();
         onWait();
       }
+      this.#hooks.releasePersonWaits?.(provider);
       yield* Effect.sleep(PROVIDER_RESTART_POLL_MS);
     }
   });
@@ -2608,6 +2610,7 @@ export class ProviderRuntime implements ProviderPort {
       this.#cliLogin.has(provider) ||
       (provider === "codex" && this.#codexLogin.pending);
     if (waiting) {
+      if (this.#hooks.isProviderBusy(provider)) this.#hooks.releasePersonWaits?.(provider);
       const timer = setTimeout(
         () => Effect.runFork(this.#checkRestartWhenIdle(provider).pipe(Effect.forkIn(this.#scope))),
         PROVIDER_RESTART_POLL_MS,
