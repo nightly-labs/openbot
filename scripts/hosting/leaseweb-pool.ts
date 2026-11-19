@@ -22,6 +22,15 @@ const isOwnerReference = (reference: string) => {
   return rest.length === 0 && EMAIL_PATTERN.test((email ?? "").toLowerCase()) && /^[0-9a-f]{8}$/u.test(server ?? "");
 };
 const IMAGE = "UBUNTU_26_04_64BIT";
+const OPERATOR_KEYS_HOST_PATTERN = /^[A-Za-z0-9_][A-Za-z0-9._-]*@[A-Za-z0-9][A-Za-z0-9.-]*$/u;
+const OPERATOR_KEY_PATTERN =
+  /^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(256|384|521)|sk-ssh-ed25519@openssh\.com|sk-ecdsa-sha2-nistp256@openssh\.com) [A-Za-z0-9+/]+=*( .*)?$/u;
+const keyLines = (text: string) =>
+  text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line !== "" && !line.startsWith("#"));
+const keyBlob = (line: string) => line.split(/\s+/u)[1] ?? "";
 const REINSTALL_WAIT_MS = 15 * 60_000;
 const VPS_ID_PATTERN = /^\d{1,20}$/u;
 const HOST_ID_PATTERN = /^leaseweb:\d{1,20}$/u;
@@ -334,6 +343,8 @@ class Pool {
   readonly #keys: { name: string; key: string }[];
   readonly #found = new Map<string, Vps>();
   readonly #operatorKeysFile: string | undefined;
+  readonly #operatorKeysHost: string | undefined;
+  #operatorKeysBase64: string | undefined;
   readonly #boatKey: string | undefined;
   readonly #claimsToken: string | undefined;
 
@@ -346,6 +357,7 @@ class Pool {
     this.#apply = apply;
     this.#testDatabase = testDatabase;
     this.#operatorKeysFile = operatorKeysFile;
+    this.#operatorKeysHost = environment.OPERATOR_KEYS_HOST || undefined;
     this.#boatKey = environment.BOAT_API_KEY || undefined;
     this.#claimsToken = environment.SERVER_CLAIMS_ADMIN_TOKEN || undefined;
     this.#keys = Object.entries(environment).flatMap(([name, key]) =>
@@ -797,15 +809,29 @@ class Pool {
   }
 
   #operatorKeys() {
-    if (!this.#operatorKeysFile) throw new Error("Give the public keys of the operators with --keys=<file>.");
-    const text = readFileSync(this.#operatorKeysFile, "utf8");
-    const blobs = (lines: string) =>
-      lines
-        .split("\n")
-        .map((line) => line.trim().split(/\s+/u)[1] ?? "")
-        .filter((blob) => blob !== "");
-    const listed = blobs(text);
-    if (listed.length === 0) throw new Error(`${this.#operatorKeysFile} has no public key.`);
+    this.#operatorKeysBase64 ??= this.#readOperatorKeys();
+    return this.#operatorKeysBase64;
+  }
+
+  #readOperatorKeys() {
+    const host = this.#operatorKeysHost;
+    if (!host) throw new Error("OPERATOR_KEYS_HOST is not in the environment.");
+    if (!OPERATOR_KEYS_HOST_PATTERN.test(host)) throw new Error("OPERATOR_KEYS_HOST is not <user>@<host>.");
+    const fromCore = execFileSync(
+      "ssh",
+      ["-o", "BatchMode=yes", "-o", "ConnectTimeout=20", host, "cat /root/.ssh/authorized_keys"],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] },
+    );
+    const coreLines = keyLines(fromCore);
+    if (coreLines.length === 0) throw new Error("The core server of the operators has no public key.");
+    const fileLines = this.#operatorKeysFile ? keyLines(readFileSync(this.#operatorKeysFile, "utf8")) : [];
+    const lines: string[] = [];
+    for (const line of [...coreLines, ...fileLines]) {
+      if (!OPERATOR_KEY_PATTERN.test(line)) {
+        throw new Error(`Operator key ${lines.length + 1} is not a public key with no options.`);
+      }
+      if (!lines.some((listed) => keyBlob(listed) === keyBlob(line))) lines.push(line);
+    }
     let own = "";
     try {
       own += execFileSync("ssh-add", ["-L"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
@@ -816,12 +842,14 @@ class Pool {
         own += `\n${readFileSync(join(home, ".ssh", name), "utf8")}`;
       } catch {}
     }
-    if (!blobs(own).some((blob) => listed.includes(blob))) {
+    const ownBlobs = keyLines(own).map(keyBlob);
+    if (!lines.some((line) => ownBlobs.includes(keyBlob(line)))) {
       throw new Error(
-        `${this.#operatorKeysFile} has no key of this computer, so the script could not sign in after the bootstrap.`,
+        "The operator keys have no key of this computer, so the script could not sign in after the bootstrap.",
       );
     }
-    return Buffer.from(text).toString("base64");
+    logger.info(`The bootstrap installs ${lines.length} operator keys.`);
+    return Buffer.from(`${lines.join("\n")}\n`).toString("base64");
   }
 
   async #rootPassword(machine: Vps) {
@@ -1734,7 +1762,7 @@ systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/ru
 }
 
 const USAGE =
-  "Usage: leaseweb-pool.ts status | boat | free | traffic [--from=<YYYY-MM-DD>] [--to=<YYYY-MM-DD>] | add <VPS ID>... | remove <VPS ID>... | sync | prepare <VPS ID>... --keys=<file> [--reinstall] | move <server ID> <VPS ID | auto> [--keys=<file>] [--units=<unit>,...] [--docker] [--folders=<folder>,...] | custom <VPS ID> --owner=<email> --customer=<word> --name=<server name> --keys=<file> [--apply] [--env=test]";
+  "Usage: leaseweb-pool.ts status | boat | free | traffic [--from=<YYYY-MM-DD>] [--to=<YYYY-MM-DD>] | add <VPS ID>... | remove <VPS ID>... | sync | prepare <VPS ID>... [--keys=<file>] [--reinstall] | move <server ID> <VPS ID | auto> [--keys=<file>] [--units=<unit>,...] [--docker] [--folders=<folder>,...] | custom <VPS ID> --owner=<email> --customer=<word> --name=<server name> [--keys=<file>] [--apply] [--env=test]";
 
 async function main(args: string[]) {
   const [command, ...operands] = args.filter((arg) => !arg.startsWith("--"));

@@ -965,7 +965,8 @@ with the account of an operator. One command does all the steps below.
 Before you start, you need:
 
 - The root `.env.keys` with `DOTENV_PRIVATE_KEY_PRODUCTION`. `apps/auth-api/.env.production` then
-  gives the five Leaseweb keys, `SERVER_CLAIMS_ADMIN_TOKEN` and the Cloudflare token for D1.
+  gives the five Leaseweb keys, `SERVER_CLAIMS_ADMIN_TOKEN`, the Cloudflare token for D1 and
+  `OPERATOR_KEYS_HOST`, the SSH address of the core server of the operators.
 - An SSH key of your computer in `/root/.ssh/authorized_keys` of the core server of the operators.
 - The VPS ID, the owner's email, one short word for the customer (`a-z`, `0-9`), and the server name
   that the customer sees (6 to 32 characters).
@@ -974,13 +975,11 @@ Before you start, you need:
 env="bunx @dotenvx/dotenvx@2.38.2 run --quiet -f apps/auth-api/.env.production -fk <root>/.env.keys --"
 # 1. Find the VPS just bought: each VPS with no reference on the five accounts.
 $env bun scripts/hosting/leaseweb-pool.ts free
-# 2. The public keys of the operators, which the bootstrap installs.
-ssh <core server> cat /root/.ssh/authorized_keys >operator-keys
-# 3. See the plan, then do it.
+# 2. See the plan, then do it.
 $env bun scripts/hosting/leaseweb-pool.ts custom <VPS ID> --owner=<email> --customer=<word> \
-  --name="<server name>" --keys=operator-keys
+  --name="<server name>"
 $env bun scripts/hosting/leaseweb-pool.ts custom <VPS ID> --owner=<email> --customer=<word> \
-  --name="<server name>" --keys=operator-keys --apply
+  --name="<server name>" --apply
 ```
 
 When it ends, the owner sees the server in the app, and can invite the other members.
@@ -994,7 +993,7 @@ When it ends, the owner sees the server in the app, and can invite the other mem
 - It sets the reference `custom-<NN> <customer> <email>` first, with the next number after the
   highest on all five accounts, and reads it again (see [Leaseweb references](#leaseweb-references)).
 - It signs in with the root password of the Leaseweb API one time. After the bootstrap, only the
-  operator keys sign in, so `--keys` must have a key of this computer.
+  operator keys sign in, so one operator key must be a key of this computer.
 - It makes the claim just before the install, because a claim works for 15 minutes.
 - At the end it runs `leaseweb-bootstrap-e2e.ts`, which restarts the server, and then checks that
   OpenBot is online and that D1 shows the owner as the active owner of the server.
@@ -1099,8 +1098,11 @@ A pool VPS and a custom VPS also use these names:
 The operator keys are a file with one public key for each operator, in the format of
 `authorized_keys`, with no options. The fixed place of the list is `/root/.ssh/authorized_keys` of
 the core server of the operators: read it at each run, as the command above does, so that the same
-persons have access to each server. The list is not in this repository, which is public, and not in
-the bootstrap, which each release has. Only public keys go on a server: each operator keeps the
+persons have access to each server. `leaseweb-pool.ts` reads it at each run from `OPERATOR_KEYS_HOST`,
+so each bootstrap that it runs installs all the operator keys. `--keys=<file>` only adds keys to that
+list. The bootstrap replaces the list on the server: a file with one key once left 106 machines with
+the key of only one operator. The list is not in this repository, which is public, and not in the
+bootstrap, which each release has. Only public keys go on a server: each operator keeps the
 private key.
 
 - The list replaces the list of the last run. To remove an operator, run the bootstrap with the
@@ -1138,7 +1140,7 @@ sandbox when none is. A server that starts on boat moves to a VPS later
 
 The Worker cannot connect to a machine, and it has no Leaseweb key. So the machine asks:
 
-1. `leaseweb-pool.ts prepare <VPS ID>... --keys=<file> --apply` installs the newest OpenBot, disabled,
+1. `leaseweb-pool.ts prepare <VPS ID>... --apply` installs the newest OpenBot, disabled,
    on each free machine, as for a move. Then it offers the machine: it makes a random token, stores the
    SHA-256 of the token in `operator_hosts.assign_token_hash` (migration 0055), and runs
    `move-from-boat.sh offer leaseweb:<VPS ID>` on the machine with the token on standard input. `offer`
@@ -1271,7 +1273,7 @@ hand. It needs `BOAT_API_KEY` in the environment, from `apps/auth-api/.env.dev`:
 
 ```bash
 bunx dotenvx run -f apps/auth-api/.env.production -f apps/auth-api/.env.dev -fk <root>/.env.keys -- \
-  bun scripts/hosting/leaseweb-pool.ts move <server ID> auto --keys=<operator keys> --apply
+  bun scripts/hosting/leaseweb-pool.ts move <server ID> auto --apply
 ```
 
 Tested on 2026-11-12 with the test Worker: one Standard server from a boat sandbox to a VPS 2 in
@@ -1294,7 +1296,7 @@ still uses the sandbox. The downtime is the export, the copy, the import and the
    The IDs are those of `id user` in the sandbox (1000 and 1000 in the boat image). The release is the
    one that the sandbox has, or a newer one. The command sets the hostname, makes the user `user`
    with the home `/home/user`, runs `provision.sh`, and disables `openbot.service`, so a restart does
-   not start OpenBot with no data. `leaseweb-pool.ts prepare <VPS ID>... --keys=<file> --apply` does
+   not start OpenBot with no data. `leaseweb-pool.ts prepare <VPS ID>... --apply` does
    steps 2 and 3 on free machines before a move, with the newest release.
 3. Run `leaseweb-bootstrap.sh` with the operator keys. Restart the VPS one time. A new or reinstalled
    VPS has no key of an operator: `leaseweb-pool.ts` then signs in one time with the root password of
@@ -1778,12 +1780,12 @@ bunx dotenvx run -f apps/auth-api/.env.production -fk <root>/.env.keys -- \
 | `add <VPS ID>...` | Adds bought machines. It reads the location and the product from Leaseweb, and sets the reference `pool` when the machine has none. It refuses a machine with another reference. |
 | `remove <VPS ID>...` | Takes a free machine out of the pool, for example before its contract ends. It refuses a machine that a server has. |
 | `sync` | Stops OpenBot where a plan ended, starts it where the owner renewed, and reinstalls each machine of a deleted server. It reinstalls only a machine of the pool. It also sets the reference of each machine on which a new server started, and `pool` on each free machine with the old `pool-free` or an owner reference. It changes no other reference. |
-| `prepare <VPS ID>... --keys=<file> [--reinstall]` | Installs the newest release, disabled, on free machines, runs the bootstrap with the operator keys in `<file>`, restarts each machine, and offers it for a new server. A prepared machine with no server data and an older OpenBot gets the newest release (`move-from-boat.sh upgrade`); `move` does the same. A disabled OpenBot does not update itself, so run `prepare` again after each release. A free machine that has the data of a server (a start that failed) is skipped; `--reinstall` erases it first. |
+| `prepare <VPS ID>... [--keys=<file>] [--reinstall]` | Installs the newest release, disabled, on free machines, runs the bootstrap with the operator keys of the core server and of `<file>`, restarts each machine, and offers it for a new server. A prepared machine with no server data and an older OpenBot gets the newest release (`move-from-boat.sh upgrade`); `move` does the same. A disabled OpenBot does not update itself, so run `prepare` again after each release. A free machine that has the data of a server (a start that failed) is skipped; `--reinstall` erases it first. |
 | `move <server ID> <VPS ID \| auto> [--keys=<file>]` | Moves one server from boat to a free machine. See [Move a server from boat](#move-a-server-from-boat). It prepares the machine when necessary. The machine takes no new server from then on. `auto` selects the machine when the move starts, and takes the next one when a new customer gets it first. |
 
 `sync` connects as root over SSH with the key of the operator. Not confirmed: SSH from a server of the
-operator. One key of the computer that runs `prepare` or `move` must be in `--keys`: the bootstrap
-turns off the password, and the script refuses a list without such a key.
+operator. One key of the computer that runs `prepare` or `move` must be in the operator keys: the
+bootstrap turns off the password, and the script refuses a list without such a key.
 
 The OpenPanel dashboard "Server pool" (project `openbot`) shows the pool. Each 5 minutes, the
 production Worker sends one `hosted_pool_snapshot` event for each location and product and one with
