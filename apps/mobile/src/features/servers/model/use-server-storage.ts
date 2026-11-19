@@ -4,15 +4,16 @@ import { useMobileWorkspace, useMobileWorkspaceActions } from "@/features/worksp
 import { queryKeys } from "@/features/workspace/model/query-keys";
 
 export function useServerStorage(serverId: string) {
-  const { canReadServerStorage } = useMobileWorkspace();
+  const { canReadServerStorage, knownServerChecks } = useMobileWorkspace();
   const { loadServerStorage, readKeptLibrary, keepLibrary } = useMobileWorkspaceActions();
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();
   const queryKey = queryKeys.serverStorage(queryScope, serverId);
-  const available = canReadServerStorage(serverId);
+  const connected = canReadServerStorage(serverId);
+  const available = connected || (knownServerChecks(serverId)?.canReadServerStorage(serverId) ?? false);
   const query = useQuery({
     queryKey,
-    enabled: available,
+    enabled: connected,
     retry: false,
     staleTime: 0,
     queryFn: async () => {

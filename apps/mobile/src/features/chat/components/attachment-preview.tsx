@@ -275,6 +275,9 @@ function requestFullQuality(serverId: string, attachmentId: string) {
 export function useAttachmentFile(serverId: string, attachment: AttachmentSummary, preview: boolean, copy = false) {
   const { downloadAttachment, downloadAttachmentPreview } = useMobileWorkspaceActions();
   const hostPreviews = useMobileWorkspaceSelector((workspace) => workspace.canLoadAttachmentPreviews(serverId));
+  const knownPreviews = useMobileWorkspaceSelector(
+    (workspace) => workspace.knownServerChecks(serverId)?.canLoadAttachmentPreviews(serverId) ?? false,
+  );
   const fullQuality = useFullQualityRequests((state) => state.keys.has(fullQualityKey(serverId, attachment.id)));
   const text = useText();
   const { t, sourceText } = text;
@@ -298,7 +301,7 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
   );
   const wantsPreview =
     copy &&
-    (hostPreviews || previewKept) &&
+    (knownPreviews || previewKept) &&
     !local &&
     !pending &&
     !originalKept &&
@@ -306,7 +309,7 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
     takesPreview(attachment);
   const previewQuery = useQuery({
     queryKey: queryKeys.chatAttachmentPreview(serverId, attachment.id),
-    enabled: preview && wantsPreview,
+    enabled: preview && wantsPreview && (hostPreviews || previewKept),
     queryFn: async (): Promise<string | null> => {
       const kept = keptPreview(serverId, attachment.id);
       if (kept) return kept;
