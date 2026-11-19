@@ -224,6 +224,7 @@ import {
   type TeamCapabilitiesV10,
 } from "./v10";
 import { VAULT_IMPORT_CAPABILITY } from "./vault-import-v1";
+import { VAULT_MEMBER_SAVE_CAPABILITY } from "./vault-member-save-v1";
 import { VAULT_CAPABILITY } from "./vault-v1";
 import { VAULT_V2_CAPABILITY } from "./vault-v2";
 import { VAULT_V3_CAPABILITY } from "./vault-v3";
@@ -235,6 +236,7 @@ import { WEBHOOK_TESTS_CAPABILITY } from "./webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "./whatsapp-connector-v1";
 import { WHATSAPP_STATUS_REACTIONS_CAPABILITY } from "./whatsapp-status-reactions-v1";
 import { WHATSAPP_WORKING_MESSAGE_CAPABILITY } from "./whatsapp-working-message-v1";
+import { WORKFLOWS_AGENT_FILES_CAPABILITY } from "./workflows-agent-files-v1";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "./workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "./workflows-chats-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "./workflows-github-v1";
@@ -450,6 +452,7 @@ export {
   USAGE_CREDITS_CAPABILITY,
   VAULT_CAPABILITY,
   VAULT_IMPORT_CAPABILITY,
+  VAULT_MEMBER_SAVE_CAPABILITY,
   VAULT_V2_CAPABILITY,
   VAULT_V3_CAPABILITY,
   VAULT_V4_CAPABILITY,
@@ -459,6 +462,7 @@ export {
   WHATSAPP_CONNECTOR_CAPABILITY,
   WHATSAPP_STATUS_REACTIONS_CAPABILITY,
   WHATSAPP_WORKING_MESSAGE_CAPABILITY,
+  WORKFLOWS_AGENT_FILES_CAPABILITY,
   WORKFLOWS_CAPABILITY,
   WORKFLOWS_CHANNELS_CAPABILITY,
   WORKFLOWS_CHATS_CAPABILITY,
@@ -756,6 +760,8 @@ const TEAM_CAPABILITY_REGISTRY = [
   [SKILL_PROBLEMS_CAPABILITY, V10],
   [ROUTINE_RESULTS_WHATSAPP_CAPABILITY, V10],
   [QUEUE_HOLD_CAPABILITY, V10],
+  [VAULT_MEMBER_SAVE_CAPABILITY, V10],
+  [WORKFLOWS_AGENT_FILES_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

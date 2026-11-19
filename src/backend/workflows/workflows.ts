@@ -124,6 +124,7 @@ import { type WorkflowStore, WorkflowStoreError } from "./workflow-store";
 import { prepareWorkflowSchedules, type ScheduledWorkflowStart, workflowWebhookPayload } from "./workflow-triggers";
 import {
   agentFileInputs,
+  agentHandoffText,
   agentStepText,
   conditionAnswer,
   conditionPrompt,
@@ -406,7 +407,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                 scheduledFor: run?.scheduledFor ?? run?.startedAt ?? step.createdAt,
               },
               agentId: step.agentId,
-              text: step.input,
+              text: agentHandoffText(step.input, sourcePaths.length),
               sourcePaths,
               idempotencyKey: `workflow-step:${step.id}`,
             })

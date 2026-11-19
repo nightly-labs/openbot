@@ -172,11 +172,12 @@ export const messages = {
     "この設定はあなただけに適用され、すべてのデバイスで有効です。サーバーがミュート中か「なし」の場合、このエージェントも通知しません。",
 
   "agentSettings.newChat.title": "新しいチャット",
-  "agentSettings.newChat.description": "エージェントはこのチャットを忘れます。設定はそのままです。",
+  "agentSettings.newChat.description":
+    "エージェントは新しく始めますが、必要なときはこのチャットを検索できます。設定はそのままです。",
   "agentSettings.newChat.button": "開始",
   "agentSettings.newChat.confirmTitle": "{name} と新しいチャットを始めますか？",
   "agentSettings.newChat.confirmDescription":
-    "エージェントはこのチャットを忘れます。メッセージは区切り線の上に表示されたままです。指示、モデル、ツール、メモリー、ワークスペース、ブラウザーは変わりません。",
+    "エージェントは新しく始めますが、必要なときはこのチャットを検索できます。メッセージは区切り線の上に表示されたままです。指示、モデル、ツール、メモリー、ワークスペース、ブラウザーは変わりません。",
   "agentSettings.newChat.confirm": "新しいチャットを開始",
   "agentSettings.newChat.failed": "新しいチャットを始められませんでした。",
   "agentSettings.deleteHistory.title": "履歴を削除",

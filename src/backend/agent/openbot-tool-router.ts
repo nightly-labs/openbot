@@ -404,6 +404,7 @@ export interface OpenBotToolRouterHooks {
   runsTurn(agentId: string): boolean;
   interrupt(agentId: string, turnId: string, mayStop: () => boolean): Effect.Effect<boolean, ToolOperationFailed>;
   turnActivity(agentId: string, turnId: string | null): { startedAt: number | null; lastEventAt: number | null };
+  turnUnfinished(turnId: string): boolean;
   requestNoUpdate(
     agentId: string,
     threadId: string,
@@ -2246,7 +2247,12 @@ export class OpenBotToolRouter {
       );
     }
 
-    const memoryResult = this.#memories.handleTool(params, senderAgentId, this.#hooks.redactMcpForAgent);
+    const memoryResult = this.#memories.handleTool(
+      params,
+      senderAgentId,
+      this.#hooks.redactMcpForAgent,
+      this.#hooks.turnUnfinished(params.turnId),
+    );
     if (memoryResult) return memoryResult;
 
     const callerThreadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
@@ -2664,11 +2670,15 @@ export class OpenBotToolRouter {
     }
     const target = yield* this.#captureApprovalReason(host, capture);
     if (typeof target !== "string") return target;
+    const promptsForPermission = yield* host.promptsForPermission();
     const channelName = channelId ? this.#channels.store.get(channelId).name : null;
-    const reason =
-      channelName === null
-        ? target
-        : `${target} ${sourceText("status.agent.screenCaptureChannel", { channel: channelName })}`;
+    const reason = [
+      target,
+      promptsForPermission ? sourceText("status.agent.screenCapturePermissionNext") : null,
+      channelName === null ? null : sourceText("status.agent.screenCaptureChannel", { channel: channelName }),
+    ]
+      .filter((part) => part !== null)
+      .join(" ");
     const decision = yield* this.#attention.awaitToolApproval(
       client,
       request,
@@ -2684,7 +2694,7 @@ export class OpenBotToolRouter {
         grantRoot: null,
         permissions: null,
       },
-      { alwaysAsk: channelId !== null },
+      { alwaysAsk: channelId !== null || promptsForPermission },
     );
     if (decision !== "accept") return openBotToolFailure(sourceText("error.agent.screenCaptureDeclined"));
     const image = yield* Effect.result(host.capture(capture));
@@ -2919,17 +2929,17 @@ export class OpenBotToolRouter {
       const { x, y, width, height } = capture.region;
       return sourceText("status.agent.screenCaptureRegion", { x, y, width, height });
     }
-    const listed = yield* Effect.result(host.listSources());
-    if (Result.isFailure(listed)) return captureFailure(listed.failure);
-    const sources = listed.success;
     if (capture.target === "window") {
-      const window = sources.windows.find(({ id }) => id === capture.windowId);
+      const listed = yield* Effect.result(host.listSources());
+      if (Result.isFailure(listed)) return captureFailure(listed.failure);
+      const window = listed.success.windows.find(({ id }) => id === capture.windowId);
       if (!window) return openBotToolFailure(sourceText("error.agent.screenCaptureWindowMissing"));
       return sourceText("status.agent.screenCaptureWindow", { name: window.name });
     }
+    const displays = yield* host.listDisplays();
     const display = capture.displayId
-      ? sources.displays.find(({ id }) => id === capture.displayId)
-      : sources.displays.find(({ primary }) => primary);
+      ? displays.find(({ id }) => id === capture.displayId)
+      : displays.find(({ primary }) => primary);
     if (capture.displayId && !display) return openBotToolFailure(sourceText("error.agent.screenCaptureDisplayMissing"));
     return display?.name
       ? sourceText("status.agent.screenCaptureDisplay", { name: display.name })

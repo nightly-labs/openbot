@@ -1,5 +1,4 @@
 import { ProviderLogo } from "@openbot/brand";
-import type { AgentModelId } from "@openbot/contracts/ipc";
 import { Bot, Button, buttonVariants, ChevronDown, DropdownMenu, Play, Textarea, TriangleAlert } from "@openbot/ui";
 import { Show, untrack } from "solid-js";
 import type { AgentProfile } from "../../data";
@@ -7,10 +6,10 @@ import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { PickerMenu, type PickerOption } from "./WorkflowPicker";
 import { useBoard } from "./workflow-board";
+import { InputPictures } from "./workflow-input-pictures";
 import type { WorkflowCatalogs } from "./workflow-model";
-import { ModelPill, modelOption } from "./workflow-model-pills";
+import { modelOption } from "./workflow-model-pills";
 import {
-  asProvider,
   asString,
   Field,
   NodeShell,
@@ -20,9 +19,12 @@ import {
   useLocked,
   useStepRun,
   useTextField,
-  type WfProvider,
   wfProviderLogo,
 } from "./workflow-node-parts";
+
+function agentModelName(catalogs: WorkflowCatalogs, agent: AgentProfile): string {
+  return modelOption(catalogs.models, agent.model)?.name ?? agent.model;
+}
 
 function agentOptions(catalogs: WorkflowCatalogs): PickerOption<string>[] {
   return catalogs.agents.map((agent) => ({
@@ -33,7 +35,7 @@ function agentOptions(catalogs: WorkflowCatalogs): PickerOption<string>[] {
       { text: agent.title },
       {
         icon: () => <ProviderLogo provider={wfProviderLogo(agent.provider)} class="wfn-model-logo" />,
-        text: modelOption(catalogs.models, agent.model)?.name ?? agent.model,
+        text: agentModelName(catalogs, agent),
       },
     ],
   }));
@@ -94,6 +96,19 @@ function AgentPill(props: {
   );
 }
 
+function AgentModel(props: { agent: AgentProfile }) {
+  const board = useBoard();
+  const { t } = useText();
+  const name = () => agentModelName(board.catalogs(), props.agent);
+  return (
+    <span class="wfn-pill wfn-model-pill" data-static="">
+      <ProviderLogo provider={wfProviderLogo(props.agent.provider)} class="wfn-model-logo" />
+      <span class="sr-only">{t("workflow.model.label", { name: name() })}</span>
+      <span aria-hidden="true">{name()}</span>
+    </span>
+  );
+}
+
 export function AgentNode(props: { id: string; agentId?: string; task?: string }) {
   const board = useBoard();
   const { t } = useText();
@@ -104,12 +119,6 @@ export function AgentNode(props: { id: string; agentId?: string; task?: string }
     asString,
   );
   const agent = () => board.catalogs().agents.find((candidate) => candidate.id === agentId());
-  const first = untrack(() => {
-    const found = agent();
-    return { model: found?.model ?? "", provider: found?.provider ?? "codex" };
-  });
-  const [model] = useField<AgentModelId>(() => props.id, "model", first.model, asString);
-  const [provider] = useField<WfProvider>(() => props.id, "provider", first.provider, asProvider);
   const [task, setTask] = useTextField(
     () => props.id,
     "task",
@@ -117,6 +126,7 @@ export function AgentNode(props: { id: string; agentId?: string; task?: string }
   );
   const [locked, setLocked] = useLocked(() => props.id);
   const run = useStepRun(untrack(() => props.id));
+  const pictures = () => (board.catalogs().agentFiles === true ? board.inputs(props.id, "image") : []);
   return (
     <NodeShell
       action={
@@ -141,6 +151,9 @@ export function AgentNode(props: { id: string; agentId?: string; task?: string }
       toolbar={<NodeToolbar id={props.id} name={t("workflow.agent.name")} locked={locked()} onLock={setLocked} />}
     >
       <Field class="wfn-field-task">
+        <Show when={pictures().length > 0}>
+          <InputPictures sources={pictures()} />
+        </Show>
         <Textarea
           class="wfn-input"
           aria-label={t("workflow.agent.task")}
@@ -154,18 +167,9 @@ export function AgentNode(props: { id: string; agentId?: string; task?: string }
             agent={agent()}
             removed={agentId() !== "" && !agent()}
             disabled={locked()}
-            onChange={(choice) =>
-              board.setFields(props.id, { agentId: choice.id, model: choice.model, provider: choice.provider })
-            }
+            onChange={(choice) => board.setFields(props.id, { agentId: choice.id, provider: choice.provider })}
           />
-          <Show when={agent()}>
-            <ModelPill
-              provider={provider()}
-              value={model()}
-              disabled={locked()}
-              onChange={(next, nextProvider) => board.setFields(props.id, { model: next, provider: nextProvider })}
-            />
-          </Show>
+          <Show when={agent()}>{(found) => <AgentModel agent={found()} />}</Show>
         </div>
       </Field>
       <ResultField id={props.id} running={run.running()} />

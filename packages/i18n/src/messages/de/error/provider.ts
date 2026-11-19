@@ -275,6 +275,10 @@ export const messages = {
     "Dieses Modell ist für dich nicht verfügbar. Wähle ein anderes Modell für diesen Agenten.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "Die Antwort des Modells wurde abgebrochen oder war ungültig. Sende deine Nachricht erneut oder wähle ein anderes Modell.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "Die Antwort des Modells war dreimal länger als sein Ausgabelimit, darum wurde der Durchgang beendet. Wähle einen geringeren Aufwand oder ein anderes Modell und sende deine Nachricht erneut.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "Die Antwort des Modells war dreimal länger als sein Ausgabelimit, darum wurde der Durchgang beendet. Öffne in den Einstellungen Eigener Anbieter, klicke bei diesem Endpunkt auf Bearbeiten und lege für dieses Modell eine größere Max. Ausgabe fest. Oder wähle einen geringeren Aufwand oder ein anderes Modell.",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode konnte das Denken dieses Modells bei diesem Aufwand nicht lesen. Wähle einen geringeren Aufwand oder ein anderes Modell und sende deine Nachricht dann erneut.",
   "error.provider.opencodeModelNotServed":

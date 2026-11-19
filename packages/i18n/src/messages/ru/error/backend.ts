@@ -295,6 +295,10 @@ export const messages = {
     "{provider} не может запустить MCP-сервер {name}. Его инструменты недоступны для {provider}. {provider} запускает сервер сам, поэтому проверка подключения в OpenBot может пройти успешно. Начните новый чат, чтобы попробовать снова.",
   "error.backend.mcpServerTimedOutInProvider":
     "{provider} не может запустить MCP-сервер {name}, потому что сервер не ответил вовремя. Начните новый чат, чтобы попробовать снова.",
+  "error.backend.mcpServerUnavailableInProvider":
+    "{provider} не может запустить MCP-сервер {name}, потому что сервер сейчас недоступен. Подождите несколько минут, затем начните новый чат, чтобы попробовать снова.",
+  "error.backend.mcpServerUnreachableInProvider":
+    "{provider} не может подключиться к MCP-серверу {name}. Откройте {name} в разделе Каталог, Приложения и проверьте, что адрес указан верно и сервер запущен. Затем начните новый чат, чтобы попробовать снова.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot не смог запустить локальное подключение для входа на этот сервер. Перезапустите OpenBot и повторите попытку.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -366,8 +370,9 @@ export const messages = {
   "error.backend.takeoverInactive": "Этот перехват браузера больше не активен.",
   "error.backend.authSubmitting": "Отправка аутентификации уже выполняется.",
   "error.backend.apiKeySaveFailed": "OpenBot не удалось сохранить ключ API. Повторите попытку.",
-  "error.backend.apiKeyNotAllowed": "Ввести ключ API может только владелец или админ сервера.",
   "error.backend.apiKeySaving": "Ключ API уже сохраняется.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot не смог прочитать ключ API. Введите ключ длиной не более 8000 символов и выберите, кто может его использовать.",
   "error.backend.authRequestInactive": "Этот запрос безопасной аутентификации больше не активен.",
   "error.backend.secureAuthUnavailable": "Безопасная аутентификация недоступна.",
   "error.backend.browserUrlRequired": "Нужен URL для браузера.",
@@ -409,7 +414,7 @@ export const messages = {
   "error.backend.popupLoadFailed": "Не удалось загрузить всплывающее окно. Повторите вход с исходной страницы.",
   "error.backend.browserTabNotFound": "Вкладка браузера не найдена.",
   "error.backend.authActive": "Аутентификация уже активна.",
-  "error.backend.authHttpsRequired": "Безопасная аутентификация требует HTTPS.",
+  "error.backend.authWebPageRequired": "Безопасная аутентификация требует HTTP/HTTPS.",
   "error.backend.authDigitsRange": "Коды аутентификации должны содержать 4–12 цифр.",
   "error.backend.authExpired": "Запрос аутентификации истёк.",
   "error.backend.authDigitsRequired": "Введите запрошенное количество цифр.",

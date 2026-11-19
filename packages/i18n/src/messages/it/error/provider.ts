@@ -269,6 +269,10 @@ export const messages = {
     "Questo modello non è disponibile per te. Scegli un altro modello per questo agente.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "La risposta del modello si è interrotta o non era valida. Invia di nuovo il messaggio o scegli un altro modello.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "La risposta del modello ha superato il suo limite di output tre volte, quindi il turno si è fermato. Scegli un impegno più basso o un altro modello, poi invia di nuovo il messaggio.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "La risposta del modello ha superato il suo limite di output tre volte, quindi il turno si è fermato. In Impostazioni, apri Provider personalizzato, fai clic su Modifica per questo endpoint e imposta un Output massimo più alto per questo modello. Oppure scegli un impegno più basso o un altro modello.",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode non è riuscito a leggere il ragionamento di questo modello con questo impegno. Seleziona un impegno minore o un altro modello, poi invia di nuovo il messaggio.",
   "error.provider.opencodeModelNotServed":

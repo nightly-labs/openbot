@@ -530,6 +530,12 @@ export const messages = {
   "workflow.canvas.version.run": "실행 전",
   "workflow.canvas.deleteUndo.title": "{name}을(를) 삭제했어요",
   "workflow.canvas.deleteUndo.action": "실행 취소",
+  "workflow.canvas.none.lead": "단계는 한 번만 설정하세요.",
+  "workflow.canvas.none.title": "이제 {run}하세요.",
+  "workflow.canvas.none.run": "실행",
+  "workflow.canvas.none.trigger": "트리거가 워크플로를 시작합니다.",
+  "workflow.canvas.none.handoff": "각 단계가 결과를 다음 단계로 넘깁니다.",
+  "workflow.canvas.none.open": "{name} 열기",
   "workflow.page.failed": "OpenBot이 이 작업을 할 수 없었어요. 다시 시도해 주세요.",
   "workflow.page.needsNewerApp":
     "이 워크플로에는 최신 버전 OpenBot의 단계가 있어요. 변경하려면 OpenBot을 업데이트하세요.",

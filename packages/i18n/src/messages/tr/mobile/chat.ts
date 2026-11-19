@@ -591,6 +591,8 @@ export const messages = {
     other: "{name}, mesaj dizileri. {count} dizi sizi bekliyor",
   },
   "mobile.chat.threads.main": "Ana sohbet",
+  "mobile.chat.threads.count": { one: "{count} mesaj dizisi", other: "{count} mesaj dizisi" },
+  "mobile.chat.threads.unreadCount": { one: "{count} okunmamış dizi", other: "{count} okunmamış dizi" },
   "mobile.chat.threads.branchedFrom": "Dallandırıldığı yer: {title}",
   "mobile.chat.threads.branchedFromDeleted": "Silinmiş bir mesaj dizisinden dallandırıldı",
   "mobile.chat.threads.new": "Yeni mesaj dizisi",

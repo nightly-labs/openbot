@@ -317,6 +317,10 @@ export const messages = {
     "{provider} konnte den MCP-Server {name} nicht starten. Seine Werkzeuge stehen {provider} nicht zur Verfügung. {provider} startet den Server selbst, daher kann der Verbindungstest in OpenBot erfolgreich sein. Starte einen neuen Chat, um es erneut zu versuchen.",
   "error.backend.mcpServerTimedOutInProvider":
     "{provider} konnte den MCP-Server {name} nicht starten, weil der Server nicht rechtzeitig geantwortet hat. Starte einen neuen Chat, um es erneut zu versuchen.",
+  "error.backend.mcpServerUnavailableInProvider":
+    "{provider} konnte den MCP-Server {name} nicht starten, weil der Server gerade nicht erreichbar ist. Warte ein paar Minuten und starte dann einen neuen Chat, um es erneut zu versuchen.",
+  "error.backend.mcpServerUnreachableInProvider":
+    "{provider} konnte den MCP-Server {name} nicht erreichen. Öffne {name} unter Marketplace, Apps und prüfe, ob die Adresse stimmt und der Server läuft. Starte dann einen neuen Chat, um es erneut zu versuchen.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot konnte die lokale Anmeldeverbindung für diesen Server nicht starten. Starte OpenBot neu und versuche es dann erneut.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -390,8 +394,9 @@ export const messages = {
   "error.backend.takeoverInactive": "Diese Browserübernahme ist nicht mehr aktiv.",
   "error.backend.authSubmitting": "Die Authentifizierung wird bereits übermittelt.",
   "error.backend.apiKeySaveFailed": "OpenBot konnte den API-Schlüssel nicht speichern. Versuche es erneut.",
-  "error.backend.apiKeyNotAllowed": "Nur der Serverinhaber oder ein Admin kann einen API-Schlüssel eingeben.",
   "error.backend.apiKeySaving": "Der API-Schlüssel wird bereits gespeichert.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot konnte den API-Schlüssel nicht lesen. Gib einen Schlüssel mit höchstens 8.000 Zeichen ein und wähle, wer ihn nutzen darf.",
   "error.backend.authRequestInactive": "Diese sichere Authentifizierungsanfrage ist nicht mehr aktiv.",
   "error.backend.secureAuthUnavailable": "Die sichere Authentifizierung ist nicht verfügbar.",
   "error.backend.browserUrlRequired": "Eine Browser-URL ist erforderlich.",
@@ -436,7 +441,7 @@ export const messages = {
     "Das Pop-up konnte nicht geladen werden. Versuche die Anmeldung erneut auf der ursprünglichen Seite.",
   "error.backend.browserTabNotFound": "Browser-Tab nicht gefunden.",
   "error.backend.authActive": "Die Authentifizierung ist bereits aktiv.",
-  "error.backend.authHttpsRequired": "Die sichere Authentifizierung erfordert HTTPS.",
+  "error.backend.authWebPageRequired": "Die sichere Authentifizierung erfordert HTTP/HTTPS.",
   "error.backend.authDigitsRange": "Authentifizierungscodes benötigen 4–12 Ziffern.",
   "error.backend.authExpired": "Die Authentifizierungsanfrage ist abgelaufen.",
   "error.backend.authDigitsRequired": "Gib die angeforderte Anzahl an Ziffern ein.",

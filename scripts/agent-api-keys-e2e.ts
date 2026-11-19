@@ -174,12 +174,10 @@ try {
     ]);
   });
 
-  await step("a member cannot answer, and the form stays open", async () => {
+  await step("a member saves the key", async () => {
     const { id, spec } = requestKey({ name: "OPENAI_API_KEY", title: "OpenAI API key" }, "turn-1");
-    await assert.rejects(answer(id, submitted(spec, KEY), MEMBER));
-    assert.equal(client.answers.has(id), false);
     assert.deepEqual(await Effect.runPromise(apiKeys.list(AGENT)), []);
-    await answer(id, submitted(spec, KEY));
+    await answer(id, submitted(spec, KEY), MEMBER);
     const result = agentAnswer(client.answers.get(id));
     const path = join(root, "agent-api-keys", AGENT, "OPENAI_API_KEY");
     assert.deepEqual(result, { status: "saved", blockId: `block-${id}`, name: "OPENAI_API_KEY", path });
@@ -790,9 +788,7 @@ try {
       const { id, spec } = ask("DEPLOY_TOKEN", "turn-vault-1");
       const values = { [API_KEY_FIELD_ID]: ` ${VAULT_KEY}\n`, [API_KEY_SCOPE_FIELD_ID]: "All agents (Vault)" };
       const answers = uiBlockAnswersFromResponse(spec, { actionId: "submit", values });
-      await assert.rejects(respond(id, answers, MEMBER));
-      assert.equal(vault.items.apiKeys("agent-4").length, 0, "a member saved a key in the Vault");
-      await respond(id, answers);
+      await respond(id, answers, MEMBER);
       const vaultPath = join(root, "form-api-keys", ".vault", AGENT, "DEPLOY_TOKEN");
       const result = agentAnswer(formClient.answers.get(id));
       assert.deepEqual(result, {
@@ -855,6 +851,43 @@ try {
     assert.deepEqual(vault.items.apiKeys("agent-4"), []);
     assert.deepEqual(await Effect.runPromise(keys.list("agent-4")), []);
     await assert.rejects(stat(join(root, "private-api-keys", ".vault", "agent-4", "PRIVATE_TOKEN")));
+  });
+
+  await step("a typed key that the form cannot read keeps the form open, and saves nothing", async () => {
+    const { keys, registry: unreadRegistry } = await vaultRegistry("unread");
+    const spec = apiKeyFormSpec({ name: "UNREAD_TOKEN", title: "Unread token", vault: true });
+    assert.ok(spec);
+    const id = nextRequest++;
+    unreadRegistry.surfaceUiBlock(
+      client,
+      { id, method: "item/tool/call", params: { threadId: THREAD, turnId: "turn-unread" } },
+      { blockId: `block-${id}`, spec, apiKey: { name: "UNREAD_TOKEN", vault: true } },
+    );
+    const respond = (answers: Record<string, string[]>, responder?: PromptResponder) =>
+      runCauseEffect(unreadRegistry.respondToPrompt({ requestId: id, answers }, responder));
+    const unreadable = /OpenBot could not read the API key/;
+    await assert.rejects(
+      respond({ [API_KEY_FIELD_ID]: [KEY], [API_KEY_SCOPE_FIELD_ID]: ["Todos os agentes"] }, MEMBER),
+      unreadable,
+    );
+    await assert.rejects(
+      respond({ [API_KEY_FIELD_ID]: [KEY], [API_KEY_SCOPE_FIELD_ID]: ["Todos os agentes"] }),
+      unreadable,
+    );
+    await assert.rejects(
+      respond({ [API_KEY_FIELD_ID]: ["k".repeat(8_001)], [API_KEY_SCOPE_FIELD_ID]: ["All agents (Vault)"] }),
+      unreadable,
+    );
+    assert.equal(client.answers.has(id), false, "the agent got an answer for a refused form");
+    assert.deepEqual(await Effect.runPromise(keys.list(AGENT)), []);
+    const message = snapshot.messages.find((candidate) => candidate.uiBlock?.blockId === `block-${id}`);
+    assert.equal(message?.uiBlock?.state.status, "pending");
+    await respond({ [API_KEY_FIELD_ID]: [KEY], [API_KEY_SCOPE_FIELD_ID]: ["All agents (Vault)"] });
+    assert.equal(agentAnswer(client.answers.get(id)).status, "saved");
+    assert.deepEqual(
+      (await Effect.runPromise(keys.list(AGENT))).map((key) => key.name),
+      ["UNREAD_TOKEN"],
+    );
   });
 
   await writeFile(join(OUT, "report.json"), `${JSON.stringify({ passed: true, steps }, null, 2)}\n`);

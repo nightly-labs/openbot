@@ -25,6 +25,7 @@ export const messages = {
   "status.agent.screenCaptureScreen": "التقاط الشاشة الرئيسية وإرسال الصورة إلى نموذج الوكيل.",
   "status.agent.screenCaptureChannel":
     "تظهر الصورة في القناة {channel}، ويمكن لكل عضو في هذا الخادم يقرأ القناة رؤيتها.",
+  "status.agent.screenCapturePermissionNext": "قد يطلب منك macOS بعد ذلك السماح لـ OpenBot بـ «تسجيل الشاشة».",
   "status.agent.screenCaptureDisplay": "التقاط الشاشة {name} وإرسال الصورة إلى نموذج الوكيل.",
   "status.agent.screenCaptureWindow": "التقاط النافذة {name} وإرسال الصورة إلى نموذج الوكيل.",
   "status.agent.screenCaptureRegion":
@@ -70,6 +71,7 @@ export const messages = {
   "status.agent.browserActing": "جارٍ استخدام صفحة الويب…",
   "status.agent.browserReviewing": "جارٍ مراجعة صفحة الويب…",
   "status.agent.memoriesSearching": "جارٍ البحث في ذكرياته…",
+  "status.agent.chatsSearching": "جارٍ البحث في دردشاته السابقة…",
   "status.agent.memoriesSearched": {
     zero: "بحث في ذكرياته: لم يُعثر على شيء",
     one: "بحث في ذكرياته: عُثر على ذكرى واحدة",

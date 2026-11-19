@@ -1,10 +1,10 @@
 {
-  "version": "0.73.0",
+  "version": "0.74.0",
   "highlights": [
-    "Update your joined servers to this version too, so that custom image sizes and the Sunra and Higgsfield models work there.",
-    "See the side threads of each agent in the sidebar, and filter the sidebar by agents, channels, unread chats or folders.",
-    "Edit one workflow together with other people at the same time.",
-    "OpenBot uses much less CPU while many agents work, and its database uses much less space.",
-    "Agents finish a checkout when the bank asks for a 3-D Secure code that they can read in your email or SMS."
+    "Update your joined servers to this version too, so that faster canvas pictures, Custom video lengths and agents that finish a request work there.",
+    "Share your invite link in Settings > Invite friends and get credit from the payments of the friends who join.",
+    "Put nodes of a workflow canvas in a group, and give a video step any length that its model makes.",
+    "Agents now finish your request without a \"continue\" from you.",
+    "Claude and ChatGPT agents no longer stay on \"working\" for hours when the provider stops responding."
   ]
 }

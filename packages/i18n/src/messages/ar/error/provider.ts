@@ -245,6 +245,10 @@ export const messages = {
   "error.provider.opencodeModelUnavailable": "هذا النموذج غير متاح لك. اختر نموذجًا آخر لهذا الوكيل.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "انقطع رد النموذج أو لم يكن صالحًا. أرسل رسالتك مرة أخرى أو اختر نموذجًا آخر.\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "كان رد النموذج أطول من حد الإخراج ثلاث مرات، فتوقف الدور. اختر جهدًا أقل أو نموذجًا آخر، ثم أرسل رسالتك مرة أخرى.",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "كان رد النموذج أطول من حد الإخراج ثلاث مرات، فتوقف الدور. في الإعدادات، افتح مزوّد مخصص، وانقر تعديل على نقطة النهاية هذه، واضبط أقصى إخراج أكبر لهذا النموذج. أو اختر جهدًا أقل أو نموذجًا آخر.",
   "error.provider.opencodeReasoningOverlap":
     "تعذّر على OpenCode قراءة تفكير هذا النموذج بهذا المستوى من الجهد. اختر جهدًا أقل أو نموذجًا آخر، ثم أرسل رسالتك مرة أخرى.",
   "error.provider.opencodeModelNotServed":

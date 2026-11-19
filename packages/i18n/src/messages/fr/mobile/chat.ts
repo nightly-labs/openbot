@@ -602,6 +602,8 @@ export const messages = {
     other: "{name}, fils. {count} fils vous attendent",
   },
   "mobile.chat.threads.main": "Chat principal",
+  "mobile.chat.threads.count": { one: "{count} fil", other: "{count} fils" },
+  "mobile.chat.threads.unreadCount": { one: "{count} fil non lu", other: "{count} fils non lus" },
   "mobile.chat.threads.branchedFrom": "Dérivé de {title}",
   "mobile.chat.threads.branchedFromDeleted": "Dérivé d’un fil supprimé",
   "mobile.chat.threads.new": "Nouveau fil",

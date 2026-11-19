@@ -65,6 +65,7 @@ import {
 } from "./developer-instructions";
 import {
   appendRoutineDigest,
+  hasEarlierChat,
   readHandoffHistory,
   renderProviderHandoff,
   renderRoutineHandoff,
@@ -1599,7 +1600,10 @@ export class ThreadLifecycle {
       const text = captures.get(session.id)?.get(row.message.turnId);
       if (text) steps.set(row.message.id, text);
     }
-    return renderProviderHandoff(history, agentNames, steps, { branch });
+    return renderProviderHandoff(history, agentNames, steps, {
+      branch,
+      earlierChat: hasEarlierChat(this.#store.database, agentId, threadId, history.resetMessageId),
+    });
   }).bind(this);
 }
 

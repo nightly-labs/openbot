@@ -428,10 +428,11 @@ export const messages = {
     "Dieser Server kann keine eigene Benachrichtigungsstufe für einen Agent speichern. Aktualisiere OpenBot auf dem Computer, auf dem er läuft.",
   "mobile.agent.newChat.title": "Neuer Chat",
   "mobile.agent.newChat.starting": "Neuer Chat wird gestartet…",
-  "mobile.agent.newChat.footer": "Der Agent vergisst diesen Chat. Seine Einrichtung bleibt erhalten.",
+  "mobile.agent.newChat.footer":
+    "Der Agent beginnt neu und kann diesen Chat bei Bedarf noch durchsuchen. Seine Einrichtung bleibt erhalten.",
   "mobile.agent.newChat.confirmTitle": "Neuen Chat mit {name} starten?",
   "mobile.agent.newChat.confirmBody":
-    "Der Agent vergisst diesen Chat. Die Nachrichten bleiben über einer Trennlinie sichtbar. Anweisungen, Modell, Werkzeuge, Erinnerungen, Arbeitsbereich und Browser bleiben unverändert.",
+    "Der Agent beginnt neu und kann diesen Chat bei Bedarf noch durchsuchen. Die Nachrichten bleiben über einer Trennlinie sichtbar. Anweisungen, Modell, Werkzeuge, Erinnerungen, Arbeitsbereich und Browser bleiben unverändert.",
   "mobile.agent.newChat.confirm": "Neuen Chat starten",
   "mobile.agent.newChat.failed": "Ein neuer Chat konnte nicht gestartet werden",
   "mobile.agent.newChat.failedBody": "Der Host konnte keinen neuen Chat starten.",

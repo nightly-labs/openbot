@@ -188,7 +188,7 @@ import {
   jsonStringFit,
   type ModelTextCut,
 } from "./model-text-limit";
-import { websiteMatchesOrigin } from "./password-vault";
+import { isWebProtocol, websiteMatchesOrigin } from "./password-vault";
 import { allowPinchZoom, blockPinchZoom } from "./pinch-zoom";
 import type { DynamicToolCallParams, DynamicToolResult } from "./protocol";
 import { isRecord } from "./protocol";
@@ -538,6 +538,7 @@ export class BrowserHost {
     { ownerThreadId: string | null; ownerAgentId: string | null; sharedThreadIds: ReadonlySet<string> }
   >();
   readonly #memoryLow: () => boolean;
+  readonly #tabLimit: () => number;
   readonly #idleTabSweep: NodeJS.Timeout;
   readonly #awakeTabGraceMs: number;
   readonly #webPreferences: ReturnType<typeof browserWebPreferences>;
@@ -551,6 +552,7 @@ export class BrowserHost {
       recordingMaxConcurrent?: number;
       recordingMaxAggregateBytes?: number;
       memoryLow?: () => boolean;
+      tabLimit?: () => number;
       browserProfile?: (agentId: string) => AgentBrowserProfile;
       profileExists?: (profileId: string) => boolean;
       agentChat?: (threadId: string) => boolean;
@@ -577,6 +579,7 @@ export class BrowserHost {
       window.once("closed", () => this.#closeBackgroundWindow());
     }
     this.#memoryLow = options.memoryLow ?? (() => false);
+    this.#tabLimit = options.tabLimit ?? (() => INPUT_LIMITS.browserTabs);
     this.#awakeTabGraceMs = options.tabSleep?.awakeGraceMs ?? AWAKE_TAB_GRACE_MS;
     this.#browserProfile = options.browserProfile ?? (() => ({ kind: "shared" }));
     this.#profileExists = options.profileExists ?? (() => false);
@@ -933,9 +936,7 @@ export class BrowserHost {
     privateSession?: Session,
   ): Effect.fn.Return<BrowserTab, BrowserOperationError> {
     if (!this.#hasTabCapacity(ownerThreadId, ownerAgentId)) {
-      return yield* browserFailure(
-        new Error(sourceText("error.backend.browserTabLimit", { limit: INPUT_LIMITS.browserTabs })),
-      );
+      return yield* browserFailure(new Error(sourceText("error.backend.browserTabLimit", { limit: this.#tabLimit() })));
     }
     if (this.#memoryLow()) return yield* browserFailure(new Error(sourceText("error.backend.browserLowMemory")));
     const normalizedUrl = yield* browserSync(() => normalizeBrowserUrl(url));
@@ -1019,7 +1020,7 @@ export class BrowserHost {
         tab.ownerThreadId === ownerThreadId &&
         (tab.ownerAgentId === null || tab.ownerAgentId === ownerAgentId),
     );
-    return tabs.length < INPUT_LIMITS.browserTabs;
+    return tabs.length < this.#tabLimit();
   }
 
   readonly activate = Effect.fn("BrowserHost.activate")(function* (
@@ -1418,8 +1419,7 @@ export class BrowserHost {
     const tab = yield* this.#requireTab(args.tabId);
     if (tab.secret) return yield* browserFailure(new Error(sourceText("error.backend.authActive")));
     const url = yield* browserSync(() => new URL(currentTabUrl(tab)));
-    if (url.protocol !== "https:")
-      return yield* browserFailure(new Error(sourceText("error.backend.authHttpsRequired")));
+    if (!isWebProtocol(url)) return yield* browserFailure(new Error(sourceText("error.backend.authWebPageRequired")));
     yield* browserSync(() => this.#requireIsolatedFromConnectedTabs(tab, url.origin));
     const digitFields = args.method === "password" && args.targets.length > 2;
     if ((args.method !== "password" || digitFields) && args.digits < 4)
@@ -1469,7 +1469,10 @@ export class BrowserHost {
         true,
       );
       const fieldOrigin = entry.origin;
-      if (fieldOrigin !== url.origin && !websiteMatchesOrigin({ url: url.origin, autofill: "anywhere" }, fieldOrigin))
+      if (
+        fieldOrigin !== url.origin &&
+        (url.protocol === "http:" || !websiteMatchesOrigin({ url: url.origin, autofill: "anywhere" }, fieldOrigin))
+      )
         return yield* browserFailure(
           new Error("The field target is in a frame of another site. Use browser takeover for this form."),
         );
