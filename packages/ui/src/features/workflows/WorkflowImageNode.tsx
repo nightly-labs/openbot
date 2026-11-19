@@ -511,6 +511,7 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
   const fileName = () => (kind() === "video" ? "video.mp4" : "image.png");
   const [viewer, setViewer] = createSignal<ImageLightboxOpening>();
   let media: HTMLElement | undefined;
+  let promptInput: HTMLTextAreaElement | undefined;
   const openViewer = () => {
     const shown = board.shown(props.id);
     const images = board.results(props.id).flatMap((result) => {
@@ -533,6 +534,9 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
     setViewer({ images, index: Math.max(0, index), origin: media });
   };
   const making = () => run.running();
+  const pictureLoading = () => shownValue() !== undefined && shownPicture() !== null && Boolean(board.catalogs().media);
+  const generated = () => !making() && (Boolean(shownPicture()) || pictureLoading());
+  const panelShown = () => generated() || !collapsed();
   const specsDisabled = () => locked() || making();
   const durationText = (value: number) => t("workflow.video.seconds", { value: String(value) });
   const frameText = () => (specs().size ? t("workflow.image.aspect.custom") : specs().aspect);
@@ -593,10 +597,7 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
           <Show
             when={shownPicture()}
             fallback={
-              <Show
-                when={shownValue() === undefined || shownPicture() === null || !board.catalogs().media}
-                fallback={<CardPictureLoading />}
-              >
+              <Show when={!pictureLoading()} fallback={<CardPictureLoading />}>
                 <span class="wfn-media-empty" aria-hidden="true">
                   <Show when={kind() === "video"} fallback={<Image />}>
                     <Film />
@@ -634,7 +635,11 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
             )}
           </Show>
         </Show>
-        <div class="wfn-overlay wfn-media-overlay" data-collapsed={collapsed() ? "" : undefined}>
+        <div
+          class="wfn-overlay wfn-media-overlay"
+          data-collapsed={collapsed() ? "" : undefined}
+          data-reveal={generated() ? "" : undefined}
+        >
           <div class="wfn-overlay-bar">
             <Show when={making()}>
               <span class="wfn-elapsed" aria-hidden="true">
@@ -738,9 +743,14 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
               </Show>
             </span>
             <Show
-              when={!collapsed()}
+              when={!generated() && !collapsed()}
               fallback={
-                <Button variant="ghost" size="xs" class="wfn-chip" onClick={() => setCollapsed(false)}>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  class="wfn-chip"
+                  onClick={() => (generated() ? promptInput?.focus() : setCollapsed(false))}
+                >
                   <Type aria-hidden="true" />
                   {t("workflow.prompt.title")}
                 </Button>
@@ -757,7 +767,7 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
               </Button>
             </Show>
           </div>
-          <Show when={!collapsed()}>
+          <Show when={panelShown()}>
             <div class="wfn-panel" data-inputs={inputs().length > 0 ? "" : undefined}>
               <Show when={inputs().length > 0}>
                 <fieldset class="wfn-media-inputs" aria-label={t("workflow.media.inputs")}>
@@ -767,6 +777,9 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
                 </fieldset>
               </Show>
               <Textarea
+                ref={(element: HTMLTextAreaElement) => {
+                  promptInput = element;
+                }}
                 class="wfn-input"
                 rows={1}
                 aria-label={text("description")}
