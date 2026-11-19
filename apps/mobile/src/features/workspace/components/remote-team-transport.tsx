@@ -494,7 +494,9 @@ export const RemoteTeamTransport = memo(
       onConnectionUpdate: async (update: RemoteTeamConnectionUpdate) => latest.current.props.onConnectionUpdate(update),
       onDiagnostic: async ({ hostId, step, detail }: RemoteTeamDiagnostic) =>
         supportLog.add(
-          step === "failed" || step === "stalled" || step === "signal-error" ? "warn" : "info",
+          step === "failed" || step === "stalled" || step === "signal-error" || step === "ice-candidate-error"
+            ? "warn"
+            : "info",
           "connection",
           `${hostId} peer ${step}${detail ? `: ${detail}` : ""}`,
         ),

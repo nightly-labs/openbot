@@ -87,6 +87,7 @@ import { markRemoteSync, type RemoteRequestProfile, startRemoteRequest } from ".
 export type { RemoteFileUpload } from "./file-upload";
 export { MOBILE_ATTACHMENT_BYTES } from "./file-upload";
 
+import { iceServerErrorDetail } from "./ice-diagnostics";
 import {
   judgePath,
   PATH_CHECK_INTERVAL_MS,
@@ -311,6 +312,7 @@ export interface RemoteTeamDiagnostic {
     | "peer-state"
     | "ice-state"
     | "ice-gathering"
+    | "ice-candidate-error"
     | "route"
     | "ice-recovery"
     | "channels-open"
@@ -1674,6 +1676,14 @@ export function createRemoteTeamPeer(
     connection.ondatachannel = (event) => {
       const kind = channelKind(event.channel.label);
       if (kind) bindChannel(state, kind, event.channel, actions);
+    };
+    const candidateErrors = new Set<string>();
+    connection.onicecandidateerror = (event) => {
+      if (state.connection !== connection || state.closed || peer !== state) return;
+      const detail = iceServerErrorDetail(event.url, event.errorCode, event.errorText);
+      if (candidateErrors.has(detail)) return;
+      candidateErrors.add(detail);
+      diagnose(state, "ice-candidate-error", detail);
     };
     // A path that does not start can stop at gathering (no local candidates) or at the checks.
     connection.onicegatheringstatechange = () => {

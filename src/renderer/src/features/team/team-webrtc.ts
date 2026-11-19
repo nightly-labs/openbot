@@ -49,6 +49,11 @@ interface MainBridgeMessage {
   channel?: "rpc" | "events" | "files" | "desktop";
   data?: string | ArrayBuffer;
   path?: "p2p" | "relay";
+  route?: string;
+  side?: "host" | "client";
+  url?: string;
+  errorCode?: number;
+  errorText?: string;
   code?: string;
   message?: string;
   /** On `peer-error` and `signal-closed`: this peer does not connect its Signal socket again. */
@@ -715,6 +720,21 @@ function createPeerConnection(state: PeerState, iceServers: RTCIceServer[]): RTC
       sdpMLineIndex: event.candidate.sdpMLineIndex,
     });
   };
+  const candidateErrors = new Set<string>();
+  connection.onicecandidateerror = (event) => {
+    if (state.peerConnection !== connection) return;
+    const key = `${event.url} ${event.errorCode}`;
+    if (candidateErrors.has(key)) return;
+    candidateErrors.add(key);
+    post({
+      type: "ice-candidate-error",
+      peerId: state.id,
+      side: state.role,
+      url: event.url,
+      errorCode: event.errorCode,
+      errorText: event.errorText,
+    });
+  };
   connection.ondatachannel = (event) => {
     // A host reads the egress channel of a desktop client. Main decides if it uses it.
     if (event.channel.label === BROWSER_EGRESS_CHANNEL && state.role === "host") {
@@ -1000,11 +1020,10 @@ function requiredDescriptionSdp(description: RTCSessionDescriptionInit): string 
 }
 
 async function reportSelectedPath(state: PeerState, connection: RTCPeerConnection): Promise<void> {
-  post({ type: "ice-path", peerId: state.id, path: await selectedPath(connection) });
+  post({ type: "ice-path", peerId: state.id, side: state.role, ...(await selectedPath(connection)) });
 }
 
-/** `relay` when either end of the selected pair is a TURN allocation, which keeps the credentials it was made with. */
-async function selectedPath(connection: RTCPeerConnection): Promise<"relay" | "p2p"> {
+async function selectedPath(connection: RTCPeerConnection): Promise<{ path: "relay" | "p2p"; route: string }> {
   const stats = await connection.getStats();
   const transport = [...stats.values()].find((report) => report.type === "transport" && report.selectedCandidatePairId);
   const selectedPair = transport ? stats.get(transport.selectedCandidatePairId) : null;
@@ -1016,7 +1035,14 @@ async function selectedPath(connection: RTCPeerConnection): Promise<"relay" | "p
     [...stats.values()].find((report) => report.type === "candidate-pair" && report.state === "succeeded");
   const local = pair ? stats.get(pair.localCandidateId) : null;
   const remote = pair ? stats.get(pair.remoteCandidateId) : null;
-  return local?.candidateType === "relay" || remote?.candidateType === "relay" ? "relay" : "p2p";
+  return {
+    path: local?.candidateType === "relay" || remote?.candidateType === "relay" ? "relay" : "p2p",
+    route: `${candidateRoute(local)} -> ${candidateRoute(remote)}`,
+  };
+}
+
+function candidateRoute(candidate: { candidateType?: string; protocol?: string } | null | undefined): string {
+  return `${candidate?.candidateType ?? "unknown"}/${candidate?.protocol ?? "unknown"}`;
 }
 
 function sendSignal(state: PeerState, message: SignalClientMessage): void {
