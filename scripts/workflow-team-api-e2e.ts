@@ -10,7 +10,8 @@
 // event socket about a change. With routine results, the host advertises `workflows-chats-v1` to a
 // protocol 9 peer, and only an owner or admin adds a Telegram trigger or a Slack output. The host
 // advertises `workflows-channels-v1` to a protocol 9 peer, and only an owner or admin adds an output
-// into an OpenBot channel. The codec carries kinds and statuses that this app does not know, and
+// into an OpenBot channel. A member puts that output in a canvas group, but a change of its settings
+// still needs an owner. The codec carries kinds and statuses that this app does not know, and
 // the client shows a workflow with such a node read-only; a member reads the graph of an old version.
 // The host advertises `workflows-media-v1` to a protocol 9 peer, and a member keeps an uploaded PNG
 // as a picture of the host; a GIF, a used draft and a client without the capability are refused.
@@ -44,14 +45,16 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import type {
-  AgentAccessChange,
-  WorkflowDetail,
-  WorkflowGraph,
-  WorkflowMediaAccountCredits,
-  WorkflowMediaCatalogModel,
-  WorkflowMediaPriceRequest,
-  WorkflowNode,
+import {
+  type AgentAccessChange,
+  WORKFLOW_GROUP_FIELDS,
+  type WorkflowDetail,
+  type WorkflowGraph,
+  type WorkflowMediaAccountCredits,
+  type WorkflowMediaCatalogModel,
+  type WorkflowMediaPriceRequest,
+  type WorkflowNode,
+  workflowVideoLengthChoices,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
@@ -138,6 +141,8 @@ const mediaAccounts: (string | null)[] = [];
 const mediaRequests: { transparent: boolean; prompt: string; aspect: string }[] = [];
 /** The model id at the provider and the catalog id of each media request, in order. */
 const mediaModels: { model: string; catalogId: string }[] = [];
+/** The length in seconds that each media request asks for, in order. */
+const mediaDurations: number[] = [];
 /** Each price request that reached the host's price read, in order. */
 const priceRequests: WorkflowMediaPriceRequest[] = [];
 /** A Higgsfield model that only the live list has, as the host's catalog read gives it after the sign-in. */
@@ -149,7 +154,8 @@ const LIVE_MODEL: WorkflowMediaCatalogModel = {
   maker: "Kuaishou",
   kinds: ["video"],
   aspects: ["16:9", "9:16", "1:1"],
-  durations: [5, 10],
+  // Each second from 3 to 15, as the host reads a duration range: more lengths than the short list shows.
+  durations: Array.from({ length: 13 }, (_, index) => index + 3),
   resolutions: ["720p", "1080p"],
   transparent: false,
 };
@@ -404,6 +410,7 @@ async function startHost(): Promise<Host> {
       generateMedia: (request) => {
         mediaAccounts.push(request.account);
         mediaModels.push({ model: request.model, catalogId: request.catalogId });
+        mediaDurations.push(request.specs.duration);
         mediaRequests.push({
           transparent: request.specs.transparent,
           prompt: request.prompt,
@@ -992,6 +999,47 @@ try {
     const nodes = JSON.stringify(record(saved.graph, "graph").nodes);
     assert.ok(nodes.includes("chat-channel") && nodes.includes("channel-e2e"), nodes);
     return { denied, owner: 200, capability: WORKFLOWS_CHANNELS_CAPABILITY };
+  });
+
+  await step("groups: a member groups a channel output, and its settings still need an owner", async () => {
+    const before = Number((await ok(WORKFLOWS_ROUTES.get, member, { workflowId: ids.open })).revision);
+    const output: WorkflowNode = {
+      id: "chat-channel-output",
+      kind: "output",
+      at: at(600),
+      fields: { target: "chat-channel", channelId: "channel-e2e" },
+    };
+    const group = { [WORKFLOW_GROUP_FIELDS.id]: "group-e2e", [WORKFLOW_GROUP_FIELDS.name]: "Posts" };
+    const grouped = (fields: WorkflowNode["fields"]): WorkflowGraph => {
+      const graph = withOutput(agentGraph(open), { ...output, fields: { ...fields, ...group } });
+      return {
+        ...graph,
+        nodes: graph.nodes.map((node) =>
+          node.kind === "agent" ? { ...node, fields: { ...node.fields, ...group } } : node,
+        ),
+      };
+    };
+    const saved = await ok(WORKFLOWS_ROUTES.saveGraph, member, {
+      workflowId: ids.open,
+      baseRevision: before,
+      graph: grouped(output.fields),
+    });
+    assert.equal(saved.ok, true);
+    const after = await ok(WORKFLOWS_ROUTES.get, member, { workflowId: ids.open });
+    const nodes = JSON.stringify(record(after.graph, "graph").nodes);
+    assert.ok(nodes.includes("group-e2e") && nodes.includes("Posts"), nodes);
+    const denied = await refused(
+      WORKFLOWS_ROUTES.saveGraph,
+      member,
+      {
+        workflowId: ids.open,
+        baseRevision: Number(after.revision),
+        graph: grouped({ ...output.fields, channelId: "other" }),
+      },
+      403,
+      "error.team.adminRequired",
+    );
+    return { grouped: 200, denied };
   });
 
   await step("restore: a version that names the closed agent answers as missing", async () => {
@@ -1747,7 +1795,9 @@ try {
         const badPrice = await raw(WORKFLOWS_MEDIA_CATALOG_ROUTES.price, { ...ask, duration: -1 });
         assert.equal(badPrice.status, 400, JSON.stringify(badPrice.body));
         assert.equal(priceRequests.length, before + 1);
-        // A step with the live model reaches the media maker with its id at Higgsfield and its catalog id.
+        // A step with the live model reaches the media maker with its id at Higgsfield, its catalog id and
+        // a custom length that the short list of the canvas does not show.
+        assert.ok(!workflowVideoLengthChoices(LIVE_MODEL.durations).includes(7), "7 s is a custom length");
         const beforeModels = mediaModels.length;
         const workflow = await hostWorkflow("Live Higgsfield model", {
           nodes: [
@@ -1756,7 +1806,7 @@ try {
               id: "image",
               kind: "image",
               at: at(300),
-              fields: { model: LIVE_MODEL.id, media: "video", aspect: "16:9", duration: 10, resolution: "1080p" },
+              fields: { model: LIVE_MODEL.id, media: "video", aspect: "16:9", duration: 7, resolution: "1080p" },
             },
           ],
           edges: [{ id: "edge", from: "prompt", to: "image", type: "text" }],
@@ -1771,6 +1821,7 @@ try {
         assert.deepEqual(mediaModels.slice(beforeModels), [
           { model: LIVE_MODEL.providerModel, catalogId: LIVE_MODEL.id },
         ]);
+        assert.deepEqual(mediaDurations.slice(beforeModels), [7], "the step asks for the custom length");
         const old = await raw(
           WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog,
           {},

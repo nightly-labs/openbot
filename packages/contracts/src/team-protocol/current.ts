@@ -6,6 +6,7 @@ import { ACP_REGISTRY_CAPABILITY } from "./acp-registry-v1";
 import { AGENT_ACCESS_CAPABILITY } from "./agent-access-v1";
 import { AGENT_ACTIVE_QUEUES_CAPABILITY } from "./agent-active-queues-v1";
 import { AGENT_ADMIN_CAPABILITY } from "./agent-admin-v1";
+import { AGENT_BACKGROUND_WORK_CAPABILITY } from "./agent-background-work-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "./agent-backup-models-v1";
 import { AGENT_COLORS_CAPABILITY } from "./agent-colors-v1";
 import { AGENT_CREATE_OPERATION_CAPABILITY } from "./agent-create-operation-v1";
@@ -168,8 +169,10 @@ import { TEAM_REASONING_EFFORTS_CAPABILITY } from "./reasoning-efforts-v1";
 import { ROUTINE_FLOW_STOP_CAPABILITY } from "./routine-flow-stop-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "./routine-flows-v1";
 import { ROUTINE_PAUSE_REASONS_CAPABILITY } from "./routine-pause-reasons-v1";
+import { ROUTINE_QUIET_ANSWERS_CAPABILITY } from "./routine-quiet-answers-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "./routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "./routine-results-v1";
+import { ROUTINE_RESULTS_WHATSAPP_CAPABILITY } from "./routine-results-whatsapp-v1";
 import { ROUTINE_RUN_COMMAND_CAPABILITY } from "./routine-run-command-v1";
 import { ROUTINE_RUN_PLACE_CAPABILITY } from "./routine-run-place-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "./routines-once-v1";
@@ -183,6 +186,7 @@ import { SIDEBAR_PINS_CAPABILITY } from "./sidebar-pins-v1";
 import { SIGN_IN_RELAY_DEEP_LINK_CAPABILITY } from "./sign-in-relay-deep-link-v1";
 import { SIGN_IN_RELAY_CAPABILITY } from "./sign-in-relay-v1";
 import { SKILL_LEARNING_CAPABILITY } from "./skill-learning-v1";
+import { SKILL_PROBLEMS_CAPABILITY } from "./skill-problems-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "./skills-admin-v1";
 import { SKILLS_EVENTS_CAPABILITY } from "./skills-events-v1";
 import { STORAGE_CHANNEL_CAPABILITY } from "./storage-channel-v1";
@@ -310,6 +314,7 @@ export {
   AGENT_ACCESS_CAPABILITY,
   AGENT_ACTIVE_QUEUES_CAPABILITY,
   AGENT_ADMIN_CAPABILITY,
+  AGENT_BACKGROUND_WORK_CAPABILITY,
   AGENT_BACKUP_MODELS_CAPABILITY,
   AGENT_COLORS_CAPABILITY,
   AGENT_CREATE_OPERATION_CAPABILITY,
@@ -440,6 +445,7 @@ export {
   ROUTINE_FLOW_STOP_CAPABILITY,
   ROUTINE_FLOWS_CAPABILITY,
   ROUTINE_PAUSE_REASONS_CAPABILITY,
+  ROUTINE_QUIET_ANSWERS_CAPABILITY,
   ROUTINE_RECOVERY_CAPABILITY,
   ROUTINE_RESULTS_CAPABILITY,
   ROUTINE_RUN_PLACE_CAPABILITY,
@@ -454,6 +460,7 @@ export {
   SIGN_IN_RELAY_CAPABILITY,
   SIGN_IN_RELAY_DEEP_LINK_CAPABILITY,
   SKILL_LEARNING_CAPABILITY,
+  SKILL_PROBLEMS_CAPABILITY,
   SKILLS_ADMIN_CAPABILITY,
   SKILLS_EVENTS_CAPABILITY,
   STORAGE_CAPABILITY,
@@ -798,8 +805,12 @@ const TEAM_CAPABILITY_REGISTRY = [
   [TEAM_CAPABILITY_BASELINE_CAPABILITY, V10],
   [SERVER_SAFE_MODE_CAPABILITY, V10],
   [WEBHOOK_AGENT_SECRET_CAPABILITY, V10],
+  [AGENT_BACKGROUND_WORK_CAPABILITY, V10],
   [ATTACHMENT_PREVIEW_CAPABILITY, V10],
   [WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY, V10],
+  [ROUTINE_QUIET_ANSWERS_CAPABILITY, V10],
+  [SKILL_PROBLEMS_CAPABILITY, V10],
+  [ROUTINE_RESULTS_WHATSAPP_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

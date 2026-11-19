@@ -4,14 +4,12 @@ import { dirname, join } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT,
-  AGENT_WELCOME_ITEM_TYPE,
   type AgentAccessLevel,
   type AgentAccessRole,
   type AgentEvent,
   type AgentSummary,
   AnalyticsInputError,
   agentAccessRank,
-  CHANNEL_RESUME_ITEM_TYPE,
   type ChatColors,
   canAdministerServer,
   type DirectConversationPage,
@@ -24,8 +22,6 @@ import {
   type DuplicateAgentResult,
   isAgentEvent,
   isTeamRealtimeEvent,
-  ROUTINE_QUIET_ANSWER_ITEM_TYPE,
-  SETTING_LINK_ITEM_TYPE_PREFIX,
   type SidebarLayoutSnapshot,
   type TeamMemberSummary,
   type TeamPresenceSnapshot,
@@ -37,6 +33,7 @@ import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { ACP_REGISTRY_CAPABILITY } from "@openbot/contracts/team-protocol/acp-registry-v1";
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { AGENT_ACTIVE_QUEUES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-active-queues-v1";
+import { AGENT_BACKGROUND_WORK_CAPABILITY } from "@openbot/contracts/team-protocol/agent-background-work-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
 import { AGENT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import { AGENT_CREATE_OPERATION_CAPABILITY } from "@openbot/contracts/team-protocol/agent-create-operation-v1";
@@ -240,6 +237,8 @@ import {
   TEAM_REASONING_EFFORTS_CAPABILITY,
   withLegacyReasoningEfforts,
 } from "@openbot/contracts/team-protocol/reasoning-efforts-v1";
+import { ROUTINE_QUIET_ANSWERS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-quiet-answers-v1";
+import { ROUTINE_RESULTS_WHATSAPP_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-whatsapp-v1";
 import { ROUTINE_RUN_COMMAND_CAPABILITY } from "@openbot/contracts/team-protocol/routine-run-command-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
 import { SERVER_AUDIT_CAPABILITY } from "@openbot/contracts/team-protocol/server-audit-v1";
@@ -317,6 +316,7 @@ import {
   conversationSnapshotForCapabilities,
   firstHeaderValue,
   JSON_LIMIT,
+  markerSupported,
   pathIdentifier,
   readJson,
   requestCapabilities,
@@ -1652,6 +1652,7 @@ export class TeamApiServer {
         browserSignIn: capabilities.has(BROWSER_SIGN_IN_CAPABILITY),
         browserVaultSkip: capabilities.has(BROWSER_VAULT_SKIP_CAPABILITY),
         contextUsage: capabilities.has(TEAM_CONTEXT_USAGE_CAPABILITY),
+        backgroundWork: capabilities.has(AGENT_BACKGROUND_WORK_CAPABILITY),
         usageTertiary: capabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
         agentPendingRuntime: capabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
         // Only the V7 and V8 encoders read them.
@@ -1989,17 +1990,10 @@ export class TeamApiServer {
         (!connection.capabilities.has("routine-event-markers") ||
           !connection.capabilities.has("routine-run-event-markers") ||
           !connection.capabilities.has("hosted-site-event-markers") ||
-          event.snapshot.messages.some(
-            (message) =>
-              message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE ||
-              message.itemType === AGENT_WELCOME_ITEM_TYPE ||
-              message.itemType === CHANNEL_RESUME_ITEM_TYPE ||
-              (message.itemType?.startsWith(SETTING_LINK_ITEM_TYPE_PREFIX) === true &&
-                !connection.capabilities.has(SETTING_LINK_MARKERS_CAPABILITY)),
-          ))
+          event.snapshot.messages.some((message) => !markerSupported(message.itemType, connection.capabilities)))
       ) {
         // The payloads are shared between clients, so the key holds what the roles allow too.
-        const key = `${blockedKey}:${protocol}:${connection.capabilities.has("opencode")}:${connection.capabilities.has("routine-event-markers")}:${connection.capabilities.has("routine-run-event-markers")}:${connection.capabilities.has("hosted-site-event-markers")}:${connection.capabilities.has(SETTING_LINK_MARKERS_CAPABILITY)}:${connection.capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)}:${connection.capabilities.has(SKILL_LEARNING_CAPABILITY)}:${encodingOptions.preserveSemanticTags}`;
+        const key = `${blockedKey}:${protocol}:${connection.capabilities.has("opencode")}:${connection.capabilities.has("routine-event-markers")}:${connection.capabilities.has("routine-run-event-markers")}:${connection.capabilities.has("hosted-site-event-markers")}:${connection.capabilities.has(SETTING_LINK_MARKERS_CAPABILITY)}:${connection.capabilities.has(ROUTINE_QUIET_ANSWERS_CAPABILITY)}:${connection.capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)}:${connection.capabilities.has(SKILL_LEARNING_CAPABILITY)}:${encodingOptions.preserveSemanticTags}`;
         let filtered = filteredConversationPayloads.get(key);
         if (!filtered) {
           filtered =
@@ -2544,6 +2538,7 @@ export class TeamApiServer {
       channelSeenSubtasks: route.capabilities.has(CHANNEL_SEEN_SUBTASKS_CAPABILITY),
       channelTaskWaits: route.capabilities.has(CHANNEL_TASK_WAITS_CAPABILITY),
       mcpManyServers: route.capabilities.has(MCP_MANY_SERVERS_CAPABILITY),
+      routineResultsWhatsApp: route.capabilities.has(ROUTINE_RESULTS_WHATSAPP_CAPABILITY),
       agentTaskUiBlocks: route.capabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY),
       uiBlocks: route.capabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
       subagents: route.capabilities.has(TEAM_SUBAGENTS_CAPABILITY),
@@ -3002,7 +2997,8 @@ export class TeamApiServer {
           return this.#options.admin?.update !== undefined;
         if (capability === EVENTS_CAPABILITY) return this.#options.events !== undefined;
         if (capability === ROUTINE_RECOVERY_CAPABILITY) return this.#options.events !== undefined;
-        if (capability === ROUTINE_RESULTS_CAPABILITY) return this.#options.admin?.routineResults !== undefined;
+        if (capability === ROUTINE_RESULTS_CAPABILITY || capability === ROUTINE_RESULTS_WHATSAPP_CAPABILITY)
+          return this.#options.admin?.routineResults !== undefined;
         if (capability === ROUTINE_RUN_COMMAND_CAPABILITY) return this.#options.admin?.routineRunCommand !== undefined;
         if (capability === ROUTINE_RUN_PLACE_CAPABILITY) return this.#options.routineRunPlaces !== undefined;
         if (capability === ROUTINE_PAUSE_REASONS_CAPABILITY) return this.#options.routineRunPlaces !== undefined;
@@ -3183,6 +3179,7 @@ const EVENT_ENCODING_CAPABILITIES = [
   BROWSER_SIGN_IN_CAPABILITY,
   BROWSER_VAULT_SKIP_CAPABILITY,
   TEAM_CONTEXT_USAGE_CAPABILITY,
+  AGENT_BACKGROUND_WORK_CAPABILITY,
   TEAM_USAGE_TERTIARY_CAPABILITY,
   AGENT_PENDING_RUNTIME_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,

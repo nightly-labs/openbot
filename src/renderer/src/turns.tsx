@@ -101,6 +101,8 @@ const Turns = createSimpleContext({
     const [usageLimits, setUsageLimits] = createSignal<Record<string, number | null>>({});
     // The turn of each agent whose subagents still run, also after the turn ended. Only a runtime snapshot of the local host carries it.
     const [subagentTurns, setSubagentTurns] = createSignal<Record<string, string>>({});
+    // When the background work of each chat started, by `backgroundWorkKey`, while it runs after its turn ended.
+    const [backgroundWork, setBackgroundWork] = createSignal<Record<string, number>>({});
     // Each provider account and model that a usage limit holds, also with no agent on it.
     const [usageLimitedModels, setUsageLimitedModels] = createSignal<AgentModelChoice[]>([]);
     // Each provider account and model that a provider error holds, so that a switch passes over it.
@@ -698,6 +700,8 @@ const Turns = createSimpleContext({
       setUsageLimits,
       subagentTurns,
       setSubagentTurns,
+      backgroundWork,
+      setBackgroundWork,
       usageLimitedModels,
       setUsageLimitedModels,
       failedModels,

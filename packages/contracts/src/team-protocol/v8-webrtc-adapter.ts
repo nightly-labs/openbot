@@ -82,6 +82,7 @@ export function createTeamProtocolV8Event(
     promptMultiSelect?: boolean;
     videoGeneration?: boolean;
     contextUsage?: boolean;
+    backgroundWork?: boolean;
     usageTertiary?: boolean;
     agentPendingRuntime?: boolean;
     memoryChanges?: boolean;

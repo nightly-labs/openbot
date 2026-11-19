@@ -241,12 +241,20 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* The credits of a media service with no team quota: its logo with the number of credits under it. */
-.window-rail-credits {
-  display: flex;
+/* The credits of a media service: its logo with the number of credits under it. The hover fill has
+ * the shape of the page buttons, not of a ring. */
+.window-rail-button.window-rail-credits {
+  height: auto;
   flex-direction: column;
-  align-items: center;
-  gap: 2px;
+  gap: var(--openbot-space-1);
+  padding-block: var(--openbot-space-1-5);
+}
+
+.window-rail-button .window-rail-credits-logo {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  overflow: visible;
+  fill: var(--openbot-provider-current);
 }
 
 .window-rail-credits-count {
@@ -255,6 +263,14 @@
   font-weight: var(--openbot-weight-semibold);
   font-variant-numeric: tabular-nums;
   line-height: 1;
+}
+
+.window-rail-credits-count[data-usage-tone="warning"] {
+  color: var(--openbot-warning-text);
+}
+
+.window-rail-credits-count[data-usage-tone="critical"] {
+  color: var(--openbot-danger-text);
 }
 
 /* The number of the account when a service has more than one, as the workflow model picker shows it. */

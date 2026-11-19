@@ -173,6 +173,11 @@ import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/rou
 import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
 import { SERVER_AUDIT_CAPABILITY } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { SHARED_TABLES_CAPABILITY } from "@openbot/contracts/team-protocol/shared-tables-v1";
+import {
+  decodeSideQuestionResponse,
+  SIDE_QUESTION_CAPABILITY,
+  SIDE_QUESTION_ROUTES,
+} from "@openbot/contracts/team-protocol/side-question-v1";
 import { SIGN_IN_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { SKILL_LEARNING_CAPABILITY } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/skills-admin-v1";
@@ -451,6 +456,7 @@ type HostRequestActions = Pick<
   | "markAgentThreadRead"
   | "loadMessagePins"
   | "setMessagePinned"
+  | "askSideQuestion"
   | "respondToTaskPrompt"
   | "loadAgentSkills"
   | "installAgentSkill"
@@ -694,6 +700,7 @@ export function createHostRequestChecks(capabilities: ServerCapabilities): HostR
     canReadThreads: (serverId) => has(serverId, AGENT_THREAD_READS_CAPABILITY),
     canAttachThreadFiles: (serverId) => has(serverId, AGENT_THREAD_FILES_CAPABILITY),
     canPinMessages: (serverId) => has(serverId, MESSAGE_PINS_CAPABILITY),
+    canAskSideQuestion: (serverId) => has(serverId, SIDE_QUESTION_CAPABILITY),
     canBranchThreads: (serverId) => has(serverId, AGENT_THREAD_BRANCHES_CAPABILITY),
     canUseWorkflows: (serverId) => has(serverId, WORKFLOWS_CAPABILITY),
     canUseWorkflowGitHub: (serverId) =>
@@ -1346,6 +1353,18 @@ export function createHostRequestActions({
       runTeamRequest(markAgentThreadRead(threadReadsApi(serverId), input)),
     loadMessagePins: async (agentId, serverId) => runTeamRequest(listMessagePins(messagePinsApi(serverId), agentId)),
     setMessagePinned: async (input, serverId) => runTeamRequest(setMessagePinned(messagePinsApi(serverId), input)),
+    // Any member who can see the agent can ask, so the request is not limited to an admin.
+    askSideQuestion: async (input, serverId) =>
+      capabilityApi(serverId, SIDE_QUESTION_CAPABILITY, "mobile.chat.sideQuestion.unsupported")(
+        "POST",
+        SIDE_QUESTION_ROUTES.ask,
+        decodeSideQuestionResponse,
+        {
+          agentId: input.agentId,
+          question: input.question,
+          earlier: input.earlier.map(({ question, answer }) => ({ question, answer })),
+        },
+      ),
     respondToTaskPrompt: async (input, serverId) => {
       await request(
         "POST",

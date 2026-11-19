@@ -14,6 +14,8 @@
 
 import {
   isWorkflowStepKind,
+  type StoredFileRow,
+  WORKFLOW_GROUP_FIELDS,
   WORKFLOW_PICTURE_TYPES,
   type WorkflowDetail,
   type WorkflowGraph,
@@ -29,6 +31,8 @@ import {
   Button,
   buttonVariants,
   ChevronDown,
+  ChevronsDownUp,
+  ChevronsUpDown,
   ClipboardPaste,
   ContextMenu,
   Copy,
@@ -37,6 +41,7 @@ import {
   Eraser,
   Eye,
   EyeOff,
+  Group as GroupIcon,
   Hand,
   Highlighter,
   Kbd,
@@ -54,6 +59,7 @@ import {
   Trash2,
   Type,
   Undo2,
+  Ungroup,
   Zap,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
@@ -82,7 +88,7 @@ import {
 } from "./WorkflowAddMenu";
 import { AgentNode } from "./WorkflowAgentNode";
 import { ApprovalNode } from "./WorkflowApprovalNode";
-import { AssetNode } from "./WorkflowAssetNode";
+import { AssetNode, assetPicture } from "./WorkflowAssetNode";
 import {
   ColorButtons,
   HudButton,
@@ -117,10 +123,13 @@ import {
   type PortRef,
   resizeCursor,
   takesKeys,
+  type WfnAnchor,
   type WfnEdge,
   type WfnFields,
   type WfnHandle,
   type WfnPoint,
+  type WfnPortType,
+  type WfnRunStatus,
   type WfnSize,
   type WfnStretch,
 } from "./workflow-board";
@@ -128,6 +137,22 @@ import { type WorkflowBuild, workflowBuildPlan } from "./workflow-build";
 import { type Camera, type CameraMotion, glideCamera } from "./workflow-camera";
 import { CLIP_TYPE, type Clip, copied, setCopied } from "./workflow-clipboard";
 import type { WorkflowGitHubCanvas } from "./workflow-github";
+import {
+  type CanvasGroup,
+  frameBox,
+  GroupFrame,
+  type GroupPort,
+  groupPatch,
+  groupsOf,
+  inputPoint,
+  joinPatch,
+  leavePatch,
+  outputTypes,
+  portPoint,
+  regroupCopies,
+  STACK_PICTURES,
+  sameGroups,
+} from "./workflow-groups";
 import {
   type CanvasItem,
   type CanvasSnapshot,
@@ -338,6 +363,11 @@ const BUILD_STEP = 620;
 const BUILD_LINGER = 900;
 const BUILD_FADE = 240;
 const FIT_MARGIN = 64;
+/** The run states that a collapsed group shows for its members, most important first. */
+const FOLDED_STATUS: readonly WfnRunStatus[] = ["failed", "approval", "running"];
+/** The trigger types and output targets of host steps: on a joined server, only an owner or admin changes them. */
+const HOST_TRIGGERS: readonly string[] = ["github", "discord", "telegram", "slack"];
+const HOST_OUTPUTS: readonly string[] = [...HOST_TRIGGERS, "chat-channel"];
 /**
  * In screen pixels, as in workflows.css: the gap between a node and its toolbar, and the room that
  * the results strip takes under a node with its gap.
@@ -351,6 +381,8 @@ const GRID = 20;
 const DUPLICATE_OFFSET = 32;
 /** The room that a new node takes before it renders and has a measured size. */
 const NEW_NODE = { width: 300, height: 240 };
+/** New files that the user adds at one time go in rows of this many nodes. */
+const PICTURE_ROW = 4;
 /** The distance in screen pixels between the places that a new node can take in the view. */
 const PLACE_STEP = 40;
 /** The fields of each kind that hold text that the user wrote, in the order that the card shows them. */
@@ -708,6 +740,9 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     },
     running,
     toolbarBelow: (id, bar) => toolbarBelow(id, bar),
+    anchor: (port, other, slot) => groupAnchor(port, other, slot),
+    hides: (edge) => hiddenLine(edge),
+    dropFiles: (id, files) => dropOnAsset(id, files),
     release: (start, at, event) => {
       const hit = document.elementFromPoint(event.clientX, event.clientY);
       if (!hit || !viewport?.contains(hit) || hit.closest("[data-node-id], .wfn-hud, [data-wfn-portal]")) return false;
@@ -1528,14 +1563,16 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   const freePlace = (size: { width: number; height: number }, except: string): WfnPoint => {
     const { width, height } = view();
     const { x, y, scale } = target();
-    const cards = untrack(() =>
-      live().flatMap((node) => {
+    // The frames of groups too, so a new node does not look like a member.
+    const cards = untrack(() => [
+      ...live().flatMap((node) => {
         if (node.kind === "text" || node.kind === "shape" || node.id === except) return [];
         const at = positions[node.id];
         const box = boxOf(node.id) ?? (at && { ...at, ...NEW_NODE });
         return box ? [box] : [];
       }),
-    );
+      ...nodeGroups().flatMap((entry) => frameOf(entry) ?? []),
+    ]);
     const margin = FIT_MARGIN / scale;
     const left = -x / scale + margin;
     const top = -y / scale + margin;
@@ -1664,7 +1701,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     setSizes((draft) => {
       for (const [id, size] of Object.entries(clip.sizes)) draft[ids.get(id) ?? id] = { ...size };
     });
-    for (const [id, fields] of Object.entries(clip.fields)) canvas.putFields(ids.get(id) ?? id, fields);
+    // The copies of a group make a new group.
+    for (const [id, fields] of Object.entries(regroupCopies(clip.fields))) canvas.putFields(ids.get(id) ?? id, fields);
     setNodes((list) => [...list, ...copies]);
     canvas.addEdges(
       clip.edges.flatMap((edge) => {
@@ -1706,6 +1744,335 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       : undefined;
   };
   const boxesOf = (ids: readonly string[]) => ids.flatMap((id) => boxOf(id) ?? []);
+
+  /* ----------------------------------------------------------- Groups */
+
+  /** The groups on the canvas, from the fields of their members. */
+  const nodeGroups = createMemo(
+    () =>
+      groupsOf(
+        live().map((node) => node.id),
+        (id, key) => board.field(id, key),
+      ),
+    { equals: sameGroups },
+  );
+  /** The group of each member. */
+  const groupIndex = createMemo(() => {
+    const index = new Map<string, CanvasGroup>();
+    for (const entry of nodeGroups()) for (const id of entry.members) index.set(id, entry);
+    return index;
+  });
+  /** The box of a group on the canvas: its frame, or its stack card when it is collapsed. */
+  const frameOf = (entry: CanvasGroup) => {
+    const members = union(boxesOf(entry.members));
+    return members ? frameBox(entry, members) : undefined;
+  };
+  /** The box that shows for a node: a member of a collapsed group shows as the stack card. */
+  const shownBox = (id: string) => {
+    const entry = groupIndex().get(id);
+    return entry?.folded ? frameOf(entry) : boxOf(id);
+  };
+  const shownBoxes = (ids: readonly string[]) => ids.flatMap((id) => shownBox(id) ?? []);
+  /** The members of a group that have an output of a type. */
+  const typeMembers = (entry: CanvasGroup, type: WfnPortType) =>
+    entry.members.filter((id) => canvas.outputs(id).includes(type));
+  /** The output types of each group, once for all the ports and lines that read them. */
+  const typesOfGroups = createMemo(
+    () => new Map(nodeGroups().map((entry) => [entry.id, outputTypes(entry.members.map((id) => canvas.outputs(id)))])),
+  );
+  const groupTypes = (entry: CanvasGroup) => typesOfGroups().get(entry.id) ?? [];
+  /** How many members of a group connect to the same input: by `<group>><node>:<type>`. */
+  const groupFeeds = createMemo(() => {
+    const counts = new Map<string, number>();
+    for (const edge of canvas.edges()) {
+      const entry = groupIndex().get(edge.from);
+      // A named input, as the first frame of a video, takes one source: its line stays on the member.
+      if (!entry || edge.branch !== undefined || canvas.slots(edge).length > 0) continue;
+      const key = `${entry.id}>${edge.to}:${edge.type}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return counts;
+  });
+  /**
+   * Where the line of a port of a member starts or ends. A collapsed group takes all the lines of its
+   * members. An open group takes the lines of an output type that two or more members send to the same
+   * node, and the line that the user drags from its port. Else the line stays on the member, as a line to a
+   * named input does.
+   */
+  const groupAnchor = (port: PortRef, other: string | undefined, slot?: string): WfnAnchor | undefined => {
+    const entry = groupIndex().get(port.node);
+    if (!entry || (other !== undefined && groupIndex().get(other)?.id === entry.id)) return undefined;
+    const types = groupTypes(entry);
+    const index = types.indexOf(port.type);
+    const at = (place: (box: Box) => WfnPoint) => () => {
+      const box = frameOf(entry);
+      return box && place(box);
+    };
+    if (entry.folded) {
+      if (port.side === "in") return { key: `group:${entry.id}:in`, at: at(inputPoint) };
+      return {
+        key: `group:${entry.id}:out:${port.type}`,
+        at: at((box) => portPoint(box, Math.max(index, 0), index < 0 ? 1 : types.length, true)),
+      };
+    }
+    if (port.side === "in" || port.branch !== undefined || slot !== undefined || index < 0) return undefined;
+    const many =
+      other === undefined
+        ? typeMembers(entry, port.type).every((id) => board.isSelected(id))
+        : (groupFeeds().get(`${entry.id}>${other}:${port.type}`) ?? 0) > 1;
+    if (!many) return undefined;
+    return { key: `group:${entry.id}:out:${port.type}`, at: at((box) => portPoint(box, index, types.length, false)) };
+  };
+  /** A line between two members of a collapsed group does not show. */
+  const hiddenLine = (edge: WfnEdge) => {
+    const entry = groupIndex().get(edge.from);
+    return entry?.folded === true && groupIndex().get(edge.to)?.id === entry.id;
+  };
+  const framePorts = (entry: CanvasGroup): GroupPort[] =>
+    groupTypes(entry).map((type) => {
+      const members = typeMembers(entry, type);
+      return {
+        type,
+        connected: canvas
+          .edges()
+          .some(
+            (edge) =>
+              members.includes(edge.from) &&
+              edge.type === type &&
+              groupAnchor(
+                { node: edge.from, side: "out", type, branch: edge.branch },
+                edge.to,
+                canvas.slots(edge)[0],
+              ) !== undefined,
+          ),
+        armed: members.length > 0 && members.every((id) => board.armed(id, "out", type)),
+      };
+    });
+  /** A drag from the port of a group connects each member that has that output. */
+  const groupPortDown = (entry: CanvasGroup, type: WfnPortType, event: PointerEvent) => {
+    const members = typeMembers(entry, type);
+    const [first] = members;
+    if (!first || event.button !== 0) return;
+    canvas.select(members);
+    board.dragPort(first, "out", type, event);
+  };
+  const groupPortPress = (entry: CanvasGroup, type: WfnPortType) => {
+    const members = typeMembers(entry, type);
+    const [first] = members;
+    if (!first) return;
+    canvas.select(members);
+    board.pressPort(first, "out", type);
+  };
+  /** The run state that a collapsed group shows for its hidden members: a failure first, then a wait. */
+  const foldedStatus = (entry: CanvasGroup): WfnRunStatus | undefined => {
+    if (!entry.folded) return undefined;
+    const states = entry.members.map(statusOf);
+    return FOLDED_STATUS.find((status) => states.includes(status));
+  };
+  const stackPictures = (entry: CanvasGroup) =>
+    entry.members.flatMap((id) => assetPicture(board, id) ?? []).slice(0, STACK_PICTURES);
+  const isWhole = (entry: CanvasGroup) => {
+    const ids = group();
+    return ids.length === entry.members.length && entry.members.every((id) => board.isSelected(id));
+  };
+  /** The group that the selection is, when the selection is all of one group and nothing more. */
+  const selectedGroup = createMemo(() => {
+    const [first] = group();
+    const entry = first === undefined ? undefined : groupIndex().get(first);
+    return entry && isWhole(entry) ? entry : undefined;
+  });
+  /** The last group that the selection was, for the toolbar while it closes. */
+  const heldGroup = createMemo((last?: CanvasGroup) => selectedGroup() ?? last);
+  /**
+   * Whether the person can change the group fields of a node. A host step that `features` does not offer
+   * belongs to an owner or admin of the joined server, and a host from before this release refuses a save
+   * that changes any field of one, its group fields too.
+   */
+  const groupable = (id: string) => {
+    const kind = live().find((node) => node.id === id)?.kind;
+    const type = board.field(id, kind === "trigger" ? "trigger" : "target");
+    if (typeof type !== "string") return true;
+    if (kind === "trigger") return !HOST_TRIGGERS.includes(type) || props.features.triggers.some((one) => one === type);
+    if (kind === "output") return !HOST_OUTPUTS.includes(type) || props.features.outputs.some((one) => one === type);
+    return true;
+  };
+  /** Whether the person can rename, collapse, expand or end a group. */
+  const changeable = (entry: CanvasGroup) => !frozen() && entry.members.every(groupable);
+  /** Puts nodes in a new group. A group that keeps only one member ends. */
+  const groupNodes = (ids: readonly string[], name = "") => {
+    const members = ids.filter((id) => !board.isRemoved(id) && groupable(id));
+    // A group that is already all of the selection stays as it is, with its name.
+    if (members.length < 2 || frozen() || selectedGroup()) return;
+    // A member that the person cannot change keeps its old fields: a group with one member is no group.
+    const left = nodeGroups().flatMap((entry) => {
+      const rest = entry.members.filter((id) => !members.includes(id));
+      return rest.length === 1 ? rest.filter(groupable) : [];
+    });
+    canvas.patchFields({ ...leavePatch(left), ...joinPatch(members, name) });
+    canvas.select(members);
+  };
+  /** Ends the groups of the nodes. The members stay where they are. */
+  const ungroup = (ids: readonly string[]) => {
+    const ended = nodeGroups().filter((entry) => entry.members.some((id) => ids.includes(id)) && changeable(entry));
+    if (ended.length === 0) return;
+    canvas.patchFields(leavePatch(ended.flatMap((entry) => entry.members)));
+  };
+  const foldGroup = (entry: CanvasGroup, folded: boolean) => {
+    if (!changeable(entry)) return;
+    canvas.patchFields(groupPatch(entry, WORKFLOW_GROUP_FIELDS.folded, folded || undefined));
+  };
+  const renameGroup = (entry: CanvasGroup, name: string) => {
+    if (!changeable(entry)) return;
+    // The burst is `<node id>:<field>` of the first member, so a sync keeps it while the member stays.
+    canvas.patchFields(
+      groupPatch(entry, WORKFLOW_GROUP_FIELDS.name, name || undefined),
+      `${entry.members[0]}:${WORKFLOW_GROUP_FIELDS.name}`,
+    );
+  };
+  const foldText = (entry: CanvasGroup) =>
+    t(entry.folded ? "workflow.canvas.group.expand" : "workflow.canvas.group.collapse");
+  const FoldIcon = (props: { folded: boolean }) => (
+    <Show when={props.folded} fallback={<ChevronsDownUp />}>
+      <ChevronsUpDown />
+    </Show>
+  );
+
+  /** The places of new nodes in rows from a world point, before their first layout. */
+  const rowPlaces = (count: number, from: WfnPoint) =>
+    Array.from({ length: count }, (_, index) => ({
+      x: from.x + (index % PICTURE_ROW) * (NEW_NODE.width + GRID * 2),
+      y: from.y + Math.floor(index / PICTURE_ROW) * (NEW_NODE.height + GRID * 2),
+    }));
+  /**
+   * The first place right of a box where rows of new nodes cover no card and no frame of another group.
+   * The rows go past the members of the group of the box, so they do not cover them.
+   */
+  const rowsRightOf = (box: Box, count: number, group?: string): WfnPoint => {
+    const size = rowsSize(count);
+    const blocks = blocksBut(group);
+    let at = { x: box.x + box.width + GRID * 2, y: box.y };
+    for (;;) {
+      const row = { ...at, ...size };
+      const hit = blocks.find((block) => overlaps(row, block));
+      if (!hit) return at;
+      at = { x: hit.x + hit.width + GRID * 2, y: at.y };
+    }
+  };
+  /** The size of rows of new nodes, before their first layout. */
+  const rowsSize = (count: number) => ({
+    width: Math.min(count, PICTURE_ROW) * (NEW_NODE.width + GRID * 2) - GRID * 2,
+    height: Math.ceil(count / PICTURE_ROW) * (NEW_NODE.height + GRID * 2) - GRID * 2,
+  });
+  /** The cards on the canvas and the frames of its groups, but not the frame of one group. */
+  const blocksBut = (group?: string) =>
+    untrack(() => [
+      ...live().flatMap((node) => shownBox(node.id) ?? []),
+      ...nodeGroups().flatMap((entry) => (entry.id === group ? [] : (frameOf(entry) ?? []))),
+    ]);
+  /** The box of rows of new nodes at a point, with the room of their frame when they make a group. */
+  const rowsBox = (at: WfnPoint, count: number): Box => {
+    const size = rowsSize(count);
+    if (count < 2) return { ...at, ...size };
+    return frameBox({ id: "", name: "", folded: false, members: [] }, { ...at, ...size });
+  };
+  /** After their first layout, puts new nodes in rows by their real sizes, a gap apart. */
+  const reflowRows = (ids: readonly string[], from: WfnPoint) =>
+    afterLayout(() => {
+      const next: Record<string, WfnPoint> = {};
+      let y = from.y;
+      for (let row = 0; row * PICTURE_ROW < ids.length; row++) {
+        let x = from.x;
+        let tallest = 0;
+        for (const id of ids.slice(row * PICTURE_ROW, (row + 1) * PICTURE_ROW)) {
+          const element = slot(id);
+          if (!element || board.isRemoved(id)) continue;
+          next[id] = snapPoint({ x, y });
+          x += element.offsetWidth + GRID * 2;
+          tallest = Math.max(tallest, element.offsetHeight);
+        }
+        y += tallest + GRID * 2;
+      }
+      setPositions((draft) => {
+        for (const [id, at] of Object.entries(next)) draft[id] = at;
+      });
+    });
+  /** The name of a group of new files: Images when all of them are pictures. */
+  const filesName = (files: readonly StoredFileRow[]) =>
+    files.every((file) => file.previewKind === "image") ? t("workflow.canvas.group.imagesName") : "";
+  /**
+   * Adds an asset node for each file, in rows from a world point or in a free place in the view, and
+   * puts two or more in one group. It is one undo step, and the new nodes are selected.
+   */
+  const addFiles = (files: readonly StoredFileRow[], from?: WfnPoint) => {
+    if (files.length === 0 || deleted() || frozen() || !allows("asset")) return;
+    // At the pointer when the rows cover nothing there; else in a free place in the view.
+    const blocks = blocksBut();
+    const fits = (at: WfnPoint) => !blocks.some((block) => overlaps(rowsBox(at, files.length), block));
+    const room = rowsBox({ x: 0, y: 0 }, files.length);
+    const free = () => {
+      const at = freePlace({ width: room.width, height: room.height }, "");
+      return { x: at.x - room.x, y: at.y - room.y };
+    };
+    const start = from && fits(from) ? from : free();
+    commit();
+    const release = edits.join();
+    try {
+      const places = rowPlaces(files.length, start);
+      const ids = files.map((file, index) =>
+        addNode("asset", places[index] ?? start, { file: file.name, fileId: file.id }),
+      );
+      if (ids.length > 1) canvas.patchFields(joinPatch(ids, filesName(files)));
+      canvas.select(ids);
+      reflowRows(ids, snapPoint(start));
+    } finally {
+      release();
+    }
+  };
+  /** Sends files from the computer to the files of the board, and gives the ones that arrive. */
+  const uploadAll = (files: readonly File[]) =>
+    Promise.allSettled(files.map((file) => board.upload(file))).then((results) =>
+      results.flatMap((result) => (result.status === "fulfilled" ? [result.value] : [])),
+    );
+  /**
+   * Files dropped on an asset node: the node takes the first, and new asset nodes to its right take the
+   * others. All of them go in the group of the node, or in a new group. It is one undo step.
+   */
+  const dropOnAsset = (id: string, files: readonly File[]) => {
+    if (frozen() || !props.features.uploads) return;
+    void uploadAll(files).then((stored) => {
+      const [first, ...rest] = stored;
+      if (!first || deleted() || frozen() || board.isRemoved(id) || !allows("asset")) return;
+      const box = boxOf(id);
+      const entry = groupIndex().get(id);
+      const start = box ? rowsRightOf(box, rest.length, entry?.id) : undefined;
+      commit();
+      const release = edits.join();
+      try {
+        canvas.patchFields({ [id]: { file: first.name, fileId: first.id } });
+        if (rest.length === 0) return;
+        const places = start ? rowPlaces(rest.length, start) : [];
+        const added = rest.map((file, index) => addNode("asset", places[index], { file: file.name, fileId: file.id }));
+        canvas.patchFields(
+          entry
+            ? Object.fromEntries(
+                added.map((member) => [
+                  member,
+                  {
+                    [WORKFLOW_GROUP_FIELDS.id]: entry.id,
+                    [WORKFLOW_GROUP_FIELDS.name]: entry.name || undefined,
+                    [WORKFLOW_GROUP_FIELDS.folded]: entry.folded || undefined,
+                  },
+                ]),
+              )
+            : joinPatch([id, ...added], filesName(stored)),
+        );
+        canvas.select([id, ...added]);
+        if (start) reflowRows(added, snapPoint(start));
+      } finally {
+        release();
+      }
+    });
+  };
 
   /* --------------------------------------------------------- Presence */
 
@@ -1865,10 +2232,12 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     return !covers(zone(box.y + box.height + room / camera.scale));
   };
 
-  /** The frame around a selection of more than one node. */
+  /** The frame around a selection of more than one node, or the box of the group that the selection is. */
   const groupBox = createMemo(() => {
+    const whole = selectedGroup();
+    if (whole) return frameOf(whole);
     const ids = group();
-    return ids.length > 1 ? union(boxesOf(ids)) : undefined;
+    return ids.length > 1 ? union(shownBoxes(ids)) : undefined;
   });
 
   /** Moves the selected nodes that are not locked by a world distance. */
@@ -2076,20 +2445,25 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
 
   /** Moves the camera so a node is in the centre of the view, and selects it. */
   const showNode = (id: string) => {
-    const at = positions[id];
+    // A member of a collapsed group does not show: the view goes to the stack card and selects the group.
+    const entry = groupIndex().get(id);
     const element = slot(id);
-    if (!at || !element) return;
+    const at = positions[id];
+    const box = entry?.folded
+      ? frameOf(entry)
+      : at && element && { ...at, width: element.offsetWidth, height: element.offsetHeight };
+    if (!box) return;
     const { width, height } = view();
     const scale = clampScale(Math.max(target().scale, 0.75));
     glideTo(
       {
         scale,
-        x: width / 2 - (at.x + element.offsetWidth / 2) * scale,
-        y: height / 2 - (at.y + element.offsetHeight / 2) * scale,
+        x: width / 2 - (box.x + box.width / 2) * scale,
+        y: height / 2 - (box.y + box.height / 2) * scale,
       },
       "flight",
     );
-    canvas.select([id]);
+    canvas.select(entry?.folded ? entry.members : [id]);
   };
 
   /** Pans the least distance that shows a whole node, with a margin. */
@@ -2122,7 +2496,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     const order = live()
       .flatMap((node) => {
         const at = positions[node.id];
-        return at ? [{ id: node.id, at }] : [];
+        // The members of a collapsed group do not show, so they cannot take the focus.
+        return at && (node.id === id || !groupIndex().get(node.id)?.folded) ? [{ id: node.id, at }] : [];
       })
       .sort((a, b) => a.at.x - b.at.x || a.at.y - b.at.y)
       .map((node) => node.id);
@@ -2275,6 +2650,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           box: Box;
           /** The boxes of the other nodes, for the alignment guides. */
           others: readonly Box[];
+          /** The press was on the frame of a group, so all its members stay selected. */
+          whole?: boolean;
         }
       | {
           kind: "box";
@@ -2576,8 +2953,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           field.focus({ preventScroll: true });
           field.setSelectionRange(caret, caret);
         }
-        // A click without a move on a node of a group selects only that node.
-        if (current.group.length > 1) canvas.select([current.id]);
+        // A click without a move on a node of a selection selects only that node.
+        if (current.group.length > 1 && !current.whole) canvas.select([current.id]);
       }
       if (current.moved) {
         // A drag that ends on a button must not press it.
@@ -2687,6 +3064,46 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         return;
       }
       if (target.closest(NO_DRAG) || target.closest(".wfn-edge-hit")) return;
+      // A press on the frame of a group selects all its members, and a drag moves them.
+      const frame = target.closest<HTMLElement>("[data-wfn-group]")?.dataset.wfnGroup;
+      const pressed = frame === undefined ? undefined : nodeGroups().find((entry) => entry.id === frame);
+      if (pressed) {
+        event.preventDefault();
+        closeField();
+        if (event.shiftKey) {
+          const rest = group().filter((member) => !pressed.members.includes(member));
+          canvas.select(
+            isWhole(pressed) || pressed.members.every((member) => board.isSelected(member))
+              ? rest
+              : [...rest, ...pressed.members],
+          );
+          return;
+        }
+        canvas.select(pressed.members);
+        const members = pressed.members.filter((member) => !board.isLocked(member));
+        const moving = members.flatMap((member) => {
+          const origin = positions[member];
+          return origin ? [{ id: member, origin }] : [];
+        });
+        const [lead] = moving;
+        const box = frameOf(pressed);
+        if (!lead || !box) return;
+        gesture = {
+          kind: "node",
+          id: lead.id,
+          start,
+          origin: lead.origin,
+          moved: false,
+          group: moving,
+          box,
+          others: shownBoxes(live().flatMap((node) => (pressed.members.includes(node.id) ? [] : [node.id]))),
+          whole: true,
+        };
+        window.addEventListener("pointermove", onMove);
+        window.addEventListener("pointerup", onUp);
+        window.addEventListener("pointercancel", onUp);
+        return;
+      }
       const id = target.closest<HTMLElement>("[data-node-id]")?.dataset.nodeId;
       const at = id && !board.isLocked(id) ? positions[id] : undefined;
       if (id && at) {
@@ -2719,7 +3136,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           moved: false,
           group: moving,
           box,
-          others: boxesOf(live().flatMap((node) => (members.includes(node.id) ? [] : [node.id]))),
+          others: shownBoxes(live().flatMap((node) => (members.includes(node.id) ? [] : [node.id]))),
           ...(field && edits ? { focus: { field, caret: caretAt(field, event.clientX, event.clientY) } } : {}),
         };
       } else if (!target.closest("[data-node-id]")) {
@@ -2729,8 +3146,9 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           kind: "box",
           start,
           base: event.shiftKey ? group() : [],
+          // A member of a collapsed group has the box of the stack card, so a box over the card selects all of them.
           boxes: live().flatMap((node) => {
-            const box = boxOf(node.id);
+            const box = shownBox(node.id);
             return box ? [{ id: node.id, box }] : [];
           }),
           moved: false,
@@ -2822,7 +3240,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     };
     /**
      * Pictures on the clipboard, such as a screenshot or an image copied in a browser, go into the
-     * files of the board, and each becomes an asset node at the pointer. The canvas takes the paste
+     * files of the board, and each becomes an asset node at the pointer. Two or more go in one group. The canvas takes the paste
      * when it has the focus, or when the pointer is on it and no field has the focus: a click on the
      * empty canvas does not move the focus from the button that opened it. A field with focus keeps
      * a paste that also has text.
@@ -2836,17 +3254,28 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       if (isEditable(active) && data?.types.includes("text/plain")) return;
       event.preventDefault();
       const start = pointer ? toWorld(pointer) : undefined;
-      pictures.forEach((picture, index) => {
-        const point = start && { x: start.x + index * (NEW_NODE.width + GRID * 2), y: start.y };
-        // The host shows a failed upload, so the canvas adds no node for it.
-        board.upload(picture).then(
-          (file) => {
-            if (!deleted() && !frozen() && allows("asset"))
-              addNode("asset", point, { file: file.name, fileId: file.id });
-          },
-          () => undefined,
-        );
-      });
+      // The host shows a failed upload, so the canvas adds no node for it.
+      void uploadAll(pictures).then((files) => addFiles(files, start));
+    };
+    /** Files from the computer, dropped on the empty canvas, become asset nodes at the drop point. */
+    const takesFiles = (event: DragEvent) =>
+      event.dataTransfer?.types.includes("Files") === true &&
+      !deleted() &&
+      !frozen() &&
+      allows("asset") &&
+      props.features.uploads === true &&
+      !(event.target instanceof Element && event.target.closest("[data-node-id], [data-wfn-portal], .wfn-hud"));
+    const onDragOver = (event: DragEvent) => {
+      if (!takesFiles(event) || !event.dataTransfer) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "copy";
+    };
+    const onDrop = (event: DragEvent) => {
+      const files = [...(event.dataTransfer?.files ?? [])];
+      if (!takesFiles(event) || files.length === 0) return;
+      event.preventDefault();
+      const at = toWorld(local(event));
+      void uploadAll(files).then((stored) => addFiles(stored, at));
     };
     /** ⌘V pastes copied nodes at the pointer, also into a field, because the clipboard has no text then. */
     const onPaste = (event: ClipboardEvent) => {
@@ -2908,6 +3337,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         if (mod && !editing && key === "z") return event.shiftKey ? redo : undo;
         if (mod && !editing && key === "y") return redo;
         if (mod && !editing && key === "a") return selectAll;
+        if (mod && !editing && key === "g" && event.shiftKey && ids.length > 0) return () => ungroup(ids);
+        if (mod && !editing && key === "g" && ids.length > 1) return () => groupNodes(ids);
         if (mod && !editing && ids.length > 0 && onNodes[key]) return () => onNodes[key]?.(ids);
         if (mod) return withMod[event.key];
         // Escape in a field of a node gives the focus back to the node.
@@ -2978,6 +3409,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       } else delete area.dataset.space;
     };
     area.addEventListener("dblclick", onDoubleClick);
+    area.addEventListener("dragover", onDragOver);
+    area.addEventListener("drop", onDrop);
     area.addEventListener("contextmenu", onNativeMenu, { capture: true });
     document.addEventListener("keydown", onShortcut);
     document.addEventListener("copy", onCopy);
@@ -2993,6 +3426,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       area.removeEventListener("pointermove", onHover);
       area.removeEventListener("pointerleave", onLeave);
       area.removeEventListener("dblclick", onDoubleClick);
+      area.removeEventListener("dragover", onDragOver);
+      area.removeEventListener("drop", onDrop);
       area.removeEventListener("contextmenu", onNativeMenu, { capture: true });
       document.removeEventListener("keydown", onShortcut);
       document.removeEventListener("copy", onCopy);
@@ -3066,6 +3501,31 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                 "--wfn-scale": camera.scale,
               }}
             >
+              {/* The frames of the groups, under the lines, so a line to a member shows over the frame. */}
+              <For each={nodeGroups()} keyed={(entry) => entry.id}>
+                {(entry) => (
+                  <Show when={frameOf(entry())}>
+                    {(box) => (
+                      <GroupFrame
+                        group={entry()}
+                        box={box()}
+                        selected={isWhole(entry())}
+                        ports={framePorts(entry())}
+                        pictures={stackPictures(entry())}
+                        status={foldedStatus(entry())}
+                        readOnly={frozen()}
+                        fixed={!changeable(entry())}
+                        onRename={(name) => renameGroup(entry(), name)}
+                        onEndRename={() => canvas.endTyping()}
+                        onExpand={() => foldGroup(entry(), false)}
+                        onSelect={() => canvas.select(entry().members)}
+                        onPortDown={(type, event) => groupPortDown(entry(), type, event)}
+                        onPortPress={(type) => groupPortPress(entry(), type)}
+                      />
+                    )}
+                  </Show>
+                )}
+              </For>
               <canvas.Edges />
               {/* Keyed by id, so a node keeps its element when undo or a schedule change gives a new item. */}
               <For each={nodes()} keyed={(node) => node.id}>
@@ -3084,6 +3544,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                         slotResize.observe(element);
                       }}
                       data-kind={node().kind}
+                      data-folded={groupIndex().get(node().id)?.folded ? "" : undefined}
                       data-peer={ringOn(node().id) ? "" : undefined}
                       data-build={buildState(node().id)}
                       data-focus={focusSet()?.has(node().id) ? "" : undefined}
@@ -3141,6 +3602,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                 {(box) => (
                   <div
                     class="wfn-group"
+                    data-whole={selectedGroup() ? "" : undefined}
                     style={{
                       left: `${box().x}px`,
                       top: `${box().y}px`,
@@ -3156,6 +3618,39 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                     >
                       <span class="wfn-group-count">{t("workflow.canvas.selected", { count: group().length })}</span>
                       <span class="wfn-toolbar-separator" aria-hidden="true" />
+                      <Show
+                        when={selectedGroup()}
+                        fallback={
+                          <Show when={group().filter(groupable).length > 1}>
+                            <ToolAction
+                              text={t("workflow.canvas.group.make")}
+                              keys={[MOD_KEY, "G"]}
+                              icon={<GroupIcon />}
+                              onClick={() => groupNodes(group())}
+                            />
+                          </Show>
+                        }
+                      >
+                        {(entry) => {
+                          // Solid can run this once more after the group ends: read the held group then.
+                          const shown = () => heldGroup() ?? entry();
+                          return (
+                            <Show when={changeable(shown())}>
+                              <ToolAction
+                                text={foldText(shown())}
+                                icon={<FoldIcon folded={shown().folded} />}
+                                onClick={() => foldGroup(shown(), !shown().folded)}
+                              />
+                              <ToolAction
+                                text={t("workflow.canvas.group.ungroup")}
+                                keys={["⇧", MOD_KEY, "G"]}
+                                icon={<Ungroup />}
+                                onClick={() => ungroup(shown().members)}
+                              />
+                            </Show>
+                          );
+                        }}
+                      </Show>
                       <ToolAction
                         text={t("workflow.node.toolbar.duplicate")}
                         keys={[MOD_KEY, "D"]}

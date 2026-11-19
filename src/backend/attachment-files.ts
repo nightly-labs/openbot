@@ -246,7 +246,7 @@ export class AttachmentFiles {
             yield* attachmentCall(() => rm(targetDirectory, { recursive: true, force: true })).pipe(
               Effect.uninterruptible,
             );
-            throw new Error(`${name} exceeds the 100 MB limit.`);
+            throw new Error(sourceText("error.attachment.namedFileTooLarge", { name }));
           }
           total += copied.size;
           if (total > MAX_TOTAL_BYTES) {
@@ -270,7 +270,7 @@ export class AttachmentFiles {
         for (const item of data) {
           const bytes = normalizeBytes(item.bytes);
           if (bytes.byteLength > MAX_FILE_BYTES) {
-            throw new Error(`${item.name} exceeds the 100 MB limit.`);
+            throw new Error(sourceText("error.attachment.namedFileTooLarge", { name: item.name }));
           }
           total += bytes.byteLength;
           if (total > MAX_TOTAL_BYTES) throw new Error(sourceText("error.attachment.totalTooLarge"));
@@ -361,7 +361,7 @@ export class AttachmentFiles {
           const id = randomUUID();
           const targetPath = join(temporaryRoot, name);
           const copied = yield* attachmentCall(() => stat(targetPath));
-          if (copied.size > MAX_FILE_BYTES) throw new Error(`${name} exceeds the 100 MB limit.`);
+          if (copied.size > MAX_FILE_BYTES) throw new Error(sourceText("error.attachment.namedFileTooLarge", { name }));
           total += copied.size;
           if (total > MAX_TOTAL_BYTES) throw new Error(sourceText("error.attachment.totalTooLarge"));
           attachments.push(
@@ -674,7 +674,9 @@ const inspectSourceEffect = Effect.fn("Attachments.inspectSource")(function* (
       new Error(sourceText("error.backend.attachmentNotRegularFile", { name: basename(path) })),
     );
   if (metadata.size > MAX_FILE_BYTES)
-    return yield* attachmentFailure(new Error(`${basename(path)} exceeds the 100 MB limit.`));
+    return yield* attachmentFailure(
+      new Error(sourceText("error.attachment.namedFileTooLarge", { name: basename(path) })),
+    );
   return { path, size: metadata.size };
 });
 

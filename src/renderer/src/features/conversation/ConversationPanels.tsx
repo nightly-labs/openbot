@@ -28,7 +28,7 @@ import { desktopBrowserProfileCalls } from "../browser/browser-profiles-port";
 import type { AgentFilesOptions } from "../files/AgentFilesSettings";
 import type { ChatFilesSource } from "../files/ChatFilesPanel";
 import { canManageStorage, serverHasChannelStorage, serverHasStorage } from "../files/storage-usage";
-import { serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
+import { serverCanAdminister, serverCanManageMcp, serverSupportsCapability } from "../servers/server-capabilities";
 import { codexLiveAccess } from "../speech/codex-live-access";
 import { speechPort } from "../speech/speech-port";
 import { cycleSpeechSpeed, speechSpeed } from "../speech/speech-speed";
@@ -529,6 +529,31 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     if (opened) setActiveRightPanel("none");
     return opened;
   };
+  /**
+   * The handle on the start edge of a pane that has no width control of its own: the pane list, a side
+   * thread, the side question and a subagent. All panes have one width, so a drag here sets it for each.
+   */
+  const sidePanelResizer = (controls: string) => (
+    <PanelResizer
+      class="right-panel-resizer"
+      label={t("conversation.sidePanel.resize")}
+      controls={controls}
+      direction="right"
+      value={sidePanelWidth()}
+      defaultValue={SIDE_PANEL_DEFAULT}
+      min={SIDE_PANEL_DEFAULT}
+      max={sidePanelMaxWidth}
+      onResize={setSidePanelWidth}
+      onResizeEnd={saveSidePanelWidth}
+      // A narrower chat makes the panel narrower only for now. When the chat gets wider, the panel goes
+      // back to the width from the last drag.
+      onParentResize={() => setSidePanelWidth(Math.round(Math.min(sidePanelMaxWidth(), readSidePanelWidth())))}
+      onReset={() => {
+        resetSidePanelWidth();
+        setSidePanelWidth(SIDE_PANEL_DEFAULT);
+      }}
+    />
+  );
   const sideThreadTabs = () => props.threads?.side.tabs ?? [];
   const moveSideThread = (id: string, index: number) => props.threads?.side.onMove(id, index);
   return (
@@ -575,25 +600,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
           aria-label={t("conversation.sidePanel.label")}
         >
           {/* The list has the width of the panes, so a drag here also sets the width of each pane. */}
-          <PanelResizer
-            class="right-panel-resizer"
-            label={t("conversation.sidePanel.resize")}
-            controls="side-panel-launcher"
-            direction="right"
-            value={sidePanelWidth()}
-            defaultValue={SIDE_PANEL_DEFAULT}
-            min={SIDE_PANEL_DEFAULT}
-            max={sidePanelMaxWidth}
-            onResize={setSidePanelWidth}
-            onResizeEnd={saveSidePanelWidth}
-            // A narrower chat makes the panel narrower only for now. When the chat gets wider, the panel goes
-            // back to the width from the last drag.
-            onParentResize={() => setSidePanelWidth(Math.round(Math.min(sidePanelMaxWidth(), readSidePanelWidth())))}
-            onReset={() => {
-              resetSidePanelWidth();
-              setSidePanelWidth(SIDE_PANEL_DEFAULT);
-            }}
-          />
+          {sidePanelResizer("side-panel-launcher")}
           <SidePanelLauncher
             available={sidePanelPanes()}
             settingsLabel={channel ? t("channel.settings.title") : undefined}
@@ -690,6 +697,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
             onDraftChange={setSideQuestionDraft}
             onAsk={askSideQuestion}
             onClosePanel={() => closeSidePanelPane("question")}
+            resizer={sidePanelResizer("side-question-panel")}
             onOpenLink={(url) => void openExternalMessageUrl(url)}
             macWindowControls={props.platform === "darwin"}
           />
@@ -712,7 +720,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
 
       {/* Keyed, so each side thread gets its own messages and read state. */}
       <Show when={shownThread()} keyed>
-        {(threadId) => <ConversationSideThread threadId={threadId} />}
+        {(threadId) => <ConversationSideThread threadId={threadId} resizer={sidePanelResizer("side-thread-panel")} />}
       </Show>
 
       <Show when={activeRightPanel() === "subagent"}>
@@ -720,6 +728,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
           subagent={panelSubagent()}
           agentName={props.agent?.name ?? ""}
           onClosePanel={() => closeSidePanelPane("subagent")}
+          resizer={sidePanelResizer("subagent-panel")}
         />
       </Show>
 
@@ -843,6 +852,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
                   : undefined
               }
               onOpenUsage={panelProps.onOpenUsage}
+              onOpenApps={serverCanManageMcp(props.server) ? props.onOpenMarketplace : undefined}
               onPublish={canPublish() ? () => publishAgent.open(agent().id) : undefined}
               agent={agent()}
               runtimeSettings={{

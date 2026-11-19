@@ -14,6 +14,7 @@ export const messages = {
   "status.messaging.stopped": "已停止。",
   "status.messaging.stop": "停止",
   "status.messaging.approvalTitle": "OpenBot 请求批准以继续。",
+  "status.messaging.approvalTitleTeammate": "团队成员 {agent} 请求批准以继续。",
   "status.messaging.approvalCommand": "运行命令",
   "status.messaging.approvalFileChange": "修改文件",
   "status.messaging.approvalPermissions": "获取更多权限",

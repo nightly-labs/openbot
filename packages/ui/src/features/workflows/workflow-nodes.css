@@ -1428,6 +1428,7 @@ fieldset.wfn-picker-group {
 }
 
 .ui-popover-menu-surface.wfn-popover {
+  z-index: var(--openbot-layer-popover);
   display: grid;
   gap: var(--openbot-space-3);
   width: 344px;
@@ -1452,6 +1453,11 @@ fieldset.wfn-picker-group {
 .wfn-size-field {
   display: grid;
   gap: var(--openbot-space-1);
+}
+
+/* A custom length: one slider over the lengths of the model. */
+.ui-popover-menu-surface.wfn-popover.wfn-length-popover {
+  width: 240px;
 }
 
 /* The title of a popover, with one action at the end, such as Upload. */
@@ -3069,6 +3075,12 @@ fieldset.wfn-picker-group {
   text-transform: capitalize;
   pointer-events: none;
   translate: -50% -50%;
+}
+
+/* The number of connections that one line stands for. */
+.wfn-edge-count {
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
 }
 
 /*

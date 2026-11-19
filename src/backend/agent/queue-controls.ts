@@ -329,6 +329,8 @@ export class QueueControls {
               snapshot,
               routineRun:
                 context.delivery.sender.kind === "routine" ? this.#routines.runForDelivery(input.deliveryId) : null,
+              workflowRunSource:
+                context.delivery.sender.kind === "routine" ? this.#routines.workflowRunSource(input.deliveryId) : null,
               wokenWaits: context.delivery.sender.kind === "routine" ? this.#routines.wokenWaits(input.deliveryId) : [],
               routineTimezone:
                 context.delivery.sender.kind === "routine"

@@ -17,6 +17,7 @@ import type {
   RoutineRunConversationEventStatus,
   TestRoutineInput,
   UpdateRoutineInput,
+  WorkflowRunSource,
 } from "@openbot/contracts/ipc";
 import { routineConversationEventItemType, routineRunConversationEventItemType } from "@openbot/contracts/ipc";
 import type { EventRoutine } from "@openbot/contracts/ipc-events";
@@ -40,6 +41,7 @@ import type {
   RoutineRecordInput,
 } from "../routine-store";
 import type { RoutineDueSource, RoutineTimer } from "../routine-timer";
+import { WorkflowRunStore } from "../workflows/workflow-run-store";
 import {
   type ConversationRuntime,
   type ConversationTransaction,
@@ -160,6 +162,7 @@ export class RoutineScheduler implements RoutineDueSource {
   readonly #conversation: ConversationRuntime;
   readonly #hooks: RoutineHooks;
   readonly #routines: AgentRoutineStore;
+  readonly #workflowRuns: WorkflowRunStore;
   readonly #waits: AgentWaits;
   /**
    * A deletion has to interrupt live runs before it can remove their routine, so it holds the agent
@@ -185,6 +188,7 @@ export class RoutineScheduler implements RoutineDueSource {
     this.#hooks = options.hooks;
     this.#timer = options.timer;
     this.#routines = new AgentRoutineStore(options.store.database);
+    this.#workflowRuns = new WorkflowRunStore({ database: options.store.database });
     this.#waits = options.waits;
     this.#timezone = options.timezone ?? localTimezone;
     this.#webhookRoutines = options.webhookRoutines;
@@ -238,6 +242,15 @@ export class RoutineScheduler implements RoutineDueSource {
 
   runForDelivery(deliveryId: string): RoutineRun | null {
     return this.#routines.runForDelivery(deliveryId);
+  }
+
+  /**
+   * How the workflow run of a workflow agent step's delivery began, or null for any other delivery. A
+   * workflow step is a routine handoff that names the workflow run, so its delivery has no routine run.
+   */
+  workflowRunSource(deliveryId: string): WorkflowRunSource | null {
+    const sender = this.#mailbox.getDelivery(deliveryId)?.delivery.sender;
+    return sender?.kind === "routine" ? this.#workflowRuns.handoffSource(sender.runId) : null;
   }
 
   /**

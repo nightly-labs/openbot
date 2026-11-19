@@ -64,6 +64,7 @@ import {
   decodeHostProviderAccountPools,
   decodeHostWhatsAppLinkState,
   decodeHostWhatsAppOverview,
+  decodeInstalledSkills,
   disconnectedPasswordManager,
   type HermesImportPreview,
   type HiddenAgentsSnapshot,
@@ -78,6 +79,7 @@ import {
   type ProviderDetectionSettings,
   type QueueDelivery,
   type QueueSnapshot,
+  ROUTINE_QUIET_ANSWER_ITEM_TYPE,
   type Routine,
   type RoutineResultConnectionOption,
   type RoutineResultDestination,
@@ -384,10 +386,12 @@ import {
   ROUTINE_PAUSE_REASONS_CAPABILITY,
   ROUTINE_PAUSE_REASONS_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-pause-reasons-v1";
+import { ROUTINE_QUIET_ANSWERS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-quiet-answers-v1";
 import {
   ROUTINE_RESULTS_CAPABILITY,
   ROUTINE_RESULTS_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-results-v1";
+import { ROUTINE_RESULTS_WHATSAPP_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-whatsapp-v1";
 import {
   decodeRoutineRunCommandResponse,
   ROUTINE_RUN_COMMAND_CAPABILITY,
@@ -403,6 +407,7 @@ import { SIDE_QUESTION_CAPABILITY, SIDE_QUESTION_ROUTES } from "@openbot/contrac
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { SIDEBAR_PINS_CAPABILITY, SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { SKILL_LEARNING_CAPABILITY, SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
+import { SKILL_PROBLEMS_CAPABILITY } from "@openbot/contracts/team-protocol/skill-problems-v1";
 import { SKILLS_ADMIN_CAPABILITY, SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { STORAGE_DISK_CAPABILITY, STORAGE_DISK_ROUTES } from "@openbot/contracts/team-protocol/storage-disk-v1";
 import {
@@ -528,7 +533,7 @@ import { RemoteRequestError } from "../src/main/remote-server-errors";
 import { RemoteWorkflowError } from "../src/main/remote-service-effects";
 import { SidebarPinStore } from "../src/main/sidebar-pin-store";
 import { SkillLearningPreferenceStore } from "../src/main/skill-learning-preference-store";
-import { SkillMarketplaceFailure, type SkillMarketplaceService } from "../src/main/skill-marketplace-service";
+import { SkillMarketplaceFailure, SkillMarketplaceService } from "../src/main/skill-marketplace-service";
 import type {
   TeamApiAgentAccess,
   TeamApiAgents,
@@ -611,6 +616,13 @@ const routineResultOptions: RoutineResultConnectionOption[] = [
     platform: "slack",
     connectionName: "Acme",
     places: [{ id: "C0123", name: "general" }],
+    placesFailed: false,
+  },
+  {
+    connectionId: "whatsapp-ada",
+    platform: "whatsapp",
+    connectionName: "Ada's phone",
+    places: [{ id: "120363000000000000@g.us", name: "Family" }],
     placesFailed: false,
   },
 ];
@@ -1534,7 +1546,32 @@ const fakeAgents: TeamApiAgents = {
   setAvatar: unused("setAvatar"),
   resolveAvatar: unused("resolveAvatar"),
   readConversation: unused("readConversation"),
-  readConversationFor: unused("readConversationFor"),
+  // A quiet routine run: its run row and the report that the agent ended quiet (#11174).
+  readConversationFor: (agentId) =>
+    Effect.succeed({
+      agentId,
+      threadId: `thread-${agentId}`,
+      activeTurnId: null,
+      revision: 1,
+      messages: [
+        {
+          id: "run-answer",
+          author: "assistant",
+          text: "Reply",
+          createdAt: "2026-11-05T08:00:00.000Z",
+          status: "completed",
+        },
+        {
+          id: "quiet-report",
+          author: "assistant",
+          text: "Inbox rundown",
+          createdAt: "2026-11-05T08:01:00.000Z",
+          status: "completed",
+          itemType: ROUTINE_QUIET_ANSWER_ITEM_TYPE,
+        },
+      ],
+      readState: { unreadCount: 0, firstUnreadMessageId: null, throughMessageId: "quiet-report" },
+    }),
   // The chat of each agent shows every message but `message-gone`. A page around a message starts with it.
   readConversationPageFor: (agentId, memberId, anchor, limit, options) => {
     record("readConversationPageFor", agentId, memberId, anchor, limit, options);
@@ -2357,6 +2394,25 @@ const githubSkillsAdmin: Pick<
   setEnabled: () => Effect.die(new Error("Not used.")),
 };
 
+// The real skill reader over Ada's workspace (#9006): one skill folder that the provider reads, and one
+// whose `SKILL.md` starts with the byte order mark that Windows PowerShell 5.1 writes.
+const adaSkills = join(root, "workspaces", "agent-ada", ".claude", "skills");
+mkdirSync(join(adaSkills, "good-skill"), { recursive: true });
+writeFileSync(join(adaSkills, "good-skill", "SKILL.md"), "---\nname: good-skill\ndescription: Works.\n---\n# Good\n");
+mkdirSync(join(adaSkills, "settlement-economy"), { recursive: true });
+writeFileSync(
+  join(adaSkills, "settlement-economy", "SKILL.md"),
+  "\uFEFF---\r\nname: settlement-economy\r\ndescription: Settles.\r\n---\r\n# Settle\r\n",
+);
+const chatSkills = new SkillMarketplaceService(
+  {
+    requestAuthorized: () => Effect.die("Not used."),
+    downloadAuthorized: () => Effect.die("Not used."),
+    resolveApiUrl: () => "",
+  },
+  () => agents,
+);
+
 // The real skill learning store on a temporary file, as the host keeps it.
 const skillLearningFile = join(root, "skill-learning.json");
 const skillLearning = new SkillLearningPreferenceStore(skillLearningFile);
@@ -2506,6 +2562,7 @@ try {
     attachmentPreviews,
     browser,
     chat: new TeamChatStore(database),
+    skills: chatSkills,
     // The real host-settings service, over an agent writer that records each change.
     admin: {
       skills: githubSkillsAdmin,
@@ -2690,9 +2747,12 @@ try {
             record("setRoutineResultDestination", input);
             if (input.agentId !== "agent-ada" || input.routineId !== "routine-ada")
               return Effect.fail({ cause: new RoutineResultError(sourceText("error.backend.routineGone")) });
-            routineDestination = input.destination
-              ? { ...input.destination, platform: "slack", connectionName: "Acme" }
-              : null;
+            const { destination } = input;
+            const connection = routineResultOptions.find((option) => option.connectionId === destination?.connectionId);
+            routineDestination =
+              destination && connection
+                ? { ...destination, platform: connection.platform, connectionName: connection.connectionName }
+                : null;
             return Effect.succeed(routineDestination);
           }),
       },
@@ -6206,6 +6266,64 @@ try {
     );
   }
 
+  // ---- Quiet routine answers (routine-quiet-answers-v1) ----
+  {
+    // A capability after protocol 9: the protocol 9 list is full.
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, {
+      protocol: TEAM_PROTOCOL_V10,
+      headers: teamCapabilityHeaders(TEAM_PROTOCOL_V10, TEAM_CURRENT_CAPABILITIES),
+    });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises routine-quiet-answers-v1 to a protocol 10 peer only",
+      decodeTeamProtocolSupportExpanded(compatibility.body).capabilities.includes(ROUTINE_QUIET_ANSWERS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(ROUTINE_QUIET_ANSWERS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    // A user on a server reads a report that the agent ended quiet in its closed run, as on desktop.
+    const ids = (response: Awaited<ReturnType<typeof call>>) =>
+      list(field(response.body, "messages")).map((message) => field(message, "id"));
+    const conversationPath = TEAM_API_ROUTES.agent.conversation("agent-ada");
+    const withQuiet = await call("GET", conversationPath, {
+      token: bobToken,
+      protocol: TEAM_PROTOCOL_V10,
+      capabilities: [ROUTINE_QUIET_ANSWERS_CAPABILITY],
+    });
+    const withoutQuiet = await call("GET", conversationPath, { token: bobToken, protocol: TEAM_PROTOCOL_V10 });
+    const through = (response: Awaited<ReturnType<typeof call>>) =>
+      field(field(response.body, "readState"), "throughMessageId");
+    check(
+      "a conversation keeps a quiet routine answer, and a read through it, only for a client with routine-quiet-answers-v1",
+      withQuiet.status === 200 &&
+        isDeepStrictEqual(ids(withQuiet), ["run-answer", "quiet-report"]) &&
+        through(withQuiet) === "quiet-report" &&
+        withoutQuiet.status === 200 &&
+        isDeepStrictEqual(ids(withoutQuiet), ["run-answer"]) &&
+        through(withoutQuiet) === "run-answer",
+      [summary(withQuiet), summary(withoutQuiet)],
+    );
+    const pagePath = `${TEAM_API_ROUTES.agent.conversationPage("agent-ada")}?around=quiet-report`;
+    const pageExcludes = () => {
+      const options = callsOf("readConversationPageFor").at(-1)?.[4];
+      return options && typeof options === "object" && "excludeRoutineQuietAnswers" in options
+        ? options.excludeRoutineQuietAnswers
+        : undefined;
+    };
+    await call("GET", pagePath, {
+      token: bobToken,
+      protocol: TEAM_PROTOCOL_V10,
+      capabilities: [ROUTINE_QUIET_ANSWERS_CAPABILITY],
+    });
+    const withQuietExcluded = pageExcludes();
+    await call("GET", pagePath, { token: bobToken, protocol: TEAM_PROTOCOL_V10 });
+    const withoutQuietExcluded = pageExcludes();
+    check(
+      "a conversation page keeps quiet routine answers only for a client with routine-quiet-answers-v1",
+      withQuietExcluded === false && withoutQuietExcluded === true,
+      [withQuietExcluded, withoutQuietExcluded],
+    );
+  }
+
   // ---- Skill learning (skill-learning-v1) ----
   {
     const capabilities = [SKILL_LEARNING_CAPABILITY];
@@ -6535,6 +6653,55 @@ try {
           ],
         ),
       [summary(noSave), summary(saved), summary(discarded)],
+    );
+  }
+
+  // ---- The skills that an agent cannot use, with the reason (skill-problems-v1, #9006) ----
+  {
+    const withSkillProblems = teamCapabilityHeaders(TEAM_PROTOCOL_V10, TEAM_CURRENT_CAPABILITIES);
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, {
+      protocol: TEAM_PROTOCOL_V10,
+      headers: withSkillProblems,
+    });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises skill-problems-v1 to a protocol 10 peer only",
+      decodeTeamProtocolSupportExpanded(compatibility.body).capabilities.includes(SKILL_PROBLEMS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(SKILL_PROBLEMS_CAPABILITY),
+      [summary(compatibility), list(field(older.body, "capabilities")).length],
+    );
+    const path = TEAM_API_ROUTES.agent.skills("agent-ada");
+    const plain = await call("GET", path, {
+      token: bobToken,
+      protocol: TEAM_PROTOCOL_V10,
+      headers: teamCapabilityHeaders(
+        TEAM_PROTOCOL_V10,
+        TEAM_CURRENT_CAPABILITIES.filter((capability) => capability !== SKILL_PROBLEMS_CAPABILITY),
+      ),
+    });
+    const withProblems = await call("GET", path, {
+      token: bobToken,
+      protocol: TEAM_PROTOCOL_V10,
+      headers: withSkillProblems,
+    });
+    // The list also has the host user's own skills in `~/.agents/skills`, which differ on each computer.
+    const named = (reply: Reply) =>
+      decodeInstalledSkills(reply.body)
+        .filter((skill) => skill.skillId.startsWith("workspace:"))
+        .map(({ slug, problem }) => ({ slug, problem }));
+    check(
+      "an older client gets only the usable skill folder, as before",
+      plain.status === 200 && isDeepStrictEqual(named(plain), [{ slug: "good-skill", problem: undefined }]),
+      summary(plain),
+    );
+    check(
+      "a client with skill-problems-v1 also gets the folder whose SKILL.md has a byte order mark, with the reason",
+      withProblems.status === 200 &&
+        isDeepStrictEqual(named(withProblems), [
+          { slug: "good-skill", problem: undefined },
+          { slug: "settlement-economy", problem: sourceText("error.skill.frontmatterMissing") },
+        ]),
+      summary(withProblems),
     );
   }
 
@@ -11323,9 +11490,11 @@ try {
       capabilities: resultCapabilities,
     });
     check(
-      "an admin reads the connections with their places, and no destination yet",
+      "an admin reads the connections with their places, without WhatsApp for a client of routine-results-v1 alone, and no destination yet",
       options.status === 200 &&
-        isDeepStrictEqual(options.body, { connections: routineResultOptions }) &&
+        isDeepStrictEqual(options.body, {
+          connections: routineResultOptions.filter((option) => option.platform !== "whatsapp"),
+        }) &&
         before.status === 200 &&
         isDeepStrictEqual(before.body, { destination: null }),
       [summary(options), summary(before)],
@@ -11368,6 +11537,54 @@ try {
         isDeepStrictEqual(cleared.body, { destination: null }),
       [summary(gone), summary(cleared)],
     );
+    // routine-results-whatsapp-v1: the client also gets the WhatsApp numbers, and its own codec reads them.
+    const whatsAppCapabilities = [ROUTINE_RESULTS_CAPABILITY, ROUTINE_RESULTS_WHATSAPP_CAPABILITY];
+    const decoded = (path: string, reply: Reply) =>
+      teamSideRouteCodec(path)?.response(path, reply.status, reply.body, { routineResultsWhatsApp: true });
+    const wideOptions = await call("POST", ROUTINE_RESULTS_ROUTES.options, {
+      token: adaToken,
+      json: {},
+      capabilities: whatsAppCapabilities,
+    });
+    const family = { connectionId: "whatsapp-ada", placeId: "120363000000000000@g.us", placeName: "Family" };
+    const wideSet = await call("POST", ROUTINE_RESULTS_ROUTES.setDestination, {
+      token: adaToken,
+      json: { agentId: "agent-ada", routineId: "routine-ada", destination: family },
+      capabilities: whatsAppCapabilities,
+    });
+    const wideAfter = await call("POST", ROUTINE_RESULTS_ROUTES.destination, {
+      token: adaToken,
+      json: { agentId: "agent-ada", routineId: "routine-ada" },
+      capabilities: whatsAppCapabilities,
+    });
+    const savedFamily = { ...family, platform: "whatsapp", connectionName: "Ada's phone" };
+    check(
+      "a client of routine-results-whatsapp-v1 reads the WhatsApp numbers and sets a WhatsApp destination",
+      wideOptions.status === 200 &&
+        isDeepStrictEqual(decoded(ROUTINE_RESULTS_ROUTES.options, wideOptions), {
+          connections: routineResultOptions,
+        }) &&
+        wideSet.status === 200 &&
+        isDeepStrictEqual(decoded(ROUTINE_RESULTS_ROUTES.setDestination, wideSet), { destination: savedFamily }) &&
+        wideAfter.status === 200 &&
+        isDeepStrictEqual(decoded(ROUTINE_RESULTS_ROUTES.destination, wideAfter), { destination: savedFamily }),
+      [summary(wideOptions), summary(wideSet), summary(wideAfter)],
+    );
+    const narrowAfter = await call("POST", ROUTINE_RESULTS_ROUTES.destination, {
+      token: adaToken,
+      json: { agentId: "agent-ada", routineId: "routine-ada" },
+      capabilities: resultCapabilities,
+    });
+    check(
+      "a client of routine-results-v1 alone reads no destination when it is WhatsApp",
+      narrowAfter.status === 200 && isDeepStrictEqual(narrowAfter.body, { destination: null }),
+      summary(narrowAfter),
+    );
+    await call("POST", ROUTINE_RESULTS_ROUTES.setDestination, {
+      token: adaToken,
+      json: { agentId: "agent-ada", routineId: "routine-ada", destination: null },
+      capabilities: whatsAppCapabilities,
+    });
   }
 
   // ---- Queue routes ----

@@ -14,6 +14,7 @@ export const messages = {
   "chat.activity.cookingUp": "Faydalı bir şeyler hazırlanıyor…",
   "chat.activity.status": "{name} çalışıyor: {label}",
   "chat.activity.waitingFor": "{provider} bekleniyor…",
+  "chat.activity.backgroundWork": "Arka plan işi bekleniyor…",
   "chat.activity.waitingStatus": "{name}, {provider} için bekliyor",
   "chat.activity.waitingForAnswer": "Yanıtınız bekleniyor",
   "chat.activity.waitingForApproval": "Onayınız bekleniyor",

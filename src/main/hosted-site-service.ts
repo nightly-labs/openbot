@@ -305,10 +305,9 @@ export class HostedSiteDesktopService {
             `/v1/sites/uploads/${encodeURIComponent(session.uploadId)}/file?path=${encodeURIComponent(file.path)}`,
             {
               method: "PUT",
-              headers: {
-                "Content-Type": file.mimeType,
-                "Content-Length": String(file.size),
-              },
+              // The fetch sets `Content-Length` from the body. Chromium's `net.fetch` refuses a request
+              // that sets it as a header (`net::ERR_INVALID_ARGUMENT`), and the upload then fails (#12282).
+              headers: { "Content-Type": file.mimeType },
               body: arrayBuffer(file.bytes),
             },
             decodeUploadResult,

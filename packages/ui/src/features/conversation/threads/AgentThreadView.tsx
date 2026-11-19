@@ -53,6 +53,8 @@ import { ComposerSendControl } from "@openbot/ui/features/conversation/ComposerS
 import { ComposerStackCard } from "@openbot/ui/features/conversation/ComposerStackCard";
 import { ContextUsageMeter, type ContextUsageView } from "@openbot/ui/features/conversation/ContextUsage";
 import { ApprovalCard } from "@openbot/ui/features/conversation/ConversationPrompts";
+import { dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
+import { CHAT_TIME_GAP_MS, continuesSenderRun } from "@openbot/ui/features/conversation/chat-grouping";
 import {
   preferredMessageScrollBehavior,
   ScrollToLatestButton,
@@ -270,10 +272,15 @@ export interface AgentThreadViewProps {
   stepsAbove?: ((messageId: string) => AgentStep[] | undefined) | undefined;
   /** The time that the turn of an answer took, and how many of its steps failed. */
   factsAbove?: ((messageId: string) => AgentStepsFacts | undefined) | undefined;
-  /** The trace that the steps row above an answer opens, with the token usage and the time of each step. */
+  /** The trace of the turn of an answer. With it, the steps stand beside the answer, as in the agent's chat. */
   traceAbove?: ((messageId: string) => AgentStepsTrace) | undefined;
   /** The steps of the running turn, for its activity row. */
   activeSteps?: readonly AgentStep[] | undefined;
+  /**
+   * When the background work of the thread started, in epoch milliseconds, while it still runs after
+   * its turn ended. The agent continues when it ends, so the thread shows that it waits.
+   */
+  backgroundWorkSince?: number | undefined;
   /** The "Show agent steps" setting: the steps are open at first. */
   stepsOpenByDefault?: boolean | undefined;
   /** Receives the message list, where the app searches the thread. */
@@ -352,7 +359,7 @@ export interface AgentThreadSelectionActions {
  * busy-message mode says.
  */
 export function AgentThreadView(props: AgentThreadViewProps) {
-  const { t, errorMessage } = useText();
+  const { t, format, errorMessage } = useText();
   // Resolved once, so the card is built one time for the check and the row.
   const attention = children(() => props.attention);
   const [sending, setSending] = createSignal(false);
@@ -522,7 +529,8 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   const title = () => props.task?.title ?? t("conversation.threads.new");
   const placeholder = () =>
     props.task
-      ? t("conversation.threads.view.placeholder", { name: props.agent.name, title: props.task.title })
+      ? // The tab already names the thread, and a title can be a whole message.
+        t("conversation.threads.view.placeholder", { name: props.agent.name })
       : t("conversation.threads.view.newPlaceholder", { name: props.agent.name });
   const voicePhase = () => props.voice?.phase ?? "idle";
   const recording = () => voicePhase() === "recording";
@@ -657,11 +665,12 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   }
   /**
    * The action row of a message. The compact row has Reply, and More with the items of the right-click
-   * menu. The full row has Reply, Copy, and Branch on the last answer of a finished turn.
+   * menu. The full row has Reply, Copy, and Branch on the last answer of a finished turn. The text
+   * above a waiting question is a step of the turn, so it has no actions, as in the agent's chat.
    */
   function messageActions(message: AgentMessage): JSX.Element | undefined {
     const onCopy = props.onCopyMessage;
-    if (!onCopy || message.streaming) return undefined;
+    if (!onCopy || message.streaming || message.itemType === "commentary") return undefined;
     return (
       <Show
         when={props.compactMessageActions !== false}
@@ -701,12 +710,65 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   /** The right-click menu of a message, with the items of its More button. */
   function messageMenu(message: AgentMessage): (() => JSX.Element) | undefined {
     const onCopy = props.onCopyMessage;
-    if (!onCopy || message.streaming) return undefined;
+    if (!onCopy || message.streaming || message.itemType === "commentary") return undefined;
     return () => <MessageMenu {...menuItems(message, onCopy)} authorName={author(message).name} />;
   }
   /** A finished turn with no answer shows its steps on its thinking row, with no message under them. */
   const shownRow = (message: AgentMessage) =>
     shownInThread(message) || (message.kind === "thinking" && props.stepsAbove?.(message.id) !== undefined);
+  const shownRows = createMemo(() => props.messages.filter(shownRow));
+  /** A marker, a question or a thinking row draws no message row, so a run of one sender cannot continue under it. */
+  const holdsSenderRun = (message: AgentMessage) =>
+    message.kind !== "thinking" &&
+    message.kind !== "plan" &&
+    message.kind !== "subagents" &&
+    message.kind !== "memory-changes" &&
+    message.questionPrompt === undefined &&
+    !agentMessageMarker(message) &&
+    !changeMarker(message);
+  const senderRunRow = (message: AgentMessage) => ({
+    author: message.author === "agent" ? `agent:${message.senderAgentId ?? props.agent.id}` : message.author,
+    ...(message.createdAt === undefined ? {} : { createdAt: message.createdAt }),
+    ...(message.turnId === undefined ? {} : { turnId: message.turnId }),
+  });
+  /**
+   * As in the agent's chat: a separator names the time above the first row and above a new day. The
+   * compact action row shows no time, so a pause of an hour or more also gets one.
+   */
+  const timeMarkers = createMemo(() => {
+    const labels = new Map<string, string>();
+    const gap = props.compactMessageActions === false ? {} : { gapMs: CHAT_TIME_GAP_MS };
+    let previous: AgentMessage | undefined;
+    for (const message of shownRows()) {
+      const label =
+        message.createdAt === undefined
+          ? previous === undefined
+            ? (message.time ?? t("chat.day.now"))
+            : null
+          : dayMarkerLabel(previous?.createdAt, message.createdAt, { t, format, ...gap });
+      if (label !== null) labels.set(message.id, label);
+      previous = message;
+    }
+    return labels;
+  });
+  /** As in the agent's chat: the messages of a run by one sender read as one block. */
+  const continuesRunIds = createMemo(() => {
+    const ids = new Set<string>();
+    const markers = timeMarkers();
+    let previous: AgentMessage | undefined;
+    for (const message of shownRows()) {
+      if (
+        holdsSenderRun(message) &&
+        continuesSenderRun(previous && senderRunRow(previous), senderRunRow(message), {
+          previousDrawsTime: previous !== undefined && holdsSenderRun(previous),
+          startsDay: markers.has(message.id),
+        })
+      )
+        ids.add(message.id);
+      previous = message;
+    }
+    return ids;
+  });
   /**
    * The row that the branch line follows: the last message that the branch copied. That message can be
    * one that the thread does not show as a row, such as a thought in the steps of a turn. Then the line
@@ -715,7 +777,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   const branchDividerId = createMemo(() => {
     const source = props.branchSource;
     if (!source) return undefined;
-    const shown = props.messages.filter(shownRow);
+    const shown = shownRows();
     if (shown.some((message) => message.id === source.throughMessageId)) return source.throughMessageId;
     const branchedAt = props.task ? Date.parse(props.task.createdAt) : Number.NaN;
     if (Number.isNaN(branchedAt)) return undefined;
@@ -741,6 +803,8 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   const running = () =>
     props.task?.state === "running" && !props.approval && !props.waitsForAnswer ? props.task : undefined;
   const queued = () => (props.task && props.task.queuedMessages.length > 0 ? props.task : undefined);
+  // As in the agent's chat: a live turn hides the row, also while it waits for an approval or an answer.
+  const backgroundWorkSince = () => (props.task?.state === "running" ? undefined : props.backgroundWorkSince);
   const hold = () => (props.task ? agentThreadHoldText(props.task, props.limit, t) : null);
   const editingQueued = () => Boolean(props.queue?.editingDeliveryId);
   const sendLabel = () =>
@@ -853,22 +917,47 @@ export function AgentThreadView(props: AgentThreadViewProps) {
               {t("conversation.threads.view.startedByAgent", { name: props.agent.name })}
             </p>
           </Show>
-          <For each={props.messages.filter(shownRow)} keyed={(message) => message.id}>
+          <For each={shownRows()} keyed={(message) => message.id}>
             {(message) => {
               const card = createMemo(() => props.messageCard?.(message(), quoteSelection));
+              // As in the agent's chat: the steps of an answer stand beside it and open only the trace.
+              // "Show agent steps" keeps the open list above the answer.
+              const stepsInRow = () =>
+                props.traceAbove !== undefined &&
+                !props.stepsOpenByDefault &&
+                message().kind !== "thinking" &&
+                message().questionPrompt === undefined &&
+                !agentMessageMarker(message()) &&
+                !changeMarker(message()) &&
+                !card() &&
+                author(message()).kind === "agent";
+              const stepsDisclosure = () => (
+                <Show when={props.stepsAbove?.(message().id)}>
+                  {(steps) => (
+                    <AgentStepsDisclosure
+                      steps={steps()}
+                      defaultOpen={props.stepsOpenByDefault ?? false}
+                      list={!stepsInRow()}
+                      // A turn with no answer shows its steps on its thinking row, with no trace, as in the chat.
+                      trace={message().kind === "thinking" ? undefined : props.traceAbove?.(message().id)}
+                      facts={props.factsAbove?.(message().id)}
+                    />
+                  )}
+                </Show>
+              );
               return (
-                <div class="virtual-chat-row">
-                  <Show when={props.stepsAbove?.(message().id)}>
-                    {(steps) => (
-                      <AgentStepsDisclosure
-                        steps={steps()}
-                        defaultOpen={props.stepsOpenByDefault ?? false}
-                        // A turn with no answer shows its steps on its thinking row, with no trace, as in the chat.
-                        trace={message().kind === "thinking" ? undefined : props.traceAbove?.(message().id)}
-                        facts={props.factsAbove?.(message().id)}
-                      />
+                <div
+                  class="virtual-chat-row"
+                  data-grouped={!card() && continuesRunIds().has(message().id) ? "sender" : undefined}
+                >
+                  <Show when={timeMarkers().get(message().id)}>
+                    {(label) => (
+                      <div class="time-marker">
+                        <span>{label()}</span>
+                      </div>
                     )}
                   </Show>
+                  <Show when={!stepsInRow()}>{stepsDisclosure()}</Show>
                   <Show when={message().kind !== "thinking" && agentMessageMarker(message())}>
                     {(marker) => (
                       <article data-chat-search-message={message().id}>
@@ -935,6 +1024,9 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                             if (id) showMessage(id);
                           }}
                           actions={messageActions(message())}
+                          steps={stepsInRow() ? stepsDisclosure() : undefined}
+                          actionTime={props.compactMessageActions === false}
+                          actionsBeside={stepsInRow() || author(message()).kind === "you"}
                           menu={messageMenu(message())}
                           data-chat-search-message={message().id}
                         />
@@ -950,13 +1042,25 @@ export function AgentThreadView(props: AgentThreadViewProps) {
           </For>
           <Show when={running()}>
             {(task) => (
-              <div class="virtual-chat-row">
+              <div class="virtual-chat-row virtual-chat-row-activity">
                 <AgentActivityIndicator
                   agent={props.agent}
                   label={activityLabel}
                   detail={task().progress}
                   steps={props.activeSteps}
                   stepsOpenByDefault={props.stepsOpenByDefault}
+                />
+              </div>
+            )}
+          </Show>
+          <Show when={backgroundWorkSince()}>
+            {(since) => (
+              <div class="virtual-chat-row virtual-chat-row-activity">
+                <AgentActivityIndicator
+                  agent={props.agent}
+                  label={activityLabel}
+                  detail={t("chat.activity.backgroundWork")}
+                  since={since()}
                 />
               </div>
             )}

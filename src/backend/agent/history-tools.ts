@@ -3,6 +3,7 @@ import {
   CONVERSATION_TRACE_STEP_LIMIT,
   type ConversationMessage,
   type ConversationTurnTrace,
+  ROUTINE_QUIET_ANSWER_ITEM_TYPE,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { redactSecrets } from "@openbot/logging";
@@ -165,8 +166,17 @@ const searchSchema = z
         "A cursor continues the call that gave it. Send a history_search cursor with the same query, a chat list cursor with no query, and a history_read cursor to history_read as before.",
     },
   );
+// The read answer gives nextCursor and history_search takes it as `cursor`, so models send `cursor`
+// here too. The error names the argument that takes it (#12517).
+// A history_search with only a taskId gives this answer too, so the hint names the tool.
+const READ_CURSOR_HINT = "Send nextCursor to history_read as before for older messages.";
 const readSchema = z
-  .strictObject(readShape)
+  .strictObject(readShape, {
+    error: (issue) =>
+      issue.code === "unrecognized_keys" && issue.keys.includes("cursor")
+        ? `There is no cursor argument. ${READ_CURSOR_HINT}`
+        : undefined,
+  })
   .refine(
     (value) =>
       !(value.messageId && value.before) &&
@@ -315,6 +325,12 @@ interface HistoryEntry {
   attachmentsOmitted?: number;
   /** Set for a visual reply in a list: its text is only the page title. */
   page?: string;
+  /**
+   * Set for the answer of a turn that ended with nothing to report. The user got no notification, the
+   * chat shows it only when they open its run or update, and the phone app does not show it, so a model
+   * must not say that the user saw it (#11174).
+   */
+  quiet?: string;
 }
 
 /** Owns bounded model-facing history output. Scope is supplied by the authenticated router. */
@@ -573,10 +589,13 @@ export class HistoryTools {
           query: query ?? null,
         }),
       ).toString("base64url");
-    const result: { messages: HistoryEntry[]; nextCursor: string | null; order: string } = {
+    // A read says where nextCursor goes, as the search answers do. It is set before the size checks
+    // below, so that they count it.
+    const result: { messages: HistoryEntry[]; nextCursor: string | null; order: string; next?: string } = {
       messages: [],
       nextCursor: null,
       order: "newest-first",
+      ...(read ? { next: READ_CURSOR_HINT } : {}),
     };
     const maximum = search ? 8000 : 16000;
     const sessions = read?.includeWorkSteps ? store.database.listProviderSessions(threadId) : [];
@@ -632,6 +651,12 @@ export class HistoryTools {
               page: "history_read with this messageId, and the taskId of this entry if it has one, gives the page text.",
             }
           : {}),
+        ...(message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE
+          ? {
+              quiet:
+                "Ended with nothing to report: no notification. The chat folds it under its run or update; the phone app does not show it.",
+            }
+          : {}),
       };
       if (read?.includeWorkSteps) {
         const session = sessions.find((candidate) => candidate.id === row.providerSessionId);
@@ -684,6 +709,7 @@ export class HistoryTools {
       }
     }
     if (!more) result.nextCursor = null;
+    if (result.nextCursor === null) delete result.next;
     // File reads yield. Recheck reset and message existence before any content leaves the process.
     for (const entry of result.messages) {
       const checked = yield* toolStep(() =>

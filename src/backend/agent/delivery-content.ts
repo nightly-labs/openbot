@@ -10,6 +10,7 @@ import type {
   ConversationSnapshot,
   QueueDelivery,
   RoutineRun,
+  WorkflowRunSource,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { redactSecrets, redactText } from "@openbot/logging";
@@ -102,6 +103,17 @@ export function failedRunReason(
   return sourceText("error.backend.routineRunFailedNoReason");
 }
 
+/** The run type that a workflow agent step's prompt gives, by how its workflow run began. */
+const WORKFLOW_RUN_KINDS: Record<WorkflowRunSource, string> = {
+  manual: "manual run",
+  schedule: "scheduled run",
+  webhook: "webhook run",
+  github: "GitHub event run",
+  discord: "Discord message run",
+  telegram: "Telegram message run",
+  slack: "Slack message run",
+};
+
 export type DeliveryInputItem =
   | { type: "text"; text: string }
   | { type: "localImage"; path: string }
@@ -112,6 +124,8 @@ export interface DeliveryPromptSources {
   /** The conversation the delivery joins. A user reply quotes the message it answers from it. */
   snapshot: ConversationSnapshot;
   routineRun: Pick<RoutineRun, "kind" | "source" | "agentId"> | null;
+  /** How the workflow run of a workflow agent step began. Such a delivery has no routine run. */
+  workflowRunSource?: WorkflowRunSource | null;
   /** The zone of a routine delivery's routine. The run time is also given on its clock. */
   routineTimezone?: string | undefined;
   /** The open waits that a routine run wakes. The run continues their requests. */
@@ -461,7 +475,14 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
   if (delivery.sender.kind === "routine") {
     const run = sources.routineRun;
     const testRun = run !== null && !quietRoutineRun(run);
-    const runKind = testRun ? "manual Test run" : run?.source ? `${run.source} run` : "scheduled run";
+    const runKind = testRun
+      ? "manual Test run"
+      : run?.source
+        ? `${run.source} run`
+        : // A workflow step that a person or an event started must not read as scheduled (#12452).
+          run === null && sources.workflowRunSource
+          ? WORKFLOW_RUN_KINDS[sources.workflowRunSource]
+          : "scheduled run";
     // A routine whose task says to stop when it is done pauses itself; without this, each run reports
     // the same result again (#8963). A pause keeps the routine, so the user can turn it on again. A Test
     // run must not change the routine, and update_routine does not find a webhook routine. A flow

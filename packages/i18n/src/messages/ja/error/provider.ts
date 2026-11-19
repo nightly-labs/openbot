@@ -186,6 +186,8 @@ export const messages = {
     "{provider} が時間内に応答しませんでした。コンピューターの負荷が高い可能性があります。プロバイダーを更新して再試行してください。",
   "error.provider.stoppedBeforeStart":
     "このメッセージが始まる前に {provider} が停止しました。メッセージをもう一度送信してください。",
+  "error.provider.sessionStartTimedOut":
+    "{provider} が時間内に新しいチャットを開けなかったため、このメッセージは開始されませんでした。OpenBot を実行しているコンピューターでプロバイダーを開き、{provider} を選択して再起動をクリックしてください。その後、もう一度お試しください。",
   "error.provider.serviceUnreachable":
     "{provider} がサービスに接続できません。インターネット接続を確認してください。OpenBot が再試行します。",
   "error.provider.serviceUnreachableRefresh":
@@ -245,6 +247,8 @@ export const messages = {
     "OpenCode の API キーの有効期限が切れました。OpenCode Console で新しいキーを作成し、OpenCode の設定に貼り付けてから、もう一度お試しください。",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go が保存済みの API キーを拒否しました。キーの有効期限が切れている可能性があります。OpenCode Console で新しいキーを作成し、OpenCode の設定に貼り付けてから、もう一度お試しください。",
+  "error.provider.opencodeGoRequestRefused":
+    "OpenCode Go がリクエストを拒否しました。新しい API キーでは解決しません。OpenCode Go のプランが有効でないか、OpenCode Go がお使いのネットワークをブロックしている可能性があります。一部のサービスは VPN、プロキシ、または一部の国をブロックします。OpenCode Console でプランが有効か確認するか、VPN をオフにしてから、もう一度お試しください。別のモデルを選ぶこともできます。",
   "error.provider.opencodeServiceFailure":
     "OpenCode のローカルサービスが失敗したため、このターンを完了できませんでした。もう一度お試しください。エラーが続く場合は、設定で OpenCode を再接続してください。",
   "error.provider.opencodeRateLimited":
@@ -397,6 +401,8 @@ export const messages = {
     "Claude のサービスがこのリクエストをブロックしました。通常は Claude 側の一時的な問題で、アカウントの問題ではありません。数分後にもう一度メッセージを送信してください。",
   "error.provider.foreignReasoning":
     "別のアカウントまたは API キーが受け取ったため、{provider} はこのチャットの以前の推論を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
+  "error.provider.blankHistoryText":
+    "保存された履歴に空のメッセージがあるため、モデルはこのチャットを受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
   "error.provider.codexHistoryItemMissing":
     "保存された履歴の項目が見つからないため、Codex はこのチャットを続行できませんでした。OpenBot はチャット履歴を引き継いだ新しい Codex セッションを開始しました。もう一度お試しください。",
   "error.provider.codexRequestRefused":

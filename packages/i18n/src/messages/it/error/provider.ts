@@ -182,6 +182,8 @@ export const messages = {
     "{provider} non ha risposto in tempo. Il computer potrebbe essere occupato. Aggiorna i provider per riprovare.",
   "error.provider.stoppedBeforeStart":
     "{provider} si è fermato prima che questo messaggio iniziasse. Invia di nuovo il messaggio.",
+  "error.provider.sessionStartTimedOut":
+    "{provider} non ha aperto una nuova chat in tempo, quindi questo messaggio non è iniziato. Sul computer che esegue OpenBot, apri Provider, seleziona {provider} e fai clic su Riavvia. Poi riprova.",
   "error.provider.serviceUnreachable":
     "{provider} non riesce a connettersi al suo servizio. Controlla la connessione a internet. OpenBot riproverà.",
   "error.provider.serviceUnreachableRefresh":
@@ -241,6 +243,8 @@ export const messages = {
     "La tua chiave API di OpenCode è scaduta. Crea una nuova chiave in OpenCode Console, incollala nelle impostazioni di OpenCode, poi riprova.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go ha rifiutato la tua chiave API salvata. La chiave potrebbe essere scaduta. Crea una nuova chiave in OpenCode Console, incollala nelle impostazioni di OpenCode, poi riprova.",
+  "error.provider.opencodeGoRequestRefused":
+    "OpenCode Go ha rifiutato la richiesta. Una nuova chiave API non risolve il problema. Il tuo piano OpenCode Go potrebbe non essere attivo, oppure OpenCode Go potrebbe bloccare la tua rete: alcuni servizi bloccano VPN, proxy o alcuni paesi. Verifica che il piano sia attivo in OpenCode Console o disattiva la VPN, poi riprova. Puoi anche scegliere un altro modello.",
   "error.provider.opencodeServiceFailure":
     "OpenCode non ha potuto completare questo turno perché il suo servizio locale è andato in errore. Riprova. Se l'errore continua, riconnetti OpenCode in Impostazioni.",
   "error.provider.opencodeRateLimited":
@@ -388,6 +392,8 @@ export const messages = {
     "Il servizio di Claude ha bloccato questa richiesta. Di solito è un breve problema di Claude, non del tuo account. Invia di nuovo il messaggio tra qualche minuto.",
   "error.provider.foreignReasoning":
     "{provider} non ha accettato il ragionamento precedente in questa chat, perché lo ha ricevuto un altro account o un'altra chiave API. OpenBot ha avviato una nuova sessione di {provider} con la cronologia della chat. Riprova.",
+  "error.provider.blankHistoryText":
+    "Il modello non ha accettato questa chat, perché la sua cronologia salvata contiene un messaggio vuoto. OpenBot ha avviato una nuova sessione di {provider} con la cronologia della chat. Riprova.",
   "error.provider.codexHistoryItemMissing":
     "Codex non ha potuto continuare questa chat, perché manca un elemento nella sua cronologia salvata. OpenBot ha avviato una nuova sessione di Codex con la cronologia della chat. Riprova.",
   "error.provider.codexRequestRefused":

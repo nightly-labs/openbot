@@ -175,6 +175,8 @@ export const messages = {
   "error.provider.cliTimedOutRefresh":
     "{provider} не ответил вовремя. Возможно, компьютер занят. Обновите провайдеров, чтобы повторить попытку.",
   "error.provider.stoppedBeforeStart": "{provider} остановился до начала этого сообщения. Отправьте сообщение ещё раз.",
+  "error.provider.sessionStartTimedOut":
+    "{provider} не открыл новый чат вовремя, поэтому это сообщение не началось. На компьютере, где работает OpenBot, откройте «Провайдеры», выберите {provider} и нажмите «Перезапустить». Затем попробуйте ещё раз.",
   "error.provider.serviceUnreachable":
     "{provider} не может подключиться к своему сервису. Проверьте подключение к интернету. OpenBot повторит попытку.",
   "error.provider.serviceUnreachableRefresh":
@@ -231,6 +233,8 @@ export const messages = {
     "Срок действия API-ключа OpenCode истёк. Создайте новый ключ в OpenCode Console, вставьте его в настройках OpenCode, затем повторите попытку.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go отклонил сохранённый API-ключ. Возможно, срок действия ключа истёк. Создайте новый ключ в OpenCode Console, вставьте его в настройках OpenCode, затем повторите попытку.",
+  "error.provider.opencodeGoRequestRefused":
+    "OpenCode Go отклонил запрос. Новый API-ключ это не исправит. Возможно, ваш план OpenCode Go не активен или OpenCode Go блокирует вашу сеть: некоторые сервисы блокируют VPN, прокси или некоторые страны. Проверьте в OpenCode Console, что план активен, или отключите VPN, затем повторите попытку. Также можно выбрать другую модель.",
   "error.provider.opencodeServiceFailure":
     "OpenCode не смог завершить этот ход из-за сбоя локальной службы. Повторите попытку. Если ошибка повторяется, подключите OpenCode заново в настройках.",
   "error.provider.opencodeRateLimited":
@@ -376,6 +380,8 @@ export const messages = {
     "Сервис Claude заблокировал этот запрос. Обычно это короткий сбой на стороне Claude, а не проблема с вашим аккаунтом. Отправьте сообщение снова через несколько минут.",
   "error.provider.foreignReasoning":
     "{provider} не принял предыдущие рассуждения в этом чате, потому что их получил другой аккаунт или API-ключ. OpenBot начал новую сессию {provider} с историей чата. Повторите попытку.",
+  "error.provider.blankHistoryText":
+    "Модель не приняла этот чат, потому что в его сохранённой истории есть пустое сообщение. OpenBot начал новую сессию {provider} с историей чата. Повторите попытку.",
   "error.provider.codexHistoryItemMissing":
     "Codex не смог продолжить этот чат, потому что в его сохранённой истории не хватает элемента. OpenBot начал новую сессию Codex с историей чата. Повторите попытку.",
   "error.provider.codexRequestRefused":

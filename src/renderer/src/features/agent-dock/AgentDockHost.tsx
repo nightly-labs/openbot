@@ -388,16 +388,19 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     const page = channelId ? channelPage(channelId) : null;
     if (!page) return [];
     return withStepAnswers(
-      channelConversationRows(page.messages.filter(channelMessageHasContent)).map(asOwn),
+      channelConversationRows(page.messages.filter(channelMessageHasContent), page.tasks).map(asOwn),
       new Set(channelWorkingTurns(page, new Set())),
       (row) => agentList().find((agent) => agent.id === row.senderAgentId)?.provider,
     );
   });
   const agentMessages = (agentId: string): AgentMessage[] => {
     const running = workingTurns()[agentId];
+    /* A turn that waits for an answer shows its last note above the question, as the main chat does:
+       the question is often about it, such as a draft to approve (#12544). */
+    const asking = promptOf({ kind: "agent", id: agentId })?.turnId;
     return withStepAnswers(
       (conversations[agentId]?.messages ?? []).map(asOwn),
-      new Set(running ? [running] : []),
+      new Set(running && running !== asking ? [running] : []),
       () => agentList().find((agent) => agent.id === agentId)?.provider,
     );
   };
