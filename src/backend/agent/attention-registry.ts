@@ -16,7 +16,12 @@ import type {
   RespondToBrowserTakeoverInput,
   RespondToPromptInput,
 } from "@openbot/contracts/ipc";
-import { AGENT_RUNTIME_ATTENTION_LIMIT, BROWSER_TAKEOVER_REASONS, cardBrand } from "@openbot/contracts/ipc";
+import {
+  AGENT_RUNTIME_ATTENTION_LIMIT,
+  AGENT_WELCOME_ITEM_TYPE,
+  BROWSER_TAKEOVER_REASONS,
+  cardBrand,
+} from "@openbot/contracts/ipc";
 import { type DynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { normalizeTwoStepKey, twoStepKeySecret } from "@openbot/contracts/two-step-code";
 import {
@@ -728,7 +733,9 @@ export class AttentionRegistry {
             preview,
           );
         } else {
-          this.#resolvePersistedPrompt(pending, promptResolution(pending.questions, answers));
+          const resolution = promptResolution(pending.questions, answers);
+          this.#resolvePersistedPrompt(pending, resolution);
+          this.#showWelcomeAnswer(pending, resolution, responder?.sender);
         }
       } catch (error) {
         this.#emitError("prompt_persistence_failed", error, pending.agentId);
@@ -2415,6 +2422,45 @@ export class AttentionRegistry {
       status: resolution.status,
     });
   }
+
+  #showWelcomeAnswer(
+    pending: PendingPrompt,
+    resolution: AgentPromptResolution,
+    sender: ConversationMessageSender | undefined,
+  ): void {
+    if (pending.detached || pending.subagent) return;
+    const text = welcomeAnswerText(pending.questions, resolution);
+    if (!text) return;
+    const snapshot = this.#conversation.ensureSnapshot(pending.agentId, pending.publicThreadId);
+    const welcomeTurn = snapshot.messages.some(
+      (message) => message.itemType === AGENT_WELCOME_ITEM_TYPE && message.turnId === pending.turnId,
+    );
+    const id = `welcome-answer:${pending.turnId}:${String(pending.id)}`;
+    if (!welcomeTurn || snapshot.messages.some((message) => message.id === id)) return;
+    snapshot.messages.push({
+      id,
+      turnId: pending.turnId,
+      author: "user",
+      source: "user",
+      ...(sender ? { senderMember: structuredClone(sender) } : {}),
+      text,
+      createdAt: new Date().toISOString(),
+      status: "completed",
+    });
+    this.#conversation.emitConversation(snapshot);
+  }
+}
+
+function welcomeAnswerText(questions: AgentPromptQuestion[], resolution: AgentPromptResolution): string {
+  if (resolution.status !== "answered") return "";
+  return questions
+    .flatMap((question) => {
+      const response = resolution.responses[question.id];
+      if (question.isSecret || response?.status !== "answered" || !response.answers) return [];
+      const answer = response.answers.join(", ").trim();
+      return answer ? [answer] : [];
+    })
+    .join("\n");
 }
 
 function uiBlockAnswer(
