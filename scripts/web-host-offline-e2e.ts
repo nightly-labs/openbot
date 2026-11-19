@@ -7,9 +7,12 @@
 //  [--email=openbot-dev-host@example.com] [--browser-executable=<path>]`
 //
 // 1. The web app signs in as the host owner with the development code and loads the workspace.
-// 2. The host stops its server. The web app loads the page again: it shows "Connecting to <name>", never
-//    "Loading <name>", and its Details show Connect as the current step.
+// 2. The host stops its server. The web app loads the page again: it shows "Connecting to <name>", or
+//    "Reconnecting to <name>" over the saved copy of the workspace, never "Loading <name>", and its
+//    Details show Connect as the current step.
 // 3. The host starts its server again. The web app loads the workspace without a user action.
+// 4. The host stops its server while the workspace is open. The web app shows "Reconnecting to <name>",
+//    never "Loading <name>". When the host starts again, the notice goes without a user action.
 // Writes .openbot-build/web-host-offline-e2e/report.json and screenshots.
 import assert from "node:assert/strict";
 import { mkdirSync } from "node:fs";
@@ -38,6 +41,8 @@ interface Report {
     loadStepDone: boolean;
   };
   back?: { workspaceLoaded: boolean };
+  reconnect?: { reconnectingShown: boolean; loadingShown: boolean; recovered: boolean };
+  loadingWhere?: string[];
   pageErrors: string[];
   screenshots: string[];
   passed: boolean;
@@ -64,6 +69,16 @@ async function shot(page: Page, label: string): Promise<void> {
 
 const chatList = () => web.getByRole("navigation", { name: english("sidebar.nav.label") });
 
+/** The workspace is ready: the chat list shows, and no connection or load text is left on the page. */
+async function workspaceReady(texts: string[]): Promise<void> {
+  await chatList().waitFor({ timeout: UI_WAIT_MS * 2 });
+  for (const text of texts)
+    await web
+      .getByText(text, { exact: true })
+      .first()
+      .waitFor({ state: "detached", timeout: UI_WAIT_MS * 2 });
+}
+
 try {
   let status = await hostStatus();
   assert.ok(status.configured && status.serverName, "Set up the server of this computer in the dev app first.");
@@ -73,6 +88,9 @@ try {
   }
   const name = status.serverName ?? "";
   report.serverName = name;
+  const connecting = english("server.connection.connecting", { name });
+  const loading = english("server.connection.loading", { name });
+  const reconnecting = english("server.connection.reconnecting", { name });
 
   await web.goto(`${authApi}/app`);
   await web.getByRole("textbox", { name: english("account.login.email") }).fill(email);
@@ -82,7 +100,7 @@ try {
   const code = (await codeLine.textContent())?.replace(/^Development code: /, "").replace(/[^A-Za-z0-9]/g, "");
   assert.ok(code && code.length === 8, "The page shows no development code.");
   await web.keyboard.type(code);
-  await chatList().waitFor({ timeout: UI_WAIT_MS * 2 });
+  await workspaceReady([loading, connecting]);
   report.online = { workspaceLoaded: true };
   await shot(web, "1-online");
 
@@ -90,15 +108,21 @@ try {
   stopped = true;
   await waitFor(host.page, "the host stops", hostStatus, (value) => value.phase === "idle");
   await web.reload();
-  const connecting = english("server.connection.connecting", { name });
-  const loading = english("server.connection.loading", { name });
-  // The toast opens after the first-load wait. Its Details button is the only one on this screen.
+  // The toast of a first load opens after its wait; over the saved copy, the notice shows Details at once.
   const details = web.getByRole("button", { name: english("server.connection.details") });
-  await details.waitFor({ timeout: UI_WAIT_MS });
-  const connectingShown = (await web.getByText(connecting, { exact: true }).count()) > 0;
+  await details.first().waitFor({ timeout: UI_WAIT_MS });
+  // Until Signal answers, the page loads as for any server. The held attempt then gives the connect title.
+  await web
+    .getByText(connecting, { exact: true })
+    .or(web.getByText(reconnecting, { exact: true }))
+    .first()
+    .waitFor({ timeout: UI_WAIT_MS });
+  const connectingShown =
+    (await web.getByText(connecting, { exact: true }).count()) > 0 ||
+    (await web.getByText(reconnecting, { exact: true }).count()) > 0;
   const loadingShown = (await web.getByText(loading, { exact: true }).count()) > 0;
   await shot(web, "2-offline");
-  await details.click();
+  await details.first().click();
   const steps = web.getByRole("list", { name: english("server.status.steps") });
   await steps.waitFor({ timeout: UI_WAIT_MS });
   const currentStep = await steps.locator('li[aria-current="step"]').first().textContent();
@@ -109,7 +133,7 @@ try {
       .getAttribute("data-status")) === "done";
   report.offline = { connectingShown, loadingShown, currentStep, loadStepDone };
   await shot(web, "3-offline-details");
-  assert.ok(connectingShown, `The web app does not show "${connecting}".`);
+  assert.ok(connectingShown, `The web app shows neither "${connecting}" nor "${reconnecting}".`);
   assert.ok(!loadingShown, `The web app shows "${loading}" for an offline host.`);
   assert.ok(currentStep?.startsWith(english("server.status.stepConnect")), "Connect is not the current step.");
   assert.ok(!loadStepDone, "The workspace load shows as done.");
@@ -118,9 +142,35 @@ try {
   await host.page.evaluate(() => window.openbot.host.start());
   stopped = false;
   await waitFor(host.page, "the host publishes again", hostStatus, (value) => value.phase === "online");
-  await chatList().waitFor({ timeout: UI_WAIT_MS * 2 });
+  await workspaceReady([loading, connecting]);
   report.back = { workspaceLoaded: true };
   await shot(web, "4-back-online");
+
+  await host.page.evaluate(() => window.openbot.host.stop());
+  stopped = true;
+  await waitFor(host.page, "the host stops again", hostStatus, (value) => value.phase === "idle");
+  await web.getByText(reconnecting, { exact: true }).first().waitFor({ timeout: UI_WAIT_MS });
+  // While the app tries the lost connection again, the notice loads as for any attempt. When Signal holds
+  // the attempt of the offline host, the notice must name the reconnect, not a load.
+  const reconnectLoadingShown = await web
+    .getByText(loading, { exact: true })
+    .first()
+    .waitFor({ state: "detached", timeout: UI_WAIT_MS })
+    .then(
+      () => false,
+      () => true,
+    );
+  report.loadingWhere = await web
+    .getByText(loading, { exact: true })
+    .evaluateAll((nodes) => nodes.map((node) => (node.parentElement?.outerHTML ?? "").slice(0, 300)));
+  await shot(web, "5-reconnecting");
+  assert.ok(!reconnectLoadingShown, `The web app shows "${loading}" for a held reconnect.`);
+  await host.page.evaluate(() => window.openbot.host.start());
+  stopped = false;
+  await waitFor(host.page, "the host publishes after the reconnect", hostStatus, (value) => value.phase === "online");
+  await workspaceReady([reconnecting, loading]);
+  report.reconnect = { reconnectingShown: true, loadingShown: reconnectLoadingShown, recovered: true };
+  await shot(web, "6-reconnected");
   report.passed = true;
 } catch (error) {
   await shot(web, "failure-web").catch(() => undefined);
