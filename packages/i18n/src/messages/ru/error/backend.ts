@@ -411,7 +411,7 @@ export const messages = {
   "error.backend.popupLoadFailed": "Не удалось загрузить всплывающее окно. Повторите вход с исходной страницы.",
   "error.backend.browserTabNotFound": "Вкладка браузера не найдена.",
   "error.backend.authActive": "Аутентификация уже активна.",
-  "error.backend.authHttpsRequired": "Безопасная аутентификация требует HTTPS.",
+  "error.backend.authWebPageRequired": "Безопасная аутентификация требует HTTP/HTTPS.",
   "error.backend.authDigitsRange": "Коды аутентификации должны содержать 4–12 цифр.",
   "error.backend.authExpired": "Запрос аутентификации истёк.",
   "error.backend.authDigitsRequired": "Введите запрошенное количество цифр.",

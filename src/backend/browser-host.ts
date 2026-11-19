@@ -188,7 +188,7 @@ import {
   jsonStringFit,
   type ModelTextCut,
 } from "./model-text-limit";
-import { websiteMatchesOrigin } from "./password-vault";
+import { isWebProtocol, websiteMatchesOrigin } from "./password-vault";
 import { allowPinchZoom, blockPinchZoom } from "./pinch-zoom";
 import type { DynamicToolCallParams, DynamicToolResult } from "./protocol";
 import { isRecord } from "./protocol";
@@ -1419,8 +1419,7 @@ export class BrowserHost {
     const tab = yield* this.#requireTab(args.tabId);
     if (tab.secret) return yield* browserFailure(new Error(sourceText("error.backend.authActive")));
     const url = yield* browserSync(() => new URL(currentTabUrl(tab)));
-    if (url.protocol !== "https:")
-      return yield* browserFailure(new Error(sourceText("error.backend.authHttpsRequired")));
+    if (!isWebProtocol(url)) return yield* browserFailure(new Error(sourceText("error.backend.authWebPageRequired")));
     yield* browserSync(() => this.#requireIsolatedFromConnectedTabs(tab, url.origin));
     const digitFields = args.method === "password" && args.targets.length > 2;
     if ((args.method !== "password" || digitFields) && args.digits < 4)

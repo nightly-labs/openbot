@@ -368,7 +368,7 @@ export const messages = {
   "error.backend.popupLoadFailed": "弹窗加载失败。请从原页面重新尝试登录。",
   "error.backend.browserTabNotFound": "未找到该浏览器标签页。",
   "error.backend.authActive": "身份验证已在进行中。",
-  "error.backend.authHttpsRequired": "安全验证需要 HTTPS。",
+  "error.backend.authWebPageRequired": "安全验证需要 HTTP/HTTPS。",
   "error.backend.authDigitsRange": "验证码需为 4–12 位数字。",
   "error.backend.authExpired": "验证请求已过期。",
   "error.backend.authDigitsRequired": "请输入要求位数的数字。",

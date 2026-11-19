@@ -88,6 +88,12 @@ function loginTitle(website: string): string {
   return websiteUrl(website)?.hostname ?? website;
 }
 
+function typedLoginWebsite(website: string): string {
+  const url = websiteUrl(website);
+  if (!url) return website;
+  return url.protocol === "http:" ? url.origin : url.host;
+}
+
 function loginHost(website: string): string | undefined {
   return websiteUrl(website)?.host.replace(/^www\./u, "");
 }
@@ -547,12 +553,11 @@ export class VaultService {
         };
         return record;
       }
-      const host = websiteUrl(website)?.host ?? website;
       const stored: StoredLogin = existing
         ? { ...existing, password: login.password }
         : {
             id: randomUUID(),
-            website: host,
+            website: typedLoginWebsite(website),
             username,
             password: login.password,
             notes: "",

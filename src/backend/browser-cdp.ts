@@ -471,7 +471,7 @@ export class BrowserCdpEngine {
               : yield* this.#callOnNode(
                   send,
                   node.backendNodeId,
-                  `function(input) { return this.isConnected && this.ownerDocument === document && location.protocol === 'https:' && (!input || (this.localName === 'input' && !this.disabled && !this.readOnly && ['password','text','tel','number'].includes(this.type))) ? location.origin : false; }`,
+                  `function(input) { return this.isConnected && this.ownerDocument === document && (location.protocol === 'https:' || location.protocol === 'http:') && (!input || (this.localName === 'input' && !this.disabled && !this.readOnly && ['password','text','tel','number'].includes(this.type))) ? location.origin : false; }`,
                   [input],
                   node.sessionId,
                   contextId,

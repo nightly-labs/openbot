@@ -438,7 +438,7 @@ export const messages = {
     "Das Pop-up konnte nicht geladen werden. Versuche die Anmeldung erneut auf der ursprünglichen Seite.",
   "error.backend.browserTabNotFound": "Browser-Tab nicht gefunden.",
   "error.backend.authActive": "Die Authentifizierung ist bereits aktiv.",
-  "error.backend.authHttpsRequired": "Die sichere Authentifizierung erfordert HTTPS.",
+  "error.backend.authWebPageRequired": "Die sichere Authentifizierung erfordert HTTP/HTTPS.",
   "error.backend.authDigitsRange": "Authentifizierungscodes benötigen 4–12 Ziffern.",
   "error.backend.authExpired": "Die Authentifizierungsanfrage ist abgelaufen.",
   "error.backend.authDigitsRequired": "Gib die angeforderte Anzahl an Ziffern ein.",

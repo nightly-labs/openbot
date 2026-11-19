@@ -426,7 +426,7 @@ export const messages = {
     "De pop-up kon niet laden. Probeer opnieuw in te loggen vanaf de oorspronkelijke pagina.",
   "error.backend.browserTabNotFound": "Browsertabblad niet gevonden.",
   "error.backend.authActive": "Verificatie is al actief.",
-  "error.backend.authHttpsRequired": "Beveiligde verificatie vereist HTTPS.",
+  "error.backend.authWebPageRequired": "Beveiligde verificatie vereist HTTP/HTTPS.",
   "error.backend.authDigitsRange": "Verificatiecodes moeten 4–12 cijfers hebben.",
   "error.backend.authExpired": "Het verificatieverzoek is verlopen.",
   "error.backend.authDigitsRequired": "Voer het gevraagde aantal cijfers in.",
