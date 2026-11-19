@@ -8,6 +8,7 @@ import { createWebFileSaver } from "./web-file-download";
 import type { WebFile, WebWorkspaceRuntime } from "./web-runtime";
 
 const VISUAL_PAGE_CACHE = 8;
+const VISUAL_PAGE_READS = 4;
 
 export function createWebAttachmentFiles(
   remote: Pick<WebWorkspaceRuntime, "download" | "sharedFile" | "workspaceFile">,
@@ -16,6 +17,7 @@ export function createWebAttachmentFiles(
 ) {
   const save = createWebFileSaver();
   const pages = new Map<string, Promise<string>>();
+  const readPage = createReadQueue(VISUAL_PAGE_READS);
   return {
     async download(id: string): Promise<void> {
       const held = await media.file(id);
@@ -44,7 +46,7 @@ export function createWebAttachmentFiles(
         pages.set(key, cached);
         return cached;
       }
-      const page = readVisualPage(remote, attachment);
+      const page = readPage(() => readVisualPage(remote, attachment));
       pages.set(key, page);
       page.catch(() => pages.delete(key));
       for (const old of pages.keys()) {
@@ -67,6 +69,22 @@ export function createWebAttachmentFiles(
       const file = await remote.workspaceFile(agentId, path);
       return filePreview({ ...file, mimeType: attachmentMimeTypeForName(file.name) });
     },
+  };
+}
+
+function createReadQueue(limit: number) {
+  let active = 0;
+  const waiting: Array<() => void> = [];
+  return async function read<T>(task: () => Promise<T>): Promise<T> {
+    if (active < limit) active += 1;
+    else await new Promise<void>((start) => waiting.push(start));
+    try {
+      return await task();
+    } finally {
+      const next = waiting.shift();
+      if (next) next();
+      else active -= 1;
+    }
   };
 }
 
