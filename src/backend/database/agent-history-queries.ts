@@ -59,15 +59,19 @@ export class AgentHistoryQueries {
     const resetMessageId = reset ? requiredStringColumn(reset, "message_id") : null;
     const anchorId = selection.messageId ?? selection.before;
     const anchor = anchorId
-      ? databaseRow(
+      ? (databaseRow(
+          this.#core.connection
+            .prepare(`${cte} SELECT message_id FROM allowed WHERE message_id = ?`)
+            .get(...bindings, anchorId),
+        ) ??
+        databaseRow(
           this.#core.connection
             .prepare(
-              `${cte} SELECT message_id FROM allowed
-              WHERE message_id = ? OR json_extract(message_json, '$.exchange.messageId') = ?
-              ORDER BY message_id = ? DESC, ${ORDER_KEY_DESC} LIMIT 1`,
+              `${cte} SELECT message_id FROM allowed WHERE json_extract(message_json, '$.exchange.messageId') = ?
+              ORDER BY ${ORDER_KEY_DESC} LIMIT 1`,
             )
-            .get(...bindings, anchorId, anchorId, anchorId),
-        )
+            .get(...bindings, anchorId),
+        ))
       : null;
     if (anchorId && !anchor) throw new HistoryReferenceUnavailable();
     const anchorMessageId = anchor ? requiredStringColumn(anchor, "message_id") : null;

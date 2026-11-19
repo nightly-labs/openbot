@@ -70,6 +70,7 @@ export const messages = {
   "status.agent.browserActing": "Работа с веб-страницей…",
   "status.agent.browserReviewing": "Просмотр веб-страницы…",
   "status.agent.memoriesSearching": "Поиск в памяти…",
+  "status.agent.chatsSearching": "Поиск в прошлых чатах…",
   "status.agent.memoriesSearched": {
     one: "Поиск в памяти: найдено {count}",
     few: "Поиск в памяти: найдено {count}",

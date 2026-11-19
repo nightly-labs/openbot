@@ -71,6 +71,7 @@ export const messages = {
   "status.agent.browserActing": "جارٍ استخدام صفحة الويب…",
   "status.agent.browserReviewing": "جارٍ مراجعة صفحة الويب…",
   "status.agent.memoriesSearching": "جارٍ البحث في ذكرياته…",
+  "status.agent.chatsSearching": "جارٍ البحث في دردشاته السابقة…",
   "status.agent.memoriesSearched": {
     zero: "بحث في ذكرياته: لم يُعثر على شيء",
     one: "بحث في ذكرياته: عُثر على ذكرى واحدة",

@@ -75,6 +75,7 @@ export const messages = {
   "status.agent.browserActing": "Uso della pagina web…",
   "status.agent.browserReviewing": "Analisi della pagina web…",
   "status.agent.memoriesSearching": "Ricerca nelle sue memorie…",
+  "status.agent.chatsSearching": "Ricerca nelle sue chat precedenti…",
   "status.agent.memoriesSearched": {
     one: "Ha cercato nelle sue memorie: {count} trovata",
     other: "Ha cercato nelle sue memorie: {count} trovate",

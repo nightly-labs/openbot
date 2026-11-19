@@ -14,7 +14,7 @@ interface Report {
   word: string;
   resetMarkerBetween: boolean;
   wordInMemories?: boolean;
-  recall?: { found: boolean; reply: string; toolSteps: string[] };
+  recall?: { found: boolean; reply: string; toolSteps: string[]; seconds: number | null; tokens: number | null };
   screenshot?: string;
   passed: boolean;
 }
@@ -53,8 +53,7 @@ try {
 
   await page.evaluate((id) => window.openbot.agent.clearContext(id), agentId);
 
-  const recall =
-    "Before I started this new chat, I gave you a one-time test value. Find it. Reply with that test value only.";
+  const recall = "What was the one-time test value that I gave you? Reply with that test value only.";
   await send(recall);
   const after = await waitFor(page, "recall reply", main, (snapshot) => repliesAfter(snapshot, recall).length > 0);
   const seedIndex = after.messages.findLastIndex((message) => message.text.includes(seed));
@@ -64,7 +63,14 @@ try {
     .some((message) => message.itemType === CONTEXT_RESET_ITEM_TYPE);
   const replies = repliesAfter(after, recall);
   const reply = replies.map((message) => message.text).join("\n");
-  report.recall = { found: reply.includes(word), reply, toolSteps: toolSteps(replies) };
+  const trace = replies.findLast((message) => message.trace)?.trace;
+  report.recall = {
+    found: reply.includes(word),
+    reply,
+    toolSteps: toolSteps(replies),
+    seconds: trace?.endedAt ? (Date.parse(trace.endedAt) - Date.parse(trace.startedAt)) / 1000 : null,
+    tokens: trace?.tokens ?? null,
+  };
 
   const memories = await page.evaluate((id) => window.openbot.agent.listMemories(id), agentId);
   report.wordInMemories = memories.some((memory) => JSON.stringify(memory).includes(word));
@@ -75,7 +81,10 @@ try {
 
   assert.ok(report.resetMarkerBetween, "A New chat divider is between the seed and the question.");
   assert.ok(!report.wordInMemories, "The test value is not in a saved memory, so only the chat history holds it.");
-  assert.ok(report.recall.found, "After New chat, the agent found the test value in the earlier messages.");
+  assert.ok(
+    report.recall.found,
+    "After New chat, the agent found the test value without being told about the new chat.",
+  );
   report.passed = true;
 } finally {
   writeReport("new-chat-history-e2e", report);
