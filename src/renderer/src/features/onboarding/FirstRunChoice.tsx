@@ -28,21 +28,7 @@ export function FirstRunChoice(props: FirstRunChoiceProps) {
   const planDetailId = createUniqueId();
   const freeDescribedBy = () => (props.reason ? `${freeDetailId} ${reasonId}` : freeDetailId);
   return (
-    <section class="first-run-choice" aria-labelledby="onboarding-title">
-      <div class="first-run-choice-team" aria-hidden="true">
-        <For each={props.team}>
-          {(member) => (
-            <AgentAvatar
-              seed={member.seed}
-              hue={member.hue}
-              motion="idle"
-              animationOffset={member.animationOffset}
-              followPointer
-              class="first-run-choice-avatar"
-            />
-          )}
-        </For>
-      </div>
+    <>
       <h1 id="onboarding-title" class="first-run-choice-title">
         {t("onboarding.choice.title")}
       </h1>
@@ -104,6 +90,25 @@ export function FirstRunChoice(props: FirstRunChoiceProps) {
           </p>
         )}
       </Show>
-    </section>
+    </>
+  );
+}
+
+export function FirstRunTeam(props: { team: readonly OnboardingAvatarVariant[] }) {
+  return (
+    <div class="first-run-choice-team" aria-hidden="true">
+      <For each={props.team}>
+        {(member) => (
+          <AgentAvatar
+            seed={member.seed}
+            hue={member.hue}
+            motion="idle"
+            animationOffset={member.animationOffset}
+            followPointer
+            class="first-run-choice-avatar"
+          />
+        )}
+      </For>
+    </div>
   );
 }

@@ -17,8 +17,6 @@ export interface FirstRunExistingServersProps {
   onOpenPrivacy: () => void;
 }
 
-const HERO_SIZE = 5;
-
 export function FirstRunExistingServers(props: FirstRunExistingServersProps) {
   const { t } = useText();
   const detail = (server: FirstRunServer) =>
@@ -26,16 +24,7 @@ export function FirstRunExistingServers(props: FirstRunExistingServersProps) {
       ? t("onboarding.existing.openDetail")
       : t("onboarding.existing.offlineDetail");
   return (
-    <section class="first-run-choice" aria-labelledby="onboarding-title">
-      <div class="first-run-existing-hero" aria-hidden="true">
-        <For each={props.servers.slice(0, HERO_SIZE)}>
-          {(server) => (
-            <span class="first-run-existing-hero-mark">
-              <ServerMark server={server} />
-            </span>
-          )}
-        </For>
-      </div>
+    <>
       <h1 id="onboarding-title" class="first-run-choice-title">
         {t("onboarding.existing.title")}
       </h1>
@@ -84,6 +73,6 @@ export function FirstRunExistingServers(props: FirstRunExistingServersProps) {
         </Button>
       </div>
       <ConsentNotice onOpenTerms={() => props.onOpenTerms()} onOpenPrivacy={() => props.onOpenPrivacy()} />
-    </section>
+    </>
   );
 }

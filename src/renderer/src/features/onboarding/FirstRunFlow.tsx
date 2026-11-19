@@ -5,7 +5,7 @@ import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, createStore, createUniqueId, For, Match, Show, Switch, untrack } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
-import { FirstRunChoice } from "./FirstRunChoice";
+import { FirstRunChoice, FirstRunTeam } from "./FirstRunChoice";
 import { FirstRunExistingServers, type FirstRunServer } from "./FirstRunExistingServers";
 import { FirstRunLaunch } from "./FirstRunLaunch";
 import { FirstRunPlanStep } from "./FirstRunPlanStep";
@@ -369,36 +369,42 @@ export function FirstRunFlow(props: FirstRunFlowProps) {
 
           <div class="onboarding-step" data-step={shownStep()}>
             <Switch>
-              <Match when={existingShown()}>
-                <FirstRunExistingServers
-                  servers={props.existingServers ?? []}
-                  opening={state.openingServer}
-                  disabled={busy()}
-                  onOpen={(server) => void openServer(server)}
-                  onStartNew={startNew}
-                  onOpenTerms={() => void onboardingPort().openUrl(TERMS_URL)}
-                  onOpenPrivacy={() => void onboardingPort().openUrl(PRIVACY_URL)}
-                />
-              </Match>
-
               <Match when={state.step === "choose"}>
-                <FirstRunChoice
-                  team={team}
-                  disabled={busy()}
-                  loading={busy()}
-                  reason={blockedReason()}
-                  onStartFree={startFree}
-                  onUsePlan={usePlan}
-                  analytics={state.analytics}
-                  onAnalyticsChange={(enabled) =>
-                    setState((current) => {
-                      current.analytics = enabled;
-                      current.analyticsTouched = true;
-                    })
-                  }
-                  onOpenTerms={() => void onboardingPort().openUrl(TERMS_URL)}
-                  onOpenPrivacy={() => void onboardingPort().openUrl(PRIVACY_URL)}
-                />
+                <section class="first-run-choice" aria-labelledby="onboarding-title">
+                  <FirstRunTeam team={team} />
+                  <Show
+                    when={existingShown()}
+                    fallback={
+                      <FirstRunChoice
+                        team={team}
+                        disabled={busy()}
+                        loading={busy()}
+                        reason={blockedReason()}
+                        onStartFree={startFree}
+                        onUsePlan={usePlan}
+                        analytics={state.analytics}
+                        onAnalyticsChange={(enabled) =>
+                          setState((current) => {
+                            current.analytics = enabled;
+                            current.analyticsTouched = true;
+                          })
+                        }
+                        onOpenTerms={() => void onboardingPort().openUrl(TERMS_URL)}
+                        onOpenPrivacy={() => void onboardingPort().openUrl(PRIVACY_URL)}
+                      />
+                    }
+                  >
+                    <FirstRunExistingServers
+                      servers={props.existingServers ?? []}
+                      opening={state.openingServer}
+                      disabled={busy()}
+                      onOpen={(server) => void openServer(server)}
+                      onStartNew={startNew}
+                      onOpenTerms={() => void onboardingPort().openUrl(TERMS_URL)}
+                      onOpenPrivacy={() => void onboardingPort().openUrl(PRIVACY_URL)}
+                    />
+                  </Show>
+                </section>
               </Match>
 
               <Match when={state.step === "plan"}>
