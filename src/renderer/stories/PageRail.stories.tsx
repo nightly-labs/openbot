@@ -226,8 +226,8 @@ export const SharedQuota: Story = {
 };
 
 /**
- * Ten accounts: the rings that fit, at most four, then one "+N" ring. The rings with the least left
- * stay. Hover "+N" to see the other accounts, and make the window shorter to see fewer rings.
+ * Ten accounts: all the rings that fit, then one "+N" ring when some do not fit. The rings with the
+ * least left stay. Hover "+N" to see the other accounts, and make the window shorter to see fewer rings.
  */
 export const ManyAccounts: Story = {
   args: { usageRows: manyAccountRows },

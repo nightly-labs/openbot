@@ -274,11 +274,11 @@ function MoreUsageRings(props: { rings: readonly UsageRing[]; onOpen: (button: H
 }
 
 /**
- * The most ring places in the rail, also in a tall window: four rings and the "+N" ring, or five
- * rings. A "+N" ring never takes the place of one ring. When the window has space for one place
- * only, the "+N" ring shows all the readings.
+ * The ring places before the first measure. Then the rail shows as many rings as fit, and a "+N"
+ * ring only when all the rings do not fit. A "+N" ring never takes the place of one ring. When the
+ * window has space for one place only, the "+N" ring shows all the readings.
  */
-const MAX_RING_PLACES = 5;
+const START_RING_PLACES = 5;
 /** The space in pixels that stays between the pages and the end of the rail. */
 const RAIL_MIN_FREE = 12;
 
@@ -606,7 +606,7 @@ export function PageRail(props: PageRailProps) {
       .map((row) => ({ row, shared: rows.filter((other) => owner(other) === row) }));
   });
   /** The number of ring places that fit between the pages and the end buttons. */
-  const [ringSlots, setRingSlots] = createSignal(MAX_RING_PLACES);
+  const [ringSlots, setRingSlots] = createSignal(START_RING_PLACES);
   /**
    * When all rings do not fit, the rings with the least left stay, in their order, and one "+N" ring
    * takes the last place.
@@ -638,7 +638,7 @@ export function PageRail(props: PageRailProps) {
         pagesBox.getBoundingClientRect().bottom -
         endWithoutRings -
         RAIL_MIN_FREE;
-      setRingSlots(Math.max(1, Math.min(MAX_RING_PLACES, Math.floor(free / slot))));
+      setRingSlots(Math.max(1, Math.floor(free / slot)));
     };
     /* A new ring count changes the size of the end group, which this observer watches. The measure
      * waits for the next frame, so the change does not come back in the same observer loop. */
