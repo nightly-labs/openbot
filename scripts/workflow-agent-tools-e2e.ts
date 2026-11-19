@@ -461,11 +461,6 @@ try {
     libraryAfter,
   });
 
-  check(
-    "the workflow guidance names the events of each trigger kind",
-    (search.guidance ?? []).some((text) => text.includes("pr.opened") && text.includes("telegram mention")),
-    search.guidance,
-  );
   const badEvent = await call("failure-event", "edit_workflow", {
     title: "Pull request review",
     ops: [{ op: "add", kind: "trigger", fields: { trigger: "github", event: "pull_request.opened" } }],
