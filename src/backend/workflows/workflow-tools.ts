@@ -94,10 +94,10 @@ const runSchema = z
   .object({
     workflowId: identifier,
     fromNodeId: identifier.optional(),
+    only: z.boolean().optional(),
     input: z.string().trim().min(1).max(INPUT_LIMITS.workflowStepInput).optional(),
   })
   .strict();
-const stepSchema = z.object({ workflowId: identifier, nodeId: identifier }).strict();
 const runsSchema = z
   .object({ workflowId: identifier, runId: identifier.optional(), limit: z.number().int().min(1).max(5).optional() })
   .strict();
@@ -127,18 +127,14 @@ export const WORKFLOW_TOOL_DEFINITIONS = [
   },
   {
     name: "run_workflow",
-    description: "Run a workflow, or from one node with the newest answers before it. Triggers output input.",
+    description:
+      "Run a workflow, from one node with the newest answers before it, or only that node. Triggers output input.",
     shape: runSchema.shape,
-  },
-  {
-    name: "run_workflow_step",
-    description: "Run one node of a workflow with its current fields and the newest answers before it.",
-    shape: stepSchema.shape,
   },
   {
     name: "read_workflow_runs",
     description:
-      "Read the newest runs and single steps of a workflow, or one run: the kind, label, status and output of each step, and the settings and inputs it used.",
+      "Read the newest runs of a workflow, or one run, with the kind, label, status and output of each step.",
     shape: runsSchema.shape,
   },
 ] as const;
@@ -149,7 +145,6 @@ export const WORKFLOW_CHANGE_TOOL_NAMES: ReadonlySet<string> = new Set([
   "edit_workflow",
   "delete_workflow",
   "run_workflow",
-  "run_workflow_step",
 ]);
 
 const LABEL_FIELD: Partial<Record<WorkflowNodeKind, string>> = {
@@ -752,6 +747,16 @@ export const handleWorkflowTool = Effect.fn("WorkflowTools.handle")(function* (
     }
     if (tool === "run_workflow") {
       const input = yield* toolStep(() => runSchema.parse(args));
+      if (input.only) {
+        if (input.fromNodeId === undefined) return openBotToolFailure("only needs fromNodeId.");
+        if (input.input !== undefined) return openBotToolFailure("only takes no input. Leave out input.");
+        const step = yield* workflows.runStep({
+          workflowId: input.workflowId,
+          nodeId: input.fromNodeId,
+          requestId: callKey,
+        });
+        return openBotToolResult({ stepId: step.id, status: step.status });
+      }
       if (input.input !== undefined && input.fromNodeId !== undefined) {
         const from = (yield* workflows.get(input.workflowId)).graph.nodes.find((node) => node.id === input.fromNodeId);
         if (from !== undefined && from.kind !== "trigger")
@@ -768,11 +773,6 @@ export const handleWorkflowTool = Effect.fn("WorkflowTools.handle")(function* (
         input.input,
       );
       return openBotToolResult({ runId: detail.run.id, number: detail.run.number, status: detail.run.status });
-    }
-    if (tool === "run_workflow_step") {
-      const input = yield* toolStep(() => stepSchema.parse(args));
-      const step = yield* workflows.runStep({ workflowId: input.workflowId, nodeId: input.nodeId, requestId: callKey });
-      return openBotToolResult({ stepId: step.id, status: step.status });
     }
     const input = yield* toolStep(() => runsSchema.parse(args));
     const nodes = new Map((yield* workflows.get(input.workflowId)).graph.nodes.map((node) => [node.id, node]));

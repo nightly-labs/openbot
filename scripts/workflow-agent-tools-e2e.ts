@@ -195,8 +195,8 @@ try {
   report.bytes.search = Buffer.byteLength(JSON.stringify(search));
   const ready = search.tools.filter((tool) => "inputSchema" in tool).map((tool) => tool.name);
   check(
-    "a workflow search gives all 7 workflow tools with schemas, and the guidance",
-    ready.filter((name) => name.includes("workflow")).length === 7 &&
+    "a workflow search gives all 6 workflow tools with schemas, and the guidance",
+    ready.filter((name) => name.includes("workflow")).length === 6 &&
       (search.guidance ?? []).some((text) => text.includes("Fields by kind")),
     search,
   );
@@ -208,8 +208,8 @@ try {
   );
   const canvas = discoverTools(params("tool_search", { query: "create a canvas" }), "claude");
   check(
-    "a canvas search gives all 7 workflow tools with schemas",
-    canvas.tools.filter((tool) => tool.name.includes("workflow") && "inputSchema" in tool).length === 7,
+    "a canvas search gives all 6 workflow tools with schemas",
+    canvas.tools.filter((tool) => tool.name.includes("workflow") && "inputSchema" in tool).length === 6,
     canvas.tools.map((tool) => tool.name),
   );
   const otherReady = ["click canvas", "connect routine agents canvas"].flatMap((query) =>
@@ -693,28 +693,46 @@ try {
     poster?.kind === "image" && poster.fields.model === "gpt-image" && poster.fields.aspect === "16:9",
     poster,
   );
-  const missingStep = await call("failure-step-missing", "run_workflow_step", { workflowId, nodeId: "no-such-node" });
-  check("run_workflow_step on a missing node is a tool failure", !missingStep.ok, missingStep.value);
+  const missingStep = await call("failure-step-missing", "run_workflow", {
+    workflowId,
+    fromNodeId: "no-such-node",
+    only: true,
+  });
+  check("run_workflow only on a missing node is a tool failure", !missingStep.ok, missingStep.value);
+  const onlyNoNode = await call("failure-only-no-node", "run_workflow", { workflowId, only: true });
+  check("run_workflow only with no fromNodeId is a tool failure", !onlyNoNode.ok, onlyNoNode.value);
+  const onlyInput = await call("failure-only-input", "run_workflow", {
+    workflowId,
+    fromNodeId: mediaIds.title,
+    only: true,
+    input: "case",
+  });
+  check("run_workflow only with input is a tool failure", !onlyInput.ok, onlyInput.value);
   const stepDeadline = Date.now() + WAIT_MS;
   const soloSteps = async (label: string) =>
     stepList.parse((await call(label, "read_workflow_runs", { workflowId })).value).steps ?? [];
-  const ideaRun = await call("run-step-idea", "run_workflow_step", { workflowId, nodeId: mediaIds.idea });
+  const ideaRun = await call("run-step-idea", "run_workflow", { workflowId, fromNodeId: mediaIds.idea, only: true });
   const ideaStepId = stepStarted.parse(ideaRun.value).stepId;
   while ((await soloSteps("runs-steps")).find((step) => step.stepId === ideaStepId)?.status !== "done") {
     if (Date.now() > stepDeadline) throw new Error("The prompt step did not end.");
     await new Promise((done) => setImmediate(done));
   }
-  const stepRun = await call("run-step", "run_workflow_step", { workflowId, nodeId: mediaIds.title }, "run-step-call");
-  check("run_workflow_step starts one step", stepRun.ok, stepRun.value);
+  const stepRun = await call(
+    "run-step",
+    "run_workflow",
+    { workflowId, fromNodeId: mediaIds.title, only: true },
+    "run-step-call",
+  );
+  check("run_workflow only starts one step", stepRun.ok, stepRun.value);
   const { stepId } = stepStarted.parse(stepRun.value);
   const stepAgain = await call(
     "run-step-repeated",
-    "run_workflow_step",
-    { workflowId, nodeId: mediaIds.title },
+    "run_workflow",
+    { workflowId, fromNodeId: mediaIds.title, only: true },
     "run-step-call",
   );
   check(
-    "a repeated run_workflow_step call starts no second step",
+    "a repeated run_workflow only call starts no second step",
     stepAgain.ok && stepStarted.parse(stepAgain.value).stepId === stepId,
     stepAgain.value,
   );
