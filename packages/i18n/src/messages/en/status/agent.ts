@@ -5,6 +5,7 @@ export const messages = defineMessages("status.agent", {
   "status.agent.mcpSignInPageDoneDetail": "The agent tries the request again.",
   "status.agent.mcpSignInPageDecline": "Don't sign in",
   "status.agent.mcpSignInPageDeclineDetail": "The request stops.",
+  "status.agent.elicitationMoreOptions": "More choices: {options}. To select one, type it as your answer.",
   "status.agent.claudeWriteOutside":
     "Write {path}, outside the agent's workspace, the shared folder and the temporary folders.",
   "status.agent.contextCleared": "Context cleared. A new chat starts here.",
