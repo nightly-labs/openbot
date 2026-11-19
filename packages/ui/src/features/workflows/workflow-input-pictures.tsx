@@ -19,7 +19,7 @@ const ROLE_BADGE = {
   both: "workflow.video.badge.both",
 } as const satisfies Record<Exclude<InputRole, "reference">, AppTextKey>;
 
-export function storedPictureUrl(board: WfnBoard, value: string): string | undefined {
+function storedPictureUrl(board: WfnBoard, value: string): string | undefined {
   return (
     board.catalogs().files.find((file) => (file.id === value || file.name === value) && file.previewKind === "image")
       ?.previewUrl ?? undefined
