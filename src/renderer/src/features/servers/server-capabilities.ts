@@ -7,6 +7,7 @@ import {
   type ServerSummary,
 } from "@openbot/contracts/ipc";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
+import { DEVIN_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/devin-code-sign-in-v1";
 import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mistral-code-sign-in-v1";
 import { PROVIDER_HOST_SIGN_IN_PROVIDERS } from "@openbot/contracts/team-protocol/provider-host-sign-in-v1";
 import { PROVIDERS_ADMIN_CODE_SIGN_IN_PROVIDERS } from "@openbot/contracts/team-protocol/providers-v1";
@@ -99,6 +100,7 @@ export function serverSupportsCapability(
       capability === "claude-api-key-v1" ||
       capability === "codex-api-key-v1" ||
       capability === "mistral-code-sign-in-v1" ||
+      capability === "devin-code-sign-in-v1" ||
       capability === "host-personality-v1" ||
       capability === "agent-access-v1" ||
       capability === "sidebar-folders-v1" ||
@@ -237,7 +239,8 @@ export function serverCodeRouteProviders(server: ServerSummary | undefined): rea
       (provider) =>
         v4.includes(provider) ||
         (agentProviderDescriptor(provider).localCodeSignIn === "device" && !earlier.includes(provider)) ||
-        (provider === "mistral" && serverSupportsCapability(server, MISTRAL_CODE_SIGN_IN_CAPABILITY)),
+        (provider === "mistral" && serverSupportsCapability(server, MISTRAL_CODE_SIGN_IN_CAPABILITY)) ||
+        (provider === "devin" && serverSupportsCapability(server, DEVIN_CODE_SIGN_IN_CAPABILITY)),
     );
   }
   if (serverSupportsCapability(server, "providers-v3")) return PROVIDERS_SIGN_IN_V3_PROVIDERS;

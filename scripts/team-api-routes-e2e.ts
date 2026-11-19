@@ -246,6 +246,7 @@ import {
   CUSTOM_PROVIDER_HARNESS_CODECS,
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
+import { DEVIN_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/devin-code-sign-in-v1";
 import {
   decodeFeedbackWithdrawResult,
   FEEDBACK_WITHDRAW_CAPABILITY,
@@ -624,6 +625,10 @@ function check(name: string, passed: boolean, detail: unknown = null): void {
 }
 
 const MISTRAL_SIGN_IN_PAGE = "https://console.mistral.ai/vibe/sign-in/e2e";
+
+const DEVIN_SIGN_IN_PAGE = "https://app.devin.ai/auth/cli/continue?state=e2e";
+
+let pasteSignIn = false;
 
 function record(method: string, ...args: unknown[]): void {
   calls.push({ method, args });
@@ -2638,6 +2643,8 @@ try {
         service: {
           startProviderCodeLogin: (provider) => {
             record("startProviderCodeLogin", provider);
+            if (provider === "devin")
+              return Effect.succeed({ kind: "paste", verificationUrl: DEVIN_SIGN_IN_PAGE, expiresAt: 1 });
             if (provider !== "mistral") throw new Error(sourceText("error.provider.noCodeSignIn", { provider }));
             return Effect.succeed({ kind: "link", verificationUrl: MISTRAL_SIGN_IN_PAGE, expiresAt: 1 });
           },
@@ -2734,7 +2741,9 @@ try {
               return customEndpointResult();
             }),
         },
-        pasteSignIn: false,
+        get pasteSignIn() {
+          return pasteSignIn;
+        },
       },
     },
     bitwardenConnector,
@@ -8043,6 +8052,40 @@ try {
       "a member gets 403 and starts no Mistral sign-in",
       member.status === 403 && callsOf("startProviderCodeLogin").length === 1,
       summary(member),
+    );
+  }
+
+  {
+    const v10 = {
+      protocol: TEAM_PROTOCOL_V10,
+      headers: teamCapabilityHeaders(TEAM_PROTOCOL_V10, TEAM_CURRENT_CAPABILITIES),
+    };
+    const withoutPaste = await call("GET", TEAM_API_ROUTES.compatibility, v10);
+    pasteSignIn = true;
+    const withPaste = await call("GET", TEAM_API_ROUTES.compatibility, v10);
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    pasteSignIn = false;
+    check(
+      "the host advertises devin-code-sign-in-v1 to a protocol 10 peer only when it takes a pasted code",
+      decodeTeamProtocolSupportExpanded(withPaste.body).capabilities.includes(DEVIN_CODE_SIGN_IN_CAPABILITY) &&
+        !decodeTeamProtocolSupportExpanded(withoutPaste.body).capabilities.includes(DEVIN_CODE_SIGN_IN_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(DEVIN_CODE_SIGN_IN_CAPABILITY),
+      [summary(withPaste), summary(withoutPaste), summary(older)],
+    );
+    const before = callsOf("startProviderCodeLogin").length;
+    const started = await call("POST", PROVIDERS_V8_ROUTES.codeLoginStart, {
+      token: adaToken,
+      protocol: TEAM_PROTOCOL_V9,
+      capabilities: [PROVIDERS_V8_CAPABILITY],
+      json: { provider: "devin" },
+    });
+    check(
+      "an admin starts the Devin sign-in on providers-v8 and gets the Devin page to paste a code from",
+      started.status === 200 &&
+        field(started.body, "kind") === "paste" &&
+        field(started.body, "verificationUrl") === DEVIN_SIGN_IN_PAGE &&
+        isDeepStrictEqual(callsOf("startProviderCodeLogin").slice(before), [["devin"]]),
+      summary(started),
     );
   }
 

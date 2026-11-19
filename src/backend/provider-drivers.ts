@@ -1111,6 +1111,15 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
   {
     id: "devin",
     signIn: { kind: "acp-authenticate", methodId: "devin-browser", argv: DEVIN_ARGV, timeoutMs: CLI_LOGIN_TIMEOUT_MS },
+    codeSignIn: {
+      kind: "cli",
+      flow: "paste",
+      command: {
+        argv: ["auth", "login", "--force-manual-token-flow"],
+        env: () => ({}),
+        timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+      },
+    },
     signInFiles: () => [join(devinDataDirectory(), "credentials.toml")],
     signOut: { argv: ["auth", "logout"], env: () => ({}), timeoutMs: 30_000 },
     resolveCli: resolveDevinCli,
