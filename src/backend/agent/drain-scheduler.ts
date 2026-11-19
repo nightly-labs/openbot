@@ -1114,6 +1114,8 @@ export class DrainScheduler {
               snapshot,
               routineRun:
                 item.delivery.sender.kind === "routine" ? this.#routines.runForDelivery(item.delivery.id) : null,
+              workflowRunSource:
+                item.delivery.sender.kind === "routine" ? this.#routines.workflowRunSource(item.delivery.id) : null,
               wokenWaits: item.delivery.sender.kind === "routine" ? this.#routines.wokenWaits(item.delivery.id) : [],
               routineTimezone:
                 item.delivery.sender.kind === "routine"
