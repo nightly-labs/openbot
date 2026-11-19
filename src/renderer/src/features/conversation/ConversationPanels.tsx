@@ -43,6 +43,8 @@ import { desktopChatEventRoutinesApi } from "./routine-webhooks-api";
 import type { RoutineResultsCalls } from "./routines-port";
 import { type CodexLivePort, createCodexLiveConversation } from "./stores/codex-live-conversation-store";
 import type { VoiceConversationKind } from "./stores/voice-session-store";
+import { useVoiceTalkKey } from "./voice-talk-key";
+import { setVoiceTalkMode, useVoiceTalkMode } from "./voice-talk-mode";
 
 const loadAgentSettingsPanel = () => import("./AgentSettingsPanel");
 
@@ -105,6 +107,9 @@ function VoiceConversation(paneProps: VoicePillPresence & { kind: VoiceConversat
       ? createCodexLiveConversation({ agentId, serverId, ...(port ? { port } : {}) })
       : startVoiceConversation(agentId),
   );
+  const talkMode = useVoiceTalkMode();
+  createEffect(talkMode, (mode) => conversation.setTalkMode(mode));
+  const talkKey = useVoiceTalkKey(() => props.platform);
   const transcribed = kind === "transcribed";
   const replySpeed = () => (transcribed ? speechSpeed() : undefined);
   const cycleSpeed = transcribed ? cycleSpeechSpeed : undefined;
@@ -118,6 +123,13 @@ function VoiceConversation(paneProps: VoicePillPresence & { kind: VoiceConversat
           levels={conversation.levels()}
           error={conversation.error()}
           onToggleMute={conversation.toggleMute}
+          talkMode={talkMode()}
+          onTalkModeChange={setVoiceTalkMode}
+          talkKey={talkKey()}
+          talking={conversation.talking()}
+          onTalkStart={conversation.startTalking}
+          onTalkEnd={conversation.stopTalking}
+          onTalkCancel={conversation.cancelTalking}
           onInterrupt={conversation.interrupt}
           onEnd={endVoiceConversation}
           speed={replySpeed()}
