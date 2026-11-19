@@ -4631,8 +4631,23 @@ export class ProviderRuntime implements ProviderPort {
       if (notification.method === "mcpServer/startupStatus/updated") {
         this.#reportMcpStartupStatus(client, notification.params);
       }
+      if (notification.method === "error") this.#reportTurnSignedOut(client, notification.params);
     });
     client.once("exit", (error) => this.#handleExit(client, error));
+  }
+
+  /**
+   * Marks the account of an agent's own process signed out when a turn of it found no login (#12479),
+   * as a start that finds no login does (#8277): its row then offers the sign-in again, and no backup
+   * model moves to it. Only the client's sign-in expired text counts, which Claude sends for "Not logged
+   * in". A refusal without it, such as a 403, can pass, so the account keeps its state.
+   */
+  #reportTurnSignedOut(client: AgentClient, params: unknown): void {
+    const expired = sourceText("error.provider.signInExpired", { provider: providerLabel(client.provider) });
+    if (getString(params, "message") !== expired) return;
+    const accountId = [...this.#confined.values()].find((confined) => confined.client === client)?.accountId;
+    const account = accountId ? this.#providerAccounts?.account(client.provider, accountId) : null;
+    if (account) this.#providerAccounts?.foundSignedOut(account);
   }
 
   /**
