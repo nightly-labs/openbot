@@ -9,6 +9,7 @@ import { waitForPresentedFrame } from "./browser-smoke-frames";
 
 const FRAME_HOSTS = ["login.openbot.test", "login.other-site.test"];
 const FRAME_PASSWORD = "fixture-frame-password-201938";
+const HIDDEN_PASSWORD = "fixture-hidden-password-480317";
 
 async function runFrameScenario(browser: BrowserHost): Promise<void> {
   const report: {
@@ -132,6 +133,15 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
         headers: { "Content-Type": "text/html" },
       });
     }
+    if (url.pathname === "/hidden-password")
+      return new Response(
+        `<!doctype html><body><form onsubmit="event.preventDefault(); location.href = [...document.querySelector('#real-password').value].reverse().join('') === '${[...HIDDEN_PASSWORD].reverse().join("")}' ? '/complete' : '/wrong'">
+        <label>User<input id="user" type="text" value="someone"></label>
+        <label>Password<input id="masked-visible" class="mask" type="text" oninput="document.querySelector('#real-password').value = this.value"></label>
+        <input id="real-password" name="password" type="password" style="display:none">
+        <button id="hidden-submit">Sign in</button></form></body>`,
+        { headers: { "Content-Type": "text/html" } },
+      );
     if (url.pathname === "/modal") {
       modalPageLoads += 1;
       return new Response(
@@ -267,6 +277,60 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
         const snapshot = await runCauseEffect(browser.snapshot(tab.id));
         if (JSON.stringify(snapshot).includes(secret)) throw new Error("Authentication value reached a snapshot.");
         if (!snapshot.url.endsWith("/complete")) throw new Error("Authentication fixture did not complete.");
+      } finally {
+        await runCauseEffect(browser.close(tab.id));
+      }
+    }
+    for (const { selector, submission, vault } of [
+      { selector: "#real-password", submission: "enter", vault: true },
+      { selector: "#real-password", submission: "click", vault: true },
+      { selector: "#masked-visible", submission: "click", vault: true },
+      { selector: "#masked-visible", submission: "click", vault: false },
+    ] as const) {
+      const tab = await runCauseEffect(
+        browser.open("https://authentication.openbot.test/hidden-password", "secret-thread", "secret-agent"),
+      );
+      try {
+        const contents = webContents.getAllWebContents().find((candidate) => candidate.getURL() === tab.url);
+        if (!contents) throw new Error("Missing hidden password fixture.");
+        await waitForPresentedFrame(contents);
+        const label = `${selector} with submission=${submission} and vault=${vault}`;
+        const prepared = await runCauseEffect(
+          browser.prepareSecret({
+            namespace: "openbot_browser",
+            tool: "submit_secret",
+            threadId: "secret-thread",
+            ownerAgentId: "secret-agent",
+            turnId: "secret-turn",
+            callId: `secret-hidden-${selector}-${submission}-${vault}`,
+            arguments: {
+              tabId: tab.id,
+              method: "password",
+              targets: [{ kind: "css", selector }],
+              submission,
+              ...(submission === "click" ? { submitTarget: { kind: "css", selector: "#hidden-submit" } } : {}),
+            },
+          }),
+        ).then(
+          (handoff) => ({ handoff, error: null }),
+          (error: unknown) => ({ handoff: null, error: error instanceof Error ? error.message : String(error) }),
+        );
+        if (submission === "enter") {
+          prepared.handoff?.cancel();
+          if (!prepared.error?.includes("password field is hidden"))
+            throw new Error("Enter submission was accepted for a hidden password field.");
+          continue;
+        }
+        if (!prepared.handoff) throw new Error(`The hidden password form was refused for ${label}: ${prepared.error}`);
+        if (!prepared.handoff.vaultFillable)
+          throw new Error(`The hidden password form was not vault-fillable for ${label}.`);
+        if ((await runCauseEffect(prepared.handoff.submit(HIDDEN_PASSWORD, vault))) !== "submitted")
+          throw new Error(`The password was not entered for ${label}.`);
+        const snapshot = await runCauseEffect(browser.snapshot(tab.id));
+        if (JSON.stringify(snapshot).includes(HIDDEN_PASSWORD))
+          throw new Error(`A hidden password value reached a snapshot for ${label}.`);
+        if (!snapshot.url.endsWith("/complete"))
+          throw new Error(`The hidden password form did not get the password for ${label}.`);
       } finally {
         await runCauseEffect(browser.close(tab.id));
       }

@@ -6,7 +6,7 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Cause, Effect, Schema } from "effect";
-import { type AgentProvider, RequestTimeoutError } from "../agent-client";
+import { type AgentProvider, MissingPiSessionError, RequestTimeoutError } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import { mergeConversationSnapshots } from "../conversation-snapshots";
 import { causeHelpers, reportOriginalFailure } from "../effect-boundary";
@@ -451,7 +451,7 @@ export class BootRecovery {
                 logger.warn("A provider history read timed out.", { provider: session.provider, agentId: agent.id });
                 return;
               }
-              if (!containsCause(failure, (cause) => isCodexMissingRollout(cause) || isCodexRolloutPending(cause)))
+              if (!containsCause(failure, (cause) => missingHistory(cause) || isCodexRolloutPending(cause)))
                 this.#hooks.emitError("provider_history_backfill_pending", failure.cause, agent.id);
             }),
           ),
@@ -523,7 +523,11 @@ class BootRecoveryFailed extends Schema.TaggedError<BootRecoveryFailed>()("BootR
 const { sync: recoveryStep, rewrap: toBootRecoveryFailed } = causeHelpers(BootRecoveryFailed);
 
 function unreadableHistory(failure: unknown): boolean {
-  return containsCause(failure, (cause) => cause instanceof LineTooLongError || isCodexMissingRollout(cause));
+  return containsCause(failure, (cause) => cause instanceof LineTooLongError || missingHistory(cause));
+}
+
+function missingHistory(cause: unknown): boolean {
+  return isCodexMissingRollout(cause) || cause instanceof MissingPiSessionError;
 }
 
 function containsCause(value: unknown, matches: (cause: unknown) => boolean): boolean {

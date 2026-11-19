@@ -1381,6 +1381,8 @@ export function createRemoteTeamPeer(
   }
 
   function createPeerConnection(state: PeerState, iceServers: RTCIceServer[], actions: ActionsRef): RTCPeerConnection {
+    if (typeof RTCPeerConnection !== "function")
+      throw referenced(sourceText("error.remote.webrtcBlocked"), "webrtc/unavailable");
     const connection = new RTCPeerConnection({ iceServers, bundlePolicy: "max-bundle" });
     state.connection = connection;
     state.iceRestarts = 0;

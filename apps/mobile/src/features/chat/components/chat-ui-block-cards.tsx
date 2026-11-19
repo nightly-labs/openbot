@@ -25,6 +25,7 @@ import X from "lucide-react-native/icons/x";
 import { type ReactNode, useEffect, useState } from "react";
 import { AccessibilityInfo, View } from "react-native";
 import { useCSSVariable } from "uniwind";
+import { useChatCardSurface } from "@/features/chat/components/chat-bubble-fill";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { storeCodePreview } from "@/features/chat/model/code-preview-store";
@@ -287,6 +288,7 @@ export function ChatConfirmPrompt({
   canEditPreview?: boolean;
 }) {
   const { t } = useText();
+  const card = useChatCardSurface();
   const muted = useThemeColor("muted");
   const { disabled, submit } = controller;
   const autoAnswer = uiBlock?.state.autoAnswer?.done ? undefined : uiBlock?.state.autoAnswer;
@@ -323,8 +325,8 @@ export function ChatConfirmPrompt({
   return (
     <View className="w-full gap-2.5" accessibilityLabel={t("mobile.chat.question.form")}>
       <View
-        className="max-w-[92%] flex-row items-start gap-2 self-start rounded-[20px] bg-control/60 px-4 py-3"
-        style={{ borderCurve: "circular" }}
+        className={`max-w-[92%] flex-row items-start gap-2 self-start rounded-[20px] ${card.fillClass} px-4 py-3`}
+        style={card.style}
       >
         <View className="min-w-0 flex-1 pt-1">
           <ConfirmBody
@@ -451,6 +453,7 @@ export function ChatChoicePrompt({
   canSend: boolean;
 }) {
   const { t } = useText();
+  const card = useChatCardSurface();
   const [muted, accent] = useThemeColor(["muted", "accent"]);
   const { disabled, submit } = controller;
   const [picked, setPicked] = useState<string[]>(() =>
@@ -466,8 +469,8 @@ export function ChatChoicePrompt({
 
   return (
     <View
-      className="w-full max-w-[92%] self-start gap-1 rounded-[20px] bg-control/60 px-4 py-3"
-      style={{ borderCurve: "circular" }}
+      className={`w-full max-w-[92%] self-start gap-1 rounded-[20px] ${card.fillClass} px-4 py-3`}
+      style={card.style}
       accessibilityLabel={t("mobile.chat.question.form")}
     >
       <View className="flex-row items-center gap-2">

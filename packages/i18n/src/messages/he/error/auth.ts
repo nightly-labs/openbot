@@ -3,6 +3,7 @@ import type { messages as source } from "../../en/error/auth";
 
 export const messages = {
   "error.auth.serviceUnavailable": "OpenBot לא הצליח להגיע לשירות החשבון. יש לוודא שה-API פועל ולנסות שוב.",
+  "error.auth.sessionTimeout": "OpenBot לא ענה בזמן. בדקו את החיבור לאינטרנט, ואז נסו שוב.",
   "error.auth.networkBlocked":
     "חומת אש או שרת proxy ברשת הזו חסמו את הגישה של OpenBot אל {host}. יש לבקש ממנהל הרשת לאפשר את {host} ולנסות שוב.",
   "error.auth.signInFirst": "יש להתחבר תחילה ל-OpenBot.",

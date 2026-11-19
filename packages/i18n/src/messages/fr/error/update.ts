@@ -10,6 +10,8 @@ export const messages = {
   "error.update.installFailed": "Impossible d’installer la mise à jour. Quittez puis rouvrez OpenBot, et réessayez.",
   "error.update.notInstalled": "Le dernier redémarrage n’a pas installé la mise à jour. Redémarrez pour réessayer.",
   "error.update.downloadFailed": "Impossible de télécharger la mise à jour. Réessayez.",
+  "error.update.signatureNotConfirmed":
+    "OpenBot n'a pas pu vérifier la mise à jour. Réessayez. Si l'erreur persiste, téléchargez OpenBot sur openbot.run/download.",
   "error.update.checkFailed": "Impossible de rechercher des mises à jour. Réessayez.",
   "error.update.checkStalled": "La recherche de mise à jour ne répond plus. Réessayez.",
   "error.update.checkOffline":

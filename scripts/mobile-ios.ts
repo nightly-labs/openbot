@@ -1,8 +1,8 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { homedir } from "node:os";
-import { delimiter, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const mobileRoot = fileURLToPath(new URL("../apps/mobile", import.meta.url));
@@ -45,6 +45,20 @@ if (useRocketSim) {
 
 process.env.OPENBOT_XCODE_DERIVED_DATA ??= join(mobileRoot, "ios/DerivedData");
 process.env.PATH = [fileURLToPath(new URL("mobile-ios-bin", import.meta.url)), process.env.PATH].join(delimiter);
+
+process.env.OPENBOT_KEEP_METRO_CACHE = "1";
+
+const { mobileBuildCacheRoot }: { mobileBuildCacheRoot: (projectRoot: string) => string | undefined } = require(
+  join(mobileRoot, "metro-cache.js"),
+);
+const buildCacheRoot = mobileBuildCacheRoot(mobileRoot);
+if (buildCacheRoot) {
+  const checkout = dirname(dirname(mobileRoot));
+  process.env.OPENBOT_XCODE_COMPILATION_CACHE = join(buildCacheRoot, "xcode");
+  process.env.OPENBOT_XCODE_PREFIX_MAPPINGS = [...new Set([checkout, realpathSync(checkout)])]
+    .map((path) => `"${path}=/^openbot"`)
+    .join(" ");
+}
 
 const podsOutput = join(mobileRoot, "ios/build/generated/autolinking/autolinking.json");
 const podfileLock = join(mobileRoot, "ios/Podfile.lock");
