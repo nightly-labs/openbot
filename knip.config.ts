@@ -21,6 +21,7 @@ const config: KnipConfig = {
     "ssh-keyscan",
     "ssh-add",
     "cmake",
+    "ccache",
     "otool",
     "install_name_tool",
     "ldd",

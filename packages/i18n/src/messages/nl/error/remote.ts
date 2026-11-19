@@ -24,6 +24,8 @@ export const messages = {
     "De host heeft OpenBot niet toegestaan het scherm op te nemen. Geef toestemming voor schermopname op de host en probeer het opnieuw.",
   "error.remote.windowsSessionDisconnected":
     "De Windows-sessie op de host is verbroken, dus er is geen scherm om te delen. Meld je aan bij Windows op het scherm van de host en probeer het opnieuw.",
+  "error.remote.macScreenLocked":
+    "De Mac is vergrendeld en kan zijn scherm dus niet delen. Ontgrendel de Mac op zijn scherm en probeer het opnieuw.",
   "error.remote.streamTooSlowLowerQuality":
     "De verbinding met de host is te traag voor het beeld. Probeer het opnieuw: de volgende verbinding gebruikt een lagere kwaliteit.",
   "error.remote.streamTooSlow":
@@ -193,6 +195,8 @@ export const messages = {
   "error.remote.iceFailed":
     "Er kon geen directe verbinding met de host worden gemaakt. Een firewall, VPN of proxy kan deze blokkeren.",
   "error.remote.iceDisconnected": "De directe verbinding met de host is verbroken.",
+  "error.remote.webrtcBlocked":
+    "Dit apparaat blokkeert de verbinding die OpenBot nodig heeft. Als de isolatiemodus aan staat, zet die dan uit voor OpenBot via Instellingen > Privacy en beveiliging > Isolatiemodus.",
   "error.remote.directoryUnreachable": "OpenBot kan de OpenBot-service niet bereiken. Controleer je verbinding.",
   "error.remote.directoryTimeout": "De OpenBot-service reageerde niet op tijd. Probeer het opnieuw.",
   "error.remote.inviteAlreadyUsed": "Deze uitnodiging is al gebruikt. Vraag om een nieuwe uitnodiging.",

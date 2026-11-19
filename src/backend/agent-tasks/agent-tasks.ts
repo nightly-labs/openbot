@@ -30,11 +30,13 @@ import {
   copyBranchMessages,
   type ThreadListPosition,
 } from "../agent-threads/agent-thread-store";
-import type { MailboxStore } from "../mailbox-store";
+import type { MailboxStore, TaskWork } from "../mailbox-store";
 import type { DynamicToolCallParams } from "../protocol";
 import { storedSync } from "../stored-state-effects";
 
 const logger = createOpenBotLogger("agent-tasks");
+
+const PROGRESS_PUBLISH_MS = 150;
 
 const AGENT_STARTED_UNFINISHED_TASKS = 8;
 
@@ -93,6 +95,7 @@ export class AgentTasks implements TaskLanes {
   readonly #hooks: AgentTasksHooks;
   readonly #progress = new Map<string, string>();
   readonly #stoppedTurns = new Map<string, string>();
+  readonly #progressPublish = new Map<string, NodeJS.Timeout>();
   readonly #turnEndWaiters = new Map<string, Set<Deferred.Deferred<void>>>();
   readonly #branches = Semaphore.makeUnsafe(1);
   readonly #starts = Semaphore.makeUnsafe(1);
@@ -131,10 +134,12 @@ export class AgentTasks implements TaskLanes {
   }
 
   snapshot(agentId: string): AgentTasksSnapshot {
+    const tasks = this.#store.list(agentId);
+    const work = tasks.some((task) => task.closedAt === null) ? this.#mailbox.taskWork(agentId) : new Map();
     const awaited = this.#mailbox.awaitedThreadRequests();
     return {
       agentId,
-      tasks: this.#store.list(agentId).map((task) => this.#publicTask(task, awaited)),
+      tasks: tasks.map((task) => this.#publicTask(task, work, awaited)),
       limit: this.limit(agentId),
     };
   }
@@ -330,7 +335,7 @@ export class AgentTasks implements TaskLanes {
   }
 
   publicTask(task: AgentThreadRecord): AgentTask {
-    return this.#publicTask(task);
+    return this.#publicTask(task, task.closedAt === null ? this.#mailbox.taskWork(task.agentId) : new Map());
   }
 
   close(task: AgentThreadRecord): void {
@@ -425,6 +430,7 @@ export class AgentTasks implements TaskLanes {
   }
 
   deleteForAgent(agentId: string): void {
+    this.#cancelProgressPublish(agentId);
     for (const taskId of this.#store.taskIdsForAgent(agentId)) {
       this.#progress.delete(taskId);
       this.#stoppedTurns.delete(taskId);
@@ -504,7 +510,35 @@ export class AgentTasks implements TaskLanes {
   });
 
   changed(agentId: string): void {
+    this.#cancelProgressPublish(agentId);
     this.#hooks.emit({ type: "agent-tasks-changed", snapshot: this.snapshot(agentId) });
+  }
+
+  #progressChanged(agentId: string): void {
+    if (this.#progressPublish.has(agentId)) return;
+    this.#progressPublish.set(
+      agentId,
+      setTimeout(() => {
+        this.#progressPublish.delete(agentId);
+        try {
+          this.changed(agentId);
+        } catch (error) {
+          logger.warn("Could not send the task list with its progress.", { agentId, error });
+        }
+      }, PROGRESS_PUBLISH_MS),
+    );
+  }
+
+  #cancelProgressPublish(agentId: string): void {
+    const timer = this.#progressPublish.get(agentId);
+    if (!timer) return;
+    clearTimeout(timer);
+    this.#progressPublish.delete(agentId);
+  }
+
+  dispose(): void {
+    for (const timer of this.#progressPublish.values()) clearTimeout(timer);
+    this.#progressPublish.clear();
   }
 
   event(event: AgentEvent): boolean {
@@ -525,7 +559,7 @@ export class AgentTasks implements TaskLanes {
         const task = this.#taskOf(event.threadId);
         if (!task) return false;
         this.#progress.set(task.taskId, event.detail.slice(0, INPUT_LIMITS.agentTaskProgress));
-        this.changed(task.agentId);
+        this.#progressChanged(task.agentId);
         return true;
       }
       case "turn-started": {
@@ -579,18 +613,20 @@ export class AgentTasks implements TaskLanes {
     return this.#store.taskForThread(threadId);
   }
 
-  #publicTask(task: AgentThreadRecord, awaited = this.#mailbox.awaitedThreadRequests()): AgentTask {
+  #publicTask(
+    task: AgentThreadRecord,
+    work: ReadonlyMap<string, TaskWork>,
+    awaited = this.#mailbox.awaitedThreadRequests(),
+  ): AgentTask {
     const snapshot = this.#conversation.loadedExecutionSnapshot(task.threadId);
+    const taskWork = task.closedAt === null ? work.get(task.taskId) : undefined;
     const activeTurnId = task.closedAt === null ? (snapshot?.activeTurnId ?? null) : null;
-    const queuedMessages =
-      task.closedAt === null
-        ? this.#mailbox.queuedTaskMessages(task.agentId, task.taskId).map((message) => ({
-            deliveryId: message.deliveryId,
-            text: expandAttachmentReferences(message.text).slice(0, AGENT_TASK_QUEUED_PREVIEW),
-            createdAt: message.createdAt,
-          }))
-        : [];
-    const running = activeTurnId !== null || this.#mailbox.laneActive(task.agentId, task.taskId);
+    const queuedMessages = (taskWork?.queuedMessages ?? []).map((message) => ({
+      deliveryId: message.deliveryId,
+      text: expandAttachmentReferences(message.text).slice(0, AGENT_TASK_QUEUED_PREVIEW),
+      createdAt: message.createdAt,
+    }));
+    const running = activeTurnId !== null || taskWork?.active === true;
     const state =
       task.closedAt !== null ? "closed" : running ? "running" : queuedMessages.length > 0 ? "queued" : "idle";
     const hold = state === "queued" ? publicHold(this.#hooks.hold(task.agentId, task.taskId)) : null;
@@ -607,7 +643,7 @@ export class AgentTasks implements TaskLanes {
       progress: activeTurnId ? (this.#progress.get(task.taskId) ?? null) : null,
       error: task.outcome === "failed" ? task.error : null,
       queuedMessages,
-      queue: task.closedAt === null ? this.#mailbox.taskQueue(task.agentId, task.taskId) : [],
+      queue: taskWork?.queue ?? [],
       awaitedReplies: awaited.flatMap(({ taskId, messageId, recipientAgentId, status }) =>
         taskId === task.taskId && task.closedAt === null ? [{ messageId, recipientAgentId, status }] : [],
       ),
